@@ -142,6 +142,20 @@ def test_create_get_set_roundtrip(app: Flask) -> None:
     assert entry["created_by"] == "mcp" and entry["elements"] == 1
 
 
+def test_delete_page(app: Flask) -> None:
+    _enable(app)
+    client = app.test_client()
+    pid = _create_page(client)
+    resp = client.delete(f"/api/mcp/pages/{pid}")
+    assert resp.status_code == 200 and resp.get_json()["ok"] is True
+    pages = client.get("/api/mcp/pages").get_json()["pages"]
+    assert not any(p["id"] == pid for p in pages)
+    # Gone now -> 404; a grid page is never deletable via this route.
+    assert client.delete(f"/api/mcp/pages/{pid}").status_code == 404
+    app.config["PAGE_STORE"].save(Page(id="grid9", name="Grid", layout_kind="grid"))
+    assert client.delete("/api/mcp/pages/grid9").status_code == 404
+
+
 def test_set_canvas_compact_and_return_doc(app: Flask) -> None:
     _enable(app)
     client = app.test_client()

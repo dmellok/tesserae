@@ -245,9 +245,14 @@ def widget_data(key: str) -> Response:
     raw_options = body.get("options")
     options: dict[str, Any] = raw_options if isinstance(raw_options, dict) else {}
     opts = _resolved_options(key, options)
+    # ``?fresh=true`` bypasses caches (ctx["fresh"]) so a just-edited server.py is
+    # reflected immediately instead of a stale cached payload.
+    fresh = request.args.get("fresh") in ("1", "true", "True")
     live: Any = None
     try:
-        live = _fetch_plugin_data(key, opts, 600, 400, preview=False, cell_w=600, cell_h=400)
+        live = _fetch_plugin_data(
+            key, opts, 600, 400, preview=False, cell_w=600, cell_h=400, fresh=fresh
+        )
     except Exception as err:
         live = {"error": f"{type(err).__name__}: {err}"}
 
@@ -296,10 +301,10 @@ def _reload_registry(mode: str, *, restart_if_blueprint: bool) -> dict[str, Any]
         if updater is None:
             raise RuntimeError("restart unavailable (no updater configured)")
         updater.restart(delay_s=1.0)
-        return {"reload": "restart", "restarting": True}
+        return {"reload": "restart", "restarting": True, "reloaded": False}
 
     if mode == "none":
-        return {"reload": "none", "restarting": False}
+        return {"reload": "none", "restarting": False, "reloaded": False}
     if mode == "restart" or (mode == "auto" and restart_if_blueprint):
         return _restart()
 
@@ -320,7 +325,11 @@ def _reload_registry(mode: str, *, restart_if_blueprint: bool) -> dict[str, Any]
     app.config["PLUGIN_REGISTRY"] = new_registry
     for perr in new_registry.errors:
         logger.warning("plugin reload: %s, %s", perr.plugin_id, perr.message)
-    return {"reload": "in_process", "restarting": False}
+    # ``reloaded`` + the re-imported server-module count let the caller tell a real
+    # in-process reload (server.py re-imported) from a no-op it would otherwise
+    # guess needed a restart.
+    modules = sum(1 for p in new_registry.plugins.values() if p.server_module is not None)
+    return {"reload": "in_process", "restarting": False, "reloaded": True, "modules": modules}
 
 
 @bp.post("/widgets/install")
@@ -372,6 +381,7 @@ def install_widget() -> Response:
             "version": result["version"],
             "installed": True,
             "reload": rel["reload"],
+            "reloaded": rel.get("reloaded", False),
             "active": active,
             "restarting": rel["restarting"],
         }
@@ -399,6 +409,7 @@ def uninstall_widget(key: str) -> Response:
             "ok": True,
             "id": key,
             "reload": rel["reload"],
+            "reloaded": rel.get("reloaded", False),
             "active": False,
             "restarting": rel["restarting"],
         }
@@ -421,7 +432,15 @@ def reload_plugins() -> Response:
         )
     except Exception as err:
         return _err(500, f"reload failed: {err}")
-    return jsonify({"ok": True, "mode": rel["reload"], "restarting": rel["restarting"]})
+    return jsonify(
+        {
+            "ok": True,
+            "mode": rel["reload"],
+            "reloaded": rel.get("reloaded", False),
+            "modules": rel.get("modules", 0),
+            "restarting": rel["restarting"],
+        }
+    )
 
 
 @bp.get("/widgets")
@@ -440,20 +459,27 @@ def widget_render(key: str) -> Response:
     """Faithful e-ink render of a single widget as a PNG, over the authed MCP
     surface (so a client can preview against a remote / HA instance where
     ``/_test/render`` is not reachable). Query: ``size`` (xs|sm|md|lg, default lg),
-    ``opts`` (JSON cell options), optional ``theme`` / ``style`` / ``sample`` / ``zoom``."""
+    ``opts`` (JSON cell options), optional ``theme`` / ``style`` / ``sample`` / ``zoom``,
+    ``fragment`` (render one declared fragment, default the whole widget), and
+    ``fresh=true`` (bypass caches so a just-edited server.py is reflected now)."""
     from urllib.parse import urlencode
 
     from app.composer import SIZE_DIMENSIONS
+    from app.panels_schema import fragments_of
     from app.renderer import RenderRequest, render_to_png, to_loopback_url
 
-    if _pr._registry().get(key) is None:
+    plugin = _pr._registry().get(key)
+    if plugin is None:
         return _err(404, f"unknown widget {key!r}")
     size = request.args.get("size", "lg")
     if size not in SIZE_DIMENSIONS:
         return _err(400, f"size must be one of {'|'.join(sorted(SIZE_DIMENSIONS))}")
     w, h = SIZE_DIMENSIONS[size]
+    fragment = request.args.get("fragment")
+    if fragment and fragment != "full" and fragment not in {f["id"] for f in fragments_of(plugin)}:
+        return _err(400, f"widget {key!r} has no fragment {fragment!r}")
     params: dict[str, str] = {"plugin": key, "size": size}
-    for arg in ("opts", "theme", "style", "sample", "zoom"):
+    for arg in ("opts", "theme", "style", "sample", "zoom", "fragment", "fresh"):
         val = request.args.get(arg)
         if val:
             params[arg] = val
@@ -566,6 +592,16 @@ def create_page() -> Response:
             page.canvas.h = h
     _save_mcp(page)
     return jsonify({"id": page.id, "name": page.name})
+
+
+@bp.delete("/pages/<page_id>")
+def delete_page(page_id: str) -> Response:
+    """Delete a canvas dashboard (e.g. a throwaway QA page). Only removes canvas
+    pages, same guardrail as the other page writes; 404 if it isn't one."""
+    if _pr._get_canvas(page_id) is None:
+        return _err(404, f"no canvas dashboard {page_id!r}")
+    _pr._pages().delete(page_id)
+    return jsonify({"ok": True, "id": page_id})
 
 
 @bp.get("/pages/<page_id>/canvas")

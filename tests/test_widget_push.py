@@ -99,6 +99,7 @@ def test_install_reloads_in_process_and_goes_live(app: Flask) -> None:
     body = resp.get_json()
     assert body["ok"] and body["id"] == "air_quality"
     assert body["reload"] == "in_process" and body["restarting"] is False
+    assert body["reloaded"] is True  # server modules were actually re-imported
     assert body["active"] is True
 
     # On the persistent volume, and live in the registry / catalog.
@@ -256,6 +257,41 @@ def test_render_png(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
     # Unknown widget + bad size.
     assert client.get("/api/mcp/widgets/nope/render.png").status_code == 404
     assert client.get("/api/mcp/widgets/clock_analog/render.png?size=huge").status_code == 400
+
+
+def test_render_png_fragment(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    """render.png?fragment=<id> renders one fragment; an unknown fragment 400s and
+    a valid one forwards ``fragment`` to the render URL."""
+    _enable(app)
+    captured: dict[str, str] = {}
+
+    def _capture(req: Any, pool: Any = None) -> bytes:
+        captured["url"] = req.url
+        return _FAKE_PNG
+
+    monkeypatch.setattr("app.renderer.render_to_png", _capture)
+    client = app.test_client()
+    # weather_now declares a "temp" fragment.
+    ok = client.get("/api/mcp/widgets/weather_now/render.png?size=md&fragment=temp")
+    assert ok.status_code == 200 and "fragment=temp" in captured["url"]
+    # Unknown fragment is rejected before rendering.
+    assert client.get("/api/mcp/widgets/weather_now/render.png?fragment=nope").status_code == 400
+
+
+def test_fresh_threads_ctx_flag(app: Flask) -> None:
+    """?fresh=true reaches the widget as ctx["fresh"], so a cache-aware widget can
+    bypass its own cache and a server edit is instantly verifiable."""
+    _enable(app)
+    client = app.test_client()
+    files = _widget_files()
+    files["server.py"] = (
+        "def fetch(options, settings, *, ctx):\n    return {'fresh': bool(ctx.get('fresh'))}\n"
+    )
+    _install(client, _make_tar(files, top="fresh_probe"))
+    default = client.post("/api/mcp/widgets/fresh_probe/data", json={}).get_json()
+    assert default["data_source"] == "live" and default["data"]["fresh"] is False
+    fresh = client.post("/api/mcp/widgets/fresh_probe/data?fresh=true", json={}).get_json()
+    assert fresh["data"]["fresh"] is True
 
 
 def test_render_png_screenshots_widget_not_login_with_password(
