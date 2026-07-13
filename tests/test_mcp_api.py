@@ -271,6 +271,112 @@ def test_preview_returns_png(app: Flask, monkeypatch: pytest.MonkeyPatch) -> Non
     assert resp.get_data() == _FAKE_PNG
 
 
+# -- faithful render / Screenshot Contract (widgets/<id>/render.png) ------
+
+
+def _png_of_size(w: int, h: int) -> bytes:
+    """A real PNG at exactly ``w x h`` so the render mock exercises the
+    endpoint's dimensioning end to end (the browser viewport drives the size)."""
+    from io import BytesIO
+
+    from PIL import Image
+
+    buf = BytesIO()
+    Image.new("RGB", (w, h), "white").save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def _viewport_render(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "app.renderer.render_to_png",
+        lambda req, pool=None: _png_of_size(req.viewport_w, req.viewport_h),
+    )
+
+
+def test_render_png_lg_is_1200x800(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    from io import BytesIO
+
+    from PIL import Image
+
+    _enable(app)
+    _viewport_render(monkeypatch)
+    resp = app.test_client().get("/api/mcp/widgets/clock_analog/render.png?size=lg")
+    assert resp.status_code == 200 and resp.mimetype == "image/png"
+    assert Image.open(BytesIO(resp.get_data())).size == (1200, 800)
+
+
+def test_render_png_explicit_wh_overrides_size(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    from io import BytesIO
+
+    from PIL import Image
+
+    _enable(app)
+    _viewport_render(monkeypatch)
+    resp = app.test_client().get("/api/mcp/widgets/clock_analog/render.png?w=300&h=200")
+    assert resp.status_code == 200
+    assert Image.open(BytesIO(resp.get_data())).size == (300, 200)
+
+
+def test_render_png_wh_clamped(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    from io import BytesIO
+
+    from PIL import Image
+
+    _enable(app)
+    _viewport_render(monkeypatch)
+    resp = app.test_client().get("/api/mcp/widgets/clock_analog/render.png?w=999999&h=1")
+    assert resp.status_code == 200
+    # 4096 max / 16 min bounds (see composer.clamp_screenshot_dim).
+    assert Image.open(BytesIO(resp.get_data())).size == (4096, 16)
+
+
+def test_render_png_bad_wh_400(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    _enable(app)
+    _viewport_render(monkeypatch)
+    resp = app.test_client().get("/api/mcp/widgets/clock_analog/render.png?w=abc&h=200")
+    assert resp.status_code == 400 and "error" in resp.get_json()
+
+
+def test_render_png_unknown_widget_404(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    _enable(app)
+    monkeypatch.setattr("app.renderer.render_to_png", lambda req, pool=None: _FAKE_PNG)
+    resp = app.test_client().get("/api/mcp/widgets/does_not_exist/render.png")
+    assert resp.status_code == 404 and "error" in resp.get_json()
+
+
+def test_render_png_render_unavailable_503(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    _enable(app)
+
+    def _boom(req: Any, pool: Any = None) -> bytes:
+        raise RuntimeError("no browser")
+
+    monkeypatch.setattr("app.renderer.render_to_png", _boom)
+    resp = app.test_client().get("/api/mcp/widgets/clock_analog/render.png?size=lg")
+    assert resp.status_code == 503 and "error" in resp.get_json()
+
+
+def test_render_png_bad_options_400(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    _enable(app)
+    monkeypatch.setattr("app.renderer.render_to_png", lambda req, pool=None: _FAKE_PNG)
+    client = app.test_client()
+    # Both spellings validate; malformed JSON is a 400, not a silent fallthrough.
+    assert client.get("/api/mcp/widgets/clock_analog/render.png?opts=not-json").status_code == 400
+    assert client.get("/api/mcp/widgets/clock_analog/render.png?options=%7Bbad").status_code == 400
+    # Valid JSON that isn't an object is also rejected ([1,2]).
+    assert (
+        client.get("/api/mcp/widgets/clock_analog/render.png?opts=%5B1%2C2%5D").status_code == 400
+    )
+    # A valid object still renders.
+    assert client.get("/api/mcp/widgets/clock_analog/render.png?opts=%7B%7D").status_code == 200
+
+
+def test_render_png_unknown_fragment_400(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    _enable(app)
+    monkeypatch.setattr("app.renderer.render_to_png", lambda req, pool=None: _FAKE_PNG)
+    resp = app.test_client().get("/api/mcp/widgets/weather_now/render.png?fragment=nope")
+    assert resp.status_code == 400 and "error" in resp.get_json()
+
+
 def test_push_requires_device_ids(app: Flask) -> None:
     _enable(app)
     client = app.test_client()

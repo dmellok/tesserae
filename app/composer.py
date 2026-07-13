@@ -41,6 +41,17 @@ SIZE_DIMENSIONS: dict[str, tuple[int, int]] = {
     "lg": (1200, 800),
 }
 
+# Bounds for an explicit ``w,h`` screenshot request (Screenshot Contract). Wide
+# enough for any real panel, tight enough that a typo can't ask the browser for
+# a runaway viewport.
+SCREENSHOT_MIN_DIM = 16
+SCREENSHOT_MAX_DIM = 4096
+
+
+def clamp_screenshot_dim(value: int) -> int:
+    """Clamp an explicit screenshot dimension to ``[MIN, MAX]``."""
+    return max(SCREENSHOT_MIN_DIM, min(SCREENSHOT_MAX_DIM, value))
+
 
 def _registry() -> PluginRegistry:
     registry: PluginRegistry = current_app.config["PLUGIN_REGISTRY"]
@@ -1066,6 +1077,10 @@ def test_render() -> str:
     size = request.args.get("size", "md")
     if size not in SIZE_DIMENSIONS:
         abort(400)
+    # Explicit ``w,h`` (Screenshot Contract) override the size preset for the
+    # cell dimensions; absent, the size mapping stands (default behaviour).
+    dim_w = request.args.get("w")
+    dim_h = request.args.get("h")
 
     sample_mode = request.args.get("sample") == "1"
     # ?theme=<id> picks one of the Spectra theme blocks
@@ -1116,7 +1131,14 @@ def test_render() -> str:
         except (json.JSONDecodeError, ValueError):
             cell_options = {}
 
-    cell_w, cell_h = SIZE_DIMENSIONS[size]
+    if dim_w is not None or dim_h is not None:
+        try:
+            cell_w = clamp_screenshot_dim(int(dim_w))  # type: ignore[arg-type]
+            cell_h = clamp_screenshot_dim(int(dim_h))  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            abort(400)
+    else:
+        cell_w, cell_h = SIZE_DIMENSIONS[size]
     page = {
         "id": "_test",
         "name": f"Test: {plugin_id} @ {size}",

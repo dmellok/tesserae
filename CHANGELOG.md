@@ -8,6 +8,16 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **MCP faithful-render screenshots for the catalog (Screenshot Contract).** The
+  `GET /api/mcp/widgets/<id>/render.png` faithful render now accepts explicit `w`&`h`
+  (clamped) as an alternative to `size` (`lg` stays 1200x800), reuses the same
+  Playwright render path, and tightens its error semantics to the contract: unknown
+  widget 404, unknown fragment or invalid `options`/`opts` JSON 400, render unavailable
+  503 (was 502), never a 200 with a blank / HTML body. A small `python -m app.screenshots
+  <id> --out <dir> --lg --extra <presets.json>` CLI drives that same endpoint to write a
+  widget's whole catalog set (`lg.png` plus `extra-1..N.png` from a `{name, options}`
+  preset list). All additive; no `w`/`h` = today's behaviour.
+
 - **CircuitPython clients can request an uncompressed BMP frame.** New
   `circuitpython_bmp` renderer emits the composition quantised to the panel's palette
   as an uncompressed indexed BMP, alongside the existing `circuitpython_png`. A client
