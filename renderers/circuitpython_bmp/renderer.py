@@ -28,11 +28,11 @@ Output palette selected from the bound panel's gamut, identical to
 
 Unknown or custom gamuts fall back to Spectra 6 nominal.
 
-Note on wire size: Pillow writes palette-mode BMP at 8 bits per pixel,
-so the 2-bit gamuts go out a few times larger than the equivalent PNG.
-The client's constraint here is the decode buffer, not download size,
-so that trade is deliberate; a sub-byte BMP writer is a follow-up if
-bandwidth ever matters.
+Wire size: the frame is packed at the smallest standard BMP bit depth
+that fits its palette (:func:`app.bmp_writer.pack_indexed_bmp`), 1 bpp for
+mono and 4 bpp for the tri-colour / 4-grey / Spectra 6 / 7-colour gamuts,
+so it's 2-8x smaller than a naive 8-bit BMP while still decoding on the
+same ``adafruit_imageload`` path (its unpacker is generic over bit depth).
 
 Same per-device settings as ``circuitpython_png``: a dither-mode select
 and a pre-dither contrast slider.
@@ -40,9 +40,9 @@ and a pre-dither contrast slider.
 
 from __future__ import annotations
 
-import io
 from typing import Any
 
+from app.bmp_writer import pack_indexed_bmp
 from app.quantizer import circuitpython_indexed_image
 from app.state.page_store import Panel
 
@@ -53,10 +53,14 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
 
     Shares the pixel pipeline (fit, contrast, palette-quantise) with
     ``circuitpython_png`` via
-    :func:`app.quantizer.circuitpython_indexed_image`; this renderer
-    saves the result as an uncompressed BMP so the client never runs
-    ``zlib.decompress``. Pillow's BMP writer emits BI_RGB (uncompressed)
-    bottom-up bitmaps, the format ``adafruit_imageload`` reads.
+    :func:`app.quantizer.circuitpython_indexed_image`; this renderer saves
+    the result as an uncompressed BMP so the client never runs
+    ``zlib.decompress``. :func:`app.bmp_writer.pack_indexed_bmp` packs the
+    indexed image at the smallest standard bit depth that fits its palette
+    (1 bpp for mono, 4 bpp for tri-colour / 4-grey / Spectra 6 / 7-colour),
+    so the wire size is 2-8x smaller than Pillow's fixed 8-bit BMP. Output is
+    BI_RGB (uncompressed) bottom-up, the shape ``adafruit_imageload`` reads;
+    the full-colour rgb24/rgb16 passthrough falls back to a 24-bit BMP.
     """
     img = circuitpython_indexed_image(
         png_bytes,
@@ -67,11 +71,7 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
         underscan=panel.underscan,
         settings=settings,
     )
-    buf = io.BytesIO()
-    # Uncompressed BMP: no ``compression`` kwarg means BI_RGB, which is
-    # the only BMP form adafruit_imageload decodes (it rejects RLE).
-    img.save(buf, format="BMP")
-    return buf.getvalue()
+    return pack_indexed_bmp(img)
 
 
 def payload(digest: str, base_url: str, *, settings: dict[str, Any]) -> dict[str, Any]:

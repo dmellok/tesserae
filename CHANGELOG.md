@@ -6,6 +6,16 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Changed
+
+- **CircuitPython BMP frames are 2-8x smaller (sub-byte packing).** The `circuitpython_bmp`
+  renderer now packs the indexed frame at the smallest standard BMP bit depth that fits its
+  palette (a bespoke writer in `app.bmp_writer`): 1 bpp for mono, 4 bpp for tri-colour / 4-grey /
+  Spectra 6 / 7-colour ACeP, versus Pillow's fixed 8-bit. Output stays uncompressed BI_RGB and
+  decodes on the same `adafruit_imageload` path (its unpacker is generic over bit depth); the
+  full-colour rgb24/rgb16 passthrough still emits a 24-bit BMP. The palette compacts to the colours
+  actually present, so a frame that touches few colours packs even smaller.
+
 ### Added
 
 - **Chart.js in code elements; MCP data-source guidance.** Chart.js (vendored, self-hosted) is
