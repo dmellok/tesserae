@@ -69,9 +69,7 @@ def _is_trigger(entry: dict[str, Any]) -> bool:
     if entry.get("state") in ("on", "off"):
         return False
     msg = str(entry.get("message") or "").lower()
-    if msg and "trigger" not in msg:
-        return False
-    return True
+    return not (msg and "trigger" not in msg)
 
 
 def _refresh_s(raw: Any) -> int:
@@ -122,7 +120,7 @@ def _logbook(
     )
     try:
         data = core.request_json(path, timeout=12)
-    except Exception as err:  # noqa: BLE001 — surfaced via coerce_error
+    except Exception as err:
         return [], core.coerce_error(err)
     return ([e for e in data if isinstance(e, dict)] if isinstance(data, list) else []), None
 
@@ -173,7 +171,7 @@ def _build(
 ) -> tuple[dict[str, Any] | None, str | None]:
     try:
         states = core.get_states()
-    except Exception as err:  # noqa: BLE001 — surfaced via coerce_error
+    except Exception as err:
         return None, core.coerce_error(err)
 
     now_dt = datetime.now(UTC)
