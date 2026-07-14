@@ -166,6 +166,16 @@ hooks; the loader catches mistakes at boot rather than mid-push.
 * **Devices** describe a wire-level client: which renderers they
   consume, what their status / config topics look like, and a JSON
   Schema for the per-device config form the admin UI generates.
+* **Services** (`kind: "service"`) are non-placeable data sources: a
+  plugin folder with a server module exporting only `fetch(options,
+  settings, *, ctx)` and no `render`. A service exposes a whole external
+  API (Open-Meteo, Home Assistant, Spotify, a generic REST endpoint) for
+  a canvas `code` / `data` element to pull from, but never shows up in
+  the widget picker. Probed with empty options it returns a
+  self-describing map of the scopes it offers, so the MCP agent can
+  explore the API (`GET /api/mcp/services`) before choosing a scope to
+  source. Because it has no placeable UI, its manifest may leave
+  `supports.sizes` empty.
 
 See [the widget contract](../widgets.md) for the per-plugin schema +
 the full set of UI hooks (icon, theme, data plugins) widgets can use.

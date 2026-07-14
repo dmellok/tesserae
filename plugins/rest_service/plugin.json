@@ -1,0 +1,18 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "REST / JSON (service)",
+  "version": "0.1.0",
+  "kind": "service",
+  "description": "Non-placeable data source that GETs any public JSON HTTP(S) endpoint and hands the parsed response to a code element. The universal fallback when there's no bespoke service plugin for an API. Not shown in the canvas picker; source it by key 'rest_service'. Set options.url (and optional options.headers as a JSON object, e.g. an Authorization header). Loopback and private-network hosts are blocked. Probe with an empty url to see usage.",
+  "icon": "ph-brackets-angle",
+  "supports": { "sizes": [] },
+  "cell_options": [
+    { "name": "url", "type": "string", "label": "URL (https://…, returns JSON)", "default": "" },
+    {
+      "name": "headers",
+      "type": "textarea",
+      "label": "Extra request headers (JSON object, optional)",
+      "default": ""
+    }
+  ]
+}

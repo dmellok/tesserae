@@ -23,7 +23,7 @@ import urllib.error
 import urllib.request
 from typing import Any
 
-__version__ = "0.5.7"
+__version__ = "0.5.8"
 
 _BASE = os.environ.get("TESSERAE_URL", "http://127.0.0.1:8765").rstrip("/")
 _TOKEN = os.environ.get("TESSERAE_MCP_TOKEN", "").strip()
@@ -255,6 +255,19 @@ def build_server() -> Any:
         the available theme/style/font appearance options."""
         return _json("GET", "/catalog")
 
+    def list_services() -> Any:
+        """List SERVICE data sources (kind "service") -- non-placeable plugins that
+        expose a whole external service's API (e.g. Home Assistant, a weather API, a
+        generic REST endpoint) as data for a code element. They don't appear in
+        list_widgets (they can't be placed), but you use one exactly like a widget
+        source: its "key" is a valid "source"/"sources[].key" for a code or data
+        element. Workflow: list_services() -> get_widget_options(key) to see its
+        scope options -> probe_widget_data(key, {}) with EMPTY options first (a
+        service returns a self-describing map of the scopes/endpoints it offers) ->
+        probe_widget_data(key, {scope...}) to see a specific slice -> use it as a
+        source. Returns {services: [{key, name, description, options}]}."""
+        return _json("GET", "/services")
+
     def get_widget_options(widget: str, include_choices: bool = False) -> Any:
         """Get the configurable options for one widget, so you can fill an element's
         "options" correctly (e.g. a weather widget's location). Each option carries a
@@ -446,6 +459,7 @@ def build_server() -> Any:
     mcp = FastMCP("tesserae", instructions=_INSTRUCTIONS)
     for fn in (
         list_widgets,
+        list_services,
         get_widget_options,
         get_widget_choices,
         probe_widget_data,

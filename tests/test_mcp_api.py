@@ -113,6 +113,31 @@ def test_devices_shape(app: Flask) -> None:
     assert "devices" in body and isinstance(body["devices"], list)
 
 
+def test_services_listed_and_excluded_from_catalog(app: Flask) -> None:
+    _enable(app)
+    client = app.test_client()
+    body = client.get("/api/mcp/services").get_json()
+    assert "services" in body and isinstance(body["services"], list)
+    keys = {str(s["key"]) for s in body["services"]}
+    # The bundled reference services are present...
+    assert {"rest_service", "openmeteo_service", "ha_service"} <= keys
+    for svc in body["services"]:
+        assert svc["name"] and "options" in svc
+    # ...and none of them leak into the placeable widget catalog.
+    cat_keys = {str(w["key"]) for w in client.get("/api/mcp/catalog").get_json()["widgets"]}
+    assert not (keys & cat_keys)
+
+
+def test_service_probe_returns_discovery(app: Flask) -> None:
+    # A service probed with empty options returns its self-describing scope map,
+    # the convention the agent relies on to explore the API.
+    _enable(app)
+    body = app.test_client().post("/api/mcp/widgets/openmeteo_service/data", json={"options": {}})
+    assert body.status_code == 200
+    data = body.get_json()["data"]
+    assert data["service"] == "open-meteo" and "scopes" in data
+
+
 # -- canvas CRUD --------------------------------------------------------
 
 
@@ -140,6 +165,37 @@ def test_create_get_set_roundtrip(app: Flask) -> None:
     pages = client.get("/api/mcp/pages").get_json()["pages"]
     entry = next(p for p in pages if p["id"] == pid)
     assert entry["created_by"] == "mcp" and entry["elements"] == 1
+
+
+def test_code_element_sources_a_service(app: Flask) -> None:
+    # End-to-end: a code element names a service (rest_service) as a source, and
+    # the composer resolves it through the same path a widget uses, injecting the
+    # service's payload as ctx.data.<name>. Probed with no url, rest_service
+    # returns its discovery map, so this stays offline.
+    _enable(app)
+    client = app.test_client()
+    pid = _create_page(client)
+    body = {
+        "w": 800,
+        "h": 480,
+        "els": [
+            {
+                "id": "c1",
+                "kind": "code",
+                "x": 0,
+                "y": 0,
+                "w": 400,
+                "h": 300,
+                "sources": [{"key": "rest_service", "name": "api", "options": {}}],
+                "html": "<div id=out></div>",
+                "js": "document.getElementById('out').textContent = ctx.data.api.service",
+            }
+        ],
+    }
+    assert client.put(f"/api/mcp/pages/{pid}/canvas", json=body).status_code == 200
+    html = client.get(f"/compose/{pid}").get_data(as_text=True)
+    # The discovery payload (service: "rest") reached the element's injected data.
+    assert '"service": "rest"' in html or '"service":"rest"' in html
 
 
 def test_delete_page(app: Flask) -> None:

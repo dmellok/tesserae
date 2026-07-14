@@ -1,0 +1,35 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "Open-Meteo (service)",
+  "version": "0.1.0",
+  "kind": "service",
+  "description": "Non-placeable data source that exposes the Open-Meteo API (no key required) for a code element: current conditions, hourly + daily forecast, air quality, and marine. Not shown in the canvas picker; source it from a code/data element by its key 'openmeteo_service'. Probe with empty options to get a map of scopes + the variables each accepts, then request a scope with a variables list. Latitude/longitude fall back to the app's home location when omitted.",
+  "icon": "ph-cloud-sun",
+  "supports": { "sizes": [] },
+  "cell_options": [
+    {
+      "name": "scope",
+      "type": "select",
+      "label": "Scope",
+      "default": "",
+      "choices": [
+        { "value": "", "label": "(discovery: list scopes)" },
+        { "value": "current", "label": "Current conditions" },
+        { "value": "hourly", "label": "Hourly forecast" },
+        { "value": "daily", "label": "Daily forecast" },
+        { "value": "air_quality", "label": "Air quality" },
+        { "value": "marine", "label": "Marine" }
+      ]
+    },
+    { "name": "latitude", "type": "number", "label": "Latitude", "default": 0 },
+    { "name": "longitude", "type": "number", "label": "Longitude", "default": 0 },
+    {
+      "name": "variables",
+      "type": "string",
+      "label": "Variables (comma-separated; empty = a sensible default set for the scope)",
+      "default": ""
+    },
+    { "name": "forecast_days", "type": "number", "label": "Forecast days (hourly/daily)", "default": 3 },
+    { "name": "timezone", "type": "string", "label": "Timezone (IANA, or 'auto')", "default": "auto" }
+  ]
+}

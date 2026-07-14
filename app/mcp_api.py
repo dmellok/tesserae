@@ -110,6 +110,35 @@ def catalog() -> Response:
     return jsonify({"widgets": lean, "appearance": _pr._appearance()})
 
 
+@bp.get("/services")
+def services() -> Response:
+    """Service plugins (kind ``service``): non-placeable data sources that expose a
+    whole external service's API for a code element to pull from. They don't show
+    up in ``/catalog`` (they can't be placed on the canvas), but you use them
+    exactly like a widget source: their ``key`` is a valid ``source`` for a
+    ``code`` / ``data`` element, and ``POST /widgets/<key>/data`` (probe) and
+    ``GET /widgets/<key>/options`` work on them unchanged.
+
+    Returns ``{services: [{key, name, description, options}]}``. A service's
+    ``options`` pick which slice of the API to fetch (a scope / endpoint /
+    entity). Probe with empty options first: by convention a service returns a
+    self-describing map of the scopes it offers, so the agent can explore the API
+    before choosing what to source."""
+    reg = _pr._registry()
+    out = [
+        {
+            "key": p.id,
+            "name": p.manifest.get("name", p.id),
+            "description": p.manifest.get("description", ""),
+            "options": _pr._materialised_options(p),
+        }
+        for p in reg.plugins.values()
+        if getattr(p, "kind", "") == "service"
+    ]
+    out.sort(key=lambda e: str(e["name"]).lower())
+    return jsonify({"services": out})
+
+
 # Format hints injected per option ``type`` so an agent knows the expected shape
 # without reverse-engineering it. Keyed on the ``cell_options`` type string.
 _TYPE_HINTS: dict[str, str] = {

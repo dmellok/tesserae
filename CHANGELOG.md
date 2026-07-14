@@ -8,6 +8,19 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Service plugins: a non-placeable `service` plugin kind that feeds the canvas code element.**
+  A new manifest `kind: "service"` exposes a whole external API as a data source for a `code` / `data`
+  element without appearing in the canvas picker (it has no placeable render). The MCP agent discovers
+  them via `GET /api/mcp/services` (and the `list_services` bridge tool), then sources one by key exactly
+  like a widget: `POST /widgets/<key>/data` (probe) and `GET /widgets/<key>/options` work unchanged. By
+  convention a service probed with empty options returns a self-describing map of the scopes it offers,
+  so the agent can explore the API before choosing what to pull. Four reference services ship: **Open-Meteo**
+  (no key: current / hourly / daily / air quality / marine), **REST / JSON** (any public https endpoint, with
+  a loopback/private-host SSRF guard), **Home Assistant** (reuses the ha_core connection: states / entity /
+  history / services / config / raw), and **Spotify** (marketplace, reuses spotify_core: now-playing / queue /
+  top / raw Web API GET). The plugin schema now allows non-placeable kinds to leave `supports.sizes` empty.
+  Bridge bumped to 0.5.8.
+
 - **Stream a code element in live (MCP `append_code`).** A new `POST /pages/<id>/elements/<eid>/append`
   endpoint (and `append_code` bridge tool) appends text to a code element's `html` / `css` / `js` and
   saves on each call. Since a save is what pushes the SSE update to an open canvas editor, an agent

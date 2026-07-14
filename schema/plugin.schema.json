@@ -20,7 +20,7 @@
       "pattern": "^\\d+\\.\\d+\\.\\d+(?:[-+].*)?$"
     },
     "kind": {
-      "enum": ["widget", "font", "admin", "data"]
+      "enum": ["widget", "font", "admin", "data", "service"]
     },
     "description": {
       "type": "string"
@@ -37,7 +37,6 @@
         "sizes": {
           "type": "array",
           "items": { "enum": ["xs", "sm", "md", "lg"] },
-          "minItems": 1,
           "uniqueItems": true
         },
         "panels": {
@@ -188,5 +187,12 @@
         }
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "description": "Placeable widgets must declare at least one size; non-placeable kinds (service, data, font, admin) may leave supports.sizes empty.",
+      "if": { "properties": { "kind": { "const": "widget" } } },
+      "then": { "properties": { "supports": { "properties": { "sizes": { "minItems": 1 } } } } }
+    }
+  ]
 }
