@@ -8,6 +8,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Stream a code element in live (MCP `append_code`).** A new `POST /pages/<id>/elements/<eid>/append`
+  endpoint (and `append_code` bridge tool) appends text to a code element's `html` / `css` / `js` and
+  saves on each call. Since a save is what pushes the SSE update to an open canvas editor, an agent
+  can stream a code element in chunk by chunk and watch it build up, rather than the whole blob
+  appearing at the end. Returns the field's new length; bridge doc-shape documents the pattern
+  (add the empty code element, then append). Bridge bumped to 0.5.7.
+
 - **Code elements get a rich sandbox toolkit + editor polish.** The `code` element's sandbox now
   has a vendored, self-hosted library toolkit, each **conditionally inlined** (loaded only when the
   code references it, so unused libs cost nothing): Chart.js + chartjs-plugin-datalabels,

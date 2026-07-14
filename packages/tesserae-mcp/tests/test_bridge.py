@@ -32,6 +32,7 @@ def test_tools_register() -> None:
         "set_canvas_background",
         "add_element",
         "update_element",
+        "append_code",
         "delete_element",
         "patch_canvas",
         "arrange",

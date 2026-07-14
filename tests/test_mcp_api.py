@@ -551,6 +551,45 @@ def test_code_element_legacy_single_source_maps(app: Flask) -> None:
     assert "weather_now" in els[0]["data"]
 
 
+def test_append_code_streams_and_saves(app: Flask) -> None:
+    # Streaming a code element in: each append grows the field, bumps the rev
+    # (which is what pushes a live update to an open editor), and persists.
+    _enable(app)
+    client = app.test_client()
+    pid = _create_page(client)
+    created = client.post(
+        f"/api/mcp/pages/{pid}/elements", json={"kind": "code", "x": 0, "y": 0, "w": 100, "h": 100}
+    ).get_json()
+    eid, rev0 = created["element_id"], created["rev"]
+    a = client.post(
+        f"/api/mcp/pages/{pid}/elements/{eid}/append", json={"field": "js", "text": "var a=1;\n"}
+    )
+    assert a.status_code == 200
+    ja = a.get_json()
+    assert ja["length"] == len("var a=1;\n") and ja["rev"] != rev0
+    b = client.post(
+        f"/api/mcp/pages/{pid}/elements/{eid}/append", json={"field": "js", "text": "var b=2;\n"}
+    ).get_json()
+    assert b["length"] == len("var a=1;\nvar b=2;\n")
+    doc = client.get(f"/api/mcp/pages/{pid}/canvas").get_json()
+    assert doc["els"][0]["js"] == "var a=1;\nvar b=2;\n"
+
+
+def test_append_code_validates_inputs(app: Flask) -> None:
+    _enable(app)
+    client = app.test_client()
+    pid = _create_page(client)
+    eid = client.post(
+        f"/api/mcp/pages/{pid}/elements", json={"kind": "code", "x": 0, "y": 0, "w": 10, "h": 10}
+    ).get_json()["element_id"]
+    base = f"/api/mcp/pages/{pid}/elements/{eid}/append"
+    assert client.post(base, json={"field": "nope", "text": "x"}).status_code == 400
+    assert client.post(base, json={"field": "js"}).status_code == 400  # missing text
+    assert client.post(
+        f"/api/mcp/pages/{pid}/elements/missing/append", json={"field": "js", "text": "x"}
+    ).status_code == 404
+
+
 def test_push_requires_device_ids(app: Flask) -> None:
     _enable(app)
     client = app.test_client()

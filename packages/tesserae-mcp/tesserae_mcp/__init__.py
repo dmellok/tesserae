@@ -23,7 +23,7 @@ import urllib.error
 import urllib.request
 from typing import Any
 
-__version__ = "0.5.6"
+__version__ = "0.5.7"
 
 _BASE = os.environ.get("TESSERAE_URL", "http://127.0.0.1:8765").rstrip("/")
 _TOKEN = os.environ.get("TESSERAE_MCP_TOKEN", "").strip()
@@ -136,7 +136,10 @@ FIELD PATHS ("field" on data elements):
 
 EDITING WITHOUT RESENDING EVERYTHING:
   update_element / delete_element / patch_canvas change one thing without re-sending the whole
-  document (cheaper, fewer errors on a big canvas). add_element appends one.
+  document (cheaper, fewer errors on a big canvas). add_element appends one. For a code element,
+  append_code(page_id, element_id, field, text) appends to its html/css/js and saves each time, so
+  an open editor re-renders after each chunk -- stream a code element in line by line for a live
+  build instead of one big post at the end (add the empty code element first, then append).
 
 AVOID CLOBBERING A CONCURRENT EDIT:
   get_canvas() returns a "rev". Pass it as base_rev to a write; if the page changed since (someone
@@ -361,6 +364,19 @@ def build_server() -> Any:
             "PATCH", f"/pages/{page_id}/elements/{element_id}{_rev_suffix(base_rev)}", patch
         )
 
+    def append_code(page_id: str, element_id: str, field: str, text: str) -> Any:
+        """Append "text" to a code element's "field" ("html" | "css" | "js") and save.
+        Each call is a separate save, which pushes a live update to an editor open on
+        the page, so you can STREAM a code element in (chunk by chunk / line by line)
+        and watch it build up, instead of posting the whole blob at once. Typical flow:
+        add_element an empty code element (with its sources), then append_code repeatedly
+        for html, then css, then js. Returns the ack plus the field's new "length".
+        Don't thread base_rev while streaming (the rev changes every append)."""
+        return _json(
+            "POST", f"/pages/{page_id}/elements/{element_id}/append",
+            {"field": field, "text": text},
+        )
+
     def delete_element(page_id: str, element_id: str, base_rev: str = "") -> Any:
         """Remove ONE element from a canvas by id. Returns the compact ack."""
         return _json("DELETE", f"/pages/{page_id}/elements/{element_id}{_rev_suffix(base_rev)}")
@@ -439,6 +455,7 @@ def build_server() -> Any:
         get_canvas,
         set_canvas_background,
         update_element,
+        append_code,
         delete_element,
         patch_canvas,
         arrange,

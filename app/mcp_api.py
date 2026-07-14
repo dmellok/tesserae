@@ -853,6 +853,51 @@ def patch_element(page_id: str, element_id: str) -> Response:
     return _saved(page)
 
 
+@bp.post("/pages/<page_id>/elements/<element_id>/append")
+def append_element_code(page_id: str, element_id: str) -> Response:
+    """Append text to a ``code`` element's ``html`` / ``css`` / ``js`` and save,
+    so an editor open on the page re-renders after each chunk (stream a code
+    element in line by line rather than posting the whole blob at the end).
+
+    Body: ``{field, text}`` where ``field`` is one of ``html`` | ``css`` | ``js``.
+    Each call is one save, which is what pushes the live update to the editor.
+    Returns the compact ack plus the field's new ``length``. Don't pass
+    ``base_rev`` while streaming (the rev changes on every append); the returned
+    ``rev`` lets you chain if you want. 422 if the append makes the element
+    invalid, so a half-written element still round-trips."""
+    from app.state.panel_store import Element
+
+    page = _pr._get_canvas(page_id)
+    if page is None or page.canvas is None:
+        return _err(404, f"no canvas dashboard {page_id!r}")
+    conflict = _drift_conflict(page)
+    if conflict is not None:
+        return conflict
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return _err(400, "body must be a JSON object")
+    field = str(body.get("field") or "")
+    if field not in ("html", "css", "js"):
+        return _err(400, "field must be one of html|css|js")
+    text = body.get("text")
+    if not isinstance(text, str):
+        return _err(400, "text must be a string")
+    idx = next((i for i, e in enumerate(page.canvas.els) if e.id == element_id), None)
+    if idx is None:
+        return _err(404, f"no element {element_id!r} on {page_id!r}")
+    current = page.canvas.els[idx]
+    merged = {**current.model_dump(mode="json"), field: (getattr(current, field) or "") + text}
+    try:
+        element = Element.model_validate(merged)
+    except ValidationError as exc:
+        return _err(422, "invalid element after append", details=exc.errors(include_url=False))
+    page.canvas.els[idx] = element
+    _save_mcp(page)
+    data = _saved(page).get_json()
+    data["length"] = len(getattr(element, field))
+    return jsonify(data)
+
+
 @bp.delete("/pages/<page_id>/elements/<element_id>")
 def delete_element(page_id: str, element_id: str) -> Response:
     """Remove one element from a canvas. Supports ``?base_rev=`` drift guard.
