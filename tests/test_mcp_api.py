@@ -585,9 +585,12 @@ def test_append_code_validates_inputs(app: Flask) -> None:
     base = f"/api/mcp/pages/{pid}/elements/{eid}/append"
     assert client.post(base, json={"field": "nope", "text": "x"}).status_code == 400
     assert client.post(base, json={"field": "js"}).status_code == 400  # missing text
-    assert client.post(
-        f"/api/mcp/pages/{pid}/elements/missing/append", json={"field": "js", "text": "x"}
-    ).status_code == 404
+    assert (
+        client.post(
+            f"/api/mcp/pages/{pid}/elements/missing/append", json={"field": "js", "text": "x"}
+        ).status_code
+        == 404
+    )
 
 
 def test_push_requires_device_ids(app: Flask) -> None:

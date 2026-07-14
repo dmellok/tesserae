@@ -373,7 +373,8 @@ def build_server() -> Any:
         for html, then css, then js. Returns the ack plus the field's new "length".
         Don't thread base_rev while streaming (the rev changes every append)."""
         return _json(
-            "POST", f"/pages/{page_id}/elements/{element_id}/append",
+            "POST",
+            f"/pages/{page_id}/elements/{element_id}/append",
             {"field": field, "text": text},
         )
 
