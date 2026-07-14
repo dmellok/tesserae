@@ -6,6 +6,17 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Changed
+
+- **MCP agent designs in full colour, not just the raw panel inks.** The canvas agent's guidance
+  (bridge doc-shape + the `/devices` colour capability) told it to "design within the panel palette
+  so colours don't quantise away", which pushed it to flatten layouts to the handful of Spectra 6 /
+  ACeP inks and threw away what dithering buys. The panel actually dithers the full-colour
+  composition (Floyd-Steinberg) down to its inks, so rich colours, gradients, and photos reproduce
+  as blended approximations. Guidance now says to design in full colour and reserve exact palette
+  hex only for fine detail (thin text / small icons) where dithering reads as speckle, and to honour
+  the `mono` flag for genuinely grayscale panels. Bridge bumped to 0.5.10.
+
 ### Fixed
 
 - **Stable Home Assistant add-on now tracks releases again.** The `release.yml` workflow

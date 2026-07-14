@@ -23,7 +23,7 @@ import urllib.error
 import urllib.request
 from typing import Any
 
-__version__ = "0.5.9"
+__version__ = "0.5.10"
 
 _BASE = os.environ.get("TESSERAE_URL", "http://127.0.0.1:8765").rstrip("/")
 _TOKEN = os.environ.get("TESSERAE_MCP_TOKEN", "").strip()
@@ -81,8 +81,10 @@ plus optional "opacity" (0-100) and "rotate" (degrees). By "kind":
                dayjs.utc(...) and dayjs(...).tz("Europe/Berlin") work. Use for formatting ctx.data times.
              - qrcode -> qrcode(typeNumber, ecc). QR codes; render .createSvgTag() or .createImgTag().
              - marked -> marked.parse(md). Markdown -> HTML string; assign to an element's innerHTML.
-             - chroma -> chroma(...). Colour parsing/scales; snap values to the panel palette so colours
-               don't quantise away (list_devices() gives the palette hex).
+             - chroma -> chroma(...). Colour parsing/scales for rich fills + gradients. Use the full
+               spectrum: the renderer dithers to the panel, so you do NOT need to snap to the raw
+               palette. Reserve exact palette hex (list_devices()) only for fine text/icons where
+               dithering would look noisy.
              - SVG -> SVG(). @svgdotjs/svg.js for programmatic vector graphics (rings, arcs, badges).
              - Phosphor icons: use <i class="ph-bold ph-heart"></i> in your html; the bold icon font is
                inlined when your code contains a ph- class.
@@ -156,7 +158,15 @@ LAY OUT BY INTENT, NOT PIXELS:
 
 MATCH THE HARDWARE:
   list_devices() reports each panel's colour capability (color_mode, the renderable palette as hex,
-  and a "mono" flag). Design within that palette so colours don't quantise away on the panel.
+  and a "mono" flag). The panel does NOT paint only those raw inks: the renderer dithers the
+  full-colour composition down to them (Floyd-Steinberg error diffusion), so rich colours,
+  gradients, and photos reproduce as blended approximations -- a red+yellow dither reads as orange
+  at panel DPI. So DESIGN IN FULL COLOUR; don't flatten a layout to the handful of pure palette inks
+  (that's the common mistake -- it throws away everything dithering buys you and looks poster-flat).
+  Two caveats: (1) reserve exact palette hex for FINE detail -- thin text, hairline rules, small
+  icons -- where dithering reads as speckle; (2) honour the "mono" flag, going grayscale only on a
+  genuinely 1-2 colour panel. The palette is a fidelity guide for fine detail, not a straitjacket
+  for the whole design.
 """
 
 
@@ -303,8 +313,9 @@ def build_server() -> Any:
         """List registered display devices with panel dims AND colour capability:
         "color_mode" (e.g. "6-colour (Spectra 6)"), "colors" (the renderable palette
         as hex), "gamut", "orientation", and a "mono" flag. Match a canvas's w/h to
-        the target panel, and design within its palette so colours don't quantise
-        away on the hardware."""
+        the target panel. The panel dithers the full-colour render down to these inks,
+        so DESIGN IN FULL COLOUR -- the palette guides fine detail (thin text/icons),
+        it doesn't cap the whole layout. Honour "mono" for grayscale-only panels."""
         return _json("GET", "/devices")
 
     def list_pages() -> Any:

@@ -566,10 +566,12 @@ def _hex(rgb: tuple[int, int, int]) -> str:
 
 
 def _gamut_info(gamut: str) -> dict[str, Any]:
-    """Map a panel gamut to a human colour_mode + the actual palette hex list, so
-    an agent can pick a palette the hardware can render instead of designing in
-    colours that quantise away (the "designed colourful for a grayscale panel"
-    trap)."""
+    """Map a panel gamut to a human colour_mode + the actual palette hex list. The
+    panel dithers the full-colour render down to these inks, so the agent should
+    design in full colour and use this palette to keep fine detail (thin text /
+    icons) crisp and to honour the ``mono`` flag, not to flatten the whole layout
+    to the raw inks. The one real trap is the inverse: painting a colourful design
+    for a genuinely grayscale (``mono``) panel."""
     from app import quantizer as q
 
     table: dict[str, tuple[str, tuple[tuple[int, int, int], ...]]] = {
@@ -594,7 +596,9 @@ def devices() -> Response:
     """Registered display instances a canvas can be pushed to, with panel dims and
     colour capability (gamut, a friendly ``color_mode``, the renderable palette as
     hex, an ``orientation``, and a ``mono`` flag) so the agent can size and colour
-    a canvas to the hardware instead of guessing."""
+    a canvas to the hardware. The panel dithers the full-colour render to these
+    inks, so the palette guides fine detail, it doesn't cap the whole design; only
+    the ``mono`` flag should force a grayscale layout."""
     from app.panel import device_panel
 
     reg = current_app.config.get("DEVICE_REGISTRY")
