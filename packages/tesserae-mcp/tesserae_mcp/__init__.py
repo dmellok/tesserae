@@ -23,7 +23,7 @@ import urllib.error
 import urllib.request
 from typing import Any
 
-__version__ = "0.5.8"
+__version__ = "0.5.9"
 
 _BASE = os.environ.get("TESSERAE_URL", "http://127.0.0.1:8765").rstrip("/")
 _TOKEN = os.environ.get("TESSERAE_MCP_TOKEN", "").strip()
@@ -64,13 +64,15 @@ plus optional "opacity" (0-100) and "rotate" (degrees). By "kind":
            ({key, options, optional name}); its fetched data is injected into a sandboxed iframe as
            ctx.data[name] (name falls back to key). So two sources named "weather" and "transit" give you
            ctx.data.weather and ctx.data.transit. Your "js" builds the DOM from them (also ctx.options,
-           ctx.w, ctx.h). The frame runs scripts but has NO network and NO same-origin access (data is
-           delivered, never fetched), and renders ONCE (e-ink is static -- no interactivity or animation).
+           ctx.w, ctx.h). The frame runs scripts and can load remote IMAGES (<img src="https://...">, e.g.
+           a Spotify album cover from ctx.data or an Unsplash photo URL), but has NO readable network
+           (fetch/XHR blocked) and NO same-origin access -- source data is delivered, never fetched -- and
+           renders ONCE (e-ink is static -- no interactivity or animation).
            Use this for custom layouts/formatting a "data" primitive can't express, or to combine widgets.
            Call probe_widget_data(key, options) per source to see field shapes, then read those paths off
            ctx.data.<name>. Example js: "document.body.textContent = Math.round(ctx.data.weather.current.temp)+'°'".
            These libraries are preloaded in the sandbox (each auto-loads only when your code references
-           it by the global shown, so unused ones cost nothing). No network, so they're your toolkit:
+           it by the global shown, so unused ones cost nothing). No script-fetch, so they're your toolkit:
              - Chart.js -> window.Chart. Charts to a <canvas>. Animations are already off. On e-ink there's
                no hover, so bake values in: also reference ChartDataLabels (chartjs-plugin-datalabels,
                auto-registered) and add datalabels to a dataset/options to print values on bars/points.

@@ -8,6 +8,14 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Canvas code elements can show remote images.** The `code` element sandbox now allows
+  `img-src` from the web (`https:` / `http:` / `data:` / `blob:`), so a code element can paint
+  a Spotify album cover, an Unsplash photo, or any other remote artwork it pulls from a source,
+  the same external images ordinary widgets already render. Isolation is otherwise unchanged: this
+  is images only (a one-way GET); `fetch` / XHR / WebSocket stay blocked by `default-src 'none'`, and
+  the frame keeps its opaque origin (no same-origin or credentialed access to Tesserae). Bridge
+  doc-shape updated so the agent knows remote `<img>` works; bridge bumped to 0.5.9.
+
 - **Service plugins: a non-placeable `service` plugin kind that feeds the canvas code element.**
   A new manifest `kind: "service"` exposes a whole external API as a data source for a `code` / `data`
   element without appearing in the canvas picker (it has no placeable render). The MCP agent discovers

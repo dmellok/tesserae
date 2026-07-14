@@ -1734,7 +1734,8 @@
 
     mount.appendChild(el("div", "psec", '<i class="ph-bold ph-brackets-curly"></i>Code'));
     mount.appendChild(el("div", "note",
-      "Sandboxed iframe: scripts on, no network. Sources arrive as ctx.data.<name> " +
+      "Sandboxed iframe: scripts on, remote images OK (&lt;img src=https://…&gt;), no script-fetch. " +
+      "Sources arrive as ctx.data.<name> " +
       "(plus ctx.options, ctx.w, ctx.h). Runs once at render. Available when referenced: " +
       "Chart.js + datalabels, canvas-gauges, dayjs, qrcode, marked, chroma, SVG.js, and " +
       "Phosphor icons (<i class=\"ph-bold ph-heart\">)."));

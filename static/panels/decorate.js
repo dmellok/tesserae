@@ -134,10 +134,12 @@
   //   sandbox="allow-scripts" WITHOUT allow-same-origin -> the frame is a unique
   //     opaque origin, so it can't read the parent, cookies, storage, or reach
   //     any same-origin (loopback) Tesserae endpoint with credentials.
-  //   CSP default-src 'none' -> no network at all (fetch/XHR/img/font blocked),
-  //     only inline <script>/<style> and data: images. The render runs in
-  //     headless Chromium navigating a loopback compose URL, i.e. inside
-  //     Tesserae's trust boundary, so blocking network is load-bearing.
+  //   CSP default-src 'none' -> no readable network: fetch/XHR/WebSocket are
+  //     blocked, so a script can't reach a loopback Tesserae endpoint or read
+  //     any response back. img-src additionally allows the web so remote artwork
+  //     (Spotify covers, Unsplash) loads like it does for ordinary widgets; that
+  //     is a one-way GET only. The render runs in headless Chromium navigating a
+  //     loopback compose URL, i.e. inside Tesserae's trust boundary.
   // The widget data arrives DELIVERED (injected as window.ctx), never fetched
   // from inside the frame. Runs once at render time (e-ink is static).
   // Vendored libraries made available INSIDE the sandbox by inlining their
@@ -228,8 +230,16 @@
         if (lib.init) libScripts += "<script>" + lib.init + "</" + "script>";
       }
     }
+    // img-src allows the web so a code element can show remote artwork
+    // (Spotify album covers, Unsplash photos, etc.), the same external images
+    // ordinary widgets already paint at render time. This is images ONLY: a
+    // one-way GET. connect-src / fetch / XHR / WebSocket stay blocked by
+    // default-src 'none', so a script still can't read anything back over the
+    // network (or reach a loopback Tesserae endpoint); the worst a URL can do is
+    // leak into an <img> request, and the element's content is user-authored.
     var csp =
-      "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:" +
+      "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; " +
+      "img-src data: blob: https: http:" +
       (needFont ? "; font-src data:" : "");
 
     f.srcdoc =
