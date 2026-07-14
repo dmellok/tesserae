@@ -16,6 +16,13 @@ on:
 
 permissions:
   contents: write
+  # Needed to trigger sync-addon.yml via workflow_dispatch below. A
+  # ``release: published`` event created with the built-in GITHUB_TOKEN
+  # does NOT trigger other workflows (GitHub's anti-recursion rule), so
+  # the stable add-on sync would never fire on release. workflow_dispatch
+  # + repository_dispatch are the documented exceptions that DO fire from
+  # GITHUB_TOKEN, so we dispatch the sync explicitly.
+  actions: write
 
 jobs:
   publish:
@@ -73,3 +80,18 @@ jobs:
             --title "${{ steps.notes.outputs.tag }}" \
             --notes-file release_body.md \
             --latest
+
+      - name: Sync stable add-on
+        # The release: published event above won't reach sync-addon.yml
+        # (created by GITHUB_TOKEN), so trigger its stable job explicitly.
+        # Runs whether or not we created the Release this run, so a
+        # hand-created Release still bumps the add-on.
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          version="${{ steps.notes.outputs.tag }}"
+          version="${version#v}"
+          gh workflow run sync-addon.yml --field version="${version}"
+          echo "Dispatched stable add-on sync for ${version}."

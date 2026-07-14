@@ -6,6 +6,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **Stable Home Assistant add-on now tracks releases again.** The `release.yml` workflow
+  published each GitHub Release with the built-in `GITHUB_TOKEN`, and GitHub does not let that
+  token trigger downstream workflows, so `sync-addon.yml`'s stable-channel job never fired and the
+  add-on's stable version froze (it lagged at 0.65.0 while releases reached v0.100.0). `release.yml`
+  now explicitly dispatches the sync via `workflow_dispatch` (the documented exception that does fire
+  from `GITHUB_TOKEN`), so every release bumps the stable add-on. Edge was unaffected.
+
 ### Added
 
 - **Canvas code elements can show remote images.** The `code` element sandbox now allows
