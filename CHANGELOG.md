@@ -50,6 +50,14 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Changed
 
+- **A device can switch frame format (png <-> bmp) without re-registering.** Re-declaring
+  `format` on a later `POST /api/v1/device/register` or `/discover` (MAC-match) now moves an
+  already-registered device to the matching renderer in place, instead of the declared format
+  being silently ignored on any existing device. On a real switch the device's cached frame is
+  invalidated, so `GET /frame` returns `204` until the next push repaints it in the new format,
+  rather than serving the stale old-format frame (previously only clearable by deleting
+  `data/core/renders`). A `format` that's absent, unknown, or already active is a no-op.
+
 - **CircuitPython BMP frames are 2-8x smaller (sub-byte packing).** The `circuitpython_bmp`
   renderer now packs the indexed frame at the smallest standard BMP bit depth that fits its
   palette (a bespoke writer in `app.bmp_writer`): 1 bpp for mono, 4 bpp for tri-colour / 4-grey /

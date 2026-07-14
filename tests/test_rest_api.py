@@ -248,6 +248,43 @@ def test_register_is_idempotent_on_existing_device_id(app: Flask) -> None:
     assert body["device_token"] == token1
 
 
+def test_reregister_switches_wire_format_and_invalidates_render(app: Flask) -> None:
+    """A device registered as png can switch to bmp by re-declaring the
+    format on a later /register, no delete + re-create. The renderer flips
+    and any stale render is invalidated so /frame won't keep serving the
+    old-format frame."""
+    client = app.test_client()
+    _sign_in(client)
+    devices = app.config["DEVICE_REGISTRY"]
+
+    code = _issue_pairing(app)
+    first = client.post(
+        "/api/v1/device/register",
+        headers={"X-Pairing-Code": code, "Content-Type": "application/json"},
+        data=json.dumps(
+            {"device_id": "cp_fmt", "kind": "circuitpython_generic", "panel_w": 400, "panel_h": 300}
+        ),
+    )
+    assert first.status_code == 201
+    assert devices.get("cp_fmt").renderer_ids == ["circuitpython_png__cp_fmt"]
+
+    # Seed a stale render so we can prove it gets invalidated on switch.
+    push_mgr = app.config["PUSH_MANAGER"]
+    push_mgr._latest_renders["cp_fmt"] = {"digest": "abc", "ext": "png", "filename": "abc.png"}
+
+    second_code = _issue_pairing(app)
+    switched = client.post(
+        "/api/v1/device/register",
+        headers={"X-Pairing-Code": second_code, "Content-Type": "application/json"},
+        data=json.dumps({"device_id": "cp_fmt", "kind": "circuitpython_generic", "format": "bmp"}),
+    )
+    assert switched.status_code == 200
+    assert switched.get_json()["reused_existing"] is True
+    assert devices.get("cp_fmt").renderer_ids == ["circuitpython_bmp__cp_fmt"]
+    # Stale png render dropped -> /frame will 204 until the next push.
+    assert push_mgr.latest_render_for("cp_fmt") is None
+
+
 # -- auth --------------------------------------------------------------
 
 

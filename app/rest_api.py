@@ -341,6 +341,39 @@ def _next_poll_s(device: Device) -> int:
     return 60
 
 
+def _maybe_switch_wire_format(device_id: str, body: dict[str, Any]) -> None:
+    """Apply a client-declared wire-format switch on an already-registered
+    device, if it declared one that resolves to a different renderer.
+
+    Lets a device move between ``png`` and ``bmp`` after registration by
+    just re-declaring ``format`` on its next ``/register`` or ``/discover``
+    (a memory-constrained CircuitPython client dropping PNG's zlib inflate
+    for the uncompressed BMP path), no delete + re-create. When the
+    renderer actually moves, the device's cached render is invalidated so
+    ``/frame`` reports 204 until the next push repaints it in the new
+    format, rather than serving the stale old-format frame. Best-effort:
+    any failure is logged and swallowed so it never breaks the poll."""
+    wire_format = body.get("format")
+    if not wire_format:
+        return
+    try:
+        from app.device_service import update_instance_renderer
+
+        _result, changed = update_instance_renderer(
+            devices=_devices(),
+            renderers=_renderers(),
+            data_root=_data_root(),
+            instance_id=device_id,
+            wire_format=str(wire_format),
+        )
+        if changed:
+            push_mgr = current_app.config.get("PUSH_MANAGER")
+            if push_mgr is not None:
+                push_mgr.invalidate_latest_render(device_id)
+    except Exception:
+        current_app.logger.exception("rest: wire-format switch failed for device=%s", device_id)
+
+
 def _current_config(device: Device) -> dict[str, Any]:
     """Per-device config as it stands right now. Same source the MQTT
     config_topic publisher reads from; piggybacking in the status
@@ -748,13 +781,17 @@ def post_discover() -> Response:
         if claimed is not None:
             token = claimed.manifest.get("access_token")
             if isinstance(token, str) and token:
+                # Honour a re-declared wire format (png<->bmp) on reconnect,
+                # same as /register. Reloads the instance, so re-fetch it.
+                _maybe_switch_wire_format(claimed.id, body)
+                current = _devices().get(claimed.id) or claimed
                 return jsonify(
                     {
                         "status": 200,
                         "registered": True,
                         "device_token": token,
-                        "device_id": claimed.id,
-                        "config": _current_config(claimed),
+                        "device_id": current.id,
+                        "config": _current_config(current),
                         "server_time": time.time(),
                     }
                 )
@@ -877,12 +914,17 @@ def post_register() -> Response:
             _persist_token(existing, token)
         if limiter is not None:
             limiter.record_success(client_id)
+        # Honour a re-declared wire format so a device can switch png<->bmp
+        # without a delete + re-register. Reloads the instance in place, so
+        # re-fetch it for the config echo.
+        _maybe_switch_wire_format(device_id, body)
+        current = devices_registry.get(device_id) or existing
         return jsonify(
             {
                 "status": 200,
                 "device_token": token,
                 "server_time": time.time(),
-                "config": _current_config(existing),
+                "config": _current_config(current),
                 "reused_existing": True,
             }
         )

@@ -186,6 +186,14 @@ server URL.
    `format` you declare is exactly the `format` field you'll get back
    from `/frame`. An unknown or absent value leaves the kind's default
    (PNG) renderer in place.
+
+   **Switching format later.** You don't need to delete and re-create a
+   device to change its format. Re-declare `format` on any later
+   `/register` or `/discover` (MAC-match) call and the server moves the
+   device to the matching renderer in place, then invalidates its cached
+   frame so `/frame` returns `204` until the next push repaints it in the
+   new format (rather than serving a stale frame in the old one). A
+   `format` that's absent, unknown, or already active is a no-op.
 2. Server caches the announcement. Returns:
    ```json
    {

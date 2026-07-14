@@ -436,6 +436,23 @@ class PushManager:
          frame the renderer just wrote, not a stale guess."""
         return self._latest_renders.get(device_id)
 
+    def invalidate_latest_render(self, device_id: str) -> bool:
+        """Forget a device's latest render so ``/frame`` reports 204 (no
+        frame yet) until the next push repaints it.
+
+        Used when a device's renderer changes under it (e.g. a wire-format
+        switch png -> bmp): the cached artifact was written by the old
+        renderer, in the old format, so it must not keep being served to a
+        client that now asks for the other format. Drops only the pointer,
+        not the artifact file (another device may share the digest); the
+        next push regenerates in the new format and repopulates the map.
+        Returns True when an entry was actually removed."""
+        with self._lock:
+            existed = self._latest_renders.pop(device_id, None) is not None
+            if existed:
+                self._save_latest_renders()
+        return existed
+
     def _load_latest_renders(self) -> dict[str, dict[str, Any]]:
         """Read the persisted latest-render map from disk if present.
 

@@ -501,6 +501,55 @@ def update_instance_panel(
     return InstanceResult(reloaded)
 
 
+def update_instance_renderer(
+    *,
+    devices: DeviceRegistry,
+    renderers: RendererRegistry,
+    data_root: Path,
+    instance_id: str,
+    wire_format: str | None,
+) -> tuple[InstanceResult, bool]:
+    """Repin an instance to the renderer matching a client-declared wire
+    format (``"png"`` / ``"bmp"``), rewritten on disk + reloaded in place.
+
+    Lets a device switch its frame format after it's already registered:
+    the client re-declares ``format`` on ``/register`` or ``/discover`` and
+    the server moves it to the matching renderer of its kind (e.g.
+    ``circuitpython_png`` -> ``circuitpython_bmp``) without a delete +
+    re-create. A format that's empty, unknown to the kind, or already
+    active is a no-op, not an error.
+
+    Returns ``(result, changed)``. ``changed`` is True only when the
+    renderer actually moved, so the caller can invalidate the device's
+    now-stale render (it was produced by the old renderer, in the old
+    format) rather than serving it to a client that asked for the other
+    format."""
+    device = devices.get(instance_id)
+    if device is None or device.kind_of is None:
+        return InstanceResult(None, f"Unknown device {instance_id!r}."), False
+    kind = devices.get(device.kind_of)
+    target = renderer_id_for_format(renderers, kind, wire_format)
+    if not target or target == device.manifest.get("renderer_id"):
+        return InstanceResult(device), False  # empty / unknown / already active
+
+    inst_file = device.path
+    try:
+        raw = json.loads(inst_file.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as err:
+        return InstanceResult(None, f"Couldn't read {inst_file.name}: {err}"), False
+    raw["renderer_id"] = target
+    inst_file.write_text(json.dumps(raw, indent=2) + "\n", encoding="utf-8")
+
+    devices.devices.pop(instance_id, None)
+    _drop_clones(renderers, instance_id)
+    reloaded = load_instance_file(devices, inst_file=inst_file, data_root=data_root)
+    if reloaded is None:
+        last_err = devices.errors[-1] if devices.errors else None
+        return InstanceResult(None, last_err.message if last_err else "unknown error"), False
+    clone_for_instances(renderers, devices)
+    return InstanceResult(reloaded), True
+
+
 def update_instance_quiet_hours(
     *,
     devices: DeviceRegistry,

@@ -147,6 +147,60 @@ def test_create_instance_ignores_unknown_renderer_id(registries) -> None:
     assert "renderer_id" not in saved
 
 
+def test_update_instance_renderer_switches_format(registries) -> None:
+    # A device created as png can switch to bmp after the fact by
+    # re-declaring the wire format, no delete + re-create. The renderer
+    # clone flips, the manifest persists, and "changed" reports True.
+    devices, renderers, data_root = registries
+    created = device_service.create_instance(
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="cp_switch",
+        kind_id="circuitpython_generic",
+    )
+    assert created.ok and created.device.renderer_ids == ["circuitpython_png__cp_switch"]
+
+    result, changed = device_service.update_instance_renderer(
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="cp_switch",
+        wire_format="bmp",
+    )
+    assert changed is True and result.ok
+    assert result.device.renderer_ids == ["circuitpython_bmp__cp_switch"]
+    assert renderers.get("circuitpython_png__cp_switch") is None
+    assert (
+        json.loads((data_root / "cp_switch.json").read_text())["renderer_id"] == "circuitpython_bmp"
+    )
+
+
+def test_update_instance_renderer_noop_cases(registries) -> None:
+    # Switching to the already-active format, or an empty / unknown one,
+    # is a no-op (changed=False) rather than an error or a needless
+    # rewrite + reclone.
+    devices, renderers, data_root = registries
+    device_service.create_instance(
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="cp_noop",
+        kind_id="circuitpython_generic",
+        renderer_id="circuitpython_bmp",
+    )
+    for fmt in ("bmp", "", "webp", None):
+        result, changed = device_service.update_instance_renderer(
+            devices=devices,
+            renderers=renderers,
+            data_root=data_root,
+            instance_id="cp_noop",
+            wire_format=fmt,
+        )
+        assert changed is False and result.ok
+        assert result.device.renderer_ids == ["circuitpython_bmp__cp_noop"]
+
+
 def test_create_instance_portrait_swaps_dims(registries) -> None:
     devices, renderers, data_root = registries
     result = device_service.create_instance(
