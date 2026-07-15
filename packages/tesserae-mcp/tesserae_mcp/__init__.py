@@ -23,7 +23,7 @@ import urllib.error
 import urllib.request
 from typing import Any
 
-__version__ = "0.5.10"
+__version__ = "0.5.11"
 
 _BASE = os.environ.get("TESSERAE_URL", "http://127.0.0.1:8765").rstrip("/")
 _TOKEN = os.environ.get("TESSERAE_MCP_TOKEN", "").strip()
@@ -249,8 +249,10 @@ BINDING & DECORATION
 - Paint from var(--accent-N) / semantic tokens or documented data-identity colours; avoid
   arbitrary hex.
 
-PUSH: list_devices, then push_to_device once the render looks right. Confirm before pushing
-to a real panel.
+PUSH: list_devices, then push_to_device once the render looks right -- device_ids may name
+several panels and the one render fans out to each, fitted to its own dims. Use bind_devices to
+remember that target set on the page (for scheduling / rotation / the editor's Send). Confirm
+before pushing to a real panel.
 """
 
 
@@ -465,9 +467,20 @@ def build_server() -> Any:
         return Image(data=raw, format="png")
 
     def push_to_device(page_id: str, device_ids: list[str]) -> Any:
-        """Render the canvas and push it to the given devices (ids from list_devices).
-        device_ids is required — pushing is always explicit."""
+        """Render the canvas ONCE and fan it out to the given devices (ids from
+        list_devices), each fitted/quantised to its own panel by the server.
+        device_ids is required and may list many panels -- pushing is always
+        explicit. This is a one-off; use bind_devices to remember the target set
+        for scheduling. Returns {sent: [...], errors: [...]}."""
         return _json("POST", f"/pages/{page_id}/push", {"device_ids": device_ids})
+
+    def bind_devices(page_id: str, device_ids: list[str]) -> Any:
+        """Persistently bind a canvas to a set of devices (replaces the set; []
+        unbinds). Unlike push_to_device (a one-off fan-out), this SAVES the target
+        set on the page, so a later schedule / rotation / the visual editor's Send
+        hits the same panels. Ids not matching a registered device (list_devices)
+        are dropped and returned under "unknown". Returns {bound, unknown}."""
+        return _json("POST", f"/pages/{page_id}/devices", {"device_ids": device_ids})
 
     mcp = FastMCP("tesserae", instructions=_INSTRUCTIONS)
     for fn in (
@@ -491,6 +504,7 @@ def build_server() -> Any:
         render_report,
         render_preview,
         push_to_device,
+        bind_devices,
     ):
         mcp.add_tool(fn)
     mcp.add_tool(

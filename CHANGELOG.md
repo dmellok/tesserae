@@ -6,6 +6,16 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added
+
+- **Bind a canvas to multiple devices.** The canvas editor's device picker is now a multi-select
+  popover: a canvas can target any number of panels, and Send fans the one render out to each,
+  fitted/quantised to its own dims by the server. Matching the artboard to a specific panel's
+  resolution is now a separate, explicit per-device action (⤢), decoupled from binding so a
+  mixed-size fleet doesn't fight over one artboard. On the MCP side, `push_to_device` already fanned
+  out to a device list; a new `bind_devices` tool (`POST /api/mcp/pages/<id>/devices`) persists the
+  target set on the page so agent-built dashboards can be scheduled to the same panels. Bridge 0.5.11.
+
 ### Changed
 
 - **MCP agent designs in full colour, not just the raw panel inks.** The canvas agent's guidance

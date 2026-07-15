@@ -1225,5 +1225,34 @@ def push(page_id: str) -> Response:
     return jsonify({"sent": sent, "errors": errors})
 
 
+@bp.post("/pages/<page_id>/devices")
+def bind_devices(page_id: str) -> Response:
+    """Persistently bind a canvas dashboard to a set of devices. Body:
+    ``{device_ids: []}`` replaces the bound set (``[]`` unbinds). Unlike ``/push``
+    (a one-off explicit fan-out), this SAVES the set on the page so a later
+    schedule / rotation / the editor's Send targets the same panels. Ids that
+    don't match a registered device are dropped and reported rather than stored.
+    Returns ``{bound: [...], unknown: [...]}``."""
+    page = _pr._get_canvas(page_id)
+    if page is None or page.canvas is None:
+        return _err(404, f"no canvas dashboard {page_id!r}")
+    body = request.get_json(silent=True) or {}
+    picked = body.get("device_ids")
+    if not isinstance(picked, list):
+        return _err(400, "device_ids must be a list")
+    reg = current_app.config.get("DEVICE_REGISTRY")
+    known = {d.id for d in reg.all() if d.kind_of is not None} if reg is not None else set()
+    bound: list[str] = []
+    unknown: list[str] = []
+    for x in picked:
+        did = str(x).strip()
+        if not did:
+            continue
+        (bound if did in known else unknown).append(did)
+    page.device_ids = bound
+    _save_mcp(page)
+    return jsonify({"bound": bound, "unknown": unknown})
+
+
 def register(app: Flask) -> None:
     app.register_blueprint(bp)

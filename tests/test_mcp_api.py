@@ -671,6 +671,53 @@ def test_push_ok(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
     assert payload == _FAKE_PNG
 
 
+def test_push_fans_out_to_multiple_devices(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    # One render, pushed to every device in the list.
+    _enable(app)
+    monkeypatch.setattr("app.renderer.render_to_png", lambda req, pool=None: _FAKE_PNG)
+    pm = MagicMock()
+    pm.push_image.return_value = PushResult(status="sent", page_id="c", composition_digest="d")
+    app.config["PUSH_MANAGER"] = pm
+    client = app.test_client()
+    pid = _create_page(client)
+    resp = client.post(f"/api/mcp/pages/{pid}/push", json={"device_ids": ["dev1", "dev2", "dev3"]})
+    assert resp.status_code == 200
+    assert resp.get_json()["sent"] == ["dev1", "dev2", "dev3"]
+    assert pm.push_image.call_count == 3  # rendered once, pushed thrice
+
+
+def test_bind_devices_persists_and_filters_unknown(app: Flask) -> None:
+    from types import SimpleNamespace
+
+    _enable(app)
+    reg = MagicMock()
+    reg.all.return_value = [
+        SimpleNamespace(id="dev1", kind_of="pico_bin_client"),
+        SimpleNamespace(id="dev2", kind_of="pico_bin_client"),
+    ]
+    app.config["DEVICE_REGISTRY"] = reg
+    client = app.test_client()
+    pid = _create_page(client)
+    resp = client.post(
+        f"/api/mcp/pages/{pid}/devices", json={"device_ids": ["dev1", "dev2", "ghost"]}
+    )
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["bound"] == ["dev1", "dev2"] and body["unknown"] == ["ghost"]
+    # Persisted on the page so a later push / schedule / editor Send targets it.
+    page = app.config["PAGE_STORE"].get(pid)
+    assert page.device_ids == ["dev1", "dev2"]
+
+
+def test_bind_devices_rejects_non_list(app: Flask) -> None:
+    _enable(app)
+    client = app.test_client()
+    pid = _create_page(client)
+    assert (
+        client.post(f"/api/mcp/pages/{pid}/devices", json={"device_ids": "dev1"}).status_code == 400
+    )
+
+
 # -- partial updates (#3) -----------------------------------------------
 
 

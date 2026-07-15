@@ -2415,59 +2415,117 @@
   }
 
   // ---- devices + send ---------------------------------------------------
+  // Multi-device: a canvas binds to any number of panels. Binding is a
+  // checkbox popover (S.doc.device_ids is the list); Send fans out the one
+  // render to every bound panel, each fitted/quantised to its own dims by the
+  // server. Matching the artboard to a panel's resolution is a SEPARATE,
+  // explicit per-device action (the ⤢ button), decoupled from binding so a
+  // mixed-size fleet doesn't fight over one artboard.
   function initDevices() {
-    var sel = $("panels-device");
-    var btn = $("panels-send");
-    if (sel && S.cfg.devicesUrl) {
+    var btn = $("panels-devices-btn");
+    var pop = $("panels-devices-pop");
+    var sendBtn = $("panels-send");
+    if (btn && S.cfg.devicesUrl) {
       fetch(S.cfg.devicesUrl)
         .then(function (r) { return r.json(); })
         .then(function (p) {
           S.devices = p.devices || [];
-          S.devices.forEach(function (d) {
-            var o = document.createElement("option");
-            o.value = d.id;
-            o.textContent = (d.name || d.id) + (d.w && d.h ? "  ·  " + d.w + "×" + d.h : "");
-            if (d.w) o.dataset.w = d.w;
-            if (d.h) o.dataset.h = d.h;
-            sel.appendChild(o);
-          });
+          buildDeviceList();
           syncDeviceSelection();
         })
         .catch(function () { /* no devices endpoint */ });
-      sel.addEventListener("change", onDeviceChange);
+      btn.addEventListener("click", function (e) { e.stopPropagation(); toggleDevicePop(); });
+      btn.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleDevicePop(); }
+      });
+      document.addEventListener("click", function (e) {
+        if (pop && !pop.hidden && !pop.contains(e.target) && !btn.contains(e.target)) hideDevicePop();
+      });
+      document.addEventListener("keydown", function (e) { if (e.key === "Escape") hideDevicePop(); });
     }
-    if (btn) btn.addEventListener("click", sendCanvas);
+    if (sendBtn) sendBtn.addEventListener("click", sendCanvas);
+  }
+  function toggleDevicePop() { var p = $("panels-devices-pop"); if (p) { p.hidden ? showDevicePop() : hideDevicePop(); } }
+  function showDevicePop() { var p = $("panels-devices-pop"); if (p) p.hidden = false; }
+  function hideDevicePop() { var p = $("panels-devices-pop"); if (p) p.hidden = true; }
+  function buildDeviceList() {
+    var list = $("panels-devices-list");
+    var empty = $("panels-devices-empty");
+    if (!list) return;
+    list.innerHTML = "";
+    if (empty) empty.hidden = !!S.devices.length;
+    S.devices.forEach(function (d) {
+      var row = document.createElement("label");
+      row.style.cssText = "display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;cursor:pointer;font-size:13px";
+      row.addEventListener("mouseenter", function () { row.style.background = "var(--t-surface-soft)"; });
+      row.addEventListener("mouseleave", function () { row.style.background = ""; });
+      var cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.value = d.id;
+      cb.className = "panels-device-cb";
+      cb.addEventListener("change", onDeviceToggle);
+      var name = document.createElement("span");
+      name.style.cssText = "flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap";
+      name.textContent = (d.name || d.id) + (d.w && d.h ? "  ·  " + d.w + "×" + d.h : "");
+      row.appendChild(cb);
+      row.appendChild(name);
+      if (d.w && d.h) {
+        var fit = document.createElement("button");
+        fit.type = "button";
+        fit.title = "Set the artboard to this panel's size (" + d.w + "×" + d.h + ")";
+        fit.innerHTML = '<i class="ph-bold ph-arrows-out"></i>';
+        fit.style.cssText = "border:0;background:transparent;color:var(--t-muted);cursor:pointer;padding:2px 4px;font-size:14px";
+        fit.addEventListener("click", function (e) {
+          e.preventDefault(); e.stopPropagation();
+          if (d.w !== S.doc.w || d.h !== S.doc.h) setPanelSize(d.w, d.h);
+          hideDevicePop();
+        });
+        row.appendChild(fit);
+      }
+      list.appendChild(row);
+    });
+  }
+  function onDeviceToggle() {
+    var ids = [];
+    document.querySelectorAll(".panels-device-cb").forEach(function (cb) { if (cb.checked) ids.push(cb.value); });
+    S.doc.device_ids = ids;
+    updateDevicesLabel();
+    scheduleSave();
   }
   function syncDeviceSelection() {
-    var sel = $("panels-device");
-    if (sel && S.doc && S.doc.device_ids && S.doc.device_ids.length) sel.value = S.doc.device_ids[0];
+    var ids = (S.doc && S.doc.device_ids) || [];
+    document.querySelectorAll(".panels-device-cb").forEach(function (cb) {
+      cb.checked = ids.indexOf(cb.value) !== -1;
+    });
+    updateDevicesLabel();
   }
-  function onDeviceChange() {
-    var sel = $("panels-device");
-    if (!sel) return;
-    S.doc.device_ids = sel.value ? [sel.value] : [];
-    var opt = sel.options[sel.selectedIndex];
-    var w = opt ? Number(opt.dataset.w) : 0;
-    var h = opt ? Number(opt.dataset.h) : 0;
-    if (w && h && (w !== S.doc.w || h !== S.doc.h)) setPanelSize(w, h);
-    else scheduleSave();
+  function updateDevicesLabel() {
+    var label = $("panels-devices-label");
+    if (!label) return;
+    var ids = (S.doc && S.doc.device_ids) || [];
+    if (!ids.length) { label.textContent = "Choose devices…"; return; }
+    if (ids.length === 1) {
+      var d = S.devices.filter(function (x) { return x.id === ids[0]; })[0];
+      label.textContent = d ? (d.name || d.id) : ids[0];
+      return;
+    }
+    label.textContent = ids.length + " devices";
   }
   function sendCanvas() {
-    var sel = $("panels-device");
     var status = $("panels-status");
-    var did = sel ? sel.value : "";
-    if (!did) { if (status) status.textContent = "pick a device first"; return; }
+    var ids = (S.doc && S.doc.device_ids) || [];
+    if (!ids.length) { if (status) status.textContent = "pick at least one device"; return; }
     if (status) status.textContent = "sending…";
     fetch(S.cfg.sendUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ device_ids: [did] }),
+      body: JSON.stringify({ device_ids: ids }),
     })
       .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
       .then(function (res) {
         if (!status) return;
-        status.textContent =
-          res.ok && res.j.sent && res.j.sent.length ? "sent to panel" : (res.j && res.j.error) || "send failed";
+        var n = res.ok && res.j.sent ? res.j.sent.length : 0;
+        status.textContent = n ? ("sent to " + n + " panel" + (n > 1 ? "s" : "")) : (res.j && res.j.error) || "send failed";
       })
       .catch(function () { if (status) status.textContent = "send failed"; });
   }
