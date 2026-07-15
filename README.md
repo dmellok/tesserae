@@ -162,6 +162,14 @@ The reTerminal E-Series and XIAO ePaper family run the [Tesserae-native firmware
 | [Waveshare 7.3" PhotoPainter (ESP32-S3)](https://www.waveshare.com/esp32-s3-photopainter.htm) | 800×480 | [photopainter-7.3-bin](https://github.com/dmellok/tesserae-device-photopainter-7.3-bin) | ✅ |
 | [Waveshare 4.2" B/W (ESP32)](https://www.waveshare.com/4.2inch-e-paper-module.htm) | 400×300 | [esp32-bw](https://github.com/dmellok/tesserae-device-esp32-bw) | TBD |
 
+### Community
+
+Community-authored clients, contributed and maintained by their authors (not in the Tesserae org). Thanks to everyone building these.
+
+| Panel | Resolution | Client | Status |
+|---|---|---|---|
+| [PicPak 4.2" BWRY](https://docs.tesserae.ink/hardware/picpak/) | 400×300 (4-colour BWRY) | [picpak-tesserae-client](https://github.com/varanu5/picpak-tesserae-client) by [@varanu5](https://github.com/varanu5) | ✅ |
+
 ### TRMNL-compatible (HTTP pull)
 
 Any client implementing the [TRMNL BYOS spec](https://help.trmnl.com/en/articles/9510536-bring-your-own-server)

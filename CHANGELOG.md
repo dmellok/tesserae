@@ -28,6 +28,10 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **PicPak listed under supported hardware.** The README's supported-hardware section gains a
+  Community table crediting the [PicPak 4.2" BWRY](https://docs.tesserae.ink/hardware/picpak/)
+  client, a community firmware by [@varanu5](https://github.com/varanu5).
+
 - **Canvas code elements can show remote images.** The `code` element sandbox now allows
   `img-src` from the web (`https:` / `http:` / `data:` / `blob:`), so a code element can paint
   a Spotify album cover, an Unsplash photo, or any other remote artwork it pulls from a source,
