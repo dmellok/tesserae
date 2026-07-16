@@ -58,7 +58,13 @@
     <ul class="dx-discovered-list">
       {% for page in group %}
       {% set d = page_dims.get(page.id) %}
-      <li class="dx-inset-row dx-dashboard-row">
+      {# Preview dims must match what /compose renders at: an unbound freeform
+         canvas lays out at its authored size, everything else at the resolved
+         panel. Using the wrong one distorts the scaled iframe. #}
+      {% set _cv = page.canvas if (page.layout_kind == 'canvas' and page.canvas and not page.device_ids) else none %}
+      {% set pv_w = _cv.w if _cv else (d.w if d else 0) %}
+      {% set pv_h = _cv.h if _cv else (d.h if d else 0) %}
+      <li class="dx-inset-row dx-dashboard-row"{% if pv_w and pv_h %} data-preview-src="{{ url_for('composer.compose', page_id=page.id) }}" data-preview-w="{{ pv_w }}" data-preview-h="{{ pv_h }}"{% endif %}>
         <a class="dx-dashboard-main" href="{{ url_for('pages.edit', page_id=page.id) }}">
           <span class="dx-section-icon dx-dashboard-icon" aria-hidden="true">
             <i class="ph ph-{{ page.icon or 'cube' }}"></i>
@@ -121,6 +127,21 @@
   {% endif %}
 {% endcall %}
 
+<style>
+  /* On-hover dashboard preview: a live, scaled-down iframe of the same
+     /compose/<id> HTML the panel is screenshotted from. Rendered by the
+     browser (no server render), faithful to the design. */
+  .dx-dash-preview {
+    position: absolute; z-index: 400; pointer-events: none;
+    border: 1px solid var(--t-border); border-radius: 10px; overflow: hidden;
+    background: var(--t-surface); box-shadow: 0 10px 30px rgba(0, 0, 0, .22);
+    opacity: 0; transform: translateY(4px);
+    transition: opacity .12s ease, transform .12s ease;
+  }
+  .dx-dash-preview.is-visible { opacity: 1; transform: translateY(0); }
+  .dx-dash-preview iframe { border: 0; transform-origin: top left; pointer-events: none; background: #fff; }
+  @media (hover: none), (max-width: 720px) { .dx-dash-preview { display: none; } }
+</style>
 <script>
   // Keep "Create dashboard" disabled until a name is typed.
   (function () {
@@ -130,6 +151,74 @@
     const sync = () => { btn.disabled = !input.value.trim(); };
     input.addEventListener('input', sync);
     sync();
+  })();
+
+  // Live hover preview. One shared popover + iframe, lazily pointed at the
+  // hovered dashboard's /compose HTML after a short hover-intent delay so
+  // casual mouse-overs don't fire a render.
+  (function () {
+    const rows = document.querySelectorAll('[data-preview-src]');
+    if (!rows.length || !window.matchMedia('(hover: hover)').matches) return;
+    const PW = 300;               // preview width in px
+    const DELAY = 350;            // hover-intent delay
+    let pop, frame, timer, current, lastSrc = '';
+
+    function build() {
+      if (pop) return;
+      pop = document.createElement('div');
+      pop.className = 'dx-dash-preview';
+      pop.setAttribute('aria-hidden', 'true');
+      frame = document.createElement('iframe');
+      frame.setAttribute('scrolling', 'no');
+      frame.setAttribute('tabindex', '-1');
+      frame.setAttribute('aria-hidden', 'true');
+      pop.appendChild(frame);
+      document.body.appendChild(pop);
+    }
+
+    function show(row) {
+      const src = row.getAttribute('data-preview-src');
+      const w = parseInt(row.getAttribute('data-preview-w') || '0', 10);
+      const h = parseInt(row.getAttribute('data-preview-h') || '0', 10);
+      if (!src || !w || !h) return;
+      build();
+      const scale = PW / w;
+      const ph = Math.round(h * scale);
+      pop.style.width = PW + 'px';
+      pop.style.height = ph + 'px';
+      frame.style.width = w + 'px';
+      frame.style.height = h + 'px';
+      frame.style.transform = 'scale(' + scale + ')';
+      if (lastSrc !== src) { frame.src = src; lastSrc = src; }  // lazy load
+      position(row, ph);
+      pop.classList.add('is-visible');
+    }
+
+    function position(row, ph) {
+      const r = row.getBoundingClientRect();
+      const gap = 12;
+      const vw = document.documentElement.clientWidth;
+      const vh = document.documentElement.clientHeight;
+      let left = r.right + gap;
+      if (left + PW > vw) left = r.left - PW - gap;         // flip to the left
+      left = Math.max(8, left);
+      let top = r.top;
+      if (top + ph > vh - 8) top = Math.max(8, vh - ph - 8); // clamp to viewport
+      pop.style.left = (left + window.scrollX) + 'px';
+      pop.style.top = (top + window.scrollY) + 'px';
+    }
+
+    function hide() { if (pop) pop.classList.remove('is-visible'); current = null; }
+
+    rows.forEach(function (row) {
+      row.addEventListener('mouseenter', function () {
+        clearTimeout(timer);
+        current = row;
+        timer = setTimeout(function () { if (current === row) show(row); }, DELAY);
+      });
+      row.addEventListener('mouseleave', function () { clearTimeout(timer); hide(); });
+    });
+    window.addEventListener('scroll', hide, { passive: true });
   })();
 </script>
 {% endblock %}

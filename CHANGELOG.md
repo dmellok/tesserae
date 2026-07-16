@@ -8,6 +8,12 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Hover preview on the Dashboards page.** Hovering a dashboard row now shows a live, scaled-down
+  preview of it, a small `<iframe>` of the same `/compose/<id>` HTML the panel is screenshotted from,
+  so it's faithful to the design and rendered entirely by the browser (no server render). It lazy-loads
+  after a short hover-intent delay, previews grid and freeform pages alike (matching each page's real
+  compose dims so nothing distorts), and is disabled on touch / narrow screens.
+
 - **Bind a canvas to multiple devices.** The canvas editor's device picker is now a multi-select
   popover: a canvas can target any number of panels, and Send fans the one render out to each,
   fitted/quantised to its own dims by the server. Matching the artboard to a specific panel's
