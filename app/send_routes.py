@@ -358,6 +358,24 @@ def send_page() -> Response:
     return _redirect_after_page_push(page_id)
 
 
+@bp.post("/pages")
+def send_pages() -> Response:
+    """Push several saved dashboards at once (multi-select on the Dashboards
+    page). Body: repeated ``page_ids`` form fields. Each fans out to its own
+    bound devices, same force-publish / bypass-coalesce as a single Push."""
+    ids = [i.strip() for i in request.form.getlist("page_ids") if i.strip()]
+    if not ids:
+        flash("Select at least one dashboard.", "error")
+        return redirect(url_for("pages.index"))
+    for pid in ids:
+        _run_in_background(
+            lambda p=pid: _push().push(p, bypass_coalesce=True, force_publish=True),
+            label=f"page:{pid}",
+        )
+    flash(f"Sending {len(ids)} dashboard{'s' if len(ids) != 1 else ''}.", "ok")
+    return redirect(url_for("pages.index"))
+
+
 def _redirect_after_page_push(page_id: str, *, on_error: bool = False) -> Response:
     """Honour the form's ``return_to`` hint so a Push from the dashboards
     list or the editor doesn't yank the user into Send → History.

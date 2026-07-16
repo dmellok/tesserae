@@ -285,6 +285,18 @@ def test_delete_page_removes_it(app: Flask, tmp_path: Path) -> None:
     assert _store(tmp_path).get(pid) is None
 
 
+def test_bulk_delete_removes_only_selected(app: Flask, tmp_path: Path) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    a = _new(client, name="A")
+    b = _new(client, name="B")
+    c = _new(client, name="C")
+    client.post("/pages/bulk/delete", data={"page_ids": [a, b]})
+    store = _store(tmp_path)
+    assert store.get(a) is None and store.get(b) is None
+    assert store.get(c) is not None  # unselected survives
+
+
 # -- duplicate ------------------------------------------------------
 
 

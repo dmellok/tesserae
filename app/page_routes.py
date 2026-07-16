@@ -949,6 +949,24 @@ def delete(page_id: str) -> Response:
     return redirect(url_for("pages.index"))
 
 
+@bp.post("/bulk/delete")
+def bulk_delete() -> Response:
+    """Delete several dashboards at once (multi-select on the Dashboards page).
+    Body: repeated ``page_ids`` form fields. Deletes each and flashes a count."""
+    ids = [i.strip() for i in request.form.getlist("page_ids") if i.strip()]
+    cache = current_app.config.get("PREVIEW_CACHE", {})
+    deleted = 0
+    for pid in ids:
+        cache.pop(pid, None)
+        if _store().delete(pid):
+            deleted += 1
+    if deleted:
+        flash(f"Deleted {deleted} dashboard{'s' if deleted != 1 else ''}.", "ok")
+    else:
+        flash("No dashboards deleted.", "error")
+    return redirect(url_for("pages.index"))
+
+
 @bp.post("/<page_id>/duplicate")
 def duplicate(page_id: str) -> Response:
     """Clone an existing dashboard into a new one and drop the user into

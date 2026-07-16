@@ -8,6 +8,11 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Multi-select dashboards for bulk push / delete.** The Dashboards page now has a checkbox per
+  dashboard and a floating action bar that appears once one is selected, with "Push selected" and
+  "Delete selected". Push fans each dashboard out to its own bound devices; delete removes them all
+  after a confirm. New `POST /send/pages` and `POST /pages/bulk/delete` endpoints back it.
+
 - **All six Phosphor icon weights in the canvas code element.** The sandbox previously only had bold;
   it now has thin, light, regular, bold, fill, and duotone, each vendored as a self-contained CSS with
   the font embedded as a `data:` URL and inlined only when its class (`ph`, `ph-thin`, `ph-duotone`, …)

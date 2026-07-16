@@ -112,6 +112,25 @@ def test_saved_dashboard_invokes_push(app: Flask) -> None:
     pm.push.assert_called_once_with("home", bypass_coalesce=True, force_publish=True)
 
 
+def test_bulk_push_sends_each_selected(app: Flask) -> None:
+    pm = MagicMock()
+    pm.push.return_value = PushResult(status="sent", page_id="x")
+    app.config["PUSH_MANAGER"] = pm
+
+    client = app.test_client()
+    _sign_in(client)
+    client.post("/send/pages", data={"page_ids": ["a", "b", "c"]}, follow_redirects=False)
+    assert pm.push.call_count == 3
+    assert {c.args[0] for c in pm.push.call_args_list} == {"a", "b", "c"}
+
+
+def test_bulk_push_empty_selection_redirects(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    resp = client.post("/send/pages", data={}, follow_redirects=False)
+    assert resp.status_code == 302  # error flash + back to dashboards, no 500
+
+
 def test_url_invokes_push_url_image(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
