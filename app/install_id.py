@@ -19,9 +19,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 def install_id_path(data_root: Path) -> Path:
@@ -33,16 +36,34 @@ def load_or_create(data_root: Path) -> str:
     """Return the current install id.
 
     Generates and persists a fresh v4 UUID on first startup, or when the
-    file is missing or unreadable. The file is created with the parent
-    ``core/`` directory as needed, so a fresh checkout (or an upgrade
-    from a version that predates the install-id file) does the right
-    thing on first run.
+    file is missing or genuinely corrupt. The file is created with the
+    parent ``core/`` directory as needed, so a fresh checkout (or an
+    upgrade from a version that predates the install-id file) does the
+    right thing on first run.
+
+    Crucially, a file that *exists* but can't be read right now (a
+    transient I/O or permission error, e.g. the container-boot chown race)
+    is NOT overwritten: clobbering it would permanently rotate the
+    install identity, which is exactly the "my UUID changed after an
+    update" failure. In that case we return an ephemeral id for this boot
+    and leave the file untouched so the next healthy boot recovers the
+    real one.
     """
     path = install_id_path(data_root)
-    existing = _read_existing(path)
+    existing, may_heal = _read_existing(path)
     if existing is not None:
         return existing
-    return _generate_and_write(path)
+    if may_heal:
+        # Absent or genuinely corrupt (parsed but no valid id): safe to
+        # mint + persist a fresh id.
+        return _generate_and_write(path)
+    # The file is present but unreadable this instant. Don't destroy it.
+    logger.warning(
+        "install_id: %s exists but could not be read; using an ephemeral id "
+        "for this boot and leaving the file intact so a later boot recovers it",
+        path,
+    )
+    return str(uuid.uuid4())
 
 
 def regenerate(data_root: Path) -> str:
@@ -95,19 +116,35 @@ def scoped_id(install_id: str, scope: str) -> str:
     return digest[:32]
 
 
-def _read_existing(path: Path) -> str | None:
+def _read_existing(path: Path) -> tuple[str | None, bool]:
+    """Return ``(install_id, may_heal)``.
+
+    ``install_id`` is the valid persisted id, or ``None`` when there isn't
+    one to return. ``may_heal`` says whether it's safe to mint + overwrite:
+
+    * absent file → ``(None, True)`` — first boot, mint one.
+    * unreadable file (``OSError``) → ``(None, False)`` — transient; the
+      caller must NOT overwrite it or it destroys a still-valid identity.
+    * corrupt content (bad JSON / wrong shape / non-UUID id) → ``(None,
+      True)`` — genuinely broken, self-heal by minting a fresh id.
+    * valid content → ``(id, True)``.
+    """
     if not path.exists():
-        return None
+        return None, True
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None
+        raw = path.read_text(encoding="utf-8")
+    except OSError:
+        return None, False
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return None, True
     if not isinstance(data, dict):
-        return None
+        return None, True
     existing = data.get("id")
     if isinstance(existing, str) and _is_valid_uuid(existing):
-        return existing
-    return None
+        return existing, True
+    return None, True
 
 
 def _generate_and_write(path: Path) -> str:

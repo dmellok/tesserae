@@ -59,6 +59,35 @@ def test_malformed_file_is_replaced_with_fresh_uuid(tmp_path: Path) -> None:
         assert uuid.UUID(new_id).version == 4
 
 
+def test_unreadable_file_is_not_overwritten(tmp_path: Path, monkeypatch) -> None:
+    """A file that exists but can't be read *right now* (a transient
+    I/O / permission error, e.g. the container-boot chown race) must NOT be
+    clobbered. Overwriting it permanently rotates the install identity,
+    which is the "my UUID changed after an update" bug. The boot gets an
+    ephemeral id and the on-disk file is left intact so a later, healthy
+    boot recovers the real one."""
+    original = install_id_module.load_or_create(tmp_path)
+    path = install_id_module.install_id_path(tmp_path)
+    on_disk_before = path.read_text(encoding="utf-8")
+
+    real_read_text = Path.read_text
+
+    def boom(self: Path, *args: object, **kwargs: object) -> str:
+        if self == path:
+            raise OSError("transient read failure")
+        return real_read_text(self, *args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(Path, "read_text", boom)
+    ephemeral = install_id_module.load_or_create(tmp_path)
+    monkeypatch.undo()
+
+    # A valid id came back for the boot, but it did NOT overwrite the file.
+    assert uuid.UUID(ephemeral).version == 4
+    assert path.read_text(encoding="utf-8") == on_disk_before
+    # The next healthy boot recovers the original persisted identity.
+    assert install_id_module.load_or_create(tmp_path) == original
+
+
 def test_read_metadata_returns_none_when_missing(tmp_path: Path) -> None:
     """The Settings UI reads metadata to show the current id + minted-at
     timestamp. Missing file returns ``None`` so the template can hide the

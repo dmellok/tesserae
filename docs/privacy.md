@@ -94,7 +94,10 @@ ID, the running version and channel, the OS family (linux/macos/windows),
 CPU arch, Python minor version, deployment kind (docker/ha_addon/pip/lxc/
 source), transport (mqtt/rest/both/none), a **bucketed** device count
 (`0`, `1`, `2-3`, `4-9`, `10+`, never the exact number), the set of
-registered device kinds, and a Home Assistant boolean. No names, paths,
+device kinds you've configured, the firmware versions running on them
+grouped by kind (so the maintainer can see what firmware is in the field),
+and a Home Assistant boolean. The device count and kinds cover only the
+devices you've actually added, not the built-in catalogue. No names, paths,
 layouts, or exact counts. The server stores only the **day** (not a
 timestamp), so the cadence can't become a per-install activity trace, and
 it dedupes to one heartbeat per install per day. A coarse country is

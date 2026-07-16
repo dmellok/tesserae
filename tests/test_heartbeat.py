@@ -21,8 +21,8 @@ class _FakeApp:
         self.config = config
 
 
-def _device(kind: str, transport: str) -> SimpleNamespace:
-    return SimpleNamespace(kind_of=kind, transport=transport)
+def _device(kind: str, transport: str, device_id: str = "") -> SimpleNamespace:
+    return SimpleNamespace(kind_of=kind, transport=transport, id=device_id)
 
 
 def _app(
@@ -32,6 +32,7 @@ def _app(
     online_on: bool = True,
     devices: list[Any] | None = None,
     ha: bool = False,
+    status: dict[str, Any] | None = None,
 ) -> tuple[_FakeApp, list[dict[str, Any]]]:
     app_section: dict[str, Any] = {"ha_discovery_enabled": ha, "online_features": online_on}
     settings = SimpleNamespace(get_section=lambda name, _s=app_section: _s if name == "app" else {})
@@ -44,6 +45,7 @@ def _app(
         "INSTALL_ID": install,
         "APP_VERSION": "0.94.2",
         "DEVICE_REGISTRY": registry,
+        "DEVICE_STATUS": status or {},
         "EVENT_LOG": event_log,
     }
     return _FakeApp(config), records
@@ -64,6 +66,7 @@ def test_build_payload_shape(tmp_path: Path, test_install_uuid: Any) -> None:
     assert p["transport"] == "both"  # one mqtt + one rest device
     assert p["devices"] == "2-3"  # bucketed, not exact
     assert p["device_kinds"] == ["pimoroni_inky_4", "waveshare_x"]
+    assert p["fw_by_kind"] == {}  # no status heartbeats in this fixture
     assert p["ha"] is True
     assert p["py"].startswith("3.") and p["py"].count(".") == 1
     assert p["os"] in ("linux", "macos", "windows", "other")
@@ -75,6 +78,58 @@ def test_build_payload_no_devices(tmp_path: Path, test_install_uuid: Any) -> Non
     app, _ = _app(tmp_path, install=test_install_uuid(), devices=[])
     p = heartbeat.build_payload(app)  # type: ignore[arg-type]
     assert p["devices"] == "0" and p["device_kinds"] == [] and p["transport"] == "none"
+
+
+def test_build_payload_ignores_builtin_kinds(tmp_path: Path, test_install_uuid: Any) -> None:
+    """``registry.all()`` returns the built-in device kinds + hardware
+    SKUs (``kind_of is None``) alongside real instances. Only instances are
+    the operator's hardware, so counting the catalog kinds made every install
+    report "10+". The count, transport, and kinds must key off instances."""
+    devices = [
+        # 22 catalog kinds (kind_of None): 8 built-ins + 14 SKUs in the repo.
+        *[_device(None, "mqtt") for _ in range(22)],
+        # One real instance the operator actually configured.
+        _device("pi_bin_client", "rest"),
+    ]
+    app, _ = _app(tmp_path, install=test_install_uuid(), devices=devices)
+    p = heartbeat.build_payload(app)  # type: ignore[arg-type]
+    assert p["devices"] == "1"  # one instance, not "10+"
+    assert p["device_kinds"] == ["pi_bin_client"]
+    assert p["transport"] == "rest"  # the kinds' mqtt transport is ignored
+
+
+def test_build_payload_all_kinds_no_instances(tmp_path: Path, test_install_uuid: Any) -> None:
+    """A brand-new install with the catalog loaded but no device added yet
+    reports zero devices, not the kind count."""
+    app, _ = _app(
+        tmp_path, install=test_install_uuid(), devices=[_device(None, "rest") for _ in range(22)]
+    )
+    p = heartbeat.build_payload(app)  # type: ignore[arg-type]
+    assert p["devices"] == "0" and p["device_kinds"] == [] and p["transport"] == "none"
+
+
+def test_build_payload_firmware_by_kind(tmp_path: Path, test_install_uuid: Any) -> None:
+    """Firmware versions are aggregated per device kind from each
+    instance's latest status heartbeat, deduped + sorted. Instances that
+    haven't reported firmware are simply absent from the map."""
+    devices = [
+        _device("pi_bin_client", "rest", device_id="pi-a"),
+        _device("pi_bin_client", "rest", device_id="pi-b"),
+        _device("esp32_client", "mqtt", device_id="esp-a"),
+        _device("esp32_client", "mqtt", device_id="esp-silent"),  # no fw reported
+    ]
+    status = {
+        "pi-a": {"parsed": {"fw_version": "1.3.1"}},
+        "pi-b": {"parsed": {"fw_version": "1.2.0"}},
+        "esp-a": {"parsed": {"fw_version": "0.9.0"}},
+        "esp-silent": {"parsed": {}},
+    }
+    app, _ = _app(tmp_path, install=test_install_uuid(), devices=devices, status=status)
+    p = heartbeat.build_payload(app)  # type: ignore[arg-type]
+    assert p["fw_by_kind"] == {
+        "pi_bin_client": ["1.2.0", "1.3.1"],  # deduped + sorted across two panels
+        "esp32_client": ["0.9.0"],  # the silent one contributes nothing
+    }
 
 
 def test_maybe_send_skips_when_online_off(

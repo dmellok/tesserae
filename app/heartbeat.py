@@ -2,8 +2,9 @@
 
 A once-a-day, best-effort ping that reports low-cardinality, aggregate facts
 about this install (version, platform family, deployment kind, transport, the
-set of registered device kinds, and a bucketed device count) so the maintainer
-can see how many installs are active and what to prioritise.
+set of registered device kinds, per-kind firmware versions, and a bucketed
+device count) so the maintainer can see how many installs are active, what
+firmware is in the field, and what to prioritise.
 
 Privacy: gated by the master online-features switch (nothing is sent when it's
 off); no personal data, no exact device counts, no exact timestamps (the server
@@ -120,10 +121,36 @@ def build_payload(app: Flask) -> dict[str, Any]:
     except Exception:
         devices = []
 
-    kinds = sorted({d.kind_of for d in devices if getattr(d, "kind_of", None)})[:32]
+    # ``registry.all()`` returns the built-in device *kinds* and hardware
+    # SKUs (``kind_of is None``) alongside the operator's actual *instances*
+    # (``kind_of`` set to the kind they inherit from). There are 20+ catalog
+    # kinds, so counting them made every install report "10+" devices no
+    # matter how many panels the operator owns. Only instances are real
+    # hardware, so the count + transport + kinds all key off them.
+    instances = [d for d in devices if getattr(d, "kind_of", None)]
+
+    kinds = sorted({d.kind_of for d in instances})[:32]
+
+    # Firmware versions per device kind, sourced from each instance's most
+    # recent status heartbeat (``DEVICE_STATUS[id]["parsed"]["fw_version"]``).
+    # Aggregated into ``{kind: [versions]}`` so the maintainer can see the
+    # firmware distribution across the fleet without any per-device identity.
+    # Low-cardinality: capped kinds + capped versions per kind.
+    status_cache: dict[str, Any] = app.config.get("DEVICE_STATUS") or {}
+    fw_by_kind: dict[str, list[str]] = {}
+    for device in instances:
+        parsed = (status_cache.get(getattr(device, "id", "")) or {}).get("parsed") or {}
+        fw = parsed.get("fw_version")
+        fw_str = str(fw).strip() if fw is not None else ""
+        if not fw_str:
+            continue
+        versions = fw_by_kind.setdefault(device.kind_of, [])
+        if fw_str not in versions and len(versions) < 16:
+            versions.append(fw_str)
+    fw_by_kind = {k: sorted(v) for k, v in sorted(fw_by_kind.items())[:32]}
 
     transports: set[str] = set()
-    for device in devices:
+    for device in instances:
         with contextlib.suppress(Exception):
             transports.add(device.transport)
     if {"mqtt", "rest"} <= transports:
@@ -151,8 +178,9 @@ def build_payload(app: Flask) -> dict[str, Any]:
         "py": f"{sys.version_info.major}.{sys.version_info.minor}",
         "deploy": _deploy(),
         "transport": transport,
-        "devices": _devices_bucket(len(devices)),
+        "devices": _devices_bucket(len(instances)),
         "device_kinds": kinds,
+        "fw_by_kind": fw_by_kind,
         "ha": ha,
     }
 

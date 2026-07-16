@@ -18,6 +18,12 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   keep their fixed, unit-aware precision. `ha_sensor` 0.7.0, `ha_entities` 0.6.0, `ha_history` 0.5.0.
   (#111)
 
+- **Daily heartbeat now reports firmware versions per device kind.** The opt-in heartbeat already
+  sent the set of configured device kinds but not what firmware they run, so the maintainer couldn't
+  see the firmware spread in the field. It now includes `fw_by_kind` (`{kind: [versions]}`), sourced
+  from each device's latest status heartbeat, deduped and capped. Aggregate only, no per-device
+  identity; documented on the privacy page.
+
 - **Bundled fonts are now usable inside the code element.** A code element can use any bundled font
   by family name (`font-family: "Fira Code"`, `"Press Start 2P"`, …). The sandbox has no network and
   a `font-src data:` CSP, so a new `/fonts/face/<id>.css` endpoint serves a self-contained `@font-face`
@@ -76,6 +82,20 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   the `mono` flag for genuinely grayscale panels. Bridge bumped to 0.5.10.
 
 ### Fixed
+
+- **Heartbeat device count no longer reads "10+" on every install.** `build_payload` counted
+  `registry.all()`, which includes the 20+ built-in device kinds and hardware SKUs (catalogue
+  entries, not owned hardware) alongside the operator's actual device instances. So every install
+  reported the `10+` bucket regardless of how many panels it drives. The count, transport, and kind
+  set now key off instances only (`kind_of` set).
+
+- **Install identifier no longer rotates on a transient read hiccup.** The install-id loader treated
+  "file exists but couldn't be read right now" (a transient I/O / permission error, e.g. the
+  container-boot `chown` race) the same as "corrupt", and self-healed by minting a fresh UUID that
+  **overwrote** the still-valid file, permanently changing the install's identity (which surfaced as
+  the ID appearing to change across updates). A present-but-unreadable file is now left untouched: the
+  boot uses an ephemeral ID and the next healthy boot recovers the real one. Genuinely corrupt files
+  still self-heal.
 
 - **Spectra 6 panels no longer pick up a 7th colour.** The CircuitPython PNG/BMP path mapped a
   `spectra_6` panel to the 7-entry palette that carries orange (that palette exists for the Pi-side
