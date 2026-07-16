@@ -17,6 +17,7 @@ hosts resend / delete actions that POST back to ``/send/resend/...`` and
 
 from __future__ import annotations
 
+import functools
 import logging
 import threading
 from collections.abc import Callable
@@ -358,6 +359,13 @@ def send_page() -> Response:
     return _redirect_after_page_push(page_id)
 
 
+def _push_one_page(page_id: str) -> None:
+    """Force-publish one page to its bound devices. Module-level so the bulk
+    loop can bind it per id via ``functools.partial`` (a default-arg lambda
+    trips mypy's inference)."""
+    _push().push(page_id, bypass_coalesce=True, force_publish=True)
+
+
 @bp.post("/pages")
 def send_pages() -> Response:
     """Push several saved dashboards at once (multi-select on the Dashboards
@@ -368,10 +376,7 @@ def send_pages() -> Response:
         flash("Select at least one dashboard.", "error")
         return redirect(url_for("pages.index"))
     for pid in ids:
-        _run_in_background(
-            lambda p=pid: _push().push(p, bypass_coalesce=True, force_publish=True),
-            label=f"page:{pid}",
-        )
+        _run_in_background(functools.partial(_push_one_page, pid), label=f"page:{pid}")
     flash(f"Sending {len(ids)} dashboard{'s' if len(ids) != 1 else ''}.", "ok")
     return redirect(url_for("pages.index"))
 
