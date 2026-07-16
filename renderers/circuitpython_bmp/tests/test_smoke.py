@@ -118,6 +118,22 @@ def test_circuitpython_bmp_matches_png_pixels(circuitpython_bmp, composition_png
     assert list(out.convert("RGB").getdata()) == list(expected.convert("RGB").getdata())
 
 
+def test_circuitpython_bmp_spectra_6_has_no_orange(circuitpython_bmp, composition_png) -> None:
+    # #118: a spectra_6 panel is 6-colour (black/white/red/yellow/blue/green).
+    # The BMP must not carry the 7th colour (orange) that the Pi-side inky
+    # palette uses; the CircuitPython client paints exactly what arrives.
+    from app.quantizer import WAVESHARE_E6_PALETTE
+
+    panel = Panel(w=200, h=100, gamut="spectra_6")
+    artifact = circuitpython_bmp.transform(
+        composition_png, panel=panel, settings=circuitpython_bmp.settings_defaults()
+    )
+    out = Image.open(io.BytesIO(artifact))
+    colors = _colors_used(out)
+    assert colors <= set(WAVESHARE_E6_PALETTE)
+    assert (255, 140, 0) not in colors
+
+
 def test_circuitpython_bmp_payload_points_at_bmp(circuitpython_bmp) -> None:
     payload = circuitpython_bmp.payload(
         "deadbeef", "http://host:8080", settings=circuitpython_bmp.settings_defaults()

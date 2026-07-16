@@ -112,10 +112,10 @@ def test_circuitpython_png_gray_4_uses_grey_ramp(circuitpython_png, composition_
 def test_circuitpython_png_spectra_6_uses_palette_colors(
     circuitpython_png, composition_png
 ) -> None:
-    # Spectra 6 panel: every distinct colour in the output must come
-    # from the 6-entry Spectra 6 palette. The image quantises against
-    # that palette, so anything outside the palette is a regression.
-    from app.quantizer import SPECTRA_6_PALETTE
+    # Spectra 6 panel: every distinct colour must come from the 6-entry
+    # Spectra 6 palette, and NOT include orange. #118: this path used to emit
+    # the 7-colour palette (with orange) on a 6-colour panel.
+    from app.quantizer import WAVESHARE_E6_PALETTE
 
     panel = Panel(w=200, h=100, gamut="spectra_6")
     artifact = circuitpython_png.transform(
@@ -124,15 +124,16 @@ def test_circuitpython_png_spectra_6_uses_palette_colors(
     out = Image.open(io.BytesIO(artifact))
     assert out.mode == "P"
     colors = _colors_used(out)
-    assert colors <= set(SPECTRA_6_PALETTE)
+    assert colors <= set(WAVESHARE_E6_PALETTE)
+    assert (255, 140, 0) not in colors  # no orange
 
 
 def test_circuitpython_png_unknown_gamut_falls_back_to_spectra_6(
     circuitpython_png, composition_png
 ) -> None:
-    # Empty / custom gamut should fall through to Spectra 6 nominal
-    # rather than erroring or emitting RGB.
-    from app.quantizer import SPECTRA_6_PALETTE
+    # Empty / custom gamut should fall through to the 6-colour Spectra 6
+    # palette rather than erroring or emitting RGB.
+    from app.quantizer import WAVESHARE_E6_PALETTE
 
     panel = Panel(w=200, h=100, gamut="")
     artifact = circuitpython_png.transform(
@@ -141,7 +142,7 @@ def test_circuitpython_png_unknown_gamut_falls_back_to_spectra_6(
     out = Image.open(io.BytesIO(artifact))
     assert out.mode == "P"
     colors = _colors_used(out)
-    assert colors <= set(SPECTRA_6_PALETTE)
+    assert colors <= set(WAVESHARE_E6_PALETTE)
 
 
 def test_circuitpython_png_rgb24_output_is_full_colour(circuitpython_png, composition_png) -> None:

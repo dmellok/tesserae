@@ -67,6 +67,17 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **Spectra 6 panels no longer pick up a 7th colour.** The CircuitPython PNG/BMP path mapped a
+  `spectra_6` panel to the 7-entry palette that carries orange (that palette exists for the Pi-side
+  inky path, which reprojects to its own gamut). A CircuitPython client paints exactly what arrives,
+  so the extra ink showed up as `DarkOrange` (`#FF8C00`) in the output on a 6-colour panel. The gamut
+  now maps to the 6-colour Waveshare E6 palette (black/white/red/yellow/blue/green), and the unknown /
+  unset-gamut fallback matches. (#118)
+
+- **Gallery accepts BMP uploads.** The Picture, Gallery widget filtered BMP out of both the file
+  picker and the server-side upload check, so a pre-dithered `.bmp` couldn't be added. `.bmp` is now
+  an allowed suffix; thumbnails and serving already handled it. (#117)
+
 - **Stable Home Assistant add-on now tracks releases again.** The `release.yml` workflow
   published each GitHub Release with the built-in `GITHUB_TOKEN`, and GitHub does not let that
   token trigger downstream workflows, so `sync-addon.yml`'s stable-channel job never fired and the

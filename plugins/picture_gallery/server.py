@@ -48,7 +48,7 @@ from werkzeug.security import safe_join
 from werkzeug.utils import secure_filename
 from werkzeug.wrappers import Response
 
-ALLOWED_SUFFIXES = frozenset({".jpg", ".jpeg", ".png", ".webp", ".gif"})
+ALLOWED_SUFFIXES = frozenset({".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp"})
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 _FOLDER_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 ROOT_FOLDER_VALUE = "_root"

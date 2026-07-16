@@ -723,8 +723,8 @@ def palette_for_circuitpython_gamut(
     client wants, or ``None`` when the gamut asks for a full-colour
     (unquantised) output.
 
-    Unknown or empty gamuts fall through to Spectra 6 nominal so a panel
-    that just hasn't declared its gamut yet still produces a sensible
+    Unknown or empty gamuts fall through to the 6-colour Spectra 6 palette so
+    a panel that just hasn't declared its gamut yet still produces a sensible
     indexed image rather than 8-bit RGB. Aliases handled:
 
       * ``mono`` -> black + white
@@ -732,6 +732,7 @@ def palette_for_circuitpython_gamut(
       * ``gray_4`` -> 4-level greyscale ramp (2-bit, no highlight)
       * ``bwry_4`` -> 4-colour black/white/red/yellow
       * ``acep_7colour`` / ``acep_7color`` / ``inky_7colour`` -> 7-colour
+      * ``spectra_6`` / ``waveshare_e6`` (and the fallback) -> 6-colour, no orange
       * ``rgb24`` / ``rgb16`` -> ``None`` (full-colour passthrough)
     """
     g = (gamut or "").lower()
@@ -747,7 +748,12 @@ def palette_for_circuitpython_gamut(
         return INKY_7COLOUR_PALETTE
     if g in ("rgb24", "rgb16"):
         return None
-    return SPECTRA_6_PALETTE
+    # Spectra 6 (E6) and everything unrecognised: the 6-colour palette
+    # (black/white/red/yellow/blue/green, NO orange). A CircuitPython client
+    # paints exactly what arrives, so the 7-colour SPECTRA_6_PALETTE (which
+    # carries orange for the Pi-side inky path that reprojects to its own
+    # gamut) would put a 7th colour on a 6-colour panel (#118).
+    return WAVESHARE_E6_PALETTE
 
 
 def circuitpython_indexed_image(
