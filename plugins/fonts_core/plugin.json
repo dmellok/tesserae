@@ -1,18 +1,27 @@
 {
   "tesserae_compat": "1.x",
   "name": "Core fonts",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "kind": "font",
-  "description": "Curated open-source font set vendored locally. 18 families covering modern sans (Inter, Manrope, Outfit, IBM Plex Sans, Public-Sans-ish), accessible sans (Atkinson Hyperlegible, designed for low-vision and works great on e-ink), geometric (Space Grotesk, Jost), heavy display (Archivo Black, Anton, Bebas Neue), narrow (Archivo Narrow), monospace (JetBrains Mono, IBM Plex Mono, Space Mono), and serif body / display (DM Serif Display, IBM Plex Serif, Crimson Pro, Lora, Bodoni Moda). All Latin subset, woff2.",
+  "description": "Curated open-source font set vendored locally, 36 families. Modern + accessible sans, geometric, display, serif, plus a broad monospace / programming set (JetBrains Mono, IBM Plex Mono, Space Mono, Fira Code, Source Code Pro, Martian Mono, Red Hat Mono, Fragment Mono, Spline Sans Mono, Overpass Mono) and pixel / bitmap fonts (Press Start 2P, VT323, Silkscreen, Pixelify Sans, Handjet, Micro 5, DotGothic16, Jersey 10 / 25). All Latin subset, woff2, OFL/Apache.",
   "supports": {
-    "sizes": ["xs", "sm", "md", "lg"]
+    "sizes": [
+      "xs",
+      "sm",
+      "md",
+      "lg"
+    ]
   },
   "fonts": [
     {
       "id": "inter",
       "name": "Inter",
       "category": "sans",
-      "weights": [400, 700, 800],
+      "weights": [
+        400,
+        700,
+        800
+      ],
       "files": {
         "400": "static/inter/400.woff2",
         "700": "static/inter/700.woff2",
@@ -23,7 +32,10 @@
       "id": "ibm_plex_sans",
       "name": "IBM Plex Sans",
       "category": "sans",
-      "weights": [400, 700],
+      "weights": [
+        400,
+        700
+      ],
       "files": {
         "400": "static/ibm_plex_sans/400.woff2",
         "700": "static/ibm_plex_sans/700.woff2"
@@ -33,7 +45,11 @@
       "id": "manrope",
       "name": "Manrope",
       "category": "sans",
-      "weights": [400, 700, 800],
+      "weights": [
+        400,
+        700,
+        800
+      ],
       "files": {
         "400": "static/manrope/400.woff2",
         "700": "static/manrope/700.woff2",
@@ -44,7 +60,10 @@
       "id": "outfit",
       "name": "Outfit",
       "category": "sans",
-      "weights": [400, 700],
+      "weights": [
+        400,
+        700
+      ],
       "files": {
         "400": "static/outfit/400.woff2",
         "700": "static/outfit/700.woff2"
@@ -54,7 +73,10 @@
       "id": "space_grotesk",
       "name": "Space Grotesk",
       "category": "sans",
-      "weights": [400, 700],
+      "weights": [
+        400,
+        700
+      ],
       "files": {
         "400": "static/space-grotesk/400.woff2",
         "700": "static/space-grotesk/700.woff2"
@@ -64,7 +86,10 @@
       "id": "atkinson_hyperlegible",
       "name": "Atkinson Hyperlegible",
       "category": "sans",
-      "weights": [400, 700],
+      "weights": [
+        400,
+        700
+      ],
       "files": {
         "400": "static/atkinson_hyperlegible/400.woff2",
         "700": "static/atkinson_hyperlegible/700.woff2"
@@ -74,7 +99,9 @@
       "id": "archivo_black",
       "name": "Archivo Black",
       "category": "display",
-      "weights": [400],
+      "weights": [
+        400
+      ],
       "files": {
         "400": "static/archivo-black/400.woff2"
       }
@@ -83,7 +110,9 @@
       "id": "anton",
       "name": "Anton",
       "category": "display",
-      "weights": [400],
+      "weights": [
+        400
+      ],
       "files": {
         "400": "static/anton/400.woff2"
       }
@@ -92,7 +121,9 @@
       "id": "bebas_neue",
       "name": "Bebas Neue",
       "category": "display",
-      "weights": [400],
+      "weights": [
+        400
+      ],
       "files": {
         "400": "static/bebas_neue/400.woff2"
       }
@@ -101,7 +132,10 @@
       "id": "jetbrains_mono",
       "name": "JetBrains Mono",
       "category": "mono",
-      "weights": [400, 700],
+      "weights": [
+        400,
+        700
+      ],
       "files": {
         "400": "static/jetbrains-mono/400.woff2",
         "700": "static/jetbrains-mono/700.woff2"
@@ -111,7 +145,10 @@
       "id": "ibm_plex_mono",
       "name": "IBM Plex Mono",
       "category": "mono",
-      "weights": [400, 700],
+      "weights": [
+        400,
+        700
+      ],
       "files": {
         "400": "static/ibm_plex_mono/400.woff2",
         "700": "static/ibm_plex_mono/700.woff2"
@@ -121,7 +158,9 @@
       "id": "dm_serif_display",
       "name": "DM Serif Display",
       "category": "serif",
-      "weights": [400],
+      "weights": [
+        400
+      ],
       "files": {
         "400": "static/dm-serif-display/400.woff2"
       }
@@ -130,7 +169,10 @@
       "id": "ibm_plex_serif",
       "name": "IBM Plex Serif",
       "category": "serif",
-      "weights": [400, 700],
+      "weights": [
+        400,
+        700
+      ],
       "files": {
         "400": "static/ibm_plex_serif/400.woff2",
         "700": "static/ibm_plex_serif/700.woff2"
@@ -140,7 +182,10 @@
       "id": "crimson_pro",
       "name": "Crimson Pro",
       "category": "serif",
-      "weights": [400, 700],
+      "weights": [
+        400,
+        700
+      ],
       "files": {
         "400": "static/crimson_pro/400.woff2",
         "700": "static/crimson_pro/700.woff2"
@@ -150,7 +195,10 @@
       "id": "lora",
       "name": "Lora",
       "category": "serif",
-      "weights": [400, 700],
+      "weights": [
+        400,
+        700
+      ],
       "files": {
         "400": "static/lora/400.woff2",
         "700": "static/lora/700.woff2"
@@ -160,7 +208,11 @@
       "id": "archivo",
       "name": "Archivo",
       "category": "sans",
-      "weights": [400, 700, 800],
+      "weights": [
+        400,
+        700,
+        800
+      ],
       "files": {
         "400": "static/archivo/400.woff2",
         "700": "static/archivo/700.woff2",
@@ -171,7 +223,10 @@
       "id": "space_mono",
       "name": "Space Mono",
       "category": "mono",
-      "weights": [400, 700],
+      "weights": [
+        400,
+        700
+      ],
       "files": {
         "400": "static/space-mono/400.woff2",
         "700": "static/space-mono/700.woff2"
@@ -181,7 +236,10 @@
       "id": "bodoni_moda",
       "name": "Bodoni Moda",
       "category": "serif",
-      "weights": [400, 700],
+      "weights": [
+        400,
+        700
+      ],
       "files": {
         "400": "static/bodoni-moda/400.woff2",
         "700": "static/bodoni-moda/700.woff2"
@@ -191,7 +249,10 @@
       "id": "archivo_narrow",
       "name": "Archivo Narrow",
       "category": "sans",
-      "weights": [400, 700],
+      "weights": [
+        400,
+        700
+      ],
       "files": {
         "400": "static/archivo-narrow/400.woff2",
         "700": "static/archivo-narrow/700.woff2"
@@ -201,10 +262,207 @@
       "id": "jost",
       "name": "Jost",
       "category": "sans",
-      "weights": [400, 700],
+      "weights": [
+        400,
+        700
+      ],
       "files": {
         "400": "static/jost/400.woff2",
         "700": "static/jost/700.woff2"
+      }
+    },
+    {
+      "id": "fira_code",
+      "name": "Fira Code",
+      "category": "mono",
+      "weights": [
+        400,
+        700
+      ],
+      "files": {
+        "400": "static/fira_code/400.woff2",
+        "700": "static/fira_code/700.woff2"
+      }
+    },
+    {
+      "id": "source_code_pro",
+      "name": "Source Code Pro",
+      "category": "mono",
+      "weights": [
+        400,
+        700
+      ],
+      "files": {
+        "400": "static/source_code_pro/400.woff2",
+        "700": "static/source_code_pro/700.woff2"
+      }
+    },
+    {
+      "id": "martian_mono",
+      "name": "Martian Mono",
+      "category": "mono",
+      "weights": [
+        400,
+        700
+      ],
+      "files": {
+        "400": "static/martian_mono/400.woff2",
+        "700": "static/martian_mono/700.woff2"
+      }
+    },
+    {
+      "id": "red_hat_mono",
+      "name": "Red Hat Mono",
+      "category": "mono",
+      "weights": [
+        400,
+        700
+      ],
+      "files": {
+        "400": "static/red_hat_mono/400.woff2",
+        "700": "static/red_hat_mono/700.woff2"
+      }
+    },
+    {
+      "id": "fragment_mono",
+      "name": "Fragment Mono",
+      "category": "mono",
+      "weights": [
+        400
+      ],
+      "files": {
+        "400": "static/fragment_mono/400.woff2"
+      }
+    },
+    {
+      "id": "spline_sans_mono",
+      "name": "Spline Sans Mono",
+      "category": "mono",
+      "weights": [
+        400,
+        700
+      ],
+      "files": {
+        "400": "static/spline_sans_mono/400.woff2",
+        "700": "static/spline_sans_mono/700.woff2"
+      }
+    },
+    {
+      "id": "overpass_mono",
+      "name": "Overpass Mono",
+      "category": "mono",
+      "weights": [
+        400,
+        700
+      ],
+      "files": {
+        "400": "static/overpass_mono/400.woff2",
+        "700": "static/overpass_mono/700.woff2"
+      }
+    },
+    {
+      "id": "press_start_2p",
+      "name": "Press Start 2P",
+      "category": "display",
+      "weights": [
+        400
+      ],
+      "files": {
+        "400": "static/press_start_2p/400.woff2"
+      }
+    },
+    {
+      "id": "vt323",
+      "name": "VT323",
+      "category": "display",
+      "weights": [
+        400
+      ],
+      "files": {
+        "400": "static/vt323/400.woff2"
+      }
+    },
+    {
+      "id": "silkscreen",
+      "name": "Silkscreen",
+      "category": "display",
+      "weights": [
+        400,
+        700
+      ],
+      "files": {
+        "400": "static/silkscreen/400.woff2",
+        "700": "static/silkscreen/700.woff2"
+      }
+    },
+    {
+      "id": "pixelify_sans",
+      "name": "Pixelify Sans",
+      "category": "display",
+      "weights": [
+        400,
+        700
+      ],
+      "files": {
+        "400": "static/pixelify_sans/400.woff2",
+        "700": "static/pixelify_sans/700.woff2"
+      }
+    },
+    {
+      "id": "handjet",
+      "name": "Handjet",
+      "category": "display",
+      "weights": [
+        400,
+        700
+      ],
+      "files": {
+        "400": "static/handjet/400.woff2",
+        "700": "static/handjet/700.woff2"
+      }
+    },
+    {
+      "id": "micro_5",
+      "name": "Micro 5",
+      "category": "display",
+      "weights": [
+        400
+      ],
+      "files": {
+        "400": "static/micro_5/400.woff2"
+      }
+    },
+    {
+      "id": "dotgothic16",
+      "name": "DotGothic16",
+      "category": "display",
+      "weights": [
+        400
+      ],
+      "files": {
+        "400": "static/dotgothic16/400.woff2"
+      }
+    },
+    {
+      "id": "jersey_10",
+      "name": "Jersey 10",
+      "category": "display",
+      "weights": [
+        400
+      ],
+      "files": {
+        "400": "static/jersey_10/400.woff2"
+      }
+    },
+    {
+      "id": "jersey_25",
+      "name": "Jersey 25",
+      "category": "display",
+      "weights": [
+        400
+      ],
+      "files": {
+        "400": "static/jersey_25/400.woff2"
       }
     }
   ]

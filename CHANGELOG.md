@@ -8,6 +8,12 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **16 new fonts: a big programming + pixel set.** Core fonts (`fonts_core` 0.5.0) gains a broad
+  monospace / coding set (Fira Code, Source Code Pro, Martian Mono, Red Hat Mono, Fragment Mono,
+  Spline Sans Mono, Overpass Mono, on top of the existing JetBrains Mono / IBM Plex Mono / Space
+  Mono) and a pixel / bitmap set (Press Start 2P, VT323, Silkscreen, Pixelify Sans, Handjet, Micro 5,
+  DotGothic16, Jersey 10, Jersey 25). All Latin-subset woff2, OFL/Apache, verified to load in-browser.
+
 - **Multi-select dashboards for bulk push / delete.** The Dashboards page now has a checkbox per
   dashboard and a floating action bar that appears once one is selected, with "Push selected" and
   "Delete selected". Push fans each dashboard out to its own bound devices; delete removes them all
