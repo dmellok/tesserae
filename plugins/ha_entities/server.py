@@ -146,12 +146,13 @@ def _parse_entities(raw: Any) -> list[str]:
 
 
 def _parse_overrides(raw: Any) -> dict[str, dict[str, str]]:
-    """Parse the ``overrides`` textarea into ``{entity_id: {name?, icon?}}``.
+    """Parse the ``overrides`` textarea into
+    ``{entity_id: {name?, icon?, format?}}``.
 
-    Format: one entity per line, pipe-separated ``entity_id | name | icon``.
-    Either field may be empty (just leave nothing between the pipes) to keep
-    the auto value. Lines starting with ``#`` are comments; blank lines
-    are skipped.
+    Format: one entity per line, pipe-separated
+    ``entity_id | name | icon | format``. Any field may be empty (leave
+    nothing between the pipes) to keep the auto value. Lines starting with
+    ``#`` are comments; blank lines are skipped.
     """
     out: dict[str, dict[str, str]] = {}
     text = str(raw or "")
@@ -167,6 +168,8 @@ def _parse_overrides(raw: Any) -> dict[str, dict[str, str]]:
             entry["name"] = parts[1]
         if len(parts) > 2 and parts[2]:
             entry["icon"] = parts[2]
+        if len(parts) > 3 and parts[3]:
+            entry["format"] = parts[3]
         if entry:
             out[parts[0]] = entry
     return out
@@ -189,19 +192,38 @@ def _icon_for(entity_id: str, attrs: dict[str, Any], status: str) -> str:
     return _DOMAIN_ICONS.get(domain, "circle")
 
 
-def _humanise(raw: str, unit: str) -> str:
-    """Format an HA state for display. Numeric states are rounded to
-    two decimal places (then trimmed of trailing zeros) so a noisy
-    sensor reading like ``18.42857`` reads ``18.43`` instead of taking
-    up half a cell. Non-numeric states fall through unchanged with
-    underscores → spaces and title-case."""
+_NUMBER_FORMAT = re.compile(r"0(?:\.(0+))?$")
+
+
+def _apply_number_format(value: float, fmt: str) -> str | None:
+    """Format ``value`` per a data-element number pattern: ``0`` /
+    ``0.0`` / ``0.00`` fix the decimal places (matching the canvas data
+    element's vocabulary). Returns ``None`` when ``fmt`` isn't a
+    recognised pattern, so the caller keeps its default formatting."""
+    m = _NUMBER_FORMAT.fullmatch(fmt)
+    if not m:
+        return None
+    decimals = len(m.group(1)) if m.group(1) else 0
+    return f"{value:.{decimals}f}"
+
+
+def _humanise(raw: str, unit: str, fmt: str = "") -> str:
+    """Format an HA state for display. With an explicit ``fmt`` (a number
+    pattern like ``0.0``) the value is fixed to that many decimals;
+    otherwise numeric states are rounded to two decimal places (then
+    trimmed of trailing zeros) so a noisy reading like ``18.42857`` reads
+    ``18.43`` instead of taking up half a cell. Non-numeric states fall
+    through unchanged with underscores → spaces and title-case."""
     try:
         value = float(raw)
     except ValueError:
         return raw.replace("_", " ").capitalize()
-    rounded = round(value, 2)
-    # Trim trailing zeros so 21.00 → "21" and 18.40 → "18.4".
-    rendered = f"{rounded:g}"
+    rendered = None
+    if fmt:
+        rendered = _apply_number_format(value, fmt)
+    if rendered is None:
+        # Trim trailing zeros so 21.00 → "21" and 18.40 → "18.4".
+        rendered = f"{round(value, 2):g}"
     return f"{rendered} {unit}".strip()
 
 
@@ -231,6 +253,7 @@ def fetch(
         return {"error": core.coerce_error(err)}
 
     by_id = {str(s.get("entity_id")): s for s in states}
+    number_format = str(options.get("number_format") or "").strip()
     overrides = _parse_overrides(options.get("overrides"))
     items: list[dict[str, Any]] = []
     for eid in wanted:
@@ -261,7 +284,11 @@ def fetch(
         items.append(
             {
                 "name": ov.get("name") or core.friendly_name(st),
-                "label": "unavailable" if status == "missing" else _humanise(raw, unit),
+                "label": (
+                    "unavailable"
+                    if status == "missing"
+                    else _humanise(raw, unit, ov.get("format") or number_format)
+                ),
                 "status": status,
                 "icon": ov.get("icon") or _icon_for(eid, attrs, status),
                 # Surface last_changed so the client can flag rows

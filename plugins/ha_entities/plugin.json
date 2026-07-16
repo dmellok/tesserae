@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "Home Assistant, Entities",
-  "version": "0.5.2",
+  "version": "0.6.0",
   "kind": "widget",
   "description": "A status grid of several Home Assistant entities. Each row tints by its state (on / off / other), leads with a device-class-aware Phosphor glyph (temperature → thermometer, CO₂ → wind, motion → person walking, …), and shows its current value. Rows that changed within the last 10 minutes pick up an accent-4 wash + a 'just now' / 'Nm ago' badge.",
   "icon": "ph-squares-four",
@@ -29,9 +29,18 @@
     {
       "name": "overrides",
       "type": "entity_overrides",
-      "label": "Custom names + icons",
+      "label": "Custom names + icons + number format",
       "default": "",
-      "help": "One row per ticked entity. Leave the name blank to keep the auto label; pick \"No icon\" to keep the auto icon."
+      "formats": true,
+      "help": "One row per ticked entity. Leave the name blank to keep the auto label; pick \"No icon\" to keep the auto icon. The format box overrides the widget number format for that entity (blank = use the widget default)."
+    },
+    {
+      "name": "number_format",
+      "type": "string",
+      "label": "Number format",
+      "default": "",
+      "placeholder": "auto (e.g. 0, 0.0, 0.00)",
+      "help": "How numeric values are shown. Blank rounds to 2 decimals and trims trailing zeros (21.00 → 21). Use 0 for whole numbers, 0.0 for one decimal, 0.00 for two, and so on. Per-entity overrides live in the row above."
     }
   ],
   "render": {

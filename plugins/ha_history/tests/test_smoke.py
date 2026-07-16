@@ -48,6 +48,22 @@ def test_single_series_trend_and_axis(app: Flask, monkeypatch) -> None:
     assert it["unit"] == "°C"
 
 
+def test_number_format_fixes_current_min_max(app: Flask, monkeypatch) -> None:
+    """#111: number_format fixes decimals on the current / min / max
+    labels; blank keeps the round(2):g default."""
+    hist, core = _mods(app)
+    series = [{"state": str(v)} for v in [10, 11, 13, 16, 19]]
+    with app.app_context():
+        monkeypatch.setattr(core, "get_states", lambda: _STATES)
+        monkeypatch.setattr(core, "history", lambda eid, hours=24: series)
+        out = hist.fetch(
+            {"entities": "sensor.temp", "hours": 12, "number_format": "0.0"}, {}, ctx={}
+        )
+    it = out["items"][0]
+    assert it["current"] == "21.4"  # raw state 21.4 formatted to one decimal
+    assert it["min"] == "10.0" and it["max"] == "19.0"
+
+
 def test_multiple_series(app: Flask, monkeypatch) -> None:
     hist, core = _mods(app)
     series = {

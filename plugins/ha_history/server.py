@@ -44,6 +44,22 @@ def _to_float(value: Any) -> float | None:
         return None
 
 
+_NUMBER_FORMAT = re.compile(r"0(?:\.(0+))?$")
+
+
+def _fmt_num(value: float, fmt: str = "") -> str:
+    """Format ``value`` per a data-element number pattern (``0`` / ``0.0``
+    / ``0.00``, matching the canvas data element's vocabulary). Blank or
+    unrecognised patterns round to 2 decimals with trailing zeros trimmed
+    (18.42857 → "18.43", 21.00 → "21")."""
+    if fmt:
+        m = _NUMBER_FORMAT.fullmatch(fmt)
+        if m:
+            decimals = len(m.group(1)) if m.group(1) else 0
+            return f"{value:.{decimals}f}"
+    return f"{round(value, 2):g}"
+
+
 def _downsample(values: list[float], cap: int = _MAX_POINTS) -> list[float]:
     n = len(values)
     if n <= cap:
@@ -109,7 +125,9 @@ def _hourly_profile(samples: list[dict[str, Any]]) -> list[float | None]:
     return out
 
 
-def _series_for(core: Any, eid: str, by_id: dict[str, Any], hours: int) -> dict[str, Any]:
+def _series_for(
+    core: Any, eid: str, by_id: dict[str, Any], hours: int, fmt: str = ""
+) -> dict[str, Any]:
     st = by_id.get(eid)
     if st is None:
         return {
@@ -129,7 +147,7 @@ def _series_for(core: Any, eid: str, by_id: dict[str, Any], hours: int) -> dict[
     current = ""
     if raw_state.lower() not in _UNAVAILABLE:
         current_f = _to_float(raw_state)
-        current = f"{round(current_f, 2):g}" if current_f is not None else raw_state
+        current = _fmt_num(current_f, fmt) if current_f is not None else raw_state
 
     samples = core.history(eid, hours=hours)
     values = [v for v in (_to_float(s.get("state")) for s in samples) if v is not None]
@@ -161,10 +179,10 @@ def _series_for(core: Any, eid: str, by_id: dict[str, Any], hours: int) -> dict[
     return {
         "name": name,
         "unit": unit,
-        "current": current or f"{values[-1]:g}",
+        "current": current or _fmt_num(values[-1], fmt),
         "values": values,
-        "min": f"{lo:g}",
-        "max": f"{hi:g}",
+        "min": _fmt_num(lo, fmt),
+        "max": _fmt_num(hi, fmt),
         "min_idx": min_idx,
         "max_idx": max_idx,
         "hourly_profile": profile,
@@ -189,11 +207,12 @@ def fetch(
     # Prefer the new ``window`` select; fall back to ``hours`` for cells
     # saved before the picker existed.
     hours = _clamp_hours(options.get("window") or options.get("hours") or 24)
+    number_format = str(options.get("number_format") or "").strip()
 
     try:
         states = core.get_states()
         by_id = {str(s.get("entity_id")): s for s in states}
-        items = [_series_for(core, eid, by_id, hours) for eid in wanted]
+        items = [_series_for(core, eid, by_id, hours, number_format) for eid in wanted]
     except Exception as err:
         return {"error": core.coerce_error(err)}
 

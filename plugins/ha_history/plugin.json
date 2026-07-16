@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "Home Assistant, History",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "kind": "widget",
   "description": "A numeric Home Assistant sensor over time. Pairs the current value + trend arrow + min/max with a Chart.js line chart, optional threshold horizontal line, min/max marker dots + labels on the curve, and an averaged hourly-profile ghost overlay for long windows. Requires the Home Assistant Core plugin.",
   "icon": "ph-chart-line",
@@ -25,6 +25,14 @@
       "label": "Entities",
       "default": [],
       "choices_from": "entity"
+    },
+    {
+      "name": "number_format",
+      "type": "string",
+      "label": "Number format",
+      "default": "",
+      "placeholder": "auto (e.g. 0, 0.0, 0.00)",
+      "help": "How the current / min / max values are shown. Blank rounds to 2 decimals and trims trailing zeros (21.00 → 21). Use 0 for whole numbers, 0.0 for one decimal, 0.00 for two, and so on."
     },
     {
       "name": "threshold",

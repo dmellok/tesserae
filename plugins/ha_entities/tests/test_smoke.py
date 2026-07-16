@@ -67,6 +67,48 @@ def test_choices_delegates_to_core(app: Flask, monkeypatch) -> None:
         assert ent.choices("entity") == [{"value": "light.x", "label": "X"}]
 
 
+def test_number_format_option_and_per_entity_override(app: Flask, monkeypatch) -> None:
+    """#111: widget-level number_format fixes decimals on numeric states,
+    and a per-entity format (4th override field) wins over it. The unit
+    still follows the value."""
+    ent, core = _mods(app)
+    states = [
+        {
+            "entity_id": "sensor.temp",
+            "state": "21",
+            "attributes": {"friendly_name": "Lounge", "unit_of_measurement": "°C"},
+        },
+        {
+            "entity_id": "sensor.humidity",
+            "state": "55.5",
+            "attributes": {"friendly_name": "Humidity", "unit_of_measurement": "%"},
+        },
+    ]
+    with app.app_context():
+        monkeypatch.setattr(core, "get_states", lambda: states)
+        out = ent.fetch(
+            {
+                "entities": ["sensor.temp", "sensor.humidity"],
+                "number_format": "0.0",
+                "overrides": "sensor.humidity | | | 0.00",
+            },
+            {},
+            ctx={},
+        )
+    rows = {r["name"]: r for r in out["items"]}
+    assert rows["Lounge"]["label"] == "21.0 °C"  # widget default 0.0
+    assert rows["Humidity"]["label"] == "55.50 %"  # per-entity 0.00 beats 0.0
+
+
+def test_overrides_parser_reads_format_field() -> None:
+    """The 4th pipe field parses into ``format``."""
+    from plugins.ha_entities.server import _parse_overrides
+
+    parsed = _parse_overrides("sensor.a | Name | icon | 0.0\nsensor.b | | | 0.00")
+    assert parsed["sensor.a"] == {"name": "Name", "icon": "icon", "format": "0.0"}
+    assert parsed["sensor.b"] == {"format": "0.00"}
+
+
 def test_composer_mounts_widget(client: FlaskClient) -> None:
     resp = client.get("/_test/render?plugin=ha_entities&size=md")
     assert resp.status_code == 200
