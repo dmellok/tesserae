@@ -218,8 +218,8 @@ macro here instead.
    ticked entity. The hidden textarea is the source of truth, JS keeps
    it in the legacy pipe-separated format so the server-side parser
    (`_parse_overrides`) stays unchanged. -#}
-{%- macro entity_overrides_field(field_id, name, label, value='', help=None) -%}
-<div class="field field--entity-overrides" data-entity-overrides>
+{%- macro entity_overrides_field(field_id, name, label, value='', help=None, formats=False) -%}
+<div class="field field--entity-overrides" data-entity-overrides{% if formats %} data-overrides-formats="1"{% endif %}>
   <label for="{{ field_id }}">{{ label }}{{ info_pop(help) }}</label>
   <textarea id="{{ field_id }}" name="{{ name }}" rows="1"
             class="entity-overrides-storage" data-overrides-storage
@@ -482,7 +482,7 @@ macro here instead.
                                 variables=spec.get('variables', []),
                                 help=help_text) }}
   {% elif ftype == 'entity_overrides' %}
-    {{ entity_overrides_field(field_id, name, label, value=value, help=help_text) }}
+    {{ entity_overrides_field(field_id, name, label, value=value, help=help_text, formats=spec.get('formats', False)) }}
   {% elif ftype == 'location_search' %}
     {{ location_search_field(field_id, name, label, value=value, help=help_text) }}
   {% elif ftype == 'slider' %}

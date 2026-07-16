@@ -472,6 +472,15 @@ code {
   box-shadow: 0 0 0 0 transparent inset;
   transition: box-shadow 80ms ease, background 80ms ease;
 }
+/* HA sensor opts in to a per-row number-format input (a 5th column). */
+.entity-override-row.has-formats {
+  grid-template-columns: auto minmax(0, 1.2fr) minmax(0, 1.3fr) minmax(90px, 0.6fr) minmax(72px, 0.55fr);
+}
+.entity-override-row .entity-override-format {
+  width: 100%;
+  font-family: var(--t-font-mono, ui-monospace, monospace);
+  text-align: center;
+}
 .entity-override-row.is-dragging {
   opacity: 0.4;
 }
@@ -508,10 +517,12 @@ code {
 @media (max-width: 640px) {
   /* Stack on narrow screens, the inline icon picker needs full row
      width for its popover not to clip out of the cell card. */
-  .entity-override-row {
+  .entity-override-row,
+  .entity-override-row.has-formats {
     grid-template-columns: auto 1fr;
   }
   .entity-override-row .entity-override-name,
+  .entity-override-row .entity-override-format,
   .entity-override-row .icon-picker--inline {
     grid-column: 1 / -1;
   }

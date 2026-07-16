@@ -155,3 +155,52 @@ def test_overrides_parser_tolerates_garbage() -> None:
     assert _parse_overrides("sensor.bare") == {}
     # Empty entity id (leading pipe), skipped.
     assert _parse_overrides("| Name | icon") == {}
+
+
+def test_format_value_default_and_patterns() -> None:
+    """#111: blank format keeps the round(2):g default; number patterns
+    fix the decimal places; non-numeric states pass through."""
+    from plugins.ha_sensor.server import _format_value
+
+    # Default: round to 2 dp, trim trailing zeros.
+    assert _format_value("21.00") == "21"
+    assert _format_value("20.55") == "20.55"
+    assert _format_value("on") == "on"
+    # Explicit patterns fix the decimals so a column reads consistently.
+    assert _format_value("21", "0.0") == "21.0"
+    assert _format_value("20.554", "0.00") == "20.55"
+    assert _format_value("21.6", "0") == "22"
+    # An unrecognised pattern falls back to the default rather than erroring.
+    assert _format_value("21.004", "junk") == "21"
+    # A non-numeric state ignores the format entirely.
+    assert _format_value("cooling", "0.00") == "cooling"
+
+
+def test_number_format_option_and_per_entity_override(app: Flask, monkeypatch) -> None:
+    """#111: the widget-level number_format applies to every entity, and a
+    per-entity format (4th override field) wins over it."""
+    sensor, core = _mods(app)
+    overrides = "sensor.humidity | | | 0.00"  # per-entity format only
+    with app.app_context():
+        monkeypatch.setattr(core, "get_states", lambda: _STATES)
+        out = sensor.fetch(
+            {
+                "entities": ["sensor.lounge_temp", "sensor.humidity"],
+                "number_format": "0.0",
+                "overrides": overrides,
+            },
+            {},
+            ctx={},
+        )
+    items = out["items"]
+    assert items[0]["value"] == "21.4"  # widget default 0.0
+    assert items[1]["value"] == "55.00"  # per-entity override 0.00 beats 0.0
+
+
+def test_overrides_parser_reads_format_field() -> None:
+    """The 4th pipe field parses into ``format`` and name/icon stay optional."""
+    from plugins.ha_sensor.server import _parse_overrides
+
+    parsed = _parse_overrides("sensor.a | Name | icon | 0.0\nsensor.b | | | 0.00")
+    assert parsed["sensor.a"] == {"name": "Name", "icon": "icon", "format": "0.0"}
+    assert parsed["sensor.b"] == {"format": "0.00"}

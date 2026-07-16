@@ -81,15 +81,35 @@ _DOMAIN_ICONS: dict[str, str] = {
 _UNAVAILABLE = {"unavailable", "unknown", "none", ""}
 
 
-def _format_value(raw: str) -> str:
-    """Round numeric HA states to 2 decimal places (then trim trailing
-    zeros so 21.00 → "21" / 18.40 → "18.4"). Non-numeric states pass
-    through unchanged so a state like ``on`` or ``cooling`` keeps its
-    spelling."""
+_NUMBER_FORMAT = re.compile(r"0(?:\.(0+))?$")
+
+
+def _apply_number_format(value: float, fmt: str) -> str | None:
+    """Format ``value`` per a data-element number pattern: ``0`` /
+    ``0.0`` / ``0.00`` fix the decimal places (matching the canvas data
+    element's vocabulary). Returns ``None`` when ``fmt`` isn't a
+    recognised pattern, so the caller keeps its default formatting."""
+    m = _NUMBER_FORMAT.fullmatch(fmt)
+    if not m:
+        return None
+    decimals = len(m.group(1)) if m.group(1) else 0
+    return f"{value:.{decimals}f}"
+
+
+def _format_value(raw: str, fmt: str = "") -> str:
+    """Format a numeric HA state. With an explicit ``fmt`` (a number
+    pattern like ``0.0``) the value is fixed to that many decimals;
+    otherwise it's rounded to 2 decimals with trailing zeros trimmed
+    (so 21.00 → "21" / 18.40 → "18.4"). Non-numeric states pass through
+    unchanged so a state like ``on`` or ``cooling`` keeps its spelling."""
     try:
         value = float(raw)
     except (TypeError, ValueError):
         return raw
+    if fmt:
+        formatted = _apply_number_format(value, fmt)
+        if formatted is not None:
+            return formatted
     return f"{round(value, 2):g}"
 
 
@@ -114,12 +134,14 @@ def _entity_list(raw: Any) -> list[str]:
 
 
 def _parse_overrides(raw: Any) -> dict[str, dict[str, str]]:
-    """Parse the ``overrides`` textarea into ``{entity_id: {name?, icon?}}``.
+    """Parse the ``overrides`` textarea into
+    ``{entity_id: {name?, icon?, format?}}``.
 
-    Format: one entity per line, pipe-separated ``entity_id | name | icon``.
-    Either field may be empty (just leave nothing between the pipes) to keep
-    the auto value. Lines starting with ``#`` are comments; blank lines
-    are skipped. Tolerant of trailing whitespace and a missing third field.
+    Format: one entity per line, pipe-separated
+    ``entity_id | name | icon | format``. Any field may be empty (leave
+    nothing between the pipes) to keep the auto value. Lines starting with
+    ``#`` are comments; blank lines are skipped. Tolerant of trailing
+    whitespace and a missing third/fourth field.
     """
     out: dict[str, dict[str, str]] = {}
     text = str(raw or "")
@@ -135,6 +157,8 @@ def _parse_overrides(raw: Any) -> dict[str, dict[str, str]]:
             entry["name"] = parts[1]
         if len(parts) > 2 and parts[2]:
             entry["icon"] = parts[2]
+        if len(parts) > 3 and parts[3]:
+            entry["format"] = parts[3]
         if entry:
             out[parts[0]] = entry
     return out
@@ -202,6 +226,7 @@ def fetch(
     # flip them either way.
     show_trend = options.get("show_trend") is not False
     show_sparkline = options.get("show_sparkline") is not False
+    number_format = str(options.get("number_format") or "").strip()
     overrides = _parse_overrides(options.get("overrides"))
     items: list[dict[str, Any]] = []
     for eid in wanted:
@@ -223,7 +248,7 @@ def fetch(
         is_unavailable = raw.lower() in _UNAVAILABLE
         item = {
             "name": ov.get("name") or core.friendly_name(st),
-            "value": _format_value(raw),
+            "value": _format_value(raw, ov.get("format") or number_format),
             "unit": str(attrs.get("unit_of_measurement") or "") if show_unit else "",
             "icon": ov.get("icon") or _icon_for(eid, attrs),
             "unavailable": is_unavailable,

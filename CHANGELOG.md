@@ -8,6 +8,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **HA Sensor: choose how numbers are formatted.** The Home Assistant Sensor widget rounded every
+  numeric state to 2 decimals and trimmed trailing zeros, so a column mixing `21.00` and `20.55`
+  rendered as `21` next to `20.55`. A new widget-level **Number format** option fixes the decimal
+  places using the same pattern vocabulary as the canvas data element (`0`, `0.0`, `0.00`, …), and
+  each entity can override it from a per-row format box in the names/icons editor. Blank keeps the
+  old auto behaviour. `ha_sensor` 0.7.0. (#111)
+
 - **Bundled fonts are now usable inside the code element.** A code element can use any bundled font
   by family name (`font-family: "Fira Code"`, `"Press Start 2P"`, …). The sandbox has no network and
   a `font-src data:` CSP, so a new `/fonts/face/<id>.css` endpoint serves a self-contained `@font-face`

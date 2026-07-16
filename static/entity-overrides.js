@@ -8,10 +8,13 @@
 // the source of truth for the name/icon, JS keeps it in the legacy
 // pipe-separated format
 //
-//     entity_id | name | icon
+//     entity_id | name | icon | format
 //
 // so the server-side parser (_parse_overrides in ha_sensor/server.py
-// + ha_entities/server.py) stays unchanged.
+// + ha_entities/server.py) stays unchanged. The 4th field (a number
+// format like ``0.0``) is only written when set, and the per-row
+// input is only shown when the field opts in via
+// ``data-overrides-formats`` (the HA sensor widget).
 //
 // Drag-to-reorder: rows are HTML5-draggable. On drop, the matching
 // .multiselect-opt elements in the linked multiselect are reordered
@@ -36,7 +39,8 @@
       const entry = {};
       if (parts.length > 1 && parts[1]) entry.name = parts[1];
       if (parts.length > 2 && parts[2]) entry.icon = parts[2];
-      if (entry.name || entry.icon) out.set(parts[0], entry);
+      if (parts.length > 3 && parts[3]) entry.format = parts[3];
+      if (entry.name || entry.icon || entry.format) out.set(parts[0], entry);
     }
     return out;
   }
@@ -46,8 +50,11 @@
     map.forEach((entry, eid) => {
       const name = entry.name || "";
       const icon = entry.icon || "";
-      if (!name && !icon) return;
-      lines.push(`${eid} | ${name} | ${icon}`);
+      const format = entry.format || "";
+      if (!name && !icon && !format) return;
+      // Only emit the 4th (format) field when it's set, so name/icon-only
+      // rows keep the legacy three-field shape.
+      lines.push(format ? `${eid} | ${name} | ${icon} | ${format}` : `${eid} | ${name} | ${icon}`);
     });
     return lines.join("\n");
   }
@@ -70,6 +77,7 @@
     const textarea = field.querySelector("[data-overrides-storage]");
     const list = field.querySelector("[data-overrides-list]");
     const emptyTpl = field.querySelector("[data-overrides-empty]");
+    const showFormats = field.dataset.overridesFormats === "1";
     if (!multiselect || !textarea || !list) return;
 
     const state = parseOverrides(textarea.value);
@@ -99,7 +107,7 @@
     function updateState(eid, patch) {
       const e = state.get(eid) || {};
       Object.assign(e, patch);
-      if (!e.name && !e.icon) state.delete(eid);
+      if (!e.name && !e.icon && !e.format) state.delete(eid);
       else state.set(eid, e);
       writeStorage();
     }
@@ -187,12 +195,20 @@
       const safeEid = escapeAttr(eid);
       const safeName = escapeAttr(existing.name || "");
       const safeIcon = escapeAttr(existing.icon || "");
+      const safeFormat = escapeAttr(existing.format || "");
       const iconMarkup = existing.icon
         ? `<i class="ph ph-${escapeAttr(existing.icon)}" aria-hidden="true"></i>`
         : `<i class="ph ph-prohibit" aria-hidden="true"></i>`;
+      const formatMarkup = showFormats
+        ? `<input type="text" class="entity-override-format"
+                 placeholder="auto" value="${safeFormat}"
+                 title="Number format, e.g. 0.0 (blank = auto)"
+                 aria-label="Number format for ${safeLabel}"
+                 autocomplete="off" spellcheck="false">`
+        : "";
 
       const div = document.createElement("div");
-      div.className = "entity-override-row";
+      div.className = showFormats ? "entity-override-row has-formats" : "entity-override-row";
       div.dataset.entityId = eid;
       div.innerHTML = `
         <button type="button" class="entity-override-drag"
@@ -222,6 +238,7 @@
             <p class="icon-picker-empty" data-icon-empty hidden>No icons match that search.</p>
           </div>
         </div>
+        ${formatMarkup}
       `;
 
       const nameInput = div.querySelector(".entity-override-name");
@@ -232,6 +249,12 @@
       iconHidden.addEventListener("input", () => {
         updateState(eid, { icon: iconHidden.value.trim() });
       });
+      const formatInput = div.querySelector(".entity-override-format");
+      if (formatInput) {
+        formatInput.addEventListener("input", () => {
+          updateState(eid, { format: formatInput.value.trim() });
+        });
+      }
       bindRowDrag(div, eid);
 
       return div;

@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "Home Assistant, Sensor",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "kind": "widget",
   "description": "One or more Home Assistant entities as bold value blocks. A single entity fills the cell as a hero number with a trend arrow + 24h sparkline beneath; several lay out as a list with per-row trend + hairline sparkline. Lead glyph picks up the device-class (temperature → thermometer, CO₂ → wind, current → wave-sine, money → coin, etc.). Requires the Home Assistant Core plugin.",
   "icon": "ph-gauge",
@@ -30,9 +30,18 @@
     {
       "name": "overrides",
       "type": "entity_overrides",
-      "label": "Custom names + icons",
+      "label": "Custom names + icons + number format",
       "default": "",
-      "help": "One row per ticked entity. Leave the name blank to keep the auto label; pick \"No icon\" to keep the auto icon."
+      "formats": true,
+      "help": "One row per ticked entity. Leave the name blank to keep the auto label; pick \"No icon\" to keep the auto icon. The format box overrides the widget number format for that entity (blank = use the widget default)."
+    },
+    {
+      "name": "number_format",
+      "type": "string",
+      "label": "Number format",
+      "default": "",
+      "placeholder": "auto (e.g. 0, 0.0, 0.00)",
+      "help": "How numeric values are shown. Blank rounds to 2 decimals and trims trailing zeros (21.00 → 21). Use 0 for whole numbers, 0.0 for one decimal, 0.00 for two, and so on. Per-entity overrides live in the row above."
     },
     {
       "name": "show_unit",
