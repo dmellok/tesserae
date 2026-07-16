@@ -316,7 +316,8 @@
     phosphor_light: "{{ url_for('static', filename='vendor/phosphor/phosphor-light.css') }}",
     phosphor_fill: "{{ url_for('static', filename='vendor/phosphor/phosphor-fill.css') }}",
     phosphor_duotone: "{{ url_for('static', filename='vendor/phosphor/phosphor-duotone.css') }}"
-  };</script>
+  };
+  window.__TESSERAE_FONTS = [{% for f in code_fonts or [] %}{ "name": {{ f.name|tojson }}, "url": "{{ url_for('composer.font_face_datauri', font_id=f.id) }}" }{{ "," if not loop.last }}{% endfor %}];</script>
   <script src="{{ url_for('static', filename='vendor/jsbeautify/beautifier.min.js') }}"></script>
   <script src="{{ url_for('static', filename='panels/decorate.js') }}"></script>
   <script src="{{ url_for('static', filename='panels/editor.js') }}"></script>

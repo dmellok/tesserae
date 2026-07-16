@@ -238,6 +238,18 @@
         if (lib.init) libScripts += "<script>" + lib.init + "</" + "script>";
       }
     }
+    // Inline any bundled font whose family name the code references, so a code
+    // element can use it by name. The sandbox has no network and a
+    // ``font-src data:`` CSP, so the @font-face has to carry the woff2 as a
+    // data: URL (the /fonts/face/<id>.css endpoint builds that). Only fonts the
+    // code actually names are inlined, so a lean element stays lean.
+    var fonts = window.__TESSERAE_FONTS || [];
+    for (var k = 0; k < fonts.length; k++) {
+      var fnt = fonts[k];
+      if (!fnt || !fnt.name || probe.indexOf(fnt.name) === -1) continue;
+      var fcss = libSource(fnt.url);
+      if (fcss) { headCss += fcss + "\n"; needFont = true; }
+    }
     // img-src allows the web so a code element can show remote artwork
     // (Spotify album covers, Unsplash photos, etc.), the same external images
     // ordinary widgets already paint at render time. This is images ONLY: a

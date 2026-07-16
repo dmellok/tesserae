@@ -23,7 +23,7 @@ import urllib.error
 import urllib.request
 from typing import Any
 
-__version__ = "0.5.12"
+__version__ = "0.5.13"
 
 _BASE = os.environ.get("TESSERAE_URL", "http://127.0.0.1:8765").rstrip("/")
 _TOKEN = os.environ.get("TESSERAE_MCP_TOKEN", "").strip()
@@ -89,6 +89,10 @@ plus optional "opacity" (0-100) and "rotate" (degrees). By "kind":
              - Phosphor icons, all six weights: <i class="ph-bold ph-heart"></i> (also ph (regular),
                ph-thin, ph-light, ph-fill, ph-duotone). Each weight's font is inlined only when its
                class appears in your code.
+             - Fonts: any bundled font (the names in appearance.fonts from list_widgets) works in the
+               sandbox by family name, e.g. `font-family: "Fira Code"` or `"Press Start 2P"`. Only
+               fonts your code actually names are inlined, so there's a broad programming + pixel set
+               available at no cost until used.
            Chart.js example: put a <canvas id="c"> in "html", then in "js":
            "new Chart(document.getElementById('c'),{type:'line',data:{labels:[...],
            datasets:[{data: ctx.data.weather.hourly.map(h=>h.temp)}]}})".

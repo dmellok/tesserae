@@ -17,6 +17,22 @@ def test_test_render_route_returns_cell_markup(client: FlaskClient) -> None:
     assert 'class="cell' in body
 
 
+def test_font_face_datauri_embeds_woff2(client: FlaskClient) -> None:
+    # Self-contained @font-face CSS (woff2 as data: URL) so the code element
+    # sandbox can use a bundled font by name.
+    resp = client.get("/fonts/face/fira_code.css")
+    assert resp.status_code == 200
+    assert resp.mimetype == "text/css"
+    body = resp.get_data(as_text=True)
+    assert "@font-face" in body
+    assert "font-family: 'Fira Code'" in body
+    assert "src: url(data:font/woff2;base64," in body
+
+
+def test_font_face_datauri_unknown_404s(client: FlaskClient) -> None:
+    assert client.get("/fonts/face/not_a_font.css").status_code == 404
+
+
 def test_test_render_unknown_plugin_still_routes(client: FlaskClient) -> None:
     # /_test/render mounts whatever plugin id you give it; the client-side
     # composer surfaces the load failure rather than the server refusing.

@@ -83,6 +83,11 @@ _LOOPBACK_PATHS: Final[tuple[str, ...]] = (
     # (/_test/widgets, ...) stays behind the session gate. composer.test_render
     # is itself 404 unless debug/testing or loopback, so this exposes nothing new.
     "/_test/render",
+    # Self-contained @font-face CSS (woff2 as data: URLs) for the code element
+    # sandbox. The composer's decorate.js pulls these over loopback while
+    # rendering a canvas, same as /plugins/<id>/client.js. Exposes only the
+    # already-installed font files, nothing sensitive.
+    "/fonts/face/",
 )
 _LAN_PATHS: Final[tuple[str, ...]] = ("/renders/", "/preview/", "/mirror/")
 # Plugin assets, /plugins/<id>/<asset> only, NOT /plugins/ (the admin

@@ -8,6 +8,14 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Bundled fonts are now usable inside the code element.** A code element can use any bundled font
+  by family name (`font-family: "Fira Code"`, `"Press Start 2P"`, …). The sandbox has no network and
+  a `font-src data:` CSP, so a new `/fonts/face/<id>.css` endpoint serves a self-contained `@font-face`
+  (woff2 embedded as a `data:` URL), and the sandbox inlines only the fonts a given element actually
+  names. Previously only Phosphor was available in code elements; the whole `fonts_core` set (including
+  the new programming + pixel fonts) now works there. Bridge doc-shape updated so the agent knows.
+  Bridge 0.5.13.
+
 - **16 new fonts: a big programming + pixel set.** Core fonts (`fonts_core` 0.5.0) gains a broad
   monospace / coding set (Fira Code, Source Code Pro, Martian Mono, Red Hat Mono, Fragment Mono,
   Spline Sans Mono, Overpass Mono, on top of the existing JetBrains Mono / IBM Plex Mono / Space

@@ -14,6 +14,7 @@ no longer carry palette / --theme-* / --c-* tokens.
 
 from __future__ import annotations
 
+import base64
 import json
 import logging
 from typing import Any, Final
@@ -277,6 +278,43 @@ def _resolve_font(font_id: str | None, registry: PluginRegistry) -> Font | None:
         if font is not None:
             return font
     return registry.get_font("default")
+
+
+# Self-contained (data: URL) @font-face CSS per font, cached. Built from the
+# font plugin's woff2 on disk. Used by the code element sandbox, which has no
+# network and a ``font-src data:`` CSP, so file-URL @font-face won't load there.
+_FONT_FACE_DATAURI_CACHE: dict[str, str] = {}
+
+
+@bp.get("/fonts/face/<font_id>.css")
+def font_face_datauri(font_id: str) -> Any:
+    """Self-contained @font-face CSS (woff2 embedded as ``data:`` URLs) for one
+    font id, so a code element can use it by family name inside its sandbox.
+    Cached; the file list comes from the plugin manifest (not user input)."""
+    css = _FONT_FACE_DATAURI_CACHE.get(font_id)
+    if css is None:
+        reg = current_app.config["PLUGIN_REGISTRY"]
+        font = reg.fonts.get(font_id)
+        plugin = reg.get(font.plugin_id) if font is not None else None
+        if font is None or plugin is None:
+            abort(404)
+        entry = next((f for f in plugin.manifest.get("fonts", []) if f.get("id") == font_id), None)
+        if entry is None:
+            abort(404)
+        rules: list[str] = []
+        for weight, rel in sorted(entry.get("files", {}).items()):
+            try:
+                data = (plugin.path / rel).read_bytes()
+            except OSError:
+                continue
+            b64 = base64.b64encode(data).decode("ascii")
+            rules.append(
+                f"@font-face {{ font-family: '{font.name}'; font-weight: {weight}; "
+                f"src: url(data:font/woff2;base64,{b64}) format('woff2'); font-display: block; }}"
+            )
+        css = "\n".join(rules)
+        _FONT_FACE_DATAURI_CACHE[font_id] = css
+    return current_app.response_class(css, mimetype="text/css")
 
 
 def _font_face_css(fonts: dict[str, Font]) -> str:
@@ -1006,6 +1044,7 @@ def _render_canvas(layout: Any, *, target_w: int, target_h: int) -> str:
         bg_image=layout.bg_image or "",
         bg_fit=layout.bg_fit or "cover",
         font_face_css=_font_face_css(registry.fonts),
+        code_fonts=[{"id": f.id, "name": f.name} for f in registry.fonts.values()],
     )
 
 
