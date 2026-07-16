@@ -8,6 +8,19 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **All six Phosphor icon weights in the canvas code element.** The sandbox previously only had bold;
+  it now has thin, light, regular, bold, fill, and duotone, each vendored as a self-contained CSS with
+  the font embedded as a `data:` URL and inlined only when its class (`ph`, `ph-thin`, `ph-duotone`, …)
+  appears in the code, so an element that uses one weight doesn't pay for the others. Verified all six
+  load and render under the sandbox CSP.
+
+### Changed
+
+- **The MCP agent defaults to the code element for dashboards.** Guidance now tells the agent to build
+  a dashboard as a `code` element (HTML/CSS/JS fed by widget sources, with the vendored toolkit) for
+  anything beyond a trivial single-widget page, falling back to bare widget/data/shape elements only
+  when the page really is just one widget. Bridge bumped to 0.5.12.
+
 - **Hover preview on the Dashboards page.** Hovering a dashboard row now shows a live, scaled-down
   preview of it, a small `<iframe>` of the same `/compose/<id>` HTML the panel is screenshotted from,
   so it's faithful to the design and rendered entirely by the browser (no server render). It lazy-loads

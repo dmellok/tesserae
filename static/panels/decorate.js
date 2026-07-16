@@ -169,7 +169,15 @@
     { name: "marked", files: ["marked"], test: /\bmarked\b/, kind: "js" },
     { name: "chroma", files: ["chroma"], test: /\bchroma\b/, kind: "js" },
     { name: "svg.js", files: ["svgjs"], test: /\bSVG\b/, kind: "js" },
-    { name: "phosphor", files: ["phosphor"], test: /\bph-/, kind: "css" },
+    // Phosphor icons, all six weights. Each weight's self-contained CSS
+    // (font embedded as a data: URL) is inlined only when its class appears,
+    // so an element that uses one weight doesn't pay for the others.
+    { name: "ph-regular", files: ["phosphor_regular"], test: /\bph\b(?!-)/, kind: "css" },
+    { name: "ph-thin", files: ["phosphor_thin"], test: /\bph-thin\b/, kind: "css" },
+    { name: "ph-light", files: ["phosphor_light"], test: /\bph-light\b/, kind: "css" },
+    { name: "ph-bold", files: ["phosphor"], test: /\bph-bold\b/, kind: "css" },
+    { name: "ph-fill", files: ["phosphor_fill"], test: /\bph-fill\b/, kind: "css" },
+    { name: "ph-duotone", files: ["phosphor_duotone"], test: /\bph-duotone\b/, kind: "css" },
   ];
 
   var _libCache = {};

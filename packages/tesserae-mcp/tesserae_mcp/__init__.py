@@ -23,7 +23,7 @@ import urllib.error
 import urllib.request
 from typing import Any
 
-__version__ = "0.5.11"
+__version__ = "0.5.12"
 
 _BASE = os.environ.get("TESSERAE_URL", "http://127.0.0.1:8765").rstrip("/")
 _TOKEN = os.environ.get("TESSERAE_MCP_TOKEN", "").strip()
@@ -86,8 +86,9 @@ plus optional "opacity" (0-100) and "rotate" (degrees). By "kind":
                palette. Reserve exact palette hex (list_devices()) only for fine text/icons where
                dithering would look noisy.
              - SVG -> SVG(). @svgdotjs/svg.js for programmatic vector graphics (rings, arcs, badges).
-             - Phosphor icons: use <i class="ph-bold ph-heart"></i> in your html; the bold icon font is
-               inlined when your code contains a ph- class.
+             - Phosphor icons, all six weights: <i class="ph-bold ph-heart"></i> (also ph (regular),
+               ph-thin, ph-light, ph-fill, ph-duotone). Each weight's font is inlined only when its
+               class appears in your code.
            Chart.js example: put a <canvas id="c"> in "html", then in "js":
            "new Chart(document.getElementById('c'),{type:'line',data:{labels:[...],
            datasets:[{data: ctx.data.weather.hourly.map(h=>h.temp)}]}})".
@@ -213,6 +214,14 @@ def _json(method: str, path: str, body: dict[str, Any] | None = None) -> Any:
 # the tools instead of being pasted in by hand.
 _INSTRUCTIONS = """\
 You compose Tesserae canvases through these tools (mcp__tesserae__*). Work this loop.
+
+DEFAULT TO THE CODE ELEMENT. For anything beyond a trivial single-widget page, build the
+dashboard as a `code` element: HTML/CSS/JS fed by any number of widget sources (read as
+ctx.data.<name>), with the vendored toolkit available (Chart.js, canvas-gauges, dayjs, qrcode,
+marked, chroma, SVG.js, Phosphor icons). It gives full control over layout, typography, and
+styling that the widget/data/shape elements can't match, and it's the only way to combine
+several widgets into one cohesive design. Reach for a bare widget/data/shape element only when
+the page really is just one widget, or a couple of standalone values.
 
 LOOP: probe -> place -> render_preview -> render_report -> adjust -> (push).
 - get_widget_options(key) before placing, so you fill "options" correctly.
