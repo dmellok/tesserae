@@ -54,6 +54,7 @@ from app import (
 from app import (
     install_id as install_id_module,
 )
+from app import version_check as _version_check
 from app.discovery import DiscoveryCache
 from app.ha_discovery import HomeAssistantDiscovery
 from app.scheduler import Scheduler
@@ -978,6 +979,10 @@ def create_app(
             "community_discussions_url": "https://github.com/dmellok/tesserae/discussions",
             "community_discord_url": "https://discord.gg/6qmwkGhGR7",
             "community_sponsor_url": "https://github.com/sponsors/dmellok",
+            # Cached "update available" status for the topbar icon. Reads the
+            # last background-refreshed result (never blocks the render); off
+            # entirely when online features are disabled. See app/version_check.
+            "update_status": _version_check.status(app),
         }
 
     @app.get("/")

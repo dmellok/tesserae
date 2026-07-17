@@ -205,6 +205,19 @@
          class="{% if request.endpoint in ('auth.settings', 'auth.settings_area') or request.blueprint == 'events' %}is-active{% endif %}">
          <i class="ph ph-gear-six" aria-hidden="true"></i><span>Settings</span>
       </a>
+      {% if update_status is defined and update_status.available %}
+      {# Update-available badge. Shown only when the background version check
+         (app/version_check) found a newer release; links to the Settings
+         update section. Hidden entirely when online features are off. #}
+      <a href="{{ url_for('auth.settings') }}"
+         class="topbar-update"
+         title="Tesserae update available{% if update_status.latest %} (v{{ update_status.latest }}){% endif %}"
+         aria-label="Tesserae update available{% if update_status.latest %}: version {{ update_status.latest }}{% endif %}">
+        <span class="topbar-update-dot" aria-hidden="true"></span>
+        <i class="ph-bold ph-arrow-circle-up" aria-hidden="true"></i>
+        <span class="topbar-update-label">Update{% if update_status.latest %} · v{{ update_status.latest }}{% endif %}</span>
+      </a>
+      {% endif %}
       {% if nav_batteries %}
       {% set _drawer_worst = nav_batteries[0] %}
       <a href="{{ url_for('device_battery.index') }}"

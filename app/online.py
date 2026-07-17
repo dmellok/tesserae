@@ -192,3 +192,41 @@ def clear_counts_cache() -> None:
     """Drop the cached install counts (tests + on-demand refresh)."""
     global _counts_cache
     _counts_cache = None
+
+
+def latest_version(
+    channel: str,
+    current: str | None,
+    install: str | None = None,
+    *,
+    api_base: str = API_BASE,
+) -> dict[str, Any] | None:
+    """``GET /version/latest?channel=&current=&install=`` -> the parsed dict, or
+    ``None`` on any failure.
+
+    The response shape (per channel) is
+    ``{channel, current, latest: {version, url, released_at, notes_headline},
+    is_current, versions_behind}``. Best-effort; the caller checks
+    :func:`online_enabled` first (an opted-out install makes no request).
+    """
+    from urllib.parse import urlencode
+
+    params = {"channel": channel}
+    if current:
+        params["current"] = current
+    if install:
+        params["install"] = install
+    url = f"{api_base.rstrip('/')}/version/latest?{urlencode(params)}"
+    req = urllib.request.Request(url, headers={"User-Agent": "tesserae-version"})
+    try:
+        with urllib.request.urlopen(req, timeout=_TIMEOUT_SECONDS) as resp:
+            if int(resp.status) == 200:
+                payload = json.loads(resp.read().decode("utf-8"))
+                return payload if isinstance(payload, dict) else None
+    except urllib.error.HTTPError as exc:
+        with contextlib.suppress(Exception):
+            exc.close()
+        logger.debug("online: version check failed: %s", exc)
+    except Exception as exc:
+        logger.debug("online: version check failed: %s", exc)
+    return None

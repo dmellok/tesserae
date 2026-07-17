@@ -104,6 +104,38 @@ def test_report_widget_install_posts_expected_payload(
     }
 
 
+def test_latest_version_parses_channel_response(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, Any] = {}
+    body = json.dumps(
+        {
+            "channel": "stable",
+            "current": "0.130.0",
+            "latest": {"version": "0.140.0", "url": "https://gh/rel"},
+            "is_current": False,
+            "versions_behind": 3,
+        }
+    ).encode()
+
+    def fake_urlopen(req: Any, timeout: float) -> _FakeResp:
+        captured["url"] = req.full_url
+        return _FakeResp(200, body)
+
+    monkeypatch.setattr(online.urllib.request, "urlopen", fake_urlopen)
+    out = online.latest_version("stable", "0.130.0", "abc", api_base="https://x.test")
+    assert out is not None
+    assert "channel=stable" in captured["url"]
+    assert "current=0.130.0" in captured["url"] and "install=abc" in captured["url"]
+    assert out["latest"]["version"] == "0.140.0" and out["versions_behind"] == 3
+
+
+def test_latest_version_best_effort_on_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    def boom(req: Any, timeout: float) -> _FakeResp:
+        raise OSError("offline")
+
+    monkeypatch.setattr(online.urllib.request, "urlopen", boom)
+    assert online.latest_version("stable", "0.1.0", api_base="https://x.test") is None
+
+
 def test_report_widget_install_best_effort(monkeypatch: pytest.MonkeyPatch) -> None:
     def boom(req: Any, timeout: float) -> _FakeResp:
         raise OSError("network down")

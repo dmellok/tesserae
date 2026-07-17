@@ -8,6 +8,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **"Update available" badge in the header.** When a newer Tesserae release exists, the topbar shows
+  an accent-tinted update badge (with the version) linking to Settings. The check reads
+  `api.tesserae.ink/version/latest` for the running version, entirely in the background off the
+  request thread (a cached, single-flight refresh with a 6h TTL), so no page render ever blocks on
+  it. It's gated by the online-features opt-out exactly like the heartbeat, so an opted-out install
+  makes no call and shows nothing, and the install id is scoped (a one-way derivation) before it's
+  sent. Compares against the latest stable release; an install already ahead of stable (a source /
+  edge build) simply shows no badge rather than a false nag.
+
 - **Choose how Home Assistant numbers are formatted.** HA widgets rounded every numeric state to 2
   decimals and trimmed trailing zeros, so a column mixing `21.00` and `20.55` rendered as `21` next
   to `20.55`. A new widget-level **Number format** option fixes the decimal places using the same

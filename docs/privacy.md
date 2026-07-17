@@ -103,17 +103,19 @@ timestamp), so the cadence can't become a per-install activity trace, and
 it dedupes to one heartbeat per install per day. A coarse country is
 derived from the request IP and the IP is then discarded.
 
-### App update check (`tesserae_status`)
+### App update check (header badge + `tesserae_status`)
 
-When the update-indicator chip is enabled on a `tesserae_status`
-placement, the widget fetches
-`https://api.tesserae.ink/version/latest?channel=stable&current=<v>&install=<scoped-id>`
-so it can show an amber "update available" chip when a newer Tesserae
-release exists. The `install` parameter is the widget-scoped derivation
-of your install identifier. No IP address or User-Agent is stored; only
-a coarse country lookup plus the query params. The chip is off per
-placement by default, and does nothing at all when Online features is
-off.
+Tesserae checks for a newer release by fetching
+`https://api.tesserae.ink/version/latest?channel=stable&current=<v>&install=<scoped-id>`.
+Two things use it: the web UI's header shows an "update available" badge
+when a newer release exists (checked once in the background, cached for
+several hours, never blocking a page), and the `tesserae_status` widget
+shows the same as an on-panel chip when its update indicator is enabled.
+The `install` parameter is a scoped, one-way derivation of your install
+identifier (not the raw id), so it can't be correlated with the daily
+heartbeat. No IP address or User-Agent is stored; only a coarse country
+lookup plus the query params. Both are off when Online features is off,
+and the widget chip is additionally off per placement by default.
 
 ### Device firmware check
 

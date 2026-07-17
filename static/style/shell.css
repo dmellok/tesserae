@@ -221,6 +221,22 @@
    the trigger paints in the tone of the WORST battery so a single
    critical device catches the eye even when others are fine. Native
    <details> handles hover-on-desktop + click-on-mobile without JS. */
+/* Update-available badge in the topnav. Accent-tinted so it reads as "new"
+   against the plain nav links, with a small dot on the icon. Only rendered
+   when the background version check found a newer release. */
+.topbar-update { position: relative; color: var(--t-accent, #2563eb) !important; font-weight: 600; }
+.topbar-update > .ph, .topbar-update > .ph-bold { font-size: 18px; }
+.topbar-update .topbar-update-dot {
+  position: absolute;
+  top: 5px;
+  left: 20px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--t-accent, #2563eb);
+  box-shadow: 0 0 0 2px var(--t-surface, #fff);
+  pointer-events: none;
+}
 .topbar-batteries { position: relative; }
 .topbar-batteries--topbar { margin-left: auto; }
 /* Push the theme-toggle's auto-margin off when the indicator is
