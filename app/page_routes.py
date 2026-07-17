@@ -790,6 +790,13 @@ def index() -> str:
         pid: _humanise_age(time.time() - ts) for pid, ts in page_last_pushed.items()
     }
     from app import experiments
+    from app.composer import page_preview_token, preview_dims
+
+    # Content token per page, so the hover preview's <img> URL changes only
+    # when the dashboard changes (and otherwise reuses the cached render).
+    page_preview_tokens = {
+        p.id: page_preview_token(p, preview_dims(p, devices, settings)) for p in pages
+    }
 
     return render_template(
         "pages_list.html",
@@ -798,6 +805,7 @@ def index() -> str:
         page_devices=page_devices,
         page_groups=page_groups,
         page_last_pushed_rel=page_last_pushed_rel,
+        page_preview_tokens=page_preview_tokens,
         composer_enabled=experiments.is_enabled("composer"),
     )
 

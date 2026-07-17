@@ -64,7 +64,7 @@
       {% set _cv = page.canvas if (page.layout_kind == 'canvas' and page.canvas and not page.device_ids) else none %}
       {% set pv_w = _cv.w if _cv else (d.w if d else 0) %}
       {% set pv_h = _cv.h if _cv else (d.h if d else 0) %}
-      <li class="dx-inset-row dx-dashboard-row"{% if pv_w and pv_h %} data-preview-src="{{ url_for('composer.compose', page_id=page.id) }}" data-preview-w="{{ pv_w }}" data-preview-h="{{ pv_h }}"{% endif %}>
+      <li class="dx-inset-row dx-dashboard-row"{% if pv_w and pv_h %} data-preview-src="{{ url_for('composer.compose', page_id=page.id) }}" data-preview-png="{{ url_for('composer.compose_preview', page_id=page.id) }}?v={{ page_preview_tokens.get(page.id, '') }}" data-preview-w="{{ pv_w }}" data-preview-h="{{ pv_h }}"{% endif %}>
         <input type="checkbox" class="dx-dash-select" value="{{ page.id }}"
                aria-label="Select {{ page.name }}" title="Select for bulk push / delete">
         <a class="dx-dashboard-main" href="{{ url_for('pages.edit', page_id=page.id) }}">
@@ -147,9 +147,9 @@
 </div>
 
 <style>
-  /* On-hover dashboard preview: a live, scaled-down iframe of the same
-     /compose/<id> HTML the panel is screenshotted from. Rendered by the
-     browser (no server render), faithful to the design. */
+  /* On-hover dashboard preview: a cached PNG screenshot of the dashboard
+     (rendered server-side once per content version, then reused). Falls back
+     to a live, scaled-down /compose/<id> iframe if the image can't render. */
   .dx-dash-preview {
     position: absolute; z-index: 400; pointer-events: none;
     border: 1px solid var(--t-border); border-radius: 10px; overflow: hidden;
@@ -172,6 +172,7 @@
   .dx-bulk-actions { display: flex; align-items: center; gap: 8px; }
   .dx-bulk-actions .form { margin: 0; }
   .dx-dash-preview iframe { border: 0; transform-origin: top left; pointer-events: none; background: #fff; }
+  .dx-dash-preview img { display: block; width: 100%; height: 100%; object-fit: cover; background: #fff; }
   @media (hover: none), (max-width: 720px) { .dx-dash-preview { display: none; } }
 </style>
 <script>
@@ -185,43 +186,74 @@
     sync();
   })();
 
-  // Live hover preview. One shared popover + iframe, lazily pointed at the
-  // hovered dashboard's /compose HTML after a short hover-intent delay so
-  // casual mouse-overs don't fire a render.
+  // Hover preview. One shared popover holding a cached PNG screenshot of the
+  // dashboard (rendered server-side once per content version, then reused). If
+  // the image can't render, it falls back to a live, scaled /compose iframe.
+  // Lazily loaded after a short hover-intent delay so casual mouse-overs don't
+  // trigger a fetch.
   (function () {
     const rows = document.querySelectorAll('[data-preview-src]');
     if (!rows.length || !window.matchMedia('(hover: hover)').matches) return;
     const PW = 300;               // preview width in px
     const DELAY = 350;            // hover-intent delay
-    let pop, frame, timer, current, lastSrc = '';
+    let pop, img, frame, timer, current, imgSrc = '', frameSrc = '';
 
     function build() {
       if (pop) return;
       pop = document.createElement('div');
       pop.className = 'dx-dash-preview';
       pop.setAttribute('aria-hidden', 'true');
+      img = document.createElement('img');
+      img.setAttribute('alt', '');
+      img.setAttribute('aria-hidden', 'true');
+      // On a render failure (browser pool off / transient), fall back to the
+      // live iframe for whichever row is currently hovered.
+      img.addEventListener('error', function () {
+        img.style.display = 'none';
+        if (current) showIframe(current);
+      });
       frame = document.createElement('iframe');
       frame.setAttribute('scrolling', 'no');
       frame.setAttribute('tabindex', '-1');
       frame.setAttribute('aria-hidden', 'true');
+      frame.style.display = 'none';
+      pop.appendChild(img);
       pop.appendChild(frame);
       document.body.appendChild(pop);
     }
 
-    function show(row) {
+    function showIframe(row) {
       const src = row.getAttribute('data-preview-src');
       const w = parseInt(row.getAttribute('data-preview-w') || '0', 10);
       const h = parseInt(row.getAttribute('data-preview-h') || '0', 10);
       if (!src || !w || !h) return;
+      const scale = PW / w;
+      frame.style.display = '';
+      frame.style.width = w + 'px';
+      frame.style.height = h + 'px';
+      frame.style.transform = 'scale(' + scale + ')';
+      if (frameSrc !== src) { frame.src = src; frameSrc = src; }
+    }
+
+    function show(row) {
+      const png = row.getAttribute('data-preview-png');
+      const w = parseInt(row.getAttribute('data-preview-w') || '0', 10);
+      const h = parseInt(row.getAttribute('data-preview-h') || '0', 10);
+      if (!w || !h) return;
       build();
       const scale = PW / w;
       const ph = Math.round(h * scale);
       pop.style.width = PW + 'px';
       pop.style.height = ph + 'px';
-      frame.style.width = w + 'px';
-      frame.style.height = h + 'px';
-      frame.style.transform = 'scale(' + scale + ')';
-      if (lastSrc !== src) { frame.src = src; lastSrc = src; }  // lazy load
+      if (png) {
+        // Primary path: the cached image. The token in the URL means the
+        // browser reuses it until the dashboard changes.
+        img.style.display = '';
+        frame.style.display = 'none';
+        if (imgSrc !== png) { img.src = png; imgSrc = png; }
+      } else {
+        showIframe(row);
+      }
       position(row, ph);
       pop.classList.add('is-visible');
     }

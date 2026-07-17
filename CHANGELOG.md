@@ -56,11 +56,12 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   anything beyond a trivial single-widget page, falling back to bare widget/data/shape elements only
   when the page really is just one widget. Bridge bumped to 0.5.12.
 
-- **Hover preview on the Dashboards page.** Hovering a dashboard row now shows a live, scaled-down
-  preview of it, a small `<iframe>` of the same `/compose/<id>` HTML the panel is screenshotted from,
-  so it's faithful to the design and rendered entirely by the browser (no server render). It lazy-loads
-  after a short hover-intent delay, previews grid and freeform pages alike (matching each page's real
-  compose dims so nothing distorts), and is disabled on touch / narrow screens.
+- **Hover preview on the Dashboards page.** Hovering a dashboard row shows a scaled-down preview of
+  it. The preview is a cached PNG screenshot, rendered server-side once (via the same headless path a
+  push uses) the first time a dashboard is hovered and then reused, keyed by a content token so it
+  only re-renders when the dashboard actually changes. It lazy-loads after a short hover-intent delay,
+  covers grid and freeform pages alike, falls back to a live `/compose/<id>` iframe if the image can't
+  render, and is disabled on touch / narrow screens.
 
 - **Bind a canvas to multiple devices.** The canvas editor's device picker is now a multi-select
   popover: a canvas can target any number of panels, and Send fans the one render out to each,

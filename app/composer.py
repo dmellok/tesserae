@@ -15,12 +15,15 @@ no longer carry palette / --theme-* / --c-* tokens.
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import logging
+import os
+from pathlib import Path
 from typing import Any, Final
 from urllib.parse import quote
 
-from flask import Blueprint, abort, current_app, render_template, request
+from flask import Blueprint, Response, abort, current_app, render_template, request
 
 from app.bindings import apply_binding
 from app.panel import PANEL_PRESETS, resolve_panel_for_page
@@ -1113,6 +1116,113 @@ def compose(page_id: str) -> str:
         for_push=for_push,
         preview_mode=preview_mode,
     )
+
+
+# Longest side of the cached hover-preview PNG. The dashboards list shows the
+# image scaled well below this, so 800px is plenty sharp while keeping the
+# screenshot cheap to render and small to cache.
+PREVIEW_MAX_DIM: Final = 800
+
+
+def preview_dims(page: Page, devices: Any, settings_store: Any) -> tuple[int, int]:
+    """The dims to render a dashboard's hover preview at: its panel (or an
+    unbound canvas's authored size), scaled so the longest side is
+    ``PREVIEW_MAX_DIM`` with the aspect preserved. Mirrors ``compose``'s dim
+    logic so the preview matches what a push would look like."""
+    cv = (
+        page.canvas
+        if (page.layout_kind == "canvas" and page.canvas and not page.device_ids)
+        else None
+    )
+    if cv is not None:
+        pw, ph = int(cv.w), int(cv.h)
+    else:
+        panel = resolve_panel_for_page(page, devices, settings_store)
+        pw, ph = int(panel.w), int(panel.h)
+    pw, ph = max(1, pw), max(1, ph)
+    longest = max(pw, ph)
+    if longest > PREVIEW_MAX_DIM:
+        scale = PREVIEW_MAX_DIM / longest
+        pw, ph = max(1, round(pw * scale)), max(1, round(ph * scale))
+    return pw, ph
+
+
+def page_preview_token(page: Page, dims: tuple[int, int]) -> str:
+    """A short content hash identifying this dashboard's rendered look.
+
+    Changes whenever any render-affecting field of the page (or its resolved
+    preview dims) changes, and stays stable otherwise, so a cached preview
+    image can be reused until the dashboard is actually edited. Volatile
+    concurrency metadata (``updated_at`` / ``updated_by``) is excluded so a
+    no-op save doesn't needlessly invalidate the cache."""
+    payload = page.model_dump(mode="json", exclude_none=True)
+    payload.pop("updated_at", None)
+    payload.pop("updated_by", None)
+    blob = json.dumps(payload, sort_keys=True, default=str) + f"|{dims[0]}x{dims[1]}"
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
+
+
+def _render_page_preview(page_id: str, width: int, height: int) -> bytes | None:
+    """Screenshot ``/compose/<id>`` at the preview dims via the warm browser
+    pool. Returns ``None`` (not a raise) when the render is unavailable, so a
+    hover preview degrades to no-image rather than a 500."""
+    from app.renderer import RenderRequest, render_to_png, to_loopback_url
+
+    url = to_loopback_url(f"{request.host_url.rstrip('/')}/compose/{page_id}?w={width}&h={height}")
+    try:
+        return render_to_png(
+            RenderRequest(url=url, viewport_w=width, viewport_h=height),
+            pool=current_app.config.get("BROWSER_POOL"),
+        )
+    except Exception:
+        logger.debug("preview render failed for page %s", page_id, exc_info=True)
+        return None
+
+
+@bp.get("/compose/<page_id>/preview.png")
+def compose_preview(page_id: str) -> Response:
+    """A cached PNG preview of a dashboard, for the dashboards-list hover.
+
+    Rendered once per content version (the token) via the same headless path a
+    push uses, cached on disk, and served immutably keyed by the token in the
+    URL. The dashboards list embeds the current token, so an edit produces a new
+    URL and a fresh render; unchanged dashboards keep hitting the cached image.
+    """
+    preview_cache: dict[str, Page] = current_app.config.get("PREVIEW_CACHE", {}) or {}
+    page = preview_cache.get(page_id) or current_app.config["PAGE_STORE"].get(page_id)
+    if page is None:
+        abort(404)
+    devices = current_app.config.get("DEVICE_REGISTRY")
+    settings_store = current_app.config["SETTINGS_STORE"]
+    width, height = preview_dims(page, devices, settings_store)
+    token = page_preview_token(page, (width, height))
+
+    cache_dir = Path(current_app.config["DATA_ROOT"]) / "core" / "previews"
+    cache_path = cache_dir / f"{page_id}__{token}.png"
+
+    if not cache_path.exists():
+        png = _render_page_preview(page_id, width, height)
+        if png is None:
+            abort(503)
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        # Drop older versions of this page so the cache doesn't grow per edit.
+        for stale in cache_dir.glob(f"{page_id}__*.png"):
+            if stale.name != cache_path.name:
+                stale.unlink(missing_ok=True)
+        # Atomic publish so a concurrent hover never reads a half-written file.
+        tmp = cache_dir / f".{token}.{os.getpid()}.tmp"
+        tmp.write_bytes(png)
+        tmp.replace(cache_path)
+
+    # Immutable per token: the URL changes when the dashboard changes, so the
+    # browser can hold it for a day and a matching If-None-Match short-circuits.
+    if request.if_none_match and token in request.if_none_match:
+        resp = current_app.response_class(status=304)
+    else:
+        resp = current_app.response_class(cache_path.read_bytes(), mimetype="image/png")
+    resp.set_etag(token)
+    resp.headers["Cache-Control"] = "private, max-age=86400"
+    return resp
 
 
 @bp.get("/compose/canvas/<canvas_id>")

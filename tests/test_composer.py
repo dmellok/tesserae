@@ -76,6 +76,104 @@ def test_compose_route_404s_on_unknown_page(client: FlaskClient) -> None:
     assert resp.status_code == 404
 
 
+# -- cached hover-preview PNG (dashboards list) ---------------------------
+
+
+def _tiny_png() -> bytes:
+    from io import BytesIO
+
+    from PIL import Image
+
+    buf = BytesIO()
+    Image.new("RGB", (8, 8), "white").save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def test_page_preview_token_stable_and_changes() -> None:
+    """The token is stable for an unchanged page + dims, changes when a
+    render-affecting field changes, and ignores volatile concurrency
+    metadata (a no-op save shouldn't bust the cache)."""
+    from app.state.page_store import Page
+
+    p = Page(id="p1", name="Weather", layout_kind="grid", theme="light")
+    t = composer.page_preview_token(p, (400, 300))
+    assert t == composer.page_preview_token(p, (400, 300))  # stable
+    # Different resolved dims -> different token (a rebinding changes the look).
+    assert composer.page_preview_token(p, (800, 600)) != t
+    # A content change (theme) rotates it.
+    assert composer.page_preview_token(p.model_copy(update={"theme": "dark"}), (400, 300)) != t
+    # updated_at / updated_by are excluded, so they don't rotate it.
+    same = p.model_copy(update={"updated_at": "2026-07-17T00:00:00Z", "updated_by": "ui"})
+    assert composer.page_preview_token(same, (400, 300)) == t
+
+
+def test_compose_preview_renders_once_then_serves_cache(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """First hit renders + caches a PNG; a second hit for the same content is
+    served from disk without re-rendering."""
+    from app.state.page_store import Page
+
+    app.config["PAGE_STORE"].save(Page(id="pg", name="Grid", layout_kind="grid"))
+    calls: list[int] = []
+    png = _tiny_png()
+    monkeypatch.setattr("app.renderer.render_to_png", lambda req, pool=None: calls.append(1) or png)
+    client = app.test_client()
+
+    first = client.get("/compose/pg/preview.png")
+    assert first.status_code == 200 and first.mimetype == "image/png"
+    assert first.get_data() == png
+    assert len(calls) == 1
+    # Cached on disk under data_root/core/previews.
+    cache_dir = app.config["DATA_ROOT"] / "core" / "previews"
+    assert list(cache_dir.glob("pg__*.png"))
+
+    second = client.get("/compose/pg/preview.png")
+    assert second.status_code == 200
+    assert len(calls) == 1  # served from cache, not re-rendered
+
+
+def test_compose_preview_re_renders_after_edit(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Editing the dashboard rotates the token, so the next request renders a
+    fresh image and prunes the stale one."""
+    from app.state.page_store import Page
+
+    store = app.config["PAGE_STORE"]
+    store.save(Page(id="pg", name="Grid", layout_kind="grid", theme="light"))
+    calls: list[int] = []
+    monkeypatch.setattr(
+        "app.renderer.render_to_png", lambda req, pool=None: calls.append(1) or _tiny_png()
+    )
+    client = app.test_client()
+    client.get("/compose/pg/preview.png")
+    assert len(calls) == 1
+
+    store.save(Page(id="pg", name="Grid", layout_kind="grid", theme="dark"))  # edit
+    client.get("/compose/pg/preview.png")
+    assert len(calls) == 2  # re-rendered for the new content
+    # Only the current version's file remains.
+    cache_dir = app.config["DATA_ROOT"] / "core" / "previews"
+    assert len(list(cache_dir.glob("pg__*.png"))) == 1
+
+
+def test_compose_preview_unknown_page_404(client: FlaskClient) -> None:
+    assert client.get("/compose/nope/preview.png").status_code == 404
+
+
+def test_compose_preview_render_unavailable_503(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.state.page_store import Page
+
+    app.config["PAGE_STORE"].save(Page(id="pg", name="Grid", layout_kind="grid"))
+
+    def _boom(req: object, pool: object = None) -> bytes:
+        raise RuntimeError("no browser")
+
+    monkeypatch.setattr("app.renderer.render_to_png", _boom)
+    assert app.test_client().get("/compose/pg/preview.png").status_code == 503
+
+
 def test_canvas_page_renders_via_compose(app: Flask) -> None:
     """A dashboard with layout_kind='canvas' renders its freeform layout through
     the same /compose/<page_id> route grid pages use, so push / scheduler /
