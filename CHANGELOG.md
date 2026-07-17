@@ -108,6 +108,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **Grid dashboard editor: reload-on-change fields no longer pop a spurious "Leave site?" dialog.**
+  Picking a target device, a cell's widget, a layout preset, or refitting the panel saves every form
+  then reloads the editor (the server reshapes the page). That reload left the page still flagged
+  dirty, so the browser's unsaved-changes guard fired: choosing "stay" cancelled the reload and left
+  the status stuck on "Saving…" (even though the change had already been saved), while "leave" let it
+  through and looked like leaving had saved. These paths now mark the page clean once the save
+  completes and before the reload, so they persist and refresh silently; genuinely unsaved text edits
+  still warn on navigate and discard on leave as before. (#115)
+
 - **Render pipeline no longer starves its own worker threads.** The headless screenshot self-requests
   `/compose/<id>`, which needs a free web-server thread to be served; a blocked render holds its
   caller's thread for up to ~105s, and every open SSE stream (the event log, the canvas editor) pins

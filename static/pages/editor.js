@@ -454,6 +454,13 @@
           (async () => {
             try {
               for (const f of forms()) await submit(f);
+              // Persisted: mark clean BEFORE reloading. Otherwise the page
+              // is still flagged dirty (save button enabled + stale
+              // snapshot), so location.reload() trips the beforeunload
+              // guard and pops the "Leave site?" dialog. Picking "stay"
+              // then cancels the reload and leaves the spinner stuck on
+              // "Saving…" even though the change was already saved (#115).
+              setDirty(false);
               location.reload();
             } catch (err) {
               setStatus("error");
@@ -489,6 +496,7 @@
           // when the editor renders fresh from disk.
           for (const f of forms()) await submit(f);
           await submit(form);
+          setDirty(false); // clean before reload so beforeunload stays quiet (#115)
           location.reload();
         } catch (err) {
           setStatus("error");
@@ -518,6 +526,7 @@
           headers: { "X-Requested-With": "fetch" },
         });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        setDirty(false); // clean before reload so beforeunload stays quiet (#115)
         location.reload();
       } catch (err) {
         setStatus("error");
