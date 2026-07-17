@@ -86,6 +86,9 @@ def parse_status(payload: bytes) -> dict[str, Any]:
     return out
 
 
+TOUCH_LINGER_MAX_S = 60
+
+
 def validate_config(payload: dict[str, Any]) -> tuple[bool, str | None]:
     """Check the payload makes sense before it goes on the wire."""
     if "sleep_interval_s" not in payload:
@@ -98,4 +101,16 @@ def validate_config(payload: dict[str, Any]) -> tuple[bool, str | None]:
         return False, f"sleep_interval_s must be >= {SLEEP_INTERVAL_MIN_S} (got {interval})"
     if interval > SLEEP_INTERVAL_MAX_S:
         return False, f"sleep_interval_s must be <= {SLEEP_INTERVAL_MAX_S} (got {interval})"
+    # Touch fields (issue #49) only exist on kinds whose hardware entry
+    # extends the schema with them (reTerminal E1003); optional here so
+    # the shared protocol validator accepts every board's form.
+    if "touch_enabled" in payload and not isinstance(payload["touch_enabled"], bool):
+        return False, "touch_enabled must be a boolean"
+    if "touch_linger_s" in payload:
+        try:
+            linger = int(payload["touch_linger_s"])
+        except (TypeError, ValueError):
+            return False, "touch_linger_s must be an integer"
+        if not 0 <= linger <= TOUCH_LINGER_MAX_S:
+            return False, f"touch_linger_s must be 0..{TOUCH_LINGER_MAX_S} (got {linger})"
     return True, None

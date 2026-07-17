@@ -118,6 +118,17 @@ class Cell(BaseModel):
     # when the widget's manifest opted out. Consumed by
     # ``app.dither_regions.regions_from_page``.
     dither: str | None = None
+    # Touch actions (issue #49). ``on_tap`` overrides the widget
+    # manifest's ``on_tap`` default for this cell; the string form is
+    # the ``button_actions`` grammar (``refresh`` / ``page:<id>`` /
+    # ``webhook:<url>`` / …), the dict form is reserved for structured
+    # actions. ``on_swipe`` maps directions (up/down/left/right) to
+    # action specs. None inherits the widget default (tap) / declares no
+    # swipe actions. The composer stamps these as ``data-on-tap`` /
+    # ``data-on-swipe`` on the cell container; the render-time extractor
+    # turns them into the frame's touch region map.
+    on_tap: str | dict[str, Any] | None = None
+    on_swipe: dict[str, str] | None = None
 
 
 class Page(BaseModel):

@@ -170,6 +170,21 @@ class InspectRequest:
     script: str
 
 
+@dataclass(frozen=True)
+class CaptureRequest:
+    """A screenshot AND a script evaluation from the same page session.
+
+    Powers touch-region extraction (issue #49): the region map must be
+    measured against the exact DOM the screenshot captured, so running a
+    second ``InspectRequest`` navigation isn't equivalent (live widget
+    data could differ between the two loads). The script runs after the
+    screenshot; a script failure degrades to ``result=None`` rather than
+    failing the render, pixels always win."""
+
+    render: RenderRequest
+    script: str
+
+
 _IMAGE_WAIT_JS: Final[str] = """async () => {
     // Walk every <img> across the page AND every shadow root (each
     // widget lives in its own shadow tree), then resolve once they've
@@ -527,6 +542,64 @@ def _inspect_attempt(browser: Browser, request: InspectRequest, attempt: int) ->
             logger.debug("inspect context close failed (continuing)", exc_info=True)
 
 
+def _capture_attempt(browser: Browser, request: CaptureRequest, attempt: int) -> tuple[bytes, Any]:
+    """One render pass that returns ``(png, script_result)`` from a single
+    page session. Navigation + settle mirror the screenshot path exactly;
+    the script evaluation is best-effort (``None`` on failure) so touch
+    extraction can never sink a push."""
+    context, page = _new_composer_page(browser, request.render)
+    try:
+        _navigate_and_settle(page, request.render, attempt)
+        png: bytes = page.screenshot(
+            full_page=False,
+            type="png",
+            animations="disabled",
+            omit_background=False,
+        )
+        result: Any = None
+        try:
+            result = page.evaluate(request.script)
+        except PlaywrightError as err:
+            logger.warning("capture script skipped: %s", err)
+        return png, result
+    finally:
+        try:
+            context.close()
+        except Exception:
+            logger.debug("capture context close failed (continuing)", exc_info=True)
+
+
+def _capture_one(browser: Browser, request: CaptureRequest) -> tuple[bytes, Any]:
+    """Retry shell around ``_capture_attempt`` (mirrors ``_screenshot_one``)."""
+    last_err: PlaywrightTimeoutError | None = None
+    for attempt in range(1, request.render.max_attempts + 1):
+        try:
+            return _capture_attempt(browser, request, attempt)
+        except PlaywrightTimeoutError as err:
+            last_err = err
+            if attempt >= request.render.max_attempts:
+                raise
+            logger.warning("capture attempt %d hit a timeout (will retry): %s", attempt, err)
+    assert last_err is not None
+    raise last_err
+
+
+def capture_composed(
+    request: CaptureRequest, *, pool: BrowserPool | None = None
+) -> tuple[bytes, Any]:
+    """Screenshot the composed URL and evaluate the script in the same page
+    session; returns ``(png, script_result)``. Warm path via ``pool`` when
+    supplied, else a one-shot Chromium launch."""
+    if pool is not None:
+        return pool.capture(request)
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(**_chromium_launch_kwargs())
+        try:
+            return _capture_one(browser, request)
+        finally:
+            browser.close()
+
+
 def _inspect_one(browser: Browser, request: InspectRequest) -> Any:
     """Retry shell around ``_inspect_attempt`` (mirrors ``_screenshot_one``)."""
     last_err: PlaywrightTimeoutError | None = None
@@ -605,6 +678,7 @@ class BrowserPool:
             tuple[RenderRequest, concurrent.futures.Future[bytes]]
             | tuple[FetchRequest, concurrent.futures.Future[str]]
             | tuple[InspectRequest, concurrent.futures.Future[Any]]
+            | tuple[CaptureRequest, concurrent.futures.Future[tuple[bytes, Any]]]
             | tuple[()]
         ] = queue.Queue()
         self._thread: threading.Thread | None = None
@@ -660,6 +734,19 @@ class BrowserPool:
             timeout=(request.render.timeout_ms * request.render.max_attempts) / 1000 + 60
         )
 
+    def capture(self, request: CaptureRequest) -> tuple[bytes, Any]:
+        """Run a screenshot + script capture on the pooled browser. Same
+        lazy-start + timeout envelope as ``render``."""
+        if self._thread is None:
+            self.start()
+        if self._stopped:
+            raise RuntimeError("browser pool has been stopped")
+        fut: concurrent.futures.Future[tuple[bytes, Any]] = concurrent.futures.Future()
+        self._q.put((request, fut))
+        return fut.result(
+            timeout=(request.render.timeout_ms * request.render.max_attempts) / 1000 + 60
+        )
+
     def fetch_text(self, request: FetchRequest) -> str:
         """Fetch a URL through the pooled Chromium's network stack.
          Returns the response body as text. Each call spawns a fresh
@@ -705,6 +792,10 @@ class BrowserPool:
                     elif isinstance(request, InspectRequest):
                         cast(concurrent.futures.Future[Any], fut).set_result(
                             _inspect_one(browser, request)
+                        )
+                    elif isinstance(request, CaptureRequest):
+                        cast(concurrent.futures.Future[tuple[bytes, Any]], fut).set_result(
+                            _capture_one(browser, request)
                         )
                     else:
                         cast(concurrent.futures.Future[bytes], fut).set_result(

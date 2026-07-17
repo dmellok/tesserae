@@ -8,6 +8,22 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Touch input protocol (server side).** Touch-capable devices can now report taps and swipes and
+  have them drive the dashboard (#49). A stroke arrives either as `touch_*` query params on the
+  existing `GET /frame` poll (deep-sleep clients get the action's repaint on the same wake, exactly
+  like button wakes) or via a new `POST /api/v1/device/<id>/tap`; the device stays a thin client and
+  the server does all gesture classification (tap vs directional swipe) and hit-testing. Touch
+  regions are declared in markup, not drawn: any element in the composed page can carry
+  `data-on-tap` / `data-on-swipe` attributes (the existing button-action grammar: `refresh`,
+  `page:<id>`, `rotate_next`, `webhook:<url>`, …), including DOM generated inside a canvas code
+  element. Grid cells take a per-cell `on_tap` override plus a widget-manifest `on_tap` default.
+  Regions are extracted at render time from the exact DOM the frame captured (shadow roots
+  included) and stored beside the render, and a stroke is only ever dispatched against the frame
+  the finger actually touched (stale strokes degrade to a plain refresh). Touch events land in the
+  History page alongside button presses. The reTerminal E1003 (GT911 touch panel) gains
+  **Touch input** and **Touch linger** device settings delivered through the standard config
+  channel; firmware support lands separately in the unified device firmware.
+
 - **Manual history controls.** The History page auto-evicts at a cap, but now you can also clear it
   by hand: a "Clear history" control deletes everything or everything older than 7 / 30 / 90 days,
   and a per-row checkbox with a floating bulk bar (like the Dashboards multi-select) deletes just the

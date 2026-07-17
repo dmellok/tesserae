@@ -209,6 +209,20 @@ def _location_configured(raw: dict[str, Any] | None) -> bool:
     return isinstance(loc, dict) and bool(loc)
 
 
+def _touch_attr(cell_value: Any, manifest_value: Any) -> str:
+    """Serialise a touch action declaration into its ``data-on-*``
+    attribute string (issue #49). The cell-level value wins over the
+    widget-manifest default; strings pass through (the flat action
+    grammar), dicts serialise to JSON (the structured / swipe forms).
+    Empty string means "emit no attribute"."""
+    value = cell_value if cell_value not in (None, "") else manifest_value
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, dict) and value:
+        return json.dumps(value)
+    return ""
+
+
 def _resolved_options(plugin_id: str, raw: dict[str, Any]) -> dict[str, Any]:
     plugin = _registry().get(plugin_id)
     if plugin is None:
@@ -766,6 +780,9 @@ def _hydrate_page(
                 "layout": layout,
                 "font_family": cell_font_family,
                 "full_bleed": full_bleed,
+                # Widget-manifest default tap action (issue #49); the
+                # per-cell ``on_tap`` override wins at emission time.
+                "manifest_on_tap": plugin.manifest.get("on_tap") if plugin else None,
             }
         )
 
@@ -800,6 +817,12 @@ def _hydrate_page(
                 "data": data_by_cell_index.get(idx),
                 "font_family": meta["font_family"],
                 "full_bleed": meta["full_bleed"],
+                # Touch attributes (issue #49): stamped on the cell
+                # container so the render-time extractor picks the whole
+                # cell up as a region. Cell override wins over the
+                # widget-manifest default.
+                "on_tap_attr": _touch_attr(cell.get("on_tap"), meta["manifest_on_tap"]),
+                "on_swipe_attr": _touch_attr(cell.get("on_swipe"), None),
             }
         )
 

@@ -62,11 +62,19 @@ from app.panel import (
     resolve_settings_panel,
 )
 from app.quiet_hours import device_is_quiet
-from app.renderer import BrowserPool, RenderRequest, render_to_png, to_loopback_url
+from app.renderer import (
+    BrowserPool,
+    CaptureRequest,
+    RenderRequest,
+    capture_composed,
+    render_to_png,
+    to_loopback_url,
+)
 from app.renderer_loader import Renderer, RendererRegistry
 from app.state.event_log import EventLog
 from app.state.page_store import PageStore, Panel
 from app.state.settings_store import SettingsStore
+from app.touch_regions import EXTRACT_REGIONS_JS, load_regions, normalize_regions, save_regions
 from app.transport import MqttTransport
 
 
@@ -436,6 +444,14 @@ class PushManager:
          frame the renderer just wrote, not a stale guess."""
         return self._latest_renders.get(device_id)
 
+    def touch_regions_for(self, comp_digest: str) -> list[dict[str, Any]]:
+        """Touch region map extracted when this composition rendered
+        (issue #49). Empty when the composition had no touch annotations
+        or the digest is unknown."""
+        if not comp_digest:
+            return []
+        return load_regions(self._renders_dir, comp_digest)
+
     def invalidate_latest_render(self, device_id: str) -> bool:
         """Forget a device's latest render so ``/frame`` reports 204 (no
         frame yet) until the next push repaints it.
@@ -767,7 +783,7 @@ class PushManager:
             return False
         deleted = self._event_log.delete(event_id)
         if deleted and record.digest and not self._event_log.digest_in_use(record.digest):
-            for suffix in (".png", ".bin"):
+            for suffix in (".png", ".bin", ".regions.json"):
                 path = self._renders_dir / f"{record.digest}{suffix}"
                 try:
                     path.unlink(missing_ok=True)
@@ -788,7 +804,11 @@ class PushManager:
             return 0
         removed = 0
         for path in entries:
-            if path.name.startswith("thumb_") or path.stem not in keep:
+            # First-dot split, not ``.stem``: the touch-region sidecar is
+            # ``<digest>.regions.json`` (double suffix), and its lifecycle
+            # must follow its composition digest.
+            digest = path.name.split(".", 1)[0]
+            if path.name.startswith("thumb_") or digest not in keep:
                 try:
                     path.unlink(missing_ok=True)
                     removed += 1
@@ -889,15 +909,22 @@ class PushManager:
                     f"{base}&device_id={target_id}" if target_id else base
                 )
                 try:
-                    composition_png = render_to_png(
-                        RenderRequest(
-                            url=compose_url,
-                            viewport_w=panel.w,
-                            viewport_h=panel.h,
-                            timezone_id=self._render_timezone_id(),
+                    # Screenshot + touch-region extraction from the same
+                    # page session (issue #49): the region map must be
+                    # measured against the exact DOM the frame captured.
+                    composition_png, raw_regions = capture_composed(
+                        CaptureRequest(
+                            render=RenderRequest(
+                                url=compose_url,
+                                viewport_w=panel.w,
+                                viewport_h=panel.h,
+                                timezone_id=self._render_timezone_id(),
+                            ),
+                            script=EXTRACT_REGIONS_JS,
                         ),
                         pool=self._browser_pool_fn(),
                     )
+                    touch_regions = normalize_regions(raw_regions)
                 except Exception as err:
                     err_msg = str(err) or type(err).__name__
                     group_results.append(
@@ -918,6 +945,7 @@ class PushManager:
                     device_filters=device_filter,
                     force_publish=force_publish,
                     dither_regions=dither_regions,
+                    touch_regions=touch_regions,
                 )
                 all_renderers.extend(result.renderers)
                 group_results.append(result)
@@ -985,6 +1013,7 @@ class PushManager:
         image_fit: str | None = None,
         force_publish: bool = False,
         dither_regions: list[dict[str, Any]] | None = None,
+        touch_regions: list[dict[str, Any]] | None = None,
     ) -> PushResult:
         """Common fanout: thumbnail + per-renderer transform / publish / log.
 
@@ -1007,6 +1036,13 @@ class PushManager:
             thumb_path.write_bytes(composition_png)
         else:
             thumb_path.touch()
+        # Touch-region sidecar (issue #49). Rewritten on every render, not
+        # write-once like the PNG: the digest is content-addressed on
+        # pixels, and an annotation edit can leave pixels (and digest)
+        # unchanged, so the latest render's actions must win. ``None``
+        # (image / webpage pushes, no DOM) leaves any existing map alone.
+        if touch_regions is not None:
+            save_regions(self._renders_dir, comp_digest, touch_regions)
 
         panel = Panel(**panel_dims)
         results: list[RendererResult] = []

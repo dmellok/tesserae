@@ -138,6 +138,8 @@
          data-panel-h="{{ page.panel.h }}"
          data-font-family="{{ cell.font_family }}"
          data-cell-zoom="{{ cell.zoom }}"
+         {% if cell.on_tap_attr %}data-on-tap="{{ cell.on_tap_attr }}"{% endif %}
+         {% if cell.on_swipe_attr %}data-on-swipe="{{ cell.on_swipe_attr }}"{% endif %}
          {% if cell.theme %}data-theme="{{ cell.theme }}"{% endif %}
          {% if cell.style %}data-style="{{ cell.style }}"{% endif %}
          style="left: {{ cell.x }}px; top: {{ cell.y }}px; width: {{ cell.w }}px; height: {{ cell.h }}px;

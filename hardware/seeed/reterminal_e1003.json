@@ -7,7 +7,9 @@
   "icon": "device-tablet",
   "description": "10.3 inch monochrome ePaper terminal with 16-level greyscale (IT8951 controller), ESP32-S3, up to six-month battery, 1872x1404 native landscape. Pairs with the tesserae-device-firmware ESP-IDF build (unified firmware) and speaks Tesserae's v1 REST device API. Server-side pack via esp32_gray_bin produces a raw 4-bpp linear grayscale buffer (1314144 bytes) the firmware streams straight into the IT8951's image buffer.",
   "protocol": "esp32_client",
-  "renderers": ["esp32_gray_bin"],
+  "renderers": [
+    "esp32_gray_bin"
+  ],
   "panel": {
     "w": 1872,
     "h": 1404,
@@ -19,5 +21,21 @@
   },
   "refresh_floor_s": 60,
   "image_format": "bin",
-  "notes_md": "Awaiting confirmed test on real hardware. Wire format is exactly 1314144 bytes (1872*1404/2), row-major, top-left origin, no mirror. Per byte: high nibble = LEFT pixel, low nibble = RIGHT pixel; nibble value 0x0 = black, 0xF = white, linear 16-level grayscale. The firmware handles any physical panel-side mirror; the renderer keeps a normal orientation so a browser preview and the panel paint agree. Historically the E1003 was routed through TRMNL BYOS + trmnl_png (mono 1-bit); the unified firmware supersedes that path for this panel."
+  "notes_md": "Awaiting confirmed test on real hardware. Wire format is exactly 1314144 bytes (1872*1404/2), row-major, top-left origin, no mirror. Per byte: high nibble = LEFT pixel, low nibble = RIGHT pixel; nibble value 0x0 = black, 0xF = white, linear 16-level grayscale. The firmware handles any physical panel-side mirror; the renderer keeps a normal orientation so a browser preview and the panel paint agree. Historically the E1003 was routed through TRMNL BYOS + trmnl_png (mono 1-bit); the unified firmware supersedes that path for this panel.",
+  "config_schema_extends": {
+    "touch_enabled": {
+      "type": "boolean",
+      "label": "Touch input",
+      "default": false,
+      "help": "Wake on touch and dispatch taps/swipes against the dashboard's touch regions. Keeps the touch controller powered through deep sleep (a few mA continuous), which materially reduces battery life; best on USB power."
+    },
+    "touch_linger_s": {
+      "type": "int",
+      "label": "Touch linger",
+      "default": 0,
+      "min": 0,
+      "max": 60,
+      "help": "Seconds to stay awake after a touch interaction so follow-up taps skip the deep-sleep wake latency. 0 sleeps immediately. Only applies while touch input is enabled."
+    }
+  }
 }

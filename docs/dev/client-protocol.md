@@ -422,6 +422,45 @@ this itself). On a `refresh` action the firmware should drop its
 cached `ETag` before making the request so the server always returns
 `200` with a full frame rather than `304`.
 
+**Touch wakes** — touch-capable devices report a raw stroke on the
+frame request instead of a button name. The client stays dumb: it
+sends start point, end point, and duration, and the server does all
+gesture classification (tap vs directional swipe) and hit-testing
+against the frame's touch region map:
+
+```
+GET /api/v1/device/kitchen/frame?touch_x0=512&touch_y0=300&touch_x1=512&touch_y1=180&touch_ms=240&touch_digest=abc123def456
+```
+
+| Param | Required | Notes |
+|---|---|---|
+| `touch_x0`, `touch_y0` | yes | Stroke start, in the served frame's pixel space (as downloaded, before any device-side rotation/mirror) |
+| `touch_x1`, `touch_y1` | optional | Stroke end; omit (or repeat the start) for a plain tap |
+| `touch_ms` | optional | Stroke duration in milliseconds |
+| `touch_digest` | yes | The frame digest currently displayed (your `ETag`, quotes optional). A stroke against a frame the server has since replaced is dropped, never dispatched against the wrong content |
+| `touch_event_id` | optional | Monotonic wake-event counter, shares the button counter; used for retry dedup |
+
+The resolved action dispatches synchronously before the frame lookup
+(same contract as button wakes), so a `page:` / rotate action's
+repaint comes back on this same response. A stale digest, a stroke on
+a non-interactive area, or a frame with no touch regions all degrade
+to a plain frame poll; the wake is never an error.
+
+Continuously powered clients that poll `/frame` on a timer can send
+the stroke out-of-band instead via `POST /api/v1/device/<id>/tap`
+with body `{"x0": …, "y0": …, "x1"?: …, "y1"?: …, "duration_ms"?: …,
+"digest": "<etag>", "event_id"?: …}`. The response is always `200`
+with `{"outcome": "dispatched" | "noop" | "webhook_dispatched" |
+"stale" | "no_frame" | "no_target" | "deduped" | "error", "gesture":
+"tap" | "swipe_up" | …, "action_spec": …, "description": …,
+"rotation"?: {…}}`; in every non-dispatched case the client's correct
+move is the same, re-poll `/frame` and carry on.
+
+Touch regions are declared in dashboard markup (`data-on-tap` /
+`data-on-swipe` attributes on cells, widget markup, or code-element
+DOM) and extracted server-side at render time; the firmware never
+needs region geometry.
+
 `304 Not Modified` — `If-None-Match` matches current digest. No body,
 just `ETag: "<digest>"` and `Content-Location: <absolute URL>`. Re-paint
 the previously-cached frame, or re-fetch the URL if your device didn't

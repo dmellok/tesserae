@@ -1,6 +1,6 @@
 """PushManager: end-to-end with a stub renderer and a fake transport.
 
-The Playwright screenshot path (``render_to_png``) is patched out so the
+The Playwright capture path (``capture_composed``) is patched out so the
 suite never has to launch Chromium; we feed a synthetic composition PNG and
 verify the renderer + transport + disk-write hooks fire in the right order
 with the right values."""
@@ -153,7 +153,7 @@ def test_push_fans_out_to_every_renderer(tmp_path: Path, composition_png: bytes)
     ]
     manager, mqtt_client, png = _wired(tmp_path, composition_png, renderers)
 
-    with patch("app.push.render_to_png", return_value=png):
+    with patch("app.push.capture_composed", return_value=(png, [])):
         result = manager.push("home")
 
     assert result.status == "sent"
@@ -189,13 +189,13 @@ def test_push_skips_publish_when_composition_matches_last_served(
     renderers = [_make_renderer(tmp_path, "pi_png", "png", retain=False)]
     manager, mqtt_client, png = _wired(tmp_path, composition_png, renderers)
 
-    with patch("app.push.render_to_png", return_value=png):
+    with patch("app.push.capture_composed", return_value=(png, [])):
         first = manager.push("home")
     assert first.status == "sent"
     publishes_after_first = len(mqtt_client.published)
     assert publishes_after_first == 1
 
-    with patch("app.push.render_to_png", return_value=png):
+    with patch("app.push.capture_composed", return_value=(png, [])):
         second = manager.push("home")
 
     assert second.status == "no_change"
@@ -217,11 +217,11 @@ def test_push_force_publish_bypasses_content_skip(tmp_path: Path, composition_pn
     renderers = [_make_renderer(tmp_path, "pi_png", "png", retain=False)]
     manager, mqtt_client, png = _wired(tmp_path, composition_png, renderers)
 
-    with patch("app.push.render_to_png", return_value=png):
+    with patch("app.push.capture_composed", return_value=(png, [])):
         first = manager.push("home")
     assert first.status == "sent"
 
-    with patch("app.push.render_to_png", return_value=png):
+    with patch("app.push.capture_composed", return_value=(png, [])):
         second = manager.push("home", force_publish=True)
 
     # force_publish=True must publish again even though the composition
@@ -239,7 +239,7 @@ def test_push_still_publishes_when_composition_changes(
     renderers = [_make_renderer(tmp_path, "pi_png", "png", retain=False)]
     manager, mqtt_client, png = _wired(tmp_path, composition_png, renderers)
 
-    with patch("app.push.render_to_png", return_value=png):
+    with patch("app.push.capture_composed", return_value=(png, [])):
         manager.push("home")
 
     # A different image → different digest.
@@ -248,7 +248,7 @@ def test_push_still_publishes_when_composition_changes(
     img.save(buf, format="PNG")
     changed_png = buf.getvalue()
 
-    with patch("app.push.render_to_png", return_value=changed_png):
+    with patch("app.push.capture_composed", return_value=(changed_png, [])):
         second = manager.push("home")
 
     assert second.status == "sent"
@@ -275,7 +275,7 @@ def test_push_gamut_change_repaints_despite_same_composition(
     panel_acep = Panel(w=100, h=100, gamut="inky_7colour")
 
     with (
-        patch("app.push.render_to_png", return_value=png),
+        patch("app.push.capture_composed", return_value=(png, [])),
         patch("app.push.panel_groups_for_push", return_value=[(panel_spectra, [])]),
     ):
         first = manager.push("home")
@@ -283,7 +283,7 @@ def test_push_gamut_change_repaints_despite_same_composition(
     publishes_after_first = len(mqtt_client.published)
 
     with (
-        patch("app.push.render_to_png", return_value=png),
+        patch("app.push.capture_composed", return_value=(png, [])),
         patch("app.push.panel_groups_for_push", return_value=[(panel_acep, [])]),
     ):
         second = manager.push("home")
@@ -302,7 +302,7 @@ def test_push_same_gamut_still_skips(tmp_path: Path, composition_png: bytes) -> 
 
     panel = Panel(w=100, h=100, gamut="waveshare_e6")
     with (
-        patch("app.push.render_to_png", return_value=png),
+        patch("app.push.capture_composed", return_value=(png, [])),
         patch("app.push.panel_groups_for_push", return_value=[(panel, [])]),
     ):
         manager.push("home")
@@ -350,7 +350,7 @@ def test_unbound_push_over_base_renderers_is_clean_on_brokerless_install(
         base_url_fn=lambda: "http://broker.local:8000",
     )
 
-    with patch("app.push.render_to_png", return_value=composition_png):
+    with patch("app.push.capture_composed", return_value=(composition_png, [])):
         result = manager.push("home")
 
     assert result.status == "sent"
@@ -503,7 +503,7 @@ def test_failing_renderer_marks_push_failed_but_others_still_publish(
     )
 
     manager, mqtt_client, png = _wired(tmp_path, composition_png, [good, bad])
-    with patch("app.push.render_to_png", return_value=png):
+    with patch("app.push.capture_composed", return_value=(png, [])):
         result = manager.push("home")
 
     assert result.status == "failed"
@@ -603,16 +603,16 @@ def test_multi_device_page_renders_once_per_panel_and_routes(
         devices=devices,
     )
 
-    with patch("app.push.render_to_png", return_value=composition_png) as rtp:
+    with patch("app.push.capture_composed", return_value=(composition_png, [])) as rtp:
         result = manager.push("multi")
 
     assert result.status == "sent"
     # Rendered once per distinct panel, not once per device.
     assert rtp.call_count == 2
-    sizes = {(c.args[0].viewport_w, c.args[0].viewport_h) for c in rtp.call_args_list}
+    sizes = {(c.args[0].render.viewport_w, c.args[0].render.viewport_h) for c in rtp.call_args_list}
     assert sizes == {(800, 480), (480, 800)}
     # Each render fetched the composer at its own panel override.
-    urls = [c.args[0].url for c in rtp.call_args_list]
+    urls = [c.args[0].render.url for c in rtp.call_args_list]
     assert any("w=800&h=480" in u for u in urls)
     assert any("w=480&h=800" in u for u in urls)
 
@@ -681,7 +681,7 @@ def test_push_device_filter_targets_single_display(tmp_path: Path, composition_p
         devices=devices,
     )
 
-    with patch("app.push.render_to_png", return_value=composition_png) as rtp:
+    with patch("app.push.capture_composed", return_value=(composition_png, [])) as rtp:
         result = manager.push("multi", device_ids={"esp32_land"})
 
     assert result.status == "sent"
@@ -692,7 +692,7 @@ def test_push_device_filter_targets_single_display(tmp_path: Path, composition_p
     assert {r.renderer_id for r in result.renderers} == {"esp32_bin__esp32_land"}
 
     # Filtering to a display the page doesn't target fails (renders nothing).
-    with patch("app.push.render_to_png", return_value=composition_png) as rtp2:
+    with patch("app.push.capture_composed", return_value=(composition_png, [])) as rtp2:
         miss = manager.push("multi", device_ids={"esp32_port_not_bound"})
     assert miss.status == "failed"
     assert rtp2.call_count == 0
@@ -758,13 +758,13 @@ def test_unbound_push_does_not_overwrite_a_bound_devices_frame(
     png_a = _distinct_png((10, 20, 30))
     png_b = _distinct_png((200, 100, 50))
 
-    with patch("app.push.render_to_png", return_value=png_a):
+    with patch("app.push.capture_composed", return_value=(png_a, [])):
         manager.push("bound")
     bound_frame = manager.latest_render_for("esp32_a")
     assert bound_frame is not None
     frame_after_bound = bound_frame["digest"]
 
-    with patch("app.push.render_to_png", return_value=png_b):
+    with patch("app.push.capture_composed", return_value=(png_b, [])):
         loose = manager.push("loose")
 
     # The unbound push renders (it still fans out to base renderers), but
@@ -837,7 +837,7 @@ def test_http_polled_device_skips_mqtt_publish(tmp_path: Path, composition_png: 
         devices=devices,
     )
 
-    with patch("app.push.render_to_png", return_value=composition_png):
+    with patch("app.push.capture_composed", return_value=(composition_png, [])):
         result = manager.push("trmnl_only")
 
     assert result.status == "sent"
@@ -908,7 +908,7 @@ def test_http_polled_push_succeeds_without_broker_connection(
         devices=devices,
     )
 
-    with patch("app.push.render_to_png", return_value=composition_png):
+    with patch("app.push.capture_composed", return_value=(composition_png, [])):
         result = manager.push("solo")
 
     assert result.status == "sent"
@@ -947,7 +947,7 @@ def test_unbound_send_noops_by_default(tmp_path: Path, composition_png: bytes) -
     broadcasting to base renderers, and nothing is published."""
     renderers = [_make_renderer(tmp_path, "pi_png", "png", retain=False)]
     manager, client, event_log = _wired_default(tmp_path, composition_png, renderers)
-    with patch("app.push.render_to_png", return_value=composition_png):
+    with patch("app.push.capture_composed", return_value=(composition_png, [])):
         result = manager.push("home")
     assert result.status == "unbound"
     assert "isn't bound" in (result.error or "")
@@ -962,7 +962,7 @@ def test_unbound_send_broadcasts_when_opted_in(tmp_path: Path, composition_png: 
     renderers (back-compat for single-head MQTT setups)."""
     renderers = [_make_renderer(tmp_path, "pi_png", "png", retain=False)]
     manager, client, _ = _wired(tmp_path, composition_png, renderers)
-    with patch("app.push.render_to_png", return_value=composition_png):
+    with patch("app.push.capture_composed", return_value=(composition_png, [])):
         result = manager.push("home")
     assert result.status == "sent"
     assert len(client.published) == 1

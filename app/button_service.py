@@ -52,6 +52,7 @@ from app.state.page_store import PageStore
 from app.state.rotation_model import Rotation
 from app.state.rotation_store import RotationStore
 from app.state.settings_store import SettingsStore
+from app.touch_regions import classify_stroke, hit_test, resolve_gesture_action
 
 log = logging.getLogger(__name__)
 
@@ -108,6 +109,46 @@ class ButtonHandleResult:
             "manual_override": self.manual_override,
             "override_until": (self.override_until.isoformat() if self.override_until else None),
         }
+
+
+@dataclass(frozen=True)
+class TouchStroke:
+    """A raw touch stroke as reported by the firmware, in the served
+    frame's pixel space. A tap is a stroke whose end point equals (or
+    sits within the tap radius of) its start point; clients that only
+    track a single point send the same coordinates for both."""
+
+    x0: int
+    y0: int
+    x1: int
+    y1: int
+    duration_ms: int | None = None
+
+    def to_log(self) -> dict[str, int | None]:
+        return {
+            "x0": self.x0,
+            "y0": self.y0,
+            "x1": self.x1,
+            "y1": self.y1,
+            "duration_ms": self.duration_ms,
+        }
+
+
+@dataclass(frozen=True)
+class TouchHandleResult:
+    """Outcome of a touch stroke.
+
+    ``outcome`` is one of ``deduped`` / ``no_frame`` / ``stale`` /
+    ``no_target`` (guard-chain exits) or ``dispatched`` / ``noop`` /
+    ``webhook_dispatched`` / ``error`` (the action ran, mirroring the
+    button statuses). ``base`` carries the rotation envelope the REST
+    layer serialises, exactly as a button press would."""
+
+    outcome: str
+    gesture: str | None
+    base: ButtonHandleResult
+    magnitude: int = 0
+    action_spec: str | None = None
 
 
 class ButtonService:
@@ -208,7 +249,10 @@ class ButtonService:
                 push_result=None,
             )
             self._emit_history_row(
-                result=result_dedup, button=button, event_id=event_id, status="deduped"
+                result=result_dedup,
+                origin="button",
+                origin_extra={"button": button, "button_event_id": event_id},
+                status="deduped",
             )
             return result_dedup
 
@@ -259,24 +303,200 @@ class ButtonService:
                 push_result=None,
             )
             self._emit_history_row(
-                result=result_unmapped, button=button, event_id=event_id, status="unmapped"
+                result=result_unmapped,
+                origin="button",
+                origin_extra={"button": button, "button_event_id": event_id},
+                status="unmapped",
             )
             return result_unmapped
 
         # Dispatch. Malformed spec / unknown action -> log + no-op.
+        return self._dispatch_spec(
+            device_id=device_id,
+            spec=spec,
+            ctx=ctx,
+            rotation=rotation,
+            state=state,
+            now=now,
+            current_step_index=current_step_index,
+            manual=_manual,
+            trigger_label=button,
+            event_id=event_id,
+            origin="button",
+            origin_extra={"button": button, "button_event_id": event_id},
+        )
+
+    def handle_touch(
+        self,
+        *,
+        device_id: str,
+        stroke: TouchStroke,
+        frame_digest: str,
+        event_id: int | None = None,
+    ) -> TouchHandleResult:
+        """Resolve a touch stroke against the frame the device is showing
+        and dispatch the region's action (issue #49).
+
+        The guard chain, in order:
+
+        * **dedup**: monotonic ``event_id`` shared with the button
+          counter (one wake-event counter per device). No time-window
+          fallback, two quick intentional taps are legitimate.
+        * **no_frame**: nothing rendered for this device yet.
+        * **stale**: ``frame_digest`` (the artifact digest the firmware
+          holds as its ETag) doesn't match the current frame. The stroke
+          landed on content that has since been replaced; drop it, the
+          device repaints and the user re-taps on current content.
+        * **no_target**: no region under the start point, or the region
+          declares nothing for this gesture. No-op, not an error.
+
+        Coordinates are in the served frame's pixel space (the frame as
+        downloaded, before any device-side rotation/mirror); hit-testing
+        uses the stroke's *start* point, which matches intent (the
+        gesture begins on the thing being controlled)."""
+        now = self._clock()
+        state = self._state.get(device_id) or DeviceRotationState(device_id=device_id)
+
+        if (
+            event_id is not None
+            and state.last_button_event_id is not None
+            and event_id <= state.last_button_event_id
+        ):
+            log.info(
+                "touch dedup: device=%s event_id=%s (last=%s)",
+                device_id,
+                event_id,
+                state.last_button_event_id,
+            )
+            base = self.snapshot(device_id)
+            result = TouchHandleResult(outcome="deduped", gesture=None, base=base)
+            self._emit_touch_row(result, stroke=stroke, event_id=event_id)
+            return result
+
+        pusher = self._push_getter()
+        latest = pusher.latest_render_for(device_id) if pusher is not None else None
+        if latest is None:
+            result = TouchHandleResult(
+                outcome="no_frame", gesture=None, base=self.snapshot(device_id)
+            )
+            self._emit_touch_row(result, stroke=stroke, event_id=event_id)
+            return result
+        if frame_digest != str(latest.get("digest") or ""):
+            log.info(
+                "touch stale: device=%s stroke_digest=%s current=%s",
+                device_id,
+                frame_digest,
+                latest.get("digest"),
+            )
+            result = TouchHandleResult(outcome="stale", gesture=None, base=self.snapshot(device_id))
+            self._emit_touch_row(result, stroke=stroke, event_id=event_id)
+            return result
+
+        gesture, magnitude = classify_stroke(stroke.x0, stroke.y0, stroke.x1, stroke.y1)
+        regions = (
+            pusher.touch_regions_for(str(latest.get("composition_digest") or ""))
+            if pusher is not None
+            else []
+        )
+        region = hit_test(regions, stroke.x0, stroke.y0)
+        spec = resolve_gesture_action(region, gesture) if region is not None else None
+        if spec is None:
+            result = TouchHandleResult(
+                outcome="no_target",
+                gesture=gesture,
+                magnitude=magnitude,
+                base=self.snapshot(device_id),
+            )
+            self._emit_touch_row(result, stroke=stroke, event_id=event_id)
+            return result
+
+        rotation = self._resolve_rotation(device_id)
+        current_step_index, manual = self._effective_step_index(rotation, state)
+        ctx = ActionContext(
+            device_id=device_id,
+            current_step_index=current_step_index,
+            rotation_step_count=len(rotation.steps) if rotation is not None else 0,
+            rotation_id=rotation.id if rotation is not None else None,
+            known_page_ids=frozenset(p.id for p in self._pages.list()),
+        )
+        region_box = (
+            {k: region[k] for k in ("x", "y", "w", "h") if k in region}
+            if region is not None
+            else None
+        )
+        base = self._dispatch_spec(
+            device_id=device_id,
+            spec=spec,
+            ctx=ctx,
+            rotation=rotation,
+            state=state,
+            now=now,
+            current_step_index=current_step_index,
+            manual=manual,
+            trigger_label="touch",
+            event_id=event_id,
+            origin="touch",
+            origin_extra={
+                "touch": stroke.to_log(),
+                "touch_event_id": event_id,
+                "gesture": gesture,
+                "magnitude": magnitude,
+                "region": region_box,
+            },
+        )
+        if base.action_spec is not None and base.unmapped:
+            outcome = "error"
+        elif base.pushed_page_id is not None:
+            outcome = "dispatched"
+        elif spec.startswith("webhook"):
+            outcome = "webhook_dispatched"
+        else:
+            outcome = "noop"
+        # ``_dispatch_spec`` already emitted the history row.
+        return TouchHandleResult(
+            outcome=outcome,
+            gesture=gesture,
+            magnitude=magnitude,
+            action_spec=spec,
+            base=base,
+        )
+
+    def _dispatch_spec(
+        self,
+        *,
+        device_id: str,
+        spec: str,
+        ctx: ActionContext,
+        rotation: Rotation | None,
+        state: DeviceRotationState,
+        now: datetime,
+        current_step_index: int,
+        manual: bool,
+        trigger_label: str,
+        event_id: int | None,
+        origin: str,
+        origin_extra: dict[str, object],
+    ) -> ButtonHandleResult:
+        """Shared dispatch tail for button presses and touch strokes:
+        run the action, persist rotation state, push the resolved page
+        so the same wake's frame reflects the new state, fire webhooks
+        async, and emit the history row. ``origin`` is the event-log
+        source (``button`` / ``touch``); ``origin_extra`` carries the
+        origin-specific fields for the history row and webhook payload."""
         try:
             result: ActionResult = dispatch(spec, ctx)
         except ButtonActionError as exc:
             log.warning(
-                "button action error: device=%s button=%s spec=%s: %s",
+                "%s action error: device=%s trigger=%s spec=%s: %s",
+                origin,
                 device_id,
-                button,
+                trigger_label,
                 spec,
                 exc,
             )
             new_state = state.model_copy(
                 update={
-                    "last_button": button,
+                    "last_button": trigger_label,
                     "last_button_event_id": event_id,
                     "last_button_at": now,
                 }
@@ -295,15 +515,15 @@ class ButtonService:
                 step_index=current_step_index,
                 step_page_id=step_page_id,
                 step_count=len(rotation.steps) if rotation is not None else 0,
-                manual_override=_manual,
-                override_until=state.override_until if _manual else None,
+                manual_override=manual,
+                override_until=state.override_until if manual else None,
                 pushed_page_id=None,
                 push_result=None,
             )
             self._emit_history_row(
                 result=result_error,
-                button=button,
-                event_id=event_id,
+                origin=origin,
+                origin_extra=origin_extra,
                 status="error",
                 error=str(exc),
             )
@@ -328,7 +548,7 @@ class ButtonService:
                 "rotation_id": rotation.id if rotation is not None else None,
                 "step_index": result.new_step_index if rotation is not None else state.step_index,
                 "override_until": override_until,
-                "last_button": button,
+                "last_button": trigger_label,
                 "last_button_event_id": event_id,
                 "last_button_at": now,
             }
@@ -353,11 +573,12 @@ class ButtonService:
                         pushed_page_id,
                         device_ids={device_id},
                         respect_quiet_hours=False,
-                        source="button",
+                        source=origin,
                     )
                 except Exception:
                     log.exception(
-                        "button push failed: device=%s page=%s spec=%s",
+                        "%s push failed: device=%s page=%s spec=%s",
+                        origin,
                         device_id,
                         pushed_page_id,
                         spec,
@@ -374,8 +595,7 @@ class ButtonService:
         if action_name == "webhook" and action_arg:
             payload: dict[str, object] = {
                 "device_id": device_id,
-                "button": button,
-                "button_event_id": event_id,
+                **origin_extra,
                 "action_spec": spec,
                 "timestamp": now.isoformat(),
                 "rotation_id": rotation.id if rotation is not None else None,
@@ -390,9 +610,10 @@ class ButtonService:
             rotation.steps[result.new_step_index].page_id if rotation is not None else None
         )
         log.info(
-            "button event: device=%s button=%s spec=%s -> step=%d page=%s%s",
+            "%s event: device=%s trigger=%s spec=%s -> step=%d page=%s%s",
+            origin,
             device_id,
-            button,
+            trigger_label,
             spec,
             result.new_step_index if rotation is not None else -1,
             step_page_id,
@@ -423,7 +644,9 @@ class ButtonService:
             status = "dispatched"
         else:
             status = "noop"
-        self._emit_history_row(result=result_ok, button=button, event_id=event_id, status=status)
+        self._emit_history_row(
+            result=result_ok, origin=origin, origin_extra=origin_extra, status=status
+        )
         return result_ok
 
     # ---- internals ---------------------------------------------------
@@ -432,39 +655,40 @@ class ButtonService:
         self,
         *,
         result: ButtonHandleResult,
-        button: str,
-        event_id: int | None,
+        origin: str,
+        origin_extra: dict[str, object],
         status: str,
         error: str | None = None,
     ) -> None:
         """Append a row to the event log so the History page has the
-        button feed as a first-class surface. Non-fatal on absence:
-        constructed without an event log (tests, offline paths) skips
-        silently. The push that some actions trigger already logs its
-        own row via ``PushManager``; this row is the "user pressed the
-        button" event alongside that "server pushed the page" event,
-        so a busy device produces two rows per state-changing wake.
-        Non-push branches (dedup, unmapped, error, webhook, noop) get
-        one row that captures the whole outcome.
+        button / touch feed as a first-class surface. Non-fatal on
+        absence: constructed without an event log (tests, offline
+        paths) skips silently. The push that some actions trigger
+        already logs its own row via ``PushManager``; this row is the
+        "user pressed / tapped" event alongside that "server pushed the
+        page" event, so a busy device produces two rows per
+        state-changing wake. Non-push branches (dedup, unmapped, error,
+        webhook, noop) get one row that captures the whole outcome.
 
         Uses ``type="push"`` so the existing ``/history`` route (which
         filters on that type) picks the row up without a schema
         change. ``digest`` is None so the row's Resend button stays
-        disabled, and no thumbnail is rendered."""
+        disabled, and no thumbnail is rendered. ``origin`` becomes the
+        row's source (``button`` / ``touch``); ``origin_extra`` carries
+        the origin-specific fields (button name vs stroke + gesture)."""
         if self._event_log is None:
             return
         try:
             self._event_log.record(
                 type="push",
-                source="button",
+                source=origin,
                 target=result.device_id,
                 status=status,
                 digest=None,
                 error=error,
                 duration_s=0.0,
                 extra={
-                    "button": button,
-                    "button_event_id": event_id,
+                    **origin_extra,
                     "action_spec": result.action_spec,
                     "action_description": result.action_description,
                     "rotation_id": result.rotation_id,
@@ -476,11 +700,33 @@ class ButtonService:
             )
         except Exception:
             log.exception(
-                "button event log write failed: device=%s button=%s status=%s",
+                "%s event log write failed: device=%s status=%s",
+                origin,
                 result.device_id,
-                button,
                 status,
             )
+
+    def _emit_touch_row(
+        self,
+        result: TouchHandleResult,
+        *,
+        stroke: TouchStroke,
+        event_id: int | None,
+    ) -> None:
+        """History row for the guard-chain exits (deduped / no_frame /
+        stale / no_target). Dispatched strokes are logged by
+        ``_dispatch_spec`` with the full region + action context."""
+        self._emit_history_row(
+            result=result.base,
+            origin="touch",
+            origin_extra={
+                "touch": stroke.to_log(),
+                "touch_event_id": event_id,
+                "gesture": result.gesture,
+                "magnitude": result.magnitude,
+            },
+            status=result.outcome,
+        )
 
     def _resolve_rotation(self, device_id: str) -> Rotation | None:
         """Pick the highest-priority enabled rotation this device is

@@ -46,7 +46,7 @@ from typing import Any
 from flask import Blueprint, Flask, current_app, jsonify, request
 from werkzeug.wrappers import Response
 
-from app.button_service import ButtonService
+from app.button_service import ButtonService, TouchStroke
 from app.device_loader import Device, DeviceRegistry
 from app.device_service import create_instance, generate_access_token
 from app.renderer_loader import RendererRegistry
@@ -324,6 +324,50 @@ def _parse_button_event_id(raw: Any) -> int | None:
     return None
 
 
+def _parse_coord(raw: Any) -> int | None:
+    """A touch coordinate: int or numeric string, >= 0."""
+    if isinstance(raw, bool):
+        return None
+    if isinstance(raw, int):
+        return raw if raw >= 0 else None
+    if isinstance(raw, str):
+        try:
+            v = int(raw.strip())
+        except ValueError:
+            return None
+        return v if v >= 0 else None
+    return None
+
+
+def _normalize_digest(raw: str) -> str:
+    """The firmware holds the frame digest as its ETag; be lenient
+    about clients echoing the header verbatim (``\"abc\"``) vs the bare
+    digest (``abc``)."""
+    return raw.strip().strip('"')
+
+
+def _parse_touch_query() -> TouchStroke | None:
+    """Touch stroke from ``/frame`` query params (issue #49):
+    ``touch_x0``/``touch_y0`` (required), ``touch_x1``/``touch_y1``
+    (optional, default to the start point so tap-only clients send two
+    params), ``touch_ms`` (optional duration). Returns None when the
+    wake carries no touch, or the coordinates don't parse."""
+    x0 = _parse_coord(request.args.get("touch_x0"))
+    y0 = _parse_coord(request.args.get("touch_y0"))
+    if x0 is None or y0 is None:
+        return None
+    x1 = _parse_coord(request.args.get("touch_x1"))
+    y1 = _parse_coord(request.args.get("touch_y1"))
+    ms = _parse_button_event_id(request.args.get("touch_ms"))
+    return TouchStroke(
+        x0=x0,
+        y0=y0,
+        x1=x1 if x1 is not None else x0,
+        y1=y1 if y1 is not None else y0,
+        duration_ms=ms,
+    )
+
+
 def _next_poll_s(device: Device) -> int:
     """How many seconds until the firmware should poll again. Reads
     the configured ``sleep_interval_s`` from settings when present
@@ -419,6 +463,7 @@ def get_frame(device_id: str) -> Response:
     button_result = None
     button_svc = _button_service()
     button_raw = request.args.get("button", "").strip()
+    touch_stroke = _parse_touch_query()
     if button_svc is not None:
         if button_raw:
             try:
@@ -432,6 +477,26 @@ def get_frame(device_id: str) -> Response:
                     "rest /frame: button dispatch failed for device=%s button=%s",
                     device.id,
                     button_raw,
+                )
+                button_result = None
+        elif touch_stroke is not None:
+            # Touch wake (issue #49): same shape as a button wake. The
+            # stroke dispatches through the region map before the frame
+            # lookup, so a page/rotate action's repaint comes back on
+            # this same response. Stale strokes (digest mismatch) are
+            # dropped and the wake degrades to a plain frame poll.
+            try:
+                touch_result = button_svc.handle_touch(
+                    device_id=device.id,
+                    stroke=touch_stroke,
+                    frame_digest=_normalize_digest(request.args.get("touch_digest", "")),
+                    event_id=_parse_button_event_id(request.args.get("touch_event_id")),
+                )
+                button_result = touch_result.base
+            except Exception:
+                current_app.logger.exception(
+                    "rest /frame: touch dispatch failed for device=%s",
+                    device.id,
                 )
                 button_result = None
         else:
@@ -510,6 +575,75 @@ def get_frame(device_id: str) -> Response:
     resp.headers["Content-Location"] = image_url
     resp.headers["Cache-Control"] = "no-cache"
     return resp
+
+
+# -- tap -----------------------------------------------------------------
+
+
+@bp.post("/<device_id>/tap")
+def post_tap(device_id: str) -> Response:
+    """Standalone touch-stroke dispatch (issue #49) for continuously
+    powered clients that poll ``/frame`` separately (CircuitPython
+    touch boards). Deep-sleep firmware should prefer the ``touch_*``
+    query params on ``GET /frame`` so the action's repaint comes back
+    on the same wake.
+
+    Body JSON: ``{"x0": int, "y0": int, "x1"?: int, "y1"?: int,
+    "duration_ms"?: int, "digest": str, "event_id"?: int}``. ``x``/``y``
+    are accepted as aliases for ``x0``/``y0``. ``digest`` is the frame
+    digest the client is displaying (its ETag, quotes optional) and is
+    required: a stroke is only dispatched against the exact frame the
+    finger touched.
+
+    Returns 200 with ``{outcome, gesture, action_spec, description,
+    rotation?}``. Guard-chain exits (``stale`` / ``no_frame`` /
+    ``no_target`` / ``deduped``) are 200s, not errors: the client's
+    correct move in every case is the same, re-poll ``/frame`` and
+    carry on."""
+    device, err = _auth_device(device_id)
+    if err is not None or device is None:
+        return err  # type: ignore[return-value]
+    svc = _button_service()
+    if svc is None:
+        return _error(503, "touch dispatch unavailable")
+    body = request.get_json(silent=True, force=True) or {}
+    if not isinstance(body, dict):
+        return _error(400, "body must be a JSON object")
+    x0 = _parse_coord(body.get("x0", body.get("x")))
+    y0 = _parse_coord(body.get("y0", body.get("y")))
+    if x0 is None or y0 is None:
+        return _error(400, "x0 and y0 are required non-negative integers")
+    digest = _normalize_digest(str(body.get("digest") or ""))
+    if not digest:
+        return _error(400, "digest is required (the frame ETag being displayed)")
+    x1 = _parse_coord(body.get("x1"))
+    y1 = _parse_coord(body.get("y1"))
+    stroke = TouchStroke(
+        x0=x0,
+        y0=y0,
+        x1=x1 if x1 is not None else x0,
+        y1=y1 if y1 is not None else y0,
+        duration_ms=_parse_button_event_id(body.get("duration_ms")),
+    )
+    try:
+        result = svc.handle_touch(
+            device_id=device.id,
+            stroke=stroke,
+            frame_digest=digest,
+            event_id=_parse_button_event_id(body.get("event_id")),
+        )
+    except Exception:
+        current_app.logger.exception("rest /tap: dispatch failed for device=%s", device.id)
+        return _error(500, "touch dispatch failed")
+    payload: dict[str, Any] = {
+        "outcome": result.outcome,
+        "gesture": result.gesture,
+        "action_spec": result.action_spec,
+        "description": result.base.action_description,
+    }
+    if result.base.rotation_id is not None:
+        payload["rotation"] = result.base.to_envelope()
+    return jsonify(payload)
 
 
 # -- status --------------------------------------------------------------
