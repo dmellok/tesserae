@@ -23,7 +23,7 @@ import urllib.error
 import urllib.request
 from typing import Any
 
-__version__ = "0.5.14"
+__version__ = "0.6.0"
 
 _BASE = os.environ.get("TESSERAE_URL", "http://127.0.0.1:8765").rstrip("/")
 _TOKEN = os.environ.get("TESSERAE_MCP_TOKEN", "").strip()
@@ -96,6 +96,29 @@ plus optional "opacity" (0-100) and "rotate" (degrees). By "kind":
            Chart.js example: put a <canvas id="c"> in "html", then in "js":
            "new Chart(document.getElementById('c'),{type:'line',data:{labels:[...],
            datasets:[{data: ctx.data.weather.hourly.map(h=>h.temp)}]}})".
+
+TOUCH ACTIONS ("on_tap"/"on_swipe"/"on_slide" on ANY element -- respond to taps on a touch panel):
+  Touch-capable displays report a stroke; the server hit-tests it against regions extracted from the
+  RENDERED layout (so they track the design, no coordinates to hand-place) and dispatches the action.
+  Add any of these optional fields to an element:
+    "on_tap":   an action spec -- a STRING ("refresh", "rotate_next", "rotate_prev", "step:<n>",
+                "page:<page_id>", "webhook:<url>") OR a Home Assistant service-call OBJECT
+                {"action":"ha","domain":"light","service":"turn_on","data":{"entity_id":"light.x", ...}}.
+    "on_swipe": {"up":"<spec>","down":"<spec>","left":"<spec>","right":"<spec>"} -- string specs only.
+    "on_slide": {"axis":"x"|"y","action":<spec>} -- the element becomes a SLIDER: the stroke's end
+                point maps to an absolute 0-100 value along the axis (vertical fills upward; a plain
+                tap sets the value at that point) and replaces "{value}" in the action. e.g. a
+                one-stroke dimmer: {"action":"ha","domain":"light","service":"turn_on",
+                "data":{"entity_id":"light.x","brightness_pct":"{value}"}}, or "webhook:https://…/set/{value}".
+  - hotspot: {"kind":"hotspot", <box>, "on_tap"|"on_swipe"|"on_slide": ...} -- paints NOTHING; an
+    invisible tap target you position over anything (e.g. over part of a code element's output).
+  Code element named actions: give a "code" element "actions":{"<name>":<spec>, ...} and reference
+    them from its markup as data-on-tap="@name" (also data-on-swipe / data-on-slide), in static HTML
+    or JS-built DOM. Structured (HA) specs stay in validated config; the markup holds a plain @name.
+    An @name with no matching entry is reported in render_report().tap_dangling.
+  Actions you set through THESE tools are trusted config, so webhook + HA calls dispatch. The same
+  action written into raw widget markup is limited to navigation (refresh/rotate/step/page) for
+  safety. render_report().tap_regions reads back every region that actually rendered.
 
 LIVE BINDINGS ("bind" on ANY element -- makes a SHAPE reflect data):
   Data elements auto-update, but shapes (rect/ellipse/icon/line/text) are static geometry.
@@ -475,8 +498,11 @@ def build_server() -> Any:
         render_preview's image). Per element: the resolved box, the text that
         rendered, overflow/clip flags (overflow_x when content is wider than its box),
         "data_source" (live | sample | error | static), and computed colours; plus the
-        board's resolved background / theme. Use it to verify a render — catch
-        clipping, confirm live data, read the real colours — without parsing a PNG.
+        board's resolved background / theme. Also "tap_regions" (every touch region that
+        rendered: box + resolved on_tap/on_swipe/on_slide action) and "tap_dangling" (code
+        element @name references with no matching entry in its actions map) so you can
+        verify interactivity. Use it to verify a render — catch clipping, confirm live
+        data, read the real colours, check touch targets — without parsing a PNG.
         (Widget cells render into shadow DOM, so their "text" may be empty; data
         primitives and decorations report their text.)"""
         return _json("GET", f"/pages/{page_id}/render_report")
