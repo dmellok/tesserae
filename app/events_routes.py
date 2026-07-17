@@ -37,6 +37,7 @@ bp = Blueprint("events", __name__, url_prefix="/events")
 
 _KNOWN_TYPES: tuple[str, ...] = (
     "push",
+    "touch",
     "renderer",
     "device",
     "scheduler",

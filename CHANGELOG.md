@@ -8,6 +8,12 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Touch events on the Events page (#49).** Touch strokes now log as their own `touch` event type
+  with a dedicated filter chip, instead of being folded into the push feed. Every touch is recorded,
+  including the misses (`no_target`, `stale`, `blocked`), which are the diagnostically useful ones,
+  with a scannable summary (gesture, coordinates, resolved action, region) and the full JSON payload
+  on expand. Handy for confirming a tap landed where you expected and fired the right action.
+
 - **Touch capability flag on devices (#49).** Panels with a touch digitizer (the Seeed reTerminal
   E1003) now report `touch: true` through the device APIs, the MCP `list_devices` / `/devices`
   surface and the canvas editor's device list. Previously nothing in the device registry indicated

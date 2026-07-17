@@ -308,7 +308,7 @@ def test_markup_origin_webhook_is_blocked(stores: dict[str, Any]) -> None:
     assert result.outcome == "blocked"
     assert result.action_spec == "webhook:http://127.0.0.1:9/evil"
     assert pm.calls == []
-    rows = list(stores["event_log"].list(type="push", source="touch", limit=10))
+    rows = list(stores["event_log"].list(type="touch", source="touch", limit=10))
     assert rows and rows[0].status == "blocked"
     assert rows[0].extra["blocked_action_spec"] == "webhook:http://127.0.0.1:9/evil"
 
@@ -343,7 +343,7 @@ def test_markup_origin_navigation_still_dispatches(stores: dict[str, Any]) -> No
 
 
 def _touch_rows(event_log: EventLog) -> list[Any]:
-    return list(reversed(list(event_log.list(type="push", source="touch", limit=50))))
+    return list(reversed(list(event_log.list(type="touch", source="touch", limit=50))))
 
 
 def test_dispatched_touch_emits_history_row(stores: dict[str, Any]) -> None:
@@ -419,7 +419,7 @@ def test_ha_tap_dispatches_service_call(stores: dict[str, Any]) -> None:
     )
     assert result.outcome == "ha_dispatched"
     assert calls == [("light", "toggle", {"entity_id": "light.x"})]
-    rows = list(stores["event_log"].list(type="push", source="touch", limit=10))
+    rows = list(stores["event_log"].list(type="touch", source="touch", limit=10))
     assert rows and rows[0].status == "ha_dispatched"
 
 
@@ -468,7 +468,7 @@ def test_ha_failure_reports_ha_failed(stores: dict[str, Any]) -> None:
     )
     assert result.outcome == "ha_failed"
     assert pm.calls == []  # no refresh push on failure
-    rows = list(stores["event_log"].list(type="push", source="touch", limit=10))
+    rows = list(stores["event_log"].list(type="touch", source="touch", limit=10))
     assert rows and rows[0].status == "ha_failed"
     assert "HA is down" in (rows[0].error or "")
 

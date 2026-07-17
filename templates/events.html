@@ -16,6 +16,7 @@
   'telemetry':'broadcast',
   'conditions':'funnel',
   'device':'device-mobile',
+  'touch':'hand-tap',
 } %}
 
 {% macro status_pill(status) %}
@@ -152,6 +153,24 @@
           </ul>
           {% endif %}
         </div>
+        {% elif ev.type == 'touch' and ev.extra %}
+        {# Touch dispatch (issue #49): a scannable summary of the stroke,
+           gesture, resolved action and region, then the full payload. #}
+        {% set t = ev.extra.get('touch') %}
+        {% set region = ev.extra.get('region') %}
+        <div class="event-touch">
+          <div class="event-touch-summary">
+            <span class="dx-pill">{{ ev.extra.get('gesture') or 'touch' }}</span>
+            {% if t %}
+            <span class="muted">({{ t.get('x0') }}, {{ t.get('y0') }}){% if t.get('x1') != t.get('x0') or t.get('y1') != t.get('y0') %} → ({{ t.get('x1') }}, {{ t.get('y1') }}){% endif %}{% if t.get('duration_ms') is not none %} · {{ t.get('duration_ms') }}ms{% endif %}</span>
+            {% endif %}
+            {% if ev.extra.get('value') is not none %}<span class="dx-pill">value {{ ev.extra.get('value') }}</span>{% endif %}
+          </div>
+          {% if ev.extra.get('action_spec') %}<div class="muted">action: <code>{{ ev.extra.get('action_spec') }}</code>{% if ev.extra.get('pushed_page_id') %} → {{ page_names.get(ev.extra.get('pushed_page_id'), ev.extra.get('pushed_page_id')) }}{% endif %}</div>{% endif %}
+          {% if region %}<div class="muted">region {{ region.get('w') }}×{{ region.get('h') }} @ ({{ region.get('x') }}, {{ region.get('y') }})</div>{% else %}<div class="muted">no region under the point</div>{% endif %}
+        </div>
+        <pre class="dx-code dx-event-json-placeholder" data-event-json-target></pre>
+        <script type="application/json" data-event-json>{{ ev.extra|tojson(indent=2) }}</script>
         {% elif ev.extra %}
         {# Generic raw-JSON view via the in-house highlighter. The
            JSON is stashed as a script-tag payload (browsers skip

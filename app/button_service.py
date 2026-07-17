@@ -902,17 +902,21 @@ class ButtonService:
         state-changing wake. Non-push branches (dedup, unmapped, error,
         webhook, noop) get one row that captures the whole outcome.
 
-        Uses ``type="push"`` so the existing ``/history`` route (which
-        filters on that type) picks the row up without a schema
-        change. ``digest`` is None so the row's Resend button stays
-        disabled, and no thumbnail is rendered. ``origin`` becomes the
-        row's source (``button`` / ``touch``); ``origin_extra`` carries
-        the origin-specific fields (button name vs stroke + gesture)."""
+        Button rows use ``type="push"`` so the existing ``/history``
+        route (which filters on that type) picks them up. Touch rows use
+        ``type="touch"`` (issue #49) so they get their own category +
+        chip on the Events page, carrying the full stroke / gesture /
+        region / action payload for diagnostics, including the misses
+        (no_target / stale / blocked), which are the ones worth seeing.
+        ``digest`` is None so the row's Resend button stays disabled and
+        no thumbnail is rendered. ``origin`` becomes the row's source
+        (``button`` / ``touch``); ``origin_extra`` carries the
+        origin-specific fields (button name vs stroke + gesture)."""
         if self._event_log is None:
             return
         try:
             self._event_log.record(
-                type="push",
+                type="touch" if origin == "touch" else "push",
                 source=origin,
                 target=result.device_id,
                 status=status,

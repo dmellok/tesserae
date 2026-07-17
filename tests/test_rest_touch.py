@@ -101,7 +101,7 @@ def test_frame_touch_wake_dispatches_and_serves_frame(app: Flask) -> None:
     )
     assert resp.status_code == 200
     assert resp.get_json()["render_id"] == "art123"
-    rows = list(app.config["EVENT_LOG"].list(type="push", source="touch", limit=10))
+    rows = list(app.config["EVENT_LOG"].list(type="touch", source="touch", limit=10))
     assert len(rows) == 1
     assert rows[0].status == "webhook_dispatched"
     assert rows[0].extra["gesture"] == "tap"
@@ -120,7 +120,7 @@ def test_frame_touch_wake_accepts_quoted_etag_digest(app: Flask) -> None:
         headers={"Authorization": f"Bearer {token}"},
     )
     assert resp.status_code == 200
-    rows = list(app.config["EVENT_LOG"].list(type="push", source="touch", limit=10))
+    rows = list(app.config["EVENT_LOG"].list(type="touch", source="touch", limit=10))
     assert rows and rows[0].status == "webhook_dispatched"
 
 
@@ -137,7 +137,7 @@ def test_frame_stale_touch_degrades_to_plain_poll(app: Flask) -> None:
     # The wake still serves the current frame.
     assert resp.status_code == 200
     assert resp.get_json()["render_id"] == "art123"
-    rows = list(app.config["EVENT_LOG"].list(type="push", source="touch", limit=10))
+    rows = list(app.config["EVENT_LOG"].list(type="touch", source="touch", limit=10))
     assert rows and rows[0].status == "stale"
 
 
@@ -155,7 +155,7 @@ def test_frame_touch_params_ignored_when_button_present(app: Flask) -> None:
         headers={"Authorization": f"Bearer {token}"},
     )
     assert resp.status_code == 200
-    touch_rows = list(app.config["EVENT_LOG"].list(type="push", source="touch", limit=10))
+    touch_rows = list(app.config["EVENT_LOG"].list(type="touch", source="touch", limit=10))
     assert touch_rows == []
 
 
@@ -243,3 +243,21 @@ def test_tap_no_frame_outcome(app: Flask) -> None:
     resp = _tap(client, token, {"x0": 5, "y0": 5, "digest": "whatever"})
     assert resp.status_code == 200
     assert resp.get_json()["outcome"] == "no_frame"
+
+
+def test_touch_event_shows_on_events_page(app: Flask) -> None:
+    """A dispatched touch lands as a type=touch row and renders on the
+    Events page under the touch filter, with its summary + resolved action."""
+    client = app.test_client()
+    _sign_in(client)
+    token = _register(app, client)
+    _seed_frame(app, "hall_panel", regions=[WEBHOOK_REGION])
+    client.get(
+        "/api/v1/device/hall_panel/frame"
+        "?touch_x0=100&touch_y0=100&touch_digest=art123&touch_event_id=1",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    page = client.get("/events?type=touch").get_data(as_text=True)
+    assert "dx-filter-chip--touch" in page  # the chip
+    assert "event-touch" in page  # the friendly summary block
+    assert "webhook:http://127.0.0.1:9/tesserae-test" in page  # resolved action
