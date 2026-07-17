@@ -48,6 +48,7 @@ from app import (
     send_routes,
     settings_routes,
     themes_routes,
+    touch_monitor_routes,
     trmnl_api,
     webhook_routes,
 )
@@ -860,6 +861,7 @@ def create_app(
     history_routes.register(app)
     device_battery_routes.register(app)
     events_routes.register(app)
+    touch_monitor_routes.register(app)
     page_routes.register(app)
     onboarding.register(app)
     themes_routes.register(app)

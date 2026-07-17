@@ -1,0 +1,154 @@
+"""Per-device touch monitor (issue #49).
+
+The touch-capable reTerminal E1003 gets a diagnostic page under
+``/devices/touch/<id>`` that plots recent touch events on a virtual panel
+and overlays the last render's touch regions. Non-touch devices have no
+monitor (404), and the device card only links to it for touch panels.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any
+
+import pytest
+from flask import Flask
+
+from app import device_service
+from app.main import REPO_ROOT, create_app
+from app.touch_regions import save_regions
+
+
+@pytest.fixture
+def app(tmp_path: Path) -> Flask:
+    a = create_app(
+        testing=False,
+        data_root=tmp_path,
+        plugins_dir=REPO_ROOT / "plugins",
+        renderers_dir=REPO_ROOT / "renderers",
+    )
+    a.config["TESTING"] = True
+    return a
+
+
+def _sign_in(client: Any) -> None:
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+
+
+def _make_e1003(app: Flask, instance_id: str = "hall_e1003") -> None:
+    with app.app_context():
+        device_service.create_instance(
+            devices=app.config["DEVICE_REGISTRY"],
+            renderers=app.config["RENDERER_REGISTRY"],
+            data_root=app.config["DATA_ROOT"],
+            instance_id=instance_id,
+            kind_id="seeed_reterminal_e1003",
+            name="Hall E1003",
+        )
+
+
+def _make_esp32(app: Flask, instance_id: str = "plain_esp32") -> None:
+    with app.app_context():
+        device_service.create_instance(
+            devices=app.config["DEVICE_REGISTRY"],
+            renderers=app.config["RENDERER_REGISTRY"],
+            data_root=app.config["DATA_ROOT"],
+            instance_id=instance_id,
+            kind_id="esp32_client",
+        )
+
+
+def _record_touch(app: Flask, *, target: str, status: str, extra: dict[str, Any]) -> None:
+    app.config["EVENT_LOG"].record(
+        type="touch", source="device", target=target, status=status, extra=extra
+    )
+
+
+def test_monitor_page_renders_for_touch_device(app: Flask) -> None:
+    _make_e1003(app)
+    client = app.test_client()
+    _sign_in(client)
+    resp = client.get("/devices/touch/hall_e1003")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "Touch monitor" in body
+    assert "touch_monitor.js" in body
+    # The stage carries the device id and the SSE stream URL scoped to touch.
+    assert 'data-device-id="hall_e1003"' in body
+    assert "type=touch" in body
+
+
+def test_monitor_404s_for_non_touch_device(app: Flask) -> None:
+    _make_esp32(app)
+    client = app.test_client()
+    _sign_in(client)
+    assert client.get("/devices/touch/plain_esp32").status_code == 404
+
+
+def test_monitor_404s_for_unknown_device(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    assert client.get("/devices/touch/nope").status_code == 404
+
+
+def test_data_json_returns_panel_dims_and_events(app: Flask) -> None:
+    _make_e1003(app)
+    _record_touch(
+        app,
+        target="hall_e1003",
+        status="ha_dispatched",
+        extra={
+            "gesture": "tap",
+            "touch": {"x0": 120, "y0": 80},
+            "action_spec": {"action": "ha", "domain": "light", "service": "toggle"},
+        },
+    )
+    # A touch on a different device must not leak into this device's view.
+    _record_touch(app, target="other_dev", status="ha_dispatched", extra={"gesture": "tap"})
+    client = app.test_client()
+    _sign_in(client)
+    payload = client.get("/devices/touch/hall_e1003/data.json").get_json()
+    assert payload["panel"]["w"] > 0 and payload["panel"]["h"] > 0
+    events = payload["events"]
+    assert len(events) == 1
+    assert events[0]["gesture"] == "tap"
+    assert events[0]["status"] == "ha_dispatched"
+    assert events[0]["touch"] == {"x0": 120, "y0": 80}
+
+
+def test_data_json_returns_last_render_regions(app: Flask) -> None:
+    _make_e1003(app)
+    push_mgr = app.config["PUSH_MANAGER"]
+    renders_dir = app.config["RENDERS_DIR"]
+    digest = "deadbeefcafe"
+    save_regions(
+        renders_dir,
+        digest,
+        [{"x": 10, "y": 20, "w": 100, "h": 60, "on_tap": {"action": "ha"}}],
+    )
+    # Point the device's latest render at that composition digest so the
+    # endpoint knows which sidecar to load.
+    push_mgr._latest_renders["hall_e1003"] = {"composition_digest": digest}
+    client = app.test_client()
+    _sign_in(client)
+    payload = client.get("/devices/touch/hall_e1003/data.json").get_json()
+    regions = payload["regions"]
+    assert len(regions) == 1
+    assert regions[0]["x"] == 10 and regions[0]["w"] == 100
+
+
+def test_data_json_404s_for_non_touch_device(app: Flask) -> None:
+    _make_esp32(app)
+    client = app.test_client()
+    _sign_in(client)
+    assert client.get("/devices/touch/plain_esp32/data.json").status_code == 404
+
+
+def test_device_card_links_monitor_only_for_touch(app: Flask) -> None:
+    _make_e1003(app)
+    _make_esp32(app)
+    client = app.test_client()
+    _sign_in(client)
+    body = client.get("/settings/devices").get_data(as_text=True)
+    assert "/devices/touch/hall_e1003" in body
+    assert "/devices/touch/plain_esp32" not in body

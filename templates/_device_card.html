@@ -1086,6 +1086,16 @@
            tablets that can't run an MQTT or REST client). Both open in
            a new tab so they don't blow away the admin UI. #}
         {% if section.device_id %}
+        {% if section.touch %}
+        {# Touch-capable panel (digitizer): link to the per-device touch
+           monitor (issue #49). #}
+        <a class="dx-footer-btn"
+           href="{{ url_for('touch_monitor.monitor', device_id=section.device_id) }}"
+           title="Live view of taps, swipes and sliders landing on this panel.">
+          <i class="ph ph-hand-tap" aria-hidden="true"></i>
+          <span>Touch monitor</span>
+        </a>
+        {% endif %}
         <a class="dx-footer-btn"
            href="{{ url_for('preview_png', device_id=section.device_id) }}"
            target="_blank" rel="noopener"

@@ -23,6 +23,14 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Per-device touch monitor (#49).** A touch-capable panel (the Seeed reTerminal E1003) gains a
+  **Touch monitor** page, linked from its device card, that draws the panel at its true aspect ratio
+  and plots recent touches on it: taps as dots, swipes as arrows, sliders with their value, each
+  colour-coded by outcome (fired / no target / blocked). The last render's touch regions overlay so
+  you can see whether a tap landed inside its target, and events stream in live over the Events SSE
+  feed. Seeds from the recent `touch` history on load, so you get the last session's misses without
+  waiting for a fresh tap.
+
 - **Touch events on the Events page (#49).** Touch strokes now log as their own `touch` event type
   with a dedicated filter chip, instead of being folded into the push feed. Every touch is recorded,
   including the misses (`no_target`, `stale`, `blocked`), which are the diagnostically useful ones,

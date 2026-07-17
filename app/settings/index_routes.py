@@ -1100,6 +1100,10 @@ def _build_sections() -> list[dict[str, Any]]:
                 # under a collapsed <details> at the bottom of the
                 # General tab so it stays out of the way until needed.
                 "debug_info": _device_debug_info(device, is_instance),
+                # Touch-capable panels (digitizer, e.g. reTerminal E1003)
+                # get a "Touch monitor" link to the per-device visualiser
+                # (issue #49).
+                "touch": bool(is_instance and device.manifest.get("touch")),
             }
         )
 
