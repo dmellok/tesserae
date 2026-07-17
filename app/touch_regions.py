@@ -411,10 +411,7 @@ def slide_value(region: dict[str, Any], axis: str, x: int, y: int) -> int:
     the end stop."""
     rx, ry = int(region["x"]), int(region["y"])
     rw, rh = max(1, int(region["w"])), max(1, int(region["h"]))
-    if axis == "y":
-        frac = 1.0 - (min(max(y - ry, 0), rh) / rh)
-    else:
-        frac = min(max(x - rx, 0), rw) / rw
+    frac = 1.0 - (min(max(y - ry, 0), rh) / rh) if axis == "y" else min(max(x - rx, 0), rw) / rw
     return round(frac * 100)
 
 

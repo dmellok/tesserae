@@ -473,7 +473,7 @@ class ButtonService:
             self._emit_touch_row(result, stroke=stroke, event_id=event_id)
             return result
 
-        region_box = (
+        region_box: dict[str, Any] | None = (
             {k: region[k] for k in ("x", "y", "w", "h") if k in region}
             if region is not None
             else None
