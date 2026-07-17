@@ -58,6 +58,10 @@ def test_server_ships_compose_instructions() -> None:
     assert "START HERE" in text
     assert "bind_devices" in text and "RIGHT AWAY" in text
     assert "append_code" in text
+    # Touch actions are surfaced in the handshake instructions, not just buried
+    # in the set_canvas doc-shape, so the agent knows they exist (issue #49).
+    assert "INTERACTIVITY" in text
+    assert "on_tap" in text and "on_slide" in text and "hotspot" in text
 
 
 def test_json_wraps_http_error(monkeypatch: pytest.MonkeyPatch) -> None:

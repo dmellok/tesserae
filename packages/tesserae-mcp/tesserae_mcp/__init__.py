@@ -23,7 +23,7 @@ import urllib.error
 import urllib.request
 from typing import Any
 
-__version__ = "0.6.0"
+__version__ = "0.6.1"
 
 _BASE = os.environ.get("TESSERAE_URL", "http://127.0.0.1:8765").rstrip("/")
 _TOKEN = os.environ.get("TESSERAE_MCP_TOKEN", "").strip()
@@ -295,6 +295,18 @@ BINDING & DECORATION
   the shape should track data. Full shape is in the set_canvas tool description.
 - Paint from var(--accent-N) / semantic tokens or documented data-identity colours; avoid
   arbitrary hex.
+
+INTERACTIVITY (touch panels): touch is NOT a separate tool. Any element can carry touch actions
+as FIELDS you write into the doc-shape (full detail in the set_canvas description):
+- "on_tap": a string action ("refresh", "rotate_next", "rotate_prev", "step:<n>", "page:<id>",
+  "webhook:<url>") or a Home Assistant object {"action":"ha","domain","service","data":{...}}.
+- "on_swipe": {"up":"<spec>","down":"<spec>","left":"<spec>","right":"<spec>"}.
+- "on_slide": {"axis":"x"|"y","action":<spec>} turns the element into a slider, the stroke maps to
+  0-100 and replaces "{value}" in the action (e.g. HA brightness_pct, or ".../set/{value}").
+- "kind":"hotspot" is an invisible tap target you position over anything; a "code" element can take
+  an "actions" map referenced from its markup as data-on-tap="@name".
+render_report() returns tap_regions + tap_dangling so you can verify what's tappable. Only add
+touch actions when the user asks for interactivity, and confirm before wiring a Home Assistant call.
 
 PUSH: once the render looks right, push_to_device to the same panel(s) you bound at the start --
 device_ids may name several panels and the one render fans out to each, fitted to its own dims.
