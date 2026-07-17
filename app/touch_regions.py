@@ -215,6 +215,23 @@ def normalize_regions(raw: Any) -> list[dict[str, Any]]:
         )
         if tap is None and swipe is None and slide is None and not dangling:
             continue
+        # Flag any declared action that wouldn't actually dispatch, so
+        # render_report / the editor overlay don't green-light a region
+        # whose payload is stored but undispatchable (issue #49).
+        invalid: list[dict[str, Any]] = []
+        if tap is not None:
+            reason = action_invalid_reason(tap)
+            if reason:
+                invalid.append({"gesture": "tap", "reason": reason})
+        if isinstance(swipe, dict):
+            for direction, sspec in swipe.items():
+                reason = action_invalid_reason(sspec)
+                if reason:
+                    invalid.append({"gesture": f"swipe_{direction}", "reason": reason})
+        if isinstance(slide, dict) and slide.get("action") is not None:
+            reason = action_invalid_reason(slide.get("action"))
+            if reason:
+                invalid.append({"gesture": "slide", "reason": reason})
         out.append(
             {
                 "x": x,
@@ -228,6 +245,7 @@ def normalize_regions(raw: Any) -> list[dict[str, Any]]:
                 "slide": slide,
                 "origin": "config" if entry.get("origin") == "config" else "markup",
                 "dangling": dangling,
+                "invalid": invalid,
             }
         )
     return out
@@ -360,10 +378,24 @@ def resolve_gesture_action(region: dict[str, Any], gesture: str) -> str | dict[s
 
 def coerce_action(spec: Any) -> str | dict[str, Any] | None:
     """Normalise a raw action value into a dispatchable form: a trimmed
-    grammar string, a structured dict (parsed from JSON text when
-    needed, validated to carry a string ``action`` name), or None."""
+    grammar string, a structured dict, or None.
+
+    Structured actions are normalised generously so the natural Home
+    Assistant shapes an agent is likely to write all resolve to the
+    canonical ``{"action":"ha","domain","service","data":{...}}`` form:
+
+    * an explicit ``"action":"ha"`` object;
+    * an object with no ``action`` but a ``service`` (``action:"ha"`` is
+      inferred, since a service call is unambiguous);
+    * a dotted ``"service":"light.turn_on"`` splits into domain+service;
+    * an ``entity_id`` at the top level, or under ``target.entity_id``
+      (the HA-native shape), is folded into ``data``.
+
+    A dict with an unrecognised ``action`` name is returned as-is so
+    validation can name it; anything that can't be made into an action
+    returns None."""
     if isinstance(spec, dict):
-        return spec if isinstance(spec.get("action"), str) else None
+        return _coerce_dict_action(spec)
     if not isinstance(spec, str):
         return None
     text: str = spec.strip()
@@ -374,10 +406,72 @@ def coerce_action(spec: Any) -> str | dict[str, Any] | None:
             parsed = json.loads(text)
         except json.JSONDecodeError:
             return None
-        if isinstance(parsed, dict) and isinstance(parsed.get("action"), str):
-            return parsed
-        return None
+        return _coerce_dict_action(parsed) if isinstance(parsed, dict) else None
     return text
+
+
+def _coerce_dict_action(d: dict[str, Any]) -> dict[str, Any] | None:
+    """Normalise a structured (dict) action. See :func:`coerce_action`."""
+    name = d.get("action")
+    if isinstance(name, str) and name.strip():
+        name = name.strip()
+        return _normalize_ha(d) if name == "ha" else {**d, "action": name}
+    # No explicit action name: a service call is unambiguously an HA action.
+    if d.get("service"):
+        return _normalize_ha(d)
+    return None
+
+
+def _normalize_ha(d: dict[str, Any]) -> dict[str, Any]:
+    """Canonicalise an HA action into ``{action, domain, service, data}``,
+    folding the common shape variations. domain/service may be empty when
+    the input is incomplete; :func:`action_invalid_reason` reports that."""
+    service = str(d.get("service") or "").strip()
+    domain = str(d.get("domain") or "").strip()
+    if not domain and "." in service:
+        domain, _, service = service.partition(".")
+        domain, service = domain.strip(), service.strip()
+    raw = d.get("data")
+    data: dict[str, Any] = dict(raw) if isinstance(raw, dict) else {}
+    if "entity_id" not in data:
+        eid = d.get("entity_id")
+        if not eid and isinstance(d.get("target"), dict):
+            eid = d["target"].get("entity_id")
+        if eid:
+            data["entity_id"] = eid
+    return {"action": "ha", "domain": domain, "service": service, "data": data}
+
+
+# Action names that ``button_actions.dispatch`` knows plus the structured
+# actions the touch dispatcher handles. Used to flag regions whose action
+# would never fire, so render_report / the editor don't green-light a dead
+# dashboard (issue #49).
+def action_invalid_reason(spec: Any) -> str | None:
+    """Why an action wouldn't dispatch, or None if it's fine.
+
+    Mirrors what dispatch actually accepts: a known string verb
+    (``refresh`` / ``rotate_next`` / ``step:<n>`` / ``page:<id>`` /
+    ``webhook:<url>``) or a structured HA call with a domain + service.
+    Anything else is reported so verification reflects reality rather
+    than echoing a stored-but-undispatchable payload."""
+    action = coerce_action(spec)
+    if action is None:
+        return (
+            "not a usable action (expected a spec string like 'page:<id>' "
+            'or an {"action":"ha","domain":...,"service":...} object)'
+        )
+    if isinstance(action, dict):
+        if action.get("action") != "ha":
+            return f"unknown structured action {action.get('action')!r}"
+        if not action.get("domain") or not action.get("service"):
+            return 'HA action needs a "domain" and a "service"'
+        return None
+    from app.button_actions import registered_actions
+
+    verb = action.split(":", 1)[0].strip()
+    if verb not in registered_actions():
+        return f"unknown action {verb!r}"
+    return None
 
 
 # -- slide gestures ------------------------------------------------------
@@ -425,9 +519,9 @@ def substitute_value(action: str | dict[str, Any], value: int) -> str | dict[str
 
     def _sub(node: Any) -> Any:
         if isinstance(node, str):
-            if node == "{value}":
+            if node in ("{value}", "$value"):
                 return value
-            return node.replace("{value}", str(value))
+            return node.replace("{value}", str(value)).replace("$value", str(value))
         if isinstance(node, dict):
             return {k: _sub(v) for k, v in node.items()}
         if isinstance(node, list):

@@ -79,6 +79,18 @@ def test_normalize_regions_origin_and_dangling_passthrough() -> None:
     assert regions[2]["tap"] is None
 
 
+def test_normalize_regions_flags_undispatchable_action() -> None:
+    # A region whose tap action can't dispatch is flagged in "invalid",
+    # so render_report / the overlay don't green-light a dead dashboard.
+    raw = [
+        {"x": 0, "y": 0, "w": 10, "h": 10, "tap": "page:home", "origin": "config"},
+        {"x": 0, "y": 20, "w": 10, "h": 10, "tap": "warp:9", "origin": "config"},
+    ]
+    regions = normalize_regions(raw)
+    assert regions[0]["invalid"] == []
+    assert regions[1]["invalid"] and regions[1]["invalid"][0]["gesture"] == "tap"
+
+
 def test_is_side_effecting() -> None:
     from app.touch_regions import is_side_effecting
 
@@ -305,15 +317,63 @@ def test_coerce_action_forms() -> None:
     ha = '{"action": "ha", "domain": "light", "service": "toggle"}'
     parsed = coerce_action(ha)
     assert isinstance(parsed, dict) and parsed["domain"] == "light"
-    assert coerce_action({"action": "ha", "domain": "light"}) == {
+    # HA actions canonicalise to {action, domain, service, data}.
+    assert coerce_action({"action": "ha", "domain": "light", "service": "toggle"}) == {
         "action": "ha",
         "domain": "light",
+        "service": "toggle",
+        "data": {},
     }
-    # Malformed / actionless structured values read as None, never raise.
+    # Malformed / actionless-and-serviceless values read as None, never raise.
     assert coerce_action("{not json") is None
-    assert coerce_action('{"domain": "light"}') is None
+    assert coerce_action('{"domain": "light"}') is None  # no service -> not an HA call
     assert coerce_action(None) is None
     assert coerce_action(42) is None
+
+
+def test_coerce_action_tolerates_natural_ha_shapes() -> None:
+    """The shapes an agent naturally writes all normalise to the canonical
+    HA form: no ``action`` key (inferred from ``service``), ``entity_id`` at
+    the top level, a dotted service, or the HA-native ``target``."""
+    from app.touch_regions import coerce_action
+
+    # No "action" key + top-level entity_id (the shape that silently no-op'd).
+    got = coerce_action(
+        {
+            "domain": "light",
+            "service": "turn_on",
+            "entity_id": "light.desk",
+            "data": {"brightness_pct": "{value}"},
+        }
+    )
+    assert got == {
+        "action": "ha",
+        "domain": "light",
+        "service": "turn_on",
+        "data": {"brightness_pct": "{value}", "entity_id": "light.desk"},
+    }
+    # Dotted service + HA-native target.
+    got = coerce_action({"service": "light.toggle", "target": {"entity_id": "light.x"}})
+    assert got == {
+        "action": "ha",
+        "domain": "light",
+        "service": "toggle",
+        "data": {"entity_id": "light.x"},
+    }
+
+
+def test_action_invalid_reason() -> None:
+    from app.touch_regions import action_invalid_reason
+
+    # Dispatchable -> no reason.
+    assert action_invalid_reason("page:home") is None
+    assert action_invalid_reason("refresh") is None
+    assert action_invalid_reason({"domain": "light", "service": "toggle"}) is None
+    # Undispatchable -> a reason (the honest-verification signal).
+    assert action_invalid_reason("frobnicate:9") is not None
+    assert action_invalid_reason({"action": "ha", "domain": "light"}) is not None  # no service
+    assert action_invalid_reason({"foo": "bar"}) is not None
+    assert action_invalid_reason("{not json") is not None
 
 
 def test_resolve_gesture_action_returns_structured_dict() -> None:

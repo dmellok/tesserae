@@ -408,6 +408,64 @@ def _stub_ha(svc: ButtonService) -> list[tuple[str, str, dict[str, Any]]]:
     return calls
 
 
+def test_ha_tap_natural_shape_dispatches(stores: dict[str, Any]) -> None:
+    """The shape an agent naturally writes, no 'action' key, entity_id at
+    the top level, now dispatches (previously a silent no-op)."""
+    region = _tap_region(
+        tap={
+            "domain": "light",
+            "service": "turn_on",
+            "entity_id": "light.desk",
+            "data": {},
+        },
+        swipe=None,
+        origin="config",
+    )
+    pm = TouchStubPushManager(latest=_latest(), regions=[region])
+    svc = _service(stores, pm)
+    calls = _stub_ha(svc)
+    result = svc.handle_touch(
+        device_id="kitchen",
+        stroke=TouchStroke(x0=10, y0=10, x1=10, y1=10),
+        frame_digest="art123",
+    )
+    assert result.outcome == "ha_dispatched"
+    assert calls == [("light", "turn_on", {"entity_id": "light.desk"})]
+
+
+def test_slide_natural_ha_shape_with_dollar_value(stores: dict[str, Any]) -> None:
+    """A dimmer written the natural way: no 'action' key, $value alias."""
+    region = _tap_region(
+        tap=None,
+        swipe=None,
+        origin="config",
+        x=100,
+        y=100,
+        w=40,
+        h=200,
+        slide={
+            "axis": "y",
+            "action": {
+                "domain": "light",
+                "service": "turn_on",
+                "entity_id": "light.x",
+                "data": {"brightness_pct": "$value"},
+            },
+        },
+    )
+    pm = TouchStubPushManager(latest=_latest(), regions=[region])
+    svc = _service(stores, pm)
+    calls = _stub_ha(svc)
+    result = svc.handle_touch(
+        device_id="kitchen",
+        stroke=TouchStroke(x0=120, y0=290, x1=120, y1=150),  # -> 75
+        frame_digest="art123",
+    )
+    assert result.outcome == "ha_dispatched"
+    assert result.value == 75
+    assert calls == [("light", "turn_on", {"brightness_pct": 75, "entity_id": "light.x"})]
+
+
 def test_ha_tap_dispatches_service_call(stores: dict[str, Any]) -> None:
     pm = TouchStubPushManager(latest=_latest(), regions=[_ha_region()])
     svc = _service(stores, pm)

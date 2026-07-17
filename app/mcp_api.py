@@ -1138,6 +1138,14 @@ def render_report(page_id: str) -> Response:
     the board's resolved background / theme. Lets an agent verify a render (catch
     clipping, confirm live data, read the real colours) without parsing a PNG.
 
+    Also reports touch wiring (issue #49): ``tap_regions`` (every region that
+    rendered, with its resolved on_tap/on_swipe/on_slide), ``tap_dangling``
+    (code-element ``@name`` refs with no matching entry), and ``tap_invalid``
+    (regions whose declared action would NOT dispatch, e.g. an HA call missing
+    its domain/service, with the box + gesture + reason). ``tap_invalid == []``
+    is the real "this dashboard is wired" signal, a region appearing in
+    ``tap_regions`` only means it was stored, not that it will fire.
+
     Note: widget cells render into shadow DOM, so their ``text`` may be empty; data
     primitives and decorations report their text. Overflow is measured on the
     element box regardless."""
@@ -1172,6 +1180,15 @@ def render_report(page_id: str) -> Response:
     regions = normalize_regions(report.get("tap_regions"))
     report["tap_regions"] = regions
     report["tap_dangling"] = sorted({n for r in regions for n in r.get("dangling", [])})
+    # Regions whose declared action wouldn't dispatch (issue #49). Empty
+    # tap_invalid means every region will actually fire; a non-empty list
+    # is the honest signal that a dashboard looks wired but is dead, e.g.
+    # an HA call missing its domain/service or a bad structured shape.
+    report["tap_invalid"] = [
+        {"x": r["x"], "y": r["y"], "w": r["w"], "h": r["h"], **bad}
+        for r in regions
+        for bad in r.get("invalid", [])
+    ]
     return jsonify({"id": page_id, "rev": _pr._canvas_rev(page), **report})
 
 

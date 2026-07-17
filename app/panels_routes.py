@@ -667,7 +667,12 @@ def touch_regions(canvas_id: str) -> Response:
         return _error(502, f"extraction failed: {type(err).__name__}: {err}")
     regions = normalize_regions(raw)
     dangling = sorted({name for r in regions for name in r.get("dangling", [])})
-    return jsonify({"regions": regions, "dangling": dangling})
+    invalid = [
+        {"x": r["x"], "y": r["y"], "w": r["w"], "h": r["h"], **bad}
+        for r in regions
+        for bad in r.get("invalid", [])
+    ]
+    return jsonify({"regions": regions, "dangling": dangling, "invalid": invalid})
 
 
 def _error(status: int, message: str) -> Response:

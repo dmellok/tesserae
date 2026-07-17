@@ -6,6 +6,21 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **Home Assistant touch actions written in the natural shape now fire (#49).** A structured HA
+  action only dispatched when written in the exact canonical form; the shapes an agent naturally
+  writes (no `action` key when a `service` is given, `entity_id` at the top level, a dotted
+  `service:"light.turn_on"`, or the HA-native `target`) silently no-op'd. These now normalise to the
+  canonical form and dispatch, and sliders accept `$value` as well as `{value}`. Execution is
+  server-side through the ha_core connection (a POST to `/api/services/...`), not the read-only
+  ha_service data source.
+- **`render_report` no longer green-lights dead touch actions (#49).** It now returns `tap_invalid`,
+  regions whose declared action would not dispatch (box + gesture + reason), so verification reflects
+  what will actually fire instead of echoing a stored-but-undispatchable payload. A region appearing
+  in `tap_regions` only means it was stored; `tap_invalid == []` is the real "this dashboard is
+  wired" signal. The panels touch-regions endpoint reports the same.
+
 ### Added
 
 - **Touch events on the Events page (#49).** Touch strokes now log as their own `touch` event type

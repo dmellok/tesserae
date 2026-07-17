@@ -23,7 +23,7 @@ import urllib.error
 import urllib.request
 from typing import Any
 
-__version__ = "0.6.2"
+__version__ = "0.6.3"
 
 _BASE = os.environ.get("TESSERAE_URL", "http://127.0.0.1:8765").rstrip("/")
 _TOKEN = os.environ.get("TESSERAE_MCP_TOKEN", "").strip()
@@ -116,9 +116,30 @@ TOUCH ACTIONS ("on_tap"/"on_swipe"/"on_slide" on ANY element -- respond to taps 
     them from its markup as data-on-tap="@name" (also data-on-swipe / data-on-slide), in static HTML
     or JS-built DOM. Structured (HA) specs stay in validated config; the markup holds a plain @name.
     An @name with no matching entry is reported in render_report().tap_dangling.
+  HOME ASSISTANT action shape (READ THIS -- getting it wrong makes the action silently no-op):
+    canonical: {"action":"ha","domain":"<domain>","service":"<service>","data":{"entity_id":"<id>", ...}}.
+    The entity_id and any service fields (brightness_pct, etc.) go INSIDE "data". These forgiving
+    variants are also accepted and normalise to the canonical form: omitting "action" when you give a
+    "service" (it's inferred), a dotted "service":"light.turn_on" (splits into domain+service), a
+    top-level "entity_id", or the HA-native "target":{"entity_id":...}. Sliders substitute the 0-100
+    value into "{value}" (also "$value"), which becomes a number for fields like brightness_pct.
+    Execution is SERVER-SIDE via the ha_core plugin's connection (base URL + long-lived token in
+    Settings -> Plugins -> Home Assistant Core), a POST to /api/services/<domain>/<service>. This is
+    NOT the read-only ha_service data source; you do NOT need a "callable" service source.
+  On-device requirement: the target panel must be touch-capable (list_devices() shows "touch": true,
+    e.g. the reTerminal E1003) AND running firmware that reports touch. On a display-only panel these
+    fields render but never fire.
+  Code element named actions: give a "code" element "actions":{"<name>":<spec>, ...} and reference
+    them from its markup as data-on-tap="@name" (also data-on-swipe / data-on-slide), in static HTML
+    or JS-built DOM. Structured (HA) specs stay in validated config; the markup holds a plain @name.
+    An @name with no matching entry is reported in render_report().tap_dangling.
   Actions you set through THESE tools are trusted config, so webhook + HA calls dispatch. The same
   action written into raw widget markup is limited to navigation (refresh/rotate/step/page) for
-  safety. render_report().tap_regions reads back every region that actually rendered.
+  safety.
+  VERIFY with render_report(): tap_regions lists every region that rendered, tap_dangling lists
+  unresolved @name refs, and tap_invalid lists regions whose action would NOT dispatch (with the box
+  + gesture + reason). A region in tap_regions was only STORED; it will fire only if tap_invalid is
+  empty. Always check tap_invalid == [] before trusting a touch dashboard.
 
 LIVE BINDINGS ("bind" on ANY element -- makes a SHAPE reflect data):
   Data elements auto-update, but shapes (rect/ellipse/icon/line/text) are static geometry.
@@ -517,10 +538,12 @@ def build_server() -> Any:
         rendered, overflow/clip flags (overflow_x when content is wider than its box),
         "data_source" (live | sample | error | static), and computed colours; plus the
         board's resolved background / theme. Also "tap_regions" (every touch region that
-        rendered: box + resolved on_tap/on_swipe/on_slide action) and "tap_dangling" (code
-        element @name references with no matching entry in its actions map) so you can
-        verify interactivity. Use it to verify a render — catch clipping, confirm live
-        data, read the real colours, check touch targets — without parsing a PNG.
+        rendered: box + resolved on_tap/on_swipe/on_slide action), "tap_dangling" (code
+        element @name refs with no matching entry), and "tap_invalid" (regions whose action
+        would NOT dispatch: box + gesture + reason). A region in tap_regions was only
+        STORED -- it fires only if it is NOT in tap_invalid, so check tap_invalid == [] to
+        trust a touch dashboard. Use it to verify a render — catch clipping, confirm live
+        data, read the real colours, check touch targets fire — without parsing a PNG.
         (Widget cells render into shadow DOM, so their "text" may be empty; data
         primitives and decorations report their text.)"""
         return _json("GET", f"/pages/{page_id}/render_report")
