@@ -34,6 +34,7 @@ import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from app.button_actions import (
     DEFAULT_BUTTON_MAP,
@@ -52,7 +53,15 @@ from app.state.page_store import PageStore
 from app.state.rotation_model import Rotation
 from app.state.rotation_store import RotationStore
 from app.state.settings_store import SettingsStore
-from app.touch_regions import classify_stroke, hit_test, is_side_effecting, resolve_gesture_action
+from app.touch_regions import (
+    classify_stroke,
+    hit_test,
+    is_side_effecting,
+    resolve_gesture_action,
+    slide_declaration,
+    slide_value,
+    substitute_value,
+)
 
 log = logging.getLogger(__name__)
 
@@ -70,6 +79,19 @@ _FALLBACK_HOLD_SECONDS = 3600
 # that a stuck external endpoint doesn't strand threads. Overridable
 # via ``settings.app.button_webhook_timeout_s``.
 _WEBHOOK_TIMEOUT_SECONDS = 3.0
+
+# Home Assistant service calls fired from a touch action run
+# synchronously (the same wake's frame should reflect the new state),
+# so keep the ceiling tight. Overridable via
+# ``settings.app.touch_ha_timeout_s``.
+_HA_TIMEOUT_SECONDS = 5.0
+
+
+def _spec_label(spec: str | dict[str, Any] | None) -> str | None:
+    """A loggable string form of an action spec (dict specs serialise)."""
+    if spec is None:
+        return None
+    return spec if isinstance(spec, str) else json.dumps(spec, sort_keys=True)
 
 
 @dataclass(frozen=True)
@@ -142,15 +164,18 @@ class TouchHandleResult:
     ``no_target`` / ``blocked`` (guard-chain exits; ``blocked`` = a
     side-effecting action from raw markup, refused by the provenance
     gate) or ``dispatched`` / ``noop`` / ``webhook_dispatched`` /
-    ``error`` (the action ran, mirroring the button statuses). ``base``
-    carries the rotation envelope the REST layer serialises, exactly as
-    a button press would."""
+    ``ha_dispatched`` / ``ha_failed`` / ``error`` (the action ran,
+    mirroring the button statuses). ``gesture`` includes ``slide`` for
+    slider regions, whose 0-100 ``value`` is what the stroke resolved
+    to. ``base`` carries the rotation envelope the REST layer
+    serialises, exactly as a button press would."""
 
     outcome: str
     gesture: str | None
     base: ButtonHandleResult
     magnitude: int = 0
     action_spec: str | None = None
+    value: int | None = None
 
 
 class ButtonService:
@@ -401,7 +426,22 @@ class ButtonService:
             else []
         )
         region = hit_test(regions, stroke.x0, stroke.y0)
-        spec = resolve_gesture_action(region, gesture) if region is not None else None
+        spec: str | dict[str, Any] | None = None
+        slide_val: int | None = None
+        if region is not None:
+            slide = slide_declaration(region)
+            if slide is not None:
+                # A slider region absorbs every gesture: the stroke's end
+                # point (== start point for a tap) sets an absolute 0-100
+                # value along the axis, substituted into the action as
+                # ``{value}``. Press-drag-lift to a level, or tap the bar
+                # where you want it.
+                gesture = "slide"
+                slide_val = slide_value(region, str(slide["axis"]), stroke.x1, stroke.y1)
+                magnitude = slide_val
+                spec = substitute_value(slide["action"], slide_val)
+            else:
+                spec = resolve_gesture_action(region, gesture)
         if spec is None:
             result = TouchHandleResult(
                 outcome="no_target",
@@ -427,11 +467,35 @@ class ButtonService:
                 outcome="blocked",
                 gesture=gesture,
                 magnitude=magnitude,
-                action_spec=spec,
+                action_spec=_spec_label(spec),
                 base=self.snapshot(device_id),
             )
             self._emit_touch_row(result, stroke=stroke, event_id=event_id)
             return result
+
+        region_box = (
+            {k: region[k] for k in ("x", "y", "w", "h") if k in region}
+            if region is not None
+            else None
+        )
+
+        # Structured (dict) actions: currently the Home Assistant service
+        # call. Fired synchronously, then the current rotation page is
+        # re-pushed so the frame returned on this same wake reflects the
+        # new HA state (light level, cover position, …).
+        if isinstance(spec, dict):
+            return self._dispatch_structured(
+                device_id=device_id,
+                action=spec,
+                gesture=gesture,
+                magnitude=magnitude,
+                value=slide_val,
+                stroke=stroke,
+                event_id=event_id,
+                region_box=region_box,
+                state=state,
+                now=now,
+            )
 
         rotation = self._resolve_rotation(device_id)
         current_step_index, manual = self._effective_step_index(rotation, state)
@@ -441,11 +505,6 @@ class ButtonService:
             rotation_step_count=len(rotation.steps) if rotation is not None else 0,
             rotation_id=rotation.id if rotation is not None else None,
             known_page_ids=frozenset(p.id for p in self._pages.list()),
-        )
-        region_box = (
-            {k: region[k] for k in ("x", "y", "w", "h") if k in region}
-            if region is not None
-            else None
         )
         base = self._dispatch_spec(
             device_id=device_id,
@@ -464,6 +523,7 @@ class ButtonService:
                 "touch_event_id": event_id,
                 "gesture": gesture,
                 "magnitude": magnitude,
+                "value": slide_val,
                 "region": region_box,
             },
         )
@@ -481,8 +541,157 @@ class ButtonService:
             gesture=gesture,
             magnitude=magnitude,
             action_spec=spec,
+            value=slide_val,
             base=base,
         )
+
+    def _dispatch_structured(
+        self,
+        *,
+        device_id: str,
+        action: dict[str, Any],
+        gesture: str,
+        magnitude: int,
+        value: int | None,
+        stroke: TouchStroke,
+        event_id: int | None,
+        region_box: dict[str, Any] | None,
+        state: DeviceRotationState,
+        now: datetime,
+    ) -> TouchHandleResult:
+        """Dispatch a structured (dict) touch action. Currently the Home
+        Assistant service call: ``{"action": "ha", "domain", "service",
+        "data"}``, fired synchronously so a follow-up push of the current
+        rotation page reflects the new HA state on this same wake."""
+        label = _spec_label(action)
+        name = str(action.get("action") or "")
+        outcome = "error"
+        error: str | None = None
+        pushed_page_id: str | None = None
+        if name != "ha":
+            error = f"unknown structured action {name!r}"
+            log.warning("touch structured action unsupported: device=%s %s", device_id, label)
+        else:
+            domain = str(action.get("domain") or "").strip()
+            service = str(action.get("service") or "").strip()
+            raw_data = action.get("data")
+            data: dict[str, Any] = raw_data if isinstance(raw_data, dict) else {}
+            if not domain or not service:
+                error = "ha action needs 'domain' and 'service'"
+            else:
+                try:
+                    self._call_ha(domain, service, data)
+                    outcome = "ha_dispatched"
+                except Exception as exc:
+                    outcome = "ha_failed"
+                    error = f"{type(exc).__name__}: {exc}"
+                    log.warning(
+                        "touch ha call failed: device=%s %s.%s: %s",
+                        device_id,
+                        domain,
+                        service,
+                        exc,
+                    )
+        # Record the wake fingerprint for event-id dedup, same as the
+        # string path does inside _dispatch_spec.
+        self._state.upsert(
+            state.model_copy(
+                update={
+                    "last_button": "touch",
+                    "last_button_event_id": event_id,
+                    "last_button_at": now,
+                }
+            )
+        )
+        push_result: PushResult | None = None
+        if outcome == "ha_dispatched":
+            # Re-push the current rotation page so the frame this wake
+            # returns shows the post-action HA state. Devices without a
+            # rotation keep their frame; the next poll catches up.
+            rotation = self._resolve_rotation(device_id)
+            step_index, _ = self._effective_step_index(rotation, state)
+            if rotation is not None and rotation.steps:
+                pushed_page_id = rotation.steps[step_index].page_id
+                pusher = self._push_getter()
+                if pusher is not None and pushed_page_id:
+                    try:
+                        push_result = pusher.push(
+                            pushed_page_id,
+                            device_ids={device_id},
+                            respect_quiet_hours=False,
+                            source="touch",
+                        )
+                    except Exception:
+                        log.exception(
+                            "touch ha refresh push failed: device=%s page=%s",
+                            device_id,
+                            pushed_page_id,
+                        )
+        snapshot = self.snapshot(device_id)
+        base = ButtonHandleResult(
+            device_id=device_id,
+            dedup=False,
+            unmapped=False,
+            action_spec=label,
+            action_description=(
+                f"ha: {action.get('domain')}.{action.get('service')}" if name == "ha" else label
+            ),
+            rotation_id=snapshot.rotation_id,
+            step_index=snapshot.step_index,
+            step_page_id=snapshot.step_page_id,
+            step_count=snapshot.step_count,
+            manual_override=snapshot.manual_override,
+            override_until=snapshot.override_until,
+            pushed_page_id=pushed_page_id,
+            push_result=push_result,
+        )
+        result = TouchHandleResult(
+            outcome=outcome,
+            gesture=gesture,
+            magnitude=magnitude,
+            action_spec=label,
+            value=value,
+            base=base,
+        )
+        self._emit_history_row(
+            result=base,
+            origin="touch",
+            origin_extra={
+                "touch": stroke.to_log(),
+                "touch_event_id": event_id,
+                "gesture": gesture,
+                "magnitude": magnitude,
+                "value": value,
+                "region": region_box,
+            },
+            status=outcome,
+            error=error,
+        )
+        return result
+
+    def _call_ha(self, domain: str, service: str, data: dict[str, Any]) -> None:
+        """Fire a Home Assistant service call through the ha_core plugin
+        (shared base URL / token / TLS policy). Split out so tests can
+        stub the HA transport without an app context."""
+        from flask import current_app
+
+        registry = current_app.config.get("PLUGIN_REGISTRY")
+        plugin = registry.get("ha_core") if registry is not None else None
+        mod = getattr(plugin, "server_module", None) if plugin is not None else None
+        if mod is None or not hasattr(mod, "call_service_with_response"):
+            raise RuntimeError("ha_core plugin unavailable")
+        mod.call_service_with_response(
+            domain, service, data=data, timeout=int(self._ha_timeout_seconds())
+        )
+
+    def _ha_timeout_seconds(self) -> float:
+        try:
+            value = self._settings.get_section("app").get("touch_ha_timeout_s")
+        except Exception:
+            value = None
+        if isinstance(value, (int, float)) and value > 0:
+            return float(value)
+        return _HA_TIMEOUT_SECONDS
 
     def _dispatch_spec(
         self,

@@ -457,9 +457,17 @@ with `{"outcome": "dispatched" | "noop" | "webhook_dispatched" |
 move is the same, re-poll `/frame` and carry on.
 
 Touch regions are declared in dashboard markup (`data-on-tap` /
-`data-on-swipe` attributes on cells, widget markup, or code-element
-DOM) and extracted server-side at render time; the firmware never
-needs region geometry.
+`data-on-swipe` / `data-on-slide` attributes on cells, widget markup,
+or code-element DOM) and extracted server-side at render time; the
+firmware never needs region geometry. Slider regions map the stroke's
+end point to an absolute 0-100 value along an axis (vertical fills
+upward) and the server substitutes it into the region's action, so a
+press-drag-lift sets a light level in one stroke; the firmware still
+just reports raw coordinates. Home Assistant service-call actions run
+synchronously on the server and re-push the current page, so the frame
+returned on the same wake reflects the new state. The `outcome` values
+on `POST /tap` grow `ha_dispatched` / `ha_failed` / `blocked`
+accordingly.
 
 `304 Not Modified` — `If-None-Match` matches current digest. No body,
 just `ETag: "<digest>"` and `Content-Location: <absolute URL>`. Re-paint

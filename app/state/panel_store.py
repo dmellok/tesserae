@@ -186,6 +186,12 @@ class Element(BaseModel):
     # exists only to carry these. Empty = not tappable.
     on_tap: str | dict[str, Any] | None = None
     on_swipe: dict[str, str] | None = None
+    # Slider gesture (phase 3): ``{"axis": "x"|"y", "action": <spec>}``.
+    # A slider region absorbs every stroke; the end point maps to a 0-100
+    # value along the axis and substitutes ``{value}`` placeholders in
+    # the action (a structured HA call or a string spec). Vertical
+    # sliders fill upward (top = 100).
+    on_slide: dict[str, Any] | None = None
     # Named actions for kind == "code" (mirrors ``sources``: sources are data
     # in, actions are touches out). The element's markup references them as
     # ``data-on-tap="@name"`` (whole-attribute references), so structured

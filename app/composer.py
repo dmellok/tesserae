@@ -232,6 +232,7 @@ def _stamp_touch(item: dict[str, Any], e: Any) -> None:
     references inside their markup resolve at extraction time."""
     item["on_tap_attr"] = _touch_attr(getattr(e, "on_tap", None), None)
     item["on_swipe_attr"] = _touch_attr(getattr(e, "on_swipe", None), None)
+    item["on_slide_attr"] = _touch_attr(getattr(e, "on_slide", None), None)
     actions = getattr(e, "actions", None) or {}
     item["touch_actions_json"] = json.dumps(actions) if actions else ""
 
@@ -836,6 +837,7 @@ def _hydrate_page(
                 # widget-manifest default.
                 "on_tap_attr": _touch_attr(cell.get("on_tap"), meta["manifest_on_tap"]),
                 "on_swipe_attr": _touch_attr(cell.get("on_swipe"), None),
+                "on_slide_attr": _touch_attr(cell.get("on_slide"), None),
             }
         )
 

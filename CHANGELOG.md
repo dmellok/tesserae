@@ -8,6 +8,18 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Home Assistant touch actions and sliders (phase 3 of #49).** The Interaction picker gains
+  **Home Assistant…**: choose a service and entity (fetched live from your HA instance via the
+  shared ha_core connection) plus optional service data, and a tap on the element fires the call.
+  It runs synchronously and re-pushes the current page, so the frame the display gets back on that
+  same wake already shows the new state. Any element (or invisible touch region) can also become a
+  **slider**: the stroke's end point maps to 0-100 along the chosen axis (vertical fills upward, and
+  a plain tap sets the value at that point), and `"{value}"` placeholders in the action receive the
+  number, e.g. `light.turn_on` with `{"brightness_pct": "{value}"}` for a one-stroke dimmer, or a
+  webhook URL like `…/level/{value}`. Sliders work on grid cells too. Structured HA actions are
+  honoured only from editor/MCP-authored config or a code element's named actions map, per the
+  touch provenance gate.
+
 - **Touch actions in the canvas editor (phase 2 of #49).** Every canvas element gains an
   **Interaction** section: pick an on-tap action (refresh, rotate, jump to step, go to page,
   webhook) and per-direction swipe actions, with a hand badge on interactive elements and in the

@@ -88,7 +88,8 @@ def test_canvas_widget_element_on_tap_emits_on_cell(app: Flask) -> None:
     )
     body = client.get(f"/compose/{cid}").get_data(as_text=True)
     assert 'data-plugin="weather_now"' in body
-    assert 'data-on-tap="refresh" data-touch-origin="config"' in body
+    assert 'data-on-tap="refresh"' in body
+    assert 'data-touch-origin="config"' in body
 
 
 def test_hotspot_kind_round_trips_and_renders_empty(app: Flask) -> None:
@@ -162,3 +163,48 @@ def test_pages_json_lists_grid_and_canvas_dashboards(app: Flask) -> None:
     ids = {r["id"]: r for r in rows}
     assert "grid1" in ids and ids["grid1"]["kind"] == "grid"
     assert cid in ids and ids[cid]["kind"] == "canvas"
+
+
+def test_canvas_on_slide_emits_attr(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    cid = _new_canvas(client)
+    resp = client.post(
+        f"/pages/canvas/c/{cid}/save",
+        json={
+            "els": [
+                {
+                    "id": "s1",
+                    "kind": "hotspot",
+                    "x": 0,
+                    "y": 0,
+                    "w": 40,
+                    "h": 300,
+                    "on_slide": {
+                        "axis": "y",
+                        "action": {
+                            "action": "ha",
+                            "domain": "light",
+                            "service": "turn_on",
+                            "data": {"entity_id": "light.x", "brightness_pct": "{value}"},
+                        },
+                    },
+                }
+            ]
+        },
+    )
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    body = client.get(f"/compose/{cid}").get_data(as_text=True)
+    assert "data-on-slide=" in body
+    assert "brightness_pct" in body
+    assert 'data-touch-origin="config"' in body
+
+
+def test_ha_actions_json_unconfigured(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    resp = client.get("/pages/canvas/ha-actions.json")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["configured"] is False
+    assert body["services"] == [] and body["entities"] == []

@@ -378,3 +378,176 @@ def test_stale_touch_emits_history_row(stores: dict[str, Any]) -> None:
     rows = _touch_rows(stores["event_log"])
     assert len(rows) == 1
     assert rows[0].status == "stale"
+
+
+# -- structured HA actions + sliders (phase 3) ---------------------------
+
+
+def _ha_region(**overrides: Any) -> dict[str, Any]:
+    region = _tap_region(
+        tap={
+            "action": "ha",
+            "domain": "light",
+            "service": "toggle",
+            "data": {"entity_id": "light.x"},
+        },
+        swipe=None,
+        origin="config",
+    )
+    region.update(overrides)
+    return region
+
+
+def _stub_ha(svc: ButtonService) -> list[tuple[str, str, dict[str, Any]]]:
+    calls: list[tuple[str, str, dict[str, Any]]] = []
+
+    def fake(domain: str, service: str, data: dict[str, Any]) -> None:
+        calls.append((domain, service, data))
+
+    svc._call_ha = fake  # type: ignore[method-assign]
+    return calls
+
+
+def test_ha_tap_dispatches_service_call(stores: dict[str, Any]) -> None:
+    pm = TouchStubPushManager(latest=_latest(), regions=[_ha_region()])
+    svc = _service(stores, pm)
+    calls = _stub_ha(svc)
+    result = svc.handle_touch(
+        device_id="kitchen",
+        stroke=TouchStroke(x0=10, y0=10, x1=10, y1=10),
+        frame_digest="art123",
+    )
+    assert result.outcome == "ha_dispatched"
+    assert calls == [("light", "toggle", {"entity_id": "light.x"})]
+    rows = list(stores["event_log"].list(type="push", source="touch", limit=10))
+    assert rows and rows[0].status == "ha_dispatched"
+
+
+def test_ha_tap_refreshes_rotation_page_same_wake(stores: dict[str, Any]) -> None:
+    _seed_rotation(stores)
+    pm = TouchStubPushManager(latest=_latest(), regions=[_ha_region()])
+    svc = _service(stores, pm)
+    _stub_ha(svc)
+    result = svc.handle_touch(
+        device_id="kitchen",
+        stroke=TouchStroke(x0=10, y0=10, x1=10, y1=10),
+        frame_digest="art123",
+    )
+    assert result.outcome == "ha_dispatched"
+    # The current rotation page was re-pushed so this wake's frame shows
+    # the post-action HA state.
+    assert pm.calls and pm.calls[0]["page_id"] == "morning"
+    assert pm.calls[0]["source"] == "touch"
+
+
+def test_ha_from_markup_origin_is_blocked(stores: dict[str, Any]) -> None:
+    pm = TouchStubPushManager(latest=_latest(), regions=[_ha_region(origin="markup")])
+    svc = _service(stores, pm)
+    calls = _stub_ha(svc)
+    result = svc.handle_touch(
+        device_id="kitchen",
+        stroke=TouchStroke(x0=10, y0=10, x1=10, y1=10),
+        frame_digest="art123",
+    )
+    assert result.outcome == "blocked"
+    assert calls == []
+
+
+def test_ha_failure_reports_ha_failed(stores: dict[str, Any]) -> None:
+    pm = TouchStubPushManager(latest=_latest(), regions=[_ha_region()])
+    svc = _service(stores, pm)
+
+    def boom(domain: str, service: str, data: dict[str, Any]) -> None:
+        raise RuntimeError("HA is down")
+
+    svc._call_ha = boom  # type: ignore[method-assign]
+    result = svc.handle_touch(
+        device_id="kitchen",
+        stroke=TouchStroke(x0=10, y0=10, x1=10, y1=10),
+        frame_digest="art123",
+    )
+    assert result.outcome == "ha_failed"
+    assert pm.calls == []  # no refresh push on failure
+    rows = list(stores["event_log"].list(type="push", source="touch", limit=10))
+    assert rows and rows[0].status == "ha_failed"
+    assert "HA is down" in (rows[0].error or "")
+
+
+def test_slide_sets_value_and_substitutes_into_ha_data(stores: dict[str, Any]) -> None:
+    region = _tap_region(
+        tap=None,
+        swipe=None,
+        origin="config",
+        x=100,
+        y=100,
+        w=40,
+        h=200,
+        slide={
+            "axis": "y",
+            "action": {
+                "action": "ha",
+                "domain": "light",
+                "service": "turn_on",
+                "data": {"entity_id": "light.x", "brightness_pct": "{value}"},
+            },
+        },
+    )
+    pm = TouchStubPushManager(latest=_latest(), regions=[region])
+    svc = _service(stores, pm)
+    calls = _stub_ha(svc)
+    # Press near the bottom, drag to 25% from the top -> value 75.
+    result = svc.handle_touch(
+        device_id="kitchen",
+        stroke=TouchStroke(x0=120, y0=290, x1=120, y1=150),
+        frame_digest="art123",
+    )
+    assert result.outcome == "ha_dispatched"
+    assert result.gesture == "slide"
+    assert result.value == 75
+    assert calls == [("light", "turn_on", {"entity_id": "light.x", "brightness_pct": 75})]
+
+
+def test_slide_tap_sets_absolute_value_at_point(stores: dict[str, Any]) -> None:
+    """A plain tap on a slider region sets the value at the tap point."""
+    region = _tap_region(
+        tap=None,
+        swipe=None,
+        origin="config",
+        x=0,
+        y=0,
+        w=200,
+        h=40,
+        slide={"axis": "x", "action": "webhook:http://127.0.0.1:9/level/{value}"},
+    )
+    pm = TouchStubPushManager(latest=_latest(), regions=[region])
+    svc = _service(stores, pm)
+    result = svc.handle_touch(
+        device_id="kitchen",
+        stroke=TouchStroke(x0=100, y0=20, x1=100, y1=20),
+        frame_digest="art123",
+    )
+    assert result.outcome == "webhook_dispatched"
+    assert result.gesture == "slide"
+    assert result.value == 50
+    assert result.action_spec == "webhook:http://127.0.0.1:9/level/50"
+
+
+def test_slide_from_markup_with_webhook_is_blocked(stores: dict[str, Any]) -> None:
+    region = _tap_region(
+        tap=None,
+        swipe=None,
+        origin="markup",
+        x=0,
+        y=0,
+        w=200,
+        h=40,
+        slide={"axis": "x", "action": "webhook:http://127.0.0.1:9/level/{value}"},
+    )
+    pm = TouchStubPushManager(latest=_latest(), regions=[region])
+    svc = _service(stores, pm)
+    result = svc.handle_touch(
+        device_id="kitchen",
+        stroke=TouchStroke(x0=100, y0=20, x1=100, y1=20),
+        frame_digest="art123",
+    )
+    assert result.outcome == "blocked"

@@ -67,9 +67,12 @@ _SIDECAR_VERSION: Final[int] = 2
 SIDE_EFFECTING_ACTIONS: Final[frozenset[str]] = frozenset({"webhook", "ha"})
 
 
-def is_side_effecting(spec: str) -> bool:
-    """Whether an action spec (string grammar) names a side-effecting
-    action. The action name is everything before the first ``:``."""
+def is_side_effecting(spec: str | dict[str, Any]) -> bool:
+    """Whether an action spec names a side-effecting action. String form:
+    the action name is everything before the first ``:``. Structured
+    (dict) form: the ``action`` key."""
+    if isinstance(spec, dict):
+        return str(spec.get("action") or "").strip() in SIDE_EFFECTING_ACTIONS
     return spec.split(":", 1)[0].strip() in SIDE_EFFECTING_ACTIONS
 
 
@@ -335,15 +338,16 @@ def hit_test(regions: list[dict[str, Any]], x: int, y: int) -> dict[str, Any] | 
     return best
 
 
-def resolve_gesture_action(region: dict[str, Any], gesture: str) -> str | None:
+def resolve_gesture_action(region: dict[str, Any], gesture: str) -> str | dict[str, Any] | None:
     """The action spec a gesture resolves to within a region, or None.
 
-    Only the flat string grammar dispatches today. The object form
-    (attribute values starting with ``{``) is reserved for structured
-    actions (Home Assistant service calls) and is skipped, not errored,
-    so markup written against a future server degrades to a no-op
-    rather than a failure. ``slide`` declarations are likewise inert
-    until the value-substitution path lands."""
+    Returns either the flat string grammar (``page:<id>`` /
+    ``webhook:<url>`` / …) or a structured dict action (currently
+    ``{"action": "ha", "domain": …, "service": …, "data": {…}}``).
+    Attribute values that look like JSON objects parse into the dict
+    form; a malformed or unrecognised structured value reads as None (a
+    no-op, never an error, so markup written against a newer server
+    degrades cleanly)."""
     spec: Any = None
     if gesture == "tap":
         spec = region.get("tap")
@@ -351,9 +355,87 @@ def resolve_gesture_action(region: dict[str, Any], gesture: str) -> str | None:
         swipe = region.get("swipe")
         if isinstance(swipe, dict):
             spec = swipe.get(gesture.removeprefix("swipe_"))
+    return coerce_action(spec)
+
+
+def coerce_action(spec: Any) -> str | dict[str, Any] | None:
+    """Normalise a raw action value into a dispatchable form: a trimmed
+    grammar string, a structured dict (parsed from JSON text when
+    needed, validated to carry a string ``action`` name), or None."""
+    if isinstance(spec, dict):
+        return spec if isinstance(spec.get("action"), str) else None
     if not isinstance(spec, str):
         return None
     text: str = spec.strip()
-    if not text or text.startswith("{"):
+    if not text:
+        return None
+    if text.startswith("{"):
+        try:
+            parsed = json.loads(text)
+        except json.JSONDecodeError:
+            return None
+        if isinstance(parsed, dict) and isinstance(parsed.get("action"), str):
+            return parsed
         return None
     return text
+
+
+# -- slide gestures ------------------------------------------------------
+
+
+def slide_declaration(region: dict[str, Any]) -> dict[str, Any] | None:
+    """The region's slide declaration ``{"axis": "x"|"y", "action": …}``
+    when present and usable, else None. ``axis`` defaults to the box's
+    longer dimension when omitted."""
+    slide = region.get("slide")
+    if not isinstance(slide, dict):
+        return None
+    action = coerce_action(slide.get("action"))
+    if action is None:
+        return None
+    axis = slide.get("axis")
+    if axis not in ("x", "y"):
+        try:
+            axis = "x" if int(region.get("w", 0)) >= int(region.get("h", 0)) else "y"
+        except (TypeError, ValueError):
+            axis = "x"
+    return {"axis": axis, "action": action}
+
+
+def slide_value(region: dict[str, Any], axis: str, x: int, y: int) -> int:
+    """The 0-100 value a point maps to along a slider region's axis.
+
+    Horizontal: left edge = 0, right edge = 100. Vertical: BOTTOM edge =
+    0, top edge = 100 (a brightness bar fills upward). The point is
+    clamped to the region so a stroke that drifts past an edge pins to
+    the end stop."""
+    rx, ry = int(region["x"]), int(region["y"])
+    rw, rh = max(1, int(region["w"])), max(1, int(region["h"]))
+    if axis == "y":
+        frac = 1.0 - (min(max(y - ry, 0), rh) / rh)
+    else:
+        frac = min(max(x - rx, 0), rw) / rw
+    return round(frac * 100)
+
+
+def substitute_value(action: str | dict[str, Any], value: int) -> str | dict[str, Any]:
+    """Replace ``{value}`` placeholders in an action with the slide value.
+
+    String specs get a plain text substitution (``webhook:…?v={value}``).
+    Structured dicts are deep-copied with every string leaf substituted;
+    a leaf that is exactly ``"{value}"`` becomes the integer itself so HA
+    service fields like ``brightness_pct`` receive a number, not text."""
+
+    def _sub(node: Any) -> Any:
+        if isinstance(node, str):
+            if node == "{value}":
+                return value
+            return node.replace("{value}", str(value))
+        if isinstance(node, dict):
+            return {k: _sub(v) for k, v in node.items()}
+        if isinstance(node, list):
+            return [_sub(v) for v in node]
+        return node
+
+    result: str | dict[str, Any] = _sub(action)
+    return result

@@ -219,10 +219,10 @@ def test_resolve_gesture_action_tap_and_swipe() -> None:
     assert resolve_gesture_action(region, "swipe_down") is None
 
 
-def test_resolve_gesture_action_object_form_is_inert() -> None:
-    """The structured (JSON) action form is reserved; it must no-op, not
-    error, so markup written for a future server degrades cleanly."""
-    region = {"tap": '{"action": "ha", "domain": "light"}', "swipe": None}
+def test_resolve_gesture_action_actionless_object_is_inert() -> None:
+    """A JSON value with no ``action`` name must no-op, not error, so
+    markup written for a future server degrades cleanly."""
+    region = {"tap": '{"domain": "light"}', "swipe": None}
     assert resolve_gesture_action(region, "tap") is None
 
 
@@ -292,3 +292,79 @@ def test_compose_widget_manifest_on_tap_is_cell_default(app: Flask) -> None:
         assert 'data-on-tap="page:override"' in body
     finally:
         clock.manifest.pop("on_tap", None)
+
+
+# -- structured actions + slide (phase 3) --------------------------------
+
+
+def test_coerce_action_forms() -> None:
+    from app.touch_regions import coerce_action
+
+    assert coerce_action("page:x") == "page:x"
+    assert coerce_action("  refresh  ") == "refresh"
+    ha = '{"action": "ha", "domain": "light", "service": "toggle"}'
+    parsed = coerce_action(ha)
+    assert isinstance(parsed, dict) and parsed["domain"] == "light"
+    assert coerce_action({"action": "ha", "domain": "light"}) == {
+        "action": "ha",
+        "domain": "light",
+    }
+    # Malformed / actionless structured values read as None, never raise.
+    assert coerce_action("{not json") is None
+    assert coerce_action('{"domain": "light"}') is None
+    assert coerce_action(None) is None
+    assert coerce_action(42) is None
+
+
+def test_resolve_gesture_action_returns_structured_dict() -> None:
+    region = {"tap": '{"action": "ha", "domain": "light", "service": "toggle"}'}
+    spec = resolve_gesture_action(region, "tap")
+    assert isinstance(spec, dict) and spec["action"] == "ha"
+
+
+def test_slide_declaration_axis_defaults_from_aspect() -> None:
+    from app.touch_regions import slide_declaration
+
+    wide = {"w": 300, "h": 40, "slide": {"action": "webhook:http://x/{value}"}}
+    tall = {"w": 40, "h": 300, "slide": {"action": "webhook:http://x/{value}"}}
+    assert slide_declaration(wide)["axis"] == "x"
+    assert slide_declaration(tall)["axis"] == "y"
+    explicit = {"w": 300, "h": 40, "slide": {"axis": "y", "action": "refresh"}}
+    assert slide_declaration(explicit)["axis"] == "y"
+    assert slide_declaration({"slide": None}) is None
+    assert slide_declaration({"slide": {"axis": "y"}}) is None  # no action
+
+
+def test_slide_value_axes_and_clamping() -> None:
+    from app.touch_regions import slide_value
+
+    region = {"x": 100, "y": 100, "w": 200, "h": 100}
+    # Horizontal: left = 0, right = 100.
+    assert slide_value(region, "x", 100, 150) == 0
+    assert slide_value(region, "x", 300, 150) == 100
+    assert slide_value(region, "x", 200, 150) == 50
+    # Vertical: bottom = 0, top = 100 (fills upward).
+    assert slide_value(region, "y", 150, 200) == 0
+    assert slide_value(region, "y", 150, 100) == 100
+    # Points past the edges pin to the end stops.
+    assert slide_value(region, "x", 50, 150) == 0
+    assert slide_value(region, "x", 999, 150) == 100
+
+
+def test_substitute_value_string_and_dict() -> None:
+    from app.touch_regions import substitute_value
+
+    assert substitute_value("webhook:http://x/y?level={value}", 40) == "webhook:http://x/y?level=40"
+    action = {
+        "action": "ha",
+        "domain": "light",
+        "service": "turn_on",
+        "data": {"entity_id": "light.x", "brightness_pct": "{value}", "note": "set to {value}%"},
+    }
+    out = substitute_value(action, 65)
+    assert isinstance(out, dict)
+    # Exact-match placeholder becomes a real number; embedded stays text.
+    assert out["data"]["brightness_pct"] == 65
+    assert out["data"]["note"] == "set to 65%"
+    # The original action is untouched (deep copy).
+    assert action["data"]["brightness_pct"] == "{value}"

@@ -77,16 +77,20 @@
          data-panel-h="{{ ch }}"
          data-cell-zoom="1"
          data-font-family="{{ font_family }}, system-ui, sans-serif"
-         {% if e.on_tap_attr %}data-on-tap="{{ e.on_tap_attr }}" data-touch-origin="config"{% endif %}
-         {% if e.on_swipe_attr %}data-on-swipe="{{ e.on_swipe_attr }}"{% if not e.on_tap_attr %} data-touch-origin="config"{% endif %}{% endif %}>
+         {% if e.on_tap_attr %}data-on-tap="{{ e.on_tap_attr }}"{% endif %}
+         {% if e.on_swipe_attr %}data-on-swipe="{{ e.on_swipe_attr }}"{% endif %}
+         {% if e.on_slide_attr %}data-on-slide="{{ e.on_slide_attr }}"{% endif %}
+         {% if e.on_tap_attr or e.on_swipe_attr or e.on_slide_attr %}data-touch-origin="config"{% endif %}>
       <div class="cell-content"></div>
     </div>
     {% else %}
     <div class="deco" data-el='{{ e|tojson }}'
          data-el-id="{{ e.id }}"
          data-data-source="{{ e.data_source }}"
-         {% if e.on_tap_attr %}data-on-tap="{{ e.on_tap_attr }}" data-touch-origin="config"{% endif %}
-         {% if e.on_swipe_attr %}data-on-swipe="{{ e.on_swipe_attr }}"{% if not e.on_tap_attr %} data-touch-origin="config"{% endif %}{% endif %}
+         {% if e.on_tap_attr %}data-on-tap="{{ e.on_tap_attr }}"{% endif %}
+         {% if e.on_swipe_attr %}data-on-swipe="{{ e.on_swipe_attr }}"{% endif %}
+         {% if e.on_slide_attr %}data-on-slide="{{ e.on_slide_attr }}"{% endif %}
+         {% if e.on_tap_attr or e.on_swipe_attr or e.on_slide_attr %}data-touch-origin="config"{% endif %}
          {% if e.touch_actions_json %}data-touch-actions="{{ e.touch_actions_json }}"{% endif %}
          style="position:absolute;left: {{ e.x }}px; top: {{ e.y }}px; width: {{ e.w }}px; height: {{ e.h }}px;{% if e.rotate %} transform: rotate({{ e.rotate }}deg);{% endif %}{% if e.opacity is not none and e.opacity != 100 %} opacity: {{ e.opacity / 100 }};{% endif %}"></div>
     {% endif %}
