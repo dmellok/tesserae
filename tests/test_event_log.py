@@ -86,7 +86,9 @@ def test_delete_older_than_respects_cutoff(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(el.time, "time", lambda: 1000.0)
     [log.record(type="push", source="page", target=f"old{i}", status="sent") for i in range(2)]
     monkeypatch.setattr(el.time, "time", lambda: 5000.0)
-    new_ids = [log.record(type="push", source="page", target=f"new{i}", status="sent") for i in range(2)]
+    new_ids = [
+        log.record(type="push", source="page", target=f"new{i}", status="sent") for i in range(2)
+    ]
     # Cutoff between the two batches drops only the old rows.
     assert log.delete_older_than(3000.0) == 2
     assert {r.id for r in log.list(limit=10)} == set(new_ids)
