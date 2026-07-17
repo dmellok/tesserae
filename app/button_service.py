@@ -52,7 +52,7 @@ from app.state.page_store import PageStore
 from app.state.rotation_model import Rotation
 from app.state.rotation_store import RotationStore
 from app.state.settings_store import SettingsStore
-from app.touch_regions import classify_stroke, hit_test, resolve_gesture_action
+from app.touch_regions import classify_stroke, hit_test, is_side_effecting, resolve_gesture_action
 
 log = logging.getLogger(__name__)
 
@@ -139,10 +139,12 @@ class TouchHandleResult:
     """Outcome of a touch stroke.
 
     ``outcome`` is one of ``deduped`` / ``no_frame`` / ``stale`` /
-    ``no_target`` (guard-chain exits) or ``dispatched`` / ``noop`` /
-    ``webhook_dispatched`` / ``error`` (the action ran, mirroring the
-    button statuses). ``base`` carries the rotation envelope the REST
-    layer serialises, exactly as a button press would."""
+    ``no_target`` / ``blocked`` (guard-chain exits; ``blocked`` = a
+    side-effecting action from raw markup, refused by the provenance
+    gate) or ``dispatched`` / ``noop`` / ``webhook_dispatched`` /
+    ``error`` (the action ran, mirroring the button statuses). ``base``
+    carries the rotation envelope the REST layer serialises, exactly as
+    a button press would."""
 
     outcome: str
     gesture: str | None
@@ -405,6 +407,27 @@ class ButtonService:
                 outcome="no_target",
                 gesture=gesture,
                 magnitude=magnitude,
+                base=self.snapshot(device_id),
+            )
+            self._emit_touch_row(result, stroke=stroke, event_id=event_id)
+            return result
+
+        # Provenance gate (issue #49 phase 2): side-effecting actions
+        # (webhook / ha) fire only when the region's action came from
+        # validated config (editor / MCP fields, a code element's named
+        # actions map), never from raw widget markup, so a third-party
+        # widget can't aim a webhook by annotating its own HTML.
+        if region is not None and is_side_effecting(spec) and region.get("origin") != "config":
+            log.warning(
+                "touch action blocked (markup origin): device=%s spec=%s",
+                device_id,
+                spec,
+            )
+            result = TouchHandleResult(
+                outcome="blocked",
+                gesture=gesture,
+                magnitude=magnitude,
+                action_spec=spec,
                 base=self.snapshot(device_id),
             )
             self._emit_touch_row(result, stroke=stroke, event_id=event_id)
@@ -714,17 +737,20 @@ class ButtonService:
         event_id: int | None,
     ) -> None:
         """History row for the guard-chain exits (deduped / no_frame /
-        stale / no_target). Dispatched strokes are logged by
+        stale / no_target / blocked). Dispatched strokes are logged by
         ``_dispatch_spec`` with the full region + action context."""
+        extra: dict[str, object] = {
+            "touch": stroke.to_log(),
+            "touch_event_id": event_id,
+            "gesture": result.gesture,
+            "magnitude": result.magnitude,
+        }
+        if result.outcome == "blocked":
+            extra["blocked_action_spec"] = result.action_spec
         self._emit_history_row(
             result=result.base,
             origin="touch",
-            origin_extra={
-                "touch": stroke.to_log(),
-                "touch_event_id": event_id,
-                "gesture": result.gesture,
-                "magnitude": result.magnitude,
-            },
+            origin_extra=extra,
             status=result.outcome,
         )
 

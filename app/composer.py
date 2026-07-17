@@ -223,6 +223,19 @@ def _touch_attr(cell_value: Any, manifest_value: Any) -> str:
     return ""
 
 
+def _stamp_touch(item: dict[str, Any], e: Any) -> None:
+    """Attach a canvas element's touch attributes (issue #49) to its
+    template dict. Config-authored actions (editor / MCP fields) are the
+    trusted origin the dispatch gate honours for side-effecting actions;
+    the compose template marks them ``data-touch-origin="config"``. Code
+    elements also carry their named ``actions`` map so ``@name``
+    references inside their markup resolve at extraction time."""
+    item["on_tap_attr"] = _touch_attr(getattr(e, "on_tap", None), None)
+    item["on_swipe_attr"] = _touch_attr(getattr(e, "on_swipe", None), None)
+    actions = getattr(e, "actions", None) or {}
+    item["touch_actions_json"] = json.dumps(actions) if actions else ""
+
+
 def _resolved_options(plugin_id: str, raw: dict[str, Any]) -> dict[str, Any]:
     plugin = _registry().get(plugin_id)
     if plugin is None:
@@ -942,6 +955,7 @@ def _build_canvas_els(els: list[Any], cw: int, ch: int) -> list[dict[str, Any]]:
                 }
             )
             _apply_binds(e, els_out[-1])
+            _stamp_touch(els_out[-1], e)
             continue
         if e.kind == "code":
             # Author HTML/CSS/JS fed by ANY number of widgets' data primitives.
@@ -985,6 +999,7 @@ def _build_canvas_els(els: list[Any], cw: int, ch: int) -> list[dict[str, Any]]:
                     "data_source": csrc,
                 }
             )
+            _stamp_touch(els_out[-1], e)
             continue
         if e.kind and e.kind != "widget":
             els_out.append(
@@ -1012,6 +1027,7 @@ def _build_canvas_els(els: list[Any], cw: int, ch: int) -> list[dict[str, Any]]:
                 }
             )
             _apply_binds(e, els_out[-1])
+            _stamp_touch(els_out[-1], e)
             continue
         item: dict[str, Any] = {
             "id": e.id,
@@ -1035,6 +1051,7 @@ def _build_canvas_els(els: list[Any], cw: int, ch: int) -> list[dict[str, Any]]:
             item["data"] = data
             item["data_source"] = wsrc
         _apply_binds(e, item)
+        _stamp_touch(item, e)
         els_out.append(item)
     return els_out
 

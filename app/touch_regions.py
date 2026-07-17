@@ -55,7 +55,23 @@ log = logging.getLogger(__name__)
 TAP_RADIUS_PX: Final[int] = 30
 
 # Sidecar schema version, bumped if the record shape ever changes.
-_SIDECAR_VERSION: Final[int] = 1
+# v2 added ``origin`` + ``dangling`` (phase 2: provenance gate + @name refs).
+_SIDECAR_VERSION: Final[int] = 2
+
+# Actions with real-world side effects. Dispatched from a touch region
+# only when the region's action came from validated config (an editor /
+# MCP-set field or a code element's named actions map), never from raw
+# markup, so a third-party widget can't aim a webhook at an arbitrary
+# URL just by annotating its own HTML. Navigation-class actions
+# (refresh / rotate / step / page) are safe from any origin.
+SIDE_EFFECTING_ACTIONS: Final[frozenset[str]] = frozenset({"webhook", "ha"})
+
+
+def is_side_effecting(spec: str) -> bool:
+    """Whether an action spec (string grammar) names a side-effecting
+    action. The action name is everything before the first ``:``."""
+    return spec.split(":", 1)[0].strip() in SIDE_EFFECTING_ACTIONS
+
 
 GESTURES: Final[tuple[str, ...]] = (
     "tap",
@@ -66,12 +82,31 @@ GESTURES: Final[tuple[str, ...]] = (
 )
 
 # Walks the composed document (piercing shadow roots, in document order)
-# and returns the layout box + raw attribute strings for every node that
+# and returns the layout box + attribute values for every node that
 # declares a touch attribute. Runs in the render's page session after
 # the compose/image/font waits, so boxes reflect the final layout of the
 # exact frame being screenshotted. Invisible and zero-area nodes are
 # skipped: a hidden element must not swallow taps.
-EXTRACT_REGIONS_JS: Final[str] = """() => {
+#
+# Two pieces of context ride the walk:
+#
+# * ``origin``: nodes under a ``data-touch-origin="config"`` marker (the
+#   compose template stamps it on containers whose actions come from
+#   validated config fields, not raw markup) report ``origin: "config"``.
+#   The dispatch gate only honours side-effecting actions from config
+#   origin.
+# * ``actions``: the nearest ancestor's ``data-touch-actions`` JSON map
+#   (a code element's named actions). A whole-attribute ``@name`` value
+#   resolves through it, counts as config origin, and an unresolvable
+#   name is reported in ``dangling`` instead of dispatching.
+EXTRACT_REGIONS_JS: Final[str] = """async () => {
+    // Code elements render in sandboxed iframes and mirror their
+    // annotated boxes into the parent DOM asynchronously (see
+    // decorate.js); wait for every sandbox to report before walking.
+    const t0 = Date.now();
+    while ((window.__tesseraeTouchPending || 0) > 0 && Date.now() - t0 < 3500) {
+        await new Promise((r) => setTimeout(r, 50));
+    }
     const out = [];
     let order = 0;
     function visible(el, rect) {
@@ -79,32 +114,67 @@ EXTRACT_REGIONS_JS: Final[str] = """() => {
         const cs = getComputedStyle(el);
         return cs.display !== 'none' && cs.visibility !== 'hidden';
     }
-    function walk(root, depth) {
+    function resolveRef(value, actions, region) {
+        if (!value) return null;
+        if (value[0] !== '@') return { value: value, config: false };
+        const name = value.slice(1);
+        if (actions && Object.prototype.hasOwnProperty.call(actions, name)) {
+            const spec = actions[name];
+            return {
+                value: typeof spec === 'string' ? spec : JSON.stringify(spec),
+                config: true,
+            };
+        }
+        region.dangling.push(name);
+        return null;
+    }
+    function walk(root, depth, origin, actions) {
         for (const el of root.children || []) {
-            const tap = el.getAttribute && el.getAttribute('data-on-tap');
-            const swipe = el.getAttribute && el.getAttribute('data-on-swipe');
-            const slide = el.getAttribute && el.getAttribute('data-on-slide');
+            if (!el.getAttribute) continue;
+            let elOrigin = origin;
+            const originAttr = el.getAttribute('data-touch-origin');
+            if (originAttr === 'config') elOrigin = 'config';
+            else if (originAttr === 'markup') elOrigin = 'markup';
+            let elActions = actions;
+            const rawMap = el.getAttribute('data-touch-actions');
+            if (rawMap) {
+                try { elActions = JSON.parse(rawMap); } catch (e) { /* keep inherited */ }
+            }
+            const tap = el.getAttribute('data-on-tap');
+            const swipe = el.getAttribute('data-on-swipe');
+            const slide = el.getAttribute('data-on-slide');
             if (tap || swipe || slide) {
                 const rect = el.getBoundingClientRect();
                 if (visible(el, rect)) {
-                    out.push({
+                    const region = {
                         x: Math.round(rect.x),
                         y: Math.round(rect.y),
                         w: Math.round(rect.width),
                         h: Math.round(rect.height),
                         depth: depth,
                         order: order++,
-                        tap: tap || null,
-                        swipe: swipe || null,
-                        slide: slide || null,
-                    });
+                        tap: null,
+                        swipe: null,
+                        slide: null,
+                        origin: elOrigin,
+                        dangling: [],
+                    };
+                    const t = resolveRef(tap, elActions, region);
+                    const s = resolveRef(swipe, elActions, region);
+                    const l = resolveRef(slide, elActions, region);
+                    if (t) { region.tap = t.value; if (t.config) region.origin = 'config'; }
+                    if (s) { region.swipe = s.value; if (s.config) region.origin = 'config'; }
+                    if (l) { region.slide = l.value; if (l.config) region.origin = 'config'; }
+                    if (region.tap || region.swipe || region.slide || region.dangling.length) {
+                        out.push(region);
+                    }
                 }
             }
-            if (el.shadowRoot) walk(el.shadowRoot, depth + 1);
-            walk(el, depth + 1);
+            if (el.shadowRoot) walk(el.shadowRoot, depth + 1, elOrigin, elActions);
+            walk(el, depth + 1, elOrigin, elActions);
         }
     }
-    walk(document.documentElement, 0);
+    walk(document.documentElement, 0, 'markup', null);
     return out;
 }"""
 
@@ -134,7 +204,13 @@ def normalize_regions(raw: Any) -> list[dict[str, Any]]:
         tap = tap.strip() if isinstance(tap, str) and tap.strip() else None
         swipe = _parse_swipe_attr(entry.get("swipe"))
         slide = _parse_json_attr(entry.get("slide"))
-        if tap is None and swipe is None and slide is None:
+        raw_dangling = entry.get("dangling")
+        dangling = (
+            [str(n) for n in raw_dangling if isinstance(n, str)]
+            if isinstance(raw_dangling, list)
+            else []
+        )
+        if tap is None and swipe is None and slide is None and not dangling:
             continue
         out.append(
             {
@@ -147,6 +223,8 @@ def normalize_regions(raw: Any) -> list[dict[str, Any]]:
                 "tap": tap,
                 "swipe": swipe,
                 "slide": slide,
+                "origin": "config" if entry.get("origin") == "config" else "markup",
+                "dangling": dangling,
             }
         )
     return out
@@ -236,10 +314,11 @@ def classify_stroke(x0: int, y0: int, x1: int, y1: int) -> tuple[str, int]:
 
 
 def hit_test(regions: list[dict[str, Any]], x: int, y: int) -> dict[str, Any] | None:
-    """Deepest region containing the point, document order as tiebreak
-    (mirrors browser event targeting, so a code element's inner button
-    wins over its container, and a canvas hotspot painted above a code
-    element wins over the markup below it)."""
+    """Latest-in-document-order region containing the point (depth as
+    tiebreak). Document order mirrors paint order: descendants come
+    after their containers (so a code element's inner button wins over
+    its wrapper), and a later sibling (a hotspot painted above a code
+    element) wins over everything below it."""
     best: dict[str, Any] | None = None
     best_key = (-1, -1)
     for region in regions:
@@ -250,7 +329,7 @@ def hit_test(regions: list[dict[str, Any]], x: int, y: int) -> dict[str, Any] | 
             continue
         if not (rx <= x < rx + rw and ry <= y < ry + rh):
             continue
-        key = (int(region.get("depth", 0)), int(region.get("order", 0)))
+        key = (int(region.get("order", 0)), int(region.get("depth", 0)))
         if key > best_key:
             best, best_key = region, key
     return best

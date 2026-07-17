@@ -260,6 +260,23 @@ layer.
   are now yours, not the design system's). See
   [the widget contract's `design.palette` section](../widgets.md#designpalette-opting-out-of-strict-colour-tokens).
 
+## Touch actions in widget markup
+
+Widgets can make parts of their render tappable on touch-capable
+displays by annotating markup with `data-on-tap` (and `data-on-swipe`
+with a JSON direction map). The value is the button-action grammar
+(`refresh`, `page:<id>`, `rotate_next`, …); the server extracts each
+annotated node's rendered box at render time and dispatches strokes
+against it, so regions track your layout automatically. A widget can
+also declare a whole-cell default with `"on_tap": "refresh"` in
+`plugin.json`; users can override it per cell.
+
+Note the provenance rule: side-effecting actions (`webhook:`, and the
+Home Assistant action when it lands) are ignored when they originate in
+widget markup. They only dispatch from user-authored configuration (the
+cell/element settings or a code element's named actions map), so keep
+markup annotations to navigation-class actions.
+
 ## Repo hygiene
 
 - **Add a `.gitignore`** with at least `__pycache__/` and `.DS_Store`.

@@ -86,8 +86,8 @@ class Element(BaseModel):
 
     id: str
     # What this element is: a placed widget, a decoration shape, a data-bound
-    # primitive, or a custom-HTML block.
-    kind: str = "widget"  # widget | rect | ellipse | line | icon | text | data | html | svg | code
+    # primitive, a custom-HTML block, or an invisible touch hotspot.
+    kind: str = "widget"  # widget | rect | ellipse | line | icon | text | data | html | svg | code | hotspot
     # Plugin id whose render() paints this element. Empty = an unassigned box
     # (placed but not yet pointed at a widget).
     widget: str = ""
@@ -176,6 +176,23 @@ class Element(BaseModel):
     # combine (e.g. bind x by position AND colour by threshold). Empty for a
     # static element. See :class:`Binding` and :mod:`app.bindings`.
     bind: list[Binding] = Field(default_factory=list)
+    # Touch actions (issue #49). ``on_tap`` is an action spec in the
+    # ``button_actions`` string grammar (``refresh`` / ``page:<id>`` /
+    # ``webhook:<url>`` / …; the dict form is reserved for structured actions).
+    # ``on_swipe`` maps directions (up/down/left/right) to specs. The composer
+    # stamps these as ``data-on-tap`` / ``data-on-swipe`` on the element's
+    # container, so the render-time extractor picks the element's box up as a
+    # touch region. The dedicated ``hotspot`` kind is an invisible element that
+    # exists only to carry these. Empty = not tappable.
+    on_tap: str | dict[str, Any] | None = None
+    on_swipe: dict[str, str] | None = None
+    # Named actions for kind == "code" (mirrors ``sources``: sources are data
+    # in, actions are touches out). The element's markup references them as
+    # ``data-on-tap="@name"`` (whole-attribute references), so structured
+    # actions stay in validated config and never inline in markup. Values use
+    # the same spec forms as ``on_tap`` (string grammar, or a direction map for
+    # ``data-on-swipe="@name"``).
+    actions: dict[str, Any] = Field(default_factory=dict)
 
 
 class CanvasLayout(BaseModel):

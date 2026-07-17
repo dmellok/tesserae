@@ -46,6 +46,13 @@
     var kind = el.kind || "rect";
     var color = el.color || "var(--text-primary, #1B1A16)";
 
+    if (kind === "hotspot") {
+      // Touch hotspot (issue #49): carries data-on-tap/-swipe on its wrapper
+      // but paints nothing. The editor draws its own dashed affordance.
+      var hs = document.createElement("div");
+      hs.style.cssText = "width:100%;height:100%";
+      return hs;
+    }
     if (kind === "html") return renderHtml(el, false);
     if (kind === "svg") return renderHtml(el, true);
     if (kind === "code") return renderCode(el, data);
@@ -195,7 +202,31 @@
     return src;
   }
 
+  // Touch-region mirroring (issue #49). The code sandbox is an
+  // origin-less iframe, so the server-side extraction walker can't see
+  // data-on-tap nodes inside it. A collector script injected into the
+  // srcdoc posts each annotated node's box out via postMessage, and the
+  // parent mirrors them as invisible, absolutely-positioned marker divs
+  // beside the iframe, which the walker CAN see. The mirrors carry the
+  // raw attribute values (including @name refs, which resolve against
+  // the element's data-touch-actions map) and an explicit
+  // data-touch-origin="markup" so sandbox markup never inherits the
+  // config-origin trust of the element wrapper.
+  var TOUCH_COLLECT_JS =
+    "(function(){function send(){var out=[];var ns=document.querySelectorAll(" +
+    "'[data-on-tap],[data-on-swipe],[data-on-slide]');" +
+    "for(var i=0;i<ns.length;i++){var n=ns[i];var r=n.getBoundingClientRect();" +
+    "if(r.width<=0||r.height<=0)continue;var cs=getComputedStyle(n);" +
+    "if(cs.display==='none'||cs.visibility==='hidden')continue;" +
+    "out.push({x:Math.round(r.x),y:Math.round(r.y),w:Math.round(r.width),h:Math.round(r.height)," +
+    "tap:n.getAttribute('data-on-tap'),swipe:n.getAttribute('data-on-swipe')," +
+    "slide:n.getAttribute('data-on-slide')});}" +
+    "try{parent.postMessage({type:'tesserae-touch-regions',regions:out},'*');}catch(e){}}" +
+    "requestAnimationFrame(function(){requestAnimationFrame(send);});})();";
+
   function renderCode(el, data) {
+    var wrap = document.createElement("div");
+    wrap.style.cssText = "position:relative;width:100%;height:100%";
     var f = document.createElement("iframe");
     f.setAttribute("sandbox", "allow-scripts");
     f.setAttribute("scrolling", "no");
@@ -272,8 +303,38 @@
       "<script>try{" + (el.js || "") + "}catch(e){" +
       "document.body.innerHTML='<pre style=\"color:#900;font:12px monospace;white-space:pre-wrap\">'" +
       "+String(e&&e.message||e)+'</pre>';}</" + "script>" +
+      "<script>" + TOUCH_COLLECT_JS + "</" + "script>" +
       "</body></html>";
-    return f;
+
+    // Pending counter lets the extraction script wait until every code
+    // sandbox has reported (or timed out) before walking the DOM.
+    window.__tesseraeTouchPending = (window.__tesseraeTouchPending || 0) + 1;
+    var settled = false;
+    function settle() {
+      if (settled) return;
+      settled = true;
+      window.__tesseraeTouchPending = Math.max(0, (window.__tesseraeTouchPending || 1) - 1);
+    }
+    setTimeout(settle, 3000);
+    window.addEventListener("message", function onMsg(ev) {
+      if (ev.source !== f.contentWindow || !ev.data || ev.data.type !== "tesserae-touch-regions") return;
+      window.removeEventListener("message", onMsg);
+      (ev.data.regions || []).forEach(function (r) {
+        if (!r || (!r.tap && !r.swipe && !r.slide)) return;
+        var m = document.createElement("div");
+        m.className = "touch-mirror";
+        m.style.cssText = "position:absolute;pointer-events:none;left:" + (r.x | 0) + "px;top:" +
+          (r.y | 0) + "px;width:" + (r.w | 0) + "px;height:" + (r.h | 0) + "px";
+        if (r.tap) m.setAttribute("data-on-tap", r.tap);
+        if (r.swipe) m.setAttribute("data-on-swipe", r.swipe);
+        if (r.slide) m.setAttribute("data-on-slide", r.slide);
+        m.setAttribute("data-touch-origin", "markup");
+        wrap.appendChild(m);
+      });
+      settle();
+    });
+    wrap.appendChild(f);
+    return wrap;
   }
 
   // A widget data field, shown as text / number or a small chart.

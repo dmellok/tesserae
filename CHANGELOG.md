@@ -8,6 +8,19 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Touch actions in the canvas editor (phase 2 of #49).** Every canvas element gains an
+  **Interaction** section: pick an on-tap action (refresh, rotate, jump to step, go to page,
+  webhook) and per-direction swipe actions, with a hand badge on interactive elements and in the
+  Layers list. A new **Touch region** palette entry drops an invisible hotspot you can position
+  over anything, including a code element's rendered output. Code elements get a named **Actions**
+  card (mirroring Sources): define actions with pickers, reference them from markup as
+  `data-on-tap="@name"`, in static HTML or JS-built DOM alike. A toolbar **Show touch targets**
+  toggle renders the canvas headless and overlays the extracted regions, flagging unresolved
+  `@name` references. The MCP `render_report` now returns `tap_regions` + `tap_dangling` so agents
+  can verify their annotations. Dispatch gains a provenance gate: side-effecting actions (webhooks,
+  and Home Assistant actions when they land) only fire from user-authored config (editor/MCP fields,
+  code-element actions maps), never from raw widget markup; navigation actions work from anywhere.
+
 - **Touch input protocol (server side).** Touch-capable devices can now report taps and swipes and
   have them drive the dashboard (#49). A stroke arrives either as `touch_*` query params on the
   existing `GET /frame` poll (deep-sleep clients get the action's repaint on the same wake, exactly

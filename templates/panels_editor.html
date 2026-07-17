@@ -123,7 +123,9 @@
        data-preview-url="{{ url_for('panels.preview', canvas_id=canvas_id) }}"
        data-bg-url="{{ url_for('panels.generate_bg', canvas_id=canvas_id) }}"
        data-source-form-url="{{ url_for('panels.source_form') }}"
-       data-source-options-url="{{ url_for('panels.source_options') }}">
+       data-source-options-url="{{ url_for('panels.source_options') }}"
+       data-pages-url="{{ url_for('panels.pages_list') }}"
+       data-touch-regions-url="{{ url_for('panels.touch_regions', canvas_id=canvas_id) }}">
 
     <div class="tbar" style="grid-column:1/4">
       <a class="tbtn" href="{{ url_for('pages.index') }}" title="Back to Tesserae dashboards" id="panels-back"><i class="ph-bold ph-arrow-left"></i></a>
@@ -139,6 +141,7 @@
       <div class="tdiv"></div>
       <div class="tbtn on" title="Snap to grid and guides"><i class="ph-bold ph-magnet"></i></div>
       <div class="tbtn" id="panels-sim" title="Simulate e-ink"><i class="ph-bold ph-eye"></i></div>
+      <div class="tbtn" id="panels-touch" title="Show touch targets (renders headless and overlays the extracted regions)"><i class="ph-bold ph-hand-tap"></i></div>
       <div class="tbtn" id="panels-preview" title="Preview at panel resolution"><i class="ph-bold ph-image"></i></div>
       <div class="tbtn" id="panels-theme" title="Toggle dark mode"><i class="ph-bold ph-moon"></i></div>
       <div class="tdiv"></div>

@@ -1138,12 +1138,23 @@ def render_report(page_id: str) -> Response:
     if page is None or page.canvas is None:
         return _err(404, f"no canvas dashboard {page_id!r}")
     from app.renderer import InspectRequest, RenderRequest, inspect_composed, to_loopback_url
+    from app.touch_regions import EXTRACT_REGIONS_JS, normalize_regions
 
     path = url_for("composer.compose", page_id=page_id)
     url = to_loopback_url(request.host_url.rstrip("/") + path)
+    # One navigation, two scripts: the element report plus the touch
+    # region map (issue #49), so an agent can verify which boxes its
+    # data-on-tap / @name annotations actually produced.
+    combined = (
+        "async () => ({ ...("
+        + _REPORT_JS
+        + ")(), tap_regions: await ("
+        + EXTRACT_REGIONS_JS
+        + ")() })"
+    )
     ir = InspectRequest(
         render=RenderRequest(url=url, viewport_w=page.canvas.w, viewport_h=page.canvas.h),
-        script=_REPORT_JS,
+        script=combined,
     )
     try:
         report = inspect_composed(ir, pool=current_app.config.get("BROWSER_POOL"))
@@ -1151,6 +1162,9 @@ def render_report(page_id: str) -> Response:
         return _err(502, f"render report failed: {type(err).__name__}: {err}")
     if not isinstance(report, dict):
         report = {"board": {}, "elements": []}
+    regions = normalize_regions(report.get("tap_regions"))
+    report["tap_regions"] = regions
+    report["tap_dangling"] = sorted({n for r in regions for n in r.get("dangling", [])})
     return jsonify({"id": page_id, "rev": _pr._canvas_rev(page), **report})
 
 

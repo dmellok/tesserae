@@ -127,6 +127,8 @@ def _tap_region(**overrides: Any) -> dict[str, Any]:
         "tap": "page:lights",
         "swipe": {"up": "rotate_next"},
         "slide": None,
+        "origin": "markup",
+        "dangling": [],
     }
     region.update(overrides)
     return region
@@ -287,6 +289,54 @@ def test_unknown_action_spec_surfaces_as_error(stores: dict[str, Any]) -> None:
     )
     assert result.outcome == "error"
     assert pm.calls == []
+
+
+# -- provenance gate (phase 2) -------------------------------------------
+
+
+def test_markup_origin_webhook_is_blocked(stores: dict[str, Any]) -> None:
+    """A side-effecting action annotated in raw widget/code markup never
+    dispatches; only editor/MCP-authored config actions may reach out."""
+    region = _tap_region(tap="webhook:http://127.0.0.1:9/evil", origin="markup")
+    pm = TouchStubPushManager(latest=_latest(), regions=[region])
+    svc = _service(stores, pm)
+    result = svc.handle_touch(
+        device_id="kitchen",
+        stroke=TouchStroke(x0=10, y0=10, x1=10, y1=10),
+        frame_digest="art123",
+    )
+    assert result.outcome == "blocked"
+    assert result.action_spec == "webhook:http://127.0.0.1:9/evil"
+    assert pm.calls == []
+    rows = list(stores["event_log"].list(type="push", source="touch", limit=10))
+    assert rows and rows[0].status == "blocked"
+    assert rows[0].extra["blocked_action_spec"] == "webhook:http://127.0.0.1:9/evil"
+
+
+def test_config_origin_webhook_dispatches(stores: dict[str, Any]) -> None:
+    region = _tap_region(tap="webhook:http://127.0.0.1:9/ok", origin="config")
+    pm = TouchStubPushManager(latest=_latest(), regions=[region])
+    svc = _service(stores, pm)
+    result = svc.handle_touch(
+        device_id="kitchen",
+        stroke=TouchStroke(x0=10, y0=10, x1=10, y1=10),
+        frame_digest="art123",
+    )
+    assert result.outcome == "webhook_dispatched"
+
+
+def test_markup_origin_navigation_still_dispatches(stores: dict[str, Any]) -> None:
+    """Navigation-class actions (page/rotate/refresh) are safe from any
+    origin; the gate only guards side-effecting actions."""
+    pm = TouchStubPushManager(latest=_latest(), regions=[_tap_region(origin="markup")])
+    svc = _service(stores, pm)
+    result = svc.handle_touch(
+        device_id="kitchen",
+        stroke=TouchStroke(x0=10, y0=10, x1=10, y1=10),
+        frame_digest="art123",
+    )
+    assert result.outcome == "dispatched"
+    assert result.action_spec == "page:lights"
 
 
 # -- history rows --------------------------------------------------------

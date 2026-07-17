@@ -38,6 +38,19 @@
     { kind: "html", label: "Custom HTML", icon: "ph-code", w: 200, h: 120 },
     { kind: "code", label: "Code (data)", icon: "ph-brackets-curly", w: 220, h: 140 },
     { kind: "svg", label: "SVG", icon: "ph-bezier-curve", w: 120, h: 120 },
+    { kind: "hotspot", label: "Touch region", icon: "ph-hand-tap", w: 160, h: 120 },
+  ];
+  // Touch gesture directions + the action vocabulary the Interaction
+  // section offers (issue #49). Specs use the button_actions grammar.
+  var SWIPE_DIRS = ["up", "down", "left", "right"];
+  var TOUCH_ACTIONS = [
+    { id: "", label: "None" },
+    { id: "refresh", label: "Refresh" },
+    { id: "rotate_next", label: "Next in rotation" },
+    { id: "rotate_prev", label: "Previous in rotation" },
+    { id: "step", label: "Jump to step…", arg: "number" },
+    { id: "page", label: "Go to page…", arg: "page" },
+    { id: "webhook", label: "Webhook…", arg: "url" },
   ];
   // Base colour palette: Spectra semantic tokens (follow the theme) offered
   // alongside a native colour picker.
@@ -118,6 +131,7 @@
       case "icon": return "Icon: " + (e.icon || "star");
       case "html": return "Custom HTML";
       case "svg": return "SVG";
+      case "hotspot": return "Touch region";
       case "code":
         return "Code" + (e.source ? " · " + e.source : "");
       case "data":
@@ -221,6 +235,209 @@
       format: "",
       x: x, y: y, w: w, h: h, dither: true, visible: true, locked: false, group: null,
     };
+  }
+
+  // ---- touch interaction (issue #49) ------------------------------------
+  function hasInteraction(e) {
+    if (e.on_tap && typeof e.on_tap === "string") return true;
+    if (e.on_swipe && Object.keys(e.on_swipe).length) return true;
+    if (e.kind === "code" && e.actions && Object.keys(e.actions).length) return true;
+    return false;
+  }
+  // Lazily fetched list of all dashboards for the "Go to page" picker.
+  function fetchPages(cb) {
+    if (S.pagesList) { cb(S.pagesList); return; }
+    if (!S.cfg.pagesUrl) { cb([]); return; }
+    fetch(S.cfg.pagesUrl)
+      .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+      .then(function (j) { S.pagesList = (j && j.pages) || []; cb(S.pagesList); })
+      .catch(function () { cb([]); });
+  }
+  function specParts(spec) {
+    var s = typeof spec === "string" ? spec : "";
+    var i = s.indexOf(":");
+    if (i < 0) return { action: s, arg: "" };
+    return { action: s.slice(0, i), arg: s.slice(i + 1) };
+  }
+  function specJoin(action, arg) {
+    if (!action) return "";
+    var def = TOUCH_ACTIONS.filter(function (a) { return a.id === action; })[0];
+    if (def && def.arg) return arg ? action + ":" + arg : "";
+    return action;
+  }
+  // One action picker: a select of the vocabulary plus a conditional
+  // argument control (page list / webhook URL / step number). Calls
+  // onChange with the resolved spec string ("" = none).
+  function actionControl(spec, onChange) {
+    var wrap = el("span");
+    wrap.style.cssText = "display:flex;flex-direction:column;gap:4px;flex:1;min-width:0";
+    var parts = specParts(spec);
+    var sel = el("select", "psel");
+    sel.innerHTML = TOUCH_ACTIONS.map(function (a) {
+      return '<option value="' + a.id + '">' + esc(a.label) + "</option>";
+    }).join("");
+    if (!TOUCH_ACTIONS.some(function (a) { return a.id === parts.action; })) {
+      // An unknown / hand-authored spec (e.g. a structured HA action):
+      // show it verbatim rather than silently rewriting it.
+      sel.innerHTML += '<option value="__custom">Custom: ' + esc(String(spec).slice(0, 28)) + "</option>";
+      sel.value = "__custom";
+    } else {
+      sel.value = parts.action;
+    }
+    wrap.appendChild(sel);
+    var argHost = el("span");
+    argHost.style.cssText = "display:block";
+    wrap.appendChild(argHost);
+    function renderArg() {
+      argHost.textContent = "";
+      var def = TOUCH_ACTIONS.filter(function (a) { return a.id === sel.value; })[0];
+      if (!def || !def.arg) return;
+      if (def.arg === "page") {
+        var psel = el("select", "psel");
+        psel.innerHTML = '<option value="">Choose page…</option>';
+        argHost.appendChild(psel);
+        fetchPages(function (pages) {
+          psel.innerHTML = '<option value="">Choose page…</option>' + pages.map(function (p) {
+            return '<option value="' + esc(p.id) + '">' + esc(p.name) + "</option>";
+          }).join("");
+          if (parts.action === "page") psel.value = parts.arg;
+        });
+        psel.addEventListener("change", function () { commit(psel.value); });
+      } else {
+        var inp = el("input", "dinput");
+        inp.style.cssText = "width:100%;text-align:left";
+        if (def.arg === "number") { inp.type = "number"; inp.min = "0"; inp.placeholder = "step #"; }
+        else { inp.placeholder = "https://…"; }
+        if (parts.action === sel.value) inp.value = parts.arg;
+        inp.addEventListener("pointerdown", function (ev) { ev.stopPropagation(); });
+        inp.addEventListener("change", function () { commit(inp.value.trim()); });
+        argHost.appendChild(inp);
+      }
+    }
+    function commit(arg) {
+      if (sel.value === "__custom") return; // leave hand-authored specs alone
+      onChange(specJoin(sel.value, arg));
+    }
+    sel.addEventListener("change", function () {
+      parts = { action: sel.value, arg: "" };
+      renderArg();
+      var def = TOUCH_ACTIONS.filter(function (a) { return a.id === sel.value; })[0];
+      if (!def || !def.arg) commit("");
+    });
+    renderArg();
+    return wrap;
+  }
+  // The per-element Interaction section: "On tap" plus per-direction
+  // swipe actions. Stored as e.on_tap (spec string) and e.on_swipe
+  // ({direction: spec}); the composer stamps them as data-on-tap /
+  // data-on-swipe on the element's container at render time.
+  function interactionSection(mount, e) {
+    mount.appendChild(el("div", "psec", '<i class="ph-bold ph-hand-tap"></i>Interaction'));
+    if (e.kind === "hotspot") {
+      mount.appendChild(el("div", "note",
+        "An invisible touch region: position it over anything (including a code element's " +
+        "rendered output) to make that area tappable on touch displays."));
+    }
+    var trow = el("div", "prow"); trow.innerHTML = '<span class="plab">On tap</span>';
+    trow.appendChild(actionControl(typeof e.on_tap === "string" ? e.on_tap : "", function (spec) {
+      pushHistory();
+      e.on_tap = spec || null;
+      scheduleSave(); paint();
+    }));
+    mount.appendChild(trow);
+
+    var swipe = e.on_swipe || {};
+    SWIPE_DIRS.forEach(function (dir) {
+      if (!(dir in swipe)) return;
+      var row = el("div", "prow");
+      row.innerHTML = '<span class="plab">Swipe ' + dir + "</span>";
+      var box = el("span"); box.style.cssText = "display:flex;gap:4px;flex:1;min-width:0;align-items:flex-start";
+      box.appendChild(actionControl(swipe[dir] || "", function (spec) {
+        pushHistory();
+        e.on_swipe = e.on_swipe || {};
+        if (spec) e.on_swipe[dir] = spec; else delete e.on_swipe[dir];
+        if (!Object.keys(e.on_swipe).length) e.on_swipe = null;
+        scheduleSave(); paint();
+      }));
+      var rm = el("button", "minibtn", '<i class="ph-bold ph-x"></i>');
+      rm.title = "Remove swipe action";
+      rm.addEventListener("click", function () {
+        pushHistory();
+        if (e.on_swipe) delete e.on_swipe[dir];
+        if (e.on_swipe && !Object.keys(e.on_swipe).length) e.on_swipe = null;
+        scheduleSave(); paint(); renderProps();
+      });
+      box.appendChild(rm);
+      row.appendChild(box);
+      mount.appendChild(row);
+    });
+    var free = SWIPE_DIRS.filter(function (d) { return !(d in (e.on_swipe || {})); });
+    if (free.length) {
+      var addrow = el("div", "prow");
+      var addsel = el("select", "psel");
+      addsel.innerHTML = '<option value="">+ Add swipe action…</option>' + free.map(function (d) {
+        return '<option value="' + d + '">Swipe ' + d + "</option>";
+      }).join("");
+      addsel.addEventListener("change", function () {
+        if (!addsel.value) return;
+        pushHistory();
+        e.on_swipe = e.on_swipe || {};
+        e.on_swipe[addsel.value] = "";
+        renderProps();
+      });
+      addrow.appendChild(addsel); mount.appendChild(addrow);
+    }
+  }
+  // Named actions for a code element (mirrors the Sources card: sources
+  // are data in, actions are touches out). Markup references them as
+  // data-on-tap="@name"; structured actions stay in validated config.
+  function actionsCard(mount, e) {
+    if (!e.actions) e.actions = {};
+    mount.appendChild(el("div", "psec", '<i class="ph-bold ph-hand-tap"></i>Actions'));
+    mount.appendChild(el("div", "note",
+      'Named touch actions your markup can reference: data-on-tap="@name" (works in html and ' +
+      "JS-built DOM). Regions come from the annotated nodes' rendered boxes."));
+    Object.keys(e.actions).forEach(function (name) {
+      var box = el("div", "prow");
+      box.style.cssText = "display:block;border:1px solid var(--t-border);border-radius:8px;padding:8px;margin-bottom:6px";
+      var top = el("div"); top.style.cssText = "display:flex;gap:6px;align-items:center;margin-bottom:6px";
+      var nm = el("input", "dinput"); nm.value = name;
+      nm.style.cssText = "flex:1;text-align:left;font:12px var(--t-font-mono)";
+      nm.addEventListener("pointerdown", function (ev) { ev.stopPropagation(); });
+      nm.addEventListener("change", function () {
+        var next = nm.value.trim().replace(/^@/, "");
+        if (!next || next === name) { nm.value = name; return; }
+        pushHistory();
+        e.actions[next] = e.actions[name];
+        delete e.actions[name];
+        scheduleSave(); renderProps();
+      });
+      var rm = el("button", "minibtn", '<i class="ph-bold ph-trash"></i>');
+      rm.title = "Remove action";
+      rm.addEventListener("click", function () {
+        pushHistory(); delete e.actions[name]; scheduleSave(); paint(); renderProps();
+      });
+      top.appendChild(nm); top.appendChild(rm); box.appendChild(top);
+      var current = e.actions[name];
+      box.appendChild(actionControl(typeof current === "string" ? current : "", function (spec) {
+        pushHistory(); e.actions[name] = spec; scheduleSave(); paint();
+      }));
+      var hint = el("div", "note");
+      hint.style.marginTop = "6px";
+      hint.innerHTML = 'Use: <code>data-on-tap="@' + esc(name) + '"</code>';
+      box.appendChild(hint);
+      mount.appendChild(box);
+    });
+    var addb = el("button", "minibtn", '<i class="ph-bold ph-plus"></i> Add action');
+    addb.style.cssText = "width:100%;margin-bottom:8px";
+    addb.addEventListener("click", function () {
+      pushHistory();
+      var base = "action", i = 1, name = base;
+      while (name in e.actions) { i += 1; name = base + i; }
+      e.actions[name] = "";
+      scheduleSave(); renderProps();
+    });
+    mount.appendChild(addb);
   }
 
   // ---- live widget mount (cached) --------------------------------------
@@ -473,6 +690,11 @@
         : el("div");
       deco.style.pointerEvents = "none";
       node.appendChild(deco);
+      if (e.kind === "hotspot") {
+        // Editor-only affordance: the hotspot paints nothing in the real
+        // render, so show a dashed outline + hand glyph here.
+        node.appendChild(el("div", "el-hotspot", '<i class="ph-bold ph-hand-tap"></i>'));
+      }
     } else {
       // Reuse the cached widget host when nothing that affects the render
       // changed; otherwise mount fresh. The host is pointer-transparent so
@@ -501,6 +723,12 @@
 
     if (S.sim && lowContrast(e)) {
       node.appendChild(el("div", "el-warn", '<i class="ph-bold ph-warning"></i>Low contrast'));
+    }
+
+    if (e.kind !== "hotspot" && hasInteraction(e)) {
+      var tb = el("div", "el-touch", '<i class="ph-bold ph-hand-tap"></i>');
+      tb.title = "Has touch actions";
+      node.appendChild(tb);
     }
 
     if (isSel(e.id)) {
@@ -540,6 +768,7 @@
     S.gH = el("div", "ov-guide h");
     S.badge = el("div", "ov-badge");
     [S.gV, S.gH, S.badge].forEach(function (o) { o.style.display = "none"; artboard.appendChild(o); });
+    if (S.touchOn) artboard.appendChild(touchOverlayNode());
     fitZoom();
     renderLayers();
     renderProps();
@@ -1145,6 +1374,7 @@
         '<i class="ph-bold ph-dots-six-vertical grip" title="Drag to reorder"></i>' +
         '<i class="ph-bold ' + (e.group ? "ph-link" : "ph-cards-three") + ' ic"></i>' +
         '<span class="nm"></span>' +
+        (hasInteraction(e) ? '<i class="ph-bold ph-hand-tap lt" title="Has touch actions"></i>' : "") +
         '<span class="act">' +
           '<i class="ph-bold ' + (e.visible ? "ph-eye" : "ph-eye-slash") + ' li" data-act="vis" title="Show / hide"></i>' +
           '<i class="ph-bold ' + (e.locked ? "ph-lock-simple" : "ph-lock-simple-open") + ' li" data-act="lock" title="Lock"></i>' +
@@ -1592,6 +1822,7 @@
       ta.addEventListener("change", function () { pushHistory(); e[f[1]] = ta.value; scheduleSave(); paint(); });
       row.appendChild(ta); mount.appendChild(row);
     });
+    interactionSection(mount, e);
     arrangeGeom(mount, e);
     mount.appendChild(el("div", "psec", '<i class="ph-bold ph-frame-corners"></i>Align to canvas'));
     mount.appendChild(alignButtons("canvas"));
@@ -1671,6 +1902,7 @@
 
     mount.appendChild(el("div", "psec", '<i class="ph-bold ph-palette"></i>Colour'));
     mount.appendChild(colorControl(e));
+    interactionSection(mount, e);
     arrangeGeom(mount, e);
     mount.appendChild(el("div", "psec", '<i class="ph-bold ph-frame-corners"></i>Align to canvas'));
     mount.appendChild(alignButtons("canvas"));
@@ -1746,6 +1978,8 @@
     var sizes = "HTML " + (e.html || "").length + " · CSS " + (e.css || "").length + " · JS " + (e.js || "").length + " chars";
     mount.appendChild(el("div", "note", sizes));
 
+    actionsCard(mount, e);
+    interactionSection(mount, e);
     arrangeGeom(mount, e);
     mount.appendChild(el("div", "psec", '<i class="ph-bold ph-frame-corners"></i>Align to canvas'));
     mount.appendChild(alignButtons("canvas"));
@@ -1754,6 +1988,14 @@
 
   function renderDecoProps(mount, e) {
     mount.textContent = "";
+    if (e.kind === "hotspot") {
+      interactionSection(mount, e);
+      arrangeGeom(mount, e);
+      mount.appendChild(el("div", "psec", '<i class="ph-bold ph-frame-corners"></i>Align to canvas'));
+      mount.appendChild(alignButtons("canvas"));
+      propRowBtns(mount, e);
+      return;
+    }
     if (e.kind === "html" || e.kind === "svg") { renderHtmlProps(mount, e); return; }
     if (e.kind === "code") { renderCodeProps(mount, e); return; }
     if (e.kind === "data") { renderDataProps(mount, e); return; }
@@ -1813,6 +2055,7 @@
       wrow.appendChild(wsel); mount.appendChild(wrow);
     }
 
+    interactionSection(mount, e);
     arrangeGeom(mount, e);
     mount.appendChild(el("div", "psec", '<i class="ph-bold ph-frame-corners"></i>Align to canvas'));
     mount.appendChild(alignButtons("canvas"));
@@ -1929,6 +2172,7 @@
       e.dither ? '<i class="ph-bold ph-check-square"></i> On' : '<i class="ph-bold ph-square"></i> Flat');
     dbtn.addEventListener("click", function () { pushHistory(); e.dither = !e.dither; scheduleSave(); renderProps(); });
     drow.appendChild(dbtn); mount.appendChild(drow);
+    interactionSection(mount, e);
     mount.appendChild(el("div", "psec", '<i class="ph-bold ph-frame-corners"></i>Align to canvas'));
     mount.appendChild(alignButtons("canvas"));
 
@@ -2551,6 +2795,68 @@
     paint(); // show/hide low-contrast warnings
   }
 
+  // ---- touch-target overlay (issue #49) ---------------------------------
+  // Fetches the region map a real render of this canvas would produce
+  // (server-side extraction, so code-element markup and @name refs are
+  // included) and draws each box over the artboard. Boxes are in canvas
+  // pixels, 1:1 with the artboard.
+  function regionSummary(r) {
+    var bits = [];
+    if (r.tap) bits.push("tap: " + r.tap);
+    if (r.swipe) {
+      Object.keys(r.swipe).forEach(function (d) { bits.push(d + ": " + r.swipe[d]); });
+    }
+    if (r.slide) bits.push("slide");
+    (r.dangling || []).forEach(function (n) { bits.push("@" + n + " ?"); });
+    return bits.join(" · ");
+  }
+  function touchOverlayNode() {
+    var ov = el("div", "touch-ov");
+    (S.touchRegions || []).forEach(function (r) {
+      var box = el("div", "touch-ov-box" + ((r.dangling || []).length ? " dangling" : ""));
+      box.style.cssText = "left:" + r.x + "px;top:" + r.y + "px;width:" + r.w + "px;height:" + r.h + "px";
+      var lab = el("div", "touch-ov-label");
+      lab.textContent = regionSummary(r);
+      box.appendChild(lab);
+      ov.appendChild(box);
+    });
+    if (S.touchDangling && S.touchDangling.length) {
+      var warn = el("div", "touch-ov-warn",
+        '<i class="ph-bold ph-warning"></i> Unresolved: ' +
+        S.touchDangling.map(function (n) { return "@" + esc(n); }).join(", "));
+      ov.appendChild(warn);
+    } else if (!(S.touchRegions || []).length) {
+      ov.appendChild(el("div", "touch-ov-warn", "No touch regions in the last render."));
+    }
+    return ov;
+  }
+  function toggleTouchTargets() {
+    var btn = $("panels-touch");
+    if (S.touchOn) {
+      S.touchOn = false;
+      if (btn) btn.classList.remove("on");
+      paint();
+      return;
+    }
+    if (!S.cfg.touchRegionsUrl) return;
+    if (btn) btn.classList.add("on");
+    var status = $("panels-status");
+    if (status) status.textContent = "extracting touch targets…";
+    fetch(S.cfg.touchRegionsUrl)
+      .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+      .then(function (j) {
+        S.touchOn = true;
+        S.touchRegions = (j && j.regions) || [];
+        S.touchDangling = (j && j.dangling) || [];
+        if (status) status.textContent = "saved";
+        paint();
+      })
+      .catch(function () {
+        if (btn) btn.classList.remove("on");
+        if (status) status.textContent = "touch-target extraction failed";
+      });
+  }
+
   // ---- boot -------------------------------------------------------------
   function init() {
     var root = document.querySelector(".ed");
@@ -2569,6 +2875,8 @@
       sourceOptionsUrl: root.dataset.sourceOptionsUrl,
       streamUrl: root.dataset.streamUrl,
       canvasId: root.dataset.canvasId,
+      pagesUrl: root.dataset.pagesUrl,
+      touchRegionsUrl: root.dataset.touchRegionsUrl,
     };
     // Canvas-management URLs derive from this editor's own path
     // (…/c/<id>), so they carry any ingress prefix for free.
@@ -2641,6 +2949,8 @@
     if (redoBtn) redoBtn.addEventListener("click", redo);
     var simBtn = $("panels-sim");
     if (simBtn) simBtn.addEventListener("click", toggleSim);
+    var touchBtn = $("panels-touch");
+    if (touchBtn) touchBtn.addEventListener("click", toggleTouchTargets);
     var previewBtn = $("panels-preview");
     if (previewBtn) previewBtn.addEventListener("click", openPreview);
     var saveBtn = $("panels-save-btn");

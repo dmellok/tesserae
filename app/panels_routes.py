@@ -608,6 +608,52 @@ def source_options() -> Response:
     return jsonify({"options": _cell_options_from_form(plugin, request.form)})
 
 
+@bp.get("/pages.json")
+def pages_list() -> Response:
+    """Every saved dashboard (grid AND canvas) as ``{id, name, kind}``
+    rows, for the Interaction section's "Go to page" picker (issue #49).
+    A tap action may target any dashboard, not just canvases."""
+    _guard()
+    rows = [
+        {"id": p.id, "name": p.name or p.id, "kind": p.layout_kind or "grid"}
+        for p in _pages().list()
+    ]
+    rows.sort(key=lambda r: str(r["name"]).lower())
+    return jsonify({"pages": rows})
+
+
+@bp.get("/c/<canvas_id>/touch-regions.json")
+def touch_regions(canvas_id: str) -> Response:
+    """The touch region map this canvas would produce, extracted from a
+    fresh headless render of the shared ``/compose/<id>`` page (issue
+    #49). Powers the editor's "Show touch targets" overlay: boxes are in
+    canvas pixels (the compose render runs at the authored dims), and
+    ``dangling`` lists ``@name`` references with no matching entry in a
+    code element's actions map."""
+    _guard()
+    page = _get_canvas(canvas_id)
+    if page is None or page.canvas is None:
+        abort(404)
+    from app.renderer import InspectRequest, RenderRequest, inspect_composed, to_loopback_url
+    from app.touch_regions import EXTRACT_REGIONS_JS, normalize_regions
+
+    path = url_for("composer.compose", page_id=canvas_id)
+    url = to_loopback_url(request.host_url.rstrip("/") + path)
+    try:
+        raw = inspect_composed(
+            InspectRequest(
+                render=RenderRequest(url=url, viewport_w=page.canvas.w, viewport_h=page.canvas.h),
+                script=EXTRACT_REGIONS_JS,
+            ),
+            pool=current_app.config.get("BROWSER_POOL"),
+        )
+    except Exception as err:
+        return _error(502, f"extraction failed: {type(err).__name__}: {err}")
+    regions = normalize_regions(raw)
+    dangling = sorted({name for r in regions for name in r.get("dangling", [])})
+    return jsonify({"regions": regions, "dangling": dangling})
+
+
 def _error(status: int, message: str) -> Response:
     resp = jsonify({"error": message})
     resp.status_code = status

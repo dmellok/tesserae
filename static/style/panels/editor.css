@@ -163,3 +163,15 @@ body.dragging-palette .pi{cursor:grabbing}
 .cm-row:hover .cm-acts,.cm-row.on .cm-acts{opacity:1}
 .cm-act{width:26px;height:26px;display:grid;place-items:center;border:0;border-radius:6px;background:transparent;color:var(--t-muted);font-size:14px;cursor:pointer}
 .cm-act:hover{background:var(--t-surface-sunk);color:var(--t-fg)}
+
+/* ---- touch interaction (issue #49) ---- */
+.el-hotspot{position:absolute;inset:0;z-index:21;pointer-events:none;border:2px dashed var(--t-accent);border-radius:6px;background:color-mix(in srgb, var(--t-accent) 8%, transparent);display:grid;place-items:center;color:var(--t-accent)}
+.el-hotspot i{font-size:22px;opacity:.75}
+.el-touch{position:absolute;right:2px;top:2px;z-index:22;pointer-events:none;display:grid;place-items:center;width:18px;height:18px;border-radius:5px;background:var(--t-accent);color:var(--t-accent-fg);font-size:11px}
+.lrow .lt{color:var(--t-accent);font-size:12px;margin-right:2px}
+.touch-ov{position:absolute;inset:0;z-index:40;pointer-events:none}
+.touch-ov-box{position:absolute;border:1.5px dashed var(--t-accent);background:color-mix(in srgb, var(--t-accent) 10%, transparent);border-radius:4px}
+.touch-ov-box.dangling{border-color:var(--t-warn);background:color-mix(in srgb, var(--t-warn) 12%, transparent)}
+.touch-ov-label{position:absolute;left:0;top:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:700 10px var(--t-font-mono);background:var(--t-accent);color:var(--t-accent-fg);padding:1px 5px;border-radius:0 0 4px 0}
+.touch-ov-box.dangling .touch-ov-label{background:var(--t-warn)}
+.touch-ov-warn{position:absolute;left:8px;bottom:8px;display:inline-flex;align-items:center;gap:5px;font:700 11px var(--t-font);color:var(--t-warn);background:var(--t-warn-bg);border:1px solid var(--t-warn-bd);border-radius:6px;padding:3px 8px}

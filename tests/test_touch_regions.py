@@ -64,6 +64,31 @@ def test_normalize_regions_bad_swipe_json_reads_as_no_swipe() -> None:
     assert regions[0]["tap"] == "refresh"
 
 
+def test_normalize_regions_origin_and_dangling_passthrough() -> None:
+    raw = [
+        {"x": 0, "y": 0, "w": 10, "h": 10, "tap": "refresh", "origin": "config"},
+        {"x": 0, "y": 20, "w": 10, "h": 10, "tap": "refresh", "origin": "hax"},
+        # A region whose only content is a dangling @ref survives so the
+        # editor overlay / render_report can flag it.
+        {"x": 0, "y": 40, "w": 10, "h": 10, "tap": None, "dangling": ["dim", 42]},
+    ]
+    regions = normalize_regions(raw)
+    assert regions[0]["origin"] == "config"
+    assert regions[1]["origin"] == "markup"  # anything non-config reads as markup
+    assert regions[2]["dangling"] == ["dim"]
+    assert regions[2]["tap"] is None
+
+
+def test_is_side_effecting() -> None:
+    from app.touch_regions import is_side_effecting
+
+    assert is_side_effecting("webhook:https://x.example/y")
+    assert is_side_effecting("ha:whatever")
+    assert not is_side_effecting("page:morning")
+    assert not is_side_effecting("refresh")
+    assert not is_side_effecting("rotate_next")
+
+
 # -- sidecar round-trip --------------------------------------------------
 
 

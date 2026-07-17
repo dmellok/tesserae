@@ -65,6 +65,10 @@ WEBHOOK_REGION = {
     "tap": "webhook:http://127.0.0.1:9/tesserae-test",
     "swipe": None,
     "slide": None,
+    # Config origin: the provenance gate only honours side-effecting
+    # actions (webhook/ha) from editor/MCP-authored config.
+    "origin": "config",
+    "dangling": [],
 }
 
 
