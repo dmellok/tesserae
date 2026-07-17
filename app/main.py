@@ -23,6 +23,7 @@ New code should import from :mod:`app.app_factory` or
 from __future__ import annotations
 
 import logging
+import os
 
 from app.app_factory import REPO_ROOT, create_app
 from app.transport_wiring import (
@@ -104,12 +105,31 @@ def _serve(argv: list[str] | None = None) -> None:
     # warning Flask's dev server prints on startup.
     from waitress import serve
 
+    # The screenshot pipeline is a self-request: Chromium navigates back to
+    # this server's /compose/<id>, which needs a free worker thread to be
+    # served. A blocked render holds its caller's thread for up to ~105s, and
+    # every open SSE stream (/events/stream, canvas /stream) pins a thread for
+    # the life of the connection. With too few threads, a couple of open
+    # editors plus a render or two starve the inner /compose request and every
+    # render times out. 24 gives generous headroom (renders are serialised to
+    # one at a time by the single browser worker, so only ~1 free thread is
+    # ever needed to serve the inner compose); override with TESSERAE_THREADS.
+    threads = 24
+    raw_threads = os.environ.get("TESSERAE_THREADS", "").strip()
+    if raw_threads:
+        try:
+            threads = max(4, int(raw_threads))
+        except ValueError:
+            logging.getLogger(__name__).warning(
+                "ignoring invalid TESSERAE_THREADS=%r; using %d", raw_threads, threads
+            )
     logging.getLogger(__name__).info(
-        "Starting waitress on http://%s:%d/  (--dev for Flask dev server)",
+        "Starting waitress on http://%s:%d/ with %d threads  (--dev for Flask dev server)",
         args.host,
         args.port,
+        threads,
     )
-    serve(app, host=args.host, port=args.port, threads=8, ident="tesserae")
+    serve(app, host=args.host, port=args.port, threads=threads, ident="tesserae")
 
 
 def _reset_password() -> None:

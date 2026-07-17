@@ -57,11 +57,12 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   when the page really is just one widget. Bridge bumped to 0.5.12.
 
 - **Hover preview on the Dashboards page.** Hovering a dashboard row shows a scaled-down preview of
-  it. The preview is a cached PNG screenshot, rendered server-side once (via the same headless path a
-  push uses) the first time a dashboard is hovered and then reused, keyed by a content token so it
-  only re-renders when the dashboard actually changes. It lazy-loads after a short hover-intent delay,
-  covers grid and freeform pages alike, falls back to a live `/compose/<id>` iframe if the image can't
-  render, and is disabled on touch / narrow screens.
+  it. The preview is a cached PNG screenshot, rendered via the same headless path a push uses and
+  reused, keyed by a content token so it only re-renders when the dashboard actually changes. The
+  render happens in the background off the request thread (a single-flight queue): the first hover of
+  a new/changed dashboard falls back to a live `/compose/<id>` iframe while the image renders, and
+  subsequent hovers serve the cached PNG. It lazy-loads after a short hover-intent delay, covers grid
+  and freeform pages alike, and is disabled on touch / narrow screens.
 
 - **Bind a canvas to multiple devices.** The canvas editor's device picker is now a multi-select
   popover: a canvas can target any number of panels, and Send fans the one render out to each,
@@ -83,6 +84,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   the `mono` flag for genuinely grayscale panels. Bridge bumped to 0.5.10.
 
 ### Fixed
+
+- **Render pipeline no longer starves its own worker threads.** The headless screenshot self-requests
+  `/compose/<id>`, which needs a free web-server thread to be served; a blocked render holds its
+  caller's thread for up to ~105s, and every open SSE stream (the event log, the canvas editor) pins
+  one for the life of the connection. With only 8 waitress threads, a couple of open editors plus a
+  render or two could leave nothing free to serve the inner `/compose`, so every render timed out
+  (`Page.goto: Timeout 15000ms`) and the task queue backed up. The default thread count is raised to
+  24 (overridable via `TESSERAE_THREADS`), and the dashboards hover preview now renders in the
+  background rather than on the request thread, so a burst of hovers can't pile onto the pool.
 
 - **Heartbeat device count no longer reads "10+" on every install.** `build_payload` counted
   `registry.all()`, which includes the 20+ built-in device kinds and hardware SKUs (catalogue

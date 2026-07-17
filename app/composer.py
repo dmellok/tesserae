@@ -18,7 +18,6 @@ import base64
 import hashlib
 import json
 import logging
-import os
 from pathlib import Path
 from typing import Any, Final
 from urllib.parse import quote
@@ -1162,23 +1161,6 @@ def page_preview_token(page: Page, dims: tuple[int, int]) -> str:
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
 
 
-def _render_page_preview(page_id: str, width: int, height: int) -> bytes | None:
-    """Screenshot ``/compose/<id>`` at the preview dims via the warm browser
-    pool. Returns ``None`` (not a raise) when the render is unavailable, so a
-    hover preview degrades to no-image rather than a 500."""
-    from app.renderer import RenderRequest, render_to_png, to_loopback_url
-
-    url = to_loopback_url(f"{request.host_url.rstrip('/')}/compose/{page_id}?w={width}&h={height}")
-    try:
-        return render_to_png(
-            RenderRequest(url=url, viewport_w=width, viewport_h=height),
-            pool=current_app.config.get("BROWSER_POOL"),
-        )
-    except Exception:
-        logger.debug("preview render failed for page %s", page_id, exc_info=True)
-        return None
-
-
 @bp.get("/compose/<page_id>/preview.png")
 def compose_preview(page_id: str) -> Response:
     """A cached PNG preview of a dashboard, for the dashboards-list hover.
@@ -1187,9 +1169,15 @@ def compose_preview(page_id: str) -> Response:
     push uses, cached on disk, and served immutably keyed by the token in the
     URL. The dashboards list embeds the current token, so an edit produces a new
     URL and a fresh render; unchanged dashboards keep hitting the cached image.
+
+    The render is deliberately kept OFF this request thread: if the image isn't
+    cached yet we enqueue a background render and return ``202`` so the client
+    falls back to a live iframe meanwhile. Rendering inline would pin a waitress
+    worker for up to ~105s while the screenshot self-requests ``/compose``,
+    which a burst of hovers could turn into thread starvation.
     """
-    preview_cache: dict[str, Page] = current_app.config.get("PREVIEW_CACHE", {}) or {}
-    page = preview_cache.get(page_id) or current_app.config["PAGE_STORE"].get(page_id)
+    preview_pages: dict[str, Page] = current_app.config.get("PREVIEW_CACHE", {}) or {}
+    page = preview_pages.get(page_id) or current_app.config["PAGE_STORE"].get(page_id)
     if page is None:
         abort(404)
     devices = current_app.config.get("DEVICE_REGISTRY")
@@ -1201,18 +1189,23 @@ def compose_preview(page_id: str) -> Response:
     cache_path = cache_dir / f"{page_id}__{token}.png"
 
     if not cache_path.exists():
-        png = _render_page_preview(page_id, width, height)
-        if png is None:
-            abort(503)
-        cache_dir.mkdir(parents=True, exist_ok=True)
-        # Drop older versions of this page so the cache doesn't grow per edit.
-        for stale in cache_dir.glob(f"{page_id}__*.png"):
-            if stale.name != cache_path.name:
-                stale.unlink(missing_ok=True)
-        # Atomic publish so a concurrent hover never reads a half-written file.
-        tmp = cache_dir / f".{token}.{os.getpid()}.tmp"
-        tmp.write_bytes(png)
-        tmp.replace(cache_path)
+        from app import preview_cache
+
+        preview_cache.submit(
+            key=f"{page_id}__{token}",
+            base_url=request.host_url.rstrip("/"),
+            page_id=page_id,
+            width=width,
+            height=height,
+            cache_path=cache_path,
+            pool=current_app.config.get("BROWSER_POOL"),
+        )
+        # Not ready yet: tell the client to fall back to the iframe now, and
+        # don't let the browser cache this so it re-fetches once the render
+        # lands. Any non-2xx / empty body fires the <img> error handler.
+        resp = current_app.response_class(status=202)
+        resp.headers["Cache-Control"] = "no-store"
+        return resp
 
     # Immutable per token: the URL changes when the dashboard changes, so the
     # browser can hold it for a day and a matching If-None-Match short-circuits.

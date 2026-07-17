@@ -107,11 +107,13 @@ def test_page_preview_token_stable_and_changes() -> None:
     assert composer.page_preview_token(same, (400, 300)) == t
 
 
-def test_compose_preview_renders_once_then_serves_cache(
+def test_compose_preview_first_hit_enqueues_then_serves_cache(
     app: Flask, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """First hit renders + caches a PNG; a second hit for the same content is
-    served from disk without re-rendering."""
+    """The first hit doesn't render inline: it returns 202 (client falls back
+    to the iframe) and enqueues a background render. Once that lands, the same
+    URL serves the cached PNG without re-rendering."""
+    from app import preview_cache
     from app.state.page_store import Page
 
     app.config["PAGE_STORE"].save(Page(id="pg", name="Grid", layout_kind="grid"))
@@ -121,21 +123,24 @@ def test_compose_preview_renders_once_then_serves_cache(
     client = app.test_client()
 
     first = client.get("/compose/pg/preview.png")
-    assert first.status_code == 200 and first.mimetype == "image/png"
-    assert first.get_data() == png
-    assert len(calls) == 1
-    # Cached on disk under data_root/core/previews.
+    assert first.status_code == 202  # not ready; enqueued a background render
+    assert first.headers.get("Cache-Control") == "no-store"
+
+    preview_cache.join()  # block until the background worker finishes
     cache_dir = app.config["DATA_ROOT"] / "core" / "previews"
     assert list(cache_dir.glob("pg__*.png"))
+    assert len(calls) == 1
 
     second = client.get("/compose/pg/preview.png")
-    assert second.status_code == 200
+    assert second.status_code == 200 and second.mimetype == "image/png"
+    assert second.get_data() == png
     assert len(calls) == 1  # served from cache, not re-rendered
 
 
 def test_compose_preview_re_renders_after_edit(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Editing the dashboard rotates the token, so the next request renders a
-    fresh image and prunes the stale one."""
+    """Editing the dashboard rotates the token, so the next request enqueues a
+    fresh render and prunes the stale image."""
+    from app import preview_cache
     from app.state.page_store import Page
 
     store = app.config["PAGE_STORE"]
@@ -146,12 +151,14 @@ def test_compose_preview_re_renders_after_edit(app: Flask, monkeypatch: pytest.M
     )
     client = app.test_client()
     client.get("/compose/pg/preview.png")
+    preview_cache.join()
     assert len(calls) == 1
 
     store.save(Page(id="pg", name="Grid", layout_kind="grid", theme="dark"))  # edit
     client.get("/compose/pg/preview.png")
+    preview_cache.join()
     assert len(calls) == 2  # re-rendered for the new content
-    # Only the current version's file remains.
+    # Only the current version's file remains (stale one pruned).
     cache_dir = app.config["DATA_ROOT"] / "core" / "previews"
     assert len(list(cache_dir.glob("pg__*.png"))) == 1
 
@@ -160,18 +167,28 @@ def test_compose_preview_unknown_page_404(client: FlaskClient) -> None:
     assert client.get("/compose/nope/preview.png").status_code == 404
 
 
-def test_compose_preview_render_unavailable_503(
+def test_compose_preview_serves_existing_cache_without_render(
     app: Flask, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """A pre-existing cache file is served straight off disk, no render at all."""
     from app.state.page_store import Page
 
-    app.config["PAGE_STORE"].save(Page(id="pg", name="Grid", layout_kind="grid"))
+    page = Page(id="pg", name="Grid", layout_kind="grid")
+    app.config["PAGE_STORE"].save(page)
+    width, height = composer.preview_dims(
+        page, app.config.get("DEVICE_REGISTRY"), app.config["SETTINGS_STORE"]
+    )
+    token = composer.page_preview_token(page, (width, height))
+    cache_dir = app.config["DATA_ROOT"] / "core" / "previews"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    (cache_dir / f"pg__{token}.png").write_bytes(_tiny_png())
 
     def _boom(req: object, pool: object = None) -> bytes:
-        raise RuntimeError("no browser")
+        raise AssertionError("should not render when cache exists")
 
     monkeypatch.setattr("app.renderer.render_to_png", _boom)
-    assert app.test_client().get("/compose/pg/preview.png").status_code == 503
+    resp = app.test_client().get("/compose/pg/preview.png")
+    assert resp.status_code == 200 and resp.mimetype == "image/png"
 
 
 def test_canvas_page_renders_via_compose(app: Flask) -> None:

@@ -197,6 +197,7 @@
     const PW = 300;               // preview width in px
     const DELAY = 350;            // hover-intent delay
     let pop, img, frame, timer, current, imgSrc = '', frameSrc = '';
+    const failed = new Set();     // preview URLs that 202'd / errored this session
 
     function build() {
       if (pop) return;
@@ -206,9 +207,11 @@
       img = document.createElement('img');
       img.setAttribute('alt', '');
       img.setAttribute('aria-hidden', 'true');
-      // On a render failure (browser pool off / transient), fall back to the
-      // live iframe for whichever row is currently hovered.
+      // No cached image yet (202) or a render failure: remember it so a
+      // re-hover doesn't flash a broken image, and fall back to the live
+      // iframe for whichever row is currently hovered.
       img.addEventListener('error', function () {
+        if (imgSrc) failed.add(imgSrc);
         img.style.display = 'none';
         if (current) showIframe(current);
       });
@@ -245,13 +248,15 @@
       const ph = Math.round(h * scale);
       pop.style.width = PW + 'px';
       pop.style.height = ph + 'px';
-      if (png) {
+      if (png && !failed.has(png)) {
         // Primary path: the cached image. The token in the URL means the
         // browser reuses it until the dashboard changes.
         img.style.display = '';
         frame.style.display = 'none';
         if (imgSrc !== png) { img.src = png; imgSrc = png; }
       } else {
+        // No cached image (or it wasn't ready): live iframe, no server render.
+        img.style.display = 'none';
         showIframe(row);
       }
       position(row, ph);
