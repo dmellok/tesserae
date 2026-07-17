@@ -8,6 +8,14 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Touch actions in the grid dashboard editor (#49).** The touch authoring that shipped for the
+  canvas editor is now on grid dashboards too: each cell's **Advanced** pane gains a full
+  Interaction editor, on-tap and per-direction swipe actions (refresh / rotate / jump to step / go
+  to page / webhook / Home Assistant), and "Make this a slider" to map a drag to a 0-100 `{value}`
+  for a webhook or HA call. The picker UI is a shared `touch_interaction.js` module so the grid and
+  canvas editors stay consistent, backed by ungated `dashboards.json` + `ha-actions.json` endpoints
+  so it works without the canvas experiment.
+
 - **Home Assistant touch actions and sliders (phase 3 of #49).** The Interaction picker gains
   **Home Assistant…**: choose a service and entity (fetched live from your HA instance via the
   shared ha_core connection) plus optional service data, and a tap on the element fires the call.

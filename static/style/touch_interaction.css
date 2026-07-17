@@ -1,0 +1,59 @@
+/* Styling for the shared touch Interaction editor (touch_interaction.js).
+ * Scoped under .ti-root so it can drop into any host page (the grid
+ * editor loads this; the canvas editor styles the same controls itself)
+ * without colliding with the host's own classes. Uses the admin theme
+ * tokens (--t-*), which are globally available on Tesserae pages. */
+.ti-root { display: flex; flex-direction: column; gap: 6px; }
+.ti-root .prow {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.ti-root .plab {
+  flex: 0 0 74px;
+  padding-top: 6px;
+  font: 600 12px var(--t-font, system-ui);
+  color: var(--t-fg-soft, #52524f);
+}
+.ti-root .psel,
+.ti-root .dinput {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--t-border, #e6e5e1);
+  border-radius: 7px;
+  background: var(--t-surface, #fff);
+  color: var(--t-fg, #18181b);
+  font: 500 12.5px var(--t-font, system-ui);
+  padding: 5px 8px;
+}
+.ti-root textarea.dinput { line-height: 1.4; }
+.ti-root .psel:focus,
+.ti-root .dinput:focus {
+  outline: none;
+  border-color: var(--t-accent, #0d8c7e);
+  box-shadow: 0 0 0 2px var(--t-accent-soft, #e0f0ed);
+}
+.ti-root .minibtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--t-border, #e6e5e1);
+  border-radius: 7px;
+  background: var(--t-surface-soft, #fafaf9);
+  color: var(--t-fg, #18181b);
+  font: 600 12px var(--t-font, system-ui);
+  padding: 5px 8px;
+  cursor: pointer;
+}
+.ti-root .minibtn:hover { background: var(--t-surface-sunk, #f0efec); }
+.ti-root .note {
+  font: 500 11px var(--t-font, system-ui);
+  line-height: 1.4;
+  color: var(--t-muted, #83817b);
+}
+.ti-root .note code {
+  font: 600 11px var(--t-font-mono, monospace);
+  background: var(--t-surface-sunk, #f0efec);
+  padding: 1px 4px;
+  border-radius: 4px;
+}

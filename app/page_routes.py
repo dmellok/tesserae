@@ -84,6 +84,35 @@ def _devices() -> Any:
     return current_app.config.get("DEVICE_REGISTRY")
 
 
+# -- touch Interaction picker data (issue #49) ---------------------------
+# The grid editor's per-cell Interaction controls need the same picker
+# data the canvas editor uses (all dashboards for "go to page", HA
+# services + entities). The canvas editor's equivalents live on the
+# composer-gated panels blueprint; these twins are ungated so the grid
+# editor works without the composer experiment.
+
+
+@bp.get("/dashboards.json")
+def dashboards_json() -> Response:
+    """All saved dashboards as ``{id, name, kind}`` for the "go to page"
+    touch-action picker."""
+    rows = [
+        {"id": p.id, "name": p.name or p.id, "kind": p.layout_kind or "grid"}
+        for p in _store().list()
+    ]
+    rows.sort(key=lambda r: str(r["name"]).lower())
+    return jsonify({"pages": rows})
+
+
+@bp.get("/ha-actions.json")
+def ha_actions_json() -> Response:
+    """Home Assistant services + entities for the HA touch-action form.
+    ``{"configured": false}`` when HA isn't set up."""
+    from app.ha_actions import fetch_ha_actions
+
+    return jsonify(fetch_ha_actions())
+
+
 def _clean_device_ids(raw: list[str]) -> list[str]:
     """Keep only known registered-instance ids from the form, deduped in
     order. Drops unknown ids and built-in kinds so a page can't bind to
@@ -1165,8 +1194,56 @@ def _apply_cell_form(cell: Cell, form: Any, panel: Any) -> Cell:
             "zoom": _coerce_float(form.get("zoom"), cell.zoom, lo=0.5, hi=3.0),
             "padding_override": _padding_override_from_form(form, cell.padding_override),
             "dither": _dither_override_from_form(form, cell.dither),
+            **_touch_from_form(form, cell),
         }
     )
+
+
+def _touch_from_form(form: Any, cell: Cell) -> dict[str, Any]:
+    """Parse the Advanced pane's ``touch_json`` field (issue #49) into the
+    cell's ``on_tap`` / ``on_swipe`` / ``on_slide`` overrides.
+
+    The touch Interaction editor serialises its state to a single hidden
+    field ``{on_tap?, on_swipe?, on_slide?}``. Absent field (a partial-
+    form autosave that didn't include it) keeps the current values; an
+    empty object clears all three. Each branch is validated loosely: a
+    tap is a string or a structured dict, swipe a direction->spec map,
+    slide an ``{axis, action}`` object. Anything malformed is dropped
+    rather than raising, so a bad blob can't 500 the save."""
+    raw = form.get("touch_json")
+    if raw is None:
+        return {
+            "on_tap": cell.on_tap,
+            "on_swipe": cell.on_swipe,
+            "on_slide": cell.on_slide,
+        }
+    try:
+        parsed = json.loads(raw) if raw else {}
+    except (TypeError, ValueError):
+        parsed = {}
+    if not isinstance(parsed, dict):
+        parsed = {}
+
+    tap = parsed.get("on_tap")
+    on_tap = tap if isinstance(tap, (str, dict)) and tap else None
+
+    swipe = parsed.get("on_swipe")
+    on_swipe: dict[str, str] | None = None
+    if isinstance(swipe, dict):
+        cleaned = {
+            k: v
+            for k, v in swipe.items()
+            if k in ("up", "down", "left", "right") and isinstance(v, str) and v
+        }
+        on_swipe = cleaned or None
+
+    slide = parsed.get("on_slide")
+    on_slide: dict[str, Any] | None = None
+    if isinstance(slide, dict) and slide.get("action"):
+        axis = slide.get("axis")
+        on_slide = {"axis": axis if axis in ("x", "y") else "y", "action": slide["action"]}
+
+    return {"on_tap": on_tap, "on_swipe": on_swipe, "on_slide": on_slide}
 
 
 def _padding_override_from_form(form: Any, current: int | None) -> int | None:

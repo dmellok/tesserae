@@ -2,6 +2,10 @@
 {% from "_components.html" import text_input, slider, switch, select_field, color_input, button, auto_field, card_head %}
 {% block title %}{{ page.name }}, Dashboard editor, Tesserae{% endblock %}
 
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='style/touch_interaction.css') }}">
+{% endblock %}
+
 {% macro cell_form(cell, idx) %}
 {% set plugin = (plugins | selectattr('id', 'equalto', cell.plugin) | list | first) if cell.plugin else None %}
 <section class="dx-section-card cell-card" id="cell-{{ cell.id }}" data-cell-id="{{ cell.id }}">
@@ -139,6 +143,22 @@
           <option value="none" {% if cell.dither == 'none' %}selected{% endif %}>Flat colour (no dither)</option>
         </select>
         <p class="field-help">Dithering (the default) error-diffuses the cell; on 1-bit and 6-colour panels it's what keeps text and shading legible. Flat maps straight to the palette with no diffusion, cleaner only for solid blocks or sharp line art. Applies when the switch above is on, and only on e-ink panels the server quantises (Inky / ESP32 .bin).</p>
+
+        {# Touch actions (issue #49): per-cell tap / swipe / slider, incl.
+           Home Assistant. touch_interaction.js renders the picker into the
+           mount; the hidden field carries the {on_tap, on_swipe, on_slide}
+           JSON to the cell save (parsed by _touch_from_form). #}
+        <div class="dx-cell-touch">
+          <label>Touch actions</label>
+          <input type="hidden" name="touch_json" data-touch-input
+                 value='{{ {"on_tap": cell.on_tap, "on_swipe": cell.on_swipe, "on_slide": cell.on_slide}|tojson }}'>
+          <div data-touch-mount
+               data-touch-value='{{ {"on_tap": cell.on_tap, "on_swipe": cell.on_swipe, "on_slide": cell.on_slide}|tojson }}'
+               data-default-axis="{% if cell.w >= cell.h %}x{% else %}y{% endif %}"
+               data-pages-url="{{ url_for('pages.dashboards_json') }}"
+               data-ha-url="{{ url_for('pages.ha_actions_json') }}"></div>
+          <p class="field-help">Runs when a touch-capable panel is tapped. The whole cell is the tap / swipe target; "Make this a slider" maps a drag to a 0-100 value you can feed a webhook or Home Assistant call.</p>
+        </div>
       </div>
     </details>
 
@@ -577,6 +597,7 @@
   <i class="ph-bold ph-arrow-up" aria-hidden="true"></i>
 </button>
 
+<script src="{{ url_for('static', filename='touch_interaction.js') }}"></script>
 <script src="{{ url_for('static', filename='pages/editor.js') }}"></script>
 <script src="{{ url_for('static', filename='pages/layout_editor.js') }}"></script>
 <script>

@@ -629,35 +629,9 @@ def ha_actions() -> Response:
     plugin's shared connection. ``{"configured": false}`` when HA isn't
     set up, so the editor can show a hint instead of empty pickers."""
     _guard()
-    plugin = _registry().get("ha_core")
-    mod = getattr(plugin, "server_module", None) if plugin is not None else None
-    if mod is None or not getattr(mod, "is_configured", lambda: False)():
-        return jsonify({"configured": False, "services": [], "entities": []})
-    services: list[dict[str, str]] = []
-    entities: list[dict[str, str]] = []
-    try:
-        raw_services = mod.request_json("/api/services")
-        for block in raw_services if isinstance(raw_services, list) else []:
-            domain = str(block.get("domain") or "")
-            svc_map = block.get("services") or {}
-            if not domain or not isinstance(svc_map, dict):
-                continue
-            for svc, meta in svc_map.items():
-                name = ""
-                if isinstance(meta, dict):
-                    name = str(meta.get("name") or "")
-                services.append({"id": f"{domain}.{svc}", "name": name or f"{domain}.{svc}"})
-        for state in mod.get_states():
-            eid = str(state.get("entity_id") or "")
-            if eid:
-                entities.append({"id": eid, "name": mod.friendly_name(state)})
-    except Exception as err:
-        return jsonify(
-            {"configured": True, "error": str(err), "services": services, "entities": entities}
-        )
-    services.sort(key=lambda s: s["id"])
-    entities.sort(key=lambda e: e["id"])
-    return jsonify({"configured": True, "services": services, "entities": entities})
+    from app.ha_actions import fetch_ha_actions
+
+    return jsonify(fetch_ha_actions())
 
 
 @bp.get("/c/<canvas_id>/touch-regions.json")

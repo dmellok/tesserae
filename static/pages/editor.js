@@ -426,6 +426,40 @@
     }
   }
 
+  // Per-cell touch Interaction editor (issue #49). Renders the shared
+  // TouchInteraction picker into each cell card's mount and mirrors its
+  // value into the card's hidden ``touch_json`` field, then dispatches a
+  // change so watchForms() marks the card dirty + updates the preview.
+  // On the cell Save the JSON rides along and _touch_from_form parses it.
+  function wireTouchEditors() {
+    if (typeof TouchInteraction === "undefined") return;
+    document.querySelectorAll("[data-touch-mount]").forEach((mount) => {
+      if (mount.dataset.touchBound) return;
+      mount.dataset.touchBound = "1";
+      const input = mount.parentElement.querySelector("[data-touch-input]");
+      let value = {};
+      try { value = JSON.parse(mount.dataset.touchValue || "{}") || {}; } catch (e) { value = {}; }
+      const node = TouchInteraction.render({
+        value: value,
+        pagesUrl: mount.dataset.pagesUrl,
+        haActionsUrl: mount.dataset.haUrl,
+        defaultAxis: mount.dataset.defaultAxis === "x" ? "x" : "y",
+        onChange: (v) => {
+          if (!input) return;
+          // Drop null branches so an untouched cell submits "{}" and the
+          // server clears the fields cleanly.
+          const out = {};
+          if (v.on_tap) out.on_tap = v.on_tap;
+          if (v.on_swipe) out.on_swipe = v.on_swipe;
+          if (v.on_slide) out.on_slide = v.on_slide;
+          input.value = JSON.stringify(out);
+          input.dispatchEvent(new Event("change", { bubbles: true }));
+        },
+      });
+      mount.appendChild(node);
+    });
+  }
+
   function watchForms() {
     forms().forEach((form) => {
       if (form.dataset.dirtyBound) return;
@@ -703,6 +737,7 @@
   watchForms();
   watchLayoutForms();
   watchMultiSelect();
+  wireTouchEditors();
   // ``setDirty(false)`` here (not just ``setStatus("saved")``) so the
   // beforeunload snapshot is populated once forms are watched. Without
   // this the snapshot stays empty and every navigation triggers the
