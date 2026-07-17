@@ -23,7 +23,7 @@ import urllib.error
 import urllib.request
 from typing import Any
 
-__version__ = "0.6.1"
+__version__ = "0.6.2"
 
 _BASE = os.environ.get("TESSERAE_URL", "http://127.0.0.1:8765").rstrip("/")
 _TOKEN = os.environ.get("TESSERAE_MCP_TOKEN", "").strip()
@@ -376,7 +376,13 @@ def build_server() -> Any:
         as hex), "gamut", "orientation", and a "mono" flag. Match a canvas's w/h to
         the target panel. The panel dithers the full-colour render down to these inks,
         so DESIGN IN FULL COLOUR -- the palette guides fine detail (thin text/icons),
-        it doesn't cap the whole layout. Honour "mono" for grayscale-only panels."""
+        it doesn't cap the whole layout. Honour "mono" for grayscale-only panels.
+
+        "touch": true appears on panels with a touch digitizer (e.g. the Seeed
+        reTerminal E1003). On those, the on_tap / on_swipe / on_slide actions you
+        put on a dashboard's elements actually fire on the hardware. If a device
+        has no "touch" flag it's display-only (or button-driven), so don't add
+        touch actions expecting them to work there."""
         return _json("GET", "/devices")
 
     def list_pages() -> Any:

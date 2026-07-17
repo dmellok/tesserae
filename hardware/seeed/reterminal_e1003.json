@@ -21,6 +21,7 @@
   },
   "refresh_floor_s": 60,
   "image_format": "bin",
+  "touch": true,
   "notes_md": "Awaiting confirmed test on real hardware. Wire format is exactly 1314144 bytes (1872*1404/2), row-major, top-left origin, no mirror. Per byte: high nibble = LEFT pixel, low nibble = RIGHT pixel; nibble value 0x0 = black, 0xF = white, linear 16-level grayscale. The firmware handles any physical panel-side mirror; the renderer keeps a normal orientation so a browser preview and the panel paint agree. Historically the E1003 was routed through TRMNL BYOS + trmnl_png (mono 1-bit); the unified firmware supersedes that path for this panel.",
   "config_schema_extends": {
     "touch_enabled": {

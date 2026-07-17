@@ -204,6 +204,13 @@ def _derive_manifest(
     if isinstance(image_format, str):
         manifest["image_format"] = image_format
 
+    # Touch capability (issue #49): the panel has a digitizer, so Tesserae's
+    # touch dispatch and the editors' Interaction UI apply to it. A hardware
+    # fact (distinct from the ``touch_enabled`` firmware config); surfaced in
+    # the device APIs so agents and the editor know which panels are tappable.
+    if entry.manifest.get("touch") is True:
+        manifest["touch"] = True
+
     extends = entry.manifest.get("config_schema_extends")
     if isinstance(extends, dict):
         merged_schema = dict(manifest.get("config_schema") or {})

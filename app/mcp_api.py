@@ -598,7 +598,12 @@ def devices() -> Response:
     hex, an ``orientation``, and a ``mono`` flag) so the agent can size and colour
     a canvas to the hardware. The panel dithers the full-colour render to these
     inks, so the palette guides fine detail, it doesn't cap the whole design; only
-    the ``mono`` flag should force a grayscale layout."""
+    the ``mono`` flag should force a grayscale layout.
+
+    ``touch: true`` appears on panels with a touch digitizer (issue #49), meaning
+    on_tap / on_swipe / on_slide actions on the dashboard's elements will actually
+    fire on that hardware. Its absence means the panel is display-only (or
+    button-driven), so touch actions won't do anything there."""
     from app.panel import device_panel
 
     reg = current_app.config.get("DEVICE_REGISTRY")
@@ -616,6 +621,8 @@ def devices() -> Response:
                 block = d.manifest.get("panel") or {}
                 if isinstance(block, dict) and block.get("orientation"):
                     entry["orientation"] = str(block["orientation"])
+            if d.manifest.get("touch") is True:
+                entry["touch"] = True
             out.append(entry)
     out.sort(key=lambda x: str(x["name"]).lower())
     return jsonify({"devices": out})

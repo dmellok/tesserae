@@ -8,6 +8,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Touch capability flag on devices (#49).** Panels with a touch digitizer (the Seeed reTerminal
+  E1003) now report `touch: true` through the device APIs, the MCP `list_devices` / `/devices`
+  surface and the canvas editor's device list. Previously nothing in the device registry indicated
+  a panel was touch-capable, so an agent inspecting the devices couldn't tell the E1003's on-tap /
+  swipe / slider actions would actually fire on it. It's a hardware fact carried from the hardware
+  catalog entry, distinct from the per-device `touch_enabled` firmware setting.
+
 - **Touch actions in the grid dashboard editor (#49).** The touch authoring that shipped for the
   canvas editor is now on grid dashboards too: each cell's **Advanced** pane gains a full
   Interaction editor, on-tap and per-direction swipe actions (refresh / rotate / jump to step / go

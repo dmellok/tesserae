@@ -422,7 +422,9 @@ def devices() -> Response:
     """Registered device instances a canvas can be sent to (toolbar picker).
 
     Each entry carries the device's real panel dims (``w``/``h``) so picking a
-    target also sets the canvas resolution to match that panel."""
+    target also sets the canvas resolution to match that panel, plus
+    ``touch: true`` on panels with a digitizer (issue #49) so the editor can
+    tell which targets a dashboard's touch actions will actually fire on."""
     _guard()
     from app.panel import device_panel
 
@@ -437,6 +439,8 @@ def devices() -> Response:
             if panel is not None:
                 entry["w"] = panel.w
                 entry["h"] = panel.h
+            if d.manifest.get("touch") is True:
+                entry["touch"] = True
             out.append(entry)
     out.sort(key=lambda x: str(x["name"]).lower())
     return jsonify({"devices": out})
