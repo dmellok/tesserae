@@ -51,6 +51,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Changed
 
+- **MCP agent binds the device early and builds visibly.** The bridge instructions now open with a
+  "START HERE" step: pick the panel with `list_devices`, `create_canvas_page` sized to it, then
+  `bind_devices` **right away** rather than only at push time, so the artboard and Send / schedule /
+  rotation target the real hardware from the start (previously the agent left a dashboard unbound
+  unless asked). The same step tells the agent to add an empty `code` element and stream it in with
+  `append_code` (the open editor re-renders each chunk) and preview early, instead of composing the
+  whole thing silently and posting one big `set_canvas` at the end, so the build stays responsive.
+  Bridge bumped to 0.5.14.
+
 - **The MCP agent defaults to the code element for dashboards.** Guidance now tells the agent to build
   a dashboard as a `code` element (HTML/CSS/JS fed by widget sources, with the vendored toolkit) for
   anything beyond a trivial single-widget page, falling back to bare widget/data/shape elements only

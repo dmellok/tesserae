@@ -23,7 +23,7 @@ import urllib.error
 import urllib.request
 from typing import Any
 
-__version__ = "0.5.13"
+__version__ = "0.5.14"
 
 _BASE = os.environ.get("TESSERAE_URL", "http://127.0.0.1:8765").rstrip("/")
 _TOKEN = os.environ.get("TESSERAE_MCP_TOKEN", "").strip()
@@ -227,13 +227,24 @@ styling that the widget/data/shape elements can't match, and it's the only way t
 several widgets into one cohesive design. Reach for a bare widget/data/shape element only when
 the page really is just one widget, or a couple of standalone values.
 
+START HERE (do this first, before designing the layout):
+- list_devices() -> pick the target panel(s). create_canvas_page(name, w, h) sized to that
+  panel's dims, then bind_devices(page_id, [device_ids]) RIGHT AWAY -- bind early even if the
+  operator didn't explicitly ask. Binding up front fixes the artboard to the real panel and means
+  Send / schedule / rotation already target the right hardware; you only rebind if the target
+  actually changes. Skip binding only if there are genuinely no devices yet.
+- Then add an EMPTY code element and build it up with append_code (streams the html/css/js in a
+  chunk at a time; an open editor re-renders after each chunk). Do NOT compose the whole design
+  silently and post one giant set_canvas at the end -- that reads as a long pause then a blob.
+  Build incrementally and render_preview early and often so the work stays visible and responsive.
+
 LOOP: probe -> place -> render_preview -> render_report -> adjust -> (push).
 - get_widget_options(key) before placing, so you fill "options" correctly.
 - probe_widget_data(key, options) to get real field dot-paths BEFORE binding any data
   primitive or shape. It reports data_source: live | sample | error, never treat
   sample/error as real.
-- create_canvas_page then set_canvas (whole layout) or add_element (one at a time).
-  Elements paint back-to-front in list order (first = back, last = front).
+- add_element (one at a time) or set_canvas (whole layout); for a code element, add it empty then
+  append_code in chunks. Elements paint back-to-front in list order (first = back, last = front).
 - render_preview(page_id) = the image; render_report(page_id) = machine-readable
   (resolved box, rendered text, overflow_x/y, data_source, colours). Use render_report to
   catch clipping and confirm live data without eyeballing pixels.
@@ -262,10 +273,10 @@ BINDING & DECORATION
 - Paint from var(--accent-N) / semantic tokens or documented data-identity colours; avoid
   arbitrary hex.
 
-PUSH: list_devices, then push_to_device once the render looks right -- device_ids may name
-several panels and the one render fans out to each, fitted to its own dims. Use bind_devices to
-remember that target set on the page (for scheduling / rotation / the editor's Send). Confirm
-before pushing to a real panel.
+PUSH: once the render looks right, push_to_device to the same panel(s) you bound at the start --
+device_ids may name several panels and the one render fans out to each, fitted to its own dims.
+(You already called bind_devices up front, so scheduling / rotation / the editor's Send are set;
+only call it again if the target changed.) Confirm before pushing to a real panel.
 """
 
 
@@ -338,8 +349,11 @@ def build_server() -> Any:
         return _json("GET", "/pages")
 
     def create_canvas_page(name: str, w: int = 800, h: int = 480) -> Any:
-        """Create a new, empty canvas dashboard and return its id. Then set_canvas()
-        to lay it out. Size it to your target panel (see list_devices)."""
+        """Create a new, empty canvas dashboard and return its id. Size it to your
+        target panel (see list_devices), then call bind_devices(page_id, [device_ids])
+        RIGHT AWAY so the artboard and Send/schedule target the real hardware from the
+        start. Then build the layout (add an empty code element + append_code, or
+        set_canvas)."""
         return _json("POST", "/pages", {"name": name, "w": w, "h": h})
 
     def delete_canvas_page(page_id: str) -> Any:
@@ -489,10 +503,12 @@ def build_server() -> Any:
 
     def bind_devices(page_id: str, device_ids: list[str]) -> Any:
         """Persistently bind a canvas to a set of devices (replaces the set; []
-        unbinds). Unlike push_to_device (a one-off fan-out), this SAVES the target
-        set on the page, so a later schedule / rotation / the visual editor's Send
-        hits the same panels. Ids not matching a registered device (list_devices)
-        are dropped and returned under "unknown". Returns {bound, unknown}."""
+        unbinds). Call this EARLY -- right after create_canvas_page -- not just before
+        a push: it SAVES the target set on the page so the artboard, a later schedule /
+        rotation, and the visual editor's Send all hit the same panels. Unlike
+        push_to_device (a one-off fan-out), it doesn't render. Ids not matching a
+        registered device (list_devices) are dropped and returned under "unknown".
+        Returns {bound, unknown}."""
         return _json("POST", f"/pages/{page_id}/devices", {"device_ids": device_ids})
 
     mcp = FastMCP("tesserae", instructions=_INSTRUCTIONS)

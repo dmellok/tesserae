@@ -53,6 +53,11 @@ def test_server_ships_compose_instructions() -> None:
     server = bridge.build_server()
     text = server.instructions or ""
     assert "LOOP:" in text and "render_report" in text and "bind" in text
+    # Bind-early + incremental-build guidance (so the agent targets hardware up
+    # front and builds visibly instead of one big post at the end).
+    assert "START HERE" in text
+    assert "bind_devices" in text and "RIGHT AWAY" in text
+    assert "append_code" in text
 
 
 def test_json_wraps_http_error(monkeypatch: pytest.MonkeyPatch) -> None:
