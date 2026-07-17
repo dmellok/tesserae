@@ -221,6 +221,35 @@ class EventLog:
             conn.commit()
             return cur.rowcount > 0
 
+    def delete_all(self) -> int:
+        """Delete every event. Returns the number removed. The caller is
+        responsible for pruning any now-orphaned render artifacts."""
+        with self._lock, self._conn() as conn:
+            removed = int(conn.execute("SELECT COUNT(*) FROM events").fetchone()[0])
+            conn.execute("DELETE FROM events")
+            conn.commit()
+            return removed
+
+    def delete_older_than(self, cutoff: float) -> int:
+        """Delete every event with a timestamp strictly older than ``cutoff``
+        (epoch seconds). Returns the number removed."""
+        with self._lock, self._conn() as conn:
+            cur = conn.execute("DELETE FROM events WHERE timestamp < ?", (cutoff,))
+            conn.commit()
+            return int(cur.rowcount)
+
+    def delete_many(self, event_ids: list[int]) -> int:
+        """Delete the given event ids in one transaction. Returns the number
+        removed. The caller prunes any now-orphaned render artifacts."""
+        ids = [int(i) for i in event_ids]
+        if not ids:
+            return 0
+        placeholders = ",".join("?" * len(ids))
+        with self._lock, self._conn() as conn:
+            cur = conn.execute(f"DELETE FROM events WHERE id IN ({placeholders})", ids)
+            conn.commit()
+            return int(cur.rowcount)
+
     def digest_in_use(self, digest: str) -> bool:
         """Used by the artifact GC: don't delete a thumbnail PNG if other
         history rows still reference it."""

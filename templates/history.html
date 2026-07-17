@@ -96,6 +96,26 @@
 </nav>
 {% endif %}
 
+{% if history %}
+{# Manual history housekeeping (issue #116): tick rows for a bulk delete, or
+   clear everything / everything older than a cutoff. #}
+<div class="dx-history-toolbar">
+  <form method="post" action="{{ url_for('send.clear_history') }}" class="form form--inline dx-history-clear"
+        onsubmit="return confirm('Delete the selected history? This cannot be undone.');">
+    <label class="u-muted" for="hist-older">Clear history:</label>
+    <select name="older_than" id="hist-older" class="dx-history-clear-age">
+      <option value="7">older than 7 days</option>
+      <option value="30">older than 30 days</option>
+      <option value="90">older than 90 days</option>
+      <option value="">all history</option>
+    </select>
+    <button type="submit" class="dx-btn-ghost-sm dx-btn-push">
+      <i class="ph ph-trash" aria-hidden="true"></i><span>Clear</span>
+    </button>
+  </form>
+</div>
+{% endif %}
+
 {% call section_card(icon='clock-counter-clockwise', title='Push history',
                      description='Every push attempted on the panel pipeline — file, URL, webpage, dashboard, or schedule fire.',
                      meta={'label': '', 'value': history|length}) %}
@@ -115,6 +135,8 @@
     {% for ev in history %}
     {% set is_failed = ev.status not in ('sent', 'busy', 'quiet', 'no_change') %}
     <li class="dx-inset-row dx-history-row{% if is_failed %} dx-history-row--failed{% endif %}">
+      <input type="checkbox" class="dx-history-select" value="{{ ev.id }}"
+             aria-label="Select entry #{{ ev.id }}" title="Select for bulk delete">
       {% if ev.digest %}
       <a class="dx-history-thumb" href="{{ url_for('renders', filename=ev.digest ~ '.png') }}" data-lightbox aria-label="Open render for push #{{ ev.id }}">
         <img src="{{ url_for('renders', filename=ev.digest ~ '.png', w=180) }}" alt="" width="64" height="64" loading="lazy" decoding="async">
@@ -160,4 +182,73 @@
   </ul>
   {% endif %}
 {% endcall %}
+
+{# Bulk action bar: floats in once >=1 row is checked. The ids of the checked
+   rows are injected as hidden inputs on submit (kept out of the per-row forms
+   so there's no nested-form issue). Mirrors the Dashboards multi-select. #}
+<div id="dx-hist-bulk-bar" hidden>
+  <span id="dx-hist-bulk-count" class="dx-bulk-count">0 selected</span>
+  <div class="dx-bulk-actions">
+    <form method="post" action="{{ url_for('send.bulk_delete') }}" id="dx-hist-bulk-form" class="form form--inline"
+          onsubmit="return confirm('Delete the selected history entries? This cannot be undone.');">
+      <button type="submit" class="dx-btn-ghost-sm dx-btn-push"><i class="ph ph-trash" aria-hidden="true"></i><span>Delete selected</span></button>
+    </form>
+    <button type="button" id="dx-hist-bulk-clear" class="dx-btn-ghost-sm">Clear</button>
+  </div>
+</div>
+
+<style>
+  .dx-history-toolbar { display: flex; justify-content: flex-end; margin: 0 0 12px; }
+  .dx-history-clear { display: flex; align-items: center; gap: 8px; margin: 0; }
+  .dx-history-clear-age {
+    height: 32px; padding: 0 8px; border-radius: var(--t-radius-sm);
+    border: 1px solid var(--t-border); background: var(--t-surface); color: var(--t-fg);
+    font-size: 0.85rem;
+  }
+  .dx-history-select { flex: 0 0 auto; width: 16px; height: 16px; margin-right: 6px; cursor: pointer; accent-color: var(--t-accent); }
+  #dx-hist-bulk-bar {
+    position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%);
+    z-index: 500; display: flex; align-items: center; gap: 14px;
+    padding: 10px 14px; border: 1px solid var(--t-border); border-radius: 12px;
+    background: var(--t-surface); box-shadow: 0 12px 34px rgba(0, 0, 0, .24);
+  }
+  #dx-hist-bulk-bar[hidden] { display: none; }
+  #dx-hist-bulk-bar .dx-bulk-count { font-size: 13px; font-weight: 600; white-space: nowrap; }
+  #dx-hist-bulk-bar .dx-bulk-actions { display: flex; align-items: center; gap: 8px; }
+  #dx-hist-bulk-bar .form { margin: 0; }
+</style>
+<script>
+  // History multi-select: checkboxes drive a floating bulk-delete bar. On
+  // submit the checked ids are injected as hidden event_ids inputs into the
+  // bulk form (kept out of the per-row forms, so no nested-form issues).
+  (function () {
+    const boxes = Array.prototype.slice.call(document.querySelectorAll('.dx-history-select'));
+    const bar = document.getElementById('dx-hist-bulk-bar');
+    if (!boxes.length || !bar) return;
+    const count = document.getElementById('dx-hist-bulk-count');
+    const form = document.getElementById('dx-hist-bulk-form');
+    const clearBtn = document.getElementById('dx-hist-bulk-clear');
+
+    function selected() { return boxes.filter(function (b) { return b.checked; }); }
+    function sync() {
+      const n = selected().length;
+      bar.hidden = n === 0;
+      if (n) count.textContent = n + ' selected';
+    }
+    boxes.forEach(function (b) { b.addEventListener('change', sync); });
+    form.addEventListener('submit', function () {
+      form.querySelectorAll('input[name="event_ids"]').forEach(function (n) { n.remove(); });
+      selected().forEach(function (b) {
+        const inp = document.createElement('input');
+        inp.type = 'hidden'; inp.name = 'event_ids'; inp.value = b.value;
+        form.appendChild(inp);
+      });
+    });
+    clearBtn.addEventListener('click', function () {
+      boxes.forEach(function (b) { b.checked = false; });
+      sync();
+    });
+    sync();
+  })();
+</script>
 {% endblock %}

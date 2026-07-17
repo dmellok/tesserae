@@ -20,6 +20,7 @@ from __future__ import annotations
 import functools
 import logging
 import threading
+import time
 from collections.abc import Callable
 from typing import Any
 
@@ -489,6 +490,55 @@ def delete(event_id: int) -> Response:
         flash("History entry deleted.", "ok")
     else:
         flash(f"No history entry #{event_id}.", "error")
+    return redirect(url_for("history.index"))
+
+
+def _plural(n: int) -> str:
+    return "entry" if n == 1 else "entries"
+
+
+@bp.post("/history/clear")
+def clear_history() -> Response:
+    """Manual history housekeeping (issue #116). ``older_than`` (days) deletes
+    everything older than that cutoff; empty/0 deletes all. Orphaned render
+    artifacts are pruned after."""
+    events = _events()
+    raw = (request.form.get("older_than") or "").strip()
+    if raw:
+        try:
+            days = int(raw)
+        except ValueError:
+            days = 0
+        if days <= 0:
+            flash("Pick a valid age to delete.", "error")
+            return redirect(url_for("history.index"))
+        cutoff = time.time() - days * 86400
+        removed = events.delete_older_than(cutoff)
+        scope = f"older than {days} day{'s' if days != 1 else ''}"
+    else:
+        removed = events.delete_all()
+        scope = "all"
+    _push().prune_orphan_renders()
+    flash(f"Deleted {removed} history {_plural(removed)} ({scope}).", "ok")
+    return redirect(url_for("history.index"))
+
+
+@bp.post("/history/bulk-delete")
+def bulk_delete() -> Response:
+    """Delete the checked history rows (the per-row multi-select on the History
+    page). Ids come as repeated ``event_ids`` form fields."""
+    ids: list[int] = []
+    for raw in request.form.getlist("event_ids"):
+        try:
+            ids.append(int(raw))
+        except (TypeError, ValueError):
+            continue
+    if not ids:
+        flash("No history entries selected.", "error")
+        return redirect(url_for("history.index"))
+    removed = _events().delete_many(ids)
+    _push().prune_orphan_renders()
+    flash(f"Deleted {removed} history {_plural(removed)}.", "ok")
     return redirect(url_for("history.index"))
 
 

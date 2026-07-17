@@ -258,6 +258,66 @@ def test_delete_invokes_delete_history(app: Flask) -> None:
     pm.delete_history.assert_called_once_with(7)
 
 
+def test_clear_history_all(app: Flask) -> None:
+    log = app.config["EVENT_LOG"]
+    for i in range(3):
+        log.record(type="push", source="page", target=f"p{i}", status="sent")
+    pm = MagicMock()
+    app.config["PUSH_MANAGER"] = pm
+    client = app.test_client()
+    _sign_in(client)
+    client.post("/send/history/clear", data={"older_than": ""}, follow_redirects=False)
+    assert log.count() == 0
+    pm.prune_orphan_renders.assert_called_once()
+
+
+def test_clear_history_older_than(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    import time as _time
+
+    import app.state.event_log as el
+
+    log = app.config["EVENT_LOG"]
+    now = _time.time()
+    # An ancient row (10 days ago) and a fresh one (now).
+    monkeypatch.setattr(el.time, "time", lambda: now - 10 * 86400)
+    log.record(type="push", source="page", target="old", status="sent")
+    monkeypatch.setattr(el.time, "time", lambda: now)
+    log.record(type="push", source="page", target="fresh", status="sent")
+    app.config["PUSH_MANAGER"] = MagicMock()
+    client = app.test_client()
+    _sign_in(client)
+    # 1 day cutoff drops the ancient row, keeps the fresh one.
+    client.post("/send/history/clear", data={"older_than": "1"}, follow_redirects=False)
+    assert {r.target for r in log.list(type="push", limit=10)} == {"fresh"}
+
+
+def test_bulk_delete_history(app: Flask) -> None:
+    log = app.config["EVENT_LOG"]
+    ids = [log.record(type="push", source="page", target=f"p{i}", status="sent") for i in range(3)]
+    pm = MagicMock()
+    app.config["PUSH_MANAGER"] = pm
+    client = app.test_client()
+    _sign_in(client)
+    client.post(
+        "/send/history/bulk-delete",
+        data={"event_ids": [str(ids[0]), str(ids[2])]},
+        follow_redirects=False,
+    )
+    assert {r.id for r in log.list(type="push", limit=10)} == {ids[1]}
+    pm.prune_orphan_renders.assert_called_once()
+
+
+def test_bulk_delete_history_none_selected(app: Flask) -> None:
+    log = app.config["EVENT_LOG"]
+    log.record(type="push", source="page", target="keep", status="sent")
+    app.config["PUSH_MANAGER"] = MagicMock()
+    client = app.test_client()
+    _sign_in(client)
+    resp = client.post("/send/history/bulk-delete", data={}, follow_redirects=False)
+    assert resp.status_code == 302
+    assert log.count(type="push") == 1  # nothing deleted
+
+
 def test_nav_links_to_send(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)

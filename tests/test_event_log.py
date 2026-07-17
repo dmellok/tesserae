@@ -60,6 +60,38 @@ def test_delete_removes_row(tmp_path: Path) -> None:
     assert log.delete(eid) is False
 
 
+def test_delete_all_removes_everything(tmp_path: Path) -> None:
+    log = EventLog(tmp_path / "events.db")
+    for i in range(5):
+        log.record(type="push", source="page", target=f"p{i}", status="sent")
+    assert log.delete_all() == 5
+    assert log.count() == 0
+    # Idempotent on an empty log.
+    assert log.delete_all() == 0
+
+
+def test_delete_many_removes_given_ids(tmp_path: Path) -> None:
+    log = EventLog(tmp_path / "events.db")
+    ids = [log.record(type="push", source="page", target=f"p{i}", status="sent") for i in range(4)]
+    # Includes an absent id (99999), which is simply ignored.
+    assert log.delete_many([ids[0], ids[2], 99999]) == 2
+    assert {r.id for r in log.list(limit=10)} == {ids[1], ids[3]}
+    assert log.delete_many([]) == 0
+
+
+def test_delete_older_than_respects_cutoff(tmp_path: Path, monkeypatch) -> None:
+    import app.state.event_log as el
+
+    log = EventLog(tmp_path / "events.db")
+    monkeypatch.setattr(el.time, "time", lambda: 1000.0)
+    [log.record(type="push", source="page", target=f"old{i}", status="sent") for i in range(2)]
+    monkeypatch.setattr(el.time, "time", lambda: 5000.0)
+    new_ids = [log.record(type="push", source="page", target=f"new{i}", status="sent") for i in range(2)]
+    # Cutoff between the two batches drops only the old rows.
+    assert log.delete_older_than(3000.0) == 2
+    assert {r.id for r in log.list(limit=10)} == set(new_ids)
+
+
 def test_digest_in_use_only_when_referenced(tmp_path: Path) -> None:
     log = EventLog(tmp_path / "events.db")
     log.record(type="push", source="page", target="a", status="sent", digest="shared")

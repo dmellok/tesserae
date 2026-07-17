@@ -8,6 +8,11 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Manual history controls.** The History page auto-evicts at a cap, but now you can also clear it
+  by hand: a "Clear history" control deletes everything or everything older than 7 / 30 / 90 days,
+  and a per-row checkbox with a floating bulk bar (like the Dashboards multi-select) deletes just the
+  ticked entries. Orphaned render artifacts are pruned after any bulk delete. (#116)
+
 - **"Update available" badge in the header.** When a newer Tesserae release exists, the topbar shows
   an accent-tinted update badge (with the version) linking to Settings. The check reads
   `api.tesserae.ink/version/latest` for the running version, entirely in the background off the
