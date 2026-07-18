@@ -422,11 +422,16 @@ this itself). On a `refresh` action the firmware should drop its
 cached `ETag` before making the request so the server always returns
 `200` with a full frame rather than `304`.
 
-**Touch wakes** — touch-capable devices report a raw stroke on the
-frame request instead of a button name. The client stays dumb: it
-sends start point, end point, and duration, and the server does all
-gesture classification (tap vs directional swipe) and hit-testing
-against the frame's touch region map:
+#### Touch wakes
+
+Touch-capable devices report a raw stroke on the frame request instead
+of a button name. This is transport-agnostic and firmware-agnostic: the
+client stays dumb — it sends start point, end point, and duration, and
+the server does all gesture classification (tap vs directional swipe)
+and hit-testing against the frame's touch region map. Any client that
+can read a touch coordinate and make an HTTP request can implement it
+(ESP-IDF, CircuitPython, a Pi, a browser shim); nothing about the region
+geometry lives on the device.
 
 ```
 GET /api/v1/device/kitchen/frame?touch_x0=512&touch_y0=300&touch_x1=512&touch_y1=180&touch_ms=240&touch_digest=abc123def456

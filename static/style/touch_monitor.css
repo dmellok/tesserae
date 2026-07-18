@@ -39,6 +39,7 @@
 .tm-region--invalid { fill: color-mix(in srgb, var(--t-danger, #dc2626) 12%, transparent); stroke: var(--t-danger, #dc2626); }
 
 /* Touch marks */
+.tm-mark { transition: opacity .25s ease; }
 .tm-swipe { stroke-width: 5; fill: none; }
 .tm-dot { stroke: #fff; stroke-width: 2; }
 .tm-mark--ok .tm-dot { fill: var(--t-accent, #0d8c7e); }

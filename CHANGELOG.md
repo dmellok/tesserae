@@ -6,6 +6,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added
+
+- **Touch interactions guide (#49).** A new docs page covers enabling touch, attaching tap / swipe /
+  slider / hotspot / code-element actions in the editor, verifying with the touch monitor, and
+  implementing touch on any client (the transport is device-agnostic: ESP-IDF, CircuitPython, a Pi,
+  or any HTTP client, not just the reTerminal firmware).
+- **"Fade old" toggle on the touch monitor (#49).** Dims older touch marks by recency so the latest
+  activity stands out against the history.
+
 ### Changed
 
 - **The canvas and grid editors share one touch Interaction picker (#49).** The canvas editor had its

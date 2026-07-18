@@ -23,6 +23,7 @@
 
   var showRegions = document.querySelector("[data-tm-regions]");
   var showLabels = document.querySelector("[data-tm-labels]");
+  var fadeChk = document.querySelector("[data-tm-fade]");
   var clearBtn = document.querySelector("[data-tm-clear]");
   var countEl = document.querySelector("[data-tm-count]");
   var liveEl = document.querySelector("[data-tm-live]");
@@ -106,8 +107,23 @@
     }
     gMarks.appendChild(g);
     bumpCount();
-    // Fade the oldest marks so the view doesn't fill up forever.
+    // Cap so the view doesn't fill up forever.
     while (gMarks.childNodes.length > 400) gMarks.removeChild(gMarks.firstChild);
+    applyFade();
+  }
+
+  // When "Fade old" is on, dim marks by recency so the latest touches stand
+  // out against the history: newest at full opacity, oldest at 0.2.
+  function applyFade() {
+    var nodes = gMarks.childNodes;
+    var n = nodes.length;
+    if (fadeChk && fadeChk.checked && n > 1) {
+      for (var i = 0; i < n; i++) {
+        nodes[i].style.opacity = (0.2 + 0.8 * (i / (n - 1))).toFixed(3);
+      }
+    } else {
+      for (var j = 0; j < n; j++) nodes[j].style.opacity = "";
+    }
   }
 
   function applyToggles() {
@@ -118,6 +134,7 @@
     // Re-render labels by reloading marks is overkill; just toggle a class.
     svg.classList.toggle("tm-hide-labels", !showLabels.checked);
   });
+  if (fadeChk) fadeChk.addEventListener("change", applyFade);
   function clearView() {
     gMarks.textContent = ""; count = 0;
     if (countEl) countEl.textContent = "";
