@@ -66,6 +66,14 @@ from app.touch_regions import (
 log = logging.getLogger(__name__)
 
 
+def _handles_swipe(region: dict[str, Any] | None, gesture: str) -> bool:
+    """True when ``region`` declares an action for this swipe direction.
+    Used by the swipe end-point fallback so a swipe is only re-homed onto a
+    region that actually handles it (issue #49). Sliders aren't matched here
+    (they're a press-on interaction, not a swipe target)."""
+    return region is not None and resolve_gesture_action(region, gesture) is not None
+
+
 # Cap on how long a manual override sticks when we can't compute the
 # rotation's next daily anchor (no rotation bound, or a degenerate
 # anchor value). One hour is long enough to prevent a "scheduler yanks
@@ -435,13 +443,14 @@ class ButtonService:
           holds as its ETag) doesn't match the current frame. The stroke
           landed on content that has since been replaced; drop it, the
           device repaints and the user re-taps on current content.
-        * **no_target**: no region under the start point, or the region
-          declares nothing for this gesture. No-op, not an error.
+        * **no_target**: no region handles this gesture. No-op, not an error.
 
         Coordinates are in the served frame's pixel space (the frame as
-        downloaded, before any device-side rotation/mirror); hit-testing
-        uses the stroke's *start* point, which matches intent (the
-        gesture begins on the thing being controlled)."""
+        downloaded, before any device-side rotation/mirror). A tap hit-tests
+        on its point; a swipe hit-tests on its *start* point and, if that
+        doesn't land on a region declaring the swipe direction, falls back to
+        the *end* point, so a stroke that starts just outside a small zone
+        and moves into it still triggers."""
         now = self._clock()
         state = self._state.get(device_id) or DeviceRotationState(device_id=device_id)
 
@@ -487,6 +496,17 @@ class ButtonService:
             else []
         )
         region = hit_test(regions, stroke.x0, stroke.y0)
+        # Swipe forgiveness (issue #49): a swipe often starts a hair outside a
+        # small zone and moves into it (or the firmware's first sample lands
+        # just outside the box). If the start point didn't land on a region
+        # that declares this swipe direction, retry at the END point so the
+        # stroke still triggers. Taps keep strict start-point hit-testing, and
+        # sliders (which you press ON) are unaffected: this only rescues a
+        # swipe onto a region that explicitly handles that direction.
+        if gesture.startswith("swipe_") and not _handles_swipe(region, gesture):
+            end_region = hit_test(regions, stroke.x1, stroke.y1)
+            if _handles_swipe(end_region, gesture):
+                region = end_region
         spec: str | dict[str, Any] | None = None
         slide_val: int | None = None
         if region is not None:

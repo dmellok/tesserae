@@ -266,6 +266,52 @@ def test_swipe_dispatches_rotation_step(stores: dict[str, Any]) -> None:
     assert persisted is not None and persisted.step_index == 1
 
 
+def test_swipe_starting_outside_zone_falls_back_to_end_point(stores: dict[str, Any]) -> None:
+    """A swipe that starts just outside a small zone but moves INTO it still
+    fires: hit-testing falls back to the stroke's end point (issue #49
+    swipe forgiveness). The region is (0,0,400,300) with swipe up ->
+    rotate_next; the stroke starts at y=500 (below it) and ends inside."""
+    _seed_rotation(stores)
+    pm = TouchStubPushManager(latest=_latest(), regions=[_tap_region()])
+    svc = _service(stores, pm)
+    result = svc.handle_touch(
+        device_id="kitchen",
+        stroke=TouchStroke(x0=200, y0=500, x1=200, y1=50),
+        frame_digest="art123",
+    )
+    assert result.gesture == "swipe_up"
+    assert result.outcome == "dispatched"
+    assert result.action_spec == "rotate_next"
+
+
+def test_swipe_fully_outside_zone_is_no_target(stores: dict[str, Any]) -> None:
+    """Neither endpoint in the zone -> still no_target (the fallback rescues
+    a swipe onto a zone, it doesn't fire zones the stroke never touched)."""
+    _seed_rotation(stores)
+    pm = TouchStubPushManager(latest=_latest(), regions=[_tap_region()])
+    svc = _service(stores, pm)
+    result = svc.handle_touch(
+        device_id="kitchen",
+        stroke=TouchStroke(x0=600, y0=250, x1=600, y1=20),
+        frame_digest="art123",
+    )
+    assert result.outcome == "no_target"
+
+
+def test_tap_still_uses_start_point_only(stores: dict[str, Any]) -> None:
+    """The swipe fallback must not change tap behaviour: a tap outside every
+    zone stays no_target (no end-point rescue for a point)."""
+    pm = TouchStubPushManager(latest=_latest(), regions=[_tap_region()])
+    svc = _service(stores, pm)
+    result = svc.handle_touch(
+        device_id="kitchen",
+        stroke=TouchStroke(x0=600, y0=600, x1=600, y1=600),
+        frame_digest="art123",
+    )
+    assert result.gesture == "tap"
+    assert result.outcome == "no_target"
+
+
 def test_deepest_region_wins_hit_test_through_service(stores: dict[str, Any]) -> None:
     outer = _tap_region(tap="page:morning", depth=1, order=0)
     inner = _tap_region(x=100, y=100, w=50, h=50, tap="page:lights", depth=3, order=1)

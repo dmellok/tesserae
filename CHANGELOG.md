@@ -8,6 +8,11 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **Swipe zones are more forgiving (#49).** A swipe was hit-tested only on its start point, so a
+  stroke that began a hair outside a small zone and moved into it registered as `no_target` even
+  though its tail crossed the zone. Swipe hit-testing now falls back to the stroke's end point when
+  the start didn't land on a region declaring that direction, so a swipe onto a zone fires reliably.
+  Taps are unchanged (still strict start-point), and sliders (a press-on interaction) aren't affected.
 - **Home Assistant touch actions no longer fail with HTTP 400 (#49).** The touch dispatcher called HA
   through `call_service_with_response`, which always appends `?return_response` — and HA rejects that
   with 400 for any service that doesn't support returning a payload (most actuators, e.g.
