@@ -212,17 +212,28 @@
   // the element's data-touch-actions map) and an explicit
   // data-touch-origin="markup" so sandbox markup never inherits the
   // config-origin trust of the element wrapper.
+  // The collector re-scans on DOM changes, not just once: a code element
+  // that builds its tappable DOM asynchronously (JS, fetched data, a chart)
+  // wouldn't have the annotated node yet on a single early pass, so its touch
+  // region was silently lost. It posts the FULL current set each time (the
+  // parent rebuilds mirrors from it), de-duped so an unrelated animation
+  // doesn't spam, and stops observing before the parent's settle cap.
   var TOUCH_COLLECT_JS =
-    "(function(){function send(){var out=[];var ns=document.querySelectorAll(" +
+    "(function(){var last=null;function snap(){var out=[];var ns=document.querySelectorAll(" +
     "'[data-on-tap],[data-on-swipe],[data-on-slide]');" +
     "for(var i=0;i<ns.length;i++){var n=ns[i];var r=n.getBoundingClientRect();" +
     "if(r.width<=0||r.height<=0)continue;var cs=getComputedStyle(n);" +
     "if(cs.display==='none'||cs.visibility==='hidden')continue;" +
     "out.push({x:Math.round(r.x),y:Math.round(r.y),w:Math.round(r.width),h:Math.round(r.height)," +
     "tap:n.getAttribute('data-on-tap'),swipe:n.getAttribute('data-on-swipe')," +
-    "slide:n.getAttribute('data-on-slide')});}" +
+    "slide:n.getAttribute('data-on-slide')});}return out;}" +
+    "function send(){var out=snap();var s=JSON.stringify(out);if(s===last)return;last=s;" +
     "try{parent.postMessage({type:'tesserae-touch-regions',regions:out},'*');}catch(e){}}" +
-    "requestAnimationFrame(function(){requestAnimationFrame(send);});})();";
+    "requestAnimationFrame(function(){requestAnimationFrame(send);});" +
+    "var t=null;var mo=new MutationObserver(function(){clearTimeout(t);t=setTimeout(send,50);});" +
+    "try{mo.observe(document.documentElement,{childList:true,subtree:true,attributes:true," +
+    "attributeFilter:['data-on-tap','data-on-swipe','data-on-slide','style','class','hidden']});}catch(e){}" +
+    "setTimeout(function(){try{mo.disconnect();}catch(e){}},2900);})();";
 
   function renderCode(el, data) {
     var wrap = document.createElement("div");
@@ -310,15 +321,24 @@
     // sandbox has reported (or timed out) before walking the DOM.
     window.__tesseraeTouchPending = (window.__tesseraeTouchPending || 0) + 1;
     var settled = false;
+    var quietTimer = null;
     function settle() {
       if (settled) return;
       settled = true;
+      clearTimeout(quietTimer);
+      window.removeEventListener("message", onMsg);
       window.__tesseraeTouchPending = Math.max(0, (window.__tesseraeTouchPending || 1) - 1);
     }
+    // Hard cap so a constantly-mutating sandbox can't stall the walk.
     setTimeout(settle, 3000);
-    window.addEventListener("message", function onMsg(ev) {
+    function onMsg(ev) {
       if (ev.source !== f.contentWindow || !ev.data || ev.data.type !== "tesserae-touch-regions") return;
-      window.removeEventListener("message", onMsg);
+      if (settled) return;
+      // Each message is the FULL current set; rebuild this iframe's mirrors
+      // from it so a late (async) annotated node replaces the earlier (empty)
+      // snapshot rather than being missed.
+      var old = wrap.querySelectorAll(".touch-mirror");
+      for (var i = 0; i < old.length; i++) old[i].remove();
       (ev.data.regions || []).forEach(function (r) {
         if (!r || (!r.tap && !r.swipe && !r.slide)) return;
         var m = document.createElement("div");
@@ -331,8 +351,13 @@
         m.setAttribute("data-touch-origin", "markup");
         wrap.appendChild(m);
       });
-      settle();
-    });
+      // Settle a short quiet period after the last report (bounded by the 3s
+      // cap), so an async-built region has time to arrive without every push
+      // waiting the full timeout.
+      clearTimeout(quietTimer);
+      quietTimer = setTimeout(settle, 350);
+    }
+    window.addEventListener("message", onMsg);
     wrap.appendChild(f);
     return wrap;
   }

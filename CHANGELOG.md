@@ -15,6 +15,12 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **Code-element touch regions built asynchronously are no longer lost (#49).** A code element that
+  builds its tappable DOM in JS (fetched data, a chart, any delayed render) had its `data-on-tap`
+  nodes scanned once, ~32ms after load, before they existed, so the region never reached the sidecar
+  and every tap on it resolved to `no_target`. The sandbox collector now re-scans on DOM changes and
+  reports the full set each time (the host rebuilds the mirror regions from it), with a short quiet
+  settle bounded by the existing timeout, so a late-appearing annotated node still registers.
 - **Swipe zones are more forgiving (#49).** A swipe was hit-tested only on its start point, so a
   stroke that began a hair outside a small zone and moved into it registered as `no_target` even
   though its tail crossed the zone. Swipe hit-testing now falls back to the stroke's end point when
