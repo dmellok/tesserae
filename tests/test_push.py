@@ -40,7 +40,9 @@ def _distinct_png(colour: tuple[int, int, int]) -> bytes:
     return buf.getvalue()
 
 
-def _make_renderer(tmp_path: Path, rid: str, ext: str, retain: bool) -> Renderer:
+def _make_renderer(
+    tmp_path: Path, rid: str, ext: str, retain: bool, device: str | None = None
+) -> Renderer:
     mod = ModuleType(f"_test.{rid}")
 
     def transform(png_bytes, *, panel, settings):
@@ -65,7 +67,9 @@ def _make_renderer(tmp_path: Path, rid: str, ext: str, retain: bool) -> Renderer
             "topic_pattern": f"tesserae/{{device}}/frame/{ext}",
             # pi_bin / pi_png each have their own device id (post-split);
             # esp32_* renderers all live under the shared 'esp32' kind.
-            "device": "esp32" if rid.startswith("esp32") else rid,
+            # ``device`` overrides for tests that bind a renderer clone
+            # to a specific device instance (the prewarm tests).
+            "device": device or ("esp32" if rid.startswith("esp32") else rid),
             "retain": retain,
         },
         module=mod,
@@ -966,3 +970,159 @@ def test_unbound_send_broadcasts_when_opted_in(tmp_path: Path, composition_png: 
         result = manager.push("home")
     assert result.status == "sent"
     assert len(client.published) == 1
+
+
+# -- touch ETag stability + speculative pre-compose (issue #49 linger) ----
+
+
+class _FakeDevice:
+    def __init__(self, id_: str, panel: dict) -> None:
+        self.id = id_
+        self.display_name = id_
+        self.kind_of = "esp32_client"
+        self.manifest = {"panel": panel}
+        self.panel = panel
+        # HTTP-polled REST instance (the E1003 shape): no MQTT topics,
+        # frames served via /frame + latest_renders.
+        self.status_topic = None
+        self.transport = "rest"
+
+
+class _FakeDeviceRegistry:
+    def __init__(self, devices: list[_FakeDevice]) -> None:
+        self.devices = {d.id: d for d in devices}
+
+    def get(self, device_id: str):
+        return self.devices.get(device_id)
+
+
+def _wired_bound(tmp_path: Path, composition_png: bytes):
+    """PushManager with a page bound to one device ('kitchen') whose
+    renderer clone fans out only to it, the shape the touch prewarm
+    path targets."""
+    page_store = PageStore(tmp_path / "pages.json")
+    page_store.save(
+        Page(id="home", name="Home", panel=Panel(w=100, h=100), cells=[], device_ids=["kitchen"])
+    )
+    renderers = [_make_renderer(tmp_path, "pi_png", "png", retain=False, device="kitchen")]
+    registry = RendererRegistry(renderers={r.id: r for r in renderers})
+
+    fakes = {}
+
+    def factory(client_id: str):
+        fakes["client"] = _FakeMqttClient(client_id)
+        return fakes["client"]
+
+    transport = MqttTransport(BrokerConfig(host="x"), client_factory=factory)
+    transport.connect()
+
+    manager = PushManager(
+        registry=registry,
+        page_store=page_store,
+        transport=transport,
+        settings=SettingsStore(tmp_path / "settings.json"),
+        event_log=EventLog(tmp_path / "events.db"),
+        renders_dir=tmp_path / "renders",
+        base_url_fn=lambda: "http://broker.local:8000",
+        devices=_FakeDeviceRegistry([_FakeDevice("kitchen", {"w": 100, "h": 100})]),
+    )
+    return manager, fakes["client"], page_store
+
+
+def test_touch_repush_of_unchanged_content_keeps_digest(
+    tmp_path: Path, composition_png: bytes
+) -> None:
+    """The ETag-stability guarantee behind the E1003's touch 304 path: a
+    touch action that doesn't change the canvas triggers an unforced
+    re-push (source='touch'), which must leave the device's latest-render
+    digest untouched so the follow-up /frame poll 304s instead of costing
+    a 1.3 MB download and a ~30 s panel repaint."""
+    manager, client, _ = _wired_bound(tmp_path, composition_png)
+
+    with patch("app.push.capture_composed", return_value=(composition_png, [])):
+        first = manager.push("home", device_ids={"kitchen"})
+    assert first.status == "sent"
+    digest_before = manager.latest_render_for("kitchen")["digest"]
+
+    with patch("app.push.capture_composed", return_value=(composition_png, [])):
+        second = manager.push("home", device_ids={"kitchen"}, source="touch")
+
+    assert second.status == "no_change"
+    assert manager.latest_render_for("kitchen")["digest"] == digest_before
+    # HTTP-polled REST device: nothing rides MQTT on either push.
+    assert client.published == []
+
+
+def test_prewarm_page_is_consumed_by_next_push(tmp_path: Path, composition_png: bytes) -> None:
+    """prewarm_page captures the composition ahead of time; the next push
+    of that page consumes it and skips its own Playwright capture. The
+    entry is consume-once: a second push captures fresh."""
+    manager, _client, _ = _wired_bound(tmp_path, composition_png)
+    calls: list[str] = []
+
+    def fake_capture(req, pool=None):
+        calls.append(req.render.url)
+        return (composition_png, [])
+
+    with patch("app.push.capture_composed", side_effect=fake_capture):
+        assert manager.prewarm_page("home", device_id="kitchen") is True
+        assert len(calls) == 1
+
+        result = manager.push("home", device_ids={"kitchen"})
+        assert result.status == "sent"
+        # The push consumed the prewarmed composition, no second capture.
+        assert len(calls) == 1
+
+        manager.push("home", device_ids={"kitchen"})
+        # Consume-once: the follow-up push captures fresh.
+        assert len(calls) == 2
+
+
+def test_prewarm_ignores_unbound_page_and_unknown_device(
+    tmp_path: Path, composition_png: bytes
+) -> None:
+    manager, _client, _ = _wired_bound(tmp_path, composition_png)
+    with patch("app.push.capture_composed", return_value=(composition_png, [])):
+        assert manager.prewarm_page("home", device_id="not_bound") is False
+        assert manager.prewarm_page("missing_page", device_id="kitchen") is False
+
+
+def test_prewarm_entry_expires_after_ttl(tmp_path: Path, composition_png: bytes) -> None:
+    """A stale prewarmed composition must never serve: widget data was
+    captured at touch time, and a push minutes later needs fresh data."""
+    manager, _client, _ = _wired_bound(tmp_path, composition_png)
+    calls: list[str] = []
+
+    def fake_capture(req, pool=None):
+        calls.append(req.render.url)
+        return (composition_png, [])
+
+    with patch("app.push.capture_composed", side_effect=fake_capture):
+        assert manager.prewarm_page("home", device_id="kitchen") is True
+        # Backdate the cached entry past the TTL.
+        with manager._precompose_lock:
+            for key, (ts, png, regions) in list(manager._precompose.items()):
+                manager._precompose[key] = (ts - 10_000.0, png, regions)
+        result = manager.push("home", device_ids={"kitchen"})
+        assert result.status == "sent"
+        # Expired entry ignored, the push captured fresh.
+        assert len(calls) == 2
+
+
+def test_prewarm_misses_after_page_edit(tmp_path: Path, composition_png: bytes) -> None:
+    """An edit between prewarm and push changes the page's content token,
+    so the push must re-capture instead of serving the pre-edit frame."""
+    manager, _client, page_store = _wired_bound(tmp_path, composition_png)
+    calls: list[str] = []
+
+    def fake_capture(req, pool=None):
+        calls.append(req.render.url)
+        return (composition_png, [])
+
+    with patch("app.push.capture_composed", side_effect=fake_capture):
+        assert manager.prewarm_page("home", device_id="kitchen") is True
+        page = page_store.get("home")
+        page_store.save(page.model_copy(update={"name": "Home v2"}))
+        result = manager.push("home", device_ids={"kitchen"})
+        assert result.status == "sent"
+        assert len(calls) == 2

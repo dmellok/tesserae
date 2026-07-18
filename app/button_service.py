@@ -361,6 +361,67 @@ class ButtonService:
         frame_digest: str,
         event_id: int | None = None,
     ) -> TouchHandleResult:
+        """Resolve + dispatch a touch stroke (see ``_handle_touch``),
+        then speculatively prewarm the rotation's adjacent pages so a
+        follow-up tap's synchronous push skips its Playwright capture
+        (issue #49 linger). The prewarm runs on a daemon thread after the
+        result is computed, so it never adds latency to this wake."""
+        result = self._handle_touch(
+            device_id=device_id,
+            stroke=stroke,
+            frame_digest=frame_digest,
+            event_id=event_id,
+        )
+        # Any live-session stroke qualifies (even a no_target tap means a
+        # user is interacting with the current frame); the guard exits
+        # mean there's no current-frame session to speculate for.
+        if result.outcome not in ("deduped", "no_frame", "stale"):
+            self._spawn_prewarm(device_id)
+        return result
+
+    def _spawn_prewarm(self, device_id: str) -> None:
+        """Fire ``_prewarm_adjacent`` on a daemon thread. Split out so
+        tests can run it synchronously."""
+        threading.Thread(
+            target=self._prewarm_adjacent,
+            args=(device_id,),
+            name="tesserae-touch-prewarm",
+            daemon=True,
+        ).start()
+
+    def _prewarm_adjacent(self, device_id: str) -> None:
+        """Prewarm the compositions a linger session will most likely ask
+        for next: the rotation steps either side of the device's current
+        step (prev/next swipe targets). Best-effort by design."""
+        try:
+            pusher = self._push_getter()
+            prewarm = getattr(pusher, "prewarm_page", None)
+            if not callable(prewarm):
+                return
+            rotation = self._resolve_rotation(device_id)
+            if rotation is None or len(rotation.steps) < 2:
+                return
+            state = self._state.get(device_id) or DeviceRotationState(device_id=device_id)
+            step_index, _ = self._effective_step_index(rotation, state)
+            count = len(rotation.steps)
+            candidates: list[str] = []
+            for offset in (1, -1):
+                page_id = rotation.steps[(step_index + offset) % count].page_id
+                if page_id and page_id not in candidates:
+                    candidates.append(page_id)
+            for page_id in candidates:
+                prewarm(page_id, device_id=device_id)
+        except Exception:
+            log.exception("touch prewarm failed for device=%s", device_id)
+
+    def _handle_touch(
+        self,
+        *,
+        device_id: str,
+        stroke: TouchStroke,
+        frame_digest: str,
+        event_id: int | None = None,
+    ) -> TouchHandleResult:
         """Resolve a touch stroke against the frame the device is showing
         and dispatch the region's action (issue #49).
 

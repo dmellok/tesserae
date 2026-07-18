@@ -43,6 +43,7 @@ import threading
 import time
 import urllib.error
 import urllib.request
+from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -76,6 +77,14 @@ from app.state.page_store import PageStore, Panel
 from app.state.settings_store import SettingsStore
 from app.touch_regions import EXTRACT_REGIONS_JS, load_regions, normalize_regions, save_regions
 from app.transport import MqttTransport
+
+# Speculative pre-compose cache bounds (issue #49 linger). TTL keeps a
+# prewarmed composition usable across a linger window's tap cadence but
+# never lets a scheduled push minutes later serve widget data captured at
+# touch time; the cap bounds memory (a 1872x1404 composition PNG is a few
+# hundred KB).
+_PRECOMPOSE_TTL_S = 60.0
+_PRECOMPOSE_CAP = 6
 
 
 def _resolve_full_profile(
@@ -410,6 +419,17 @@ class PushManager:
         # next scheduled push lands.
         self._latest_renders_path = self._renders_dir.parent / "latest_renders.json"
         self._latest_renders: dict[str, dict[str, Any]] = self._load_latest_renders()
+        # Speculative composition cache (issue #49 linger). ``prewarm_page``
+        # captures the compositions a touch session is likely to ask for
+        # next (the rotation's prev/next pages) so the synchronous push a
+        # touch action triggers skips the Playwright capture, which is
+        # where the post-touch latency lives. Keyed by compose URL +
+        # content token; entries are consume-once and short-TTL so a
+        # scheduled push minutes later can never serve stale widget data.
+        self._precompose_lock = threading.Lock()
+        self._precompose: OrderedDict[str, tuple[float, bytes, list[dict[str, Any]]]] = (
+            OrderedDict()
+        )
 
     # -- listeners -------------------------------------------------------
 
@@ -468,6 +488,100 @@ class PushManager:
             if existed:
                 self._save_latest_renders()
         return existed
+
+    # -- speculative pre-compose (issue #49 linger) ----------------------
+
+    def _compose_url_for(self, page_id: str, panel: Panel, target_id: str) -> str:
+        """The compose URL a push would capture for this page / panel /
+        per-device target. Shared with ``prewarm_page`` so a prewarmed
+        capture and the push that consumes it agree on the key."""
+        base_url = self._base_url_fn().rstrip("/")
+        base = f"{base_url}/compose/{page_id}?for_push=1&w={panel.w}&h={panel.h}"
+        return to_loopback_url(f"{base}&device_id={target_id}" if target_id else base)
+
+    @staticmethod
+    def _precompose_key(compose_url: str, page: Any, panel: Panel) -> str:
+        """Cache key: the exact capture input (URL encodes page, dims,
+        per-device target) plus the page's content token, so an edit
+        between prewarm and consume misses instead of serving the
+        pre-edit composition."""
+        from app.composer import page_preview_token
+
+        return f"{compose_url}|{page_preview_token(page, (panel.w, panel.h))}"
+
+    def _take_precomposed(self, key: str) -> tuple[bytes, list[dict[str, Any]]] | None:
+        """Pop a fresh prewarmed composition, or None. Consume-once: a
+        hit removes the entry so one speculative capture can never serve
+        two pushes (widget data would drift further each time)."""
+        with self._precompose_lock:
+            entry = self._precompose.pop(key, None)
+        if entry is None:
+            return None
+        stamped, png, regions = entry
+        if time.monotonic() - stamped > _PRECOMPOSE_TTL_S:
+            return None
+        return png, regions
+
+    def _store_precomposed(self, key: str, png: bytes, regions: list[dict[str, Any]]) -> None:
+        with self._precompose_lock:
+            now = time.monotonic()
+            # Drop expired entries opportunistically, then bound the size.
+            for k in [
+                k for k, (ts, _p, _r) in self._precompose.items() if now - ts > _PRECOMPOSE_TTL_S
+            ]:
+                del self._precompose[k]
+            self._precompose[key] = (now, png, regions)
+            self._precompose.move_to_end(key)
+            while len(self._precompose) > _PRECOMPOSE_CAP:
+                self._precompose.popitem(last=False)
+
+    def prewarm_page(self, page_id: str, *, device_id: str) -> bool:
+        """Speculatively capture the composition a push of ``page_id`` to
+        ``device_id`` would render, so that push skips its Playwright
+        capture (the dominant share of post-touch latency during a linger
+        session). Best-effort: any failure is logged and swallowed, a
+        missed prewarm only costs the latency it would have saved. Runs
+        without the push lock; the browser pool serialises captures on
+        its own worker, so a prewarm queues behind (never races) a real
+        push's capture. Returns True when a composition was captured or
+        was already cached fresh."""
+        try:
+            page = self._page_store.get(page_id)
+            if page is None:
+                return False
+            groups = panel_groups_for_push(page, self._devices, self._settings)
+            match = next(
+                ((panel, dids) for panel, dids in groups if device_id in dids),
+                None,
+            )
+            if match is None:
+                return False
+            panel, _dids = match
+            target_id = device_id if _page_needs_per_device_render(page) else ""
+            compose_url = self._compose_url_for(page_id, panel, target_id)
+            key = self._precompose_key(compose_url, page, panel)
+            with self._precompose_lock:
+                cached = self._precompose.get(key)
+                if cached is not None and time.monotonic() - cached[0] <= _PRECOMPOSE_TTL_S:
+                    return True
+            composition_png, raw_regions = capture_composed(
+                CaptureRequest(
+                    render=RenderRequest(
+                        url=compose_url,
+                        viewport_w=panel.w,
+                        viewport_h=panel.h,
+                        timezone_id=self._render_timezone_id(),
+                    ),
+                    script=EXTRACT_REGIONS_JS,
+                ),
+                pool=self._browser_pool_fn(),
+            )
+            self._store_precomposed(key, composition_png, normalize_regions(raw_regions))
+            logger.info("prewarm: cached composition for page=%s device=%s", page_id, device_id)
+            return True
+        except Exception:
+            logger.exception("prewarm failed for page=%s device=%s", page_id, device_id)
+            return False
 
     def _load_latest_renders(self) -> dict[str, dict[str, Any]]:
         """Read the persisted latest-render map from disk if present.
@@ -873,7 +987,6 @@ class PushManager:
                 # and return, not a failure (the user intent is
                 # respected) but not a successful push either.
                 return self._log_quiet_skip(page_id, source=source)
-        base_url = self._base_url_fn().rstrip("/")
 
         all_renderers: list[RendererResult] = []
         group_results: list[PushResult] = []
@@ -904,38 +1017,42 @@ class PushManager:
             else:
                 render_targets = [("", set(group_dids) if group_dids else None)]
             for target_id, device_filter in render_targets:
-                base = f"{base_url}/compose/{page_id}?for_push=1&w={panel.w}&h={panel.h}"
-                compose_url = to_loopback_url(
-                    f"{base}&device_id={target_id}" if target_id else base
-                )
-                try:
-                    # Screenshot + touch-region extraction from the same
-                    # page session (issue #49): the region map must be
-                    # measured against the exact DOM the frame captured.
-                    composition_png, raw_regions = capture_composed(
-                        CaptureRequest(
-                            render=RenderRequest(
-                                url=compose_url,
-                                viewport_w=panel.w,
-                                viewport_h=panel.h,
-                                timezone_id=self._render_timezone_id(),
+                compose_url = self._compose_url_for(page_id, panel, target_id)
+                # Prewarmed composition (issue #49 linger): a touch session
+                # speculatively captured this page already; consume it and
+                # skip the Playwright capture entirely.
+                cached = self._take_precomposed(self._precompose_key(compose_url, page, panel))
+                if cached is not None:
+                    composition_png, touch_regions = cached
+                else:
+                    try:
+                        # Screenshot + touch-region extraction from the same
+                        # page session (issue #49): the region map must be
+                        # measured against the exact DOM the frame captured.
+                        composition_png, raw_regions = capture_composed(
+                            CaptureRequest(
+                                render=RenderRequest(
+                                    url=compose_url,
+                                    viewport_w=panel.w,
+                                    viewport_h=panel.h,
+                                    timezone_id=self._render_timezone_id(),
+                                ),
+                                script=EXTRACT_REGIONS_JS,
                             ),
-                            script=EXTRACT_REGIONS_JS,
-                        ),
-                        pool=self._browser_pool_fn(),
-                    )
-                    touch_regions = normalize_regions(raw_regions)
-                except Exception as err:
-                    err_msg = str(err) or type(err).__name__
-                    group_results.append(
-                        self._log_failure(
-                            source=source,
-                            target=page_id,
-                            error=f"render: {err_msg}",
-                            duration_s=time.monotonic() - started,
+                            pool=self._browser_pool_fn(),
                         )
-                    )
-                    continue
+                        touch_regions = normalize_regions(raw_regions)
+                    except Exception as err:
+                        err_msg = str(err) or type(err).__name__
+                        group_results.append(
+                            self._log_failure(
+                                source=source,
+                                target=page_id,
+                                error=f"render: {err_msg}",
+                                duration_s=time.monotonic() - started,
+                            )
+                        )
+                        continue
                 result = self._fan_out(
                     composition_png,
                     panel.model_dump(),

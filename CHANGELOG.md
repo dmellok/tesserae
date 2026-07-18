@@ -6,7 +6,28 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
-### Fixed
+### Added
+
+- **Touch linger on by default for the reTerminal E1003 (#49).** `touch_linger_s` now defaults to
+  30, so after a touch wake the firmware stays up polling the digitizer directly and follow-up taps
+  dispatch in a few hundred ms instead of paying the ~2.7 s deep-sleep boot each time. Delivered
+  through the `/status` response `config` block like every other device setting; set it back to 0
+  in the device's settings to sleep immediately. Touch input itself stays opt-in.
+
+- **Speculative pre-render of likely next frames (#49).** During a touch session the server now
+  prewarms the compositions a follow-up gesture is most likely to ask for (the rotation steps either
+  side of the current one) on a background thread, so the synchronous push a swipe or page tap
+  triggers skips its Playwright capture, the dominant share of post-touch latency. Entries are
+  consume-once with a 60 s TTL and keyed on the page's content token, so an edit mid-session or a
+  scheduled push minutes later can never be served a stale composition.
+
+- **Touch ETag stability locked by regression tests (#49).** A touch whose action doesn't change
+  the canvas must leave the frame ETag untouched: renders are content-addressed, the packers are
+  deterministic, and the touch re-push path doesn't force-publish, so an unchanged canvas resolves
+  to `no_change` and the device's next `/frame` poll 304s. On the E1003 every false-positive 200
+  costs a 1.3 MB download and a ~30 s panel repaint, so this chain is now pinned by tests at both
+  the REST layer (no-op touch → 304 against the prior ETag) and the push layer (unchanged re-push
+  keeps the digest).
 
 - **Touch monitor Clear now sticks (#49).** Clear only wiped the on-screen marks, but the monitor
   re-seeds from touch history on load, so the events reappeared on refresh. It now deletes this

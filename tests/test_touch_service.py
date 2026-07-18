@@ -609,3 +609,94 @@ def test_slide_from_markup_with_webhook_is_blocked(stores: dict[str, Any]) -> No
         frame_digest="art123",
     )
     assert result.outcome == "blocked"
+
+
+# -- adjacent-page prewarm (issue #49 linger) -----------------------------
+
+
+@dataclass
+class PrewarmStubPushManager(TouchStubPushManager):
+    """TouchStubPushManager that also records prewarm_page calls."""
+
+    prewarmed: list[tuple[str, str]] = field(default_factory=list)
+
+    def prewarm_page(self, page_id: str, *, device_id: str) -> bool:
+        self.prewarmed.append((page_id, device_id))
+        return True
+
+
+def test_prewarm_adjacent_targets_prev_and_next_steps(stores: dict[str, Any]) -> None:
+    """After a touch on a rotation-bound device, the steps either side of
+    the current one get prewarmed (the likely swipe targets), nothing
+    else."""
+    _seed_rotation(stores)
+    pm = PrewarmStubPushManager(latest=_latest(), regions=[_tap_region()])
+    svc = _service(stores, pm)
+    # Rotation kitchen_rot: morning / afternoon / evening, current step 0.
+    svc._prewarm_adjacent("kitchen")
+    assert ("afternoon", "kitchen") in pm.prewarmed  # next
+    assert ("evening", "kitchen") in pm.prewarmed  # prev (wraps)
+    assert all(p != "morning" for p, _ in pm.prewarmed)  # current already rendered
+
+
+def test_prewarm_skips_without_rotation_or_single_step(stores: dict[str, Any]) -> None:
+    pm = PrewarmStubPushManager(latest=_latest(), regions=[_tap_region()])
+    svc = _service(stores, pm)
+    svc._prewarm_adjacent("kitchen")  # no rotation at all
+    assert pm.prewarmed == []
+    stores["rotation_store"].upsert(
+        Rotation(
+            id="solo",
+            name="Solo",
+            device_ids=["kitchen"],
+            steps=[RotationStep(page_id="morning", dwell_minutes=30)],
+        )
+    )
+    svc._prewarm_adjacent("kitchen")  # one step: nowhere to go
+    assert pm.prewarmed == []
+
+
+def test_prewarm_tolerates_stub_without_hook(stores: dict[str, Any]) -> None:
+    """Push managers that don't implement prewarm_page (older stubs,
+    minimal transports) are skipped, not crashed on."""
+    _seed_rotation(stores)
+    pm = TouchStubPushManager(latest=_latest(), regions=[_tap_region()])
+    svc = _service(stores, pm)
+    svc._prewarm_adjacent("kitchen")  # must not raise
+
+
+def test_handle_touch_spawns_prewarm_only_for_live_session(stores: dict[str, Any]) -> None:
+    """The prewarm fires after any live-session stroke (even no_target),
+    but not on the guard exits where there's no current-frame session."""
+    _seed_rotation(stores)
+    pm = PrewarmStubPushManager(latest=_latest(), regions=[_tap_region()])
+    svc = _service(stores, pm)
+    spawned: list[str] = []
+    svc._spawn_prewarm = spawned.append  # synchronous, records device ids
+
+    svc.handle_touch(
+        device_id="kitchen",
+        stroke=TouchStroke(x0=50, y0=50, x1=50, y1=50),
+        frame_digest="art123",
+        event_id=1,
+    )
+    assert spawned == ["kitchen"]
+
+    # Stale stroke: no session on the current frame, no prewarm.
+    svc.handle_touch(
+        device_id="kitchen",
+        stroke=TouchStroke(x0=50, y0=50, x1=50, y1=50),
+        frame_digest="old_digest",
+        event_id=2,
+    )
+    assert spawned == ["kitchen"]
+
+    # no_target still counts as a live session (user is interacting).
+    pm.regions = []
+    svc.handle_touch(
+        device_id="kitchen",
+        stroke=TouchStroke(x0=900, y0=900, x1=900, y1=900),
+        frame_digest="art123",
+        event_id=3,
+    )
+    assert spawned == ["kitchen", "kitchen"]

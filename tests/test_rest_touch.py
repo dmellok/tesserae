@@ -261,3 +261,82 @@ def test_touch_event_shows_on_events_page(app: Flask) -> None:
     assert "dx-filter-chip--touch" in page  # the chip
     assert "event-touch" in page  # the friendly summary block
     assert "webhook:http://127.0.0.1:9/tesserae-test" in page  # resolved action
+
+
+# -- ETag stability on touch wakes (E1003 linger) -------------------------
+
+
+def test_frame_noop_touch_returns_304_when_frame_unchanged(app: Flask) -> None:
+    """Regression: a touch whose action does not change the canvas must
+    304 against the client's If-None-Match, not 200. On the E1003 every
+    false-positive 200 costs a 1.3 MB download and a ~30 s panel repaint,
+    so the ETag has to survive the dispatch."""
+    client = app.test_client()
+    _sign_in(client)
+    token = _register(app, client)
+    _seed_frame(app, "hall_panel", regions=[WEBHOOK_REGION])
+
+    resp = client.get(
+        "/api/v1/device/hall_panel/frame"
+        "?touch_x0=100&touch_y0=100&touch_digest=art123&touch_event_id=3",
+        headers={"Authorization": f"Bearer {token}", "If-None-Match": '"art123"'},
+    )
+    assert resp.status_code == 304
+    assert resp.headers["ETag"] == '"art123"'
+    # The action still dispatched; only the frame transfer was skipped.
+    rows = list(app.config["EVENT_LOG"].list(type="touch", source="touch", limit=10))
+    assert rows and rows[0].status == "webhook_dispatched"
+
+
+def test_frame_guard_exit_touch_also_304s(app: Flask) -> None:
+    """Guard-chain exits (here: no_target) must not perturb the ETag
+    either; the wake degrades to a plain 304 poll."""
+    client = app.test_client()
+    _sign_in(client)
+    token = _register(app, client)
+    _seed_frame(app, "hall_panel", regions=[])
+
+    resp = client.get(
+        "/api/v1/device/hall_panel/frame?touch_x0=5&touch_y0=5&touch_digest=art123",
+        headers={"Authorization": f"Bearer {token}", "If-None-Match": '"art123"'},
+    )
+    assert resp.status_code == 304
+
+
+# -- touch linger config (E1003) ------------------------------------------
+
+
+def test_e1003_status_config_carries_touch_linger_default(app: Flask) -> None:
+    """The E1003 hardware entry defaults touch_linger_s to 30 so a touch
+    session skips the ~2.7 s deep-sleep wake for follow-up taps. The
+    value must reach the firmware through the /status response config
+    block, same path as touch_enabled."""
+    client = app.test_client()
+    _sign_in(client)
+    code = app.config["PAIRING_STORE"].issue(note="test").code
+    resp = client.post(
+        "/api/v1/device/register",
+        headers={"X-Pairing-Code": code, "Content-Type": "application/json"},
+        data=json.dumps(
+            {
+                "device_id": "hall_e1003",
+                "kind": "seeed_reterminal_e1003",
+                "panel_w": 1872,
+                "panel_h": 1404,
+                "fw_version": "1.3.0",
+            }
+        ),
+    )
+    assert resp.status_code == 201, resp.get_data(as_text=True)
+    token = resp.get_json()["device_token"]
+
+    status = client.post(
+        "/api/v1/device/hall_e1003/status",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        data=json.dumps({"battery_pct": 80}),
+    )
+    assert status.status_code == 200
+    config = status.get_json()["config"]
+    assert config.get("touch_linger_s") == 30
+    # Touch input itself stays opt-in (battery cost through deep sleep).
+    assert config.get("touch_enabled") is False
