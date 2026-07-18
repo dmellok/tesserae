@@ -6,6 +6,20 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **Touch actions written in the flat Home Assistant shape now dispatch fully (#49).** An action like
+  `{"service":"light.turn_on","entity_id":["light.hall"],"brightness_pct":50}` validated as fine but
+  silently dropped `brightness_pct`: only `entity_id` was folded into the call. Top-level service-data
+  keys are now hoisted into `data` (an explicit `data` block still wins), and a comma-joined
+  `entity_id` string normalises to the list HA expects, so the flat form dispatches the same as the
+  nested canonical one.
+- **Structured swipe actions can be authored (#49).** `on_swipe` was typed as a direction→string map,
+  so an inline HA object (`{"left":{"action":"ha",...}}`) was rejected at write time and the
+  interaction never stored. A swipe direction now accepts the same string-or-structured forms as
+  `on_tap`. A swipe object with no `up`/`down`/`left`/`right` key (which can't fire) is flagged in
+  `render_report`'s `tap_invalid` with a fix hint instead of being silently dropped.
+
 ### Added
 
 - **Self-hosted CalDAV calendars + todo lists (calendar_core).** Calendar feeds can now carry basic

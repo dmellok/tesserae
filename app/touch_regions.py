@@ -205,7 +205,9 @@ def normalize_regions(raw: Any) -> list[dict[str, Any]]:
             continue
         tap = entry.get("tap")
         tap = tap.strip() if isinstance(tap, str) and tap.strip() else None
-        swipe = _parse_swipe_attr(entry.get("swipe"))
+        raw_swipe = entry.get("swipe")
+        swipe = _parse_swipe_attr(raw_swipe)
+        swipe_unusable = swipe is None and _swipe_attr_present_but_unusable(raw_swipe)
         slide = _parse_json_attr(entry.get("slide"))
         raw_dangling = entry.get("dangling")
         dangling = (
@@ -213,7 +215,7 @@ def normalize_regions(raw: Any) -> list[dict[str, Any]]:
             if isinstance(raw_dangling, list)
             else []
         )
-        if tap is None and swipe is None and slide is None and not dangling:
+        if tap is None and swipe is None and slide is None and not dangling and not swipe_unusable:
             continue
         # Flag any declared action that wouldn't actually dispatch, so
         # render_report / the editor overlay don't green-light a region
@@ -228,6 +230,18 @@ def normalize_regions(raw: Any) -> list[dict[str, Any]]:
                 reason = action_invalid_reason(sspec)
                 if reason:
                     invalid.append({"gesture": f"swipe_{direction}", "reason": reason})
+        if swipe_unusable:
+            invalid.append(
+                {
+                    "gesture": "swipe",
+                    "reason": (
+                        "swipe needs a per-direction map, e.g. "
+                        '{"left":"rotate_next"} or '
+                        '{"left":{"action":"ha","domain":"light","service":"toggle"}}; '
+                        "a bare action object with no up/down/left/right key won't fire"
+                    ),
+                }
+            )
         if isinstance(slide, dict) and slide.get("action") is not None:
             reason = action_invalid_reason(slide.get("action"))
             if reason:
@@ -262,18 +276,36 @@ def _parse_json_attr(value: Any) -> dict[str, Any] | None:
     return parsed if isinstance(parsed, dict) else None
 
 
-def _parse_swipe_attr(value: Any) -> dict[str, str] | None:
-    """``data-on-swipe`` is a JSON object of direction -> action spec.
-    Unknown directions and non-string specs are dropped."""
+_SWIPE_DIRECTIONS = ("up", "down", "left", "right")
+
+
+def _parse_swipe_attr(value: Any) -> dict[str, Any] | None:
+    """``data-on-swipe`` is a JSON object mapping a direction (up / down /
+    left / right) to an action spec: either a grammar string
+    (``"rotate_next"``) or a structured HA object (``{"action":"ha",…}``),
+    the same forms ``on_tap`` accepts. Unknown directions are dropped;
+    an empty result reads as "no swipe"."""
     parsed = _parse_json_attr(value)
     if parsed is None:
         return None
-    out = {
-        k: v.strip()
-        for k, v in parsed.items()
-        if k in ("up", "down", "left", "right") and isinstance(v, str) and v.strip()
-    }
+    out: dict[str, Any] = {}
+    for k, v in parsed.items():
+        if k not in _SWIPE_DIRECTIONS:
+            continue
+        if isinstance(v, str) and v.strip():
+            out[k] = v.strip()
+        elif isinstance(v, dict) and v:
+            out[k] = v
     return out or None
+
+
+def _swipe_attr_present_but_unusable(value: Any) -> bool:
+    """True when a swipe attribute was written but resolves to no usable
+    direction (e.g. an inline ``{"service":…}`` with no up/down/left/right
+    keys). Lets normalize_regions surface a diagnostic instead of silently
+    dropping the author's intent (issue #49)."""
+    parsed = _parse_json_attr(value)
+    return isinstance(parsed, dict) and bool(parsed) and _parse_swipe_attr(value) is None
 
 
 # -- sidecar persistence -------------------------------------------------
@@ -422,6 +454,13 @@ def _coerce_dict_action(d: dict[str, Any]) -> dict[str, Any] | None:
     return None
 
 
+# Top-level keys that carry structure, not service data. Everything else
+# an agent puts at the top level (``brightness_pct``, ``color_name``, …) is
+# folded into ``data``, so the flat HA shape ``{service, entity_id,
+# brightness_pct}`` dispatches the same as the nested ``{service, data:{…}}``.
+_HA_RESERVED_KEYS = frozenset({"action", "domain", "service", "target", "data", "entity_id"})
+
+
 def _normalize_ha(d: dict[str, Any]) -> dict[str, Any]:
     """Canonicalise an HA action into ``{action, domain, service, data}``,
     folding the common shape variations. domain/service may be empty when
@@ -439,6 +478,17 @@ def _normalize_ha(d: dict[str, Any]) -> dict[str, Any]:
             eid = d["target"].get("entity_id")
         if eid:
             data["entity_id"] = eid
+    # Hoist any remaining top-level keys as service data: the natural flat
+    # HA form puts brightness_pct / color_name / etc. beside entity_id, not
+    # under a ``data`` block. Explicit ``data`` keys win over hoisted ones.
+    for key, value in d.items():
+        if key not in _HA_RESERVED_KEYS and key not in data:
+            data[key] = value
+    # A comma-joined entity_id is a common hand-written shape; HA wants a
+    # list, so split it (entity ids never contain commas).
+    eid = data.get("entity_id")
+    if isinstance(eid, str) and "," in eid:
+        data["entity_id"] = [part.strip() for part in eid.split(",") if part.strip()]
     return {"action": "ha", "domain": domain, "service": service, "data": data}
 
 

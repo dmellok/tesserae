@@ -185,7 +185,10 @@ class Element(BaseModel):
     # touch region. The dedicated ``hotspot`` kind is an invisible element that
     # exists only to carry these. Empty = not tappable.
     on_tap: str | dict[str, Any] | None = None
-    on_swipe: dict[str, str] | None = None
+    # Direction (up/down/left/right) → action spec. Each value is a grammar
+    # string ("rotate_next") or a structured HA object ({"action":"ha",…}),
+    # the same forms on_tap accepts, so a swipe can fire a service call.
+    on_swipe: dict[str, str | dict[str, Any]] | None = None
     # Slider gesture (phase 3): ``{"axis": "x"|"y", "action": <spec>}``.
     # A slider region absorbs every stroke; the end point maps to a 0-100
     # value along the axis and substitutes ``{value}`` placeholders in

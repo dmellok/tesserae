@@ -128,7 +128,7 @@ class Cell(BaseModel):
     # ``data-on-swipe`` on the cell container; the render-time extractor
     # turns them into the frame's touch region map.
     on_tap: str | dict[str, Any] | None = None
-    on_swipe: dict[str, str] | None = None
+    on_swipe: dict[str, str | dict[str, Any]] | None = None
     # Slider gesture (phase 3): ``{"axis": "x"|"y", "action": <spec>}``;
     # the whole cell becomes a slider, ``{value}`` in the action receives
     # the stroke's 0-100 position along the axis.

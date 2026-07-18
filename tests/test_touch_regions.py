@@ -428,3 +428,93 @@ def test_substitute_value_string_and_dict() -> None:
     assert out["data"]["note"] == "set to 65%"
     # The original action is untouched (deep copy).
     assert action["data"]["brightness_pct"] == "{value}"
+
+
+def test_coerce_action_hoists_flat_service_data() -> None:
+    """The flat HA shape puts service data (brightness_pct, …) at the top
+    level beside entity_id. It must be folded into ``data`` so the call
+    dispatches with the data, not just the entity (issue #49 agent feedback:
+    a combined {service, entity_id, brightness_pct} validated OK but the
+    brightness silently vanished)."""
+    from app.touch_regions import coerce_action
+
+    got = coerce_action(
+        {"service": "light.turn_on", "entity_id": ["light.hall"], "brightness_pct": 50}
+    )
+    assert got == {
+        "action": "ha",
+        "domain": "light",
+        "service": "turn_on",
+        "data": {"entity_id": ["light.hall"], "brightness_pct": 50},
+    }
+
+
+def test_coerce_action_explicit_data_wins_over_hoist() -> None:
+    from app.touch_regions import coerce_action
+
+    got = coerce_action(
+        {"service": "light.turn_on", "brightness_pct": 10, "data": {"brightness_pct": 99}}
+    )
+    assert got["data"]["brightness_pct"] == 99  # explicit data block wins
+
+
+def test_coerce_action_splits_csv_entity_id_into_list() -> None:
+    """HA wants a list of entity ids; a comma-joined string is a common
+    hand-written shape and must normalise to the array HA accepts."""
+    from app.touch_regions import coerce_action
+
+    got = coerce_action({"service": "light.toggle", "entity_id": "light.a, light.b"})
+    assert got["data"]["entity_id"] == ["light.a", "light.b"]
+
+
+def test_parse_swipe_attr_accepts_structured_ha_per_direction() -> None:
+    """A swipe direction can carry a structured HA object, the same form
+    on_tap accepts (issue #49 agent feedback: structured swipe was dropped
+    to null with no diagnostic)."""
+    from app.touch_regions import _parse_swipe_attr
+
+    parsed = _parse_swipe_attr('{"left": {"action": "ha", "domain": "light", "service": "toggle"}}')
+    assert parsed == {"left": {"action": "ha", "domain": "light", "service": "toggle"}}
+    # String specs still work.
+    assert _parse_swipe_attr('{"right": "rotate_next"}') == {"right": "rotate_next"}
+
+
+def test_normalize_regions_flags_directionless_swipe() -> None:
+    """An inline swipe object with no up/down/left/right key can't fire; it
+    must surface a diagnostic in ``invalid`` instead of being silently
+    dropped (issue #49 agent feedback)."""
+    from app.touch_regions import normalize_regions
+
+    regions = normalize_regions(
+        [
+            {
+                "x": 0,
+                "y": 0,
+                "w": 100,
+                "h": 100,
+                "swipe": '{"service": "light.toggle", "entity_id": "light.x"}',
+            }
+        ]
+    )
+    assert len(regions) == 1
+    assert regions[0]["swipe"] is None
+    reasons = [i for i in regions[0]["invalid"] if i["gesture"] == "swipe"]
+    assert reasons and "per-direction" in reasons[0]["reason"]
+
+
+def test_normalize_regions_structured_swipe_roundtrips() -> None:
+    from app.touch_regions import normalize_regions
+
+    regions = normalize_regions(
+        [
+            {
+                "x": 0,
+                "y": 0,
+                "w": 100,
+                "h": 100,
+                "swipe": '{"left": {"action": "ha", "domain": "light", "service": "toggle"}}',
+            }
+        ]
+    )
+    assert regions[0]["swipe"]["left"]["service"] == "toggle"
+    assert regions[0]["invalid"] == []  # structured swipe is dispatchable

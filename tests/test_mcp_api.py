@@ -971,6 +971,33 @@ def test_append_element_accepts_touch_fields(app: Flask) -> None:
     assert el["on_swipe"] == {"left": "rotate_next"}
 
 
+def test_append_element_accepts_structured_swipe(app: Flask) -> None:
+    """A swipe direction can carry a structured HA object (issue #49 agent
+    feedback: on_swipe was typed dict[str, str], so an inline HA action
+    422'd at write time and the interaction never stored)."""
+    _enable(app)
+    client = app.test_client()
+    pid = _create_page(client)
+    resp = client.post(
+        f"/api/mcp/pages/{pid}/elements",
+        json={
+            "kind": "hotspot",
+            "x": 0,
+            "y": 0,
+            "w": 100,
+            "h": 50,
+            "on_swipe": {
+                "left": {"action": "ha", "domain": "light", "service": "toggle"},
+                "right": "rotate_next",
+            },
+        },
+    )
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    el = client.get(f"/api/mcp/pages/{pid}/canvas").get_json()["els"][0]
+    assert el["on_swipe"]["left"]["service"] == "toggle"
+    assert el["on_swipe"]["right"] == "rotate_next"
+
+
 def test_patch_element_rejects_unknown_keys(app: Flask) -> None:
     _enable(app)
     client = app.test_client()
