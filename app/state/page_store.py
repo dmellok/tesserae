@@ -134,6 +134,18 @@ class Cell(BaseModel):
     # the stroke's 0-100 position along the axis.
     on_slide: dict[str, Any] | None = None
 
+    @model_validator(mode="after")
+    def _canonicalize_touch(self) -> Cell:
+        """Canonicalise touch actions on write/load so the editor decodes
+        them and dispatch sees the same shape (issue #49). See the mirror
+        on ``panel_store.Element``."""
+        from app.touch_regions import canonical_action, canonical_slide, canonical_swipe
+
+        object.__setattr__(self, "on_tap", canonical_action(self.on_tap))
+        object.__setattr__(self, "on_swipe", canonical_swipe(self.on_swipe))
+        object.__setattr__(self, "on_slide", canonical_slide(self.on_slide))
+        return self
+
 
 class Page(BaseModel):
     """A saved dashboard.

@@ -8,6 +8,11 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **Touch actions show correctly in the canvas editor (#49).** Touch actions are now stored in their
+  canonical `{action,domain,service,data}` form at write time (a model validator, so it applies to
+  MCP writes, editor saves, and self-heals legacy dashboards on load). Previously an agent-written
+  flat HA action (`{service,entity_id,brightness_pct}`) dispatched fine but was stored raw, and the
+  editor's Interaction panel — which only decodes the canonical shape — showed it as blank/`Custom`.
 - **Touch actions written in the flat Home Assistant shape now dispatch fully (#49).** An action like
   `{"service":"light.turn_on","entity_id":["light.hall"],"brightness_pct":50}` validated as fine but
   silently dropped `brightness_pct`: only `entity_id` was folded into the call. Top-level service-data

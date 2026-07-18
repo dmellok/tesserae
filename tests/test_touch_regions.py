@@ -430,6 +430,81 @@ def test_substitute_value_string_and_dict() -> None:
     assert action["data"]["brightness_pct"] == "{value}"
 
 
+def test_canonical_action_normalises_flat_ha_and_keeps_strings() -> None:
+    from app.touch_regions import canonical_action, canonical_slide, canonical_swipe
+
+    got = canonical_action(
+        {"service": "light.turn_on", "entity_id": "light.x", "brightness_pct": 40}
+    )
+    assert got == {
+        "action": "ha",
+        "domain": "light",
+        "service": "turn_on",
+        "data": {"entity_id": "light.x", "brightness_pct": 40},
+    }
+    assert canonical_action("page:home") == "page:home"
+    assert canonical_action("") is None and canonical_action(None) is None
+    # Unrecognisable dict is kept (not silently dropped) so it can be flagged.
+    assert canonical_action({"foo": "bar"}) == {"foo": "bar"}
+    # Swipe values canonicalise per direction; empty map -> None.
+    assert canonical_swipe({"left": {"service": "switch.toggle"}})["left"]["service"] == "toggle"
+    assert canonical_swipe({}) is None
+    # Slide canonicalises the inner action.
+    slide = canonical_slide({"axis": "y", "action": {"service": "light.turn_on"}})
+    assert slide["action"]["action"] == "ha" and slide["axis"] == "y"
+
+
+def test_element_model_canonicalises_touch_on_write() -> None:
+    """The Element model stores touch actions canonically so the canvas
+    editor's Interaction panel can decode an agent-written flat HA action
+    instead of showing it blank (issue #49)."""
+    from app.state.panel_store import Element
+
+    el = Element.model_validate(
+        {
+            "id": "e1",
+            "kind": "box",
+            "x": 0,
+            "y": 0,
+            "w": 10,
+            "h": 10,
+            "on_tap": {
+                "service": "light.turn_on",
+                "entity_id": ["light.hall"],
+                "brightness_pct": 50,
+            },
+            "on_swipe": {"left": {"service": "light.toggle", "entity_id": "light.x"}},
+        }
+    )
+    assert el.on_tap["action"] == "ha"
+    assert el.on_tap["data"]["brightness_pct"] == 50
+    assert el.on_swipe["left"]["action"] == "ha"
+    # Idempotent: re-validating the canonical form doesn't double-wrap.
+    assert Element.model_validate(el.model_dump()).on_tap == el.on_tap
+
+
+def test_cell_model_canonicalises_touch_on_write() -> None:
+    from app.state.page_store import Cell
+
+    cell = Cell.model_validate(
+        {
+            "id": "c1",
+            "plugin": "clock",
+            "x": 0,
+            "y": 0,
+            "w": 1,
+            "h": 1,
+            "on_tap": {"service": "switch.toggle", "entity_id": "switch.fan"},
+        }
+    )
+    assert cell.on_tap == {
+        "action": "ha",
+        "domain": "switch",
+        "service": "toggle",
+        "data": {"entity_id": "switch.fan"},
+    }
+
+
 def test_coerce_action_hoists_flat_service_data() -> None:
     """The flat HA shape puts service data (brightness_pct, …) at the top
     level beside entity_id. It must be folded into ``data`` so the call

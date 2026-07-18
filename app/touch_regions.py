@@ -492,6 +492,46 @@ def _normalize_ha(d: dict[str, Any]) -> dict[str, Any]:
     return {"action": "ha", "domain": domain, "service": service, "data": data}
 
 
+def canonical_action(spec: Any) -> str | dict[str, Any] | None:
+    """Canonicalise a single stored action for persistence (issue #49).
+
+    The models run this on write so a dashboard's on_tap / on_swipe /
+    on_slide are stored in the dispatchable form, not the raw shape an
+    agent happened to type. That keeps the canvas editor's Interaction
+    panel able to decode it (it recognises ``{"action":"ha",…}``, not the
+    flat ``{"service":…}`` variant), and means dispatch and the editor see
+    the same thing. An empty value normalises to None; a value that isn't
+    a recognisable action is kept as-is so validation / render_report can
+    still flag it rather than silently dropping the author's intent."""
+    if spec is None:
+        return None
+    if isinstance(spec, str) and not spec.strip():
+        return None
+    coerced = coerce_action(spec)
+    return coerced if coerced is not None else spec
+
+
+def canonical_swipe(value: Any) -> dict[str, Any] | None:
+    """Canonicalise an ``on_swipe`` direction map's values in place."""
+    if not isinstance(value, dict):
+        return value if value else None
+    out: dict[str, Any] = {}
+    for direction, spec in value.items():
+        canon = canonical_action(spec)
+        if canon is not None:
+            out[direction] = canon
+    return out or None
+
+
+def canonical_slide(value: Any) -> dict[str, Any] | None:
+    """Canonicalise the ``action`` inside an ``on_slide`` declaration."""
+    if not isinstance(value, dict):
+        return value if value else None
+    if value.get("action") is None:
+        return value or None
+    return {**value, "action": canonical_action(value["action"])}
+
+
 # Action names that ``button_actions.dispatch`` knows plus the structured
 # actions the touch dispatcher handles. Used to flag regions whose action
 # would never fire, so render_report / the editor don't green-light a dead

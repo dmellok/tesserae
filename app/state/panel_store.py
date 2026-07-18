@@ -25,7 +25,7 @@ import threading
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class PartScale(BaseModel):
@@ -202,6 +202,24 @@ class Element(BaseModel):
     # the same spec forms as ``on_tap`` (string grammar, or a direction map for
     # ``data-on-swipe="@name"``).
     actions: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _canonicalize_touch(self) -> Element:
+        """Store touch actions in their canonical, dispatchable form so the
+        canvas editor's Interaction panel can decode them (it recognises
+        ``{"action":"ha",…}``, not the flat ``{"service":…}`` an agent may
+        write) and dispatch sees the same shape. Runs on every load too, so
+        legacy dashboards self-heal (issue #49)."""
+        from app.touch_regions import canonical_action, canonical_slide, canonical_swipe
+
+        object.__setattr__(self, "on_tap", canonical_action(self.on_tap))
+        object.__setattr__(self, "on_swipe", canonical_swipe(self.on_swipe))
+        object.__setattr__(self, "on_slide", canonical_slide(self.on_slide))
+        if self.actions:
+            object.__setattr__(
+                self, "actions", {k: canonical_action(v) for k, v in self.actions.items()}
+            )
+        return self
 
 
 class CanvasLayout(BaseModel):
