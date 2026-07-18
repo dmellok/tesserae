@@ -8,6 +8,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **OpenDisplay device kind.** A new `opendisplay` device kind for OpenDisplay BLE e-paper tags,
+  driven by the separate `tesserae-opendisplay` bridge: Tesserae renders a full-colour PNG (via the
+  `pi_png` renderer) and the bridge polls the frame over REST and pushes it to the tag over Bluetooth
+  LE, where the OpenDisplay SDK dithers for the tag's panel. REST-polled, honours `sleep_interval_s`.
+  The panel size is set per tag at registration, so one kind covers every OpenDisplay panel.
+
+
 - **Touch interactions guide (#49).** A new docs page covers enabling touch, attaching tap / swipe /
   slider / hotspot / code-element actions in the editor, verifying with the touch monitor, and
   implementing touch on any client (the transport is device-agnostic: ESP-IDF, CircuitPython, a Pi,

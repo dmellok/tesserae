@@ -1,0 +1,29 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "OpenDisplay tag",
+  "icon": "devices",
+  "version": "0.1.0",
+  "description": "An OpenDisplay BLE e-paper tag, driven by the tesserae-opendisplay bridge. Tesserae renders a full-colour PNG; the bridge polls the frame over REST and pushes it to the tag over Bluetooth LE with the py-opendisplay SDK, which dithers for whatever panel the tag advertises. One bridge drives many tags. The panel dimensions here are a placeholder: the bridge registers each tag with its real advertised size, so the composition renders at the correct aspect. REST-polled, honours sleep_interval_s (echoed back as next_poll_s).",
+  "renderers": ["pi_png"],
+  "status_topic": "tesserae/opendisplay/status",
+  "panel": { "w": 800, "h": 480, "orientation": "landscape", "name": "OpenDisplay tag (placeholder; bridge sets the real size)", "gamut": "spectra_6" },
+  "config_schema": {
+    "sleep_interval_s": {
+      "type": "int",
+      "label": "Sleep interval",
+      "default": 300,
+      "min": 30,
+      "max": 604800,
+      "presets": [
+        {"value": 300,   "label": "5 minutes"},
+        {"value": 900,   "label": "15 minutes"},
+        {"value": 1800,  "label": "30 minutes"},
+        {"value": 3600,  "label": "1 hour"},
+        {"value": 21600, "label": "6 hours"},
+        {"value": 43200, "label": "12 hours"},
+        {"value": 86400, "label": "1 day"}
+      ],
+      "help": "How long the bridge sleeps between frame polls for this tag. BLE image pushes are slow, and e-paper updates infrequently, so a longer interval is usually right. Custom value is in seconds."
+    }
+  }
+}
