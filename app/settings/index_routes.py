@@ -26,6 +26,7 @@ from app import install_id as install_id_module
 from app import updater as _updater_mod
 from app.button_actions import DEFAULT_BUTTON_MAP, registered_actions
 from app.device_loader import Device
+from app.ha_options import is_ha_addon
 from app.network import detect_local_ip, docker_bridge_ip_warning, is_docker_bridge_ip
 from app.panel import PANEL_PRESET_CHOICES, PANEL_PRESETS
 from app.state.settings_store import SECRET_MASK
@@ -900,12 +901,19 @@ def _build_sections() -> list[dict[str, Any]]:
                 # the CURRENT transport, the template uses it to decide
                 # the button label and the new value to POST. None on
                 # kinds (only instances flip).
+                # Push devices (OpenDisplay-via-HA) don't flip: there's no
+                # broker to switch to and no REST poll to mint a token for,
+                # the frame always goes out through the HA service call.
                 "set_transport_endpoint": (
                     url_for("auth.devices_set_transport", instance_id=device.id)
-                    if is_instance
+                    if is_instance and device.transport in ("mqtt", "rest")
                     else None
                 ),
                 "transport": device.transport if is_instance else None,
+                # OpenDisplay setup helper: detects whether this Tesserae is
+                # the HA add-on and points at the integration (HA path) or
+                # the bridge (standalone). None for non-OpenDisplay kinds.
+                "opendisplay_setup": _opendisplay_setup(device),
                 # The Display-name field reads ``device_name`` (raw) for
                 # the input's value, separately from ``title`` (which gets
                 # a "Device: " prefix for the card heading). Instance-only;
@@ -1278,18 +1286,83 @@ def _device_meta_block(device: Device, is_instance: bool) -> dict[str, Any]:
 
 
 # Short transport label used by the device card's header badge.
-_TRANSPORT_BADGE = {"rest": "REST", "mqtt": "MQTT"}
+_TRANSPORT_BADGE = {"rest": "REST", "mqtt": "MQTT", "push": "HA"}
 
 
 def _transport_badge(device: Device) -> str:
     """One-word transport label for the device card header badge.
     Returns "HTTP" for legacy TRMNL devices (access-token + MQTT)
-    so the header still reads cleanly when the card is collapsed."""
+    so the header still reads cleanly when the card is collapsed, and
+    "HA" for push devices (OpenDisplay-via-HA) delivered through a Home
+    Assistant service call rather than a broker."""
     if device.transport == "rest":
         return "REST"
+    if device.transport == "push":
+        return "HA"
     if isinstance(device.manifest.get("access_token"), str) and device.manifest.get("access_token"):
         return "HTTP"
     return _TRANSPORT_BADGE.get(device.transport or "mqtt", "MQTT")
+
+
+_OPENDISPLAY_BRIDGE = {
+    "label": "tesserae-opendisplay bridge",
+    "url": "https://github.com/dmellok/tesserae-opendisplay",
+}
+_OPENDISPLAY_INTEGRATION = {
+    "label": "OpenDisplay integration for Home Assistant",
+    "url": "https://opendisplay.org/",
+}
+
+
+def _opendisplay_setup(device: Device) -> dict[str, Any] | None:
+    """Setup guidance for OpenDisplay device cards. Detects whether this
+    Tesserae is the Home Assistant add-on and points the user at the
+    right delivery path: HA's OpenDisplay integration (the HA kind) or
+    the standalone bridge (the REST kind). Returns None for every other
+    kind so the card only grows the section for OpenDisplay devices."""
+    kind = device.kind_of or device.id
+    if kind not in ("opendisplay", "opendisplay_ha"):
+        return None
+    in_ha = is_ha_addon()
+    if kind == "opendisplay_ha":
+        if in_ha:
+            return {
+                "title": "OpenDisplay via Home Assistant",
+                "in_ha": True,
+                "ok": True,
+                "body": (
+                    "Running as the Home Assistant add-on. Install the OpenDisplay "
+                    "integration in HA and pair your tag, then set its HA device id "
+                    "above. On each render Tesserae writes the frame to /media and "
+                    "calls opendisplay.upload_image; HA pushes it to the tag over "
+                    "Bluetooth LE."
+                ),
+                "link": _OPENDISPLAY_INTEGRATION,
+            }
+        return {
+            "title": "OpenDisplay via Home Assistant",
+            "in_ha": False,
+            "ok": False,
+            "body": (
+                "This kind delivers frames through Home Assistant's "
+                "opendisplay.upload_image action, but this Tesserae is not running "
+                "as the HA add-on (no shared /media, no Supervisor). Run the HA "
+                "add-on, or use the OpenDisplay tag (bridge) kind with the "
+                "standalone bridge instead."
+            ),
+            "link": _OPENDISPLAY_BRIDGE,
+        }
+    return {
+        "title": "OpenDisplay bridge",
+        "in_ha": in_ha,
+        "ok": True,
+        "body": (
+            "Driven by the standalone bridge over Bluetooth LE. Install it on a "
+            "machine near your tags (pip install tesserae-opendisplay), then pair "
+            "it with a code from Settings then Devices. One bridge drives many tags."
+        ),
+        "link": _OPENDISPLAY_BRIDGE,
+    }
 
 
 def _device_connection_details(device: Device, is_instance: bool) -> list[dict[str, Any]]:

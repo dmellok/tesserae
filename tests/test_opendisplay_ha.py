@@ -7,6 +7,7 @@ service call and use a temp media root, so no HA or Bluetooth is needed.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -170,3 +171,65 @@ def test_no_ha_core_call_service_is_soft(app: Flask, tmp_path: Path) -> None:
         media_root=tmp_path / "media",
     )
     pub.on_push()  # no crash; nothing marked sent
+
+
+def test_ha_instance_is_push_transport_no_topics(app: Flask) -> None:
+    _make_tag(app)
+    device = app.config["DEVICE_REGISTRY"].devices["kitchen_tag"]
+    # Delivered by the HA publisher, not a broker: push transport, no
+    # MQTT topics derived (so the push pipeline never publishes for it).
+    assert device.transport == "push"
+    assert device.status_topic is None
+    assert device.config_topic is None
+
+
+def test_ha_instance_badge_reads_HA(app: Flask) -> None:
+    from app.settings.index_routes import _transport_badge
+
+    _make_tag(app)
+    device = app.config["DEVICE_REGISTRY"].devices["kitchen_tag"]
+    assert _transport_badge(device) == "HA"
+
+
+def test_bridge_instance_is_rest_with_token(app: Flask) -> None:
+    with app.app_context():
+        device_service.create_instance(
+            devices=app.config["DEVICE_REGISTRY"],
+            renderers=app.config["RENDERER_REGISTRY"],
+            data_root=app.config["DATA_ROOT"],
+            instance_id="hall_bridge",
+            kind_id="opendisplay",
+            name="Hall bridge tag",
+        )
+    device = app.config["DEVICE_REGISTRY"].devices["hall_bridge"]
+    # The bridge polls over REST; a manual add inherits the kind's REST
+    # transport and mints a token for the bridge to authenticate with.
+    assert device.transport == "rest"
+    assert device.status_topic is None
+    assert isinstance(device.manifest.get("access_token"), str)
+    assert device.manifest["access_token"]
+
+
+def test_loader_normalizes_stale_push_instance(app: Flask, tmp_path: Path) -> None:
+    """An instance file written before the kind dropped status_topic (so it
+    carries a stale MQTT topic and no transport) still loads as push with
+    the topic stripped."""
+    from app.device_loader import load_instance_file
+
+    registry = app.config["DEVICE_REGISTRY"]
+    inst_file = tmp_path / "stale_tag.json"
+    inst_file.write_text(
+        json.dumps(
+            {
+                "id": "stale_tag",
+                "kind": "opendisplay_ha",
+                "name": "Stale tag",
+                "status_topic": "tesserae/opendisplay_ha_stale_tag/status",
+            }
+        ),
+        encoding="utf-8",
+    )
+    device = load_instance_file(registry, inst_file=inst_file, data_root=app.config["DATA_ROOT"])
+    assert device is not None
+    assert device.transport == "push"
+    assert device.status_topic is None

@@ -39,6 +39,14 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **OpenDisplay devices no longer read as MQTT.** Both OpenDisplay kinds carried a `status_topic` in
+  their manifest, which tagged them as MQTT devices and showed dormant MQTT topic rows. Neither uses
+  a broker: the OpenDisplay-via-HA kind now declares a new `push` transport (delivered through Home
+  Assistant's `opendisplay.upload_image`, badged "HA"), and the bridge kind declares `rest` (the
+  bridge polls the frame endpoint). Existing instances are normalised on load, so a device added
+  before this fix corrects itself without re-adding. Both device cards also gain an OpenDisplay setup
+  note that detects whether Tesserae is the HA add-on and links to the integration or the bridge
+  accordingly.
 - **Code-element touch regions built asynchronously are no longer lost (#49).** A code element that
   builds its tappable DOM in JS (fetched data, a chart, any delayed render) had its `data-on-tap`
   nodes scanned once, ~32ms after load, before they existed, so the region never reached the sidecar

@@ -103,14 +103,19 @@ class Device:
         the default for backward compat (every pre-0.52 instance keeps
         working unchanged). ``"rest"`` means the device polls
         ``/api/v1/device/<id>/*`` instead, so the push pipeline skips the
-        MQTT publish for it.
+        MQTT publish for it. ``"push"`` means neither: an out-of-band
+        publisher delivers the frame (the OpenDisplay-via-HA kind hands
+        it to Home Assistant's ``opendisplay.upload_image`` on each
+        render), so there's no broker and nothing to poll.
 
-        Kinds themselves don't carry a transport (transport is per-
-        instance, not per-kind), so a missing field on a kind just
-        reads as the default and never enters the push path."""
+        Unlike ``"rest"`` / ``"mqtt"`` (chosen per-instance), ``"push"``
+        is declared on the kind manifest: a push kind's instances are
+        always push. A missing field reads as the ``"mqtt"`` default."""
         raw = self.manifest.get("transport")
-        if isinstance(raw, str) and raw.strip().lower() == "rest":
-            return "rest"
+        if isinstance(raw, str):
+            val = raw.strip().lower()
+            if val in ("rest", "push"):
+                return val
         return "mqtt"
 
     @property
@@ -595,6 +600,16 @@ def load_instance_file(
     # and any code that reads device.renderer_ids sees the per-
     # instance ids that clone_for_instances() will create.
     inst_manifest["renderers"] = [f"{r}__{instance_id}" for r in chosen_renderers]
+    # Push kinds (OpenDisplay-via-HA) deliver frames through a Home
+    # Assistant service call, not MQTT or a REST poll. Force the push
+    # transport and drop any MQTT topic an older instance file baked in
+    # (instances created before the kind dropped its status_topic), so
+    # the card reads "HA" instead of a misleading "MQTT" and the push
+    # pipeline never publishes to a broker for it.
+    if str(kind.manifest.get("transport") or "").strip().lower() == "push":
+        inst_manifest["transport"] = "push"
+        inst_manifest.pop("status_topic", None)
+        inst_manifest.pop("config_topic", None)
     inst_data_dir = data_root / instance_id
     inst_data_dir.mkdir(parents=True, exist_ok=True)
     device = Device(

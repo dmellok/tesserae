@@ -150,6 +150,19 @@
     </details>
     {% endif %}
 
+    {# OPENDISPLAY SETUP HELPER (HA vs bridge, issue: OpenDisplay support) #}
+    {% if section.opendisplay_setup %}
+    {% set od = section.opendisplay_setup %}
+    <div class="{% if od.ok %}dx-hint-band{% else %}dx-warn-band{% endif %}">
+      <i class="ph {% if od.ok %}ph-info{% else %}ph-warning{% endif %}" aria-hidden="true"></i>
+      <p>
+        <strong>{{ od.title }}</strong><br>
+        {{ od.body }}
+        <a href="{{ od.link.url }}" target="_blank" rel="noopener noreferrer">{{ od.link.label }}</a>.
+      </p>
+    </div>
+    {% endif %}
+
     {# TAB BAR #}
     <nav class="dx-tabs" role="tablist" aria-label="Device settings">
       {% for tab_id, tab_label in [('status', 'Status'), ('general', 'General'), ('schedule', 'Schedule'), ('calibration', 'Calibration')] %}

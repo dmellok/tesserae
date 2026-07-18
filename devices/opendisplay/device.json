@@ -5,7 +5,7 @@
   "version": "0.1.0",
   "description": "An OpenDisplay BLE e-paper tag, driven by the tesserae-opendisplay bridge. Tesserae renders a full-colour PNG; the bridge polls the frame over REST and pushes it to the tag over Bluetooth LE with the py-opendisplay SDK, which dithers for whatever panel the tag advertises. One bridge drives many tags. The panel dimensions here are a placeholder: the bridge registers each tag with its real advertised size, so the composition renders at the correct aspect. REST-polled, honours sleep_interval_s (echoed back as next_poll_s).",
   "renderers": ["pi_png"],
-  "status_topic": "tesserae/opendisplay/status",
+  "transport": "rest",
   "panel": { "w": 800, "h": 480, "orientation": "landscape", "name": "OpenDisplay tag (placeholder; bridge sets the real size)", "gamut": "spectra_6" },
   "config_schema": {
     "sleep_interval_s": {

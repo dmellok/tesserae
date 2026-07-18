@@ -273,14 +273,22 @@ def create_instance(
     normalised_transport: str | None = None
     if isinstance(transport, str) and transport.strip().lower() == "rest":
         normalised_transport = "rest"
+    else:
+        # A kind can declare its own transport (OpenDisplay-via-HA is
+        # "push"; the OpenDisplay bridge kind is "rest"). Inherit it when
+        # the caller didn't force one, so manually-added instances match
+        # the kind instead of falling back to the MQTT default.
+        kind_transport = str(kind.manifest.get("transport") or "").strip().lower()
+        if kind_transport in ("rest", "push"):
+            normalised_transport = kind_transport
 
     manifest: dict[str, Any] = {
         "id": instance_id,
         "kind": kind_id,
         "name": name.strip() or f"{kind.name} ({instance_id})",
     }
-    if normalised_transport == "rest":
-        manifest["transport"] = "rest"
+    if normalised_transport in ("rest", "push"):
+        manifest["transport"] = normalised_transport
     # Pin a renderer when the kind offers a choice (multi-renderer kinds
     # like circuitpython_generic). Only recorded when it names one of the
     # kind's renderers, so a bad value falls back to the kind's default

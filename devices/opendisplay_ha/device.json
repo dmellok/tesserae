@@ -5,7 +5,7 @@
   "version": "0.1.0",
   "description": "An OpenDisplay BLE e-paper tag driven through Home Assistant. Tesserae renders a full-colour PNG, writes it into HA's media folder, and calls the opendisplay.upload_image action; HA's OpenDisplay integration pushes it to the tag over Bluetooth LE and dithers for the panel. No separate bridge or BLE hardware on the Tesserae host. Set the tag's HA device id below. Best when Tesserae runs as the Home Assistant add-on (shared /media). Requires the Home Assistant Core plugin.",
   "renderers": ["pi_png"],
-  "status_topic": "tesserae/opendisplay_ha/status",
+  "transport": "push",
   "panel": { "w": 800, "h": 480, "orientation": "landscape", "name": "OpenDisplay tag (set your panel size)", "gamut": "spectra_6" },
   "config_schema": {
     "ha_device_id": {
