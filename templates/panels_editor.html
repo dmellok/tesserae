@@ -40,6 +40,8 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='style/panels/chrome.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='style/panels/editor.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='style/panels/picker.css') }}">
+  {# Shared touch Interaction editor, the same picker the grid editor uses. #}
+  <link rel="stylesheet" href="{{ url_for('static', filename='style/touch_interaction.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='vendor/codemirror/codemirror.css') }}">
   {# Spectra tokens + styles so the widgets mounted live on the canvas paint
      with the same semantic palette (--bg, --accent-*, …) a real panel uses. #}
@@ -323,6 +325,9 @@
   window.__TESSERAE_FONTS = [{% for f in code_fonts or [] %}{ "name": {{ f.name|tojson }}, "url": "{{ url_for('composer.font_face_datauri', font_id=f.id) }}" }{{ "," if not loop.last }}{% endfor %}];</script>
   <script src="{{ url_for('static', filename='vendor/jsbeautify/beautifier.min.js') }}"></script>
   <script src="{{ url_for('static', filename='panels/decorate.js') }}"></script>
+  {# Shared touch Interaction picker (window.TouchInteraction), loaded before
+     editor.js so the inspector's Interaction section can call it. #}
+  <script src="{{ url_for('static', filename='touch_interaction.js') }}"></script>
   <script src="{{ url_for('static', filename='panels/editor.js') }}"></script>
 </body>
 </html>

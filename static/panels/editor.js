@@ -40,19 +40,6 @@
     { kind: "svg", label: "SVG", icon: "ph-bezier-curve", w: 120, h: 120 },
     { kind: "hotspot", label: "Touch region", icon: "ph-hand-tap", w: 160, h: 120 },
   ];
-  // Touch gesture directions + the action vocabulary the Interaction
-  // section offers (issue #49). Specs use the button_actions grammar.
-  var SWIPE_DIRS = ["up", "down", "left", "right"];
-  var TOUCH_ACTIONS = [
-    { id: "", label: "None" },
-    { id: "refresh", label: "Refresh" },
-    { id: "rotate_next", label: "Next in rotation" },
-    { id: "rotate_prev", label: "Previous in rotation" },
-    { id: "step", label: "Jump to step…", arg: "number" },
-    { id: "page", label: "Go to page…", arg: "page" },
-    { id: "webhook", label: "Webhook…", arg: "url" },
-    { id: "ha", label: "Home Assistant…", arg: "ha" },
-  ];
   // Base colour palette: Spectra semantic tokens (follow the theme) offered
   // alongside a native colour picker.
   var INKS = [
@@ -246,173 +233,19 @@
     if (e.kind === "code" && e.actions && Object.keys(e.actions).length) return true;
     return false;
   }
-  // Lazily fetched Home Assistant services + entities for the HA action
-  // form (ha-actions.json via the ha_core connection).
-  function fetchHA(cb) {
-    if (S.haData) { cb(S.haData); return; }
-    var url = (S.cfg.pagesUrl || "").replace(/pages\.json$/, "ha-actions.json");
-    if (!url) { cb({ configured: false, services: [], entities: [] }); return; }
-    fetch(url)
-      .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
-      .then(function (j) { S.haData = j || {}; cb(S.haData); })
-      .catch(function () { cb({ configured: false, services: [], entities: [] }); });
+  // URLs the shared TouchInteraction picker needs: the dashboards list (for
+  // "Go to page") and the HA services/entities feed (for the HA form). Both
+  // derive from the ungated pages.json endpoint the editor is configured with.
+  function tiUrls() {
+    var pages = S.cfg.pagesUrl || "";
+    return { pagesUrl: pages, haActionsUrl: pages.replace(/pages\.json$/, "ha-actions.json") };
   }
-  // Lazily fetched list of all dashboards for the "Go to page" picker.
-  function fetchPages(cb) {
-    if (S.pagesList) { cb(S.pagesList); return; }
-    if (!S.cfg.pagesUrl) { cb([]); return; }
-    fetch(S.cfg.pagesUrl)
-      .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
-      .then(function (j) { S.pagesList = (j && j.pages) || []; cb(S.pagesList); })
-      .catch(function () { cb([]); });
-  }
-  function specParts(spec) {
-    if (spec && typeof spec === "object") return { action: String(spec.action || ""), arg: "" };
-    var s = typeof spec === "string" ? spec : "";
-    var i = s.indexOf(":");
-    if (i < 0) return { action: s, arg: "" };
-    return { action: s.slice(0, i), arg: s.slice(i + 1) };
-  }
-  function specJoin(action, arg) {
-    if (!action) return "";
-    var def = TOUCH_ACTIONS.filter(function (a) { return a.id === action; })[0];
-    if (def && def.arg) return arg ? action + ":" + arg : "";
-    return action;
-  }
-  // One action picker: a select of the vocabulary plus a conditional
-  // argument control (page list / webhook URL / step number). Calls
-  // onChange with the resolved spec string ("" = none).
-  function actionControl(spec, onChange, opts) {
-    var exclude = (opts && opts.exclude) || [];
-    var wrap = el("span");
-    wrap.style.cssText = "display:flex;flex-direction:column;gap:4px;flex:1;min-width:0";
-    var parts = specParts(spec);
-    var sel = el("select", "psel");
-    sel.innerHTML = TOUCH_ACTIONS.filter(function (a) {
-      return exclude.indexOf(a.id) < 0;
-    }).map(function (a) {
-      return '<option value="' + a.id + '">' + esc(a.label) + "</option>";
-    }).join("");
-    if (!TOUCH_ACTIONS.some(function (a) { return a.id === parts.action; })) {
-      // An unknown / hand-authored spec (e.g. a structured HA action):
-      // show it verbatim rather than silently rewriting it.
-      sel.innerHTML += '<option value="__custom">Custom: ' + esc(String(spec).slice(0, 28)) + "</option>";
-      sel.value = "__custom";
-    } else {
-      sel.value = parts.action;
-    }
-    wrap.appendChild(sel);
-    var argHost = el("span");
-    argHost.style.cssText = "display:block";
-    wrap.appendChild(argHost);
-    function renderHaForm() {
-      var cur = (spec && typeof spec === "object" && spec.action === "ha") ? spec : {};
-      var data = cur.data || {};
-      var svcVal = cur.domain && cur.service ? cur.domain + "." + cur.service : "";
-      var entVal = data.entity_id || "";
-      var extra = {};
-      Object.keys(data).forEach(function (k) { if (k !== "entity_id") extra[k] = data[k]; });
-      var sid = "ha-svc-" + uid(), eid = "ha-ent-" + uid();
-
-      var svc = el("input", "dinput");
-      svc.setAttribute("list", sid);
-      svc.placeholder = "light.turn_on";
-      svc.value = svcVal;
-      svc.style.cssText = "width:100%;text-align:left;font:12px var(--t-font-mono);margin-bottom:4px";
-      var slist = el("datalist"); slist.id = sid;
-
-      var ent = el("input", "dinput");
-      ent.setAttribute("list", eid);
-      ent.placeholder = "light.lounge (entity)";
-      ent.value = entVal;
-      ent.style.cssText = "width:100%;text-align:left;font:12px var(--t-font-mono);margin-bottom:4px";
-      var elist = el("datalist"); elist.id = eid;
-
-      var extraTa = el("textarea", "dinput");
-      extraTa.rows = 2;
-      extraTa.placeholder = '{"brightness_pct": "{value}"}';
-      extraTa.value = Object.keys(extra).length ? JSON.stringify(extra) : "";
-      extraTa.style.cssText = "width:100%;font:11px var(--t-font-mono);resize:vertical";
-      extraTa.title = "Optional service data (JSON). On a slider, \"{value}\" becomes the 0-100 stroke value.";
-
-      var hint = el("div", "note");
-      hint.textContent = "";
-      function commitHa() {
-        var m = svc.value.trim().match(/^([a-z0-9_]+)\.([a-z0-9_]+)$/i);
-        if (!m) return;
-        var payload = {};
-        var raw = extraTa.value.trim();
-        if (raw) {
-          try { payload = JSON.parse(raw) || {}; } catch (err) { hint.textContent = "Extra data is not valid JSON."; return; }
-        }
-        hint.textContent = "";
-        if (ent.value.trim()) payload.entity_id = ent.value.trim();
-        onChange({ action: "ha", domain: m[1], service: m[2], data: payload });
-      }
-      [svc, ent, extraTa].forEach(function (inp) {
-        inp.addEventListener("pointerdown", function (ev) { ev.stopPropagation(); });
-        inp.addEventListener("change", commitHa);
-      });
-      argHost.appendChild(svc); argHost.appendChild(slist);
-      argHost.appendChild(ent); argHost.appendChild(elist);
-      argHost.appendChild(extraTa); argHost.appendChild(hint);
-      fetchHA(function (ha) {
-        if (!ha.configured) {
-          hint.textContent = "Home Assistant isn't configured (Settings → Plugins → Home Assistant Core).";
-          return;
-        }
-        slist.innerHTML = (ha.services || []).map(function (s) {
-          return '<option value="' + esc(s.id) + '">' + esc(s.name || "") + "</option>";
-        }).join("");
-        elist.innerHTML = (ha.entities || []).map(function (x) {
-          return '<option value="' + esc(x.id) + '">' + esc(x.name || "") + "</option>";
-        }).join("");
-      });
-    }
-    function renderArg() {
-      argHost.textContent = "";
-      var def = TOUCH_ACTIONS.filter(function (a) { return a.id === sel.value; })[0];
-      if (!def || !def.arg) return;
-      if (def.arg === "ha") { renderHaForm(); return; }
-      if (def.arg === "page") {
-        var psel = el("select", "psel");
-        psel.innerHTML = '<option value="">Choose page…</option>';
-        argHost.appendChild(psel);
-        fetchPages(function (pages) {
-          psel.innerHTML = '<option value="">Choose page…</option>' + pages.map(function (p) {
-            return '<option value="' + esc(p.id) + '">' + esc(p.name) + "</option>";
-          }).join("");
-          if (parts.action === "page") psel.value = parts.arg;
-        });
-        psel.addEventListener("change", function () { commit(psel.value); });
-      } else {
-        var inp = el("input", "dinput");
-        inp.style.cssText = "width:100%;text-align:left";
-        if (def.arg === "number") { inp.type = "number"; inp.min = "0"; inp.placeholder = "step #"; }
-        else { inp.placeholder = "https://…"; }
-        if (parts.action === sel.value) inp.value = parts.arg;
-        inp.addEventListener("pointerdown", function (ev) { ev.stopPropagation(); });
-        inp.addEventListener("change", function () { commit(inp.value.trim()); });
-        argHost.appendChild(inp);
-      }
-    }
-    function commit(arg) {
-      if (sel.value === "__custom") return; // leave hand-authored specs alone
-      onChange(specJoin(sel.value, arg));
-    }
-    sel.addEventListener("change", function () {
-      parts = { action: sel.value, arg: "" };
-      renderArg();
-      var def = TOUCH_ACTIONS.filter(function (a) { return a.id === sel.value; })[0];
-      if (!def || !def.arg) commit("");
-    });
-    renderArg();
-    return wrap;
-  }
-  // The per-element Interaction section: "On tap" plus per-direction
-  // swipe actions. Stored as e.on_tap (spec string) and e.on_swipe
-  // ({direction: spec}); the composer stamps them as data-on-tap /
-  // data-on-swipe on the element's container at render time.
+  // The per-element Interaction section: On tap + per-direction swipe +
+  // slider, rendered by the shared TouchInteraction module (the same picker
+  // the grid editor uses) so the two editors can't drift. The module owns the
+  // control's internal state and re-renders itself; we mirror its onChange
+  // value back onto the element and save. Composer stamps e.on_tap /
+  // e.on_swipe / e.on_slide as data-on-* at render time (issue #49).
   function interactionSection(mount, e) {
     mount.appendChild(el("div", "psec", '<i class="ph-bold ph-hand-tap"></i>Interaction'));
     if (e.kind === "hotspot") {
@@ -420,101 +253,20 @@
         "An invisible touch region: position it over anything (including a code element's " +
         "rendered output) to make that area tappable on touch displays."));
     }
-    var trow = el("div", "prow"); trow.innerHTML = '<span class="plab">On tap</span>';
-    trow.appendChild(actionControl(e.on_tap || "", function (spec) {
-      pushHistory();
-      e.on_tap = spec || null;
-      scheduleSave(); paint();
+    if (typeof TouchInteraction === "undefined") return;
+    mount.appendChild(TouchInteraction.render({
+      value: { on_tap: e.on_tap, on_swipe: e.on_swipe, on_slide: e.on_slide },
+      pagesUrl: tiUrls().pagesUrl,
+      haActionsUrl: tiUrls().haActionsUrl,
+      defaultAxis: e.w >= e.h ? "x" : "y",
+      onChange: function (v) {
+        pushHistory();
+        e.on_tap = v.on_tap;
+        e.on_swipe = v.on_swipe;
+        e.on_slide = v.on_slide;
+        scheduleSave(); paint();
+      },
     }));
-    mount.appendChild(trow);
-
-    var swipe = e.on_swipe || {};
-    SWIPE_DIRS.forEach(function (dir) {
-      if (!(dir in swipe)) return;
-      var row = el("div", "prow");
-      row.innerHTML = '<span class="plab">Swipe ' + dir + "</span>";
-      var box = el("span"); box.style.cssText = "display:flex;gap:4px;flex:1;min-width:0;align-items:flex-start";
-      // Swipe values stay in the string grammar (the schema keeps them
-      // flat); HA calls belong on taps and sliders.
-      box.appendChild(actionControl(swipe[dir] || "", function (spec) {
-        pushHistory();
-        e.on_swipe = e.on_swipe || {};
-        if (spec) e.on_swipe[dir] = spec; else delete e.on_swipe[dir];
-        if (!Object.keys(e.on_swipe).length) e.on_swipe = null;
-        scheduleSave(); paint();
-      }, { exclude: ["ha"] }));
-      var rm = el("button", "minibtn", '<i class="ph-bold ph-x"></i>');
-      rm.title = "Remove swipe action";
-      rm.addEventListener("click", function () {
-        pushHistory();
-        if (e.on_swipe) delete e.on_swipe[dir];
-        if (e.on_swipe && !Object.keys(e.on_swipe).length) e.on_swipe = null;
-        scheduleSave(); paint(); renderProps();
-      });
-      box.appendChild(rm);
-      row.appendChild(box);
-      mount.appendChild(row);
-    });
-    var free = SWIPE_DIRS.filter(function (d) { return !(d in (e.on_swipe || {})); });
-    if (free.length) {
-      var addrow = el("div", "prow");
-      var addsel = el("select", "psel");
-      addsel.innerHTML = '<option value="">+ Add swipe action…</option>' + free.map(function (d) {
-        return '<option value="' + d + '">Swipe ' + d + "</option>";
-      }).join("");
-      addsel.addEventListener("change", function () {
-        if (!addsel.value) return;
-        pushHistory();
-        e.on_swipe = e.on_swipe || {};
-        e.on_swipe[addsel.value] = "";
-        renderProps();
-      });
-      addrow.appendChild(addsel); mount.appendChild(addrow);
-    }
-
-    // Slider: the element becomes an absolute-value control. The stroke's
-    // end point maps to 0-100 along the axis (vertical fills upward) and
-    // replaces "{value}" in the action, e.g. an HA light.turn_on with
-    // {"brightness_pct": "{value}"}. A slider absorbs taps and swipes.
-    if (e.on_slide) {
-      var srow = el("div", "prow"); srow.innerHTML = '<span class="plab">Slider</span>';
-      var sbox = el("span");
-      sbox.style.cssText = "display:flex;flex-direction:column;gap:4px;flex:1;min-width:0";
-      var axrow = el("span"); axrow.style.cssText = "display:flex;gap:4px;align-items:center";
-      var ax = el("select", "psel");
-      ax.innerHTML = '<option value="y">Vertical (top = 100)</option><option value="x">Horizontal (right = 100)</option>';
-      ax.value = e.on_slide.axis === "x" ? "x" : "y";
-      ax.addEventListener("change", function () {
-        pushHistory(); e.on_slide.axis = ax.value; scheduleSave(); paint();
-      });
-      var srm = el("button", "minibtn", '<i class="ph-bold ph-x"></i>');
-      srm.title = "Remove slider";
-      srm.addEventListener("click", function () {
-        pushHistory(); e.on_slide = null; scheduleSave(); paint(); renderProps();
-      });
-      axrow.appendChild(ax); axrow.appendChild(srm);
-      sbox.appendChild(axrow);
-      sbox.appendChild(actionControl(e.on_slide.action || "", function (spec) {
-        pushHistory();
-        e.on_slide = e.on_slide || { axis: ax.value };
-        e.on_slide.action = spec || "";
-        scheduleSave(); paint();
-      }));
-      sbox.appendChild(el("div", "note",
-        'Use "{value}" in the action for the stroke\'s 0-100 position (webhook URLs or HA service data).'));
-      srow.appendChild(sbox);
-      mount.appendChild(srow);
-    } else {
-      var mkrow = el("div", "prow");
-      var mk = el("button", "minibtn", '<i class="ph-bold ph-sliders-horizontal"></i> Make this a slider…');
-      mk.style.cssText = "width:100%;justify-content:center";
-      mk.addEventListener("click", function () {
-        pushHistory();
-        e.on_slide = { axis: e.w >= e.h ? "x" : "y", action: "" };
-        renderProps();
-      });
-      mkrow.appendChild(mk); mount.appendChild(mkrow);
-    }
   }
   // Named actions for a code element (mirrors the Sources card: sources
   // are data in, actions are touches out). Markup references them as
@@ -547,9 +299,11 @@
       });
       top.appendChild(nm); top.appendChild(rm); box.appendChild(top);
       var current = e.actions[name];
-      box.appendChild(actionControl(current || "", function (spec) {
-        pushHistory(); e.actions[name] = spec; scheduleSave(); paint();
-      }));
+      if (typeof TouchInteraction !== "undefined") {
+        box.appendChild(TouchInteraction.actionControl(current || "", tiUrls(), function (spec) {
+          pushHistory(); e.actions[name] = spec; scheduleSave(); paint();
+        }));
+      }
       var hint = el("div", "note");
       hint.style.marginTop = "6px";
       hint.innerHTML = 'Use: <code>data-on-tap="@' + esc(name) + '"</code>';

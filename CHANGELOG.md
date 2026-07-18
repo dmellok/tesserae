@@ -6,6 +6,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Changed
+
+- **The canvas and grid editors share one touch Interaction picker (#49).** The canvas editor had its
+  own copy of the Interaction UI (on-tap / swipe / slider / code-element actions); it now uses the
+  same `touch_interaction.js` module the grid editor does, so the two can't drift and an editor-side
+  fix (e.g. decoding a Home Assistant action back into the form) only has to be made once.
+
 ### Fixed
 
 - **Swipe zones are more forgiving (#49).** A swipe was hit-tested only on its start point, so a
