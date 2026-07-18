@@ -739,11 +739,13 @@ class ButtonService:
         registry = current_app.config.get("PLUGIN_REGISTRY")
         plugin = registry.get("ha_core") if registry is not None else None
         mod = getattr(plugin, "server_module", None) if plugin is not None else None
-        if mod is None or not hasattr(mod, "call_service_with_response"):
+        if mod is None or not hasattr(mod, "call_service"):
             raise RuntimeError("ha_core plugin unavailable")
-        mod.call_service_with_response(
-            domain, service, data=data, timeout=int(self._ha_timeout_seconds())
-        )
+        # Plain service call (no ``return_response``): an actuator like
+        # light.turn_on doesn't support returning a payload, and HA 400s the
+        # request if asked to. call_service_with_response is only for the
+        # read-style services that do (todo.get_items et al).
+        mod.call_service(domain, service, data=data, timeout=int(self._ha_timeout_seconds()))
 
     def _ha_timeout_seconds(self) -> float:
         try:

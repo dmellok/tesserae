@@ -74,3 +74,59 @@ def test_coerce_error_is_friendly(app: Flask) -> None:
         err.close()
     assert "401" in msg
     assert "token" in msg
+
+
+class _FakeResp(io.BytesIO):
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        self.close()
+
+
+def _configure(app: Flask) -> None:
+    app.config["SETTINGS_STORE"].update_section(
+        "plugins", {"ha_core": {"base_url": "http://ha", "token_secret": "t"}}
+    )
+
+
+def test_call_service_omits_return_response(app: Flask, monkeypatch) -> None:
+    """A fire-and-forget service call (light.turn_on) must NOT ask for
+    return_response, which HA 400s for services that don't support it
+    (the touch ha_failed regression)."""
+    core = _core(app)
+    seen: dict[str, object] = {}
+
+    def fake_urlopen(req, timeout=0, context=None):
+        seen["url"] = req.full_url
+        seen["method"] = req.get_method()
+        seen["body"] = req.data
+        return _FakeResp(b"[]")
+
+    with app.app_context():
+        _configure(app)
+        monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+        core.call_service(
+            "light", "turn_on", data={"entity_id": ["light.a"], "brightness_pct": 100}
+        )
+
+    assert seen["method"] == "POST"
+    assert seen["url"] == "http://ha/api/services/light/turn_on"
+    assert "return_response" not in str(seen["url"])
+    assert b"brightness_pct" in seen["body"]
+
+
+def test_call_service_with_response_keeps_return_response(app: Flask, monkeypatch) -> None:
+    core = _core(app)
+    seen: dict[str, object] = {}
+
+    def fake_urlopen(req, timeout=0, context=None):
+        seen["url"] = req.full_url
+        return _FakeResp(b"{}")
+
+    with app.app_context():
+        _configure(app)
+        monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+        core.call_service_with_response("todo", "get_items", data={"entity_id": "todo.x"})
+
+    assert "return_response" in str(seen["url"])

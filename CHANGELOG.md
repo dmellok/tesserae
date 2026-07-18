@@ -8,6 +8,12 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **Home Assistant touch actions no longer fail with HTTP 400 (#49).** The touch dispatcher called HA
+  through `call_service_with_response`, which always appends `?return_response` — and HA rejects that
+  with 400 for any service that doesn't support returning a payload (most actuators, e.g.
+  `light.turn_on`). A tap that resolved and dispatched correctly still came back `ha_failed`. Touch/
+  button HA actions now use a plain `call_service` (no `return_response`); the response variant stays
+  for the read-style services that need it (`todo.get_items` et al).
 - **Touch actions show correctly in the canvas editor (#49).** Touch actions are now stored in their
   canonical `{action,domain,service,data}` form at write time (a model validator, so it applies to
   MCP writes, editor saves, and self-heals legacy dashboards on load). Previously an agent-written

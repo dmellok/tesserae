@@ -113,6 +113,38 @@ def call_service_with_response(
     return payload if isinstance(payload, dict) else {}
 
 
+def call_service(
+    domain: str,
+    service: str,
+    *,
+    data: dict[str, Any] | None = None,
+    timeout: int = 10,
+) -> list[dict[str, Any]]:
+    """POST ``/api/services/<domain>/<service>`` (a plain fire-and-forget
+    service call), return the list of changed-state dicts HA echoes back.
+
+    Use this for actuators like ``light.turn_on`` / ``switch.toggle`` /
+    ``cover.open``. It does NOT append ``return_response``: HA rejects that
+    with 400 for any service that doesn't support returning a payload (most
+    don't), which is the wrong tool for a touch action that just wants the
+    service to run. ``call_service_with_response`` is only for the handful
+    of services that DO return data (``todo.get_items`` et al).
+
+    Raises on missing config or HTTP errors so the caller can surface them."""
+    if not is_configured():
+        raise RuntimeError("Home Assistant is not configured")
+    path = f"/api/services/{quote(domain)}/{quote(service)}"
+    body = json.dumps(data or {}).encode("utf-8")
+    req = urllib.request.Request(base_url() + path, data=body, headers=_headers(), method="POST")
+    with urllib.request.urlopen(req, timeout=timeout, context=_ssl_context()) as resp:
+        raw = resp.read().decode("utf-8")
+    try:
+        parsed = json.loads(raw) if raw.strip() else []
+    except json.JSONDecodeError:
+        return []
+    return parsed if isinstance(parsed, list) else []
+
+
 def get_states() -> list[dict[str, Any]]:
     """All entity states: ``[{entity_id, state, attributes, ...}, ...]``."""
     data = request_json("/api/states")
