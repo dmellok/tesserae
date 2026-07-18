@@ -25,6 +25,8 @@ import json
 import re
 import secrets
 import time
+import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -48,6 +50,13 @@ CACHE_TTL_S = 15 * 60
 HTTP_TIMEOUT_S = 15
 USER_AGENT = "tesserae/0.1 (+calendar_core)"
 DEFAULT_COLOUR = "#0d8c7e"
+
+# Per-feed HTTP auth modes. "none" is the default (public Google / iCloud
+# share URLs); "basic" and "digest" cover a self-hosted CalDAV server
+# (Baikal / Radicale / Nextcloud) that gates its .ics export behind
+# credentials. Both run server-side, so a LAN-only server the panel can't
+# reach directly still works as long as Tesserae can reach it.
+AUTH_MODES = ("none", "basic", "digest")
 
 
 # ----- storage --------------------------------------------------------
@@ -108,19 +117,59 @@ def _ics_cache_path(data_dir: Path, feed_id: str) -> Path:
     return data_dir / f"feed_{safe}.ics"
 
 
-def _fetch_ics(url: str, cache_path: Path) -> bytes | None:
+def _feed_auth(feed: dict[str, Any]) -> dict[str, str]:
+    """The auth block for a feed: ``{mode, username, password}``. Absent /
+    malformed values collapse to no auth."""
+    mode = str(feed.get("auth_mode") or "none").strip().lower()
+    if mode not in AUTH_MODES:
+        mode = "none"
+    return {
+        "mode": mode,
+        "username": str(feed.get("username") or ""),
+        "password": str(feed.get("password") or ""),
+    }
+
+
+def _build_opener(url: str, auth: dict[str, str] | None) -> urllib.request.OpenerDirector:
+    """An opener that answers a basic/digest challenge for ``url`` with the
+    feed's credentials. urllib's auth handlers are reactive (they respond
+    to the server's 401 ``WWW-Authenticate``), which is exactly right for a
+    CalDAV export URL behind Baikal/Radicale digest auth. ``none`` (or no
+    creds) returns a plain opener."""
+    if not auth or auth.get("mode") == "none" or not auth.get("username"):
+        return urllib.request.build_opener()
+    pwd_mgr = urllib.request.HTTPPasswordMgrWithDefaultRealm()
+    pwd_mgr.add_password(None, url, auth["username"], auth.get("password", ""))  # type: ignore[arg-type]
+    if auth["mode"] == "digest":
+        handler: urllib.request.BaseHandler = urllib.request.HTTPDigestAuthHandler(pwd_mgr)
+    else:
+        handler = urllib.request.HTTPBasicAuthHandler(pwd_mgr)
+    return urllib.request.build_opener(handler)
+
+
+def _http_get(url: str, auth: dict[str, str] | None) -> bytes | None:
+    """GET ``url`` (server-side), honouring the feed's auth. Returns the
+    body bytes, or None on any failure (unreachable, 401, timeout)."""
+    fixed = url.replace("webcal://", "https://", 1) if url.startswith("webcal://") else url
+    try:
+        opener = _build_opener(fixed, auth)
+        req = urllib.request.Request(fixed, headers={"User-Agent": USER_AGENT})
+        with opener.open(req, timeout=HTTP_TIMEOUT_S) as resp:
+            blob: bytes = resp.read()
+        return blob
+    except Exception:
+        return None
+
+
+def _fetch_ics(url: str, cache_path: Path, auth: dict[str, str] | None = None) -> bytes | None:
     if cache_path.exists() and time.time() - cache_path.stat().st_mtime < CACHE_TTL_S:
         try:
             return cache_path.read_bytes()
         except OSError:
             pass
     # Some providers (notably Google) require https; webcal:// → https://.
-    fixed = url.replace("webcal://", "https://", 1) if url.startswith("webcal://") else url
-    try:
-        req = urllib.request.Request(fixed, headers={"User-Agent": USER_AGENT})
-        with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT_S) as resp:
-            blob = resp.read()
-    except Exception:
+    blob = _http_get(url, auth)
+    if blob is None:
         return None
     with contextlib.suppress(OSError):
         cache_path.parent.mkdir(parents=True, exist_ok=True)
@@ -261,7 +310,7 @@ def load_events(
         if not url:
             continue
         cache_path = _ics_cache_path(dd, fid)
-        blob = _fetch_ics(url, cache_path)
+        blob = _fetch_ics(url, cache_path, _feed_auth(feed))
         if blob is None:
             continue
         try:
@@ -275,6 +324,241 @@ def load_events(
             out.append(ev)
     out.sort(key=lambda e: (not e["all_day"], e["start"]))
     return out
+
+
+# ----- todos (VTODO) --------------------------------------------------
+
+# iCal VTODO STATUS values → the shape the todo widget (and ha_todo)
+# expect, so a caldav todo list and an HA todo list render through the
+# same client.
+_VTODO_STATUS = {
+    "NEEDS-ACTION": "needs_action",
+    "COMPLETED": "completed",
+    "IN-PROCESS": "in_process",
+    "CANCELLED": "cancelled",
+}
+
+
+def _normalise_vtodo(comp: Any) -> dict[str, Any] | None:
+    """One icalendar VTODO → a normalised todo dict, or None when it has
+    no summary (a placeholder the widget shouldn't show)."""
+    summary = str(comp.get("SUMMARY") or "").strip()
+    if not summary:
+        return None
+    raw_status = str(comp.get("STATUS") or "NEEDS-ACTION").strip().upper()
+    status = _VTODO_STATUS.get(raw_status, "needs_action")
+
+    due_iso: str | None = None
+    due = comp.get("DUE")
+    if due is not None:
+        ddt = getattr(due, "dt", None)
+        if ddt is not None:
+            if hasattr(ddt, "hour"):
+                if ddt.tzinfo is None:
+                    ddt = ddt.replace(tzinfo=UTC)
+                due_iso = ddt.astimezone(UTC).isoformat()
+            else:
+                due_iso = ddt.isoformat()
+
+    priority = comp.get("PRIORITY")
+    try:
+        priority_n: int | None = int(priority) if priority not in (None, "") else None
+    except (TypeError, ValueError):
+        priority_n = None
+
+    percent = comp.get("PERCENT-COMPLETE")
+    try:
+        percent_n: int | None = int(percent) if percent not in (None, "") else None
+    except (TypeError, ValueError):
+        percent_n = None
+
+    return {
+        "uid": str(comp.get("UID") or ""),
+        "summary": summary,
+        "status": status,
+        "due": due_iso,
+        "description": str(comp.get("DESCRIPTION") or "").strip(),
+        "priority": priority_n,
+        "percent_complete": percent_n,
+    }
+
+
+def _parse_todos(blob: bytes) -> list[dict[str, Any]]:
+    try:
+        cal = icalendar.Calendar.from_ical(blob)
+    except Exception:
+        return []
+    out: list[dict[str, Any]] = []
+    for comp in cal.walk("VTODO"):
+        try:
+            item = _normalise_vtodo(comp)
+        except Exception:
+            item = None
+        if item is not None:
+            out.append(item)
+    return out
+
+
+def load_todos(
+    feed_ids: list[str] | None,
+    *,
+    data_dir: Path | None = None,
+) -> list[dict[str, Any]]:
+    """Public API for todo widgets: VTODO items from the requested feeds,
+    tagged with the feed's name + colour. Pass ``None`` for ``feed_ids``
+    to include every enabled feed. VTODOs aren't recurrence-expanded (a
+    recurring todo is rare and the semantics are murky); each VTODO
+    component maps to one item."""
+    dd = data_dir if data_dir is not None else _data_dir()
+    feeds = _load_feeds(dd).get("feeds") or []
+    wanted = set(feed_ids) if feed_ids else None
+    out: list[dict[str, Any]] = []
+    for feed in feeds:
+        if not feed.get("enabled", True):
+            continue
+        fid = feed.get("id")
+        if wanted is not None and fid not in wanted:
+            continue
+        url = feed.get("url")
+        if not url:
+            continue
+        blob = _fetch_ics(url, _ics_cache_path(dd, fid), _feed_auth(feed))
+        if blob is None:
+            continue
+        for item in _parse_todos(blob):
+            item["feed_id"] = fid
+            item["feed_name"] = feed.get("name") or fid
+            item["feed_colour"] = feed.get("colour") or DEFAULT_COLOUR
+            out.append(item)
+    return out
+
+
+# ----- CalDAV discovery -----------------------------------------------
+
+# One PROPFIND over the calendar-home collection enumerates its child
+# calendar / todo collections in a single round-trip. Depth: 1 lists the
+# immediate children (the collections), which is what a self-hosted
+# server's "calendar home" (``.../calendars/<user>/``) holds.
+_NS = {
+    "d": "DAV:",
+    "c": "urn:ietf:params:xml:ns:caldav",
+    "cs": "http://apple.com/ns/ical/",
+}
+_PROPFIND_BODY = (
+    b'<?xml version="1.0" encoding="utf-8"?>'
+    b'<d:propfind xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav" '
+    b'xmlns:cs="http://apple.com/ns/ical/"><d:prop>'
+    b"<d:resourcetype/><d:displayname/><cs:calendar-color/>"
+    b"<c:supported-calendar-component-set/>"
+    b"</d:prop></d:propfind>"
+)
+
+
+def _export_url(collection_url: str) -> str:
+    """The GET-able .ics export URL for a collection. sabre/dav (Baikal,
+    Nextcloud) needs ``?export``; Radicale serves the collection as ICS on
+    a plain GET and ignores the extra query, so appending it is safe
+    either way."""
+    sep = "&" if "?" in collection_url else "?"
+    return f"{collection_url}{sep}export"
+
+
+def _normalise_colour(raw: str) -> str:
+    """A CalDAV ``calendar-color`` (often ``#RRGGBBAA``) → the ``#RRGGBB``
+    the feed store keeps. Falls back to the default when unparseable."""
+    val = (raw or "").strip()
+    if re.match(r"^#[0-9a-fA-F]{6}", val):
+        return val[:7]
+    return DEFAULT_COLOUR
+
+
+def discover_collections(base_url: str, auth: dict[str, str] | None) -> dict[str, Any]:
+    """PROPFIND ``base_url`` and return its calendar / todo collections.
+
+    Returns ``{"collections": [{name, url, export_url, colour,
+    components[]}], "error": <msg|None>}``. ``components`` is the subset of
+    ``VEVENT`` / ``VTODO`` the collection holds, so the UI can label a
+    todo list vs a calendar. Best-effort: a bad URL / auth / non-CalDAV
+    response comes back as an ``error`` string, never an exception."""
+    import defusedxml.ElementTree as DET
+
+    fixed = (
+        base_url.replace("webcal://", "https://", 1)
+        if base_url.startswith("webcal://")
+        else base_url
+    )
+    try:
+        opener = _build_opener(fixed, auth)
+        req = urllib.request.Request(
+            fixed,
+            data=_PROPFIND_BODY,
+            method="PROPFIND",
+            headers={
+                "User-Agent": USER_AGENT,
+                "Depth": "1",
+                "Content-Type": 'application/xml; charset="utf-8"',
+            },
+        )
+        with opener.open(req, timeout=HTTP_TIMEOUT_S) as resp:
+            body = resp.read()
+    except urllib.error.HTTPError as err:
+        code = err.code
+        err.close()  # HTTPError is a response object; don't leak the handle.
+        if code in (401, 403):
+            return {
+                "collections": [],
+                "error": "Authentication failed (check username / password).",
+            }
+        return {"collections": [], "error": f"Server returned HTTP {code}."}
+    except Exception as err:
+        return {"collections": [], "error": f"Couldn't reach the server: {type(err).__name__}."}
+
+    try:
+        root = DET.fromstring(body)
+    except Exception:
+        return {"collections": [], "error": "The server's response wasn't valid CalDAV XML."}
+
+    collections: list[dict[str, Any]] = []
+    for resp_el in root.findall("d:response", _NS):
+        href_el = resp_el.find("d:href", _NS)
+        if href_el is None or not (href_el.text or "").strip():
+            continue
+        prop = resp_el.find("d:propstat/d:prop", _NS)
+        if prop is None:
+            continue
+        rtype = prop.find("d:resourcetype", _NS)
+        if rtype is None or rtype.find("c:calendar", _NS) is None:
+            continue  # not a calendar collection (principal, addressbook, …)
+        comps = [
+            c.get("name", "").upper()
+            for c in prop.findall("c:supported-calendar-component-set/c:comp", _NS)
+            if c.get("name")
+        ]
+        # No declared component set means "everything" per RFC 4791; treat
+        # it as both so the collection still shows up under either widget.
+        wanted = [x for x in ("VEVENT", "VTODO") if x in comps] or ["VEVENT", "VTODO"]
+        name_el = prop.find("d:displayname", _NS)
+        colour_el = prop.find("cs:calendar-color", _NS)
+        href = (href_el.text or "").strip()
+        collection_url = urllib.parse.urljoin(fixed, href)
+        collections.append(
+            {
+                "name": (name_el.text or "").strip() if name_el is not None else href,
+                "url": collection_url,
+                "export_url": _export_url(collection_url),
+                "colour": _normalise_colour(colour_el.text or "")
+                if colour_el is not None
+                else DEFAULT_COLOUR,
+                "components": wanted,
+            }
+        )
+    if not collections:
+        return {
+            "collections": [],
+            "error": "No calendars found at that URL. Point it at your calendar home "
+            "(the folder that holds your calendars, e.g. .../calendars/<user>/).",
+        }
+    return {"collections": collections, "error": None}
 
 
 # ----- cell-option choices --------------------------------------------
@@ -298,8 +582,10 @@ def choices(name: str) -> list[dict[str, str]]:
 def blueprint() -> Blueprint:
     bp = Blueprint("calendar_core_admin", __name__, template_folder="templates")
 
-    @bp.get("/")
-    def index() -> str:
+    def _render_index(
+        discovered: list[dict[str, Any]] | None = None,
+        discover_auth: dict[str, str] | None = None,
+    ) -> str:
         feeds = _load_feeds().get("feeds") or []
         # Cache-status per feed so the admin page can chip "fresh"
         # vs "stale (N min old)" next to each row. Users on HA / Docker
@@ -330,7 +616,33 @@ def blueprint() -> Blueprint:
                 "is_stale": age_s >= CACHE_TTL_S,
                 "ttl_s": CACHE_TTL_S,
             }
-        return render_template("calendar_core/index.html", feeds=feeds, cache_info=cache_info)
+        # Mark which feeds a discovered collection would duplicate (by
+        # export URL) so the UI can show "already added".
+        existing_urls = {f.get("url") for f in feeds}
+        for col in discovered or []:
+            col["already_added"] = col.get("export_url") in existing_urls
+        return render_template(
+            "calendar_core/index.html",
+            feeds=feeds,
+            cache_info=cache_info,
+            auth_modes=AUTH_MODES,
+            discovered=discovered or [],
+            discover_auth=discover_auth or {},
+        )
+
+    @bp.get("/")
+    def index() -> str:
+        return _render_index()
+
+    def _read_auth_form() -> dict[str, str]:
+        mode = (request.form.get("auth_mode") or "none").strip().lower()
+        if mode not in AUTH_MODES:
+            mode = "none"
+        return {
+            "auth_mode": mode,
+            "username": (request.form.get("username") or "").strip(),
+            "password": request.form.get("password") or "",
+        }
 
     @bp.post("/feeds")
     def create_feed() -> Response:
@@ -344,19 +656,67 @@ def blueprint() -> Blueprint:
             colour = DEFAULT_COLOUR
         data = _load_feeds()
         fid = _unique_id(data, _slugify(name))
-        data["feeds"].append(
-            {
-                "id": fid,
-                "name": name,
-                "url": url,
-                "colour": colour,
-                "enabled": True,
-                "created_at": datetime.now(UTC).replace(microsecond=0).isoformat(),
-            }
-        )
+        auth = _read_auth_form()
+        entry: dict[str, Any] = {
+            "id": fid,
+            "name": name,
+            "url": url,
+            "colour": colour,
+            "enabled": True,
+            "created_at": datetime.now(UTC).replace(microsecond=0).isoformat(),
+        }
+        if auth["auth_mode"] != "none":
+            entry.update(auth)
+        data["feeds"].append(entry)
         _save_feeds(data)
         flash(f"Added feed '{name}'.", "ok")
         return redirect(url_for("calendar_core_admin.index"))
+
+    @bp.post("/feeds/<feed_id>/auth")
+    def update_auth(feed_id: str) -> Response:
+        """Set / change / clear a feed's credentials without recreating it.
+        A blank password leaves the stored one untouched (so the form
+        never has to echo the secret back); switching to ``none`` drops
+        the credentials entirely."""
+        data = _load_feeds()
+        feed = next((f for f in data.get("feeds", []) if f.get("id") == feed_id), None)
+        if not feed:
+            abort(404)
+        auth = _read_auth_form()
+        if auth["auth_mode"] == "none":
+            for key in ("auth_mode", "username", "password"):
+                feed.pop(key, None)
+        else:
+            feed["auth_mode"] = auth["auth_mode"]
+            feed["username"] = auth["username"]
+            # Blank password = keep the existing one (form doesn't echo it).
+            if auth["password"]:
+                feed["password"] = auth["password"]
+        _save_feeds(data)
+        # Force a re-fetch so the new creds take effect immediately.
+        with contextlib.suppress(OSError):
+            _ics_cache_path(_data_dir(), feed_id).unlink(missing_ok=True)
+        flash(f"Updated credentials for '{feed.get('name') or feed_id}'.", "ok")
+        return redirect(url_for("calendar_core_admin.index"))
+
+    @bp.post("/discover")
+    def discover() -> str:
+        """Enumerate a self-hosted CalDAV server's calendars / todo lists
+        from one PROPFIND, so the user picks + adds them instead of hand-
+        constructing each ``?export`` URL."""
+        base_url = (request.form.get("base_url") or "").strip()
+        auth = _read_auth_form()
+        if not base_url:
+            flash("Enter your CalDAV calendar-home URL.", "warn")
+            return _render_index()
+        result = discover_collections(base_url, _feed_auth(auth))
+        if result.get("error"):
+            flash(result["error"], "warn")
+        elif not result.get("collections"):
+            flash("No calendars found at that URL.", "warn")
+        # Re-render the index with the discovered list + the creds echoed
+        # into the per-row Add forms so a one-click add carries them.
+        return _render_index(discovered=result.get("collections") or [], discover_auth=auth)
 
     @bp.post("/feeds/<feed_id>/toggle")
     def toggle_feed(feed_id: str) -> Response:
@@ -402,7 +762,7 @@ def blueprint() -> Blueprint:
         if not url:
             flash(f"Feed '{name}' has no URL to refresh from.", "warn")
             return redirect(url_for("calendar_core_admin.index"))
-        blob = _fetch_ics(url, _ics_cache_path(_data_dir(), feed_id))
+        blob = _fetch_ics(url, _ics_cache_path(_data_dir(), feed_id), _feed_auth(feed))
         if blob is None:
             flash(
                 f"Refresh failed for '{name}': couldn't reach the feed URL. "

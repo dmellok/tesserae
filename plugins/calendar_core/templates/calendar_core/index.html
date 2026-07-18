@@ -2,11 +2,82 @@
 {% from "_components.html" import card_head, button, empty_state %}
 {% block title %}Calendar Feeds, Tesserae{% endblock %}
 
+{% macro auth_fields(prefix='', mode='none', username='') %}
+<div class="field-grid cf-auth-grid">
+  <div class="field">
+    <label for="{{ prefix }}auth-mode">Authentication</label>
+    <select id="{{ prefix }}auth-mode" name="auth_mode" class="cf-auth-mode">
+      <option value="none" {% if mode == 'none' %}selected{% endif %}>None (public URL)</option>
+      <option value="basic" {% if mode == 'basic' %}selected{% endif %}>Basic</option>
+      <option value="digest" {% if mode == 'digest' %}selected{% endif %}>Digest</option>
+    </select>
+  </div>
+  <div class="field cf-auth-cred">
+    <label for="{{ prefix }}auth-user">Username</label>
+    <input type="text" id="{{ prefix }}auth-user" name="username" value="{{ username }}" autocomplete="off">
+  </div>
+  <div class="field cf-auth-cred">
+    <label for="{{ prefix }}auth-pass">Password</label>
+    <input type="password" id="{{ prefix }}auth-pass" name="password" autocomplete="off" placeholder="{{ 'leave blank to keep' if prefix else '' }}">
+  </div>
+</div>
+{% endmacro %}
+
 {% block main %}
 <div class="page-head">
   <h1><i class="ph-bold ph-calendar-dots" aria-hidden="true"></i> Calendar Feeds</h1>
-  <p class="page-blurb">iCal URLs that the calendar widgets read from. Google Calendar → Settings → Integrate calendar → Secret address in iCal format. iCloud → Calendar → Share Calendar → Public. Most calendar apps expose one.</p>
+  <p class="page-blurb">iCal URLs that the calendar widgets read from. Google Calendar → Settings → Integrate calendar → Secret address in iCal format. iCloud → Calendar → Share Calendar → Public. Self-hosted (Baikal / Radicale / Nextcloud) works too: use the auth fields, or Discover below.</p>
 </div>
+
+<section class="card">
+  {{ card_head('Discover a CalDAV server', icon_name='binoculars', level=2) }}
+  <p class="field-help" style="margin-top:0">Point this at your calendar-home URL (the folder holding your calendars, e.g. <code>https://baikal.lan/dav.php/calendars/you/</code>) and Tesserae lists the calendars + todo lists it finds, so you can add each in one click. Fetches run server-side, so a LAN-only server works as long as Tesserae can reach it.</p>
+  <form method="post" action="{{ url_for('calendar_core_admin.discover') }}" class="form">
+    <div class="field">
+      <label for="disc-url">CalDAV calendar-home URL</label>
+      <input type="url" id="disc-url" name="base_url" placeholder="https://baikal.lan/dav.php/calendars/you/" value="{{ discover_auth.base_url or '' }}" required>
+    </div>
+    {{ auth_fields(mode=discover_auth.auth_mode or 'digest', username=discover_auth.username or '') }}
+    <div class="actions">{{ button('Discover', icon='binoculars') }}</div>
+  </form>
+
+  {% if discovered %}
+  <div class="cf-discovered">
+    <h3 class="cf-sub">Found {{ discovered|length }} collection{{ 's' if discovered|length != 1 }}</h3>
+    <ul class="cf-list">
+      {% for col in discovered %}
+      <li class="cf-row cf-disc-row">
+        <span class="cf-swatch" style="background: {{ col.colour }};" aria-hidden="true"></span>
+        <span class="cf-name">
+          <span class="cf-name-line">
+            <span class="cf-name-text">{{ col.name }}</span>
+            {% for comp in col.components %}
+            <span class="cf-chip cf-chip--comp">{{ 'Todos' if comp == 'VTODO' else 'Events' }}</span>
+            {% endfor %}
+          </span>
+          <span class="cf-id">{{ col.export_url }}</span>
+        </span>
+        <div class="cf-actions">
+          {% if col.already_added %}
+          <span class="cf-chip cf-chip--ok">already added</span>
+          {% else %}
+          <form method="post" action="{{ url_for('calendar_core_admin.create_feed') }}" class="inline">
+            <input type="hidden" name="name" value="{{ col.name }}">
+            <input type="hidden" name="url" value="{{ col.export_url }}">
+            <input type="hidden" name="colour" value="{{ col.colour }}">
+            <input type="hidden" name="auth_mode" value="{{ discover_auth.auth_mode or 'none' }}">
+            <input type="hidden" name="username" value="{{ discover_auth.username or '' }}">
+            <input type="hidden" name="password" value="{{ discover_auth.password or '' }}">
+            <button type="submit" class="button"><i class="ph ph-plus" aria-hidden="true"></i><span>Add</span></button>
+          </form>
+          {% endif %}
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+</section>
 
 <section class="card">
   {{ card_head('Add feed', icon_name='plus-circle', level=2) }}
@@ -14,7 +85,7 @@
     <div class="field-grid">
       <div class="field" style="flex:1;">
         <label for="feed-name">Name</label>
-        <input type="text" id="feed-name" name="name" placeholder="Personal" required autofocus>
+        <input type="text" id="feed-name" name="name" placeholder="Personal" required>
       </div>
       <div class="field">
         <label for="feed-colour">Colour</label>
@@ -24,8 +95,9 @@
     <div class="field">
       <label for="feed-url">iCal URL</label>
       <input type="url" id="feed-url" name="url" placeholder="https://calendar.google.com/calendar/ical/.../basic.ics" required>
-      <p class="field-help">webcal:// URLs are auto-rewritten to https://.</p>
+      <p class="field-help">webcal:// URLs are auto-rewritten to https://. For a self-hosted server, add credentials below.</p>
     </div>
+    {{ auth_fields() }}
     <div class="actions">{{ button('Add feed', icon='plus') }}</div>
   </form>
 </section>
@@ -41,6 +113,9 @@
       <span class="cf-name">
         <span class="cf-name-line">
           <span class="cf-name-text">{{ f.name }}</span>
+          {% if f.auth_mode and f.auth_mode != 'none' %}
+          <span class="cf-chip cf-chip--auth" title="Fetched with {{ f.auth_mode }} auth as {{ f.username }}."><i class="ph ph-lock-simple" aria-hidden="true"></i> {{ f.auth_mode }}</span>
+          {% endif %}
           <span class="cf-cache">
             {% if not ci.has_cache %}
               <span class="cf-chip cf-chip--warn">no cache yet</span>
@@ -71,6 +146,9 @@
             <span>Refresh</span>
           </button>
         </form>
+        <button type="button" class="ghost" title="Credentials" onclick="document.getElementById('cf-auth-{{ f.id }}').hidden = !document.getElementById('cf-auth-{{ f.id }}').hidden">
+          <i class="ph ph-lock-simple" aria-hidden="true"></i>
+        </button>
         <form method="post" action="{{ url_for('calendar_core_admin.toggle_feed', feed_id=f.id) }}" class="inline">
           <button type="submit" class="ghost" title="{{ 'Disable' if f.enabled else 'Enable' }}">
             <i class="ph ph-{{ 'eye' if f.enabled else 'eye-slash' }}" aria-hidden="true"></i>
@@ -80,12 +158,18 @@
           <button type="submit" class="ghost danger" title="Delete"><i class="ph ph-trash" aria-hidden="true"></i></button>
         </form>
       </div>
+      <div class="cf-auth-edit" id="cf-auth-{{ f.id }}" hidden>
+        <form method="post" action="{{ url_for('calendar_core_admin.update_auth', feed_id=f.id) }}" class="form">
+          {{ auth_fields(prefix=f.id ~ '-', mode=f.auth_mode or 'none', username=f.username or '') }}
+          <div class="actions">{{ button('Save credentials', icon='check') }}</div>
+        </form>
+      </div>
     </li>
     {% endfor %}
   </ul>
   {% else %}
   {{ empty_state('calendar-blank', 'No feeds yet',
-                 blurb='Add one above. Then drop a Calendar, Month / Week / Day widget into a dashboard and pick which feeds it should show.') }}
+                 blurb='Add one above, or Discover a self-hosted server. Then drop a Calendar, Month / Week / Day widget into a dashboard and pick which feeds it should show.') }}
   {% endif %}
 </section>
 
@@ -102,14 +186,15 @@
     background: var(--t-surface);
     box-shadow: var(--t-shadow-xs);
   }
+  .cf-disc-row { grid-template-columns: auto 1fr auto; }
   .cf-row.is-disabled { opacity: 0.55; }
   .cf-swatch { width: 14px; height: 14px; border-radius: 4px; border: 1px solid rgba(0,0,0,0.1); }
-  .cf-name { display: grid; gap: 1px; font-weight: 600; font-size: var(--t-size-md); }
+  .cf-name { display: grid; gap: 1px; font-weight: 600; font-size: var(--t-size-md); min-width: 0; }
   .cf-name-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-  .cf-id { font: var(--t-size-xs)/1.2 var(--t-font-mono); color: var(--t-fg-soft); font-weight: 400; }
+  .cf-id { font: var(--t-size-xs)/1.2 var(--t-font-mono); color: var(--t-fg-soft); font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .cf-cache { display: inline-flex; }
   .cf-chip {
-    display: inline-block;
+    display: inline-flex; align-items: center; gap: 3px;
     font: var(--t-size-xs)/1.2 var(--t-font-body);
     padding: 1px 6px;
     border-radius: 999px;
@@ -117,8 +202,14 @@
   }
   .cf-chip--ok { background: color-mix(in oklab, var(--t-fg-soft) 10%, transparent); color: var(--t-fg-soft); }
   .cf-chip--warn { background: color-mix(in oklab, #d97706 15%, transparent); color: #92400e; border-color: color-mix(in oklab, #d97706 40%, transparent); }
+  .cf-chip--auth { background: color-mix(in oklab, var(--t-accent, #0d8c7e) 12%, transparent); color: var(--t-accent, #0d8c7e); text-transform: capitalize; }
+  .cf-chip--comp { background: color-mix(in oklab, var(--t-fg-soft) 10%, transparent); color: var(--t-fg-soft); }
   .cf-url { font: var(--t-size-xs)/1.4 var(--t-font-mono); color: var(--t-fg-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .cf-actions { display: flex; gap: 2px; }
+  .cf-actions { display: flex; gap: 2px; align-items: center; }
   .cf-actions form { margin: 0; }
+  .cf-auth-grid { align-items: end; }
+  .cf-auth-edit { grid-column: 1 / -1; margin-top: 8px; padding-top: 10px; border-top: 1px dashed var(--t-border); }
+  .cf-sub { font-size: var(--t-size-sm); color: var(--t-fg-soft); margin: 14px 0 6px; }
+  .cf-discovered { margin-top: 6px; }
 </style>
 {% endblock %}

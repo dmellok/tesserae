@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tesserae"
-version = "0.146.1"
+version = "0.147.0"
 description = "E-ink dashboard companion. Compose tile-based dashboards, render headless, push frames over MQTT."
 requires-python = ">=3.11"
 license = { text = "AGPL-3.0-or-later" }
@@ -37,6 +37,11 @@ dependencies = [
     # RFC 5545.
     "icalendar>=5.0,<7",
     "recurring-ical-events>=2.1,<4",
+    # Safe XML parsing for the calendar_core CalDAV discovery PROPFIND
+    # (enumerating a self-hosted server's calendar / todo collections).
+    # Pure-Python, no transitive deps; guards the multistatus parse
+    # against entity-expansion attacks that stdlib ElementTree doesn't.
+    "defusedxml>=0.7,<1",
     # Production WSGI server, Flask's built-in run() is dev-only and
     # prints a "DO NOT USE IN PRODUCTION" banner on every startup.
     # Waitress is pure-Python, cross-platform, and tuned-by-default for

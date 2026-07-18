@@ -6,6 +6,17 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added
+
+- **Self-hosted CalDAV calendars + todo lists (calendar_core).** Calendar feeds can now carry basic
+  or digest credentials, so a private server (Baikal, Radicale, Nextcloud) that gates its `.ics`
+  export behind auth works, including a LAN-only server the panel can't reach directly (fetches run
+  server-side). A **Discover** panel takes your CalDAV calendar-home URL and enumerates the calendars
+  and todo lists it finds via one PROPFIND, so you add each in a click instead of hand-building
+  `?export` URLs. calendar_core also parses `VTODO` components now (`load_todos`), which the new
+  CalDAV Todo widget renders as a read-only checklist. Credentials are stored in the plugin's
+  `feeds.json` (plaintext in the data dir, same posture as the Home Assistant token).
+
 ### Fixed
 
 - **Artifact GC no longer eats the live frame's touch regions (#49).** The render prune (and the
