@@ -115,10 +115,23 @@
     // Re-render labels by reloading marks is overkill; just toggle a class.
     svg.classList.toggle("tm-hide-labels", !showLabels.checked);
   });
-  if (clearBtn) clearBtn.addEventListener("click", function () {
+  function clearView() {
     gMarks.textContent = ""; count = 0;
     if (countEl) countEl.textContent = "";
     if (emptyEl) emptyEl.hidden = false;
+  }
+  if (clearBtn) clearBtn.addEventListener("click", function () {
+    if (!window.confirm(
+      "Clear the recorded touch events for this device? This removes them " +
+      "from the monitor and the Events history and can't be undone."
+    )) return;
+    var url = clearBtn.dataset.clearUrl;
+    if (!url) { clearView(); return; }
+    // Delete server-side first so the clear survives a refresh; only wipe
+    // the view once the rows are actually gone.
+    fetch(url, { method: "POST" })
+      .then(function (r) { if (r.ok) clearView(); })
+      .catch(function () { /* leave the view as-is on failure */ });
   });
 
   // Initial paint.

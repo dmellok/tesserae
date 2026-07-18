@@ -8,6 +8,11 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **Touch monitor Clear now sticks (#49).** Clear only wiped the on-screen marks, but the monitor
+  re-seeds from touch history on load, so the events reappeared on refresh. It now deletes this
+  device's recorded touch events server-side (scoped to `touch` events for that device, so push and
+  button history is untouched), so the clear survives a reload.
+
 - **Home Assistant touch actions written in the natural shape now fire (#49).** A structured HA
   action only dispatched when written in the exact canonical form; the shapes an agent naturally
   writes (no `action` key when a `service` is given, `entity_id` at the top level, a dotted

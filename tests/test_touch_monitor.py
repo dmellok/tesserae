@@ -144,6 +144,41 @@ def test_data_json_404s_for_non_touch_device(app: Flask) -> None:
     assert client.get("/devices/touch/plain_esp32/data.json").status_code == 404
 
 
+def test_clear_deletes_touch_events_and_survives_refresh(app: Flask) -> None:
+    """Clear must remove the rows, not just the client view: the monitor
+    re-seeds from touch history on every load, so a view-only clear would
+    reappear on refresh (the reported bug)."""
+    _make_e1003(app)
+    for _ in range(3):
+        _record_touch(app, target="hall_e1003", status="ha_dispatched", extra={"gesture": "tap"})
+    # A push event for the same device and a touch on another device must
+    # both survive: Clear is scoped to this device's touch events only.
+    app.config["EVENT_LOG"].record(type="push", source="page", target="hall_e1003", status="sent")
+    _record_touch(app, target="other_dev", status="ha_dispatched", extra={"gesture": "tap"})
+
+    client = app.test_client()
+    _sign_in(client)
+    assert len(client.get("/devices/touch/hall_e1003/data.json").get_json()["events"]) == 3
+
+    resp = client.post("/devices/touch/hall_e1003/clear")
+    assert resp.status_code == 200
+    assert resp.get_json()["cleared"] == 3
+
+    # Refresh: the reported bug was that they came back. They must not.
+    assert client.get("/devices/touch/hall_e1003/data.json").get_json()["events"] == []
+    # Scope check: the push row and the other device's touch are untouched.
+    log = app.config["EVENT_LOG"]
+    assert log.count(type="push") == 1
+    assert len(log.list(type="touch", limit=50)) == 1
+
+
+def test_clear_404s_for_non_touch_device(app: Flask) -> None:
+    _make_esp32(app)
+    client = app.test_client()
+    _sign_in(client)
+    assert client.post("/devices/touch/plain_esp32/clear").status_code == 404
+
+
 def test_device_card_links_monitor_only_for_touch(app: Flask) -> None:
     _make_e1003(app)
     _make_esp32(app)

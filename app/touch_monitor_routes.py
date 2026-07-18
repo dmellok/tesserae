@@ -106,5 +106,22 @@ def data(device_id: str) -> Response:
     return jsonify({"panel": {"w": w, "h": h}, "regions": regions, "events": events})
 
 
+@bp.post("/<device_id>/clear")
+def clear(device_id: str) -> Response:
+    """Delete this device's recorded touch events. The monitor seeds from
+    touch history on load, so a view-only clear would reappear on the next
+    refresh; removing the rows makes it stick. Scoped to ``touch`` events
+    for this device, so push / button history is untouched. Returns
+    ``{"cleared": <count>}``."""
+    dev = _touch_device(device_id)
+    if dev is None:
+        abort(404)
+    removed = 0
+    log = current_app.config.get("EVENT_LOG")
+    if log is not None:
+        removed = log.delete_by_type_target(type="touch", target=device_id)
+    return jsonify({"cleared": removed})
+
+
 def register(app: Flask) -> None:
     app.register_blueprint(bp)

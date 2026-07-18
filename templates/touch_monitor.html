@@ -15,7 +15,8 @@
       <span class="tm-live" data-tm-live>● live</span>
       <label class="tm-toggle"><input type="checkbox" data-tm-regions checked> Show regions</label>
       <label class="tm-toggle"><input type="checkbox" data-tm-labels checked> Show actions</label>
-      <button class="minibtn" data-tm-clear><i class="ph-bold ph-eraser"></i> Clear</button>
+      <button class="minibtn" data-tm-clear
+              data-clear-url="{{ url_for('touch_monitor.clear', device_id=device_id) }}"><i class="ph-bold ph-eraser"></i> Clear</button>
       <span class="tm-count" data-tm-count></span>
     </div>
 

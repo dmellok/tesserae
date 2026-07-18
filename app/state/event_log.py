@@ -250,6 +250,16 @@ class EventLog:
             conn.commit()
             return int(cur.rowcount)
 
+    def delete_by_type_target(self, *, type: str, target: str) -> int:
+        """Delete every event of ``type`` for ``target``. Returns the number
+        removed. The per-device touch monitor's Clear uses this: the monitor
+        seeds from touch history on load, so a view-only clear reappears on
+        refresh; removing the rows makes the clear stick."""
+        with self._lock, self._conn() as conn:
+            cur = conn.execute("DELETE FROM events WHERE type = ? AND target = ?", (type, target))
+            conn.commit()
+            return int(cur.rowcount)
+
     def digest_in_use(self, digest: str) -> bool:
         """Used by the artifact GC: don't delete a thumbnail PNG if other
         history rows still reference it."""
