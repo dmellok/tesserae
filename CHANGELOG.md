@@ -13,6 +13,14 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   `pi_png` renderer) and the bridge polls the frame over REST and pushes it to the tag over Bluetooth
   LE, where the OpenDisplay SDK dithers for the tag's panel. REST-polled, honours `sleep_interval_s`.
   The panel size is set per tag at registration, so one kind covers every OpenDisplay panel.
+- **OpenDisplay via Home Assistant.** A second OpenDisplay path for people already running Home
+  Assistant with the OpenDisplay integration: the new `opendisplay_ha` device kind writes each
+  rendered frame into HA's media folder and calls the `opendisplay.upload_image` action, so HA owns
+  the Bluetooth and no separate bridge or BLE hardware runs on the Tesserae host. Set the tag's HA
+  device id on the device; each tag targets its own, so it scales to many tags. The frame uses a
+  stable per-device filename overwritten in place (no media-folder growth), and orphaned files are
+  swept on startup and when a device is removed. Best when Tesserae runs as the Home Assistant
+  add-on with a shared `/media`; requires the Home Assistant Core plugin.
 
 
 - **Touch interactions guide (#49).** A new docs page covers enabling touch, attaching tap / swipe /

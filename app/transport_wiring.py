@@ -684,6 +684,16 @@ def _rebuild_transport(
     else:
         app.config["HA_DISCOVERY"] = None
 
+    # OpenDisplay-via-HA publisher: re-attach to the freshly built
+    # PUSH_MANAGER (same reason HA discovery is restarted above; the old
+    # listener goes away with the replaced manager).
+    try:
+        from app import opendisplay_ha
+
+        opendisplay_ha.register(app)
+    except Exception:
+        logger.exception("wiring OpenDisplay-HA publisher")
+
     # mDNS: opt-in advertiser for tesserae.local (+ an _http._tcp service)
     # so the appliance is reachable by name without touching the host's
     # hostname. Stop any previous instance before (re)starting.
