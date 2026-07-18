@@ -894,6 +894,56 @@ def append_element(page_id: str) -> Response:
     return jsonify(data)
 
 
+@bp.post("/pages/<page_id>/elements/bulk")
+def append_elements_bulk(page_id: str) -> Response:
+    """Append many elements to a canvas in one save. Body is
+    ``{"elements": [ {element}, … ]}`` (max 500 per call). Built for large
+    primitive boards that don't fit in a single ``set_canvas`` body: chunk
+    the elements across a few bulk calls (each is one save, so an open
+    editor updates as you go) instead of inlining the whole 20k+ document.
+
+    All-or-nothing: if any element is invalid (unknown field or schema
+    error) nothing is appended and the offending index is named, so a bad
+    chunk never half-lands. Returns the ack plus ``element_ids`` in order.
+    Supports ``?base_rev=`` drift guard."""
+    from app.state.panel_store import CanvasLayout, Element
+
+    page = _pr._get_canvas(page_id)
+    if page is None:
+        return _err(404, f"no canvas dashboard {page_id!r}")
+    conflict = _drift_conflict(page)
+    if conflict is not None:
+        return conflict
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict) or not isinstance(body.get("elements"), list):
+        return _err(400, 'body must be {"elements": [ {element}, … ]}')
+    raw_els = body["elements"]
+    if not raw_els:
+        return _err(400, "elements must be a non-empty list")
+    if len(raw_els) > 500:
+        return _err(400, f"too many elements ({len(raw_els)}); send at most 500 per call")
+    validated: list[Any] = []
+    for i, raw in enumerate(raw_els):
+        if not isinstance(raw, dict):
+            return _err(422, f"els[{i}] must be an object")
+        bad = _unknown_element_keys(raw)
+        if bad:
+            return _element_key_error(bad, index=i)
+        el_in = raw if raw.get("id") else {**raw, "id": uuid.uuid4().hex[:8]}
+        try:
+            validated.append(Element.model_validate(el_in))
+        except ValidationError as exc:
+            return _err(422, f"els[{i}] is invalid", details=exc.errors(include_url=False))
+    layout = page.canvas or CanvasLayout()
+    layout.els.extend(validated)
+    page.canvas = layout
+    _save_mcp(page)
+    data = _saved(page).get_json()
+    data["element_ids"] = [e.id for e in validated]
+    data["appended"] = len(validated)
+    return jsonify(data)
+
+
 @bp.patch("/pages/<page_id>/elements/<element_id>")
 def patch_element(page_id: str, element_id: str) -> Response:
     """Update one element in place without re-sending the whole document. Body is
@@ -1183,7 +1233,13 @@ def render_report(page_id: str) -> Response:
 
     Note: widget cells render into shadow DOM, so their ``text`` may be empty; data
     primitives and decorations report their text. Overflow is measured on the
-    element box regardless."""
+    element box regardless.
+
+    Large boards: pass ``?fields=tap_invalid,tap_dangling`` (any of ``board`` /
+    ``elements`` / ``tap_regions`` / ``tap_invalid`` / ``tap_dangling``) to trim
+    the response, or ``?view=touch`` for the touch-wiring subset, so verifying
+    interactions doesn't pull the whole ``elements`` array. ``id`` + ``rev``
+    always ride along."""
     page = _pr._get_canvas(page_id)
     if page is None or page.canvas is None:
         return _err(404, f"no canvas dashboard {page_id!r}")
@@ -1224,7 +1280,125 @@ def render_report(page_id: str) -> Response:
         for r in regions
         for bad in r.get("invalid", [])
     ]
-    return jsonify({"id": page_id, "rev": _pr._canvas_rev(page), **report})
+    # ``?fields=a,b`` trims the response to the named top-level sections so a
+    # feedback loop can ask for just what it needs (e.g. ``tap_invalid,
+    # tap_dangling``) instead of pulling the whole ``elements`` array, which
+    # on a large board blows the output cap and dumps to a file. ``id`` +
+    # ``rev`` always ride along. ``?view=touch`` is the touch-wiring preset.
+    selectable = {"board", "elements", "tap_regions", "tap_invalid", "tap_dangling"}
+    view = (request.args.get("view") or "").strip().lower()
+    raw_fields = (request.args.get("fields") or "").strip()
+    wanted: set[str] | None = None
+    if view == "touch":
+        wanted = {"tap_regions", "tap_invalid", "tap_dangling"}
+    elif raw_fields:
+        wanted = {f.strip() for f in raw_fields.split(",") if f.strip() in selectable}
+    out: dict[str, Any] = {"id": page_id, "rev": _pr._canvas_rev(page)}
+    for key in selectable:
+        if wanted is None or key in wanted:
+            out[key] = report.get(key)
+    return jsonify(out)
+
+
+_ACTION_STRING_DOCS: dict[str, str] = {
+    "refresh": "re-render and re-push the current page",
+    "rotate_next": "advance to the next step of the device's rotation",
+    "rotate_prev": "go back to the previous rotation step",
+    "step": "jump to a rotation step by index, e.g. 'step:2' (0-based)",
+    "page": "switch the device to a saved dashboard, e.g. 'page:kitchen'",
+    "webhook": "fire an HTTP request, e.g. 'webhook:https://host/hook' (config origin only)",
+}
+
+
+@bp.get("/actions/describe")
+def describe_actions() -> Response:
+    """The authoritative touch-action vocabulary for canvas elements
+    (issue #49), so an agent doesn't have to reverse-engineer it.
+
+    Covers the element fields (``on_tap`` / ``on_swipe`` / ``on_slide`` /
+    ``actions``), the flat string grammar, the Home Assistant structured
+    form and the input variations that normalise to it, the slider
+    ``{value}`` placeholder, the provenance rule for side-effecting
+    actions, and how to verify wiring. Element-level actions aren't part
+    of ``get_widget_options`` (that's cell data options), which is why
+    this lives on its own."""
+    from app.button_actions import parse_action_spec, registered_actions
+
+    string_actions = []
+    for name in registered_actions():
+        takes_arg = False
+        try:
+            parse_action_spec(f"{name}:probe")
+            # A verb that ignores the arg (refresh/rotate_*) still parses;
+            # distinguish by whether the bare form is meaningful.
+            takes_arg = name in ("step", "page", "webhook")
+        except Exception:
+            takes_arg = False
+        string_actions.append(
+            {
+                "spec": f"{name}:<arg>" if takes_arg else name,
+                "takes_arg": takes_arg,
+                "desc": _ACTION_STRING_DOCS.get(name, ""),
+            }
+        )
+
+    return jsonify(
+        {
+            "element_fields": {
+                "on_tap": "one action: a grammar string or a structured HA object",
+                "on_swipe": (
+                    "a map of direction -> action: "
+                    '{"left":"rotate_next","right":{"action":"ha",...}}. '
+                    "Keys are up/down/left/right; a bare object with no direction "
+                    "key will NOT fire and is reported in render_report.tap_invalid"
+                ),
+                "on_slide": (
+                    '{"axis":"x"|"y","action":<spec>}: the whole box becomes a '
+                    "slider; the stroke's 0-100 position substitutes {value} (or "
+                    "$value) in the action, e.g. brightness_pct"
+                ),
+                "actions": (
+                    "code elements only: a named map {name: <spec>}; the markup "
+                    'references them as data-on-tap="@name" so structured actions '
+                    "stay in validated config, never inline in markup"
+                ),
+            },
+            "string_actions": string_actions,
+            "home_assistant": {
+                "canonical": {
+                    "action": "ha",
+                    "domain": "light",
+                    "service": "turn_on",
+                    "data": {"entity_id": ["light.hall"], "brightness_pct": 50},
+                },
+                "accepted_variations": [
+                    "omit 'action' when 'service' is present (inferred as ha)",
+                    "dotted service: {'service':'light.turn_on'} splits to domain+service",
+                    "flat: service data (brightness_pct, …) at the top level is folded into data",
+                    "entity_id at the top level or under target.entity_id is folded into data",
+                    "a comma-joined entity_id string is split into the list HA expects",
+                ],
+                "note": (
+                    "All the above normalise to the canonical form and dispatch "
+                    "identically. Runs server-side via the ha_core connection "
+                    "(POST /api/services/<domain>/<service>), then re-pushes the "
+                    "current page so the frame reflects the new state on the same wake."
+                ),
+            },
+            "provenance": (
+                "Side-effecting actions (webhook / ha) fire only from config origin "
+                "(editor / MCP element fields, or a code element's named actions map), "
+                "never from raw widget markup, so a third-party widget can't aim a "
+                "webhook by annotating its own HTML."
+            ),
+            "verify": (
+                "GET pages/<id>/render_report?view=touch. tap_regions lists what "
+                "rendered; tap_invalid == [] is the real 'this will fire' signal "
+                "(a region in tap_regions was only stored, not proven dispatchable); "
+                "tap_dangling lists code-element @refs with no matching action."
+            ),
+        }
+    )
 
 
 @bp.post("/measure-text")

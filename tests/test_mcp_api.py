@@ -913,6 +913,91 @@ def test_render_report_shape(app: Flask, monkeypatch: pytest.MonkeyPatch) -> Non
     assert body["elements"][0]["overflow_x"] is True
 
 
+def test_render_report_view_touch_trims_to_touch_fields(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``?view=touch`` returns only the touch-wiring sections so a feedback
+    loop on a big board doesn't pull the whole elements array (issue #49
+    agent feedback: full reads blow the token cap)."""
+    _enable(app)
+    fake = {"board": {"w": 800}, "elements": [{"id": "e1"}], "tap_regions": []}
+    monkeypatch.setattr("app.renderer.inspect_composed", lambda req, pool=None: fake)
+    client = app.test_client()
+    pid = _create_page(client)
+    body = client.get(f"/api/mcp/pages/{pid}/render_report?view=touch").get_json()
+    assert set(body) == {"id", "rev", "tap_regions", "tap_invalid", "tap_dangling"}
+    assert "elements" not in body and "board" not in body
+
+
+def test_render_report_fields_selector(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    _enable(app)
+    fake = {"board": {"w": 800}, "elements": [{"id": "e1"}], "tap_regions": []}
+    monkeypatch.setattr("app.renderer.inspect_composed", lambda req, pool=None: fake)
+    client = app.test_client()
+    pid = _create_page(client)
+    body = client.get(f"/api/mcp/pages/{pid}/render_report?fields=tap_invalid,board").get_json()
+    assert set(body) == {"id", "rev", "tap_invalid", "board"}
+    # Unknown field names are ignored, not errored.
+    body2 = client.get(f"/api/mcp/pages/{pid}/render_report?fields=bogus").get_json()
+    assert set(body2) == {"id", "rev"}
+
+
+def test_describe_actions(app: Flask) -> None:
+    """The touch-action vocabulary is served authoritatively so an agent
+    doesn't reverse-engineer it (issue #49 agent feedback)."""
+    _enable(app)
+    d = app.test_client().get("/api/mcp/actions/describe").get_json()
+    specs = {a["spec"] for a in d["string_actions"]}
+    assert "refresh" in specs and "page:<arg>" in specs and "webhook:<arg>" in specs
+    assert set(d["element_fields"]) == {"on_tap", "on_swipe", "on_slide", "actions"}
+    assert d["home_assistant"]["canonical"]["action"] == "ha"
+    assert d["home_assistant"]["accepted_variations"]  # non-empty
+    assert "config origin" in d["provenance"]
+
+
+def test_bulk_append_adds_all_in_one_save(app: Flask) -> None:
+    _enable(app)
+    client = app.test_client()
+    pid = _create_page(client)
+    els = [{"kind": "box", "x": i, "y": 0, "w": 10, "h": 10} for i in range(25)]
+    resp = client.post(f"/api/mcp/pages/{pid}/elements/bulk", json={"elements": els})
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    data = resp.get_json()
+    assert data["appended"] == 25 and len(data["element_ids"]) == 25
+    assert len(client.get(f"/api/mcp/pages/{pid}/canvas").get_json()["els"]) == 25
+
+
+def test_bulk_append_is_all_or_nothing(app: Flask) -> None:
+    """A bad element in the chunk aborts the whole append (named by index),
+    so a partial board never half-lands."""
+    _enable(app)
+    client = app.test_client()
+    pid = _create_page(client)
+    resp = client.post(
+        f"/api/mcp/pages/{pid}/elements/bulk",
+        json={
+            "elements": [
+                {"kind": "box", "x": 0, "y": 0, "w": 10, "h": 10},
+                {"kind": "box", "tap": "x"},
+            ]
+        },
+    )
+    assert resp.status_code == 422
+    assert "els[1]" in resp.get_json()["error"]
+    # Nothing appended.
+    assert client.get(f"/api/mcp/pages/{pid}/canvas").get_json()["els"] == []
+
+
+def test_bulk_append_rejects_bad_body(app: Flask) -> None:
+    _enable(app)
+    client = app.test_client()
+    pid = _create_page(client)
+    assert client.post(f"/api/mcp/pages/{pid}/elements/bulk", json={}).status_code == 400
+    assert (
+        client.post(f"/api/mcp/pages/{pid}/elements/bulk", json={"elements": []}).status_code == 400
+    )
+
+
 def test_measure_text(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
     _enable(app)
     monkeypatch.setattr(

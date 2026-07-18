@@ -179,6 +179,47 @@ def test_clear_404s_for_non_touch_device(app: Flask) -> None:
     assert client.post("/devices/touch/plain_esp32/clear").status_code == 404
 
 
+def test_regions_preview_renders_selected_dashboard(app: Flask, monkeypatch: Any) -> None:
+    """The monitor's dashboard picker previews a dashboard's regions at the
+    device panel size without pushing it (agent feedback: let me see regions
+    before I send)."""
+    _make_e1003(app)
+    # A saved canvas page to preview.
+    ps = app.config["PAGE_STORE"]
+    from app.state.page_store import Page
+
+    ps.save(Page(id="board1", name="Board One", layout_kind="canvas"))
+    # Stub the headless render/extract so no Chromium is needed.
+    monkeypatch.setattr(
+        "app.renderer.inspect_composed",
+        lambda req, pool=None: [{"x": 10, "y": 20, "w": 100, "h": 60, "tap": "refresh"}],
+    )
+    client = app.test_client()
+    _sign_in(client)
+    payload = client.get("/devices/touch/hall_e1003/regions.json?page=board1").get_json()
+    assert payload["panel"]["w"] > 0
+    assert payload["page_id"] == "board1"
+    assert len(payload["regions"]) == 1
+    assert payload["regions"][0]["tap"] == "refresh"
+
+
+def test_regions_preview_no_page_returns_empty(app: Flask) -> None:
+    _make_e1003(app)
+    client = app.test_client()
+    _sign_in(client)
+    payload = client.get("/devices/touch/hall_e1003/regions.json").get_json()
+    assert payload["regions"] == [] and payload["page_id"] == ""
+
+
+def test_regions_preview_404s_for_unknown_page_or_device(app: Flask) -> None:
+    _make_e1003(app)
+    _make_esp32(app)
+    client = app.test_client()
+    _sign_in(client)
+    assert client.get("/devices/touch/hall_e1003/regions.json?page=nope").status_code == 404
+    assert client.get("/devices/touch/plain_esp32/regions.json?page=x").status_code == 404
+
+
 def test_device_card_links_monitor_only_for_touch(app: Flask) -> None:
     _make_e1003(app)
     _make_esp32(app)

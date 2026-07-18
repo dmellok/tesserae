@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from flask import Blueprint, Flask, abort, current_app, jsonify, render_template
+from flask import Blueprint, Flask, abort, current_app, jsonify, render_template, request, url_for
 from werkzeug.wrappers import Response
 
 from app.device_loader import Device, DeviceRegistry
@@ -104,6 +104,53 @@ def data(device_id: str) -> Response:
             )
 
     return jsonify({"panel": {"w": w, "h": h}, "regions": regions, "events": events})
+
+
+@bp.get("/<device_id>/regions.json")
+def regions(device_id: str) -> Response:
+    """Preview a dashboard's touch regions at this device's panel size,
+    without pushing it. Renders ``?page=<page_id>`` headless and extracts
+    the region map, so the monitor can overlay a dashboard you're about to
+    send (or comparing designs) instead of only the frame currently on the
+    panel. Returns ``{panel:{w,h}, page_id, regions:[…], error?}``."""
+    dev = _touch_device(device_id)
+    if dev is None:
+        abort(404)
+    w, h = _panel_dims(dev)
+    page_id = (request.args.get("page") or "").strip()
+    if not page_id:
+        return jsonify({"panel": {"w": w, "h": h}, "page_id": "", "regions": []})
+    store = current_app.config.get("PAGE_STORE")
+    if store is None or store.get(page_id) is None:
+        abort(404)
+
+    from app.renderer import InspectRequest, RenderRequest, inspect_composed, to_loopback_url
+    from app.touch_regions import EXTRACT_REGIONS_JS, normalize_regions
+
+    # Compose at the device panel dims (w/h override) so extracted region
+    # coordinates land in the same panel space the monitor's SVG uses.
+    path = url_for("composer.compose", page_id=page_id, w=w, h=h)
+    url = to_loopback_url(request.host_url.rstrip("/") + path)
+    try:
+        raw = inspect_composed(
+            InspectRequest(
+                render=RenderRequest(url=url, viewport_w=w, viewport_h=h),
+                script=EXTRACT_REGIONS_JS,
+            ),
+            pool=current_app.config.get("BROWSER_POOL"),
+        )
+    except Exception as err:
+        return jsonify(
+            {
+                "panel": {"w": w, "h": h},
+                "page_id": page_id,
+                "regions": [],
+                "error": f"render failed: {type(err).__name__}",
+            }
+        )
+    return jsonify(
+        {"panel": {"w": w, "h": h}, "page_id": page_id, "regions": normalize_regions(raw)}
+    )
 
 
 @bp.post("/<device_id>/clear")

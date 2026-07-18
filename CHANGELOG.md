@@ -22,6 +22,16 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Touch authoring ergonomics for MCP agents (#49).** Four additions from agent-session feedback:
+  a `describe_actions` MCP tool / `GET /api/mcp/actions/describe` returns the authoritative
+  touch-action vocabulary (element fields, string grammar, the HA object form and every input
+  variation, slider `{value}`, provenance, how to verify) so it doesn't have to be reverse-engineered;
+  `render_report` takes `?view=touch` or `?fields=…` to trim the response so verifying a large board
+  doesn't blow the output cap; a bulk element endpoint (`POST /pages/<id>/elements/bulk`, all-or-
+  nothing) builds a big primitive board in a few chunked saves instead of one giant `set_canvas`; and
+  the touch monitor gains a dashboard picker that previews any dashboard's touch regions at the device
+  panel size without pushing it first. Bridge published as 0.7.0 with the matching tools.
+
 - **Self-hosted CalDAV calendars + todo lists (calendar_core).** Calendar feeds can now carry basic
   or digest credentials, so a private server (Baikal, Radicale, Nextcloud) that gates its `.ics`
   export behind auth works, including a LAN-only server the panel can't reach directly (fetches run

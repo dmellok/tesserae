@@ -104,7 +104,9 @@ TOUCH ACTIONS ("on_tap"/"on_swipe"/"on_slide" on ANY element -- respond to taps 
     "on_tap":   an action spec -- a STRING ("refresh", "rotate_next", "rotate_prev", "step:<n>",
                 "page:<page_id>", "webhook:<url>") OR a Home Assistant service-call OBJECT
                 {"action":"ha","domain":"light","service":"turn_on","data":{"entity_id":"light.x", ...}}.
-    "on_swipe": {"up":"<spec>","down":"<spec>","left":"<spec>","right":"<spec>"} -- string specs only.
+    "on_swipe": {"up":"<spec>","down":"<spec>","left":"<spec>","right":"<spec>"} -- each value is a
+                string spec OR a Home Assistant object, same forms as on_tap. A bare object with no
+                up/down/left/right key won't fire and is reported in render_report().tap_invalid.
     "on_slide": {"axis":"x"|"y","action":<spec>} -- the element becomes a SLIDER: the stroke's end
                 point maps to an absolute 0-100 value along the axis (vertical fills upward; a plain
                 tap sets the value at that point) and replaces "{value}" in the action. e.g. a
@@ -121,7 +123,9 @@ TOUCH ACTIONS ("on_tap"/"on_swipe"/"on_slide" on ANY element -- respond to taps 
     The entity_id and any service fields (brightness_pct, etc.) go INSIDE "data". These forgiving
     variants are also accepted and normalise to the canonical form: omitting "action" when you give a
     "service" (it's inferred), a dotted "service":"light.turn_on" (splits into domain+service), a
-    top-level "entity_id", or the HA-native "target":{"entity_id":...}. Sliders substitute the 0-100
+    top-level "entity_id", the HA-native "target":{"entity_id":...}, service fields at the top level
+    beside entity_id (brightness_pct etc. are folded into data), and a comma-joined entity_id string
+    (split into the list HA wants). Sliders substitute the 0-100
     value into "{value}" (also "$value"), which becomes a number for fields like brightness_pct.
     Execution is SERVER-SIDE via the ha_core plugin's connection (base URL + long-lived token in
     Settings -> Plugins -> Home Assistant Core), a POST to /api/services/<domain>/<service>. This is
@@ -470,6 +474,19 @@ def build_server() -> Any:
         set_canvas to replace the whole layout at once."""
         return _json("POST", f"/pages/{page_id}/elements{_rev_suffix(base_rev)}", element)
 
+    def add_elements_bulk(page_id: str, elements: list[dict[str, Any]], base_rev: str = "") -> Any:
+        """Append MANY elements to a canvas in one save (max 500). Built for a large
+        primitive board that won't fit in a single set_canvas body: chunk the elements
+        across a few calls instead of inlining a 20k+ document. All-or-nothing: if any
+        element is invalid (unknown field / schema error) nothing is appended and the
+        offending index is named, so a bad chunk never half-lands. Returns the ack plus
+        "element_ids" (in order) and "appended" (the count)."""
+        return _json(
+            "POST",
+            f"/pages/{page_id}/elements/bulk{_rev_suffix(base_rev)}",
+            {"elements": elements},
+        )
+
     def update_element(
         page_id: str, element_id: str, patch: dict[str, Any], base_rev: str = ""
     ) -> Any:
@@ -532,7 +549,7 @@ def build_server() -> Any:
         the text is within max_width. Font names come from list_widgets().appearance."""
         return _json("POST", "/measure-text", {"items": items})
 
-    def render_report(page_id: str) -> Any:
+    def render_report(page_id: str, view: str = "", fields: str = "") -> Any:
         """Read back what a canvas actually rendered, as JSON (a companion to
         render_preview's image). Per element: the resolved box, the text that
         rendered, overflow/clip flags (overflow_x when content is wider than its box),
@@ -545,8 +562,29 @@ def build_server() -> Any:
         trust a touch dashboard. Use it to verify a render — catch clipping, confirm live
         data, read the real colours, check touch targets fire — without parsing a PNG.
         (Widget cells render into shadow DOM, so their "text" may be empty; data
-        primitives and decorations report their text.)"""
-        return _json("GET", f"/pages/{page_id}/render_report")
+        primitives and decorations report their text.)
+
+        On a large board the full report can be big. Pass view="touch" for just the
+        touch-wiring sections (tap_regions / tap_invalid / tap_dangling), or
+        fields="tap_invalid,tap_dangling" (any of board / elements / tap_regions /
+        tap_invalid / tap_dangling) to trim it. id + rev always ride along."""
+        params = []
+        if view:
+            params.append(f"view={view}")
+        if fields:
+            params.append(f"fields={fields}")
+        suffix = ("?" + "&".join(params)) if params else ""
+        return _json("GET", f"/pages/{page_id}/render_report{suffix}")
+
+    def describe_actions() -> Any:
+        """The authoritative touch-action vocabulary for canvas elements, so you don't
+        have to reverse-engineer it: the element fields (on_tap / on_swipe / on_slide /
+        actions), the string grammar (refresh / rotate_next / rotate_prev / step:<n> /
+        page:<id> / webhook:<url>), the Home Assistant object form and every input
+        variation that normalises to it, the slider {value} placeholder, the provenance
+        rule (webhook/HA fire only from config, not raw markup), and how to verify wiring.
+        Element-level actions are NOT part of get_widget_options (that's cell data)."""
+        return _json("GET", "/actions/describe")
 
     def render_preview(page_id: str) -> Any:
         """Render the canvas to a PNG at its authored size and return the image, so you
@@ -591,12 +629,14 @@ def build_server() -> Any:
         delete_canvas_page,
         get_canvas,
         set_canvas_background,
+        add_elements_bulk,
         update_element,
         append_code,
         delete_element,
         patch_canvas,
         arrange,
         measure_text,
+        describe_actions,
         render_report,
         render_preview,
         push_to_device,

@@ -18,6 +18,8 @@
   var H = parseInt(stage.dataset.panelH, 10) || 1;
   var dataUrl = stage.dataset.dataUrl;
   var streamUrl = stage.dataset.streamUrl;
+  var dashboardsUrl = stage.dataset.dashboardsUrl;
+  var regionsUrl = stage.dataset.regionsUrl;
 
   var showRegions = document.querySelector("[data-tm-regions]");
   var showLabels = document.querySelector("[data-tm-labels]");
@@ -25,6 +27,7 @@
   var countEl = document.querySelector("[data-tm-count]");
   var liveEl = document.querySelector("[data-tm-live]");
   var emptyEl = document.querySelector("[data-tm-empty]");
+  var dashSelect = document.querySelector("[data-tm-dashboard]");
 
   // Radius / stroke expressed in panel units so they scale with the SVG.
   var R = Math.max(6, Math.round(Math.min(W, H) * 0.012));
@@ -134,17 +137,54 @@
       .catch(function () { /* leave the view as-is on failure */ });
   });
 
+  // Regions for the frame currently on the panel; kept so switching the
+  // dashboard picker back to "Live frame" restores them without a refetch.
+  var liveRegions = [];
+
   // Initial paint.
   fetch(dataUrl)
     .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
     .then(function (j) {
-      renderRegions(j.regions);
+      liveRegions = j.regions || [];
+      renderRegions(liveRegions);
       applyToggles();
       // Oldest first so the newest end up on top.
       (j.events || []).slice().reverse().forEach(addMark);
       if (emptyEl) emptyEl.hidden = count > 0;
     })
     .catch(function () { if (emptyEl) { emptyEl.hidden = false; emptyEl.textContent = "Couldn't load touch data."; } });
+
+  // Dashboard picker: overlay any dashboard's regions (rendered on demand
+  // at this panel's size) so you can preview a board's touch targets
+  // before sending it, not only the frame that's already on the panel.
+  if (dashSelect && dashboardsUrl && regionsUrl) {
+    fetch(dashboardsUrl)
+      .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+      .then(function (j) {
+        (j.pages || []).forEach(function (p) {
+          var opt = document.createElement("option");
+          opt.value = p.id;
+          opt.textContent = p.name || p.id;
+          dashSelect.appendChild(opt);
+        });
+      })
+      .catch(function () { /* picker just stays at "Live frame" */ });
+
+    dashSelect.addEventListener("change", function () {
+      var pageId = dashSelect.value;
+      if (!pageId) { renderRegions(liveRegions); return; }
+      // Rendering headless takes a moment; hint it in the picker.
+      dashSelect.disabled = true;
+      fetch(regionsUrl + "?page=" + encodeURIComponent(pageId))
+        .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+        .then(function (j) {
+          renderRegions(j.regions || []);
+          applyToggles();
+        })
+        .catch(function () { renderRegions([]); })
+        .then(function () { dashSelect.disabled = false; });
+    });
+  }
 
   // Live stream: the shared events SSE feed, filtered to this device.
   if (streamUrl && typeof EventSource !== "undefined") {

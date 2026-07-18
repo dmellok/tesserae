@@ -7,6 +7,15 @@
   margin-bottom: 12px;
 }
 .tm-toggle { display: inline-flex; align-items: center; gap: 6px; font: 500 13px var(--t-font, system-ui); color: var(--t-fg-soft, #52524f); }
+.tm-dash select {
+  font: 500 13px var(--t-font, system-ui);
+  color: var(--t-fg, #18181b);
+  background: var(--t-surface, #fff);
+  border: 1px solid var(--t-border-strong, #d4d3cd);
+  border-radius: 6px;
+  padding: 3px 6px;
+}
+.tm-dash select:disabled { opacity: .6; }
 .tm-live { font: 700 12px var(--t-font, system-ui); color: var(--t-accent, #0d8c7e); letter-spacing: .02em; }
 .tm-live--down { color: var(--t-muted, #83817b); }
 .tm-live--flash { color: var(--t-danger, #dc2626); }
