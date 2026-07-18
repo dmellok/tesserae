@@ -925,3 +925,84 @@ def test_measure_text(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
     items = out.get_json()["items"]
     assert items[0]["width"] == 120 and items[0]["fits"] is False
     assert client.post("/api/mcp/measure-text", json={}).status_code == 400
+
+
+# -- unknown element keys 422 (touch actions that would silently vanish) --
+
+
+def test_append_element_rejects_unknown_keys(app: Flask) -> None:
+    """Pydantic ignores unknown keys, so an agent writing ``tap`` instead
+    of ``on_tap`` used to get a 200 while the interaction evaporated
+    (then nothing fired on the panel and the touch monitor showed no
+    regions). The MCP write paths now 422 with the bad keys named."""
+    _enable(app)
+    client = app.test_client()
+    pid = _create_page(client)
+    resp = client.post(
+        f"/api/mcp/pages/{pid}/elements",
+        json={"kind": "box", "x": 0, "y": 0, "w": 100, "h": 50, "tap": "page:other"},
+    )
+    assert resp.status_code == 422
+    body = resp.get_json()
+    assert body["unknown_fields"] == ["tap"]
+    assert "on_tap" in body["error"]
+
+
+def test_append_element_accepts_touch_fields(app: Flask) -> None:
+    _enable(app)
+    client = app.test_client()
+    pid = _create_page(client)
+    resp = client.post(
+        f"/api/mcp/pages/{pid}/elements",
+        json={
+            "kind": "hotspot",
+            "x": 0,
+            "y": 0,
+            "w": 100,
+            "h": 50,
+            "on_tap": {"action": "ha", "domain": "light", "service": "toggle"},
+            "on_swipe": {"left": "rotate_next"},
+        },
+    )
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    doc = client.get(f"/api/mcp/pages/{pid}/canvas").get_json()
+    el = doc["els"][0]
+    assert el["on_tap"]["action"] == "ha"
+    assert el["on_swipe"] == {"left": "rotate_next"}
+
+
+def test_patch_element_rejects_unknown_keys(app: Flask) -> None:
+    _enable(app)
+    client = app.test_client()
+    pid = _create_page(client)
+    made = client.post(
+        f"/api/mcp/pages/{pid}/elements",
+        json={"kind": "box", "x": 0, "y": 0, "w": 100, "h": 50},
+    ).get_json()
+    resp = client.patch(
+        f"/api/mcp/pages/{pid}/elements/{made['element_id']}",
+        json={"swipe": {"left": "rotate_next"}},
+    )
+    assert resp.status_code == 422
+    assert resp.get_json()["unknown_fields"] == ["swipe"]
+
+
+def test_set_canvas_rejects_unknown_element_keys_with_index(app: Flask) -> None:
+    _enable(app)
+    client = app.test_client()
+    pid = _create_page(client)
+    resp = client.put(
+        f"/api/mcp/pages/{pid}/canvas",
+        json={
+            "w": 800,
+            "h": 480,
+            "els": [
+                {"id": "a1", "kind": "box", "x": 0, "y": 0, "w": 10, "h": 10},
+                {"id": "b2", "kind": "box", "x": 0, "y": 0, "w": 10, "h": 10, "onTap": "refresh"},
+            ],
+        },
+    )
+    assert resp.status_code == 422
+    body = resp.get_json()
+    assert body["unknown_fields"] == ["onTap"]
+    assert "els[1]" in body["error"]

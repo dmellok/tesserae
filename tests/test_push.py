@@ -1126,3 +1126,61 @@ def test_prewarm_misses_after_page_edit(tmp_path: Path, composition_png: bytes) 
         result = manager.push("home", device_ids={"kitchen"})
         assert result.status == "sent"
         assert len(calls) == 2
+
+
+def test_prune_keeps_live_frame_artifacts_without_event_rows(
+    tmp_path: Path, composition_png: bytes
+) -> None:
+    """Regression: the latest render for a device must survive the prune
+    even when no event row references it any more (cap eviction, or the
+    History page's Clear). Deleting the live frame's regions sidecar made
+    every tap resolve no_target and left the touch monitor with nothing
+    to overlay."""
+    renderers = [_make_renderer(tmp_path, "pi_png", "png", retain=False)]
+    manager, _, _ = _wired(tmp_path, composition_png, renderers)
+    renders = manager._renders_dir
+
+    manager._latest_renders["hall_e1003"] = {
+        "digest": "liveart123456",
+        "ext": "bin",
+        "filename": "liveart123456.bin",
+        "composition_digest": "livecomp12345",
+    }
+    (renders / "liveart123456.bin").write_bytes(b"x")
+    (renders / "livecomp12345.png").write_bytes(b"x")
+    (renders / "livecomp12345.regions.json").write_text('{"v":1,"regions":[]}')
+    (renders / "orphan99999999.png").write_bytes(b"x")
+
+    removed = manager.prune_orphan_renders()
+    assert removed == 1
+    assert (renders / "liveart123456.bin").exists()
+    assert (renders / "livecomp12345.png").exists()
+    assert (renders / "livecomp12345.regions.json").exists(), (
+        "the live frame's touch-region sidecar must survive the prune"
+    )
+    assert not (renders / "orphan99999999.png").exists()
+
+
+def test_delete_history_keeps_live_frame_artifacts(tmp_path: Path, composition_png: bytes) -> None:
+    """Deleting the History row for the frame a panel is currently
+    showing removes the row but must leave the artifacts (thumbnail +
+    regions sidecar) on disk."""
+    renderers = [_make_renderer(tmp_path, "pi_png", "png", retain=False)]
+    manager, _, _ = _wired(tmp_path, composition_png, renderers)
+    renders = manager._renders_dir
+
+    event_id = manager._event_log.record(
+        type="push", source="page", target="home", status="sent", digest="livecomp12345"
+    )
+    manager._latest_renders["hall_e1003"] = {
+        "digest": "liveart123456",
+        "ext": "bin",
+        "filename": "liveart123456.bin",
+        "composition_digest": "livecomp12345",
+    }
+    (renders / "livecomp12345.png").write_bytes(b"x")
+    (renders / "livecomp12345.regions.json").write_text('{"v":1,"regions":[]}')
+
+    assert manager.delete_history(event_id) is True
+    assert (renders / "livecomp12345.png").exists()
+    assert (renders / "livecomp12345.regions.json").exists()

@@ -178,8 +178,18 @@ def test_delete_history_drops_artifact_when_unreferenced(tmp_path: Path, panel_p
     result = manager.push_image(panel_png, source_label="x.png")
     digest = result.composition_digest
     assert (renders_dir / f"{digest}.png").exists()
+    # While the digest is a device's current frame it survives the row
+    # delete (the panel is still showing it; its regions sidecar and
+    # preview thumbnail must not vanish underneath it).
     assert manager.delete_history(result.event_id) is True  # type: ignore[arg-type]
-    # No other rows reference the digest, so the PNG goes too.
+    assert (renders_dir / f"{digest}.png").exists()
+    # Once superseded (no longer any device's latest render) the same
+    # delete semantics drop the unreferenced artifact.
+    row_id = manager._event_log.record(
+        type="push", source="file", target="x.png", status="sent", digest=digest
+    )
+    manager._latest_renders.clear()
+    assert manager.delete_history(row_id) is True
     assert not (renders_dir / f"{digest}.png").exists()
 
 

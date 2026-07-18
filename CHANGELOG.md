@@ -6,6 +6,22 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **Artifact GC no longer eats the live frame's touch regions (#49).** The render prune (and the
+  History page's per-row delete) kept only digests still referenced by event rows, so once the event
+  cap evicted (or a History clear deleted) the push row for a frame still on a panel, its
+  touch-region sidecar and thumbnail were removed from disk. From then on every tap resolved
+  `no_target`, interactions stopped carrying actions, and the touch monitor had no regions to
+  overlay. The latest render for every device (artifact + composition digest) is now always kept.
+  Recovery on an affected install: push the dashboard once and the sidecar regenerates.
+
+- **MCP element writes reject unknown fields (422).** Unknown element keys were silently ignored, so
+  an agent writing `tap` instead of `on_tap` (or any misspelled field) got a 200 while the
+  interaction evaporated. The element write paths (append / patch / whole-document) now return 422
+  naming the unknown keys and pointing at `on_tap` / `on_swipe` / `on_slide`, so the mistake
+  surfaces at write time instead of as a dead panel.
+
 ### Added
 
 - **Touch linger on by default for the reTerminal E1003 (#49).** `touch_linger_s` now defaults to

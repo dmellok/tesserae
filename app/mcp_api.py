@@ -755,6 +755,13 @@ def set_canvas(page_id: str) -> Response:
     # Force server-owned fields; the agent supplies the layout only.
     doc_in = {**body, "id": page_id, "name": str(body.get("name") or page.name)}
     doc_in.setdefault("device_ids", list(page.device_ids))
+    els = doc_in.get("els")
+    if isinstance(els, list):
+        for i, el in enumerate(els):
+            if isinstance(el, dict):
+                bad = _unknown_element_keys(el)
+                if bad:
+                    return _element_key_error(bad, index=i)
     try:
         doc = CanvasPage.model_validate(doc_in)
     except ValidationError as exc:
@@ -829,6 +836,28 @@ def generate_background(page_id: str) -> Response:
     return jsonify(data)
 
 
+def _unknown_element_keys(body: dict[str, Any]) -> list[str]:
+    """Keys that aren't Element fields. Pydantic silently ignores unknown
+    keys, so an agent that writes ``tap`` instead of ``on_tap`` (or nests
+    an interaction under a made-up key) would get a 200 while the action
+    evaporates, and then spend a session wondering why nothing fires.
+    The MCP write paths 422 instead so the mistake surfaces on the spot."""
+    from app.state.panel_store import Element
+
+    return sorted(k for k in body if k not in Element.model_fields)
+
+
+def _element_key_error(bad: list[str], *, index: int | None = None) -> Response:
+    where = f"els[{index}]: " if index is not None else ""
+    return _err(
+        422,
+        f"{where}unknown element field(s): {', '.join(bad)}. Touch actions "
+        "use on_tap / on_swipe / on_slide (a code element's named map is "
+        "'actions'); see the canvas doc shape for the full field list.",
+        unknown_fields=bad,
+    )
+
+
 @bp.post("/pages/<page_id>/elements")
 def append_element(page_id: str) -> Response:
     """Append one element to a canvas and save (each call is one save, so an open
@@ -848,6 +877,9 @@ def append_element(page_id: str) -> Response:
         return conflict
     if not body.get("id"):
         body = {**body, "id": uuid.uuid4().hex[:8]}
+    bad = _unknown_element_keys(body)
+    if bad:
+        return _element_key_error(bad)
     try:
         element = Element.model_validate(body)
     except ValidationError as exc:
@@ -883,6 +915,9 @@ def patch_element(page_id: str, element_id: str) -> Response:
     idx = next((i for i, e in enumerate(page.canvas.els) if e.id == element_id), None)
     if idx is None:
         return _err(404, f"no element {element_id!r} on {page_id!r}")
+    bad = _unknown_element_keys(patch)
+    if bad:
+        return _element_key_error(bad)
     merged = {**page.canvas.els[idx].model_dump(mode="json"), **patch, "id": element_id}
     try:
         element = Element.model_validate(merged)

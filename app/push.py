@@ -888,15 +888,37 @@ class PushManager:
         self._notify(result)
         return result
 
+    def _live_digests(self) -> set[str]:
+        """Digests that must survive any artifact GC: the latest render
+        for every device (artifact digest + composition digest). Deleting
+        these while the frame is still on a panel kills its thumbnail and
+        its touch-region sidecar, after which every tap resolves
+        ``no_target`` and the touch monitor has nothing to overlay."""
+        live: set[str] = set()
+        # Shallow copy: callers may or may not hold self._lock.
+        for entry in list(self._latest_renders.values()):
+            for key in ("digest", "composition_digest"):
+                value = entry.get(key)
+                if isinstance(value, str) and value:
+                    live.add(value)
+        return live
+
     def delete_history(self, event_id: int) -> bool:
         """Delete a history row and, if no other rows still reference the
         composition PNG, drop the PNG too. Returns True if the row was
-        deleted. Per-renderer artifacts are LRU-evicted separately."""
+        deleted. Per-renderer artifacts are LRU-evicted separately. The
+        artifacts of any device's current frame are kept regardless (see
+        ``_live_digests``)."""
         record = self._event_log.get(event_id)
         if record is None:
             return False
         deleted = self._event_log.delete(event_id)
-        if deleted and record.digest and not self._event_log.digest_in_use(record.digest):
+        if (
+            deleted
+            and record.digest
+            and not self._event_log.digest_in_use(record.digest)
+            and record.digest not in self._live_digests()
+        ):
             for suffix in (".png", ".bin", ".regions.json"):
                 path = self._renders_dir / f"{record.digest}{suffix}"
                 try:
@@ -910,8 +932,16 @@ class PushManager:
         any leftover thumbnails). Renders are content-addressed: a file
         whose digest isn't on an event row is dead weight left behind when
         the event-log cap evicted the row that owned it. Safe to call any
-        time; returns the number of files removed."""
-        keep = self._event_log.referenced_digests()
+        time; returns the number of files removed.
+
+        The latest render for every device is always kept, whether or not
+        an event row still references it. Event rows are capped (and the
+        History page's Clear deletes them outright), so a long-lived frame
+        could otherwise lose its artifact, thumbnail, and touch-region
+        sidecar while still on the panel; with the sidecar gone every tap
+        resolved ``no_target`` and the touch monitor had no regions to
+        overlay."""
+        keep = self._event_log.referenced_digests() | self._live_digests()
         try:
             entries = [p for p in self._renders_dir.iterdir() if p.is_file()]
         except OSError:
