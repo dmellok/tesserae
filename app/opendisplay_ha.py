@@ -42,6 +42,11 @@ KIND = "opendisplay_ha"
 # Subdirectory under the HA media root; also the media-source path segment.
 MEDIA_SUBDIR = "tesserae"
 DEFAULT_MEDIA_ROOT = "/media"
+# HA holds the HTTP connection open until opendisplay.upload_image finishes,
+# and a BLE e-paper transfer is slow (connect + chunked image + refresh).
+# The default 10s HTTP timeout fired mid-push and masked HA's own error, so
+# give the BLE leg room to either complete or report its real failure.
+UPLOAD_TIMEOUT_S = 120
 
 
 class OpenDisplayHaPublisher:
@@ -54,6 +59,7 @@ class OpenDisplayHaPublisher:
         renders_dir: Path,
         latest_render_fn: Callable[[str], dict[str, Any] | None],
         media_root: Path | None = None,
+        run_async: bool = True,
     ) -> None:
         self._app = app
         self._devices = devices
@@ -67,6 +73,14 @@ class OpenDisplayHaPublisher:
         self._last_sent: dict[str, str] = {}
         self._media_warned = False
         self._lock = threading.Lock()
+        # A BLE upload can block for tens of seconds; push listeners run
+        # synchronously in the push thread, so offload to a single serial
+        # worker (BLE is serial anyway) and coalesce via a dirty flag so a
+        # push never stalls the pipeline. Tests set run_async=False to keep
+        # on_push synchronous.
+        self._run_async = run_async
+        self._dirty = False
+        self._worker_running = False
 
     def _configured_root(self) -> str:
         try:
@@ -78,8 +92,36 @@ class OpenDisplayHaPublisher:
     # -- push reaction ----------------------------------------------------
 
     def on_push(self, _result: Any = None) -> None:
-        """Listener entry point: re-check every opendisplay_ha device and
-        push the ones whose frame changed. Never raises into the caller."""
+        """Listener entry point (runs in the push thread). Schedules a
+        background pass so a slow BLE upload never blocks the pipeline;
+        never raises into the caller. Synchronous when run_async=False."""
+        if not self._run_async:
+            self._process_once()
+            return
+        if not self._ha_devices():
+            return
+        with self._lock:
+            self._dirty = True
+            if self._worker_running:
+                return
+            self._worker_running = True
+        threading.Thread(target=self._worker, name="opendisplay-ha", daemon=True).start()
+
+    def _worker(self) -> None:
+        """Drain pushes until nothing is pending. Any push arriving during a
+        pass re-sets the dirty flag, so the newest frame always gets sent
+        without overlapping uploads."""
+        while True:
+            with self._lock:
+                if not self._dirty:
+                    self._worker_running = False
+                    return
+                self._dirty = False
+            self._process_once()
+
+    def _process_once(self) -> None:
+        """Re-check every opendisplay_ha device and push the ones whose
+        frame changed."""
         for device in self._ha_devices():
             try:
                 self._maybe_send(device)
@@ -176,7 +218,7 @@ class OpenDisplayHaPublisher:
             data["rotation"] = rotate
         try:
             with self._app.app_context():
-                mod.call_service("opendisplay", "upload_image", data=data)
+                mod.call_service("opendisplay", "upload_image", data=data, timeout=UPLOAD_TIMEOUT_S)
             return True
         except Exception as exc:
             # HA echoes the integration's actual error in the response body

@@ -8,6 +8,7 @@ service call and use a temp media root, so no HA or Bluetooth is needed.
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 from typing import Any
 
@@ -68,6 +69,7 @@ def _publisher(app: Flask, media_root: Path, calls: list) -> OpenDisplayHaPublis
         renders_dir=app.config["RENDERS_DIR"],
         latest_render_fn=app.config["PUSH_MANAGER"].latest_render_for,
         media_root=media_root,
+        run_async=False,
     )
 
 
@@ -169,8 +171,39 @@ def test_no_ha_core_call_service_is_soft(app: Flask, tmp_path: Path) -> None:
         renders_dir=app.config["RENDERS_DIR"],
         latest_render_fn=app.config["PUSH_MANAGER"].latest_render_for,
         media_root=tmp_path / "media",
+        run_async=False,
     )
     pub.on_push()  # no crash; nothing marked sent
+
+
+def test_async_worker_sends_off_the_push_thread(app: Flask, tmp_path: Path) -> None:
+    """With run_async (the default), on_push returns immediately and a
+    background worker performs the slow upload, so a push never blocks."""
+    _make_tag(app)
+    _plant_render(app, "kitchen_tag")
+    calls: list[Any] = []
+    core = app.config["PLUGIN_REGISTRY"].get("ha_core").server_module
+
+    def fake_call_service(domain, service, *, data=None, timeout=10):
+        calls.append((domain, service, data))
+        return []
+
+    core.call_service = fake_call_service  # type: ignore[attr-defined]
+    pub = OpenDisplayHaPublisher(
+        app=app,
+        devices=app.config["DEVICE_REGISTRY"],
+        settings=app.config["SETTINGS_STORE"],
+        renders_dir=app.config["RENDERS_DIR"],
+        latest_render_fn=app.config["PUSH_MANAGER"].latest_render_for,
+        media_root=tmp_path / "media",
+        run_async=True,
+    )
+    pub.on_push()  # returns immediately; worker runs in the background
+    for _ in range(100):
+        if calls:
+            break
+        time.sleep(0.02)
+    assert len(calls) == 1
 
 
 def test_ha_instance_is_push_transport_no_topics(app: Flask) -> None:

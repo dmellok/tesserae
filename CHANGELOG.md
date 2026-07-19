@@ -45,6 +45,12 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **OpenDisplay-via-HA no longer times out on slow BLE pushes or blocks the push pipeline.** A BLE
+  e-paper transfer can take tens of seconds; the 10s HTTP timeout fired mid-push and masked Home
+  Assistant's own error, and because push listeners run synchronously it would also have stalled the
+  pipeline. The upload now runs on a single background worker (BLE is serial anyway, so pushes
+  coalesce to the newest frame) with a 120s timeout, so a push returns immediately and HA gets time
+  to finish or report the real failure.
 - **OpenDisplay-via-HA surfaces the reason `upload_image` failed.** When Home Assistant returns a 500
   for `opendisplay.upload_image`, the log now includes HA's response body (the integration's actual
   error) instead of just "HTTP Error 500", so a failed BLE push is diagnosable without digging
