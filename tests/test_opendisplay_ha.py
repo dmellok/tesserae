@@ -283,3 +283,47 @@ def test_unwritable_media_dir_is_soft(app: Flask, tmp_path: Path) -> None:
     pub.on_push()  # no crash
     assert calls == []  # upload never attempted
     assert pub._media_warned is True
+
+
+def test_telemetry_poll_records_heartbeat(app: Flask) -> None:
+    """The telemetry poller pulls the tag's battery/signal/firmware from HA
+    and feeds it through record_status_heartbeat, so the device's status
+    cache shows it like any other device's heartbeat."""
+    from app.opendisplay_ha import OpenDisplayHaTelemetryPoller
+
+    _make_tag(app)
+    core = app.config["PLUGIN_REGISTRY"].get("ha_core").server_module
+    core.render_template = (  # type: ignore[attr-defined]
+        lambda _t, timeout=10: (
+            '{"fw_version": "1.4.2", "battery_pct": "88", "rssi": "-58", "temperature": "20"}'
+        )
+    )
+    poller = OpenDisplayHaTelemetryPoller(
+        app=app,
+        devices=app.config["DEVICE_REGISTRY"],
+        settings=app.config["SETTINGS_STORE"],
+        run_async=False,
+    )
+    with app.app_context():
+        assert poller.poll_once() == 1
+    parsed = app.config["DEVICE_STATUS"]["kitchen_tag"]["parsed"]
+    assert parsed["fw_version"] == "1.4.2"
+    assert parsed["battery_pct"] == 88
+    assert parsed["rssi"] == -58
+
+
+def test_telemetry_poll_skips_without_ha_device_id(app: Flask) -> None:
+    from app.opendisplay_ha import OpenDisplayHaTelemetryPoller
+
+    _make_tag(app, ha_device_id="")
+    core = app.config["PLUGIN_REGISTRY"].get("ha_core").server_module
+    core.render_template = lambda _t, timeout=10: '{"battery_pct": "50"}'  # type: ignore[attr-defined]
+    poller = OpenDisplayHaTelemetryPoller(
+        app=app,
+        devices=app.config["DEVICE_REGISTRY"],
+        settings=app.config["SETTINGS_STORE"],
+        run_async=False,
+    )
+    with app.app_context():
+        assert poller.poll_once() == 0
+    assert "kitchen_tag" not in app.config["DEVICE_STATUS"]

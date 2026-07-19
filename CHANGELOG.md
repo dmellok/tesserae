@@ -32,6 +32,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **OpenDisplay-via-HA tags report battery, signal, and firmware.** These tags never heartbeat
+  Tesserae directly (Home Assistant owns the Bluetooth link), so a background poller pulls each tag's
+  battery / signal-strength / temperature / firmware from its HA entities (matched by device class,
+  via `/api/template`) and reshapes them into a normal heartbeat. It flows through the same pipeline
+  every other device uses, so the device card's battery, signal, and firmware tiles, the battery-drain
+  history, and the event log all populate with no tag-side reporting. Polls every 15 minutes by default
+  (`app.opendisplay_telemetry_interval_s`).
 - **Pick the OpenDisplay tag from a dropdown instead of pasting an id.** Both the Add-device form's
   OpenDisplay tab and the device card now list the OpenDisplay devices Home Assistant knows about
   (queried over HA's `/api/template` endpoint, no WebSocket), so you select the tag by name and

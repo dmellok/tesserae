@@ -40,8 +40,10 @@ pushes it to the tag over Bluetooth LE and dithers for the panel.
 
 ### Set it up
 
-1. In Tesserae, **Settings → Devices → Add device** and pick **OpenDisplay
-   tag (via Home Assistant)**.
+1. In Tesserae, **Settings → Devices → Add device**, set **Transport** to
+   **OpenDisplay**, and fill in the tag form that appears. (The Home
+   Assistant form shows automatically when Tesserae runs as the HA add-on;
+   otherwise you get the bridge instructions instead.)
 2. Pick your tag from the **HA device** dropdown. It lists the OpenDisplay
    devices Home Assistant knows about, so you don't have to copy any ids;
    Tesserae stores the device id behind the scenes, and if the tag's model
@@ -59,6 +61,29 @@ Add one device per tag; each targets its own HA device id, so this
 scales to as many tags as HA can drive. The frame uses a stable
 per-device filename overwritten in place, so the media folder never
 grows, and files for removed devices are swept automatically.
+
+### Telemetry
+
+The tag talks to Home Assistant, not to Tesserae, so its battery, signal
+strength, temperature, and firmware version come from HA's entities rather
+than a heartbeat. Tesserae polls HA for them (every 15 minutes by default,
+set by `app.opendisplay_telemetry_interval_s`) and shows them on the device
+card like any other device, battery-drain history included. This uses the
+same Home Assistant Core plugin the push path does; values only appear for
+fields the tag actually reports.
+
+### Firmware and SDK compatibility
+
+When Home Assistant sets a tag up, its OpenDisplay integration reads the
+tag's configuration over Bluetooth. If the tag's firmware is newer than the
+`py-opendisplay` SDK the integration ships, HA can hit a config field it
+doesn't recognise and refuse to add the tag or push to it (for example,
+firmware that emits a `DATA_EXTENDED` / `0x2c` config packet an older parser
+rejects). This is an integration/firmware matter, not a Tesserae one:
+Tesserae only renders the frame and hands it to HA. If a tag won't add or
+won't update, check that your OpenDisplay integration and its SDK are recent
+enough for the tag's firmware. The integration's beta / HACS build is often
+ahead of the version bundled with Home Assistant Core.
 
 ## With the standalone bridge
 

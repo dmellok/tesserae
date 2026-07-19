@@ -24,6 +24,7 @@ only on the ``opendisplay_ha`` devices whose frame actually changed. mypy
 from __future__ import annotations
 
 import contextlib
+import json
 import logging
 import shutil
 import threading
@@ -34,6 +35,7 @@ from typing import Any
 
 from flask import Flask
 
+from app import ha_telemetry
 from app.device_loader import Device, DeviceRegistry
 
 logger = logging.getLogger(__name__)
@@ -42,6 +44,19 @@ KIND = "opendisplay_ha"
 # Subdirectory under the HA media root; also the media-source path segment.
 MEDIA_SUBDIR = "tesserae"
 DEFAULT_MEDIA_ROOT = "/media"
+# How often to pull each tag's telemetry from HA (battery / signal / fw).
+# Telemetry changes independently of renders, so this is its own cadence,
+# not tied to pushes. Overridable via app.opendisplay_telemetry_interval_s.
+TELEMETRY_INTERVAL_S = 900
+
+
+def _ha_core_module(app: Flask) -> Any:
+    """The ha_core plugin's server module, or None when it isn't loaded."""
+    registry = app.config.get("PLUGIN_REGISTRY")
+    plugin = registry.get("ha_core") if registry is not None else None
+    return getattr(plugin, "server_module", None) if plugin is not None else None
+
+
 # HA holds the HTTP connection open until opendisplay.upload_image finishes,
 # and a BLE e-paper transfer is slow (connect + chunked image + refresh).
 # The default 10s HTTP timeout fired mid-push and masked HA's own error, so
@@ -265,6 +280,123 @@ class OpenDisplayHaPublisher:
         return removed
 
 
+class OpenDisplayHaTelemetryPoller:
+    """Periodically pull each opendisplay_ha tag's battery / signal / firmware
+    from Home Assistant and feed it through the normal heartbeat pipeline, so
+    the device card shows the same telemetry as a device that heartbeats us
+    directly. The tag never talks to Tesserae, HA does, so this reshapes HA's
+    entity states into a heartbeat via app.ha_telemetry."""
+
+    def __init__(
+        self,
+        *,
+        app: Flask,
+        devices: DeviceRegistry,
+        settings: Any,
+        interval_s: int = TELEMETRY_INTERVAL_S,
+        run_async: bool = True,
+    ) -> None:
+        self._app = app
+        self._devices = devices
+        self._settings = settings
+        self._interval_s = max(60, int(interval_s))
+        self._run_async = run_async
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+
+    def start(self) -> None:
+        if not self._run_async or (self._thread is not None and self._thread.is_alive()):
+            return
+        self._thread = threading.Thread(
+            target=self._loop, name="opendisplay-ha-telemetry", daemon=True
+        )
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stop.set()
+
+    def _loop(self) -> None:
+        # Brief settle, an early first sample, then the steady interval.
+        if self._stop.wait(min(30, self._interval_s)):
+            return
+        while True:
+            try:
+                self.poll_once()
+            except Exception:
+                logger.exception("opendisplay_ha telemetry: poll failed")
+            if self._stop.wait(self._interval_s):
+                return
+
+    def _ha_devices(self) -> list[Device]:
+        return [d for d in self._devices.devices.values() if d.kind_of == KIND]
+
+    def _device_cfg(self, device_id: str) -> dict[str, Any]:
+        section = self._settings.get_section("devices") or {}
+        cfg = section.get(device_id) if isinstance(section, dict) else None
+        return cfg if isinstance(cfg, dict) else {}
+
+    def poll_once(self) -> int:
+        """Refresh telemetry for every configured tag. Returns the count
+        recorded (useful for tests)."""
+        mod = _ha_core_module(self._app)
+        if mod is None or not hasattr(mod, "render_template"):
+            return 0
+        recorded = 0
+        for device in self._ha_devices():
+            ha_device_id = str(self._device_cfg(device.id).get("ha_device_id") or "").strip()
+            if not ha_device_id:
+                continue
+            try:
+                rendered = mod.render_template(ha_telemetry.build_template(ha_device_id))
+            except Exception as exc:
+                logger.debug(
+                    "opendisplay_ha telemetry: HA query failed for %s (%s)", device.id, exc
+                )
+                continue
+            heartbeat = ha_telemetry.parse_telemetry(rendered)
+            if not heartbeat:
+                continue
+            if self._record(device, heartbeat):
+                recorded += 1
+        return recorded
+
+    def _record(self, device: Device, heartbeat: dict[str, Any]) -> bool:
+        events = self._app.config.get("EVENT_LOG")
+        status_cache = self._app.config.get("DEVICE_STATUS")
+        if events is None or status_cache is None:
+            return False
+        # Local import avoids a module-load cycle (transport_wiring imports
+        # this module's register()).
+        from app.transport_wiring import record_status_heartbeat
+
+        payload = json.dumps(heartbeat).encode("utf-8")
+        try:
+            with self._app.app_context():
+                record_status_heartbeat(
+                    app=self._app,
+                    device=device,
+                    payload=payload,
+                    status_cache=status_cache,
+                    event_log=events,
+                    event_target=f"ha://{device.id}/telemetry",
+                )
+            return True
+        except Exception:
+            logger.exception("opendisplay_ha telemetry: record failed for %s", device.id)
+            return False
+
+
+def _configured_telemetry_interval(settings: Any) -> int:
+    try:
+        val = settings.get_section("app").get("opendisplay_telemetry_interval_s")
+    except Exception:
+        val = None
+    try:
+        return max(60, int(val)) if val is not None else TELEMETRY_INTERVAL_S
+    except (TypeError, ValueError):
+        return TELEMETRY_INTERVAL_S
+
+
 def register(app: Flask) -> None:
     """Build the publisher and wire it to the push loop. No-op if there's no
     push manager (bare test setups)."""
@@ -285,3 +417,19 @@ def register(app: Flask) -> None:
     app.config["OPENDISPLAY_HA_PUBLISHER"] = pub
     with contextlib.suppress(Exception):
         pub.prune_orphans()
+
+    # Telemetry poller (battery / signal / firmware from HA). Stop any
+    # previous one first: register() re-runs on every transport rebuild, and
+    # a leaked poll thread would keep querying HA against a stale app.
+    old_poller = app.config.get("OPENDISPLAY_HA_TELEMETRY_POLLER")
+    if old_poller is not None:
+        with contextlib.suppress(Exception):
+            old_poller.stop()
+    poller = OpenDisplayHaTelemetryPoller(
+        app=app,
+        devices=devices,
+        settings=settings,
+        interval_s=_configured_telemetry_interval(settings),
+    )
+    poller.start()
+    app.config["OPENDISPLAY_HA_TELEMETRY_POLLER"] = poller
