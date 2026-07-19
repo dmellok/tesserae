@@ -6,9 +6,10 @@ This is the shared boundary between the Tesserae server (which signs) and the
 device firmware (which verifies and applies). Discussion: #121.
 
 Status: Phase 1. The signer, verifier, published test key, and signed fixtures
-exist (`app/ota/`, `tests/fixtures/ota/`). The `/status` delivery and capability
-handshake land in a following slice; this document is the frozen part both sides
-build against.
+exist (`app/ota/`, `tests/fixtures/ota/`), and the `/status` capability handshake
+and descriptor delivery are wired (`app/rest_api.py`, `app/state/ota_staging.py`,
+staged via `python -m app.ota.stage`). Still to come: the production key, image
+hosting on R2, OTA state reporting, and staged rollout controls.
 
 ## Roles
 
@@ -80,7 +81,21 @@ A device verifies checks 1-3, decides to fetch, then re-checks 4 as the image
 streams in. `app/ota/verify.py:verify()` takes an optional `image=` to match
 that split.
 
-## Delivery (following slice)
+## Capability handshake
+
+A device advertises OTA support by including an `ota` capability object in its
+`/register` and `/status` request body, naming the descriptor schema version it
+speaks:
+
+```json
+{ "...normal heartbeat fields...": "...", "ota": { "schema": 1 } }
+```
+
+The server only ever hands back a descriptor to a device that advertised a
+schema at least as new as the descriptor's, so OTA is opt-in per device kind and
+older firmware is never handed an envelope it can't read.
+
+## Delivery
 
 The descriptor rides on the always-200 `/status` response, not on `/frame`:
 
@@ -88,14 +103,30 @@ The descriptor rides on the always-200 `/status` response, not on `/frame`:
 { "...normal status fields...": "...", "ota": { "payload": "...", "signature": "..." } }
 ```
 
-`ota` is absent when no update is pending. `/frame` keeps its exact 200 / 304 /
-204 behaviour, so the image channel stays byte-clean for every device kind. See
-#121 for why `/frame` is the wrong place (non-ESP32 clients poll it for image
-bytes and would try to decode a JSON envelope as an image).
+`ota` is present only when a descriptor is staged for the device, the device
+advertised a compatible schema (above), and the descriptor targets the device's
+kind; it is absent otherwise. `/frame` keeps its exact 200 / 304 / 204 behaviour,
+so the image channel stays byte-clean for every device kind. See #121 for why
+`/frame` is the wrong place (non-ESP32 clients poll it for image bytes and would
+try to decode a JSON envelope as an image).
 
-Delivery is gated on a capability the firmware advertises at register/status, so
-the server only ever emits `ota` to a device that has declared it can apply one.
-This makes OTA opt-in per device kind. Exact capability field: TBD in that slice.
+Re-offering an update the device already applied is harmless: the firmware's
+`already_current` check skips a descriptor naming the running version, so the
+server keeps offering a staged descriptor until it is cleared.
+
+## Staging
+
+An operator stages a signed descriptor for a device with the signer + stager:
+
+```bash
+python -m app.ota.sign --key-id … --device-kind esp32_client \
+    --fw-version 1.4.0 --image app.bin --image-url … --key signing.hex > d.json
+python -m app.ota.stage --data-root data --device-id hall_esp --descriptor d.json
+# clear:  python -m app.ota.stage --data-root data --device-id hall_esp --clear
+```
+
+The store is `<data-root>/core/ota_pending.json`; the server reads it on the next
+heartbeat, no restart needed. An admin UI for this is a later slice.
 
 ## Keys and signing
 

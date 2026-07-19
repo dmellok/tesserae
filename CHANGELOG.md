@@ -8,6 +8,14 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **OTA capability handshake and `/status` delivery (Phase 2, #121).** A device advertises OTA
+  support with an `ota: {schema: N}` object in its register/status body; the server hands back a
+  staged, signed descriptor on the always-200 `/status` response only when the device advertised a
+  compatible schema and the descriptor targets its kind. Descriptors are staged per device with
+  `python -m app.ota.stage` (pipeline: `sign` then `stage`), held in `data/core/ota_pending.json`,
+  and picked up on the next heartbeat. `/frame` is untouched, so the image channel stays byte-clean
+  for every device kind. The production key, R2 image hosting, and OTA state reporting are later
+  slices.
 - **Button wake window for ESP32 devices (#123).** A per-device `button_wake_s` config field (0-60
   seconds, default 0) that keeps the device awake for a moment after a button press changes the page,
   so scrolling several pages doesn't pay a fresh wake and Wi-Fi cycle per press. Set it under

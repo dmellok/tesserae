@@ -455,6 +455,48 @@ def _current_config(device: Device) -> dict[str, Any]:
     return out
 
 
+def _advertised_ota_schema(body: dict[str, Any]) -> int | None:
+    """The OTA schema version a device advertises support for, from the
+    ``ota`` capability object in its register/status body
+    (``{"ota": {"schema": 1}}``). None when absent or malformed."""
+    if not isinstance(body, dict):
+        return None
+    cap = body.get("ota")
+    if not isinstance(cap, dict):
+        return None
+    schema = cap.get("schema")
+    return int(schema) if isinstance(schema, int) else None
+
+
+def _pending_ota(device: Device, body: dict[str, Any]) -> dict[str, str] | None:
+    """The signed OTA descriptor to hand this device on /status, or None.
+
+    Offered only when a descriptor is staged for the device, the device
+    advertised an OTA schema at least as new as the descriptor's, and the
+    descriptor targets this device's kind. Re-offering an already-applied
+    update is harmless: the firmware's ``already_current`` guard skips it."""
+    store = current_app.config.get("OTA_STAGING")
+    if store is None:
+        return None
+    entry = store.get(device.id)
+    if not isinstance(entry, dict):
+        return None
+    advertised = _advertised_ota_schema(body)
+    if advertised is None:
+        return None
+    schema_version = entry.get("schema_version")
+    if not isinstance(schema_version, int) or schema_version > advertised:
+        return None
+    # Guard against a mis-staged descriptor reaching the wrong kind.
+    kind = device.kind_of or device.id
+    if entry.get("device_kind") not in (None, kind):
+        return None
+    descriptor = entry.get("descriptor")
+    if isinstance(descriptor, dict) and "payload" in descriptor and "signature" in descriptor:
+        return {"payload": str(descriptor["payload"]), "signature": str(descriptor["signature"])}
+    return None
+
+
 @bp.get("/<device_id>/frame")
 def get_frame(device_id: str) -> Response:
     """Latest frame URL for this device.
@@ -775,6 +817,12 @@ def post_status(device_id: str) -> Response:
     }
     if button_result is not None and button_result.rotation_id is not None:
         response["rotation"] = button_result.to_envelope()
+    # OTA (#121): hand back a staged, signed descriptor when the device
+    # advertised a compatible ``ota`` capability in this heartbeat. Absent
+    # otherwise, so /status stays byte-identical for devices without OTA.
+    ota = _pending_ota(device, body if isinstance(body, dict) else {})
+    if ota is not None:
+        response["ota"] = ota
     return jsonify(response)
 
 

@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import time
 from pathlib import Path
+from typing import Any
 
 import pytest
 from flask import Flask
@@ -521,6 +522,94 @@ def test_frame_omits_button_wake_for_non_button_kind(app: Flask) -> None:
     )
     assert resp.status_code == 200
     assert "button_wake_s" not in resp.get_json()
+
+
+def _stage_ota(
+    app: Flask, device_id: str, *, kind: str = "esp32_client", fw: str = "1.4.0", schema: int = 1
+) -> dict:
+    """Sign a descriptor with the test fixtures key and stage it for a device."""
+    from app.ota import build_manifest, load_private_key, sign_manifest
+
+    seed = bytes.fromhex(
+        (REPO_ROOT / "tests" / "fixtures" / "ota" / "test_signing_key.hex").read_text().strip()
+    )
+    manifest = build_manifest(
+        key_id="test-ed25519-1",
+        device_kind=kind,
+        fw_version=fw,
+        image_url="https://cdn.example.test/app.bin",
+        image=b"firmware-bytes",
+    )
+    descriptor = sign_manifest(manifest, load_private_key(seed))
+    app.config["OTA_STAGING"].stage(
+        device_id, descriptor, device_kind=kind, fw_version=fw, schema_version=schema
+    )
+    return descriptor
+
+
+def _post_status(client, device_id: str, token: str, body: dict) -> Any:
+    return client.post(
+        f"/api/v1/device/{device_id}/status",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        data=json.dumps(body),
+    )
+
+
+def _register_esp32(app: Flask, client, device_id: str) -> str:
+    _sign_in(client)
+    code = _issue_pairing(app)
+    resp = _register_via_api(client, code=code, device_id=device_id, kind="esp32_client")
+    return resp.get_json()["device_token"]
+
+
+def test_status_delivers_staged_ota_when_device_is_capable(app: Flask) -> None:
+    client = app.test_client()
+    token = _register_esp32(app, client, "hall_esp")
+    descriptor = _stage_ota(app, "hall_esp")
+
+    resp = _post_status(client, "hall_esp", token, {"ota": {"schema": 1}, "battery_mv": 4000})
+    assert resp.status_code == 200
+    assert resp.get_json()["ota"] == descriptor
+
+
+def test_status_omits_ota_when_device_does_not_advertise(app: Flask) -> None:
+    client = app.test_client()
+    token = _register_esp32(app, client, "hall_esp")
+    _stage_ota(app, "hall_esp")
+
+    resp = _post_status(client, "hall_esp", token, {"battery_mv": 4000})
+    assert resp.status_code == 200
+    assert "ota" not in resp.get_json()
+
+
+def test_status_omits_ota_when_nothing_staged(app: Flask) -> None:
+    client = app.test_client()
+    token = _register_esp32(app, client, "hall_esp")
+
+    resp = _post_status(client, "hall_esp", token, {"ota": {"schema": 1}})
+    assert resp.status_code == 200
+    assert "ota" not in resp.get_json()
+
+
+def test_status_omits_ota_when_descriptor_schema_newer_than_device(app: Flask) -> None:
+    client = app.test_client()
+    token = _register_esp32(app, client, "hall_esp")
+    _stage_ota(app, "hall_esp", schema=2)
+
+    resp = _post_status(client, "hall_esp", token, {"ota": {"schema": 1}})
+    assert resp.status_code == 200
+    assert "ota" not in resp.get_json()
+
+
+def test_status_omits_ota_when_staged_for_other_kind(app: Flask) -> None:
+    client = app.test_client()
+    token = _register_esp32(app, client, "hall_esp")
+    # A descriptor mis-staged for a different kind must not reach this device.
+    _stage_ota(app, "hall_esp", kind="pico_bin_client")
+
+    resp = _post_status(client, "hall_esp", token, {"ota": {"schema": 1}})
+    assert resp.status_code == 200
+    assert "ota" not in resp.get_json()
 
 
 def test_frame_response_carries_renderer_payload_fields(app: Flask) -> None:
