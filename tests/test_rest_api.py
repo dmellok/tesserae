@@ -459,6 +459,70 @@ def test_frame_returns_url_and_etag_when_rendered(app: Flask) -> None:
     assert resp.headers["ETag"] == '"abc123"'
 
 
+def test_frame_carries_button_wake_for_button_kind(app: Flask) -> None:
+    """A button-capable kind (esp32) gets ``button_wake_s`` on /frame: the
+    schema default, then the stored per-device value once set (#123)."""
+    client = app.test_client()
+    _sign_in(client)
+    code = _issue_pairing(app)
+    resp = _register_via_api(client, code=code, device_id="hall_esp", kind="esp32_client")
+    token = resp.get_json()["device_token"]
+
+    push_mgr = app.config["PUSH_MANAGER"]
+    push_mgr._latest_renders["hall_esp"] = {
+        "digest": "e0e0",
+        "ext": "bin",
+        "filename": "e0e0.bin",
+        "renderer_id": "esp32_bin",
+        "timestamp": time.time(),
+        "composition_digest": "comp_e0",
+    }
+
+    def _frame() -> dict:
+        r = client.get(
+            "/api/v1/device/hall_esp/frame",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 200
+        return r.get_json()
+
+    # Schema default is 0 (deep-sleep immediately).
+    assert _frame()["button_wake_s"] == 0
+
+    # A stored per-device value overrides the default.
+    store = app.config["SETTINGS_STORE"]
+    section = store.get_section("devices") or {}
+    section["hall_esp"] = {**section.get("hall_esp", {}), "button_wake_s": 5}
+    store.update_section("devices", section)
+    assert _frame()["button_wake_s"] == 5
+
+
+def test_frame_omits_button_wake_for_non_button_kind(app: Flask) -> None:
+    """A kind whose schema doesn't declare ``button_wake_s`` (pico) never
+    carries the field, so the /frame envelope stays clean for it."""
+    client = app.test_client()
+    _sign_in(client)
+    code = _issue_pairing(app)
+    resp = _register_via_api(client, code=code, device_id="desk_pico", kind="pico_bin_client")
+    token = resp.get_json()["device_token"]
+
+    push_mgr = app.config["PUSH_MANAGER"]
+    push_mgr._latest_renders["desk_pico"] = {
+        "digest": "d1d1",
+        "ext": "bin",
+        "filename": "d1d1.bin",
+        "renderer_id": "pico_bin",
+        "timestamp": time.time(),
+        "composition_digest": "comp_d1",
+    }
+    resp = client.get(
+        "/api/v1/device/desk_pico/frame",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 200
+    assert "button_wake_s" not in resp.get_json()
+
+
 def test_frame_response_carries_renderer_payload_fields(app: Flask) -> None:
     """REST /frame must return the renderer-specific fields its MQTT-
     subscribed cousins receive (rotate / scale / bg / saturation for

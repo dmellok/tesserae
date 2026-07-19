@@ -42,6 +42,10 @@ from typing import Any
 SLEEP_INTERVAL_MIN_S = 30
 SLEEP_INTERVAL_MAX_S = 7 * 24 * 60 * 60
 
+# Upper bound for the post-button stay-awake window (issue #123). Staying
+# awake longer than this to catch repeat presses is never worth the battery.
+BUTTON_WAKE_MAX_S = 60
+
 
 def parse_status(payload: bytes) -> dict[str, Any]:
     """Decode and normalise the heartbeat. Always returns a dict with
@@ -123,4 +127,13 @@ def validate_config(payload: dict[str, Any]) -> tuple[bool, str | None]:
         return False, f"sleep_interval_s must be >= {SLEEP_INTERVAL_MIN_S} (got {interval})"
     if interval > SLEEP_INTERVAL_MAX_S:
         return False, f"sleep_interval_s must be <= {SLEEP_INTERVAL_MAX_S} (got {interval})"
+    # Button wake window (issue #123): optional, so the shared validator
+    # accepts a form that predates the field. 0 disables the linger.
+    if "button_wake_s" in payload:
+        try:
+            wake = int(payload["button_wake_s"])
+        except (TypeError, ValueError):
+            return False, "button_wake_s must be an integer"
+        if not 0 <= wake <= BUTTON_WAKE_MAX_S:
+            return False, f"button_wake_s must be 0..{BUTTON_WAKE_MAX_S} (got {wake})"
     return True, None

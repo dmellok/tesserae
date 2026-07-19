@@ -26,6 +26,21 @@
         {"value": 86400, "label": "1 day"}
       ],
       "help": "Custom value is in seconds."
+    },
+    "button_wake_s": {
+      "type": "int",
+      "label": "Button wake window",
+      "default": 0,
+      "min": 0,
+      "max": 60,
+      "presets": [
+        {"value": 0,  "label": "Off (sleep immediately)"},
+        {"value": 2,  "label": "2 seconds"},
+        {"value": 5,  "label": "5 seconds"},
+        {"value": 10, "label": "10 seconds"},
+        {"value": 30, "label": "30 seconds"}
+      ],
+      "help": "After a button press changes the page, stay awake this many seconds to catch rapid repeat presses before deep-sleeping, so scrolling several pages doesn't pay a fresh wake and Wi-Fi cycle per press. 0 sleeps immediately (best battery). Applies only to button wakes, not scheduled refreshes or rotation."
     }
   }
 }

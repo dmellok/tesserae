@@ -8,6 +8,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Button wake window for ESP32 devices (#123).** A per-device `button_wake_s` config field (0-60
+  seconds, default 0) that keeps the device awake for a moment after a button press changes the page,
+  so scrolling several pages doesn't pay a fresh wake and Wi-Fi cycle per press. Set it under
+  Settings → Devices. The value is delivered on the `/frame` response a button wake already fetches
+  (and via the config block on register/status), so firmware reads it without an extra request; 0
+  keeps the current behaviour of sleeping immediately, and it applies only to button wakes, not
+  scheduled refreshes or rotation. Firmware support lands separately.
 - **OTA update contract (Phase 1).** The signing and verification half of the over-the-air
   firmware update flow: an Ed25519-signed `{payload, signature}` descriptor binds the target device
   kind, firmware version, image URL, size, and SHA-256. `app/ota/` carries the signer (with a

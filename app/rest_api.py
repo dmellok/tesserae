@@ -385,6 +385,23 @@ def _next_poll_s(device: Device) -> int:
     return 60
 
 
+def _button_wake_s(device: Device) -> int:
+    """Seconds the firmware should stay awake after a button wake to catch
+    rapid repeat presses (#123): the configured per-device value, then the
+    schema default, then 0 (deep-sleep immediately). Delivered on the
+    ``/frame`` response a button wake already fetches, so the firmware
+    decides how long to linger without a cached config read."""
+    section = _settings().get_section("devices") or {}
+    stored = section.get(device.id) if isinstance(section, dict) else None
+    if isinstance(stored, dict) and isinstance(stored.get("button_wake_s"), int):
+        return int(stored["button_wake_s"])
+    schema = device.config_schema or {}
+    spec = schema.get("button_wake_s") if isinstance(schema, dict) else None
+    if isinstance(spec, dict) and isinstance(spec.get("default"), int):
+        return int(spec["default"])
+    return 0
+
+
 def _maybe_switch_wire_format(device_id: str, body: dict[str, Any]) -> None:
     """Apply a client-declared wire-format switch on an already-registered
     device, if it declared one that resolves to a different renderer.
@@ -577,6 +594,12 @@ def get_frame(device_id: str) -> Response:
     # bound to any rotation.
     if button_result is not None and button_result.rotation_id is not None:
         payload["rotation"] = button_result.to_envelope()
+
+    # Button-wake window (#123): emitted only for kinds whose schema declares
+    # it, so a button wake learns how long to stay awake for repeat presses
+    # from this same response. 0 means deep-sleep immediately after painting.
+    if "button_wake_s" in (device.config_schema or {}):
+        payload["button_wake_s"] = _button_wake_s(device)
 
     resp = jsonify(payload)
     resp.headers["ETag"] = etag
