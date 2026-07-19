@@ -27,6 +27,7 @@ import contextlib
 import logging
 import shutil
 import threading
+import urllib.error
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -178,7 +179,20 @@ class OpenDisplayHaPublisher:
                 mod.call_service("opendisplay", "upload_image", data=data)
             return True
         except Exception as exc:
-            logger.warning("opendisplay_ha: upload_image failed (%s)", exc)
+            # HA echoes the integration's actual error in the response body
+            # (an HTTPError). The bare status ("HTTP Error 500") hides why
+            # opendisplay.upload_image failed, so read the body when present.
+            detail = ""
+            if isinstance(exc, urllib.error.HTTPError):
+                try:
+                    detail = exc.read().decode("utf-8", "replace").strip()[:500]
+                except Exception:
+                    detail = ""
+            logger.warning(
+                "opendisplay_ha: upload_image failed (%s)%s",
+                exc,
+                f": {detail}" if detail else "",
+            )
             return False
 
     # -- housekeeping -----------------------------------------------------

@@ -12,7 +12,7 @@
       "type": "string",
       "label": "HA device id",
       "default": "",
-      "help": "The tag's Home Assistant device id (Developer Tools → the tag's device page, or the opendisplay.upload_image action's device picker). Tesserae targets this device when it pushes."
+      "help": "Home Assistant's internal device id for the tag: a long hex string (e.g. 4ab9c7f0e2…), NOT the tag's own name/serial (e.g. OD6CD5F9). Find it in Developer Tools → Actions → opendisplay.upload_image: pick the tag in the device picker, switch to YAML mode, and copy the device_id value. Tesserae targets this device when it pushes."
     },
     "rotate": {
       "type": "select",

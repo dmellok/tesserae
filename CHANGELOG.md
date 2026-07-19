@@ -45,6 +45,11 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **OpenDisplay-via-HA surfaces the reason `upload_image` failed.** When Home Assistant returns a 500
+  for `opendisplay.upload_image`, the log now includes HA's response body (the integration's actual
+  error) instead of just "HTTP Error 500", so a failed BLE push is diagnosable without digging
+  through HA's own logs. The **HA device id** help text and docs now spell out that it's HA's internal
+  device id (a long hex string), not the tag's own name/serial, which was an easy mismatch to make.
 - **Resending a frame from History now re-paints REST clients (#119).** A resend force-republishes
   over MQTT, but a REST/HTTP-polled client comparing the content-addressed ETag would get a 304 and
   skip the re-paint when the resent frame was byte-identical to what it already showed. Resend now

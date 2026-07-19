@@ -43,9 +43,12 @@ pushes it to the tag over Bluetooth LE and dithers for the panel.
 1. In Tesserae, **Settings → Devices → Add device** and pick **OpenDisplay
    tag (via Home Assistant)**.
 2. Set the panel size to your tag's resolution, and set **HA device id**
-   to the tag's Home Assistant device (the same one the
-   `opendisplay.upload_image` action's device picker shows). Optionally
-   set a **Rotation** if the tag's mounting needs it.
+   to Home Assistant's internal device id for the tag. This is a long hex
+   string, not the tag's own name or serial (`OD…`). Get it from
+   **Developer Tools → Actions → `opendisplay.upload_image`**: pick the
+   tag in the device picker, switch to **YAML mode**, and copy the
+   `device_id` value. Optionally set a **Rotation** if the tag's mounting
+   needs it.
 3. Bind a dashboard to the device and send, the same as any other panel.
    On each changed frame Tesserae writes
    `media/tesserae/<device-id>.png` and calls `opendisplay.upload_image`
