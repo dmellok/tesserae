@@ -9,10 +9,11 @@
   "panel": { "w": 800, "h": 480, "orientation": "landscape", "name": "OpenDisplay tag (set your panel size)", "gamut": "spectra_6" },
   "config_schema": {
     "ha_device_id": {
-      "type": "string",
-      "label": "HA device id",
+      "type": "ha_device_picker",
+      "integration": "opendisplay",
+      "label": "HA device",
       "default": "",
-      "help": "Home Assistant's internal device id for the tag: a long hex string (e.g. 4ab9c7f0e2…), NOT the tag's own name/serial (e.g. OD6CD5F9). Find it in Developer Tools → Actions → opendisplay.upload_image: pick the tag in the device picker, switch to YAML mode, and copy the device_id value. Tesserae targets this device when it pushes."
+      "help": "Pick your tag from Home Assistant's OpenDisplay devices; Tesserae stores its device id and, when the model reports a resolution, fills the panel size. If Home Assistant isn't reachable, type the device id by hand (its internal hex id, e.g. 4ab9c7f0e2…, not the tag's own name/serial). Requires the Home Assistant Core plugin."
     },
     "rotate": {
       "type": "select",

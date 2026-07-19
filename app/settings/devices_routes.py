@@ -529,6 +529,23 @@ def devices_discovered_json() -> Response:
     return current_app.response_class(json.dumps({"devices": items}), mimetype="application/json")
 
 
+@bp.get("/settings/devices/ha-devices.json")
+def devices_ha_list() -> Response:
+    """List a Home Assistant integration's devices for the config-form
+    picker (issue: OpenDisplay). ``?integration=<domain>`` selects which.
+    Always 200s: on no HA / error it returns an empty list plus a message
+    so the picker degrades to manual entry."""
+    from app.ha_device_picker import list_integration_devices
+
+    integration = (request.args.get("integration") or "").strip().lower()
+    registry = current_app.config.get("PLUGIN_REGISTRY")
+    plugin = registry.get("ha_core") if registry is not None else None
+    mod = getattr(plugin, "server_module", None) if plugin is not None else None
+    found, error = list_integration_devices(mod, integration)
+    payload = {"devices": found, "error": error}
+    return current_app.response_class(json.dumps(payload), mimetype="application/json")
+
+
 @bp.post("/settings/devices/discovery/<discovered_id>/register")
 def devices_register_discovered(discovered_id: str) -> Response:
     """One-click register a discovered device, same lifecycle as the

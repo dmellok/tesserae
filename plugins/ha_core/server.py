@@ -145,6 +145,25 @@ def call_service(
     return parsed if isinstance(parsed, list) else []
 
 
+def render_template(template: str, *, timeout: int = 10) -> str:
+    """POST ``/api/template`` and return the rendered text.
+
+    HA renders the Jinja template with its own device / entity helpers
+    (``integration_entities``, ``device_id``, ``device_attr`` …), which
+    aren't reachable through the plain state REST API. Used to pull the
+    device registry (e.g. list an integration's devices) without a
+    WebSocket connection. Raises on missing config or HTTP errors.
+    """
+    if not is_configured():
+        raise RuntimeError("Home Assistant is not configured")
+    body = json.dumps({"template": template}).encode("utf-8")
+    req = urllib.request.Request(
+        base_url() + "/api/template", data=body, headers=_headers(), method="POST"
+    )
+    with urllib.request.urlopen(req, timeout=timeout, context=_ssl_context()) as resp:
+        return resp.read().decode("utf-8")
+
+
 def get_states() -> list[dict[str, Any]]:
     """All entity states: ``[{entity_id, state, attributes, ...}, ...]``."""
     data = request_json("/api/states")

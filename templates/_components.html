@@ -460,6 +460,27 @@ macro here instead.
    (the {name, type, label, default, choices, min, max, step, unit, help}
    shape used by plugin / renderer / device manifests). Used by the
    settings page so we don't have to keep a parallel rendering table. -#}
+{#- Home Assistant device picker. A convenience <select> (no name, not
+   submitted) is populated by JS from HA's device registry; picking an
+   option fills the real text input (the submitted value) with the
+   device id and, when the model carries a resolution, the card's panel
+   size. Degrades to plain manual entry when HA is unreachable. -#}
+{%- macro ha_device_picker_field(field_id, name, label, value='', integration='', help=None, form=None) -%}
+<div class="field" data-ha-device-picker data-ha-integration="{{ integration }}">
+  <label for="{{ field_id }}">{{ label }}{{ info_pop(help) }}</label>
+  <select class="dx-ha-picker-select" data-ha-picker-select
+          aria-label="Pick from Home Assistant" hidden>
+    <option value="">Loading devices from Home Assistant…</option>
+  </select>
+  <input type="text" id="{{ field_id }}" name="{{ name }}"
+         value="{{ value|default('', true) }}"
+         {% if form %}form="{{ form }}"{% endif %}
+         data-ha-picker-value
+         placeholder="Home Assistant device id">
+  <p class="dx-hint" data-ha-picker-hint hidden></p>
+</div>
+{%- endmacro -%}
+
 {%- macro auto_field(field_id, name, spec, value, help=None, form=None) -%}
   {% set ftype = spec.get('type', 'string') %}
   {% set label = spec.get('label', name) %}
@@ -485,6 +506,9 @@ macro here instead.
     {{ entity_overrides_field(field_id, name, label, value=value, help=help_text, formats=spec.get('formats', False)) }}
   {% elif ftype == 'location_search' %}
     {{ location_search_field(field_id, name, label, value=value, help=help_text) }}
+  {% elif ftype == 'ha_device_picker' %}
+    {{ ha_device_picker_field(field_id, name, label, value=value or '',
+                              integration=spec.get('integration', ''), help=help_text, form=form) }}
   {% elif ftype == 'slider' %}
     {{ slider(field_id, name, label,
               value=value if value is not none else spec.get('default', 0),

@@ -41,9 +41,10 @@
         "type": "object",
         "required": ["type"],
         "properties": {
-          "type": { "enum": ["int", "float", "string", "boolean", "select"] },
+          "type": { "enum": ["int", "float", "string", "boolean", "select", "ha_device_picker"] },
           "label": { "type": "string" },
           "default": {},
+          "integration": { "type": "string", "description": "For 'ha_device_picker': the Home Assistant integration domain whose devices populate the dropdown (e.g. 'opendisplay')." },
           "min": { "type": "number" },
           "max": { "type": "number" },
           "choices": {

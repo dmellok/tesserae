@@ -392,11 +392,101 @@
     }
   }
 
+  // ---- HA device picker (OpenDisplay-via-HA config) -------------------
+  // A convenience <select> populated from HA's device registry. Picking a
+  // device fills the real text input (the submitted value) with its id and,
+  // when the model carries a resolution, the card's panel width/height.
+  // Degrades to plain manual entry when HA is unreachable.
+  function initHaDevicePicker(root) {
+    const integration = root.getAttribute('data-ha-integration') || '';
+    const select = root.querySelector('[data-ha-picker-select]');
+    const value = root.querySelector('[data-ha-picker-value]');
+    const hint = root.querySelector('[data-ha-picker-hint]');
+    if (!integration || !select || !value) return;
+
+    function showHint(text) {
+      if (!hint) return;
+      hint.textContent = text;
+      hint.hidden = !text;
+    }
+
+    function fillPanel(dev) {
+      if (!dev || !dev.w || !dev.h) return;
+      const card = root.closest('[data-device-body]') || root.closest('[data-device-card]');
+      if (!card) return;
+      const w = card.querySelector('input[name="panel_w"]');
+      const h = card.querySelector('input[name="panel_h"]');
+      if (w && h) {
+        w.value = dev.w;
+        h.value = dev.h;
+        w.dispatchEvent(new Event('change', { bubbles: true }));
+        h.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    }
+
+    fetch('/settings/devices/ha-devices.json?integration=' + encodeURIComponent(integration))
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        const devices = (data && data.devices) || [];
+        if (!devices.length) {
+          select.hidden = true;
+          showHint(
+            data && data.error
+              ? 'Home Assistant unavailable (' + data.error + '); enter the device id manually.'
+              : 'No Home Assistant devices found; enter the device id manually.'
+          );
+          return;
+        }
+        // Rebuild options: prompt, one per device, then a manual escape.
+        select.textContent = '';
+        const byId = {};
+        const prompt = document.createElement('option');
+        prompt.value = '';
+        prompt.textContent = '— Pick a device —';
+        select.appendChild(prompt);
+        devices.forEach(function (dev) {
+          byId[dev.device_id] = dev;
+          const opt = document.createElement('option');
+          opt.value = dev.device_id;
+          opt.textContent = dev.model ? dev.name + ' — ' + dev.model : dev.name;
+          if (dev.device_id === value.value) opt.selected = true;
+          select.appendChild(opt);
+        });
+        const manual = document.createElement('option');
+        manual.value = '__manual__';
+        manual.textContent = 'Enter manually…';
+        select.appendChild(manual);
+        select.hidden = false;
+        // Reflect the current stored value's model as a hint if it matches.
+        if (byId[value.value] && byId[value.value].model) {
+          showHint('Home Assistant: ' + byId[value.value].model);
+        }
+        select.addEventListener('change', function () {
+          if (select.value === '__manual__') {
+            value.focus();
+            select.value = value.value && byId[value.value] ? value.value : '';
+            return;
+          }
+          if (!select.value) return;
+          value.value = select.value;
+          value.dispatchEvent(new Event('change', { bubbles: true }));
+          const dev = byId[select.value];
+          fillPanel(dev);
+          showHint(dev && dev.model ? 'Home Assistant: ' + dev.model : '');
+        });
+      })
+      .catch(function () {
+        select.hidden = true;
+        showHint('Could not reach Home Assistant; enter the device id manually.');
+      });
+  }
+
   ready(function () {
     document.querySelectorAll('[data-device-card]').forEach(function (card) {
       initDeviceCard(card);
       initCollapse(card);
     });
+    document.querySelectorAll('[data-ha-device-picker]').forEach(initHaDevicePicker);
     document.querySelectorAll('[data-dirty-form]').forEach(initDirtyForm);
     initSaveBarStackObserver();
     document.querySelectorAll('[data-dep-group]').forEach(initDepGroup);

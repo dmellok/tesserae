@@ -130,3 +130,26 @@ def test_call_service_with_response_keeps_return_response(app: Flask, monkeypatc
         core.call_service_with_response("todo", "get_items", data={"entity_id": "todo.x"})
 
     assert "return_response" in str(seen["url"])
+
+
+def test_render_template_posts_to_template_endpoint(app: Flask, monkeypatch) -> None:
+    """render_template POSTs the template to /api/template and returns the
+    rendered text verbatim (used by the HA device picker)."""
+    core = _core(app)
+    seen: dict[str, object] = {}
+
+    def fake_urlopen(req, timeout=0, context=None):
+        seen["url"] = req.full_url
+        seen["method"] = req.get_method()
+        seen["body"] = req.data
+        return _FakeResp(b'[{"device_id": "abc"}]')
+
+    with app.app_context():
+        _configure(app)
+        monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+        out = core.render_template("{{ integration_entities('opendisplay') }}")
+
+    assert out == '[{"device_id": "abc"}]'
+    assert seen["method"] == "POST"
+    assert seen["url"] == "http://ha/api/template"
+    assert b"integration_entities" in seen["body"]
