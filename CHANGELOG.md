@@ -6,6 +6,18 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added
+
+- **OTA update contract (Phase 1).** The signing and verification half of the over-the-air
+  firmware update flow: an Ed25519-signed `{payload, signature}` descriptor binds the target device
+  kind, firmware version, image URL, size, and SHA-256. `app/ota/` carries the signer (with a
+  `python -m app.ota.sign` CLI), the reference verifier (signature, then manifest shape, then target,
+  then image digest, each failure a stable reason code), and the wire contract at
+  `docs/ota/contract.md`. `tests/fixtures/ota/` publishes a test-only key and four signed fixtures
+  (valid, wrong key, truncated, digest mismatch) so device firmware can self-test the verifier before
+  the live pipeline exists. Descriptor delivery on `/status` behind a capability flag, and image
+  hosting, are separate follow-up slices.
+
 ## [0.152.0], 2026-07-19
 
 ### Added
