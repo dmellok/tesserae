@@ -134,3 +134,26 @@ def test_endpoint_returns_devices_when_ha_answers(
     assert body["error"] is None
     assert body["devices"][0]["device_id"] == "abc"
     assert body["devices"][0]["w"] == 296 and body["devices"][0]["h"] == 128
+
+
+def test_add_form_persists_picked_ha_device_id(app: Flask) -> None:
+    """Adding an OpenDisplay tag from the Add-device form stores the picked
+    HA device id as config, so it's usable without opening the card."""
+    client = app.test_client()
+    _sign_in(client)
+    resp = client.post(
+        "/settings/devices/add",
+        data={
+            "kind": "opendisplay_ha",
+            "id": "kitchen_tag",
+            "name": "Kitchen tag",
+            "panel_w": "296",
+            "panel_h": "128",
+            "panel_orientation": "landscape",
+            "ha_device_id": "4ab9c7f0e2",
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code in (302, 303)
+    section = app.config["SETTINGS_STORE"].get_section("devices") or {}
+    assert section.get("kitchen_tag", {}).get("ha_device_id") == "4ab9c7f0e2"

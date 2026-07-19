@@ -412,7 +412,9 @@
 
     function fillPanel(dev) {
       if (!dev || !dev.w || !dev.h) return;
-      const card = root.closest('[data-device-body]') || root.closest('[data-device-card]');
+      // Works from both the device card (config field) and the Add-device
+      // card (OpenDisplay branch), whichever holds this picker + panel inputs.
+      const card = root.closest('[data-device-body], [data-device-card], [data-add-device-card]');
       if (!card) return;
       const w = card.querySelector('input[name="panel_w"]');
       const h = card.querySelector('input[name="panel_h"]');

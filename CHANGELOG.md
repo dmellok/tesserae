@@ -32,12 +32,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
-- **Pick the OpenDisplay tag from a dropdown instead of pasting an id.** The OpenDisplay-via-HA device
-  config now lists the OpenDisplay devices Home Assistant knows about (queried over HA's `/api/template`
-  endpoint, no WebSocket), so you select the tag by name and Tesserae stores the correct device id.
-  When the tag's model string carries a resolution (e.g. `296x128`), it also fills the panel size. Falls
-  back to manual entry when Home Assistant isn't reachable. The underlying `ha_device_picker` config
-  field type is reusable by any HA-targeting device kind.
+- **Pick the OpenDisplay tag from a dropdown instead of pasting an id.** Both the Add-device form's
+  OpenDisplay tab and the device card now list the OpenDisplay devices Home Assistant knows about
+  (queried over HA's `/api/template` endpoint, no WebSocket), so you select the tag by name and
+  Tesserae stores the correct device id. When the tag's model string carries a resolution (e.g.
+  `296x128`), it also fills the panel size. Falls back to manual entry when Home Assistant isn't
+  reachable. The underlying `ha_device_picker` config field type is reusable by any HA-targeting
+  device kind.
 
 ### Changed
 

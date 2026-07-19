@@ -178,6 +178,24 @@ def devices_add() -> Response:
             "device_name": result.device.name,
             "token": token,
         }
+    # Persist any config-schema values the add form actually supplied (e.g.
+    # the OpenDisplay HA device id picked from the dropdown), the same way
+    # the device card's Save does, so the device is usable without a second
+    # trip to its card. Only fields present in the form are stored, so a
+    # kind whose config fields aren't on the add form keeps its defaults
+    # rather than getting them written out; only stored when valid.
+    present_fields = [
+        f
+        for f in config_fields_from_schema(result.device.config_schema)
+        if f["name"] in request.form
+    ]
+    if present_fields:
+        values = values_from_form(present_fields)
+        ok, _err = result.device.validate_config(values)
+        if ok:
+            settings_store().update_for_namespace(
+                "devices", result.device.id, values, present_fields
+            )
     # New device's clones inherit picture-quality (dither/saturation/
     # contrast) from the user's existing base-renderer values where
     # available, so a freshly-added device matches the rest of the

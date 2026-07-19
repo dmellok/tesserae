@@ -17,7 +17,7 @@
    - ``pairing_codes`` — list of REST pending codes
 #}
 
-{% from "_components.html" import number_input, select_field, text_input with context %}
+{% from "_components.html" import number_input, select_field, text_input, ha_device_picker_field with context %}
 
 <section class="dx-section-card" id="add-device" data-add-device-card data-transport="{{ default_transport }}">
 
@@ -200,12 +200,15 @@
         <p>
           <strong>Via Home Assistant.</strong> Tesserae writes each frame to <code>/media</code>
           and calls HA's <code>opendisplay.upload_image</code> action; HA drives the tag over
-          Bluetooth LE. Add the tag below, then set its <strong>HA device id</strong> on the device
-          card. Prefer the standalone bridge? Use the <strong>REST API</strong> tab instead.
+          Bluetooth LE. Pick your tag below; its panel size fills in when Home Assistant reports
+          one. Prefer the standalone bridge? Use the <strong>REST API</strong> tab instead.
         </p>
       </div>
       <form method="post" action="{{ url_for('auth.devices_add') }}" class="form">
         <input type="hidden" name="kind" value="opendisplay_ha">
+        {{ ha_device_picker_field('add-od-hadev', 'ha_device_id', 'HA device', value='',
+                                  integration='opendisplay',
+                                  help='Pick your tag from Home Assistant. Its device id is stored and its panel size fills in when the model reports one. Falls back to manual entry if HA is unreachable.') }}
         {{ text_input('add-od-id', 'id', 'Device id', value='', placeholder='kitchen_tag', required=True,
                       help='Lowercase, no spaces. Names the frame file Tesserae writes for this tag.') }}
         {{ text_input('add-od-name', 'name', 'Display name', value='', placeholder='Kitchen tag') }}
