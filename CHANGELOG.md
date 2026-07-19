@@ -6,6 +6,8 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.152.0], 2026-07-19
+
 ### Added
 
 - **OpenDisplay device kind.** A new `opendisplay` device kind for OpenDisplay BLE e-paper tags,
