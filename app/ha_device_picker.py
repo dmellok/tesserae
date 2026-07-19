@@ -27,15 +27,25 @@ _WXH_RE = re.compile(r"(\d{2,5})\s*[x×]\s*(\d{2,5})")
 
 
 def build_template(integration: str) -> str:
-    """Jinja that renders a JSON array of the integration's devices."""
+    """Jinja that renders a JSON array of the integration's devices.
+
+    Uses the ``device_id`` / ``device_attr`` *functions* (not their filter
+    forms) in an explicit loop: not every HA build registers them as
+    filters, so ``map('device_id')`` can raise and blank the whole list.
+    Devices are found via their entities (every OpenDisplay tag registers a
+    binary_sensor), deduped by device id.
+    """
     return (
-        "{%- set ns = namespace(rows=[]) -%}"
-        f"{{%- for d in integration_entities('{integration}')"
-        " | map('device_id') | reject('none') | unique -%}"
+        "{%- set ns = namespace(rows=[], seen=[]) -%}"
+        f"{{%- for e in integration_entities('{integration}') -%}}"
+        "{%- set did = device_id(e) -%}"
+        "{%- if did and did not in ns.seen -%}"
+        "{%- set ns.seen = ns.seen + [did] -%}"
         "{%- set ns.rows = ns.rows + [{"
-        "'device_id': d,"
-        " 'name': device_attr(d, 'name_by_user') or device_attr(d, 'name'),"
-        " 'model': device_attr(d, 'model')}] -%}"
+        "'device_id': did,"
+        " 'name': device_attr(did, 'name_by_user') or device_attr(did, 'name'),"
+        " 'model': device_attr(did, 'model')}] -%}"
+        "{%- endif -%}"
         "{%- endfor -%}"
         "{{ ns.rows | tojson }}"
     )
