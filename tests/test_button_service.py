@@ -191,6 +191,48 @@ def test_right_button_advances_to_next_step_and_pushes(
     assert persisted.last_button_event_id == 1
 
 
+def test_button_advances_rotation_with_empty_device_ids(
+    rotation_store: RotationStore,
+    state_store: DeviceRotationStateStore,
+    settings_store: SettingsStore,
+    page_store: PageStore,
+    push_manager: StubPushManager,
+    clock: FakeClock,
+) -> None:
+    """Regression (#122): the Rotations UI writes ``device_ids=[]``, which
+    means "use the step pages' device bindings". A device bound to the pages
+    (not listed on the rotation) must still advance the rotation on a button
+    press; before the fix ``_resolve_rotation`` returned None and the press
+    was a no-op."""
+    rotation_store.upsert(
+        Rotation(
+            id="kitchen_rot",
+            name="Kitchen",
+            device_ids=[],  # what the UI form always saves
+            steps=[
+                RotationStep(page_id="morning", dwell_minutes=30),
+                RotationStep(page_id="afternoon", dwell_minutes=30),
+                RotationStep(page_id="evening", dwell_minutes=30),
+            ],
+        )
+    )
+    svc = _wire(
+        rotation_store=rotation_store,
+        state_store=state_store,
+        settings_store=settings_store,
+        page_store=page_store,
+        push_manager=push_manager,
+        clock=clock,
+    )
+
+    # The fixture pages are bound to "kitchen", so the empty-device_ids
+    # rotation falls through to them and the button advances it.
+    result = svc.handle_button(device_id="kitchen", button="right", event_id=1)
+    assert result.step_index == 1
+    assert result.pushed_page_id == "afternoon"
+    assert push_manager.calls and push_manager.calls[0]["page_id"] == "afternoon"
+
+
 def test_left_button_wraps_at_start(
     rotation_store: RotationStore,
     state_store: DeviceRotationStateStore,

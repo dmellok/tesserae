@@ -32,6 +32,10 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Set the log level on self-hosted installs (#122).** A `--log-level` flag and a `TESSERAE_LOG_LEVEL`
+  environment variable set the root log level (trace / debug / info / warning / error) for Docker, LXC,
+  and bare installs, which previously had no way to change it from the hardcoded INFO. The flag wins
+  over the env var; the Home Assistant add-on keeps using its own Log level option.
 - **OpenDisplay-via-HA tags report battery, signal, and firmware.** These tags never heartbeat
   Tesserae directly (Home Assistant owns the Bluetooth link), so a background poller pulls each tag's
   battery / signal-strength / temperature / firmware from its HA entities (matched by device class,
@@ -62,6 +66,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **Physical buttons and touch swipes advance rotations built in the UI (#122).** The Rotations page
+  saves a rotation with an empty `device_ids` (meaning "drive whichever devices the step pages are
+  bound to"), but the button / touch handler only matched rotations that named the device explicitly.
+  So no rotation created in the UI ever advanced on a `left`/`right` press or a swipe: the device just
+  re-served its current frame, and the press showed in History as a red "failed" row. The handler now
+  honours the same page-binding fall-through the scheduler uses, and benign button outcomes (no-op,
+  duplicate, unmapped, dispatched) are labelled as such in History instead of "failed".
 - **The "Issue pairing code" button lines up with the note field.** The button sat ~12px below the
   input because the field wrapper's block padding extended the flex row's baseline; the pairing-row
   field now has that padding zeroed so the button's bottom meets the input's.

@@ -70,13 +70,24 @@ def load_options(path: Path = DEFAULT_OPTIONS_PATH) -> dict[str, Any] | None:
     return parsed
 
 
+def resolve_log_level(name: str | None) -> int | None:
+    """Map a level name to a ``logging`` level, or None if empty / unknown.
+
+    Accepts HA's ``log_level`` vocabulary (trace / notice / fatal …) plus
+    the standard Python names, so the same helper serves the add-on option,
+    the ``TESSERAE_LOG_LEVEL`` env var, and the ``--log-level`` flag."""
+    raw = str(name or "").strip().lower()
+    if not raw:
+        return None
+    extra = {"warn": logging.WARNING, "critical": logging.CRITICAL}
+    return _HA_LOG_LEVEL_MAP.get(raw) or extra.get(raw)
+
+
 def apply_log_level(options: dict[str, Any]) -> None:
     """Translate HA's ``log_level`` option onto the root logger."""
-    raw = str(options.get("log_level") or "").strip().lower()
-    level = _HA_LOG_LEVEL_MAP.get(raw)
-    if level is None:
-        return
-    logging.getLogger().setLevel(level)
+    level = resolve_log_level(options.get("log_level"))
+    if level is not None:
+        logging.getLogger().setLevel(level)
 
 
 def _broker_patch_from_options(options: dict[str, Any]) -> dict[str, Any]:

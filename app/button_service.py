@@ -1055,12 +1055,33 @@ class ButtonService:
         bound to. Ties broken by earliest id lexicographically for
         determinism."""
         matches = [
-            r for r in self._rotations.all() if r.enabled and device_id in r.device_ids and r.steps
+            r
+            for r in self._rotations.all()
+            if r.enabled and r.steps and self._rotation_targets_device(r, device_id)
         ]
         if not matches:
             return None
         matches.sort(key=lambda r: (-r.priority, r.id))
         return matches[0]
+
+    def _rotation_targets_device(self, rotation: Rotation, device_id: str) -> bool:
+        """Whether a rotation drives this device. An explicit ``device_ids``
+        wins; an empty one (the default the Rotations UI writes) falls
+        through to the step pages' own device bindings, matching how the
+        scheduler fires a rotation, it pushes the step page and lets the
+        page's bindings route it. Without this, no UI-created rotation ever
+        matched here, so physical buttons and touch swipes never advanced
+        one."""
+        if rotation.device_ids:
+            return device_id in rotation.device_ids
+        pages_by_id = {p.id: p for p in self._pages.list()}
+        for step in rotation.steps:
+            page = pages_by_id.get(step.page_id)
+            # An unbound page (no device_ids) shows on every device, same
+            # rule the timetable / composer use.
+            if page is not None and (not page.device_ids or device_id in page.device_ids):
+                return True
+        return False
 
     def _effective_step_index(
         self,

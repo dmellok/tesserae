@@ -66,6 +66,13 @@ def _serve(argv: list[str] | None = None) -> None:
     parser.add_argument("--host", default="0.0.0.0", help="Bind host (default: 0.0.0.0)")
     parser.add_argument("--port", type=int, default=8765, help="Bind port (default: 8765)")
     parser.add_argument(
+        "--log-level",
+        default=None,
+        help="Root log level: trace/debug/info/warning/error (default: info). "
+        "Also settable via the TESSERAE_LOG_LEVEL env var (this flag wins). "
+        "The Home Assistant add-on uses its own Log level option instead.",
+    )
+    parser.add_argument(
         "--reset-password",
         action="store_true",
         help="Clear the stored admin password and exit. The next request "
@@ -78,14 +85,21 @@ def _serve(argv: list[str] | None = None) -> None:
         _reset_password()
         return
 
+    # Log level for self-hosted installs (Docker / LXC / bare): --log-level
+    # wins, then TESSERAE_LOG_LEVEL, else INFO. The HA add-on's log_level
+    # option is applied just below and takes precedence there.
+    from app.ha_options import apply_log_level, load_options, resolve_log_level
+
+    level = resolve_log_level(args.log_level) or resolve_log_level(
+        os.environ.get("TESSERAE_LOG_LEVEL")
+    )
     logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s, %(message)s"
+        level=level if level is not None else logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s, %(message)s",
     )
     # Honour HA's log_level option before create_app so its own startup
     # log lines respect it. apply_log_level is a no-op when there's no
     # options.json (i.e. not running as an HA Add-on).
-    from app.ha_options import apply_log_level, load_options
-
     _ha_options = load_options()
     if _ha_options is not None:
         apply_log_level(_ha_options)

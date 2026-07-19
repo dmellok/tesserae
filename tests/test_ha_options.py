@@ -14,6 +14,7 @@ from app.ha_options import (
     apply_log_level,
     apply_to_settings,
     load_options,
+    resolve_log_level,
 )
 from app.state.settings_store import SettingsStore
 
@@ -155,3 +156,22 @@ def test_ha_log_levels_round_trip(level: str, expected: int) -> None:
         assert root.level == expected
     finally:
         root.setLevel(original)
+
+
+@pytest.mark.parametrize(
+    "name, expected",
+    [
+        ("debug", logging.DEBUG),
+        ("trace", logging.DEBUG),
+        ("INFO", logging.INFO),
+        ("warn", logging.WARNING),
+        ("warning", logging.WARNING),
+        ("critical", logging.CRITICAL),
+        ("fatal", logging.CRITICAL),
+        ("", None),
+        (None, None),
+        ("bogus", None),
+    ],
+)
+def test_resolve_log_level(name: str | None, expected: int | None) -> None:
+    assert resolve_log_level(name) == expected
