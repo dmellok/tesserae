@@ -464,6 +464,16 @@ class PushManager:
          frame the renderer just wrote, not a stale guess."""
         return self._latest_renders.get(device_id)
 
+    def consume_force_refetch(self, device_id: str) -> None:
+        """Clear the one-shot resend refetch flag (#119) after a REST
+        client has been served a 200 for it, so subsequent polls of the
+        same unchanged frame go back to 304 (deep-sleep battery win)."""
+        with self._lock:
+            entry = self._latest_renders.get(device_id)
+            if entry and entry.get("force_refetch"):
+                entry["force_refetch"] = False
+                self._save_latest_renders()
+
     def touch_regions_for(self, comp_digest: str) -> list[dict[str, Any]]:
         """Touch region map extracted when this composition rendered
         (issue #49). Empty when the composition had no touch annotations
@@ -882,6 +892,7 @@ class PushManager:
                         record.target,
                         source="resend",
                         force_publish=True,
+                        force_client_refetch=True,
                     )
                 finally:
                     self._lock.release()
@@ -1133,6 +1144,7 @@ class PushManager:
         device_id: str | None = None,
         fit: str | None = None,
         force_publish: bool = False,
+        force_client_refetch: bool = False,
     ) -> PushResult:
         """Shared tail end of push_image / push_webpage / republish."""
         started = started if started is not None else time.monotonic()
@@ -1146,6 +1158,7 @@ class PushManager:
             device_filters={device_id} if device_id else None,
             image_fit=fit,
             force_publish=force_publish,
+            force_client_refetch=force_client_refetch,
         )
 
     def _fan_out(
@@ -1159,6 +1172,7 @@ class PushManager:
         device_filters: set[str] | None = None,
         image_fit: str | None = None,
         force_publish: bool = False,
+        force_client_refetch: bool = False,
         dither_regions: list[dict[str, Any]] | None = None,
         touch_regions: list[dict[str, Any]] | None = None,
     ) -> PushResult:
@@ -1309,6 +1323,13 @@ class PushManager:
                     # this matches, so a gamut / calibration change repaints
                     # even against an unchanged composition (issue #81).
                     "render_signature": signature,
+                    # Resend intent (#119): a user clicking "resend" in the
+                    # History page wants the panel to re-paint even when the
+                    # frame is byte-identical to what it already shows. MQTT
+                    # honours this via force_publish; for REST clients the
+                    # content-addressed ETag would otherwise 304, so we flag
+                    # the entry and /frame serves one 200 before clearing it.
+                    "force_refetch": force_client_refetch,
                 }
                 self._save_latest_renders()
             # One event per renderer per push: lets /events filter for a

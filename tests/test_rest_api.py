@@ -533,6 +533,39 @@ def test_frame_returns_304_when_if_none_match_matches(app: Flask) -> None:
     assert resp.headers["Content-Location"].endswith("/renders/abc123.bin")
 
 
+def test_resend_forces_one_200_then_reverts_to_304(app: Flask) -> None:
+    """Resend from History (#119): a frame flagged ``force_refetch`` serves
+    one 200 to a REST client even when its ETag matches (so an explicit
+    resend re-paints identical content, matching MQTT's force_publish),
+    then clears the flag so the next unchanged poll is 304 again."""
+    client = app.test_client()
+    _sign_in(client)
+    code = _issue_pairing(app)
+    resp = _register_via_api(client, code=code, device_id="bedroom_pico")
+    token = resp.get_json()["device_token"]
+
+    push_mgr = app.config["PUSH_MANAGER"]
+    push_mgr._latest_renders["bedroom_pico"] = {
+        "digest": "abc123",
+        "ext": "bin",
+        "filename": "abc123.bin",
+        "renderer_id": "pico_bin",
+        "timestamp": time.time(),
+        "composition_digest": "comp123",
+        "force_refetch": True,
+    }
+
+    headers = {"Authorization": f"Bearer {token}", "If-None-Match": '"abc123"'}
+    # First poll: matching ETag would normally 304, but the resend flag
+    # forces a 200 so the panel re-paints.
+    first = client.get("/api/v1/device/bedroom_pico/frame", headers=headers)
+    assert first.status_code == 200
+    assert first.headers["ETag"] == '"abc123"'
+    # Flag consumed: the next unchanged poll is back to 304.
+    second = client.get("/api/v1/device/bedroom_pico/frame", headers=headers)
+    assert second.status_code == 304
+
+
 def test_frame_returns_content_location_on_200(app: Flask) -> None:
     """The Content-Location header ships on 200 too so caching clients
     that don't parse the JSON body still have the canonical URL."""

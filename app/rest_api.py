@@ -525,12 +525,20 @@ def get_frame(device_id: str) -> Response:
     # "the specific resource location that would be returned". Cost
     # to existing clients: zero (they ignore unknown headers).
     image_url = f"{request.url_root.rstrip('/')}/renders/{latest['filename']}"
+    # Resend intent (#119): a "resend" from History flags the frame so a
+    # REST client re-fetches once even when the bytes are identical to
+    # what it already shows (MQTT gets this via force_publish). Skip the
+    # 304 this once, then clear the flag so the next poll of the same
+    # frame goes back to 304.
+    force_refetch = bool(latest.get("force_refetch"))
     if_none_match = request.headers.get("If-None-Match", "")
-    if if_none_match and if_none_match == etag:
+    if if_none_match and if_none_match == etag and not force_refetch:
         resp = Response(status=304)
         resp.headers["ETag"] = etag
         resp.headers["Content-Location"] = image_url
         return resp
+    if force_refetch and push_mgr is not None:
+        push_mgr.consume_force_refetch(device.id)
     panel = device.manifest.get("panel") or {}
     payload = {
         "url": image_url,

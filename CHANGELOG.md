@@ -45,6 +45,11 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **Resending a frame from History now re-paints REST clients (#119).** A resend force-republishes
+  over MQTT, but a REST/HTTP-polled client comparing the content-addressed ETag would get a 304 and
+  skip the re-paint when the resent frame was byte-identical to what it already showed. Resend now
+  flags the frame so `/frame` serves one 200 to force the re-fetch, then clears the flag so the next
+  unchanged poll is 304 again (the deep-sleep battery path is unaffected).
 - **OpenDisplay-via-HA can write frames to the media folder.** The container drops to an unprivileged
   user, but Home Assistant mounts `/media` root-owned, so the first frame write hit
   `PermissionError` and no frame reached the tag. The entrypoint now creates and chowns the
