@@ -54,6 +54,9 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **The "Issue pairing code" button lines up with the note field.** The button sat ~12px below the
+  input because the field wrapper's block padding extended the flex row's baseline; the pairing-row
+  field now has that padding zeroed so the button's bottom meets the input's.
 - **OpenDisplay-via-HA no longer times out on slow BLE pushes or blocks the push pipeline.** A BLE
   e-paper transfer can take tens of seconds; the 10s HTTP timeout fired mid-push and masked Home
   Assistant's own error, and because push listeners run synchronously it would also have stalled the

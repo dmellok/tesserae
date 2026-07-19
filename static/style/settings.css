@@ -2773,9 +2773,11 @@
   flex-wrap: wrap;
 }
 .dx-pair-input { flex: 1 1 320px; min-width: 0; }
-/* The field wrapper carries a 12px top margin elsewhere; drop it here so
-   the input aligns flush and the button's bottom meets the input's. */
-.dx-pair-input .field { margin-top: 0; }
+/* The field wrapper carries 12px block padding + a top margin elsewhere;
+   drop both here so the field box ends at the input's bottom edge and the
+   flex-end button lines up with the input rather than sitting ~12px below
+   it (the padding-bottom). */
+.dx-pair-input .field { margin-top: 0; padding: 0; }
 .dx-pair-action { flex: 0 0 auto; }
 .dx-pair-action .dx-btn-primary { white-space: nowrap; }
 
