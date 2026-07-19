@@ -469,7 +469,7 @@ macro here instead.
 <div class="field" data-ha-device-picker data-ha-integration="{{ integration }}">
   <label for="{{ field_id }}">{{ label }}{{ info_pop(help) }}</label>
   <select class="dx-ha-picker-select" data-ha-picker-select
-          aria-label="Pick from Home Assistant" hidden>
+          aria-label="Pick from Home Assistant" disabled>
     <option value="">Loading devices from Home Assistant…</option>
   </select>
   <input type="text" id="{{ field_id }}" name="{{ name }}"

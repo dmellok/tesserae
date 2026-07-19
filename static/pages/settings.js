@@ -424,12 +424,23 @@
       }
     }
 
+    // Keep the <select> visible (so the field always reads as a picker)
+    // but disabled with a status option when there's nothing to pick.
+    function disabledWith(text) {
+      select.textContent = '';
+      const opt = document.createElement('option');
+      opt.value = '';
+      opt.textContent = text;
+      select.appendChild(opt);
+      select.disabled = true;
+    }
+
     fetch('/settings/devices/ha-devices.json?integration=' + encodeURIComponent(integration))
       .then(function (r) { return r.json(); })
       .then(function (data) {
         const devices = (data && data.devices) || [];
         if (!devices.length) {
-          select.hidden = true;
+          disabledWith(data && data.error ? 'Home Assistant unavailable' : 'No devices found');
           showHint(
             data && data.error
               ? 'Home Assistant unavailable (' + data.error + '); enter the device id manually.'
@@ -456,7 +467,7 @@
         manual.value = '__manual__';
         manual.textContent = 'Enter manually…';
         select.appendChild(manual);
-        select.hidden = false;
+        select.disabled = false;
         // Reflect the current stored value's model as a hint if it matches.
         if (byId[value.value] && byId[value.value].model) {
           showHint('Home Assistant: ' + byId[value.value].model);
@@ -476,7 +487,7 @@
         });
       })
       .catch(function () {
-        select.hidden = true;
+        disabledWith('Could not reach Home Assistant');
         showHint('Could not reach Home Assistant; enter the device id manually.');
       });
   }
