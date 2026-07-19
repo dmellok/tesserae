@@ -64,6 +64,7 @@ class OpenDisplayHaPublisher:
         )
         self._media_dir = self._media_root / MEDIA_SUBDIR
         self._last_sent: dict[str, str] = {}
+        self._media_warned = False
         self._lock = threading.Lock()
 
     def _configured_root(self) -> str:
@@ -113,7 +114,26 @@ class OpenDisplayHaPublisher:
         if not src.exists():
             logger.warning("opendisplay_ha %s: composition %s missing on disk", device.id, digest)
             return
-        media_id = self._write_media(device.id, src)
+        try:
+            media_id = self._write_media(device.id, src)
+        except OSError as exc:
+            # Most likely the HA media folder isn't writable: the add-on
+            # needs the media:rw mapping and a writable /media (the
+            # tesserae subdir is chowned to the app user at container
+            # start). Warn once, actionably, instead of a traceback per
+            # render; clear the flag on success so a later fix re-arms it.
+            if not self._media_warned:
+                self._media_warned = True
+                logger.warning(
+                    "opendisplay_ha %s: can't write frame to %s (%s). In the HA add-on "
+                    "this needs the media:rw mapping and a writable /media; update the "
+                    "add-on and restart. Frames won't reach the tag until this is fixed.",
+                    device.id,
+                    self._media_dir,
+                    exc,
+                )
+            return
+        self._media_warned = False
         rotate = self._parse_rotate(cfg.get("rotate"))
         if self._call_upload(ha_device_id, media_id, rotate):
             with self._lock:

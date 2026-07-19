@@ -233,3 +233,20 @@ def test_loader_normalizes_stale_push_instance(app: Flask, tmp_path: Path) -> No
     assert device is not None
     assert device.transport == "push"
     assert device.status_topic is None
+
+
+def test_unwritable_media_dir_is_soft(app: Flask, tmp_path: Path) -> None:
+    """A read-only / root-owned HA media folder (PermissionError on mkdir)
+    must not crash the push loop or fire the upload; it warns and skips."""
+    _make_tag(app)
+    _plant_render(app, "kitchen_tag")
+    calls: list[Any] = []
+    pub = _publisher(app, tmp_path / "media", calls)
+
+    def boom(_device_id: str, _src: Path) -> str:
+        raise PermissionError("[Errno 13] Permission denied: '/media/tesserae'")
+
+    pub._write_media = boom  # type: ignore[method-assign]
+    pub.on_push()  # no crash
+    assert calls == []  # upload never attempted
+    assert pub._media_warned is True

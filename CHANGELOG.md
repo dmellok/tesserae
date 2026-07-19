@@ -45,6 +45,11 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **OpenDisplay-via-HA can write frames to the media folder.** The container drops to an unprivileged
+  user, but Home Assistant mounts `/media` root-owned, so the first frame write hit
+  `PermissionError` and no frame reached the tag. The entrypoint now creates and chowns the
+  `/media/tesserae` subdirectory while still root (HA core keeps read access), and the publisher logs
+  one actionable warning instead of a traceback per render if the folder still isn't writable.
 - **OpenDisplay devices no longer read as MQTT.** Both OpenDisplay kinds carried a `status_topic` in
   their manifest, which tagged them as MQTT devices and showed dormant MQTT topic rows. Neither uses
   a broker: the OpenDisplay-via-HA kind now declares a new `push` transport (delivered through Home

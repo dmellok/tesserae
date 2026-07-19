@@ -38,6 +38,17 @@ if [ "$(id -u)" = "0" ]; then
         chown pwuser:pwuser "${TESSERAE_DATA_ROOT}"
         chown -R pwuser:pwuser "${TESSERAE_DATA_ROOT}" 2>/dev/null || true
     fi
+    # HA Add-on path: the OpenDisplay-via-HA device kind writes frames
+    # into HA's media folder (/media, mapped media:rw) so it can hand HA
+    # a media-source id. Supervisor mounts /media root-owned, so create
+    # the tesserae subdir and chown it to pwuser while we're still root;
+    # otherwise the unprivileged process EPERMs on the first frame. Root
+    # (HA core) can still read it. Skipped harmlessly when /media isn't
+    # mapped (plain docker install) or is read-only.
+    if [ -d /media ]; then
+        mkdir -p /media/tesserae 2>/dev/null \
+            && chown pwuser:pwuser /media/tesserae 2>/dev/null || true
+    fi
     exec gosu pwuser "$@"
 fi
 
