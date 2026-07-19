@@ -32,6 +32,12 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Changed
 
+- **OpenDisplay is a transport choice when adding a device.** The Add-device card's transport control
+  gains an "OpenDisplay" option alongside REST and MQTT. It detects whether Tesserae is the Home
+  Assistant add-on: if so it offers a short form to add the tag (pushed via `opendisplay.upload_image`),
+  otherwise it points at the standalone bridge and the REST pairing tab. The "Issue pairing code"
+  button also aligns to the note field and stacks full-width on narrow viewports instead of
+  overflowing the card.
 - **The canvas and grid editors share one touch Interaction picker (#49).** The canvas editor had its
   own copy of the Interaction UI (on-tap / swipe / slider / code-element actions); it now uses the
   same `touch_interaction.js` module the grid editor does, so the two can't drift and an editor-side

@@ -230,6 +230,9 @@ def settings_area(area: str) -> str | Response:
         discovered_sig=discovered_sig,
         default_transport=default_transport,
         broker_configured=broker_configured,
+        # Drives the OpenDisplay transport branch: HA add-on gets the
+        # push (opendisplay_ha) form, otherwise the bridge instructions.
+        in_ha=is_ha_addon(),
         kind_default_rows=kind_default_rows,
         # When set (via ?calibrating=<id>), the matching device card shows
         # the "which number is in the top-left?" answer form.

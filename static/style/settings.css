@@ -2763,7 +2763,9 @@
   line-height: 1.5;
 }
 
-/* Pair row: note input on the left, action button on the right. */
+/* Pair row: note input on the left, action button on the right. The
+   input's label sits above it, so flex-end lines the button's bottom up
+   with the input field (not the label). */
 .dx-pair-row {
   display: flex;
   align-items: flex-end;
@@ -2771,7 +2773,20 @@
   flex-wrap: wrap;
 }
 .dx-pair-input { flex: 1 1 320px; min-width: 0; }
+/* The field wrapper carries a 12px top margin elsewhere; drop it here so
+   the input aligns flush and the button's bottom meets the input's. */
+.dx-pair-input .field { margin-top: 0; }
 .dx-pair-action { flex: 0 0 auto; }
+.dx-pair-action .dx-btn-primary { white-space: nowrap; }
+
+/* Narrow viewports (device preview panes, phones): stack the button
+   under the note and let it span the row instead of overflowing the
+   card edge. */
+@media (max-width: 560px) {
+  .dx-pair-input { flex-basis: 100%; }
+  .dx-pair-action { flex: 1 1 100%; }
+  .dx-pair-action .dx-btn-primary { width: 100%; justify-content: center; }
+}
 
 .dx-pending-codes { margin-top: 14px; }
 

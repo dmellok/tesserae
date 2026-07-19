@@ -57,12 +57,22 @@
                 aria-selected="{% if default_transport == 'mqtt' %}true{% else %}false{% endif %}">
           <i class="ph ph-broadcast" aria-hidden="true"></i><span>MQTT broker</span>
         </button>
+        <button type="button"
+                class="dx-segmented-btn"
+                data-segmented-btn="opendisplay"
+                role="tab"
+                aria-selected="false">
+          <i class="ph ph-bluetooth" aria-hidden="true"></i><span>OpenDisplay</span>
+        </button>
       </div>
       <p class="dx-segmented-help" data-segmented-help-rest{% if default_transport != 'rest' %} hidden{% endif %}>
         REST is the recommended default, devices pair with a one-time code, no broker required.
       </p>
       <p class="dx-segmented-help" data-segmented-help-mqtt{% if default_transport != 'mqtt' %} hidden{% endif %}>
         MQTT devices publish heartbeats to the broker; topics are derived from the device id.
+      </p>
+      <p class="dx-segmented-help" data-segmented-help-opendisplay hidden>
+        OpenDisplay BLE tags, driven through Home Assistant or the standalone bridge.
       </p>
     </div>
 
@@ -175,6 +185,56 @@
             </button>
           </form>
         </div>
+      </div>
+      {% endif %}
+    </div>
+
+    {# OpenDisplay branch: BLE tags via Home Assistant (push) or the
+       standalone bridge (REST). HA-detection picks which to lead with. #}
+    <div class="dx-add-branch dx-add-branch--opendisplay"
+         data-transport-branch="opendisplay"
+         hidden>
+      {% if in_ha %}
+      <div class="dx-hint-band">
+        <i class="ph ph-info" aria-hidden="true"></i>
+        <p>
+          <strong>Via Home Assistant.</strong> Tesserae writes each frame to <code>/media</code>
+          and calls HA's <code>opendisplay.upload_image</code> action; HA drives the tag over
+          Bluetooth LE. Add the tag below, then set its <strong>HA device id</strong> on the device
+          card. Prefer the standalone bridge? Use the <strong>REST API</strong> tab instead.
+        </p>
+      </div>
+      <form method="post" action="{{ url_for('auth.devices_add') }}" class="form">
+        <input type="hidden" name="kind" value="opendisplay_ha">
+        {{ text_input('add-od-id', 'id', 'Device id', value='', placeholder='kitchen_tag', required=True,
+                      help='Lowercase, no spaces. Names the frame file Tesserae writes for this tag.') }}
+        {{ text_input('add-od-name', 'name', 'Display name', value='', placeholder='Kitchen tag') }}
+        <div class="add-device-custom-fields add-device-custom-fields--static">
+          {{ number_input('add-od-w', 'panel_w', 'Panel width (px)', value='800', min=1, step=1) }}
+          {{ number_input('add-od-h', 'panel_h', 'Panel height (px)', value='480', min=1, step=1) }}
+        </div>
+        {{ select_field('add-od-orientation', 'panel_orientation', 'Rotation', value='landscape',
+                        options=[{'value':'landscape','label':'0°'},
+                                 {'value':'portrait','label':'90°'},
+                                 {'value':'landscape_flipped','label':'180°'},
+                                 {'value':'portrait_flipped','label':'270°'}],
+                        help='Clockwise turn applied to match how the tag is mounted.') }}
+        <div class="dx-actions-right">
+          <button type="submit" class="dx-btn-primary"><i class="ph ph-plus" aria-hidden="true"></i><span>Add OpenDisplay tag</span></button>
+        </div>
+      </form>
+      {% else %}
+      <div class="dx-hint-band">
+        <i class="ph ph-info" aria-hidden="true"></i>
+        <p>
+          <strong>OpenDisplay tags run over Bluetooth LE.</strong> This Tesserae is not the Home
+          Assistant add-on, so drive them with the standalone
+          <a href="https://github.com/dmellok/tesserae-opendisplay" target="_blank" rel="noopener noreferrer">tesserae-opendisplay bridge</a>:
+          switch to the <strong>REST API</strong> tab, issue a pairing code, then run the bridge on a
+          machine near your tags (<code>pip install tesserae-opendisplay</code>). One bridge drives
+          many tags. Running Home Assistant instead? Install Tesserae as the HA add-on to push through
+          <code>opendisplay.upload_image</code> with no extra hardware.
+        </p>
       </div>
       {% endif %}
     </div>
