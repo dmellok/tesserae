@@ -472,6 +472,20 @@ def _normalise_colour(raw: str) -> str:
     return DEFAULT_COLOUR
 
 
+def _prop_find(props: list[Any], tag: str) -> Any:
+    """First matching child ``tag`` across a response's ``propstat/prop``
+    blocks. A ``<response>`` can carry several ``<propstat>`` elements split
+    by status: sabre/dav (Baikal, Nextcloud) returns the props it has in a
+    200 block and the ones it lacks in a 404 block, in no guaranteed order.
+    Looking only at the first block drops a calendar whose ``resourcetype``
+    happens to sit after a 404 block (e.g. a calendar with no colour set)."""
+    for p in props:
+        el = p.find(tag, _NS)
+        if el is not None:
+            return el
+    return None
+
+
 def discover_collections(base_url: str, auth: dict[str, str] | None) -> dict[str, Any]:
     """PROPFIND ``base_url`` and return its calendar / todo collections.
 
@@ -523,22 +537,23 @@ def discover_collections(base_url: str, auth: dict[str, str] | None) -> dict[str
         href_el = resp_el.find("d:href", _NS)
         if href_el is None or not (href_el.text or "").strip():
             continue
-        prop = resp_el.find("d:propstat/d:prop", _NS)
-        if prop is None:
+        props = resp_el.findall("d:propstat/d:prop", _NS)
+        if not props:
             continue
-        rtype = prop.find("d:resourcetype", _NS)
+        rtype = _prop_find(props, "d:resourcetype")
         if rtype is None or rtype.find("c:calendar", _NS) is None:
             continue  # not a calendar collection (principal, addressbook, …)
         comps = [
             c.get("name", "").upper()
+            for prop in props
             for c in prop.findall("c:supported-calendar-component-set/c:comp", _NS)
             if c.get("name")
         ]
         # No declared component set means "everything" per RFC 4791; treat
         # it as both so the collection still shows up under either widget.
         wanted = [x for x in ("VEVENT", "VTODO") if x in comps] or ["VEVENT", "VTODO"]
-        name_el = prop.find("d:displayname", _NS)
-        colour_el = prop.find("cs:calendar-color", _NS)
+        name_el = _prop_find(props, "d:displayname")
+        colour_el = _prop_find(props, "cs:calendar-color")
         href = (href_el.text or "").strip()
         collection_url = urllib.parse.urljoin(fixed, href)
         collections.append(
@@ -715,8 +730,13 @@ def blueprint() -> Blueprint:
         elif not result.get("collections"):
             flash("No calendars found at that URL.", "warn")
         # Re-render the index with the discovered list + the creds echoed
-        # into the per-row Add forms so a one-click add carries them.
-        return _render_index(discovered=result.get("collections") or [], discover_auth=auth)
+        # into the per-row Add forms so a one-click add carries them. Echo
+        # base_url back too so a failed discovery doesn't wipe the field the
+        # user just typed (the template reads discover_auth.base_url).
+        return _render_index(
+            discovered=result.get("collections") or [],
+            discover_auth={**auth, "base_url": base_url},
+        )
 
     @bp.post("/feeds/<feed_id>/toggle")
     def toggle_feed(feed_id: str) -> Response:

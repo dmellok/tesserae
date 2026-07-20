@@ -225,6 +225,54 @@ def test_discover_collections_parses_calendars_and_todos(
     assert cols["Tasks"]["export_url"] == "http://baikal.lan/dav/cal/you/tasks/?export"
 
 
+# sabre/dav (Baikal, Nextcloud) splits a response's props across a 200
+# propstat (props it has) and a 404 propstat (props it lacks), and the
+# 404 block can come first. A colourless calendar therefore has its
+# <resourcetype> in a block that isn't the first one. #124.
+PROPFIND_XML_SABRE = b"""<?xml version="1.0" encoding="utf-8"?>
+<d:multistatus xmlns:d="DAV:" xmlns:cal="urn:ietf:params:xml:ns:caldav" xmlns:ical="http://apple.com/ns/ical/">
+ <d:response>
+  <d:href>/baikal/html/dav.php/calendars/bablokb/</d:href>
+  <d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop>
+   <d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+ </d:response>
+ <d:response>
+  <d:href>/baikal/html/dav.php/calendars/bablokb/private/</d:href>
+  <d:propstat><d:prop><ical:calendar-color/></d:prop>
+   <d:status>HTTP/1.1 404 Not Found</d:status></d:propstat>
+  <d:propstat><d:prop>
+   <d:resourcetype><d:collection/><cal:calendar/></d:resourcetype>
+   <d:displayname>Private</d:displayname>
+   <cal:supported-calendar-component-set><cal:comp name="VEVENT"/><cal:comp name="VTODO"/></cal:supported-calendar-component-set>
+  </d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+ </d:response>
+</d:multistatus>
+"""
+
+
+def test_discover_collections_handles_split_propstats(
+    cc: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A colourless Baikal calendar with its resourcetype in a non-first
+    propstat block is still detected (regression for #124)."""
+
+    class _FakeOpener:
+        def open(self, req: Any, timeout: float = 0) -> Any:
+            return _FakeResp(PROPFIND_XML_SABRE)
+
+    monkeypatch.setattr(cc, "_build_opener", lambda url, auth: _FakeOpener())
+    result = cc.discover_collections(
+        "http://baikal-dev/baikal/html/dav.php/calendars/bablokb/", None
+    )
+    assert result["error"] is None
+    cols = {c["name"]: c for c in result["collections"]}
+    # The bare calendar-home (no <calendar/>) is skipped; the colourless
+    # calendar is found despite its 404 propstat coming first.
+    assert set(cols) == {"Private"}
+    assert cols["Private"]["components"] == ["VEVENT", "VTODO"]
+    assert cols["Private"]["colour"] == cc.DEFAULT_COLOUR
+
+
 def test_discover_collections_reports_auth_failure(
     cc: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -390,3 +438,24 @@ def test_discover_route_lists_collections(app: Any, monkeypatch: pytest.MonkeyPa
     body = resp.get_data(as_text=True)
     assert "Tasks" in body
     assert "http://baikal.lan/dav/tasks/?export" in body
+
+
+def test_discover_route_keeps_url_on_empty_result(
+    app: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A discovery that finds nothing must not wipe the URL the user typed
+    (regression for #124's UI half)."""
+    client = app.test_client()
+    _sign_in(client)
+    core = _live_core(app)
+    monkeypatch.setattr(
+        core, "discover_collections", lambda base_url, auth: {"collections": [], "error": None}
+    )
+    typed = "http://baikal-dev/baikal/html/dav.php/calendars/bablokb/"
+    resp = client.post(
+        "/plugins/calendar_core/discover",
+        data={"base_url": typed, "auth_mode": "digest", "username": "u", "password": "p"},
+    )
+    assert resp.status_code == 200
+    # The base_url input is re-rendered with the typed value, not emptied.
+    assert f'value="{typed}"' in resp.get_data(as_text=True)
