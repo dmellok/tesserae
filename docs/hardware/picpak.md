@@ -17,9 +17,19 @@ speaks Tesserae's REST device API directly and paints frames the
   2-bpp packing layout, and the vertical-scan flip requirement.
 
 The firmware is not part of the Tesserae repo; it lives with its
-author. Grab it from the repo above, flash to a PicPak per the
-firmware's README, then pair the device in Tesserae's Settings →
-Devices.
+author. The quickest way on is the browser flasher below; otherwise
+build and flash from the repo per its README. Either way, pair the
+device afterwards in Tesserae's Settings → Devices.
+
+## Flashing
+
+The **[PicPak Web Flasher](https://picpaktesserae.pages.dev)** writes the
+community firmware straight from your browser over Web Serial, with no
+toolchain to install. Plug the PicPak in over USB, open the flasher in a
+Chromium-based browser (Chrome or Edge), pick the serial port, and flash.
+
+Prefer to build it yourself? Follow the README in
+[`varanu5/picpak-tesserae-client`](https://github.com/varanu5/picpak-tesserae-client).
 
 ## Panel specs
 
