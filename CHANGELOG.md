@@ -8,6 +8,12 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **MCP: rotations, schedules, and decks.** The agent MCP surface (`/api/mcp`) and the
+  `tesserae-mcp` bridge now expose list / create / delete for rotations and schedules, and list /
+  create / delete / suggest for decks, so an agent that builds pages can also wire how they cycle
+  (rotations), when they push (schedules), and how they group for instant navigation (decks).
+  `suggest_decks` derives a ready-made deck from the `page:<id>` tap / swipe links already on page
+  elements, so the agent can offer a deck once it has wired inter-page navigation.
 - **Decks: pre-rendered, navigable page groups.** A new Decks page (next to Rotations) groups pages
   into a small linked graph that Tesserae keeps pre-rendered per bound device, so a button press or
   touch that moves between them serves an already-rendered frame instead of rendering on the fly. Each

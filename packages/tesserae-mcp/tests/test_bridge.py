@@ -44,6 +44,16 @@ def test_tools_register() -> None:
         "render_preview",
         "push_to_device",
         "bind_devices",
+        "list_rotations",
+        "create_rotation",
+        "delete_rotation",
+        "list_schedules",
+        "create_schedule",
+        "delete_schedule",
+        "list_decks",
+        "suggest_decks",
+        "create_deck",
+        "delete_deck",
     }
     set_canvas = next(t for t in tools if t.name == "set_canvas")
     assert "canvas document is JSON" in (set_canvas.description or "")

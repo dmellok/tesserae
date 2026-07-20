@@ -337,6 +337,18 @@ PUSH: once the render looks right, push_to_device to the same panel(s) you bound
 device_ids may name several panels and the one render fans out to each, fitted to its own dims.
 (You already called bind_devices up front, so scheduling / rotation / the editor's Send are set;
 only call it again if the target changed.) Confirm before pushing to a real panel.
+
+WIRE UP NAVIGATION / SCHEDULING (once the pages exist):
+- rotations (list_rotations / create_rotation / delete_rotation): cycle a device through several
+  pages on a wall-clock cadence; steps are [{page_id, dwell_minutes}]. Bind the step pages first.
+- schedules (list_schedules / create_schedule / delete_schedule): push a page to its devices on an
+  interval or at a daily time.
+- decks (list_decks / create_deck / delete_deck, and suggest_decks): group pages a user navigates
+  between (button / touch) and keep them PRE-RENDERED per device so a press or tap is instant. A
+  deck is exactly the graph of page:<id> tap/swipe links between pages, so once you have wired
+  those links (on_tap:"page:<id>" / on_swipe), call suggest_decks() to get a ready-made deck (graph
+  + touch zones filled in) and create_deck() it instead of hand-building the graph. Offer this when
+  several pages link to each other.
 """
 
 
@@ -616,6 +628,67 @@ def build_server() -> Any:
         Returns {bound, unknown}."""
         return _json("POST", f"/pages/{page_id}/devices", {"device_ids": device_ids})
 
+    # -- rotations / schedules / decks -------------------------------------
+
+    def list_rotations() -> Any:
+        """List rotations: ordered page cycles that advance on a wall-clock
+        anchor (and via prev/next buttons). Each has steps [{page_id,
+        dwell_minutes}] and device_ids."""
+        return _json("GET", "/rotations")
+
+    def create_rotation(rotation: dict[str, Any]) -> Any:
+        """Create or replace a rotation. 'rotation' is a full object:
+        {id, name, device_ids, steps:[{page_id, dwell_minutes}], anchor?
+        ("HH:MM"), days_of_week?}. Bind the step pages to the devices first
+        (bind_devices). Returns {ok, id}, or 422 with "details" on a bad shape."""
+        return _json("POST", "/rotations", rotation)
+
+    def delete_rotation(rotation_id: str) -> Any:
+        """Delete a rotation by id."""
+        return _json("DELETE", f"/rotations/{rotation_id}")
+
+    def list_schedules() -> Any:
+        """List schedules: time-driven pushes of a page to its devices (interval
+        or daily, with day-of-week + time-window filters)."""
+        return _json("GET", "/schedules")
+
+    def create_schedule(schedule: dict[str, Any]) -> Any:
+        """Create or replace a schedule. 'schedule' is a full object:
+        {id, page_id, type ("interval"|"daily"), interval_minutes? or fires_at?
+        ("HH:MM"), days_of_week?, priority?}. Returns {ok, id}, or 422 with
+        "details" on a bad shape."""
+        return _json("POST", "/schedules", schedule)
+
+    def delete_schedule(schedule_id: str) -> Any:
+        """Delete a schedule by id."""
+        return _json("DELETE", f"/schedules/{schedule_id}")
+
+    def list_decks() -> Any:
+        """List decks: groups of pages kept pre-rendered per device so a button
+        press or touch that moves between them is instant. Each page links to
+        others by a button name or a touch zone."""
+        return _json("GET", "/decks")
+
+    def suggest_decks() -> Any:
+        """Suggest decks derived from the page:<id> tap/swipe links you set on
+        page elements (on_tap / on_swipe): connected clusters of linked pages,
+        each a ready-to-create Deck with its graph + touch zones filled in. Use
+        this after wiring inter-page navigation to offer the user a deck."""
+        return _json("GET", "/decks/suggest")
+
+    def create_deck(deck: dict[str, Any]) -> Any:
+        """Create or replace a deck. 'deck' is a full object: {id, name,
+        device_ids, pages:[{page_id, links:[{target_page_id, and exactly one of
+        button:"left"/"right"/... OR zone:{x,y,w,h in 0..1}}]}], entry_page_id?,
+        refresh_interval_minutes?}. Link targets must be pages in the deck.
+        Prefer suggest_decks() to build one from existing page links. Returns
+        {ok, id}, or 422 with "details" on a bad shape."""
+        return _json("POST", "/decks", deck)
+
+    def delete_deck(deck_id: str) -> Any:
+        """Delete a deck by id."""
+        return _json("DELETE", f"/decks/{deck_id}")
+
     mcp = FastMCP("tesserae", instructions=_INSTRUCTIONS)
     for fn in (
         list_widgets,
@@ -641,6 +714,16 @@ def build_server() -> Any:
         render_preview,
         push_to_device,
         bind_devices,
+        list_rotations,
+        create_rotation,
+        delete_rotation,
+        list_schedules,
+        create_schedule,
+        delete_schedule,
+        list_decks,
+        suggest_decks,
+        create_deck,
+        delete_deck,
     ):
         mcp.add_tool(fn)
     mcp.add_tool(

@@ -1118,3 +1118,76 @@ def test_set_canvas_rejects_unknown_element_keys_with_index(app: Flask) -> None:
     body = resp.get_json()
     assert body["unknown_fields"] == ["onTap"]
     assert "els[1]" in body["error"]
+
+
+# -- rotations / schedules / decks -------------------------------------
+
+
+def test_rotations_crud(app: Flask) -> None:
+    _enable(app)
+    c = app.test_client()
+    body = {
+        "id": "r1",
+        "name": "R",
+        "device_ids": [],
+        "steps": [{"page_id": "home", "dwell_minutes": 5}],
+    }
+    assert c.post("/api/mcp/rotations", json=body).status_code == 200
+    assert any(r["id"] == "r1" for r in c.get("/api/mcp/rotations").get_json()["rotations"])
+    assert c.delete("/api/mcp/rotations/r1").status_code == 200
+    assert c.delete("/api/mcp/rotations/r1").status_code == 404
+
+
+def test_rotation_invalid_returns_422_with_details(app: Flask) -> None:
+    _enable(app)
+    resp = app.test_client().post("/api/mcp/rotations", json={"id": "bad"})
+    assert resp.status_code == 422
+    assert resp.get_json()["details"]
+
+
+def test_schedules_crud(app: Flask) -> None:
+    _enable(app)
+    c = app.test_client()
+    body = {"id": "s1", "name": "S", "page_id": "home", "type": "interval", "interval_minutes": 60}
+    assert c.post("/api/mcp/schedules", json=body).status_code == 200
+    assert any(s["id"] == "s1" for s in c.get("/api/mcp/schedules").get_json()["schedules"])
+    assert c.delete("/api/mcp/schedules/s1").status_code == 200
+
+
+def test_decks_crud(app: Flask) -> None:
+    _enable(app)
+    c = app.test_client()
+    body = {
+        "id": "d1",
+        "name": "D",
+        "device_ids": [],
+        "pages": [
+            {"page_id": "a", "links": [{"target_page_id": "b", "button": "right"}]},
+            {"page_id": "b", "links": []},
+        ],
+    }
+    assert c.post("/api/mcp/decks", json=body).status_code == 200
+    assert any(d["id"] == "d1" for d in c.get("/api/mcp/decks").get_json()["decks"])
+    assert c.delete("/api/mcp/decks/d1").status_code == 200
+
+
+def test_deck_with_bad_link_returns_422(app: Flask) -> None:
+    _enable(app)
+    body = {
+        "id": "d",
+        "name": "D",
+        "pages": [{"page_id": "a", "links": [{"target_page_id": "ghost", "button": "right"}]}],
+    }
+    assert app.test_client().post("/api/mcp/decks", json=body).status_code == 422
+
+
+def test_decks_suggest_from_page_links(app: Flask) -> None:
+    _enable(app)
+    from app.state.page_store import Cell
+
+    ps = app.config["PAGE_STORE"]
+    ps.save(Page(id="ov", name="Ov", cells=[Cell(id="c", x=0, y=0, w=12, h=6, on_tap="page:cal")]))
+    ps.save(Page(id="cal", name="Cal", cells=[Cell(id="c", x=0, y=0, w=12, h=6, on_tap="page:ov")]))
+    out = app.test_client().get("/api/mcp/decks/suggest").get_json()["suggestions"]
+    assert len(out) == 1
+    assert {p["page_id"] for p in out[0]["pages"]} == {"ov", "cal"}

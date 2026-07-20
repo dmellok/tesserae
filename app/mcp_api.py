@@ -1501,5 +1501,124 @@ def bind_devices(page_id: str) -> Response:
     return jsonify({"bound": bound, "unknown": unknown})
 
 
+# ---- rotations / schedules / decks -----------------------------------
+#
+# Read + create + delete for the three scheduling / navigation primitives, so
+# an agent that has built pages can wire up how they cycle (rotations), when
+# they push (schedules), and how they group for instant navigation (decks).
+# Create validates the JSON body against the model and returns 422 with
+# field-level details on a bad shape, so the agent can correct and retry.
+
+
+def _model_errors(exc: ValidationError) -> list[dict[str, Any]]:
+    return [
+        {"loc": ".".join(str(x) for x in e.get("loc", ())), "msg": e.get("msg", "invalid")}
+        for e in exc.errors()
+    ]
+
+
+@bp.get("/rotations")
+def mcp_list_rotations() -> Response:
+    """All rotations (ordered page cycles) with their steps + device bindings."""
+    store = current_app.config["ROTATION_STORE"]
+    return jsonify(
+        {"rotations": [r.model_dump(mode="json", exclude_none=True) for r in store.all()]}
+    )
+
+
+@bp.post("/rotations")
+def mcp_create_rotation() -> Response:
+    """Create / replace a rotation. Body is a full Rotation object
+    (``{id, name, device_ids, steps:[{page_id, dwell_minutes}], anchor?, ...}``)."""
+    from app.state.rotation_model import Rotation
+
+    try:
+        rotation = Rotation.model_validate(request.get_json(silent=True) or {})
+    except ValidationError as exc:
+        return _err(422, "invalid rotation", details=_model_errors(exc))
+    current_app.config["ROTATION_STORE"].upsert(rotation)
+    return jsonify({"ok": True, "id": rotation.id})
+
+
+@bp.delete("/rotations/<rotation_id>")
+def mcp_delete_rotation(rotation_id: str) -> Response:
+    if not current_app.config["ROTATION_STORE"].delete(rotation_id):
+        return _err(404, f"no rotation {rotation_id!r}")
+    return jsonify({"ok": True, "id": rotation_id})
+
+
+@bp.get("/schedules")
+def mcp_list_schedules() -> Response:
+    """All schedules (time-driven page pushes)."""
+    store = current_app.config["SCHEDULE_STORE"]
+    return jsonify(
+        {"schedules": [s.model_dump(mode="json", exclude_none=True) for s in store.all()]}
+    )
+
+
+@bp.post("/schedules")
+def mcp_create_schedule() -> Response:
+    """Create / replace a schedule. Body is a full Schedule object
+    (``{id, page_id, type, ...}``, e.g. an interval or daily push)."""
+    from app.state.schedule_model import Schedule
+
+    try:
+        schedule = Schedule.model_validate(request.get_json(silent=True) or {})
+    except ValidationError as exc:
+        return _err(422, "invalid schedule", details=_model_errors(exc))
+    current_app.config["SCHEDULE_STORE"].upsert(schedule)
+    return jsonify({"ok": True, "id": schedule.id})
+
+
+@bp.delete("/schedules/<schedule_id>")
+def mcp_delete_schedule(schedule_id: str) -> Response:
+    if not current_app.config["SCHEDULE_STORE"].delete(schedule_id):
+        return _err(404, f"no schedule {schedule_id!r}")
+    return jsonify({"ok": True, "id": schedule_id})
+
+
+@bp.get("/decks")
+def mcp_list_decks() -> Response:
+    """All decks (pre-rendered navigable page groups)."""
+    store = current_app.config["DECK_STORE"]
+    return jsonify({"decks": [d.model_dump(mode="json", exclude_none=True) for d in store.all()]})
+
+
+@bp.post("/decks")
+def mcp_create_deck() -> Response:
+    """Create / replace a deck. Body is a full Deck object
+    (``{id, name, device_ids, pages:[{page_id, links:[{target_page_id, button|zone}]}],
+    entry_page_id?, refresh_interval_minutes?}``)."""
+    from app.state.deck_model import Deck
+
+    try:
+        deck = Deck.model_validate(request.get_json(silent=True) or {})
+    except ValidationError as exc:
+        return _err(422, "invalid deck", details=_model_errors(exc))
+    current_app.config["DECK_STORE"].upsert(deck)
+    return jsonify({"ok": True, "id": deck.id})
+
+
+@bp.delete("/decks/<deck_id>")
+def mcp_delete_deck(deck_id: str) -> Response:
+    if not current_app.config["DECK_STORE"].delete(deck_id):
+        return _err(404, f"no deck {deck_id!r}")
+    return jsonify({"ok": True, "id": deck_id})
+
+
+@bp.get("/decks/suggest")
+def mcp_suggest_decks() -> Response:
+    """Decks suggested from the ``page:<id>`` tap / swipe links across pages
+    (the navigation you authored in the canvas), each a ready-to-create Deck."""
+    from app.deck_suggest import suggest_decks
+
+    pages = current_app.config["PAGE_STORE"].list()
+    decks = current_app.config["DECK_STORE"].all()
+    suggestions = [
+        d.model_dump(mode="json", exclude_none=True) for d in suggest_decks(pages, decks)
+    ]
+    return jsonify({"suggestions": suggestions})
+
+
 def register(app: Flask) -> None:
     app.register_blueprint(bp)
