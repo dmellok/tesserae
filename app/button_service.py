@@ -45,7 +45,11 @@ from app.button_actions import (
     dispatch,
     parse_action_spec,
 )
+from app.device_loader import DeviceRegistry
 from app.push import PushManager, PushResult
+from app.state.deck_model import Deck
+from app.state.deck_nav_store import DeckNavStore
+from app.state.deck_store import DeckStore
 from app.state.device_rotation_state_model import DeviceRotationState
 from app.state.device_rotation_state_store import DeviceRotationStateStore
 from app.state.event_log import EventLog
@@ -197,11 +201,22 @@ class ButtonService:
         push_manager: PushManager | Callable[[], PushManager | None] | None,
         event_log: EventLog | None = None,
         clock: Callable[[], datetime] | None = None,
+        deck_store: DeckStore | None = None,
+        deck_nav_store: DeckNavStore | None = None,
+        devices: DeviceRegistry | None = None,
     ) -> None:
         self._rotations = rotation_store
         self._state = state_store
         self._settings = settings_store
         self._pages = page_store
+        # Optional Decks wiring: when both are present, a button that maps to a
+        # deck-graph link on the device's current page navigates the deck
+        # (promoting a pre-warmed frame) instead of the rotation.
+        self._decks = deck_store
+        self._deck_nav = deck_nav_store
+        # Only needed to normalise a touch stroke (frame pixels) against a
+        # deck zone (normalised 0..1); button navigation doesn't use it.
+        self._devices = devices
         # Accept either a live PushManager (or any duck-type with a
         # ``.push`` method, useful for tests) or a zero-arg callable
         # that returns one on each call (production, where the
@@ -291,6 +306,28 @@ class ButtonService:
             )
             return result_dedup
 
+        # Deck navigation intercept: if the device is on a deck and this button
+        # is a graph link on its current page, navigate the deck (promoting the
+        # pre-warmed frame) and short-circuit. A button that isn't a deck link
+        # falls through to the normal rotation / button_map path, so a device
+        # can both deck-navigate and keep a "refresh" button.
+        deck_target = self._try_deck_button(device_id, button)
+        if deck_target is not None:
+            return self._deck_navigate(
+                device_id=device_id,
+                deck=deck_target[0],
+                target_page=deck_target[1],
+                trigger_label=button,
+                event_id=event_id,
+                state=state,
+                now=now,
+                origin_extra={
+                    "button": button,
+                    "button_event_id": event_id,
+                    "deck_id": deck_target[0].id,
+                },
+            )
+
         # Resolve action spec through per-device -> global -> default.
         spec = self._resolve_action_spec(device_id, button)
 
@@ -361,6 +398,151 @@ class ButtonService:
             origin_extra={"button": button, "button_event_id": event_id},
         )
 
+    # ---- deck navigation ---------------------------------------------
+
+    def _bound_deck(self, device_id: str) -> Deck | None:
+        """The enabled deck bound to a device (first when several), or None."""
+        if self._decks is None or self._deck_nav is None:
+            return None
+        decks = self._decks.for_device(device_id)
+        return decks[0] if decks else None
+
+    def _deck_current_page(self, deck: Deck, device_id: str) -> str:
+        """The page the device is on within ``deck``; its entry page if new."""
+        assert self._deck_nav is not None
+        return self._deck_nav.current_page(device_id, deck.id) or deck.resolved_entry_page_id
+
+    def _try_deck_button(self, device_id: str, button: str) -> tuple[Deck, str] | None:
+        """``(deck, target_page)`` when ``button`` is a graph link on the
+        device's current deck page, else None (fall through to rotation)."""
+        deck = self._bound_deck(device_id)
+        if deck is None:
+            return None
+        target = deck.resolve_button(self._deck_current_page(deck, device_id), button)
+        return (deck, target) if target is not None else None
+
+    def _panel_dims(self, device_id: str) -> tuple[int, int] | None:
+        """The device's (width, height) in the frame's pixel space, used to
+        normalise a touch point against a deck zone. None when unknown."""
+        if self._devices is None:
+            return None
+        device = self._devices.get(device_id)
+        if device is None:
+            return None
+        panel = device.panel or {}
+        try:
+            w, h = int(panel.get("w") or 0), int(panel.get("h") or 0)
+        except (TypeError, ValueError):
+            return None
+        return (w, h) if w > 0 and h > 0 else None
+
+    def _try_deck_touch(self, device_id: str, stroke: TouchStroke) -> tuple[Deck, str] | None:
+        """``(deck, target_page)`` when the tap point lands in a deck zone on
+        the device's current deck page, else None (fall through to markup
+        touch regions)."""
+        deck = self._bound_deck(device_id)
+        if deck is None:
+            return None
+        dims = self._panel_dims(device_id)
+        if dims is None:
+            return None
+        w, h = dims
+        target = deck.resolve_zone(
+            self._deck_current_page(deck, device_id), stroke.x0 / w, stroke.y0 / h
+        )
+        return (deck, target) if target is not None else None
+
+    def _deck_navigate(
+        self,
+        *,
+        device_id: str,
+        deck: Deck,
+        target_page: str,
+        trigger_label: str,
+        event_id: int | None,
+        state: DeviceRotationState,
+        now: datetime,
+        origin_extra: dict[str, Any],
+    ) -> ButtonHandleResult:
+        """Move the device to ``target_page`` within ``deck``: promote the
+        pre-warmed frame when there is one (instant), else render on the fly.
+        Records nav position + dedup state either way."""
+        pusher = self._push_getter()
+        push_result: PushResult | None = None
+        pushed_page_id: str | None = None
+        if pusher is not None:
+            pushed_page_id = target_page
+            promoter = getattr(pusher, "promote_deck_page", None)
+            if not (callable(promoter) and promoter(device_id, target_page)):
+                # No warmed frame ready: render on the fly (Phase 4's refresh
+                # keeps decks warm so this is the cold-start / miss path).
+                push_result = pusher.push(
+                    target_page,
+                    device_ids={device_id},
+                    respect_quiet_hours=False,
+                    source="deck",
+                )
+        failed = push_result is not None and push_result.status == "failed"
+        if self._deck_nav is not None:
+            self._deck_nav.set(device_id, deck.id, target_page)
+        # Dedup bookkeeping so a retry of the same event doesn't double-navigate.
+        self._state.upsert(
+            state.model_copy(
+                update={
+                    "last_button": trigger_label,
+                    "last_button_event_id": event_id,
+                    "last_button_at": now,
+                }
+            )
+        )
+        result = ButtonHandleResult(
+            device_id=device_id,
+            dedup=False,
+            unmapped=False,
+            action_spec=f"deck:{deck.id}:{target_page}",
+            action_description=f"deck {deck.id!r} -> {target_page}",
+            rotation_id=None,
+            step_index=0,
+            step_page_id=None,
+            step_count=0,
+            manual_override=False,
+            override_until=None,
+            pushed_page_id=None if failed else pushed_page_id,
+            push_result=push_result,
+        )
+        self._emit_history_row(
+            result=result,
+            origin="deck",
+            origin_extra=origin_extra,
+            status="failed" if failed else "dispatched",
+        )
+        return result
+
+    def _deck_touch_navigate(
+        self, *, device_id: str, deck: Deck, target_page: str, event_id: int | None
+    ) -> TouchHandleResult:
+        """A deck-zone tap: dedup, navigate, wrap as a touch result."""
+        now = self._clock()
+        state = self._state.get(device_id) or DeviceRotationState(device_id=device_id)
+        if self._is_duplicate(state, button="touch", event_id=event_id, now=now):
+            return TouchHandleResult(outcome="deduped", gesture=None, base=self.snapshot(device_id))
+        base = self._deck_navigate(
+            device_id=device_id,
+            deck=deck,
+            target_page=target_page,
+            trigger_label="touch",
+            event_id=event_id,
+            state=state,
+            now=now,
+            origin_extra={"touch_event_id": event_id, "deck_id": deck.id, "target": target_page},
+        )
+        return TouchHandleResult(
+            outcome="dispatched" if base.pushed_page_id is not None else "error",
+            gesture="tap",
+            base=base,
+            action_spec=base.action_spec,
+        )
+
     def handle_touch(
         self,
         *,
@@ -374,6 +556,18 @@ class ButtonService:
         follow-up tap's synchronous push skips its Playwright capture
         (issue #49 linger). The prewarm runs on a daemon thread after the
         result is computed, so it never adds latency to this wake."""
+        # Deck navigation intercept: a tap that lands in a deck zone on the
+        # device's current deck page navigates the deck (promoting the warmed
+        # frame). Taps outside every zone fall through to the markup touch
+        # regions (widget actions) below.
+        deck_touch = self._try_deck_touch(device_id, stroke)
+        if deck_touch is not None:
+            return self._deck_touch_navigate(
+                device_id=device_id,
+                deck=deck_touch[0],
+                target_page=deck_touch[1],
+                event_id=event_id,
+            )
         result = self._handle_touch(
             device_id=device_id,
             stroke=stroke,

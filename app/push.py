@@ -430,6 +430,15 @@ class PushManager:
         self._precompose: OrderedDict[str, tuple[float, bytes, list[dict[str, Any]]]] = (
             OrderedDict()
         )
+        # Deck pre-render cache (Decks feature): device_id -> {page_id -> render
+        # info}. Holds several fully-rendered frames per device ready to promote
+        # into the live ``_latest_renders`` slot the instant navigation asks for
+        # one, so a button / touch that moves between a deck's pages skips the
+        # on-the-fly render. Warmed silently (see ``warm_deck_page``) so it never
+        # disturbs the frame the device is currently showing; kept in memory
+        # (re-warmed on restart) but its digests are GC-protected via
+        # ``_live_digests`` so the prune can't delete a warmed artifact.
+        self._deck_renders: dict[str, dict[str, dict[str, Any]]] = {}
 
     # -- listeners -------------------------------------------------------
 
@@ -498,6 +507,65 @@ class PushManager:
             if existed:
                 self._save_latest_renders()
         return existed
+
+    # -- deck pre-render cache (Decks feature) ---------------------------
+
+    def warm_deck_page(self, page_id: str, device_id: str) -> bool:
+        """Render a deck page for a device into the pre-render cache WITHOUT
+        changing the frame the device is currently serving. Returns True when a
+        frame was cached; best-effort, a render miss / failure returns False.
+
+        Renders under the push lock (like a normal push), so warms serialise
+        with real pushes rather than racing them."""
+        stamp: dict[str, dict[str, Any]] = {}
+        with self._lock:
+            try:
+                self._push_page_locked(
+                    page_id,
+                    device_ids={device_id},
+                    source="deck_warm",
+                    force_publish=True,
+                    stamp_into=stamp,
+                )
+            except Exception:
+                logger.exception("deck warm failed page=%s device=%s", page_id, device_id)
+                return False
+            info = stamp.get(device_id)
+            if info is None:
+                return False
+            self._deck_renders.setdefault(device_id, {})[page_id] = info
+        return True
+
+    def promote_deck_page(self, device_id: str, page_id: str) -> bool:
+        """Swap a pre-warmed deck frame into the device's live slot so the next
+        ``/frame`` serves it with no render. Returns False on a cache miss, the
+        caller should then fall back to an on-the-fly push."""
+        with self._lock:
+            info = self._deck_renders.get(device_id, {}).get(page_id)
+            if info is None:
+                return False
+            self._latest_renders[device_id] = dict(info)
+            self._save_latest_renders()
+        return True
+
+    def has_warm_deck_page(self, device_id: str, page_id: str) -> bool:
+        return page_id in self._deck_renders.get(device_id, {})
+
+    def clear_deck_cache(self, device_id: str, *, keep_pages: set[str] | None = None) -> None:
+        """Drop warmed frames for a device: all of them, or all except
+        ``keep_pages``. Used when a deck's page set changes or a device unbinds
+        so stale warmed frames don't linger (and stop pinning their artifacts)."""
+        with self._lock:
+            if keep_pages is None:
+                self._deck_renders.pop(device_id, None)
+                return
+            per = self._deck_renders.get(device_id)
+            if per is None:
+                return
+            for pid in [p for p in per if p not in keep_pages]:
+                per.pop(pid, None)
+            if not per:
+                self._deck_renders.pop(device_id, None)
 
     # -- speculative pre-compose (issue #49 linger) ----------------------
 
@@ -907,7 +975,13 @@ class PushManager:
         ``no_target`` and the touch monitor has nothing to overlay."""
         live: set[str] = set()
         # Shallow copy: callers may or may not hold self._lock.
-        for entry in list(self._latest_renders.values()):
+        entries = list(self._latest_renders.values())
+        # Warmed deck frames are live too: they're ready to promote onto a
+        # panel, so their artifact + regions must survive the prune even though
+        # no device is serving them yet and their event row may have been capped.
+        for per_page in list(self._deck_renders.values()):
+            entries.extend(per_page.values())
+        for entry in entries:
             for key in ("digest", "composition_digest"):
                 value = entry.get(key)
                 if isinstance(value, str) and value:
@@ -982,6 +1056,7 @@ class PushManager:
         respect_quiet_hours: bool = False,
         source: str = "page",
         force_publish: bool = False,
+        stamp_into: dict[str, dict[str, Any]] | None = None,
     ) -> PushResult:
         started = time.monotonic()
         page = self._page_store.get(page_id)
@@ -1104,6 +1179,7 @@ class PushManager:
                     force_publish=force_publish,
                     dither_regions=dither_regions,
                     touch_regions=touch_regions,
+                    stamp_into=stamp_into,
                 )
                 all_renderers.extend(result.renderers)
                 group_results.append(result)
@@ -1175,8 +1251,16 @@ class PushManager:
         force_client_refetch: bool = False,
         dither_regions: list[dict[str, Any]] | None = None,
         touch_regions: list[dict[str, Any]] | None = None,
+        stamp_into: dict[str, dict[str, Any]] | None = None,
     ) -> PushResult:
         """Common fanout: thumbnail + per-renderer transform / publish / log.
+
+        ``stamp_into`` (Decks silent warm, optional): when set, the per-device
+        render info is written into this map instead of the live
+        ``_latest_renders``, so a warm render produces the artifact + regions on
+        disk without changing what any device is currently serving. Callers pass
+        ``force_publish=True`` alongside it so the content-skip path (which reads
+        and bumps ``_latest_renders``) is bypassed.
 
         ``device_filters`` (multi-head): when set, only renderers whose
         ``.device`` is in the set fire, so a frame rendered for one
@@ -1305,7 +1389,7 @@ class PushManager:
             # populate it harmlessly, useful for future debug / REST
             # access to a device's most recent frame.
             if result.error is None and result.digest:
-                self._latest_renders[renderer.device] = {
+                render_info = {
                     "digest": result.digest,
                     "ext": renderer.extension,
                     "filename": f"{result.digest}.{renderer.extension}",
@@ -1331,7 +1415,14 @@ class PushManager:
                     # the entry and /frame serves one 200 before clearing it.
                     "force_refetch": force_client_refetch,
                 }
-                self._save_latest_renders()
+                if stamp_into is not None:
+                    # Silent warm: record the frame for the caller (Decks) without
+                    # touching the live map, so the device keeps serving its
+                    # current frame until navigation promotes this one.
+                    stamp_into[renderer.device] = render_info
+                else:
+                    self._latest_renders[renderer.device] = render_info
+                    self._save_latest_renders()
             # One event per renderer per push: lets /events filter for a
             # single renderer's history without scanning every push's
             # nested extras.
