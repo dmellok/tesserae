@@ -464,9 +464,10 @@ class Scheduler:
         threading.Thread(target=_run, name="tesserae-deck-warm", daemon=True).start()
 
     def _warm_decks(self, now: datetime) -> None:
-        """Re-warm each enabled deck's pages for its bound devices when the
-        deck's refresh cadence is due (or it hasn't been warmed yet). Silent:
-        warming stamps a side cache and never repaints a device's live frame."""
+        """Re-warm each enabled deck's pages for its bound devices, each page on
+        its own effective cadence (per-page override, else the deck default; 0
+        means don't periodically re-warm that page). Silent: warming stamps a
+        side cache and never repaints a device's live frame."""
         if self._deck_store is None:
             return
         pusher = self._push_factory()
@@ -475,13 +476,17 @@ class Scheduler:
             return
         now_ts = now.timestamp()
         for deck in self._deck_store.all():
-            if not deck.enabled or not deck.device_ids or deck.refresh_interval_minutes <= 0:
-                continue
-            last = self._deck_last_warm.get(deck.id)
-            if last is not None and now_ts - last < deck.refresh_interval_minutes * 60:
+            if not deck.enabled or not deck.device_ids:
                 continue
             for device_id in deck.device_ids:
                 for page in deck.pages:
+                    interval = page.effective_refresh_minutes(deck.refresh_interval_minutes)
+                    if interval <= 0:
+                        continue
+                    key = f"{deck.id}\x00{device_id}\x00{page.page_id}"
+                    last = self._deck_last_warm.get(key)
+                    if last is not None and now_ts - last < interval * 60:
+                        continue
                     try:
                         warm(page.page_id, device_id)
                     except Exception:
@@ -491,7 +496,7 @@ class Scheduler:
                             page.page_id,
                             device_id,
                         )
-            self._deck_last_warm[deck.id] = now_ts
+                    self._deck_last_warm[key] = now_ts
 
     def compute_step_state(
         self, rotation: Rotation, now: datetime | None = None

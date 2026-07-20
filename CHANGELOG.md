@@ -14,6 +14,10 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   (rotations), when they push (schedules), and how they group for instant navigation (decks).
   `suggest_decks` derives a ready-made deck from the `page:<id>` tap / swipe links already on page
   elements, so the agent can offer a deck once it has wired inter-page navigation.
+- **Per-page refresh cadence in decks.** A deck page can set its own
+  `refresh_interval_minutes` (in the graph editor or via MCP), overriding the deck's default, so a
+  volatile tile can re-warm every few minutes while a photo page in the same deck refreshes rarely.
+  `0` warms the page only on first navigation; unset inherits the deck cadence.
 - **Decks: pre-rendered, navigable page groups.** A new Decks page (next to Rotations) groups pages
   into a small linked graph that Tesserae keeps pre-rendered per bound device, so a button press or
   touch that moves between them serves an already-rendered frame instead of rendering on the fly. Each

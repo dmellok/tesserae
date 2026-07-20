@@ -678,11 +678,12 @@ def build_server() -> Any:
 
     def create_deck(deck: dict[str, Any]) -> Any:
         """Create or replace a deck. 'deck' is a full object: {id, name,
-        device_ids, pages:[{page_id, links:[{target_page_id, and exactly one of
-        button:"left"/"right"/... OR zone:{x,y,w,h in 0..1}}]}], entry_page_id?,
-        refresh_interval_minutes?}. Link targets must be pages in the deck.
-        Prefer suggest_decks() to build one from existing page links. Returns
-        {ok, id}, or 422 with "details" on a bad shape."""
+        device_ids, pages:[{page_id, refresh_interval_minutes? (per-page
+        override of the deck default; 0 = warm only on first visit), links:
+        [{target_page_id, and exactly one of button:"left"/"right"/... OR
+        zone:{x,y,w,h in 0..1}}]}], entry_page_id?, refresh_interval_minutes?}.
+        Link targets must be pages in the deck. Prefer suggest_decks() to build
+        one from existing page links. Returns {ok, id}, or 422 on a bad shape."""
         return _json("POST", "/decks", deck)
 
     def delete_deck(deck_id: str) -> Any:

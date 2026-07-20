@@ -99,6 +99,14 @@ def test_refresh_interval_bounds() -> None:
         _deck(refresh_interval_minutes=99999)
 
 
+def test_deck_page_refresh_override() -> None:
+    assert DeckPage(page_id="a", refresh_interval_minutes=5).effective_refresh_minutes(15) == 5
+    assert DeckPage(page_id="b").effective_refresh_minutes(15) == 15  # inherits deck default
+    assert DeckPage(page_id="c", refresh_interval_minutes=0).effective_refresh_minutes(15) == 0
+    with pytest.raises(ValidationError):
+        DeckPage(page_id="d", refresh_interval_minutes=99999)
+
+
 def test_store_round_trip(tmp_path: Path) -> None:
     store = DeckStore(tmp_path / "decks.json")
     assert store.all() == []

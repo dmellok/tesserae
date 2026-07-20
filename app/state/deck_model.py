@@ -85,6 +85,23 @@ class DeckPage(BaseModel):
     page_id: str = Field(min_length=1)
     links: list[DeckLink] = Field(default_factory=list)
 
+    # Per-page background refresh cadence, overriding the deck's default. None
+    # inherits ``Deck.refresh_interval_minutes``; 0 means the scheduler doesn't
+    # warm this page (it warms lazily on first navigation), so use a large
+    # interval for a page that should be pre-warmed but seldom refreshed. Lets a
+    # volatile tile refresh often while a photo page refreshes rarely in the
+    # same deck.
+    refresh_interval_minutes: int | None = Field(default=None, ge=0, le=1440)
+
+    def effective_refresh_minutes(self, deck_default: int) -> int:
+        """The refresh cadence to use for this page: its own override, else the
+        deck default."""
+        return (
+            self.refresh_interval_minutes
+            if self.refresh_interval_minutes is not None
+            else deck_default
+        )
+
 
 class Deck(BaseModel):
     model_config = ConfigDict(extra="forbid")

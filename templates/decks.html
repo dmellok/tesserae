@@ -52,12 +52,14 @@
     {"target_page_id": "calendar", "button": "right"},
     {"target_page_id": "weather", "zone": {"x": 0, "y": 0, "w": 0.5, "h": 0.5}}
   ]},
-  {"page_id": "calendar", "links": [{"target_page_id": "overview", "button": "left"}]},
+  {"page_id": "calendar", "refresh_interval_minutes": 5, "links": [{"target_page_id": "overview", "button": "left"}]},
   {"page_id": "weather", "links": [{"target_page_id": "overview", "button": "left"}]}
 ]'>{{ graph_json if is_edit else '' }}</textarea>
     <p class="cf-hint">
       Each page lists its links. A link fires on a physical <code>button</code> name
       (e.g. left / right / refresh) or a touch <code>zone</code> (x, y, w, h in 0..1 of the panel).
+      A page may set its own <code>refresh_interval_minutes</code> to override the deck's cadence
+      above (0 = warm only on first visit, never refreshed).
       Available pages: {% for p in pages %}<code>{{ p.id }}</code>{% if not loop.last %}, {% endif %}{% endfor %}.
     </p>
   </div>
