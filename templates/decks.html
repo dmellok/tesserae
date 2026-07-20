@@ -66,7 +66,7 @@
 </form>
 {% endmacro %}
 
-{% block content %}
+{% block main %}
 <div class="page-head">
   <h1><i class="ph-bold ph-cards-three" aria-hidden="true"></i> Decks</h1>
   <p class="page-sub">
@@ -79,6 +79,32 @@
 <datalist id="deck-page-ids">
   {% for p in pages %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
 </datalist>
+
+{% if suggestions %}
+<section class="card deck-suggest">
+  {{ card_head('Suggested from your page links', icon_name='magic-wand', level=2) }}
+  <p class="cf-hint">
+    These pages link to each other via tap / swipe actions you set in the canvas editor.
+    Create a deck to keep them pre-rendered.
+  </p>
+  {% for s in suggestions %}
+  <div class="deck-suggestion">
+    <div class="deck-suggestion__meta">
+      <strong>{{ s.name }}</strong>
+      <span class="cf-hint">{% for pid in s.page_ids %}<code>{{ page_names.get(pid, pid) }}</code>{% if not loop.last %} &rarr; {% endif %}{% endfor %}</span>
+    </div>
+    <form method="post" action="{{ url_for('decks.create') }}" class="inline">
+      <input type="hidden" name="name" value="{{ s.name }}">
+      {% for dev in s.device_ids %}<input type="hidden" name="device_ids" value="{{ dev }}">{% endfor %}
+      <input type="hidden" name="entry_page_id" value="{{ s.entry_page_id or '' }}">
+      <input type="hidden" name="refresh_interval_minutes" value="{{ s.refresh }}">
+      <input type="hidden" name="graph_json" value="{{ s.graph_json }}">
+      <button type="submit" class="button"><i class="ph ph-plus" aria-hidden="true"></i><span>Create deck</span></button>
+    </form>
+  </div>
+  {% endfor %}
+</section>
+{% endif %}
 
 {% for deck in decks %}
 <section class="card deck-card" id="deck-{{ deck.id }}">
@@ -106,10 +132,10 @@
   {% endif %}
 </section>
 {% else %}
-{{ empty_state('No decks yet', 'Create one below to group pages for instant navigation.') }}
+{{ empty_state('cards-three', 'No decks yet', 'Create one below to group pages for instant navigation.') }}
 {% endfor %}
 
-{% call section_card('New deck', icon_name='plus-circle') %}
+{% call section_card('plus-circle', 'New deck') %}
   {{ deck_form(none, '', pages, devices, page_names) }}
 {% endcall %}
 {% endblock %}

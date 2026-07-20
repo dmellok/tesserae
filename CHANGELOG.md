@@ -14,7 +14,10 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   page links to others by a physical button name or a touch zone; the scheduler re-warms a deck's
   pages in the background on the cadence you set, so their data stays current. Removes the on-the-fly
   render latency from navigation (the download and e-ink repaint still happen). Build a deck under
-  Decks: name it, bind devices, set the refresh cadence, and define the page graph.
+  Decks: name it, bind devices, set the refresh cadence, and define the page graph. Decks can also be
+  **suggested automatically**: when pages link to each other via tap / swipe "go to page" actions set
+  in the canvas editor, the Decks page offers a one-click deck for each cluster, with the graph and
+  touch zones derived from those links.
 
 - **OTA per-kind rollout: manual promote + canary (#121).** Beyond staging a build for a single
   device, an operator can now set a signed build as a device kind's release and roll it out

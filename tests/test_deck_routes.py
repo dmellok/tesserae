@@ -9,7 +9,7 @@ import pytest
 from flask import Flask
 
 from app.main import REPO_ROOT, create_app
-from app.state.page_store import Page
+from app.state.page_store import Cell, Page
 
 
 @pytest.fixture
@@ -108,3 +108,27 @@ def test_delete_deck(app: Flask) -> None:
     did = _decks(app)[0].id
     client.post(f"/decks/{did}/delete")
     assert app.config["DECK_STORE"].get(did) is None
+
+
+def test_suggestions_render_from_page_links(app: Flask) -> None:
+    ps = app.config["PAGE_STORE"]
+    ps.save(
+        Page(
+            id="overview",
+            name="Overview",
+            cells=[Cell(id="c1", x=0, y=0, w=12, h=6, on_tap="page:calendar")],
+        )
+    )
+    ps.save(
+        Page(
+            id="calendar",
+            name="Calendar",
+            cells=[Cell(id="c2", x=0, y=0, w=12, h=6, on_tap="page:overview")],
+        )
+    )
+    client = app.test_client()
+    _sign_in(client)
+    body = client.get("/decks").get_data(as_text=True)
+    assert "Suggested from your page links" in body
+    # A pre-filled create form is rendered for the suggestion.
+    assert "graph_json" in body and "Create deck" in body

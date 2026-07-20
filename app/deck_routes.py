@@ -26,6 +26,7 @@ from flask import (
 from pydantic import ValidationError
 from werkzeug.wrappers import Response
 
+from app.deck_suggest import suggest_decks
 from app.state.deck_model import Deck, DeckPage
 from app.state.deck_store import DeckStore
 from app.state.page_store import PageStore
@@ -107,16 +108,31 @@ def _invalidate(deck: Deck) -> None:
             nav.clear(device_id)
 
 
+def _graph_json(deck_pages: Any) -> str:
+    return json.dumps([p.model_dump(exclude_none=True) for p in deck_pages], indent=2)
+
+
 @bp.get("")
 def index() -> str:
     pages = _pages().list()
     decks = _store().all()
     devices = current_app.config.get("DEVICE_REGISTRY")
     instances = [d for d in (devices.all() if devices is not None else []) if d.kind_of is not None]
-    graphs = {
-        d.id: json.dumps([p.model_dump(exclude_none=True) for p in d.pages], indent=2)
-        for d in decks
-    }
+    graphs = {d.id: _graph_json(d.pages) for d in decks}
+    # Suggested decks derived from page:<id> tap/swipe links across pages, so a
+    # user who wired navigation in the canvas editor can create the deck in one
+    # click instead of hand-authoring the graph.
+    suggestions = [
+        {
+            "name": s.name,
+            "device_ids": s.device_ids,
+            "entry_page_id": s.entry_page_id,
+            "refresh": s.refresh_interval_minutes,
+            "graph_json": _graph_json(s.pages),
+            "page_ids": s.page_ids,
+        }
+        for s in suggest_decks(pages, decks)
+    ]
     return render_template(
         "decks.html",
         decks=decks,
@@ -124,6 +140,7 @@ def index() -> str:
         page_names={p.id: p.name for p in pages},
         devices=instances,
         graphs=graphs,
+        suggestions=suggestions,
         edit_id=request.args.get("edit"),
     )
 
