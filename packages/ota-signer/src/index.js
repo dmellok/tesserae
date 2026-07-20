@@ -137,9 +137,11 @@ async function handleSign(request, env) {
 }
 
 async function handleFirmware(env, path, headOnly) {
-  // HEAD uses R2's metadata-only head() so a client can probe size/etag without
-  // downloading; GET streams the body.
-  const object = headOnly ? await env.OTA_BUCKET.head(path) : await env.OTA_BUCKET.get(path);
+  // Always get(): for HEAD we return the headers with a null body, so the
+  // object's bytes are never streamed (the body is a lazy stream, unread here).
+  // Robust vs R2 head() edge cases, and a HEAD then costs the same as a GET's
+  // metadata lookup.
+  const object = await env.OTA_BUCKET.get(path);
   if (object === null) return new Response("not found", { status: 404 });
   const headers = new Headers();
   object.writeHttpMetadata(headers);
