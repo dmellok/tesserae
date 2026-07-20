@@ -68,6 +68,7 @@
             <input type="hidden" name="auth_mode" value="{{ discover_auth.auth_mode or 'none' }}">
             <input type="hidden" name="username" value="{{ discover_auth.username or '' }}">
             <input type="hidden" name="password" value="{{ discover_auth.password or '' }}">
+            <input type="hidden" name="discover_base_url" value="{{ discover_auth.base_url or '' }}">
             <button type="submit" class="button"><i class="ph ph-plus" aria-hidden="true"></i><span>Add</span></button>
           </form>
           {% endif %}

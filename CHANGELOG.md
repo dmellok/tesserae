@@ -49,6 +49,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   the live pipeline exists. Descriptor delivery on `/status` behind a capability flag, and image
   hosting, are separate follow-up slices.
 
+### Fixed
+
+- **Calendar discovery: adding one collection no longer hides the rest (#124).** After a CalDAV
+  discovery, adding a discovered calendar redirected to a bare page that dropped the other found
+  collections. The add now re-renders the discovery list (the added one marked "already added", the
+  rest still one-click addable), so a server with several calendars can be added in a few clicks.
+
 ## [0.152.0], 2026-07-19
 
 ### Added

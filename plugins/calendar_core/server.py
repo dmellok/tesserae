@@ -728,10 +728,14 @@ def blueprint() -> Blueprint:
         }
 
     @bp.post("/feeds")
-    def create_feed() -> Response:
+    def create_feed() -> Response | str:
         name = (request.form.get("name") or "").strip()
         url = (request.form.get("url") or "").strip()
         colour = (request.form.get("colour") or DEFAULT_COLOUR).strip()
+        # Set when the add came from the discovery list (the per-row Add form
+        # echoes the discovery URL). We re-render the discovered list afterwards
+        # so adding one calendar doesn't wipe the others off the page.
+        discover_base_url = (request.form.get("discover_base_url") or "").strip()
         if not name or not url:
             flash("Name and URL are required.", "warn")
             return redirect(url_for("calendar_core_admin.index"))
@@ -753,6 +757,15 @@ def blueprint() -> Blueprint:
         data["feeds"].append(entry)
         _save_feeds(data)
         flash(f"Added feed '{name}'.", "ok")
+        # Came from the discovery list: keep it on screen (re-run discovery so
+        # the just-added collection now shows "already added" and the rest stay
+        # addable) instead of redirecting to a bare index that drops the list.
+        if discover_base_url:
+            result = discover_collections(discover_base_url, _feed_auth(auth))
+            return _render_index(
+                discovered=result.get("collections") or [],
+                discover_auth={**auth, "base_url": discover_base_url},
+            )
         return redirect(url_for("calendar_core_admin.index"))
 
     @bp.post("/feeds/<feed_id>/auth")

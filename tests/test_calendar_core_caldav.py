@@ -516,3 +516,68 @@ def test_discover_route_keeps_url_on_empty_result(
     assert resp.status_code == 200
     # The base_url input is re-rendered with the typed value, not emptied.
     assert f'value="{typed}"' in resp.get_data(as_text=True)
+
+
+def _two_collections(base_url: str, auth: Any) -> dict[str, Any]:
+    return {
+        "collections": [
+            {
+                "name": "Tasks",
+                "url": "http://baikal.lan/dav/tasks/",
+                "export_url": "http://baikal.lan/dav/tasks/?export",
+                "colour": "#0d8c7e",
+                "components": ["VTODO"],
+            },
+            {
+                "name": "Personal",
+                "url": "http://baikal.lan/dav/personal/",
+                "export_url": "http://baikal.lan/dav/personal/?export",
+                "colour": "#123456",
+                "components": ["VEVENT"],
+            },
+        ],
+        "error": None,
+    }
+
+
+def test_add_from_discovery_keeps_the_other_collections(
+    app: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Adding one discovered calendar re-renders the discovery list rather than
+    redirecting to a bare index, so the remaining collections don't vanish
+    (regression for #124: 4 calendars, add one, the other three disappear)."""
+    client = app.test_client()
+    _sign_in(client)
+    monkeypatch.setattr(_live_core(app), "discover_collections", _two_collections)
+
+    resp = client.post(
+        "/plugins/calendar_core/feeds",
+        data={
+            "name": "Tasks",
+            "url": "http://baikal.lan/dav/tasks/?export",
+            "colour": "#0d8c7e",
+            "auth_mode": "digest",
+            "username": "u",
+            "password": "p",
+            "discover_base_url": "http://baikal.lan/dav/",
+        },
+    )
+    # Re-renders the discovered list (200), does not redirect (302).
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    # The un-added collection is still listed.
+    assert "Personal" in body
+    assert "http://baikal.lan/dav/personal/?export" in body
+    # The added one was stored.
+    assert any(f["name"] == "Tasks" for f in _feeds(app))
+
+
+def test_manual_add_without_discovery_still_redirects(app: Any) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    resp = client.post(
+        "/plugins/calendar_core/feeds",
+        data={"name": "Manual", "url": "http://x/manual.ics", "auth_mode": "none"},
+    )
+    assert resp.status_code == 302
+    assert any(f["name"] == "Manual" for f in _feeds(app))
