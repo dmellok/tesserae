@@ -26,7 +26,7 @@ from flask import (
 from pydantic import ValidationError
 from werkzeug.wrappers import Response
 
-from app.deck_suggest import suggest_decks
+from app.deck_suggest import graph_for_pages, suggest_decks
 from app.state.deck_model import Deck, DeckPage
 from app.state.deck_store import DeckStore
 from app.state.page_store import PageStore
@@ -164,22 +164,107 @@ def create() -> Response:
     return redirect(url_for("decks.index") + f"#deck-{deck.id}")
 
 
+def _apply_page_refresh(page: DeckPage, raw: str | None) -> DeckPage:
+    """Apply a per-page refresh override from a form field. None (field absent)
+    leaves the page unchanged; empty clears the override (inherit); a number
+    sets it."""
+    if raw is None:
+        return page
+    raw = raw.strip()
+    if raw == "":
+        return page.model_copy(update={"refresh_interval_minutes": None})
+    try:
+        return page.model_copy(update={"refresh_interval_minutes": max(0, min(1440, int(raw)))})
+    except ValueError:
+        return page
+
+
+def _edit_error(deck_id: str, exc: Exception) -> Response:
+    msg = _first_error(exc) if isinstance(exc, ValidationError) else str(exc)
+    flash(f"Invalid deck: {msg}", "error")
+    return redirect(url_for("decks.index", edit=deck_id) + f"#deck-{deck_id}")
+
+
 @bp.post("/<deck_id>/update")
 def update(deck_id: str) -> Response:
+    """Management update: name, devices, entry, refresh cadence, and per-page
+    refresh overrides. The page graph (links) is preserved, it's authored in the
+    canvas and synced, not hand-edited here."""
     existing = _store().get(deck_id)
     if existing is None:
         flash(f"No deck with id {deck_id!r}.", "error")
         return redirect(url_for("decks.index"))
+    form = request.form
+    pages = [_apply_page_refresh(p, form.get(f"page_refresh_{p.page_id}")) for p in existing.pages]
     try:
-        deck = _parse_form(request.form, existing_id=deck_id)
+        refresh = int(form.get("refresh_interval_minutes") or existing.refresh_interval_minutes)
+        deck = Deck(
+            id=deck_id,
+            name=(form.get("name") or existing.name).strip() or existing.name,
+            enabled=existing.enabled,
+            device_ids=[d for d in form.getlist("device_ids") if d],
+            pages=pages,
+            entry_page_id=(form.get("entry_page_id") or "").strip() or None,
+            refresh_interval_minutes=max(0, min(1440, refresh)),
+        )
     except (ValidationError, ValueError) as exc:
-        msg = _first_error(exc) if isinstance(exc, ValidationError) else str(exc)
-        flash(f"Invalid deck: {msg}", "error")
-        return redirect(url_for("decks.index", edit=deck_id) + f"#deck-{deck_id}")
-    deck = deck.model_copy(update={"enabled": existing.enabled})
+        return _edit_error(deck_id, exc)
     _store().upsert(deck)
     _invalidate(deck)
     flash(f"Deck {deck.name!r} updated.", "ok")
+    return redirect(url_for("decks.index") + f"#deck-{deck_id}")
+
+
+@bp.post("/<deck_id>/sync")
+def sync(deck_id: str) -> Response:
+    """Re-derive the deck's graph (links + zones) from the current page
+    ``page:<id>`` tap/swipe links, keeping its page set + per-page refresh. Use
+    after changing navigation in the canvas editor."""
+    existing = _store().get(deck_id)
+    if existing is None:
+        flash(f"No deck with id {deck_id!r}.", "error")
+        return redirect(url_for("decks.index"))
+    refresh_by_id = {p.page_id: p.refresh_interval_minutes for p in existing.pages}
+    pages = [
+        p.model_copy(update={"refresh_interval_minutes": refresh_by_id.get(p.page_id)})
+        for p in graph_for_pages(_pages().list(), existing.page_ids)
+    ]
+    deck = existing.model_copy(update={"pages": pages})
+    _store().upsert(deck)
+    _invalidate(deck)
+    flash("Deck graph re-synced from the pages' links.", "ok")
+    return redirect(url_for("decks.index") + f"#deck-{deck_id}")
+
+
+@bp.post("/<deck_id>/graph")
+def edit_graph(deck_id: str) -> Response:
+    """Advanced: replace the whole page graph from raw JSON. The management
+    fields are kept; the entry page is cleared if it's no longer a page."""
+    existing = _store().get(deck_id)
+    if existing is None:
+        flash(f"No deck with id {deck_id!r}.", "error")
+        return redirect(url_for("decks.index"))
+    raw = (request.form.get("graph_json") or "").strip()
+    try:
+        data = json.loads(raw) if raw else []
+        if not isinstance(data, list):
+            raise ValueError("page graph must be a JSON array of pages")
+        pages = [DeckPage.model_validate(p) for p in data]
+        page_ids = {p.page_id for p in pages}
+        deck = Deck(
+            id=deck_id,
+            name=existing.name,
+            enabled=existing.enabled,
+            device_ids=existing.device_ids,
+            pages=pages,
+            entry_page_id=existing.entry_page_id if existing.entry_page_id in page_ids else None,
+            refresh_interval_minutes=existing.refresh_interval_minutes,
+        )
+    except (ValidationError, ValueError, json.JSONDecodeError) as exc:
+        return _edit_error(deck_id, exc)
+    _store().upsert(deck)
+    _invalidate(deck)
+    flash(f"Deck {deck.name!r} graph updated.", "ok")
     return redirect(url_for("decks.index") + f"#deck-{deck_id}")
 
 

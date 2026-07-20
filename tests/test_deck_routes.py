@@ -132,3 +132,65 @@ def test_suggestions_render_from_page_links(app: Flask) -> None:
     assert "Suggested from your page links" in body
     # A pre-filled create form is rendered for the suggestion.
     assert "graph_json" in body and "Create deck" in body
+
+
+def test_update_sets_per_page_refresh(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    client.post("/decks/new", data={"name": "K", "graph_json": GRAPH})
+    did = _decks(app)[0].id
+    client.post(
+        f"/decks/{did}/update",
+        data={
+            "name": "K",
+            "refresh_interval_minutes": "20",
+            "page_refresh_overview": "5",
+            "page_refresh_calendar": "",
+        },
+    )
+    deck = app.config["DECK_STORE"].get(did)
+    assert deck.refresh_interval_minutes == 20
+    assert deck.page("overview").refresh_interval_minutes == 5
+    assert deck.page("calendar").refresh_interval_minutes is None  # blank -> inherit
+
+
+def test_update_preserves_graph(app: Flask) -> None:
+    # The management update doesn't submit the graph; links must survive.
+    client = app.test_client()
+    _sign_in(client)
+    client.post("/decks/new", data={"name": "K", "graph_json": GRAPH})
+    did = _decks(app)[0].id
+    client.post(f"/decks/{did}/update", data={"name": "Renamed"})
+    deck = app.config["DECK_STORE"].get(did)
+    assert deck.name == "Renamed"
+    assert any(lnk.target_page_id == "calendar" for lnk in deck.page("overview").links)
+
+
+def test_sync_rederives_graph_from_page_links(app: Flask) -> None:
+    ps = app.config["PAGE_STORE"]
+    ps.save(Page(id="ov", name="Ov", cells=[Cell(id="c", x=0, y=0, w=12, h=6, on_tap="page:cal")]))
+    ps.save(Page(id="cal", name="Cal", cells=[Cell(id="c", x=0, y=0, w=12, h=6, on_tap="page:ov")]))
+    client = app.test_client()
+    _sign_in(client)
+    graph = json.dumps([{"page_id": "ov", "links": []}, {"page_id": "cal", "links": []}])
+    client.post("/decks/new", data={"name": "D", "graph_json": graph})
+    did = _decks(app)[0].id
+    assert app.config["DECK_STORE"].get(did).page("ov").links == []
+    client.post(f"/decks/{did}/sync")
+    deck = app.config["DECK_STORE"].get(did)
+    assert any(lnk.target_page_id == "cal" for lnk in deck.page("ov").links)
+
+
+def test_edit_graph_advanced_replaces_graph(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    client.post("/decks/new", data={"name": "K", "graph_json": GRAPH})
+    did = _decks(app)[0].id
+    new_graph = json.dumps(
+        [
+            {"page_id": "overview", "links": []},
+            {"page_id": "weather", "links": [{"target_page_id": "overview", "button": "left"}]},
+        ]
+    )
+    client.post(f"/decks/{did}/graph", data={"graph_json": new_graph})
+    assert set(app.config["DECK_STORE"].get(did).page_ids) == {"overview", "weather"}

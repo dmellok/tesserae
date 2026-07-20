@@ -79,6 +79,30 @@ def _slug(value: str) -> str:
     return slug or "deck"
 
 
+def graph_for_pages(pages: list[Page], page_ids: list[str]) -> list[DeckPage]:
+    """Re-derive DeckPages for a fixed set of page ids from the current page
+    links: each page's ``page:<id>`` tap/swipe links, kept only to targets
+    within the set. Used to re-sync a deck's graph from what's authored in the
+    canvas without disturbing the deck's page set. Per-page refresh overrides
+    are not carried here; the caller preserves them from the existing deck."""
+    by_id = {p.id: p for p in pages}
+    wanted = set(page_ids)
+    out: list[DeckPage] = []
+    for pid in page_ids:
+        page = by_id.get(pid)
+        links = (
+            [
+                lnk
+                for lnk in _links_from_page(page)
+                if lnk.target_page_id in wanted and lnk.target_page_id != pid
+            ]
+            if page is not None
+            else []
+        )
+        out.append(DeckPage(page_id=pid, links=links))
+    return out
+
+
 def _build_deck(
     component: set[str], edges: dict[str, list[DeckLink]], by_id: dict[str, Page]
 ) -> Deck | None:
