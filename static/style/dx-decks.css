@@ -1,0 +1,200 @@
+/* ============================================================
+ *  /decks — page chrome
+ *
+ *  The Decks page is a management surface: a suggestions strip,
+ *  a card per deck (meta chips + actions + an edit panel), and a
+ *  manual "new deck" card. Cards reuse the global ``.card`` shell;
+ *  this file styles the deck-specific bits + the shared ``.cf-*``
+ *  form vocabulary (mirrored from the calendar admin page, which
+ *  scopes them inline, so they need styling here too).
+ * ============================================================ */
+
+.page-head {
+  margin-bottom: var(--t-space-5);
+}
+.page-head h1 {
+  display: flex;
+  align-items: center;
+  gap: var(--t-space-2);
+  margin: 0 0 var(--t-space-2);
+}
+.page-sub {
+  margin: 0;
+  max-width: 62ch;
+  color: var(--t-fg-soft);
+  font-size: var(--t-size-sm);
+  line-height: 1.5;
+}
+
+/* -- chips + hints ----------------------------------------- */
+
+.cf-hint {
+  margin: var(--t-space-1) 0 0;
+  color: var(--t-fg-soft);
+  font-size: var(--t-size-xs);
+  line-height: 1.45;
+}
+.cf-hint code,
+.cf-id code {
+  font-family: var(--t-font-mono);
+  font-size: 0.92em;
+  padding: 0 3px;
+  border-radius: var(--t-radius-sm);
+  background: var(--t-surface-sunk);
+}
+
+.deck-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--t-space-2);
+  margin: var(--t-space-2) 0 var(--t-space-3);
+}
+.cf-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border-radius: var(--t-radius-pill);
+  border: 1px solid var(--t-border);
+  background: var(--t-surface-soft);
+  color: var(--t-fg-soft);
+  font-size: var(--t-size-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.cf-chip--off {
+  color: var(--t-warn, #92400e);
+  border-color: color-mix(in oklab, var(--t-warn, #d97706) 40%, transparent);
+  background: color-mix(in oklab, var(--t-warn, #d97706) 12%, transparent);
+}
+
+/* -- deck cards -------------------------------------------- */
+
+.deck-card {
+  position: relative;
+}
+.deck-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--t-space-2);
+  align-items: center;
+}
+.deck-actions .ghost span,
+.deck-actions .button span {
+  margin-left: 4px;
+}
+.deck-edit {
+  margin-top: var(--t-space-4);
+  padding-top: var(--t-space-4);
+  border-top: 1px dashed var(--t-border);
+}
+
+/* -- suggestions strip ------------------------------------- */
+
+.deck-suggestion {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--t-space-3);
+  padding: var(--t-space-3) 0;
+  border-top: 1px solid var(--t-border);
+}
+.deck-suggestion:first-of-type {
+  border-top: none;
+}
+.deck-suggestion__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.deck-suggestion__meta .cf-hint {
+  margin: 0;
+}
+
+/* -- edit form vocabulary ---------------------------------- */
+
+.cf-row2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--t-space-3);
+}
+@media (max-width: 520px) {
+  .cf-row2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.cf-dev-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--t-space-2);
+}
+.cf-dev-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-radius-pill);
+  background: var(--t-surface-soft);
+  font-size: var(--t-size-sm);
+  cursor: pointer;
+  transition: border-color var(--t-trans-fast), background var(--t-trans-fast);
+}
+.cf-dev-chip:has(input:checked) {
+  border-color: var(--t-accent);
+  background: var(--t-accent-tint);
+  color: var(--t-accent);
+}
+
+.cf-page-refresh {
+  display: flex;
+  flex-direction: column;
+  gap: var(--t-space-1);
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-radius-md);
+  padding: var(--t-space-2) var(--t-space-3);
+  background: var(--t-surface-sunk);
+}
+.cf-pr-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--t-space-3);
+}
+.cf-pr-row span {
+  font-size: var(--t-size-sm);
+  color: var(--t-fg);
+}
+.cf-pr-row input {
+  width: 7rem;
+  flex: none;
+}
+
+.cf-graph {
+  width: 100%;
+  font-family: var(--t-font-mono);
+  font-size: var(--t-size-xs);
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.cf-advanced {
+  margin-top: var(--t-space-4);
+  border-top: 1px dashed var(--t-border);
+  padding-top: var(--t-space-3);
+}
+.cf-advanced > summary {
+  cursor: pointer;
+  color: var(--t-fg-soft);
+  font-size: var(--t-size-sm);
+  font-weight: 600;
+  list-style-position: inside;
+}
+.cf-advanced > summary:hover {
+  color: var(--t-fg);
+}
+.cf-advanced[open] > summary {
+  margin-bottom: var(--t-space-3);
+}
