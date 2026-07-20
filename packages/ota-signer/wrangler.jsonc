@@ -1,0 +1,29 @@
+{
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"name": "tesserae-ota-signer",
+	"main": "src/index.js",
+	"compatibility_date": "2026-07-01",
+	// The R2 bucket firmware images are written to and served from. Create it
+	// with: wrangler r2 bucket create tesserae-ota
+	"r2_buckets": [
+		{
+			"binding": "OTA_BUCKET",
+			"bucket_name": "tesserae-ota"
+		}
+	],
+	"vars": {
+		// Which signing key the OTA_SIGNING_KEY secret holds. Stamped into every
+		// manifest's key_id so firmware can pick the right verification key.
+		"KEY_ID": "prod-1",
+		// Public base URL images are served from. Leave empty to use the Worker's
+		// own request origin; set to a custom domain (e.g. https://fw.tesserae.ink)
+		// once one is bound to this Worker so image_url is stable across routes.
+		"IMAGE_BASE_URL": ""
+	},
+	"observability": {
+		"enabled": true
+	}
+	// Secrets (set with `wrangler secret put`, never committed):
+	//   OTA_SIGNING_KEY  - Ed25519 private JWK, minted with scripts/mint-key.mjs
+	//   OTA_SIGN_TOKEN   - bearer token that authorises POST /sign
+}

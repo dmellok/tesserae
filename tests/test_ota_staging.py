@@ -13,9 +13,11 @@ FIX = Path(__file__).parent / "fixtures" / "ota"
 SEED = bytes.fromhex((FIX / "test_signing_key.hex").read_text().strip())
 
 
-def _descriptor(kind: str = "esp32_client", fw: str = "1.4.0") -> dict[str, str]:
+def _descriptor(
+    kind: str = "esp32_client", fw: str = "1.4.0", key_id: str = "test-ed25519-1"
+) -> dict[str, str]:
     manifest = build_manifest(
-        key_id="test-ed25519-1",
+        key_id=key_id,
         device_kind=kind,
         fw_version=fw,
         image_url="https://cdn.example.test/app.bin",
@@ -90,3 +92,42 @@ def test_stage_cli_rejects_malformed_descriptor(tmp_path: Path) -> None:
         ["--data-root", str(tmp_path), "--device-id", "x", "--descriptor", str(bad)]
     )
     assert rc == 2
+
+
+def test_stage_cli_rejects_untrusted_key_id(tmp_path: Path) -> None:
+    dpath = tmp_path / "d.json"
+    dpath.write_text(json.dumps(_descriptor(key_id="nope-1")), encoding="utf-8")
+    rc = stage_cli.main(
+        ["--data-root", str(tmp_path), "--device-id", "hall_esp", "--descriptor", str(dpath)]
+    )
+    assert rc == 2
+    assert OtaStagingStore(tmp_path / "core" / "ota_pending.json").get("hall_esp") is None
+
+
+def test_stage_cli_rejects_tampered_signature(tmp_path: Path) -> None:
+    desc = _descriptor()
+    desc["signature"] = desc["signature"][:-4] + ("A" if desc["signature"][-1] != "A" else "B")
+    dpath = tmp_path / "d.json"
+    dpath.write_text(json.dumps(desc), encoding="utf-8")
+    rc = stage_cli.main(
+        ["--data-root", str(tmp_path), "--device-id", "hall_esp", "--descriptor", str(dpath)]
+    )
+    assert rc == 2
+
+
+def test_stage_cli_insecure_skip_verify_allows_untrusted_key(tmp_path: Path) -> None:
+    dpath = tmp_path / "d.json"
+    dpath.write_text(json.dumps(_descriptor(key_id="nope-1")), encoding="utf-8")
+    rc = stage_cli.main(
+        [
+            "--data-root",
+            str(tmp_path),
+            "--device-id",
+            "hall_esp",
+            "--descriptor",
+            str(dpath),
+            "--insecure-skip-verify",
+        ]
+    )
+    assert rc == 0
+    assert OtaStagingStore(tmp_path / "core" / "ota_pending.json").get("hall_esp") is not None

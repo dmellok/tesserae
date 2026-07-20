@@ -33,6 +33,8 @@ from typing import Any
 from app.state.ota_staging import OtaStagingStore
 
 from ._codec import MANIFEST_FIELDS, b64u_decode
+from .keys import default_keys_dir, load_trusted_keys
+from .verify import OtaVerificationError, verify
 
 
 def _store(data_root: Path) -> OtaStagingStore:
@@ -59,6 +61,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--device-id", required=True, help="target device id")
     parser.add_argument("--descriptor", type=Path, help="signed descriptor JSON to stage")
     parser.add_argument("--clear", action="store_true", help="clear the device's pending OTA")
+    parser.add_argument(
+        "--keys-dir",
+        type=Path,
+        default=None,
+        help=f"trusted public keys directory (default: {default_keys_dir()})",
+    )
+    parser.add_argument(
+        "--insecure-skip-verify",
+        action="store_true",
+        help="stage without verifying the descriptor's signature (not recommended)",
+    )
     args = parser.parse_args(argv)
 
     store = _store(args.data_root)
@@ -78,6 +91,26 @@ def main(argv: list[str] | None = None) -> int:
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"stage error: {exc}", file=sys.stderr)
         return 2
+
+    # Verify the signature against a trusted key before staging, so a corrupt or
+    # mis-signed descriptor is refused here rather than shipped to a device.
+    if not args.insecure_skip_verify:
+        keys = load_trusted_keys(args.keys_dir)
+        key_id = str(manifest["key_id"])
+        public_key = keys.get(key_id)
+        if public_key is None:
+            where = args.keys_dir or default_keys_dir()
+            print(
+                f"stage error: no trusted key for key_id {key_id!r} in {where}; "
+                f"publish its .pub or pass --insecure-skip-verify",
+                file=sys.stderr,
+            )
+            return 2
+        try:
+            verify(descriptor, public_key)
+        except OtaVerificationError as exc:
+            print(f"stage error: descriptor failed verification ({exc.reason})", file=sys.stderr)
+            return 2
 
     entry = store.stage(
         args.device_id,

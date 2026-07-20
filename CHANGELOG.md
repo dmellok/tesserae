@@ -8,6 +8,14 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **OTA production signing (Cloudflare Worker) and trusted-key registry (#121).** A Cloudflare Worker
+  (`packages/ota-signer/`) signs firmware descriptors with an Ed25519 key held only in a Worker
+  secret and serves the images from R2, co-locating signing with storage; its output is byte
+  identical to the Python signer. Published public keys live in `ota/keys/<key_id>.pub`, and
+  `python -m app.ota.stage` now verifies a descriptor's signature against the key matching its
+  `key_id` before staging, refusing a mis-signed one (`--insecure-skip-verify` to override). Keys are
+  keyed by `key_id` so they rotate without a re-flash. The staging gate is server-side; firmware
+  embeds its own key set as the real trust anchor.
 - **OTA capability handshake and `/status` delivery (Phase 2, #121).** A device advertises OTA
   support with an `ota: {schema: N}` object in its register/status body; the server hands back a
   staged, signed descriptor on the always-200 `/status` response only when the device advertised a

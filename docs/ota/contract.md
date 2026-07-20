@@ -130,13 +130,32 @@ heartbeat, no restart needed. An admin UI for this is a later slice.
 
 ## Keys and signing
 
-- Signing: Ed25519. `app/ota/sign.py` builds and signs a manifest; the CLI
-  (`python -m app.ota.sign …`) is the seed of the pipeline.
-- The production public key is published separately and embedded in firmware.
-- `tests/fixtures/ota/` carries a **test-only** keypair (published seeds) and
-  four signed fixtures (`valid`, `wrong_key`, `truncated`, `digest_mismatch`)
-  so firmware can self-test the verifier before the live pipeline exists. See
-  that directory's `README.md` for the per-fixture expected verdicts.
+- Signing: Ed25519, keyed by `key_id` so keys can rotate. Two signers produce
+  byte-identical output: `app/ota/sign.py` (the `python -m app.ota.sign` CLI,
+  for local/test signing) and the Cloudflare signing Worker
+  (`packages/ota-signer/`, the automated production path, which also hosts the
+  image on R2).
+- Production keys are minted in the Worker
+  (`packages/ota-signer/scripts/mint-key.mjs`): the private key stays in the
+  Worker's `OTA_SIGNING_KEY` secret and never leaves it; only the public key is
+  published.
+- Published **public** keys live in `ota/keys/<key_id>.pub` (hex). `python -m
+  app.ota.stage` verifies a descriptor against the key matching its `key_id`
+  before staging, so a mis-signed descriptor is refused at staging time. This is
+  a staging-side gate; the firmware embeds its own key set and is the real trust
+  anchor.
+- `tests/fixtures/ota/` carries a **test-only** keypair (published seeds, key_id
+  `test-ed25519-1`) and four signed fixtures (`valid`, `wrong_key`, `truncated`,
+  `digest_mismatch`) so firmware can self-test the verifier. See that
+  directory's `README.md` for the per-fixture expected verdicts.
+
+### Rotation
+
+Every manifest carries `key_id`, and firmware trusts a keyed set
+`{key_id: pubkey}` rather than a single hardcoded key. To rotate: mint a new key
+with a new id, point the Worker at it, publish its `.pub`, and ship firmware that
+trusts both ids. Old and new keys coexist, so a key can be retired once no device
+depends on it without a re-flash in between.
 
 ## Rollback
 
