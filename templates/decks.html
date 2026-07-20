@@ -1,0 +1,115 @@
+{% extends "_base.html" %}
+{% from "_components.html" import card_head, section_card, button, empty_state %}
+{% block title %}Decks, Tesserae{% endblock %}
+
+{% macro deck_form(deck, graph_json, pages, devices, page_names) %}
+{% set is_edit = deck is not none %}
+<form method="post"
+      action="{{ url_for('decks.update', deck_id=deck.id) if is_edit else url_for('decks.create') }}"
+      class="form cf-deck-form">
+  <div class="field">
+    <label for="d-name-{{ deck.id if is_edit else 'new' }}">Name</label>
+    <input type="text" id="d-name-{{ deck.id if is_edit else 'new' }}" name="name"
+           value="{{ deck.name if is_edit else '' }}" placeholder="Kitchen deck" required>
+  </div>
+
+  <div class="field">
+    <label>Devices</label>
+    <div class="cf-dev-grid">
+      {% for dev in devices %}
+      <label class="cf-dev-chip">
+        <input type="checkbox" name="device_ids" value="{{ dev.id }}"
+               {% if is_edit and dev.id in deck.device_ids %}checked{% endif %}>
+        <span>{{ dev.name }}</span>
+      </label>
+      {% else %}
+      <span class="cf-hint">No device instances yet. Add one under Settings &rarr; Devices.</span>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="cf-row2">
+    <div class="field">
+      <label for="d-entry-{{ deck.id if is_edit else 'new' }}">Entry page</label>
+      <input type="text" id="d-entry-{{ deck.id if is_edit else 'new' }}" name="entry_page_id"
+             value="{{ deck.entry_page_id or '' if is_edit else '' }}"
+             placeholder="(first page)" list="deck-page-ids">
+    </div>
+    <div class="field">
+      <label for="d-refresh-{{ deck.id if is_edit else 'new' }}">Refresh every (min)</label>
+      <input type="number" id="d-refresh-{{ deck.id if is_edit else 'new' }}"
+             name="refresh_interval_minutes" min="0" max="1440"
+             value="{{ deck.refresh_interval_minutes if is_edit else 15 }}">
+    </div>
+  </div>
+
+  <div class="field">
+    <label for="d-graph-{{ deck.id if is_edit else 'new' }}">Pages &amp; links (graph)</label>
+    <textarea id="d-graph-{{ deck.id if is_edit else 'new' }}" name="graph_json" rows="10"
+              class="cf-graph" spellcheck="false"
+              placeholder='[
+  {"page_id": "overview", "links": [
+    {"target_page_id": "calendar", "button": "right"},
+    {"target_page_id": "weather", "zone": {"x": 0, "y": 0, "w": 0.5, "h": 0.5}}
+  ]},
+  {"page_id": "calendar", "links": [{"target_page_id": "overview", "button": "left"}]},
+  {"page_id": "weather", "links": [{"target_page_id": "overview", "button": "left"}]}
+]'>{{ graph_json if is_edit else '' }}</textarea>
+    <p class="cf-hint">
+      Each page lists its links. A link fires on a physical <code>button</code> name
+      (e.g. left / right / refresh) or a touch <code>zone</code> (x, y, w, h in 0..1 of the panel).
+      Available pages: {% for p in pages %}<code>{{ p.id }}</code>{% if not loop.last %}, {% endif %}{% endfor %}.
+    </p>
+  </div>
+
+  {{ button('Save deck' if is_edit else 'Create deck', type='submit', variant='primary') }}
+</form>
+{% endmacro %}
+
+{% block content %}
+<div class="page-head">
+  <h1><i class="ph-bold ph-cards-three" aria-hidden="true"></i> Decks</h1>
+  <p class="page-sub">
+    A deck keeps a group of pages pre-rendered per device, so a button press or touch
+    that moves between them is snappier than rendering each page on the fly. Pages refresh
+    in the background on the cadence you set.
+  </p>
+</div>
+
+<datalist id="deck-page-ids">
+  {% for p in pages %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
+</datalist>
+
+{% for deck in decks %}
+<section class="card deck-card" id="deck-{{ deck.id }}">
+  {{ card_head(deck.name, icon_name='cards-three', level=2) }}
+  <div class="deck-meta">
+    <span class="cf-chip">{{ deck.pages|length }} page{{ 's' if deck.pages|length != 1 }}</span>
+    <span class="cf-chip">{{ deck.device_ids|length }} device{{ 's' if deck.device_ids|length != 1 }}</span>
+    <span class="cf-chip">{{ 'refresh %d min'|format(deck.refresh_interval_minutes) if deck.refresh_interval_minutes else 'no refresh' }}</span>
+    {% if not deck.enabled %}<span class="cf-chip cf-chip--off">disabled</span>{% endif %}
+  </div>
+  <div class="deck-actions">
+    <a class="button ghost" href="{{ url_for('decks.index', edit=deck.id) }}#deck-{{ deck.id }}">Edit</a>
+    <form method="post" action="{{ url_for('decks.toggle', deck_id=deck.id) }}" class="inline">
+      <button type="submit" class="ghost">{{ 'Disable' if deck.enabled else 'Enable' }}</button>
+    </form>
+    <form method="post" action="{{ url_for('decks.delete', deck_id=deck.id) }}" class="inline"
+          onsubmit="return confirm('Delete deck {{ deck.name }}?');">
+      <button type="submit" class="ghost danger">Delete</button>
+    </form>
+  </div>
+  {% if edit_id == deck.id %}
+  <div class="deck-edit">
+    {{ deck_form(deck, graphs.get(deck.id, ''), pages, devices, page_names) }}
+  </div>
+  {% endif %}
+</section>
+{% else %}
+{{ empty_state('No decks yet', 'Create one below to group pages for instant navigation.') }}
+{% endfor %}
+
+{% call section_card('New deck', icon_name='plus-circle') %}
+  {{ deck_form(none, '', pages, devices, page_names) }}
+{% endcall %}
+{% endblock %}

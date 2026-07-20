@@ -138,6 +138,10 @@
          class="{% if request.blueprint == 'rotations' %}is-active{% endif %}">
          <i class="ph ph-shuffle" aria-hidden="true"></i><span>Rotations</span>
       </a>
+      <a href="{{ url_for('decks.index') }}"
+         class="{% if request.blueprint == 'decks' %}is-active{% endif %}">
+         <i class="ph ph-cards-three" aria-hidden="true"></i><span>Decks</span>
+      </a>
       <a href="{{ url_for('history.index') }}"
          class="{% if request.blueprint == 'history' %}is-active{% endif %}">
          <i class="ph ph-clock-counter-clockwise" aria-hidden="true"></i><span>History</span>

@@ -32,6 +32,7 @@ from typing import Any
 
 from app.push import PushManager, PushResult
 from app.scheduler_conditions import ConditionEvaluator
+from app.state.deck_store import DeckStore
 from app.state.event_log import EventLog
 from app.state.rotation_model import Rotation, RotationStep
 from app.state.rotation_store import RotationStore
@@ -216,6 +217,7 @@ class Scheduler:
         # Rotations (issue: dashboard rotation). Optional; None means
         # no rotation evaluation runs each tick. Production wires it.
         rotation_store: RotationStore | None = None,
+        deck_store: DeckStore | None = None,
         # Conditional schedules + rotation steps (v0.48). Optional; None
         # means every condition resolves to True (legacy behaviour) so
         # existing tests don't need updating. Production wires a real
@@ -244,6 +246,12 @@ class Scheduler:
         existing tests, which don't care about staleness."""
         self._store = store
         self._rotation_store = rotation_store
+        self._deck_store = deck_store
+        # deck_id -> last warm POSIX timestamp, so a deck's pages are re-warmed
+        # (in the background, silently) at its refresh cadence. The lock keeps
+        # warm passes from stacking when one runs longer than a tick.
+        self._deck_last_warm: dict[str, float] = {}
+        self._deck_warm_lock = threading.Lock()
         self._push_factory = push_manager
         self._event_log = event_log
         self._tz_provider = timezone_provider or (lambda: None)
@@ -436,6 +444,54 @@ class Scheduler:
             self._fire_rotation(rotation, step_index, now, respect_quiet_hours=True)
         for schedule in self.find_due(now):
             self._fire(schedule, now, respect_quiet_hours=True)
+        # Deck pre-render refresh (silent, off the tick thread).
+        self._maybe_warm_decks(now)
+
+    def _maybe_warm_decks(self, now: datetime) -> None:
+        """Kick a background deck-warm pass unless one is already running, so a
+        slow warm never blocks the tick or stacks up."""
+        if self._deck_store is None:
+            return
+        if not self._deck_warm_lock.acquire(blocking=False):
+            return
+
+        def _run() -> None:
+            try:
+                self._warm_decks(now)
+            finally:
+                self._deck_warm_lock.release()
+
+        threading.Thread(target=_run, name="tesserae-deck-warm", daemon=True).start()
+
+    def _warm_decks(self, now: datetime) -> None:
+        """Re-warm each enabled deck's pages for its bound devices when the
+        deck's refresh cadence is due (or it hasn't been warmed yet). Silent:
+        warming stamps a side cache and never repaints a device's live frame."""
+        if self._deck_store is None:
+            return
+        pusher = self._push_factory()
+        warm = getattr(pusher, "warm_deck_page", None)
+        if not callable(warm):
+            return
+        now_ts = now.timestamp()
+        for deck in self._deck_store.all():
+            if not deck.enabled or not deck.device_ids or deck.refresh_interval_minutes <= 0:
+                continue
+            last = self._deck_last_warm.get(deck.id)
+            if last is not None and now_ts - last < deck.refresh_interval_minutes * 60:
+                continue
+            for device_id in deck.device_ids:
+                for page in deck.pages:
+                    try:
+                        warm(page.page_id, device_id)
+                    except Exception:
+                        logger.exception(
+                            "deck warm failed deck=%s page=%s device=%s",
+                            deck.id,
+                            page.page_id,
+                            device_id,
+                        )
+            self._deck_last_warm[deck.id] = now_ts
 
     def compute_step_state(
         self, rotation: Rotation, now: datetime | None = None

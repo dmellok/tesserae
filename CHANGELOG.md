@@ -8,6 +8,14 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Decks: pre-rendered, navigable page groups.** A new Decks page (next to Rotations) groups pages
+  into a small linked graph that Tesserae keeps pre-rendered per bound device, so a button press or
+  touch that moves between them serves an already-rendered frame instead of rendering on the fly. Each
+  page links to others by a physical button name or a touch zone; the scheduler re-warms a deck's
+  pages in the background on the cadence you set, so their data stays current. Removes the on-the-fly
+  render latency from navigation (the download and e-ink repaint still happen). Build a deck under
+  Decks: name it, bind devices, set the refresh cadence, and define the page graph.
+
 - **OTA per-kind rollout: manual promote + canary (#121).** Beyond staging a build for a single
   device, an operator can now set a signed build as a device kind's release and roll it out
   deliberately: `python -m app.ota.release set` (offered first to the canary devices you list),

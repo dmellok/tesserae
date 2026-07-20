@@ -534,6 +534,11 @@ def create_app(
     device_rotation_state_store = DeviceRotationStateStore(
         data_root / "core" / "device_rotation_state.json"
     )
+    from app.state.deck_nav_store import DeckNavStore
+    from app.state.deck_store import DeckStore
+
+    deck_store = DeckStore(data_root / "core" / "decks.json")
+    deck_nav_store = DeckNavStore(data_root / "core" / "deck_nav.json")
     # User themes live alongside core stores at ``data/themes/user.json``.
     # The store creates the directory on first save so a fresh install
     # without any custom themes leaves no empty directory behind.
@@ -605,6 +610,8 @@ def create_app(
     app.config["SCHEDULE_STORE"] = schedule_store
     app.config["ROTATION_STORE"] = rotation_store
     app.config["DEVICE_ROTATION_STATE_STORE"] = device_rotation_state_store
+    app.config["DECK_STORE"] = deck_store
+    app.config["DECK_NAV_STORE"] = deck_nav_store
     app.config["USER_THEMES_STORE"] = user_themes_store
     app.config["COMMUNITY_THEMES_STORE"] = community_themes_store
     app.config["EVENT_LOG"] = event_log
@@ -748,6 +755,12 @@ def create_app(
         # dedup / unmapped / webhook / noop events are visible next to
         # the push rows PushManager already emits.
         event_log=event_log,
+        # Decks: when a device is bound to a deck, a graph-link button / touch
+        # navigates the deck (promoting a pre-warmed frame). ``devices`` is used
+        # only to normalise a touch point against a deck's zones.
+        deck_store=deck_store,
+        deck_nav_store=deck_nav_store,
+        devices=devices,
     )
 
     # Docker bridge networking gives us an internal IP that LAN
@@ -830,6 +843,7 @@ def create_app(
     scheduler = Scheduler(
         store=schedule_store,
         rotation_store=rotation_store,
+        deck_store=deck_store,
         push_manager=lambda: app.config["PUSH_MANAGER"],
         event_log=event_log,
         timezone_provider=_resolve_timezone,
@@ -866,6 +880,9 @@ def create_app(
     from app import rotation_routes
 
     rotation_routes.register(app)
+    from app import deck_routes
+
+    deck_routes.register(app)
     send_routes.register(app)
     history_routes.register(app)
     device_battery_routes.register(app)
