@@ -450,6 +450,10 @@ _PROPFIND_BODY = (
     b'xmlns:cs="http://apple.com/ns/ical/"><d:prop>'
     b"<d:resourcetype/><d:displayname/><cs:calendar-color/>"
     b"<c:supported-calendar-component-set/>"
+    # current-user-principal + calendar-home-set let discovery resolve a
+    # principal or service-root URL to the collection that holds the
+    # calendars, instead of requiring the exact calendar-home URL.
+    b"<d:current-user-principal/><c:calendar-home-set/>"
     b"</d:prop></d:propfind>"
 )
 
@@ -486,30 +490,23 @@ def _prop_find(props: list[Any], tag: str) -> Any:
     return None
 
 
-def discover_collections(base_url: str, auth: dict[str, str] | None) -> dict[str, Any]:
-    """PROPFIND ``base_url`` and return its calendar / todo collections.
-
-    Returns ``{"collections": [{name, url, export_url, colour,
-    components[]}], "error": <msg|None>}``. ``components`` is the subset of
-    ``VEVENT`` / ``VTODO`` the collection holds, so the UI can label a
-    todo list vs a calendar. Best-effort: a bad URL / auth / non-CalDAV
-    response comes back as an ``error`` string, never an exception."""
+def _propfind(
+    url: str, auth: dict[str, str] | None, depth: str
+) -> tuple[Any, dict[str, Any] | None]:
+    """One PROPFIND round-trip. Returns ``(root_element, None)`` on success,
+    or ``(None, error_dict)`` where ``error_dict`` is a discovery result
+    shape (``{"collections": [], "error": <msg>}``). Never raises."""
     import defusedxml.ElementTree as DET
 
-    fixed = (
-        base_url.replace("webcal://", "https://", 1)
-        if base_url.startswith("webcal://")
-        else base_url
-    )
     try:
-        opener = _build_opener(fixed, auth)
+        opener = _build_opener(url, auth)
         req = urllib.request.Request(
-            fixed,
+            url,
             data=_PROPFIND_BODY,
             method="PROPFIND",
             headers={
                 "User-Agent": USER_AGENT,
-                "Depth": "1",
+                "Depth": depth,
                 "Content-Type": 'application/xml; charset="utf-8"',
             },
         )
@@ -519,19 +516,26 @@ def discover_collections(base_url: str, auth: dict[str, str] | None) -> dict[str
         code = err.code
         err.close()  # HTTPError is a response object; don't leak the handle.
         if code in (401, 403):
-            return {
+            return None, {
                 "collections": [],
                 "error": "Authentication failed (check username / password).",
             }
-        return {"collections": [], "error": f"Server returned HTTP {code}."}
+        return None, {"collections": [], "error": f"Server returned HTTP {code}."}
     except Exception as err:
-        return {"collections": [], "error": f"Couldn't reach the server: {type(err).__name__}."}
-
+        return None, {
+            "collections": [],
+            "error": f"Couldn't reach the server: {type(err).__name__}.",
+        }
     try:
-        root = DET.fromstring(body)
+        return DET.fromstring(body), None
     except Exception:
-        return {"collections": [], "error": "The server's response wasn't valid CalDAV XML."}
+        return None, {"collections": [], "error": "The server's response wasn't valid CalDAV XML."}
 
+
+def _calendars_from_multistatus(root: Any, base_url: str) -> list[dict[str, Any]]:
+    """Every calendar collection in a PROPFIND multistatus, each tagged with
+    name / colour / components and a GET-able ``?export`` URL. ``base_url``
+    resolves relative hrefs."""
     collections: list[dict[str, Any]] = []
     for resp_el in root.findall("d:response", _NS):
         href_el = resp_el.find("d:href", _NS)
@@ -555,7 +559,7 @@ def discover_collections(base_url: str, auth: dict[str, str] | None) -> dict[str
         name_el = _prop_find(props, "d:displayname")
         colour_el = _prop_find(props, "cs:calendar-color")
         href = (href_el.text or "").strip()
-        collection_url = urllib.parse.urljoin(fixed, href)
+        collection_url = urllib.parse.urljoin(base_url, href)
         collections.append(
             {
                 "name": (name_el.text or "").strip() if name_el is not None else href,
@@ -567,13 +571,77 @@ def discover_collections(base_url: str, auth: dict[str, str] | None) -> dict[str
                 "components": wanted,
             }
         )
-    if not collections:
-        return {
-            "collections": [],
-            "error": "No calendars found at that URL. Point it at your calendar home "
-            "(the folder that holds your calendars, e.g. .../calendars/<user>/).",
-        }
-    return {"collections": collections, "error": None}
+    return collections
+
+
+def _href_in_prop(root: Any, base_url: str, prop_tag: str) -> str | None:
+    """Absolute ``<d:href>`` inside the first ``prop_tag`` property found in a
+    multistatus (e.g. ``c:calendar-home-set`` or ``d:current-user-principal``),
+    resolved against ``base_url``."""
+    for resp_el in root.findall("d:response", _NS):
+        props = resp_el.findall("d:propstat/d:prop", _NS)
+        el = _prop_find(props, prop_tag)
+        if el is None:
+            continue
+        href_el = el.find("d:href", _NS)
+        if href_el is not None and (href_el.text or "").strip():
+            resolved: str = urllib.parse.urljoin(base_url, (href_el.text or "").strip())
+            return resolved
+    return None
+
+
+def discover_collections(base_url: str, auth: dict[str, str] | None) -> dict[str, Any]:
+    """Discover the calendar / todo collections reachable from ``base_url``.
+
+    Returns ``{"collections": [{name, url, export_url, colour,
+    components[]}], "error": <msg|None>}``. ``components`` is the subset of
+    ``VEVENT`` / ``VTODO`` the collection holds, so the UI can label a todo
+    list vs a calendar.
+
+    ``base_url`` can be the calendar home (``.../calendars/<user>/``,
+    calendars come back on the first PROPFIND), a principal
+    (``.../principals/<user>/``), or the CalDAV service root: when the first
+    PROPFIND finds no calendars, follow ``calendar-home-set`` (directly, or
+    via ``current-user-principal``) and enumerate there. Best-effort: a bad
+    URL / auth / non-CalDAV response comes back as an ``error`` string,
+    never an exception."""
+    fixed = (
+        base_url.replace("webcal://", "https://", 1)
+        if base_url.startswith("webcal://")
+        else base_url
+    )
+    root, err = _propfind(fixed, auth, "1")
+    if err is not None:
+        return err
+    collections = _calendars_from_multistatus(root, fixed)
+    if collections:
+        return {"collections": collections, "error": None}
+
+    # No calendars at the given URL. It may be a principal or the service
+    # root, so follow calendar-home-set to the collection that holds them,
+    # resolving current-user-principal first when the home isn't advertised
+    # on this resource directly.
+    home = _href_in_prop(root, fixed, "c:calendar-home-set")
+    if home is None:
+        principal = _href_in_prop(root, fixed, "d:current-user-principal")
+        if principal and principal != fixed:
+            proot, _perr = _propfind(principal, auth, "0")
+            if proot is not None:
+                home = _href_in_prop(proot, principal, "c:calendar-home-set")
+    if home and home != fixed:
+        hroot, herr = _propfind(home, auth, "1")
+        if herr is not None:
+            return herr
+        collections = _calendars_from_multistatus(hroot, home)
+        if collections:
+            return {"collections": collections, "error": None}
+
+    return {
+        "collections": [],
+        "error": "No calendars found at that URL. Point it at your calendar home "
+        "(the folder that holds your calendars, e.g. .../calendars/<user>/), "
+        "your principal URL, or the CalDAV root.",
+    }
 
 
 # ----- cell-option choices --------------------------------------------

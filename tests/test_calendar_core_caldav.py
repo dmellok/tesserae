@@ -273,6 +273,63 @@ def test_discover_collections_handles_split_propstats(
     assert cols["Private"]["colour"] == cc.DEFAULT_COLOUR
 
 
+# A principal URL (what bablokb pointed discovery at in #124): no calendars
+# live here, but the principal advertises calendar-home-set pointing at the
+# collection that holds them.
+PRINCIPAL_XML = b"""<?xml version="1.0"?>
+<d:multistatus xmlns:d="DAV:" xmlns:cal="urn:ietf:params:xml:ns:caldav">
+ <d:response>
+  <d:href>/baikal/html/dav.php/principals/bablokb/</d:href>
+  <d:propstat><d:prop>
+   <d:resourcetype><d:collection/><d:principal/></d:resourcetype>
+   <d:displayname>Bernhard Bablok</d:displayname>
+   <cal:calendar-home-set><d:href>/baikal/html/dav.php/calendars/bablokb/</d:href></cal:calendar-home-set>
+  </d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+ </d:response>
+</d:multistatus>
+"""
+
+CAL_HOME_XML = b"""<?xml version="1.0"?>
+<d:multistatus xmlns:d="DAV:" xmlns:cal="urn:ietf:params:xml:ns:caldav">
+ <d:response><d:href>/baikal/html/dav.php/calendars/bablokb/</d:href>
+  <d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop>
+   <d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
+ <d:response><d:href>/baikal/html/dav.php/calendars/bablokb/private/</d:href>
+  <d:propstat><d:prop>
+   <d:resourcetype><d:collection/><cal:calendar/></d:resourcetype><d:displayname>Private</d:displayname>
+  </d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
+ <d:response><d:href>/baikal/html/dav.php/calendars/bablokb/dilbert/</d:href>
+  <d:propstat><d:prop>
+   <d:resourcetype><d:collection/><cal:calendar/></d:resourcetype><d:displayname>Dilbert</d:displayname>
+  </d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
+</d:multistatus>
+"""
+
+
+def test_discover_collections_follows_calendar_home_from_principal(
+    cc: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A principal URL resolves to its calendar-home-set and enumerates the
+    calendars there (regression for #124's real cause)."""
+
+    def fake_build(url: str, auth: Any) -> Any:
+        xml = CAL_HOME_XML if "/calendars/" in url else PRINCIPAL_XML
+
+        class _FakeOpener:
+            def open(self, req: Any, timeout: float = 0) -> Any:
+                return _FakeResp(xml)
+
+        return _FakeOpener()
+
+    monkeypatch.setattr(cc, "_build_opener", fake_build)
+    result = cc.discover_collections(
+        "http://baikal-dev/baikal/html/dav.php/principals/bablokb/", None
+    )
+    assert result["error"] is None
+    cols = {c["name"] for c in result["collections"]}
+    assert cols == {"Private", "Dilbert"}
+
+
 def test_discover_collections_reports_auth_failure(
     cc: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
