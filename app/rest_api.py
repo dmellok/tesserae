@@ -468,26 +468,18 @@ def _advertised_ota_schema(body: dict[str, Any]) -> int | None:
     return int(schema) if isinstance(schema, int) else None
 
 
-def _pending_ota(device: Device, body: dict[str, Any]) -> dict[str, str] | None:
-    """The signed OTA descriptor to hand this device on /status, or None.
-
-    Offered only when a descriptor is staged for the device, the device
-    advertised an OTA schema at least as new as the descriptor's, and the
-    descriptor targets this device's kind. Re-offering an already-applied
-    update is harmless: the firmware's ``already_current`` guard skips it."""
+def _staged_ota(device: Device, advertised: int) -> dict[str, str] | None:
+    """A per-device staged descriptor (the explicit one-off override), gated on
+    schema + kind. Highest precedence: an admin staged this exact device."""
     store = current_app.config.get("OTA_STAGING")
     if store is None:
         return None
     entry = store.get(device.id)
     if not isinstance(entry, dict):
         return None
-    advertised = _advertised_ota_schema(body)
-    if advertised is None:
-        return None
     schema_version = entry.get("schema_version")
     if not isinstance(schema_version, int) or schema_version > advertised:
         return None
-    # Guard against a mis-staged descriptor reaching the wrong kind.
     kind = device.kind_of or device.id
     if entry.get("device_kind") not in (None, kind):
         return None
@@ -495,6 +487,47 @@ def _pending_ota(device: Device, body: dict[str, Any]) -> dict[str, str] | None:
     if isinstance(descriptor, dict) and "payload" in descriptor and "signature" in descriptor:
         return {"payload": str(descriptor["payload"]), "signature": str(descriptor["signature"])}
     return None
+
+
+def _released_ota(device: Device, body: dict[str, Any]) -> dict[str, str] | None:
+    """A per-kind release descriptor for this device: the kind has a release,
+    the device is eligible (promoted, or a canary), and the release firmware is
+    newer than the version the device reports. Keyed by the device's kind, so it
+    inherently targets the right board."""
+    store = current_app.config.get("OTA_RELEASE")
+    if store is None:
+        return None
+    kind = device.kind_of or device.id
+    entry = store.get(kind)
+    if entry is None:
+        return None
+    descriptor: dict[str, str] | None = store.descriptor_for(kind, device.id)
+    if descriptor is None:
+        return None
+    # Firmware-version gate: only offer when the release is strictly newer than
+    # what the device reports, so a device that already applied it isn't nagged.
+    reported = body.get("fw_version") if isinstance(body, dict) else None
+    if not isinstance(reported, str) or not reported.strip():
+        return None
+    from app.ota.release import is_newer
+
+    if not is_newer(str(entry.get("fw_version") or ""), reported):
+        return None
+    return descriptor
+
+
+def _pending_ota(device: Device, body: dict[str, Any]) -> dict[str, str] | None:
+    """The signed OTA descriptor to hand this device on /status, or None.
+
+    Only offered when the device advertised an OTA schema (capability handshake).
+    A per-device staged descriptor wins (explicit one-off); otherwise the
+    device's kind release applies (manual promote + canary). Re-offering an
+    already-applied update is harmless: the firmware's ``already_current`` guard
+    skips it, and the release path also gates on the reported firmware version."""
+    advertised = _advertised_ota_schema(body)
+    if advertised is None:
+        return None
+    return _staged_ota(device, advertised) or _released_ota(device, body)
 
 
 @bp.get("/<device_id>/frame")

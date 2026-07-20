@@ -128,6 +128,26 @@ python -m app.ota.stage --data-root data --device-id hall_esp --descriptor d.jso
 The store is `<data-root>/core/ota_pending.json`; the server reads it on the next
 heartbeat, no restart needed. An admin UI for this is a later slice.
 
+## Rollout (per kind)
+
+Staging targets one device; a **release** targets a device kind, with a manual
+promote + canary flow so a bad build can't hit the whole fleet at once:
+
+```bash
+python -m app.ota.release set --data-root data --descriptor d.json --canary hall_esp
+python -m app.ota.release promote --data-root data --kind seeed_reterminal_e1001
+# pause / clear / list also available
+```
+
+`set` reads the target kind and firmware version from the descriptor (verified
+first) and offers it only to the listed canary devices; `promote` extends it to
+every device of the kind; `pause` stops offering it. On `/status` a device is
+offered its kind's release when it is eligible (canary or promoted) and the
+release firmware is strictly newer than the version it reports (`fw_version`),
+so an already-updated device isn't re-offered. A per-device staged descriptor
+(above) takes precedence over the kind release. Store:
+`<data-root>/core/ota_releases.json`.
+
 ## Keys and signing
 
 - Signing: Ed25519, keyed by `key_id` so keys can rotate. Two signers produce

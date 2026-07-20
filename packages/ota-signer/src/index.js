@@ -136,14 +136,17 @@ async function handleSign(request, env) {
   });
 }
 
-async function handleFirmware(env, path) {
-  const object = await env.OTA_BUCKET.get(path);
+async function handleFirmware(env, path, headOnly) {
+  // HEAD uses R2's metadata-only head() so a client can probe size/etag without
+  // downloading; GET streams the body.
+  const object = headOnly ? await env.OTA_BUCKET.head(path) : await env.OTA_BUCKET.get(path);
   if (object === null) return new Response("not found", { status: 404 });
   const headers = new Headers();
   object.writeHttpMetadata(headers);
   headers.set("etag", object.httpEtag);
   headers.set("cache-control", "public, max-age=31536000, immutable");
-  return new Response(object.body, { headers });
+  headers.set("content-length", String(object.size));
+  return new Response(headOnly ? null : object.body, { headers });
 }
 
 export default {
@@ -152,8 +155,8 @@ export default {
     if (request.method === "POST" && url.pathname === "/sign") {
       return handleSign(request, env);
     }
-    if (request.method === "GET" && url.pathname.startsWith("/firmware/")) {
-      return handleFirmware(env, url.pathname.slice(1));
+    if ((request.method === "GET" || request.method === "HEAD") && url.pathname.startsWith("/firmware/")) {
+      return handleFirmware(env, url.pathname.slice(1), request.method === "HEAD");
     }
     if (request.method === "GET" && url.pathname === "/pubkey") {
       if (!env.OTA_SIGNING_KEY) return json({ error: "OTA_SIGNING_KEY not set" }, 500);

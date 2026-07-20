@@ -8,6 +8,14 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **OTA per-kind rollout: manual promote + canary (#121).** Beyond staging a build for a single
+  device, an operator can now set a signed build as a device kind's release and roll it out
+  deliberately: `python -m app.ota.release set` (offered first to the canary devices you list),
+  `promote` (to every device of the kind), `pause`, `clear`, `list`. On `/status` the server offers a
+  device its kind's release when the device is eligible (a canary, or the release is promoted) and the
+  release firmware is newer than the version the device reports; a per-device staged descriptor still
+  wins. The device-side apply/verify/rollback firmware is tracked separately, so nothing reaches a
+  device until that ships.
 - **OTA production signing (Cloudflare Worker) and trusted-key registry (#121).** A Cloudflare Worker
   (`packages/ota-signer/`) signs firmware descriptors with an Ed25519 key held only in a Worker
   secret and serves the images from R2, co-locating signing with storage; its output is byte

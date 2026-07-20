@@ -622,9 +622,13 @@ def create_app(
     app.config["BATTERY_HISTORY"] = BatteryHistory(data_root / "core" / "battery_history.db")
     # Pending OTA descriptors, staged per device and handed out on /status to
     # devices that advertise a compatible OTA schema (issue #121).
+    from app.state.ota_release import OtaReleaseStore
     from app.state.ota_staging import OtaStagingStore
 
     app.config["OTA_STAGING"] = OtaStagingStore(data_root / "core" / "ota_pending.json")
+    # Per-kind OTA releases (manual promote + canary), consulted after the
+    # per-device staging override when a device asks for a frame/status.
+    app.config["OTA_RELEASE"] = OtaReleaseStore(data_root / "core" / "ota_releases.json")
     app.config["PREVIEW_CACHE"] = {}
     app.config["RENDERS_DIR"] = renders_dir
     app.config["DEVICE_STATUS"] = status_cache

@@ -612,6 +612,94 @@ def test_status_omits_ota_when_staged_for_other_kind(app: Flask) -> None:
     assert "ota" not in resp.get_json()
 
 
+def _release_descriptor(kind: str = "esp32_client", fw: str = "1.5.0") -> dict:
+    from app.ota import build_manifest, load_private_key, sign_manifest
+
+    seed = bytes.fromhex(
+        (REPO_ROOT / "tests" / "fixtures" / "ota" / "test_signing_key.hex").read_text().strip()
+    )
+    manifest = build_manifest(
+        key_id="test-ed25519-1",
+        device_kind=kind,
+        fw_version=fw,
+        image_url="https://cdn.example.test/app.bin",
+        image=b"firmware-bytes",
+    )
+    return sign_manifest(manifest, load_private_key(seed))
+
+
+def test_status_offers_kind_release_to_canary_when_newer(app: Flask) -> None:
+    client = app.test_client()
+    token = _register_esp32(app, client, "hall_esp")
+    desc = _release_descriptor(fw="1.5.0")
+    app.config["OTA_RELEASE"].set_target(
+        "esp32_client", desc, fw_version="1.5.0", canary_device_ids=["hall_esp"]
+    )
+    # Canary device, reports an older version, advertises OTA -> offered.
+    resp = _post_status(client, "hall_esp", token, {"ota": {"schema": 1}, "fw_version": "1.4.0"})
+    assert resp.status_code == 200
+    assert resp.get_json()["ota"] == desc
+
+
+def test_status_withholds_kind_release_from_non_canary_until_promoted(app: Flask) -> None:
+    client = app.test_client()
+    token = _register_esp32(app, client, "hall_esp")
+    app.config["OTA_RELEASE"].set_target(
+        "esp32_client",
+        _release_descriptor(fw="1.5.0"),
+        fw_version="1.5.0",
+        canary_device_ids=["other"],
+    )
+    body = {"ota": {"schema": 1}, "fw_version": "1.4.0"}
+    assert "ota" not in _post_status(client, "hall_esp", token, body).get_json()
+    # After promote, the same device is offered it.
+    app.config["OTA_RELEASE"].promote("esp32_client")
+    assert "ota" in _post_status(client, "hall_esp", token, body).get_json()
+
+
+def test_status_withholds_kind_release_when_not_newer(app: Flask) -> None:
+    client = app.test_client()
+    token = _register_esp32(app, client, "hall_esp")
+    app.config["OTA_RELEASE"].set_target(
+        "esp32_client",
+        _release_descriptor(fw="1.5.0"),
+        fw_version="1.5.0",
+        canary_device_ids=["hall_esp"],
+    )
+    # Device already on 1.5.0 -> not offered.
+    body = {"ota": {"schema": 1}, "fw_version": "1.5.0"}
+    assert "ota" not in _post_status(client, "hall_esp", token, body).get_json()
+
+
+def test_status_paused_release_offers_nothing(app: Flask) -> None:
+    client = app.test_client()
+    token = _register_esp32(app, client, "hall_esp")
+    app.config["OTA_RELEASE"].set_target(
+        "esp32_client",
+        _release_descriptor(fw="1.5.0"),
+        fw_version="1.5.0",
+        canary_device_ids=["hall_esp"],
+    )
+    app.config["OTA_RELEASE"].pause("esp32_client")
+    body = {"ota": {"schema": 1}, "fw_version": "1.4.0"}
+    assert "ota" not in _post_status(client, "hall_esp", token, body).get_json()
+
+
+def test_status_per_device_stage_wins_over_kind_release(app: Flask) -> None:
+    client = app.test_client()
+    token = _register_esp32(app, client, "hall_esp")
+    staged = _stage_ota(app, "hall_esp", fw="1.6.0")
+    app.config["OTA_RELEASE"].set_target(
+        "esp32_client",
+        _release_descriptor(fw="1.5.0"),
+        fw_version="1.5.0",
+        canary_device_ids=["hall_esp"],
+    )
+    # Explicit per-device stage takes precedence over the kind release.
+    resp = _post_status(client, "hall_esp", token, {"ota": {"schema": 1}, "fw_version": "1.4.0"})
+    assert resp.get_json()["ota"] == staged
+
+
 def test_frame_response_carries_renderer_payload_fields(app: Flask) -> None:
     """REST /frame must return the renderer-specific fields its MQTT-
     subscribed cousins receive (rotate / scale / bg / saturation for
