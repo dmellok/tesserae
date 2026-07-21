@@ -465,27 +465,21 @@
   // box (denser, not a shrunken copy ringed by whitespace, discussion #131);
   // crop keeps a sub-rectangle and scales it to fill (drop a title, reclaim
   // space). Shared shape with composer.js so editor + Send agree.
-  // Always returns a rule (even at 100% / no crop, an identity fill), so once
-  // a widget is scaled it stays filled continuously through 100% instead of
-  // snapping between "natural" and "filled" as the slider crosses 100 (the jump
-  // docbobo hit). The caller decides whether the root is engaged at all.
-  function rootRule(scalePct, crop) {
+  // The widget-root content scale. Counter-sizes so the layout reflows to FILL
+  // the box (denser, not a shrunken copy ringed by whitespace, discussion #131).
+  // Always returns a rule (identity fill at 100%) so a scaled widget stays
+  // filled continuously through 100% rather than snapping natural<->filled; the
+  // caller only calls it once a widget has been scaled. Crop is handled by
+  // layout (the footprint), not here. Shared shape with composer.js.
+  function rootRule(scalePct) {
     var f = Number(scalePct == null ? 100 : scalePct) / 100;
-    var c = crop || {};
-    var l = (+c.left || 0) / 100, r = (+c.right || 0) / 100;
-    var t = (+c.top || 0) / 100, b = (+c.bottom || 0) / 100;
-    var sw = Math.max(0.05, 1 - l - r), sh = Math.max(0.05, 1 - t - b);
-    var tx = -(l / sw) * f * 100, ty = -(t / sh) * f * 100;
-    return ".w{transform-origin:0 0;width:calc(100% / " + f + ");height:calc(100% / " + f + ");" +
-      "transform:translate(" + tx + "%," + ty + "%) scale(" + (f / sw) + "," + (f / sh) + ")}";
-  }
-  function cropEngaged(c) {
-    return !!(c && ((+c.top || 0) || (+c.right || 0) || (+c.bottom || 0) || (+c.left || 0)));
+    return ".w{transform-origin:0 0;width:calc(100% / " + f + ");height:calc(100% / " + f +
+      ");transform:scale(" + f + ")}";
   }
   // Inject a <style> into a widget's shadow root scaling each saved part.
   // ``overrideSel`` / ``overrideScale`` let a live slider drag preview a piece
   // that may not be saved yet, without mutating the model.
-  function applyParts(e, shadow, overrideSel, overrideScale, overrideCrop) {
+  function applyParts(e, shadow, overrideSel, overrideScale) {
     if (!shadow) return;
     var ex = shadow.querySelector("style#panels-parts");
     if (ex) ex.remove();
@@ -493,13 +487,10 @@
     (Array.isArray(e.parts) ? e.parts : []).forEach(function (p) { if (p.sel) map[p.sel] = p.scale; });
     if (overrideSel != null) map[overrideSel] = overrideScale;
     var out = [];
-    // Root: fold the content scale + crop into one ``.w`` rule. Only engaged
-    // when the widget has been scaled (a ``.w`` part, kept even at 100) or
-    // cropped, so untouched widgets render exactly as before.
-    var crop = overrideCrop !== undefined ? overrideCrop : e.crop;
-    if (Object.prototype.hasOwnProperty.call(map, ROOT_SEL) || cropEngaged(crop)) {
-      var rootScale = map[ROOT_SEL] != null ? map[ROOT_SEL] : 100;
-      out.push(rootRule(rootScale, crop));
+    // Root fill: engaged once the widget has been scaled (a ``.w`` part, kept
+    // even at 100), so untouched widgets render exactly as before.
+    if (Object.prototype.hasOwnProperty.call(map, ROOT_SEL)) {
+      out.push(rootRule(map[ROOT_SEL] != null ? map[ROOT_SEL] : 100));
     }
     Object.keys(map).forEach(function (sel) {
       if (sel === ROOT_SEL) return;
@@ -601,13 +592,66 @@
 
   function isWidget(e) { return !e.kind || e.kind === "widget"; }
 
+  // Crop separates a widget's RENDER box (e.x/y/w/h, where the widget lays out)
+  // from its painted FOOTPRINT (the kept rectangle after trimming the crop
+  // insets). The widget still renders at full size; the footprint clips it, so
+  // cropping the top drops a fixed title and the freed space is reclaimed, all
+  // undistorted. Only widgets crop.
+  function cropFrac(e) {
+    var c = (isWidget(e) && e.crop) || {};
+    var l = Math.max(0, Math.min(90, +c.left || 0)) / 100;
+    var r = Math.max(0, Math.min(90, +c.right || 0)) / 100;
+    var t = Math.max(0, Math.min(90, +c.top || 0)) / 100;
+    var b = Math.max(0, Math.min(90, +c.bottom || 0)) / 100;
+    return { l: l, r: r, t: t, b: b, sw: Math.max(0.05, 1 - l - r), sh: Math.max(0.05, 1 - t - b) };
+  }
+  function cropOn(e) { var c = cropFrac(e); return c.l || c.r || c.t || c.b; }
+  // The painted / interaction box: render box reduced to the kept rectangle.
+  function footprint(e) {
+    var c = cropFrac(e);
+    return {
+      x: e.x + c.l * e.w, y: e.y + c.t * e.h,
+      w: e.w * c.sw, h: e.h * c.sh,
+      ix: -c.l * e.w, iy: -c.t * e.h, // inner (render box) offset within footprint
+    };
+  }
+  // Re-position/-size an already-painted widget node to match the element's
+  // footprint, creating or removing the crop inner-wrapper as needed, so a live
+  // crop drag updates without a full repaint (which would rebuild the inspector
+  // and steal focus from the crop field).
+  function relayoutNode(e) {
+    var node = artboard.querySelector('[data-id="' + e.id + '"]');
+    if (!node) return;
+    var fp = footprint(e), on = cropOn(e);
+    node.style.left = fp.x + "px"; node.style.top = fp.y + "px";
+    node.style.width = fp.w + "px"; node.style.height = fp.h + "px";
+    node.style.overflow = on ? "hidden" : "";
+    var m = S.mount[e.id], host = m && m.host;
+    if (!host) return;
+    var inner = node.querySelector(".el-cropinner");
+    if (on) {
+      if (!inner) {
+        inner = el("div", "el-cropinner"); inner.style.position = "absolute";
+        node.insertBefore(inner, node.firstChild); inner.appendChild(host);
+      }
+      inner.style.left = fp.ix + "px"; inner.style.top = fp.iy + "px";
+      inner.style.width = e.w + "px"; inner.style.height = e.h + "px";
+    } else if (inner) {
+      node.insertBefore(host, inner); inner.remove();
+    }
+  }
+
   function elNode(e) {
     var node = el("div", "el" + (isSel(e.id) ? " psel" : "") +
       (isWidget(e) && !e.widget ? " el-empty" : ""));
     node.dataset.id = e.id;
     var op = e.visible === false ? 0.4 : (e.opacity == null ? 1 : e.opacity / 100);
-    node.style.cssText = "position:absolute;left:" + e.x + "px;top:" + e.y + "px;width:" + e.w +
-      "px;height:" + e.h + "px;opacity:" + op + ";" +
+    // Node geometry is the footprint: identical to the render box when not
+    // cropped, the kept rectangle (clipped) when cropped.
+    var fpBox = footprint(e);
+    node.style.cssText = "position:absolute;left:" + fpBox.x + "px;top:" + fpBox.y + "px;width:" + fpBox.w +
+      "px;height:" + fpBox.h + "px;opacity:" + op + ";" +
+      (cropOn(e) ? "overflow:hidden;" : "") +
       (e.rotate ? "transform:rotate(" + e.rotate + "deg);" : "");
 
     if (!isWidget(e)) {
@@ -646,7 +690,17 @@
         S.mount[e.id] = { fp: fp, host: host };
         mountWidget(e, host);
       }
-      node.appendChild(host);
+      if (cropOn(e)) {
+        // Render the widget at full size in an inner box offset so the kept
+        // rectangle aligns with the (clipped) footprint node. Undistorted.
+        var inner = el("div", "el-cropinner");
+        inner.style.cssText = "position:absolute;left:" + fpBox.ix + "px;top:" + fpBox.iy +
+          "px;width:" + e.w + "px;height:" + e.h + "px";
+        inner.appendChild(host);
+        node.appendChild(inner);
+      } else {
+        node.appendChild(host);
+      }
       if (!e.widget) node.appendChild(el("div", "elplace", '<i class="ph-bold ph-cards-three"></i>'));
     }
 
@@ -878,7 +932,7 @@
       var c = clampGroupDelta(items, nx - ox, ny - oy);
       items.forEach(function (mi) {
         mi.e.x = mi.ox + c.dx; mi.e.y = mi.oy + c.dy;
-        if (mi.node) { mi.node.style.left = mi.e.x + "px"; mi.node.style.top = mi.e.y + "px"; }
+        if (mi.node) { var mf = footprint(mi.e); mi.node.style.left = mf.x + "px"; mi.node.style.top = mf.y + "px"; }
       });
       if (m.altKey) hideGuides(); else showGuides(gx, gy, e);
     }
@@ -900,7 +954,9 @@
     if (!e || e.locked) return;
     var node = ev.currentTarget.parentElement;
     var z = currentZoom(), sx = ev.clientX, sy = ev.clientY;
-    var o = { x: e.x, y: e.y, w: e.w, h: e.h };
+    // Resize the footprint (what the user grabs); the render box is derived so
+    // the crop percentages stay fixed as the visible box changes.
+    var cf = cropFrac(e), o = footprint(e);
     var before = snapshot(), changed = false;
     ev.currentTarget.setPointerCapture(ev.pointerId);
     function move(m) {
@@ -931,8 +987,12 @@
       var nx = o.x, ny = o.y;
       if (dir.indexOf("l") >= 0) nx = o.x + o.w - nw;
       if (dir.indexOf("t") >= 0) ny = o.y + o.h - nh;
-      e.x = snap(nx); e.y = snap(ny); e.w = nw; e.h = nh;
-      node.style.left = nx + "px"; node.style.top = ny + "px";
+      var fx = snap(nx), fy = snap(ny);
+      // Footprint -> render box: divide by the kept fractions, then offset the
+      // render origin back out by the crop so the footprint lands at fx/fy.
+      e.w = nw / cf.sw; e.h = nh / cf.sh;
+      e.x = fx - cf.l * e.w; e.y = fy - cf.t * e.h;
+      node.style.left = fx + "px"; node.style.top = fy + "px";
       node.style.width = nw + "px"; node.style.height = nh + "px";
     }
     function up() {
@@ -1526,8 +1586,6 @@
     var row = el("div", "prow"); row.style.display = "block";
     row.innerHTML = '<span class="plab">Crop %</span>';
     var wrap = el("span"); wrap.style.cssText = "display:flex;gap:6px;align-items:center;margin-top:4px";
-    function hostShadow() { var m = S.mount[e.id]; return m && m.host ? m.host.shadowRoot : null; }
-    var live = null; // preview crop until commit
     ["top", "right", "bottom", "left"].forEach(function (side) {
       var g = el("span"); g.style.cssText = "display:flex;align-items:center;gap:2px";
       var lb = el("span"); lb.textContent = side.charAt(0).toUpperCase();
@@ -1535,17 +1593,15 @@
       var inp = el("input", "dinput"); inp.type = "number"; inp.min = 0; inp.max = 90; inp.title = "Crop " + side;
       inp.value = (e.crop && e.crop[side]) || 0;
       inp.style.cssText = "width:40px;text-align:center";
+      var opened = false; // one history entry per field interaction
       inp.addEventListener("pointerdown", function (ev) { ev.stopPropagation(); });
       inp.addEventListener("input", function () {
-        var base = e.crop || { top: 0, right: 0, bottom: 0, left: 0 };
-        live = { top: base.top || 0, right: base.right || 0, bottom: base.bottom || 0, left: base.left || 0 };
-        live[side] = Math.max(0, Math.min(90, Number(inp.value) || 0));
-        var sh = hostShadow(); if (sh) applyParts(e, sh, null, undefined, live);
+        if (!opened) { pushHistory(); opened = true; }
+        if (!e.crop) e.crop = { top: 0, right: 0, bottom: 0, left: 0 };
+        e.crop[side] = Math.max(0, Math.min(90, Number(inp.value) || 0));
+        relayoutNode(e); // live footprint update without rebuilding the inspector
       });
-      inp.addEventListener("change", function () {
-        if (!live) return;
-        pushHistory(); e.crop = live; live = null; scheduleSave();
-      });
+      inp.addEventListener("change", function () { opened = false; scheduleSave(); });
       g.appendChild(lb); g.appendChild(inp); wrap.appendChild(g);
     });
     row.appendChild(wrap);

@@ -61,15 +61,15 @@
     {% endif %}
     {% for e in els %}
     {% if e.kind == 'widget' %}
+    {% set cl = e.crop_layout %}
     <div class="cell"
-         style="left: {{ e.x }}px; top: {{ e.y }}px; width: {{ e.w }}px; height: {{ e.h }}px;{% if e.rotate %} transform: rotate({{ e.rotate }}deg);{% endif %}{% if e.opacity is not none and e.opacity != 100 %} opacity: {{ e.opacity / 100 }};{% endif %}"
+         style="left: {{ cl.fx if cl else e.x }}px; top: {{ cl.fy if cl else e.y }}px; width: {{ cl.fw if cl else e.w }}px; height: {{ cl.fh if cl else e.h }}px;{% if cl %} overflow: hidden;{% endif %}{% if e.rotate %} transform: rotate({{ e.rotate }}deg);{% endif %}{% if e.opacity is not none and e.opacity != 100 %} opacity: {{ e.opacity / 100 }};{% endif %}"
          data-cell-id="{{ e.id }}"
          data-el-id="{{ e.id }}"
          data-data-source="{{ e.data_source }}"
          data-plugin="{{ e.widget }}"
          data-fragment="{{ e.fragment }}"
          data-parts='{{ e.parts|tojson }}'
-         {% if e.crop %}data-crop='{{ e.crop|tojson }}'{% endif %}
          data-options='{{ e.options|tojson }}'
          data-data='{{ e.data|tojson }}'
          data-cell-w="{{ e.w }}"
@@ -82,7 +82,7 @@
          {% if e.on_swipe_attr %}data-on-swipe="{{ e.on_swipe_attr }}"{% endif %}
          {% if e.on_slide_attr %}data-on-slide="{{ e.on_slide_attr }}"{% endif %}
          {% if e.on_tap_attr or e.on_swipe_attr or e.on_slide_attr %}data-touch-origin="config"{% endif %}>
-      <div class="cell-content"></div>
+      <div class="cell-content"{% if cl %} style="position:absolute; left: {{ cl.ix }}px; top: {{ cl.iy }}px; width: {{ e.w }}px; height: {{ e.h }}px;"{% endif %}></div>
     </div>
     {% else %}
     <div class="deco" data-el='{{ e|tojson }}'

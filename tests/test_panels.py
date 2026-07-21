@@ -404,7 +404,8 @@ def test_fragment_part_scales_roundtrip_and_compose(app: Flask) -> None:
 
 def test_crop_insets_roundtrip_and_compose(app: Flask) -> None:
     """A widget element's crop persists and reaches the compose render as the
-    cell's data-crop payload (drop a title / reclaim space)."""
+    reduced footprint cell + full-size offset cell-content (drop a title /
+    reclaim space, undistorted)."""
     client = app.test_client()
     _sign_in(client)
     cid = client.get("/pages/canvas/").location.rsplit("/", 1)[1]
@@ -428,13 +429,17 @@ def test_crop_insets_roundtrip_and_compose(app: Flask) -> None:
     crop = doc["els"][0]["crop"]
     assert crop["top"] == 22 and crop["bottom"] == 5 and crop["left"] == 0
 
+    # Crop is layout: the cell shrinks to the kept footprint and the widget
+    # still renders at full size in an offset, clipped cell-content.
     body = client.get(f"/compose/{cid}").get_data(as_text=True)
-    assert "data-crop=" in body
+    assert "top: 30.8px" in body  # 22% of 140
+    assert "height: 102.2px" in body  # (100-22-5)% of 140
+    assert 'class="cell-content" style="position:absolute;' in body
 
 
 def test_crop_omitted_from_compose_when_zero(app: Flask) -> None:
-    """A widget with no crop doesn't emit a data-crop attribute, so the common
-    case stays clean."""
+    """A widget with no crop renders as a plain full-size cell: no footprint
+    clipping and no positioned cell-content, so the common case stays clean."""
     client = app.test_client()
     _sign_in(client)
     cid = client.get("/pages/canvas/").location.rsplit("/", 1)[1]
@@ -443,7 +448,8 @@ def test_crop_omitted_from_compose_when_zero(app: Flask) -> None:
         json={"els": [{"id": "e1", "widget": "weather_now", "x": 0, "y": 0, "w": 200, "h": 140}]},
     )
     body = client.get(f"/compose/{cid}").get_data(as_text=True)
-    assert 'data-el-id="e1"' in body and "data-crop=" not in body
+    assert 'data-el-id="e1"' in body
+    assert '<div class="cell-content"></div>' in body  # plain, not offset/clipped
 
 
 def test_crop_edge_capped_at_90(app: Flask) -> None:

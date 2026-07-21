@@ -863,6 +863,31 @@ def _panel_override(w: str | None, h: str | None) -> tuple[int, int] | None:
     return min(pw, 10000), min(ph, 10000)
 
 
+def _crop_layout(e: Any) -> dict[str, float] | None:
+    """Footprint geometry for a cropped widget, or ``None`` when uncropped.
+
+    Crop separates the widget's render box (``e.x/y/w/h``) from its painted
+    footprint (the kept rectangle). The widget still renders at full size in an
+    inner box (``ix``/``iy`` offset); the footprint (``fx/fy/fw/fh``) clips it,
+    so the trimmed edges are dropped and the freed space is reclaimed, all
+    undistorted. Mirrors the editor's ``footprint()``."""
+    crop = getattr(e, "crop", None)
+    if crop is None or not any([crop.top, crop.right, crop.bottom, crop.left]):
+        return None
+    left, right = crop.left / 100, crop.right / 100
+    top, bottom = crop.top / 100, crop.bottom / 100
+    sw = max(0.05, 1 - left - right)
+    sh = max(0.05, 1 - top - bottom)
+    return {
+        "fx": e.x + left * e.w,
+        "fy": e.y + top * e.h,
+        "fw": e.w * sw,
+        "fh": e.h * sh,
+        "ix": -left * e.w,
+        "iy": -top * e.h,
+    }
+
+
 def _build_canvas_els(
     els: list[Any], cw: int, ch: int, *, target_device_id: str = ""
 ) -> list[dict[str, Any]]:
@@ -1074,11 +1099,7 @@ def _build_canvas_els(
             "rotate": e.rotate,
             "opacity": e.opacity,
             "parts": [p.model_dump() for p in e.parts],
-            "crop": (
-                e.crop.model_dump()
-                if e.crop and any([e.crop.top, e.crop.right, e.crop.bottom, e.crop.left])
-                else None
-            ),
+            "crop_layout": _crop_layout(e),
             "x": e.x,
             "y": e.y,
             "w": e.w,

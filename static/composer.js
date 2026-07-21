@@ -49,39 +49,26 @@ function partRule(sel, scale) {
   const iconFix = /\.ph-/.test(sel) ? "display:inline-block;" : "";
   return `${sel}{transform:scale(${f});transform-origin:center center;${iconFix}}`;
 }
-// The widget root (``.w``): the "Scale" content density and the crop compose
-// into one transform. Scale counter-sizes so the layout reflows to FILL the box
-// (denser, not a shrunken copy ringed by whitespace, discussion #131); crop
-// keeps a sub-rectangle and scales it to fill (drop a title, reclaim space).
-// Shared shape with the editor's ``rootRule``.
-// Always returns a rule (identity fill at 100% / no crop), so a scaled widget
-// stays filled continuously through 100% instead of snapping natural<->filled.
-function rootRule(scalePct, crop) {
+// The widget-root content scale ("Scale"): counter-sizes so the layout reflows
+// to FILL the box (discussion #131). Always returns a rule (identity fill at
+// 100%) so a scaled widget stays filled continuously through 100% rather than
+// snapping natural<->filled. Crop is handled by layout (the footprint cell),
+// not here. Shared shape with the editor's ``rootRule``.
+function rootRule(scalePct) {
   const f = Number(scalePct || 100) / 100;
-  const c = crop || {};
-  const l = (+c.left || 0) / 100, r = (+c.right || 0) / 100;
-  const t = (+c.top || 0) / 100, b = (+c.bottom || 0) / 100;
-  const sw = Math.max(0.05, 1 - l - r), sh = Math.max(0.05, 1 - t - b);
-  const tx = -(l / sw) * f * 100, ty = -(t / sh) * f * 100;
-  return `.w{transform-origin:0 0;width:calc(100% / ${f});height:calc(100% / ${f});` +
-    `transform:translate(${tx}%,${ty}%) scale(${f / sw},${f / sh})}`;
-}
-function cropEngaged(c) {
-  return !!(c && ((+c.top || 0) || (+c.right || 0) || (+c.bottom || 0) || (+c.left || 0)));
+  return `.w{transform-origin:0 0;width:calc(100% / ${f});height:calc(100% / ${f});transform:scale(${f})}`;
 }
 function applyParts(shadow, cell) {
   const existing = shadow.querySelector("style#tesserae-parts");
   if (existing) existing.remove();
   let parts = [];
   try { parts = JSON.parse(cell.dataset.parts || "[]"); } catch { parts = []; }
-  let crop = null;
-  try { crop = cell.dataset.crop ? JSON.parse(cell.dataset.crop) : null; } catch { crop = null; }
   let rootScale = null;
   (Array.isArray(parts) ? parts : []).forEach((p) => { if (p && p.sel === ".w" && p.scale != null) rootScale = p.scale; });
   const out = [];
-  // Root engaged only when the widget was scaled (a ``.w`` part, kept at 100) or
-  // cropped, so untouched widgets render exactly as before.
-  if (rootScale != null || cropEngaged(crop)) out.push(rootRule(rootScale == null ? 100 : rootScale, crop));
+  // Root fill engaged only when the widget was scaled (a ``.w`` part, kept at
+  // 100), so untouched widgets render exactly as before.
+  if (rootScale != null) out.push(rootRule(rootScale));
   (Array.isArray(parts) ? parts : [])
     .filter((p) => p && p.sel && p.sel !== ".w" && p.scale != null && p.scale !== 100)
     .forEach((p) => out.push(partRule(p.sel, p.scale)));
@@ -338,10 +325,6 @@ async function applyCellPatch(patch) {
   cell.dataset.data = JSON.stringify(patch.data ?? null);
   if (Object.prototype.hasOwnProperty.call(patch, "parts")) {
     cell.dataset.parts = JSON.stringify(patch.parts ?? []);
-  }
-  if (Object.prototype.hasOwnProperty.call(patch, "crop")) {
-    if (patch.crop) cell.dataset.crop = JSON.stringify(patch.crop);
-    else delete cell.dataset.crop;
   }
 
   const state = cellState.get(patch.id);
