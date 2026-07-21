@@ -2953,7 +2953,11 @@
     scaler = $("panels-scaler");
 
     // Zoom controls + wheel-zoom + space-drag pan.
+    // ``vp`` is the scrolling area (holds the scaler); the zoombar mounts on
+    // its non-scrolling parent (.cv-viewport) so it stays pinned to the view
+    // instead of scrolling away with a large canvas (issue #133).
     var vp = scaler.parentElement;
+    var frame = (vp && vp.parentElement) || vp;
     if (vp) {
       var zc = el("div", "zoombar");
       zc.innerHTML =
@@ -2970,7 +2974,7 @@
       });
       var zrange = zc.querySelector("#panels-zoom-range");
       if (zrange) zrange.addEventListener("input", function () { setZoom(Number(zrange.value) / 100); });
-      vp.appendChild(zc);
+      frame.appendChild(zc);
       vp.addEventListener("wheel", function (ev) {
         if (!(ev.ctrlKey || ev.metaKey)) return;
         ev.preventDefault();

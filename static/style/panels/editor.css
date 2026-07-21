@@ -8,8 +8,11 @@
 :root[data-theme="dark"] .ed select.psel{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23b6bcc7' stroke-width='3'><path d='M6 9l6 6 6-6'/></svg>")}
 .ed select.psel:focus{outline:none;border-color:var(--t-accent);box-shadow:0 0 0 3px color-mix(in oklab,var(--t-accent) 22%,transparent)}
 
-/* workspace */
-.cv-viewport{position:relative;overflow:auto;display:grid;place-items:center;min-height:0;min-width:0}
+/* workspace: .cv-viewport is the fixed, non-scrolling frame (so overlays like
+   the zoombar stay pinned to it); .cv-scroll is the scrolling/centering area
+   that actually holds the canvas. */
+.cv-viewport{position:relative;display:grid;overflow:hidden;min-height:0;min-width:0}
+.cv-scroll{grid-area:1/1;overflow:auto;display:grid;place-items:center;min-height:0;min-width:0}
 .cv-viewport::before{content:"";position:absolute;inset:0;background-image:radial-gradient(color-mix(in oklab,var(--t-fg) 9%,transparent) 1px,transparent 1.5px);background-size:22px 22px;opacity:.5;pointer-events:none}
 .cv-scaler{transform-origin:center center;position:relative;z-index:1;flex:none}
 .cv-panel{position:relative;overflow:visible}
