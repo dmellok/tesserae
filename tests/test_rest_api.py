@@ -356,6 +356,40 @@ def test_frame_endpoint_with_nonexistent_device_id_returns_404(app: Flask) -> No
     assert "no device" in body["error"].lower()
 
 
+def test_register_echoes_canonical_lowercased_device_id(app: Flask) -> None:
+    """Register lowercases the id on write, so the success response has
+    to echo the canonical id back (like /discover does) or a firmware
+    that keeps its mixed-case id 404s on every frame fetch (#128)."""
+    client = app.test_client()
+    _sign_in(client)
+    code = _issue_pairing(app)
+    resp = _register_via_api(client, code=code, device_id="Bedroom_Pico")
+    assert resp.status_code == 201
+    assert resp.get_json()["device_id"] == "bedroom_pico"
+
+
+def test_frame_fetch_tolerates_mixed_case_device_id_in_url(app: Flask) -> None:
+    """A device that paired with a mixed-case id (stored lowercased) and
+    kept the mixed-case form in its URL template must still resolve, not
+    404. Regression for #128: the id in the path is normalised the same
+    way register normalises it on write."""
+    client = app.test_client()
+    _sign_in(client)
+    code = _issue_pairing(app)
+    resp = _register_via_api(client, code=code, device_id="Bedroom_Pico")
+    token = resp.get_json()["device_token"]
+
+    # Mixed-case id in the URL, canonical instance stored as bedroom_pico.
+    resp = client.get(
+        "/api/v1/device/Bedroom_Pico/frame",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    # No push yet, so 204 (or 304/200 if one lands) — anything but the
+    # 404 the casing mismatch used to produce.
+    assert resp.status_code != 404
+    assert resp.status_code in (200, 204, 304)
+
+
 def test_blueprint_404_returns_json_not_html(app: Flask) -> None:
     """A stray /api/v1/device/... URL that doesn't match any registered
     route must return the same {status, error} JSON envelope the

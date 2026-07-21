@@ -271,17 +271,29 @@ def _auth_device(device_id: str) -> tuple[Device | None, Response | None]:
     device = _device_by_token(token)
     if device is None:
         return None, _error(401, "invalid bearer token")
-    if device.id != device_id:
+    # Ids are stored lowercased at registration, so compare + look up
+    # against the canonical form. Without this a device that kept a
+    # mixed-case id pairs fine but 404s on every frame fetch (#128).
+    canonical = _canonical_id(device_id)
+    if device.id != canonical:
         # Distinguish "id doesn't exist" (404) from "id exists but
         # token belongs to a different device" (403). Registry lookup
         # is O(1) on the dict; keep the constant-time token-compare
         # dance above so timing side-channels stay closed on the auth
         # side.
-        target = _devices().get(device_id)
+        target = _devices().get(canonical)
         if target is None or target.kind_of is None:
             return None, _error(404, f"no device with id {device_id!r}")
         return None, _error(403, "token not valid for this device")
     return device, None
+
+
+def _canonical_id(device_id: Any) -> str:
+    """Normalise a device id the way ``create_instance`` stores it
+    (``strip().lower()``). Registration lowercases ids on write, so
+    every lookup has to normalise the same way or a device that keeps a
+    mixed-case id 404s on every request (issue #128)."""
+    return str(device_id or "").strip().lower()
 
 
 def _error(status: int, message: str, **extra: Any) -> Response:
@@ -1014,7 +1026,7 @@ def post_discover() -> Response:
     body = request.get_json(silent=True) or {}
     if not isinstance(body, dict):
         return _error(400, "body must be a JSON object")
-    device_id = str(body.get("device_id") or "").strip().lower()
+    device_id = _canonical_id(body.get("device_id"))
     if not device_id:
         return _error(400, "device_id is required")
     mac = str(body.get("mac") or "").strip()
@@ -1101,7 +1113,7 @@ def post_register() -> Response:
     if not isinstance(body, dict):
         return _error(400, "body must be a JSON object")
 
-    device_id = str(body.get("device_id") or "").strip().lower()
+    device_id = _canonical_id(body.get("device_id"))
     kind_id = str(body.get("kind") or "").strip()
     if not device_id or not kind_id:
         return _error(400, "device_id and kind are required")
@@ -1169,6 +1181,7 @@ def post_register() -> Response:
             {
                 "status": 200,
                 "device_token": token,
+                "device_id": current.id,
                 "server_time": time.time(),
                 "config": _current_config(current),
                 "reused_existing": True,
@@ -1242,6 +1255,7 @@ def post_register() -> Response:
         {
             "status": 201,
             "device_token": token,
+            "device_id": result.device.id,
             "server_time": time.time(),
             "config": _current_config(result.device),
             "reused_existing": False,
