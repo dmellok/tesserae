@@ -972,6 +972,46 @@ def _client_id_for_rate_limit() -> str:
     return request.remote_addr or "unknown"
 
 
+def _log_pairing_outcome(endpoint: str, resp: Response) -> None:
+    """Log the result of a ``/register`` or ``/discover`` attempt so a
+    failed pairing is debuggable from the server, not just from the
+    firmware's discarded HTTP response or a packet capture (issue #126).
+
+    Rejections log at WARNING with the status, device id, client IP, and
+    the returned error string; successes log at INFO. The pairing code
+    itself is never logged (it's a header, and this only reads the body +
+    the response envelope), so nothing sensitive lands in the log."""
+    status = resp.status_code
+    req_body = request.get_json(silent=True)
+    device_id = ""
+    if isinstance(req_body, dict):
+        device_id = _canonical_id(req_body.get("device_id"))
+    if status >= 400:
+        reason: Any = None
+        try:
+            payload = json.loads(resp.get_data(as_text=True))
+            if isinstance(payload, dict):
+                reason = payload.get("error")
+        except (ValueError, TypeError):
+            reason = None
+        logger.warning(
+            "rest %s: rejected device=%s ip=%s status=%d: %s",
+            endpoint,
+            device_id or "?",
+            _client_id_for_rate_limit(),
+            status,
+            reason or "(no reason)",
+        )
+    else:
+        logger.info(
+            "rest %s: device=%s ip=%s status=%d ok",
+            endpoint,
+            device_id or "?",
+            _client_id_for_rate_limit(),
+            status,
+        )
+
+
 def _claim_device_by_mac(mac: str) -> Device | None:
     """Look for a registered device instance whose stored MAC matches
     the given MAC. Used by the discover-then-claim flow: when admin
@@ -999,6 +1039,12 @@ def _claim_device_by_mac(mac: str) -> Device | None:
 
 @bp.post("/discover")
 def post_discover() -> Response:
+    resp = _discover()
+    _log_pairing_outcome("discover", resp)
+    return resp
+
+
+def _discover() -> Response:
     """Unauthenticated discovery + auto-claim.
 
     Two paths depending on whether the admin has already registered a
@@ -1090,6 +1136,12 @@ def post_discover() -> Response:
 
 @bp.post("/register")
 def post_register() -> Response:
+    resp = _register()
+    _log_pairing_outcome("register", resp)
+    return resp
+
+
+def _register() -> Response:
     """First-boot device pairing.
 
     The firmware POSTs with an ``X-Pairing-Code`` header (the 6-digit

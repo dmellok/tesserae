@@ -12,6 +12,7 @@ Covers the wire contract Phase 1 ships:
 from __future__ import annotations
 
 import json
+import logging
 import time
 from pathlib import Path
 from typing import Any
@@ -215,6 +216,36 @@ def test_register_with_invalid_pairing_code_returns_403(app: Flask) -> None:
     resp = _register_via_api(client, code="000000", device_id="bedroom_pico")
     assert resp.status_code == 403
     assert "invalid" in resp.get_json()["error"].lower()
+
+
+def test_register_rejection_is_logged_server_side_without_the_code(
+    app: Flask, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A failed pairing has to be debuggable from the server log, not
+    only from the firmware's discarded HTTP body (issue #126). Rejections
+    log at WARNING with the reason; the pairing code never appears."""
+    client = app.test_client()
+    _sign_in(client)
+    with caplog.at_level(logging.WARNING, logger="app.rest_api"):
+        resp = _register_via_api(client, code="135790", device_id="bedroom_pico")
+    assert resp.status_code == 403
+    warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
+    assert any("rejected" in r.getMessage() and "bedroom_pico" in r.getMessage() for r in warnings)
+    # The pairing code must not be logged.
+    assert all("135790" not in r.getMessage() for r in caplog.records)
+
+
+def test_register_success_is_logged(app: Flask, caplog: pytest.LogCaptureFixture) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    code = _issue_pairing(app)
+    with caplog.at_level(logging.INFO, logger="app.rest_api"):
+        resp = _register_via_api(client, code=code, device_id="bedroom_pico")
+    assert resp.status_code == 201
+    assert any(
+        "device=bedroom_pico" in r.getMessage() and "status=201" in r.getMessage()
+        for r in caplog.records
+    )
 
 
 def test_register_with_unknown_kind_does_not_burn_pairing_code(app: Flask) -> None:
