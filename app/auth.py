@@ -88,6 +88,10 @@ _LOOPBACK_PATHS: Final[tuple[str, ...]] = (
     # rendering a canvas, same as /plugins/<id>/client.js. Exposes only the
     # already-installed font files, nothing sensitive.
     "/fonts/face/",
+    # Per-dashboard cached images. The loopback renderer loads them while
+    # composing a canvas; the authed editor preview loads them too. Only images
+    # the admin cached into a dashboard's own folder are reachable here.
+    "/page-assets/",
 )
 _LAN_PATHS: Final[tuple[str, ...]] = ("/renders/", "/preview/", "/mirror/")
 # Plugin assets, /plugins/<id>/<asset> only, NOT /plugins/ (the admin

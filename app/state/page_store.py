@@ -261,6 +261,10 @@ class PageStore:
         # logged and swallowed.
         self._listener_lock = threading.Lock()
         self._listeners: list[Callable[[], None]] = []
+        # Delete listeners receive the deleted page id. Per-dashboard asset
+        # cleanup hangs off this so every delete path (UI, MCP, bulk) frees
+        # the page's folder without each caller having to remember to.
+        self._delete_listeners: list[Callable[[str], None]] = []
         self._load()
 
     def add_listener(self, callback: Callable[[], None]) -> None:
@@ -271,6 +275,20 @@ class PageStore:
     def remove_listener(self, callback: Callable[[], None]) -> None:
         with self._listener_lock, contextlib.suppress(ValueError):
             self._listeners.remove(callback)
+
+    def add_delete_listener(self, callback: Callable[[str], None]) -> None:
+        with self._listener_lock:
+            if callback not in self._delete_listeners:
+                self._delete_listeners.append(callback)
+
+    def _notify_delete(self, page_id: str) -> None:
+        with self._listener_lock:
+            listeners = list(self._delete_listeners)
+        for cb in listeners:
+            try:
+                cb(page_id)
+            except Exception:
+                logger.exception("PageStore delete listener %r raised", cb)
 
     def _notify(self) -> None:
         with self._listener_lock:
@@ -321,6 +339,7 @@ class PageStore:
                 self._flush()
         if existed:
             self._notify()
+            self._notify_delete(page_id)
         return existed
 
 

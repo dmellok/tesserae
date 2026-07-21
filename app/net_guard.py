@@ -105,6 +105,23 @@ def fetch_json(
     ``TimeoutError`` on a network failure, ``ValueError`` if the response is
     over ``max_bytes`` or isn't valid JSON. Callers translate these into an
     ``{"error": ...}`` payload for the cell rather than letting them bubble."""
+    raw, _ = fetch_bytes(url, headers=headers, timeout=timeout, max_bytes=max_bytes)
+    return json.loads(raw.decode("utf-8"))
+
+
+def fetch_bytes(
+    url: str,
+    *,
+    headers: dict[str, str] | None = None,
+    timeout: float = DEFAULT_TIMEOUT_S,
+    max_bytes: int = DEFAULT_MAX_BYTES,
+) -> tuple[bytes, str]:
+    """GET a user-supplied ``url`` and return ``(body, content_type)``.
+
+    Same SSRF guard, redirect re-validation, and size cap as
+    :func:`fetch_json`; used for caching remote images into a dashboard's asset
+    folder. ``content_type`` is the (lower-cased, parameter-stripped) response
+    ``Content-Type``, or ``""`` if the server didn't send one."""
     _validate_url(url)
     req_headers = {"User-Agent": _USER_AGENT}
     if headers:
@@ -113,6 +130,7 @@ def fetch_json(
     opener = urllib.request.build_opener(_GuardedRedirect())
     with opener.open(req, timeout=timeout) as resp:
         raw = resp.read(max_bytes + 1)
+        content_type = str(resp.headers.get("Content-Type", "")).split(";", 1)[0].strip().lower()
     if len(raw) > max_bytes:
         raise ValueError(f"response exceeds {max_bytes} byte cap")
-    return json.loads(raw.decode("utf-8"))
+    return raw, content_type

@@ -95,6 +95,10 @@ def _err(status: int, message: str, **extra: Any) -> Response:
     return resp
 
 
+def _data_root() -> Any:
+    return current_app.config["DATA_ROOT"]
+
+
 # -- catalog / widget options -------------------------------------------
 
 
@@ -720,6 +724,68 @@ def delete_page(page_id: str) -> Response:
         return _err(404, f"no canvas dashboard {page_id!r}")
     _pr._pages().delete(page_id)
     return jsonify({"ok": True, "id": page_id})
+
+
+@bp.get("/pages/<page_id>/assets")
+def list_page_assets(page_id: str) -> Response:
+    """List a dashboard's cached image assets. Returns ``{assets: [{name, url,
+    bytes}]}``. Each ``url`` is a stable local path a code element can reference
+    (``<img src="/page-assets/…">``) instead of hotlinking a remote URL."""
+    from app import page_assets as _pa
+
+    if _pr._get_canvas(page_id) is None:
+        return _err(404, f"no canvas dashboard {page_id!r}")
+    return jsonify({"assets": _pa.list_assets(_data_root(), page_id)})
+
+
+@bp.post("/pages/<page_id>/assets")
+def add_page_asset(page_id: str) -> Response:
+    """Cache an image into a dashboard's asset folder so a code element can
+    reference a stable local copy instead of hotlinking. Body: ``{url,
+    headers?}`` to fetch a remote image (through the SSRF guard), or a multipart
+    ``file`` upload. Returns ``{name, url, bytes}``. The folder is deleted with
+    the dashboard, so assets never outlive their page."""
+    from app import page_assets as _pa
+
+    if _pr._get_canvas(page_id) is None:
+        return _err(404, f"no canvas dashboard {page_id!r}")
+    try:
+        upload = request.files.get("file")
+        if upload is not None:
+            rec = _pa.save_bytes(
+                _data_root(), page_id, upload.read(), upload.mimetype or "application/octet-stream"
+            )
+        else:
+            body = request.get_json(silent=True) or {}
+            url = str(body.get("url") or "").strip()
+            if not url:
+                return _err(422, "provide a 'url' to cache or a multipart 'file'")
+            raw_headers = body.get("headers")
+            headers = (
+                {str(k): str(v) for k, v in raw_headers.items()}
+                if isinstance(raw_headers, dict)
+                else None
+            )
+            rec = _pa.cache_url(_data_root(), page_id, url, headers=headers)
+    except _pa.AssetError as err:
+        return _err(422, str(err))
+    return jsonify(rec)
+
+
+@bp.delete("/pages/<page_id>/assets/<name>")
+def delete_page_asset(page_id: str, name: str) -> Response:
+    """Remove one cached image from a dashboard's asset folder."""
+    from app import page_assets as _pa
+
+    if _pr._get_canvas(page_id) is None:
+        return _err(404, f"no canvas dashboard {page_id!r}")
+    try:
+        removed = _pa.delete_asset(_data_root(), page_id, name)
+    except _pa.AssetError as err:
+        return _err(422, str(err))
+    if not removed:
+        return _err(404, f"no asset {name!r}")
+    return jsonify({"ok": True, "name": name})
 
 
 @bp.get("/pages/<page_id>/canvas")

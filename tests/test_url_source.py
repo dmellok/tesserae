@@ -73,6 +73,8 @@ def test_guarded_redirect_revalidates_target() -> None:
 
 def test_fetch_json_enforces_size_cap() -> None:
     class _Resp:
+        headers: dict[str, str] = {}
+
         def read(self, n: int) -> bytes:
             return b"x" * n  # always returns the full requested amount -> over cap
 

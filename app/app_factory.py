@@ -538,6 +538,11 @@ def create_app(
     renderer_loader.seed_device_settings_from_base(renderers, settings)
 
     page_store = PageStore(data_root / "core" / "pages.json")
+    # Free a dashboard's cached image folder when the page is deleted, on every
+    # delete path (issue: per-dashboard asset catalog).
+    from app import page_assets as _page_assets
+
+    page_store.add_delete_listener(lambda pid: _page_assets.delete_all(data_root, pid))
     schedule_store = ScheduleStore(data_root / "core" / "schedules.json")
     rotation_store = RotationStore(data_root / "core" / "rotations.json")
     # Per-device rotation position + button dedup state. Written by the
@@ -1072,6 +1077,27 @@ def create_app(
         # auth.py LAN-bypass list lets any private-network client
         # reach it, same as a real device fetching MQTT-published
         # frame URLs).
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        return resp
+
+    @app.get("/page-assets/<page_id>/<name>")
+    def page_asset(page_id: str, name: str) -> Response:
+        # A dashboard's cached images (issue: per-dashboard asset catalog).
+        # The headless renderer fetches these over loopback while composing a
+        # canvas; the editor preview fetches them from an authed session. Both
+        # bypass the auth gate via _LOOPBACK_PATHS. Names are content-addressed
+        # (``<sha>.<ext>``); reject anything with a path separator or leading dot.
+        from app import page_assets as _pa
+
+        if "/" in name or name.startswith(".") or "/" in page_id or ".." in page_id:
+            abort(404)
+        try:
+            directory = _pa.assets_dir(data_root, page_id)
+        except _pa.AssetError:
+            abort(404)
+        if not (directory / name).is_file():
+            abort(404)
+        resp: Response = send_from_directory(directory, name)
         resp.headers["Access-Control-Allow-Origin"] = "*"
         return resp
 
