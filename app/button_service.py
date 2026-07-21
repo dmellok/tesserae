@@ -129,6 +129,7 @@ class ButtonHandleResult:
     override_until: datetime | None
     pushed_page_id: str | None
     push_result: PushResult | None
+    force_download: bool = False
 
     def to_envelope(self) -> dict[str, str | int | bool | None]:
         """Serialisable subset for the ``rotation`` block on ``/frame``
@@ -806,6 +807,8 @@ class ButtonService:
             outcome = "error"
         elif base.pushed_page_id is not None:
             outcome = "dispatched"
+        elif base.force_download:
+            outcome = "fetched"
         elif spec.startswith("webhook"):
             outcome = "webhook_dispatched"
         else:
@@ -1115,6 +1118,21 @@ class ButtonService:
             }
             self._fire_webhook_async(action_arg, payload)
 
+        # ``fetch_latest`` serves an artefact that already exists, so there is
+        # no PushResult carrying the composition thumbnail. Snapshot the
+        # current composition digest into the button event instead. The event's
+        # top-level ``digest`` deliberately stays None: History treats that as
+        # the resend contract, while this value is preview-only.
+        preview_composition_digest: str | None = None
+        if result.force_download and pusher is not None:
+            latest_render_for = getattr(pusher, "latest_render_for", None)
+            if callable(latest_render_for):
+                latest = latest_render_for(device_id)
+                if isinstance(latest, dict):
+                    candidate = latest.get("composition_digest")
+                    if isinstance(candidate, str) and candidate:
+                        preview_composition_digest = candidate
+
         step_page_id = (
             rotation.steps[result.new_step_index].page_id if rotation is not None else None
         )
@@ -1142,6 +1160,7 @@ class ButtonService:
             override_until=override_until,
             pushed_page_id=pushed_page_id,
             push_result=push_result,
+            force_download=result.force_download,
         )
         # Status distinguishes the outcomes admins care about: an actual
         # push, a fire-and-forget webhook (no push), or a rotate/refresh
@@ -1149,12 +1168,18 @@ class ButtonService:
         # showing so the user sees the press wasn't lost).
         if action_name == "webhook":
             status = "webhook_dispatched"
+        elif result.force_download:
+            status = "fetched"
         elif pushed_page_id is not None:
             status = "dispatched"
         else:
             status = "noop"
         self._emit_history_row(
-            result=result_ok, origin=origin, origin_extra=origin_extra, status=status
+            result=result_ok,
+            origin=origin,
+            origin_extra=origin_extra,
+            status=status,
+            composition_digest=preview_composition_digest,
         )
         return result_ok
 
@@ -1168,6 +1193,7 @@ class ButtonService:
         origin_extra: dict[str, object],
         status: str,
         error: str | None = None,
+        composition_digest: str | None = None,
     ) -> None:
         """Append a row to the event log so the History page has the
         button / touch feed as a first-class surface. Non-fatal on
@@ -1176,8 +1202,8 @@ class ButtonService:
         already logs its own row via ``PushManager``; this row is the
         "user pressed / tapped" event alongside that "server pushed the
         page" event, so a busy device produces two rows per
-        state-changing wake. Non-push branches (dedup, unmapped, error,
-        webhook, noop) get one row that captures the whole outcome.
+        state-changing wake. Non-push branches (fetch, dedup, unmapped,
+        error, webhook, noop) get one row that captures the whole outcome.
 
         Button rows use ``type="push"`` so the existing ``/history``
         route (which filters on that type) picks them up. Touch rows use
@@ -1185,10 +1211,12 @@ class ButtonService:
         chip on the Events page, carrying the full stroke / gesture /
         region / action payload for diagnostics, including the misses
         (no_target / stale / blocked), which are the ones worth seeing.
-        ``digest`` is None so the row's Resend button stays disabled and
-        no thumbnail is rendered. ``origin`` becomes the row's source
-        (``button`` / ``touch``); ``origin_extra`` carries the
-        origin-specific fields (button name vs stroke + gesture)."""
+        ``digest`` is None so the row's Resend button stays disabled.
+        ``fetch_latest`` may carry a preview-only ``composition_digest`` in
+        ``extra`` so History can render the exact existing frame without
+        changing that resend contract. ``origin`` becomes the row's source
+        (``button`` / ``touch``); ``origin_extra`` carries the origin-specific
+        fields (button name vs stroke + gesture)."""
         if self._event_log is None:
             return
         try:
@@ -1209,6 +1237,11 @@ class ButtonService:
                     "step_page_id": result.step_page_id,
                     "pushed_page_id": result.pushed_page_id,
                     "manual_override": result.manual_override,
+                    **(
+                        {"composition_digest": composition_digest}
+                        if composition_digest is not None
+                        else {}
+                    ),
                 },
             )
         except Exception:

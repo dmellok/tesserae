@@ -121,6 +121,8 @@ paths:
         - $ref: '#/components/parameters/DeviceIdPath'
         - $ref: '#/components/parameters/IfNoneMatchHeader'
         - $ref: '#/components/parameters/ButtonQueryParam'
+        - $ref: '#/components/parameters/ButtonEventIdQueryParam'
+        - $ref: '#/components/parameters/LegacyButtonEventQueryParam'
       responses:
         '200':
           description: Frame envelope. Body is JSON; `ETag` carries the artifact digest.
@@ -754,10 +756,36 @@ components:
         selecting the frame, so the returned artefact reflects the
         new state on this same wake. Firmwares that support buttons
         SHOULD drop their cached `ETag` when the action is `refresh`
-        so the server returns a fresh 200 rather than a 304.
+        so the server returns a fresh 200 rather than a 304. The
+        `fetch_latest` action instead makes the server bypass a matching
+        ETag for that response while serving the already-rendered frame.
       schema:
         type: string
         example: right
+    ButtonEventIdQueryParam:
+      name: button_event_id
+      in: query
+      required: false
+      description: |
+        Monotonically increasing physical-button event id. Retries reuse the
+        same value so the server can deduplicate them across `/frame` and
+        `/status`. Preferred over the legacy `event` alias.
+      schema:
+        type: integer
+        minimum: 0
+        example: 42
+    LegacyButtonEventQueryParam:
+      name: event
+      in: query
+      required: false
+      deprecated: true
+      description: |
+        Compatibility alias for `button_event_id`, emitted by Tesserae ESP32
+        firmware through v1.5.0. Ignored when `button_event_id` is present.
+      schema:
+        type: integer
+        minimum: 0
+        example: 42
     TrmnlIdHeader:
       name: Id
       in: header

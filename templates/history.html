@@ -40,6 +40,7 @@
   {% elif status == 'no_change' %}<span class="dx-pill is-info"><span class="dx-pill-dot"></span>no change</span>
   {% elif status == 'dispatched' %}<span class="dx-pill is-ok"><span class="dx-pill-dot"></span>button</span>
   {% elif status == 'webhook_dispatched' %}<span class="dx-pill is-info"><span class="dx-pill-dot"></span>webhook</span>
+  {% elif status == 'fetched' %}<span class="dx-pill is-ok"><span class="dx-pill-dot"></span>fetched</span>
   {% elif status == 'noop' %}<span class="dx-pill is-info"><span class="dx-pill-dot"></span>no-op</span>
   {% elif status == 'deduped' %}<span class="dx-pill is-info"><span class="dx-pill-dot"></span>duplicate</span>
   {% elif status == 'unmapped' %}<span class="dx-pill is-warn"><span class="dx-pill-dot"></span>unmapped</span>
@@ -138,20 +139,20 @@
   {% else %}
   <ul class="dx-discovered-list">
     {% for ev in history %}
-    {% set is_failed = ev.status not in ('sent', 'busy', 'quiet', 'no_change', 'dispatched', 'webhook_dispatched', 'noop', 'deduped', 'unmapped') %}
+    {% set is_failed = ev.status not in ('sent', 'busy', 'quiet', 'no_change', 'dispatched', 'webhook_dispatched', 'fetched', 'noop', 'deduped', 'unmapped') %}
     <li class="dx-inset-row dx-history-row{% if is_failed %} dx-history-row--failed{% endif %}">
       <input type="checkbox" class="dx-history-select" value="{{ ev.id }}"
              aria-label="Select entry #{{ ev.id }}" title="Select for bulk delete">
-      {% if ev.digest %}
-      <a class="dx-history-thumb" href="{{ url_for('renders', filename=ev.digest ~ '.png') }}" data-lightbox aria-label="Open render for push #{{ ev.id }}">
-        <img src="{{ url_for('renders', filename=ev.digest ~ '.png', w=180) }}" alt="" width="64" height="64" loading="lazy" decoding="async">
+      {% if ev.preview_digest %}
+      <a class="dx-history-thumb" href="{{ url_for('renders', filename=ev.preview_digest ~ '.png') }}" data-lightbox aria-label="Open render for push #{{ ev.id }}">
+        <img src="{{ url_for('renders', filename=ev.preview_digest ~ '.png', w=180) }}" alt="" width="64" height="64" loading="lazy" decoding="async">
       </a>
       {% else %}
       <span class="dx-history-thumb dx-history-thumb--empty" aria-hidden="true">
         <i class="ph ph-image-square"></i>
       </span>
       {% endif %}
-      <a class="dx-history-time" {% if ev.digest %}href="{{ url_for('renders', filename=ev.digest ~ '.png') }}" data-lightbox aria-label="Push #{{ ev.id }}"{% endif %}>
+      <a class="dx-history-time" {% if ev.preview_digest %}href="{{ url_for('renders', filename=ev.preview_digest ~ '.png') }}" data-lightbox aria-label="Push #{{ ev.id }}"{% endif %}>
         <span class="dx-history-clock"><code>{{ ev.abs.split(' ')[1] if ' ' in ev.abs else ev.abs }}</code></span>
         <span class="dx-history-date">{{ ev.rel }}</span>
       </a>
@@ -172,7 +173,7 @@
         {{ status_chip(ev.status) }}
         <span class="dx-history-dur">{% if ev.duration_s %}{{ '%.1f'|format(ev.duration_s) }}s{% else %}—{% endif %}</span>
         <form method="post" action="{{ url_for('send.resend', event_id=ev.id) }}" class="form form--inline">
-          <button type="submit" class="dx-btn-ghost-sm dx-btn-icon-only" {% if not ev.digest %}disabled title="no composition PNG stored"{% else %}title="Resend this push"{% endif %}>
+          <button type="submit" class="dx-btn-ghost-sm dx-btn-icon-only" {% if not ev.can_resend %}disabled title="preview only; resend from the original push"{% else %}title="Resend this push"{% endif %}>
             <i class="ph ph-arrow-clockwise" aria-hidden="true"></i>
           </button>
         </form>

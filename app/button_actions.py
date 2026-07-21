@@ -26,6 +26,8 @@ plus their ``arg``. They return an ``ActionResult`` describing:
   rotation's resolved page (``target_page_id``),
 * whether the caller should force a re-render even if the resolved
   page is unchanged (``force_refresh``),
+* whether the current frame response should bypass ``If-None-Match``
+  and serve the latest already-rendered artefact (``force_download``),
 * a short log-friendly description of what happened.
 
 Adding a new action is one function + one registry entry. Custom
@@ -77,6 +79,9 @@ class ActionResult:
     * ``force_refresh``: re-render even if the resolved page hasn't
       changed. ``refresh`` is the canonical case; ``page:<id>`` also
       sets this when the target matches the currently-pushed page.
+    * ``force_download``: serve the latest already-rendered artefact
+      with a full ``200`` response even when the client's ETag matches.
+      This does not render, push, move the rotation, or set an override.
     * ``description``: short human-readable label, used in event log
       + admin surfaces.
     """
@@ -85,6 +90,7 @@ class ActionResult:
     target_page_id: str | None
     force_refresh: bool
     description: str
+    force_download: bool = False
 
 
 ActionFn = Callable[[ActionContext, str | None], ActionResult]
@@ -176,6 +182,17 @@ def _refresh(ctx: ActionContext, _arg: str | None) -> ActionResult:
     )
 
 
+def _fetch_latest(ctx: ActionContext, _arg: str | None) -> ActionResult:
+    """Re-serve the latest rendered frame without producing a new one."""
+    return ActionResult(
+        new_step_index=ctx.current_step_index,
+        target_page_id=None,
+        force_refresh=False,
+        description="fetch_latest (download latest rendered frame)",
+        force_download=True,
+    )
+
+
 def _step(ctx: ActionContext, arg: str | None) -> ActionResult:
     if arg is None:
         raise ButtonActionError("step action requires an index arg, e.g. 'step:2'")
@@ -245,6 +262,7 @@ def _webhook(_ctx: ActionContext, arg: str | None) -> ActionResult:
 register("rotate_prev", _rotate_prev)
 register("rotate_next", _rotate_next)
 register("refresh", _refresh)
+register("fetch_latest", _fetch_latest)
 register("step", _step)
 register("page", _page)
 register("webhook", _webhook)

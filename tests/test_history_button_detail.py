@@ -8,7 +8,9 @@ so the History row stays informative for the common outcomes.
 
 from __future__ import annotations
 
-from app.history_routes import _button_detail
+from dataclasses import replace
+
+from app.history_routes import _button_detail, _preview_digest
 from app.state.event_log import EventRow
 
 
@@ -78,3 +80,15 @@ def test_deduped_press_falls_back_to_description() -> None:
 def test_row_without_any_button_info_returns_none() -> None:
     row = _row()
     assert _button_detail(row, page_names={}) is None
+
+
+def test_fetch_latest_uses_preview_only_composition_digest() -> None:
+    row = _row(action_spec="fetch_latest", composition_digest="comp123")
+    assert row.digest is None
+    assert _preview_digest(row) == "comp123"
+
+
+def test_top_level_digest_wins_over_preview_only_digest() -> None:
+    row = _row(composition_digest="preview123")
+    row = replace(row, digest="push456")
+    assert _preview_digest(row) == "push456"

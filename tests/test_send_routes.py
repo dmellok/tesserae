@@ -238,6 +238,30 @@ def test_history_lists_event_log_rows(app: Flask, tmp_path: Path) -> None:
     assert "boom" in body
 
 
+def test_fetch_latest_history_shows_preview_but_disables_resend(app: Flask) -> None:
+    log = app.config["EVENT_LOG"]
+    log.record(
+        type="push",
+        source="button",
+        target="panel_one",
+        status="fetched",
+        digest=None,
+        extra={
+            "button": "refresh",
+            "action_spec": "fetch_latest",
+            "composition_digest": "comp123",
+        },
+    )
+
+    client = app.test_client()
+    _sign_in(client)
+    body = client.get("/history").get_data(as_text=True)
+
+    assert "/renders/comp123.png" in body
+    assert "preview only; resend from the original push" in body
+    assert "fetch_latest" in body
+
+
 def test_resend_invokes_republish(app: Flask) -> None:
     pm = MagicMock()
     pm.republish.return_value = PushResult(status="sent", page_id="resent")

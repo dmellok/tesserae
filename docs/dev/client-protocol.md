@@ -386,14 +386,15 @@ Headers: `ETag: "<digest>"`, `Content-Location: <absolute URL of the frame>`, `C
 - Other renderers may ship their own extras in the future. The contract is: anything not listed in the "always present" set above is renderer-specific, and **clients should ignore unknown fields** so new renderers don't break older firmware. Note that things like the TRMNL renderer's `dither` and `contrast` knobs are *device-side settings* (configured per instance in Settings → Devices, applied server-side before encoding) rather than envelope fields, the wire payload stays minimal.
 
 **Physical button wakes** — devices with hardware buttons add
-`?button=<name>` to the frame request on a button-driven wake (the
+`?button=<name>&button_event_id=<uint>` to the frame request on a
+button-driven wake (the
 name matches the device's `button_map`; conventionally `left`,
 `right`, `refresh`). The server dispatches the mapped action
 synchronously before selecting the frame, so the returned artefact
 already reflects the new state on this same wake:
 
 ```
-GET /api/v1/device/kitchen/frame?button=right
+GET /api/v1/device/kitchen/frame?button=right&button_event_id=42
 ```
 
 When bound to a rotation, the response also carries a `rotation`
@@ -414,11 +415,19 @@ block describing where the device is now:
 }
 ```
 
+`button_event_id` is the same monotonic counter reported in `/status`.
+Retries reuse the same value. The legacy query name `event` is accepted as a
+fallback for firmware through v1.5.0, but new clients should use the canonical
+name.
+
 The `rotation` block is omitted when the device isn't bound to any
 rotation. `manual_override: true` means a button press is currently
 suppressing the time-based scheduler; the scheduler resumes at
 `override_until` (server-side; the firmware doesn't need to check
-this itself). On a `refresh` action the firmware should drop its
+this itself). A `fetch_latest` action bypasses a matching
+`If-None-Match` for that response and returns the latest existing
+artefact with `200`, without triggering a render or push. On a
+`refresh` action the firmware should drop its
 cached `ETag` before making the request so the server always returns
 `200` with a full frame rather than `304`.
 
