@@ -311,6 +311,50 @@ def widget_data(key: str) -> Response:
     )
 
 
+@bp.post("/probe-url")
+def probe_url() -> Response:
+    """Fetch a raw JSON API URL for field discovery before wiring it into a code
+    element as a URL data source. Body: ``{url, headers?}``. Returns ``{url,
+    data, data_source, fields}``. This is the no-plugin path: hand over any
+    public https JSON endpoint and get back its parsed shape, then set it on a
+    code element via ``sources: [{url, headers?, name}]`` (delivered at
+    ``ctx.data[name]``). Fetched through the SSRF guard, so loopback / private
+    hosts are refused."""
+    from app.net_guard import BlockedURLError, fetch_json
+
+    body = request.get_json(silent=True) or {}
+    url = str(body.get("url") or "").strip()
+    if not url:
+        return _err(422, "url is required")
+    raw_headers = body.get("headers")
+    headers = (
+        {str(k): str(v) for k, v in raw_headers.items()} if isinstance(raw_headers, dict) else None
+    )
+    try:
+        data = fetch_json(url, headers=headers)
+    except BlockedURLError as err:
+        return jsonify(
+            {"url": url, "data": {"error": str(err)}, "data_source": "error", "fields": []}
+        )
+    except Exception as err:
+        return jsonify(
+            {
+                "url": url,
+                "data": {"error": f"{type(err).__name__}: {err}"},
+                "data_source": "error",
+                "fields": [],
+            }
+        )
+    return jsonify(
+        {
+            "url": url,
+            "data": data,
+            "data_source": "live",
+            "fields": _flatten_fields(data) if isinstance(data, dict) else [],
+        }
+    )
+
+
 # -- widget push / install (Tesserae Studio) ----------------------------
 
 

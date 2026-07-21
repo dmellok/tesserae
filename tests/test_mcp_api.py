@@ -287,6 +287,33 @@ def test_probe_widget_data_returns_payload(app: Flask) -> None:
     assert client.post("/api/mcp/widgets/not_a_widget/data", json={}).status_code == 404
 
 
+def test_probe_url_returns_fields(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    _enable(app)
+    client = app.test_client()
+    monkeypatch.setattr("app.net_guard.fetch_json", lambda url, headers=None: {"temp": 21})
+    resp = client.post("/api/mcp/probe-url", json={"url": "https://api.example.com/w"})
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["data_source"] == "live"
+    assert body["data"] == {"temp": 21}
+    assert any(f["path"] == "temp" for f in body["fields"])
+
+
+def test_probe_url_blocks_private_host(app: Flask) -> None:
+    _enable(app)
+    client = app.test_client()
+    resp = client.post("/api/mcp/probe-url", json={"url": "http://10.0.0.1/x"})
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["data_source"] == "error"
+    assert "error" in body["data"]
+
+
+def test_probe_url_requires_url(app: Flask) -> None:
+    _enable(app)
+    assert app.test_client().post("/api/mcp/probe-url", json={}).status_code == 422
+
+
 def test_catalog_omits_samples(app: Flask) -> None:
     _enable(app)
     cat = app.test_client().get("/api/mcp/catalog").get_json()

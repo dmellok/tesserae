@@ -332,8 +332,12 @@
   // plus a legacy bare "source"). Empty for pure decorations.
   function elSources(e) {
     if (e.kind === "code") {
-      var out = (e.sources || []).filter(function (s) { return s && s.key; })
-        .map(function (s) { return { key: s.key, options: s.options || {}, name: s.name || s.key }; });
+      var out = (e.sources || []).filter(function (s) { return s && (s.key || s.url); })
+        .map(function (s) {
+          return s.url
+            ? { url: s.url, headers: s.headers || {}, options: {}, name: s.name || "data" }
+            : { key: s.key, options: s.options || {}, name: s.name || s.key };
+        });
       if (e.source && !out.some(function (s) { return s.key === e.source; })) {
         out.unshift({ key: e.source, options: e.options || {}, name: e.source });
       }
@@ -345,11 +349,16 @@
   // The primary source widget id (widget id, or a data primitive's source).
   function sourceOf(e) { return (e.kind === "data" || e.kind === "code") ? e.source : e.widget; }
   // Live data is fetched per (source, options); fragment/size don't change it.
-  function srcKey(s) { return s.key + "|" + JSON.stringify(s.options || {}); }
+  // URL sources key on their url + headers instead of a widget key.
+  function srcKey(s) {
+    if (s.url) return "url:" + s.url + "|" + JSON.stringify(s.headers || {});
+    return s.key + "|" + JSON.stringify(s.options || {});
+  }
   function dataKey(e) { return sourceOf(e) + "|" + JSON.stringify(e.options || {}); }
   function dataForSrc(s) {
     var k = srcKey(s);
     if (k in S.data) return S.data[k]; // fetched live value (may be null)
+    if (s.url) return null; // URL sources have no sample; wait for the live fetch
     var w = widgetFor(s.key);
     return (w && w.sample) || null; // instant placeholder until live arrives
   }
@@ -389,7 +398,9 @@
       elSources(e).forEach(function (s) {
         var k = srcKey(s);
         if (k in S.data || S.dataPending[k]) return;
-        want[k] = { widget: s.key, options: s.options, w: e.w, h: e.h };
+        want[k] = s.url
+          ? { url: s.url, headers: s.headers || {} }
+          : { widget: s.key, options: s.options, w: e.w, h: e.h };
       });
     });
     Object.keys(want).forEach(function (k) {
@@ -398,7 +409,7 @@
       fetch(S.cfg.dataUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ widget: req.widget, options: req.options, w: req.w, h: req.h }),
+        body: JSON.stringify(req),
       })
         .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
         .then(function (j) { S.data[k] = j && "data" in j ? j.data : null; })
@@ -1800,11 +1811,14 @@
     if (!e.sources) e.sources = [];
     mount.appendChild(el("div", "psec", '<i class="ph-bold ph-database"></i>Data sources'));
     mount.appendChild(el("div", "note",
-      "Add any number of widgets. Each lands at ctx.data.<name> for your JS."));
+      "Add any number of widgets, or a raw API URL. Each lands at ctx.data.<name> for your JS."));
 
-    var wOpts = '<option value="">Choose widget…</option>' + (S.catalog || []).map(function (w) {
-      return '<option value="' + esc(w.key) + '">' + esc(w.name || w.key) + "</option>";
-    }).join("");
+    var URL_SRC = "__url__";
+    var wOpts = '<option value="">Choose widget…</option>' +
+      '<option value="' + URL_SRC + '">🔗 API URL (no widget)</option>' +
+      (S.catalog || []).map(function (w) {
+        return '<option value="' + esc(w.key) + '">' + esc(w.name || w.key) + "</option>";
+      }).join("");
 
     e.sources.forEach(function (s, idx) {
       var box = el("div", "prow"); box.style.cssText = "display:block;border:1px solid var(--t-border);border-radius:8px;padding:8px;margin-bottom:6px";
@@ -1818,14 +1832,46 @@
       rm.title = "Remove source";
       rm.addEventListener("click", function () { pushHistory(); e.sources.splice(idx, 1); scheduleSave(); paint(); renderProps(); });
       top.appendChild(nm); top.appendChild(rm); box.appendChild(top);
-      // widget select
-      var wsel = el("select", "psel"); wsel.innerHTML = wOpts; wsel.value = s.key || "";
+      // source select: a widget/service key, or a raw API URL
+      var isUrl = !!s.url;
+      var wsel = el("select", "psel"); wsel.innerHTML = wOpts;
+      wsel.value = isUrl ? URL_SRC : (s.key || "");
       wsel.addEventListener("change", function () {
-        pushHistory(); s.key = wsel.value; s.options = {}; if (!s.name) s.name = s.key;
+        pushHistory();
+        if (wsel.value === URL_SRC) {
+          s.key = ""; s.options = {}; if (s.url == null) s.url = "";
+          if (!s.name) s.name = "data";
+        } else {
+          s.key = wsel.value; s.options = {}; s.url = ""; s.headers = {};
+          if (!s.name) s.name = s.key;
+        }
         scheduleSave(); paint(); renderProps();
       });
       box.appendChild(wsel);
-      if (s.key) {
+      if (isUrl) {
+        var uin = el("input", "dinput");
+        uin.type = "url"; uin.placeholder = "https://api.example.com/…"; uin.value = s.url || "";
+        uin.style.cssText = "width:100%;margin-top:6px;text-align:left;font:12px var(--t-font-mono)";
+        uin.addEventListener("pointerdown", function (ev) { ev.stopPropagation(); });
+        uin.addEventListener("change", function () {
+          pushHistory(); s.url = uin.value.trim(); scheduleSave(); paint(); renderProps();
+        });
+        box.appendChild(uin);
+        var hin = el("textarea", "dinput");
+        hin.placeholder = 'Headers JSON, optional: {"Authorization":"Bearer …"}';
+        hin.value = s.headers && Object.keys(s.headers).length ? JSON.stringify(s.headers) : "";
+        hin.rows = 2;
+        hin.style.cssText = "width:100%;margin-top:6px;text-align:left;font:11px var(--t-font-mono)";
+        hin.addEventListener("pointerdown", function (ev) { ev.stopPropagation(); });
+        hin.addEventListener("change", function () {
+          var v = hin.value.trim(); var parsed = {};
+          if (v) { try { var o = JSON.parse(v); if (o && typeof o === "object") parsed = o; } catch (er) { hin.value = ""; } }
+          pushHistory(); s.headers = parsed; scheduleSave();
+        });
+        box.appendChild(hin);
+        box.appendChild(el("div", "note",
+          "Fetched server-side (https, no loopback/private hosts). Arrives at ctx.data." + (s.name || "data") + "."));
+      } else if (s.key) {
         var cfg = el("button", "minibtn", '<i class="ph-bold ph-sliders-horizontal"></i> Options');
         cfg.style.marginTop = "6px";
         cfg.addEventListener("click", function () { openConfig(e.id, idx); });

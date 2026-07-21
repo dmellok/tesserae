@@ -542,6 +542,24 @@ def widget_data() -> Response:
     sample fallback on error), so what the editor shows matches a Send."""
     _guard()
     body = request.get_json(silent=True) or {}
+    # Raw URL source (code-element API source): fetch through the SSRF guard so
+    # the editor preview matches a Send, which resolves URL sources the same way.
+    url = body.get("url")
+    if isinstance(url, str) and url:
+        from app.net_guard import BlockedURLError, fetch_json
+
+        raw_headers = body.get("headers")
+        headers = (
+            {str(k): str(v) for k, v in raw_headers.items()}
+            if isinstance(raw_headers, dict)
+            else None
+        )
+        try:
+            return jsonify({"data": fetch_json(url, headers=headers)})
+        except BlockedURLError as err:
+            return jsonify({"data": {"error": str(err)}})
+        except Exception as err:
+            return jsonify({"data": {"error": f"{type(err).__name__}: {err}"}})
     widget = body.get("widget")
     if not isinstance(widget, str) or not widget:
         return jsonify({"data": None})

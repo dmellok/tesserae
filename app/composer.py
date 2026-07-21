@@ -923,6 +923,20 @@ def _build_canvas_els(
                 return opts, sample, "sample"
         return opts, data, "error"
 
+    def _resolve_url_source(url: str, headers: dict[str, str]) -> tuple[Any, str]:
+        """Fetch a raw URL data source for a code element through the SSRF
+        guard, classifying as ``live`` (parsed JSON) or ``error``. The parsed
+        body is delivered as-is at ``ctx.data[name]``; on failure an
+        ``{"error": ...}`` payload is delivered so the element can show it."""
+        from app.net_guard import BlockedURLError, fetch_json
+
+        try:
+            return fetch_json(url, headers=headers or None), "live"
+        except BlockedURLError as err:
+            return {"error": str(err)}, "error"
+        except Exception as err:  # network / decode / size-cap
+            return {"error": f"{type(err).__name__}: {err}"}, "error"
+
     def _apply_binds(el: Any, out: dict[str, Any]) -> None:
         """Evaluate an element's live data bindings and patch its props in place,
         so a bound shape reflects data on this render (see :mod:`app.bindings`).
@@ -990,10 +1004,16 @@ def _build_canvas_els(
             cdata: dict[str, Any] = {}
             csrc = "none"
             for s in srcs:
-                if not s.key:
+                if getattr(s, "url", ""):
+                    # Raw URL source: fetch server-side through the SSRF guard
+                    # and deliver the parsed JSON directly at ctx.data[name].
+                    sdata, sstate = _resolve_url_source(s.url, getattr(s, "headers", {}) or {})
+                    cdata[s.name or "data"] = sdata
+                elif s.key:
+                    _, sdata, sstate = _resolve_source(s.key, s.options, e.w, e.h)
+                    cdata[s.name or s.key] = sdata
+                else:
                     continue
-                _, sdata, sstate = _resolve_source(s.key, s.options, e.w, e.h)
-                cdata[s.name or s.key] = sdata
                 # Roll up a single status: live if any is live, else the first.
                 if csrc == "none" or sstate == "live":
                     csrc = sstate

@@ -63,15 +63,30 @@ class Binding(BaseModel):
 
 
 class CodeSource(BaseModel):
-    """One named data source for a ``code`` element: a widget id (``key``) plus
-    its ``options``, exposed to the element's JS as ``ctx.data[name]``. A code
-    element can list several, so its script can combine data from any number of
-    widgets (weather + calendar + transit, …). ``name`` defaults to ``key`` when
-    empty."""
+    """One named data source for a ``code`` element, exposed to the element's JS
+    as ``ctx.data[name]``. A code element can list several, so its script can
+    combine data from any number of sources (weather + calendar + transit, …).
+
+    A source is one of two shapes:
+
+    * **Widget / service** (``key`` set): a widget or ``service`` plugin id plus
+      its ``options``, resolved through the normal plugin fetch. ``name``
+      defaults to ``key`` when empty.
+    * **URL** (``url`` set, ``key`` empty): a raw JSON HTTP(S) endpoint fetched
+      server-side through the SSRF guard (:mod:`app.net_guard`) and delivered
+      parsed. ``headers`` carries optional request headers (e.g. an
+      ``Authorization`` token). Lets the agent wire an arbitrary API straight
+      into a dashboard without a bespoke service plugin. ``name`` defaults to
+      ``"data"`` when empty.
+
+    Note: ``headers`` is stored in the page document, so treat any token here as
+    visible to anyone the dashboard is exported/shared with."""
 
     key: str = ""
     options: dict[str, Any] = Field(default_factory=dict)
     name: str = ""
+    url: str = ""
+    headers: dict[str, str] = Field(default_factory=dict)
 
 
 class Element(BaseModel):
