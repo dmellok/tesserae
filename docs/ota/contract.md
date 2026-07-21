@@ -5,11 +5,13 @@ pending update, how a device verifies it, and where the description travels.
 This is the shared boundary between the Tesserae server (which signs) and the
 device firmware (which verifies and applies). Discussion: #121.
 
-Status: Phase 1. The signer, verifier, published test key, and signed fixtures
-exist (`app/ota/`, `tests/fixtures/ota/`), and the `/status` capability handshake
-and descriptor delivery are wired (`app/rest_api.py`, `app/state/ota_staging.py`,
-staged via `python -m app.ota.stage`). Still to come: the production key, image
-hosting on R2, OTA state reporting, and staged rollout controls.
+Status: the signer, verifier, published test key, and signed fixtures exist
+(`app/ota/`, `tests/fixtures/ota/`); the `/status` capability handshake and
+descriptor delivery are wired (`app/rest_api.py`, `app/state/ota_staging.py`,
+staged via `python -m app.ota.stage`); the production signing Worker + R2 image
+hosting and the per-kind rollout controls (`python -m app.ota.release`) are live.
+The state-reporting shape below (device → server) is now specified; the
+server-side ingest of it is the remaining slice.
 
 ## Roles
 
@@ -114,6 +116,92 @@ Re-offering an update the device already applied is harmless: the firmware's
 `already_current` check skips a descriptor naming the running version, so the
 server keeps offering a staged descriptor until it is cleared.
 
+## State reporting
+
+A device reports the outcome of its OTA lifecycle back to the server by adding
+report fields to the same `ota` object it already sends for the capability
+handshake. One namespace, so a device that speaks OTA sends one object:
+
+```json
+{ "...normal heartbeat fields...": "...",
+  "ota": {
+    "schema": 1,
+    "phase": "confirmed",
+    "reason": "ok",
+    "target_fw": "1.6.0",
+    "attempt_id": "a3f19c",
+    "detail": ""
+  }
+}
+```
+
+`schema` is unchanged and stays required (it is the capability advertisement the
+server gates delivery on). The report fields are all optional, so existing
+firmware that sends only `{"schema": 1}` keeps working and simply reports no
+state.
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `phase` | string | Current lifecycle phase (enum below). Absent → treated as `idle`. |
+| `reason` | string | Stable outcome code for a terminal phase; `ok` on success. Ignored for in-progress phases. |
+| `target_fw` | string | The `fw_version` of the descriptor this report is about. Lets the server correlate the report to what it offered (kind + `target_fw`). Absent when `idle`. |
+| `attempt_id` | string | Opaque, device-chosen id, stable across the multi-wake life of one attempt (a counter, or the descriptor `sha256` prefix). Lets the server dedup progress beats and tie a `rolled_back` back to the `downloading` that preceded it. Optional. |
+| `detail` | string | Short human context for logs (e.g. `http 500 on image fetch`). Never parsed for logic; capped at 200 bytes server-side. |
+
+### Phases
+
+Coarse enough that a device need only heartbeat at phase boundaries, not
+mid-transfer. A device that sleeps through the whole apply in one wake reports
+only the terminal phase.
+
+| `phase` | Meaning | Terminal |
+| --- | --- | --- |
+| `idle` | Running confirmed firmware, nothing in progress. | – |
+| `downloading` | Streaming the image to the inactive slot. | no |
+| `validating` | Post-download size + `sha256` + image-validity checks. | no |
+| `pending_confirm` | New image written and booted, awaiting first-boot confirmation. | no |
+| `confirmed` | First boot succeeded, new slot marked valid. Success. | yes |
+| `rejected` | Descriptor refused before any download. | yes |
+| `failed` | Attempt failed during or after download. | yes |
+| `rolled_back` | Booted the new image, the first-boot gate failed, reverted to the previous slot. | yes |
+
+Verification (signature, shape, target) is fast and pre-download, so its
+failures surface as `rejected` with the reason rather than a phase of their own.
+
+### Reason codes
+
+`reason` is meaningful only on a terminal phase. All lowercase snake_case;
+the pre-download codes reuse the verifier's reasons (see **Verification order**)
+so one vocabulary spans verify and apply.
+
+- `confirmed` → `ok`.
+- `rejected` → `bad_signature`, `malformed_descriptor`, `malformed_manifest`,
+  `schema_version`, `kind_mismatch`, `already_current`, `battery_low`,
+  `battery_unknown`.
+- `failed` → `download_error`, `size_mismatch`, `digest_mismatch`,
+  `image_invalid`, `flash_error`.
+- `rolled_back` → `boot_failed`.
+
+`battery_low` / `battery_unknown` are the apply-time gate (a device refuses to
+flash below its safe threshold, or when it can't read the level); the rest of
+the apply-time codes name where the write or boot broke.
+
+### Server handling
+
+The report is advisory: the server records it and surfaces it, but a device's
+own local checks remain the acceptance gate (see **Rollback**). On each
+`/status` the server:
+
+- stores the latest report on the device's live status so the Devices card can
+  show a chip (`OTA: confirmed 1.6.0`, `OTA: rolled_back (digest_mismatch)`);
+- appends an event-log entry when the report *changes* (`phase`, `reason`,
+  `target_fw`, or `attempt_id` differs from the last stored one), so a device
+  re-sending the same terminal report every heartbeat logs once, not every wake;
+- (later slice) uses a canary's terminal outcome to inform rollout: a
+  `confirmed` from every canary is the signal to `promote`; a `rolled_back` or
+  `failed` pauses the release. This stays a manual decision until the reporting
+  path has real fleet data behind it.
+
 ## Staging
 
 An operator stages a signed descriptor for a device with the signer + stager:
@@ -180,8 +268,8 @@ depends on it without a re-flash in between.
 ## Rollback
 
 The device marks the new app valid on **local** startup checks (correct running
-partition, NVS readable, Wi-Fi associates) and reports `completed` on the next
-heartbeat as telemetry. A server heartbeat is deliberately **not** part of the
-acceptance gate: a briefly-offline self-hosted server must not roll back healthy
-firmware. If server reachability is ever added to the gate, it comes with a
-bounded retry policy.
+partition, NVS readable, Wi-Fi associates) and reports the `confirmed` phase on
+the next heartbeat as telemetry (see **State reporting**). A server heartbeat is
+deliberately **not** part of the acceptance gate: a briefly-offline self-hosted
+server must not roll back healthy firmware. If server reachability is ever added
+to the gate, it comes with a bounded retry policy.
