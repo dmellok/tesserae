@@ -8,7 +8,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
-- **Status bar showed the wrong device's battery (#125).** Three gaps fed the same symptom, a status
+- **Status bar showed the wrong device's battery (#125).** Four gaps fed the same symptom, a status
   bar falling back to the lowest battery / signal across all devices (and the wrong temperature /
   humidity). (1) Per-device render detection only scanned grid cells, so a canvas dashboard pushed once
   per panel instead of per device; it now scans canvas elements too. (2) Even when a canvas push fanned
@@ -16,7 +16,10 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   panel still resolved the aggregate; the target now threads through to the fetch. (3) Editor previews
   (the dashboards-list hover thumbnail and the live compose iframe) carry no target device, so both
   grid and canvas previews showed the aggregate; a preview now defaults to the page's first bound
-  device and shows a real one.
+  device and shows a real one. (4) The per-device fan-out decision read the plugin registry off
+  `current_app`, which is absent on the scheduler and rotation push threads, so scheduled refreshes
+  silently dropped the fan-out and a grid panel kept showing the aggregate even when a manual Send was
+  correct; the push manager now holds a direct registry accessor.
 
 ### Added
 

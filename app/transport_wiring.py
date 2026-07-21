@@ -648,6 +648,12 @@ def _rebuild_transport(
         # profile as ``_palette_override`` in settings; .bin renderers
         # pass the override through to :func:`pack_to_panel_bin`.
         palette_profile_store=PaletteProfileStore(app.config["DATA_ROOT"]),
+        # Per-device render fan-out reads plugin manifests to spot the
+        # status bar (#125). The scheduler / rotation push loops run off
+        # the request thread, where a ``current_app`` lookup raises; give
+        # the PushManager a direct accessor so fan-out stays correct on
+        # those paths, not just on request-bound manual Sends.
+        plugin_registry_fn=lambda: app.config.get("PLUGIN_REGISTRY"),
     )
     # Sweep render artifacts orphaned by event-log eviction (or a manual
     # history clear) at boot. Idempotent + never fatal.

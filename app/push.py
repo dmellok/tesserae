@@ -151,7 +151,7 @@ def _disabled_renderer_ids(settings: SettingsStore) -> set[str]:
     return {rid for rid, enabled in raw.items() if enabled is False}
 
 
-def _page_needs_per_device_render(page: Any) -> bool:
+def _page_needs_per_device_render(page: Any, registry: Any = None) -> bool:
     """True when ``page`` carries a widget that declares
     ``render.per_device_id: true`` in its manifest.
 
@@ -164,16 +164,23 @@ def _page_needs_per_device_render(page: Any) -> bool:
     code element's data ``sources[].key``), so a canvas dashboard's
     status bar is per-device too (#125).
 
-    Falls back to False when there's no Flask app context or no
-    ``PLUGIN_REGISTRY`` on it (unit-test setups), which keeps the
-    pre-v0.71.x panel-group behaviour intact for callers that don't
-    care."""
-    try:
-        from flask import current_app
+    ``registry`` is the plugin registry to consult. Callers that run
+    off the request thread (the scheduler / rotation push loops) must
+    pass it explicitly, otherwise the ``current_app`` fallback raises
+    outside an app context and the page silently loses per-device
+    fan-out, showing a min-across-all-devices status bar (#125). When
+    omitted, fall back to ``current_app.config["PLUGIN_REGISTRY"]``.
 
-        registry = current_app.config.get("PLUGIN_REGISTRY")
-    except Exception:
-        return False
+    Falls back to False when no registry is available (unit-test
+    setups), which keeps the pre-v0.71.x panel-group behaviour intact
+    for callers that don't care."""
+    if registry is None:
+        try:
+            from flask import current_app
+
+            registry = current_app.config.get("PLUGIN_REGISTRY")
+        except Exception:
+            return False
     if registry is None:
         return False
 
@@ -373,6 +380,7 @@ class PushManager:
         browser_pool_fn: Callable[[], BrowserPool | None] | None = None,
         device_status_fn: Callable[[], dict[str, dict[str, Any]]] | None = None,
         palette_profile_store: PaletteProfileStore | None = None,
+        plugin_registry_fn: Callable[[], Any] | None = None,
     ) -> None:
         self._registry = registry
         self._page_store = page_store
@@ -392,6 +400,14 @@ class PushManager:
         # which the low-battery overlay reads). Constructor-snapshot
         # would freeze the value at boot.
         self._device_status_fn = device_status_fn or (lambda: {})
+        # Plugin registry accessor, used to decide per-device render
+        # fan-out (#125). The push loops run off the request thread
+        # (scheduler / rotation), where the ``current_app`` fallback in
+        # ``_page_needs_per_device_render`` raises and silently disables
+        # fan-out; supplying it here keeps the decision correct on every
+        # push path. Lazy so a plugin reload swaps the registry without a
+        # PushManager rebuild.
+        self._plugin_registry_fn = plugin_registry_fn or (lambda: None)
         # Optional, enables multi-head routing. When a page sets a
         # device_id, the panel comes from that device's manifest and
         # only its renderers fire in _fan_out.
@@ -650,7 +666,9 @@ class PushManager:
             if match is None:
                 return False
             panel, _dids = match
-            target_id = device_id if _page_needs_per_device_render(page) else ""
+            target_id = (
+                device_id if _page_needs_per_device_render(page, self._plugin_registry_fn()) else ""
+            )
             compose_url = self._compose_url_for(page_id, panel, target_id)
             key = self._precompose_key(compose_url, page, panel)
             with self._precompose_lock:
@@ -1127,7 +1145,7 @@ class PushManager:
         # bound device so each device's frame reflects its own status,
         # not a min-across-all-devices aggregate. Everything else keeps
         # the panel-group fan-out (one render → many devices).
-        per_device_render = _page_needs_per_device_render(page)
+        per_device_render = _page_needs_per_device_render(page, self._plugin_registry_fn())
         # Per-cell dither map (issue #86): collect the cells that opted out
         # of dithering (Advanced pane -> Flat colour) once for the whole
         # page. Geometry is composition-space (cell pixels), so it's shared

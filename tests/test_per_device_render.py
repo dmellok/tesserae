@@ -98,6 +98,21 @@ def test_page_with_no_widgets_does_not_trigger(app: Flask) -> None:
         assert _page_needs_per_device_render(Page(id="p", name="P")) is False
 
 
+def test_detection_needs_explicit_registry_off_request_thread(app: Flask) -> None:
+    """The scheduler / rotation push loops run off the request thread, so the
+    ``current_app`` fallback raises and detection silently returns False (#125).
+    An explicitly-passed registry keeps fan-out working there."""
+    page = Page(
+        id="p", name="P", cells=[Cell(id="c", x=0, y=0, w=12, h=1, plugin="tesserae_status")]
+    )
+    registry = app.config["PLUGIN_REGISTRY"]
+    # No app context: mimics the scheduler thread. The current_app fallback
+    # fails, so without an explicit registry the status bar loses per-device
+    # rendering and shows the min-across-all-devices battery.
+    assert _page_needs_per_device_render(page) is False
+    assert _page_needs_per_device_render(page, registry) is True
+
+
 # -- threading: the resolved device must reach the widget fetch ---------------
 
 
