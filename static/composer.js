@@ -42,32 +42,48 @@ function prefixShadowUrls(root, prefix) {
 // same in a Send as it did in the editor. Reads data-parts (JSON list of
 // {sel, scale}); a no-op when there are none.
 //
-// One CSS rule per scaled selector. The widget root (``.w``) is special: it's
-// the "Scale" content-zoom, and it counter-sizes so the layout reflows to FILL
-// the box (denser content), not just a shrunken copy with whitespace around it
-// (discussion #131). Individual pieces keep a plain centre-scale. Kept in sync
-// with decorate.js ``partRule`` so the editor preview and a Send agree.
+// One CSS rule per scaled piece (icons, text runs). Kept in sync with the
+// editor's ``partRule`` so the preview and a Send agree.
 function partRule(sel, scale) {
   const f = Number(scale) / 100;
-  if (sel === ".w") {
-    return `.w{transform:scale(${f});transform-origin:top left;width:calc(100% / ${f});height:calc(100% / ${f})}`;
-  }
   const iconFix = /\.ph-/.test(sel) ? "display:inline-block;" : "";
   return `${sel}{transform:scale(${f});transform-origin:center center;${iconFix}}`;
+}
+// The widget root (``.w``): the "Scale" content density and the crop compose
+// into one transform. Scale counter-sizes so the layout reflows to FILL the box
+// (denser, not a shrunken copy ringed by whitespace, discussion #131); crop
+// keeps a sub-rectangle and scales it to fill (drop a title, reclaim space).
+// Shared shape with the editor's ``rootRule``.
+function rootRule(scalePct, crop) {
+  const f = Number(scalePct || 100) / 100;
+  const c = crop || {};
+  const l = (+c.left || 0) / 100, r = (+c.right || 0) / 100;
+  const t = (+c.top || 0) / 100, b = (+c.bottom || 0) / 100;
+  const sw = Math.max(0.05, 1 - l - r), sh = Math.max(0.05, 1 - t - b);
+  if (f === 1 && sw === 1 && sh === 1) return "";
+  const tx = -(l / sw) * f * 100, ty = -(t / sh) * f * 100;
+  return `.w{transform-origin:0 0;width:calc(100% / ${f});height:calc(100% / ${f});` +
+    `transform:translate(${tx}%,${ty}%) scale(${f / sw},${f / sh})}`;
 }
 function applyParts(shadow, cell) {
   const existing = shadow.querySelector("style#tesserae-parts");
   if (existing) existing.remove();
   let parts = [];
   try { parts = JSON.parse(cell.dataset.parts || "[]"); } catch { parts = []; }
-  const rules = (Array.isArray(parts) ? parts : [])
-    .filter((p) => p && p.sel && p.scale != null && p.scale !== 100)
-    .map((p) => partRule(p.sel, p.scale))
-    .join("\n");
-  if (!rules) return;
+  let crop = null;
+  try { crop = cell.dataset.crop ? JSON.parse(cell.dataset.crop) : null; } catch { crop = null; }
+  let rootScale = 100;
+  (Array.isArray(parts) ? parts : []).forEach((p) => { if (p && p.sel === ".w" && p.scale != null) rootScale = p.scale; });
+  const out = [];
+  const rr = rootRule(rootScale, crop);
+  if (rr) out.push(rr);
+  (Array.isArray(parts) ? parts : [])
+    .filter((p) => p && p.sel && p.sel !== ".w" && p.scale != null && p.scale !== 100)
+    .forEach((p) => out.push(partRule(p.sel, p.scale)));
+  if (!out.length) return;
   const st = document.createElement("style");
   st.id = "tesserae-parts";
-  st.textContent = rules;
+  st.textContent = out.join("\n");
   shadow.appendChild(st);
 }
 
@@ -317,6 +333,10 @@ async function applyCellPatch(patch) {
   cell.dataset.data = JSON.stringify(patch.data ?? null);
   if (Object.prototype.hasOwnProperty.call(patch, "parts")) {
     cell.dataset.parts = JSON.stringify(patch.parts ?? []);
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, "crop")) {
+    if (patch.crop) cell.dataset.crop = JSON.stringify(patch.crop);
+    else delete cell.dataset.crop;
   }
 
   const state = cellState.get(patch.id);

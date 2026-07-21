@@ -1074,6 +1074,11 @@ def _build_canvas_els(
             "rotate": e.rotate,
             "opacity": e.opacity,
             "parts": [p.model_dump() for p in e.parts],
+            "crop": (
+                e.crop.model_dump()
+                if e.crop and any([e.crop.top, e.crop.right, e.crop.bottom, e.crop.left])
+                else None
+            ),
             "x": e.x,
             "y": e.y,
             "w": e.w,

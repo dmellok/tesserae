@@ -53,9 +53,11 @@ def test_cache_url_stores_and_is_content_addressed(tmp_path: Path) -> None:
 
 
 def test_cache_url_rejects_non_image(tmp_path: Path) -> None:
-    with patch("app.page_assets.fetch_bytes", return_value=(b"<html>", "text/html")):
-        with pytest.raises(page_assets.AssetError, match="not a supported image"):
-            page_assets.cache_url(tmp_path, "pageone", "https://x.example/p")
+    with (
+        patch("app.page_assets.fetch_bytes", return_value=(b"<html>", "text/html")),
+        pytest.raises(page_assets.AssetError, match="not a supported image"),
+    ):
+        page_assets.cache_url(tmp_path, "pageone", "https://x.example/p")
 
 
 def test_save_bytes_and_list_and_delete(tmp_path: Path) -> None:

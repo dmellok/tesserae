@@ -9,7 +9,7 @@ composer resolution, and the editor preview endpoint.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 from unittest.mock import patch
 
 import pytest
@@ -73,12 +73,12 @@ def test_guarded_redirect_revalidates_target() -> None:
 
 def test_fetch_json_enforces_size_cap() -> None:
     class _Resp:
-        headers: dict[str, str] = {}
+        headers: ClassVar[dict[str, str]] = {}
 
         def read(self, n: int) -> bytes:
             return b"x" * n  # always returns the full requested amount -> over cap
 
-        def __enter__(self) -> "_Resp":
+        def __enter__(self) -> _Resp:
             return self
 
         def __exit__(self, *a: object) -> None:
@@ -88,9 +88,11 @@ def test_fetch_json_enforces_size_cap() -> None:
         def open(self, *a: object, **k: object) -> _Resp:
             return _Resp()
 
-    with patch("app.net_guard.urllib.request.build_opener", return_value=_Opener()):
-        with pytest.raises(ValueError, match="cap"):
-            net_guard.fetch_json("https://example.com/big.json", max_bytes=1024)
+    with (
+        patch("app.net_guard.urllib.request.build_opener", return_value=_Opener()),
+        pytest.raises(ValueError, match="cap"),
+    ):
+        net_guard.fetch_json("https://example.com/big.json", max_bytes=1024)
 
 
 # -- composer resolution -------------------------------------------------
@@ -108,9 +110,11 @@ def test_code_element_url_source_delivers_parsed_json(app: Flask) -> None:
         h=100,
         sources=[CodeSource(url="https://api.example.com/weather", name="weather")],
     )
-    with app.app_context():
-        with patch("app.net_guard.fetch_json", return_value={"temp": 21, "city": "Melbourne"}):
-            out = composer._build_canvas_els([el], 400, 300)
+    with (
+        app.app_context(),
+        patch("app.net_guard.fetch_json", return_value={"temp": 21, "city": "Melbourne"}),
+    ):
+        out = composer._build_canvas_els([el], 400, 300)
     assert out[0]["data_source"] == "live"
     assert out[0]["data"] == {"weather": {"temp": 21, "city": "Melbourne"}}
 
@@ -127,12 +131,14 @@ def test_code_element_url_source_error_is_delivered_not_raised(app: Flask) -> No
         h=100,
         sources=[CodeSource(url="http://127.0.0.1/x", name="weather")],
     )
-    with app.app_context():
-        with patch(
+    with (
+        app.app_context(),
+        patch(
             "app.net_guard.fetch_json",
             side_effect=net_guard.BlockedURLError("host is loopback/private and not allowed"),
-        ):
-            out = composer._build_canvas_els([el], 400, 300)
+        ),
+    ):
+        out = composer._build_canvas_els([el], 400, 300)
     assert out[0]["data_source"] == "error"
     assert "error" in out[0]["data"]["weather"]
 
@@ -149,9 +155,8 @@ def test_code_element_url_source_name_defaults_to_data(app: Flask) -> None:
         h=100,
         sources=[CodeSource(url="https://api.example.com/x")],
     )
-    with app.app_context():
-        with patch("app.net_guard.fetch_json", return_value={"ok": True}):
-            out = composer._build_canvas_els([el], 400, 300)
+    with app.app_context(), patch("app.net_guard.fetch_json", return_value={"ok": True}):
+        out = composer._build_canvas_els([el], 400, 300)
     assert out[0]["data"] == {"data": {"ok": True}}
 
 

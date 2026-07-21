@@ -402,6 +402,59 @@ def test_fragment_part_scales_roundtrip_and_compose(app: Flask) -> None:
     assert "data-parts=" in body and ".wx-temp" in body
 
 
+def test_crop_insets_roundtrip_and_compose(app: Flask) -> None:
+    """A widget element's crop persists and reaches the compose render as the
+    cell's data-crop payload (drop a title / reclaim space)."""
+    client = app.test_client()
+    _sign_in(client)
+    cid = client.get("/pages/canvas/").location.rsplit("/", 1)[1]
+    client.post(
+        f"/pages/canvas/c/{cid}/save",
+        json={
+            "els": [
+                {
+                    "id": "e1",
+                    "widget": "weather_now",
+                    "crop": {"top": 22, "bottom": 5},
+                    "x": 0,
+                    "y": 0,
+                    "w": 200,
+                    "h": 140,
+                }
+            ]
+        },
+    )
+    doc = client.get(f"/pages/canvas/c/{cid}/doc.json").get_json()
+    crop = doc["els"][0]["crop"]
+    assert crop["top"] == 22 and crop["bottom"] == 5 and crop["left"] == 0
+
+    body = client.get(f"/compose/{cid}").get_data(as_text=True)
+    assert "data-crop=" in body
+
+
+def test_crop_omitted_from_compose_when_zero(app: Flask) -> None:
+    """A widget with no crop doesn't emit a data-crop attribute, so the common
+    case stays clean."""
+    client = app.test_client()
+    _sign_in(client)
+    cid = client.get("/pages/canvas/").location.rsplit("/", 1)[1]
+    client.post(
+        f"/pages/canvas/c/{cid}/save",
+        json={"els": [{"id": "e1", "widget": "weather_now", "x": 0, "y": 0, "w": 200, "h": 140}]},
+    )
+    body = client.get(f"/compose/{cid}").get_data(as_text=True)
+    assert 'data-el-id="e1"' in body and "data-crop=" not in body
+
+
+def test_crop_edge_capped_at_90(app: Flask) -> None:
+    from pydantic import ValidationError
+
+    from app.state.panel_store import CropInsets
+
+    with pytest.raises(ValidationError):
+        CropInsets(top=95)
+
+
 def test_background_image(app: Flask) -> None:
     """A canvas background image + fit mode persists and reaches the render."""
     client = app.test_client()

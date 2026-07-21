@@ -89,6 +89,20 @@ class CodeSource(BaseModel):
     headers: dict[str, str] = Field(default_factory=dict)
 
 
+class CropInsets(BaseModel):
+    """How much of a widget's rendered output to crop away from each edge, in
+    percent of the box (widget-only). The kept rectangle is scaled to fill the
+    box, so cropping the top drops a fixed title and the body reclaims the
+    space, and cropping the bottom trims content to free room for another
+    element. All zero = no crop. Capped at 90 an edge so at least a sliver of
+    content always survives."""
+
+    top: float = Field(default=0, ge=0, le=90)
+    right: float = Field(default=0, ge=0, le=90)
+    bottom: float = Field(default=0, ge=0, le=90)
+    left: float = Field(default=0, ge=0, le=90)
+
+
 class Element(BaseModel):
     """One placed element on the canvas: a widget instance rendered as one of
     its declared fragments, at an absolute box. ``z`` is implicit in list order
@@ -181,6 +195,9 @@ class Element(BaseModel):
     # Per-sub-element scale overrides for a widget fragment (widget-only): each
     # scales the CSS selector it names inside the rendered shadow root.
     parts: list[PartScale] = Field(default_factory=list)
+    # Crop insets (widget-only): trim the rendered output at each edge and let
+    # the kept region fill the box. Composes with the ``.w`` content scale.
+    crop: CropInsets = Field(default_factory=CropInsets)
     # Per-element dither opt-out (issue #86): flat packs nearest-colour.
     dither: bool = True
     visible: bool = True

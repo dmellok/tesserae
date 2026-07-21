@@ -69,6 +69,7 @@
          data-plugin="{{ e.widget }}"
          data-fragment="{{ e.fragment }}"
          data-parts='{{ e.parts|tojson }}'
+         {% if e.crop %}data-crop='{{ e.crop|tojson }}'{% endif %}
          data-options='{{ e.options|tojson }}'
          data-data='{{ e.data|tojson }}'
          data-cell-w="{{ e.w }}"

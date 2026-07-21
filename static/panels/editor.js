@@ -452,38 +452,53 @@
   // The widget's root element. Scaling this zooms the whole render inside a
   // fixed box; the "Scale" slider writes it as an ordinary part.
   var ROOT_SEL = ".w";
-  // One CSS rule that scales the selector; icons (inline <i>) get
-  // inline-block so the transform actually applies. The widget root (ROOT_SEL)
-  // is the "Scale" content-zoom: counter-size it so the layout reflows to FILL
-  // the box (denser content) instead of a plain shrunken copy ringed by
-  // whitespace (discussion #131). Shared shape with composer.js so the editor
-  // and a Send agree.
+  // One CSS rule that scales a piece (icons, text runs); icons (inline <i>) get
+  // inline-block so the transform applies. The widget root is handled by
+  // ``rootRule`` instead. Shared shape with composer.js so editor + Send agree.
   function partRule(sel, scale) {
-    var f = Number(scale) / 100;
-    if (sel === ROOT_SEL) {
-      return ROOT_SEL + "{transform:scale(" + f + ");transform-origin:top left;" +
-        "width:calc(100% / " + f + ");height:calc(100% / " + f + ")}";
-    }
-    var r = sel + "{transform:scale(" + f + ");transform-origin:center center;";
+    var r = sel + "{transform:scale(" + (Number(scale) / 100) + ");transform-origin:center center;";
     if (/\.ph-/.test(sel)) r += "display:inline-block;";
     return r + "}";
+  }
+  // The widget root (``.w``): the "Scale" content density and the crop compose
+  // into one transform. Scale counter-sizes so the layout reflows to FILL the
+  // box (denser, not a shrunken copy ringed by whitespace, discussion #131);
+  // crop keeps a sub-rectangle and scales it to fill (drop a title, reclaim
+  // space). Shared shape with composer.js so editor + Send agree.
+  function rootRule(scalePct, crop) {
+    var f = Number(scalePct == null ? 100 : scalePct) / 100;
+    var c = crop || {};
+    var l = (+c.left || 0) / 100, r = (+c.right || 0) / 100;
+    var t = (+c.top || 0) / 100, b = (+c.bottom || 0) / 100;
+    var sw = Math.max(0.05, 1 - l - r), sh = Math.max(0.05, 1 - t - b);
+    if (f === 1 && sw === 1 && sh === 1) return "";
+    var tx = -(l / sw) * f * 100, ty = -(t / sh) * f * 100;
+    return ".w{transform-origin:0 0;width:calc(100% / " + f + ");height:calc(100% / " + f + ");" +
+      "transform:translate(" + tx + "%," + ty + "%) scale(" + (f / sw) + "," + (f / sh) + ")}";
   }
   // Inject a <style> into a widget's shadow root scaling each saved part.
   // ``overrideSel`` / ``overrideScale`` let a live slider drag preview a piece
   // that may not be saved yet, without mutating the model.
-  function applyParts(e, shadow, overrideSel, overrideScale) {
+  function applyParts(e, shadow, overrideSel, overrideScale, overrideCrop) {
     if (!shadow) return;
     var ex = shadow.querySelector("style#panels-parts");
     if (ex) ex.remove();
     var map = {};
     (Array.isArray(e.parts) ? e.parts : []).forEach(function (p) { if (p.sel) map[p.sel] = p.scale; });
     if (overrideSel != null) map[overrideSel] = overrideScale;
-    var rules = Object.keys(map).map(function (sel) {
+    var out = [];
+    // Root: fold the content scale + crop into one ``.w`` rule.
+    var rootScale = map[ROOT_SEL] != null ? map[ROOT_SEL] : 100;
+    var rr = rootRule(rootScale, overrideCrop !== undefined ? overrideCrop : e.crop);
+    if (rr) out.push(rr);
+    Object.keys(map).forEach(function (sel) {
+      if (sel === ROOT_SEL) return;
       var sc = map[sel];
-      return (sc == null || Number(sc) === 100) ? "" : partRule(sel, sc);
-    }).filter(Boolean).join("\n");
-    if (!rules) return;
-    var st = el("style"); st.id = "panels-parts"; st.textContent = rules;
+      if (sc == null || Number(sc) === 100) return;
+      out.push(partRule(sel, sc));
+    });
+    if (!out.length) return;
+    var st = el("style"); st.id = "panels-parts"; st.textContent = out.join("\n");
     shadow.appendChild(st);
   }
 
@@ -1492,6 +1507,39 @@
     row.appendChild(wrap);
     return row;
   }
+  // Crop insets (T/R/B/L, percent of the box). Trims the widget's render at
+  // each edge and lets the kept region fill the box, so cropping the top drops
+  // a fixed title and cropping the bottom reclaims space. Previews live without
+  // committing until you release the field. Composes with Scale on ``.w``.
+  function cropRow(e) {
+    var row = el("div", "prow"); row.style.display = "block";
+    row.innerHTML = '<span class="plab">Crop %</span>';
+    var wrap = el("span"); wrap.style.cssText = "display:flex;gap:6px;align-items:center;margin-top:4px";
+    function hostShadow() { var m = S.mount[e.id]; return m && m.host ? m.host.shadowRoot : null; }
+    var live = null; // preview crop until commit
+    ["top", "right", "bottom", "left"].forEach(function (side) {
+      var g = el("span"); g.style.cssText = "display:flex;align-items:center;gap:2px";
+      var lb = el("span"); lb.textContent = side.charAt(0).toUpperCase();
+      lb.style.cssText = "font:600 10px var(--t-font-mono);color:var(--t-muted)";
+      var inp = el("input", "dinput"); inp.type = "number"; inp.min = 0; inp.max = 90; inp.title = "Crop " + side;
+      inp.value = (e.crop && e.crop[side]) || 0;
+      inp.style.cssText = "width:40px;text-align:center";
+      inp.addEventListener("pointerdown", function (ev) { ev.stopPropagation(); });
+      inp.addEventListener("input", function () {
+        var base = e.crop || { top: 0, right: 0, bottom: 0, left: 0 };
+        live = { top: base.top || 0, right: base.right || 0, bottom: base.bottom || 0, left: base.left || 0 };
+        live[side] = Math.max(0, Math.min(90, Number(inp.value) || 0));
+        var sh = hostShadow(); if (sh) applyParts(e, sh, null, undefined, live);
+      });
+      inp.addEventListener("change", function () {
+        if (!live) return;
+        pushHistory(); e.crop = live; live = null; scheduleSave();
+      });
+      g.appendChild(lb); g.appendChild(inp); wrap.appendChild(g);
+    });
+    row.appendChild(wrap);
+    return row;
+  }
   // Current saved zoom for a piece (100 = untouched).
   function pieceScale(e, sel) {
     var p = (e.parts || []).filter(function (x) { return x.sel === sel; })[0];
@@ -1592,6 +1640,8 @@
       numField(e.w, MIN, function (v) { commitGeom(e, { w: v }); }),
       numField(e.h, MIN, function (v) { commitGeom(e, { h: v }); })));
     mount.appendChild(scaleRow(e));
+    // Crop only applies to a widget's rendered output (the ``.w`` shadow root).
+    if (!e.kind || e.kind === "widget") mount.appendChild(cropRow(e));
     mount.appendChild(rotationRow(e));
     mount.appendChild(opacityRow(e));
   }
