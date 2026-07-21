@@ -465,16 +465,22 @@
   // box (denser, not a shrunken copy ringed by whitespace, discussion #131);
   // crop keeps a sub-rectangle and scales it to fill (drop a title, reclaim
   // space). Shared shape with composer.js so editor + Send agree.
+  // Always returns a rule (even at 100% / no crop, an identity fill), so once
+  // a widget is scaled it stays filled continuously through 100% instead of
+  // snapping between "natural" and "filled" as the slider crosses 100 (the jump
+  // docbobo hit). The caller decides whether the root is engaged at all.
   function rootRule(scalePct, crop) {
     var f = Number(scalePct == null ? 100 : scalePct) / 100;
     var c = crop || {};
     var l = (+c.left || 0) / 100, r = (+c.right || 0) / 100;
     var t = (+c.top || 0) / 100, b = (+c.bottom || 0) / 100;
     var sw = Math.max(0.05, 1 - l - r), sh = Math.max(0.05, 1 - t - b);
-    if (f === 1 && sw === 1 && sh === 1) return "";
     var tx = -(l / sw) * f * 100, ty = -(t / sh) * f * 100;
     return ".w{transform-origin:0 0;width:calc(100% / " + f + ");height:calc(100% / " + f + ");" +
       "transform:translate(" + tx + "%," + ty + "%) scale(" + (f / sw) + "," + (f / sh) + ")}";
+  }
+  function cropEngaged(c) {
+    return !!(c && ((+c.top || 0) || (+c.right || 0) || (+c.bottom || 0) || (+c.left || 0)));
   }
   // Inject a <style> into a widget's shadow root scaling each saved part.
   // ``overrideSel`` / ``overrideScale`` let a live slider drag preview a piece
@@ -487,10 +493,14 @@
     (Array.isArray(e.parts) ? e.parts : []).forEach(function (p) { if (p.sel) map[p.sel] = p.scale; });
     if (overrideSel != null) map[overrideSel] = overrideScale;
     var out = [];
-    // Root: fold the content scale + crop into one ``.w`` rule.
-    var rootScale = map[ROOT_SEL] != null ? map[ROOT_SEL] : 100;
-    var rr = rootRule(rootScale, overrideCrop !== undefined ? overrideCrop : e.crop);
-    if (rr) out.push(rr);
+    // Root: fold the content scale + crop into one ``.w`` rule. Only engaged
+    // when the widget has been scaled (a ``.w`` part, kept even at 100) or
+    // cropped, so untouched widgets render exactly as before.
+    var crop = overrideCrop !== undefined ? overrideCrop : e.crop;
+    if (Object.prototype.hasOwnProperty.call(map, ROOT_SEL) || cropEngaged(crop)) {
+      var rootScale = map[ROOT_SEL] != null ? map[ROOT_SEL] : 100;
+      out.push(rootRule(rootScale, crop));
+    }
     Object.keys(map).forEach(function (sel) {
       if (sel === ROOT_SEL) return;
       var sc = map[sel];
@@ -1500,7 +1510,8 @@
     });
     r.addEventListener("dblclick", function () {
       r.value = 100; val.textContent = "100%";
-      pushHistory(); setPieceScale(e, ROOT_SEL, 100); scheduleSave(); preview(100);
+      pushHistory(); clearRootScale(e); scheduleSave();
+      var m = S.mount[e.id]; if (m && m.host) applyParts(e, m.host.shadowRoot);
     });
     r.addEventListener("pointerdown", function (ev) { ev.stopPropagation(); });
     wrap.appendChild(r); wrap.appendChild(val);
@@ -1545,16 +1556,23 @@
     var p = (e.parts || []).filter(function (x) { return x.sel === sel; })[0];
     return p ? (p.scale == null ? 100 : p.scale) : 100;
   }
-  // Upsert a piece's zoom; 100 removes it so ``parts`` stays tidy.
+  // Upsert a piece's zoom. For a normal piece, 100 removes it so ``parts``
+  // stays tidy. The root (``.w``) is kept even at 100 once engaged, so the fill
+  // stays continuous across 100 instead of snapping back to natural; the Scale
+  // slider's double-click resets it explicitly.
   function setPieceScale(e, sel, scale) {
     if (!Array.isArray(e.parts)) e.parts = [];
-    if (Number(scale) === 100) {
+    if (Number(scale) === 100 && sel !== ROOT_SEL) {
       e.parts = e.parts.filter(function (x) { return x.sel !== sel; });
       return;
     }
     var p = e.parts.filter(function (x) { return x.sel === sel; })[0];
     if (p) p.scale = Number(scale);
     else e.parts.push({ sel: sel, scale: Number(scale) });
+  }
+  // Remove the root scale entirely (back to the widget's natural render).
+  function clearRootScale(e) {
+    e.parts = (e.parts || []).filter(function (x) { return x.sel !== ROOT_SEL; });
   }
   // One friendly piece row: label + zoom slider.
   function pieceRow(e, pc) {
