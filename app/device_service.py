@@ -20,6 +20,7 @@ mypy --strict applies to this module, see pyproject.toml.
 from __future__ import annotations
 
 import json
+import logging
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -28,6 +29,8 @@ from typing import Any
 from app.device_loader import Device, DeviceRegistry, load_instance_file
 from app.quantizer import PANEL_GAMUTS
 from app.renderer_loader import RendererRegistry, clone_for_instances
+
+logger = logging.getLogger(__name__)
 
 # Canonical instance-id rule, shared with the Settings routes. Lowercase,
 # starts with a letter, 2–32 chars of [a-z0-9_-].
@@ -429,6 +432,42 @@ def backfill_native_panel_dims(data_root: Path) -> list[str]:
         path.write_text(json.dumps(raw, indent=2) + "\n", encoding="utf-8")
         patched.append(str(raw.get("id") or path.stem))
     return patched
+
+
+def relocate_orphan_instance_files(*, data_root: Path, device_data_root: Path) -> list[str]:
+    """One-shot migration: move stray instance manifests out of the data
+    root and into ``data/devices/`` where the loader scans.
+
+    A REST ``/register`` before this fix wrote the manifest to
+    ``data/<id>.json`` instead of ``data/devices/<id>.json`` (issue #127).
+    The file never loaded on restart (the device 404'd) and blocked
+    re-pairing with an "instance file already exists" 400. Nothing else
+    keeps ``*.json`` directly at the data root, so any file there is such
+    an orphan.
+
+    Skips a file when a manifest with the same name already exists in
+    ``data/devices/`` (a re-pair created a fresh one) so the newer copy
+    isn't clobbered; the stray is left in place for the operator to
+    inspect. Idempotent. Returns the ids that were moved, for logging."""
+    moved: list[str] = []
+    if not data_root.exists():
+        return moved
+    device_data_root.mkdir(parents=True, exist_ok=True)
+    for path in sorted(data_root.glob("*.json")):
+        if not path.is_file():
+            continue
+        target = device_data_root / path.name
+        if target.exists():
+            logger.warning(
+                "device migration: leaving orphan instance file %s in place "
+                "(a manifest already exists at %s)",
+                path,
+                target,
+            )
+            continue
+        path.rename(target)
+        moved.append(path.stem)
+    return moved
 
 
 def update_instance_panel(

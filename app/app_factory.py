@@ -492,7 +492,22 @@ def create_app(
     # Inky 13.3" by the dims-only matching loop, packs at the wrong row
     # stride, and prints a distorted-looking frame. Idempotent, does
     # nothing on a fresh install or for already-migrated manifests.
-    from app.device_service import backfill_native_panel_dims
+    from app.device_service import (
+        backfill_native_panel_dims,
+        relocate_orphan_instance_files,
+    )
+
+    # Heal instance manifests a pre-fix REST /register wrote to the data
+    # root instead of data/devices/ (issue #127), so they load here and
+    # the id is re-pairable. Runs before the loader scan below.
+    _moved_ids = relocate_orphan_instance_files(
+        data_root=data_root, device_data_root=device_data_root
+    )
+    if _moved_ids:
+        logger.info(
+            "device migration: relocated orphaned instance file(s) into data/devices/: %s",
+            ", ".join(_moved_ids),
+        )
 
     _patched_ids = backfill_native_panel_dims(device_data_root)
     if _patched_ids:

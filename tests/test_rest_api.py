@@ -356,6 +356,23 @@ def test_frame_endpoint_with_nonexistent_device_id_returns_404(app: Flask) -> No
     assert "no device" in body["error"].lower()
 
 
+def test_register_writes_instance_file_into_device_data_root(app: Flask) -> None:
+    """The manifest has to land in ``data/devices/`` where the loader
+    scans, not the parent data root. Writing to the parent orphans it:
+    it never loads on restart and blocks re-pair with a 400 (#127)."""
+    client = app.test_client()
+    _sign_in(client)
+    code = _issue_pairing(app)
+    resp = _register_via_api(client, code=code, device_id="bedroom_pico")
+    assert resp.status_code == 201
+
+    device_data_root = Path(app.config["DEVICE_DATA_ROOT"])
+    data_root = Path(app.config["DATA_ROOT"])
+    assert (device_data_root / "bedroom_pico.json").is_file()
+    # Not orphaned one level up in the parent data root.
+    assert not (data_root / "bedroom_pico.json").exists()
+
+
 def test_register_echoes_canonical_lowercased_device_id(app: Flask) -> None:
     """Register lowercases the id on write, so the success response has
     to echo the canonical id back (like /discover does) or a firmware

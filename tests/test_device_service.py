@@ -567,3 +567,46 @@ def test_delete_instance_removes_record_file_and_clones(registries) -> None:
     assert devices.get("esp32_lab") is None
     assert renderers.get("esp32_bin__esp32_lab") is None
     assert not (data_root / "esp32_lab.json").exists()
+
+
+def test_relocate_orphan_instance_files_moves_stray_manifests(tmp_path: Path) -> None:
+    """A manifest left at the data root by a pre-fix REST /register is
+    moved into data/devices/ so it loads on restart and re-pairs (#127)."""
+    data_root = tmp_path
+    device_data_root = tmp_path / "devices"
+    device_data_root.mkdir()
+    (data_root / "orphan_pico.json").write_text(
+        json.dumps({"id": "orphan_pico", "kind": "pico_bin_client"}), encoding="utf-8"
+    )
+
+    moved = device_service.relocate_orphan_instance_files(
+        data_root=data_root, device_data_root=device_data_root
+    )
+
+    assert moved == ["orphan_pico"]
+    assert (device_data_root / "orphan_pico.json").is_file()
+    assert not (data_root / "orphan_pico.json").exists()
+
+
+def test_relocate_orphan_instance_files_does_not_clobber_existing(tmp_path: Path) -> None:
+    """If a manifest already exists in data/devices/ (a re-pair created a
+    fresh one), the stray is left in place rather than overwriting the
+    newer copy."""
+    data_root = tmp_path
+    device_data_root = tmp_path / "devices"
+    device_data_root.mkdir()
+    (data_root / "dupe_pico.json").write_text(
+        '{"id": "dupe_pico", "stale": true}', encoding="utf-8"
+    )
+    (device_data_root / "dupe_pico.json").write_text(
+        '{"id": "dupe_pico", "fresh": true}', encoding="utf-8"
+    )
+
+    moved = device_service.relocate_orphan_instance_files(
+        data_root=data_root, device_data_root=device_data_root
+    )
+
+    assert moved == []
+    # Stray untouched; the fresh copy in data/devices/ is preserved.
+    assert (data_root / "dupe_pico.json").exists()
+    assert '"fresh": true' in (device_data_root / "dupe_pico.json").read_text(encoding="utf-8")

@@ -203,6 +203,15 @@ def _data_root() -> Path:
     return current_app.config["DATA_ROOT"]  # type: ignore[no-any-return]
 
 
+def _device_data_root() -> Path:
+    """Where instance manifests live (``data/devices/``). The loader scans
+    this directory, so ``create_instance`` / ``update_instance_renderer``
+    have to write here, not into the parent ``DATA_ROOT``. Writing to the
+    parent orphans the file: it never loads on restart and blocks re-pair
+    with an "instance file already exists" 400 (issue #127)."""
+    return current_app.config["DEVICE_DATA_ROOT"]  # type: ignore[no-any-return]
+
+
 # -- auth ----------------------------------------------------------------
 
 
@@ -435,7 +444,7 @@ def _maybe_switch_wire_format(device_id: str, body: dict[str, Any]) -> None:
         _result, changed = update_instance_renderer(
             devices=_devices(),
             renderers=_renderers(),
-            data_root=_data_root(),
+            data_root=_device_data_root(),
             instance_id=device_id,
             wire_format=str(wire_format),
         )
@@ -1219,7 +1228,7 @@ def post_register() -> Response:
     result = create_instance(
         devices=devices_registry,
         renderers=_renderers(),
-        data_root=_data_root(),
+        data_root=_device_data_root(),
         instance_id=device_id,
         kind_id=kind_id,
         name=str(body.get("name") or "").strip(),
@@ -1271,7 +1280,7 @@ def _persist_token(device: Device, token: str) -> None:
     create_instance wrote at registration time."""
     import json
 
-    manifest_path = _data_root() / "devices" / f"{device.id}.json"
+    manifest_path = _device_data_root() / f"{device.id}.json"
     try:
         existing = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
