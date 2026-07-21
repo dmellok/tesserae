@@ -438,6 +438,9 @@
   }
 
   // ---- fragment parts (zoom individual icons / text) --------------------
+  // The widget's root element. Scaling this zooms the whole render inside a
+  // fixed box; the "Scale" slider writes it as an ordinary part.
+  var ROOT_SEL = ".w";
   // One CSS rule that scales the selector; icons (inline <i>) get
   // inline-block so the transform actually applies. Shared shape with
   // composer.js so the editor and a Send agree.
@@ -1440,28 +1443,29 @@
     row.appendChild(wrap);
     return row;
   }
-  // Proportional resize slider: scales the element's box around its centre
-  // relative to the geometry captured when the panel rendered. Commits on
-  // release; the panel then re-renders and the slider re-anchors at 100%.
+  // Content zoom slider: scales the whole render inside the fixed box by
+  // writing the widget root (``.w``) as a part. The box keeps its dimensions
+  // (drag the handles or the Size fields for that); only the content grows or
+  // shrinks, clipped by the box. Double-click to reset. Commits on release.
   function scaleRow(e) {
     var row = el("div", "prow");
     row.innerHTML = '<span class="plab">Scale</span>';
     var wrap = el("span"); wrap.style.cssText = "display:flex;align-items:center;gap:8px";
-    var r = el("input"); r.type = "range"; r.min = 25; r.max = 300; r.step = 1; r.value = 100; r.style.width = "86px";
-    var val = el("span", "mono"); val.textContent = "100%";
-    var base = { w: e.w, h: e.h, cx: e.x + e.w / 2, cy: e.y + e.h / 2 };
-    function geomAt(f) {
-      var nw = Math.max(MIN, Math.round(base.w * f));
-      var nh = Math.max(MIN, Math.round(base.h * f));
-      return { w: nw, h: nh, x: Math.round(base.cx - nw / 2), y: Math.round(base.cy - nh / 2) };
+    var cur = pieceScale(e, ROOT_SEL);
+    var r = el("input"); r.type = "range"; r.min = 25; r.max = 300; r.step = 1; r.value = cur; r.style.width = "86px";
+    var val = el("span", "mono"); val.textContent = cur + "%";
+    function preview(v) {
+      var m = S.mount[e.id];
+      if (m && m.host) applyParts(e, m.host.shadowRoot, ROOT_SEL, v);
     }
-    r.addEventListener("input", function () {
-      val.textContent = r.value + "%";
-      var g = geomAt(Number(r.value) / 100);
-      var n = artboard.querySelector('[data-id="' + e.id + '"]');
-      if (n) { n.style.width = g.w + "px"; n.style.height = g.h + "px"; n.style.left = g.x + "px"; n.style.top = g.y + "px"; }
+    r.addEventListener("input", function () { val.textContent = r.value + "%"; preview(Number(r.value)); });
+    r.addEventListener("change", function () {
+      pushHistory(); setPieceScale(e, ROOT_SEL, Number(r.value)); scheduleSave();
     });
-    r.addEventListener("change", function () { commitGeom(e, geomAt(Number(r.value) / 100)); });
+    r.addEventListener("dblclick", function () {
+      r.value = 100; val.textContent = "100%";
+      pushHistory(); setPieceScale(e, ROOT_SEL, 100); scheduleSave(); preview(100);
+    });
     r.addEventListener("pointerdown", function (ev) { ev.stopPropagation(); });
     wrap.appendChild(r); wrap.appendChild(val);
     row.appendChild(wrap);
@@ -1518,9 +1522,10 @@
     var known = {};
     pieces.forEach(function (p) { known[p.sel] = 1; });
     // Keep any saved piece whose selector isn't currently discovered so it can
-    // still be seen and reset (e.g. after a fragment change).
+    // still be seen and reset (e.g. after a fragment change). The widget root
+    // is owned by the "Scale" slider, so it never shows up here.
     (e.parts || []).forEach(function (p) {
-      if (p.sel && !known[p.sel]) { pieces.push({ sel: p.sel, label: humanizeSel(p.sel) }); known[p.sel] = 1; }
+      if (p.sel && p.sel !== ROOT_SEL && !known[p.sel]) { pieces.push({ sel: p.sel, label: humanizeSel(p.sel) }); known[p.sel] = 1; }
     });
     if (!pieces.length) {
       var hint = el("div", "note"); hint.style.cssText = "padding:2px 2px 8px;font-size:10.5px";
