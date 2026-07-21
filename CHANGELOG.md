@@ -8,11 +8,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
-- **Status bar showed the wrong device's battery on canvas dashboards (#125).** The per-device render
-  detection only scanned grid cells, so a canvas dashboard's status bar rendered once per panel
-  instead of per device and fell back to showing the lowest battery across all devices (and the same
-  device's temperature / humidity / Wi-Fi). It now scans canvas elements too, so each panel's status
-  bar shows its own telemetry.
+- **Status bar showed the wrong device's battery (#125).** Three gaps fed the same symptom, a status
+  bar falling back to the lowest battery / signal across all devices (and the wrong temperature /
+  humidity). (1) Per-device render detection only scanned grid cells, so a canvas dashboard pushed once
+  per panel instead of per device; it now scans canvas elements too. (2) Even when a canvas push fanned
+  out per device, the canvas render path dropped the target device before the widget fetch, so every
+  panel still resolved the aggregate; the target now threads through to the fetch. (3) Editor previews
+  (the dashboards-list hover thumbnail and the live compose iframe) carry no target device, so both
+  grid and canvas previews showed the aggregate; a preview now defaults to the page's first bound
+  device and shows a real one.
 
 ### Added
 

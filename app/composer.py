@@ -863,10 +863,18 @@ def _panel_override(w: str | None, h: str | None) -> tuple[int, int] | None:
     return min(pw, 10000), min(ph, 10000)
 
 
-def _build_canvas_els(els: list[Any], cw: int, ch: int) -> list[dict[str, Any]]:
+def _build_canvas_els(
+    els: list[Any], cw: int, ch: int, *, target_device_id: str = ""
+) -> list[dict[str, Any]]:
     """Shape a canvas's elements for ``panels_compose.html``: decorations pass
     their raw props (drawn client-side), widget elements get resolved options +
-    fetched data (sample fallback), all in the authored ``cw x ch`` space."""
+    fetched data (sample fallback), all in the authored ``cw x ch`` space.
+
+    ``target_device_id`` is threaded to each widget fetch so per-device widgets
+    (``tesserae_status`` battery / signal) reflect the panel receiving this
+    render rather than a min-across-all-devices aggregate. The grid path carries
+    this through ``page_dict["target_device_id"]``; canvas needs it passed in
+    because :func:`_render_canvas` fetches server-side here."""
     from app.widget_samples import get_sample
 
     # Dedupe fetches across elements that resolve to the same widget +
@@ -884,7 +892,14 @@ def _build_canvas_els(els: list[Any], cw: int, ch: int) -> list[dict[str, Any]]:
             return fetch_memo[memo_key]
         try:
             fetched = _fetch_plugin_data(
-                plugin_id, opts, cw, ch, preview=False, cell_w=cell_w, cell_h=cell_h
+                plugin_id,
+                opts,
+                cw,
+                ch,
+                preview=False,
+                cell_w=cell_w,
+                cell_h=cell_h,
+                target_device_id=target_device_id,
             )
         except Exception:
             fetched = None
@@ -1058,10 +1073,13 @@ def _build_canvas_els(els: list[Any], cw: int, ch: int) -> list[dict[str, Any]]:
     return els_out
 
 
-def _render_canvas(layout: Any, *, target_w: int, target_h: int) -> str:
+def _render_canvas(layout: Any, *, target_w: int, target_h: int, target_device_id: str = "") -> str:
     """Render a canvas layout (authored at ``layout.w x layout.h``) scaled to fit
     a ``target_w x target_h`` panel, aspect preserved and centred. When the
-    authored size already matches the target the scale is 1 (no transform)."""
+    authored size already matches the target the scale is 1 (no transform).
+
+    ``target_device_id`` names which bound device this render is for, so
+    per-device widgets (``tesserae_status``) resolve to that device's telemetry."""
     cw = max(1, int(layout.w))
     ch = max(1, int(layout.h))
     scale = min(target_w / cw, target_h / ch)
@@ -1073,7 +1091,7 @@ def _render_canvas(layout: Any, *, target_w: int, target_h: int) -> str:
     font = _resolve_font(layout.font or None, registry)
     return render_template(
         "panels_compose.html",
-        els=_build_canvas_els(layout.els, cw, ch),
+        els=_build_canvas_els(layout.els, cw, ch, target_device_id=target_device_id),
         cw=cw,
         ch=ch,
         w=target_w,
@@ -1104,6 +1122,22 @@ def compose_measure() -> str:
     return render_template("panels_measure.html", font_face_css=_font_face_css(registry.fonts))
 
 
+def _preview_target_device(page: Page, devices: Any) -> str:
+    """First bound device id that exists in the registry, or ``""``.
+
+    A non-push preview render (the dashboards-list hover thumbnail, the live
+    compose iframe) carries no ``?device_id``. Without a target, per-device
+    widgets like ``tesserae_status`` fall back to a min-across-all-devices
+    aggregate, so the preview shows the wrong (worst) battery / signal. Picking
+    the page's first bound device makes the preview show a real device instead."""
+    if devices is None:
+        return ""
+    for did in getattr(page, "device_ids", None) or []:
+        if devices.devices.get(did) is not None:
+            return str(did)
+    return ""
+
+
 @bp.get("/compose/<page_id>")
 def compose(page_id: str) -> str:
     preview_cache: dict[str, Page] = current_app.config.get("PREVIEW_CACHE", {})
@@ -1129,6 +1163,22 @@ def compose(page_id: str) -> str:
         panel = resolve_panel_for_page(page, devices, settings_store)
         panel_w, panel_h = panel.w, panel.h
 
+    # ``?device_id=<id>`` on the compose URL names which bound device this
+    # render is for, so per-device widgets (tesserae_status battery / signal)
+    # reflect the panel receiving the frame rather than a min-across-all-devices
+    # aggregate. The push pipeline sets this when it fans out to devices sharing
+    # a panel. A non-push preview (hover thumbnail / live iframe) carries no
+    # device_id, so we default to the page's first bound device rather than
+    # rendering the aggregate. Grid and canvas both consume it (grid via
+    # page_dict, canvas via _render_canvas).
+    explicit_device_id = (request.args.get("device_id") or "").strip()
+    if explicit_device_id:
+        target_device_id = explicit_device_id
+    elif not for_push:
+        target_device_id = _preview_target_device(page, devices)
+    else:
+        target_device_id = ""
+
     # Freeform (canvas) dashboards render the composer layout scaled to the
     # panel, and share this route so push / scheduler / rotation drive them by
     # page id exactly like a grid page. An unbound, un-overridden canvas renders
@@ -1138,17 +1188,14 @@ def compose(page_id: str) -> str:
             target_w, target_h = page.canvas.w, page.canvas.h
         else:
             target_w, target_h = panel_w, panel_h
-        return _render_canvas(page.canvas, target_w=target_w, target_h=target_h)
+        return _render_canvas(
+            page.canvas,
+            target_w=target_w,
+            target_h=target_h,
+            target_device_id=target_device_id,
+        )
 
     page_dict["panel"] = {"w": panel_w, "h": panel_h}
-    # v0.71.x: ``?device_id=<id>`` on the compose URL tells widgets like
-    # tesserae_status which of the page's bound devices this render is
-    # for, so per-device battery / signal chips actually reflect the
-    # panel receiving the frame rather than a min-across-all-devices
-    # aggregate. The push pipeline sets this when it fans out to
-    # multiple devices sharing a panel; the editor preview leaves it
-    # empty.
-    target_device_id = (request.args.get("device_id") or "").strip()
     if target_device_id:
         page_dict["target_device_id"] = target_device_id
     return render_template(
