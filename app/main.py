@@ -85,6 +85,16 @@ def _serve(argv: list[str] | None = None) -> None:
         _reset_password()
         return
 
+    # Record the real internal bind port so the in-process renderer fetches
+    # /compose over loopback on the port Flask actually listens on, not the
+    # port the browser used. Behind a reverse proxy / k8s Service / Docker
+    # port map (external 4567 -> container 8765), request.host carries the
+    # external port, and a loopback fetch to it is refused because nothing
+    # listens there inside the container (#129). The HA add-on already sets
+    # TESSERAE_BIND_PORT in its own config for the same reason; setdefault
+    # keeps that value and covers every other CLI-launched deployment.
+    os.environ.setdefault("TESSERAE_BIND_PORT", str(args.port))
+
     # Log level for self-hosted installs (Docker / LXC / bare): --log-level
     # wins, then TESSERAE_LOG_LEVEL, else INFO. The HA add-on's log_level
     # option is applied just below and takes precedence there.

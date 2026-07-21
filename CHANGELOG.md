@@ -8,6 +8,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **Canvas preview failed behind a non-default external port (#129).** When the server was reached on a
+  port that differs from its internal bind (a reverse proxy, k8s Service, or Docker port map sending
+  external 4567 to the container's 8765), the canvas preview and other render routes built the internal
+  loopback fetch from the browser's port, so the headless renderer hit `127.0.0.1:<external>` where
+  nothing listens and the render was refused. The `tesserae` CLI now records its real bind port in
+  `TESSERAE_BIND_PORT` (previously set only by the Home Assistant add-on), so the renderer always
+  fetches `/compose` on the port Flask actually binds.
 - **Status bar showed the wrong device's battery (#125).** Four gaps fed the same symptom, a status
   bar falling back to the lowest battery / signal across all devices (and the wrong temperature /
   humidity). (1) Per-device render detection only scanned grid cells, so a canvas dashboard pushed once
