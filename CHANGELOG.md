@@ -6,6 +6,14 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **Status bar showed the wrong device's battery on canvas dashboards (#125).** The per-device render
+  detection only scanned grid cells, so a canvas dashboard's status bar rendered once per panel
+  instead of per device and fell back to showing the lowest battery across all devices (and the same
+  device's temperature / humidity / Wi-Fi). It now scans canvas elements too, so each panel's status
+  bar shows its own telemetry.
+
 ### Added
 
 - **MCP: rotations, schedules, and decks.** The agent MCP surface (`/api/mcp`) and the

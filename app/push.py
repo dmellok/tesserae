@@ -152,13 +152,17 @@ def _disabled_renderer_ids(settings: SettingsStore) -> set[str]:
 
 
 def _page_needs_per_device_render(page: Any) -> bool:
-    """True when ``page`` carries a cell whose widget declares
+    """True when ``page`` carries a widget that declares
     ``render.per_device_id: true`` in its manifest.
 
     v0.71.x introduced this flag so the push pipeline knows to fan out
     per bound device instead of per panel group. The tesserae_status
     bar needs it (per-device battery + Wi-Fi chips); other widgets that
-    render identically for every device on a shared panel don't.
+    render identically for every device on a shared panel don't. Both
+    page shapes are scanned: grid ``cells`` (each ``cell.plugin``) and
+    canvas ``canvas.els`` (each ``el.widget`` for a placed widget, plus a
+    code element's data ``sources[].key``), so a canvas dashboard's
+    status bar is per-device too (#125).
 
     Falls back to False when there's no Flask app context or no
     ``PLUGIN_REGISTRY`` on it (unit-test setups), which keeps the
@@ -172,15 +176,26 @@ def _page_needs_per_device_render(page: Any) -> bool:
         return False
     if registry is None:
         return False
-    for cell in getattr(page, "cells", []) or []:
-        plugin_id = getattr(cell, "plugin", None)
+
+    def _wants(plugin_id: Any) -> bool:
         if not plugin_id:
-            continue
-        plugin = registry.get(plugin_id)
-        if plugin is None:
-            continue
-        if plugin.manifest.get("render", {}).get("per_device_id"):
+            return False
+        plugin = registry.get(str(plugin_id))
+        return bool(plugin and plugin.manifest.get("render", {}).get("per_device_id"))
+
+    # Grid pages: each cell names its widget in ``plugin``.
+    for cell in getattr(page, "cells", []) or []:
+        if _wants(getattr(cell, "plugin", None)):
             return True
+    # Canvas pages: a placed widget (``el.widget``), or a code element that
+    # pulls a per-device widget as a data source (``el.sources[].key``).
+    canvas = getattr(page, "canvas", None)
+    for el in (getattr(canvas, "els", None) or []) if canvas is not None else []:
+        if _wants(getattr(el, "widget", None)):
+            return True
+        for src in getattr(el, "sources", None) or []:
+            if _wants(getattr(src, "key", None)):
+                return True
     return False
 
 
