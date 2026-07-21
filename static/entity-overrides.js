@@ -330,6 +330,11 @@
     document.querySelectorAll("[data-entity-overrides]").forEach(bindOne);
   }
 
+  // Exposed so editors that inject the options form after page load (the
+  // canvas config drawer, #130) can bind the newly-added overrides field.
+  // bindOne is idempotent, so calling bindAll again is cheap.
+  window.tesseraeEntityOverridesBindAll = bindAll;
+
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", bindAll);
   } else {

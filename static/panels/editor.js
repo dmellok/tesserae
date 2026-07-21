@@ -2235,7 +2235,16 @@
           if (tc.attachLocationSearch) tc.attachLocationSearch(body);
           if (tc.attachSliders) tc.attachSliders(body);
           if (tc.attachPresetNumbers) tc.attachPresetNumbers(body);
+          // HA entity picker filter box (#130): dead without this in the
+          // drawer since the form is injected after page load.
+          if (tc.attachMultiSelect) tc.attachMultiSelect(body);
         }
+        // Icon picker + per-entity label/icon/format overrides (#130). Both
+        // bindAll passes are idempotent and only touch the freshly-injected
+        // drawer nodes; entity-overrides renders one icon picker per ticked
+        // entity, so bind it before the icon picker.
+        if (window.tesseraeEntityOverridesBindAll) window.tesseraeEntityOverridesBindAll();
+        if (window.tesseraeIconPickerBindAll) window.tesseraeIconPickerBindAll();
       })
       .catch(function () { body.innerHTML = '<div class="note" style="padding:12px">Failed to load options.</div>'; });
   }

@@ -159,6 +159,50 @@
     });
   }
 
+  // Multi-select checklists (e.g. the HA entity pickers): a client-side
+  // filter box narrows the list, and a count shows how many are ticked.
+  // The filter input has no name (never submitted) and stops its own
+  // events from bubbling to the form so typing doesn't fire a preview.
+  // Shared so both the grid editor (forms present at load) and the canvas
+  // editor (forms injected into the config drawer after load) wire it the
+  // same way (#130).
+  function attachMultiSelect(root) {
+    root.querySelectorAll("[data-multiselect]").forEach((ms) => {
+      if (ms.dataset.msBound) return;
+      ms.dataset.msBound = "1";
+      const filter = ms.querySelector("[data-ms-filter]");
+      const opts = Array.from(ms.querySelectorAll(".multiselect-opt"));
+      const emptyEl = ms.querySelector("[data-ms-empty]");
+      const countEl = ms.querySelector("[data-ms-count]");
+
+      function updateCount() {
+        if (!countEl) return;
+        const n = opts.filter((o) => o.querySelector("input").checked).length;
+        countEl.textContent = n ? `${n} selected` : "";
+      }
+      function applyFilter() {
+        const q = (filter ? filter.value : "").trim().toLowerCase();
+        let shown = 0;
+        opts.forEach((o) => {
+          const match = !q || (o.dataset.msText || "").indexOf(q) !== -1;
+          o.hidden = !match;
+          if (match) shown += 1;
+        });
+        if (emptyEl) emptyEl.hidden = shown > 0;
+      }
+      if (filter) {
+        // Keep filter keystrokes local, don't dirty the form or trigger
+        // a preview POST (the filter isn't part of the saved value).
+        ["input", "change", "keyup", "keydown"].forEach((evt) =>
+          filter.addEventListener(evt, (e) => e.stopPropagation()),
+        );
+        filter.addEventListener("input", applyFilter);
+      }
+      ms.addEventListener("change", updateCount);
+      updateCount();
+    });
+  }
+
   // Lightbox, delegated click handler that intercepts any
   // `<a data-lightbox href="...">` and shows the image in an in-page
   // overlay instead of a new tab. ESC or backdrop click closes.
@@ -478,6 +522,7 @@
     attachSendFitPreview(document);
     attachPresetNumbers(document);
     attachLocationSearch(document);
+    attachMultiSelect(document);
     attachLightbox();
   }
 
@@ -496,6 +541,7 @@
     attachSendFitPreview,
     attachPresetNumbers,
     attachLocationSearch,
+    attachMultiSelect,
     fitPreview,
   };
 })();

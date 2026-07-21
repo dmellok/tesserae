@@ -8,6 +8,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **Canvas editor: HA entity filter, icon picker, and per-entity overrides were dead (#130).** The
+  canvas config drawer injects a widget's options form after page load, but the canvas editor template
+  is standalone and never loaded the icon-picker / entity-overrides modules, and the multi-select
+  filter wiring lived only in the grid editor. So for the Home Assistant "Entities" widget the filter
+  box did nothing, the icon picker didn't open, and the per-entity label / icon / number-format
+  overrides never rendered. The filter is now a shared component wired in both editors, the two modules
+  load on the canvas page, and the drawer initializes all three after injecting the form.
 - **Canvas preview failed behind a non-default external port (#129).** When the server was reached on a
   port that differs from its internal bind (a reverse proxy, k8s Service, or Docker port map sending
   external 4567 to the container's 8765), the canvas preview and other render routes built the internal

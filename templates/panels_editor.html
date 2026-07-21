@@ -328,6 +328,12 @@
   {# Shared touch Interaction picker (window.TouchInteraction), loaded before
      editor.js so the inspector's Interaction section can call it. #}
   <script src="{{ url_for('static', filename='touch_interaction.js') }}"></script>
+  {# Icon picker + per-entity overrides for the config drawer (HA entities /
+     sensor). This template is standalone (doesn't extend _base.html), so these
+     shared modules must be loaded explicitly or the drawer's icon picker and
+     label/icon/format overrides stay dead (#130). #}
+  <script src="{{ url_for('static', filename='icon-picker.js') }}"></script>
+  <script src="{{ url_for('static', filename='entity-overrides.js') }}"></script>
   <script src="{{ url_for('static', filename='panels/editor.js') }}"></script>
 </body>
 </html>
