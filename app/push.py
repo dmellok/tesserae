@@ -181,6 +181,20 @@ def _page_needs_per_device_render(page: Any) -> bool:
             continue
         if plugin.manifest.get("render", {}).get("per_device_id"):
             return True
+
+    if getattr(page, "layout_kind", "grid") == "canvas":
+        canvas = getattr(page, "canvas", None)
+        elements = getattr(canvas, "els", []) if canvas else []
+        for el in elements:
+            plugin_id = getattr(el, "widget", None)
+            if not plugin_id:
+                continue
+            plugin = registry.get(plugin_id)
+            if plugin is None:
+                continue
+            if plugin.manifest.get("render", {}).get("per_device_id"):
+                return True
+
     return False
 
 

@@ -863,7 +863,7 @@ def _panel_override(w: str | None, h: str | None) -> tuple[int, int] | None:
     return min(pw, 10000), min(ph, 10000)
 
 
-def _build_canvas_els(els: list[Any], cw: int, ch: int) -> list[dict[str, Any]]:
+def _build_canvas_els(els: list[Any], cw: int, ch: int, target_device_id: str = "") -> list[dict[str, Any]]:
     """Shape a canvas's elements for ``panels_compose.html``: decorations pass
     their raw props (drawn client-side), widget elements get resolved options +
     fetched data (sample fallback), all in the authored ``cw x ch`` space."""
@@ -884,7 +884,7 @@ def _build_canvas_els(els: list[Any], cw: int, ch: int) -> list[dict[str, Any]]:
             return fetch_memo[memo_key]
         try:
             fetched = _fetch_plugin_data(
-                plugin_id, opts, cw, ch, preview=False, cell_w=cell_w, cell_h=cell_h
+                plugin_id, opts, cw, ch, preview=False, cell_w=cell_w, cell_h=cell_h, target_device_id=target_device_id
             )
         except Exception:
             fetched = None
@@ -1058,7 +1058,7 @@ def _build_canvas_els(els: list[Any], cw: int, ch: int) -> list[dict[str, Any]]:
     return els_out
 
 
-def _render_canvas(layout: Any, *, target_w: int, target_h: int) -> str:
+def _render_canvas(layout: Any, *, target_w: int, target_h: int, target_device_id: str = "") -> str:
     """Render a canvas layout (authored at ``layout.w x layout.h``) scaled to fit
     a ``target_w x target_h`` panel, aspect preserved and centred. When the
     authored size already matches the target the scale is 1 (no transform)."""
@@ -1073,7 +1073,7 @@ def _render_canvas(layout: Any, *, target_w: int, target_h: int) -> str:
     font = _resolve_font(layout.font or None, registry)
     return render_template(
         "panels_compose.html",
-        els=_build_canvas_els(layout.els, cw, ch),
+        els=_build_canvas_els(layout.els, cw, ch, target_device_id=target_device_id),
         cw=cw,
         ch=ch,
         w=target_w,
@@ -1129,6 +1129,15 @@ def compose(page_id: str) -> str:
         panel = resolve_panel_for_page(page, devices, settings_store)
         panel_w, panel_h = panel.w, panel.h
 
+    # v0.71.x: ``?device_id=<id>`` on the compose URL tells widgets like
+    # tesserae_status which of the page's bound devices this render is
+    # for, so per-device battery / signal chips actually reflect the
+    # panel receiving the frame rather than a min-across-all-devices
+    # aggregate. The push pipeline sets this when it fans out to
+    # multiple devices sharing a panel; the editor preview leaves it
+    # empty.
+    target_device_id = (request.args.get("device_id") or "").strip()
+
     # Freeform (canvas) dashboards render the composer layout scaled to the
     # panel, and share this route so push / scheduler / rotation drive them by
     # page id exactly like a grid page. An unbound, un-overridden canvas renders
@@ -1138,17 +1147,9 @@ def compose(page_id: str) -> str:
             target_w, target_h = page.canvas.w, page.canvas.h
         else:
             target_w, target_h = panel_w, panel_h
-        return _render_canvas(page.canvas, target_w=target_w, target_h=target_h)
+        return _render_canvas(page.canvas, target_w=target_w, target_h=target_h, target_device_id=target_device_id)
 
     page_dict["panel"] = {"w": panel_w, "h": panel_h}
-    # v0.71.x: ``?device_id=<id>`` on the compose URL tells widgets like
-    # tesserae_status which of the page's bound devices this render is
-    # for, so per-device battery / signal chips actually reflect the
-    # panel receiving the frame rather than a min-across-all-devices
-    # aggregate. The push pipeline sets this when it fans out to
-    # multiple devices sharing a panel; the editor preview leaves it
-    # empty.
-    target_device_id = (request.args.get("device_id") or "").strip()
     if target_device_id:
         page_dict["target_device_id"] = target_device_id
     return render_template(
