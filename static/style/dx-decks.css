@@ -9,22 +9,7 @@
  *  scopes them inline, so they need styling here too).
  * ============================================================ */
 
-.page-head {
-  margin-bottom: var(--t-space-5);
-}
-.page-head h1 {
-  display: flex;
-  align-items: center;
-  gap: var(--t-space-2);
-  margin: 0 0 var(--t-space-2);
-}
-.page-sub {
-  margin: 0;
-  max-width: 62ch;
-  color: var(--t-fg-soft);
-  font-size: var(--t-size-sm);
-  line-height: 1.5;
-}
+/* Header uses the global .page-head + .lede (shell.css), same as Rotations. */
 
 /* -- chips + hints ----------------------------------------- */
 

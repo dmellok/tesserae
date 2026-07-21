@@ -72,14 +72,14 @@
 {% endmacro %}
 
 {% block main %}
-<div class="page-head">
-  <h1><i class="ph-bold ph-cards-three" aria-hidden="true"></i> Decks</h1>
-  <p class="page-sub">
+<header class="page-head">
+  <h1><i class="ph ph-cards-three" aria-hidden="true"></i> Decks</h1>
+  <p class="lede">
     A deck keeps a group of pages pre-rendered per device, so a button press or touch that moves
     between them is snappier than rendering each on the fly. Author the navigation in the canvas
     editor (tap / swipe "go to page" on a tile); Tesserae turns those links into a deck.
   </p>
-</div>
+</header>
 
 <datalist id="deck-page-ids">
   {% for p in pages %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
