@@ -83,6 +83,20 @@ def _renderer_label(renderer_id: str) -> str:
     return renderer.name
 
 
+def _preview_digest(ev: EventRow) -> str | None:
+    """Composition PNG to show for a History row.
+
+    Normal push rows use the top-level digest, which also means they can be
+    resent. Non-push button outcomes keep that field empty; ``fetch_latest``
+    instead snapshots a preview-only composition digest in ``extra`` so its
+    thumbnail can be shown without making the row resendable.
+    """
+    if isinstance(ev.digest, str) and ev.digest:
+        return ev.digest
+    candidate = ev.extra.get("composition_digest")
+    return candidate if isinstance(candidate, str) and candidate else None
+
+
 def history_view(rows: list[EventRow]) -> list[dict[str, Any]]:
     """Shape raw event rows for the History page: page name instead of id,
     humanised time, friendly device labels."""
@@ -136,11 +150,14 @@ def history_view(rows: list[EventRow]) -> list[dict[str, Any]]:
         # actually happened" is visible without opening the raw event
         # (which the History page doesn't expose today).
         button_detail = _button_detail(ev, page_names) if ev.source == "button" else None
+        preview_digest = _preview_digest(ev)
         out.append(
             {
                 "id": ev.id,
                 "status": ev.status,
                 "digest": ev.digest,
+                "preview_digest": preview_digest,
+                "can_resend": bool(ev.digest),
                 "source": ev.source,
                 "target": target,
                 "target_devices": target_devices,

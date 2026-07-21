@@ -54,7 +54,11 @@ class StubPushManager:
     kwargs ButtonService actually uses."""
 
     calls: list[dict[str, Any]] = field(default_factory=list)
+    latest_renders: dict[str, dict[str, Any]] = field(default_factory=dict)
     fail: bool = False
+
+    def latest_render_for(self, device_id: str) -> dict[str, Any] | None:
+        return self.latest_renders.get(device_id)
 
     def push(
         self,
@@ -279,6 +283,34 @@ def test_refresh_forces_push_of_current_page(
 
     assert result.step_index == 0
     assert result.pushed_page_id == "morning"
+
+
+def test_fetch_latest_does_not_push_or_set_manual_override(
+    rotation_store: RotationStore,
+    state_store: DeviceRotationStateStore,
+    settings_store: SettingsStore,
+    page_store: PageStore,
+    push_manager: StubPushManager,
+    clock: FakeClock,
+) -> None:
+    _seed_rotation(rotation_store)
+    settings_store.patch_section("devices", {"kitchen": {"button_map": {"custom": "fetch_latest"}}})
+    svc = _wire(
+        rotation_store=rotation_store,
+        state_store=state_store,
+        settings_store=settings_store,
+        page_store=page_store,
+        push_manager=push_manager,
+        clock=clock,
+    )
+
+    result = svc.handle_button(device_id="kitchen", button="custom", event_id=1)
+
+    assert result.step_index == 0
+    assert result.pushed_page_id is None
+    assert result.manual_override is False
+    assert result.force_download is True
+    assert push_manager.calls == []
 
 
 # -- dedup --------------------------------------------------------
@@ -771,6 +803,70 @@ def test_unmapped_press_emits_history_row(
     assert len(rows) == 1
     assert rows[0].status == "unmapped"
     assert rows[0].extra["button"] == "unicorn"
+
+
+def test_fetch_latest_press_emits_fetched_history_row(
+    rotation_store: RotationStore,
+    state_store: DeviceRotationStateStore,
+    settings_store: SettingsStore,
+    page_store: PageStore,
+    push_manager: StubPushManager,
+    clock: FakeClock,
+    event_log: EventLog,
+) -> None:
+    settings_store.patch_section("devices", {"kitchen": {"button_map": {"custom": "fetch_latest"}}})
+    push_manager.latest_renders["kitchen"] = {
+        "digest": "wire123",
+        "composition_digest": "composition456",
+    }
+    svc = _wire(
+        rotation_store=rotation_store,
+        state_store=state_store,
+        settings_store=settings_store,
+        page_store=page_store,
+        push_manager=push_manager,
+        clock=clock,
+        event_log=event_log,
+    )
+
+    svc.handle_button(device_id="kitchen", button="custom", event_id=1)
+
+    rows = _button_rows(event_log)
+    assert len(rows) == 1
+    assert rows[0].status == "fetched"
+    assert rows[0].digest is None
+    assert rows[0].extra["action_spec"] == "fetch_latest"
+    assert rows[0].extra["composition_digest"] == "composition456"
+    assert rows[0].extra["pushed_page_id"] is None
+    assert push_manager.calls == []
+
+
+def test_fetch_latest_without_existing_frame_keeps_preview_empty(
+    rotation_store: RotationStore,
+    state_store: DeviceRotationStateStore,
+    settings_store: SettingsStore,
+    page_store: PageStore,
+    push_manager: StubPushManager,
+    clock: FakeClock,
+    event_log: EventLog,
+) -> None:
+    settings_store.patch_section("devices", {"kitchen": {"button_map": {"custom": "fetch_latest"}}})
+    svc = _wire(
+        rotation_store=rotation_store,
+        state_store=state_store,
+        settings_store=settings_store,
+        page_store=page_store,
+        push_manager=push_manager,
+        clock=clock,
+        event_log=event_log,
+    )
+
+    svc.handle_button(device_id="kitchen", button="custom", event_id=1)
+
+    row = _button_rows(event_log)[0]
+    assert row.status == "fetched"
+    assert row.digest is None
+    assert "composition_digest" not in row.extra
 
 
 def test_webhook_press_emits_webhook_dispatched_row(

@@ -37,6 +37,11 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **`fetch_latest` button action.** Re-downloads and repaints the latest frame
+  already rendered for the device without running the composer, publishing a
+  new artefact, moving the rotation, or setting a manual override. The action
+  bypasses a matching `If-None-Match` for its `/frame` response, so its meaning
+  does not depend on a particular firmware clearing its cached ETag first.
 - **MCP: rotations, schedules, and decks.** The agent MCP surface (`/api/mcp`) and the
   `tesserae-mcp` bridge now expose list / create / delete for rotations and schedules, and list /
   create / delete / suggest for decks, so an agent that builds pages can also wire how they cycle
@@ -63,7 +68,6 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   **suggested automatically**: when pages link to each other via tap / swipe "go to page" actions set
   in the canvas editor, the Decks page offers a one-click deck for each cluster, with the graph and
   touch zones derived from those links.
-
 - **OTA per-kind rollout: manual promote + canary (#121).** Beyond staging a build for a single
   device, an operator can now set a signed build as a device kind's release and roll it out
   deliberately: `python -m app.ota.release set` (offered first to the canary devices you list),

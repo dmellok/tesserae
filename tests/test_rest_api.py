@@ -856,6 +856,93 @@ def test_frame_returns_304_when_if_none_match_matches(app: Flask) -> None:
     assert resp.headers["Content-Location"].endswith("/renders/abc123.bin")
 
 
+def test_fetch_latest_action_bypasses_matching_etag_without_rendering(app: Flask) -> None:
+    """``fetch_latest`` returns the existing artefact with 200 while
+    leaving the render pipeline and latest-render entry untouched."""
+    client = app.test_client()
+    _sign_in(client)
+    code = _issue_pairing(app)
+    resp = _register_via_api(client, code=code, device_id="bedroom_pico")
+    token = resp.get_json()["device_token"]
+
+    settings = app.config["SETTINGS_STORE"]
+    devices = settings.get_section("devices") or {}
+    devices["bedroom_pico"] = {
+        **devices.get("bedroom_pico", {}),
+        "button_map": {"custom": "fetch_latest"},
+    }
+    settings.update_section("devices", devices)
+
+    push_mgr = app.config["PUSH_MANAGER"]
+    latest = {
+        "digest": "abc123",
+        "ext": "bin",
+        "filename": "abc123.bin",
+        "renderer_id": "pico_bin",
+        "timestamp": time.time(),
+        "composition_digest": "comp123",
+    }
+    push_mgr._latest_renders["bedroom_pico"] = latest.copy()
+
+    resp = client.get(
+        "/api/v1/device/bedroom_pico/frame?button=custom&button_event_id=1",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "If-None-Match": '"abc123"',
+        },
+    )
+
+    assert resp.status_code == 200
+    assert resp.get_json()["render_id"] == "abc123"
+    assert push_mgr._latest_renders["bedroom_pico"] == latest
+
+
+def test_frame_accepts_legacy_event_alias_and_prefers_canonical_id(app: Flask) -> None:
+    """Firmware through v1.5.0 sent ``event`` on /frame. Accept it as
+    an alias, but let an explicitly supplied ``button_event_id`` win."""
+    client = app.test_client()
+    _sign_in(client)
+    code = _issue_pairing(app)
+    resp = _register_via_api(client, code=code, device_id="bedroom_pico")
+    token = resp.get_json()["device_token"]
+
+    settings = app.config["SETTINGS_STORE"]
+    devices = settings.get_section("devices") or {}
+    devices["bedroom_pico"] = {
+        **devices.get("bedroom_pico", {}),
+        "button_map": {"custom": "fetch_latest"},
+    }
+    settings.update_section("devices", devices)
+    app.config["PUSH_MANAGER"]._latest_renders["bedroom_pico"] = {
+        "digest": "abc123",
+        "ext": "bin",
+        "filename": "abc123.bin",
+        "renderer_id": "pico_bin",
+        "timestamp": time.time(),
+        "composition_digest": "comp123",
+    }
+    headers = {"Authorization": f"Bearer {token}"}
+
+    first = client.get(
+        "/api/v1/device/bedroom_pico/frame?button=custom&button_event_id=7&event=6",
+        headers=headers,
+    )
+    retry = client.get(
+        "/api/v1/device/bedroom_pico/frame?button=custom&event=7",
+        headers=headers,
+    )
+
+    assert first.status_code == 200
+    assert retry.status_code == 200
+    rows = [
+        row
+        for row in app.config["EVENT_LOG"].list(type="push")
+        if row.source == "button" and row.target == "bedroom_pico"
+    ]
+    assert [row.status for row in rows[:2]] == ["deduped", "fetched"]
+    assert [row.extra["button_event_id"] for row in rows[:2]] == [7, 7]
+
+
 def test_resend_forces_one_200_then_reverts_to_304(app: Flask) -> None:
     """Resend from History (#119): a frame flagged ``force_refetch`` serves
     one 200 to a REST client even when its ETag matches (so an explicit

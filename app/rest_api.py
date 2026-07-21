@@ -580,10 +580,18 @@ def get_frame(device_id: str) -> Response:
     if button_svc is not None:
         if button_raw:
             try:
+                # ``button_event_id`` is the canonical client-protocol
+                # parameter. Firmware through v1.5.0 sent the same monotonic
+                # counter as ``event`` on /frame (while /status used the
+                # canonical name), so retain that as a compatibility alias.
+                # A present canonical parameter always wins, even if malformed.
+                raw_event_id = request.args.get("button_event_id")
+                if raw_event_id is None:
+                    raw_event_id = request.args.get("event")
                 button_result = button_svc.handle_button(
                     device_id=device.id,
                     button=button_raw,
-                    event_id=_parse_button_event_id(request.args.get("button_event_id")),
+                    event_id=_parse_button_event_id(raw_event_id),
                 )
             except Exception:
                 current_app.logger.exception(
@@ -644,8 +652,14 @@ def get_frame(device_id: str) -> Response:
     # 304 this once, then clear the flag so the next poll of the same
     # frame goes back to 304.
     force_refetch = bool(latest.get("force_refetch"))
+    # ``fetch_latest`` is deliberately narrower than ``refresh``: do not
+    # render or publish anything, but bypass the conditional GET for this
+    # response so the client downloads the latest artefact already on disk.
+    # Carrying the intent through ButtonHandleResult also makes the action
+    # work for clients that keep their ETag on button/touch requests.
+    force_download = bool(button_result is not None and button_result.force_download)
     if_none_match = request.headers.get("If-None-Match", "")
-    if if_none_match and if_none_match == etag and not force_refetch:
+    if if_none_match and if_none_match == etag and not (force_refetch or force_download):
         resp = Response(status=304)
         resp.headers["ETag"] = etag
         resp.headers["Content-Location"] = image_url

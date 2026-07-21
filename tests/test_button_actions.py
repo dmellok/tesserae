@@ -107,6 +107,17 @@ def test_refresh_keeps_step_and_forces_refresh() -> None:
     assert result.target_page_id is None
 
 
+# -- fetch_latest ---------------------------------------------------
+
+
+def test_fetch_latest_only_forces_frame_download() -> None:
+    result = dispatch("fetch_latest", _ctx(current_step_index=1))
+    assert result.new_step_index == 1
+    assert result.target_page_id is None
+    assert result.force_refresh is False
+    assert result.force_download is True
+
+
 # -- step:<i> -------------------------------------------------------
 
 
@@ -216,7 +227,15 @@ def test_register_overwrites_existing_action() -> None:
 
 def test_registered_actions_includes_defaults() -> None:
     names = set(registered_actions())
-    assert {"rotate_prev", "rotate_next", "refresh", "step", "page", "webhook"} <= names
+    assert {
+        "rotate_prev",
+        "rotate_next",
+        "refresh",
+        "fetch_latest",
+        "step",
+        "page",
+        "webhook",
+    } <= names
 
 
 # -- default button map --------------------------------------------

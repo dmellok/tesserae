@@ -50,7 +50,7 @@
   panelEl.appendChild(svg);
 
   function statusClass(status) {
-    if (["dispatched", "ha_dispatched", "webhook_dispatched", "noop"].indexOf(status) >= 0) return "ok";
+    if (["dispatched", "ha_dispatched", "webhook_dispatched", "fetched", "noop"].indexOf(status) >= 0) return "ok";
     if (["blocked", "error", "ha_failed"].indexOf(status) >= 0) return "bad";
     return "miss"; // no_target / stale / deduped / no_frame
   }

@@ -4,7 +4,8 @@ Hardware buttons on a Tesserae device (the front buttons on a Seeed
 reTerminal E-Series, the back-panel buttons on a Pimoroni Inky
 Impression, etc.) can be bound to server-side **actions**: rotate
 through the dashboards on this device, jump straight to a specific
-dashboard, force a fresh render, fire a webhook. The mapping is
+dashboard, download the latest rendered frame, force a fresh render,
+or fire a webhook. The mapping is
 per-device and edited from **Settings → Devices**.
 
 Introduced in v0.65.0. Server-side works for any device kind whose
@@ -62,6 +63,7 @@ name (`rotate_next`) or `<action>:<arg>` (`page:morning_briefing`,
 |---|---|---|
 | `rotate_prev` | none | Advance the device's rotation one step backwards. Wraps at the start. |
 | `rotate_next` | none | Advance the device's rotation one step forwards. Wraps at the end. |
+| `fetch_latest` | none | Download and repaint the latest frame already rendered for this device. Does not re-render, push, move the rotation, or set a manual override. |
 | `refresh` | none | Force a fresh render + push of the current step. Useful when a widget's upstream data changed but the composition hash is stable. |
 | `step:<index>` | rotation step index (0-based) | Jump straight to that step in the rotation. |
 | `page:<page_id>` | dashboard page id | Push a specific dashboard to this device. Doesn't touch rotation state, so a later timer wake resumes the scheduled step. |
@@ -115,7 +117,7 @@ chip in the History toolbar to see just the button feed.
 If you're building a client and want it to send button events, see
 the [Client protocol spec](../dev/client-protocol.md). Short version:
 
-- On the frame request: `GET /api/v1/device/<id>/frame?button=<name>`.
+- On the frame request: `GET /api/v1/device/<id>/frame?button=<name>&button_event_id=<uint>`.
 - In the status body: `{"button": "<name>", "button_event_id": <uint>, …}`.
 - The server dispatches the mapped action synchronously before
   selecting the frame, so the returned artefact reflects the new
