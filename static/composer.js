@@ -41,6 +41,20 @@ function prefixShadowUrls(root, prefix) {
 // widget's shadow root, so an individually-scaled fragment piece renders the
 // same in a Send as it did in the editor. Reads data-parts (JSON list of
 // {sel, scale}); a no-op when there are none.
+//
+// One CSS rule per scaled selector. The widget root (``.w``) is special: it's
+// the "Scale" content-zoom, and it counter-sizes so the layout reflows to FILL
+// the box (denser content), not just a shrunken copy with whitespace around it
+// (discussion #131). Individual pieces keep a plain centre-scale. Kept in sync
+// with decorate.js ``partRule`` so the editor preview and a Send agree.
+function partRule(sel, scale) {
+  const f = Number(scale) / 100;
+  if (sel === ".w") {
+    return `.w{transform:scale(${f});transform-origin:top left;width:calc(100% / ${f});height:calc(100% / ${f})}`;
+  }
+  const iconFix = /\.ph-/.test(sel) ? "display:inline-block;" : "";
+  return `${sel}{transform:scale(${f});transform-origin:center center;${iconFix}}`;
+}
 function applyParts(shadow, cell) {
   const existing = shadow.querySelector("style#tesserae-parts");
   if (existing) existing.remove();
@@ -48,11 +62,7 @@ function applyParts(shadow, cell) {
   try { parts = JSON.parse(cell.dataset.parts || "[]"); } catch { parts = []; }
   const rules = (Array.isArray(parts) ? parts : [])
     .filter((p) => p && p.sel && p.scale != null && p.scale !== 100)
-    .map((p) => {
-      // Icons are inline <i>; give them inline-block so the transform applies.
-      const iconFix = /\.ph-/.test(p.sel) ? "display:inline-block;" : "";
-      return `${p.sel}{transform:scale(${p.scale / 100});transform-origin:center center;${iconFix}}`;
-    })
+    .map((p) => partRule(p.sel, p.scale))
     .join("\n");
   if (!rules) return;
   const st = document.createElement("style");

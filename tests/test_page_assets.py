@@ -140,3 +140,52 @@ def test_page_asset_route_rejects_traversal(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
     assert client.get("/page-assets/pg/..%2f..%2fsecrets").status_code == 404
+
+
+# -- editor (panels blueprint) endpoints ---------------------------------
+
+
+def test_editor_assets_cache_list_delete(app: Flask) -> None:
+    """The editor drawer's session-authed endpoints edit the same folder as the
+    MCP ones, so an image cached in the editor is visible to the agent too."""
+    client = app.test_client()
+    _sign_in(client)
+    pid = _make_page(client)
+    with patch("app.page_assets.fetch_bytes", return_value=(_PNG, "image/png")):
+        rec = client.post(
+            f"/pages/canvas/c/{pid}/assets", json={"url": "https://cdn.example.com/a.png"}
+        ).get_json()
+    assert rec["url"].startswith(f"/page-assets/{pid}/")
+    # Same folder as the MCP surface.
+    listing = client.get(f"/api/mcp/pages/{pid}/assets").get_json()
+    assert listing["assets"][0]["name"] == rec["name"]
+
+    assert (
+        client.get(f"/pages/canvas/c/{pid}/assets.json").get_json()["assets"][0]["name"]
+        == rec["name"]
+    )
+    dele = client.post(f"/pages/canvas/c/{pid}/assets/{rec['name']}/delete")
+    assert dele.status_code == 200 and dele.get_json()["deleted"] is True
+
+
+def test_editor_assets_upload(app: Flask) -> None:
+    import io
+
+    client = app.test_client()
+    _sign_in(client)
+    pid = _make_page(client)
+    resp = client.post(
+        f"/pages/canvas/c/{pid}/assets",
+        data={"file": (io.BytesIO(_PNG), "logo.png", "image/png")},
+        content_type="multipart/form-data",
+    )
+    assert resp.status_code == 200
+    assert resp.get_json()["url"].startswith(f"/page-assets/{pid}/")
+
+
+def test_editor_assets_blocks_private_host(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    pid = _make_page(client)
+    resp = client.post(f"/pages/canvas/c/{pid}/assets", json={"url": "http://127.0.0.1/x"})
+    assert resp.status_code == 422

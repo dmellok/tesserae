@@ -417,6 +417,79 @@ def delete(canvas_id: str) -> Response:
     return jsonify({"status": "ok", "deleted": bool(deleted)})
 
 
+# -- per-dashboard image assets (the editor's Assets drawer) --------------
+#
+# Session-authed twins of the MCP /pages/<id>/assets endpoints, keyed on the
+# canvas id (which IS the page id). Both edit the same folder, so an image the
+# agent caches shows up in the drawer and vice versa. Delete cascades with the
+# page (PageStore delete listener).
+
+
+def _assets_data_root() -> Any:
+    return current_app.config["DATA_ROOT"]
+
+
+def _asset_err(message: str, status: int = 422) -> Response:
+    resp = jsonify({"error": message})
+    resp.status_code = status
+    return resp
+
+
+@bp.get("/c/<canvas_id>/assets.json")
+def list_assets(canvas_id: str) -> Response:
+    _guard()
+    if _get_canvas(canvas_id) is None:
+        abort(404)
+    from app import page_assets
+
+    return jsonify({"assets": page_assets.list_assets(_assets_data_root(), canvas_id)})
+
+
+@bp.post("/c/<canvas_id>/assets")
+def add_asset(canvas_id: str) -> Response:
+    """Cache an image into this dashboard's folder. Either a multipart ``file``
+    upload, or JSON ``{url}`` to fetch a remote image through the SSRF guard.
+    Returns the stored ``{name, url, bytes}`` so the editor can drop the local
+    URL into a code element instead of hotlinking."""
+    _guard()
+    if _get_canvas(canvas_id) is None:
+        abort(404)
+    from app import page_assets
+
+    try:
+        upload = request.files.get("file")
+        if upload is not None:
+            rec = page_assets.save_bytes(
+                _assets_data_root(),
+                canvas_id,
+                upload.read(),
+                upload.mimetype or "application/octet-stream",
+            )
+        else:
+            body = request.get_json(silent=True) or {}
+            url = str(body.get("url") or "").strip()
+            if not url:
+                return _asset_err("provide a 'url' or a 'file'")
+            rec = page_assets.cache_url(_assets_data_root(), canvas_id, url)
+    except page_assets.AssetError as err:
+        return _asset_err(str(err))
+    return jsonify(rec)
+
+
+@bp.post("/c/<canvas_id>/assets/<name>/delete")
+def delete_asset(canvas_id: str, name: str) -> Response:
+    _guard()
+    if _get_canvas(canvas_id) is None:
+        abort(404)
+    from app import page_assets
+
+    try:
+        removed = page_assets.delete_asset(_assets_data_root(), canvas_id, name)
+    except page_assets.AssetError as err:
+        return _asset_err(str(err))
+    return jsonify({"status": "ok", "deleted": bool(removed)})
+
+
 @bp.get("/devices.json")
 def devices() -> Response:
     """Registered device instances a canvas can be sent to (toolbar picker).

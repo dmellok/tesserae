@@ -453,10 +453,18 @@
   // fixed box; the "Scale" slider writes it as an ordinary part.
   var ROOT_SEL = ".w";
   // One CSS rule that scales the selector; icons (inline <i>) get
-  // inline-block so the transform actually applies. Shared shape with
-  // composer.js so the editor and a Send agree.
+  // inline-block so the transform actually applies. The widget root (ROOT_SEL)
+  // is the "Scale" content-zoom: counter-size it so the layout reflows to FILL
+  // the box (denser content) instead of a plain shrunken copy ringed by
+  // whitespace (discussion #131). Shared shape with composer.js so the editor
+  // and a Send agree.
   function partRule(sel, scale) {
-    var r = sel + "{transform:scale(" + (Number(scale) / 100) + ");transform-origin:center center;";
+    var f = Number(scale) / 100;
+    if (sel === ROOT_SEL) {
+      return ROOT_SEL + "{transform:scale(" + f + ");transform-origin:top left;" +
+        "width:calc(100% / " + f + ");height:calc(100% / " + f + ")}";
+    }
+    var r = sel + "{transform:scale(" + f + ");transform-origin:center center;";
     if (/\.ph-/.test(sel)) r += "display:inline-block;";
     return r + "}";
   }
@@ -1454,10 +1462,12 @@
     row.appendChild(wrap);
     return row;
   }
-  // Content zoom slider: scales the whole render inside the fixed box by
-  // writing the widget root (``.w``) as a part. The box keeps its dimensions
-  // (drag the handles or the Size fields for that); only the content grows or
-  // shrinks, clipped by the box. Double-click to reset. Commits on release.
+  // Content density slider: scales the whole render by writing the widget root
+  // (``.w``) as a part. The box keeps its dimensions (drag the handles or the
+  // Size fields for that); the content reflows to FILL the box at the chosen
+  // scale, so scaling down packs in denser content rather than leaving a
+  // shrunken copy ringed by whitespace (discussion #131). Double-click to
+  // reset. Commits on release.
   function scaleRow(e) {
     var row = el("div", "prow");
     row.innerHTML = '<span class="plab">Scale</span>';
@@ -2036,6 +2046,122 @@
       }
       if (search) search.addEventListener("input", function () { draw(search.value.trim().toLowerCase()); });
       draw("");
+    });
+  }
+
+  // ---- dashboard image assets (reuses the drawer) -----------------------
+  // Per-dashboard image catalog: cache a remote image or upload one, and it's
+  // stored in the dashboard's own folder and referenced by a stable local URL
+  // (deleted with the dashboard). Beats hotlinking: no broken image when the
+  // upstream is down, no third-party request on every render.
+  function assetUrl(action) { return compUrl(S.cfg.canvasId, action); }
+  function copyText(txt) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(txt).then(function () { setStatus("Copied image URL"); },
+        function () { setStatus(txt); });
+    } else { setStatus(txt); }
+  }
+  function setStatus(msg) {
+    var s = $("panels-status"); if (s) s.textContent = msg;
+  }
+  function prefixed(url) { return (window.TESSERAE_URL_PREFIX || "") + url; }
+  // Drop an <img> for this asset into the selected code element (if one is), so
+  // the user doesn't have to hand-type the tag. Otherwise just copy the URL.
+  function insertAssetIntoCode(url) {
+    var sel = selEls().filter(function (e) { return e.kind === "code"; });
+    if (!sel.length) { copyText(url); setStatus("No code element selected — URL copied"); return; }
+    var e = sel[0];
+    pushHistory();
+    var tag = '<img src="' + prefixed(url) + '" style="max-width:100%">';
+    e.html = (e.html ? e.html + "\n" : "") + tag;
+    scheduleSave(); paint(); renderProps();
+    setStatus("Inserted image into code element");
+  }
+  function renderAssetList(listEl) {
+    listEl.textContent = "Loading…";
+    fetch(assetUrl("assets.json"))
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        var items = (j && j.assets) || [];
+        listEl.textContent = "";
+        if (!items.length) {
+          var note = el("div", "note"); note.style.padding = "8px 2px";
+          note.textContent = "No images yet. Cache a remote image by URL or upload one.";
+          listEl.appendChild(note); return;
+        }
+        items.forEach(function (a) {
+          var row = el("div", "prow");
+          row.style.cssText = "display:flex;align-items:center;gap:8px;padding:6px;border:1px solid var(--t-border);border-radius:8px;margin-bottom:6px";
+          var img = el("img"); img.src = prefixed(a.url);
+          img.style.cssText = "width:44px;height:44px;object-fit:contain;background:var(--t-surface-soft);border-radius:6px;flex:none";
+          var meta = el("div"); meta.style.cssText = "flex:1;min-width:0";
+          var nm = el("div"); nm.textContent = a.name;
+          nm.style.cssText = "font:11px var(--t-font-mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap";
+          var sz = el("div", "note"); sz.textContent = Math.max(1, Math.round(a.bytes / 1024)) + " KB";
+          meta.appendChild(nm); meta.appendChild(sz);
+          var ins = el("button", "minibtn", '<i class="ph-bold ph-arrow-square-in"></i>');
+          ins.title = "Insert into selected code element (or copy URL)";
+          ins.addEventListener("click", function () { insertAssetIntoCode(a.url); });
+          var cp = el("button", "minibtn", '<i class="ph-bold ph-copy"></i>');
+          cp.title = "Copy local URL";
+          cp.addEventListener("click", function () { copyText(prefixed(a.url)); });
+          var rm = el("button", "minibtn", '<i class="ph-bold ph-trash"></i>');
+          rm.title = "Delete image";
+          rm.addEventListener("click", function () {
+            fetch(assetUrl("assets/" + encodeURIComponent(a.name) + "/delete"), { method: "POST" })
+              .then(function () { renderAssetList(listEl); });
+          });
+          row.appendChild(img); row.appendChild(meta); row.appendChild(ins); row.appendChild(cp); row.appendChild(rm);
+          listEl.appendChild(row);
+        });
+      })
+      .catch(function () { listEl.textContent = ""; var n = el("div", "note"); n.textContent = "Couldn't load images."; listEl.appendChild(n); });
+  }
+  function openAssetsDrawer() {
+    var overlay = $("panels-drawer"), body = $("panels-drawer-body"), title = $("panels-drawer-title");
+    if (!overlay || !body) return;
+    title.textContent = "Dashboard images";
+    body.dataset.eid = "";
+    body.innerHTML =
+      '<div class="note" style="margin-bottom:8px;line-height:1.5">Images cached here live in this dashboard\'s own folder and are referenced by a local URL, so they don\'t break if the source goes away and aren\'t re-fetched every render. Deleted with the dashboard.</div>' +
+      '<div style="display:flex;gap:6px;margin-bottom:6px">' +
+      '<input class="dinput" id="panels-asset-url" placeholder="https://…/image.png" style="flex:1;text-align:left" autocomplete="off">' +
+      '<button class="minibtn" id="panels-asset-add">Cache</button></div>' +
+      '<div style="margin-bottom:10px"><label class="minibtn" style="display:inline-block;cursor:pointer">' +
+      '<i class="ph-bold ph-upload-simple"></i> Upload…<input type="file" id="panels-asset-file" accept="image/*" hidden></label>' +
+      '<span class="note" id="panels-asset-msg" style="margin-left:8px"></span></div>' +
+      '<div id="panels-asset-list"></div>';
+    overlay.classList.add("open");
+    var listEl = $("panels-asset-list");
+    renderAssetList(listEl);
+    var msg = $("panels-asset-msg");
+    function addByUrl() {
+      var inp = $("panels-asset-url"); var url = (inp.value || "").trim();
+      if (!url) return;
+      msg.textContent = "Caching…";
+      fetch(assetUrl("assets"), {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: url }),
+      })
+        .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+        .then(function (res) {
+          if (!res.ok) { msg.textContent = (res.j && res.j.error) || "Failed"; return; }
+          msg.textContent = ""; inp.value = ""; renderAssetList(listEl);
+        })
+        .catch(function () { msg.textContent = "Failed"; });
+    }
+    $("panels-asset-add").addEventListener("click", addByUrl);
+    $("panels-asset-url").addEventListener("keydown", function (ev) { if (ev.key === "Enter") addByUrl(); });
+    $("panels-asset-file").addEventListener("change", function () {
+      var f = this.files && this.files[0]; if (!f) return;
+      msg.textContent = "Uploading…";
+      var fd = new FormData(); fd.append("file", f);
+      fetch(assetUrl("assets"), { method: "POST", body: fd })
+        .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+        .then(function (res) {
+          msg.textContent = res.ok ? "" : ((res.j && res.j.error) || "Failed");
+          if (res.ok) renderAssetList(listEl);
+        })
+        .catch(function () { msg.textContent = "Failed"; });
     });
   }
 
@@ -2895,6 +3021,8 @@
     if (touchBtn) touchBtn.addEventListener("click", toggleTouchTargets);
     var previewBtn = $("panels-preview");
     if (previewBtn) previewBtn.addEventListener("click", openPreview);
+    var assetsBtn = $("panels-assets");
+    if (assetsBtn) assetsBtn.addEventListener("click", openAssetsDrawer);
     var saveBtn = $("panels-save-btn");
     if (saveBtn) saveBtn.addEventListener("click", saveNow);
     initThemeToggle();
