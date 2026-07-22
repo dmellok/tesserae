@@ -28,7 +28,9 @@ def panel_png() -> bytes:
     return buf.getvalue()
 
 
-def _stub_renderer(tmp_path: Path, rid: str, ext: str, retain: bool) -> Renderer:
+def _stub_renderer(
+    tmp_path: Path, rid: str, ext: str, retain: bool, device: str = "pi"
+) -> Renderer:
     mod = ModuleType(f"_test.{rid}")
 
     def transform(png_bytes, *, panel, settings):
@@ -49,8 +51,8 @@ def _stub_renderer(tmp_path: Path, rid: str, ext: str, retain: bool) -> Renderer
             "orientation": "composition",
             "mime": "application/octet-stream",
             "extension": ext,
-            "topic_pattern": f"tesserae/pi/frame/{ext}",
-            "device": "pi",
+            "topic_pattern": f"tesserae/{device}/frame/{ext}",
+            "device": device,
             "retain": retain,
         },
         module=mod,
@@ -87,7 +89,7 @@ class _FakeMqttClient:
         return (0, 1)
 
 
-def _wire(tmp_path: Path, panel_png: bytes):
+def _wire(tmp_path: Path, panel_png: bytes, renderers: list[Renderer] | None = None):
     page_store = PageStore(tmp_path / "pages.json")
     page_store.save(Page(id="home", name="Home", panel=Panel(w=100, h=80), cells=[]))
     settings = SettingsStore(tmp_path / "settings.json")
@@ -103,9 +105,9 @@ def _wire(tmp_path: Path, panel_png: bytes):
     transport = MqttTransport(BrokerConfig(host="x"), client_factory=factory)
     transport.connect()
 
-    registry = RendererRegistry(
-        renderers={r.id: r for r in [_stub_renderer(tmp_path, "pi_png", "png", False)]}
-    )
+    if renderers is None:
+        renderers = [_stub_renderer(tmp_path, "pi_png", "png", False)]
+    registry = RendererRegistry(renderers={r.id: r for r in renderers})
 
     manager = PushManager(
         registry=registry,
@@ -162,6 +164,36 @@ def test_republish_reuses_stored_composition(tmp_path: Path, panel_png: bytes) -
     assert rows[0].target == "src.png"
     # The original target is preserved as the resend's target.
     assert len(client.published) == 1
+
+
+def test_republish_replays_original_device_targets(tmp_path: Path, panel_png: bytes) -> None:
+    """#119: a resend must fan out to the devices the original push hit.
+
+    An unbound fan-out skips per-device clone renderers (#83), so before
+    the fix a resend to a device served by a clone updated nothing: the
+    device's latest-render entry kept pointing at the newer frame and its
+    /frame poll answered 304 against the resent frame's differing ETag."""
+    clone = _stub_renderer(tmp_path, "pi_png__dev1", "png", False, device="dev1")
+    manager, event_log, _client, _ = _wire(tmp_path, panel_png, renderers=[clone])
+
+    first = manager.push_image(panel_png, source_label="gallery.png", device_id="dev1")
+    assert first.status == "sent"
+    other = Image.new("RGB", (100, 80), (10, 20, 30))
+    buf = io.BytesIO()
+    other.save(buf, format="PNG")
+    second = manager.push_image(buf.getvalue(), source_label="calendar.png", device_id="dev1")
+    assert second.status == "sent"
+    assert manager.latest_render_for("dev1")["composition_digest"] == second.composition_digest
+
+    resend = manager.republish(first.event_id)  # type: ignore[arg-type]
+    assert resend.status == "sent"
+    latest = manager.latest_render_for("dev1")
+    assert latest["composition_digest"] == first.composition_digest
+    # REST clients get one forced 200 so the panel repaints (v0.149.5).
+    assert latest["force_refetch"] is True
+    rows = event_log.list(type="push")
+    assert rows[0].source == "resend"
+    assert rows[0].extra["device_ids"] == ["dev1"]
 
 
 def test_republish_fails_when_thumbnail_evicted(tmp_path: Path, panel_png: bytes) -> None:

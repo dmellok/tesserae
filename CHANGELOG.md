@@ -8,6 +8,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **Resend from History never reached devices served by a per-device renderer clone (#119).** A
+  resend replayed the stored composition as an unbound fan-out, and unbound pushes deliberately skip
+  clone renderers (`<base>__<device>`, the #83 guard), so for a bound device the resend published
+  nothing: the device's latest-frame entry kept pointing at the newer frame and its REST `/frame`
+  poll answered 304 against the resent frame's differing ETag. The push history row already snapshots
+  the delivery targets, so a resend now replays those exact targets (and the matching panel dims)
+  through the fan-out.
 - **Canvas editor: HA entity filter, icon picker, and per-entity overrides were dead (#130).** The
   canvas config drawer injects a widget's options form after page load, but the canvas editor template
   is standalone and never loaded the icon-picker / entity-overrides modules, and the multi-select

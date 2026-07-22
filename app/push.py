@@ -977,6 +977,19 @@ class PushManager:
                     error="composition PNG evicted from disk",
                 )
             else:
+                # Replay the original push's delivery targets. The push
+                # row snapshots ``device_ids`` (renderer.device of every
+                # renderer that fired: instance ids for clones, topic
+                # prefixes for base kinds), so passing them back as
+                # ``device_filters`` re-fires exactly the same renderers.
+                # Without this a resend fans out unbound, which skips
+                # per-device clone renderers (#83) entirely, so the
+                # device's latest-render entry never updates and its
+                # /frame poll keeps 304-ing on the OLD frame (#119).
+                extra = record.extra if isinstance(record.extra, dict) else {}
+                device_ids = [
+                    d for d in (extra.get("device_ids") or []) if isinstance(d, str) and d
+                ]
                 # Republish is a user-initiated resend from the History
                 # page; treat it as user intent (bypass coalescing) so
                 # the user's re-send never gets silently superseded.
@@ -988,10 +1001,17 @@ class PushManager:
                     # honour the click and re-publish (v0.71.x content-
                     # checksum skip otherwise would collapse this into
                     # ``no_change`` and swallow the user's intent).
-                    result = self._push_bytes_locked(
+                    # Devices in one push row share a panel group, so the
+                    # first id resolves the group's dims (base-kind topic
+                    # prefixes miss the device lookup and fall back to the
+                    # virtual panel, same as the original unbound push).
+                    result = self._fan_out(
                         comp_path.read_bytes(),
-                        record.target,
+                        self._panel_dims_for_send(device_ids[0] if device_ids else None),
                         source="resend",
+                        target=record.target,
+                        started=time.monotonic(),
+                        device_filters=set(device_ids) if device_ids else None,
                         force_publish=True,
                         force_client_refetch=True,
                     )
