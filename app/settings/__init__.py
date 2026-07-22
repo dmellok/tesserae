@@ -50,6 +50,7 @@ def register(app: Flask) -> None:
         auth_routes,
         devices_routes,
         diagnostics_routes,
+        firmware_routes,
         index_routes,
         palette_routes,
         system_routes,

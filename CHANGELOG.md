@@ -8,6 +8,17 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **OTA rollout UI (Settings → Firmware) (#121).** A guard-railed admin page over the same per-kind
+  rollout state the CLI writes (never a parallel store). Per device kind it shows the current release
+  and its verified manifest (fw_version, key_id, sha256, size, image host), and the rollout controls:
+  import + verify a `descriptor-<kind>.json` (rejected with the verifier's reason if the signature or
+  key doesn't check out, or the kind is unknown), set a canary from the kind's OTA-capable devices,
+  promote to the whole kind (disabled until a canary reports `confirmed` on that version, with a
+  confirm dialog stating how many devices will be offered it), and pause/withdraw. A fleet view lists
+  each device's firmware version and OTA phase chip, floating `rolled_back` / `failed` to the top;
+  devices that never advertised OTA support show "USB update only". Every action is event-logged. The
+  page never fetches the image bytes; it shows the URL and the devices fetch it themselves.
+
 - **OTA state reporting is ingested server-side (#121).** A device that speaks OTA reports where it is
   in the update lifecycle on the `ota` object of its heartbeat (`phase` / `reason` / `target_fw` /
   `attempt_id` / `detail`, per the contract's State reporting section). The server now records the

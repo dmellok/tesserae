@@ -301,6 +301,14 @@ def record_status_heartbeat(
             )
     elif ota_prev is not None:
         entry["ota"] = ota_prev
+    # OTA capability: remember the advertised descriptor schema so the rollout
+    # UI can tell OTA-capable firmware from non-OTA (USB-only). Carried forward
+    # when a beat omits it, so a device stays "capable" across partial beats.
+    ota_schema = ota_report_module.advertised_schema(payload)
+    if ota_schema is not None:
+        entry["ota_schema"] = ota_schema
+    elif prev_entry.get("ota_schema") is not None:
+        entry["ota_schema"] = prev_entry["ota_schema"]
     status_cache[device.id] = entry
     # Smart sync (issue #10): record telemetry for the scheduler's
     # JIT prediction. Pulls the configured sleep_interval_s from

@@ -62,6 +62,29 @@ def parse_report(payload: bytes | str | dict[str, Any]) -> dict[str, Any] | None
     return report
 
 
+def advertised_schema(payload: bytes | str | dict[str, Any]) -> int | None:
+    """The OTA descriptor schema version a device advertises in the ``ota``
+    capability object of its heartbeat (``{"ota": {"schema": 1}}``), or None.
+
+    Distinct from :func:`parse_report`: this is the capability handshake (which
+    the server gates descriptor delivery on), telling the rollout UI a device
+    runs OTA-capable firmware at all, whether or not it has an update in flight."""
+    if isinstance(payload, (bytes, bytearray, str)):
+        try:
+            body = json.loads(payload)
+        except (ValueError, TypeError):
+            return None
+    else:
+        body = payload
+    if not isinstance(body, dict):
+        return None
+    ota = body.get("ota")
+    if not isinstance(ota, dict):
+        return None
+    schema = ota.get("schema")
+    return int(schema) if isinstance(schema, int) else None
+
+
 def report_changed(prev: dict[str, Any] | None, cur: dict[str, Any]) -> bool:
     """True when ``cur`` is a new lifecycle event vs the last stored report,
     i.e. any identity field (phase / reason / target_fw / attempt_id) differs.

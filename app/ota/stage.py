@@ -28,31 +28,16 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Any
 
 from app.state.ota_staging import OtaStagingStore
 
-from ._codec import MANIFEST_FIELDS, b64u_decode
-from .keys import default_keys_dir, load_trusted_keys
-from .verify import OtaVerificationError, verify
+from .keys import default_keys_dir
+from .service import manifest_from_descriptor, verify_descriptor
+from .verify import OtaVerificationError
 
 
 def _store(data_root: Path) -> OtaStagingStore:
     return OtaStagingStore(data_root / "core" / "ota_pending.json")
-
-
-def _manifest_from_descriptor(descriptor: dict[str, Any]) -> dict[str, Any]:
-    """Decode + shape-check the descriptor's manifest (no signature check; the
-    device verifies the signature, this is a convenience decode for staging)."""
-    if not isinstance(descriptor, dict) or "payload" not in descriptor:
-        raise ValueError("descriptor must be an object with a 'payload'")
-    manifest = json.loads(b64u_decode(str(descriptor["payload"])))
-    if not isinstance(manifest, dict):
-        raise ValueError("decoded payload is not a manifest object")
-    missing = [k for k in MANIFEST_FIELDS if k not in manifest]
-    if missing:
-        raise ValueError(f"manifest missing keys: {missing}")
-    return manifest
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -87,30 +72,28 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         descriptor = json.loads(args.descriptor.read_text(encoding="utf-8"))
-        manifest = _manifest_from_descriptor(descriptor)
-    except (OSError, ValueError, json.JSONDecodeError) as exc:
+    except (OSError, json.JSONDecodeError) as exc:
         print(f"stage error: {exc}", file=sys.stderr)
         return 2
 
     # Verify the signature against a trusted key before staging, so a corrupt or
-    # mis-signed descriptor is refused here rather than shipped to a device.
-    if not args.insecure_skip_verify:
-        keys = load_trusted_keys(args.keys_dir)
-        key_id = str(manifest["key_id"])
-        public_key = keys.get(key_id)
-        if public_key is None:
+    # mis-signed descriptor is refused here rather than shipped to a device. The
+    # same verify path backs the Firmware rollout UI (app.ota.service).
+    try:
+        if args.insecure_skip_verify:
+            manifest = manifest_from_descriptor(descriptor)
+        else:
+            manifest = verify_descriptor(descriptor, keys_dir=args.keys_dir)
+    except OtaVerificationError as exc:
+        if exc.reason == "unknown_key":
             where = args.keys_dir or default_keys_dir()
             print(
-                f"stage error: no trusted key for key_id {key_id!r} in {where}; "
-                f"publish its .pub or pass --insecure-skip-verify",
+                f"stage error: {exc} in {where}; publish its .pub or pass --insecure-skip-verify",
                 file=sys.stderr,
             )
-            return 2
-        try:
-            verify(descriptor, public_key)
-        except OtaVerificationError as exc:
+        else:
             print(f"stage error: descriptor failed verification ({exc.reason})", file=sys.stderr)
-            return 2
+        return 2
 
     entry = store.stage(
         args.device_id,
