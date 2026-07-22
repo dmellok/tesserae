@@ -95,6 +95,19 @@
         </a>
         {% endif %}
         {% endif %}
+
+        {# OTA lifecycle chip (#121): the device's last-reported update phase.
+           Hidden until a device reports OTA state. Green confirmed, red
+           failed / rolled_back, amber rejected, neutral in-progress. #}
+        {% set _ota = section.status.ota %}
+        {% if _ota %}
+        <span class="dx-status-muted">·</span>
+        <span class="dx-status-muted">OTA
+          <span class="pill {{ _ota.pill_class }}"{% if _ota.detail %} title="{{ _ota.detail }}"{% endif %}>
+            {{ _ota.phase }}{% if _ota.target_fw %} {{ _ota.target_fw if _ota.target_fw.startswith('v') else 'v' ~ _ota.target_fw }}{% endif %}{% if _ota.reason and _ota.pill_class == 'is-danger' %} ({{ _ota.reason }}){% endif %}
+          </span>
+        </span>
+        {% endif %}
       </div>
     </div>
     <button type="button" class="dx-collapse-btn" data-device-toggle

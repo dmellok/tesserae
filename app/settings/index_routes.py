@@ -1562,6 +1562,7 @@ def _status_view(device: Device) -> dict[str, Any]:
         "smart_sync_header": _smart_sync_header(smart_sync),
         "reported_panel_hint": None,
         "firmware": _firmware_view(device, {}),
+        "ota": None,
     }
     if cache is None:
         return base
@@ -1581,9 +1582,35 @@ def _status_view(device: Device) -> dict[str, Any]:
             "tiles": _status_tiles(parsed),
             "reported_panel_hint": _reported_panel_hint(device, parsed),
             "firmware": _firmware_view(device, parsed),
+            "ota": _ota_view(cache.get("ota")),
         }
     )
     return base
+
+
+# Phase → pill colour for the Devices-card OTA chip. In-progress phases fall
+# through to the neutral accent pill.
+_OTA_PILL_CLASS = {
+    "confirmed": "is-ok",
+    "failed": "is-danger",
+    "rolled_back": "is-danger",
+    "rejected": "is-warn",
+}
+
+
+def _ota_view(report: Any) -> dict[str, Any] | None:
+    """Shape the OTA-report chip for the Devices card, or None when the device
+    has reported no OTA lifecycle state (contract: "State reporting")."""
+    if not isinstance(report, dict) or not report.get("phase"):
+        return None
+    phase = str(report["phase"])
+    return {
+        "phase": phase,
+        "reason": report.get("reason"),
+        "target_fw": report.get("target_fw"),
+        "detail": report.get("detail"),
+        "pill_class": _OTA_PILL_CLASS.get(phase, "is-accent"),
+    }
 
 
 def _firmware_view(device: Device, parsed: dict[str, Any]) -> dict[str, Any]:

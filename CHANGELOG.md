@@ -6,6 +6,17 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added
+
+- **OTA state reporting is ingested server-side (#121).** A device that speaks OTA reports where it is
+  in the update lifecycle on the `ota` object of its heartbeat (`phase` / `reason` / `target_fw` /
+  `attempt_id` / `detail`, per the contract's State reporting section). The server now records the
+  latest report on the device's live status, shows it as a chip on the Devices card (green
+  `confirmed`, red `failed` / `rolled_back`, amber `rejected`, neutral in-progress), and appends an
+  event-log row on each lifecycle transition (a terminal report re-sent every heartbeat logs once). A
+  capability-only or `idle` beat leaves the last outcome standing. The report is advisory; the
+  device's own first-boot checks remain the acceptance gate.
+
 ### Fixed
 
 - **OTA release path crashed on the Docker image, and shipped no trusted keys (#121).** Two packaging

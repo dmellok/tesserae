@@ -31,6 +31,7 @@ from app.embedded_broker import EmbeddedBroker
 from app.ha_discovery import HomeAssistantDiscovery
 from app.mdns import MdnsAdvertiser
 from app.network import detect_base_url
+from app.ota import report as ota_report_module
 from app.palette_profiles import PaletteProfileStore
 from app.push import PushManager
 from app.renderer import BrowserPool
@@ -275,12 +276,32 @@ def record_status_heartbeat(
     way the initial v0.52 REST handler did."""
     parsed = device.parse_status(payload)
     received_at = time.time()
-    prev = status_cache.get(device.id, {}).get("parsed", {})
+    prev_entry = status_cache.get(device.id, {})
+    prev = prev_entry.get("parsed", {})
     merged = merge_status_parsed(prev, parsed)
-    status_cache[device.id] = {
-        "received_at": received_at,
-        "parsed": merged,
-    }
+    entry: dict[str, Any] = {"received_at": received_at, "parsed": merged}
+    # OTA state report (#121): a device speaking OTA reports where it is in the
+    # update lifecycle on the same heartbeat body. Carry the last report forward
+    # on an idle / capability-only beat (so the outcome chip persists), overwrite
+    # on a fresh non-idle one, and event-log each lifecycle transition. Dedup: a
+    # device re-sends the same terminal report every heartbeat, so report_changed
+    # logs it once. Advisory only; the device's first-boot checks are the gate.
+    ota_prev = prev_entry.get("ota")
+    ota_report = ota_report_module.parse_report(payload)
+    if ota_report is not None:
+        ota_report = {**ota_report, "received_at": received_at}
+        entry["ota"] = ota_report
+        if ota_report_module.report_changed(ota_prev, ota_report):
+            event_log.record(
+                type="device",
+                source=device.id,
+                target=event_target,
+                status="error" if ota_report_module.is_failure(ota_report) else "ok",
+                extra={"ota": ota_report},
+            )
+    elif ota_prev is not None:
+        entry["ota"] = ota_prev
+    status_cache[device.id] = entry
     # Smart sync (issue #10): record telemetry for the scheduler's
     # JIT prediction. Pulls the configured sleep_interval_s from
     # the per-device settings section as a fallback when the
