@@ -8,6 +8,14 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **OTA release path crashed on the Docker image, and shipped no trusted keys (#121).** Two packaging
+  gaps blocked the first canary. `app/ota/release.py` imported `packaging.version` at module scope,
+  but `packaging` was never declared and is absent from the slim image, so the release CLI and the
+  `/status` release-delivery path (which imports `is_newer`) both raised `ModuleNotFoundError`. The
+  version comparison now uses a small internal plain-SemVer helper (`app/semver.py`) with no
+  third-party dependency. Separately, the Dockerfile did not copy `ota/`, so `load_trusted_keys()`
+  found an empty registry at its default `ota/keys` dir; the image now includes it.
+
 - **Resend from History never reached devices served by a per-device renderer clone (#119).** A
   resend replayed the stored composition as an unbound fan-out, and unbound pushes deliberately skip
   clone renderers (`<base>__<device>`, the #83 guard), so for a bound device the resend published

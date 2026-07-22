@@ -107,12 +107,12 @@ def compare_versions(current: str | None, latest: FirmwareInfo | None) -> str:
     # can't be parsed (e.g. a "1.2.0-dev+abc" build the caller can't compare
     # against a released "1.2.0"). "unknown" is a truthful signal, not a
     # misleading "outdated" claim.
-    try:
-        from packaging.version import Version
+    from app.semver import is_strictly_newer
 
-        return "outdated" if Version(current) < Version(latest.version) else "current"
-    except Exception:
+    latest_is_newer = is_strictly_newer(latest.version, current)
+    if latest_is_newer is None:
         return "unknown"
+    return "outdated" if latest_is_newer else "current"
 
 
 def _fetch(kind: str, *, api_base: str) -> FirmwareInfo | None:

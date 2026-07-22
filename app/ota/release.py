@@ -29,8 +29,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from packaging.version import InvalidVersion, Version
-
+from app.semver import is_strictly_newer
 from app.state.ota_release import OtaReleaseStore
 
 from ._codec import MANIFEST_FIELDS, b64u_decode
@@ -43,10 +42,10 @@ def is_newer(candidate: str, current: str) -> bool:
     ``current`` (plain SemVer). If either is unparseable, fall back to a
     conservative "offer only when the strings differ" so we never suppress a
     genuine update, but also never loop on an equal version."""
-    try:
-        return Version(candidate) > Version(current)
-    except InvalidVersion:
+    newer = is_strictly_newer(candidate, current)
+    if newer is None:
         return candidate.strip() != current.strip() and bool(candidate.strip())
+    return newer
 
 
 def _store(data_root: Path) -> OtaReleaseStore:

@@ -52,6 +52,10 @@ COPY renderers/  /app/renderers/
 COPY devices/    /app/devices/
 COPY hardware/   /app/hardware/
 COPY schema/     /app/schema/
+# OTA trusted public keys (ota/keys/<key_id>.pub). load_trusted_keys()'s
+# default dir is <repo>/ota/keys, so without this the image ships no trust
+# anchor and OTA descriptor verification / staging finds an empty key set.
+COPY ota/        /app/ota/
 COPY templates/  /app/templates/
 COPY static/     /app/static/
 
