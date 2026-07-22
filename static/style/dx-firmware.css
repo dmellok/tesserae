@@ -44,6 +44,18 @@
   border-color: color-mix(in oklab, var(--t-danger, #dc2626) 45%, var(--t-border));
 }
 
+.fw-oneclick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--t-space-2) var(--t-space-3);
+  margin: 0 0 var(--t-space-3);
+}
+.fw-oneclick .cf-hint {
+  margin: 0;
+  max-width: 46ch;
+}
+
 /* -- release + manifest ------------------------------------ */
 
 .fw-release {

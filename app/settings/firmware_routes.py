@@ -13,7 +13,9 @@ from __future__ import annotations
 
 import json
 import time
+import urllib.request
 from typing import Any
+from urllib.parse import urlparse
 
 from flask import current_app, flash, redirect, render_template, request, url_for
 from werkzeug.wrappers import Response
@@ -124,22 +126,23 @@ def _latest_view(kind_id: str, rel_fw: str | None, dev_views: list[dict[str, Any
     """The latest published firmware for a kind from api.tesserae.ink, plus
     whether it's newer than what's deployed. Only called when online mode is on
     (this is the outbound check); the result is cached for an hour."""
-    info = fw_check.latest_for_kind(kind_id)
-    if info is None or not info.version:
-        return None
     # "Deployed" baseline: the imported release if any, else the newest firmware
     # version a device of this kind reports. A newer published version means a
-    # descriptor is worth importing.
+    # descriptor is worth importing. Sent as ``current`` for version telemetry.
     deployed = rel_fw or ""
     if not deployed:
         reported = [v["fw_version"] for v in dev_views if v["fw_version"]]
         for fw in reported:
             if not deployed or is_newer(str(fw), deployed):
                 deployed = str(fw)
+    info = fw_check.latest_for_kind(kind_id, current=deployed)
+    if info is None or not info.version:
+        return None
     return {
         "version": info.version,
         "url": info.url,
         "notes_headline": info.notes_headline,
+        "descriptor_url": info.descriptor_url,
         "update_available": bool(deployed) and is_newer(info.version, deployed),
     }
 
@@ -206,6 +209,39 @@ def _redirect() -> Response:
     return redirect(url_for("auth.firmware_index") + "#top")
 
 
+# Hosts a descriptor may be fetched from for one-click import (anti-SSRF). The
+# URL originates from api.tesserae.ink's update check and points at that host or
+# a GitHub release asset; verify_descriptor is still the real trust gate.
+_DESCRIPTOR_FETCH_HOSTS = {
+    "api.tesserae.ink",
+    "github.com",
+    "objects.githubusercontent.com",
+    "release-assets.githubusercontent.com",
+    "raw.githubusercontent.com",
+}
+_DESCRIPTOR_MAX_BYTES = 64 * 1024
+
+
+def _accept_descriptor(descriptor: Any, *, source: str) -> None:
+    """Verify a descriptor and set it as its kind's release. Flashes the outcome
+    (and event-logs it) for both the file upload and the one-click URL import."""
+    try:
+        manifest = verify_descriptor(descriptor)
+    except OtaVerificationError as exc:
+        flash(f"Descriptor rejected: {exc.reason} ({exc}).", "error")
+        _log(source, "(unknown)", "error", reason=exc.reason)
+        return
+    kind_id = str(manifest["device_kind"])
+    if kind_id not in _known_kind_ids():
+        flash(f"Descriptor rejected: no registered device kind {kind_id!r}.", "error")
+        _log(source, kind_id, "error", reason="unknown_kind")
+        return
+    fw_version = str(manifest["fw_version"])
+    _release_store().set_target(kind_id, descriptor, fw_version=fw_version, canary_device_ids=[])
+    _log(source, kind_id, "ok", fw_version=fw_version, key_id=str(manifest.get("key_id") or ""))
+    flash(f"Imported {kind_id} release v{fw_version}. Set a canary to begin.", "ok")
+
+
 @bp.post("/settings/firmware/import")
 def firmware_import() -> Response:
     """Verify an uploaded descriptor-<kind>.json and set it as the kind's release
@@ -219,24 +255,38 @@ def firmware_import() -> Response:
     except (ValueError, TypeError):
         flash("That file is not valid JSON.", "error")
         return _redirect()
+    _accept_descriptor(descriptor, source="import")
+    return _redirect()
 
+
+@bp.post("/settings/firmware/import-url")
+def firmware_import_url() -> Response:
+    """One-click import: fetch a descriptor from the release URL the update check
+    surfaced, then verify + set it exactly like an upload. Gated on online mode;
+    the URL host is allowlisted (anti-SSRF) and the body size is capped."""
+    if not online_enabled(settings_store()):
+        flash("Online mode is off; enable it to fetch a release descriptor.", "error")
+        return _redirect()
+    url = (request.form.get("descriptor_url") or "").strip()
+    parsed = urlparse(url)
+    if parsed.scheme != "https" or parsed.netloc.lower() not in _DESCRIPTOR_FETCH_HOSTS:
+        flash("Refusing to fetch a descriptor from an untrusted URL.", "error")
+        _log("import_url", "(unknown)", "error", reason="untrusted_host")
+        return _redirect()
     try:
-        manifest = verify_descriptor(descriptor)
-    except OtaVerificationError as exc:
-        flash(f"Descriptor rejected: {exc.reason} ({exc}).", "error")
-        _log("import", "(unknown)", "error", reason=exc.reason)
+        req = urllib.request.Request(url, headers={"User-Agent": "tesserae-firmware-import"})
+        with urllib.request.urlopen(req, timeout=8.0) as resp:
+            if resp.status != 200:
+                raise ValueError(f"HTTP {resp.status}")
+            raw = resp.read(_DESCRIPTOR_MAX_BYTES + 1)
+        if len(raw) > _DESCRIPTOR_MAX_BYTES:
+            raise ValueError("descriptor too large")
+        descriptor = json.loads(raw)
+    except Exception as exc:
+        flash(f"Could not fetch descriptor: {exc}.", "error")
+        _log("import_url", "(unknown)", "error", reason="fetch_failed")
         return _redirect()
-
-    kind_id = str(manifest["device_kind"])
-    if kind_id not in _known_kind_ids():
-        flash(f"Descriptor rejected: no registered device kind {kind_id!r}.", "error")
-        _log("import", kind_id, "error", reason="unknown_kind")
-        return _redirect()
-
-    fw_version = str(manifest["fw_version"])
-    _release_store().set_target(kind_id, descriptor, fw_version=fw_version, canary_device_ids=[])
-    _log("import", kind_id, "ok", fw_version=fw_version, key_id=str(manifest.get("key_id") or ""))
-    flash(f"Imported {kind_id} release v{fw_version}. Set a canary to begin.", "ok")
+    _accept_descriptor(descriptor, source="import_url")
     return _redirect()
 
 

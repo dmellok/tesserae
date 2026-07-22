@@ -191,7 +191,7 @@ def test_online_shows_available_badge(app: Flask, monkeypatch) -> None:  # type:
     monkeypatch.setattr(
         fwc,
         "latest_for_kind",
-        lambda kind: FirmwareInfo(
+        lambda kind, current="": FirmwareInfo(
             version="1.9.0",
             released_at="",
             url="https://example.test/r",
@@ -206,6 +206,77 @@ def test_online_shows_available_badge(app: Flask, monkeypatch) -> None:  # type:
     html = client.get("/settings/firmware").get_data(as_text=True)
     assert "Automatic update checks are off" not in html
     assert "v1.9.0 available" in html  # newer published version than the 1.4.0 device
+
+
+class _UrlResp:
+    status = 200
+
+    def __init__(self, data: bytes) -> None:
+        self._data = data
+
+    def __enter__(self) -> _UrlResp:
+        return self
+
+    def __exit__(self, *_: object) -> bool:
+        return False
+
+    def read(self, n: int = -1) -> bytes:
+        return self._data
+
+
+def test_import_url_fetches_and_imports(app: Flask, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    import urllib.request
+
+    import app.settings.firmware_routes as fr
+
+    monkeypatch.setattr(fr, "online_enabled", lambda _s: True)
+    monkeypatch.setattr(
+        urllib.request, "urlopen", lambda req, timeout=None: _UrlResp(VALID.read_bytes())
+    )
+    with app.app_context():
+        _mk_device(app, "dev_a")
+    client = _authed_client(app)
+    client.post(
+        "/settings/firmware/import-url",
+        data={"descriptor_url": "https://api.tesserae.ink/firmware/esp32_client/descriptor.json"},
+    )
+    rel = app.config["OTA_RELEASE"].get(KIND)
+    assert rel is not None
+    assert rel["fw_version"] == REL_FW
+
+
+def test_import_url_rejects_untrusted_host(app: Flask, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    import urllib.request
+
+    import app.settings.firmware_routes as fr
+
+    monkeypatch.setattr(fr, "online_enabled", lambda _s: True)
+    fetched = {"n": 0}
+
+    def _boom(*a, **k):  # must never be called for an untrusted host
+        fetched["n"] += 1
+        raise AssertionError("fetched an untrusted URL")
+
+    monkeypatch.setattr(urllib.request, "urlopen", _boom)
+    client = _authed_client(app)
+    client.post(
+        "/settings/firmware/import-url",
+        data={"descriptor_url": "https://evil.example.com/descriptor.json"},
+    )
+    assert app.config["OTA_RELEASE"].get(KIND) is None
+    assert fetched["n"] == 0
+
+
+def test_import_url_blocked_when_offline(app: Flask, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    import app.settings.firmware_routes as fr
+
+    monkeypatch.setattr(fr, "online_enabled", lambda _s: False)
+    client = _authed_client(app)
+    client.post(
+        "/settings/firmware/import-url",
+        data={"descriptor_url": "https://api.tesserae.ink/d.json"},
+    )
+    assert app.config["OTA_RELEASE"].get(KIND) is None
 
 
 def test_page_renders_with_capability_and_chip(app: Flask) -> None:

@@ -58,6 +58,14 @@
     {% endif %}
     {% endif %}
   </p>
+  {% if k.latest and k.latest.update_available and k.latest.descriptor_url %}
+  <form method="post" action="{{ url_for('auth.firmware_import_url') }}" class="fw-oneclick"
+        onsubmit="return confirm('Fetch and verify {{ fw(k.latest.version) }} for {{ k.kind_id }}, then set it as this kind\'s release?');">
+    <input type="hidden" name="descriptor_url" value="{{ k.latest.descriptor_url }}">
+    <button type="submit" class="button"><i class="ph ph-download-simple" aria-hidden="true"></i><span>Import {{ fw(k.latest.version) }} from release</span></button>
+    <span class="cf-hint">Fetches the signed descriptor and verifies it against your trust anchor before setting the release. Devices fetch the image themselves.</span>
+  </form>
+  {% endif %}
 
   {# Release + manifest #}
   {% if k.release %}

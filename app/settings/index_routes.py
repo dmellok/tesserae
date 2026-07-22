@@ -1640,7 +1640,7 @@ def _firmware_view(device: Device, parsed: dict[str, Any]) -> dict[str, Any]:
     current_str = str(current) if isinstance(current, (str, int, float)) else None
     latest = None
     if _firmware_check_enabled():
-        latest = firmware_check_module.latest_for_kind(kind_id)
+        latest = firmware_check_module.latest_for_kind(kind_id, current=current_str or "")
     state = firmware_check_module.compare_versions(current_str, latest)
     return {
         "current": current_str,

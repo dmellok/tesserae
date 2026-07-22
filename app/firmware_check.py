@@ -56,6 +56,9 @@ class FirmwareInfo:
     url: str
     notes_headline: str
     assets: tuple[dict[str, Any], ...]
+    # The release's descriptor-<kind>.json asset URL, for one-click import on
+    # the Firmware page. Empty when the endpoint didn't supply one.
+    descriptor_url: str = ""
 
 
 # Kind -> (fetched_at_epoch, FirmwareInfo | None). A ``None`` entry means we
@@ -64,18 +67,25 @@ class FirmwareInfo:
 _cache: dict[str, tuple[float, FirmwareInfo | None]] = {}
 
 
-def latest_for_kind(kind: str, *, api_base: str = _DEFAULT_API_BASE) -> FirmwareInfo | None:
+def latest_for_kind(
+    kind: str, *, api_base: str = _DEFAULT_API_BASE, current: str = ""
+) -> FirmwareInfo | None:
     """Return the latest known firmware info for ``kind`` (or ``None``).
 
     Consults the in-memory cache first; hits api.tesserae.ink on a miss
     or after TTL expiry. Never raises: any failure returns ``None`` and
     the caller renders a "current" chip without an update indicator.
+
+    ``current`` is a firmware version a device of this kind reports; it's sent
+    as ``?current=`` on the outbound request so api.tesserae.ink can aggregate
+    version distribution. It never changes the response, so it's only sent on a
+    cache-miss fetch, not on a cached hit.
     """
     now = time.time()
     hit = _cache.get(kind)
     if hit is not None and (now - hit[0]) < _CACHE_TTL_SECONDS:
         return hit[1]
-    info = _fetch(kind, api_base=api_base)
+    info = _fetch(kind, api_base=api_base, current=current)
     _cache[kind] = (now, info)
     return info
 
@@ -115,8 +125,10 @@ def compare_versions(current: str | None, latest: FirmwareInfo | None) -> str:
     return "outdated" if latest_is_newer else "current"
 
 
-def _fetch(kind: str, *, api_base: str) -> FirmwareInfo | None:
+def _fetch(kind: str, *, api_base: str, current: str = "") -> FirmwareInfo | None:
     url = f"{api_base.rstrip('/')}/firmware/{urllib.parse.quote(kind)}/latest"
+    if current:
+        url += f"?current={urllib.parse.quote(current)}"
     req = urllib.request.Request(url, headers={"User-Agent": "tesserae-firmware-check"})
     try:
         with urllib.request.urlopen(req, timeout=_HTTP_TIMEOUT_SECONDS) as resp:
@@ -145,4 +157,5 @@ def _fetch(kind: str, *, api_base: str) -> FirmwareInfo | None:
         url=str(latest.get("url") or ""),
         notes_headline=str(latest.get("notes_headline") or ""),
         assets=tuple(latest.get("assets") or ()),
+        descriptor_url=str(latest.get("descriptor_url") or ""),
     )

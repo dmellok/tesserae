@@ -59,6 +59,26 @@ def test_latest_for_kind_returns_parsed_info(monkeypatch: pytest.MonkeyPatch) ->
     assert len(info.assets) == 1
 
 
+def test_current_version_sent_as_query_param() -> None:
+    seen: dict[str, str] = {}
+
+    def _capture(req: Any, timeout: float | None = None):  # type: ignore[no-untyped-def]
+        seen["url"] = req.full_url
+        return _mock_response({"latest": {"version": "1.6.0"}})
+
+    with patch("urllib.request.urlopen", side_effect=_capture):
+        firmware_check.latest_for_kind("esp32_client", current="1.4.0")
+    assert "?current=1.4.0" in seen["url"]
+
+
+def test_descriptor_url_parsed() -> None:
+    payload = {"latest": {"version": "1.6.0", "descriptor_url": "https://api.tesserae.ink/d.json"}}
+    with patch("urllib.request.urlopen", return_value=_mock_response(payload)):
+        info = firmware_check.latest_for_kind("esp32_client")
+    assert info is not None
+    assert info.descriptor_url == "https://api.tesserae.ink/d.json"
+
+
 def test_second_call_serves_from_cache(monkeypatch: pytest.MonkeyPatch) -> None:
     payload = {"latest": {"version": "1.0.0", "released_at": "", "url": "", "notes_headline": ""}}
     with patch("urllib.request.urlopen", return_value=_mock_response(payload)) as mocked:
