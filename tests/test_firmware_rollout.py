@@ -163,6 +163,51 @@ def test_pause_withdraws_offer(app: Flask) -> None:
     assert app.config["OTA_RELEASE"].get(KIND)["state"] == "paused"
 
 
+def test_offline_shows_disclosure_and_skips_check(app: Flask, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    import app.firmware_check as fwc
+    import app.settings.firmware_routes as fr
+
+    monkeypatch.setattr(fr, "online_enabled", lambda _s: False)
+
+    def _boom(*a, **k):  # the outbound check must not run when online is off
+        raise AssertionError("api.tesserae.ink was contacted while offline")
+
+    monkeypatch.setattr(fwc, "latest_for_kind", _boom)
+    with app.app_context():
+        _mk_device(app, "dev_a")
+    _set_status(app, "dev_a", fw="1.4.0")
+    client = _authed_client(app)
+    html = client.get("/settings/firmware").get_data(as_text=True)
+    assert "Automatic update checks are off" in html
+    assert "api.tesserae.ink" in html  # the disclosure names what would be pinged
+
+
+def test_online_shows_available_badge(app: Flask, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    import app.firmware_check as fwc
+    import app.settings.firmware_routes as fr
+    from app.firmware_check import FirmwareInfo
+
+    monkeypatch.setattr(fr, "online_enabled", lambda _s: True)
+    monkeypatch.setattr(
+        fwc,
+        "latest_for_kind",
+        lambda kind: FirmwareInfo(
+            version="1.9.0",
+            released_at="",
+            url="https://example.test/r",
+            notes_headline="",
+            assets=(),
+        ),
+    )
+    with app.app_context():
+        _mk_device(app, "dev_a")
+    _set_status(app, "dev_a", fw="1.4.0")
+    client = _authed_client(app)
+    html = client.get("/settings/firmware").get_data(as_text=True)
+    assert "Automatic update checks are off" not in html
+    assert "v1.9.0 available" in html  # newer published version than the 1.4.0 device
+
+
 def test_page_renders_with_capability_and_chip(app: Flask) -> None:
     with app.app_context():
         _mk_device(app, "dev_a")

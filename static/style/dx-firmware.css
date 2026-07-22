@@ -14,6 +14,32 @@
   gap: var(--t-space-3);
 }
 
+/* -- online-mode disclosure -------------------------------- */
+
+.fw-offline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--t-space-3);
+  border-style: dashed;
+}
+.fw-offline__msg {
+  display: flex;
+  gap: var(--t-space-2);
+  align-items: flex-start;
+  margin: 0;
+  max-width: 68ch;
+  color: var(--t-fg-soft);
+  font-size: var(--t-size-sm);
+  line-height: 1.5;
+}
+.fw-offline__msg .ph {
+  margin-top: 2px;
+  color: var(--t-warn);
+  flex: none;
+}
+
 .fw-kind--attention {
   border-color: color-mix(in oklab, var(--t-danger, #dc2626) 45%, var(--t-border));
 }

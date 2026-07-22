@@ -18,12 +18,22 @@ from typing import Any
 from flask import current_app, flash, redirect, render_template, request, url_for
 from werkzeug.wrappers import Response
 
+from app import firmware_check as fw_check
+from app.online import online_enabled
 from app.ota.release import is_newer
 from app.ota.service import manifest_summary, verify_descriptor
 from app.ota.verify import OtaVerificationError
 from app.settings.index_routes import _OTA_PILL_CLASS
 
-from ._shared import bp, device_kinds, device_status, devices, events, format_relative
+from ._shared import (
+    bp,
+    device_kinds,
+    device_status,
+    devices,
+    events,
+    format_relative,
+    settings_store,
+)
 
 
 def _release_store() -> Any:
@@ -110,7 +120,31 @@ def _release_view(rel: dict[str, Any] | None) -> dict[str, Any] | None:
     }
 
 
-def _kinds_model() -> list[dict[str, Any]]:
+def _latest_view(kind_id: str, rel_fw: str | None, dev_views: list[dict[str, Any]]) -> Any:
+    """The latest published firmware for a kind from api.tesserae.ink, plus
+    whether it's newer than what's deployed. Only called when online mode is on
+    (this is the outbound check); the result is cached for an hour."""
+    info = fw_check.latest_for_kind(kind_id)
+    if info is None or not info.version:
+        return None
+    # "Deployed" baseline: the imported release if any, else the newest firmware
+    # version a device of this kind reports. A newer published version means a
+    # descriptor is worth importing.
+    deployed = rel_fw or ""
+    if not deployed:
+        reported = [v["fw_version"] for v in dev_views if v["fw_version"]]
+        for fw in reported:
+            if not deployed or is_newer(str(fw), deployed):
+                deployed = str(fw)
+    return {
+        "version": info.version,
+        "url": info.url,
+        "notes_headline": info.notes_headline,
+        "update_available": bool(deployed) and is_newer(info.version, deployed),
+    }
+
+
+def _kinds_model(*, online: bool) -> list[dict[str, Any]]:
     reg = devices()
     releases = _release_store().all()
     names = _kind_names()
@@ -146,6 +180,7 @@ def _kinds_model() -> list[dict[str, Any]]:
                 "kind_id": kind_id,
                 "kind_name": names.get(kind_id, kind_id),
                 "release": _release_view(rel),
+                "latest": _latest_view(kind_id, rel_fw, dev_views) if online else None,
                 "devices": dev_views,
                 "capable_devices": [v for v in dev_views if v["capable"]],
                 "has_attention": any(v["needs_attention"] for v in dev_views),
@@ -159,7 +194,12 @@ def _kinds_model() -> list[dict[str, Any]]:
 
 @bp.get("/settings/firmware")
 def firmware_index() -> str:
-    return render_template("settings_firmware.html", kinds=_kinds_model())
+    online = online_enabled(settings_store())
+    return render_template(
+        "settings_firmware.html",
+        kinds=_kinds_model(online=online),
+        online_enabled=online,
+    )
 
 
 def _redirect() -> Response:
@@ -241,7 +281,9 @@ def firmware_promote() -> Response:
     """Promote the release to every device of the kind, gated on a confirmed
     canary. The gate is re-checked here, never trusted from the client."""
     kind_id = (request.form.get("kind_id") or "").strip()
-    model = next((k for k in _kinds_model() if k["kind_id"] == kind_id), None)
+    # online=False: the promote gate (confirmed canary) is local; no need for the
+    # outbound availability check on a POST.
+    model = next((k for k in _kinds_model(online=False) if k["kind_id"] == kind_id), None)
     if model is None or model["release"] is None:
         flash("No release set for that kind.", "error")
         return _redirect()

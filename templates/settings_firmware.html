@@ -17,6 +17,22 @@
 
 {{ settings_tabs('firmware') }}
 
+{# ---- Online-mode disclosure --------------------------------------------- #}
+{% if not online_enabled %}
+<section class="card fw-offline">
+  <p class="fw-offline__msg">
+    <i class="ph ph-wifi-slash" aria-hidden="true"></i>
+    <span><strong>Automatic update checks are off.</strong> With online mode on, Tesserae asks
+    <code>api.tesserae.ink</code> whether newer firmware exists for your device kinds, sending the
+    kind ids and the firmware versions your devices report, and shows an "available" badge here.
+    Everything else on this page (import, canary, promote) works offline; only this check reaches out.</span>
+  </p>
+  <a class="button ghost" href="{{ url_for('auth.settings_area', area='system') }}">
+    <i class="ph ph-gear" aria-hidden="true"></i><span>Turn on under System &rarr; Online features</span>
+  </a>
+</section>
+{% endif %}
+
 {# ---- Import ------------------------------------------------------------- #}
 <section class="card">
   {{ card_head('Import a release descriptor', icon_name='upload-simple', level=2,
@@ -31,7 +47,17 @@
 {% for k in kinds %}
 <section class="card fw-kind{% if k.has_attention %} fw-kind--attention{% endif %}" id="kind-{{ k.kind_id }}">
   {{ card_head(k.kind_name, icon_name='device-tablet', level=2) }}
-  <p class="cf-hint"><code>{{ k.kind_id }}</code></p>
+  <p class="cf-hint">
+    <code>{{ k.kind_id }}</code>
+    {% if k.latest %}
+    {% if k.latest.update_available %}
+    <a class="pill is-warn" href="{{ k.latest.url }}" target="_blank" rel="noopener"
+       title="{{ k.latest.notes_headline or ('Latest published: ' ~ fw(k.latest.version)) }}">{{ fw(k.latest.version) }} available</a>
+    {% else %}
+    <span class="dx-status-muted">latest published {{ fw(k.latest.version) }}</span>
+    {% endif %}
+    {% endif %}
+  </p>
 
   {# Release + manifest #}
   {% if k.release %}

@@ -18,6 +18,11 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   each device's firmware version and OTA phase chip, floating `rolled_back` / `failed` to the top;
   devices that never advertised OTA support show "USB update only". Every action is event-logged. The
   page never fetches the image bytes; it shows the URL and the devices fetch it themselves.
+  When online mode is on, each kind also shows whether a newer firmware has been published
+  (api.tesserae.ink's per-kind update check, cached hourly) with an "available" badge linking to the
+  release. When online mode is off the check never runs and the page discloses that turning it on
+  pings api.tesserae.ink with the kind ids and reported firmware versions; rollout itself stays fully
+  offline.
 
 - **OTA state reporting is ingested server-side (#121).** A device that speaks OTA reports where it is
   in the update lifecycle on the `ota` object of its heartbeat (`phase` / `reason` / `target_fw` /
