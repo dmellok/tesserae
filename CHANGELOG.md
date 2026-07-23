@@ -8,6 +8,18 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Overlay value slots + glyph atlases (hybrid render mode, schema 1 slice 2).** Widgets can mark
+  an element `data-overlay-key="ha:<entity_id>"` (optional `data-overlay-suffix`) and capable touch
+  firmware repaints just that slot with live values during a wake, no full re-render. The slot's
+  box, alignment, font size, and weight are extracted in the same Playwright pass as touch regions
+  (sidecar v3); glyph atlases are rasterized through the same browser + Inter faces as the
+  composition so blitted text is pixel-identical, packed 4bpp to the firmware's strip contract, and
+  served content-addressed at `/frame/overlay/atlas/<digest>`. Live values come from
+  `GET /frame/data?digest=` (pre-formatted strings via the ha_core plugin) and piggyback as
+  `overlay_values` on `/status` responses for capability-advertising devices. Firmware caps
+  honoured server-side (8 slots, 2 atlases by largest group, 32 glyphs, 47-char values); every
+  failure path degrades the spec to rect-only. Contract updated in docs/dev/client-protocol.md.
+
 - **Overlay specs for touch boards (hybrid render mode, schema 1).** Firmware with fast partial
   refresh (reTerminal E1003 first) advertises `overlay: {schema: 1}` and fetches
   `GET /api/v1/device/<id>/frame/overlay/<digest>`: a rect-only draw list of tap-echo targets

@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import logging
+from pathlib import Path
 from typing import Any
 
 from app.panel import is_flipped_orientation
@@ -32,6 +33,17 @@ logger = logging.getLogger(__name__)
 # must stay within them; anything past the cap is dropped with a log
 # line (no silent truncation).
 MAX_TARGETS = 8
+MAX_SLOTS = 8
+MAX_ATLASES = 2
+MAX_GLYPHS = 32
+MAX_VALUE_CHARS = 47
+
+# Every glyph a slice-2 atlas carries. Sized for numeric sensor values:
+# digits, separators, sign, percent, degree, and the two temperature
+# letters. 19 glyphs, comfortably under the 32-glyph firmware cap. A
+# value character outside this set renders as a mean-width blank on the
+# device (firmware fallback), so values should stay numeric-ish.
+ATLAS_CHARSET = "0123456789.,:-+%°CF "
 
 
 def advertised_overlay(payload: bytes | str | dict[str, Any]) -> dict[str, int] | None:
@@ -160,38 +172,48 @@ def _panel_geometry(panel: dict[str, Any]) -> dict[str, Any] | None:
     }
 
 
+def _rect_from(entry: dict[str, Any], geo: dict[str, Any]) -> tuple[int, int, int, int] | None:
+    try:
+        rect = (float(entry["x"]), float(entry["y"]), float(entry["w"]), float(entry["h"]))
+    except (KeyError, TypeError, ValueError):
+        return None
+    return rect_to_wire(
+        rect,
+        comp_w=geo["comp_w"],
+        comp_h=geo["comp_h"],
+        native_w=geo["native_w"],
+        native_h=geo["native_h"],
+        flip=geo["flip"],
+        underscan=geo["underscan"],
+    )
+
+
 def build_spec(
     *,
     frame_digest: str,
     regions: list[dict[str, Any]],
     panel: dict[str, Any],
+    slots: list[dict[str, Any]] | None = None,
+    atlas_provider: Any | None = None,
 ) -> dict[str, Any] | None:
-    """The schema-1 overlay spec for one frame: rect-only (tap-echo
-    targets from the touch-region sidecar), wire-space coordinates.
-    None when the panel block can't provide the transform inputs."""
+    """The schema-1 overlay spec for one frame, wire-space coordinates:
+    tap-echo targets from the touch-region sidecar, plus (when the
+    sidecar carries value slots and an ``atlas_provider`` is supplied)
+    ``slots`` + ``atlases`` for live value text.
+
+    ``atlas_provider(px, weight)`` returns an atlas dict
+    ``{id, digest, url, format, height, glyphs}`` or None on failure; a
+    failed atlas drops its slots (the spec degrades to rect-only rather
+    than erroring). Slots group by (px, weight); the firmware carries at
+    most MAX_ATLASES groups, so the largest groups win and the rest are
+    dropped with a log line. None when the panel block can't provide the
+    transform inputs."""
     geo = _panel_geometry(panel)
     if geo is None:
         return None
     targets: list[dict[str, Any]] = []
     for i, region in enumerate(regions):
-        try:
-            rect = (
-                float(region["x"]),
-                float(region["y"]),
-                float(region["w"]),
-                float(region["h"]),
-            )
-        except (KeyError, TypeError, ValueError):
-            continue
-        wire = rect_to_wire(
-            rect,
-            comp_w=geo["comp_w"],
-            comp_h=geo["comp_h"],
-            native_w=geo["native_w"],
-            native_h=geo["native_h"],
-            flip=geo["flip"],
-            underscan=geo["underscan"],
-        )
+        wire = _rect_from(region, geo)
         if wire is None:
             continue
         if len(targets) >= MAX_TARGETS:
@@ -212,4 +234,241 @@ def build_spec(
                 "echo": "invert",
             }
         )
-    return {"schema": 1, "frame_digest": frame_digest, "targets": targets}
+
+    spec: dict[str, Any] = {"schema": 1, "frame_digest": frame_digest, "targets": targets}
+
+    usable = [s for s in (slots or []) if isinstance(s, dict)]
+    if usable and atlas_provider is not None:
+        # Group by the (px, weight) pair that defines an atlas; largest
+        # groups win the MAX_ATLASES budget.
+        groups: dict[tuple[int, int], list[dict[str, Any]]] = {}
+        for s in usable:
+            try:
+                groups.setdefault((int(s["px"]), int(s["weight"])), []).append(s)
+            except (KeyError, TypeError, ValueError):
+                continue
+        ranked = sorted(groups.items(), key=lambda kv: (-len(kv[1]), kv[0]))
+        if len(ranked) > MAX_ATLASES:
+            dropped = sum(len(v) for _k, v in ranked[MAX_ATLASES:])
+            logger.info(
+                "overlay spec: dropping %d slot(s) beyond %d atlas groups for frame %s",
+                dropped,
+                MAX_ATLASES,
+                frame_digest,
+            )
+        out_slots: list[dict[str, Any]] = []
+        out_atlases: list[dict[str, Any]] = []
+        for idx, ((px, weight), members) in enumerate(ranked[:MAX_ATLASES]):
+            atlas = atlas_provider(px, weight)
+            if atlas is None:
+                logger.warning(
+                    "overlay spec: atlas build failed px=%d weight=%d; dropping %d slot(s)",
+                    px,
+                    weight,
+                    len(members),
+                )
+                continue
+            atlas_id = f"a{idx + 1}"
+            out_atlases.append({**atlas, "id": atlas_id})
+            for s in members:
+                if len(out_slots) >= MAX_SLOTS:
+                    logger.info(
+                        "overlay spec: dropping slots past firmware cap %d for frame %s",
+                        MAX_SLOTS,
+                        frame_digest,
+                    )
+                    break
+                wire = _rect_from(s, geo)
+                if wire is None:
+                    continue
+                out_slots.append(
+                    {
+                        "id": f"s{len(out_slots) + 1}",
+                        "x": wire[0],
+                        "y": wire[1],
+                        "w": wire[2],
+                        "h": wire[3],
+                        "key": str(s.get("key") or ""),
+                        "align": str(s.get("align") or "left"),
+                        "atlas": atlas_id,
+                    }
+                )
+        if out_slots:
+            spec["slots"] = out_slots
+            spec["atlases"] = out_atlases
+    return spec
+
+
+# -- glyph atlases ---------------------------------------------------------
+
+
+def pack_atlas_strip(
+    glyphs: list[tuple[str, Any]],
+) -> tuple[bytes, dict[str, dict[str, int]], int, int]:
+    """Pack per-glyph grayscale PIL images (equal heights) into one
+    horizontal 4bpp-gray strip: ``(bin_bytes, glyph_table, strip_w,
+    height)``. Firmware contract: rows packed at exactly
+    max(glyph.x + glyph.w) pixels, 2 px/byte, high nibble = left pixel,
+    0x0 black / 0xF white, so the strip width is forced even by
+    widening the final glyph's declared width when needed."""
+    import numpy as np
+
+    if not glyphs:
+        raise ValueError("no glyphs to pack")
+    height = glyphs[0][1].height
+    widths = [img.width for _ch, img in glyphs]
+    strip_w = sum(widths)
+    pad = strip_w % 2
+    strip_w += pad
+
+    arr = np.full((height, strip_w), 255, dtype=np.uint8)
+    table: dict[str, dict[str, int]] = {}
+    x = 0
+    for i, (ch, img) in enumerate(glyphs):
+        if img.height != height:
+            raise ValueError("glyph heights differ")
+        w = img.width
+        arr[:, x : x + w] = np.asarray(img.convert("L"), dtype=np.uint8)
+        declared_w = w + (pad if i == len(glyphs) - 1 else 0)
+        table[ch] = {"x": x, "w": declared_w}
+        x += w
+
+    nibbles = np.clip(np.rint(arr.astype(np.float32) / 17.0), 0, 15).astype(np.uint8)
+    packed = ((nibbles[:, 0::2] << 4) | nibbles[:, 1::2]).astype(np.uint8).tobytes()
+    return packed, table, strip_w, height
+
+
+def build_atlas(
+    px: int,
+    weight: int,
+    *,
+    renders_dir: Path,
+    rasterize: Any,
+    charset: str = ATLAS_CHARSET,
+) -> dict[str, Any] | None:
+    """Build (or reuse) the glyph atlas for one (px, weight) pair:
+    ``{digest, format, height, glyphs}``, with the strip bytes persisted
+    as ``overlay-atlas-<digest>.bin`` in the renders dir.
+
+    ``rasterize(px, weight, charset)`` returns ``(png_bytes, boxes)``
+    where boxes are ``[{ch, x, y, w, h}]`` page-space glyph boxes; the
+    default implementation captures the ``/compose/_overlay_atlas``
+    strip through the same browser + fonts as compositions. Cached per
+    (px, weight, charset) in a meta sidecar; None on any failure (the
+    spec then degrades to rect-only)."""
+    import io
+
+    from PIL import Image
+
+    meta_path = renders_dir / f"overlay-atlas-{px}-{weight}.json"
+    try:
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        if (
+            isinstance(meta, dict)
+            and meta.get("charset") == charset
+            and (renders_dir / f"overlay-atlas-{meta.get('digest')}.bin").is_file()
+        ):
+            return {k: meta[k] for k in ("digest", "format", "height", "glyphs")}
+    except (OSError, json.JSONDecodeError, KeyError):
+        pass
+
+    try:
+        png_bytes, boxes = rasterize(px, weight, charset)
+        img = Image.open(io.BytesIO(png_bytes)).convert("L")
+        by_ch = {b["ch"]: b for b in boxes if isinstance(b, dict) and b.get("w", 0) > 0}
+        drawn = [by_ch[ch] for ch in charset if ch in by_ch]
+        if not drawn:
+            return None
+        top = max(0, min(int(b["y"]) for b in drawn))
+        bottom = min(img.height, max(int(b["y"]) + int(b["h"]) for b in drawn))
+        if bottom - top <= 0:
+            return None
+        glyph_imgs: list[tuple[str, Any]] = []
+        for ch in charset:
+            box = by_ch.get(ch)
+            if box is None:
+                # Undrawn glyph (a bare space collapses in some engines):
+                # synthesize a blank at a third of the font size.
+                blank = Image.new("L", (max(2, px // 3), bottom - top), 255)
+                glyph_imgs.append((ch, blank))
+                continue
+            x0 = max(0, int(box["x"]))
+            glyph_imgs.append((ch, img.crop((x0, top, x0 + int(box["w"]), bottom))))
+        packed, table, _strip_w, height = pack_atlas_strip(glyph_imgs)
+        import hashlib as _hashlib
+
+        digest = _hashlib.sha256(packed).hexdigest()[:16]
+        (renders_dir / f"overlay-atlas-{digest}.bin").write_bytes(packed)
+        atlas = {"digest": digest, "format": "4bpp-gray", "height": height, "glyphs": table}
+        meta_path.write_text(json.dumps({**atlas, "charset": charset}), encoding="utf-8")
+        return atlas
+    except Exception:
+        logger.exception("overlay atlas build failed px=%d weight=%d", px, weight)
+        return None
+
+
+def browser_rasterizer(base_url: str, timezone_id: str | None = None) -> Any:
+    """The default atlas rasterizer: captures the loopback
+    ``/compose/_overlay_atlas`` strip. Returned as a callable so tests
+    (and the REST endpoint) can inject alternatives."""
+
+    def rasterize(px: int, weight: int, charset: str) -> tuple[bytes, list[dict[str, Any]]]:
+        from urllib.parse import quote
+
+        from app.renderer import CaptureRequest, RenderRequest, capture_composed, to_loopback_url
+
+        url = to_loopback_url(
+            f"{base_url.rstrip('/')}/compose/_overlay_atlas"
+            f"?px={px}&weight={weight}&chars={quote(charset)}"
+        )
+        png, boxes = capture_composed(
+            CaptureRequest(
+                render=RenderRequest(
+                    url=url,
+                    viewport_w=min(4000, px * len(charset) * 2 + 64),
+                    viewport_h=px * 2 + 32,
+                    timezone_id=timezone_id,
+                ),
+                script=(
+                    "() => Array.from(document.querySelectorAll('#strip span')).map(el => {"
+                    "  const r = el.getBoundingClientRect();"
+                    "  return {ch: el.getAttribute('data-ch'), x: Math.floor(r.x),"
+                    "          y: Math.floor(r.y), w: Math.ceil(r.width), h: Math.ceil(r.height)};"
+                    "})"
+                ),
+            ),
+        )
+        return png, boxes if isinstance(boxes, list) else []
+
+    return rasterize
+
+
+def values_document(
+    slots: list[dict[str, Any]],
+    *,
+    ha_get_state: Any,
+    now: float,
+) -> dict[str, Any]:
+    """The values document for a frame's slots: pre-formatted display
+    strings keyed by slot key, plus a seq the firmware uses for
+    newest-wins dedup. Slice-2 grammar: ``ha:<entity_id>`` resolves to
+    the entity's state string plus the slot's declared suffix. A failed
+    or unknown entity yields no key (the firmware keeps showing the
+    baked-in render). Strings clip to the firmware's 47-char cap."""
+    values: dict[str, str] = {}
+    for slot in slots:
+        key = slot.get("key")
+        if not isinstance(key, str) or not key.startswith("ha:") or key in values:
+            continue
+        entity_id = key[3:]
+        try:
+            state = ha_get_state(entity_id)
+        except Exception:
+            logger.debug("overlay values: state fetch failed for %s", entity_id, exc_info=True)
+            continue
+        raw = state.get("state") if isinstance(state, dict) else None
+        if not isinstance(raw, str) or raw in ("unknown", "unavailable"):
+            continue
+        suffix = str(slot.get("suffix") or "")
+        values[key] = (raw + suffix)[:MAX_VALUE_CHARS]
+    return {"seq": int(now), "values": values}

@@ -56,7 +56,9 @@ TAP_RADIUS_PX: Final[int] = 30
 
 # Sidecar schema version, bumped if the record shape ever changes.
 # v2 added ``origin`` + ``dangling`` (phase 2: provenance gate + @name refs).
-_SIDECAR_VERSION: Final[int] = 2
+# v3 added the optional ``slots`` list (overlay value slots, hybrid render
+# mode); readers of ``regions`` are unaffected.
+_SIDECAR_VERSION: Final[int] = 3
 
 # Actions with real-world side effects. Dispatched from a touch region
 # only when the region's action came from validated config (an editor /
@@ -308,6 +310,107 @@ def _swipe_attr_present_but_unusable(value: Any) -> bool:
     return isinstance(parsed, dict) and bool(parsed) and _parse_swipe_attr(value) is None
 
 
+# -- overlay slot extraction (hybrid render mode, schema 1 slice 2) --------
+
+# Combined extraction: the touch-region walk plus a second pass that
+# collects overlay value slots (``data-overlay-key`` nodes). Composed by
+# string interpolation so the regions walker stays byte-identical; the
+# slots walker pierces shadow roots the same way but deliberately skips
+# code-element iframes (a live value slot inside sandboxed script markup
+# is out of scope for slice 2).
+EXTRACT_INTERACTIVE_JS: Final[str] = (
+    """async () => {
+    const regions = await ("""
+    + EXTRACT_REGIONS_JS
+    + """)();
+    const slots = [];
+    const walk = (root) => {
+        for (const el of root.querySelectorAll('[data-overlay-key]')) {
+            const rect = el.getBoundingClientRect();
+            if (rect.width <= 0 || rect.height <= 0) continue;
+            const cs = getComputedStyle(el);
+            slots.push({
+                x: Math.round(rect.x),
+                y: Math.round(rect.y),
+                w: Math.round(rect.width),
+                h: Math.round(rect.height),
+                key: el.getAttribute('data-overlay-key') || '',
+                suffix: el.getAttribute('data-overlay-suffix') || '',
+                align: cs.textAlign,
+                px: Math.round(parseFloat(cs.fontSize) || 0),
+                weight: parseInt(cs.fontWeight, 10) || 400,
+            });
+        }
+        for (const el of root.querySelectorAll('*')) {
+            if (el.shadowRoot) walk(el.shadowRoot);
+        }
+    };
+    walk(document);
+    return {regions: regions, slots: slots};
+}"""
+)
+
+
+def split_capture_result(raw: Any) -> tuple[Any, Any]:
+    """``(raw_regions, raw_slots)`` from a capture script result.
+
+    Tolerates both shapes: the combined ``EXTRACT_INTERACTIVE_JS`` dict
+    and the legacy bare regions list (older prewarmed entries, or a
+    script failure that degraded to None)."""
+    if isinstance(raw, dict):
+        return raw.get("regions"), raw.get("slots")
+    return raw, None
+
+
+_SLOT_ALIGNS: Final[frozenset[str]] = frozenset({"left", "center", "right"})
+
+
+def normalize_slots(raw: Any) -> list[dict[str, Any]]:
+    """Validate + coerce extracted overlay slots into sidecar records.
+
+    Slice-2 grammar: ``key`` must be ``ha:<entity_id>``. Weight buckets
+    to 400/700 (the two Inter faces the atlas rasterizer ships), align
+    collapses to left/center/right, font size clamps to a sane range.
+    Malformed entries are dropped."""
+    if not isinstance(raw, list):
+        return []
+    out: list[dict[str, Any]] = []
+    for entry in raw:
+        if not isinstance(entry, dict):
+            continue
+        try:
+            x, y = int(entry["x"]), int(entry["y"])
+            w, h = int(entry["w"]), int(entry["h"])
+            px = int(entry.get("px") or 0)
+        except (KeyError, TypeError, ValueError):
+            continue
+        key = entry.get("key")
+        if not isinstance(key, str) or not key.startswith("ha:") or len(key) <= 3:
+            continue
+        if w <= 0 or h <= 0 or not (8 <= px <= 200):
+            continue
+        suffix = entry.get("suffix")
+        align = entry.get("align")
+        try:
+            weight = int(entry.get("weight") or 400)
+        except (TypeError, ValueError):
+            weight = 400
+        out.append(
+            {
+                "x": x,
+                "y": y,
+                "w": w,
+                "h": h,
+                "key": key,
+                "suffix": suffix[:8] if isinstance(suffix, str) else "",
+                "align": align if align in _SLOT_ALIGNS else "left",
+                "px": px,
+                "weight": 700 if weight >= 600 else 400,
+            }
+        )
+    return out
+
+
 # -- sidecar persistence -------------------------------------------------
 
 
@@ -315,22 +418,43 @@ def regions_sidecar_path(renders_dir: Path, comp_digest: str) -> Path:
     return renders_dir / f"{comp_digest}.regions.json"
 
 
-def save_regions(renders_dir: Path, comp_digest: str, regions: list[dict[str, Any]]) -> None:
+def save_regions(
+    renders_dir: Path,
+    comp_digest: str,
+    regions: list[dict[str, Any]],
+    *,
+    slots: list[dict[str, Any]] | None = None,
+) -> None:
     """Write (or rewrite) the region map for a composition digest.
 
     Always overwrites: the digest is content-addressed on *pixels*, and
     two renders with identical pixels can differ in touch annotations
     (e.g. the user removed a cell's action), so the latest render's map
-    must win. Best-effort: a failed write only costs interactivity on
-    that frame, never the push."""
+    must win. ``slots`` (overlay value slots, v3) share the sidecar so
+    both maps are measured against the same DOM. Best-effort: a failed
+    write only costs interactivity on that frame, never the push."""
     try:
         path = regions_sidecar_path(renders_dir, comp_digest)
-        path.write_text(
-            json.dumps({"v": _SIDECAR_VERSION, "regions": regions}),
-            encoding="utf-8",
-        )
+        payload: dict[str, Any] = {"v": _SIDECAR_VERSION, "regions": regions}
+        if slots:
+            payload["slots"] = slots
+        path.write_text(json.dumps(payload), encoding="utf-8")
     except OSError:
         log.exception("touch regions: failed to write sidecar for %s", comp_digest)
+
+
+def load_slots(renders_dir: Path, comp_digest: str) -> list[dict[str, Any]]:
+    """Overlay value slots for a composition digest; missing or pre-v3
+    sidecars read as "no slots"."""
+    path = regions_sidecar_path(renders_dir, comp_digest)
+    try:
+        parsed = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    if not isinstance(parsed, dict):
+        return []
+    slots = parsed.get("slots")
+    return slots if isinstance(slots, list) else []
 
 
 def load_regions(renders_dir: Path, comp_digest: str) -> list[dict[str, Any]]:

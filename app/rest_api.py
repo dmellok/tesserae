@@ -1014,6 +1014,25 @@ def post_status(device_id: str) -> Response:
             deck_env = None
         if deck_env is not None:
             response["deck"] = deck_env
+        # Overlay values piggyback (hybrid render mode): a capable device
+        # gets its live frame's values on every heartbeat for free, so
+        # slots refresh on every wake even outside a linger window.
+        from app.overlay_sync import advertised_overlay
+
+        if advertised_overlay(body) is not None:
+            try:
+                push_mgr = current_app.config.get("PUSH_MANAGER")
+                latest = push_mgr.latest_render_for(device.id) if push_mgr else None
+                values = (
+                    _overlay_values_doc(device, str(latest.get("digest") or "")) if latest else None
+                )
+            except Exception:
+                current_app.logger.exception(
+                    "rest /status: overlay values failed for device=%s", device.id
+                )
+                values = None
+            if values is not None:
+                response["overlay_values"] = values
     return jsonify(response)
 
 
@@ -1119,13 +1138,111 @@ def get_frame_overlay(device_id: str, digest: str) -> Response:
 
     comp_digest = str(info.get("composition_digest") or "")
     regions = push_mgr.touch_regions_for(comp_digest) if comp_digest else []
+    slots = push_mgr.overlay_slots_for(comp_digest) if comp_digest else []
 
-    from app.overlay_sync import build_spec
+    from app.overlay_sync import browser_rasterizer, build_atlas, build_spec
 
-    spec = build_spec(frame_digest=wanted, regions=regions, panel=device.panel or {})
+    renders_dir = current_app.config.get("RENDERS_DIR")
+
+    def atlas_provider(px: int, weight: int) -> dict[str, Any] | None:
+        if renders_dir is None:
+            return None
+        rasterize = current_app.config.get("OVERLAY_ATLAS_RASTERIZER") or browser_rasterizer(
+            request.url_root
+        )
+        atlas = build_atlas(px, weight, renders_dir=Path(renders_dir), rasterize=rasterize)
+        if atlas is None:
+            return None
+        atlas["url"] = f"/api/v1/device/{device.id}/frame/overlay/atlas/{atlas['digest']}"
+        return atlas
+
+    spec = build_spec(
+        frame_digest=wanted,
+        regions=regions,
+        panel=device.panel or {},
+        slots=slots,
+        atlas_provider=atlas_provider if slots else None,
+    )
     if spec is None:
         return _error(404, "no overlay for this frame")
     return jsonify(spec)
+
+
+@bp.get("/<device_id>/frame/overlay/atlas/<digest>")
+def get_overlay_atlas(device_id: str, digest: str) -> Response:
+    """One glyph atlas strip by digest (raw 4bpp-gray bytes). Content-
+    addressed, so immutable caching applies; 404 means the client's
+    spec is stale."""
+    device, err = _auth_device(device_id)
+    if err is not None or device is None:
+        return err  # type: ignore[return-value]
+    renders_dir = current_app.config.get("RENDERS_DIR")
+    wanted = _normalize_digest(digest)
+    if renders_dir is None or not wanted or not wanted.isalnum():
+        return _error(404, "unknown atlas digest")
+    path = Path(renders_dir) / f"overlay-atlas-{wanted}.bin"
+    if not path.is_file():
+        return _error(404, "unknown atlas digest")
+    from flask import send_file
+
+    resp = send_file(path, mimetype="application/octet-stream")
+    resp.headers["ETag"] = f'"{wanted}"'
+    resp.headers["Cache-Control"] = "immutable, max-age=31536000"
+    return resp
+
+
+def _ha_get_state() -> Any | None:
+    """``get_state(entity_id)`` from the ha_core plugin, or None when HA
+    isn't configured. Same resolution path as app.ha_actions."""
+    registry = current_app.config.get("PLUGIN_REGISTRY")
+    plugin = registry.get("ha_core") if registry is not None else None
+    mod = getattr(plugin, "server_module", None) if plugin is not None else None
+    if mod is None or not getattr(mod, "is_configured", lambda: False)():
+        return None
+    return mod.get_state
+
+
+def _overlay_values_doc(device: Device, frame_digest: str) -> dict[str, Any] | None:
+    """The values document for a device's frame, or None when the frame
+    is unknown, has no slots, or HA isn't configured."""
+    push_mgr = current_app.config.get("PUSH_MANAGER")
+    if push_mgr is None or not frame_digest:
+        return None
+    info = push_mgr.latest_render_for(device.id)
+    if not (info and str(info.get("digest") or "") == frame_digest):
+        info = None
+        deck = _bound_deck(device.id)
+        if deck is not None:
+            from app.deck_sync import frame_entry_by_digest
+
+            info = frame_entry_by_digest(deck, device.id, frame_digest, push_mgr=push_mgr)
+    if info is None:
+        return None
+    slots = push_mgr.overlay_slots_for(str(info.get("composition_digest") or ""))
+    if not slots:
+        return None
+    get_state = _ha_get_state()
+    if get_state is None:
+        return None
+    from app.overlay_sync import values_document
+
+    return values_document(slots, ha_get_state=get_state, now=time.time())
+
+
+@bp.get("/<device_id>/frame/data")
+def get_frame_data(device_id: str) -> Response:
+    """Live values for a frame's overlay slots (``?digest=<frame>``):
+    pre-formatted display strings the firmware blits into its slots
+    during the touch-linger window. 404 when the frame is unknown, has
+    no slots, or HA isn't configured; the firmware treats that as
+    values-off for the frame."""
+    device, err = _auth_device(device_id)
+    if err is not None or device is None:
+        return err  # type: ignore[return-value]
+    doc = _overlay_values_doc(device, _normalize_digest(request.args.get("digest", "")))
+    if doc is None:
+        return _error(404, "no values for this frame")
+    return jsonify(doc)
 
 
 # -- log -----------------------------------------------------------------

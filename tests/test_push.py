@@ -1101,8 +1101,8 @@ def test_prewarm_entry_expires_after_ttl(tmp_path: Path, composition_png: bytes)
         assert manager.prewarm_page("home", device_id="kitchen") is True
         # Backdate the cached entry past the TTL.
         with manager._precompose_lock:
-            for key, (ts, png, regions) in list(manager._precompose.items()):
-                manager._precompose[key] = (ts - 10_000.0, png, regions)
+            for key, (ts, png, regions, slots) in list(manager._precompose.items()):
+                manager._precompose[key] = (ts - 10_000.0, png, regions, slots)
         result = manager.push("home", device_ids={"kitchen"})
         assert result.status == "sent"
         # Expired entry ignored, the push captured fresh.

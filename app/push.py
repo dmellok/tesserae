@@ -75,7 +75,15 @@ from app.renderer_loader import Renderer, RendererRegistry
 from app.state.event_log import EventLog
 from app.state.page_store import PageStore, Panel
 from app.state.settings_store import SettingsStore
-from app.touch_regions import EXTRACT_REGIONS_JS, load_regions, normalize_regions, save_regions
+from app.touch_regions import (
+    EXTRACT_INTERACTIVE_JS,
+    load_regions,
+    load_slots,
+    normalize_regions,
+    normalize_slots,
+    save_regions,
+    split_capture_result,
+)
 from app.transport import MqttTransport
 
 # Speculative pre-compose cache bounds (issue #49 linger). TTL keeps a
@@ -458,9 +466,9 @@ class PushManager:
         # content token; entries are consume-once and short-TTL so a
         # scheduled push minutes later can never serve stale widget data.
         self._precompose_lock = threading.Lock()
-        self._precompose: OrderedDict[str, tuple[float, bytes, list[dict[str, Any]]]] = (
-            OrderedDict()
-        )
+        self._precompose: OrderedDict[
+            str, tuple[float, bytes, list[dict[str, Any]], list[dict[str, Any]]]
+        ] = OrderedDict()
         # Deck pre-render cache (Decks feature): device_id -> {page_id -> render
         # info}. Holds several fully-rendered frames per device ready to promote
         # into the live ``_latest_renders`` slot the instant navigation asks for
@@ -521,6 +529,14 @@ class PushManager:
         if not comp_digest:
             return []
         return load_regions(self._renders_dir, comp_digest)
+
+    def overlay_slots_for(self, comp_digest: str) -> list[dict[str, Any]]:
+        """Overlay value slots extracted when this composition rendered
+        (hybrid render mode). Empty when the composition had no
+        ``data-overlay-key`` annotations or the digest is unknown."""
+        if not comp_digest:
+            return []
+        return load_slots(self._renders_dir, comp_digest)
 
     def invalidate_latest_render(self, device_id: str) -> bool:
         """Forget a device's latest render so ``/frame`` reports 204 (no
@@ -627,7 +643,9 @@ class PushManager:
 
         return f"{compose_url}|{page_preview_token(page, (panel.w, panel.h))}"
 
-    def _take_precomposed(self, key: str) -> tuple[bytes, list[dict[str, Any]]] | None:
+    def _take_precomposed(
+        self, key: str
+    ) -> tuple[bytes, list[dict[str, Any]], list[dict[str, Any]]] | None:
         """Pop a fresh prewarmed composition, or None. Consume-once: a
         hit removes the entry so one speculative capture can never serve
         two pushes (widget data would drift further each time)."""
@@ -635,20 +653,26 @@ class PushManager:
             entry = self._precompose.pop(key, None)
         if entry is None:
             return None
-        stamped, png, regions = entry
+        stamped, png, regions, slots = entry
         if time.monotonic() - stamped > _PRECOMPOSE_TTL_S:
             return None
-        return png, regions
+        return png, regions, slots
 
-    def _store_precomposed(self, key: str, png: bytes, regions: list[dict[str, Any]]) -> None:
+    def _store_precomposed(
+        self,
+        key: str,
+        png: bytes,
+        regions: list[dict[str, Any]],
+        slots: list[dict[str, Any]],
+    ) -> None:
         with self._precompose_lock:
             now = time.monotonic()
             # Drop expired entries opportunistically, then bound the size.
             for k in [
-                k for k, (ts, _p, _r) in self._precompose.items() if now - ts > _PRECOMPOSE_TTL_S
+                k for k, entry in self._precompose.items() if now - entry[0] > _PRECOMPOSE_TTL_S
             ]:
                 del self._precompose[k]
-            self._precompose[key] = (now, png, regions)
+            self._precompose[key] = (now, png, regions, slots)
             self._precompose.move_to_end(key)
             while len(self._precompose) > _PRECOMPOSE_CAP:
                 self._precompose.popitem(last=False)
@@ -684,7 +708,7 @@ class PushManager:
                 cached = self._precompose.get(key)
                 if cached is not None and time.monotonic() - cached[0] <= _PRECOMPOSE_TTL_S:
                     return True
-            composition_png, raw_regions = capture_composed(
+            composition_png, raw_result = capture_composed(
                 CaptureRequest(
                     render=RenderRequest(
                         url=compose_url,
@@ -692,11 +716,17 @@ class PushManager:
                         viewport_h=panel.h,
                         timezone_id=self._render_timezone_id(),
                     ),
-                    script=EXTRACT_REGIONS_JS,
+                    script=EXTRACT_INTERACTIVE_JS,
                 ),
                 pool=self._browser_pool_fn(),
             )
-            self._store_precomposed(key, composition_png, normalize_regions(raw_regions))
+            raw_regions, raw_slots = split_capture_result(raw_result)
+            self._store_precomposed(
+                key,
+                composition_png,
+                normalize_regions(raw_regions),
+                normalize_slots(raw_slots),
+            )
             logger.info("prewarm: cached composition for page=%s device=%s", page_id, device_id)
             return True
         except Exception:
@@ -1201,13 +1231,14 @@ class PushManager:
                 # skip the Playwright capture entirely.
                 cached = self._take_precomposed(self._precompose_key(compose_url, page, panel))
                 if cached is not None:
-                    composition_png, touch_regions = cached
+                    composition_png, touch_regions, overlay_slots = cached
                 else:
                     try:
-                        # Screenshot + touch-region extraction from the same
-                        # page session (issue #49): the region map must be
-                        # measured against the exact DOM the frame captured.
-                        composition_png, raw_regions = capture_composed(
+                        # Screenshot + touch-region and overlay-slot
+                        # extraction from the same page session (issue #49):
+                        # both maps must be measured against the exact DOM
+                        # the frame captured.
+                        composition_png, raw_result = capture_composed(
                             CaptureRequest(
                                 render=RenderRequest(
                                     url=compose_url,
@@ -1215,11 +1246,13 @@ class PushManager:
                                     viewport_h=panel.h,
                                     timezone_id=self._render_timezone_id(),
                                 ),
-                                script=EXTRACT_REGIONS_JS,
+                                script=EXTRACT_INTERACTIVE_JS,
                             ),
                             pool=self._browser_pool_fn(),
                         )
+                        raw_regions, raw_slots = split_capture_result(raw_result)
                         touch_regions = normalize_regions(raw_regions)
+                        overlay_slots = normalize_slots(raw_slots)
                     except Exception as err:
                         err_msg = str(err) or type(err).__name__
                         group_results.append(
@@ -1241,6 +1274,7 @@ class PushManager:
                     force_publish=force_publish,
                     dither_regions=dither_regions,
                     touch_regions=touch_regions,
+                    overlay_slots=overlay_slots,
                     stamp_into=stamp_into,
                 )
                 all_renderers.extend(result.renderers)
@@ -1313,6 +1347,7 @@ class PushManager:
         force_client_refetch: bool = False,
         dither_regions: list[dict[str, Any]] | None = None,
         touch_regions: list[dict[str, Any]] | None = None,
+        overlay_slots: list[dict[str, Any]] | None = None,
         stamp_into: dict[str, dict[str, Any]] | None = None,
     ) -> PushResult:
         """Common fanout: thumbnail + per-renderer transform / publish / log.
@@ -1349,7 +1384,7 @@ class PushManager:
         # unchanged, so the latest render's actions must win. ``None``
         # (image / webpage pushes, no DOM) leaves any existing map alone.
         if touch_regions is not None:
-            save_regions(self._renders_dir, comp_digest, touch_regions)
+            save_regions(self._renders_dir, comp_digest, touch_regions, slots=overlay_slots)
 
         panel = Panel(**panel_dims)
         results: list[RendererResult] = []

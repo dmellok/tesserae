@@ -1168,6 +1168,38 @@ def compose_measure() -> str:
     return render_template("panels_measure.html", font_face_css=_font_face_css(registry.fonts))
 
 
+@bp.get("/compose/_overlay_atlas")
+def compose_overlay_atlas() -> str:
+    """A minimal loopback strip of glyphs for the overlay atlas
+    rasterizer (hybrid render mode): each character of the requested
+    charset in one Inter span, measured and cropped by
+    ``app.overlay_sync``. Rendering through the same browser + font
+    stack as compositions keeps overlay text pixel-identical to the
+    baked-in render. Static path under ``/compose/`` so it skips the
+    login gate like the other render targets (loopback only)."""
+    from markupsafe import escape
+
+    try:
+        px = max(8, min(200, int(request.args.get("px", "32"))))
+        weight = 700 if int(request.args.get("weight", "400")) >= 600 else 400
+    except ValueError:
+        abort(400)
+    chars = request.args.get("chars") or ""
+    if not chars or len(chars) > 64:
+        abort(400)
+    registry = current_app.config["PLUGIN_REGISTRY"]
+    spans = "".join(f'<span data-ch="{escape(ch)}">{escape(ch)}</span>' for ch in chars)
+    return (
+        "<!doctype html><html><head><meta charset='utf-8'><style>"
+        f"{_font_face_css(registry.fonts)}"
+        "body{margin:0;background:#fff}"
+        "#strip{display:flex;align-items:flex-start;font-family:'Inter',sans-serif;"
+        f"font-size:{px}px;font-weight:{weight};line-height:1.2;white-space:pre;color:#000}}"
+        "#strip span{display:inline-block}"
+        f"</style></head><body><div id='strip'>{spans}</div></body></html>"
+    )
+
+
 def _preview_target_device(page: Page, devices: Any) -> str:
     """First bound device id that exists in the registry, or ``""``.
 

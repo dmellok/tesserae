@@ -765,10 +765,60 @@ the server exactly as normal (the echo never replaces the dispatch).
 The invert is restored by the next full paint. Hygiene: after ~8
 partial refreshes do a full-quality repaint to clear ghosting.
 
-`slots` / `atlases` (server-rasterized glyph strips for live value
-text) and the values document endpoint are the next schema slice and
-are not served yet; clients must treat those lists as independent and
-optional, and tolerate their absence.
+### Value slots and glyph atlases
+
+Widgets opt into live value text by annotating an element with
+`data-overlay-key="ha:<entity_id>"` (optional `data-overlay-suffix`,
+e.g. a degree sign). At render time the slot's box, alignment, font
+size, and weight are extracted alongside the touch regions, and the
+overlay spec then also carries:
+
+```json
+{
+  "slots": [
+    {"id": "s1", "x": 140, "y": 660, "w": 200, "h": 32,
+     "key": "ha:sensor.temp", "align": "right", "atlas": "a1"}
+  ],
+  "atlases": [
+    {"id": "a1", "digest": "<16-hex>", "format": "4bpp-gray",
+     "height": 32,
+     "url": "/api/v1/device/<id>/frame/overlay/atlas/<digest>",
+     "glyphs": {"0": {"x": 0, "w": 18}, ".": {"x": 18, "w": 8}}}
+  ]
+}
+```
+
+Atlases are rasterized server-side through the same browser and fonts
+as the composition (Inter, at the slot's exact size and weight), so
+blitted text is pixel-consistent with the baked-in render. The strip is
+packed at exactly `max(glyph.x + glyph.w)` pixels wide, 4bpp gray, high
+nibble = left pixel; fetch by digest with immutable caching. The glyph
+charset covers numeric values (`0-9 . , : - + % ° C F` and space); a
+character outside it renders as a mean-width blank on the device.
+
+`targets`, `slots`, and `atlases` are independent and optional; a spec
+can be rect-only (no annotated slots, or the atlas build failed and the
+spec degraded gracefully).
+
+### Values document
+
+`GET /api/v1/device/<id>/frame/data?digest=<frame_digest>` (Bearer):
+
+```json
+{"seq": 1753305600, "values": {"ha:sensor.temp": "21.4°"}}
+```
+
+Values are pre-formatted display strings (state + declared suffix,
+clipped to 47 chars); the firmware applies zero formatting. Poll only
+while awake in the touch-linger window (1-2 s cadence). The same
+document also arrives as `overlay_values` on `/status` responses when
+the capability was advertised on that beat, so slots refresh on every
+normal wake for free; both sources are interchangeable, newest `seq`
+wins, equal `seq` = no repaint. `404` = no values for this frame
+(unknown digest, no slots, or Home Assistant not configured); treat as
+values-off. An entity that is `unknown` / `unavailable` is simply
+absent from `values`, and the firmware keeps showing whatever the
+baked-in render had.
 
 ## MQTT topics
 
