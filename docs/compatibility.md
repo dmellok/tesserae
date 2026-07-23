@@ -29,6 +29,7 @@ A renderer turns the composition PNG into the exact bytes a client wants. Each s
 
 | Renderer | Output | Target client(s) | What it's for |
 |---|---|---|---|
+| `circuitpython_bmp` | `.bmp` | - | Composition quantized to the panel's palette and emitted as an uncompressed indexed BMP for adafruit_imageload on memory-constrained CircuitPython microcontrollers. |
 | `circuitpython_png` | `.png` | - | Composition PNG quantized to the panel's palette and emitted as an indexed PNG sized for adafruit_imageload on CircuitPython microcontrollers. |
 | `esp32_bin` | `.bin` | [tesserae-device-esp32-bin (13.3" Waveshare)](https://github.com/dmellok/tesserae-device-esp32-bin)<br>[tesserae-device-photopainter-7.3-bin (7.3" PhotoPainter)](https://github.com/dmellok/tesserae-device-photopainter-7.3-bin) | Composition PNG packed into the Waveshare E6 4-bpp buffer the ESP32 firmware streams to SPI. |
 | `esp32_bw_bin` | `.bin` | - | Composition PNG dithered to mono B/W and packed into a 1-bpp raw buffer the ESP32 firmware (e.g. |
@@ -45,9 +46,11 @@ The bundled client kinds Tesserae knows how to talk to. A flashed client announc
 
 | Device kind | Default panel | Renderers | What it is |
 |---|---|---|---|
-| `circuitpython_generic` | 800×480 | `circuitpython_png` | Generic CircuitPython client kind for boards driving an e-paper panel from a Pico W / Pico 2 W / Feather / similar microcontroller. |
+| `circuitpython_generic` | 800×480 | `circuitpython_png`, `circuitpython_bmp` | Generic CircuitPython client kind for boards driving an e-paper panel from a Pico W / Pico 2 W / Feather / similar microcontroller. |
 | `esp32_bw_client` | 400×300 | `esp32_bw_bin` | Battery-powered ESP32 firmware for mono B/W e-paper panels (e.g. |
 | `esp32_client` | 800×480 | `esp32_bin` | Battery-powered ESP32 firmware that subscribes to tesserae/esp32/frame/bin (retained), paints the panel via SPI, and goes back to deep sleep. |
+| `opendisplay` | 800×480 | `pi_png` | An OpenDisplay BLE e-paper tag, driven by the tesserae-opendisplay bridge. |
+| `opendisplay_ha` | 800×480 | `pi_png` | An OpenDisplay BLE e-paper tag driven through Home Assistant. |
 | `pi_bin_client` | 1424×1200 | `pi_bin` | Raspberry-Pi-side client that consumes the 4-bpp .bin frame. |
 | `pi_png_client` | 1424×1200 | `pi_png` | Raspberry-Pi-side client that consumes the PNG frame. |
 | `pico_bin_client` | 1600×1200 | `pico_bin` | Battery-powered Pico Plus 2 firmware (RP2350) driving a Pimoroni Inky-style Spectra 6 panel over SPI. |
@@ -65,6 +68,8 @@ The reTerminal E-Series and XIAO ePaper family run the [Tesserae-native firmware
 | SKU | Panel | Gamut | Protocol / Renderer | Kind id |
 |---|---|---|---|---|
 | [Seeed XIAO ePaper EE02 (13.3")](https://www.seeedstudio.com/XIAO-ePaper-DIY-Kit-EE02-for-13-3-Spectratm-6-E-Ink.html) | 1200×1600 portrait | `spectra_6` | `esp32_client` (inherit) | `seeed_ee02` |
+| [Seeed XIAO ePaper EE04 (7.3" Spectra 6)](https://www.seeedstudio.com/XIAO-ePaper-Display-Board-EE04-p-6560.html) | 800×480 | `spectra_6` | `esp32_client` (inherit) | `seeed_ee04_73e6` |
+| [Seeed XIAO ePaper EE04 (7.5" mono)](https://www.seeedstudio.com/XIAO-ePaper-Display-Board-EE04-p-6560.html) | 800×480 | `mono` | `esp32_bw_client` (inherit) | `seeed_ee04_75` |
 | [Seeed reTerminal E1001](https://www.seeedstudio.com/reTerminal-E1001-p-6534.html) | 800×480 | `mono` | `esp32_bw_client` (inherit) | `seeed_reterminal_e1001` |
 | [Seeed reTerminal E1002](https://www.seeedstudio.com/reTerminal-E1002-p-6533.html) | 800×480 | `spectra_6` | `esp32_client` (inherit) | `seeed_reterminal_e1002` |
 | [Seeed reTerminal E1003](https://www.seeedstudio.com/reTerminal-E1003-p-6731.html) | 1872×1404 | `mono` | `esp32_client` <br> `esp32_gray_bin` | `seeed_reterminal_e1003` |
@@ -107,6 +112,7 @@ Honest status from the maintainer's own bench. Untested doesn't mean broken, it 
 
 | Renderer | Hardware | Status | Notes |
 |---|---|---|---|
+| `circuitpython_bmp` | - | :material-circle-outline: Not yet tested | - |
 | `circuitpython_png` | - | :material-circle-outline: Not yet tested | - |
 | `esp32_bin` | Waveshare 13.3" Spectra 6 (ESP32-S3-WROOM-2) + Waveshare 7.3" PhotoPainter (ESP32-S3) | :material-check-circle: Tested | Primary daily driver, battery-powered, deep-sleep. The 13.3" client lives at tesserae-device-esp32-bin; the 7.3" PhotoPainter client at tesserae-device-photopainter-7.3-bin. Both pair with the same renderer; the panel preset (waveshare_e6_13_3 vs waveshare_photopainter_7_3) selects the firmware-native row stride. |
 | `esp32_bw_bin` | - | :material-circle-outline: Not yet tested | - |

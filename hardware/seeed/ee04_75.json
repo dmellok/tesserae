@@ -1,0 +1,25 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "seeed_ee04_75",
+  "name": "Seeed XIAO ePaper EE04 (7.5\" mono)",
+  "vendor": "Seeed Studio",
+  "url": "https://www.seeedstudio.com/XIAO-ePaper-Display-Board-EE04-p-6560.html",
+  "icon": "device-tablet",
+  "description": "Seeed XIAO ePaper Display Board EE04 (XIAO ESP32-S3 Plus) driving the 7.5 inch monochrome panel on the 24-pin FPC (800x480). Speaks Tesserae's v1 REST device API and paints a raw 1-bpp mono buffer (48000 bytes) produced by the esp32_bw_bin renderer; byte-identical wire contract to the Seeed reTerminal E1001 and the XIAO ePaper 7.5. Reports battery percentage via the onboard ADC divider and carries the refresh/left/right three-button set like the EE02; no onboard temperature/humidity sensor.",
+  "protocol": "esp32_bw_client",
+  "panel": {
+    "w": 800,
+    "h": 480,
+    "orientation": "landscape",
+    "name": "7.5 inch monochrome ePaper (800x480)",
+    "gamut": "mono",
+    "native_w": 800,
+    "native_h": 480
+  },
+  "protocol_config": {
+    "model_header": "Seeed_EE04_75"
+  },
+  "refresh_floor_s": 60,
+  "image_format": "bin",
+  "notes_md": "Awaiting confirmed test on real hardware; community bring-up in progress. Wire format is exactly 48000 bytes (800*480/8), MSB=leftmost pixel, bit-set=white, bit-clear=black; no header, no padding, no checksum. Frame is byte-identical to the seeed_reterminal_e1001 and xiao_epaper_75 targets, so validate cross-panel by pointing the same renderer output at any of them. Default device ids look like Seeed_EE04_75_<mac-suffix>. The board hosts one panel on either a 24-pin or 50-pin FPC; this kind is the 24-pin mono build variant, see seeed_ee04_73e6 for the 50-pin Spectra 6 variant."
+}

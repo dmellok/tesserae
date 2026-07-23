@@ -1,0 +1,25 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "seeed_ee04_73e6",
+  "name": "Seeed XIAO ePaper EE04 (7.3\" Spectra 6)",
+  "vendor": "Seeed Studio",
+  "url": "https://www.seeedstudio.com/XIAO-ePaper-Display-Board-EE04-p-6560.html",
+  "icon": "device-tablet",
+  "description": "Seeed XIAO ePaper Display Board EE04 (XIAO ESP32-S3 Plus) driving the 7.3 inch 6-colour Spectra 6 panel on the 50-pin FPC (800x480). Speaks Tesserae's v1 REST device API and paints a raw 4-bpp Spectra 6 buffer (192000 bytes) produced by the esp32_bin renderer; byte-identical wire contract to the Seeed reTerminal E1002 and the Waveshare PhotoPainter 7.3. The panel mounts normally, so the server renders in top-left orientation with no pre-rotation. Reports battery percentage via the onboard ADC divider and carries the refresh/left/right three-button set like the EE02; no onboard temperature/humidity sensor.",
+  "protocol": "esp32_client",
+  "panel": {
+    "w": 800,
+    "h": 480,
+    "orientation": "landscape",
+    "name": "7.3 inch Spectra 6 ePaper (800x480)",
+    "gamut": "spectra_6",
+    "native_w": 800,
+    "native_h": 480
+  },
+  "protocol_config": {
+    "model_header": "Seeed_EE04_73E6"
+  },
+  "refresh_floor_s": 60,
+  "image_format": "bin",
+  "notes_md": "Awaiting confirmed test on real hardware; community bring-up in progress. Palette nibbles align with the firmware's Spectra 6 constants byte-for-byte (black=0x0, white=0x1, yellow=0x2, red=0x3, blue=0x5, green=0x6; 0x4 and 0x7 reserved), and the buffer is byte-identical to the seeed_reterminal_e1002 and waveshare_photopainter_73 targets at 800x480: two pixels per byte, high nibble = LEFT (even column), low nibble = RIGHT (odd column), row-major, 400 bytes per row, top-left origin. Default device ids look like Seeed_EE04_73E6_<mac-suffix>. This kind is the 50-pin Spectra 6 build variant of the EE04; see seeed_ee04_75 for the 24-pin mono variant."
+}
