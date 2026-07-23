@@ -40,6 +40,15 @@
   flex: none;
 }
 
+/* Online variant of the disclosure card: manual re-check. Same layout,
+   but a solid border and a neutral icon (nothing is wrong). */
+.fw-checknow {
+  border-style: solid;
+}
+.fw-checknow .fw-offline__msg .ph {
+  color: var(--t-fg-soft);
+}
+
 .fw-kind--attention {
   border-color: color-mix(in oklab, var(--t-danger, #dc2626) 45%, var(--t-border));
 }

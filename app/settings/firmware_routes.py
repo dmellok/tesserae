@@ -366,3 +366,16 @@ def firmware_pause() -> Response:
     _log("pause", kind_id, "ok")
     flash(f"Paused {kind_id}: no devices will be offered the update.", "ok")
     return _redirect()
+
+
+@bp.post("/settings/firmware/check")
+def firmware_check_now() -> Response:
+    """Drop the hourly update-check cache so the redirect back to the page
+    re-asks api.tesserae.ink for every kind. Same online-mode gate as the
+    automatic check; the fetch itself happens during the following GET."""
+    if not online_enabled(settings_store()):
+        flash("Update checks need online features; turn them on under System.", "error")
+        return _redirect()
+    fw_check.clear_cache()
+    flash("Checked api.tesserae.ink for the latest published firmware.", "ok")
+    return _redirect()

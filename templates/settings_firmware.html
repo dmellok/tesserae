@@ -31,6 +31,19 @@
     <i class="ph ph-gear" aria-hidden="true"></i><span>Turn on under System &rarr; Online features</span>
   </a>
 </section>
+{% else %}
+<section class="card fw-offline fw-checknow">
+  <p class="fw-offline__msg">
+    <i class="ph ph-arrows-clockwise" aria-hidden="true"></i>
+    <span>Update availability is checked against <code>api.tesserae.ink</code> when this page loads
+    and cached for an hour. Check now drops the cache and re-asks for every kind.</span>
+  </p>
+  <form method="post" action="{{ url_for('auth.firmware_check_now') }}">
+    <button type="submit" class="button ghost">
+      <i class="ph ph-arrows-clockwise" aria-hidden="true"></i><span>Check now</span>
+    </button>
+  </form>
+</section>
 {% endif %}
 
 {# ---- Import ------------------------------------------------------------- #}

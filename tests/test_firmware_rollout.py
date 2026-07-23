@@ -291,3 +291,35 @@ def test_page_renders_with_capability_and_chip(app: Flask) -> None:
     assert "USB update only" in html  # non-capable device flagged
     assert "confirmed" in html  # capable device's OTA chip
     assert KIND in html
+
+
+def test_check_now_clears_cache_and_button_renders(app: Flask, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    import app.firmware_check as fwc
+    import app.settings.firmware_routes as fr
+
+    monkeypatch.setattr(fr, "online_enabled", lambda _s: True)
+    monkeypatch.setattr(fwc, "latest_for_kind", lambda kind, current="": None)
+    client = _authed_client(app)
+    html = client.get("/settings/firmware").get_data(as_text=True)
+    assert "Check now" in html
+
+    fwc._cache["some_kind"] = (time.time(), None)
+    resp = client.post("/settings/firmware/check")
+    assert resp.status_code == 302
+    assert fwc._cache == {}
+
+
+def test_check_now_blocked_when_offline(app: Flask, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    import app.firmware_check as fwc
+    import app.settings.firmware_routes as fr
+
+    monkeypatch.setattr(fr, "online_enabled", lambda _s: False)
+    client = _authed_client(app)
+    html = client.get("/settings/firmware").get_data(as_text=True)
+    assert "Check now" not in html
+
+    stale = (time.time(), None)
+    fwc._cache["some_kind"] = stale
+    client.post("/settings/firmware/check")
+    assert fwc._cache.get("some_kind") == stale
+    del fwc._cache["some_kind"]

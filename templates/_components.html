@@ -429,8 +429,8 @@ macro here instead.
 {%- endif -%}
 {%- set tabs = tabs + [
   ('devices',   'Devices',   'devices',           url_for('auth.settings_area', area='devices')),
-  ('plugins',   'Widgets',   'puzzle-piece',      url_for('auth.settings_area', area='plugins')),
   ('firmware',  'Firmware',  'download-simple',   url_for('auth.firmware_index')),
+  ('plugins',   'Widgets',   'puzzle-piece',      url_for('auth.settings_area', area='plugins')),
   ('system',    'System',    'wrench',            url_for('auth.settings_area', area='system')),
   ('about',     'About',     'info',              url_for('auth.settings_area', area='about')),
   ('events',    'Events',    'pulse',             url_for('events.index')),
