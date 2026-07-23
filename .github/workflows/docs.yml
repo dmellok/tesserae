@@ -103,11 +103,11 @@ jobs:
       # workflow errors out and the daily rebuild schedule + manual
       # workflow_dispatch cover any remaining case.
       - id: deployment
-        uses: actions/deploy-pages@v5
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128  # v5
         continue-on-error: true
       - name: Wait before retry
         if: steps.deployment.outcome == 'failure'
         run: sleep 30
       - id: deployment-retry
         if: steps.deployment.outcome == 'failure'
-        uses: actions/deploy-pages@v5
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128  # v5
