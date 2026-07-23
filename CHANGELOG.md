@@ -8,6 +8,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **MCP surfaces the deck-cache and overlay capabilities.** `/api/mcp/devices` entries now carry
+  the hardware `kind` plus firmware capability flags from live heartbeats: `overlay: true`
+  (instant tap echo + live value slots apply on that panel) and `deck_cache: {capacity_bytes}`
+  (radio-off deck navigation). `render_report` extracts `overlay_slots` alongside `tap_regions`
+  (also in `?view=touch` and `?fields=`), so an agent can verify a `data-overlay-key` annotation
+  survived the render. The tesserae-mcp bridge (0.8.1) documents the live-value-slot vocabulary
+  and its server-enforced guardrails (8 slots, 2 font buckets, numeric charset, 47-char values,
+  `ha:` keys only, widget-markup-only extraction) in the handshake instructions.
+
 - **Overlay value slots + glyph atlases (hybrid render mode, schema 1 slice 2).** Widgets can mark
   an element `data-overlay-key="ha:<entity_id>"` (optional `data-overlay-suffix`) and capable touch
   firmware repaints just that slot with live values during a wake, no full re-render. The slot's

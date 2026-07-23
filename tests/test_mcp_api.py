@@ -113,6 +113,66 @@ def test_devices_shape(app: Flask) -> None:
     assert "devices" in body and isinstance(body["devices"], list)
 
 
+def test_devices_surface_firmware_capabilities(app: Flask) -> None:
+    """overlay / deck_cache flags from the device's live heartbeats ride
+    along on the MCP device list so an agent knows which panels support
+    instant tap echo, live value slots, and radio-off deck nav."""
+    _enable(app)
+    from app.device_service import create_instance
+
+    result = create_instance(
+        devices=app.config["DEVICE_REGISTRY"],
+        renderers=app.config["RENDERER_REGISTRY"],
+        data_root=app.config["DEVICE_DATA_ROOT"],
+        instance_id="cap_panel",
+        kind_id="esp32_client",
+    )
+    assert result.ok
+    app.config["DEVICE_STATUS"]["cap_panel"] = {
+        "overlay": {"schema": 1},
+        "deck_cache": {"schema": 1, "capacity_bytes": 7_900_000},
+    }
+    devices = app.test_client().get("/api/mcp/devices").get_json()["devices"]
+    entry = next(d for d in devices if d["id"] == "cap_panel")
+    assert entry["overlay"] is True
+    assert entry["deck_cache"] == {"capacity_bytes": 7_900_000}
+    assert entry["kind"] == "esp32_client"
+
+
+def test_render_report_extracts_overlay_slots(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The combined interactive extraction splits into tap_regions +
+    overlay_slots, and slots normalize through the same validator the
+    push-time sidecar uses."""
+    _enable(app)
+    fake = {
+        "board": {"w": 800},
+        "elements": [],
+        "interactive": {
+            "regions": [],
+            "slots": [
+                {
+                    "x": 10,
+                    "y": 20,
+                    "w": 100,
+                    "h": 40,
+                    "key": "ha:sensor.temp",
+                    "suffix": "°",
+                    "align": "right",
+                    "px": 32,
+                    "weight": 700,
+                },
+                {"x": 1, "y": 1, "w": 10, "h": 10, "key": "not-ha", "px": 32, "weight": 400},
+            ],
+        },
+    }
+    monkeypatch.setattr("app.renderer.inspect_composed", lambda req, pool=None: fake)
+    client = app.test_client()
+    pid = _create_page(client)
+    body = client.get(f"/api/mcp/pages/{pid}/render_report").get_json()
+    assert len(body["overlay_slots"]) == 1
+    assert body["overlay_slots"][0]["key"] == "ha:sensor.temp"
+
+
 def test_services_listed_and_excluded_from_catalog(app: Flask) -> None:
     _enable(app)
     client = app.test_client()
@@ -952,7 +1012,7 @@ def test_render_report_view_touch_trims_to_touch_fields(
     client = app.test_client()
     pid = _create_page(client)
     body = client.get(f"/api/mcp/pages/{pid}/render_report?view=touch").get_json()
-    assert set(body) == {"id", "rev", "tap_regions", "tap_invalid", "tap_dangling"}
+    assert set(body) == {"id", "rev", "tap_regions", "tap_invalid", "tap_dangling", "overlay_slots"}
     assert "elements" not in body and "board" not in body
 
 

@@ -651,16 +651,30 @@ def devices() -> Response:
     ``touch: true`` appears on panels with a touch digitizer (issue #49), meaning
     on_tap / on_swipe / on_slide actions on the dashboard's elements will actually
     fire on that hardware. Its absence means the panel is display-only (or
-    button-driven), so touch actions won't do anything there."""
+    button-driven), so touch actions won't do anything there.
+
+    Firmware capabilities (from the device's live heartbeats) ride along when
+    present: ``overlay: true`` means the panel does local partial-refresh
+    overlays, so tap targets echo instantly and ``data-overlay-key`` value
+    slots in widget markup repaint with live values between full renders;
+    ``deck_cache: {capacity_bytes}`` means the device caches deck frames on
+    local storage and navigates decks without a network round trip. Both are
+    read-only facts about the hardware; their absence just means those
+    features silently don't apply there."""
     from app.panel import device_panel
 
     reg = current_app.config.get("DEVICE_REGISTRY")
+    status_cache = current_app.config.get("DEVICE_STATUS") or {}
     out: list[dict[str, Any]] = []
     if reg is not None:
         for d in reg.all():
             if d.kind_of is None:  # instances only, not built-in kinds
                 continue
-            entry: dict[str, Any] = {"id": d.id, "name": str(d.manifest.get("name") or d.id)}
+            entry: dict[str, Any] = {
+                "id": d.id,
+                "name": str(d.manifest.get("name") or d.id),
+                "kind": d.kind_of,
+            }
             panel = device_panel(d)
             if panel is not None:
                 entry["w"] = panel.w
@@ -671,6 +685,15 @@ def devices() -> Response:
                     entry["orientation"] = str(block["orientation"])
             if d.manifest.get("touch") is True:
                 entry["touch"] = True
+            status = status_cache.get(d.id) if isinstance(status_cache, dict) else None
+            if isinstance(status, dict):
+                if isinstance(status.get("overlay"), dict):
+                    entry["overlay"] = True
+                deck_cache = status.get("deck_cache")
+                if isinstance(deck_cache, dict):
+                    entry["deck_cache"] = {
+                        "capacity_bytes": int(deck_cache.get("capacity_bytes") or 0)
+                    }
             out.append(entry)
     out.sort(key=lambda x: str(x["name"]).lower())
     return jsonify({"devices": out})
@@ -1341,31 +1364,43 @@ def render_report(page_id: str) -> Response:
     is the real "this dashboard is wired" signal, a region appearing in
     ``tap_regions`` only means it was stored, not that it will fire.
 
+    ``overlay_slots`` (hybrid render mode) lists the ``data-overlay-key``
+    annotations that actually extracted (box + key + font bucket): the
+    live-value slots overlay-capable panels repaint locally between full
+    renders. An annotation missing here collapsed at render time or sits
+    inside a code-element iframe, which the extractor skips.
+
     Note: widget cells render into shadow DOM, so their ``text`` may be empty; data
     primitives and decorations report their text. Overflow is measured on the
     element box regardless.
 
     Large boards: pass ``?fields=tap_invalid,tap_dangling`` (any of ``board`` /
-    ``elements`` / ``tap_regions`` / ``tap_invalid`` / ``tap_dangling``) to trim
-    the response, or ``?view=touch`` for the touch-wiring subset, so verifying
-    interactions doesn't pull the whole ``elements`` array. ``id`` + ``rev``
-    always ride along."""
+    ``elements`` / ``tap_regions`` / ``tap_invalid`` / ``tap_dangling`` /
+    ``overlay_slots``) to trim the response, or ``?view=touch`` for the
+    touch-and-overlay wiring subset, so verifying interactions doesn't pull
+    the whole ``elements`` array. ``id`` + ``rev`` always ride along."""
     page = _pr._get_canvas(page_id)
     if page is None or page.canvas is None:
         return _err(404, f"no canvas dashboard {page_id!r}")
     from app.renderer import InspectRequest, RenderRequest, inspect_composed, to_loopback_url
-    from app.touch_regions import EXTRACT_REGIONS_JS, normalize_regions
+    from app.touch_regions import (
+        EXTRACT_INTERACTIVE_JS,
+        normalize_regions,
+        normalize_slots,
+        split_capture_result,
+    )
 
     path = url_for("composer.compose", page_id=page_id)
     url = to_loopback_url(request.host_url.rstrip("/") + path)
-    # One navigation, two scripts: the element report plus the touch
-    # region map (issue #49), so an agent can verify which boxes its
-    # data-on-tap / @name annotations actually produced.
+    # One navigation, two scripts: the element report plus the combined
+    # touch-region + overlay-slot map (issue #49 / hybrid render mode),
+    # so an agent can verify which boxes its data-on-tap / @name /
+    # data-overlay-key annotations actually produced.
     combined = (
         "async () => ({ ...("
         + _REPORT_JS
-        + ")(), tap_regions: await ("
-        + EXTRACT_REGIONS_JS
+        + ")(), interactive: await ("
+        + EXTRACT_INTERACTIVE_JS
         + ")() })"
     )
     ir = InspectRequest(
@@ -1378,8 +1413,16 @@ def render_report(page_id: str) -> Response:
         return _err(502, f"render report failed: {type(err).__name__}: {err}")
     if not isinstance(report, dict):
         report = {"board": {}, "elements": []}
-    regions = normalize_regions(report.get("tap_regions"))
+    raw_regions, raw_slots = split_capture_result(report.pop("interactive", None))
+    regions = normalize_regions(raw_regions)
     report["tap_regions"] = regions
+    # Overlay value slots (hybrid render mode): the data-overlay-key
+    # elements that actually extracted, with their resolved box + font
+    # bucket, so an agent can confirm a slot annotation survived the
+    # render (an empty list against authored annotations means the
+    # element collapsed, or sits inside a code-element iframe, which
+    # the extractor deliberately skips).
+    report["overlay_slots"] = normalize_slots(raw_slots)
     report["tap_dangling"] = sorted({n for r in regions for n in r.get("dangling", [])})
     # Regions whose declared action wouldn't dispatch (issue #49). Empty
     # tap_invalid means every region will actually fire; a non-empty list
@@ -1395,12 +1438,19 @@ def render_report(page_id: str) -> Response:
     # tap_dangling``) instead of pulling the whole ``elements`` array, which
     # on a large board blows the output cap and dumps to a file. ``id`` +
     # ``rev`` always ride along. ``?view=touch`` is the touch-wiring preset.
-    selectable = {"board", "elements", "tap_regions", "tap_invalid", "tap_dangling"}
+    selectable = {
+        "board",
+        "elements",
+        "tap_regions",
+        "tap_invalid",
+        "tap_dangling",
+        "overlay_slots",
+    }
     view = (request.args.get("view") or "").strip().lower()
     raw_fields = (request.args.get("fields") or "").strip()
     wanted: set[str] | None = None
     if view == "touch":
-        wanted = {"tap_regions", "tap_invalid", "tap_dangling"}
+        wanted = {"tap_regions", "tap_invalid", "tap_dangling", "overlay_slots"}
     elif raw_fields:
         wanted = {f.strip() for f in raw_fields.split(",") if f.strip() in selectable}
     out: dict[str, Any] = {"id": page_id, "rev": _pr._canvas_rev(page)}

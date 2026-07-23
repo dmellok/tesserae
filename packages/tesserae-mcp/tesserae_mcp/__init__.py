@@ -333,6 +333,22 @@ as FIELDS you write into the doc-shape (full detail in the set_canvas descriptio
 render_report() returns tap_regions + tap_dangling so you can verify what's tappable. Only add
 touch actions when the user asks for interactivity, and confirm before wiring a Home Assistant call.
 
+LIVE VALUE SLOTS (overlay-capable panels): devices whose list_devices entry shows "overlay": true
+repaint small regions locally in under a second. Two things follow:
+- Tap targets on those panels get instant visual echo automatically -- nothing to author.
+- In an AUTHORED WIDGET's markup (install_widget / authored widgets), the element showing a live
+  value can carry data-overlay-key="ha:<entity_id>" (optional data-overlay-suffix, e.g. a degree
+  sign). The panel then repaints just that value with fresh Home Assistant state between full
+  renders. GUARDRAILS the server enforces (stay inside them by design, not by luck): at most 8
+  slots per frame; at most 2 distinct (font-size, weight) pairs across all slots (each pair costs
+  a glyph atlas and the firmware carries two); values are the RAW entity state + suffix, clipped
+  to 47 chars, drawn from a numeric charset (0-9 . , : - + % degree C F space) -- free text
+  renders as blanks, so only annotate numeric-ish values; keys must be ha:<entity_id>. NOT
+  extracted from a canvas code-element's markup (it renders in an iframe the extractor skips);
+  widget markup only. Verify with render_report(): "overlay_slots" lists the annotations that
+  actually extracted, and an empty list against your markup means the annotation was lost. On
+  panels without "overlay": true the attribute is inert and harmless.
+
 PUSH: once the render looks right, push_to_device to the same panel(s) you bound at the start --
 device_ids may name several panels and the one render fans out to each, fitted to its own dims.
 (You already called bind_devices up front, so scheduling / rotation / the editor's Send are set;
@@ -348,7 +364,9 @@ WIRE UP NAVIGATION / SCHEDULING (once the pages exist):
   deck is exactly the graph of page:<id> tap/swipe links between pages, so once you have wired
   those links (on_tap:"page:<id>" / on_swipe), call suggest_decks() to get a ready-made deck (graph
   + touch zones filled in) and create_deck() it instead of hand-building the graph. Offer this when
-  several pages link to each other.
+  several pages link to each other. Devices whose list_devices entry carries "deck_cache" go one
+  better: they store the deck's frames on local storage (SD) and navigate with the radio off, so
+  decks are the single snappiest navigation you can give those panels.
 """
 
 
@@ -419,7 +437,16 @@ def build_server() -> Any:
         reTerminal E1003). On those, the on_tap / on_swipe / on_slide actions you
         put on a dashboard's elements actually fire on the hardware. If a device
         has no "touch" flag it's display-only (or button-driven), so don't add
-        touch actions expecting them to work there."""
+        touch actions expecting them to work there.
+
+        Firmware capability flags ride along when the hardware reports them:
+        "overlay": true means the panel repaints small regions locally (instant
+        tap echo, plus data-overlay-key live value slots in authored widget
+        markup -- see the LIVE VALUE SLOTS section of the server instructions
+        for the guardrails); "deck_cache": {capacity_bytes} means the device
+        caches deck frames on local storage and navigates decks instantly with
+        the radio off. "kind" is the hardware model id. All read-only facts;
+        never ask the user to enable them, the firmware advertises them."""
         return _json("GET", "/devices")
 
     def list_pages() -> Any:
