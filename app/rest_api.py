@@ -555,6 +555,17 @@ def _ingest_deck_report(device: Device, page_id: Any) -> None:
         if wanted not in {p.page_id for p in deck.pages}:
             return
         nav.set(device.id, deck.id, wanted)
+        # The reported page is what's physically on glass, so it also
+        # becomes the device's live frame server-side: ETag polling
+        # keeps 304ing (a poll must never "un-navigate" the panel back
+        # to the pre-nav frame) and touch stale-checks accept strokes
+        # against it. Skip when already aligned.
+        push_mgr = current_app.config.get("PUSH_MANAGER")
+        if push_mgr is not None:
+            info = push_mgr.deck_render_for(device.id, wanted)
+            latest = push_mgr.latest_render_for(device.id)
+            if info is not None and (latest is None or latest.get("digest") != info.get("digest")):
+                push_mgr.promote_deck_page(device.id, wanted)
     except Exception:
         current_app.logger.exception("rest: deck report failed for device=%s", device.id)
 
@@ -672,6 +683,11 @@ def get_frame(device_id: str) -> Response:
     if err is not None or device is None:
         return err  # type: ignore[return-value]
 
+    # Deck cache: ingest the displayed-page report BEFORE any touch or
+    # button dispatch on this same wake, so a stroke against a locally-
+    # painted deck frame is validated against what's actually on glass.
+    _ingest_deck_report(device, request.args.get("deck_page_id"))
+
     # Button dispatch, if the firmware indicated one. Errors here are
     # non-fatal: the goal is best-effort action + always-serve-a-frame,
     # so the wake still returns a valid response even if the button
@@ -730,11 +746,6 @@ def get_frame(device_id: str) -> Response:
                 button_result = button_svc.snapshot(device.id)
             except Exception:
                 button_result = None
-
-    # Deck cache: a capable device that painted a page from its SD card
-    # reports it here on the same wake (``?deck_page_id=...``), keeping
-    # the server's nav position truthful without a separate request.
-    _ingest_deck_report(device, request.args.get("deck_page_id"))
 
     push_mgr = current_app.config.get("PUSH_MANAGER")
     latest = push_mgr.latest_render_for(device.id) if push_mgr is not None else None
@@ -948,6 +959,10 @@ def post_status(device_id: str) -> Response:
         raw_tz = body.get("tz", "")
         if isinstance(raw_tz, str):
             request_tz = raw_tz.strip()
+        # Deck cache: ingest the displayed-page report BEFORE the button
+        # dispatch below, so a button carried on the same heartbeat
+        # resolves from the deck position actually on glass.
+        _ingest_deck_report(device, body.get("deck_page_id"))
 
     # Button dispatch, if the firmware included it in the body. Same
     # non-fatal contract as the /frame path: errors here don't break
@@ -1004,7 +1019,6 @@ def post_status(device_id: str) -> Response:
     # Gated on the capability being advertised in THIS body, so /status
     # stays byte-identical for everything else.
     if isinstance(body, dict):
-        _ingest_deck_report(device, body.get("deck_page_id"))
         try:
             deck_env = _deck_status_envelope(device, body)
         except Exception:

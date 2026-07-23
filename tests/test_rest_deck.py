@@ -250,3 +250,105 @@ def test_frame_query_deck_page_report_updates_nav_position(app: Flask) -> None:
     nav = app.config["DECK_NAV_STORE"].get("frame01")
     assert nav is not None
     assert (nav["deck_id"], nav["page_id"]) == (deck.id, "weather")
+
+
+# -- local-nav reconciliation (touch/poll against deck-painted frames) --------
+
+
+def _bind_deck_with_regions(app: Flask, device_id: str) -> str:
+    """Deck bound to the device with page p2 warmed, its composition
+    carrying one touch region. Returns p2's frame digest."""
+    _bind_deck(app, device_id)  # pages: overview, weather
+    digest = _warm(app, device_id, "weather", b"deck-frame-weather")
+    push_mgr = app.config["PUSH_MANAGER"]
+    push_mgr._deck_renders[device_id]["weather"]["composition_digest"] = "e" * 16
+    from app.touch_regions import save_regions
+
+    save_regions(
+        app.config["RENDERS_DIR"],
+        "e" * 16,
+        [{"x": 10, "y": 10, "w": 200, "h": 100, "tap": "refresh", "invalid": [], "dangling": []}],
+    )
+    return digest
+
+
+def test_touch_on_deck_painted_frame_dispatches_not_stale(app: Flask) -> None:
+    """Deck local nav: the panel shows an SD-painted frame the server
+    never served via /frame. A touch echoing that digest must hit-test
+    against it (and promote it), not drop as stale."""
+    client = app.test_client()
+    token = _register_esp32(app, client, "frame01")
+    # A live frame exists from an earlier push, digest differs from glass.
+    app.config["PUSH_MANAGER"]._latest_renders["frame01"] = {
+        "digest": "0" * 16,
+        "ext": "bin",
+        "filename": "old.bin",
+        "composition_digest": "f" * 16,
+    }
+    deck_digest = _bind_deck_with_regions(app, "frame01")
+
+    resp = client.get(
+        f"/api/v1/device/frame01/frame?touch_x0=20&touch_y0=20&touch_digest={deck_digest}"
+        "&touch_event_id=5",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code in (200, 304)
+    # The stroke landed: the live slot is now the deck frame (promoted),
+    # and the nav store points at the page on glass.
+    latest = app.config["PUSH_MANAGER"].latest_render_for("frame01")
+    assert latest is not None and latest["digest"] == deck_digest
+    nav = app.config["DECK_NAV_STORE"].get("frame01")
+    assert nav is not None and nav["page_id"] == "weather"
+
+
+def test_deck_report_promotes_so_poll_304s(app: Flask) -> None:
+    """After local nav + report, a routine conditional poll must 304
+    against the deck frame instead of serving the stale pre-nav frame
+    (which would repaint the panel backwards)."""
+    client = app.test_client()
+    token = _register_esp32(app, client, "frame01")
+    app.config["PUSH_MANAGER"]._latest_renders["frame01"] = {
+        "digest": "0" * 16,
+        "ext": "bin",
+        "filename": "old.bin",
+        "composition_digest": "f" * 16,
+    }
+    deck_digest = _bind_deck_with_regions(app, "frame01")
+
+    resp = _post_status(client, "frame01", token, {"deck_page_id": "weather"})
+    assert resp.status_code == 200
+    latest = app.config["PUSH_MANAGER"].latest_render_for("frame01")
+    assert latest is not None and latest["digest"] == deck_digest
+
+    poll = client.get(
+        "/api/v1/device/frame01/frame",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "If-None-Match": f'"{deck_digest}"',
+        },
+    )
+    assert poll.status_code == 304
+
+
+def test_unknown_digest_still_stale(app: Flask) -> None:
+    """A digest matching neither the live slot nor any deck render is
+    still dropped as stale (the original guard stands)."""
+    client = app.test_client()
+    token = _register_esp32(app, client, "frame01")
+    app.config["PUSH_MANAGER"]._latest_renders["frame01"] = {
+        "digest": "0" * 16,
+        "ext": "bin",
+        "filename": "old.bin",
+        "composition_digest": "f" * 16,
+    }
+    _bind_deck_with_regions(app, "frame01")
+
+    resp = client.get(
+        f"/api/v1/device/frame01/frame?touch_x0=20&touch_y0=20&touch_digest={'9' * 16}"
+        "&touch_event_id=6",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code in (200, 304)
+    # Live slot untouched: the stroke was stale, nothing promoted.
+    latest = app.config["PUSH_MANAGER"].latest_render_for("frame01")
+    assert latest is not None and latest["digest"] == "0" * 16

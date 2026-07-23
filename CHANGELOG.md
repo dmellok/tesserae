@@ -6,6 +6,18 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **Touches were dropped as stale after deck local navigation.** When firmware paints a deck page
+  from its SD cache, the panel shows a frame the server never served via `/frame`, so the touch
+  stale-check rejected every subsequent stroke, and a routine conditional poll could even repaint
+  the panel backwards to the pre-nav frame. A digest that matches a deck-cached render is now
+  reconciled instead of dropped: the frame is promoted into the live slot (ETag polling 304s, nav
+  position recorded) and the stroke hit-tests against its composition. `deck_page_id` reports do
+  the same promotion, and report ingestion now runs before button/touch dispatch on `/frame` and
+  `/status` so same-wake events resolve from the page actually on glass. Digests matching nothing
+  are still dropped as stale.
+
 ### Added
 
 - **Per-device overlay target budgets (firmware v1.9).** The overlay capability now carries the

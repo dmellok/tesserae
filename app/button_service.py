@@ -437,6 +437,37 @@ class ButtonService:
             return None
         return (w, h) if w > 0 and h > 0 else None
 
+    def _reconcile_deck_frame(self, device_id: str, frame_digest: str) -> dict[str, Any] | None:
+        """When ``frame_digest`` matches a deck-cached render for this
+        device, the panel is showing that frame via local (SD) nav:
+        promote it into the live slot, record the nav position, and
+        return the render info so the caller hit-tests the right
+        composition. None when the digest matches nothing we know."""
+        if not frame_digest or self._decks is None:
+            return None
+        deck = self._bound_deck(device_id)
+        pusher = self._push_getter()
+        if deck is None or pusher is None:
+            return None
+        render_for = getattr(pusher, "deck_render_for", None)
+        promoter = getattr(pusher, "promote_deck_page", None)
+        if not (callable(render_for) and callable(promoter)):
+            return None
+        for page in deck.pages:
+            info = render_for(device_id, page.page_id)
+            if info is not None and str(info.get("digest") or "") == frame_digest:
+                promoter(device_id, page.page_id)
+                if self._deck_nav is not None:
+                    self._deck_nav.set(device_id, deck.id, page.page_id)
+                log.info(
+                    "touch reconcile: device=%s showing deck frame %s (page=%s)",
+                    device_id,
+                    frame_digest,
+                    page.page_id,
+                )
+                return dict(info)
+        return None
+
     def _try_deck_touch(self, device_id: str, stroke: TouchStroke) -> tuple[Deck, str] | None:
         """``(deck, target_page)`` when the tap point lands in a deck zone on
         the device's current deck page, else None (fall through to markup
@@ -674,15 +705,27 @@ class ButtonService:
             self._emit_touch_row(result, stroke=stroke, event_id=event_id)
             return result
         if frame_digest != str(latest.get("digest") or ""):
-            log.info(
-                "touch stale: device=%s stroke_digest=%s current=%s",
-                device_id,
-                frame_digest,
-                latest.get("digest"),
-            )
-            result = TouchHandleResult(outcome="stale", gesture=None, base=self.snapshot(device_id))
-            self._emit_touch_row(result, stroke=stroke, event_id=event_id)
-            return result
+            # Deck local nav (SD cache): the device may legitimately be
+            # showing a deck-cached frame the server never served via
+            # /frame. If the echoed digest matches one, that frame IS
+            # current: promote it into the live slot (aligning ETag
+            # polling and future strokes) and hit-test against it,
+            # instead of dropping the user's tap as stale.
+            reconciled = self._reconcile_deck_frame(device_id, frame_digest)
+            if reconciled is not None:
+                latest = reconciled
+            else:
+                log.info(
+                    "touch stale: device=%s stroke_digest=%s current=%s",
+                    device_id,
+                    frame_digest,
+                    latest.get("digest"),
+                )
+                result = TouchHandleResult(
+                    outcome="stale", gesture=None, base=self.snapshot(device_id)
+                )
+                self._emit_touch_row(result, stroke=stroke, event_id=event_id)
+                return result
 
         gesture, magnitude = classify_stroke(stroke.x0, stroke.y0, stroke.x1, stroke.y1)
         regions = (
