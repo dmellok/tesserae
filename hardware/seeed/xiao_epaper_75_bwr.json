@@ -1,0 +1,26 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "xiao_epaper_75_bwr",
+  "name": "Seeed XIAO ePaper 7.5\" (black/white/red)",
+  "vendor": "Seeed Studio",
+  "url": "https://www.seeedstudio.com/XIAO-7-5-ePaper-Panel-p-6416.html",
+  "icon": "device-tablet",
+  "description": "Seeed XIAO ESP32-S3 driving a 7.5 inch black/white/red tri-colour ePaper panel (800x480). Speaks Tesserae's v1 REST device API and paints a raw 2-bpp packed buffer (96000 bytes) produced by the esp32_bin renderer against the bwr_3 gamut. Same board as xiao_epaper_75; pick this kind when a BWR panel is fitted and the unit runs the BWR firmware build.",
+  "protocol": "esp32_bw_client",
+  "renderers": ["esp32_bin"],
+  "panel": {
+    "w": 800,
+    "h": 480,
+    "orientation": "landscape",
+    "name": "7.5 inch black/white/red ePaper (800x480)",
+    "gamut": "bwr_3",
+    "native_w": 800,
+    "native_h": 480
+  },
+  "protocol_config": {
+    "model_header": "XIAO_ePaper_75_BWR"
+  },
+  "refresh_floor_s": 60,
+  "image_format": "bin",
+  "notes_md": "Awaiting confirmed test on real hardware (firmware in progress). Wire format is exactly 96000 bytes (800*480/4), row-major from top-left, 4 pixels per byte MSB first (bits 7-6 = leftmost pixel); 2-bit value 0b00 = black, 0b01 = white, 0b10 = red, 0b11 reserved and never emitted by the server (firmware renders a stray 0b11 as white). No pre-rotation or mirroring; the firmware handles any panel-side transform. Same physical board as `xiao_epaper_75`; the server migrates a registered unit between the mono and BWR kinds automatically when its firmware re-registers or re-discovers declaring the other kind (same-protocol kind heal), keeping the device row, token, and history."
+}

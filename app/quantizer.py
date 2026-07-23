@@ -221,8 +221,8 @@ INKY_7COLOUR_CALIBRATED_PALETTE: tuple[tuple[int, int, int], ...] = (
 # require migrating every existing on-disk config, so the awkward
 # names stay for backward compat and the aliases carry the semantic
 # intent.
-PanelGamut = Literal["waveshare_e6", "inky_7colour", "bwry_4"]
-PANEL_GAMUTS: tuple[str, ...] = ("waveshare_e6", "inky_7colour", "bwry_4")
+PanelGamut = Literal["waveshare_e6", "inky_7colour", "bwry_4", "bwr_3"]
+PANEL_GAMUTS: tuple[str, ...] = ("waveshare_e6", "inky_7colour", "bwry_4", "bwr_3")
 
 # Wider allow-list for values a client can *declare* over
 # /api/v1/device/{discover, register} (added v0.69.1 for issue #41
@@ -322,11 +322,24 @@ def _compress_to_calibrated_range(
     return Image.fromarray(np.clip(scaled, 0, 255).astype(np.uint8))
 
 
+# Identity LUT, same rationale as BWRY's: palette index IS the wire
+# value (0b00 black, 0b01 white, 0b10 red). The palette has only three
+# entries, so the reserved 0b11 field can never be emitted; firmware
+# that encounters it (a corrupt frame) renders it as white per the
+# XIAO BWR wire contract.
+_BWR_3_WIRE_BY_PALETTE_INDEX: tuple[int, ...] = (0x0, 0x1, 0x2)
+
 _GAMUT_TABLE: dict[str, tuple[tuple[tuple[int, int, int], ...], tuple[int, ...]]] = {
     "waveshare_e6": (WAVESHARE_E6_PALETTE, _E6_NIBBLE_BY_PALETTE_INDEX),
     "inky_7colour": (INKY_7COLOUR_PALETTE, _INKY_7COLOUR_NIBBLE_BY_PALETTE_INDEX),
     "bwry_4": (BWRY_4_PALETTE, _BWRY_4_NIBBLE_BY_PALETTE_INDEX),
+    "bwr_3": (BWR_3_PALETTE, _BWR_3_WIRE_BY_PALETTE_INDEX),
 }
+
+# Gamuts whose native wire format is 2-bpp packed (four pixels per
+# byte, MSB first) rather than 4-bpp nibbles: the PicPak-class BWRY
+# panels and the XIAO 7.5" BWR class.
+_NATIVE_2BPP_GAMUTS: frozenset[str] = frozenset({"bwry_4", "bwr_3"})
 
 
 def _apply_exposure(img: Image.Image, exposure: int) -> Image.Image:
@@ -1178,6 +1191,9 @@ def pack_to_panel_bin(
       1:0 = col 3). Values are the four palette indices directly (0x0
       black, 0x1 white, 0x2 yellow, 0x3 red), goes straight to the SPI
       stream on the C3-class controllers these panels ship with.
+    * ``bwr_3`` (XIAO 7.5" BWR class): same 2-bpp layout with the
+      tri-colour values 0x0 black, 0x1 white, 0x2 red. 0x3 is reserved
+      on the wire and never emitted (the palette has three entries).
 
     Unknown gamuts fall back to ``waveshare_e6`` (6 colour, 4-bpp).
 
@@ -1216,10 +1232,10 @@ def pack_to_panel_bin(
       stay clean while photo cells keep diffusing. ``None`` reproduces the
       pre-#86 single-strategy behaviour byte-for-byte.
     """
-    if gamut == "bwry_4":
+    if gamut in _NATIVE_2BPP_GAMUTS:
         if width % 4:
             raise ValueError(
-                f"BWRY panel width must be a multiple of 4 (four pixels per byte), got {width}"
+                f"2-bpp panel width must be a multiple of 4 (four pixels per byte), got {width}"
             )
     elif width % 2:
         raise ValueError(f"panel width must be even (two pixels per byte), got {width}")
@@ -1379,11 +1395,11 @@ def pack_to_panel_bin(
         lut[i] = nibble
     nibbles = raw.translate(bytes(lut))
 
-    if gamut == "bwry_4":
+    if gamut in _NATIVE_2BPP_GAMUTS:
         # 2-bpp native pack, 4 pixels per byte. MSB = leftmost pixel:
         # bits 7:6 = col 0, 5:4 = col 1, 3:2 = col 2, 1:0 = col 3.
-        # Goes straight to the SPI stream on PicPak-class controllers,
-        # no decode / repack on the C3.
+        # Goes straight to the SPI stream on PicPak-class controllers
+        # (BWRY) and the XIAO 7.5" BWR firmware, no decode / repack.
         idx = np.frombuffer(nibbles, dtype=np.uint8).reshape(height, width)
         packed_arr = (
             (idx[:, 0::4] << 6) | (idx[:, 1::4] << 4) | (idx[:, 2::4] << 2) | idx[:, 3::4]

@@ -318,3 +318,55 @@ def test_landscape_calibration_on_portrait_native_panel(registry) -> None:
     # (right of landscape) → bottom of portrait.
     assert _decode_pixel(out, 600, 400, 1200) == red_nibble
     assert _decode_pixel(out, 600, 1200, 1200) == blue_nibble
+
+
+def test_bwr_panel_gets_native_2bpp_pack(registry) -> None:
+    """The XIAO 7.5" BWR class: ``gamut = "bwr_3"`` routes into the same
+    native 2-bpp pack as BWRY, with the tri-colour wire values 0b00
+    black, 0b01 white, 0b10 red. Solid frames pin all three, and the
+    reserved 0b11 can never appear (the palette has three entries)."""
+    esp = registry.get("esp32_bin")
+    assert esp is not None
+    settings = {"dither": "none", "saturation": 1.0, "contrast": 1.0}
+    panel = Panel(w=800, h=480, gamut="bwr_3")
+    for colour, expected_byte in (
+        ((0, 0, 0), 0x00),  # black -> 0b00 in all four slots
+        ((255, 255, 255), 0x55),  # white -> 0b01
+        ((255, 0, 0), 0xAA),  # red -> 0b10
+    ):
+        img = Image.new("RGB", (800, 480), colour)
+        out = esp.transform(_png_bytes(img), panel=panel, settings=settings)
+        assert len(out) == 800 * 480 // 4
+        assert all(b == expected_byte for b in out)
+
+
+def test_bwr_msb_first_pixel_order_and_no_reserved_value(registry) -> None:
+    """A single red pixel at the top-left corner lands in bits 7-6 of
+    byte 0; a busy gradient never emits the reserved 0b11 field."""
+    esp = registry.get("esp32_bin")
+    assert esp is not None
+    settings = {"dither": "none", "saturation": 1.0, "contrast": 1.0}
+    panel = Panel(w=800, h=480, gamut="bwr_3")
+
+    img = Image.new("RGB", (800, 480), (0, 0, 0))
+    img.putpixel((0, 0), (255, 0, 0))
+    out = esp.transform(_png_bytes(img), panel=panel, settings=settings)
+    assert out[0] == 0b10000000
+    assert out[1] == 0x00
+
+    # Gradient through greys and reds, dithered: every 2-bit field must
+    # stay within {0b00, 0b01, 0b10}.
+    grad = Image.new("RGB", (800, 480))
+    for x in range(800):
+        g = (x * 255) // 800
+        for y in range(0, 480, 2):
+            grad.putpixel((x, y), (g, g, g))
+            grad.putpixel((x, y + 1), (255, g, g))
+    dithered = esp.transform(
+        _png_bytes(grad),
+        panel=panel,
+        settings={"dither": "floyd-steinberg", "saturation": 1.0, "contrast": 1.0},
+    )
+    for byte in dithered:
+        for shift in (6, 4, 2, 0):
+            assert (byte >> shift) & 0b11 != 0b11

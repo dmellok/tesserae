@@ -8,6 +8,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **XIAO ePaper 7.5" black/white/red variant.** `bwr_3` is now a canonical packer gamut: the
+  `esp32_bin` renderer packs tri-colour panels to the native 2-bpp layout (96000 bytes at 800x480,
+  MSB-first, 0b00 black / 0b01 white / 0b10 red; the reserved 0b11 is never emitted), sharing the
+  BWRY 2-bpp path. New `xiao_epaper_75_bwr` hardware SKU on the same `esp32_bw_client` protocol as
+  the mono board, so reflashing a unit between mono and BWR firmware migrates its registration
+  automatically (same-protocol kind heal) while keeping the device row, token, and history.
+
 - **Deck cache sync for devices (on-device SD frame cache).** Firmware with local storage can now
   cache a bound deck's pre-rendered frames and navigate button/touch links on-device (wake, read
   card, paint; no WiFi round trip). New device-facing surface: a `deck_cache` capability advertised

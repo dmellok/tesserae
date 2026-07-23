@@ -437,6 +437,67 @@ def test_discover_mac_claim_heals_kind(app: Flask) -> None:
     assert devices.get("frame03").kind_of == "seeed_reterminal_e1004"
 
 
+def test_heal_between_catalog_siblings_keeps_device_identity(app: Flask) -> None:
+    """A reflash switches the same physical unit between catalog
+    sibling kinds (E1001 mono <-> E1001 gray, XIAO mono <-> XIAO BWR).
+    The heal must move the EXISTING row, not create a duplicate: same
+    device id, same token, one registry entry, and per-device state
+    keyed by the id (history, pages, nav) stays attached."""
+    client = app.test_client()
+    _sign_in(client)
+    devices = app.config["DEVICE_REGISTRY"]
+
+    for device_id, mac, first_kind, second_kind in (
+        (
+            "hall_e1001",
+            "aa:bb:cc:dd:ee:11",
+            "seeed_reterminal_e1001",
+            "seeed_reterminal_e1001_gray",
+        ),
+        ("desk_xiao", "aa:bb:cc:dd:ee:12", "xiao_epaper_75", "xiao_epaper_75_bwr"),
+    ):
+        code = _issue_pairing(app)
+        first = client.post(
+            "/api/v1/device/register",
+            headers={"X-Pairing-Code": code, "Content-Type": "application/json"},
+            data=json.dumps({"device_id": device_id, "kind": first_kind, "mac": mac}),
+        )
+        assert first.status_code == 201
+        token = first.get_json()["device_token"]
+
+        # Reflash: wiped NVS, device re-discovers by MAC declaring the
+        # sibling kind.
+        resp = client.post(
+            "/api/v1/device/discover",
+            headers={"Content-Type": "application/json"},
+            data=json.dumps(
+                {"device_id": device_id, "kind": second_kind, "fw_version": "1.7.0", "mac": mac}
+            ),
+        )
+        assert resp.status_code == 200
+        body = resp.get_json()
+        assert body["registered"] is True
+        assert body["device_token"] == token  # identity kept, not re-minted
+
+        healed = devices.get(device_id)
+        assert healed is not None and healed.kind_of == second_kind
+        assert healed.manifest.get("access_token") == token
+        # One row, no duplicate instance under another id.
+        instances = [d for d in devices.all() if d.kind_of is not None and d.id == device_id]
+        assert len(instances) == 1
+
+        # And back again (gray unit reflashed to mono firmware).
+        back = client.post(
+            "/api/v1/device/discover",
+            headers={"Content-Type": "application/json"},
+            data=json.dumps(
+                {"device_id": device_id, "kind": first_kind, "fw_version": "1.7.1", "mac": mac}
+            ),
+        )
+        assert back.status_code == 200
+        assert devices.get(device_id).kind_of == first_kind
+
+
 # -- auth --------------------------------------------------------------
 
 
