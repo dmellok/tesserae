@@ -29,10 +29,34 @@ from app.panel import is_flipped_orientation
 
 logger = logging.getLogger(__name__)
 
-# Firmware-side caps from the v1.8 implementation report. The server
-# must stay within them; anything past the cap is dropped with a log
-# line (no silent truncation).
+# Firmware-side caps from the v1.8 implementation report (v1.9 raised
+# the target buffer and advertises its own limit via
+# ``overlay.max_targets``; 8 stays the floor for firmware that doesn't
+# send the field). The server must stay within them; anything past a
+# cap is dropped with a log line (no silent truncation).
 MAX_TARGETS = 8
+# Firmware parses spec documents into a fixed 8 KB buffer; the v1.9
+# worst-case host test (32 targets + 8 slots + 2 full atlases) measures
+# ~6.5 KB, so exceeding this indicates a server-side regression.
+MAX_SPEC_BYTES = 8192
+
+
+def _is_nav_region(region: dict[str, Any]) -> bool:
+    """True when a touch region's action navigates (page jump, rotation
+    step): the targets that most deserve instant echo when a frame has
+    more regions than the device's target budget."""
+    specs: list[str] = []
+    tap = region.get("tap")
+    if isinstance(tap, str):
+        specs.append(tap)
+    swipe = region.get("swipe")
+    if isinstance(swipe, dict):
+        specs.extend(str(s) for s in swipe.values())
+    return any(
+        s.startswith(("page:", "step:")) or s in ("rotate_next", "rotate_prev") for s in specs
+    )
+
+
 MAX_SLOTS = 8
 MAX_ATLASES = 2
 MAX_GLYPHS = 32
@@ -48,7 +72,10 @@ ATLAS_CHARSET = "0123456789.,:-+%°CF "
 
 def advertised_overlay(payload: bytes | str | dict[str, Any]) -> dict[str, int] | None:
     """The overlay capability a device advertises in its register /
-    heartbeat body (``{"overlay": {"schema": 1}}``), validated, or None.
+    heartbeat body (``{"overlay": {"schema": 1, "max_targets": 32}}``),
+    validated, or None. ``max_targets`` is additive (firmware >= v1.9);
+    absent means the v1.8 baseline of 8, and the value clamps to a sane
+    band so a corrupt beat can't zero out or explode the spec.
 
     Sticky like the OTA schema (a firmware capability, not removable
     hardware): the caller carries it forward across beats that omit it."""
@@ -67,7 +94,11 @@ def advertised_overlay(payload: bytes | str | dict[str, Any]) -> dict[str, int] 
     schema = cap.get("schema")
     if not isinstance(schema, int) or isinstance(schema, bool) or schema < 1:
         return None
-    return {"schema": schema}
+    out: dict[str, int] = {"schema": schema}
+    raw_max = cap.get("max_targets")
+    if isinstance(raw_max, int) and not isinstance(raw_max, bool):
+        out["max_targets"] = max(1, min(64, raw_max))
+    return out
 
 
 _Rect = tuple[float, float, float, float]
@@ -195,6 +226,7 @@ def build_spec(
     panel: dict[str, Any],
     slots: list[dict[str, Any]] | None = None,
     atlas_provider: Any | None = None,
+    max_targets: int = MAX_TARGETS,
 ) -> dict[str, Any] | None:
     """The schema-1 overlay spec for one frame, wire-space coordinates:
     tap-echo targets from the touch-region sidecar, plus (when the
@@ -211,29 +243,36 @@ def build_spec(
     geo = _panel_geometry(panel)
     if geo is None:
         return None
-    targets: list[dict[str, Any]] = []
-    for i, region in enumerate(regions):
-        wire = _rect_from(region, geo)
-        if wire is None:
-            continue
-        if len(targets) >= MAX_TARGETS:
-            logger.info(
-                "overlay spec: dropping target %d+ for frame %s (firmware cap %d)",
-                i,
-                frame_digest,
-                MAX_TARGETS,
-            )
-            break
-        targets.append(
-            {
-                "id": f"t{len(targets) + 1}",
-                "x": wire[0],
-                "y": wire[1],
-                "w": wire[2],
-                "h": wire[3],
-                "echo": "invert",
-            }
+    # Resolve every region to a wire rect first; when the frame carries
+    # more regions than the device's advertised target budget, trim with
+    # navigation-priority (page/rotation targets echo first, document
+    # order within each class) instead of blind document order, so the
+    # targets most likely to be pressed repeatedly keep their echo.
+    resolved = [(region, wire) for region in regions if (wire := _rect_from(region, geo))]
+    if len(resolved) > max_targets:
+        logger.info(
+            "overlay spec: %d regions > device budget %d for frame %s; nav targets win",
+            len(resolved),
+            max_targets,
+            frame_digest,
         )
+        by_priority = sorted(enumerate(resolved), key=lambda p: (not _is_nav_region(p[1][0]), p[0]))
+        # Survivors go back to document position: the firmware's own
+        # overflow rule is first-in-document-order, so emitting in
+        # document order keeps behaviour identical even if a stale
+        # device ignores its advertised budget.
+        resolved = [rw for _i, rw in sorted(by_priority[:max_targets], key=lambda p: p[0])]
+    targets = [
+        {
+            "id": f"t{n + 1}",
+            "x": wire[0],
+            "y": wire[1],
+            "w": wire[2],
+            "h": wire[3],
+            "echo": "invert",
+        }
+        for n, (_region, wire) in enumerate(resolved)
+    ]
 
     spec: dict[str, Any] = {"schema": 1, "frame_digest": frame_digest, "targets": targets}
 
@@ -296,6 +335,17 @@ def build_spec(
         if out_slots:
             spec["slots"] = out_slots
             spec["atlases"] = out_atlases
+    size = len(json.dumps(spec, separators=(",", ":")))
+    if size > MAX_SPEC_BYTES:
+        # Shouldn't be reachable within the caps (firmware's worst-case
+        # host test measures ~6.5 KB); a breach means a regression here,
+        # so log loudly rather than ship a document the parser rejects.
+        logger.error(
+            "overlay spec: %d bytes exceeds firmware buffer %d for frame %s",
+            size,
+            MAX_SPEC_BYTES,
+            frame_digest,
+        )
     return spec
 
 

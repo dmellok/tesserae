@@ -129,14 +129,19 @@ def test_devices_surface_firmware_capabilities(app: Flask) -> None:
     )
     assert result.ok
     app.config["DEVICE_STATUS"]["cap_panel"] = {
-        "overlay": {"schema": 1},
+        "overlay": {"schema": 1, "max_targets": 32},
         "deck_cache": {"schema": 1, "capacity_bytes": 7_900_000},
     }
     devices = app.test_client().get("/api/mcp/devices").get_json()["devices"]
     entry = next(d for d in devices if d["id"] == "cap_panel")
-    assert entry["overlay"] is True
+    assert entry["overlay"] == {"max_targets": 32}
     assert entry["deck_cache"] == {"capacity_bytes": 7_900_000}
     assert entry["kind"] == "esp32_client"
+    # v1.8 firmware (no max_targets field) reads as the baseline 8.
+    app.config["DEVICE_STATUS"]["cap_panel"]["overlay"] = {"schema": 1}
+    devices = app.test_client().get("/api/mcp/devices").get_json()["devices"]
+    entry = next(d for d in devices if d["id"] == "cap_panel")
+    assert entry["overlay"] == {"max_targets": 8}
 
 
 def test_render_report_extracts_overlay_slots(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:

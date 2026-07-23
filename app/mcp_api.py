@@ -654,9 +654,10 @@ def devices() -> Response:
     button-driven), so touch actions won't do anything there.
 
     Firmware capabilities (from the device's live heartbeats) ride along when
-    present: ``overlay: true`` means the panel does local partial-refresh
-    overlays, so tap targets echo instantly and ``data-overlay-key`` value
-    slots in widget markup repaint with live values between full renders;
+    present: ``overlay: {max_targets}`` means the panel does local partial-
+    refresh overlays, so up to ``max_targets`` tap zones echo instantly and
+    ``data-overlay-key`` value slots in widget markup repaint with live
+    values between full renders;
     ``deck_cache: {capacity_bytes}`` means the device caches deck frames on
     local storage and navigates decks without a network round trip. Both are
     read-only facts about the hardware; their absence just means those
@@ -687,8 +688,11 @@ def devices() -> Response:
                 entry["touch"] = True
             status = status_cache.get(d.id) if isinstance(status_cache, dict) else None
             if isinstance(status, dict):
-                if isinstance(status.get("overlay"), dict):
-                    entry["overlay"] = True
+                overlay_cap = status.get("overlay")
+                if isinstance(overlay_cap, dict):
+                    # max_targets = how many tap zones get instant echo
+                    # on this panel (v1.8 firmware baseline is 8).
+                    entry["overlay"] = {"max_targets": overlay_cap.get("max_targets", 8)}
                 deck_cache = status.get("deck_cache")
                 if isinstance(deck_cache, dict):
                     entry["deck_cache"] = {

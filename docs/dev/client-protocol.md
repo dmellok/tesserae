@@ -738,8 +738,15 @@ server-declared primitives over the served frame locally, giving
 sub-second tap feedback without a network round trip. The server frame
 stays the source of truth; the overlay is cosmetic and optimistic.
 
-Advertise `"overlay": {"schema": 1}` in register/status bodies. The
-capability is sticky (a firmware property, unlike `deck_cache`).
+Advertise `"overlay": {"schema": 1, "max_targets": 32}` in
+register/status bodies. The capability is sticky (a firmware property,
+unlike `deck_cache`). `max_targets` (additive, firmware v1.9+) is the
+device's tap-echo target buffer; the server trims target lists to it,
+treating absence as the v1.8 baseline of 8. When a frame carries more
+touch regions than the budget, navigation targets (`page:`, `step:`,
+`rotate_*`) win the echo slots and the rest still dispatch normally,
+just without the instant flash; survivors are always emitted in
+document order. Spec documents never exceed 8 KB.
 
 `GET /api/v1/device/<id>/frame/overlay/<frame_digest>` (Bearer) returns
 the spec for one served frame, or `404` meaning "feature off for this

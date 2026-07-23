@@ -1156,12 +1156,20 @@ def get_frame_overlay(device_id: str, digest: str) -> Response:
         atlas["url"] = f"/api/v1/device/{device.id}/frame/overlay/atlas/{atlas['digest']}"
         return atlas
 
+    # The device's advertised target budget (v1.9 firmware sends
+    # overlay.max_targets; absent = the v1.8 baseline of 8). Sticky in
+    # the status cache, so it survives beats that omit the capability.
+    status = (current_app.config.get("DEVICE_STATUS") or {}).get(device.id)
+    overlay_cap = status.get("overlay") if isinstance(status, dict) else None
+    max_targets = overlay_cap.get("max_targets", 8) if isinstance(overlay_cap, dict) else 8
+
     spec = build_spec(
         frame_digest=wanted,
         regions=regions,
         panel=device.panel or {},
         slots=slots,
         atlas_provider=atlas_provider if slots else None,
+        max_targets=max_targets,
     )
     if spec is None:
         return _error(404, "no overlay for this frame")

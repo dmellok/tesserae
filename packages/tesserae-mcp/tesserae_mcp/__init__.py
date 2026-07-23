@@ -333,8 +333,9 @@ as FIELDS you write into the doc-shape (full detail in the set_canvas descriptio
 render_report() returns tap_regions + tap_dangling so you can verify what's tappable. Only add
 touch actions when the user asks for interactivity, and confirm before wiring a Home Assistant call.
 
-LIVE VALUE SLOTS (overlay-capable panels): devices whose list_devices entry shows "overlay": true
-repaint small regions locally in under a second. Two things follow:
+LIVE VALUE SLOTS (overlay-capable panels): devices whose list_devices entry carries an "overlay"
+object repaint small regions locally in under a second; its "max_targets" is how many tap zones
+get instant echo on that panel (8 on older firmware, 32 on current). Two things follow:
 - Tap targets on those panels get instant visual echo automatically -- nothing to author.
 - In an AUTHORED WIDGET's markup (install_widget / authored widgets), the element showing a live
   value can carry data-overlay-key="ha:<entity_id>" (optional data-overlay-suffix, e.g. a degree
@@ -347,7 +348,9 @@ repaint small regions locally in under a second. Two things follow:
   extracted from a canvas code-element's markup (it renders in an iframe the extractor skips);
   widget markup only. Verify with render_report(): "overlay_slots" lists the annotations that
   actually extracted, and an empty list against your markup means the annotation was lost. On
-  panels without "overlay": true the attribute is inert and harmless.
+  panels without an "overlay" entry the attribute is inert and harmless. Keep interactive zones
+  within "max_targets" or accept that navigation targets win the echo budget and the rest respond
+  without the instant flash.
 
 PUSH: once the render looks right, push_to_device to the same panel(s) you bound at the start --
 device_ids may name several panels and the one render fans out to each, fitted to its own dims.
@@ -440,7 +443,7 @@ def build_server() -> Any:
         touch actions expecting them to work there.
 
         Firmware capability flags ride along when the hardware reports them:
-        "overlay": true means the panel repaints small regions locally (instant
+        "overlay": {max_targets} means the panel repaints small regions locally (instant
         tap echo, plus data-overlay-key live value slots in authored widget
         markup -- see the LIVE VALUE SLOTS section of the server instructions
         for the guardrails); "deck_cache": {capacity_bytes} means the device

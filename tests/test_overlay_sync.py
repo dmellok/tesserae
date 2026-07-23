@@ -165,3 +165,55 @@ def test_build_spec_drops_malformed_and_offscreen_regions() -> None:
 
 def test_build_spec_none_on_bad_panel() -> None:
     assert overlay_sync.build_spec(frame_digest="d" * 16, regions=[], panel={}) is None
+
+
+# -- max_targets (v1.9 firmware) ---------------------------------------------
+
+
+def test_capability_parses_max_targets_with_clamp() -> None:
+    assert overlay_sync.advertised_overlay({"overlay": {"schema": 1, "max_targets": 32}}) == {
+        "schema": 1,
+        "max_targets": 32,
+    }
+    # Clamped to a sane band; bools and junk ignored.
+    assert overlay_sync.advertised_overlay({"overlay": {"schema": 1, "max_targets": 500}}) == {
+        "schema": 1,
+        "max_targets": 64,
+    }
+    assert overlay_sync.advertised_overlay({"overlay": {"schema": 1, "max_targets": 0}}) == {
+        "schema": 1,
+        "max_targets": 1,
+    }
+    assert overlay_sync.advertised_overlay({"overlay": {"schema": 1, "max_targets": True}}) == {
+        "schema": 1
+    }
+
+
+def test_build_spec_honours_device_target_budget() -> None:
+    regions = [_region(10 * i, 10) for i in range(20)]
+    spec = overlay_sync.build_spec(
+        frame_digest="e" * 16, regions=regions, panel=PANEL, max_targets=32
+    )
+    assert spec is not None and len(spec["targets"]) == 20  # under budget: all emit
+    spec8 = overlay_sync.build_spec(
+        frame_digest="e" * 16, regions=regions, panel=PANEL, max_targets=8
+    )
+    assert spec8 is not None and len(spec8["targets"]) == 8
+
+
+def test_trim_prioritizes_nav_targets_in_document_order() -> None:
+    # 10 regions, budget 8: two nav regions sit LAST in document order and
+    # must survive the trim; the two dropped are the last non-nav ones.
+    regions = [dict(_region(10 * i, 10), tap="refresh") for i in range(8)]
+    regions.append(dict(_region(200, 10), tap="page:kitchen"))
+    regions.append(dict(_region(220, 10), swipe={"left": "rotate_next"}))
+    spec = overlay_sync.build_spec(
+        frame_digest="f" * 16, regions=regions, panel=PANEL, max_targets=8
+    )
+    assert spec is not None
+    xs = [t["x"] for t in spec["targets"]]
+    # Nav rects (x=200, 220) survived; the last two non-nav (x=60, 70) dropped.
+    assert 200 in xs and 220 in xs
+    assert 60 not in xs and 70 not in xs
+    # Survivors are emitted in document order (x ascending here).
+    assert xs == sorted(xs)

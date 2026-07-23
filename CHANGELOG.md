@@ -8,6 +8,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Per-device overlay target budgets (firmware v1.9).** The overlay capability now carries the
+  device's own tap-echo buffer size (`overlay: {schema, max_targets}`, 32 on current E1003
+  firmware); the server trims target lists to the advertised value, treating absence as the v1.8
+  baseline of 8. When a frame has more touch regions than the budget, navigation targets
+  (`page:` / `step:` / `rotate_*`) win the echo slots ahead of miscellaneous actions, and
+  survivors always emit in document order. Spec size is guarded against the firmware's 8 KB parse
+  buffer. The MCP device list now reports `overlay: {max_targets}` so agents can design within
+  the real per-panel budget.
+
 - **MCP surfaces the deck-cache and overlay capabilities.** `/api/mcp/devices` entries now carry
   the hardware `kind` plus firmware capability flags from live heartbeats: `overlay: true`
   (instant tap echo + live value slots apply on that panel) and `deck_cache: {capacity_bytes}`
