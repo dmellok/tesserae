@@ -25,7 +25,7 @@ from typing import Any
 
 from flask import Flask
 
-from app import device_loader, renderer_loader
+from app import deck_sync, device_loader, renderer_loader
 from app.discovery import DiscoveryCache, device_id_from_status_topic
 from app.embedded_broker import EmbeddedBroker
 from app.ha_discovery import HomeAssistantDiscovery
@@ -309,6 +309,13 @@ def record_status_heartbeat(
         entry["ota_schema"] = ota_schema
     elif prev_entry.get("ota_schema") is not None:
         entry["ota_schema"] = prev_entry["ota_schema"]
+    # Deck cache capability (on-device SD frame cache): deliberately NOT
+    # carried forward on a beat that omits it. The firmware advertises only
+    # while a card is present and mounted; the card can be pulled between
+    # wakes, and the server must stop offering deck syncs the moment it is.
+    deck_cache = deck_sync.advertised_deck_cache(payload)
+    if deck_cache is not None:
+        entry["deck_cache"] = deck_cache
     status_cache[device.id] = entry
     # Persist the stable facts (fw version, OTA capability) so a restart
     # doesn't forget them until the device's next wake; write-on-change only.

@@ -582,6 +582,15 @@ class PushManager:
     def has_warm_deck_page(self, device_id: str, page_id: str) -> bool:
         return page_id in self._deck_renders.get(device_id, {})
 
+    def deck_render_for(self, device_id: str, page_id: str) -> dict[str, Any] | None:
+        """The warmed render info for one deck page of a device
+        (``{digest, ext, filename, ...}``, same shape as
+        :meth:`latest_render_for`), or None when not warmed. Used by the
+        device-facing deck manifest / frame endpoints (``app.deck_sync``)."""
+        with self._lock:
+            info = self._deck_renders.get(device_id, {}).get(page_id)
+            return dict(info) if info is not None else None
+
     def clear_deck_cache(self, device_id: str, *, keep_pages: set[str] | None = None) -> None:
         """Drop warmed frames for a device: all of them, or all except
         ``keep_pages``. Used when a deck's page set changes or a device unbinds

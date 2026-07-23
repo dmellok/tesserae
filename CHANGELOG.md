@@ -8,6 +8,25 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Deck cache sync for devices (on-device SD frame cache).** Firmware with local storage can now
+  cache a bound deck's pre-rendered frames and navigate button/touch links on-device (wake, read
+  card, paint; no WiFi round trip). New device-facing surface: a `deck_cache` capability advertised
+  in heartbeat bodies (current-state per beat, withdrawn the moment a card disappears), a
+  `GET /api/v1/device/<id>/deck` manifest (page frame digests, byte sizes, TTLs, and the link graph;
+  cold pages are warmed on demand), digest-addressed frame fetch at
+  `GET /api/v1/device/<id>/deck/frame/<digest>` with immutable cache headers, a `deck.version`
+  envelope on `/status` responses so firmware knows when to re-sync, and `deck_page_id` reporting on
+  `/status` bodies and `/frame` query params so locally-navigated pages keep the server's nav
+  position truthful. Devices that never advertise the capability see byte-identical responses
+  everywhere. Contract documented in docs/dev/client-protocol.md ("Deck cache sync").
+
+- **2-bit grayscale renderer + reTerminal E1001 grayscale variant.** New `esp32_gray2_bin` renderer
+  packs compositions to 4-level grayscale at 2 bpp (96000 bytes for 800x480; MSB-first, 0b00 black,
+  0b11 white, linear) for UC8179-class mono panels driven in their 4-gray waveform mode, and a
+  `seeed_reterminal_e1001_gray` hardware SKU pairs it with the grayscale firmware build. Same
+  `esp32_bw_client` protocol as the mono SKU, so the registration variant picker offers both and an
+  already-registered E1001 migrates automatically when its firmware re-declares the gray kind.
+
 - **Stale device kind auto-heals on re-pair (#121).** A device that first registered under a generic
   protocol kind (e.g. `esp32_client`) and later comes back declaring its hardware-catalog SKU
   (e.g. `seeed_reterminal_e1004`) is now moved to the declared kind instead of staying pinned to the

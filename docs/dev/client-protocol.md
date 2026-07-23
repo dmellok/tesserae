@@ -644,6 +644,93 @@ dashboards, or "what does this device currently look like" tooling.
 Headers: `Cache-Control: no-store, max-age=0`, so consumers always
 get the latest. Returns `404` if no frame has rendered yet.
 
+## Deck cache sync (on-device frame cache)
+
+Decks are small navigable graphs of pre-rendered pages (Settings →
+Decks). By default the server does all the navigation: a button/touch
+event arrives, the server resolves the graph and serves the target
+frame on the same wake. A client with local storage (an SD card slot,
+typically) can opt into caching the deck's frames and navigating
+locally instead: wake, read card, paint, radio off. Everything below is
+optional; clients that never advertise the capability see no change on
+any endpoint.
+
+### Capability
+
+Advertise in the `/register` and every `/status` body, **only while the
+storage is actually present and usable**:
+
+```json
+{ "deck_cache": { "schema": 1, "capacity_bytes": 7900000 } }
+```
+
+The capability is treated as current-state per heartbeat, not sticky: a
+beat that omits it (card pulled, mount failed) withdraws it, and the
+server stops offering deck syncs until it reappears.
+
+### Sync flow
+
+1. When a deck is bound to the device and the capability was advertised
+   on that beat, the `/status` response carries the deck's current
+   version: `"deck": { "version": "<16-hex>" }`.
+2. Version differs from the one you cached → `GET
+   /api/v1/device/<id>/deck` (Bearer token). `200` returns the
+   manifest; `204` means no deck is bound (drop local nav state):
+
+   ```json
+   {
+     "status": 200,
+     "deck_id": "kitchen_deck",
+     "version": "a1b2c3d4e5f60718",
+     "entry_page_id": "overview",
+     "pages": [
+       {
+         "page_id": "overview",
+         "digest": "0f1e2d3c4b5a6978",
+         "bytes": 96000,
+         "ttl_s": 900,
+         "links": [
+           { "button": "right", "zone": null, "target_page_id": "calendar" },
+           { "button": null,
+             "zone": { "x": 0.0, "y": 0.0, "w": 0.5, "h": 0.5 },
+             "target_page_id": "weather" }
+         ]
+       }
+     ]
+   }
+   ```
+
+   Zones are normalised 0..1 rects; scale by your panel dims to
+   hit-test. The manifest warms (renders) cold pages on demand, so the
+   first call after a deck edit can take a few seconds.
+3. Diff digests against your cache, fetch only what's missing via `GET
+   /api/v1/device/<id>/deck/frame/<digest>` (raw frame bytes, identical
+   format to `/frame` for your kind; `ETag` + immutable cache headers).
+   `404` means your manifest is stale: re-fetch it. Delete cached files
+   the manifest no longer references.
+4. Verify before painting: exact `bytes` length AND digest. The digest
+   is the first 16 hex chars of `sha256(frame bytes)`.
+
+### Local navigation and reporting
+
+When a button/touch wake matches a link on your current page and the
+target frame is cached, verified, and younger than its `ttl_s`: paint
+it locally and **do not** send the event to the server. Instead report
+what you painted on your next contact: `deck_page_id` in the `/status`
+body, or `?deck_page_id=` on a same-wake `/frame` poll. The server
+updates its nav position from the report, so its UI and any later
+server-side navigation resume from the page actually on glass.
+
+Every other case (no link match, frame missing/stale/corrupt, version
+mismatch, no card) falls back to today's behaviour: send the event and
+fetch `/frame`. Any event the server receives is handled server-side as
+normal; the handoff works because a locally-handled event is simply
+never sent.
+
+`ttl_s` expiry on the page currently displayed does not force a network
+wake by itself; scheduled wakes handle refresh. It only disqualifies a
+cached frame from being served for a navigation.
+
 ## MQTT topics
 
 All topics are namespaced under `tesserae/<device_id>/`.

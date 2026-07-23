@@ -494,6 +494,71 @@ def _maybe_heal_kind(device_id: str, body: dict[str, Any]) -> None:
         current_app.logger.exception("rest: kind heal failed for device=%s", device_id)
 
 
+def _deck_store() -> Any:
+    return current_app.config.get("DECK_STORE")
+
+
+def _deck_nav_store() -> Any:
+    return current_app.config.get("DECK_NAV_STORE")
+
+
+def _bound_deck(device_id: str) -> Any:
+    """The enabled deck bound to this device, or None. Thin wrapper so
+    every deck-cache path resolves the deck the same way."""
+    store = _deck_store()
+    if store is None:
+        return None
+    from app.deck_sync import bound_deck_for
+
+    return bound_deck_for(store, device_id)
+
+
+def _deck_status_envelope(device: Device, body: dict[str, Any]) -> dict[str, Any] | None:
+    """``{"version": ...}`` for the /status response, when this device
+    advertised the deck-cache capability on this beat AND has a bound
+    deck. Absent otherwise, so /status stays byte-identical for devices
+    without the feature. Computed without warming (cheap); the manifest
+    endpoint is where cold pages get rendered."""
+    from app import deck_sync
+
+    if deck_sync.advertised_deck_cache(body) is None:
+        return None
+    deck = _bound_deck(device.id)
+    push_mgr = current_app.config.get("PUSH_MANAGER")
+    renders_dir = current_app.config.get("RENDERS_DIR")
+    if deck is None or push_mgr is None or renders_dir is None:
+        return None
+    version = deck_sync.current_version(deck, device.id, push_mgr=push_mgr, renders_dir=renders_dir)
+    return {"version": version}
+
+
+def _ingest_deck_report(device: Device, page_id: Any) -> None:
+    """Record the page a capable device painted from its local cache
+    (``deck_page_id`` on /status bodies and /frame query params), so the
+    server's nav position and UI stay truthful about what's on glass.
+
+    This is also the nav-authority handoff in practice: firmware that
+    handled a nav locally reports the page instead of sending the
+    button/touch event, so the server never double-navigates; any event
+    the server DOES receive is one the firmware wants handled here (no
+    link match, stale cache), and the report has already moved the
+    position the server resolves that event from. Best-effort: bad ids
+    are dropped, failures never break the wake."""
+    if not isinstance(page_id, str) or not page_id.strip():
+        return
+    try:
+        deck = _bound_deck(device.id)
+        nav = _deck_nav_store()
+        if deck is None or nav is None:
+            return
+        wanted = page_id.strip()
+        if wanted not in {p.page_id for p in deck.pages}:
+            return
+        nav.set(device.id, deck.id, wanted)
+    except Exception:
+        current_app.logger.exception("rest: deck report failed for device=%s", device.id)
+
+
 def _current_config(device: Device) -> dict[str, Any]:
     """Per-device config as it stands right now. Same source the MQTT
     config_topic publisher reads from; piggybacking in the status
@@ -665,6 +730,11 @@ def get_frame(device_id: str) -> Response:
                 button_result = button_svc.snapshot(device.id)
             except Exception:
                 button_result = None
+
+    # Deck cache: a capable device that painted a page from its SD card
+    # reports it here on the same wake (``?deck_page_id=...``), keeping
+    # the server's nav position truthful without a separate request.
+    _ingest_deck_report(device, request.args.get("deck_page_id"))
 
     push_mgr = current_app.config.get("PUSH_MANAGER")
     latest = push_mgr.latest_render_for(device.id) if push_mgr is not None else None
@@ -929,7 +999,86 @@ def post_status(device_id: str) -> Response:
     ota = _pending_ota(device, body if isinstance(body, dict) else {})
     if ota is not None:
         response["ota"] = ota
+    # Deck cache: repeat the bound deck's current version so a capable
+    # device knows when its SD cache is stale and re-syncs the manifest.
+    # Gated on the capability being advertised in THIS body, so /status
+    # stays byte-identical for everything else.
+    if isinstance(body, dict):
+        _ingest_deck_report(device, body.get("deck_page_id"))
+        try:
+            deck_env = _deck_status_envelope(device, body)
+        except Exception:
+            current_app.logger.exception(
+                "rest /status: deck envelope failed for device=%s", device.id
+            )
+            deck_env = None
+        if deck_env is not None:
+            response["deck"] = deck_env
     return jsonify(response)
+
+
+# -- deck cache sync (on-device SD frame cache) ---------------------------
+
+
+@bp.get("/<device_id>/deck")
+def get_deck_manifest(device_id: str) -> Response:
+    """The bound deck's sync manifest for this device: page frame
+    digests + byte sizes + TTLs and the link graph, so capable firmware
+    can fill its SD cache and navigate locally. Contract documented in
+    docs/dev/client-protocol.md.
+
+    Cold pages are warmed (rendered) on demand so the manifest ships
+    complete and its version is stable until the next refresh; expect a
+    few seconds on the first call after a deck edit. 204 when no deck is
+    bound (mirror of /frame's no-frame-yet semantics)."""
+    device, err = _auth_device(device_id)
+    if err is not None or device is None:
+        return err  # type: ignore[return-value]
+
+    deck = _bound_deck(device.id)
+    push_mgr = current_app.config.get("PUSH_MANAGER")
+    renders_dir = current_app.config.get("RENDERS_DIR")
+    if deck is None or push_mgr is None or renders_dir is None:
+        return _error(204, "no deck bound to this device")
+
+    from app.deck_sync import build_manifest
+
+    manifest = build_manifest(
+        deck, device.id, push_mgr=push_mgr, renders_dir=renders_dir, warm_missing=True
+    )
+    return jsonify({"status": 200, **manifest})
+
+
+@bp.get("/<device_id>/deck/frame/<digest>")
+def get_deck_frame(device_id: str, digest: str) -> Response:
+    """One deck frame by digest, for the SD cache fill. Digest-addressed
+    (content never changes under a digest), so firmware can cache
+    forever and only fetch digests its manifest diff says are new. 404
+    on an unknown digest means the client's manifest is stale: re-sync."""
+    device, err = _auth_device(device_id)
+    if err is not None or device is None:
+        return err  # type: ignore[return-value]
+
+    deck = _bound_deck(device.id)
+    push_mgr = current_app.config.get("PUSH_MANAGER")
+    renders_dir = current_app.config.get("RENDERS_DIR")
+    if deck is None or push_mgr is None or renders_dir is None:
+        return _error(404, "no deck bound to this device")
+
+    from app.deck_sync import frame_entry_by_digest
+
+    info = frame_entry_by_digest(deck, device.id, _normalize_digest(digest), push_mgr=push_mgr)
+    if info is None:
+        return _error(404, "unknown frame digest; re-fetch the deck manifest")
+    path = Path(renders_dir) / str(info.get("filename") or "")
+    if not path.is_file():
+        return _error(404, "frame artifact missing; re-fetch the deck manifest")
+    from flask import send_file
+
+    resp = send_file(path, mimetype="application/octet-stream")
+    resp.headers["ETag"] = f'"{info["digest"]}"'
+    resp.headers["Cache-Control"] = "immutable, max-age=31536000"
+    return resp
 
 
 # -- log -----------------------------------------------------------------

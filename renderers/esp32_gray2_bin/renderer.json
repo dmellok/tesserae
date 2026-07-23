@@ -1,0 +1,42 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "ESP32 client (2-bpp grayscale .bin)",
+  "version": "0.1.0",
+  "description": "Composition PNG dithered to 4-level grayscale and packed into a 2-bpp raw buffer for UC8179-class mono panels driven in their 4-gray waveform mode. Targets the Seeed reTerminal E1001 (7.5\" 800x480) running the grayscale firmware build; the wire format is exactly width*height/4 bytes (96000 for the E1001). Published retained to tesserae/<device_id>/frame/bin so a freshly-woken client sees the current frame on first wake.",
+  "orientation": "composition",
+  "mime": "application/octet-stream",
+  "extension": "bin",
+  "topic_pattern": "tesserae/{device}/frame/bin",
+  "device": "esp32",
+  "retain": true,
+  "settings": [
+    {
+      "name": "dither",
+      "type": "select",
+      "label": "Dither mode",
+      "default": "floyd-steinberg",
+      "device_setting": true,
+      "choices": [
+        { "value": "floyd-steinberg", "label": "Floyd-Steinberg (smooth gradients)" },
+        { "value": "atkinson", "label": "Atkinson (contrasty, clean solids)" },
+        { "value": "jarvis", "label": "Jarvis-Judice-Ninke (smoothest)" },
+        { "value": "stucki", "label": "Stucki" },
+        { "value": "bayer-8x8", "label": "Bayer 8x8 (ordered)" },
+        { "value": "halftone", "label": "Halftone dots" },
+        { "value": "crosshatch", "label": "Crosshatch" },
+        { "value": "none", "label": "None (nearest gray level)" }
+      ]
+    },
+    {
+      "name": "contrast",
+      "type": "slider",
+      "label": "Pre-dither contrast",
+      "default": 1.0,
+      "min": 0.5,
+      "max": 2.5,
+      "step": 0.05,
+      "device_setting": true,
+      "help": "Push midtones toward black or white before the dither pass. 1.0 leaves the image alone; > 1.0 deepens contrast (good for photos with grey skies); < 1.0 softens (good for text-heavy dashboards)."
+    }
+  ]
+}

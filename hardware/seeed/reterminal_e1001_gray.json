@@ -1,0 +1,23 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "seeed_reterminal_e1001_gray",
+  "name": "Seeed reTerminal E1001 (4-level grayscale)",
+  "vendor": "Seeed Studio",
+  "url": "https://www.seeedstudio.com/reTerminal-E1001-p-6534.html",
+  "icon": "device-tablet",
+  "description": "7.5 inch monochrome ePaper terminal, ESP32-S3, battery-powered (800x480), driven in the panel's 4-gray waveform mode. Pairs with the tesserae-device-firmware ESP-IDF grayscale build (seeed-reterminal-e1001-gray env) and speaks Tesserae's v1 REST device API. Server-side pack via esp32_gray2_bin produces a raw 2-bpp 4-level grayscale buffer (96000 bytes) the firmware paints without any on-device decode.",
+  "protocol": "esp32_bw_client",
+  "renderers": ["esp32_gray2_bin"],
+  "panel": {
+    "w": 800,
+    "h": 480,
+    "orientation": "landscape",
+    "name": "7.5 inch monochrome ePaper, 4-level grayscale (800x480)",
+    "gamut": "mono",
+    "native_w": 800,
+    "native_h": 480
+  },
+  "refresh_floor_s": 60,
+  "image_format": "bin",
+  "notes_md": "Awaiting confirmed test on real hardware. Wire format is exactly 96000 bytes (800*480/4), row-major from top-left, 4 pixels per byte MSB first (bits 7-6 = leftmost pixel), 2-bit value 0b00 = black, 0b11 = white, linear 4-level gray; no header, no padding, no checksum. Same physical unit as `seeed_reterminal_e1001`; pick this kind when the unit runs the grayscale firmware build. The server migrates a registered E1001 to this kind automatically when its firmware re-registers or re-discovers declaring it (same-protocol kind heal)."
+}

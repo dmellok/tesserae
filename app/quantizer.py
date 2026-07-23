@@ -1631,3 +1631,106 @@ def pack_to_panel_bin_4bpp_gray(
     expected = width * height // 2
     assert len(out) == expected, f"packed buffer is {len(out)}, expected {expected}"
     return out
+
+
+# 4-level linear grayscale palette. Index i -> RGB (i * 85, i * 85, i * 85),
+# so 0 -> black and 3 -> white. Used by ``pack_to_panel_bin_2bpp_gray``
+# (Seeed reTerminal E1001 in its 4-gray waveform mode). As with the
+# 16-level palette, index equals on-wire value, so no LUT step.
+_GRAY_4_PALETTE: tuple[tuple[int, int, int], ...] = tuple(
+    (i * 85, i * 85, i * 85) for i in range(4)
+)
+
+
+def pack_to_panel_bin_2bpp_gray(
+    img: Image.Image,
+    *,
+    width: int,
+    height: int,
+    dither: DitherMode = "floyd-steinberg",
+    contrast: float = 1.0,
+    region_nearest_mask: Image.Image | None = None,
+) -> bytes:
+    """Quantise to 4-level grayscale and pack to a 2-bpp wire format.
+
+    Mirror of :func:`pack_to_panel_bin_4bpp_gray` for UC8179-class mono
+    panels driven in their 4-gray waveform mode (the Seeed reTerminal
+    E1001's 7.5" 800x480 EP75 in particular).
+
+    Wire layout:
+
+    * Exactly ``width * height / 4`` bytes (96000 for the E1001's
+      800x480 panel). No header, no padding, no checksum.
+    * Row-major, top-left origin, no mirror. The firmware handles any
+      physical panel-side mirror itself.
+    * 2-bpp packed, scanline order, no row padding: ``width / 4`` bytes
+      per row.
+    * **MSB first**: bits 7-6 = leftmost pixel of each 4-pixel group
+      (column 0, 4, 8, ...), bits 1-0 = rightmost (column 3, 7, ...).
+    * Gray value per 2-bit field: **0b00 = black, 0b11 = white**,
+      linear 4-level gray.
+
+    ``width`` must be a multiple of 4 (four pixels per byte). Image
+    must already be at ``(width, height)``, caller sizes / orients
+    first. Dither modes match the other packers, against the 4-entry
+    linear grayscale palette.
+    """
+    if width % 4:
+        raise ValueError(f"panel width must be a multiple of 4 (2bpp pack), got {width}")
+    if img.size != (width, height):
+        raise ValueError(f"image must be {width}x{height}, got {img.size}")
+
+    palette = _GRAY_4_PALETTE
+    pal_arr = np.array(palette, dtype=np.float32)
+
+    # Grayscale-first, then back to RGB, same as the 4-bpp packer: the
+    # dither routines expect an RGB source and the contrast bump should
+    # act on luminance, not on channel imbalance that no longer exists.
+    gray = img.convert("L")
+    if contrast != 1.0:
+        gray = ImageEnhance.Contrast(gray).enhance(contrast)
+    rgb = gray.convert("RGB")
+
+    if dither in _PIL_DITHER_MAP:
+        pal_img = _palette_image(palette)
+        indexed = rgb.quantize(palette=pal_img, dither=_PIL_DITHER_MAP[dither])
+        raw = indexed.tobytes()
+    elif dither == "atkinson":
+        raw = _error_diffusion(rgb, pal_arr, _ATKINSON_WEIGHTS)
+    elif dither == "jarvis":
+        raw = _error_diffusion(rgb, pal_arr, _JJN_WEIGHTS)
+    elif dither == "stucki":
+        raw = _error_diffusion(rgb, pal_arr, _STUCKI_WEIGHTS)
+    elif dither == "bayer-8x8":
+        raw = _dither_ordered(rgb, pal_arr, _BAYER_8X8)
+    elif dither == "halftone":
+        raw = _dither_ordered(rgb, pal_arr, _HALFTONE_16, strength=128.0)
+    elif dither == "crosshatch":
+        raw = _dither_ordered(rgb, pal_arr, _CROSSHATCH_8, strength=96.0)
+    else:
+        raise ValueError(f"unknown dither mode: {dither!r}")
+
+    raw = _apply_nearest_override(
+        raw,
+        rgb,
+        palette,
+        width=width,
+        height=height,
+        region_nearest_mask=region_nearest_mask,
+    )
+
+    # Palette indices are 0..3 already; pack four per byte, MSB first.
+    indices = np.frombuffer(raw, dtype=np.uint8).reshape(height, width)
+    # Clamp strays > 3 so a buggy dither output can't corrupt
+    # neighbouring fields when shifted.
+    indices = np.clip(indices, 0, 3).astype(np.uint8)
+    p0 = indices[:, 0::4]
+    p1 = indices[:, 1::4]
+    p2 = indices[:, 2::4]
+    p3 = indices[:, 3::4]
+    packed = (p0 << 6) | (p1 << 4) | (p2 << 2) | p3
+
+    out = packed.tobytes()
+    expected = width * height // 4
+    assert len(out) == expected, f"packed buffer is {len(out)}, expected {expected}"
+    return out

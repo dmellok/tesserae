@@ -1,0 +1,207 @@
+"""Device-facing deck cache sync: manifest building + version digests.
+
+The on-device deck cache (SD card) lets capable firmware navigate a deck
+locally: paint the target frame from the card instead of waking WiFi.
+The server side of that contract is a per-device manifest describing the
+bound deck (pages, frame digests, byte sizes, TTLs, and the link graph)
+plus a version digest the ``/status`` response repeats so the firmware
+knows when to re-sync. This module builds both; the REST endpoints live
+in :mod:`app.rest_api`, and the wire contract is documented in
+``docs/dev/client-protocol.md``.
+
+Version semantics: the version is the digest of the manifest content
+(graph + frame digests + TTLs), so ANY user edit, background refresh, or
+re-render bumps it. It is per-device (frame digests are per-device
+renders). A page that hasn't been warmed yet contributes an empty
+digest, so the version naturally changes as warming completes and the
+device converges over its next sync cycles.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import logging
+from pathlib import Path
+from typing import Any, Protocol
+
+from app.state.deck_model import Deck, DeckPage
+from app.state.deck_store import DeckStore
+
+logger = logging.getLogger(__name__)
+
+# Fallback TTL when neither the page nor the deck has a periodic refresh
+# (refresh_interval_minutes == 0 means "warmed once, no cadence"): the
+# cached frame stays navigable for a day before the firmware treats it
+# as stale and falls back to a network fetch.
+_NO_REFRESH_TTL_S = 86400
+
+
+class _DeckRenderSource(Protocol):
+    """The slice of PushManager the manifest builder needs."""
+
+    def deck_render_for(self, device_id: str, page_id: str) -> dict[str, Any] | None: ...
+
+    def warm_deck_page(self, page_id: str, device_id: str) -> bool: ...
+
+
+def advertised_deck_cache(payload: bytes | str | dict[str, Any]) -> dict[str, int] | None:
+    """The deck-cache capability a device advertises in its register /
+    heartbeat body (``{"deck_cache": {"schema": 1, "capacity_bytes": N}}``),
+    validated, or None.
+
+    Unlike the OTA schema this is CURRENT-STATE, never carried forward:
+    the firmware only advertises while an SD card is present and
+    mounted, and the server must stop offering deck syncs the moment
+    the capability disappears from a heartbeat."""
+    if isinstance(payload, (bytes, bytearray, str)):
+        try:
+            body = json.loads(payload)
+        except (ValueError, TypeError):
+            return None
+    else:
+        body = payload
+    if not isinstance(body, dict):
+        return None
+    cap = body.get("deck_cache")
+    if not isinstance(cap, dict):
+        return None
+    schema = cap.get("schema")
+    capacity = cap.get("capacity_bytes")
+    if not isinstance(schema, int) or isinstance(schema, bool) or schema < 1:
+        return None
+    if not isinstance(capacity, int) or isinstance(capacity, bool) or capacity < 0:
+        return None
+    return {"schema": schema, "capacity_bytes": capacity}
+
+
+def bound_deck_for(store: DeckStore, device_id: str) -> Deck | None:
+    """The enabled deck bound to a device (first when several), or None.
+    Same rule as ``ButtonService._bound_deck`` so the manifest a device
+    syncs and the deck the server navigates for it can never diverge."""
+    decks = store.for_device(device_id)
+    return decks[0] if decks else None
+
+
+def page_ttl_s(deck: Deck, page: DeckPage) -> int:
+    """How long a cached frame of this page may be served for a local
+    nav, in seconds: the page's effective refresh cadence, or a one-day
+    fallback for pages with no periodic refresh at all."""
+    minutes = page.effective_refresh_minutes(deck.refresh_interval_minutes)
+    return minutes * 60 if minutes > 0 else _NO_REFRESH_TTL_S
+
+
+def _links_view(page: DeckPage) -> list[dict[str, Any]]:
+    return [
+        {
+            "button": link.button,
+            "zone": link.zone.model_dump() if link.zone is not None else None,
+            "target_page_id": link.target_page_id,
+        }
+        for link in page.links
+    ]
+
+
+def _artifact_size(renders_dir: Path, filename: str) -> int:
+    try:
+        return (renders_dir / filename).stat().st_size
+    except OSError:
+        return 0
+
+
+def version_digest(manifest: dict[str, Any]) -> str:
+    """Digest of the manifest content, excluding the version field
+    itself. Same truncation convention as frame digests (sha256[:16])."""
+    body = {k: v for k, v in manifest.items() if k != "version"}
+    blob = json.dumps(body, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
+
+
+def build_manifest(
+    deck: Deck,
+    device_id: str,
+    *,
+    push_mgr: _DeckRenderSource,
+    renders_dir: Path,
+    warm_missing: bool,
+) -> dict[str, Any]:
+    """The deck sync manifest for one device, contract shape:
+
+    ``{deck_id, version, entry_page_id, pages: [{page_id, digest, bytes,
+    ttl_s, links: [{button, zone, target_page_id}]}]}``
+
+    With ``warm_missing`` (the manifest endpoint), pages without a
+    warmed render are rendered now so the manifest ships complete and
+    its version is stable until the next refresh; this can take a few
+    seconds per cold page. Without it (the ``/status`` version check),
+    the manifest reflects only what's warmed, which is cheap and
+    converges to the same version once warming completes."""
+    pages: list[dict[str, Any]] = []
+    for page in deck.pages:
+        info = push_mgr.deck_render_for(device_id, page.page_id)
+        if info is None and warm_missing:
+            if not push_mgr.warm_deck_page(page.page_id, device_id):
+                logger.warning(
+                    "deck manifest: warm failed deck=%s page=%s device=%s",
+                    deck.id,
+                    page.page_id,
+                    device_id,
+                )
+            info = push_mgr.deck_render_for(device_id, page.page_id)
+        digest = str(info.get("digest") or "") if info else ""
+        filename = str(info.get("filename") or "") if info else ""
+        pages.append(
+            {
+                "page_id": page.page_id,
+                "digest": digest,
+                "bytes": _artifact_size(renders_dir, filename) if filename else 0,
+                "ttl_s": page_ttl_s(deck, page),
+                "links": _links_view(page),
+            }
+        )
+    manifest: dict[str, Any] = {
+        "deck_id": deck.id,
+        "entry_page_id": deck.resolved_entry_page_id,
+        "pages": pages,
+    }
+    manifest["version"] = version_digest(manifest)
+    return manifest
+
+
+def current_version(
+    deck: Deck,
+    device_id: str,
+    *,
+    push_mgr: _DeckRenderSource,
+    renders_dir: Path,
+) -> str:
+    """The deck version for a device right now, without warming
+    anything. Cheap enough for every ``/status`` response."""
+    return str(
+        build_manifest(
+            deck,
+            device_id,
+            push_mgr=push_mgr,
+            renders_dir=renders_dir,
+            warm_missing=False,
+        )["version"]
+    )
+
+
+def frame_entry_by_digest(
+    deck: Deck,
+    device_id: str,
+    digest: str,
+    *,
+    push_mgr: _DeckRenderSource,
+) -> dict[str, Any] | None:
+    """The warmed render info whose digest matches, scanning the bound
+    deck's pages for this device. None when no warmed page carries the
+    digest (stale manifest on the client: it should re-sync)."""
+    if not digest:
+        return None
+    for page in deck.pages:
+        info = push_mgr.deck_render_for(device_id, page.page_id)
+        if info is not None and str(info.get("digest") or "") == digest:
+            return info
+    return None
