@@ -13,10 +13,12 @@ hosting and the per-kind rollout controls (`python -m app.ota.release`) are live
 The state-reporting shape below (device → server) is specified and ingested:
 the server records the latest report on the device's live status (a Devices-card
 chip) and event-logs each lifecycle transition (`app/ota/report.py`,
-`app/transport_wiring.py`). The rollout admin UI (Settings → Firmware,
-`app/settings/firmware_routes.py`) wraps the same release state the CLI writes:
-import + verify a descriptor, set a canary, promote (gated on a confirmed
-canary), pause, and a fleet status view driven by the stored reports.
+`app/transport_wiring.py`). The update admin UI (Settings → Firmware,
+`app/settings/firmware_routes.py`) wraps the same release state the CLI writes
+as a flat device list: check for updates, then queue / withdraw each device
+(the queue is the release store's per-device offer set). The fleet-level
+canary / promote / pause controls live in the page's collapsed Advanced
+section and in the `python -m app.ota.release` CLI.
 
 ## Roles
 

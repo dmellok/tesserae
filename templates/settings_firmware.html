@@ -9,9 +9,9 @@
 <header class="page-head">
   <h1><i class="ph ph-download-simple" aria-hidden="true"></i> Firmware</h1>
   <p class="lede">
-    Roll out signed firmware over the air, per device kind. Import a release descriptor, offer it to a
-    canary device first, then promote it to the whole kind once the canary reports a clean update.
-    Devices fetch the image themselves; this page never touches the firmware bytes.
+    Update device firmware over the air. Queue a device and it is offered the signed release on its
+    next heartbeat; the device fetches and verifies the image itself, and this page never touches the
+    firmware bytes.
   </p>
 </header>
 
@@ -24,8 +24,8 @@
     <i class="ph ph-wifi-slash" aria-hidden="true"></i>
     <span><strong>Automatic update checks are off.</strong> With online mode on, Tesserae asks
     <code>api.tesserae.ink</code> whether newer firmware exists for your device kinds, sending the
-    kind ids and the firmware versions your devices report, and shows an "available" badge here.
-    Everything else on this page (import, canary, promote) works offline; only this check reaches out.</span>
+    kind ids and the firmware versions your devices report, and Queue update fetches the signed
+    descriptor for you. Offline, import a descriptor manually below; only the check reaches out.</span>
   </p>
   <a class="button ghost" href="{{ url_for('auth.settings_area', area='system') }}">
     <i class="ph ph-gear" aria-hidden="true"></i><span>Turn on under System &rarr; Online features</span>
@@ -46,115 +46,40 @@
 </section>
 {% endif %}
 
-{# ---- Import ------------------------------------------------------------- #}
+{# ---- Unified device list ------------------------------------------------- #}
+{% if device_rows %}
 <section class="card">
-  {{ card_head('Import a release descriptor', icon_name='upload-simple', level=2,
-     blurb='A descriptor-<kind>.json from a signed GitHub release. It is verified against the published trust anchor before it is accepted; the target kind is read from the descriptor.') }}
-  <form method="post" action="{{ url_for('auth.firmware_import') }}" enctype="multipart/form-data" class="form fw-import">
-    <input type="file" name="descriptor" accept="application/json,.json" required>
-    <button type="submit" class="button"><i class="ph ph-check-circle" aria-hidden="true"></i><span>Verify &amp; import</span></button>
-  </form>
-</section>
-
-{# ---- Per-kind rollout --------------------------------------------------- #}
-{% for k in kinds %}
-<section class="card fw-kind{% if k.has_attention %} fw-kind--attention{% endif %}" id="kind-{{ k.kind_id }}">
-  {{ card_head(k.kind_name, icon_name='device-tablet', level=2) }}
-  <p class="cf-hint">
-    <code>{{ k.kind_id }}</code>
-    {% if k.latest %}
-    {% if k.latest.update_available %}
-    <a class="pill is-warn" href="{{ k.latest.url }}" target="_blank" rel="noopener"
-       title="{{ k.latest.notes_headline or ('Latest published: ' ~ fw(k.latest.version)) }}">{{ fw(k.latest.version) }} available</a>
-    {% else %}
-    <span class="dx-status-muted">latest published {{ fw(k.latest.version) }}</span>
-    {% endif %}
-    {% endif %}
-  </p>
-  {% if k.latest and k.latest.update_available and k.latest.descriptor_url %}
-  <form method="post" action="{{ url_for('auth.firmware_import_url') }}" class="fw-oneclick"
-        onsubmit="return confirm('Fetch and verify {{ fw(k.latest.version) }} for {{ k.kind_id }}, then set it as this kind\'s release?');">
-    <input type="hidden" name="descriptor_url" value="{{ k.latest.descriptor_url }}">
-    <button type="submit" class="button"><i class="ph ph-download-simple" aria-hidden="true"></i><span>Import {{ fw(k.latest.version) }} from release</span></button>
-    <span class="cf-hint">Fetches the signed descriptor and verifies it against your trust anchor before setting the release. Devices fetch the image themselves.</span>
-  </form>
-  {% endif %}
-
-  {# Release + manifest #}
-  {% if k.release %}
-  <div class="fw-release">
-    <div class="fw-release__head">
-      <span class="pill {{ 'is-ok' if k.release.state == 'promoted' else ('is-held' if k.release.state == 'paused' else 'is-accent') }}">{{ k.release.state }}</span>
-      <strong>{{ fw(k.release.fw_version) }}</strong>
-      {% if k.release.updated_relative %}<span class="dx-status-muted">set {{ k.release.updated_relative }}</span>{% endif %}
-    </div>
-    {% if k.release.manifest %}
-    <dl class="fw-manifest">
-      <div><dt>key</dt><dd><code>{{ k.release.manifest.key_id }}</code></dd></div>
-      <div><dt>sha256</dt><dd><code>{{ k.release.manifest.sha256_short }}</code></dd></div>
-      <div><dt>size</dt><dd>{{ k.release.manifest.size_human }}</dd></div>
-      <div><dt>image host</dt><dd><code>{{ k.release.manifest.image_host }}</code></dd></div>
-    </dl>
-    {% endif %}
-  </div>
-
-  {# Controls #}
-  <div class="fw-controls">
-    {# Set canary: capable devices of this kind #}
-    <form method="post" action="{{ url_for('auth.firmware_canary') }}" class="fw-canary">
-      <input type="hidden" name="kind_id" value="{{ k.kind_id }}">
-      <span class="fw-controls__label">Canary devices</span>
-      {% if k.capable_devices %}
-      <div class="cf-dev-grid">
-        {% for d in k.capable_devices %}
-        <label class="cf-dev-chip">
-          <input type="checkbox" name="device_ids" value="{{ d.id }}" {% if d.is_canary %}checked{% endif %}>
+  {{ card_head('Devices', icon_name='device-tablet', level=2) }}
+  <table class="fw-table">
+    <thead>
+      <tr>
+        <th>Device</th>
+        <th>Installed</th>
+        <th>Available</th>
+        <th>Status</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for d in device_rows %}
+      <tr{% if d.needs_attention %} class="fw-row--attention"{% endif %}>
+        <td class="fw-cell-name">
           <span>{{ d.name }}</span>
-        </label>
-        {% endfor %}
-      </div>
-      <button type="submit" class="ghost"><i class="ph ph-target" aria-hidden="true"></i><span>Set canary</span></button>
-      {% else %}
-      <p class="cf-hint">No OTA-capable devices of this kind have reported in yet.</p>
-      {% endif %}
-    </form>
-
-    <div class="fw-controls__actions">
-      {# Promote: gated on a confirmed canary #}
-      <form method="post" action="{{ url_for('auth.firmware_promote') }}" class="inline"
-            onsubmit="return confirm('Promote {{ fw(k.release.fw_version) }} to {{ k.kind_id }}? {{ k.offer_count }} device(s) will be offered the update on their next heartbeat.');">
-        <input type="hidden" name="kind_id" value="{{ k.kind_id }}">
-        <button type="submit" class="button" {% if not k.can_promote %}disabled title="Blocked until a canary device reports confirmed on this version"{% endif %}>
-          <i class="ph ph-rocket-launch" aria-hidden="true"></i><span>Promote to kind</span>
-        </button>
-      </form>
-      {% if k.release.state != 'paused' %}
-      <form method="post" action="{{ url_for('auth.firmware_pause') }}" class="inline">
-        <input type="hidden" name="kind_id" value="{{ k.kind_id }}">
-        <button type="submit" class="ghost"><i class="ph ph-pause" aria-hidden="true"></i><span>Pause / withdraw</span></button>
-      </form>
-      {% endif %}
-    </div>
-    {% if not k.can_promote and k.release.state != 'promoted' %}
-    <p class="cf-hint">Promote unlocks once a canary device reports <code>confirmed</code> on {{ fw(k.release.fw_version) }} ({{ k.confirmed_count }} so far).</p>
-    {% endif %}
-  </div>
-  {% else %}
-  <p class="cf-hint">No release set. Import a descriptor above to begin a rollout for this kind.</p>
-  {% endif %}
-
-  {# Fleet status #}
-  <div class="fw-fleet">
-    <span class="fw-controls__label">Fleet</span>
-    <ul class="fw-devlist">
-      {% for d in k.devices %}
-      <li class="fw-dev{% if d.needs_attention %} fw-dev--attention{% endif %}{% if not d.capable %} fw-dev--incapable{% endif %}">
-        <span class="fw-dev__name">
-          {{ d.name }}
-          {% if d.is_canary %}<span class="pill is-accent">canary</span>{% endif %}
-        </span>
-        <span class="fw-dev__fw">{% if d.fw_version %}<code>{{ fw(d.fw_version) }}</code>{% else %}<span class="dx-muted">no report</span>{% endif %}</span>
-        <span class="fw-dev__ota">
+          <span class="dx-status-muted">{{ d.kind_name }}</span>
+        </td>
+        <td>
+          {% if d.fw_version %}<code>{{ fw(d.fw_version) }}</code>
+          {% else %}<span class="dx-muted">no report</span>{% endif %}
+        </td>
+        <td>
+          {% if d.available_fw %}
+            {% if d.release_url %}
+            <a href="{{ d.release_url }}" target="_blank" rel="noopener"
+               {% if d.notes_headline %}title="{{ d.notes_headline }}"{% endif %}><code>{{ fw(d.available_fw) }}</code></a>
+            {% else %}<code>{{ fw(d.available_fw) }}</code>{% endif %}
+          {% else %}<span class="dx-muted">none</span>{% endif %}
+        </td>
+        <td>
           {% if not d.capable %}
           <span class="dx-status-muted" title="Device has not advertised OTA support; update over USB.">USB update only</span>
           {% elif d.phase %}
@@ -162,19 +87,124 @@
             {{ d.phase }}{% if d.target_fw %} {{ fw(d.target_fw) }}{% endif %}{% if d.reason and d.pill_class == 'is-danger' %} ({{ d.reason }}){% endif %}
           </span>
           {% if d.report_relative %}<span class="dx-status-muted">{{ d.report_relative }}</span>{% endif %}
+          {% elif d.queued %}
+          <span class="pill is-accent">queued{% if d.available_fw %} {{ fw(d.available_fw) }}{% endif %}</span>
+          {% elif d.update_available %}
+          <span class="pill is-warn">update available</span>
+          {% elif d.fw_version %}
+          <span class="dx-status-muted">up to date</span>
           {% else %}
           <span class="dx-status-muted">idle</span>
           {% endif %}
-        </span>
-      </li>
-      {% else %}
-      <li class="fw-dev"><span class="dx-muted">No devices of this kind registered.</span></li>
+        </td>
+        <td class="fw-cell-action">
+          {% if d.can_queue %}
+          <form method="post" action="{{ url_for('auth.firmware_queue') }}">
+            <input type="hidden" name="device_id" value="{{ d.id }}">
+            <button type="submit" class="button">
+              <i class="ph ph-download-simple" aria-hidden="true"></i><span>Queue update</span>
+            </button>
+          </form>
+          {% elif d.can_withdraw %}
+          <form method="post" action="{{ url_for('auth.firmware_withdraw') }}">
+            <input type="hidden" name="device_id" value="{{ d.id }}">
+            <button type="submit" class="ghost">
+              <i class="ph ph-x" aria-hidden="true"></i><span>Withdraw</span>
+            </button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
       {% endfor %}
-    </ul>
-  </div>
+    </tbody>
+  </table>
 </section>
 {% else %}
-{{ empty_state('download-simple', 'No device kinds yet',
-   'Register a device, then import a signed release descriptor to roll firmware out to it.') }}
-{% endfor %}
+{{ empty_state('download-simple', 'No devices yet',
+   'Register a device, then check for updates (or import a signed release descriptor) to update it over the air.') }}
+{% endif %}
+
+{# ---- Advanced: fleet rollout --------------------------------------------- #}
+{% if fleet %}
+<section class="card">
+  <details class="fw-manual">
+    <summary>
+      <i class="ph ph-stack" aria-hidden="true"></i>
+      <span>Fleet rollout</span>
+      <span class="dx-status-muted">advanced: staged canary &rarr; promote, per device kind</span>
+    </summary>
+    <p class="cf-hint">Stage a release on one or two canary devices first, then promote it to every
+      device of the kind once a canary reports a clean update. Same release state as the queue
+      buttons above, also drivable via <code>python -m app.ota.release</code>.</p>
+    {% for k in fleet %}
+    <div class="fw-fleet-kind">
+      <div class="fw-fleet-kind__head">
+        <strong>{{ k.kind_name }}</strong>
+        <code>{{ k.kind_id }}</code>
+        {% if k.fw_version %}
+        <span class="pill {{ 'is-ok' if k.state == 'promoted' else ('is-held' if k.state == 'paused' else 'is-accent') }}">{{ k.state }}</span>
+        <code>{{ fw(k.fw_version) }}</code>
+        {% else %}
+        <span class="dx-status-muted">no release imported</span>
+        {% endif %}
+      </div>
+      {% if k.fw_version %}
+      <form method="post" action="{{ url_for('auth.firmware_canary') }}" class="fw-canary">
+        <input type="hidden" name="kind_id" value="{{ k.kind_id }}">
+        {% if k.capable_devices %}
+        <div class="cf-dev-grid">
+          {% for d in k.capable_devices %}
+          <label class="cf-dev-chip">
+            <input type="checkbox" name="device_ids" value="{{ d.id }}" {% if d.is_canary %}checked{% endif %}>
+            <span>{{ d.name }}</span>
+          </label>
+          {% endfor %}
+        </div>
+        <button type="submit" class="ghost"><i class="ph ph-target" aria-hidden="true"></i><span>Set canary</span></button>
+        {% else %}
+        <p class="cf-hint">No OTA-capable devices of this kind have reported in yet.</p>
+        {% endif %}
+      </form>
+      <div class="fw-fleet-kind__actions">
+        <form method="post" action="{{ url_for('auth.firmware_promote') }}" class="inline"
+              onsubmit="return confirm('Promote {{ fw(k.fw_version) }} to {{ k.kind_id }}? {{ k.offer_count }} device(s) will be offered the update on their next heartbeat.');">
+          <input type="hidden" name="kind_id" value="{{ k.kind_id }}">
+          <button type="submit" class="button" {% if not k.can_promote %}disabled title="Blocked until a canary device reports confirmed on this version"{% endif %}>
+            <i class="ph ph-rocket-launch" aria-hidden="true"></i><span>Promote to kind</span>
+          </button>
+        </form>
+        {% if k.state != 'paused' %}
+        <form method="post" action="{{ url_for('auth.firmware_pause') }}" class="inline">
+          <input type="hidden" name="kind_id" value="{{ k.kind_id }}">
+          <button type="submit" class="ghost"><i class="ph ph-pause" aria-hidden="true"></i><span>Pause</span></button>
+        </form>
+        {% endif %}
+      </div>
+      {% if not k.can_promote and k.state != 'promoted' %}
+      <p class="cf-hint">Promote unlocks once a canary device reports <code>confirmed</code> on {{ fw(k.fw_version) }} ({{ k.confirmed_count }} so far).</p>
+      {% endif %}
+      {% endif %}
+    </div>
+    {% endfor %}
+  </details>
+</section>
+{% endif %}
+
+{# ---- Manual import ------------------------------------------------------- #}
+<section class="card">
+  <details class="fw-manual">
+    <summary>
+      <i class="ph ph-upload-simple" aria-hidden="true"></i>
+      <span>Manual import</span>
+      <span class="dx-status-muted">for offline installs or pre-release descriptors</span>
+    </summary>
+    <p class="cf-hint">A <code>descriptor-&lt;kind&gt;.json</code> from a signed GitHub release. It is
+      verified against the published trust anchor before it is accepted; the target kind is read from
+      the descriptor.</p>
+    <form method="post" action="{{ url_for('auth.firmware_import') }}" enctype="multipart/form-data" class="form fw-import">
+      <input type="file" name="descriptor" accept="application/json,.json" required>
+      <button type="submit" class="button"><i class="ph ph-check-circle" aria-hidden="true"></i><span>Verify &amp; import</span></button>
+    </form>
+  </details>
+</section>
 {% endblock %}

@@ -7,6 +7,12 @@ current release + its verified manifest, rollout controls (set canary / promote 
 pause), and a fleet status view driven by the heartbeat OTA reports the server
 already stores. Descriptors are verified against the published trust anchor
 before they can be offered; the UI never touches the image bytes.
+
+v0.180.0 flattens the UI to a single device list: each device shows its
+installed firmware, what's available, and a queue-for-update / withdraw
+button. Queueing rides the release store's per-device offer set (the CLI's
+"canary" list). The fleet-level canary / promote / pause controls live in a
+collapsed Advanced section (and in the CLI) for multi-device rollouts.
 """
 
 from __future__ import annotations
@@ -23,7 +29,7 @@ from werkzeug.wrappers import Response
 from app import firmware_check as fw_check
 from app.online import online_enabled
 from app.ota.release import is_newer
-from app.ota.service import manifest_summary, verify_descriptor
+from app.ota.service import verify_descriptor
 from app.ota.verify import OtaVerificationError
 from app.settings.index_routes import _OTA_PILL_CLASS
 
@@ -97,29 +103,22 @@ def _device_view(device: Any, rel_fw: str | None, canary_ids: set[str]) -> dict[
     }
 
 
-def _release_view(rel: dict[str, Any] | None) -> dict[str, Any] | None:
-    if not rel:
-        return None
-    descriptor = rel.get("descriptor") or {}
-    summary: dict[str, Any] | None = None
-    try:
-        # Decode-only summary for display; the descriptor was verified at import.
-        from app.ota.service import manifest_from_descriptor
-
-        summary = manifest_summary(manifest_from_descriptor(descriptor))
-    except OtaVerificationError:
-        summary = None
-    return {
-        "state": rel.get("state"),
-        "fw_version": rel.get("fw_version"),
-        "canary_device_ids": list(rel.get("canary_device_ids") or []),
-        "manifest": summary,
-        "updated_relative": (
-            format_relative(max(0.0, time.time() - float(rel["updated_at"])))
-            if isinstance(rel.get("updated_at"), (int, float))
-            else None
-        ),
-    }
+def _queued_ids(rel: dict[str, Any], kind_id: str) -> set[str]:
+    """The devices currently offered the kind's release. A promoted release
+    (set via the CLI) offers to every device of the kind, so materialise
+    that as the full capable set; the UI then edits it as a plain
+    per-device list. Paused means nothing is offered."""
+    state = rel.get("state")
+    if state == "paused":
+        return set()
+    if state == "promoted":
+        status = device_status()
+        return {
+            d.id
+            for d in devices().all()
+            if d.kind_of == kind_id and (status.get(d.id) or {}).get("ota_schema") is not None
+        }
+    return set(rel.get("canary_device_ids") or [])
 
 
 def _latest_view(kind_id: str, rel_fw: str | None, dev_views: list[dict[str, Any]]) -> Any:
@@ -147,7 +146,71 @@ def _latest_view(kind_id: str, rel_fw: str | None, dev_views: list[dict[str, Any
     }
 
 
-def _kinds_model(*, online: bool) -> list[dict[str, Any]]:
+def _devices_model(*, online: bool) -> list[dict[str, Any]]:
+    """One row per registered device instance across every kind: the unified
+    list the page renders. "Available" is the imported release or, when
+    online and its descriptor is fetchable, the newer published version
+    (queueing then imports it first)."""
+    reg = devices()
+    releases = _release_store().all()
+    names = _kind_names()
+
+    by_kind: dict[str, list[Any]] = {}
+    for d in reg.all():
+        if d.kind_of is None:
+            continue
+        by_kind.setdefault(d.kind_of, []).append(d)
+
+    rows: list[dict[str, Any]] = []
+    for kind_id in sorted(by_kind):
+        rel = releases.get(kind_id) if isinstance(releases.get(kind_id), dict) else None
+        rel_fw = str(rel["fw_version"]) if rel and rel.get("fw_version") else None
+        queued_ids = _queued_ids(rel, kind_id) if rel else set()
+
+        dev_views = [_device_view(d, rel_fw, queued_ids) for d in by_kind[kind_id]]
+        latest = _latest_view(kind_id, rel_fw, dev_views) if online else None
+
+        # What the row's Available column shows: the newest of the imported
+        # release and the published latest. Queueing needs something it can
+        # actually offer: an imported release, or a fetchable descriptor.
+        available = rel_fw
+        if latest and (not available or is_newer(str(latest["version"]), available)):
+            available = str(latest["version"])
+        offerable = rel is not None or bool(latest and latest.get("descriptor_url"))
+
+        for v in dev_views:
+            fw = str(v["fw_version"] or "")
+            update_available = bool(available) and (not fw or is_newer(str(available), fw))
+            queued = bool(v["is_canary"])
+            rows.append(
+                {
+                    **v,
+                    "kind_id": kind_id,
+                    "kind_name": names.get(kind_id, kind_id),
+                    "queued": queued,
+                    "available_fw": available,
+                    "release_url": str(latest["url"]) if latest and latest.get("url") else None,
+                    "notes_headline": (
+                        str(latest["notes_headline"])
+                        if latest and latest.get("notes_headline")
+                        else None
+                    ),
+                    "update_available": update_available,
+                    "can_queue": bool(
+                        v["capable"] and update_available and not queued and offerable
+                    ),
+                    "can_withdraw": bool(queued and update_available),
+                }
+            )
+    # rolled_back / failed float to the top, then by name.
+    rows.sort(key=lambda r: (not r["needs_attention"], str(r["name"]).lower()))
+    return rows
+
+
+def _fleet_model() -> list[dict[str, Any]]:
+    """Per-kind rollout view for the Advanced fleet controls: release state,
+    capable devices, and the promote gate. No outbound check; the update
+    availability shown in the device list is a separate concern."""
     reg = devices()
     releases = _release_store().all()
     names = _kind_names()
@@ -162,34 +225,26 @@ def _kinds_model(*, online: bool) -> list[dict[str, Any]]:
     for kind_id in sorted(set(by_kind) | set(releases)):
         rel = releases.get(kind_id) if isinstance(releases.get(kind_id), dict) else None
         rel_fw = str(rel["fw_version"]) if rel and rel.get("fw_version") else None
-        canary_ids = set(rel.get("canary_device_ids") or []) if rel else set()
-
-        dev_views = [_device_view(d, rel_fw, canary_ids) for d in by_kind.get(kind_id, [])]
-        # rolled_back / failed float to the top, then by name.
-        dev_views.sort(key=lambda v: (not v["needs_attention"], v["name"].lower()))
-
+        queued = _queued_ids(rel, kind_id) if rel else set()
+        dev_views = [_device_view(d, rel_fw, queued) for d in by_kind.get(kind_id, [])]
+        dev_views.sort(key=lambda v: str(v["name"]).lower())
         confirmed = sum(1 for v in dev_views if v["confirmed_on_release"])
-        # How many capable devices a promote would newly offer the update to
-        # (capable, not already on the release version).
+        # How many capable devices a promote would newly offer the update to.
         offer_count = sum(
             1
             for v in dev_views
             if v["capable"] and rel_fw and is_newer(rel_fw, str(v["fw_version"] or ""))
         )
-        can_promote = bool(rel and rel.get("state") != "promoted" and confirmed > 0)
-
         out.append(
             {
                 "kind_id": kind_id,
                 "kind_name": names.get(kind_id, kind_id),
-                "release": _release_view(rel),
-                "latest": _latest_view(kind_id, rel_fw, dev_views) if online else None,
-                "devices": dev_views,
+                "state": str(rel["state"]) if rel and rel.get("state") else None,
+                "fw_version": rel_fw,
                 "capable_devices": [v for v in dev_views if v["capable"]],
-                "has_attention": any(v["needs_attention"] for v in dev_views),
                 "confirmed_count": confirmed,
                 "offer_count": offer_count,
-                "can_promote": can_promote,
+                "can_promote": bool(rel and rel.get("state") != "promoted" and confirmed > 0),
             }
         )
     return out
@@ -200,7 +255,8 @@ def firmware_index() -> str:
     online = online_enabled(settings_store())
     return render_template(
         "settings_firmware.html",
-        kinds=_kinds_model(online=online),
+        device_rows=_devices_model(online=online),
+        fleet=_fleet_model(),
         online_enabled=online,
     )
 
@@ -223,8 +279,8 @@ _DESCRIPTOR_MAX_BYTES = 64 * 1024
 
 
 def _accept_descriptor(descriptor: Any, *, source: str) -> None:
-    """Verify a descriptor and set it as its kind's release. Flashes the outcome
-    (and event-logs it) for both the file upload and the one-click URL import."""
+    """Verify a descriptor and set it as its kind's release, preserving any
+    already-queued devices. Flashes the outcome (and event-logs it)."""
     try:
         manifest = verify_descriptor(descriptor)
     except OtaVerificationError as exc:
@@ -237,9 +293,12 @@ def _accept_descriptor(descriptor: Any, *, source: str) -> None:
         _log(source, kind_id, "error", reason="unknown_kind")
         return
     fw_version = str(manifest["fw_version"])
-    _release_store().set_target(kind_id, descriptor, fw_version=fw_version, canary_device_ids=[])
+    store = _release_store()
+    prior = store.get(kind_id)
+    queued = sorted(_queued_ids(prior, kind_id)) if prior else []
+    store.set_target(kind_id, descriptor, fw_version=fw_version, canary_device_ids=queued)
     _log(source, kind_id, "ok", fw_version=fw_version, key_id=str(manifest.get("key_id") or ""))
-    flash(f"Imported {kind_id} release v{fw_version}. Set a canary to begin.", "ok")
+    flash(f"Imported {kind_id} release v{fw_version}. Queue a device to offer it.", "ok")
 
 
 @bp.post("/settings/firmware/import")
@@ -259,20 +318,13 @@ def firmware_import() -> Response:
     return _redirect()
 
 
-@bp.post("/settings/firmware/import-url")
-def firmware_import_url() -> Response:
-    """One-click import: fetch a descriptor from the release URL the update check
-    surfaced, then verify + set it exactly like an upload. Gated on online mode;
-    the URL host is allowlisted (anti-SSRF) and the body size is capped."""
-    if not online_enabled(settings_store()):
-        flash("Online mode is off; enable it to fetch a release descriptor.", "error")
-        return _redirect()
-    url = (request.form.get("descriptor_url") or "").strip()
+def _fetch_descriptor(url: str) -> Any:
+    """Fetch a descriptor JSON from an allowlisted https host (anti-SSRF),
+    with a size cap. Raises ValueError on any failure; verify_descriptor
+    remains the real trust gate."""
     parsed = urlparse(url)
     if parsed.scheme != "https" or parsed.netloc.lower() not in _DESCRIPTOR_FETCH_HOSTS:
-        flash("Refusing to fetch a descriptor from an untrusted URL.", "error")
-        _log("import_url", "(unknown)", "error", reason="untrusted_host")
-        return _redirect()
+        raise ValueError("untrusted descriptor URL")
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "tesserae-firmware-import"})
         with urllib.request.urlopen(req, timeout=8.0) as resp:
@@ -281,13 +333,120 @@ def firmware_import_url() -> Response:
             raw = resp.read(_DESCRIPTOR_MAX_BYTES + 1)
         if len(raw) > _DESCRIPTOR_MAX_BYTES:
             raise ValueError("descriptor too large")
-        descriptor = json.loads(raw)
+        return json.loads(raw)
+    except ValueError:
+        raise
     except Exception as exc:
-        flash(f"Could not fetch descriptor: {exc}.", "error")
-        _log("import_url", "(unknown)", "error", reason="fetch_failed")
+        raise ValueError(str(exc)) from exc
+
+
+def _freshen_release(kind_id: str, rel: dict[str, Any] | None) -> dict[str, Any] | None:
+    """Upgrade the kind's release to the newest published descriptor when the
+    update check knows one newer than the imported release (or none is
+    imported), preserving the queued device set. No-op when offline or when
+    nothing newer is published; a failed fetch keeps the imported release."""
+    if not online_enabled(settings_store()):
+        return rel
+    info = fw_check.latest_for_kind(kind_id)
+    if info is None or not info.version or not info.descriptor_url:
+        return rel
+    if rel is not None and not is_newer(info.version, str(rel.get("fw_version") or "")):
+        return rel
+    try:
+        descriptor = _fetch_descriptor(info.descriptor_url)
+        manifest = verify_descriptor(descriptor)
+    except ValueError as exc:
+        flash(f"Could not fetch the published descriptor: {exc}.", "error")
+        _log("import_url", kind_id, "error", reason="fetch_failed")
+        return rel
+    except OtaVerificationError as exc:
+        flash(f"Published descriptor rejected: {exc.reason} ({exc}).", "error")
+        _log("import_url", kind_id, "error", reason=exc.reason)
+        return rel
+    if str(manifest["device_kind"]) != kind_id:
+        _log("import_url", kind_id, "error", reason="kind_mismatch")
+        return rel
+    queued = sorted(_queued_ids(rel, kind_id)) if rel else []
+    fw_version = str(manifest["fw_version"])
+    entry: dict[str, Any] = _release_store().set_target(
+        kind_id, descriptor, fw_version=fw_version, canary_device_ids=queued
+    )
+    _log(
+        "import_url", kind_id, "ok", fw_version=fw_version, key_id=str(manifest.get("key_id") or "")
+    )
+    return entry
+
+
+@bp.post("/settings/firmware/queue")
+def firmware_queue() -> Response:
+    """Queue one device for an OTA update: make sure the kind's release is the
+    newest fetchable one, then add the device to the offer set. The heartbeat
+    path still applies the firmware-version gate, so a queued device is only
+    offered a build newer than what it reports."""
+    device_id = (request.form.get("device_id") or "").strip()
+    device = devices().get(device_id)
+    if device is None or device.kind_of is None:
+        flash("Unknown device.", "error")
         return _redirect()
-    _accept_descriptor(descriptor, source="import_url")
+    kind_id = device.kind_of
+    if (device_status().get(device_id) or {}).get("ota_schema") is None:
+        flash(f"{device.display_name} has not advertised OTA support; update it over USB.", "error")
+        return _redirect()
+
+    store = _release_store()
+    rel = _freshen_release(kind_id, store.get(kind_id))
+    if rel is None:
+        flash(
+            "No release to offer yet. Import a descriptor below, or turn on "
+            "online features so it can be fetched automatically.",
+            "error",
+        )
+        return _redirect()
+
+    queued = _queued_ids(rel, kind_id)
+    queued.add(device_id)
+    fw_version = str(rel["fw_version"])
+    store.set_target(
+        kind_id, rel["descriptor"], fw_version=fw_version, canary_device_ids=sorted(queued)
+    )
+    _log("queue", kind_id, "ok", device_id=device_id, fw_version=fw_version)
+    flash(
+        f"{device.display_name} will be offered v{fw_version} on its next heartbeat.",
+        "ok",
+    )
     return _redirect()
+
+
+@bp.post("/settings/firmware/withdraw")
+def firmware_withdraw() -> Response:
+    """Remove one device from its kind's offer set."""
+    device_id = (request.form.get("device_id") or "").strip()
+    device = devices().get(device_id)
+    if device is None or device.kind_of is None:
+        flash("Unknown device.", "error")
+        return _redirect()
+    kind_id = device.kind_of
+    store = _release_store()
+    rel = store.get(kind_id)
+    if rel is None:
+        flash("No release set for that kind.", "error")
+        return _redirect()
+    queued = _queued_ids(rel, kind_id)
+    queued.discard(device_id)
+    store.set_target(
+        kind_id,
+        rel["descriptor"],
+        fw_version=str(rel["fw_version"]),
+        canary_device_ids=sorted(queued),
+    )
+    _log("withdraw", kind_id, "ok", device_id=device_id)
+    flash(f"{device.display_name} withdrawn; it will not be offered the update.", "ok")
+    return _redirect()
+
+
+# -- Advanced fleet controls: staged canary / promote / pause per kind. The
+# same release state the queue buttons edit, expressed at fleet altitude for
+# multi-device installs; also drivable via ``python -m app.ota.release``.
 
 
 @bp.post("/settings/firmware/canary")
@@ -331,10 +490,8 @@ def firmware_promote() -> Response:
     """Promote the release to every device of the kind, gated on a confirmed
     canary. The gate is re-checked here, never trusted from the client."""
     kind_id = (request.form.get("kind_id") or "").strip()
-    # online=False: the promote gate (confirmed canary) is local; no need for the
-    # outbound availability check on a POST.
-    model = next((k for k in _kinds_model(online=False) if k["kind_id"] == kind_id), None)
-    if model is None or model["release"] is None:
+    model = next((k for k in _fleet_model() if k["kind_id"] == kind_id), None)
+    if model is None or model["fw_version"] is None:
         flash("No release set for that kind.", "error")
         return _redirect()
     if not model["can_promote"]:
@@ -347,9 +504,9 @@ def firmware_promote() -> Response:
         return _redirect()
 
     _release_store().promote(kind_id)
-    _log("promote", kind_id, "ok", fw_version=str(model["release"]["fw_version"]))
+    _log("promote", kind_id, "ok", fw_version=str(model["fw_version"]))
     flash(
-        f"Promoted {kind_id} v{model['release']['fw_version']}: "
+        f"Promoted {kind_id} v{model['fw_version']}: "
         f"{model['offer_count']} device(s) will be offered it on their next heartbeat.",
         "ok",
     )

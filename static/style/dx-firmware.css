@@ -1,10 +1,10 @@
 /* ============================================================
- *  Settings -> Firmware (OTA rollout, #121)
+ *  Settings -> Firmware (OTA updates, #121)
  *
- *  Per-kind cards: a verified release + manifest, canary / promote /
- *  pause controls, and a fleet list driven by the devices' heartbeat
- *  OTA reports. Reuses the global .pill chip vocabulary and the .cf-*
- *  device-chip grid from the decks admin form.
+ *  A single flat device table: installed vs available firmware,
+ *  a status chip from the device's heartbeat OTA report, and a
+ *  queue / withdraw action per row. Reuses the global .pill chip
+ *  vocabulary.
  * ============================================================ */
 
 .fw-import {
@@ -49,73 +49,65 @@
   color: var(--t-fg-soft);
 }
 
-.fw-kind--attention {
-  border-color: color-mix(in oklab, var(--t-danger, #dc2626) 45%, var(--t-border));
-}
+/* -- device table ------------------------------------------ */
 
-.fw-oneclick {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--t-space-2) var(--t-space-3);
-  margin: 0 0 var(--t-space-3);
-}
-.fw-oneclick .cf-hint {
-  margin: 0;
-  max-width: 46ch;
-}
-
-/* -- release + manifest ------------------------------------ */
-
-.fw-release {
-  margin: var(--t-space-2) 0 var(--t-space-3);
-  padding: var(--t-space-3);
-  border: 1px solid var(--t-border);
-  border-radius: var(--t-radius-md);
-  background: var(--t-surface-sunk);
-}
-.fw-release__head {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: var(--t-space-2);
-}
-.fw-manifest {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--t-space-2) var(--t-space-4);
-  margin: var(--t-space-2) 0 0;
-}
-.fw-manifest > div {
-  display: flex;
-  gap: 6px;
-  align-items: baseline;
-}
-.fw-manifest dt {
-  color: var(--t-fg-soft);
-  font-size: var(--t-size-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-.fw-manifest dd {
-  margin: 0;
+.fw-table {
+  width: 100%;
+  border-collapse: collapse;
   font-size: var(--t-size-sm);
 }
-
-/* -- controls ---------------------------------------------- */
-
-.fw-controls {
-  display: flex;
-  flex-direction: column;
-  gap: var(--t-space-3);
-  margin-bottom: var(--t-space-3);
-}
-.fw-controls__label {
+.fw-table th {
+  text-align: left;
   font-size: var(--t-size-xs);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.03em;
   color: var(--t-fg-soft);
+  padding: 0 var(--t-space-3) var(--t-space-2) 0;
+}
+.fw-table td {
+  padding: var(--t-space-2) var(--t-space-3) var(--t-space-2) 0;
+  border-top: 1px solid var(--t-border);
+  vertical-align: middle;
+}
+.fw-table th:last-child,
+.fw-table td:last-child {
+  padding-right: 0;
+}
+.fw-row--attention td {
+  background: color-mix(in oklab, var(--t-danger, #dc2626) 8%, transparent);
+}
+.fw-cell-name {
+  font-weight: 600;
+}
+.fw-cell-name > span {
+  display: block;
+  min-width: 0;
+}
+.fw-cell-name .dx-status-muted {
+  font-weight: 400;
+}
+.fw-cell-action {
+  text-align: right;
+}
+.fw-cell-action form {
+  display: inline-block;
+}
+
+/* -- advanced fleet rollout -------------------------------- */
+
+.fw-fleet-kind {
+  display: flex;
+  flex-direction: column;
+  gap: var(--t-space-2);
+  padding: var(--t-space-3) 0;
+  border-top: 1px solid var(--t-border);
+}
+.fw-fleet-kind__head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--t-space-2);
 }
 .fw-canary {
   display: flex;
@@ -123,72 +115,47 @@
   gap: var(--t-space-2);
   align-items: flex-start;
 }
-.fw-controls__actions {
+.fw-fleet-kind__actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--t-space-2);
 }
-.fw-controls__actions button[disabled] {
+.fw-fleet-kind__actions button[disabled] {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-/* -- fleet list -------------------------------------------- */
+/* -- manual import ----------------------------------------- */
 
-.fw-fleet {
+.fw-manual > summary {
   display: flex;
-  flex-direction: column;
+  align-items: baseline;
   gap: var(--t-space-2);
-  border-top: 1px dashed var(--t-border);
-  padding-top: var(--t-space-3);
-}
-.fw-devlist {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-}
-.fw-dev {
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) auto minmax(0, 1.6fr);
-  align-items: center;
-  gap: var(--t-space-3);
-  padding: var(--t-space-2) 0;
-  border-top: 1px solid var(--t-border);
-}
-.fw-dev:first-child {
-  border-top: none;
-}
-.fw-dev--attention {
-  background: color-mix(in oklab, var(--t-danger, #dc2626) 8%, transparent);
-  border-radius: var(--t-radius-sm);
-  padding-inline: var(--t-space-2);
-}
-.fw-dev--incapable {
-  opacity: 0.6;
-}
-.fw-dev__name {
-  display: flex;
-  align-items: center;
-  gap: var(--t-space-2);
-  min-width: 0;
+  cursor: pointer;
   font-weight: 600;
 }
-.fw-dev__ota {
-  display: flex;
-  align-items: center;
-  gap: var(--t-space-2);
-  flex-wrap: wrap;
-  justify-content: flex-end;
+.fw-manual[open] > summary {
+  margin-bottom: var(--t-space-2);
 }
 
 @media (max-width: 640px) {
-  .fw-dev {
-    grid-template-columns: 1fr auto;
-    grid-template-areas: "name fw" "ota ota";
+  .fw-table thead {
+    display: none;
   }
-  .fw-dev__name { grid-area: name; }
-  .fw-dev__fw { grid-area: fw; text-align: right; }
-  .fw-dev__ota { grid-area: ota; justify-content: flex-start; }
+  .fw-table tr {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: var(--t-space-1) var(--t-space-3);
+    padding: var(--t-space-2) 0;
+    border-top: 1px solid var(--t-border);
+  }
+  .fw-table td {
+    border-top: none;
+    padding: 0;
+  }
+  .fw-cell-action {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: center;
+  }
 }
