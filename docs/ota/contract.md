@@ -16,9 +16,11 @@ chip) and event-logs each lifecycle transition (`app/ota/report.py`,
 `app/transport_wiring.py`). The update admin UI (Settings → Firmware,
 `app/settings/firmware_routes.py`) wraps the same release state the CLI writes
 as a flat device list: check for updates, then queue / withdraw each device
-(the queue is the release store's per-device offer set). The fleet-level
-canary / promote / pause controls live in the page's collapsed Advanced
-section and in the `python -m app.ota.release` CLI.
+(the queue is the release store's per-device offer set, one-shot per release
+version). A per-device "Auto" switch opts a device into every new release
+(`app/ota/auto.py`, evaluated on heartbeat; a paused release is never
+auto-resumed). The fleet-level canary / promote / pause controls live in the
+page's collapsed Advanced section and in the `python -m app.ota.release` CLI.
 
 ## Roles
 

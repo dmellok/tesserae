@@ -57,6 +57,7 @@
         <th>Installed</th>
         <th>Available</th>
         <th>Status</th>
+        <th>Auto</th>
         <th></th>
       </tr>
     </thead>
@@ -80,7 +81,9 @@
           {% else %}<span class="dx-muted">none</span>{% endif %}
         </td>
         <td>
-          {% if not d.capable %}
+          {% if not d.known %}
+          <span class="dx-status-muted" title="No heartbeat received yet; OTA capability unknown.">awaiting first heartbeat</span>
+          {% elif not d.capable %}
           <span class="dx-status-muted" title="Device has not advertised OTA support; update over USB.">USB update only</span>
           {% elif d.phase %}
           <span class="pill {{ d.pill_class }}"{% if d.detail %} title="{{ d.detail }}"{% endif %}>
@@ -95,6 +98,20 @@
           <span class="dx-status-muted">up to date</span>
           {% else %}
           <span class="dx-status-muted">idle</span>
+          {% endif %}
+        </td>
+        <td class="fw-cell-auto">
+          {% if d.capable %}
+          <form method="post" action="{{ url_for('auth.firmware_auto') }}">
+            <input type="hidden" name="device_id" value="{{ d.id }}">
+            <label class="switch"
+                   title="Automatically queue this device for every new firmware release.">
+              <input type="checkbox" name="enabled" {% if d.auto %}checked{% endif %}
+                     onchange="this.form.submit()"
+                     aria-label="Automatic updates for {{ d.name }}">
+              <span class="switch-track"><span class="switch-thumb"></span></span>
+            </label>
+          </form>
           {% endif %}
         </td>
         <td class="fw-cell-action">

@@ -19,15 +19,14 @@ from __future__ import annotations
 
 import json
 import time
-import urllib.request
 from typing import Any
-from urllib.parse import urlparse
 
 from flask import current_app, flash, redirect, render_template, request, url_for
 from werkzeug.wrappers import Response
 
 from app import firmware_check as fw_check
 from app.online import online_enabled
+from app.ota import auto as ota_auto
 from app.ota.release import is_newer
 from app.ota.service import verify_descriptor
 from app.ota.verify import OtaVerificationError
@@ -68,6 +67,18 @@ def _log(action: str, kind_id: str, status: str, **extra: Any) -> None:
     )
 
 
+def _ota_capable(device_id: str) -> bool:
+    """Whether the device has ever advertised the OTA capability: the live
+    status cache first, then the persisted facts (so a restart doesn't
+    demote a sleeping device to USB-only). Descriptor delivery on /status
+    still requires the live handshake; this only gates the admin UI."""
+    if (device_status().get(device_id) or {}).get("ota_schema") is not None:
+        return True
+    facts_store = current_app.config.get("DEVICE_FACTS")
+    facts = facts_store.get(device_id) if facts_store is not None else None
+    return bool(facts and facts.get("ota_schema") is not None)
+
+
 def _device_view(device: Any, rel_fw: str | None, canary_ids: set[str]) -> dict[str, Any]:
     entry = device_status().get(device.id) or {}
     parsed = entry.get("parsed") or {}
@@ -77,6 +88,15 @@ def _device_view(device: Any, rel_fw: str | None, canary_ids: set[str]) -> dict[
     fw = parsed.get("fw_version")
     fw_str = str(fw) if isinstance(fw, (str, int, float)) else None
     capable = entry.get("ota_schema") is not None
+    # The live status cache is in-memory; until a sleeping device's next
+    # heartbeat after a restart, fall back to the persisted facts so the row
+    # doesn't misreport an OTA-capable device as USB-only (or lose its fw).
+    facts_store = current_app.config.get("DEVICE_FACTS")
+    facts = (facts_store.get(device.id) if facts_store is not None else None) or {}
+    if fw_str is None and facts.get("fw_version"):
+        fw_str = str(facts["fw_version"])
+    if not capable and facts.get("ota_schema") is not None:
+        capable = True
     needs_attention = phase in ("failed", "rolled_back")
     report_at = report.get("received_at")
     return {
@@ -84,6 +104,10 @@ def _device_view(device: Any, rel_fw: str | None, canary_ids: set[str]) -> dict[
         "name": device.display_name,
         "fw_version": fw_str,
         "capable": capable,
+        # False only when we know nothing at all about this device (no live
+        # heartbeat this process AND no persisted facts): the UI then says
+        # "awaiting first heartbeat" instead of claiming USB-only.
+        "known": bool(entry) or bool(facts),
         "phase": phase,
         "reason": report.get("reason"),
         "target_fw": report.get("target_fw"),
@@ -112,12 +136,7 @@ def _queued_ids(rel: dict[str, Any], kind_id: str) -> set[str]:
     if state == "paused":
         return set()
     if state == "promoted":
-        status = device_status()
-        return {
-            d.id
-            for d in devices().all()
-            if d.kind_of == kind_id and (status.get(d.id) or {}).get("ota_schema") is not None
-        }
+        return {d.id for d in devices().all() if d.kind_of == kind_id and _ota_capable(d.id)}
     return set(rel.get("canary_device_ids") or [])
 
 
@@ -161,6 +180,7 @@ def _devices_model(*, online: bool) -> list[dict[str, Any]]:
             continue
         by_kind.setdefault(d.kind_of, []).append(d)
 
+    device_settings = settings_store().get_section("devices") or {}
     rows: list[dict[str, Any]] = []
     for kind_id in sorted(by_kind):
         rel = releases.get(kind_id) if isinstance(releases.get(kind_id), dict) else None
@@ -196,6 +216,7 @@ def _devices_model(*, online: bool) -> list[dict[str, Any]]:
                         else None
                     ),
                     "update_available": update_available,
+                    "auto": bool((device_settings.get(v["id"]) or {}).get("auto_fw_update")),
                     "can_queue": bool(
                         v["capable"] and update_available and not queued and offerable
                     ),
@@ -265,22 +286,21 @@ def _redirect() -> Response:
     return redirect(url_for("auth.firmware_index") + "#top")
 
 
-# Hosts a descriptor may be fetched from for one-click import (anti-SSRF). The
-# URL originates from api.tesserae.ink's update check and points at that host or
-# a GitHub release asset; verify_descriptor is still the real trust gate.
-_DESCRIPTOR_FETCH_HOSTS = {
-    "api.tesserae.ink",
-    "github.com",
-    "objects.githubusercontent.com",
-    "release-assets.githubusercontent.com",
-    "raw.githubusercontent.com",
-}
-_DESCRIPTOR_MAX_BYTES = 64 * 1024
+def _carryover_ids(kind_id: str, prior: dict[str, Any] | None, new_fw: str) -> list[str]:
+    """The offer set for a newly-set release. The manual queue is one-shot
+    per version: it carries over only when the version is unchanged (e.g. a
+    re-import mid-rollout), so queueing once never opts a device into future
+    releases. Auto-update devices ride every release."""
+    base: set[str] = set()
+    if prior is not None and str(prior.get("fw_version") or "") == new_fw:
+        base = _queued_ids(prior, kind_id)
+    base |= ota_auto.auto_update_ids(settings_store(), devices(), kind_id)
+    return sorted(base)
 
 
 def _accept_descriptor(descriptor: Any, *, source: str) -> None:
-    """Verify a descriptor and set it as its kind's release, preserving any
-    already-queued devices. Flashes the outcome (and event-logs it)."""
+    """Verify a descriptor and set it as its kind's release. Flashes the
+    outcome (and event-logs it)."""
     try:
         manifest = verify_descriptor(descriptor)
     except OtaVerificationError as exc:
@@ -294,9 +314,8 @@ def _accept_descriptor(descriptor: Any, *, source: str) -> None:
         return
     fw_version = str(manifest["fw_version"])
     store = _release_store()
-    prior = store.get(kind_id)
-    queued = sorted(_queued_ids(prior, kind_id)) if prior else []
-    store.set_target(kind_id, descriptor, fw_version=fw_version, canary_device_ids=queued)
+    carry = _carryover_ids(kind_id, store.get(kind_id), fw_version)
+    store.set_target(kind_id, descriptor, fw_version=fw_version, canary_device_ids=carry)
     _log(source, kind_id, "ok", fw_version=fw_version, key_id=str(manifest.get("key_id") or ""))
     flash(f"Imported {kind_id} release v{fw_version}. Queue a device to offer it.", "ok")
 
@@ -318,63 +337,23 @@ def firmware_import() -> Response:
     return _redirect()
 
 
-def _fetch_descriptor(url: str) -> Any:
-    """Fetch a descriptor JSON from an allowlisted https host (anti-SSRF),
-    with a size cap. Raises ValueError on any failure; verify_descriptor
-    remains the real trust gate."""
-    parsed = urlparse(url)
-    if parsed.scheme != "https" or parsed.netloc.lower() not in _DESCRIPTOR_FETCH_HOSTS:
-        raise ValueError("untrusted descriptor URL")
-    try:
-        req = urllib.request.Request(url, headers={"User-Agent": "tesserae-firmware-import"})
-        with urllib.request.urlopen(req, timeout=8.0) as resp:
-            if resp.status != 200:
-                raise ValueError(f"HTTP {resp.status}")
-            raw = resp.read(_DESCRIPTOR_MAX_BYTES + 1)
-        if len(raw) > _DESCRIPTOR_MAX_BYTES:
-            raise ValueError("descriptor too large")
-        return json.loads(raw)
-    except ValueError:
-        raise
-    except Exception as exc:
-        raise ValueError(str(exc)) from exc
-
-
 def _freshen_release(kind_id: str, rel: dict[str, Any] | None) -> dict[str, Any] | None:
     """Upgrade the kind's release to the newest published descriptor when the
     update check knows one newer than the imported release (or none is
-    imported), preserving the queued device set. No-op when offline or when
-    nothing newer is published; a failed fetch keeps the imported release."""
+    imported). No-op when offline or when nothing newer is published; a
+    failed fetch keeps the imported release. The new release's offer set is
+    auto-update devices only (the manual queue is one-shot per version)."""
     if not online_enabled(settings_store()):
         return rel
-    info = fw_check.latest_for_kind(kind_id)
-    if info is None or not info.version or not info.descriptor_url:
+    carry = sorted(ota_auto.auto_update_ids(settings_store(), devices(), kind_id))
+    fresh, err = ota_auto.freshen_release(_release_store(), kind_id, rel, carryover=carry)
+    if err is not None:
+        flash(f"Could not use the published descriptor: {err}.", "error")
+        _log("import_url", kind_id, "error", reason=err)
         return rel
-    if rel is not None and not is_newer(info.version, str(rel.get("fw_version") or "")):
-        return rel
-    try:
-        descriptor = _fetch_descriptor(info.descriptor_url)
-        manifest = verify_descriptor(descriptor)
-    except ValueError as exc:
-        flash(f"Could not fetch the published descriptor: {exc}.", "error")
-        _log("import_url", kind_id, "error", reason="fetch_failed")
-        return rel
-    except OtaVerificationError as exc:
-        flash(f"Published descriptor rejected: {exc.reason} ({exc}).", "error")
-        _log("import_url", kind_id, "error", reason=exc.reason)
-        return rel
-    if str(manifest["device_kind"]) != kind_id:
-        _log("import_url", kind_id, "error", reason="kind_mismatch")
-        return rel
-    queued = sorted(_queued_ids(rel, kind_id)) if rel else []
-    fw_version = str(manifest["fw_version"])
-    entry: dict[str, Any] = _release_store().set_target(
-        kind_id, descriptor, fw_version=fw_version, canary_device_ids=queued
-    )
-    _log(
-        "import_url", kind_id, "ok", fw_version=fw_version, key_id=str(manifest.get("key_id") or "")
-    )
-    return entry
+    if fresh is not None and fresh is not rel:
+        _log("import_url", kind_id, "ok", fw_version=str(fresh.get("fw_version") or ""))
+    return fresh
 
 
 @bp.post("/settings/firmware/queue")
@@ -389,7 +368,7 @@ def firmware_queue() -> Response:
         flash("Unknown device.", "error")
         return _redirect()
     kind_id = device.kind_of
-    if (device_status().get(device_id) or {}).get("ota_schema") is None:
+    if not _ota_capable(device_id):
         flash(f"{device.display_name} has not advertised OTA support; update it over USB.", "error")
         return _redirect()
 
@@ -444,6 +423,54 @@ def firmware_withdraw() -> Response:
     return _redirect()
 
 
+@bp.post("/settings/firmware/auto")
+def firmware_auto() -> Response:
+    """Toggle a device's automatic-updates switch. On enables riding every
+    new release (and queues the device for the current one right away); off
+    also withdraws it from a pending offer so nothing updates unbidden."""
+    device_id = (request.form.get("device_id") or "").strip()
+    enabled = request.form.get("enabled") == "on"
+    device = devices().get(device_id)
+    if device is None or device.kind_of is None:
+        flash("Unknown device.", "error")
+        return _redirect()
+    kind_id = device.kind_of
+    if enabled and not _ota_capable(device_id):
+        flash(f"{device.display_name} has not advertised OTA support; update it over USB.", "error")
+        return _redirect()
+
+    store_settings = settings_store()
+    section = dict((store_settings.get_section("devices") or {}).get(device_id) or {})
+    section["auto_fw_update"] = enabled
+    store_settings.patch_section("devices", {device_id: section})
+    _log("auto_update", kind_id, "ok", device_id=device_id, enabled=enabled)
+
+    if enabled:
+        # Immediate effect: queue for the current release (fetching the
+        # newest published one when online), same as the heartbeat hook.
+        ota_auto.maybe_auto_queue(current_app._get_current_object(), device)  # type: ignore[attr-defined]
+        flash(
+            f"Automatic updates on for {device.display_name}: new releases will be "
+            "offered on its next heartbeat.",
+            "ok",
+        )
+    else:
+        store = _release_store()
+        rel = store.get(kind_id)
+        if rel is not None and rel.get("state") != "promoted":
+            queued = _queued_ids(rel, kind_id)
+            if device_id in queued:
+                queued.discard(device_id)
+                store.set_target(
+                    kind_id,
+                    rel["descriptor"],
+                    fw_version=str(rel["fw_version"]),
+                    canary_device_ids=sorted(queued),
+                )
+        flash(f"Automatic updates off for {device.display_name}.", "ok")
+    return _redirect()
+
+
 # -- Advanced fleet controls: staged canary / promote / pause per kind. The
 # same release state the queue buttons edit, expressed at fleet altitude for
 # multi-device installs; also drivable via ``python -m app.ota.release``.
@@ -461,11 +488,7 @@ def firmware_canary() -> Response:
     picked = request.form.getlist("device_ids")
     reg = devices()
     # Only accept capable devices that belong to this kind.
-    valid = {
-        d.id
-        for d in reg.all()
-        if d.kind_of == kind_id and (device_status().get(d.id) or {}).get("ota_schema") is not None
-    }
+    valid = {d.id for d in reg.all() if d.kind_of == kind_id and _ota_capable(d.id)}
     canary = [d for d in picked if d in valid]
     if not canary:
         flash("Select at least one OTA-capable device of this kind.", "error")

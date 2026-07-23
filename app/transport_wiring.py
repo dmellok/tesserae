@@ -310,6 +310,22 @@ def record_status_heartbeat(
     elif prev_entry.get("ota_schema") is not None:
         entry["ota_schema"] = prev_entry["ota_schema"]
     status_cache[device.id] = entry
+    # Persist the stable facts (fw version, OTA capability) so a restart
+    # doesn't forget them until the device's next wake; write-on-change only.
+    facts = app.config.get("DEVICE_FACTS")
+    if facts is not None:
+        fw = merged.get("fw_version")
+        facts.record(
+            device.id,
+            fw_version=str(fw) if isinstance(fw, (str, int, float)) else None,
+            ota_schema=entry.get("ota_schema"),
+        )
+    # Automatic updates (opt-in per-device switch): make sure an auto-update
+    # device is queued for its kind's newest release before the response is
+    # built, so this same heartbeat's /status reply can carry the descriptor.
+    from app.ota.auto import maybe_auto_queue
+
+    maybe_auto_queue(app, device)
     # Smart sync (issue #10): record telemetry for the scheduler's
     # JIT prediction. Pulls the configured sleep_interval_s from
     # the per-device settings section as a fallback when the

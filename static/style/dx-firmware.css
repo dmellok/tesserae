@@ -94,6 +94,21 @@
   display: inline-block;
 }
 
+/* Inline auto-update switch: reuses the global .switch track/thumb skin,
+   but outside a .field--switch wrapper, so hide the raw checkbox here. */
+.fw-cell-auto .switch {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+.fw-cell-auto .switch input[type="checkbox"] {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
 /* -- advanced fleet rollout -------------------------------- */
 
 .fw-fleet-kind {

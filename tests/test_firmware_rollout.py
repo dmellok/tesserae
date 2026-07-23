@@ -188,15 +188,106 @@ def test_withdraw_from_promoted_release_materialises_remaining_set(app: Flask) -
     assert rel["canary_device_ids"] == ["dev_b"]
 
 
-def test_reimport_preserves_queued_devices(app: Flask) -> None:
+def test_reimport_same_version_preserves_queued_devices(app: Flask) -> None:
     with app.app_context():
         _mk_device(app, "dev_a")
     _set_status(app, "dev_a", fw="1.3.0")
     client = _authed_client(app)
     _import_valid(client)
     client.post("/settings/firmware/queue", data={"device_id": "dev_a"})
-    _import_valid(client)  # e.g. re-importing the same or a newer descriptor
+    _import_valid(client)  # re-importing the SAME version mid-rollout
     assert app.config["OTA_RELEASE"].get(KIND)["canary_device_ids"] == ["dev_a"]
+
+
+def test_queue_is_one_shot_per_release_version(app: Flask) -> None:
+    """A device queued for one release must NOT be auto-queued for the next
+    one: importing a release with a different version resets the offer set."""
+    import json as _json
+
+    with app.app_context():
+        _mk_device(app, "dev_a")
+    _set_status(app, "dev_a", fw="1.2.0")
+    client = _authed_client(app)
+    # A previous rollout (v1.3.0) with dev_a still sitting in its queue.
+    app.config["OTA_RELEASE"].set_target(
+        KIND,
+        _json.loads(VALID.read_text()),
+        fw_version="1.3.0",
+        canary_device_ids=["dev_a"],
+    )
+    _import_valid(client)  # the next release, v1.4.0
+    rel = app.config["OTA_RELEASE"].get(KIND)
+    assert rel["fw_version"] == REL_FW
+    assert rel["canary_device_ids"] == []  # dev_a is NOT carried into the new release
+
+
+def _enable_auto(app: Flask, device_id: str) -> None:
+    """Flip the auto-update flag directly in settings (bypasses the route's
+    immediate-queue side effect, for tests that isolate other paths)."""
+    store = app.config["SETTINGS_STORE"]
+    section = dict((store.get_section("devices") or {}).get(device_id) or {})
+    section["auto_fw_update"] = True
+    store.patch_section("devices", {device_id: section})
+
+
+def test_auto_update_devices_ride_new_releases(app: Flask) -> None:
+    import json as _json
+
+    with app.app_context():
+        _mk_device(app, "dev_a")
+    _set_status(app, "dev_a", fw="1.2.0")
+    client = _authed_client(app)
+    app.config["OTA_RELEASE"].set_target(
+        KIND, _json.loads(VALID.read_text()), fw_version="1.3.0", canary_device_ids=[]
+    )
+    client.post("/settings/firmware/auto", data={"device_id": "dev_a", "enabled": "on"})
+    # Enabling queues for the current release immediately.
+    assert app.config["OTA_RELEASE"].get(KIND)["canary_device_ids"] == ["dev_a"]
+    _import_valid(client)  # the next release, v1.4.0: still queued
+    rel = app.config["OTA_RELEASE"].get(KIND)
+    assert rel["fw_version"] == REL_FW
+    assert rel["canary_device_ids"] == ["dev_a"]
+
+
+def test_auto_update_off_withdraws_pending_offer(app: Flask) -> None:
+    with app.app_context():
+        _mk_device(app, "dev_a")
+    _set_status(app, "dev_a", fw="1.3.0")
+    client = _authed_client(app)
+    _import_valid(client)
+    client.post("/settings/firmware/auto", data={"device_id": "dev_a", "enabled": "on"})
+    assert app.config["OTA_RELEASE"].get(KIND)["canary_device_ids"] == ["dev_a"]
+    client.post("/settings/firmware/auto", data={"device_id": "dev_a"})  # off
+    assert app.config["OTA_RELEASE"].get(KIND)["canary_device_ids"] == []
+    devices_section = app.config["SETTINGS_STORE"].get_section("devices")
+    assert devices_section["dev_a"]["auto_fw_update"] is False
+
+
+def test_heartbeat_auto_queues_opted_in_device(app: Flask) -> None:
+    with app.app_context():
+        _mk_device(app, "dev_a")
+    client = _authed_client(app)
+    _import_valid(client)  # release v1.4.0, empty queue
+    assert app.config["OTA_RELEASE"].get(KIND)["canary_device_ids"] == []
+    _enable_auto(app, "dev_a")
+    with app.app_context():
+        _beat(app, "dev_a", {"fw_version": "1.3.0", "ota": {"schema": 1}})
+    assert app.config["OTA_RELEASE"].get(KIND)["canary_device_ids"] == ["dev_a"]
+
+
+def test_heartbeat_never_auto_resumes_paused_release(app: Flask) -> None:
+    with app.app_context():
+        _mk_device(app, "dev_a")
+    _set_status(app, "dev_a", fw="1.3.0")
+    client = _authed_client(app)
+    _import_valid(client)
+    client.post("/settings/firmware/pause", data={"kind_id": KIND})
+    _enable_auto(app, "dev_a")
+    with app.app_context():
+        _beat(app, "dev_a", {"fw_version": "1.3.0", "ota": {"schema": 1}})
+    rel = app.config["OTA_RELEASE"].get(KIND)
+    assert rel["state"] == "paused"
+    assert app.config["OTA_RELEASE"].descriptor_for(KIND, "dev_a") is None
 
 
 def test_promote_blocked_until_canary_confirmed(app: Flask) -> None:
@@ -361,6 +452,72 @@ def test_queue_refuses_untrusted_descriptor_host(app: Flask, monkeypatch) -> Non
     client = _authed_client(app)
     client.post("/settings/firmware/queue", data={"device_id": "dev_a"})
     assert app.config["OTA_RELEASE"].get(KIND) is None
+
+
+def _beat(app: Flask, device_id: str, body: dict) -> None:
+    """Drive the shared heartbeat path (what REST /status and MQTT both call)."""
+    import json
+
+    from app.transport_wiring import record_status_heartbeat
+
+    device = app.config["DEVICE_REGISTRY"].get(device_id)
+    record_status_heartbeat(
+        app=app,
+        device=device,
+        payload=json.dumps(body).encode(),
+        status_cache=app.config["DEVICE_STATUS"],
+        event_log=app.config["EVENT_LOG"],
+        event_target=f"rest://{device_id}/status",
+    )
+
+
+def test_unknown_device_shows_awaiting_heartbeat(app: Flask) -> None:
+    with app.app_context():
+        _mk_device(app, "dev_new")
+    client = _authed_client(app)
+    html = client.get("/settings/firmware").get_data(as_text=True)
+    assert "awaiting first heartbeat" in html
+    assert "USB update only" not in html
+
+
+def test_heartbeat_persists_facts(app: Flask) -> None:
+    with app.app_context():
+        _mk_device(app, "dev_a")
+        _beat(app, "dev_a", {"fw_version": "1.6.2", "ota": {"schema": 1}})
+    entry = app.config["DEVICE_FACTS"].get("dev_a")
+    assert entry is not None
+    assert entry["fw_version"] == "1.6.2"
+    assert entry["ota_schema"] == 1
+
+
+def test_capability_survives_restart(app: Flask) -> None:
+    """After a restart (empty status cache), the persisted facts keep the
+    device OTA-capable and queueable instead of demoting it to USB-only."""
+    with app.app_context():
+        _mk_device(app, "dev_a")
+        _beat(app, "dev_a", {"fw_version": "1.3.0", "ota": {"schema": 1}})
+    client = _authed_client(app)
+    _import_valid(client)
+    app.config["DEVICE_STATUS"].clear()  # simulate a server restart
+
+    html = client.get("/settings/firmware").get_data(as_text=True)
+    assert "USB update only" not in html
+    assert "awaiting first heartbeat" not in html
+    assert "v1.3.0" in html  # installed fw comes from the persisted facts
+    assert "Queue update" in html  # release 1.4.0 is newer, still queueable
+
+    client.post("/settings/firmware/queue", data={"device_id": "dev_a"})
+    assert app.config["OTA_RELEASE"].get(KIND)["canary_device_ids"] == ["dev_a"]
+
+
+def test_unregister_forgets_facts(app: Flask) -> None:
+    with app.app_context():
+        _mk_device(app, "dev_a")
+        _beat(app, "dev_a", {"fw_version": "1.6.2", "ota": {"schema": 1}})
+    assert app.config["DEVICE_FACTS"].get("dev_a") is not None
+    client = _authed_client(app)
+    client.post("/settings/devices/dev_a/delete", data={})
+    assert app.config["DEVICE_FACTS"].get("dev_a") is None
 
 
 def test_page_renders_with_capability_and_chip(app: Flask) -> None:

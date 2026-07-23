@@ -11,6 +11,7 @@ vocabulary the contract documents), so callers can show the reason verbatim.
 from __future__ import annotations
 
 import json
+import urllib.request
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -18,6 +19,40 @@ from urllib.parse import urlparse
 from ._codec import MANIFEST_FIELDS, b64u_decode
 from .keys import load_trusted_keys
 from .verify import OtaVerificationError, verify
+
+# Hosts a descriptor may be fetched from (anti-SSRF). The URL originates from
+# api.tesserae.ink's update check and points at that host or a GitHub release
+# asset; verify_descriptor is still the real trust gate.
+DESCRIPTOR_FETCH_HOSTS = {
+    "api.tesserae.ink",
+    "github.com",
+    "objects.githubusercontent.com",
+    "release-assets.githubusercontent.com",
+    "raw.githubusercontent.com",
+}
+DESCRIPTOR_MAX_BYTES = 64 * 1024
+
+
+def fetch_descriptor(url: str) -> Any:
+    """Fetch a descriptor JSON from an allowlisted https host, with a size
+    cap. Raises ValueError on any failure; verify_descriptor remains the
+    real trust gate."""
+    parsed = urlparse(url)
+    if parsed.scheme != "https" or parsed.netloc.lower() not in DESCRIPTOR_FETCH_HOSTS:
+        raise ValueError("untrusted descriptor URL")
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "tesserae-firmware-import"})
+        with urllib.request.urlopen(req, timeout=8.0) as resp:
+            if resp.status != 200:
+                raise ValueError(f"HTTP {resp.status}")
+            raw = resp.read(DESCRIPTOR_MAX_BYTES + 1)
+        if len(raw) > DESCRIPTOR_MAX_BYTES:
+            raise ValueError("descriptor too large")
+        return json.loads(raw)
+    except ValueError:
+        raise
+    except Exception as exc:
+        raise ValueError(str(exc)) from exc
 
 
 def manifest_from_descriptor(descriptor: Any) -> dict[str, Any]:

@@ -1266,6 +1266,14 @@ def devices_delete(instance_id: str) -> Response:
             battery_history.forget(instance_id)
         except Exception:
             current_app.logger.exception("battery_history: forget failed for %s", instance_id)
+    # Same for the persisted device facts (fw version / OTA capability), so a
+    # future device reusing the id starts clean.
+    device_facts = current_app.config.get("DEVICE_FACTS")
+    if device_facts is not None:
+        try:
+            device_facts.forget(instance_id)
+        except Exception:
+            current_app.logger.exception("device_facts: forget failed for %s", instance_id)
     # And the live device_status cache so a stale "last seen" or
     # parsed-heartbeat block doesn't tail-render anywhere (events,
     # ha-discovery refresh callbacks, etc).

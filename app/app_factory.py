@@ -656,6 +656,12 @@ def create_app(
     # Per-kind OTA releases (manual promote + canary), consulted after the
     # per-device staging override when a device asks for a frame/status.
     app.config["OTA_RELEASE"] = OtaReleaseStore(data_root / "core" / "ota_releases.json")
+    # Last-known per-device facts (fw_version, OTA capability). Survives
+    # restarts so the Firmware page doesn't misreport a sleeping device as
+    # USB-only until its next heartbeat.
+    from app.state.device_facts import DeviceFactsStore
+
+    app.config["DEVICE_FACTS"] = DeviceFactsStore(data_root / "core" / "device_facts.json")
     app.config["PREVIEW_CACHE"] = {}
     app.config["RENDERS_DIR"] = renders_dir
     app.config["DEVICE_STATUS"] = status_cache
