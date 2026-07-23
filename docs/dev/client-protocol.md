@@ -731,6 +731,45 @@ never sent.
 wake by itself; scheduled wakes handle refresh. It only disqualifies a
 cached frame from being served for a navigation.
 
+## Overlay specs (hybrid render mode)
+
+Touch boards with fast partial refresh (IT8951-class first) can apply
+server-declared primitives over the served frame locally, giving
+sub-second tap feedback without a network round trip. The server frame
+stays the source of truth; the overlay is cosmetic and optimistic.
+
+Advertise `"overlay": {"schema": 1}` in register/status bodies. The
+capability is sticky (a firmware property, unlike `deck_cache`).
+
+`GET /api/v1/device/<id>/frame/overlay/<frame_digest>` (Bearer) returns
+the spec for one served frame, or `404` meaning "feature off for this
+frame" (unknown digest, or a server predating the feature):
+
+```json
+{
+  "schema": 1,
+  "frame_digest": "<the frame's ETag value, quotes stripped>",
+  "targets": [
+    {"id": "t1", "x": 120, "y": 640, "w": 300, "h": 90, "echo": "invert"}
+  ]
+}
+```
+
+All coordinates are in the same pixel space as the wire framebuffer the
+device paints; the server performs every transform (rotation, flip,
+scaling, underscan) at spec-build time and the firmware applies rects
+verbatim. Schema 1 target rects are derived from the frame's touch
+regions, and `echo: "invert"` means: on a tap inside the rect, invert
+it, partial-refresh that rect immediately, then dispatch the stroke to
+the server exactly as normal (the echo never replaces the dispatch).
+The invert is restored by the next full paint. Hygiene: after ~8
+partial refreshes do a full-quality repaint to clear ghosting.
+
+`slots` / `atlases` (server-rasterized glyph strips for live value
+text) and the values document endpoint are the next schema slice and
+are not served yet; clients must treat those lists as independent and
+optional, and tolerate their absence.
+
 ## MQTT topics
 
 All topics are namespaced under `tesserae/<device_id>/`.

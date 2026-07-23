@@ -1081,6 +1081,53 @@ def get_deck_frame(device_id: str, digest: str) -> Response:
     return resp
 
 
+# -- overlay spec (hybrid render mode) ------------------------------------
+
+
+@bp.get("/<device_id>/frame/overlay/<digest>")
+def get_frame_overlay(device_id: str, digest: str) -> Response:
+    """The overlay spec for one served frame (schema 1, rect-only for
+    now): tap-echo target rects derived from the frame's touch-region
+    sidecar, transformed into wire-framebuffer pixel space so the
+    firmware applies them verbatim. Contract in client-protocol.md;
+    404 whenever there's nothing for this digest (unknown frame, no
+    composition sidecar), which the firmware treats as feature-off for
+    the frame."""
+    device, err = _auth_device(device_id)
+    if err is not None or device is None:
+        return err  # type: ignore[return-value]
+
+    push_mgr = current_app.config.get("PUSH_MANAGER")
+    if push_mgr is None:
+        return _error(404, "no overlay for this frame")
+    wanted = _normalize_digest(digest)
+    if not wanted:
+        return _error(404, "no overlay for this frame")
+
+    # The digest may be the device's live frame or a deck-cached one
+    # (deck-painted pages deserve tap echo too).
+    info = push_mgr.latest_render_for(device.id)
+    if not (info and str(info.get("digest") or "") == wanted):
+        info = None
+        deck = _bound_deck(device.id)
+        if deck is not None:
+            from app.deck_sync import frame_entry_by_digest
+
+            info = frame_entry_by_digest(deck, device.id, wanted, push_mgr=push_mgr)
+    if info is None:
+        return _error(404, "unknown frame digest")
+
+    comp_digest = str(info.get("composition_digest") or "")
+    regions = push_mgr.touch_regions_for(comp_digest) if comp_digest else []
+
+    from app.overlay_sync import build_spec
+
+    spec = build_spec(frame_digest=wanted, regions=regions, panel=device.panel or {})
+    if spec is None:
+        return _error(404, "no overlay for this frame")
+    return jsonify(spec)
+
+
 # -- log -----------------------------------------------------------------
 
 

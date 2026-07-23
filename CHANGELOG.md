@@ -8,6 +8,17 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Overlay specs for touch boards (hybrid render mode, schema 1).** Firmware with fast partial
+  refresh (reTerminal E1003 first) advertises `overlay: {schema: 1}` and fetches
+  `GET /api/v1/device/<id>/frame/overlay/<digest>`: a rect-only draw list of tap-echo targets
+  derived from the frame's touch-region sidecar, transformed server-side into wire-framebuffer
+  pixel space (rotation, flip, scaling, underscan all applied at spec-build time, so the firmware
+  uses coordinates verbatim). A tap inside a target inverts and partial-refreshes that rect locally
+  in a few hundred milliseconds while the stroke still dispatches to the server as normal. Works
+  for both live frames and deck-cached frames; capability is sticky per device. Value slots and
+  glyph atlases are the next schema slice. Contract in docs/dev/client-protocol.md ("Overlay
+  specs").
+
 - **XIAO ePaper 7.5" black/white/red variant.** `bwr_3` is now a canonical packer gamut: the
   `esp32_bin` renderer packs tri-colour panels to the native 2-bpp layout (96000 bytes at 800x480,
   MSB-first, 0b00 black / 0b01 white / 0b10 red; the reserved 0b11 is never emitted), sharing the

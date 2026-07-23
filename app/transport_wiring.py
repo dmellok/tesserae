@@ -25,7 +25,7 @@ from typing import Any
 
 from flask import Flask
 
-from app import deck_sync, device_loader, renderer_loader
+from app import deck_sync, device_loader, overlay_sync, renderer_loader
 from app.discovery import DiscoveryCache, device_id_from_status_topic
 from app.embedded_broker import EmbeddedBroker
 from app.ha_discovery import HomeAssistantDiscovery
@@ -316,6 +316,13 @@ def record_status_heartbeat(
     deck_cache = deck_sync.advertised_deck_cache(payload)
     if deck_cache is not None:
         entry["deck_cache"] = deck_cache
+    # Overlay capability (hybrid render mode): sticky like ota_schema, it's
+    # a firmware property (partial-refresh support), not removable hardware.
+    overlay = overlay_sync.advertised_overlay(payload)
+    if overlay is not None:
+        entry["overlay"] = overlay
+    elif prev_entry.get("overlay") is not None:
+        entry["overlay"] = prev_entry["overlay"]
     status_cache[device.id] = entry
     # Persist the stable facts (fw version, OTA capability) so a restart
     # doesn't forget them until the device's next wake; write-on-change only.
