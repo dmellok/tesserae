@@ -456,6 +456,44 @@ def _maybe_switch_wire_format(device_id: str, body: dict[str, Any]) -> None:
         current_app.logger.exception("rest: wire-format switch failed for device=%s", device_id)
 
 
+def _maybe_heal_kind(device_id: str, body: dict[str, Any]) -> None:
+    """Move an already-registered device to the kind its firmware now
+    declares, when that differs from the stored one.
+
+    Heals the stale-kind case: a device that first paired under a generic
+    protocol kind (``esp32_client``) comes back running a board build that
+    declares its hardware-catalog SKU (``seeed_reterminal_e1004``).
+    Without this, the idempotent re-register path pins the instance to
+    the old kind forever, which silently exempts the device from per-kind
+    OTA rollouts (releases are keyed by the SKU kind, and the firmware
+    verifies descriptors against its own kind anyway).
+
+    Same-protocol siblings only; the service layer enforces that. When
+    the instance actually moves, the cached render is invalidated (the
+    new kind may carry different panel dims / renderer) so ``/frame``
+    reports 204 until the next push repaints. Best-effort: any failure
+    is logged and swallowed so it never breaks pairing."""
+    declared = body.get("kind")
+    if not isinstance(declared, str) or not declared.strip():
+        return
+    try:
+        from app.device_service import update_instance_kind
+
+        _result, changed = update_instance_kind(
+            devices=_devices(),
+            renderers=_renderers(),
+            data_root=_device_data_root(),
+            instance_id=device_id,
+            kind_id=declared.strip(),
+        )
+        if changed:
+            push_mgr = current_app.config.get("PUSH_MANAGER")
+            if push_mgr is not None:
+                push_mgr.invalidate_latest_render(device_id)
+    except Exception:
+        current_app.logger.exception("rest: kind heal failed for device=%s", device_id)
+
+
 def _current_config(device: Device) -> dict[str, Any]:
     """Per-device config as it stands right now. Same source the MQTT
     config_topic publisher reads from; piggybacking in the status
@@ -1108,8 +1146,12 @@ def _discover() -> Response:
         if claimed is not None:
             token = claimed.manifest.get("access_token")
             if isinstance(token, str) and token:
-                # Honour a re-declared wire format (png<->bmp) on reconnect,
-                # same as /register. Reloads the instance, so re-fetch it.
+                # Honour a re-declared kind + wire format on reconnect,
+                # same as /register. A re-flashed device whose NVS was
+                # wiped lands here (MAC match), so this is the path that
+                # heals a stale generic kind after a board-build upgrade.
+                # Both reload the instance, so re-fetch it.
+                _maybe_heal_kind(claimed.id, body)
                 _maybe_switch_wire_format(claimed.id, body)
                 current = _devices().get(claimed.id) or claimed
                 return jsonify(
@@ -1247,9 +1289,11 @@ def _register() -> Response:
             _persist_token(existing, token)
         if limiter is not None:
             limiter.record_success(client_id)
-        # Honour a re-declared wire format so a device can switch png<->bmp
-        # without a delete + re-register. Reloads the instance in place, so
+        # Honour a re-declared kind (generic protocol kind -> hardware
+        # SKU sibling) and wire format so a device can move without a
+        # delete + re-register. Both reload the instance in place, so
         # re-fetch it for the config echo.
+        _maybe_heal_kind(device_id, body)
         _maybe_switch_wire_format(device_id, body)
         current = devices_registry.get(device_id) or existing
         return jsonify(

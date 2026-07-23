@@ -8,6 +8,16 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Stale device kind auto-heals on re-pair (#121).** A device that first registered under a generic
+  protocol kind (e.g. `esp32_client`) and later comes back declaring its hardware-catalog SKU
+  (e.g. `seeed_reterminal_e1004`) is now moved to the declared kind instead of staying pinned to the
+  one it first paired as. Applies on `/register` re-pair and on the `/discover` MAC-claim path a
+  re-flashed device actually hits; restricted to kinds sharing the same wire protocol, so a heal can
+  only refine which board, never move a device across protocols. Fixes devices being silently exempt
+  from per-kind OTA rollouts because releases are keyed by the SKU kind while the instance sat under
+  the generic one. The device's cached render is invalidated on a move so `/frame` serves 204 until
+  the next push repaints at the new kind's geometry.
+
 - **OTA rollout UI (Settings → Firmware) (#121).** A guard-railed admin page over the same per-kind
   rollout state the CLI writes (never a parallel store). Per device kind it shows the current release
   and its verified manifest (fw_version, key_id, sha256, size, image host), and the rollout controls:

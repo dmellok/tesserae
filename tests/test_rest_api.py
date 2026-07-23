@@ -317,6 +317,126 @@ def test_reregister_switches_wire_format_and_invalidates_render(app: Flask) -> N
     assert push_mgr.latest_render_for("cp_fmt") is None
 
 
+def test_reregister_heals_generic_kind_to_declared_sku(app: Flask) -> None:
+    """A device that first paired under the generic esp32_client kind
+    later re-registers running a board build that declares its hardware
+    SKU. The instance moves to the SKU kind (same wire protocol), keeps
+    its token, and drops any stale render, so per-kind OTA rollouts see
+    the device under the kind its firmware verifies descriptors
+    against."""
+    client = app.test_client()
+    _sign_in(client)
+    devices = app.config["DEVICE_REGISTRY"]
+
+    code = _issue_pairing(app)
+    first = client.post(
+        "/api/v1/device/register",
+        headers={"X-Pairing-Code": code, "Content-Type": "application/json"},
+        data=json.dumps(
+            {"device_id": "frame01", "kind": "esp32_client", "panel_w": 1200, "panel_h": 1600}
+        ),
+    )
+    assert first.status_code == 201
+    token = first.get_json()["device_token"]
+    assert devices.get("frame01").kind_of == "esp32_client"
+
+    push_mgr = app.config["PUSH_MANAGER"]
+    push_mgr._latest_renders["frame01"] = {"digest": "abc", "ext": "bin", "filename": "abc.bin"}
+
+    second_code = _issue_pairing(app)
+    healed = client.post(
+        "/api/v1/device/register",
+        headers={"X-Pairing-Code": second_code, "Content-Type": "application/json"},
+        data=json.dumps(
+            {
+                "device_id": "frame01",
+                "kind": "seeed_reterminal_e1004",
+                "panel_w": 1200,
+                "panel_h": 1600,
+                "fw_version": "1.6.0",
+            }
+        ),
+    )
+    assert healed.status_code == 200
+    body = healed.get_json()
+    assert body["reused_existing"] is True
+    assert body["device_token"] == token
+    assert devices.get("frame01").kind_of == "seeed_reterminal_e1004"
+    # Old-kind render dropped -> /frame will 204 until the next push.
+    assert push_mgr.latest_render_for("frame01") is None
+
+
+def test_reregister_ignores_cross_protocol_kind(app: Flask) -> None:
+    """Kind healing only refines which board on the same wire protocol.
+    A re-register declaring a kind on a different protocol keeps the
+    stored kind rather than moving the device across contracts."""
+    client = app.test_client()
+    _sign_in(client)
+    devices = app.config["DEVICE_REGISTRY"]
+
+    code = _issue_pairing(app)
+    first = client.post(
+        "/api/v1/device/register",
+        headers={"X-Pairing-Code": code, "Content-Type": "application/json"},
+        data=json.dumps({"device_id": "frame02", "kind": "esp32_client"}),
+    )
+    assert first.status_code == 201
+
+    second_code = _issue_pairing(app)
+    resp = client.post(
+        "/api/v1/device/register",
+        headers={"X-Pairing-Code": second_code, "Content-Type": "application/json"},
+        data=json.dumps({"device_id": "frame02", "kind": "pico_bin_client"}),
+    )
+    assert resp.status_code == 200
+    assert resp.get_json()["reused_existing"] is True
+    assert devices.get("frame02").kind_of == "esp32_client"
+
+
+def test_discover_mac_claim_heals_kind(app: Flask) -> None:
+    """A re-flashed device whose NVS was wiped comes back through
+    /discover with its MAC; the claim path heals a stale generic kind
+    the same way /register does. This is the path the stale-kind case
+    actually hits in the field (a healthy device never re-registers)."""
+    client = app.test_client()
+    _sign_in(client)
+    devices = app.config["DEVICE_REGISTRY"]
+
+    code = _issue_pairing(app)
+    first = client.post(
+        "/api/v1/device/register",
+        headers={"X-Pairing-Code": code, "Content-Type": "application/json"},
+        data=json.dumps(
+            {
+                "device_id": "frame03",
+                "kind": "esp32_client",
+                "panel_w": 1200,
+                "panel_h": 1600,
+                "mac": "aa:bb:cc:dd:ee:03",
+            }
+        ),
+    )
+    assert first.status_code == 201
+
+    resp = client.post(
+        "/api/v1/device/discover",
+        headers={"Content-Type": "application/json"},
+        data=json.dumps(
+            {
+                "device_id": "frame03",
+                "kind": "seeed_reterminal_e1004",
+                "panel_w": 1200,
+                "panel_h": 1600,
+                "fw_version": "1.6.0",
+                "mac": "aa:bb:cc:dd:ee:03",
+            }
+        ),
+    )
+    assert resp.status_code == 200
+    assert resp.get_json()["registered"] is True
+    assert devices.get("frame03").kind_of == "seeed_reterminal_e1004"
+
+
 # -- auth --------------------------------------------------------------
 
 

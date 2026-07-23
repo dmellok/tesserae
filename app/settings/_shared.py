@@ -150,13 +150,12 @@ def device_kinds() -> list[Device]:
 
 
 def _kind_protocol(kind: Device) -> str:
-    """The wire protocol a kind speaks. Hardware-catalog SKUs carry it
-    under ``_catalog_entry.protocol``; a folder-defined protocol kind is
-    its own protocol (its id)."""
-    ce = kind.manifest.get("_catalog_entry")
-    if isinstance(ce, dict) and isinstance(ce.get("protocol"), str) and ce["protocol"]:
-        return str(ce["protocol"])
-    return kind.id
+    """The wire protocol a kind speaks. Canonical rule lives in
+    :func:`app.device_service.kind_protocol` (shared with the
+    register-time kind auto-heal); thin alias for existing callers."""
+    from app.device_service import kind_protocol
+
+    return kind_protocol(kind)
 
 
 def variant_options(kind_id: str | None, declared_gamut: str | None) -> list[dict[str, Any]]:

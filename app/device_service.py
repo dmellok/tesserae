@@ -597,6 +597,84 @@ def update_instance_renderer(
     return InstanceResult(reloaded), True
 
 
+def kind_protocol(kind: Device) -> str:
+    """The wire protocol a kind speaks. Hardware-catalog SKUs carry it
+    under ``_catalog_entry.protocol``; a folder-defined protocol kind is
+    its own protocol (its id)."""
+    ce = kind.manifest.get("_catalog_entry")
+    if isinstance(ce, dict) and isinstance(ce.get("protocol"), str) and ce["protocol"]:
+        return str(ce["protocol"])
+    return kind.id
+
+
+def update_instance_kind(
+    *,
+    devices: DeviceRegistry,
+    renderers: RendererRegistry,
+    data_root: Path,
+    instance_id: str,
+    kind_id: str | None,
+) -> tuple[InstanceResult, bool]:
+    """Move a registered instance to the kind its firmware now declares,
+    rewritten on disk + reloaded in place.
+
+    Heals the stale-kind case: a device that first registered under a
+    generic protocol kind (``esp32_client``) later comes back running a
+    board build that declares its hardware-catalog SKU
+    (``seeed_reterminal_e1004``). Re-registration is otherwise idempotent
+    and would pin the instance to the old kind forever, which breaks
+    per-kind OTA rollouts (release descriptors are keyed by the SKU kind
+    and the firmware rejects a descriptor for any other kind).
+
+    Restricted to kinds that share the current kind's wire protocol, so
+    a heal can only refine *which board* on the same wire contract, never
+    move a device across protocols. An empty, unknown, cross-protocol or
+    already-current kind is a no-op, not an error.
+
+    Returns ``(result, changed)``. ``changed`` is True only when the
+    instance actually moved, so the caller can invalidate the device's
+    cached render (the new kind may carry different panel dims or a
+    different renderer)."""
+    device = devices.get(instance_id)
+    if device is None or device.kind_of is None:
+        return InstanceResult(None, f"Unknown device {instance_id!r}."), False
+    wanted = (kind_id or "").strip()
+    if not wanted or wanted == device.kind_of:
+        return InstanceResult(device), False
+    current_kind = devices.get(device.kind_of)
+    new_kind = devices.get(wanted)
+    if (
+        current_kind is None
+        or new_kind is None
+        or new_kind.kind_of is not None
+        or kind_protocol(new_kind) != kind_protocol(current_kind)
+    ):
+        return InstanceResult(device), False
+
+    inst_file = device.path
+    try:
+        raw = json.loads(inst_file.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as err:
+        return InstanceResult(None, f"Couldn't read {inst_file.name}: {err}"), False
+    raw["kind"] = wanted
+    # A renderer pick made under the old kind that the new kind doesn't
+    # offer would be silently ignored at load; drop it so the file
+    # doesn't carry a stale field forever.
+    if raw.get("renderer_id") not in new_kind.renderer_ids:
+        raw.pop("renderer_id", None)
+    inst_file.write_text(json.dumps(raw, indent=2) + "\n", encoding="utf-8")
+
+    devices.devices.pop(instance_id, None)
+    _drop_clones(renderers, instance_id)
+    reloaded = load_instance_file(devices, inst_file=inst_file, data_root=data_root)
+    if reloaded is None:
+        last_err = devices.errors[-1] if devices.errors else None
+        return InstanceResult(None, last_err.message if last_err else "unknown error"), False
+    clone_for_instances(renderers, devices)
+    logger.info("Device %s kind healed: %s -> %s", instance_id, device.kind_of, wanted)
+    return InstanceResult(reloaded), True
+
+
 def update_instance_quiet_hours(
     *,
     devices: DeviceRegistry,

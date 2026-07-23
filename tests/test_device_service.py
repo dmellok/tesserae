@@ -201,6 +201,104 @@ def test_update_instance_renderer_noop_cases(registries) -> None:
         assert result.device.renderer_ids == ["circuitpython_bmp__cp_noop"]
 
 
+@pytest.fixture
+def registries_with_catalog(tmp_path: Path):
+    """Like ``registries`` but with the hardware catalog layered in, so
+    SKU-derived kinds (``seeed_reterminal_e1004`` etc.) exist. Needed by
+    the kind auto-heal tests: healing moves an instance from a generic
+    protocol kind to one of its catalog siblings."""
+    data_root = tmp_path / "devices"
+    devices = device_loader.discover(
+        REPO_ROOT / "devices",
+        schema_path=REPO_ROOT / "schema" / "device.schema.json",
+        data_root=data_root,
+        hardware_dir=REPO_ROOT / "hardware",
+        hardware_schema_path=REPO_ROOT / "schema" / "hardware.schema.json",
+    )
+    renderers = renderer_loader.discover(
+        REPO_ROOT / "renderers",
+        schema_path=REPO_ROOT / "schema" / "renderer.schema.json",
+        data_root=tmp_path / "rdata",
+    )
+    assert devices.errors == []
+    assert renderers.errors == []
+    return devices, renderers, data_root
+
+
+def test_update_instance_kind_heals_to_catalog_sibling(registries_with_catalog) -> None:
+    # A device that paired under the generic esp32_client kind moves to
+    # the hardware SKU its firmware now declares. Same protocol, so the
+    # renderer clone survives under the new kind and the instance file
+    # records the SKU.
+    devices, renderers, data_root = registries_with_catalog
+    created = device_service.create_instance(
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="frame_office",
+        kind_id="esp32_client",
+        name="Office frame",
+    )
+    assert created.ok
+
+    result, changed = device_service.update_instance_kind(
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="frame_office",
+        kind_id="seeed_reterminal_e1004",
+    )
+    assert changed is True and result.ok
+    assert result.device is not None
+    assert result.device.kind_of == "seeed_reterminal_e1004"
+    assert result.device.manifest["name"] == "Office frame"
+    assert renderers.get("esp32_bin__frame_office") is not None
+    saved = json.loads((data_root / "frame_office.json").read_text())
+    assert saved["kind"] == "seeed_reterminal_e1004"
+
+
+def test_update_instance_kind_noop_cases(registries_with_catalog) -> None:
+    # Same kind, empty, unknown, an instance id, and a cross-protocol
+    # kind are all no-ops (changed=False), never an error or a move.
+    devices, renderers, data_root = registries_with_catalog
+    device_service.create_instance(
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="frame_hall",
+        kind_id="esp32_client",
+    )
+    device_service.create_instance(
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="frame_other",
+        kind_id="esp32_client",
+    )
+    for kind_id in ("esp32_client", "", None, "no_such_kind", "frame_other", "trmnl_client"):
+        result, changed = device_service.update_instance_kind(
+            devices=devices,
+            renderers=renderers,
+            data_root=data_root,
+            instance_id="frame_hall",
+            kind_id=kind_id,
+        )
+        assert changed is False and result.ok
+        assert result.device is not None and result.device.kind_of == "esp32_client"
+
+
+def test_update_instance_kind_unknown_instance(registries_with_catalog) -> None:
+    devices, renderers, data_root = registries_with_catalog
+    result, changed = device_service.update_instance_kind(
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="ghost",
+        kind_id="seeed_reterminal_e1004",
+    )
+    assert changed is False and not result.ok
+
+
 def test_create_instance_portrait_swaps_dims(registries) -> None:
     devices, renderers, data_root = registries
     result = device_service.create_instance(
