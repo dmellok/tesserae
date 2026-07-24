@@ -206,3 +206,30 @@ def test_device_already_home_untouched(tmp_path: Path) -> None:
     nav._save_raw(raw)
     sched._maybe_return_decks_home(T0)
     assert pusher.promoted == []
+
+
+def test_home_return_respects_quiet_hours(tmp_path: Path) -> None:
+    """Timer-driven return must not repaint a panel inside its quiet
+    window; it lands after the window ends (nav record still stale)."""
+    decks, pusher, nav = _home_deck(tmp_path), FakeNavPush(), _nav_store(tmp_path)
+    pusher.quiet = True
+    pusher.device_in_quiet_hours = lambda device_id: pusher.quiet  # type: ignore[attr-defined]
+    sched = Scheduler(
+        store=ScheduleStore(tmp_path / "s.json"),
+        push_manager=lambda: pusher,  # type: ignore[arg-type,return-value]
+        deck_store=decks,
+        deck_nav_store=nav,
+    )
+    nav.set("panel", "d", "away")
+    raw = nav._load_raw()
+    raw["panel"]["updated_at"] = (T0 - timedelta(hours=2)).timestamp()
+    nav._save_raw(raw)
+
+    sched._maybe_return_decks_home(T0)
+    assert pusher.promoted == []
+    assert nav.get("panel")["page_id"] == "away"
+
+    # Quiet window ends -> next tick returns home.
+    pusher.quiet = False
+    sched._maybe_return_decks_home(T0 + timedelta(minutes=31))
+    assert pusher.promoted == [("panel", "home")]

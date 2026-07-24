@@ -2067,6 +2067,28 @@ class PushManager:
             event_id=event_id,
         )
 
+    def device_in_quiet_hours(self, device_id: str) -> bool:
+        """True when the device is currently inside its effective
+        quiet-hours window. Public so timer-driven callers that bypass
+        ``push()`` (the deck home-return's promote fast path) can apply
+        the same gate a respectful push would."""
+        from datetime import datetime
+        from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+        device = self._devices.devices.get(device_id) if self._devices is not None else None
+        if device is None:
+            return False
+        app_settings = self._settings.get_section("app")
+        tz: Any | None = None
+        tz_raw = str(app_settings.get("timezone") or "system").strip()
+        if tz_raw and tz_raw.lower() != "system":
+            try:
+                tz = ZoneInfo(tz_raw)
+            except ZoneInfoNotFoundError:
+                tz = None
+        now = datetime.now(tz) if tz else datetime.now()
+        return device_is_quiet(app_settings, device, now, tz)
+
     def _filter_quiet_devices(
         self, groups: list[tuple[Panel, list[str]]]
     ) -> list[tuple[Panel, list[str]]]:

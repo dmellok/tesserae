@@ -6,6 +6,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **Deck home-return now respects quiet hours on its promote fast path.** The timer-driven
+  return-to-home could repaint a panel inside its quiet window when a pre-warmed frame was
+  available (the push fallback already gated itself); the return now defers until the window
+  ends on both paths. Hand navigation and the Push button remain quiet-exempt (user-initiated).
+
 ### Added
 
 - **Deck editor: pick pages, done ("dense rail + inspector").** Decks get a dedicated

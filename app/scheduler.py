@@ -580,6 +580,14 @@ class Scheduler:
                 if now.timestamp() - float(updated_at) < timeout_s:
                     continue
                 pusher = self._push_factory()
+                # Timer-driven, not user-initiated: respect quiet hours
+                # on BOTH paths. The push fallback gates itself, but the
+                # promote fast path would silently repaint a sleeping
+                # panel, so check before touching the live slot; the
+                # return simply lands after the window ends.
+                quiet_check = getattr(pusher, "device_in_quiet_hours", None)
+                if callable(quiet_check) and quiet_check(device_id):
+                    continue
                 promoter = getattr(pusher, "promote_deck_page", None)
                 promoted = callable(promoter) and promoter(device_id, home)
                 if not promoted:
