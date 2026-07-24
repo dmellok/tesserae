@@ -704,6 +704,25 @@ server stops offering deck syncs until it reappears.
    hit-test. The manifest warms (renders) cold pages on demand, so the
    first call after a deck edit can take a few seconds.
 
+   Additive manifest fields (firmware should tolerate their absence
+   and ignore unknown fields):
+
+   * Link entries may carry ``"swipe": "left"|"right"|"up"|"down"``
+     instead of ``button``/``zone``: classify the stroke direction and
+     hit-test it against these for local nav. Defaults follow paging
+     convention (swipe left pulls the NEXT page in; swipe right goes
+     back), with explicit authored swipes taking precedence.
+   * Pages may carry ``"cache": false`` when the device's advertised
+     ``capacity_bytes`` can't fit the whole deck: don't store that
+     frame (its links remain valid; navigating to it falls back to a
+     network fetch). Cache priority is ring-distance from the home
+     card, so home and its neighbours always fit first.
+   * A top-level ``"home": {"page_id": ..., "timeout_s": N}`` block
+     means: after ``timeout_s`` with no button press or tap, navigate
+     back to the home page locally (paint from cache, report as
+     usual). Absent = never return automatically. The server enforces
+     the same rule for devices that navigate server-side.
+
    Where a page's graph is silent, the manifest synthesizes defaults so
    a deck authored without an explicit graph still navigates locally:
    `left` / `right` button links to the previous / next page in deck

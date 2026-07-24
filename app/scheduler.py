@@ -219,6 +219,7 @@ class Scheduler:
         rotation_store: RotationStore | None = None,
         rotation_state_store: Any = None,
         deck_store: DeckStore | None = None,
+        deck_nav_store: Any = None,
         # Conditional schedules + rotation steps (v0.48). Optional; None
         # means every condition resolves to True (legacy behaviour) so
         # existing tests don't need updating. Production wires a real
@@ -249,6 +250,7 @@ class Scheduler:
         self._rotation_store = rotation_store
         self._rotation_state_store = rotation_state_store
         self._deck_store = deck_store
+        self._deck_nav_store = deck_nav_store
         # deck_id -> last warm POSIX timestamp, so a deck's pages are re-warmed
         # (in the background, silently) at its refresh cadence. The lock keeps
         # warm passes from stacking when one runs longer than a tick.
@@ -454,6 +456,11 @@ class Scheduler:
             self._fire(schedule, now, respect_quiet_hours=True)
         # Deck pre-render refresh (silent, off the tick thread).
         self._maybe_warm_decks(now)
+        # Deck home card: return idle panels to the deck's home page
+        # once the configured timeout lapses. Server-side enforcement
+        # for server-navigated devices; SD-cache firmware gets the same
+        # rule in its sync manifest and handles it offline.
+        self._maybe_return_decks_home(now)
 
     def _maybe_rejoin_rotations(self, now: datetime) -> None:
         """Bring manually-paged-away devices back into their rotation.
@@ -538,6 +545,68 @@ class Scheduler:
                         "rejoin_device": state.device_id,
                     },
                 )
+
+    def _maybe_return_decks_home(self, now: datetime) -> None:
+        """Return idle deck panels to the home card (deck editor's
+        "returns to home after N min" behaviour).
+
+        For each enabled deck with a home timeout: any bound device
+        whose nav record shows a non-home page and no interaction for
+        the timeout gets the home page promoted (pre-rendered frame,
+        zero render cost) or pushed, and its nav record moved to home.
+        The nav record's ``updated_at`` refreshes on every navigation
+        and every device report, so the timer counts from the last
+        button press or tap, matching the editor copy. Devices with no
+        nav record never had a manual position and are left alone."""
+        if self._deck_store is None or self._deck_nav_store is None:
+            return
+        for deck in self._deck_store.all():
+            if not deck.enabled or deck.home_timeout_minutes <= 0 or not deck.device_ids:
+                continue
+            home = deck.resolved_home_page_id
+            timeout_s = deck.home_timeout_minutes * 60
+            for device_id in deck.device_ids:
+                try:
+                    rec = self._deck_nav_store.get(device_id)
+                except Exception:
+                    continue
+                if rec is None or rec.get("deck_id") != deck.id:
+                    continue
+                if rec.get("page_id") == home:
+                    continue
+                updated_at = rec.get("updated_at")
+                if not isinstance(updated_at, (int, float)):
+                    continue
+                if now.timestamp() - float(updated_at) < timeout_s:
+                    continue
+                pusher = self._push_factory()
+                promoter = getattr(pusher, "promote_deck_page", None)
+                promoted = callable(promoter) and promoter(device_id, home)
+                if not promoted:
+                    result = pusher.push(
+                        home,
+                        device_ids={device_id},
+                        respect_quiet_hours=True,
+                        source="deck",
+                    )
+                    if result.status == "failed":
+                        continue  # retry next tick; nav untouched
+                self._deck_nav_store.set(device_id, deck.id, home)
+                logger.info(
+                    "deck home return: device=%s deck=%s -> %s (%s)",
+                    device_id,
+                    deck.id,
+                    home,
+                    "promoted" if promoted else "pushed",
+                )
+                if self._event_log is not None:
+                    self._event_log.record(
+                        type="deck",
+                        source="deck",
+                        target=deck.id,
+                        status="sent",
+                        extra={"home_return_device": device_id, "page_id": home},
+                    )
 
     def _maybe_warm_decks(self, now: datetime) -> None:
         """Kick a background deck-warm pass unless one is already running, so a

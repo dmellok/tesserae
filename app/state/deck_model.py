@@ -122,6 +122,17 @@ class Deck(BaseModel):
     # the first page when unset.
     entry_page_id: str | None = None
 
+    # Home card (deck editor redesign): the page the deck RETURNS to
+    # after ``home_timeout_minutes`` of no interaction, and the page
+    # the Push action sends to the panel first. ``None`` = the first
+    # page. ``home_timeout_minutes`` 0 = never return automatically.
+    # The timeout counts from the last button press or tap (the nav
+    # record's updated_at); enforced server-side by the scheduler for
+    # server-navigated devices and shipped in the sync manifest's
+    # ``home`` block so SD-cache firmware can enforce it offline.
+    home_page_id: str | None = None
+    home_timeout_minutes: int = Field(default=0, ge=0, le=120)
+
     # Background re-render cadence in minutes so the pre-rendered pages keep
     # their data current. 0 disables periodic refresh (pages are warmed once
     # and only re-rendered when their data is pushed by other means).
@@ -141,12 +152,20 @@ class Deck(BaseModel):
                     )
         if self.entry_page_id is not None and self.entry_page_id not in known:
             raise ValueError(f"entry_page_id {self.entry_page_id!r} is not a page in this deck")
+        if self.home_page_id is not None and self.home_page_id not in known:
+            raise ValueError(f"home_page_id {self.home_page_id!r} is not a page in this deck")
         return self
 
     @property
+    def resolved_home_page_id(self) -> str:
+        """The home card: the explicit home, else the first page."""
+        return self.home_page_id or self.pages[0].page_id
+
+    @property
     def resolved_entry_page_id(self) -> str:
-        """The landing page: the explicit entry, else the first page."""
-        return self.entry_page_id or self.pages[0].page_id
+        """The landing page for a freshly-bound device: the explicit
+        entry, else home (which itself defaults to the first page)."""
+        return self.entry_page_id or self.resolved_home_page_id
 
     @property
     def page_ids(self) -> list[str]:

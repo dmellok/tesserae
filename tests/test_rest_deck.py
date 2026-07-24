@@ -132,6 +132,9 @@ def test_deck_manifest_returns_pages_digests_and_links(app: Flask) -> None:
         {"button": "right", "zone": None, "target_page_id": "weather"},
         # Default prev-in-order fill for the silent "left" (2 pages, wraps).
         {"button": "left", "zone": None, "target_page_id": "weather"},
+        # Swipe mirror of the explicit right link + the paging default.
+        {"swipe": "right", "zone": None, "target_page_id": "weather"},
+        {"swipe": "left", "zone": None, "target_page_id": "weather"},
     ]
     assert pages["weather"]["digest"] == d_weather
 

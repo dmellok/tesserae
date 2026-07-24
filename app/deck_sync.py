@@ -143,6 +143,22 @@ def manifest_links(
         links.append({"button": "left", "zone": None, "target_page_id": prev_id})
     if "right" not in explicit_buttons:
         links.append({"button": "right", "zone": None, "target_page_id": next_id})
+    # Swipe triggers (additive manifest field, firmware v1.9+): explicit
+    # direction-named button links mirror as swipe entries (the graph
+    # stores authored swipes as direction-named buttons), and where the
+    # author was silent the defaults follow paging convention: swiping
+    # LEFT pulls the NEXT page in, swiping RIGHT goes back.
+    directions = {"left", "right", "up", "down"}
+    for link in page.links:
+        if link.button in directions:
+            links.append(
+                {"swipe": link.button, "zone": None, "target_page_id": link.target_page_id}
+            )
+    mirrored = {entry.get("swipe") for entry in links if entry.get("swipe")}
+    if "left" not in mirrored:
+        links.append({"swipe": "left", "zone": None, "target_page_id": next_id})
+    if "right" not in mirrored:
+        links.append({"swipe": "right", "zone": None, "target_page_id": prev_id})
     has_explicit_zones = any(link.zone is not None for link in page.links)
     if touch and not has_explicit_zones and not page_has_touch_regions:
         links.append(
@@ -186,6 +202,7 @@ def build_manifest(
     warm_missing: bool,
     touch: bool = False,
     regions_lookup: Any | None = None,
+    capacity_bytes: int | None = None,
 ) -> dict[str, Any]:
     """The deck sync manifest for one device, contract shape:
 
@@ -230,11 +247,55 @@ def build_manifest(
                 ),
             }
         )
+    # Capacity guard: when the device advertised how much room its card
+    # has, mark overflow pages ``cache: false`` instead of letting the
+    # firmware discover mid-sync that the stack doesn't fit. Priority is
+    # ring distance from the home card in deck order (home and its
+    # neighbours cache first); uncached pages keep their links and fall
+    # back to a network fetch when navigated to. Logged, never silent.
+    if capacity_bytes is not None and capacity_bytes > 0 and pages:
+        home_id = deck.resolved_home_page_id
+        ids = [p["page_id"] for p in pages]
+        home_idx = ids.index(home_id) if home_id in ids else 0
+        n = len(ids)
+
+        def ring_distance(i: int) -> int:
+            d = abs(i - home_idx)
+            return min(d, n - d)
+
+        budget = capacity_bytes
+        keep: set[str] = set()
+        for i in sorted(range(n), key=lambda i: (ring_distance(i), i)):
+            size = int(pages[i].get("bytes") or 0)
+            if size <= budget:
+                keep.add(ids[i])
+                budget -= size
+        dropped = [pid for pid in ids if pid not in keep]
+        if dropped:
+            logger.info(
+                "deck manifest: %d page(s) exceed device capacity %d for %s; "
+                "marked cache=false: %s",
+                len(dropped),
+                capacity_bytes,
+                device_id,
+                ",".join(dropped),
+            )
+            for page_view in pages:
+                if page_view["page_id"] not in keep:
+                    page_view["cache"] = False
+
     manifest: dict[str, Any] = {
         "deck_id": deck.id,
         "entry_page_id": deck.resolved_entry_page_id,
         "pages": pages,
     }
+    # Home card: shipped so SD-cache firmware can return to it locally
+    # after the idle timeout, radio off. Absent when the feature is off.
+    if deck.home_timeout_minutes > 0:
+        manifest["home"] = {
+            "page_id": deck.resolved_home_page_id,
+            "timeout_s": deck.home_timeout_minutes * 60,
+        }
     manifest["version"] = version_digest(manifest)
     return manifest
 

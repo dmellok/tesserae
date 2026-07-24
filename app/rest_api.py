@@ -1111,6 +1111,13 @@ def get_deck_manifest(device_id: str) -> Response:
 
     from app.deck_sync import build_manifest
 
+    # The device's advertised card capacity (current-state, from its
+    # heartbeats); pages beyond it get cache=false rather than letting
+    # the firmware overfill its card mid-sync.
+    status = (current_app.config.get("DEVICE_STATUS") or {}).get(device.id)
+    cache_cap = status.get("deck_cache") if isinstance(status, dict) else None
+    capacity = cache_cap.get("capacity_bytes") if isinstance(cache_cap, dict) else None
+
     manifest = build_manifest(
         deck,
         device.id,
@@ -1119,6 +1126,7 @@ def get_deck_manifest(device_id: str) -> Response:
         warm_missing=True,
         touch=device.manifest.get("touch") is True,
         regions_lookup=push_mgr.touch_regions_for,
+        capacity_bytes=capacity if isinstance(capacity, int) and capacity > 0 else None,
     )
     return jsonify({"status": 200, **manifest})
 

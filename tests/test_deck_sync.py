@@ -144,6 +144,10 @@ def test_manifest_shape_and_stable_version(tmp_path: Path) -> None:
         # Synthesized default: the graph declared no "left", so the
         # manifest fills prev-in-deck-order (wrapping).
         {"button": "left", "zone": None, "target_page_id": "weather"},
+        # Explicit direction-named button links mirror as swipe entries;
+        # the silent direction gets the paging default (left = next).
+        {"swipe": "right", "zone": None, "target_page_id": "weather"},
+        {"swipe": "left", "zone": None, "target_page_id": "weather"},
     ]
     assert source.warmed == []  # nothing was cold
 
@@ -220,14 +224,14 @@ def test_manifest_defaults_buttons_prev_next_wrapping(tmp_path: Path) -> None:
         deck, "frame01", push_mgr=source, renders_dir=tmp_path, warm_missing=False
     )
     by_id = {p["page_id"]: p["links"] for p in manifest["pages"]}
-    assert {(link["button"], link["target_page_id"]) for link in by_id["p0"]} == {
-        ("left", "p2"),  # wraps
-        ("right", "p1"),
+    buttons0 = {
+        (link["button"], link["target_page_id"]) for link in by_id["p0"] if link.get("button")
     }
-    assert {(link["button"], link["target_page_id"]) for link in by_id["p2"]} == {
-        ("left", "p1"),
-        ("right", "p0"),  # wraps
+    assert buttons0 == {("left", "p2"), ("right", "p1")}  # left wraps
+    buttons2 = {
+        (link["button"], link["target_page_id"]) for link in by_id["p2"] if link.get("button")
     }
+    assert buttons2 == {("left", "p1"), ("right", "p0")}  # right wraps
 
 
 def test_manifest_default_zones_only_on_touch_without_regions(tmp_path: Path) -> None:
@@ -300,7 +304,92 @@ def test_explicit_button_links_win_over_defaults(tmp_path: Path) -> None:
         deck, "frame01", push_mgr=source, renders_dir=tmp_path, warm_missing=False
     )
     a_links = manifest["pages"][0]["links"]
-    rights = [link for link in a_links if link["button"] == "right"]
+    rights = [link for link in a_links if link.get("button") == "right"]
     assert rights == [{"button": "right", "zone": None, "target_page_id": "c"}]  # explicit, no dup
-    lefts = [link for link in a_links if link["button"] == "left"]
+    lefts = [link for link in a_links if link.get("button") == "left"]
     assert lefts == [{"button": "left", "zone": None, "target_page_id": "c"}]  # default wrap
+
+
+# -- swipe triggers, home block, capacity trim (deck editor backend) --------
+
+
+def test_manifest_default_swipe_links(tmp_path: Path) -> None:
+    """Paging convention: swipe left pulls the NEXT page in, swipe
+    right goes back. Explicit direction-named button links mirror as
+    swipe entries with the author's own direction."""
+    source = FakeRenderSource(tmp_path)
+    deck = _linkless_deck(3)
+    for p in deck.pages:
+        source.seed("frame01", p.page_id, f"frame-{p.page_id}".encode())
+    manifest = deck_sync.build_manifest(
+        deck, "frame01", push_mgr=source, renders_dir=tmp_path, warm_missing=False
+    )
+    p0 = manifest["pages"][0]["links"]
+    swipes = {link["swipe"]: link["target_page_id"] for link in p0 if link.get("swipe")}
+    assert swipes == {"left": "p1", "right": "p2"}  # left=next, right=prev(wrap)
+
+
+def test_manifest_home_block_only_when_timeout_set(tmp_path: Path) -> None:
+    source = FakeRenderSource(tmp_path)
+    deck = _linkless_deck(2)
+    for p in deck.pages:
+        source.seed("frame01", p.page_id, f"frame-{p.page_id}".encode())
+    m = deck_sync.build_manifest(
+        deck, "frame01", push_mgr=source, renders_dir=tmp_path, warm_missing=False
+    )
+    assert "home" not in m
+
+    deck2 = deck.model_copy(update={"home_page_id": "p1", "home_timeout_minutes": 15})
+    m2 = deck_sync.build_manifest(
+        deck2, "frame01", push_mgr=source, renders_dir=tmp_path, warm_missing=False
+    )
+    assert m2["home"] == {"page_id": "p1", "timeout_s": 900}
+    assert m2["version"] != m["version"]  # home rides the version digest
+
+
+def test_manifest_capacity_marks_far_pages_uncached(tmp_path: Path) -> None:
+    """Ring-from-home priority: with room for only 2 of 4 frames, home
+    and its nearest neighbour cache; the far pages get cache=false but
+    keep their links."""
+    source = FakeRenderSource(tmp_path)
+    deck = _linkless_deck(4).model_copy(update={"home_page_id": "p0"})
+    payloads = {p.page_id: b"x" * 100 for p in deck.pages}
+    for pid, payload in payloads.items():
+        source.seed("frame01", pid, payload)
+    manifest = deck_sync.build_manifest(
+        deck,
+        "frame01",
+        push_mgr=source,
+        renders_dir=tmp_path,
+        warm_missing=False,
+        capacity_bytes=250,  # fits 2 x 100-byte frames + change
+    )
+    by_id = {p["page_id"]: p for p in manifest["pages"]}
+    cached = {pid for pid, p in by_id.items() if p.get("cache") is not False}
+    # Home (p0) always first; ring distance 1 = p1 and p3 (tie -> lower
+    # index wins), so p1 caches and p2/p3 spill.
+    assert "p0" in cached and "p1" in cached
+    assert by_id["p2"].get("cache") is False
+    assert by_id["p3"].get("cache") is False
+    assert by_id["p2"]["links"]  # links survive for network-fallback nav
+
+
+def test_deck_model_home_validation() -> None:
+    import pytest as _pytest
+    from pydantic import ValidationError
+
+    with _pytest.raises(ValidationError):
+        Deck(
+            id="bad",
+            name="Bad",
+            pages=[DeckPage(page_id="a")],
+            home_page_id="not_a_page",
+        )
+    deck = Deck(
+        id="ok",
+        name="Ok",
+        pages=[DeckPage(page_id="a"), DeckPage(page_id="b")],
+        home_page_id="b",
+    )
+    assert deck.resolved_home_page_id == "b"
+    assert deck.resolved_entry_page_id == "b"  # entry defaults to home
