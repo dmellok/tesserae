@@ -8,6 +8,14 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **Deck heartbeat reports could revert a freshly pushed dashboard.** v0.187.1's report promotion
+  promoted whatever page the panel said was on glass, so a heartbeat arriving between a push and
+  the device's next fetch clobbered the pending frame with the older deck frame, and the new
+  dashboard (and its touch zones) never landed. Promotions from reports and from touch
+  reconciliation now carry a recency guard: what's on glass only wins the live slot when it isn't
+  older than what's pending there. A touch on stale glass still dispatches against the frame the
+  finger actually touched; it just can't revert the pending push.
+
 - **Buttons and touches were permanently deduped after a device power cycle.** The firmware's
   wake-event counter is RTC-backed and restarts at 0 on any power cycle (battery pull, crash,
   reflash), usually without re-pairing since the token survives in NVS; the server's dedup rule

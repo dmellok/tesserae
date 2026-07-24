@@ -560,14 +560,37 @@ def _ingest_deck_report(device: Device, page_id: Any) -> None:
         # keeps 304ing (a poll must never "un-navigate" the panel back
         # to the pre-nav frame) and touch stale-checks accept strokes
         # against it. Skip when already aligned.
+        #
+        # RECENCY GUARD: a heartbeat report describes what WAS painted,
+        # and a fresh push may be sitting in the live slot awaiting
+        # delivery. Promoting an older deck frame over it would silently
+        # revert the push (the device polls, sees nothing newer, and the
+        # new dashboard never lands). What's on glass only wins when it
+        # is not older than the live slot.
         push_mgr = current_app.config.get("PUSH_MANAGER")
         if push_mgr is not None:
             info = push_mgr.deck_render_for(device.id, wanted)
             latest = push_mgr.latest_render_for(device.id)
-            if info is not None and (latest is None or latest.get("digest") != info.get("digest")):
+            if (
+                info is not None
+                and (latest is None or latest.get("digest") != info.get("digest"))
+                and not _render_older_than(info, latest)
+            ):
                 push_mgr.promote_deck_page(device.id, wanted)
     except Exception:
         current_app.logger.exception("rest: deck report failed for device=%s", device.id)
+
+
+def _render_older_than(info: dict[str, Any], latest: dict[str, Any] | None) -> bool:
+    """True when render ``info`` is strictly older than ``latest`` by
+    the fan-out timestamps. Missing timestamps compare as 0, so legacy
+    entries without one never block a promotion."""
+    if latest is None:
+        return False
+    try:
+        return float(info.get("timestamp") or 0) < float(latest.get("timestamp") or 0)
+    except (TypeError, ValueError):
+        return False
 
 
 def _reset_event_counter(device_id: str) -> None:

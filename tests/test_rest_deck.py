@@ -352,3 +352,59 @@ def test_unknown_digest_still_stale(app: Flask) -> None:
     # Live slot untouched: the stroke was stale, nothing promoted.
     latest = app.config["PUSH_MANAGER"].latest_render_for("frame01")
     assert latest is not None and latest["digest"] == "0" * 16
+
+
+def test_deck_report_never_reverts_a_fresh_push(app: Flask) -> None:
+    """The race that ate pushed dashboards: push a new frame, then the
+    deck-bound panel heartbeats deck_page_id for the OLD page still on
+    its glass. The report must record nav position but NOT promote the
+    older deck frame over the pending push."""
+    client = app.test_client()
+    token = _register_esp32(app, client, "frame01")
+    deck_digest = _bind_deck_with_regions(app, "frame01")
+    push_mgr = app.config["PUSH_MANAGER"]
+    push_mgr._deck_renders["frame01"]["weather"]["timestamp"] = 1000.0
+    # A fresh push lands AFTER the deck frame was warmed.
+    push_mgr._latest_renders["frame01"] = {
+        "digest": "1" * 16,
+        "ext": "bin",
+        "filename": "new.bin",
+        "composition_digest": "f" * 16,
+        "timestamp": 2000.0,
+    }
+
+    resp = _post_status(client, "frame01", token, {"deck_page_id": "weather"})
+    assert resp.status_code == 200
+    # Nav position recorded, but the push survives in the live slot.
+    assert app.config["DECK_NAV_STORE"].get("frame01")["page_id"] == "weather"
+    latest = push_mgr.latest_render_for("frame01")
+    assert latest["digest"] == "1" * 16
+
+    # And a touch on the stale glass still dispatches (hit-tests the
+    # deck frame) without reverting the pending push either.
+    touch = client.get(
+        f"/api/v1/device/frame01/frame?touch_x0=20&touch_y0=20&touch_digest={deck_digest}"
+        "&touch_event_id=9",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert touch.status_code in (200, 304)
+    assert push_mgr.latest_render_for("frame01")["digest"] == "1" * 16
+
+
+def test_deck_report_still_promotes_when_not_older(app: Flask) -> None:
+    """Steady state (local nav, no pending push): the reported deck
+    frame is newer than the live slot and promotion proceeds."""
+    client = app.test_client()
+    token = _register_esp32(app, client, "frame01")
+    deck_digest = _bind_deck_with_regions(app, "frame01")
+    push_mgr = app.config["PUSH_MANAGER"]
+    push_mgr._deck_renders["frame01"]["weather"]["timestamp"] = 3000.0
+    push_mgr._latest_renders["frame01"] = {
+        "digest": "1" * 16,
+        "ext": "bin",
+        "filename": "old.bin",
+        "composition_digest": "f" * 16,
+        "timestamp": 2000.0,
+    }
+    _post_status(client, "frame01", token, {"deck_page_id": "weather"})
+    assert push_mgr.latest_render_for("frame01")["digest"] == deck_digest

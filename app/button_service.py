@@ -453,17 +453,32 @@ class ButtonService:
         promoter = getattr(pusher, "promote_deck_page", None)
         if not (callable(render_for) and callable(promoter)):
             return None
+        latest_fn = getattr(pusher, "latest_render_for", None)
+        latest = latest_fn(device_id) if callable(latest_fn) else None
         for page in deck.pages:
             info = render_for(device_id, page.page_id)
             if info is not None and str(info.get("digest") or "") == frame_digest:
-                promoter(device_id, page.page_id)
+                # RECENCY GUARD: hit-test against the frame the finger
+                # actually touched either way, but only promote it into
+                # the live slot when it isn't older than what's pending
+                # there; otherwise a tap on a stale frame would silently
+                # revert a fresh push awaiting delivery.
+                try:
+                    older = latest is not None and float(info.get("timestamp") or 0) < float(
+                        latest.get("timestamp") or 0
+                    )
+                except (TypeError, ValueError):
+                    older = False
+                if not older:
+                    promoter(device_id, page.page_id)
                 if self._deck_nav is not None:
                     self._deck_nav.set(device_id, deck.id, page.page_id)
                 log.info(
-                    "touch reconcile: device=%s showing deck frame %s (page=%s)",
+                    "touch reconcile: device=%s showing deck frame %s (page=%s, promoted=%s)",
                     device_id,
                     frame_digest,
                     page.page_id,
+                    not older,
                 )
                 return dict(info)
         return None
