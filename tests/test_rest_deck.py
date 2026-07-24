@@ -129,7 +129,9 @@ def test_deck_manifest_returns_pages_digests_and_links(app: Flask) -> None:
     assert pages["overview"]["bytes"] == len(b"frame-overview")
     assert pages["overview"]["ttl_s"] == 900
     assert pages["overview"]["links"] == [
-        {"button": "right", "zone": None, "target_page_id": "weather"}
+        {"button": "right", "zone": None, "target_page_id": "weather"},
+        # Default prev-in-order fill for the silent "left" (2 pages, wraps).
+        {"button": "left", "zone": None, "target_page_id": "weather"},
     ]
     assert pages["weather"]["digest"] == d_weather
 

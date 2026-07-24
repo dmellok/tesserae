@@ -44,6 +44,10 @@ def _pages() -> PageStore:
     return current_app.config["PAGE_STORE"]  # type: ignore[no-any-return]
 
 
+def _nav_store() -> Any:
+    return current_app.config.get("DECK_NAV_STORE")
+
+
 def _slug_from(value: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "_", value.strip().lower()).strip("_")
     return slug or "deck"
@@ -265,6 +269,58 @@ def edit_graph(deck_id: str) -> Response:
     _store().upsert(deck)
     _invalidate(deck)
     flash(f"Deck {deck.name!r} graph updated.", "ok")
+    return redirect(url_for("decks.index") + f"#deck-{deck_id}")
+
+
+@bp.post("/<deck_id>/push")
+def push(deck_id: str) -> Response:
+    """Initialize the deck and send it to its panels: warm every page
+    for every bound device (so navigation serves pre-rendered frames
+    and the sync manifest ships complete on first fetch), then push the
+    entry page so the panels actually show the deck. The one-click
+    "make this deck live" action; without it, warming waits for the
+    scheduler tick and the panel keeps whatever it was showing."""
+    deck = _store().get(deck_id)
+    if deck is None:
+        flash(f"No deck with id {deck_id!r}.", "error")
+        return redirect(url_for("decks.index"))
+    if not deck.device_ids:
+        flash("Bind at least one device to the deck first.", "error")
+        return redirect(url_for("decks.index") + f"#deck-{deck_id}")
+    pusher = current_app.config.get("PUSH_MANAGER")
+    if pusher is None:
+        flash("Push pipeline not ready.", "error")
+        return redirect(url_for("decks.index") + f"#deck-{deck_id}")
+
+    warmed = failed = 0
+    for device_id in deck.device_ids:
+        for page in deck.pages:
+            if pusher.warm_deck_page(page.page_id, device_id):
+                warmed += 1
+            else:
+                failed += 1
+    entry = deck.resolved_entry_page_id
+    result = pusher.push(
+        entry,
+        device_ids=set(deck.device_ids),
+        respect_quiet_hours=False,
+        force_publish=True,
+        source="deck_init",
+    )
+    nav = _nav_store()
+    if nav is not None:
+        for device_id in deck.device_ids:
+            nav.set(device_id, deck.id, entry)
+    if result.status == "failed":
+        flash(f"Warmed {warmed} frame(s) but the entry-page push failed.", "error")
+    elif failed:
+        flash(
+            f"Deck pushed: entry page sent, {warmed} frame(s) warmed, {failed} warm(s) failed "
+            "(those pages render on first navigation instead).",
+            "warn",
+        )
+    else:
+        flash(f"Deck pushed: entry page sent, {warmed} frame(s) warmed.", "ok")
     return redirect(url_for("decks.index") + f"#deck-{deck_id}")
 
 

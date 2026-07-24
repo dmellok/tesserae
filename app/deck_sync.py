@@ -102,6 +102,66 @@ def _links_view(page: DeckPage) -> list[dict[str, Any]]:
     ]
 
 
+def default_neighbours(deck: Deck, page_id: str) -> tuple[str, str] | None:
+    """``(prev, next)`` page ids in deck order, wrapping, or None for a
+    single-page deck / unknown page. The default navigation for pages
+    whose graph doesn't say otherwise."""
+    ids = [p.page_id for p in deck.pages]
+    if len(ids) < 2 or page_id not in ids:
+        return None
+    i = ids.index(page_id)
+    return ids[(i - 1) % len(ids)], ids[(i + 1) % len(ids)]
+
+
+def manifest_links(
+    deck: Deck,
+    page: DeckPage,
+    *,
+    touch: bool,
+    page_has_touch_regions: bool,
+) -> list[dict[str, Any]]:
+    """The page's link table for the sync manifest: explicit graph links
+    plus synthesized defaults, so a deck authored without a graph (the
+    common management-page flow) still navigates locally on-device.
+
+    Defaults, only where the graph is silent:
+
+    * ``left`` / ``right`` button links to the previous / next page in
+      deck order, wrapping -- mirroring the rotation button convention.
+    * On touch panels, left-half / right-half tap zones to prev / next,
+      but ONLY when the page declares no explicit zones AND its
+      composition has no markup touch regions: a default zone would
+      otherwise swallow taps meant for the page's own tap targets
+      (device-local zone hits never reach the server's region map)."""
+    links = _links_view(page)
+    neighbours = default_neighbours(deck, page.page_id)
+    if neighbours is None:
+        return links
+    prev_id, next_id = neighbours
+    explicit_buttons = {link.button for link in page.links if link.button is not None}
+    if "left" not in explicit_buttons:
+        links.append({"button": "left", "zone": None, "target_page_id": prev_id})
+    if "right" not in explicit_buttons:
+        links.append({"button": "right", "zone": None, "target_page_id": next_id})
+    has_explicit_zones = any(link.zone is not None for link in page.links)
+    if touch and not has_explicit_zones and not page_has_touch_regions:
+        links.append(
+            {
+                "button": None,
+                "zone": {"x": 0.0, "y": 0.0, "w": 0.5, "h": 1.0},
+                "target_page_id": prev_id,
+            }
+        )
+        links.append(
+            {
+                "button": None,
+                "zone": {"x": 0.5, "y": 0.0, "w": 0.5, "h": 1.0},
+                "target_page_id": next_id,
+            }
+        )
+    return links
+
+
 def _artifact_size(renders_dir: Path, filename: str) -> int:
     try:
         return (renders_dir / filename).stat().st_size
@@ -124,6 +184,8 @@ def build_manifest(
     push_mgr: _DeckRenderSource,
     renders_dir: Path,
     warm_missing: bool,
+    touch: bool = False,
+    regions_lookup: Any | None = None,
 ) -> dict[str, Any]:
     """The deck sync manifest for one device, contract shape:
 
@@ -150,13 +212,22 @@ def build_manifest(
             info = push_mgr.deck_render_for(device_id, page.page_id)
         digest = str(info.get("digest") or "") if info else ""
         filename = str(info.get("filename") or "") if info else ""
+        comp_digest = str(info.get("composition_digest") or "") if info else ""
+        has_regions = False
+        if callable(regions_lookup) and comp_digest:
+            try:
+                has_regions = bool(regions_lookup(comp_digest))
+            except Exception:
+                has_regions = False
         pages.append(
             {
                 "page_id": page.page_id,
                 "digest": digest,
                 "bytes": _artifact_size(renders_dir, filename) if filename else 0,
                 "ttl_s": page_ttl_s(deck, page),
-                "links": _links_view(page),
+                "links": manifest_links(
+                    deck, page, touch=touch, page_has_touch_regions=has_regions
+                ),
             }
         )
     manifest: dict[str, Any] = {

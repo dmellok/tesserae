@@ -713,7 +713,12 @@ def build_server() -> Any:
         [{target_page_id, and exactly one of button:"left"/"right"/... OR
         zone:{x,y,w,h in 0..1}}]}], entry_page_id?, refresh_interval_minutes?}.
         Link targets must be pages in the deck. Prefer suggest_decks() to build
-        one from existing page links. Returns {ok, id}, or 422 on a bad shape."""
+        one from existing page links. Omitting links entirely is also fine: the
+        server derives the graph from the pages' page:<id> tap/swipe links, and
+        pages still link-less after that get default prev/next (left/right)
+        navigation on-device, so a plain {id, name, device_ids, pages:[{page_id}]}
+        deck navigates out of the box. Returns {ok, id, links_derived}, or 422
+        on a bad shape."""
         return _json("POST", "/decks", deck)
 
     def delete_deck(deck_id: str) -> Any:

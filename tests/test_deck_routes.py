@@ -194,3 +194,51 @@ def test_edit_graph_advanced_replaces_graph(app: Flask) -> None:
     )
     client.post(f"/decks/{did}/graph", data={"graph_json": new_graph})
     assert set(app.config["DECK_STORE"].get(did).page_ids) == {"overview", "weather"}
+
+
+def test_push_warms_all_pages_and_sends_entry(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The Push button: warm every page x device, push the entry page,
+    seed the nav position. No Playwright: pusher methods are stubbed."""
+    client = app.test_client()
+    _sign_in(client)
+    client.post(
+        "/decks/new",
+        data={"name": "Live", "graph_json": GRAPH, "device_ids": "panel_a", "entry_page_id": ""},
+    )
+    deck = _decks(app)[0]
+    assert deck.device_ids == ["panel_a"]
+
+    warmed: list = []
+    pushed: list = []
+
+    class _Push:
+        @staticmethod
+        def warm_deck_page(page_id, device_id):
+            warmed.append((device_id, page_id))
+            return page_id != "calendar"  # one page fails to warm
+
+        @staticmethod
+        def push(page_id, **kwargs):
+            pushed.append((page_id, tuple(sorted(kwargs.get("device_ids") or ()))))
+            from app.push import PushResult
+
+            return PushResult(status="sent", page_id=page_id)
+
+    monkeypatch.setitem(app.config, "PUSH_MANAGER", _Push())
+    resp = client.post(f"/decks/{deck.id}/push", follow_redirects=False)
+    assert resp.status_code == 302
+    assert set(warmed) == {("panel_a", "overview"), ("panel_a", "calendar")}
+    assert pushed == [("overview", ("panel_a",))]
+    nav = app.config["DECK_NAV_STORE"].get("panel_a")
+    assert nav is not None and nav["page_id"] == "overview" and nav["deck_id"] == deck.id
+
+
+def test_push_requires_bound_devices(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    client.post("/decks/new", data={"name": "Unbound", "graph_json": GRAPH, "device_ids": ""})
+    deck = _decks(app)[0]
+    resp = client.post(f"/decks/{deck.id}/push")
+    assert resp.status_code == 302
+    # No crash, deck untouched, nav empty.
+    assert app.config["DECK_NAV_STORE"].get("panel_a") is None

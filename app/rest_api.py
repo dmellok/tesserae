@@ -1112,7 +1112,13 @@ def get_deck_manifest(device_id: str) -> Response:
     from app.deck_sync import build_manifest
 
     manifest = build_manifest(
-        deck, device.id, push_mgr=push_mgr, renders_dir=renders_dir, warm_missing=True
+        deck,
+        device.id,
+        push_mgr=push_mgr,
+        renders_dir=renders_dir,
+        warm_missing=True,
+        touch=device.manifest.get("touch") is True,
+        regions_lookup=push_mgr.touch_regions_for,
     )
     return jsonify({"status": 200, **manifest})
 

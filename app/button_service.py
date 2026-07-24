@@ -414,12 +414,25 @@ class ButtonService:
         return self._deck_nav.current_page(device_id, deck.id) or deck.resolved_entry_page_id
 
     def _try_deck_button(self, device_id: str, button: str) -> tuple[Deck, str] | None:
-        """``(deck, target_page)`` when ``button`` is a graph link on the
-        device's current deck page, else None (fall through to rotation)."""
+        """``(deck, target_page)`` when ``button`` navigates the device's
+        current deck page: an explicit graph link, or the default
+        ``left``/``right`` = previous/next in deck order (wrapping) when
+        the graph is silent. The default keeps a graph-less deck (the
+        management-page flow) navigable and mirrors the link table the
+        sync manifest ships to cache-capable devices, so server-side and
+        device-local navigation agree. None for non-nav buttons (fall
+        through to rotation / button map)."""
         deck = self._bound_deck(device_id)
         if deck is None:
             return None
-        target = deck.resolve_button(self._deck_current_page(deck, device_id), button)
+        current = self._deck_current_page(deck, device_id)
+        target = deck.resolve_button(current, button)
+        if target is None and button in ("left", "right"):
+            from app.deck_sync import default_neighbours
+
+            neighbours = default_neighbours(deck, current)
+            if neighbours is not None:
+                target = neighbours[0] if button == "left" else neighbours[1]
         return (deck, target) if target is not None else None
 
     def _panel_dims(self, device_id: str) -> tuple[int, int] | None:

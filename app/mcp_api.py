@@ -1752,15 +1752,41 @@ def mcp_list_decks() -> Response:
 def mcp_create_deck() -> Response:
     """Create / replace a deck. Body is a full Deck object
     (``{id, name, device_ids, pages:[{page_id, links:[{target_page_id, button|zone}]}],
-    entry_page_id?, refresh_interval_minutes?}``)."""
+    entry_page_id?, refresh_interval_minutes?}``).
+
+    When the submitted pages carry NO links at all (the common agent
+    flow: name + page set, no hand-built graph), the graph is derived
+    automatically from the pages' authored ``page:<id>`` tap / swipe
+    links (same derivation as the Decks page "Sync from links"). Pages
+    still link-less after that fall back to the manifest's default
+    prev/next navigation on-device, so the deck navigates either way.
+    A submitted graph is used verbatim."""
     from app.state.deck_model import Deck
 
     try:
         deck = Deck.model_validate(request.get_json(silent=True) or {})
     except ValidationError as exc:
         return _err(422, "invalid deck", details=_model_errors(exc))
+    if not any(p.links for p in deck.pages):
+        from app.deck_suggest import graph_for_pages
+
+        derived = graph_for_pages(
+            current_app.config["PAGE_STORE"].list(), [p.page_id for p in deck.pages]
+        )
+        if any(p.links for p in derived):
+            refresh_by_id = {p.page_id: p.refresh_interval_minutes for p in deck.pages}
+            deck = deck.model_copy(
+                update={
+                    "pages": [
+                        p.model_copy(
+                            update={"refresh_interval_minutes": refresh_by_id.get(p.page_id)}
+                        )
+                        for p in derived
+                    ]
+                }
+            )
     current_app.config["DECK_STORE"].upsert(deck)
-    return jsonify({"ok": True, "id": deck.id})
+    return jsonify({"ok": True, "id": deck.id, "links_derived": any(p.links for p in deck.pages)})
 
 
 @bp.delete("/decks/<deck_id>")

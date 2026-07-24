@@ -119,6 +119,9 @@
   </div>
   <div class="deck-actions">
     <a class="button ghost" href="{{ url_for('decks.index', edit=deck.id) }}#deck-{{ deck.id }}">Edit</a>
+    <form method="post" action="{{ url_for('decks.push', deck_id=deck.id) }}" class="inline">
+      <button type="submit" class="ghost" title="Warm every page for every bound device and send the entry page to the panel(s)"><i class="ph ph-paper-plane-tilt" aria-hidden="true"></i><span>Push</span></button>
+    </form>
     <form method="post" action="{{ url_for('decks.sync', deck_id=deck.id) }}" class="inline">
       <button type="submit" class="ghost" title="Re-derive links + zones from the pages' canvas actions"><i class="ph ph-arrows-clockwise" aria-hidden="true"></i><span>Sync from links</span></button>
     </form>

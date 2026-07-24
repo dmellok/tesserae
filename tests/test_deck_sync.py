@@ -28,6 +28,7 @@ class FakeRenderSource:
             "digest": digest,
             "ext": "bin",
             "filename": filename,
+            "composition_digest": f"comp-{page_id}",
         }
         return digest
 
@@ -140,6 +141,9 @@ def test_manifest_shape_and_stable_version(tmp_path: Path) -> None:
             "zone": {"x": 0.0, "y": 0.0, "w": 0.5, "h": 0.5},
             "target_page_id": "weather",
         },
+        # Synthesized default: the graph declared no "left", so the
+        # manifest fills prev-in-deck-order (wrapping).
+        {"button": "left", "zone": None, "target_page_id": "weather"},
     ]
     assert source.warmed == []  # nothing was cold
 
@@ -193,3 +197,110 @@ def test_frame_entry_by_digest_matches_and_misses(tmp_path: Path) -> None:
     assert hit is not None and hit["digest"] == digest
     assert deck_sync.frame_entry_by_digest(deck, "frame01", "0" * 16, push_mgr=source) is None
     assert deck_sync.frame_entry_by_digest(deck, "frame01", "", push_mgr=source) is None
+
+
+# -- default navigation links (firmware bench: graph-less decks) -----------
+
+
+def _linkless_deck(n: int = 3) -> Deck:
+    return Deck(
+        id="plain",
+        name="Plain",
+        device_ids=["frame01"],
+        pages=[DeckPage(page_id=f"p{i}") for i in range(n)],
+    )
+
+
+def test_manifest_defaults_buttons_prev_next_wrapping(tmp_path: Path) -> None:
+    source = FakeRenderSource(tmp_path)
+    deck = _linkless_deck()
+    for p in deck.pages:
+        source.seed("frame01", p.page_id, f"frame-{p.page_id}".encode())
+    manifest = deck_sync.build_manifest(
+        deck, "frame01", push_mgr=source, renders_dir=tmp_path, warm_missing=False
+    )
+    by_id = {p["page_id"]: p["links"] for p in manifest["pages"]}
+    assert {(link["button"], link["target_page_id"]) for link in by_id["p0"]} == {
+        ("left", "p2"),  # wraps
+        ("right", "p1"),
+    }
+    assert {(link["button"], link["target_page_id"]) for link in by_id["p2"]} == {
+        ("left", "p1"),
+        ("right", "p0"),  # wraps
+    }
+
+
+def test_manifest_default_zones_only_on_touch_without_regions(tmp_path: Path) -> None:
+    source = FakeRenderSource(tmp_path)
+    deck = _linkless_deck(2)
+    for p in deck.pages:
+        source.seed("frame01", p.page_id, f"frame-{p.page_id}".encode())
+
+    # Touch panel, page has no markup touch regions: half-zones appear.
+    manifest = deck_sync.build_manifest(
+        deck,
+        "frame01",
+        push_mgr=source,
+        renders_dir=tmp_path,
+        warm_missing=False,
+        touch=True,
+        regions_lookup=lambda comp: [],
+    )
+    zones = [link for link in manifest["pages"][0]["links"] if link["zone"] is not None]
+    assert [(z["zone"]["x"], z["target_page_id"]) for z in zones] == [
+        (0.0, "p1"),
+        (0.5, "p1"),
+    ]
+
+    # Page HAS touch regions: no default zones (they'd swallow the
+    # page's own tap targets device-side), buttons still filled.
+    manifest2 = deck_sync.build_manifest(
+        deck,
+        "frame01",
+        push_mgr=source,
+        renders_dir=tmp_path,
+        warm_missing=False,
+        touch=True,
+        regions_lookup=lambda comp: [{"x": 1, "y": 1, "w": 2, "h": 2}],
+    )
+    assert all(link["zone"] is None for link in manifest2["pages"][0]["links"])
+
+    # Non-touch device: never zones.
+    manifest3 = deck_sync.build_manifest(
+        deck, "frame01", push_mgr=source, renders_dir=tmp_path, warm_missing=False, touch=False
+    )
+    assert all(link["zone"] is None for link in manifest3["pages"][0]["links"])
+
+
+def test_single_page_deck_gets_no_default_links(tmp_path: Path) -> None:
+    source = FakeRenderSource(tmp_path)
+    deck = _linkless_deck(1)
+    source.seed("frame01", "p0", b"frame-p0")
+    manifest = deck_sync.build_manifest(
+        deck, "frame01", push_mgr=source, renders_dir=tmp_path, warm_missing=False, touch=True
+    )
+    assert manifest["pages"][0]["links"] == []
+
+
+def test_explicit_button_links_win_over_defaults(tmp_path: Path) -> None:
+    source = FakeRenderSource(tmp_path)
+    deck = Deck(
+        id="mix",
+        name="Mix",
+        device_ids=["frame01"],
+        pages=[
+            DeckPage(page_id="a", links=[DeckLink(target_page_id="c", button="right")]),
+            DeckPage(page_id="b"),
+            DeckPage(page_id="c"),
+        ],
+    )
+    for pid in ("a", "b", "c"):
+        source.seed("frame01", pid, f"frame-{pid}".encode())
+    manifest = deck_sync.build_manifest(
+        deck, "frame01", push_mgr=source, renders_dir=tmp_path, warm_missing=False
+    )
+    a_links = manifest["pages"][0]["links"]
+    rights = [link for link in a_links if link["button"] == "right"]
+    assert rights == [{"button": "right", "zone": None, "target_page_id": "c"}]  # explicit, no dup
+    lefts = [link for link in a_links if link["button"] == "left"]
+    assert lefts == [{"button": "left", "zone": None, "target_page_id": "c"}]  # default wrap

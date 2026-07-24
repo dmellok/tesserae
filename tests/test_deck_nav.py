@@ -223,3 +223,35 @@ def test_deck_touch_dedups_repeat_event(tmp_path: Path) -> None:
     res = svc.handle_touch(device_id="panel", stroke=stroke, frame_digest="d", event_id=9)
     assert res.outcome == "deduped"
     assert len(pusher.pushes) == 1
+
+
+def test_graphless_deck_defaults_left_right_to_prev_next(tmp_path: Path) -> None:
+    """Firmware bench finding: a deck authored without a graph (the
+    management-page flow) must still navigate. left/right default to
+    prev/next in deck order, wrapping, and win over the rotation map
+    for deck-bound devices."""
+    decks = DeckStore(tmp_path / "decks.json")
+    decks.upsert(
+        Deck(
+            id="plain",
+            name="Plain",
+            device_ids=["panel"],
+            pages=[DeckPage(page_id="p0"), DeckPage(page_id="p1"), DeckPage(page_id="p2")],
+        )
+    )
+    nav, pusher = DeckNavStore(tmp_path / "nav.json"), FakePush()
+    svc = _wire(tmp_path, pusher, decks, nav)
+
+    res = svc.handle_button(device_id="panel", button="right", event_id=1)
+    assert res.action_spec == "deck:plain:p1"
+    assert nav.current_page("panel", "plain") == "p1"
+
+    # left from p1 -> p0; left again wraps to p2.
+    svc.handle_button(device_id="panel", button="left", event_id=2)
+    assert nav.current_page("panel", "plain") == "p0"
+    res = svc.handle_button(device_id="panel", button="left", event_id=3)
+    assert res.action_spec == "deck:plain:p2"
+
+    # Non-nav buttons still fall through to the button map.
+    res = svc.handle_button(device_id="panel", button="refresh", event_id=4)
+    assert res.action_spec == "refresh"

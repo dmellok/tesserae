@@ -703,6 +703,22 @@ server stops offering deck syncs until it reappears.
    Zones are normalised 0..1 rects; scale by your panel dims to
    hit-test. The manifest warms (renders) cold pages on demand, so the
    first call after a deck edit can take a few seconds.
+
+   Where a page's graph is silent, the manifest synthesizes defaults so
+   a deck authored without an explicit graph still navigates locally:
+   `left` / `right` button links to the previous / next page in deck
+   order (wrapping), and on touch panels left-half / right-half tap
+   zones to prev / next, the zones only when the page has no explicit
+   zones and no markup touch regions of its own (a default zone must
+   never swallow a page's real tap targets). Explicit graph links
+   always win over defaults.
+
+   Cache hygiene note: page frame digests are content-addressed, so a
+   page whose rendered bytes don't change keeps its digest across
+   background refreshes and the deck version stays stable. Pages that
+   embed volatile content (clocks, "last updated" stamps) produce a
+   new digest on every re-render and will re-sync on every refresh
+   cadence; keep such elements off deck pages you want to cache well.
 3. Diff digests against your cache, fetch only what's missing via `GET
    /api/v1/device/<id>/deck/frame/<digest>` (raw frame bytes, identical
    format to `/frame` for your kind; `ETag` + immutable cache headers).

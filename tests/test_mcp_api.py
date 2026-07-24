@@ -1283,3 +1283,48 @@ def test_decks_suggest_from_page_links(app: Flask) -> None:
     out = app.test_client().get("/api/mcp/decks/suggest").get_json()["suggestions"]
     assert len(out) == 1
     assert {p["page_id"] for p in out[0]["pages"]} == {"ov", "cal"}
+
+
+def test_create_deck_derives_graph_from_page_links(app: Flask) -> None:
+    """An agent creating a deck with just a page set (no hand-built
+    graph) gets the graph auto-derived from the pages' page:<id> tap /
+    swipe links, same as the Decks page 'Sync from links'."""
+    _enable(app)
+    from app.state.page_store import Cell, Page
+
+    ps = app.config["PAGE_STORE"]
+    ps.save(Page(id="ov", name="Ov", cells=[Cell(id="c", x=0, y=0, w=12, h=6, on_tap="page:cal")]))
+    ps.save(Page(id="cal", name="Cal", cells=[Cell(id="c", x=0, y=0, w=12, h=6, on_tap="page:ov")]))
+    resp = app.test_client().post(
+        "/api/mcp/decks",
+        json={
+            "id": "auto",
+            "name": "Auto",
+            "device_ids": [],
+            "pages": [{"page_id": "ov"}, {"page_id": "cal"}],
+        },
+    )
+    assert resp.status_code == 200
+    assert resp.get_json()["links_derived"] is True
+    deck = app.config["DECK_STORE"].get("auto")
+    ov = next(p for p in deck.pages if p.page_id == "ov")
+    assert any(link.target_page_id == "cal" for link in ov.links)
+
+
+def test_create_deck_keeps_explicit_graph_verbatim(app: Flask) -> None:
+    _enable(app)
+    resp = app.test_client().post(
+        "/api/mcp/decks",
+        json={
+            "id": "explicit",
+            "name": "Explicit",
+            "device_ids": [],
+            "pages": [
+                {"page_id": "a", "links": [{"target_page_id": "b", "button": "right"}]},
+                {"page_id": "b"},
+            ],
+        },
+    )
+    assert resp.status_code == 200
+    deck = app.config["DECK_STORE"].get("explicit")
+    assert deck.pages[0].links[0].target_page_id == "b"

@@ -6,6 +6,23 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added
+
+- **Decks navigate without a hand-built graph.** Where a deck page's graph is silent, sync
+  manifests now synthesize default links (`left`/`right` to prev/next in deck order, wrapping,
+  plus left-half/right-half tap zones on touch panels when the page has no zones or markup touch
+  regions of its own), and server-side button handling applies the same prev/next default for
+  deck-bound devices, so a graph-less deck navigates identically on-device and via the server
+  (previously `right` fell through to the rotation map and read as "refreshed but didn't
+  navigate"). Explicit graph links always win. MCP `create_deck` with a bare page set now derives
+  the graph from the pages' `page:<id>` tap/swipe links automatically (bridge 0.8.2 documents it).
+
+- **Push button on the Decks page.** One click warms every page for every bound device, sends the
+  entry page to the panel(s), and seeds the nav position, so a new deck goes live immediately
+  instead of waiting for the scheduler's warm tick. Deck cache hygiene is documented in
+  client-protocol.md: digests are content-addressed, so only pages with volatile content
+  (clocks, "last updated") churn the deck version.
+
 ### Fixed
 
 - **Deck heartbeat reports could revert a freshly pushed dashboard.** v0.187.1's report promotion
