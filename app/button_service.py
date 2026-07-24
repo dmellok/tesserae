@@ -680,10 +680,14 @@ class ButtonService:
         now = self._clock()
         state = self._state.get(device_id) or DeviceRotationState(device_id=device_id)
 
+        # Equality-only dedup, same rationale as ``_is_duplicate``: a
+        # retry resends the SAME id, while a lower id means the RTC
+        # counter restarted on a power cycle or the offline queue is
+        # replaying a stroke, both of which must dispatch.
         if (
             event_id is not None
             and state.last_button_event_id is not None
-            and event_id <= state.last_button_event_id
+            and event_id == state.last_button_event_id
         ):
             log.info(
                 "touch dedup: device=%s event_id=%s (last=%s)",
@@ -1388,13 +1392,11 @@ class ButtonService:
         high-water mark + the same-button time-window fallback).
 
         Called on the re-pair lifecycle paths (/register on an existing
-        id, /discover MAC claim): those are exactly the moments a
-        firmware's NVS-persisted counter legitimately restarts (reflash,
-        wipe), and without this reset every subsequent button/touch
-        event arrives with ``event_id <= last`` and is silently deduped
-        forever. The auto-heal keeping device identity across reflashes
-        makes this reset load-bearing: pre-heal, users recreated the
-        device and got fresh state by accident."""
+        id, /discover MAC claim): those are the moments a firmware's
+        counter most obviously restarts (reflash, wipe). Defensive
+        hygiene alongside the equality-only dedup rule (which already
+        tolerates restarts): it also clears the same-button time-window
+        fallback so a re-paired device starts from a clean slate."""
         state = self._state.get(device_id)
         if state is None:
             return
@@ -1423,10 +1425,16 @@ class ButtonService:
         event_id: int | None,
         now: datetime,
     ) -> bool:
-        # Preferred path: monotonic id from the firmware. Retries send
-        # the same id; a duplicate is anything <= the last processed.
+        # Preferred path: the wake-event id from the firmware. A retry
+        # resends the SAME id, so equality is the only duplicate signal.
+        # A LOWER id is not a duplicate: the counter is RTC-backed on
+        # the ESP32 boards and restarts at 0 on any power cycle (battery
+        # pull, crash, reflash) without the device re-pairing, and the
+        # offline touch queue can replay older-id strokes after a WiFi
+        # outage; both must dispatch. (Pre-v0.187.2 this was ``<=`` and
+        # a power-cycled panel had every event swallowed until re-pair.)
         if event_id is not None and state.last_button_event_id is not None:
-            return event_id <= state.last_button_event_id
+            return event_id == state.last_button_event_id
         # Fallback for firmwares that don't send an id: same button
         # within the configured window (default 3s).
         if state.last_button == button and state.last_button_at is not None:

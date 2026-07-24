@@ -8,12 +8,14 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
-- **Buttons and touches were permanently deduped after a firmware reflash.** The wake-event dedup
-  counter's high-water mark persists per device row, and the kind auto-heal now (correctly) keeps
-  that row across reflashes, so a wiped-NVS firmware restarting its counter at 1 had every
-  subsequent button/touch swallowed as a duplicate. Both re-pair paths (`/register` on an existing
-  id, `/discover` MAC claim) now reset the dedup state, since those are exactly the moments a
-  device's counter legitimately restarts.
+- **Buttons and touches were permanently deduped after a device power cycle.** The firmware's
+  wake-event counter is RTC-backed and restarts at 0 on any power cycle (battery pull, crash,
+  reflash), usually without re-pairing since the token survives in NVS; the server's dedup rule
+  treated anything `<=` the persisted high-water mark as a retry, so a restarted counter had every
+  subsequent button and touch silently swallowed. Dedup is now equality-only (a genuine retry
+  resends the same id; a lower id is a restart or an offline-queue replay and dispatches), and the
+  re-pair paths (`/register` on an existing id, `/discover` MAC claim) additionally clear the
+  dedup state outright.
 
 - **Touches were dropped as stale after deck local navigation.** When firmware paints a deck page
   from its SD cache, the panel shows a frame the server never served via `/frame`, so the touch

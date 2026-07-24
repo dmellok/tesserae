@@ -1856,3 +1856,37 @@ def test_repair_resets_event_dedup_counter(app: Flask) -> None:
     assert state is None or state.last_button_event_id is None
     assert post_button(1).status_code == 200
     assert store.get("hall_e1003").last_button_event_id == 1
+
+
+def test_counter_restart_without_repair_still_dispatches(app: Flask) -> None:
+    """The firmware's wake-event counter is RTC-backed and restarts at 0
+    on ANY power cycle, usually without a re-pair (the token survives in
+    NVS). Dedup is therefore equality-only: a lower id is a restart (or
+    an offline-queue replay), never a retry, and must dispatch."""
+    client = app.test_client()
+    _sign_in(client)
+    code = _issue_pairing(app)
+    resp = client.post(
+        "/api/v1/device/register",
+        headers={"X-Pairing-Code": code, "Content-Type": "application/json"},
+        data=json.dumps({"device_id": "desk_e1003", "kind": "esp32_client"}),
+    )
+    token = resp.get_json()["device_token"]
+    store = app.config["DEVICE_ROTATION_STATE_STORE"]
+
+    def post_button(event_id: int):
+        return client.post(
+            "/api/v1/device/desk_e1003/status",
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+            data=json.dumps({"button": "refresh", "button_event_id": event_id}),
+        )
+
+    assert post_button(50).status_code == 200
+    assert store.get("desk_e1003").last_button_event_id == 50
+    # Power cycle, no re-pair: counter restarts at 1 -> must dispatch.
+    assert post_button(1).status_code == 200
+    assert store.get("desk_e1003").last_button_event_id == 1
+    # A true retry (same id) is still swallowed: the high-water mark
+    # stays, and the dedup outcome leaves state untouched.
+    assert post_button(1).status_code == 200
+    assert store.get("desk_e1003").last_button_event_id == 1

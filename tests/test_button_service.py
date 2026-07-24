@@ -342,7 +342,7 @@ def test_duplicate_event_id_is_noop(
     assert push_manager.calls == []
 
 
-def test_event_id_less_than_last_is_treated_as_retry(
+def test_lower_event_id_is_a_counter_restart_not_a_retry(
     rotation_store: RotationStore,
     state_store: DeviceRotationStateStore,
     settings_store: SettingsStore,
@@ -350,6 +350,11 @@ def test_event_id_less_than_last_is_treated_as_retry(
     push_manager: StubPushManager,
     clock: FakeClock,
 ) -> None:
+    """v0.187.2: dedup is equality-only. The firmware counter is
+    RTC-backed and restarts at 0 on any power cycle without a re-pair,
+    and the offline touch queue replays older ids after an outage; a
+    LOWER id must therefore dispatch (pre-fix, a power-cycled panel had
+    every button and touch swallowed). Only the SAME id is a retry."""
     _seed_rotation(rotation_store)
     svc = _wire(
         rotation_store=rotation_store,
@@ -362,9 +367,15 @@ def test_event_id_less_than_last_is_treated_as_retry(
 
     svc.handle_button(device_id="kitchen", button="right", event_id=42)
     push_manager.calls.clear()
-    result = svc.handle_button(device_id="kitchen", button="right", event_id=41)
+    restarted = svc.handle_button(device_id="kitchen", button="right", event_id=1)
+    assert restarted.dedup is False
+    assert push_manager.calls != []
 
-    assert result.dedup is True
+    # The high-water mark adopts the restarted counter, and a true
+    # retry of that event (same id) is still swallowed.
+    push_manager.calls.clear()
+    retry = svc.handle_button(device_id="kitchen", button="right", event_id=1)
+    assert retry.dedup is True
     assert push_manager.calls == []
 
 
