@@ -91,7 +91,7 @@
           </span>
           {% if d.report_relative %}<span class="dx-status-muted">{{ d.report_relative }}</span>{% endif %}
           {% elif d.queued %}
-          <span class="pill is-accent">queued{% if d.available_fw %} {{ fw(d.available_fw) }}{% endif %}</span>
+          <span class="pill is-accent">queued{% if d.queued_fw %} {{ fw(d.queued_fw) }}{% endif %}</span>
           {% elif d.update_available %}
           <span class="pill is-warn">update available</span>
           {% elif d.fw_version %}

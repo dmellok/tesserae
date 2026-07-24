@@ -201,13 +201,19 @@ def _devices_model(*, online: bool) -> list[dict[str, Any]]:
         for v in dev_views:
             fw = str(v["fw_version"] or "")
             update_available = bool(available) and (not fw or is_newer(str(available), fw))
-            queued = bool(v["is_canary"])
+            # Rollout membership is retained after a device updates so the
+            # Fleet view can still identify its canaries.  The flat device
+            # list, however, should only call that membership "queued" while
+            # the imported release can actually be offered to this device.
+            release_pending = bool(rel_fw) and (not fw or is_newer(str(rel_fw), fw))
+            queued = bool(v["is_canary"] and release_pending)
             rows.append(
                 {
                     **v,
                     "kind_id": kind_id,
                     "kind_name": names.get(kind_id, kind_id),
                     "queued": queued,
+                    "queued_fw": rel_fw if queued else None,
                     "available_fw": available,
                     "release_url": str(latest["url"]) if latest and latest.get("url") else None,
                     "notes_headline": (
@@ -220,7 +226,7 @@ def _devices_model(*, online: bool) -> list[dict[str, Any]]:
                     "can_queue": bool(
                         v["capable"] and update_available and not queued and offerable
                     ),
-                    "can_withdraw": bool(queued and update_available),
+                    "can_withdraw": queued,
                 }
             )
     # rolled_back / failed float to the top, then by name.
