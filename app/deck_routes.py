@@ -9,6 +9,7 @@ stale warmed frame or a position pointing at a removed page can't linger.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import re
 from typing import Any
@@ -270,6 +271,188 @@ def edit_graph(deck_id: str) -> Response:
     _invalidate(deck)
     flash(f"Deck {deck.name!r} graph updated.", "ok")
     return redirect(url_for("decks.index") + f"#deck-{deck_id}")
+
+
+@bp.get("/new")
+@bp.get("/<deck_id>/edit")
+def editor(deck_id: str | None = None) -> str | Response:
+    """The deck editor ("dense rail + inspector" redesign): pick pages
+    and their flip order; navigation derives automatically. GET /new
+    renders a blank deck; GET /<id>/edit loads an existing one."""
+    deck = None
+    if deck_id is not None:
+        deck = _store().get(deck_id)
+        if deck is None:
+            flash(f"No deck with id {deck_id!r}.", "error")
+            return redirect(url_for("decks.index"))
+
+    pages = _pages().list()
+    from app.composer import page_preview_token, preview_dims
+
+    devices_reg = current_app.config.get("DEVICE_REGISTRY")
+    settings = current_app.config.get("SETTINGS_STORE")
+    page_meta = []
+    for p in pages:
+        try:
+            token = page_preview_token(p, preview_dims(p, devices_reg, settings))
+        except Exception:
+            token = ""
+        page_meta.append(
+            {
+                "id": p.id,
+                "name": p.name,
+                "thumb": url_for("composer.compose_preview", page_id=p.id) + f"?v={token}",
+            }
+        )
+
+    device_meta = []
+    touch_bound = False
+    if devices_reg is not None:
+        for d in devices_reg.all():
+            if d.kind_of is None:
+                continue
+            device_meta.append({"id": d.id, "name": d.display_name})
+            if deck is not None and d.id in deck.device_ids and d.manifest.get("touch") is True:
+                touch_bound = True
+
+    from app.deck_suggest import suggest_decks
+
+    suggestions = []
+    for sd in suggest_decks(pages, [d for d in _store().all() if deck is None or d.id != deck.id]):
+        suggestions.append({"name": sd.name, "page_ids": [pg.page_id for pg in sd.pages]})
+
+    member_ids = [p.page_id for p in deck.pages] if deck else []
+    override_map = (
+        {
+            p.page_id: p.refresh_interval_minutes
+            for p in deck.pages
+            if p.refresh_interval_minutes is not None
+        }
+        if deck
+        else {}
+    )
+    editor_state = {
+        "deckId": deck.id if deck else "",
+        "pages": page_meta,
+        "order": member_ids,
+        "home": (deck.resolved_home_page_id if deck and deck.pages else ""),
+        "timeout": deck.home_timeout_minutes if deck else 0,
+        "overrides": override_map,
+        "cadence": deck.refresh_interval_minutes if deck else 30,
+        "touchBound": touch_bound,
+        "suggestions": suggestions,
+    }
+    return render_template(
+        "deck_editor.html",
+        deck=deck,
+        page_meta=page_meta,
+        device_meta=device_meta,
+        member_ids=member_ids,
+        home_id=editor_state["home"],
+        override_map=override_map,
+        editor_state=editor_state,
+    )
+
+
+def _ordered_ids_from_form(form: Any) -> list[str]:
+    """Member page ids in flip order. JS submits ``pages`` (CSV in rail
+    order); the no-JS fallback submits ``member`` checkboxes plus
+    ``order[<id>]`` numeric inputs."""
+    raw = (form.get("pages") or "").strip()
+    if raw:
+        seen: list[str] = []
+        for pid in raw.split(","):
+            pid = pid.strip()
+            if pid and pid not in seen:
+                seen.append(pid)
+        return seen
+    members = form.getlist("member")
+
+    def order_key(pid: str) -> tuple[float, str]:
+        try:
+            return (float(form.get(f"order[{pid}]") or 0), pid)
+        except ValueError:
+            return (0.0, pid)
+
+    return sorted(dict.fromkeys(members), key=order_key)
+
+
+@bp.post("/editor-save")
+def editor_save() -> Response:
+    """Persist the editor form. Links re-derive from the pages'
+    authored tap/swipe actions for the chosen set (same as Sync from
+    links); the sync manifest's defaults cover everything the graph
+    doesn't say, so a bare page pick is fully navigable."""
+    form = request.form
+    deck_id = (form.get("deck_id") or "").strip()
+    name = (form.get("name") or "").strip() or "Deck"
+    ordered = _ordered_ids_from_form(form)
+    if not ordered:
+        flash("Pick at least one page for the deck.", "error")
+        return redirect(request.referrer or url_for("decks.index"))
+
+    existing = _store().get(deck_id) if deck_id else None
+    if deck_id and existing is None and not _ID_RE.match(deck_id):
+        flash(f"Bad id {deck_id!r}.", "error")
+        return redirect(url_for("decks.index"))
+    if not deck_id:
+        deck_id = _unique_id(_slug_from(name))
+
+    from app.deck_suggest import graph_for_pages
+
+    derived = {p.page_id: p for p in graph_for_pages(_pages().list(), ordered)}
+    old_refresh = (
+        {p.page_id: p.refresh_interval_minutes for p in existing.pages} if existing else {}
+    )
+
+    pages: list[DeckPage] = []
+    for pid in ordered:
+        base = derived.get(pid) or DeckPage(page_id=pid)
+        refresh = old_refresh.get(pid)
+        raw_override = form.get(f"override[{pid}]")
+        if raw_override is not None and raw_override != "":
+            with contextlib.suppress(ValueError):
+                refresh = max(0, min(1440, int(raw_override)))
+        elif raw_override == "":
+            refresh = None
+        pages.append(base.model_copy(update={"refresh_interval_minutes": refresh}))
+
+    home = (form.get("home") or "").strip() or None
+    if home is not None and home not in ordered:
+        home = None
+    entry = (form.get("entry") or "").strip() or None
+    if entry is not None and entry not in ordered:
+        entry = None
+    try:
+        timeout = max(0, min(120, int(form.get("timeout") or 0)))
+    except ValueError:
+        timeout = 0
+    try:
+        cadence = max(0, min(1440, int(form.get("refresh_interval_minutes") or 30)))
+    except ValueError:
+        cadence = 30
+
+    try:
+        deck = Deck(
+            id=deck_id,
+            name=name,
+            enabled=form.get("enabled") in ("on", "true", "1"),
+            device_ids=[d for d in form.getlist("device_ids") if d],
+            pages=pages,
+            entry_page_id=entry,
+            home_page_id=home,
+            home_timeout_minutes=timeout,
+            refresh_interval_minutes=cadence,
+        )
+    except ValidationError as exc:
+        flash(f"Invalid deck: {_first_error(exc)}", "error")
+        return redirect(
+            url_for("decks.editor", deck_id=deck_id) if existing else url_for("decks.index")
+        )
+    _store().upsert(deck)
+    _invalidate(deck)
+    flash(f"Deck {deck.name!r} saved.", "ok")
+    return redirect(url_for("decks.editor", deck_id=deck.id))
 
 
 @bp.post("/<deck_id>/push")

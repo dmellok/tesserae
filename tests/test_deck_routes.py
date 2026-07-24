@@ -242,3 +242,128 @@ def test_push_requires_bound_devices(app: Flask) -> None:
     assert resp.status_code == 302
     # No crash, deck untouched, nav empty.
     assert app.config["DECK_NAV_STORE"].get("panel_a") is None
+
+
+# -- deck editor (dense rail + inspector) -----------------------------------
+
+
+def test_editor_renders_blank_and_existing(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    assert client.get("/decks/new").status_code == 200
+    client.post(
+        "/decks/new",
+        data={"name": "Live", "graph_json": GRAPH, "device_ids": ""},
+    )
+    deck = _decks(app)[0]
+    html = client.get(f"/decks/{deck.id}/edit").get_data(as_text=True)
+    assert "FLIP ORDER" in html and "dxe-data" in html
+    assert 'name="member" value="overview" checked' in html.replace("\n", " ") or "overview" in html
+
+
+def test_editor_save_js_shape_creates_deck_with_home(app: Flask) -> None:
+    """The JS path: ordered CSV in ``pages``, home radio, timeout range,
+    per-page override, devices chips."""
+    client = app.test_client()
+    _sign_in(client)
+    resp = client.post(
+        "/decks/editor-save",
+        data={
+            "deck_id": "",
+            "name": "Kitchen stack",
+            "pages": "overview,calendar",
+            "home": "calendar",
+            "timeout": "15",
+            "refresh_interval_minutes": "30",
+            "override[calendar]": "5",
+            "enabled": "on",
+        },
+    )
+    assert resp.status_code == 302
+    deck = _decks(app)[0]
+    assert [p.page_id for p in deck.pages] == ["overview", "calendar"]
+    assert deck.home_page_id == "calendar"
+    assert deck.home_timeout_minutes == 15
+    assert deck.resolved_entry_page_id == "calendar"  # entry defaults to home
+    cal = next(p for p in deck.pages if p.page_id == "calendar")
+    assert cal.refresh_interval_minutes == 5
+    assert deck.enabled is True
+
+
+def test_editor_save_nojs_fallback_membership_and_order(app: Flask) -> None:
+    """Without JS: member checkboxes + order[<id>] numerics decide the
+    flip order; ``pages`` is empty."""
+    client = app.test_client()
+    _sign_in(client)
+    resp = client.post(
+        "/decks/editor-save",
+        data={
+            "deck_id": "",
+            "name": "Fallback",
+            "pages": "",
+            "member": ["overview", "calendar"],
+            "order[calendar]": "1",
+            "order[overview]": "2",
+            "home": "calendar",
+            "timeout": "0",
+            "refresh_interval_minutes": "60",
+            "enabled": "on",
+        },
+    )
+    assert resp.status_code == 302
+    deck = _decks(app)[0]
+    assert [p.page_id for p in deck.pages] == ["calendar", "overview"]
+    assert deck.home_timeout_minutes == 0
+
+
+def test_editor_save_updates_existing_preserving_id(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    client.post(
+        "/decks/editor-save",
+        data={"deck_id": "", "name": "First", "pages": "overview,calendar", "enabled": "on"},
+    )
+    deck = _decks(app)[0]
+    client.post(
+        "/decks/editor-save",
+        data={
+            "deck_id": deck.id,
+            "name": "Renamed",
+            "pages": "calendar",  # drop a page
+            "home": "calendar",
+            "timeout": "30",
+            "enabled": "on",
+        },
+    )
+    fresh = app.config["DECK_STORE"].get(deck.id)
+    assert fresh.name == "Renamed"
+    assert [p.page_id for p in fresh.pages] == ["calendar"]
+    assert fresh.home_timeout_minutes == 30
+
+
+def test_editor_save_rejects_empty_page_set(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    resp = client.post(
+        "/decks/editor-save",
+        data={"deck_id": "", "name": "Empty", "pages": "", "enabled": "on"},
+    )
+    assert resp.status_code == 302
+    assert _decks(app) == []
+
+
+def test_editor_save_derives_links_from_page_actions(app: Flask) -> None:
+    """Pages carrying page:<id> tap links get their graph derived on
+    save, same as Sync from links."""
+    client = app.test_client()
+    _sign_in(client)
+    ps = app.config["PAGE_STORE"]
+    ps.save(Page(id="a", name="A", cells=[Cell(id="c", x=0, y=0, w=12, h=6, on_tap="page:b")]))
+    ps.save(Page(id="b", name="B", cells=[Cell(id="c", x=0, y=0, w=12, h=6, on_tap="page:a")]))
+    client.post(
+        "/decks/editor-save",
+        data={"deck_id": "", "name": "Linked", "pages": "a,b", "enabled": "on"},
+    )
+    deck = _decks(app)[0]
+    a = next(p for p in deck.pages if p.page_id == "a")
+    assert any(link.target_page_id == "b" for link in a.links)

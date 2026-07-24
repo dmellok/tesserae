@@ -1,0 +1,148 @@
+{% extends "_base.html" %}
+{% from "_components.html" import button %}
+
+{% block title %}{{ deck.name if deck else 'New deck' }} · Decks{% endblock %}
+
+{% block main %}
+<div class="dxe" id="deck-editor">
+  <script type="application/json" id="dxe-data">{{ editor_state | tojson }}</script>
+
+  <div class="dxe-head">
+    <div>
+      <div class="dxe-eyebrow">SETTINGS / DECKS</div>
+      <h1 class="dxe-title" id="dxe-title">{{ deck.name if deck else 'New deck' }}</h1>
+    </div>
+    <label class="dxe-enabled-pill" id="dxe-enabled-pill">
+      <input type="checkbox" name="enabled" form="deck-form"
+             {% if deck is none or deck.enabled %}checked{% endif %}>
+      <span class="dot" aria-hidden="true"></span><span class="lbl">Enabled</span>
+    </label>
+  </div>
+
+  <form method="post" action="{{ url_for('decks.editor_save') }}" id="deck-form">
+    <input type="hidden" name="deck_id" value="{{ deck.id if deck else '' }}">
+    <input type="hidden" name="pages" id="dxe-pages-field" value="">
+
+    <div class="dxe-grid">
+      <section class="dxe-card dxe-rail-card">
+        <div class="dxe-card-head">
+          <span class="dxe-eyebrow">FLIP ORDER</span>
+          <span class="dxe-hint" id="dxe-wrap-hint">&#8634; wraps</span>
+        </div>
+        <div class="dxe-rail" id="dxe-rail"></div>
+        <div class="dxe-library" id="dxe-library" hidden>
+          <div class="dxe-eyebrow">PAGE LIBRARY — click to append</div>
+          <div class="dxe-lib-pills" id="dxe-lib-pills"></div>
+          <div class="dxe-lib-suggested" id="dxe-lib-suggested"></div>
+        </div>
+        <p class="dxe-behavior" id="dxe-behavior"></p>
+
+        {# No-JS source of truth: membership, order, home, overrides, timeout.
+           JS hides this fieldset and drives the same inputs from the rail. #}
+        <fieldset class="dxe-fallback" id="dxe-fallback">
+          <legend>Deck pages</legend>
+          {% for p in page_meta %}
+          {% set idx = member_ids.index(p.id) if p.id in member_ids else none %}
+          <div class="dxe-fb-row" data-page="{{ p.id }}">
+            <label>
+              <input type="checkbox" name="member" value="{{ p.id }}"
+                     {% if p.id in member_ids %}checked{% endif %}> {{ p.name }}
+              <span class="dxe-mono">#{{ p.id }}</span>
+            </label>
+            <input type="number" name="order[{{ p.id }}]" min="1" max="99"
+                   value="{{ (idx + 1) if idx is not none else loop.index }}"
+                   aria-label="Position of {{ p.name }}">
+            <label><input type="radio" name="home" value="{{ p.id }}"
+                   {% if home_id == p.id %}checked{% endif %}> &#9733; home</label>
+            <select name="override[{{ p.id }}]" aria-label="Refresh override for {{ p.name }}">
+              {% set ov = override_map.get(p.id) %}
+              <option value="">deck default</option>
+              <option value="5" {% if ov == 5 %}selected{% endif %}>every 5 min</option>
+              <option value="15" {% if ov == 15 %}selected{% endif %}>every 15 min</option>
+              <option value="60" {% if ov == 60 %}selected{% endif %}>every 60 min</option>
+              <option value="0" {% if ov == 0 %}selected{% endif %}>only on Push</option>
+            </select>
+          </div>
+          {% endfor %}
+          <div class="dxe-fb-row">
+            <label for="dxe-timeout">Return to &#9733; home after (minutes, 0 = never)</label>
+            <input type="range" name="timeout" id="dxe-timeout" min="0" max="120" step="1"
+                   value="{{ deck.home_timeout_minutes if deck else 0 }}">
+            <output id="dxe-timeout-out" for="dxe-timeout"></output>
+          </div>
+        </fieldset>
+      </section>
+
+      <aside class="dxe-card dxe-inspector" id="dxe-inspector" hidden></aside>
+    </div>
+
+    <section class="dxe-card dxe-settings-bar">
+      <div class="dxe-set">
+        <span class="dxe-eyebrow">NAME</span>
+        <input type="text" name="name" id="dxe-name" required
+               value="{{ deck.name if deck else '' }}" placeholder="Kitchen deck">
+      </div>
+      <div class="dxe-set">
+        <span class="dxe-eyebrow">DEVICES</span>
+        <div class="dxe-chips">
+          {% for d in device_meta %}
+          <label class="dxe-chip">
+            <input type="checkbox" name="device_ids" value="{{ d.id }}"
+                   {% if deck and d.id in deck.device_ids %}checked{% endif %}>
+            <span>{{ d.name }}</span>
+          </label>
+          {% else %}
+          <span class="dxe-hint">no devices registered</span>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="dxe-set">
+        <span class="dxe-eyebrow">REFRESH</span>
+        <select name="refresh_interval_minutes" id="dxe-cadence">
+          {% set cad = deck.refresh_interval_minutes if deck else 30 %}
+          <option value="15" {% if cad == 15 %}selected{% endif %}>every 15 min</option>
+          <option value="30" {% if cad == 30 %}selected{% endif %}>every 30 min</option>
+          <option value="60" {% if cad == 60 %}selected{% endif %}>every 60 min</option>
+          <option value="360" {% if cad == 360 %}selected{% endif %}>every 6 h</option>
+        </select>
+      </div>
+      <details class="dxe-advanced">
+        <summary>&#9656; Advanced</summary>
+        <div class="dxe-set">
+          <span class="dxe-eyebrow">ENTRY PAGE</span>
+          <select name="entry">
+            <option value="">same as home (default)</option>
+            {% for p in page_meta %}
+            <option value="{{ p.id }}" {% if deck and deck.entry_page_id == p.id %}selected{% endif %}>{{ p.name }}</option>
+            {% endfor %}
+          </select>
+          <p class="dxe-hint">what a device shows when first bound</p>
+        </div>
+        <div class="dxe-set">
+          <span class="dxe-eyebrow">NAVIGATION GRAPH</span>
+          <textarea id="dxe-graph" class="dxe-mono" rows="8" readonly
+            title="derived automatically from the flip order — edit only if you need custom links"></textarea>
+          <p class="dxe-hint">derived automatically from the flip order — edit only if you need custom links{% if deck %} (<a href="{{ url_for('decks.index', edit=deck.id) }}#deck-{{ deck.id }}">raw editor</a>){% endif %}</p>
+        </div>
+      </details>
+    </section>
+  </form>
+
+  <div class="dxe-actions">
+    <button class="button" type="submit" form="deck-form">Save</button>
+    {% if deck %}
+    <form method="post" action="{{ url_for('decks.push', deck_id=deck.id) }}" class="inline">
+      <button type="submit" class="ghost">Push to panel</button>
+    </form>
+    <form method="post" action="{{ url_for('decks.sync', deck_id=deck.id) }}" class="inline">
+      <button type="submit" class="ghost">Sync from links</button>
+    </form>
+    <form method="post" action="{{ url_for('decks.delete', deck_id=deck.id) }}" class="inline dxe-right"
+          onsubmit="return confirm('Delete deck {{ deck.name }}?');">
+      <button type="submit" class="ghost danger">Delete deck</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+<script src="{{ url_for('static', filename='deck_editor.js') }}" defer></script>
+{% endblock %}

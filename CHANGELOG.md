@@ -8,6 +8,29 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Deck editor: pick pages, done ("dense rail + inspector").** Decks get a dedicated
+  create/edit surface (Decks -> New deck / Edit): a flip-order rail of page cards with
+  thumbnails, click-to-append page library with suggested clusters, an inspector for the
+  selected card (home toggle, return-after slider, per-page refresh override, reposition /
+  remove), inline settings bar (name, device chips, cadence, Advanced with entry page + a
+  live-derived navigation-graph view), and a one-line behavior summary. Navigation derives
+  automatically from the flip order; no graph authoring needed. Fully submittable without
+  JavaScript (membership checkboxes + numeric order fallback).
+
+- **Deck home card with idle return.** Mark a member page as home and set "return here after"
+  (slider, 0-120 min): the deck returns to it after that long without a button press or tap,
+  enforced server-side for server-navigated panels and shipped in the sync manifest (`home`
+  block) so SD-cache firmware enforces it offline. Push sends the home page to the panel first;
+  a fresh device's entry page defaults to home.
+
+- **Deck sync manifests: swipe triggers and capacity awareness.** Link tables now carry swipe
+  triggers (authored directions mirrored from the graph; paging defaults where silent: swipe
+  left = next, swipe right = back), and when a device's advertised SD capacity can't fit the
+  whole deck, overflow pages are marked `cache: false` with ring-from-home priority instead of
+  letting the card overfill mid-sync.
+
+### Added
+
 - **Rotations re-render at every dwell boundary, including onto themselves (discussion #140).**
   Previously a rotation only rendered on step *transitions*, so a step's widget data froze for
   its whole dwell (a device poll fetches the already-rendered frame; it never triggers a render),

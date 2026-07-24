@@ -118,7 +118,7 @@
     {% if not deck.enabled %}<span class="cf-chip cf-chip--off">disabled</span>{% endif %}
   </div>
   <div class="deck-actions">
-    <a class="button ghost" href="{{ url_for('decks.index', edit=deck.id) }}#deck-{{ deck.id }}">Edit</a>
+    <a class="button ghost" href="{{ url_for('decks.editor', deck_id=deck.id) }}">Edit</a>
     <form method="post" action="{{ url_for('decks.push', deck_id=deck.id) }}" class="inline">
       <button type="submit" class="ghost" title="Warm every page for every bound device and send the entry page to the panel(s)"><i class="ph ph-paper-plane-tilt" aria-hidden="true"></i><span>Push</span></button>
     </form>
@@ -141,8 +141,10 @@
 {{ empty_state('cards-three', 'No decks yet', 'Wire tap / swipe links between pages in the canvas editor, then create a deck from the suggestions above.') }}
 {% endfor %}
 
-{% call section_card('plus-circle', 'New deck (manual)') %}
-  <p class="cf-hint">Prefer the suggestions above. Use this only to hand-build a deck's page graph.</p>
+<p><a class="button" href="{{ url_for('decks.editor') }}"><i class="ph ph-plus" aria-hidden="true"></i><span>New deck</span></a></p>
+
+{% call section_card('plus-circle', 'New deck (manual graph)') %}
+  <p class="cf-hint">Prefer the editor above (pick pages, navigation derives automatically). Use this only to hand-build a deck's page graph.</p>
   <form method="post" action="{{ url_for('decks.create') }}" class="form">
     <div class="field">
       <label for="d-name-new">Name</label>
