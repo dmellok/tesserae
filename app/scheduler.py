@@ -286,6 +286,11 @@ class Scheduler:
         # rotation. Updated on every successful (sent / quiet / held)
         # fire.
         self._rotation_last_pushed_at: dict[str, float] = {}
+        # Content-refresh bookkeeping (discussion #140): last re-render
+        # of a rotation's current step, and per (rotation, device) for
+        # manually-held pages, POSIX timestamps.
+        self._rotation_last_content_refresh: dict[str, float] = {}
+        self._rotation_held_refresh: dict[tuple[str, str], float] = {}
         # v0.48 running-state pills. Tracks the most recent PushStatus
         # the scheduler observed for each schedule / rotation, plus a
         # human-readable reason string (e.g. "conditions not met") so
@@ -450,6 +455,12 @@ class Scheduler:
         # long-dwell step never transitions, so a paged-away panel
         # stayed on the manual page forever (discussion #140).
         self._maybe_rejoin_rotations(now)
+        # Content-refresh pass: rotations with refresh_minutes re-render
+        # their current step between transitions, so widget data stays
+        # fresh while a step dwells (discussion #140: a device poll only
+        # fetches bytes; without this nothing re-renders for hours on a
+        # long-dwell step).
+        self._maybe_refresh_rotation_content(now)
         for schedule in self.find_due(now):
             self._fire(schedule, now, respect_quiet_hours=True)
         # Deck pre-render refresh (silent, off the tick thread).
@@ -537,6 +548,98 @@ class Scheduler:
                         "page_id": page_id,
                         "rejoin_device": state.device_id,
                     },
+                )
+
+    def _maybe_refresh_rotation_content(self, now: datetime) -> None:
+        """Re-render a rotation's on-glass content between transitions.
+
+        For each enabled rotation with ``refresh_minutes > 0``: when the
+        cadence has elapsed since the last content push, re-push the
+        current step (rotation-wide, so every bound panel re-renders
+        with fresh widget data), and separately re-push each manually-
+        held device's held page, device-targeted, on the same cadence.
+        Content-addressed digests keep this cheap on the wire: unchanged
+        bytes still 304 to polling devices; the cost is the re-render.
+
+        Transition fires count as content pushes (they render), so the
+        cadence timer resets on them and the first refresh lands
+        ``refresh_minutes`` after the newest of (transition, refresh)."""
+        if self._rotation_store is None:
+            return
+        for rotation in self._rotation_store.all():
+            if not rotation.enabled or rotation.refresh_minutes <= 0 or not rotation.steps:
+                continue
+            cadence_s = rotation.refresh_minutes * 60
+            step_state = self.compute_step_state(rotation, now)
+            if step_state is None:
+                continue
+            picked = self._pick_eligible_step(rotation, step_state.step_index, now)
+            if picked is None:
+                continue
+            page_id = rotation.steps[picked].page_id
+            if self._page_exists is not None and not self._page_exists(page_id):
+                continue
+            with self._lock:
+                # A transition fire is itself a fresh render; whichever
+                # happened last starts the cadence window.
+                last_fire = self._rotation_last_pushed_at.get(rotation.id) or 0.0
+                last_refresh = self._rotation_last_content_refresh.get(rotation.id) or 0.0
+                anchor_ts = max(last_fire, last_refresh)
+            if anchor_ts and now.timestamp() - anchor_ts < cadence_s:
+                pass  # current step is fresh enough; held devices below
+            else:
+                result = self._push_factory().push(
+                    page_id,
+                    respect_quiet_hours=True,
+                    source="rotation",
+                )
+                with self._lock:
+                    self._rotation_last_content_refresh[rotation.id] = now.timestamp()
+                logger.info(
+                    "rotation content refresh: rotation=%s step=%d page=%s (%s)",
+                    rotation.id,
+                    picked,
+                    page_id,
+                    result.status,
+                )
+            # Manually-held devices are showing a DIFFERENT page than the
+            # rotation-wide push covers; keep theirs fresh too.
+            if self._rotation_state_store is None:
+                continue
+            try:
+                states = self._rotation_state_store.all()
+            except Exception:
+                continue
+            for state in states.values():
+                if state.rotation_id != rotation.id:
+                    continue
+                if state.override_until is None or now >= state.override_until:
+                    continue  # not held; lapsed holds are the rejoin pass's job
+                if not 0 <= state.step_index < len(rotation.steps):
+                    continue
+                held_page = rotation.steps[state.step_index].page_id
+                if held_page == page_id:
+                    continue  # covered by the rotation-wide push
+                if self._page_exists is not None and not self._page_exists(held_page):
+                    continue
+                key = (rotation.id, state.device_id)
+                with self._lock:
+                    last_held = self._rotation_held_refresh.get(key) or 0.0
+                if last_held and now.timestamp() - last_held < cadence_s:
+                    continue
+                result = self._push_factory().push(
+                    held_page,
+                    device_ids={state.device_id},
+                    respect_quiet_hours=True,
+                    source="rotation",
+                )
+                with self._lock:
+                    self._rotation_held_refresh[key] = now.timestamp()
+                logger.info(
+                    "rotation held-page refresh: device=%s page=%s (%s)",
+                    state.device_id,
+                    held_page,
+                    result.status,
                 )
 
     def _maybe_warm_decks(self, now: datetime) -> None:

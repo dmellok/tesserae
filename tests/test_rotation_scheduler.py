@@ -564,6 +564,7 @@ def _rejoin_harness(tmp_path: Path):
         rotation_state_store=state_store,
         push_manager=lambda: push_manager,
         page_exists=lambda _pid: True,
+        timezone_provider=lambda: UTC,
     )
     rotation_store.upsert(_rot(id="r1", steps=_steps(("home", 60), ("away", 60))))
     return scheduler, push_manager, state_store, DeviceRotationState
@@ -641,4 +642,94 @@ def test_failed_rejoin_push_retries_next_tick(tmp_path: Path) -> None:
     # Hold stays set (still lapsed), so the next tick retries.
     assert state_store.get("panel").override_until is not None
     scheduler._maybe_rejoin_rotations(now)
+    assert push_manager.push.call_count == 2
+
+
+# -- content refresh (discussion #140: data staleness between transitions) --
+
+
+def _refresh_harness(tmp_path: Path, *, refresh_minutes: int = 5):
+    from app.state.device_rotation_state_model import DeviceRotationState
+    from app.state.device_rotation_state_store import DeviceRotationStateStore
+
+    schedule_store = ScheduleStore(tmp_path / "sched.json")
+    rotation_store = RotationStore(tmp_path / "rot.json")
+    state_store = DeviceRotationStateStore(tmp_path / "state.json")
+    push_manager = MagicMock()
+    push_manager.push.return_value = MagicMock(
+        status="sent", error=None, duration_s=0.1, event_id=None
+    )
+    scheduler = Scheduler(
+        store=schedule_store,
+        rotation_store=rotation_store,
+        rotation_state_store=state_store,
+        push_manager=lambda: push_manager,
+        page_exists=lambda _pid: True,
+        timezone_provider=lambda: UTC,
+    )
+    rot = Rotation(
+        id="r1",
+        name="r1",
+        anchor="00:00",
+        days_of_week=[0, 1, 2, 3, 4, 5, 6],
+        steps=_steps(("home", 600), ("away", 600)),  # long dwells
+        refresh_minutes=refresh_minutes,
+    )
+    rotation_store.upsert(rot)
+    return scheduler, push_manager, state_store, DeviceRotationState
+
+
+def test_content_refresh_repushes_current_step_on_cadence(tmp_path: Path) -> None:
+    scheduler, push_manager, _state_store, _State = _refresh_harness(tmp_path)
+    now = datetime(2026, 6, 15, 1, 0, tzinfo=UTC)  # inside step 0's dwell
+
+    scheduler._maybe_refresh_rotation_content(now)
+    assert push_manager.push.call_count == 1
+    assert push_manager.push.call_args[0][0] == "home"
+
+    # Within the cadence: no re-push.
+    scheduler._maybe_refresh_rotation_content(now + __import__("datetime").timedelta(minutes=2))
+    assert push_manager.push.call_count == 1
+
+    # Past the cadence: re-push.
+    scheduler._maybe_refresh_rotation_content(now + __import__("datetime").timedelta(minutes=6))
+    assert push_manager.push.call_count == 2
+
+
+def test_content_refresh_off_by_default(tmp_path: Path) -> None:
+    scheduler, push_manager, _s, _S = _refresh_harness(tmp_path, refresh_minutes=0)
+    scheduler._maybe_refresh_rotation_content(datetime(2026, 6, 15, 1, 0, tzinfo=UTC))
+    push_manager.push.assert_not_called()
+
+
+def test_content_refresh_counts_transition_as_fresh(tmp_path: Path) -> None:
+    scheduler, push_manager, _s, _S = _refresh_harness(tmp_path)
+    now = datetime(2026, 6, 15, 1, 0, tzinfo=UTC)
+    # A transition fired 1 minute ago -> the step content is fresh.
+    scheduler._rotation_last_pushed_at["r1"] = (
+        now - __import__("datetime").timedelta(minutes=1)
+    ).timestamp()
+    scheduler._maybe_refresh_rotation_content(now)
+    push_manager.push.assert_not_called()
+
+
+def test_content_refresh_covers_manually_held_devices(tmp_path: Path) -> None:
+    scheduler, push_manager, state_store, State = _refresh_harness(tmp_path)
+    now = datetime(2026, 6, 15, 1, 0, tzinfo=UTC)  # computed step 0 ("home")
+    state_store.upsert(
+        State(
+            device_id="panel",
+            rotation_id="r1",
+            step_index=1,  # held on "away"
+            override_until=datetime(2026, 6, 15, 23, 0, tzinfo=UTC),
+        )
+    )
+    scheduler._maybe_refresh_rotation_content(now)
+    pages = [c.args[0] for c in push_manager.push.call_args_list]
+    assert pages == ["home", "away"]
+    held_call = push_manager.push.call_args_list[1]
+    assert held_call.kwargs["device_ids"] == {"panel"}
+
+    # Held page respects the same cadence.
+    scheduler._maybe_refresh_rotation_content(now + __import__("datetime").timedelta(minutes=2))
     assert push_manager.push.call_count == 2

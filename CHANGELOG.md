@@ -6,6 +6,16 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added
+
+- **Rotation content refresh (discussion #140).** Rotations gain a "Content refresh (minutes)"
+  setting: the current step's page is re-rendered and re-pushed on that cadence between step
+  transitions, so widget data stays fresh while a long-dwell step sits on the panel (a device
+  poll only fetches the already-rendered frame; it never triggered a render, so data could sit
+  stale for the whole dwell). Pages manually held by a button press refresh on the same cadence,
+  device-targeted. Default 0 keeps the original render-on-transition-only behaviour;
+  content-addressed digests mean unchanged renders still answer polls with 304.
+
 ### Fixed
 
 - **Devices paged away by button/touch now rejoin their rotation (discussion #140).** The

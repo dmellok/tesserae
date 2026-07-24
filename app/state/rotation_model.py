@@ -129,6 +129,14 @@ class Rotation(BaseModel):
     # manual "fire now" bypasses it.
     min_hold_minutes: int = Field(default=5, ge=0, le=120)
 
+    # Content-refresh cadence (discussion #140): re-render + re-push the
+    # CURRENT step every N minutes between transitions so its widget
+    # data stays fresh while the step dwells (a device poll only fetches
+    # bytes, it never triggers a render). Also refreshes a manually-held
+    # page for devices inside their button hold. 0 = renders happen only
+    # on step transitions (the original behaviour).
+    refresh_minutes: int = Field(default=0, ge=0, le=1440)
+
     @field_validator("days_of_week")
     @classmethod
     def _validate_dow(cls, v: list[int]) -> list[int]:
