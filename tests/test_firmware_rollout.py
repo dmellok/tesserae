@@ -96,6 +96,13 @@ def _import_valid(client) -> None:  # type: ignore[no-untyped-def]
     )
 
 
+def _device_row(app: Flask, device_id: str, *, online: bool = False) -> dict:
+    import app.settings.firmware_routes as fr
+
+    with app.app_context():
+        return next(row for row in fr._devices_model(online=online) if row["id"] == device_id)
+
+
 def test_import_valid_sets_release(app: Flask) -> None:
     with app.app_context():
         _mk_device(app, "dev_a")
@@ -134,6 +141,103 @@ def test_queue_offers_release_to_device(app: Flask) -> None:
     # The offer machinery now serves this device the descriptor.
     assert app.config["OTA_RELEASE"].descriptor_for(KIND, "dev_a") is not None
     assert app.config["OTA_RELEASE"].descriptor_for(KIND, "dev_other") is None
+
+
+def test_pending_canary_shows_imported_release_as_queued(app: Flask) -> None:
+    with app.app_context():
+        _mk_device(app, "dev_a")
+    _set_status(app, "dev_a", fw="1.3.0")
+    client = _authed_client(app)
+    _import_valid(client)
+    client.post("/settings/firmware/queue", data={"device_id": "dev_a"})
+
+    row = _device_row(app, "dev_a")
+    assert row["queued"] is True
+    assert row["queued_fw"] == REL_FW
+    assert row["can_withdraw"] is True
+
+    html = client.get("/settings/firmware").get_data(as_text=True)
+    assert "queued v1.4.0" in html
+    assert "Withdraw" in html
+
+
+def test_completed_canary_shows_up_to_date_and_keeps_membership(app: Flask) -> None:
+    with app.app_context():
+        _mk_device(app, "dev_a")
+    _set_status(app, "dev_a", fw="1.3.0")
+    client = _authed_client(app)
+    _import_valid(client)
+    client.post("/settings/firmware/queue", data={"device_id": "dev_a"})
+
+    # The successful post-update heartbeat advances the installed version,
+    # while the rollout keeps its canary selection for Fleet history/state.
+    _set_status(app, "dev_a", fw=REL_FW)
+
+    row = _device_row(app, "dev_a")
+    assert row["is_canary"] is True
+    assert row["queued"] is False
+    assert row["queued_fw"] is None
+    assert row["update_available"] is False
+    assert row["can_withdraw"] is False
+    assert app.config["OTA_RELEASE"].get(KIND)["canary_device_ids"] == ["dev_a"]
+
+    html = client.get("/settings/firmware").get_data(as_text=True)
+    assert "up to date" in html
+    assert "queued v1.4.0" not in html
+
+
+def test_completed_promoted_release_shows_up_to_date(app: Flask) -> None:
+    with app.app_context():
+        _mk_device(app, "dev_a")
+    _set_status(app, "dev_a", fw=REL_FW)
+    client = _authed_client(app)
+    _import_valid(client)
+    app.config["OTA_RELEASE"].promote(KIND)
+
+    row = _device_row(app, "dev_a")
+    assert row["is_canary"] is True  # promoted materialises every capable device
+    assert row["queued"] is False
+    assert row["queued_fw"] is None
+    assert app.config["OTA_RELEASE"].get(KIND)["state"] == "promoted"
+
+
+def test_old_rollout_membership_does_not_claim_new_available_is_queued(
+    app: Flask, monkeypatch
+) -> None:  # type: ignore[no-untyped-def]
+    import json as _json
+
+    import app.firmware_check as fwc
+    from app.firmware_check import FirmwareInfo
+
+    with app.app_context():
+        _mk_device(app, "dev_a")
+    _set_status(app, "dev_a", fw="1.3.0")
+    app.config["OTA_RELEASE"].set_target(
+        KIND,
+        _json.loads(VALID.read_text()),
+        fw_version="1.3.0",
+        canary_device_ids=["dev_a"],
+    )
+    monkeypatch.setattr(
+        fwc,
+        "latest_for_kind",
+        lambda kind, current="": FirmwareInfo(
+            version="1.9.0",
+            released_at="",
+            url="https://example.test/r",
+            notes_headline="",
+            assets=(),
+            descriptor_url="https://api.tesserae.ink/d.json",
+        ),
+    )
+
+    row = _device_row(app, "dev_a", online=True)
+    assert row["is_canary"] is True
+    assert row["available_fw"] == "1.9.0"
+    assert row["update_available"] is True
+    assert row["queued"] is False
+    assert row["queued_fw"] is None
+    assert row["can_queue"] is True
 
 
 def test_queue_rejects_non_capable_device(app: Flask) -> None:

@@ -36,6 +36,11 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **Completed firmware updates stayed labelled as queued.** The Firmware page now distinguishes
+  retained canary/fleet rollout membership from a release that is still newer than the device.
+  Once a device reports the imported version it reads as up to date, while pending rows name the
+  actual imported release instead of a potentially newer online Available version.
+
 - **Deck heartbeat reports could revert a freshly pushed dashboard.** v0.187.1's report promotion
   promoted whatever page the panel said was on glass, so a heartbeat arriving between a push and
   the device's next fetch clobbered the pending frame with the older deck frame, and the new
