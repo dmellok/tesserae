@@ -1383,6 +1383,38 @@ class ButtonService:
         idx = max(0, min(state.step_index, len(rotation.steps) - 1))
         return idx, True
 
+    def reset_event_counter(self, device_id: str) -> None:
+        """Forget the device's wake-event dedup state (monotonic counter
+        high-water mark + the same-button time-window fallback).
+
+        Called on the re-pair lifecycle paths (/register on an existing
+        id, /discover MAC claim): those are exactly the moments a
+        firmware's NVS-persisted counter legitimately restarts (reflash,
+        wipe), and without this reset every subsequent button/touch
+        event arrives with ``event_id <= last`` and is silently deduped
+        forever. The auto-heal keeping device identity across reflashes
+        makes this reset load-bearing: pre-heal, users recreated the
+        device and got fresh state by accident."""
+        state = self._state.get(device_id)
+        if state is None:
+            return
+        if (
+            state.last_button_event_id is None
+            and state.last_button is None
+            and state.last_button_at is None
+        ):
+            return
+        self._state.upsert(
+            state.model_copy(
+                update={
+                    "last_button_event_id": None,
+                    "last_button": None,
+                    "last_button_at": None,
+                }
+            )
+        )
+        log.info("button dedup reset: device=%s (re-pair)", device_id)
+
     def _is_duplicate(
         self,
         state: DeviceRotationState,

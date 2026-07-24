@@ -570,6 +570,18 @@ def _ingest_deck_report(device: Device, page_id: Any) -> None:
         current_app.logger.exception("rest: deck report failed for device=%s", device.id)
 
 
+def _reset_event_counter(device_id: str) -> None:
+    """Best-effort: forget the device's button/touch dedup high-water
+    mark on a re-pair (see ButtonService.reset_event_counter). Failures
+    never break pairing."""
+    try:
+        svc = _button_service()
+        if svc is not None:
+            svc.reset_event_counter(device_id)
+    except Exception:
+        current_app.logger.exception("rest: event counter reset failed for %s", device_id)
+
+
 def _current_config(device: Device) -> dict[str, Any]:
     """Per-device config as it stands right now. Same source the MQTT
     config_topic publisher reads from; piggybacking in the status
@@ -1488,6 +1500,10 @@ def _discover() -> Response:
                 # Both reload the instance, so re-fetch it.
                 _maybe_heal_kind(claimed.id, body)
                 _maybe_switch_wire_format(claimed.id, body)
+                # Wiped NVS also means a restarted wake-event counter:
+                # forget the dedup high-water mark or every future
+                # button/touch reads as a duplicate.
+                _reset_event_counter(claimed.id)
                 current = _devices().get(claimed.id) or claimed
                 return jsonify(
                     {
@@ -1630,6 +1646,10 @@ def _register() -> Response:
         # re-fetch it for the config echo.
         _maybe_heal_kind(device_id, body)
         _maybe_switch_wire_format(device_id, body)
+        # A re-pair means the firmware's NVS (and its wake-event
+        # counter) may have been wiped; forget the dedup high-water
+        # mark or every future button/touch reads as a duplicate.
+        _reset_event_counter(device_id)
         current = devices_registry.get(device_id) or existing
         return jsonify(
             {

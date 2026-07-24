@@ -1795,3 +1795,64 @@ def test_cors_headers_on_auth_failure(app: Flask) -> None:
     )
     assert resp.status_code in (401, 403)
     assert resp.headers.get("Access-Control-Allow-Origin") == "*"
+
+
+def test_repair_resets_event_dedup_counter(app: Flask) -> None:
+    """A reflash wipes the firmware's NVS wake-event counter, and since
+    the kind heal keeps the device row across reflashes, the server's
+    persisted high-water mark would otherwise dedup EVERY subsequent
+    button/touch (counter restarts at 1 <= old mark). Both re-pair
+    paths (/register on existing id, /discover MAC claim) must forget
+    the mark."""
+    client = app.test_client()
+    _sign_in(client)
+    code = _issue_pairing(app)
+    first = client.post(
+        "/api/v1/device/register",
+        headers={"X-Pairing-Code": code, "Content-Type": "application/json"},
+        data=json.dumps(
+            {"device_id": "hall_e1003", "kind": "esp32_client", "mac": "aa:bb:cc:00:00:99"}
+        ),
+    )
+    assert first.status_code == 201
+    token = first.get_json()["device_token"]
+
+    def post_button(event_id: int):
+        return client.post(
+            "/api/v1/device/hall_e1003/status",
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+            data=json.dumps({"button": "refresh", "button_event_id": event_id}),
+        )
+
+    assert post_button(50).status_code == 200
+    store = app.config["DEVICE_ROTATION_STATE_STORE"]
+    assert store.get("hall_e1003").last_button_event_id == 50
+    # Pre-fix behaviour: a post-reflash event_id=1 would be swallowed.
+
+    # Reflash path A: MAC-claim discover.
+    resp = client.post(
+        "/api/v1/device/discover",
+        headers={"Content-Type": "application/json"},
+        data=json.dumps(
+            {"device_id": "hall_e1003", "kind": "esp32_client", "mac": "aa:bb:cc:00:00:99"}
+        ),
+    )
+    assert resp.status_code == 200 and resp.get_json()["registered"] is True
+    state = store.get("hall_e1003")
+    assert state is None or state.last_button_event_id is None
+
+    assert post_button(1).status_code == 200
+    assert store.get("hall_e1003").last_button_event_id == 1
+
+    # Reflash path B: re-register with a fresh pairing code.
+    code2 = _issue_pairing(app)
+    again = client.post(
+        "/api/v1/device/register",
+        headers={"X-Pairing-Code": code2, "Content-Type": "application/json"},
+        data=json.dumps({"device_id": "hall_e1003", "kind": "esp32_client"}),
+    )
+    assert again.status_code == 200 and again.get_json()["reused_existing"] is True
+    state = store.get("hall_e1003")
+    assert state is None or state.last_button_event_id is None
+    assert post_button(1).status_code == 200
+    assert store.get("hall_e1003").last_button_event_id == 1
