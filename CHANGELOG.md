@@ -6,6 +6,17 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **Devices paged away by button/touch now rejoin their rotation (discussion #140).** The
+  scheduler only pushed on step transitions, so on a rotation dominated by a long-dwell step a
+  panel that was manually paged away (physical button / touch) stayed on the manual page
+  indefinitely: the manual hold (`override_until`) was recorded but nothing acted when it lapsed.
+  A per-tick rejoin pass now pushes the rotation's current page, device-targeted, to any device
+  whose manual hold has lapsed, then clears the hold; devices still inside their hold are
+  untouched, and a device already on the current step just has its hold cleared. Hold length
+  remains "rest of the day" by default, or `app.button_hold_seconds` when set.
+
 ### Added
 
 - **Decks navigate without a hand-built graph.** Where a deck page's graph is silent, sync

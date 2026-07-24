@@ -869,6 +869,7 @@ def create_app(
     scheduler = Scheduler(
         store=schedule_store,
         rotation_store=rotation_store,
+        rotation_state_store=device_rotation_state_store,
         deck_store=deck_store,
         push_manager=lambda: app.config["PUSH_MANAGER"],
         event_log=event_log,

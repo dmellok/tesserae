@@ -542,3 +542,103 @@ def test_rotation_smart_sync_skips_intermediate_steps(tmp_path: Path) -> None:
     scheduler._tick_once(datetime(2026, 6, 15, 0, 49, 55, tzinfo=UTC))
     assert push.push.call_count == 1
     assert push.push.call_args.args[0] == "d"
+
+
+# -- rejoin pass (discussion #140: paged-away devices come back) -----------
+
+
+def _rejoin_harness(tmp_path: Path):
+    from app.state.device_rotation_state_model import DeviceRotationState
+    from app.state.device_rotation_state_store import DeviceRotationStateStore
+
+    schedule_store = ScheduleStore(tmp_path / "sched.json")
+    rotation_store = RotationStore(tmp_path / "rot.json")
+    state_store = DeviceRotationStateStore(tmp_path / "state.json")
+    push_manager = MagicMock()
+    push_manager.push.return_value = MagicMock(
+        status="sent", error=None, duration_s=0.1, event_id=None
+    )
+    scheduler = Scheduler(
+        store=schedule_store,
+        rotation_store=rotation_store,
+        rotation_state_store=state_store,
+        push_manager=lambda: push_manager,
+        page_exists=lambda _pid: True,
+    )
+    rotation_store.upsert(_rot(id="r1", steps=_steps(("home", 60), ("away", 60))))
+    return scheduler, push_manager, state_store, DeviceRotationState
+
+
+def test_lapsed_override_rejoins_device_to_current_step(tmp_path: Path) -> None:
+    scheduler, push_manager, state_store, State = _rejoin_harness(tmp_path)
+    # Monday 00:10 -> computed step 0 ("home"). Device paged to step 1
+    # by button; its hold lapsed ten minutes ago.
+    now = datetime(2026, 6, 15, 0, 10, tzinfo=UTC)
+    state_store.upsert(
+        State(
+            device_id="panel",
+            rotation_id="r1",
+            step_index=1,
+            override_until=datetime(2026, 6, 15, 0, 0, tzinfo=UTC),
+        )
+    )
+    scheduler._maybe_rejoin_rotations(now)
+    push_manager.push.assert_called_once()
+    args, kwargs = push_manager.push.call_args
+    assert args[0] == "home"
+    assert kwargs["device_ids"] == {"panel"}
+    fresh = state_store.get("panel")
+    assert fresh.override_until is None and fresh.step_index == 0
+
+
+def test_unlapsed_override_is_left_alone(tmp_path: Path) -> None:
+    scheduler, push_manager, state_store, State = _rejoin_harness(tmp_path)
+    now = datetime(2026, 6, 15, 0, 10, tzinfo=UTC)
+    state_store.upsert(
+        State(
+            device_id="panel",
+            rotation_id="r1",
+            step_index=1,
+            override_until=datetime(2026, 6, 15, 23, 0, tzinfo=UTC),
+        )
+    )
+    scheduler._maybe_rejoin_rotations(now)
+    push_manager.push.assert_not_called()
+    assert state_store.get("panel").override_until is not None
+
+
+def test_lapsed_override_on_current_step_clears_without_push(tmp_path: Path) -> None:
+    scheduler, push_manager, state_store, State = _rejoin_harness(tmp_path)
+    now = datetime(2026, 6, 15, 0, 10, tzinfo=UTC)  # computed step 0
+    state_store.upsert(
+        State(
+            device_id="panel",
+            rotation_id="r1",
+            step_index=0,
+            override_until=datetime(2026, 6, 15, 0, 0, tzinfo=UTC),
+        )
+    )
+    scheduler._maybe_rejoin_rotations(now)
+    push_manager.push.assert_not_called()
+    assert state_store.get("panel").override_until is None
+
+
+def test_failed_rejoin_push_retries_next_tick(tmp_path: Path) -> None:
+    scheduler, push_manager, state_store, State = _rejoin_harness(tmp_path)
+    push_manager.push.return_value = MagicMock(
+        status="failed", error="boom", duration_s=0.1, event_id=None
+    )
+    now = datetime(2026, 6, 15, 0, 10, tzinfo=UTC)
+    state_store.upsert(
+        State(
+            device_id="panel",
+            rotation_id="r1",
+            step_index=1,
+            override_until=datetime(2026, 6, 15, 0, 0, tzinfo=UTC),
+        )
+    )
+    scheduler._maybe_rejoin_rotations(now)
+    # Hold stays set (still lapsed), so the next tick retries.
+    assert state_store.get("panel").override_until is not None
+    scheduler._maybe_rejoin_rotations(now)
+    assert push_manager.push.call_count == 2

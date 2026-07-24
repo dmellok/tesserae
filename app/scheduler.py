@@ -217,6 +217,7 @@ class Scheduler:
         # Rotations (issue: dashboard rotation). Optional; None means
         # no rotation evaluation runs each tick. Production wires it.
         rotation_store: RotationStore | None = None,
+        rotation_state_store: Any = None,
         deck_store: DeckStore | None = None,
         # Conditional schedules + rotation steps (v0.48). Optional; None
         # means every condition resolves to True (legacy behaviour) so
@@ -246,6 +247,7 @@ class Scheduler:
         existing tests, which don't care about staleness."""
         self._store = store
         self._rotation_store = rotation_store
+        self._rotation_state_store = rotation_state_store
         self._deck_store = deck_store
         # deck_id -> last warm POSIX timestamp, so a deck's pages are re-warmed
         # (in the background, silently) at its refresh cadence. The lock keeps
@@ -442,10 +444,100 @@ class Scheduler:
         # panel because rotation already fired before it.
         for rotation, step_index in self.find_due_rotations(now):
             self._fire_rotation(rotation, step_index, now, respect_quiet_hours=True)
+        # Rejoin pass: devices manually paged away (physical button /
+        # touch) whose hold has lapsed get the rotation's current page
+        # pushed back, device-targeted. Without this, a rotation with a
+        # long-dwell step never transitions, so a paged-away panel
+        # stayed on the manual page forever (discussion #140).
+        self._maybe_rejoin_rotations(now)
         for schedule in self.find_due(now):
             self._fire(schedule, now, respect_quiet_hours=True)
         # Deck pre-render refresh (silent, off the tick thread).
         self._maybe_warm_decks(now)
+
+    def _maybe_rejoin_rotations(self, now: datetime) -> None:
+        """Bring manually-paged-away devices back into their rotation.
+
+        A physical button / touch rotate records a per-device manual
+        position with an ``override_until`` hold (ButtonService). The
+        transition-driven fire path never re-pushes a step it already
+        fired, so once the hold lapses NOTHING put the rotation's
+        current page back on a paged-away panel until the next step
+        transition, which on a long-dwell rotation can be hours or
+        never (discussion #140). This pass runs every tick: for each
+        device whose hold exists and has lapsed, push the rotation's
+        current page to JUST that device and clear the hold. Devices
+        still inside their hold are untouched, and devices already on
+        the current step have the hold cleared silently."""
+        if self._rotation_store is None or self._rotation_state_store is None:
+            return
+        try:
+            states = self._rotation_state_store.all()
+        except Exception:
+            logger.exception("rotation rejoin: state store read failed")
+            return
+        lapsed = [
+            s
+            for s in states.values()
+            if s.rotation_id is not None
+            and s.override_until is not None
+            and now >= s.override_until
+        ]
+        if not lapsed:
+            return
+        rotations = {r.id: r for r in self._rotation_store.all()}
+        for state in lapsed:
+            rotation = rotations.get(state.rotation_id or "")
+            if rotation is None or not rotation.enabled or not rotation.steps:
+                # Rotation gone or off: just drop the stale hold.
+                self._rotation_state_store.upsert(state.model_copy(update={"override_until": None}))
+                continue
+            step_state = self.compute_step_state(rotation, now)
+            if step_state is None:
+                continue  # outside the rotation's window; retry next tick
+            picked = self._pick_eligible_step(rotation, step_state.step_index, now)
+            if picked is None:
+                continue
+            page_id = rotation.steps[picked].page_id
+            if self._page_exists is not None and not self._page_exists(page_id):
+                continue
+            if state.step_index == picked:
+                # Already showing the current step; nothing to push.
+                self._rotation_state_store.upsert(state.model_copy(update={"override_until": None}))
+                continue
+            result = self._push_factory().push(
+                page_id,
+                device_ids={state.device_id},
+                respect_quiet_hours=True,
+                source="rotation",
+            )
+            logger.info(
+                "rotation rejoin: device=%s rotation=%s -> step=%d page=%s (%s)",
+                state.device_id,
+                rotation.id,
+                picked,
+                page_id,
+                result.status,
+            )
+            if result.status in ("sent", "quiet", "no_change"):
+                self._rotation_state_store.upsert(
+                    state.model_copy(update={"override_until": None, "step_index": picked})
+                )
+            if self._event_log is not None:
+                self._event_log.record(
+                    type="rotation",
+                    source="rotation",
+                    target=rotation.id,
+                    status=result.status,
+                    error=result.error,
+                    duration_s=result.duration_s,
+                    extra={
+                        "rotation_name": rotation.name,
+                        "step_index": picked,
+                        "page_id": page_id,
+                        "rejoin_device": state.device_id,
+                    },
+                )
 
     def _maybe_warm_decks(self, now: datetime) -> None:
         """Kick a background deck-warm pass unless one is already running, so a
