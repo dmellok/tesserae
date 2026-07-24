@@ -645,10 +645,10 @@ def test_failed_rejoin_push_retries_next_tick(tmp_path: Path) -> None:
     assert push_manager.push.call_count == 2
 
 
-# -- content refresh (discussion #140: data staleness between transitions) --
+# -- self-refire + hold exclusion (discussion #140) -------------------------
 
 
-def _refresh_harness(tmp_path: Path, *, refresh_minutes: int = 5):
+def _selffire_harness(tmp_path: Path, *, dwells=None, device_ids_for_page=None):
     from app.state.device_rotation_state_model import DeviceRotationState
     from app.state.device_rotation_state_store import DeviceRotationStateStore
 
@@ -666,70 +666,102 @@ def _refresh_harness(tmp_path: Path, *, refresh_minutes: int = 5):
         push_manager=lambda: push_manager,
         page_exists=lambda _pid: True,
         timezone_provider=lambda: UTC,
+        device_ids_for_page=device_ids_for_page,
     )
-    rot = Rotation(
-        id="r1",
-        name="r1",
-        anchor="00:00",
-        days_of_week=[0, 1, 2, 3, 4, 5, 6],
-        steps=_steps(("home", 600), ("away", 600)),  # long dwells
-        refresh_minutes=refresh_minutes,
-    )
-    rotation_store.upsert(rot)
+    rotation_store.upsert(_rot(id="r1", steps=_steps(*(dwells or [("home", 5)]))))
     return scheduler, push_manager, state_store, DeviceRotationState
 
 
-def test_content_refresh_repushes_current_step_on_cadence(tmp_path: Path) -> None:
-    scheduler, push_manager, _state_store, _State = _refresh_harness(tmp_path)
-    now = datetime(2026, 6, 15, 1, 0, tzinfo=UTC)  # inside step 0's dwell
+def test_single_step_rotation_refires_every_dwell_window(tmp_path: Path) -> None:
+    """A rotation rotates onto itself: a one-step rotation with a
+    5-minute dwell re-renders its page every 5 minutes, no extra knob.
+    min_hold (default 5m) does NOT gate self-fires."""
+    scheduler, push_manager, _s, _S = _selffire_harness(tmp_path, dwells=[("home", 5)])
+    t0 = datetime(2026, 6, 15, 0, 1, tzinfo=UTC)  # window [00:00, 00:05)
 
-    scheduler._maybe_refresh_rotation_content(now)
+    due = scheduler.find_due_rotations(t0)
+    assert [(r.id, i) for r, i in due] == [("r1", 0)]
+    scheduler._fire_rotation(*due[0], t0)
     assert push_manager.push.call_count == 1
-    assert push_manager.push.call_args[0][0] == "home"
 
-    # Within the cadence: no re-push.
-    scheduler._maybe_refresh_rotation_content(now + __import__("datetime").timedelta(minutes=2))
-    assert push_manager.push.call_count == 1
+    # Same dwell window: nothing due.
+    assert scheduler.find_due_rotations(datetime(2026, 6, 15, 0, 4, tzinfo=UTC)) == []
 
-    # Past the cadence: re-push.
-    scheduler._maybe_refresh_rotation_content(now + __import__("datetime").timedelta(minutes=6))
+    # Next window [00:05, 00:10): due again, same step index.
+    t1 = datetime(2026, 6, 15, 0, 6, tzinfo=UTC)
+    due1 = scheduler.find_due_rotations(t1)
+    assert [(r.id, i) for r, i in due1] == [("r1", 0)]
+    scheduler._fire_rotation(*due1[0], t1)
     assert push_manager.push.call_count == 2
 
 
-def test_content_refresh_off_by_default(tmp_path: Path) -> None:
-    scheduler, push_manager, _s, _S = _refresh_harness(tmp_path, refresh_minutes=0)
-    scheduler._maybe_refresh_rotation_content(datetime(2026, 6, 15, 1, 0, tzinfo=UTC))
-    push_manager.push.assert_not_called()
+def test_multi_step_transitions_still_respect_min_hold(tmp_path: Path) -> None:
+    """Index CHANGES keep the flap guard: a transition inside the
+    min-hold window stays gated."""
+    scheduler, _push_manager, _s, _S = _selffire_harness(tmp_path, dwells=[("a", 2), ("b", 2)])
+    t0 = datetime(2026, 6, 15, 0, 1, tzinfo=UTC)  # step 0
+    due = scheduler.find_due_rotations(t0)
+    scheduler._fire_rotation(*due[0], t0)
+
+    # 00:03 -> computed step 1, but min_hold (5m default) gates it.
+    assert scheduler.find_due_rotations(datetime(2026, 6, 15, 0, 3, tzinfo=UTC)) == []
 
 
-def test_content_refresh_counts_transition_as_fresh(tmp_path: Path) -> None:
-    scheduler, push_manager, _s, _S = _refresh_harness(tmp_path)
-    now = datetime(2026, 6, 15, 1, 0, tzinfo=UTC)
-    # A transition fired 1 minute ago -> the step content is fresh.
-    scheduler._rotation_last_pushed_at["r1"] = (
-        now - __import__("datetime").timedelta(minutes=1)
-    ).timestamp()
-    scheduler._maybe_refresh_rotation_content(now)
-    push_manager.push.assert_not_called()
-
-
-def test_content_refresh_covers_manually_held_devices(tmp_path: Path) -> None:
-    scheduler, push_manager, state_store, State = _refresh_harness(tmp_path)
-    now = datetime(2026, 6, 15, 1, 0, tzinfo=UTC)  # computed step 0 ("home")
+def test_fire_excludes_manually_held_devices(tmp_path: Path) -> None:
+    """A held panel must not be yanked back by the rotation's fires
+    (acute now that self-fires happen every dwell window). Other bound
+    panels still get the push."""
+    scheduler, push_manager, state_store, State = _selffire_harness(
+        tmp_path,
+        dwells=[("home", 5)],
+        device_ids_for_page=lambda _pid: ["panel_a", "panel_b"],
+    )
+    now = datetime(2026, 6, 15, 0, 1, tzinfo=UTC)
     state_store.upsert(
         State(
-            device_id="panel",
+            device_id="panel_a",
             rotation_id="r1",
-            step_index=1,  # held on "away"
+            step_index=0,
             override_until=datetime(2026, 6, 15, 23, 0, tzinfo=UTC),
         )
     )
-    scheduler._maybe_refresh_rotation_content(now)
-    pages = [c.args[0] for c in push_manager.push.call_args_list]
-    assert pages == ["home", "away"]
-    held_call = push_manager.push.call_args_list[1]
-    assert held_call.kwargs["device_ids"] == {"panel"}
+    rot = scheduler._rotation_store.all()[0]
+    scheduler._fire_rotation(rot, 0, now)
+    push_manager.push.assert_called_once()
+    assert push_manager.push.call_args.kwargs["device_ids"] == {"panel_b"}
 
-    # Held page respects the same cadence.
-    scheduler._maybe_refresh_rotation_content(now + __import__("datetime").timedelta(minutes=2))
-    assert push_manager.push.call_count == 2
+
+def test_fire_skips_push_when_every_device_is_held(tmp_path: Path) -> None:
+    scheduler, push_manager, state_store, State = _selffire_harness(
+        tmp_path,
+        dwells=[("home", 5)],
+        device_ids_for_page=lambda _pid: ["panel_a"],
+    )
+    now = datetime(2026, 6, 15, 0, 1, tzinfo=UTC)
+    state_store.upsert(
+        State(
+            device_id="panel_a",
+            rotation_id="r1",
+            step_index=0,
+            override_until=datetime(2026, 6, 15, 23, 0, tzinfo=UTC),
+        )
+    )
+    rot = scheduler._rotation_store.all()[0]
+    result = scheduler._fire_rotation(rot, 0, now)
+    push_manager.push.assert_not_called()
+    assert result.status == "quiet"
+
+
+def test_store_strips_withdrawn_refresh_minutes_key(tmp_path: Path) -> None:
+    """Rotations saved during v0.190.0's brief refresh_minutes window
+    still load (the strict model would otherwise reject the extra key
+    and the rotation would silently vanish)."""
+    import json as _json
+
+    store = RotationStore(tmp_path / "rot.json")
+    store.upsert(_rot(id="legacy"))
+    raw = _json.loads((tmp_path / "rot.json").read_text())
+    # Simulate a 0.190.0 save.
+    (tmp_path / "rot.json").write_text(_json.dumps([{**raw[0], "refresh_minutes": 5}]))
+    loaded = RotationStore(tmp_path / "rot.json").all()
+    assert [r.id for r in loaded] == ["legacy"]

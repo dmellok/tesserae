@@ -40,6 +40,14 @@ class RotationStore:
             out: list[Rotation] = []
             for d in self._load_raw():
                 try:
+                    # v0.190.0 briefly shipped a ``refresh_minutes`` field
+                    # (withdrawn same day in favour of rotations re-firing
+                    # onto themselves at dwell boundaries). Strip it so a
+                    # rotation saved during that window still validates
+                    # against the strict model instead of silently
+                    # disappearing from the store.
+                    if isinstance(d, dict):
+                        d.pop("refresh_minutes", None)
                     out.append(Rotation.model_validate(d))
                 except Exception:
                     continue

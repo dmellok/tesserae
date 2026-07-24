@@ -162,7 +162,6 @@ def _parse_form(form: Any, *, existing_id: str | None = None) -> Rotation:
         # v0.48 routing + flap protection.
         "mode": mode_raw,
         "min_hold_minutes": int(form.get("min_hold_minutes") or 5),
-        "refresh_minutes": int(form.get("refresh_minutes") or 0),
         "steps": [s.model_dump() for s in _parse_steps(form)],
     }
     return Rotation.model_validate(payload)

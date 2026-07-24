@@ -8,13 +8,17 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
-- **Rotation content refresh (discussion #140).** Rotations gain a "Content refresh (minutes)"
-  setting: the current step's page is re-rendered and re-pushed on that cadence between step
-  transitions, so widget data stays fresh while a long-dwell step sits on the panel (a device
-  poll only fetches the already-rendered frame; it never triggered a render, so data could sit
-  stale for the whole dwell). Pages manually held by a button press refresh on the same cadence,
-  device-targeted. Default 0 keeps the original render-on-transition-only behaviour;
-  content-addressed digests mean unchanged renders still answer polls with 304.
+- **Rotations re-render at every dwell boundary, including onto themselves (discussion #140).**
+  Previously a rotation only rendered on step *transitions*, so a step's widget data froze for
+  its whole dwell (a device poll fetches the already-rendered frame; it never triggers a render),
+  and a single-step rotation rendered exactly once, ever. A rotation now fires whenever a new
+  dwell window begins, even when the step is unchanged, so a one-page rotation with a 5-minute
+  dwell simply means "keep this page fresh every 5 minutes". The min-hold flap guard still
+  applies to step changes but not to self-fires. Alongside this, rotation fires now exclude
+  panels sitting inside a manual button/touch hold (previously any fire could yank a paged-away
+  panel back mid-hold; now the rejoin pass restores them only when the hold lapses).
+  (Supersedes the `refresh_minutes` setting that briefly shipped in v0.190.0; rotations saved
+  with it still load, the field is ignored and dropped on next save.)
 
 ### Fixed
 
