@@ -664,6 +664,165 @@ class ButtonService:
             self._spawn_prewarm(device_id)
         return result
 
+    def handle_region_report(
+        self,
+        *,
+        device_id: str,
+        region_id: str,
+        gesture: str,
+        frame_digest: str,
+        value: int | None = None,
+        event_id: int | None = None,
+        stroke: TouchStroke | None = None,
+    ) -> TouchHandleResult:
+        """Protocol v2 dispatch: the device hit-tested locally and
+        reports a manifest region id + gesture instead of coordinates.
+        The server validates (the id must mint from the digest's own
+        sidecar; the gesture must match the entry it names) and then
+        dispatches through the same machinery as a coordinate stroke.
+        Guard-chain outcomes mirror ``_handle_touch``: ``deduped`` /
+        ``no_frame`` / ``stale`` / ``no_target``."""
+        now = self._clock()
+        state = self._state.get(device_id) or DeviceRotationState(device_id=device_id)
+        diag = stroke or TouchStroke(x0=0, y0=0, x1=0, y1=0)
+
+        if (
+            event_id is not None
+            and state.last_button_event_id is not None
+            and event_id == state.last_button_event_id
+        ):
+            result = TouchHandleResult(
+                outcome="deduped", gesture=None, base=self.snapshot(device_id)
+            )
+            self._emit_touch_row(result, stroke=diag, event_id=event_id)
+            return result
+
+        pusher = self._push_getter()
+        latest = pusher.latest_render_for(device_id) if pusher is not None else None
+        if latest is None:
+            result = TouchHandleResult(
+                outcome="no_frame", gesture=None, base=self.snapshot(device_id)
+            )
+            self._emit_touch_row(result, stroke=diag, event_id=event_id)
+            return result
+        if frame_digest != str(latest.get("digest") or ""):
+            reconciled = self._reconcile_deck_frame(device_id, frame_digest)
+            if reconciled is not None:
+                latest = reconciled
+            else:
+                result = TouchHandleResult(
+                    outcome="stale", gesture=None, base=self.snapshot(device_id)
+                )
+                self._emit_touch_row(result, stroke=diag, event_id=event_id)
+                return result
+
+        regions = (
+            pusher.touch_regions_for(str(latest.get("composition_digest") or ""))
+            if pusher is not None
+            else []
+        )
+        panel = self._device_panel(device_id)
+        from app.manifest import resolve_region_action
+
+        resolved = resolve_region_action(regions, region_id, panel)
+        if resolved is None or resolved[1] != gesture:
+            log.info(
+                "touch region report unresolved: device=%s id=%s gesture=%s",
+                device_id,
+                region_id,
+                gesture,
+            )
+            result = TouchHandleResult(
+                outcome="no_target", gesture=gesture, base=self.snapshot(device_id)
+            )
+            self._emit_touch_row(result, stroke=diag, event_id=event_id)
+            return result
+        region, _declared_gesture, spec = resolved
+        magnitude = 0
+        slide_val: int | None = None
+        if gesture == "slide":
+            slide_val = max(0, min(100, int(value or 0)))
+            magnitude = slide_val
+            spec = substitute_value(spec, slide_val)
+        # Defense in depth: the manifest builder already refuses
+        # markup-origin side effects, but the dispatch gate stays.
+        if is_side_effecting(spec) and region.get("origin") != "config":
+            result = TouchHandleResult(
+                outcome="blocked",
+                gesture=gesture,
+                magnitude=magnitude,
+                action_spec=_spec_label(spec),
+                base=self.snapshot(device_id),
+            )
+            self._emit_touch_row(result, stroke=diag, event_id=event_id)
+            return result
+
+        origin_extra: dict[str, Any] = {
+            "region_id": region_id,
+            "touch_event_id": event_id,
+            "gesture": gesture,
+            "magnitude": magnitude,
+            "value": slide_val,
+        }
+        if isinstance(spec, dict):
+            result = self._dispatch_structured(
+                device_id=device_id,
+                action=spec,
+                gesture=gesture,
+                magnitude=magnitude,
+                value=slide_val,
+                stroke=diag,
+                event_id=event_id,
+                region_box={k: region[k] for k in ("x", "y", "w", "h") if k in region},
+                state=state,
+                now=now,
+            )
+            self._spawn_prewarm(device_id)
+            return result
+
+        rotation = self._resolve_rotation(device_id)
+        current_step_index, manual = self._effective_step_index(rotation, state)
+        ctx = ActionContext(
+            device_id=device_id,
+            current_step_index=current_step_index,
+            rotation_step_count=len(rotation.steps) if rotation is not None else 0,
+            rotation_id=rotation.id if rotation is not None else None,
+            known_page_ids=frozenset(p.id for p in self._pages.list()),
+        )
+        base = self._dispatch_spec(
+            device_id=device_id,
+            spec=spec,
+            ctx=ctx,
+            rotation=rotation,
+            state=state,
+            now=now,
+            current_step_index=current_step_index,
+            manual=manual,
+            trigger_label="touch",
+            event_id=event_id,
+            origin="touch",
+            origin_extra=origin_extra,
+        )
+        if base.action_spec is not None and base.unmapped:
+            outcome = "error"
+        elif base.pushed_page_id is not None:
+            outcome = "dispatched"
+        elif base.force_download:
+            outcome = "fetched"
+        elif spec.startswith("webhook"):
+            outcome = "webhook_dispatched"
+        else:
+            outcome = "noop"
+        self._spawn_prewarm(device_id)
+        return TouchHandleResult(
+            outcome=outcome,
+            gesture=gesture,
+            magnitude=magnitude,
+            action_spec=spec,
+            value=slide_val,
+            base=base,
+        )
+
     def _spawn_prewarm(self, device_id: str) -> None:
         """Fire ``_prewarm_adjacent`` on a daemon thread. Split out so
         tests can run it synchronously."""

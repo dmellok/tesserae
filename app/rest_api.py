@@ -922,13 +922,41 @@ def post_tap(device_id: str) -> Response:
     body = request.get_json(silent=True, force=True) or {}
     if not isinstance(body, dict):
         return _error(400, "body must be a JSON object")
+    digest = _normalize_digest(str(body.get("digest") or ""))
+    if not digest:
+        return _error(400, "digest is required (the frame ETag being displayed)")
+    # Protocol v2 report: the device hit-tested locally against its
+    # interaction manifest and names the region instead of coordinates.
+    region_id = body.get("region_id")
+    if isinstance(region_id, str) and region_id.strip():
+        x0d = _parse_coord(body.get("x0")) or 0
+        y0d = _parse_coord(body.get("y0")) or 0
+        try:
+            report = svc.handle_region_report(
+                device_id=device.id,
+                region_id=region_id.strip()[:96],
+                gesture=str(body.get("gesture") or "tap").strip(),
+                frame_digest=digest,
+                value=_parse_button_event_id(body.get("value")),
+                event_id=_parse_button_event_id(body.get("event_id")),
+                stroke=TouchStroke(x0=x0d, y0=y0d, x1=x0d, y1=y0d),
+            )
+        except Exception:
+            current_app.logger.exception("rest /tap: region report failed for device=%s", device.id)
+            return _error(500, "touch dispatch failed")
+        payload_v2: dict[str, Any] = {
+            "outcome": report.outcome,
+            "gesture": report.gesture,
+            "action_spec": report.action_spec,
+            "description": report.base.action_description,
+        }
+        if report.base.rotation_id is not None:
+            payload_v2["rotation"] = report.base.to_envelope()
+        return jsonify(payload_v2)
     x0 = _parse_coord(body.get("x0", body.get("x")))
     y0 = _parse_coord(body.get("y0", body.get("y")))
     if x0 is None or y0 is None:
         return _error(400, "x0 and y0 are required non-negative integers")
-    digest = _normalize_digest(str(body.get("digest") or ""))
-    if not digest:
-        return _error(400, "digest is required (the frame ETag being displayed)")
     x1 = _parse_coord(body.get("x1"))
     y1 = _parse_coord(body.get("y1"))
     stroke = TouchStroke(

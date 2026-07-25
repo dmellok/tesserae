@@ -278,3 +278,94 @@ def test_frame_carries_manifest_pointer_only_for_proto_2(app: Flask) -> None:
     body = resp.get_json()
     assert body["manifest"]["url"].endswith(f"digest={'a' * 16}")
     assert len(body["manifest"]["digest"]) == 16
+
+
+def test_region_report_dispatches_via_tap(app: Flask) -> None:
+    client = app.test_client()
+    token = _register(app, client)
+    _seed_frame(app)
+    regions = [
+        _region(
+            touch_id="tile",
+            tap={"action": "ha", "domain": "light", "service": "toggle", "data": {}},
+            origin="config",
+        )
+    ]
+    save_regions(app.config["RENDERS_DIR"], "c" * 16, regions)
+    svc = app.config["BUTTON_SERVICE"]
+    calls: list[Any] = []
+    svc._call_ha = lambda domain, service, data: calls.append((domain, service))
+    svc._spawn_reconcile = lambda d: None
+
+    resp = client.post(
+        "/api/v1/device/e1003/tap",
+        headers=_auth(token),
+        data=json.dumps(
+            {"region_id": "el:tile:tap", "gesture": "tap", "digest": "a" * 16, "event_id": 7}
+        ),
+    )
+    assert resp.status_code == 200
+    assert resp.get_json()["outcome"] == "ha_dispatched"
+    assert calls == [("light", "toggle")]
+
+    # Wrong gesture for the entry -> no_target; stale digest -> stale.
+    resp = client.post(
+        "/api/v1/device/e1003/tap",
+        headers=_auth(token),
+        data=json.dumps(
+            {"region_id": "el:tile:tap", "gesture": "swipe_left", "digest": "a" * 16, "event_id": 8}
+        ),
+    )
+    assert resp.get_json()["outcome"] == "no_target"
+    resp = client.post(
+        "/api/v1/device/e1003/tap",
+        headers=_auth(token),
+        data=json.dumps(
+            {"region_id": "el:tile:tap", "gesture": "tap", "digest": "b" * 16, "event_id": 9}
+        ),
+    )
+    assert resp.get_json()["outcome"] == "stale"
+
+
+def test_region_report_slide_substitutes_value(app: Flask) -> None:
+    client = app.test_client()
+    token = _register(app, client)
+    _seed_frame(app)
+    regions = [
+        _region(
+            touch_id="dim",
+            tap=None,
+            slide={
+                "axis": "y",
+                "action": {
+                    "action": "ha",
+                    "domain": "light",
+                    "service": "turn_on",
+                    "data": {"brightness_pct": "{value}"},
+                },
+            },
+            origin="config",
+        )
+    ]
+    save_regions(app.config["RENDERS_DIR"], "c" * 16, regions)
+    svc = app.config["BUTTON_SERVICE"]
+    calls: list[Any] = []
+    svc._call_ha = lambda domain, service, data: calls.append(data)
+    svc._spawn_reconcile = lambda d: None
+
+    resp = client.post(
+        "/api/v1/device/e1003/tap",
+        headers=_auth(token),
+        data=json.dumps(
+            {
+                "region_id": "el:dim:slide",
+                "gesture": "slide",
+                "value": 75,
+                "digest": "a" * 16,
+                "event_id": 11,
+            }
+        ),
+    )
+    assert resp.status_code == 200
+    assert resp.get_json()["outcome"] == "ha_dispatched"
+    assert calls == [{"brightness_pct": 75}]
