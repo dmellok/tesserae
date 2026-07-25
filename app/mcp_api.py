@@ -654,12 +654,17 @@ def devices() -> Response:
     button-driven), so touch actions won't do anything there.
 
     Firmware capabilities (from the device's live heartbeats) ride along when
-    present: ``overlay: {max_targets}`` means the panel does local partial-
-    refresh overlays, so up to ``max_targets`` tap zones echo instantly and
-    ``data-overlay-key`` value slots in widget markup repaint with live
-    values between full renders;
+    present: ``overlay: {schema, max_targets}`` means the panel does local
+    partial-refresh overlays, so up to ``max_targets`` tap zones echo
+    instantly and ``data-overlay-key`` value slots repaint with live values
+    between full renders. ``schema: 2`` additionally means post-action frame
+    patches: after a tap fires an HA action, the server re-renders and the
+    panel partial-paints just the changed regions within a couple of
+    seconds, so a control dashboard's state stays truthful without
+    designing around stale frames (``schema: 1`` panels converge via a
+    debounced full re-push a few seconds after a tap burst instead).
     ``deck_cache: {capacity_bytes}`` means the device caches deck frames on
-    local storage and navigates decks without a network round trip. Both are
+    local storage and navigates decks without a network round trip. All are
     read-only facts about the hardware; their absence just means those
     features silently don't apply there."""
     from app.panel import device_panel
@@ -690,9 +695,13 @@ def devices() -> Response:
             if isinstance(status, dict):
                 overlay_cap = status.get("overlay")
                 if isinstance(overlay_cap, dict):
-                    # max_targets = how many tap zones get instant echo
-                    # on this panel (v1.8 firmware baseline is 8).
-                    entry["overlay"] = {"max_targets": overlay_cap.get("max_targets", 8)}
+                    # max_targets = how many tap zones get instant echo on
+                    # this panel (v1.8 firmware baseline is 8); schema 2 =
+                    # the panel applies post-action frame patches.
+                    entry["overlay"] = {
+                        "schema": int(overlay_cap.get("schema") or 1),
+                        "max_targets": overlay_cap.get("max_targets", 8),
+                    }
                 deck_cache = status.get("deck_cache")
                 if isinstance(deck_cache, dict):
                     entry["deck_cache"] = {
@@ -1371,8 +1380,13 @@ def render_report(page_id: str) -> Response:
     ``overlay_slots`` (hybrid render mode) lists the ``data-overlay-key``
     annotations that actually extracted (box + key + font bucket): the
     live-value slots overlay-capable panels repaint locally between full
-    renders. An annotation missing here collapsed at render time or sits
-    inside a code-element iframe, which the extractor skips.
+    renders. Keys are ``ha:<entity_id>`` or an attribute path
+    (``ha:light.desk:attributes.brightness``); a slot may declare
+    ``data-overlay-map='{"on":"1","off":"0"}'`` to render non-numeric
+    states with the numeric glyph atlas. Code-element markup is covered:
+    slots inside a sandbox are mirrored out the same way its touch regions
+    are, so an annotation missing here collapsed at render time (zero box,
+    hidden, or malformed key), not because it sat in an iframe.
 
     Note: widget cells render into shadow DOM, so their ``text`` may be empty; data
     primitives and decorations report their text. Overflow is measured on the
@@ -1545,8 +1559,12 @@ def describe_actions() -> Response:
                 "note": (
                     "All the above normalise to the canonical form and dispatch "
                     "identically. Runs server-side via the ha_core connection "
-                    "(POST /api/services/<domain>/<service>), then re-pushes the "
-                    "current page so the frame reflects the new state on the same wake."
+                    "(POST /api/services/<domain>/<service>). The panel catches "
+                    "up afterwards on its own: a debounced background reconcile "
+                    "re-renders the page the device is showing and delivers the "
+                    "change as partial-refresh patches (overlay schema 2) or a "
+                    "full re-push a few seconds after the tap burst, so the "
+                    "dashboard does not need to encode state in tap echoes."
                 ),
             },
             "provenance": (
