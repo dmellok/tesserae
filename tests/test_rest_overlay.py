@@ -80,3 +80,30 @@ def test_overlay_capability_is_sticky_on_status(app: Flask) -> None:
     # unlike the removable-card deck_cache).
     post_status({"battery_mv": 3990})
     assert app.config["DEVICE_STATUS"]["e1003"]["overlay"] == {"schema": 1}
+
+
+def test_proto_capability_is_sticky_and_persisted(app: Flask) -> None:
+    client = app.test_client()
+    token = _register_esp32(app, client, "e1003")
+
+    def post_status(body: dict[str, Any]):
+        return client.post(
+            "/api/v1/device/e1003/status", headers=_auth(token), data=json.dumps(body)
+        )
+
+    post_status({"proto": {"v": 2}, "overlay": {"schema": 2}})
+    assert app.config["DEVICE_STATUS"]["e1003"]["proto"] == {"v": 2}
+    post_status({"battery_mv": 3990})  # omitting keeps it
+    assert app.config["DEVICE_STATUS"]["e1003"]["proto"] == {"v": 2}
+    assert app.config["DEVICE_FACTS"].get("e1003")["proto"] == {"v": 2}
+
+
+def test_advertised_proto_validation() -> None:
+    from app.overlay_sync import advertised_proto
+
+    assert advertised_proto({"proto": {"v": 2}}) == {"v": 2}
+    assert advertised_proto({"proto": {"v": 0}}) is None
+    assert advertised_proto({"proto": {"v": True}}) is None
+    assert advertised_proto({"proto": "2"}) is None
+    assert advertised_proto(b'{"proto": {"v": 3}}') == {"v": 3}
+    assert advertised_proto({}) is None

@@ -57,6 +57,7 @@ class DeviceFactsStore:
         fw_version: str | None = None,
         ota_schema: int | None = None,
         overlay: dict[str, Any] | None = None,
+        proto: dict[str, Any] | None = None,
     ) -> None:
         """Merge the given facts for ``device_id``; writes only on change.
         ``None`` values mean "no new information", never "clear".
@@ -77,6 +78,9 @@ class DeviceFactsStore:
                 changed = True
             if isinstance(overlay, dict) and entry.get("overlay") != overlay:
                 entry["overlay"] = overlay
+                changed = True
+            if isinstance(proto, dict) and entry.get("proto") != proto:
+                entry["proto"] = proto
                 changed = True
             if not changed:
                 return

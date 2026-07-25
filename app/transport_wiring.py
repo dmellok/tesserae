@@ -323,6 +323,12 @@ def record_status_heartbeat(
         entry["overlay"] = overlay
     elif prev_entry.get("overlay") is not None:
         entry["overlay"] = prev_entry["overlay"]
+    # Protocol capability (v2 device-owned touch): same sticky rules.
+    proto = overlay_sync.advertised_proto(payload)
+    if proto is not None:
+        entry["proto"] = proto
+    elif prev_entry.get("proto") is not None:
+        entry["proto"] = prev_entry["proto"]
     status_cache[device.id] = entry
     # Persist the stable facts (fw version, OTA capability) so a restart
     # doesn't forget them until the device's next wake; write-on-change only.
@@ -334,6 +340,7 @@ def record_status_heartbeat(
             fw_version=str(fw) if isinstance(fw, (str, int, float)) else None,
             ota_schema=entry.get("ota_schema"),
             overlay=entry.get("overlay"),
+            proto=entry.get("proto"),
         )
     # Automatic updates (opt-in per-device switch): make sure an auto-update
     # device is queued for its kind's newest release before the response is

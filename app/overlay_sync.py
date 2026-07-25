@@ -38,6 +38,31 @@ MAX_VALUE_CHARS = 47
 ATLAS_CHARSET = "0123456789.,:-+%°CF "
 
 
+def advertised_proto(payload: bytes | str | dict[str, Any]) -> dict[str, int] | None:
+    """The protocol capability a device advertises in its register /
+    heartbeat body (``{"proto": {"v": 2}}``), validated, or None.
+    Protocol v2 devices own hit testing and consume interaction
+    manifests / bundles / the SSE stream (docs/protocol-v2-touch.md).
+    Sticky like ``overlay``: a firmware property, carried forward across
+    beats that omit it and persisted in the device-facts store."""
+    if isinstance(payload, (bytes, bytearray, str)):
+        try:
+            body = json.loads(payload)
+        except (ValueError, TypeError):
+            return None
+    else:
+        body = payload
+    if not isinstance(body, dict):
+        return None
+    cap = body.get("proto")
+    if not isinstance(cap, dict):
+        return None
+    v = cap.get("v")
+    if not isinstance(v, int) or isinstance(v, bool) or v < 1:
+        return None
+    return {"v": min(64, v)}
+
+
 def advertised_overlay(payload: bytes | str | dict[str, Any]) -> dict[str, int] | None:
     """The overlay capability a device advertises in its register /
     heartbeat body (``{"overlay": {"schema": 1, "max_targets": 32}}``),
