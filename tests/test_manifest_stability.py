@@ -363,3 +363,124 @@ def test_region_report_dispatches_and_answers_ok(dash_app) -> None:
         ),
     )
     assert unknown.get_json()["outcome"] == "no_action_for_region"
+
+
+INTERACTIVE_MOVED = {
+    "regions": [dict(INTERACTIVE["regions"][0], x=800, y=600)],
+    "slots": [],
+}
+
+EMPTY_EXTRACTION: dict[str, Any] = {"regions": [], "slots": []}
+
+
+def test_region_report_survives_pixel_only_rerender(dash_app) -> None:
+    """Bench round 3 item 1: the device taps against the digest ON GLASS
+    while the server has re-rendered pixels since. Same layout -> the
+    report dispatches; a genuinely different layout -> stale."""
+    app, client, token = dash_app
+    _push(app, shade=0)
+    first = _get_frame(client, token)
+    manifest = client.get(
+        f"/api/v1/device/e1003/frame/manifest?digest={first['render_id']}",
+        headers=_auth(token),
+    ).get_json()
+    region_id = manifest["regions"][0]["id"]
+
+    # Pixel-only re-render: over the patch budget, so a NEW digest mints.
+    _push(app, shade=128, full=True)
+    second = _get_frame(client, token)
+    assert second["render_id"] != first["render_id"]
+
+    svc = app.config["BUTTON_SERVICE"]
+    ha_calls: list[str] = []
+    svc._call_ha = lambda domain, service, data: ha_calls.append(domain)
+    svc._spawn_reconcile = lambda d: None
+
+    resp = client.post(
+        "/api/v1/device/e1003/tap",
+        headers=_auth(token),
+        data=json.dumps(
+            {
+                "region_id": region_id,
+                "gesture": "tap",
+                "digest": first["render_id"],  # the frame the finger touched
+                "event_id": 41,
+            }
+        ),
+    )
+    assert resp.get_json()["outcome"] == "ok"
+    assert ha_calls == ["light"]
+
+    # Now the layout genuinely changes: the same report goes stale.
+    pm = app.config["PUSH_MANAGER"]
+    with patch("app.push.capture_composed", return_value=(_png(64, full=True), INTERACTIVE_MOVED)):
+        assert pm.push("dash", device_ids={"e1003"}, source="test").status == "sent"
+    resp = client.post(
+        "/api/v1/device/e1003/tap",
+        headers=_auth(token),
+        data=json.dumps(
+            {
+                "region_id": region_id,
+                "gesture": "tap",
+                "digest": first["render_id"],
+                "event_id": 42,
+            }
+        ),
+    )
+    assert resp.get_json()["outcome"] == "stale"
+
+
+def test_empty_extraction_never_overwrites_populated_sidecar(dash_app) -> None:
+    """Bench round 3 item 3: a capture that raced the code-element
+    mirrors extracts nothing; for an identical composition the populated
+    sidecar must survive."""
+    app, client, token = dash_app
+    _push(app, shade=0)
+    pm = app.config["PUSH_MANAGER"]
+    comp = pm.latest_render_for("e1003")["composition_digest"]
+    assert pm.touch_regions_for(comp)
+
+    with patch("app.push.capture_composed", return_value=(_png(0), EMPTY_EXTRACTION)):
+        pm.push("dash", device_ids={"e1003"}, source="test", force_publish=True)
+    assert pm.touch_regions_for(comp), "empty extraction clobbered the sidecar"
+
+
+def test_empty_manifest_rebuild_serves_last_populated_for_page(dash_app) -> None:
+    """Bench round 3 item 3: a re-render whose extraction raced to empty
+    must not serve a structurally-valid 0-region manifest for a page
+    that had regions (the device holds it and touch dies)."""
+    app, client, token = dash_app
+    _push(app, shade=0)
+    first = _get_frame(client, token)
+    good = client.get(
+        f"/api/v1/device/e1003/frame/manifest?digest={first['render_id']}",
+        headers=_auth(token),
+    ).get_json()
+    assert good["regions"]
+
+    pm = app.config["PUSH_MANAGER"]
+    with patch("app.push.capture_composed", return_value=(_png(128, full=True), EMPTY_EXTRACTION)):
+        assert pm.push("dash", device_ids={"e1003"}, source="test").status == "sent"
+    second = _get_frame(client, token)
+    assert second["render_id"] != first["render_id"]
+    assert "manifest" in second
+    doc = client.get(
+        f"/api/v1/device/e1003/frame/manifest?digest={second['render_id']}",
+        headers=_auth(token),
+    ).get_json()
+    assert doc["regions"], "0-region manifest served for an interactive page"
+    assert doc["manifest_digest"] == good["manifest_digest"]  # device re-anchors
+
+
+def test_sub_tolerance_jitter_holds_digest_and_stages_nothing(dash_app) -> None:
+    """Bench round 3 item 2: anti-aliasing jitter between captures of
+    visually identical content must not mint a frame (30 s GC16 flash
+    per re-render) -- the digest holds and nothing is staged."""
+    app, client, token = dash_app
+    _push(app, shade=0)
+    pm = app.config["PUSH_MANAGER"]
+    before = pm.latest_render_for("e1003")["digest"]
+    with patch("app.push.capture_composed", return_value=(_png(2), INTERACTIVE)):
+        assert pm.push("dash", device_ids={"e1003"}, source="test").status == "sent"
+    assert pm.latest_render_for("e1003")["digest"] == before
+    assert pm.frame_patches_for("e1003", before) is None

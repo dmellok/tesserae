@@ -493,6 +493,13 @@ class PushManager:
         # a device mid-linger on the old digest isn't orphaned by a
         # re-render (see previous_render_for). In-memory only.
         self._previous_renders: dict[str, dict[str, Any]] = {}
+        # Frame-digest lineage: digest -> composition digest for the last
+        # N frames each device was served. Region reports against a
+        # superseded digest resolve their layout through this (protocol
+        # v2 staleness is anchored to LAYOUT, not pixels), so a dashboard
+        # whose pixels re-render every 30 s doesn't drop every tap that
+        # races a render. In-memory only; N=10 generations.
+        self._digest_history: dict[str, OrderedDict[str, str]] = {}
         for stale in self._renders_dir.glob("overlay-patch-*.bin"):
             with contextlib.suppress(OSError):
                 stale.unlink()
@@ -540,11 +547,36 @@ class PushManager:
 
     def _retire_live_locked(self, device_id: str, new_digest: str) -> None:
         """Move the current live entry into the grace slot before a new
-        frame replaces it (no-op when the digest isn't changing)."""
+        frame replaces it (no-op when the digest isn't changing), and
+        record its digest -> composition lineage for layout-anchored
+        staleness checks."""
         old = self._latest_renders.get(device_id)
         if old is None or str(old.get("digest") or "") == new_digest:
             return
         self._previous_renders[device_id] = {**old, "superseded_at": time.time()}
+        old_digest = str(old.get("digest") or "")
+        old_comp = str(old.get("composition_digest") or "")
+        if old_digest and old_comp:
+            history = self._digest_history.setdefault(device_id, OrderedDict())
+            history[old_digest] = old_comp
+            history.move_to_end(old_digest)
+            while len(history) > 10:
+                history.popitem(last=False)
+
+    def composition_for_digest(self, device_id: str, digest: str) -> str | None:
+        """The composition digest a frame digest rendered from: the live
+        frame, the grace slot, or one of the device's last ~10 retired
+        frames. None = unknown / too old to resolve."""
+        if not digest:
+            return None
+        with self._lock:
+            live = self._latest_renders.get(device_id)
+            if live and str(live.get("digest") or "") == digest:
+                return str(live.get("composition_digest") or "") or None
+            prev = self._previous_renders.get(device_id)
+            if prev and str(prev.get("digest") or "") == digest:
+                return str(prev.get("composition_digest") or "") or None
+            return self._digest_history.get(device_id, OrderedDict()).get(digest)
 
     def latest_render_for(self, device_id: str) -> dict[str, Any] | None:
         """The most recently published render for a device, or ``None``
@@ -788,8 +820,18 @@ class PushManager:
                 png_old = png_new = b""
             if geo is not None and png_old and png_new:
                 comp_rects = frame_patch.diff_composition_rects(
-                    png_old, png_new, expected_w=geo["comp_w"], expected_h=geo["comp_h"]
+                    png_old,
+                    png_new,
+                    expected_w=geo["comp_w"],
+                    expected_h=geo["comp_h"],
+                    tolerance=frame_patch.COMP_DIFF_TOLERANCE,
                 )
+                if comp_rects == []:
+                    # Different composition digests but no visible change
+                    # (sub-tolerance anti-aliasing jitter): there is
+                    # nothing worth painting at all. The caller holds the
+                    # digest and stages nothing.
+                    return "no_visual_change"
                 if comp_rects:
                     aligned: list[tuple[int, int, int, int]] = []
                     for r in comp_rects:
@@ -897,8 +939,15 @@ class PushManager:
         if not (schema_ok or proto_ok):
             return False
         payload = self._build_patch_payload(prev, render_info, panel.model_dump())
+        if payload == "no_visual_change":
+            # Sub-tolerance jitter only: hold the digest, stage nothing.
+            prev["timestamp"] = time.time()
+            self._save_latest_renders()
+            return True
         if isinstance(payload, str):
-            logger.info("push not diverted to patches for device=%s (%s)", device_id, payload)
+            # A failed divert costs the panel a full-frame download and a
+            # full e-ink flash, so the reason deserves a warning.
+            logger.warning("push not diverted to patches for device=%s (%s)", device_id, payload)
             return False
         blob, entries = payload
         if not self._stage_patches_locked(device_id, str(prev.get("digest") or ""), blob, entries):
@@ -933,6 +982,8 @@ class PushManager:
         if str(info.get("digest") or "") == anchor_digest:
             return "no_change"
         payload = self._build_patch_payload(anchor, info, panel)
+        if payload == "no_visual_change":
+            return "no_change"
         if isinstance(payload, str):
             logger.info(
                 "frame patch: full frame instead of patches for device=%s (%s)",
@@ -1717,8 +1768,28 @@ class PushManager:
         # pixels, and an annotation edit can leave pixels (and digest)
         # unchanged, so the latest render's actions must win. ``None``
         # (image / webpage pushes, no DOM) leaves any existing map alone.
+        #
+        # EXCEPTION: an EMPTY extraction never overwrites a non-empty
+        # sidecar for the same composition. Identical pixels = identical
+        # DOM, so regions cannot legitimately vanish while the digest
+        # stays put — an empty result against a populated sidecar is the
+        # code-element mirror race (the sandbox hadn't posted its regions
+        # by capture time), and overwriting served 0-region manifests
+        # that killed touch until the next redraw (bench, 2026-07-25).
         if touch_regions is not None:
-            save_regions(self._renders_dir, comp_digest, touch_regions, slots=overlay_slots)
+            if (
+                not touch_regions
+                and not overlay_slots
+                and load_regions(self._renders_dir, comp_digest)
+            ):
+                logger.warning(
+                    "render extracted no interactive regions for comp=%s but its "
+                    "sidecar is populated; keeping the existing sidecar "
+                    "(extraction race)",
+                    comp_digest,
+                )
+            else:
+                save_regions(self._renders_dir, comp_digest, touch_regions, slots=overlay_slots)
 
         panel = Panel(**panel_dims)
         results: list[RendererResult] = []

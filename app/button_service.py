@@ -709,6 +709,20 @@ class ButtonService:
             reconciled = self._reconcile_deck_frame(device_id, frame_digest)
             if reconciled is not None:
                 latest = reconciled
+            elif self._layout_unchanged(device_id, frame_digest, latest):
+                # Protocol v2 staleness is anchored to LAYOUT, not pixels:
+                # the region id fully identifies the action, and the frame
+                # the finger touched differs from the live one only in
+                # pixels (a clock tick or sensor re-render raced the tap).
+                # Dispatch against the current sidecar instead of dropping
+                # every tap on a dashboard that re-renders each 30 s.
+                log.info(
+                    "touch region report: frame %s superseded but layout "
+                    "unchanged; dispatching (device=%s id=%s)",
+                    frame_digest,
+                    device_id,
+                    region_id,
+                )
             else:
                 result = TouchHandleResult(
                     outcome="stale", gesture=None, base=self.snapshot(device_id)
@@ -1327,6 +1341,33 @@ class ButtonService:
         latest = latest_fn(device_id) if callable(latest_fn) else None
         candidate = latest.get("page_id") if isinstance(latest, dict) else None
         return candidate if isinstance(candidate, str) and candidate else None
+
+    def _layout_unchanged(
+        self, device_id: str, reported_digest: str, latest: dict[str, Any]
+    ) -> bool:
+        """True when the frame a region report names renders the same
+        interaction layout as the live frame: identical composition, or
+        (composition differs, e.g. a value's text width shifted) an
+        identical untrimmed region-id set. The digest lineage comes from
+        the push manager's last ~10 retired frames; an unresolvable
+        digest is genuinely stale."""
+        pusher = self._push_getter()
+        comp_fn = getattr(pusher, "composition_for_digest", None) if pusher is not None else None
+        old_comp = comp_fn(device_id, reported_digest) if callable(comp_fn) else None
+        cur_comp = str(latest.get("composition_digest") or "")
+        if not old_comp or not cur_comp:
+            return False
+        if old_comp == cur_comp:
+            return True
+        regions_fn = getattr(pusher, "touch_regions_for", None)
+        if not callable(regions_fn):
+            return False
+        from app.manifest import region_ids_for
+
+        panel = self._device_panel(device_id)
+        old_ids = region_ids_for(regions_fn(old_comp), panel)
+        cur_ids = region_ids_for(regions_fn(cur_comp), panel)
+        return old_ids is not None and bool(old_ids) and old_ids == cur_ids
 
     def _device_panel(self, device_id: str) -> dict[str, Any]:
         """The device's panel block (composition + native dims), the

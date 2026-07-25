@@ -1372,7 +1372,32 @@ def _build_manifest_for(device: Device, wanted: str) -> dict[str, Any] | None:
     )
     if doc is None:
         return _reanchored()
-    cache[device.id] = {"comp": comp_digest, "doc": dict(doc)}
+    page_id = str(info.get("page_id") or "")
+    if (
+        not doc["regions"]
+        and not doc["text"]
+        and cached is not None
+        and page_id
+        and cached.get("page_id") == page_id
+        and (cached["doc"]["regions"] or cached["doc"]["text"])
+    ):
+        # An interactive page cannot legitimately rebuild to an empty
+        # manifest between redraws — that's the extraction race losing a
+        # render's regions. A structurally-valid 0-region manifest kills
+        # touch on the device until the next good redraw (bench,
+        # 2026-07-25), so serve the last populated manifest for this
+        # page re-anchored to the new frame, and keep it cached.
+        current_app.logger.warning(
+            "rest: empty manifest rebuild for interactive page=%s (comp=%s); "
+            "serving last populated manifest for device=%s",
+            page_id,
+            comp_digest,
+            device.id,
+        )
+        recovered = dict(cached["doc"])
+        recovered["frame_digest"] = wanted
+        return recovered
+    cache[device.id] = {"comp": comp_digest, "doc": dict(doc), "page_id": page_id}
     return doc
 
 

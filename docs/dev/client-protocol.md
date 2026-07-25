@@ -948,7 +948,12 @@ surfaces:
   EMPTY manifest (`regions: []`, `text: []`), never a manifest-less
   `200` (which a v2 client reads as "v1 server"). A pixel-only
   re-render keeps `manifest.digest` identical, so the device
-  re-anchors its held manifest with no re-fetch. The endpoint also
+  re-anchors its held manifest with no re-fetch. A render whose
+  region extraction raced to empty can never demote an interactive
+  page (v0.201): an empty extraction is refused as a sidecar
+  overwrite for an unchanged composition, and an empty manifest
+  rebuild for a page whose cached manifest had regions serves that
+  cached manifest re-anchored instead. The endpoint also
   answers for a just-superseded frame digest for a ~60 s grace window
   (a device mid-linger on the old digest is not orphaned); the same
   grace applies to `/frame/data`, and any KNOWN digest on
@@ -964,7 +969,13 @@ surfaces:
   `{"region_id", "gesture", "value"?, "digest", "event_id"}` — the v2
   action report. The server re-mints the id from the frame's own
   sidecar, applies the same dedup/stale/provenance guards as
-  coordinate strokes, and dispatches. Wire outcomes (v0.200): `ok`
+  coordinate strokes, and dispatches. Staleness is anchored to LAYOUT,
+  not pixels (v0.201): a report against a superseded frame digest
+  still dispatches when that frame's region set matches the live one
+  (the server keeps a ~10-generation digest lineage per device), so a
+  tap can never lose a race against a pixel-only re-render. `stale`
+  now means the layout genuinely changed or the digest is too old to
+  resolve. Wire outcomes (v0.200): `ok`
   for anything that dispatched (or legitimately resolved to nothing to
   do), `stale` / `deduped` / `ha_failed` as the firmware already
   names them, and specific diagnostics for the rest

@@ -276,6 +276,29 @@ def build_interaction_manifest(
     return doc
 
 
+def region_ids_for(regions: list[dict[str, Any]], panel: dict[str, Any]) -> frozenset[str] | None:
+    """The UNTRIMMED set of region ids a sidecar mints for a panel, for
+    layout-equality checks (protocol v2 staleness is anchored to layout,
+    not pixels: a report against a superseded frame digest dispatches
+    when the two frames' region sets are identical). Untrimmed on
+    purpose — layout equality must not depend on a device's budget — and
+    id-based on purpose: ids embed the gesture and (for unpinned
+    regions) the action + a coarse rect bucket, so pixel-level jitter in
+    a value's text width doesn't read as a layout change the way raw
+    manifest-digest comparison would. None when the panel geometry is
+    unusable."""
+    doc = build_interaction_manifest(
+        frame_digest="0" * 16,
+        regions=regions,
+        slots=[],
+        panel=panel,
+        max_regions=4096,
+    )
+    if doc is None:
+        return None
+    return frozenset(r["id"] for r in doc["regions"])
+
+
 def resolve_region_action(
     sidecar_regions: list[dict[str, Any]],
     region_id: str,

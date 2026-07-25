@@ -8,6 +8,25 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **v2 staleness is anchored to layout, not pixels (live bench round 3, 2026-07-25).** A region
+  report against a superseded frame digest now dispatches when that frame's untrimmed region-id
+  set matches the live one, resolved through a new ~10-generation digest lineage per device; a
+  dashboard whose pixels re-render every 30 s no longer drops every tap that races a render.
+  `stale` means the layout genuinely changed or the digest is too old to resolve.
+
+- **Extraction races can no longer kill touch.** A capture whose code-element mirrors hadn't
+  posted by screenshot time extracts zero regions; that empty result no longer overwrites a
+  populated sidecar for an unchanged composition, and an empty manifest rebuild for a page whose
+  cached manifest had regions serves the cached manifest re-anchored (with a warning) instead of
+  a structurally-valid 0-region manifest the device would hold until the next good redraw.
+
+- **Anti-aliasing jitter no longer mints frames.** The composition diff gained a per-channel
+  tolerance (10/255, below the 16-level gray quantization): chart canvases and browser text
+  jitter between captures of visually identical content inflated the changed area past the patch
+  budget, forcing a full-frame mint and a full e-ink flash on every re-render. Sub-tolerance
+  re-renders now hold the digest and stage nothing; real changes ride patches as designed; a
+  divert that still fails logs its reason at warning level.
+
 - **v2 region reports now dispatch (live bench round 2, 2026-07-25).** Sidecar action specs from
   code-element markup are raw JSON strings; the manifest builder and the region-id resolver
   classified and dispatched the unparsed string, so every served manifest carried

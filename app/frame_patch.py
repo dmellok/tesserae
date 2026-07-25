@@ -43,6 +43,14 @@ MAX_PATCH_BYTES = 262144
 _TILE_ROWS = 32
 _TILE_BYTES = 16
 
+# Per-channel tolerance for the composition diff. Chart canvases and
+# browser text render with sub-quantization anti-aliasing jitter between
+# captures of visually identical content; at 16 gray levels the panel
+# can't show a delta this small anyway, but exact inequality inflated
+# the changed area past the patch budget and forced a full-frame mint
+# (and a full e-ink flash) on every re-render (bench, 2026-07-25).
+COMP_DIFF_TOLERANCE = 10
+
 
 def infer_bpp(data_len: int, width: int, height: int) -> int | None:
     """Bits per pixel of a raw packed framebuffer, from its byte size
@@ -196,6 +204,7 @@ def diff_composition_rects(
     expected_w: int | None = None,
     expected_h: int | None = None,
     max_rects: int = MAX_PATCH_RECTS,
+    tolerance: int = 0,
 ) -> list[tuple[int, int, int, int]] | None:
     """Changed regions between two composition PNGs, as composition-space
     pixel rects ``(x, y, w, h)``. Empty list = pixel-identical. None =
@@ -220,7 +229,11 @@ def diff_composition_rects(
         return None
     if expected_w is not None and (a.shape[1] != expected_w or a.shape[0] != expected_h):
         return None  # PNG isn't this panel's composition (image push, resize)
-    neq = (a != b).any(axis=2)
+    if tolerance > 0:
+        delta = np.abs(a.astype(np.int16) - b.astype(np.int16))
+        neq = (delta > tolerance).any(axis=2)
+    else:
+        neq = (a != b).any(axis=2)
     if not neq.any():
         return []
     return [
