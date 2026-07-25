@@ -434,7 +434,7 @@ def test_empty_extraction_never_overwrites_populated_sidecar(dash_app) -> None:
     """Bench round 3 item 3: a capture that raced the code-element
     mirrors extracts nothing; for an identical composition the populated
     sidecar must survive."""
-    app, client, token = dash_app
+    app, _client, _token = dash_app
     _push(app, shade=0)
     pm = app.config["PUSH_MANAGER"]
     comp = pm.latest_render_for("e1003")["composition_digest"]
@@ -476,7 +476,7 @@ def test_sub_tolerance_jitter_holds_digest_and_stages_nothing(dash_app) -> None:
     """Bench round 3 item 2: anti-aliasing jitter between captures of
     visually identical content must not mint a frame (30 s GC16 flash
     per re-render) -- the digest holds and nothing is staged."""
-    app, client, token = dash_app
+    app, _client, _token = dash_app
     _push(app, shade=0)
     pm = app.config["PUSH_MANAGER"]
     before = pm.latest_render_for("e1003")["digest"]
