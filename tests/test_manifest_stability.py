@@ -282,3 +282,84 @@ def test_noninteractive_frame_gets_empty_manifest_not_silence(dash_app) -> None:
     assert resp.status_code == 200
     doc = resp.get_json()
     assert doc["regions"] == [] and doc["text"] == []
+
+
+def test_manifest_classifies_json_string_actions(dash_app) -> None:
+    """Bench round 2: code-element sidecar specs are raw JSON strings;
+    the manifest must classify the PARSED action, not the string (which
+    produced action.type == '{"action"' and tier-2 downgrades)."""
+    app, client, token = dash_app
+    _push(app, shade=0)
+    frame = _get_frame(client, token)
+    doc = client.get(
+        f"/api/v1/device/e1003/frame/manifest?digest={frame['render_id']}",
+        headers=_auth(token),
+    ).get_json()
+    assert doc["regions"], doc
+    action = doc["regions"][0]["action"]
+    assert action == {"tier": 1, "type": "ha"}
+
+
+def test_region_report_dispatches_and_answers_ok(dash_app) -> None:
+    """Bench round 2 blocker: a /tap region report on a JSON-string
+    action must dispatch the HA call and answer the v2 wire vocabulary
+    ('ok', not 'error' / internal outcome names)."""
+    app, client, token = dash_app
+    _push(app, shade=0)
+    frame = _get_frame(client, token)
+    doc = client.get(
+        f"/api/v1/device/e1003/frame/manifest?digest={frame['render_id']}",
+        headers=_auth(token),
+    ).get_json()
+    region_id = doc["regions"][0]["id"]
+
+    svc = app.config["BUTTON_SERVICE"]
+    ha_calls: list[tuple[str, str]] = []
+    svc._call_ha = lambda domain, service, data: ha_calls.append((domain, service))
+    svc._spawn_reconcile = lambda d: None
+
+    resp = client.post(
+        "/api/v1/device/e1003/tap",
+        headers=_auth(token),
+        data=json.dumps(
+            {
+                "region_id": region_id,
+                "gesture": "tap",
+                "digest": frame["render_id"],
+                "event_id": 9174321,
+            }
+        ),
+    )
+    assert resp.status_code == 200
+    assert resp.get_json()["outcome"] == "ok"
+    assert ha_calls == [("light", "toggle")]
+
+    # A replayed report answers the firmware's known vocabulary.
+    replay = client.post(
+        "/api/v1/device/e1003/tap",
+        headers=_auth(token),
+        data=json.dumps(
+            {
+                "region_id": region_id,
+                "gesture": "tap",
+                "digest": frame["render_id"],
+                "event_id": 9174321,
+            }
+        ),
+    )
+    assert replay.get_json()["outcome"] == "deduped"
+
+    # An id that mints from nothing in this frame gets a SPECIFIC name.
+    unknown = client.post(
+        "/api/v1/device/e1003/tap",
+        headers=_auth(token),
+        data=json.dumps(
+            {
+                "region_id": "el:nonexistent:tap",
+                "gesture": "tap",
+                "digest": frame["render_id"],
+                "event_id": 9174322,
+            }
+        ),
+    )
+    assert unknown.get_json()["outcome"] == "no_action_for_region"

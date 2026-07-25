@@ -117,12 +117,18 @@ def test_frame_data_never_hands_out_patches_for_other_frames(app: Flask) -> None
     assert resp.status_code == 404
 
 
-def test_frame_data_404_when_nothing_pending(app: Flask) -> None:
+def test_frame_data_empty_200_when_nothing_pending(app: Flask) -> None:
+    """A known digest with no slots and no staged patches answers an
+    empty document, not 404: a device that latched data-off from a 404
+    mid-linger would miss the patch a tap stages a second later."""
     client = app.test_client()
     token = _register(app, client, "e1003")
     _seed_frame(app, "e1003", digest="a" * 16)
     resp = client.get(f"/api/v1/device/e1003/frame/data?digest={'a' * 16}", headers=_auth(token))
-    assert resp.status_code == 404
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["values"] == {} and "patches" not in body
+    assert body["seq"] > 1_700_000_000_000
 
 
 # -- blob endpoint --------------------------------------------------------

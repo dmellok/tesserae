@@ -8,6 +8,24 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **v2 region reports now dispatch (live bench round 2, 2026-07-25).** Sidecar action specs from
+  code-element markup are raw JSON strings; the manifest builder and the region-id resolver
+  classified and dispatched the unparsed string, so every served manifest carried
+  `action.type: '{"action"'` garbage and every `/tap` region report failed. Specs now pass
+  through the same `coerce_action` normalisation the v1 dispatch path uses, in the one helper
+  both the builder and resolver share — HA actions classify as tier 1 / `ha` and dispatch.
+  `/tap` region reports also speak the firmware's wire vocabulary: `ok` on success, `stale` /
+  `deduped` / `ha_failed` unchanged, and specific diagnostics (`no_action_for_region`,
+  `action_error`, `provenance_blocked`, `resolver_exception`) instead of a mute `error`.
+
+- **`/frame/data` answers 200 for every known digest.** A frame with no slots and nothing staged
+  returns an empty values document instead of 404, so a device can't latch data-off mid-linger
+  and miss the patch a tap stages a second later; 404 now means an unknown digest only.
+
+- **Manifest region trim is priority-ordered and audited.** Over-budget frames keep navigation,
+  then sliders, then taps, then swipes (document order within each class), and the dropped
+  region ids are logged by name instead of tail sections silently going dead.
+
 - **Protocol v2 manifest delivery survives re-renders (live bench, 2026-07-25).** Every `/frame`
   200 for a proto-2 device now carries the manifest block: non-interactive frames get a valid
   empty manifest instead of silence (a manifest-less 200 reads as "v1 server" and latched the

@@ -951,14 +951,28 @@ surfaces:
   re-anchors its held manifest with no re-fetch. The endpoint also
   answers for a just-superseded frame digest for a ~60 s grace window
   (a device mid-linger on the old digest is not orphaned); the same
-  grace applies to `/frame/data`. `404` = genuinely unknown digest.
+  grace applies to `/frame/data`, and any KNOWN digest on
+  `/frame/data` answers `200` (an empty `values` document when nothing
+  is live or staged) so a device never latches data-off from a poll
+  that raced a re-render — `404` = genuinely unknown digest on both.
+  When a frame carries more regions than the device's advertised
+  budget, the trim keeps navigation first, then sliders, then taps,
+  then swipes (document order within each class) and logs the dropped
+  region ids by name; raising the advertised `max_targets` (the server
+  honours up to 64) is the headroom fix.
 - `POST /api/v1/device/<id>/tap` with
   `{"region_id", "gesture", "value"?, "digest", "event_id"}` — the v2
   action report. The server re-mints the id from the frame's own
-  sidecar (a stale or forged id resolves to `no_target`), applies the
-  same dedup/stale/provenance guards as coordinate strokes, and
-  dispatches. Coordinate bodies remain the v1 path on the same
-  endpoint.
+  sidecar, applies the same dedup/stale/provenance guards as
+  coordinate strokes, and dispatches. Wire outcomes (v0.200): `ok`
+  for anything that dispatched (or legitimately resolved to nothing to
+  do), `stale` / `deduped` / `ha_failed` as the firmware already
+  names them, and specific diagnostics for the rest
+  (`no_action_for_region`, `action_error`, `provenance_blocked`,
+  `no_frame`, `resolver_exception`) — always HTTP 200, since the
+  device's correct move on every non-ok outcome is the same (log,
+  re-poll). Coordinate bodies remain the v1 path on the same endpoint
+  with the v1 outcome names.
 - `GET /api/v1/device/<id>/stream` — Server-Sent Events: `values` /
   `patches` / `sync` envelopes (identical payloads to the `/status`
   piggybacks and `/frame/data`), comment keepalive every 25 s. An

@@ -893,6 +893,30 @@ def get_frame(device_id: str) -> Response:
 # -- tap -----------------------------------------------------------------
 
 
+# Protocol v2 wire outcomes for region reports. Everything that
+# dispatched (or legitimately resolved to nothing to do) is "ok" — the
+# device goes quiet on ok and its follow-up behaviour keys off the
+# manifest's action type, not the outcome. Failures map to SPECIFIC
+# strings (the firmware logs non-ok outcomes verbatim, so "error" hides
+# the diagnosis; bench, 2026-07-25). "stale" / "deduped" / "ha_failed"
+# pass through as the firmware vocabulary already names them.
+_V2_OK_OUTCOMES = frozenset(
+    {"ha_dispatched", "dispatched", "webhook_dispatched", "fetched", "noop"}
+)
+_V2_OUTCOME_NAMES = {
+    "no_target": "no_action_for_region",
+    "error": "action_error",
+    "blocked": "provenance_blocked",
+    "no_frame": "no_frame",
+}
+
+
+def _v2_outcome(outcome: str) -> str:
+    if outcome in _V2_OK_OUTCOMES:
+        return "ok"
+    return _V2_OUTCOME_NAMES.get(outcome, outcome)
+
+
 @bp.post("/<device_id>/tap")
 def post_tap(device_id: str) -> Response:
     """Standalone touch-stroke dispatch (issue #49) for continuously
@@ -942,10 +966,13 @@ def post_tap(device_id: str) -> Response:
                 stroke=TouchStroke(x0=x0d, y0=y0d, x1=x0d, y1=y0d),
             )
         except Exception:
+            # Still a 200: the device's correct move is identical to any
+            # non-ok outcome (log + re-poll), and the specific string
+            # reaches the serial log instead of a mute 500.
             current_app.logger.exception("rest /tap: region report failed for device=%s", device.id)
-            return _error(500, "touch dispatch failed")
+            return jsonify({"outcome": "resolver_exception", "gesture": None})
         payload_v2: dict[str, Any] = {
-            "outcome": report.outcome,
+            "outcome": _v2_outcome(report.outcome),
             "gesture": report.gesture,
             "action_spec": report.action_spec,
             "description": report.base.action_description,
@@ -1639,19 +1666,23 @@ def _overlay_values_doc(device: Device, frame_digest: str) -> dict[str, Any] | N
 @bp.get("/<device_id>/frame/data")
 def get_frame_data(device_id: str) -> Response:
     """Live data for a served frame (``?digest=<frame>``): the overlay
-    slot values, plus (overlay schema 2) any pending post-action patch
-    document under ``patches``, both anchored to the exact frame the
-    client says it is showing. Polled at 1-2 s cadence during the
-    touch-linger window. 404 when there is nothing at all for this
-    frame; the firmware treats that as data-off until the next poll."""
+    slot values, plus any pending post-action patch document under
+    ``patches``, both anchored to the exact frame the client says it is
+    showing. Polled at 1-2 s cadence during the touch-linger window.
+
+    Any KNOWN digest (live, grace-window, or deck-cached) answers 200,
+    with an empty ``values`` document when the frame has no slots and
+    nothing is staged: a 404 reads as data-off and a device that latched
+    it mid-linger would then miss the patch a tap stages a second later
+    (bench, 2026-07-25). 404 = genuinely unknown digest only."""
     device, err = _auth_device(device_id)
     if err is not None or device is None:
         return err  # type: ignore[return-value]
     digest = _normalize_digest(request.args.get("digest", ""))
     doc = _overlay_values_doc(device, digest)
     patches = _frame_patches_doc(device.id, digest)
-    if doc is None and patches is None:
-        return _error(404, "no values for this frame")
+    if doc is None and patches is None and _frame_info_for_digest(device, digest) is None:
+        return _error(404, "unknown frame digest")
     out: dict[str, Any] = doc if doc is not None else {"seq": int(time.time() * 1000), "values": {}}
     if patches is not None:
         out["patches"] = patches

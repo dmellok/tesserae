@@ -305,7 +305,7 @@ def test_region_report_dispatches_via_tap(app: Flask) -> None:
         ),
     )
     assert resp.status_code == 200
-    assert resp.get_json()["outcome"] == "ha_dispatched"
+    assert resp.get_json()["outcome"] == "ok"  # v2 wire vocabulary (v0.200)
     assert calls == [("light", "toggle")]
 
     # Wrong gesture for the entry -> no_target; stale digest -> stale.
@@ -316,7 +316,7 @@ def test_region_report_dispatches_via_tap(app: Flask) -> None:
             {"region_id": "el:tile:tap", "gesture": "swipe_left", "digest": "a" * 16, "event_id": 8}
         ),
     )
-    assert resp.get_json()["outcome"] == "no_target"
+    assert resp.get_json()["outcome"] == "no_action_for_region"
     resp = client.post(
         "/api/v1/device/e1003/tap",
         headers=_auth(token),
@@ -367,5 +367,5 @@ def test_region_report_slide_substitutes_value(app: Flask) -> None:
         ),
     )
     assert resp.status_code == 200
-    assert resp.get_json()["outcome"] == "ha_dispatched"
+    assert resp.get_json()["outcome"] == "ok"  # v2 wire vocabulary (v0.200)
     assert calls == [{"brightness_pct": 75}]

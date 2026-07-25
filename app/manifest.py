@@ -27,7 +27,7 @@ import logging
 from typing import Any
 
 from app.overlay_sync import _panel_geometry, rect_to_wire
-from app.touch_regions import is_side_effecting
+from app.touch_regions import coerce_action, is_side_effecting
 
 logger = logging.getLogger(__name__)
 
@@ -101,19 +101,29 @@ def _gesture_entries(region: dict[str, Any]) -> list[tuple[str, dict[str, Any], 
     """Explode one sidecar region into manifest entries: (gesture-slot,
     gestures-block, spec). Tap and each swipe direction are separate
     entries (their actions may differ); a slide region absorbs all
-    gestures into one entry."""
+    gestures into one entry.
+
+    Every spec passes through ``coerce_action``: sidecar values from
+    code-element markup are raw JSON STRINGS (``data-on-tap='{"action":
+    "ha",...}'``), and classifying or dispatching the raw string
+    produced ``type: '{"action"'`` garbage in served manifests and an
+    undispatchable spec at report time (bench, 2026-07-25). The builder
+    and ``resolve_region_action`` both come through here, so ids, tiers,
+    and dispatch always agree on the canonical form. Uncoercible specs
+    are dropped (a no-op region earns no manifest entry)."""
     slide = region.get("slide")
     if isinstance(slide, dict) and slide.get("action") is not None:
         axis = "y" if str(slide.get("axis") or "y") == "y" else "x"
-        return [("slide", {"slide": {"axis": axis}}, slide["action"])]
+        spec = coerce_action(slide["action"])
+        return [("slide", {"slide": {"axis": axis}}, spec)] if spec is not None else []
     out: list[tuple[str, dict[str, Any], Any]] = []
-    tap = region.get("tap")
+    tap = coerce_action(region.get("tap"))
     if tap is not None:
         out.append(("tap", {"tap": True}, tap))
     swipe = region.get("swipe")
     if isinstance(swipe, dict):
         for direction in ("up", "down", "left", "right"):
-            spec = swipe.get(direction)
+            spec = coerce_action(swipe.get(direction))
             if spec is not None:
                 out.append((f"swipe_{direction}", {"swipe": {direction: True}}, spec))
     return out
@@ -183,18 +193,30 @@ def build_interaction_manifest(
             }
             out_regions.append(entry)
     if len(out_regions) > max_regions:
-        # Nav-priority trim, document order within each class: the
-        # firmware pool is fixed, and navigation deserves echo most.
-        ranked = sorted(
-            enumerate(out_regions),
-            key=lambda p: (p[1]["action"]["type"] != "nav", p[0]),
-        )
+        # Priority trim, document order within each class: navigation
+        # first (the firmware pool is fixed and nav deserves echo most),
+        # then sliders (one entry each, high-value controls), then taps,
+        # then swipes. The dropped ids are logged by name so an operator
+        # can see exactly which controls fell off the budget instead of
+        # sections silently going dead (bench, 2026-07-25); raising the
+        # device's advertised max_targets is the real headroom fix.
+        def _rank(entry: dict[str, Any]) -> int:
+            if entry["action"]["type"] == "nav":
+                return 0
+            gestures = entry["gestures"]
+            if "slide" in gestures:
+                return 1
+            return 2 if gestures.get("tap") else 3
+
+        ranked = sorted(enumerate(out_regions), key=lambda p: (_rank(p[1]), p[0]))
         kept = {id(e) for _i, e in ranked[:max_regions]}
-        logger.info(
-            "manifest: %d regions > budget %d for frame %s; nav wins",
+        dropped = [e["id"] for e in out_regions if id(e) not in kept]
+        logger.warning(
+            "manifest: %d regions > budget %d for frame %s; dropped: %s",
             len(out_regions),
             max_regions,
             frame_digest,
+            ", ".join(dropped),
         )
         out_regions = [e for e in out_regions if id(e) in kept]
 
