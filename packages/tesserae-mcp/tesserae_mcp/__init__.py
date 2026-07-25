@@ -343,8 +343,9 @@ render_report() returns tap_regions + tap_dangling so you can verify what's tapp
 touch actions when the user asks for interactivity, and confirm before wiring a Home Assistant call.
 
 LIVE VALUE SLOTS (overlay-capable panels): devices whose list_devices entry carries an "overlay"
-object repaint small regions locally in under a second; its "max_targets" is how many tap zones
-get instant echo on that panel (8 on older firmware, 32 on current). Three things follow:
+object repaint small regions locally in under a second; its "max_targets" is that panel's
+interactive-region budget (8 on the oldest firmware, 64 on current; always read the device's own
+number). Three things follow:
 - Tap targets on those panels get instant visual echo automatically -- nothing to author.
 - If "overlay" reports "schema": 2, taps that fire Home Assistant actions also self-heal: the
   server re-renders after the action and the panel partial-paints just the changed regions within
@@ -365,8 +366,16 @@ get instant echo on that panel (8 on older firmware, 32 on current). Three thing
   non-numeric states into that charset. Verify with render_report(): "overlay_slots" lists the
   annotations that actually extracted, and an empty list against your markup means the annotation
   was lost (zero-size box, hidden, or malformed key). On panels without an "overlay" entry the
-  attribute is inert and harmless. Keep interactive zones within "max_targets" or accept that
-  navigation targets win the echo budget and the rest respond without the instant flash.
+  attribute is inert and harmless.
+  THE REGION BUDGET IS A HARD CAP on protocol v2 panels ("proto": {"v": 2}): the device
+  hit-tests locally against a manifest trimmed to "max_targets", so interactive zones beyond the
+  budget DO NOT FIRE AT ALL -- whole sections of an over-budget dashboard feel dead to the user
+  (on v1 panels the overflow merely loses its instant echo and still dispatches). The server
+  trims by priority -- navigation, then sliders, then taps, then swipes, document order within
+  each class -- and logs the dropped region ids by name. So: count your interactive zones
+  against the device's advertised "max_targets" before authoring, put the most important
+  controls earliest in the document, and split a denser dashboard across deck pages rather than
+  exceeding the budget.
 
 PUSH: once the render looks right, push_to_device to the same panel(s) you bound at the start --
 device_ids may name several panels and the one render fans out to each, fitted to its own dims.

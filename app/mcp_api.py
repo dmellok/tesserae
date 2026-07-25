@@ -670,7 +670,13 @@ def devices() -> Response:
     pre-shipped state tiles, live slider thumbs — with the server
     confirming by patch. On these panels, pin ids on interactive
     code-element markup with ``data-touch-id`` so optimistic feedback
-    survives markup edits (unpinned regions fall back to plain invert).
+    survives markup edits (unpinned regions fall back to plain invert),
+    and treat ``max_targets`` as a HARD interactive-region cap: zones
+    beyond it are trimmed from the manifest and do not fire at all (v1
+    panels merely lose the instant echo). The trim keeps navigation,
+    then sliders, then taps, then swipes, document order within each
+    class; keep dashboards inside the device's advertised budget or
+    split them across deck pages.
     ``deck_cache: {capacity_bytes}`` means the device caches deck frames on
     local storage and navigates decks without a network round trip. All are
     read-only facts about the hardware; their absence just means those
