@@ -217,3 +217,59 @@ def test_trim_prioritizes_nav_targets_in_document_order() -> None:
     assert 60 not in xs and 70 not in xs
     # Survivors are emitted in document order (x ascending here).
     assert xs == sorted(xs)
+
+
+# -- slot value resolution (attribute paths + per-slot map) ---------------
+
+
+_STATES = {
+    "light.desk": {
+        "state": "on",
+        "attributes": {"brightness": 128, "friendly_name": "Desk"},
+    },
+    "sensor.temp": {"state": "21.4", "attributes": {}},
+    "sensor.gone": {"state": "unavailable", "attributes": {}},
+}
+
+
+def _get_state(entity_id: str):
+    return _STATES.get(entity_id)
+
+
+def test_resolve_plain_state_key() -> None:
+    assert overlay_sync.resolve_slot_value("ha:sensor.temp", _get_state) == "21.4"
+
+
+def test_resolve_attribute_path_key() -> None:
+    assert (
+        overlay_sync.resolve_slot_value("ha:light.desk:attributes.brightness", _get_state) == "128"
+    )
+    assert overlay_sync.resolve_slot_value("ha:light.desk:state", _get_state) == "on"
+
+
+def test_resolve_missing_attribute_or_entity_is_none() -> None:
+    assert overlay_sync.resolve_slot_value("ha:light.desk:attributes.nope", _get_state) is None
+    assert overlay_sync.resolve_slot_value("ha:switch.unknown", _get_state) is None
+    assert overlay_sync.resolve_slot_value("ha:sensor.gone", _get_state) is None
+    assert overlay_sync.resolve_slot_value("weather:sydney", _get_state) is None
+
+
+def test_values_document_applies_slot_map_then_suffix() -> None:
+    slots = [
+        {"key": "ha:light.desk", "map": {"on": "1", "off": "0"}, "suffix": ""},
+        {"key": "ha:sensor.temp", "suffix": "°"},
+        {"key": "ha:light.desk:attributes.brightness", "suffix": ""},
+    ]
+    doc = overlay_sync.values_document(slots, ha_get_state=_get_state, now=1000.0)
+    assert doc["seq"] == 1000
+    assert doc["values"] == {
+        "ha:light.desk": "1",
+        "ha:sensor.temp": "21.4°",
+        "ha:light.desk:attributes.brightness": "128",
+    }
+
+
+def test_values_document_unmapped_value_falls_back_to_raw() -> None:
+    slots = [{"key": "ha:light.desk", "map": {"off": "0"}, "suffix": ""}]
+    doc = overlay_sync.values_document(slots, ha_get_state=_get_state, now=1.0)
+    assert doc["values"] == {"ha:light.desk": "on"}

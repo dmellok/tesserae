@@ -862,6 +862,79 @@ values-off. An entity that is `unknown` / `unavailable` is simply
 absent from `values`, and the firmware keeps showing whatever the
 baked-in render had.
 
+Slot keys accept an optional attribute path
+(`data-overlay-key="ha:light.desk:attributes.brightness"`), resolved
+against the entity's full state object. A slot may also declare
+`data-overlay-map='{"on": "1", "off": "0"}'` to rewrite raw values into
+strings the numeric glyph charset can draw; unmapped values fall back
+to the raw string. Slots inside code-element sandboxes are collected
+too: the sandbox posts them out alongside its touch regions and the
+compose page mirrors them for the extraction walker, so a full-bleed
+code dashboard gets the same live values a widget does.
+
+### Patch documents (schema 2)
+
+Boards that advertise `"overlay": {"schema": 2, ...}` also receive
+**post-action frame patches**: after a touch action changes external
+state (a Home Assistant service call), the server re-renders the page
+headless, diffs the new wire framebuffer against the frame the device
+is showing, and stages the changed rects. The device's frame digest
+never changes (its `/frame` poll keeps 304ing); the patches ARE the
+repaint. A burst of taps coalesces server-side
+(`app.touch_patch_debounce_s`, default 0.4 s after the last action)
+into one document.
+
+The document arrives under `patches` on `GET /frame/data` (poll at
+1-2 s cadence during the touch-linger window) and as `overlay_patches`
+on `/status` responses:
+
+```json
+{
+  "schema": 2,
+  "frame_digest": "<the frame the device is showing>",
+  "seq": 1753430000123,
+  "format": "fb-rect",
+  "url": "/api/v1/device/<id>/frame/patch/<blob_digest>",
+  "bytes": 34816,
+  "rects": [
+    {"x": 128, "y": 640, "w": 300, "h": 90, "offset": 0, "len": 13500}
+  ]
+}
+```
+
+Contract:
+
+* **Anchoring.** Apply only when `frame_digest` equals the digest of
+  the frame currently on glass. The server already refuses to hand out
+  a document for any other digest, so a mismatch means the client
+  raced a frame change: drop the document and do a normal frame poll.
+* **`format: "fb-rect"`.** The blob is per-rect row data in the exact
+  packing of the frame file itself (for the E1003's 4bpp gray:
+  `w * 4 / 8` bytes per row, high nibble = left pixel). `x` and `w`
+  always land on byte boundaries, so each rect is a straight row-wise
+  memcpy into the stored framebuffer at `(x, y)`, then a partial
+  refresh of that rect. Pixels are never interpreted.
+* **`seq`, newest-wins.** Strictly increasing per device (survives
+  server restarts). A document with `seq` <= the last applied one is a
+  no-op; a newer one replaces any pending document outright. Rects in
+  one document may overlap previously patched areas; painting them
+  again is correct.
+* **Tap-echo supersede.** A patch rect overlapping an active tap-echo
+  inversion clears it (the patch carries the truth the echo was
+  predicting). Patch partial-refreshes count toward the same ghosting
+  hygiene counter as echo inverts: full-quality repaint after ~8.
+* **Caps.** At most 12 rects and 256 KB of blob per document; the
+  server falls back to a normal full frame beyond that, so a client
+  never needs to handle more.
+* **Blob fetch.** Content-addressed, immutable caching. A `404` on the
+  blob means the document was superseded mid-fetch: drop it and poll
+  `/frame/data` again.
+
+Devices that only advertise schema 1 (or none) still converge: the
+server re-pushes the page asynchronously ~3 s after the last action
+(`app.touch_repush_debounce_s`), and the next `/frame` poll or MQTT
+publish delivers a normal full frame.
+
 ## MQTT topics
 
 All topics are namespaced under `tesserae/<device_id>/`.

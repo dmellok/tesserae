@@ -8,6 +8,34 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Post-action frame patches (overlay schema 2).** After a touch action fires a Home Assistant
+  service call, the server re-renders the page headless, diffs the wire framebuffer against the
+  frame on glass, and stages only the changed rects as a patch document (`patches` on
+  `GET /frame/data`, `overlay_patches` on `/status`, blob via `GET /frame/patch/<digest>`).
+  Capable firmware partial-refreshes those rects: state text catches up within a couple of
+  seconds, with no full download, no full e-ink flash, and the digitizer live throughout.
+  Documents are anchored to the served frame digest with a strictly increasing `seq` and are
+  dropped the moment a newer frame lands, so a patch can never revert a pending push. Caps:
+  12 rects / 256 KB per document; past that the server falls back to a normal full frame.
+
+- **Overlay value slots: attribute paths, value maps, code-element support.** Slot keys accept
+  an attribute path (`ha:light.desk:attributes.brightness`), a slot can declare
+  `data-overlay-map='{"on":"1","off":"0"}'` to render non-numeric states with the numeric glyph
+  atlas, and slots inside code-element sandboxes are now collected through the same mirror
+  mechanism as their touch regions.
+
+### Changed
+
+- **The post-HA repaint no longer runs inside the touch wake.** The synchronous re-push (full
+  render + download + flash while touch was locked, roughly one action per 10 s) is replaced by
+  a debounced background reconcile that re-renders whatever the device is showing: rotation
+  step, deck page, or the last directly-pushed page (previously, devices without a rotation
+  never repainted at all and kept 304ing until the next schedule). Patch-capable devices
+  reconcile ~0.4 s after the last tap of a burst; everything else gets one coalesced full push
+  ~3 s after (`app.touch_patch_debounce_s` / `app.touch_repush_debounce_s`).
+
+### Added
+
 - **Pages own their update cadence (discussion #140).** Every dashboard gains an "Updates"
   setting on the Dashboards list (only when pushed / every minute / 5 min / 15 min / hourly /
   daily). The scheduler re-renders the page on that cadence and delivers only to panels

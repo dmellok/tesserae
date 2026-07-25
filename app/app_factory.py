@@ -787,6 +787,9 @@ def create_app(
         deck_store=deck_store,
         deck_nav_store=deck_nav_store,
         devices=devices,
+        # Sticky heartbeat capabilities (overlay schema) so the post-HA
+        # reconcile can pick patch delivery over a full re-push.
+        device_status=lambda: app.config.get("DEVICE_STATUS") or {},
     )
 
     # Docker bridge networking gives us an internal IP that LAN

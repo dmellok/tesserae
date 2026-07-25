@@ -478,6 +478,19 @@ class PushManager:
         # (re-warmed on restart) but its digests are GC-protected via
         # ``_live_digests`` so the prune can't delete a warmed artifact.
         self._deck_renders: dict[str, dict[str, dict[str, Any]]] = {}
+        # Post-action frame patches (hybrid render mode, schema 2):
+        # device_id -> patch document, each anchored to the frame digest
+        # the device is showing and superseded whenever a newer frame
+        # lands in ``_latest_renders``. In-memory only (a patch outlives
+        # its usefulness in seconds); blob files are content-addressed
+        # ``overlay-patch-<digest>.bin`` in the renders dir, deleted on
+        # supersede, and swept here at startup since a restart forgets
+        # the documents that reference them.
+        self._patch_docs: dict[str, dict[str, Any]] = {}
+        self._patch_seq = 0
+        for stale in self._renders_dir.glob("overlay-patch-*.bin"):
+            with contextlib.suppress(OSError):
+                stale.unlink()
 
     # -- listeners -------------------------------------------------------
 
@@ -593,6 +606,9 @@ class PushManager:
                 return False
             self._latest_renders[device_id] = dict(info)
             self._save_latest_renders()
+            # The live frame changed; a patch anchored to the old frame
+            # must not survive it.
+            self._drop_patches_locked(device_id, keep_digest=str(info.get("digest") or ""))
         return True
 
     def has_warm_deck_page(self, device_id: str, page_id: str) -> bool:
@@ -622,6 +638,147 @@ class PushManager:
                 per.pop(pid, None)
             if not per:
                 self._deck_renders.pop(device_id, None)
+
+    # -- post-action frame patches (hybrid render mode, schema 2) --------
+
+    def frame_patches_for(self, device_id: str, frame_digest: str) -> dict[str, Any] | None:
+        """The pending patch document for a device, but only when it is
+        anchored to exactly ``frame_digest`` (the frame the client says
+        it is showing). Anything else returns None: a patch applied to
+        any other frame would paint the wrong pixels."""
+        with self._lock:
+            doc = self._patch_docs.get(device_id)
+            if doc is None or not frame_digest or doc.get("frame_digest") != frame_digest:
+                return None
+            return {k: v for k, v in doc.items() if k != "blob_digest"}
+
+    def _drop_patches_locked(self, device_id: str, *, keep_digest: str | None = None) -> None:
+        """Discard a device's patch document (and its blob file) unless
+        it is anchored to ``keep_digest``. Called under ``_lock`` at
+        every point the live frame changes: a patch must never survive
+        the frame it was diffed against (recency-guard discipline)."""
+        doc = self._patch_docs.get(device_id)
+        if doc is None or (keep_digest is not None and doc.get("frame_digest") == keep_digest):
+            return
+        self._patch_docs.pop(device_id, None)
+        blob = str(doc.get("blob_digest") or "")
+        if blob:
+            with contextlib.suppress(OSError):
+                (self._renders_dir / f"overlay-patch-{blob}.bin").unlink()
+
+    def shadow_render_page(self, page_id: str, device_id: str) -> dict[str, Any] | None:
+        """Render ``page_id`` for one device WITHOUT touching the live
+        slot: the artifact + sidecars land on disk and the render info is
+        returned, but the device keeps serving its current frame. The
+        patch reconcile diffs this against the served frame. Serialises
+        with real pushes under the push lock, same as a deck warm."""
+        stamp: dict[str, dict[str, Any]] = {}
+        with self._lock:
+            try:
+                self._push_page_locked(
+                    page_id,
+                    device_ids={device_id},
+                    source="reconcile",
+                    force_publish=True,
+                    stamp_into=stamp,
+                )
+            except Exception:
+                logger.exception("shadow render failed page=%s device=%s", page_id, device_id)
+                return None
+        return stamp.get(device_id)
+
+    def _promote_shadow(self, device_id: str, anchor_digest: str, info: dict[str, Any]) -> str:
+        """Swap a shadow render into the live slot so the device's next
+        poll downloads the full frame (the patch path's fallback).
+        Recency-guarded: if the live slot moved past ``anchor_digest``
+        while we rendered, a newer push already repainted the panel and
+        promoting would silently revert it."""
+        with self._lock:
+            cur = self._latest_renders.get(device_id)
+            if cur is not None and cur.get("digest") != anchor_digest:
+                return "superseded"
+            self._latest_renders[device_id] = dict(info)
+            self._save_latest_renders()
+            self._drop_patches_locked(device_id, keep_digest=str(info.get("digest") or ""))
+        return "promoted"
+
+    def reconcile_via_patches(self, device_id: str, page_id: str, *, panel: dict[str, Any]) -> str:
+        """Post-action reconcile for a patch-capable device: re-render
+        the page headless, diff the wire framebuffer against the frame
+        the device is showing, and stage the changed rects as a patch
+        document the device picks up on its next ``/frame/data`` poll
+        (or ``/status`` beat). The device's frame digest never changes,
+        so its ETag polling keeps 304ing and no full download or full
+        e-ink flash happens.
+
+        Returns ``patched`` (document staged), ``no_change`` (re-render
+        produced the identical artifact), ``superseded`` (a newer frame
+        landed while rendering; it already covers this), ``promoted``
+        (patching wasn't possible, the shadow render was promoted so the
+        next poll full-paints), or ``failed``."""
+        from app import frame_patch
+
+        anchor = self.latest_render_for(device_id)
+        anchor_digest = str(anchor.get("digest") or "") if anchor else ""
+        if not anchor_digest or anchor is None:
+            return "failed"
+        info = self.shadow_render_page(page_id, device_id)
+        if info is None:
+            return "failed"
+        new_digest = str(info.get("digest") or "")
+        if new_digest == anchor_digest:
+            return "no_change"
+        try:
+            native_w = int(panel.get("native_w") or panel.get("w") or 0)
+            native_h = int(panel.get("native_h") or panel.get("h") or 0)
+            old = (self._renders_dir / str(anchor.get("filename") or "")).read_bytes()
+            new = (self._renders_dir / str(info.get("filename") or "")).read_bytes()
+        except (OSError, TypeError, ValueError):
+            return "failed"
+        rects = frame_patch.diff_rects(old, new, width=native_w, height=native_h)
+        if not rects:  # None = not a packed framebuffer; [] can't happen (digests differ)
+            return self._promote_shadow(device_id, anchor_digest, info)
+        built = frame_patch.build_patch_blob(new, rects, width=native_w, height=native_h)
+        if built is None or len(built[0]) > frame_patch.MAX_PATCH_BYTES:
+            if built is not None:
+                logger.info(
+                    "frame patch: %d bytes over budget %d for device=%s; full frame instead",
+                    len(built[0]),
+                    frame_patch.MAX_PATCH_BYTES,
+                    device_id,
+                )
+            return self._promote_shadow(device_id, anchor_digest, info)
+        blob, entries = built
+        blob_digest = hashlib.sha256(blob).hexdigest()[:16]
+        with self._lock:
+            cur = self._latest_renders.get(device_id)
+            if cur is None or cur.get("digest") != anchor_digest:
+                return "superseded"
+            try:
+                (self._renders_dir / f"overlay-patch-{blob_digest}.bin").write_bytes(blob)
+            except OSError:
+                logger.exception("frame patch: blob write failed for device=%s", device_id)
+                return "failed"
+            self._drop_patches_locked(device_id)
+            self._patch_seq = max(self._patch_seq + 1, int(time.time() * 1000))
+            self._patch_docs[device_id] = {
+                "schema": 2,
+                "frame_digest": anchor_digest,
+                "seq": self._patch_seq,
+                "format": "fb-rect",
+                "url": f"/api/v1/device/{device_id}/frame/patch/{blob_digest}",
+                "bytes": len(blob),
+                "rects": entries,
+                "blob_digest": blob_digest,
+            }
+        logger.info(
+            "frame patch: %d rect(s), %d bytes staged for device=%s (anchor=%s)",
+            len(entries),
+            len(blob),
+            device_id,
+            anchor_digest,
+        )
+        return "patched"
 
     # -- speculative pre-compose (issue #49 linger) ----------------------
 
@@ -1125,6 +1282,11 @@ class PushManager:
             return 0
         removed = 0
         for path in entries:
+            # Patch blobs are referenced by an in-memory document, never
+            # an event row; they're deleted on supersede and swept at
+            # startup, so the prune must not race a pending fetch.
+            if path.name.startswith("overlay-patch-"):
+                continue
             # First-dot split, not ``.stem``: the touch-region sidecar is
             # ``<digest>.regions.json`` (double suffix), and its lifecycle
             # must follow its composition digest.
@@ -1276,6 +1438,7 @@ class PushManager:
                     touch_regions=touch_regions,
                     overlay_slots=overlay_slots,
                     stamp_into=stamp_into,
+                    page_id=page_id,
                 )
                 all_renderers.extend(result.renderers)
                 group_results.append(result)
@@ -1349,6 +1512,7 @@ class PushManager:
         touch_regions: list[dict[str, Any]] | None = None,
         overlay_slots: list[dict[str, Any]] | None = None,
         stamp_into: dict[str, dict[str, Any]] | None = None,
+        page_id: str | None = None,
     ) -> PushResult:
         """Common fanout: thumbnail + per-renderer transform / publish / log.
 
@@ -1511,6 +1675,11 @@ class PushManager:
                     # content-addressed ETag would otherwise 304, so we flag
                     # the entry and /frame serves one 200 before clearing it.
                     "force_refetch": force_client_refetch,
+                    # The page this frame renders, when it came from a page
+                    # push. The post-action reconcile uses it to re-render
+                    # "whatever the device is showing" for devices bound to
+                    # no rotation and no deck (a directly-pushed page).
+                    "page_id": page_id,
                 }
                 if stamp_into is not None:
                     # Silent warm: record the frame for the caller (Decks) without
@@ -1520,6 +1689,9 @@ class PushManager:
                 else:
                     self._latest_renders[renderer.device] = render_info
                     self._save_latest_renders()
+                    # The live frame changed; a pending patch document
+                    # anchored to the previous frame must not survive it.
+                    self._drop_patches_locked(renderer.device, keep_digest=result.digest)
             # One event per renderer per push: lets /events filter for a
             # single renderer's history without scanning every push's
             # nested extras.

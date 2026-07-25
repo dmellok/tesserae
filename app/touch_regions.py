@@ -315,9 +315,11 @@ def _swipe_attr_present_but_unusable(value: Any) -> bool:
 # Combined extraction: the touch-region walk plus a second pass that
 # collects overlay value slots (``data-overlay-key`` nodes). Composed by
 # string interpolation so the regions walker stays byte-identical; the
-# slots walker pierces shadow roots the same way but deliberately skips
-# code-element iframes (a live value slot inside sandboxed script markup
-# is out of scope for slice 2).
+# slots walker pierces shadow roots the same way. Code-element iframes
+# are origin-less, so slots inside them arrive the same way their touch
+# regions do: the sandbox collector posts them out and the compose page
+# mirrors them as annotated marker divs this walker CAN see
+# (static/panels/decorate.js).
 EXTRACT_INTERACTIVE_JS: Final[str] = (
     """async () => {
     const regions = await ("""
@@ -336,6 +338,7 @@ EXTRACT_INTERACTIVE_JS: Final[str] = (
                 h: Math.round(rect.height),
                 key: el.getAttribute('data-overlay-key') || '',
                 suffix: el.getAttribute('data-overlay-suffix') || '',
+                map: el.getAttribute('data-overlay-map') || '',
                 align: cs.textAlign,
                 px: Math.round(parseFloat(cs.fontSize) || 0),
                 weight: parseInt(cs.fontWeight, 10) || 400,
@@ -365,13 +368,32 @@ def split_capture_result(raw: Any) -> tuple[Any, Any]:
 _SLOT_ALIGNS: Final[frozenset[str]] = frozenset({"left", "center", "right"})
 
 
+def _parse_slot_map(value: Any) -> dict[str, str] | None:
+    """``data-overlay-map``: a small JSON object mapping a raw value to
+    its display string (``{"on": "1", "off": "0"}``), so non-numeric
+    states can land inside the numeric glyph charset. Capped and
+    string-string only; anything else reads as no map."""
+    parsed = _parse_json_attr(value)
+    if parsed is None:
+        return None
+    out = {
+        str(k)[:47]: str(v)[:47]
+        for k, v in list(parsed.items())[:16]
+        if isinstance(k, str) and isinstance(v, str)
+    }
+    return out or None
+
+
 def normalize_slots(raw: Any) -> list[dict[str, Any]]:
     """Validate + coerce extracted overlay slots into sidecar records.
 
-    Slice-2 grammar: ``key`` must be ``ha:<entity_id>``. Weight buckets
-    to 400/700 (the two Inter faces the atlas rasterizer ships), align
-    collapses to left/center/right, font size clamps to a sane range.
-    Malformed entries are dropped."""
+    Key grammar: ``ha:<entity_id>`` (state) or
+    ``ha:<entity_id>:<dotted.path>`` (attribute path, e.g.
+    ``ha:light.desk:attributes.brightness``). An optional ``map``
+    (from ``data-overlay-map``) rewrites raw values to display strings.
+    Weight buckets to 400/700 (the two Inter faces the atlas rasterizer
+    ships), align collapses to left/center/right, font size clamps to a
+    sane range. Malformed entries are dropped."""
     if not isinstance(raw, list):
         return []
     out: list[dict[str, Any]] = []
@@ -395,19 +417,21 @@ def normalize_slots(raw: Any) -> list[dict[str, Any]]:
             weight = int(entry.get("weight") or 400)
         except (TypeError, ValueError):
             weight = 400
-        out.append(
-            {
-                "x": x,
-                "y": y,
-                "w": w,
-                "h": h,
-                "key": key,
-                "suffix": suffix[:8] if isinstance(suffix, str) else "",
-                "align": align if align in _SLOT_ALIGNS else "left",
-                "px": px,
-                "weight": 700 if weight >= 600 else 400,
-            }
-        )
+        record = {
+            "x": x,
+            "y": y,
+            "w": w,
+            "h": h,
+            "key": key,
+            "suffix": suffix[:8] if isinstance(suffix, str) else "",
+            "align": align if align in _SLOT_ALIGNS else "left",
+            "px": px,
+            "weight": 700 if weight >= 600 else 400,
+        }
+        slot_map = _parse_slot_map(entry.get("map"))
+        if slot_map is not None:
+            record["map"] = slot_map
+        out.append(record)
     return out
 
 

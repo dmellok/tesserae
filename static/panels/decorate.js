@@ -218,6 +218,11 @@
   // region was silently lost. It posts the FULL current set each time (the
   // parent rebuilds mirrors from it), de-duped so an unrelated animation
   // doesn't spam, and stops observing before the parent's settle cap.
+  // The same message also carries overlay value slots ([data-overlay-key]
+  // nodes, hybrid render mode): the sandbox reports each slot's box plus
+  // its key / suffix / map attributes and computed type metrics, and the
+  // parent mirrors them as annotated divs (with the font metrics inlined)
+  // so the extraction walker measures them exactly like a direct slot.
   var TOUCH_COLLECT_JS =
     "(function(){var last=null;function snap(){var out=[];var ns=document.querySelectorAll(" +
     "'[data-on-tap],[data-on-swipe],[data-on-slide]');" +
@@ -227,12 +232,22 @@
     "out.push({x:Math.round(r.x),y:Math.round(r.y),w:Math.round(r.width),h:Math.round(r.height)," +
     "tap:n.getAttribute('data-on-tap'),swipe:n.getAttribute('data-on-swipe')," +
     "slide:n.getAttribute('data-on-slide')});}return out;}" +
-    "function send(){var out=snap();var s=JSON.stringify(out);if(s===last)return;last=s;" +
-    "try{parent.postMessage({type:'tesserae-touch-regions',regions:out},'*');}catch(e){}}" +
+    "function snapSlots(){var out=[];var ns=document.querySelectorAll('[data-overlay-key]');" +
+    "for(var i=0;i<ns.length;i++){var n=ns[i];var r=n.getBoundingClientRect();" +
+    "if(r.width<=0||r.height<=0)continue;var cs=getComputedStyle(n);" +
+    "if(cs.display==='none'||cs.visibility==='hidden')continue;" +
+    "out.push({x:Math.round(r.x),y:Math.round(r.y),w:Math.round(r.width),h:Math.round(r.height)," +
+    "key:n.getAttribute('data-overlay-key'),suffix:n.getAttribute('data-overlay-suffix')," +
+    "map:n.getAttribute('data-overlay-map'),align:cs.textAlign," +
+    "px:Math.round(parseFloat(cs.fontSize)||0),weight:parseInt(cs.fontWeight,10)||400});}return out;}" +
+    "function send(){var out=snap();var slots=snapSlots();" +
+    "var s=JSON.stringify(out)+JSON.stringify(slots);if(s===last)return;last=s;" +
+    "try{parent.postMessage({type:'tesserae-touch-regions',regions:out,slots:slots},'*');}catch(e){}}" +
     "requestAnimationFrame(function(){requestAnimationFrame(send);});" +
     "var t=null;var mo=new MutationObserver(function(){clearTimeout(t);t=setTimeout(send,50);});" +
     "try{mo.observe(document.documentElement,{childList:true,subtree:true,attributes:true," +
-    "attributeFilter:['data-on-tap','data-on-swipe','data-on-slide','style','class','hidden']});}catch(e){}" +
+    "attributeFilter:['data-on-tap','data-on-swipe','data-on-slide','data-overlay-key'," +
+    "'style','class','hidden']});}catch(e){}" +
     "setTimeout(function(){try{mo.disconnect();}catch(e){}},2900);})();";
 
   function renderCode(el, data) {
@@ -337,7 +352,7 @@
       // Each message is the FULL current set; rebuild this iframe's mirrors
       // from it so a late (async) annotated node replaces the earlier (empty)
       // snapshot rather than being missed.
-      var old = wrap.querySelectorAll(".touch-mirror");
+      var old = wrap.querySelectorAll(".touch-mirror, .overlay-mirror");
       for (var i = 0; i < old.length; i++) old[i].remove();
       (ev.data.regions || []).forEach(function (r) {
         if (!r || (!r.tap && !r.swipe && !r.slide)) return;
@@ -349,6 +364,23 @@
         if (r.swipe) m.setAttribute("data-on-swipe", r.swipe);
         if (r.slide) m.setAttribute("data-on-slide", r.slide);
         m.setAttribute("data-touch-origin", "markup");
+        wrap.appendChild(m);
+      });
+      // Overlay value slots reported from inside the sandbox: mirror with
+      // the type metrics inlined so the extraction walker's
+      // getComputedStyle sees the sandbox node's font size / weight /
+      // alignment on the mirror itself.
+      (ev.data.slots || []).forEach(function (s) {
+        if (!s || !s.key) return;
+        var m = document.createElement("div");
+        m.className = "overlay-mirror";
+        m.style.cssText = "position:absolute;pointer-events:none;left:" + (s.x | 0) + "px;top:" +
+          (s.y | 0) + "px;width:" + (s.w | 0) + "px;height:" + (s.h | 0) + "px;" +
+          "font-size:" + (s.px | 0) + "px;font-weight:" + (s.weight | 0) + ";" +
+          "text-align:" + (s.align || "left");
+        m.setAttribute("data-overlay-key", s.key);
+        if (s.suffix) m.setAttribute("data-overlay-suffix", s.suffix);
+        if (s.map) m.setAttribute("data-overlay-map", s.map);
         wrap.appendChild(m);
       });
       // Settle a short quiet period after the last report (bounded by the 3s

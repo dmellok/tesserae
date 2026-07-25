@@ -67,6 +67,22 @@ def test_normalize_slots_buckets_and_validates() -> None:
     assert got["align"] == "left" and got["weight"] == 400
 
 
+def test_normalize_slots_accepts_attribute_paths_and_map() -> None:
+    got = normalize_slots(
+        [
+            _raw_slot(
+                key="ha:light.desk:attributes.brightness",
+                map='{"on": "1", "off": "0"}',
+            )
+        ]
+    )[0]
+    assert got["key"] == "ha:light.desk:attributes.brightness"
+    assert got["map"] == {"on": "1", "off": "0"}
+    # Malformed / non-object / empty maps read as no map at all.
+    for bad in ("not json", "[1,2]", "{}", '{"on": 3}', None):
+        assert "map" not in normalize_slots([_raw_slot(map=bad)])[0]
+
+
 def test_split_capture_result_tolerates_both_shapes() -> None:
     assert split_capture_result({"regions": [1], "slots": [2]}) == ([1], [2])
     assert split_capture_result([1, 2]) == ([1, 2], None)

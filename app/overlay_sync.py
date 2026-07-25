@@ -493,6 +493,42 @@ def browser_rasterizer(base_url: str, timezone_id: str | None = None) -> Any:
     return rasterize
 
 
+def resolve_slot_value(key: str, ha_get_state: Any) -> str | None:
+    """The raw display string for one slot key, or None (unknown key
+    grammar, fetch failure, missing entity / attribute).
+
+    Grammar: ``ha:<entity_id>`` resolves to the entity's state string;
+    ``ha:<entity_id>:<dotted.path>`` resolves the path against the full
+    state object (``ha:light.desk:attributes.brightness``,
+    ``ha:climate.den:attributes.hvac_action``). ``unknown`` /
+    ``unavailable`` states yield None so the firmware keeps the baked-in
+    render."""
+    if not key.startswith("ha:") or len(key) <= 3:
+        return None
+    _prefix, entity_id, *rest = key.split(":", 2)
+    path = rest[0] if rest else ""
+    try:
+        state = ha_get_state(entity_id)
+    except Exception:
+        logger.debug("overlay values: state fetch failed for %s", entity_id, exc_info=True)
+        return None
+    if not isinstance(state, dict):
+        return None
+    if not path:
+        raw = state.get("state")
+        if not isinstance(raw, str) or raw in ("unknown", "unavailable"):
+            return None
+        return raw
+    node: Any = state
+    for part in path.split("."):
+        if not isinstance(node, dict) or part not in node:
+            return None
+        node = node[part]
+    if node is None or isinstance(node, (dict, list)):
+        return None
+    return str(node)
+
+
 def values_document(
     slots: list[dict[str, Any]],
     *,
@@ -501,24 +537,25 @@ def values_document(
 ) -> dict[str, Any]:
     """The values document for a frame's slots: pre-formatted display
     strings keyed by slot key, plus a seq the firmware uses for
-    newest-wins dedup. Slice-2 grammar: ``ha:<entity_id>`` resolves to
-    the entity's state string plus the slot's declared suffix. A failed
-    or unknown entity yields no key (the firmware keeps showing the
-    baked-in render). Strings clip to the firmware's 47-char cap."""
+    newest-wins dedup. Keys resolve per :func:`resolve_slot_value`; a
+    slot may then carry a ``map`` (value -> display string, e.g.
+    ``{"on": "1", "off": "0"}``) so non-numeric states land inside the
+    numeric glyph charset. A failed or unknown key is simply absent
+    (the firmware keeps showing the baked-in render). Strings clip to
+    the firmware's 47-char cap."""
     values: dict[str, str] = {}
     for slot in slots:
         key = slot.get("key")
-        if not isinstance(key, str) or not key.startswith("ha:") or key in values:
+        if not isinstance(key, str) or key in values:
             continue
-        entity_id = key[3:]
-        try:
-            state = ha_get_state(entity_id)
-        except Exception:
-            logger.debug("overlay values: state fetch failed for %s", entity_id, exc_info=True)
+        raw = resolve_slot_value(key, ha_get_state)
+        if raw is None:
             continue
-        raw = state.get("state") if isinstance(state, dict) else None
-        if not isinstance(raw, str) or raw in ("unknown", "unavailable"):
-            continue
+        mapping = slot.get("map")
+        if isinstance(mapping, dict):
+            mapped = mapping.get(raw)
+            if isinstance(mapped, str):
+                raw = mapped
         suffix = str(slot.get("suffix") or "")
         values[key] = (raw + suffix)[:MAX_VALUE_CHARS]
     return {"seq": int(now), "values": values}

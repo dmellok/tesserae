@@ -1068,20 +1068,29 @@ def post_status(device_id: str) -> Response:
         # slots refresh on every wake even outside a linger window.
         from app.overlay_sync import advertised_overlay
 
-        if advertised_overlay(body) is not None:
+        overlay_cap = advertised_overlay(body)
+        if overlay_cap is not None:
             try:
                 push_mgr = current_app.config.get("PUSH_MANAGER")
                 latest = push_mgr.latest_render_for(device.id) if push_mgr else None
-                values = (
-                    _overlay_values_doc(device, str(latest.get("digest") or "")) if latest else None
-                )
+                latest_digest = str(latest.get("digest") or "") if latest else ""
+                values = _overlay_values_doc(device, latest_digest) if latest_digest else None
             except Exception:
                 current_app.logger.exception(
                     "rest /status: overlay values failed for device=%s", device.id
                 )
                 values = None
+                latest_digest = ""
             if values is not None:
                 response["overlay_values"] = values
+            # Patch document piggyback (overlay schema 2): a pending
+            # post-action patch rides the heartbeat as a sibling of
+            # ``overlay_values``, so a device that beats before its next
+            # /frame/data poll catches up one hop earlier.
+            if int(overlay_cap.get("schema") or 0) >= 2 and latest_digest:
+                patches = _frame_patches_doc(device.id, latest_digest)
+                if patches is not None:
+                    response["overlay_patches"] = patches
     return jsonify(response)
 
 
@@ -1262,6 +1271,31 @@ def get_overlay_atlas(device_id: str, digest: str) -> Response:
     return resp
 
 
+@bp.get("/<device_id>/frame/patch/<digest>")
+def get_frame_patch_blob(device_id: str, digest: str) -> Response:
+    """One post-action patch blob by digest (raw rect row data in the
+    frame's own packing, see the patch document's ``rects`` offsets).
+    Content-addressed, so immutable caching applies; 404 means the
+    client's patch document is stale (superseded or restart-swept):
+    drop it and fall back to a normal frame poll."""
+    device, err = _auth_device(device_id)
+    if err is not None or device is None:
+        return err  # type: ignore[return-value]
+    renders_dir = current_app.config.get("RENDERS_DIR")
+    wanted = _normalize_digest(digest)
+    if renders_dir is None or not wanted or not wanted.isalnum():
+        return _error(404, "unknown patch digest")
+    path = Path(renders_dir) / f"overlay-patch-{wanted}.bin"
+    if not path.is_file():
+        return _error(404, "unknown patch digest")
+    from flask import send_file
+
+    resp = send_file(path, mimetype="application/octet-stream")
+    resp.headers["ETag"] = f'"{wanted}"'
+    resp.headers["Cache-Control"] = "immutable, max-age=31536000"
+    return resp
+
+
 def _ha_get_state() -> Any | None:
     """``get_state(entity_id)`` from the ha_core plugin, or None when HA
     isn't configured. Same resolution path as app.ha_actions."""
@@ -1302,18 +1336,43 @@ def _overlay_values_doc(device: Device, frame_digest: str) -> dict[str, Any] | N
 
 @bp.get("/<device_id>/frame/data")
 def get_frame_data(device_id: str) -> Response:
-    """Live values for a frame's overlay slots (``?digest=<frame>``):
-    pre-formatted display strings the firmware blits into its slots
-    during the touch-linger window. 404 when the frame is unknown, has
-    no slots, or HA isn't configured; the firmware treats that as
-    values-off for the frame."""
+    """Live data for a served frame (``?digest=<frame>``): the overlay
+    slot values, plus (overlay schema 2) any pending post-action patch
+    document under ``patches``, both anchored to the exact frame the
+    client says it is showing. Polled at 1-2 s cadence during the
+    touch-linger window. 404 when there is nothing at all for this
+    frame; the firmware treats that as data-off until the next poll."""
     device, err = _auth_device(device_id)
     if err is not None or device is None:
         return err  # type: ignore[return-value]
-    doc = _overlay_values_doc(device, _normalize_digest(request.args.get("digest", "")))
-    if doc is None:
+    digest = _normalize_digest(request.args.get("digest", ""))
+    doc = _overlay_values_doc(device, digest)
+    patches = _frame_patches_doc(device.id, digest)
+    if doc is None and patches is None:
         return _error(404, "no values for this frame")
-    return jsonify(doc)
+    out: dict[str, Any] = doc if doc is not None else {"seq": int(time.time()), "values": {}}
+    if patches is not None:
+        out["patches"] = patches
+    return jsonify(out)
+
+
+def _frame_patches_doc(device_id: str, frame_digest: str) -> dict[str, Any] | None:
+    """The pending patch document for a device's served frame, or None.
+    Anchoring (document digest == the digest the client asked about) is
+    enforced by the push manager; a patch for any other frame is never
+    handed out."""
+    if not frame_digest:
+        return None
+    push_mgr = current_app.config.get("PUSH_MANAGER")
+    patches_fn = getattr(push_mgr, "frame_patches_for", None) if push_mgr is not None else None
+    if not callable(patches_fn):
+        return None
+    try:
+        doc = patches_fn(device_id, frame_digest)
+    except Exception:
+        current_app.logger.exception("rest: frame patch lookup failed for %s", device_id)
+        return None
+    return doc if isinstance(doc, dict) else None
 
 
 # -- log -----------------------------------------------------------------

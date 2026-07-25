@@ -30,6 +30,7 @@ from __future__ import annotations
 import json
 import logging
 import threading
+import time
 import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -93,10 +94,22 @@ _FALLBACK_HOLD_SECONDS = 3600
 _WEBHOOK_TIMEOUT_SECONDS = 3.0
 
 # Home Assistant service calls fired from a touch action run
-# synchronously (the same wake's frame should reflect the new state),
+# synchronously (the wake's response must report dispatched vs failed),
 # so keep the ceiling tight. Overridable via
 # ``settings.app.touch_ha_timeout_s``.
 _HA_TIMEOUT_SECONDS = 5.0
+
+# Post-action reconcile debounce: after an HA action, the current page
+# re-renders in the background so the panel catches up with the new
+# state; a burst of taps coalesces into one render this many seconds
+# after the last action. Patch-capable devices (overlay schema >= 2)
+# get the short window (the reconcile lands as partial-refresh rects,
+# so eagerness is cheap); everything else gets the longer one, because
+# its reconcile is a full push -> full e-ink repaint. Overridable via
+# ``settings.app.touch_patch_debounce_s`` /
+# ``settings.app.touch_repush_debounce_s``.
+_PATCH_DEBOUNCE_SECONDS = 0.4
+_REPUSH_DEBOUNCE_SECONDS = 3.0
 
 
 def _spec_label(spec: str | dict[str, Any] | None) -> str | None:
@@ -205,6 +218,7 @@ class ButtonService:
         deck_store: DeckStore | None = None,
         deck_nav_store: DeckNavStore | None = None,
         devices: DeviceRegistry | None = None,
+        device_status: Callable[[], dict[str, Any]] | None = None,
     ) -> None:
         self._rotations = rotation_store
         self._state = state_store
@@ -234,6 +248,15 @@ class ButtonService:
             self._push_getter = push_manager
         self._event_log = event_log
         self._clock = clock or (lambda: datetime.now(tz=UTC))
+        # Live device-status cache getter (heartbeat capabilities). The
+        # post-action reconcile reads the sticky ``overlay`` capability
+        # from it to pick the patch path over a full re-push.
+        self._device_status = device_status
+        # Post-action reconcile debounce state: device_id -> monotonic
+        # time of its last HA action. Presence of a key means a worker
+        # thread is already draining that device.
+        self._reconcile_lock = threading.Lock()
+        self._reconcile_last: dict[str, float] = {}
 
     # ---- public API --------------------------------------------------
 
@@ -831,9 +854,9 @@ class ButtonService:
         )
 
         # Structured (dict) actions: currently the Home Assistant service
-        # call. Fired synchronously, then the current rotation page is
-        # re-pushed so the frame returned on this same wake reflects the
-        # new HA state (light level, cover position, …).
+        # call. Fired synchronously (the wake's response reports the
+        # outcome); the repaint that shows the new HA state happens via
+        # the debounced background reconcile, never inside this wake.
         if isinstance(spec, dict):
             return self._dispatch_structured(
                 device_id=device_id,
@@ -914,8 +937,10 @@ class ButtonService:
     ) -> TouchHandleResult:
         """Dispatch a structured (dict) touch action. Currently the Home
         Assistant service call: ``{"action": "ha", "domain", "service",
-        "data"}``, fired synchronously so a follow-up push of the current
-        rotation page reflects the new HA state on this same wake."""
+        "data"}``. The call itself is synchronous (this wake's response
+        reports dispatched vs failed); the repaint showing the new HA
+        state is handed to the debounced background reconcile so the
+        wake returns immediately and the digitizer stays live."""
         label = _spec_label(action)
         name = str(action.get("action") or "")
         outcome = "error"
@@ -958,28 +983,15 @@ class ButtonService:
         )
         push_result: PushResult | None = None
         if outcome == "ha_dispatched":
-            # Re-push the current rotation page so the frame this wake
-            # returns shows the post-action HA state. Devices without a
-            # rotation keep their frame; the next poll catches up.
-            rotation = self._resolve_rotation(device_id)
-            step_index, _ = self._effective_step_index(rotation, state)
-            if rotation is not None and rotation.steps:
-                pushed_page_id = rotation.steps[step_index].page_id
-                pusher = self._push_getter()
-                if pusher is not None and pushed_page_id:
-                    try:
-                        push_result = pusher.push(
-                            pushed_page_id,
-                            device_ids={device_id},
-                            respect_quiet_hours=False,
-                            source="touch",
-                        )
-                    except Exception:
-                        log.exception(
-                            "touch ha refresh push failed: device=%s page=%s",
-                            device_id,
-                            pushed_page_id,
-                        )
+            # Catch the panel up with the new HA state OFF this wake: a
+            # debounced background reconcile re-renders whatever the
+            # device is showing (rotation step, deck page, or the last
+            # directly-pushed page) and delivers the change either as
+            # partial-refresh patch rects (overlay schema >= 2) or as a
+            # normal push. The old synchronous re-push blocked the wake
+            # for the full render + download + e-ink flash, locking
+            # touch for ~10 s per action on the big panels.
+            self._schedule_ha_reconcile(device_id)
         snapshot = self.snapshot(device_id)
         base = ButtonHandleResult(
             device_id=device_id,
@@ -1047,6 +1059,152 @@ class ButtonService:
         if isinstance(value, (int, float)) and value > 0:
             return float(value)
         return _HA_TIMEOUT_SECONDS
+
+    # ---- post-action reconcile ---------------------------------------
+
+    def _schedule_ha_reconcile(self, device_id: str) -> None:
+        """Note an HA action and make sure a reconcile worker is
+        draining this device. Every call re-arms the debounce window, so
+        a burst of taps produces one render after the burst ends."""
+        with self._reconcile_lock:
+            already_running = device_id in self._reconcile_last
+            self._reconcile_last[device_id] = time.monotonic()
+        if not already_running:
+            self._spawn_reconcile(device_id)
+
+    def _spawn_reconcile(self, device_id: str) -> None:
+        """Fire ``_reconcile_worker`` on a daemon thread. Split out so
+        tests can run it synchronously (same seam as ``_spawn_prewarm``)."""
+        threading.Thread(
+            target=self._reconcile_worker,
+            args=(device_id,),
+            name="tesserae-touch-reconcile",
+            daemon=True,
+        ).start()
+
+    def _reconcile_worker(self, device_id: str) -> None:
+        """Debounce loop: wait until the device has been quiet for the
+        debounce window, reconcile once, and re-run if more actions
+        arrived while rendering. Exits (dropping the pending key) only
+        when a reconcile completes with no newer action recorded."""
+        try:
+            while True:
+                debounce = self._reconcile_debounce_seconds(device_id)
+                while True:
+                    with self._reconcile_lock:
+                        last = self._reconcile_last.get(device_id, 0.0)
+                    remaining = last + debounce - time.monotonic()
+                    if remaining <= 0:
+                        break
+                    time.sleep(remaining)
+                self._run_reconcile(device_id)
+                with self._reconcile_lock:
+                    if self._reconcile_last.get(device_id, last) == last:
+                        self._reconcile_last.pop(device_id, None)
+                        return
+        except Exception:
+            log.exception("touch reconcile worker failed: device=%s", device_id)
+            with self._reconcile_lock:
+                self._reconcile_last.pop(device_id, None)
+
+    def _run_reconcile(self, device_id: str) -> None:
+        """One reconcile pass: re-render the page the device is showing
+        and deliver the difference. Patch-capable devices (overlay
+        schema >= 2) get partial-refresh rects staged for their next
+        ``/frame/data`` poll; everything else gets a normal async push
+        (full frame on the next poll / publish)."""
+        pusher = self._push_getter()
+        if pusher is None:
+            return
+        page_id = self._reconcile_page_id(device_id)
+        if page_id is None:
+            log.info(
+                "touch reconcile: no page resolved for device=%s (no rotation, "
+                "deck, or last-pushed page); frame left as-is",
+                device_id,
+            )
+            return
+        if self._patch_capable(device_id):
+            reconcile = getattr(pusher, "reconcile_via_patches", None)
+            if callable(reconcile):
+                outcome = reconcile(device_id, page_id, panel=self._device_panel(device_id))
+                log.info(
+                    "touch reconcile: device=%s page=%s outcome=%s",
+                    device_id,
+                    page_id,
+                    outcome,
+                )
+                if outcome != "failed":
+                    return
+        try:
+            pusher.push(
+                page_id,
+                device_ids={device_id},
+                respect_quiet_hours=False,
+                source="touch",
+            )
+        except Exception:
+            log.exception("touch reconcile push failed: device=%s page=%s", device_id, page_id)
+
+    def _reconcile_page_id(self, device_id: str) -> str | None:
+        """The page the device is showing right now: its rotation's
+        current step, else its deck's current page, else the page of its
+        last-pushed frame. None when nothing resolves (image push, no
+        frame yet); the periodic schedule catches those up."""
+        rotation = self._resolve_rotation(device_id)
+        if rotation is not None and rotation.steps:
+            state = self._state.get(device_id)
+            step_index, _ = self._effective_step_index(rotation, state)
+            page_id = rotation.steps[step_index].page_id
+            if page_id:
+                return page_id
+        deck = self._bound_deck(device_id)
+        if deck is not None:
+            deck_page = self._deck_current_page(deck, device_id)
+            if deck_page:
+                return deck_page
+        pusher = self._push_getter()
+        latest_fn = getattr(pusher, "latest_render_for", None) if pusher is not None else None
+        latest = latest_fn(device_id) if callable(latest_fn) else None
+        candidate = latest.get("page_id") if isinstance(latest, dict) else None
+        return candidate if isinstance(candidate, str) and candidate else None
+
+    def _device_panel(self, device_id: str) -> dict[str, Any]:
+        """The device's panel block (composition + native dims), the
+        transform inputs the patch diff needs. Empty when unknown."""
+        if self._devices is None:
+            return {}
+        device = self._devices.get(device_id)
+        panel = getattr(device, "panel", None) if device is not None else None
+        return dict(panel) if isinstance(panel, dict) else {}
+
+    def _patch_capable(self, device_id: str) -> bool:
+        """True when the device's sticky heartbeat capability advertises
+        overlay schema >= 2 (it can apply patch-rect documents)."""
+        if self._device_status is None:
+            return False
+        try:
+            status = (self._device_status() or {}).get(device_id)
+        except Exception:
+            return False
+        cap = status.get("overlay") if isinstance(status, dict) else None
+        if not isinstance(cap, dict):
+            return False
+        schema = cap.get("schema")
+        return isinstance(schema, int) and not isinstance(schema, bool) and schema >= 2
+
+    def _reconcile_debounce_seconds(self, device_id: str) -> float:
+        if self._patch_capable(device_id):
+            key, default = "touch_patch_debounce_s", _PATCH_DEBOUNCE_SECONDS
+        else:
+            key, default = "touch_repush_debounce_s", _REPUSH_DEBOUNCE_SECONDS
+        try:
+            value = self._settings.get_section("app").get(key)
+        except Exception:
+            value = None
+        if isinstance(value, (int, float)) and value >= 0:
+            return float(value)
+        return default
 
     def _dispatch_spec(
         self,

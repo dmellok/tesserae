@@ -527,19 +527,27 @@ def test_ha_tap_dispatches_service_call(stores: dict[str, Any]) -> None:
     assert rows and rows[0].status == "ha_dispatched"
 
 
-def test_ha_tap_refreshes_rotation_page_same_wake(stores: dict[str, Any]) -> None:
+def test_ha_tap_schedules_debounced_reconcile_off_the_wake(stores: dict[str, Any]) -> None:
+    """The repaint that shows the new HA state never runs inside the
+    wake (that synchronous push locked touch for the whole render +
+    download + e-ink flash); it's handed to the debounced background
+    reconcile, which resolves the rotation's current page. Full
+    coverage of the reconcile lives in test_touch_reconcile.py."""
     _seed_rotation(stores)
     pm = TouchStubPushManager(latest=_latest(), regions=[_ha_region()])
     svc = _service(stores, pm)
     _stub_ha(svc)
+    scheduled: list[str] = []
+    svc._spawn_reconcile = scheduled.append  # type: ignore[method-assign]
     result = svc.handle_touch(
         device_id="kitchen",
         stroke=TouchStroke(x0=10, y0=10, x1=10, y1=10),
         frame_digest="art123",
     )
     assert result.outcome == "ha_dispatched"
-    # The current rotation page was re-pushed so this wake's frame shows
-    # the post-action HA state.
+    assert pm.calls == []  # nothing pushed synchronously on this wake
+    assert scheduled == ["kitchen"]
+    svc._run_reconcile("kitchen")  # the worker body, run inline
     assert pm.calls and pm.calls[0]["page_id"] == "morning"
     assert pm.calls[0]["source"] == "touch"
 
