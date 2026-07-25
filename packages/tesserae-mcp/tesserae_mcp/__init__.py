@@ -140,10 +140,19 @@ TOUCH ACTIONS ("on_tap"/"on_swipe"/"on_slide" on ANY element -- respond to taps 
   Actions you set through THESE tools are trusted config, so webhook + HA calls dispatch. The same
   action written into raw widget markup is limited to navigation (refresh/rotate/step/page) for
   safety.
-  VERIFY with render_report(): tap_regions lists every region that rendered, tap_dangling lists
-  unresolved @name refs, and tap_invalid lists regions whose action would NOT dispatch (with the box
-  + gesture + reason). A region in tap_regions was only STORED; it will fire only if tap_invalid is
-  empty. Always check tap_invalid == [] before trusting a touch dashboard.
+  STABLE REGION IDS (protocol v2 panels -- list_devices entry carries "proto": {"v": 2}): these
+  panels hit-test touch locally against per-region ids and give instant local feedback (invert,
+  pre-shipped state tiles, live slider thumbs), with the server confirming by patch. Canvas
+  elements are pinned automatically by their element id; interactive nodes INSIDE code-element
+  markup should carry data-touch-id="<stable-name>" so the id survives markup edits -- an
+  unpinned markup region gets a content-hash id that can churn, silently downgrading its instant
+  feedback to a plain invert. Harmless and ignored on v1 panels, so add it whenever you author
+  interactive code-element markup.
+  VERIFY with render_report(): tap_regions lists every region that rendered (with its stable
+  touch_id when pinned), tap_dangling lists unresolved @name refs, and tap_invalid lists regions
+  whose action would NOT dispatch (with the box + gesture + reason). A region in tap_regions was
+  only STORED; it will fire only if tap_invalid is empty. Always check tap_invalid == [] before
+  trusting a touch dashboard.
 
 LIVE BINDINGS ("bind" on ANY element -- makes a SHAPE reflect data):
   Data elements auto-update, but shapes (rect/ellipse/icon/line/text) are static geometry.
@@ -460,10 +469,15 @@ def build_server() -> Any:
         dashboards stay truthful and clock chrome is flash-free without any
         authoring tricks ("schema": 1 panels converge via a full re-push a
         few seconds after a tap burst).
-        "deck_cache": {capacity_bytes} means the device caches deck frames on
-        local storage and navigates decks instantly with the radio off. "kind"
-        is the hardware model id. All read-only facts; never ask the user to
-        enable them, the firmware advertises them."""
+        "proto": {"v": 2} means the panel speaks protocol v2: it hit-tests
+        touch locally against stable region ids and gives instant feedback
+        (inverts, state tiles, slider thumbs) with the server confirming by
+        patch -- pin ids on interactive code-element markup with
+        data-touch-id (see the STABLE REGION IDS section of the server
+        instructions). "deck_cache": {capacity_bytes} means the device caches
+        deck frames on local storage and navigates decks instantly with the
+        radio off. "kind" is the hardware model id. All read-only facts; never
+        ask the user to enable them, the firmware advertises them."""
         return _json("GET", "/devices")
 
     def list_pages() -> Any:

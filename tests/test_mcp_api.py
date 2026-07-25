@@ -148,6 +148,13 @@ def test_devices_surface_firmware_capabilities(app: Flask) -> None:
     devices = app.test_client().get("/api/mcp/devices").get_json()["devices"]
     entry = next(d for d in devices if d["id"] == "cap_panel")
     assert entry["overlay"] == {"schema": 2, "max_targets": 32}
+    assert "proto" not in entry  # no v2 handshake yet
+    # Protocol v2 firmware surfaces proto so an agent knows the panel
+    # hit-tests locally against stable region ids (data-touch-id matters).
+    app.config["DEVICE_STATUS"]["cap_panel"]["proto"] = {"v": 2}
+    devices = app.test_client().get("/api/mcp/devices").get_json()["devices"]
+    entry = next(d for d in devices if d["id"] == "cap_panel")
+    assert entry["proto"] == {"v": 2}
 
 
 def test_render_report_extracts_overlay_slots(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:

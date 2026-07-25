@@ -664,6 +664,13 @@ def devices() -> Response:
     state stays truthful and a clock in the header doesn't cost a full
     e-ink repaint per tick (``schema: 1`` panels converge via a debounced
     full re-push a few seconds after a tap burst instead).
+    ``proto: {v: 2}`` means the panel speaks protocol v2 (interaction
+    manifests + state bundles + a push stream): it hit-tests touch locally
+    against stable region ids and gives instant local feedback — inverts,
+    pre-shipped state tiles, live slider thumbs — with the server
+    confirming by patch. On these panels, pin ids on interactive
+    code-element markup with ``data-touch-id`` so optimistic feedback
+    survives markup edits (unpinned regions fall back to plain invert).
     ``deck_cache: {capacity_bytes}`` means the device caches deck frames on
     local storage and navigates decks without a network round trip. All are
     read-only facts about the hardware; their absence just means those
@@ -703,6 +710,9 @@ def devices() -> Response:
                         "schema": int(overlay_cap.get("schema") or 1),
                         "max_targets": overlay_cap.get("max_targets", 8),
                     }
+                proto_cap = status.get("proto")
+                if isinstance(proto_cap, dict) and proto_cap.get("v"):
+                    entry["proto"] = {"v": int(proto_cap["v"])}
                 deck_cache = status.get("deck_cache")
                 if isinstance(deck_cache, dict):
                     entry["deck_cache"] = {
@@ -1371,7 +1381,9 @@ def render_report(page_id: str) -> Response:
     clipping, confirm live data, read the real colours) without parsing a PNG.
 
     Also reports touch wiring (issue #49): ``tap_regions`` (every region that
-    rendered, with its resolved on_tap/on_swipe/on_slide), ``tap_dangling``
+    rendered, with its resolved on_tap/on_swipe/on_slide and, when pinned via
+    ``data-touch-id`` or a canvas element id, the stable ``touch_id`` that
+    protocol-v2 panels key their local feedback on), ``tap_dangling``
     (code-element ``@name`` refs with no matching entry), and ``tap_invalid``
     (regions whose declared action would NOT dispatch, e.g. an HA call missing
     its domain/service, with the box + gesture + reason). ``tap_invalid == []``
@@ -1573,6 +1585,15 @@ def describe_actions() -> Response:
                 "(editor / MCP element fields, or a code element's named actions map), "
                 "never from raw widget markup, so a third-party widget can't aim a "
                 "webhook by annotating its own HTML."
+            ),
+            "region_ids": (
+                "Protocol v2 panels (list_devices entry carries proto: {v: 2}) "
+                "hit-test locally against stable region ids. Canvas elements are "
+                "pinned automatically by their element id; interactive nodes inside "
+                'code-element markup should carry data-touch-id="<stable-name>" so '
+                "their id survives markup edits — unpinned markup regions get a "
+                "content-hash id that can churn, silently downgrading their instant "
+                "feedback to a plain invert. Not needed on v1 panels."
             ),
             "verify": (
                 "GET pages/<id>/render_report?view=touch. tap_regions lists what "
