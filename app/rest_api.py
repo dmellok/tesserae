@@ -1114,8 +1114,21 @@ def post_status(device_id: str) -> Response:
         # slots refresh on every wake even outside a linger window.
         from app.overlay_sync import advertised_overlay
 
+        # Gate on the STICKY capability (already merged from this body by
+        # record_status_heartbeat above), not the body alone: a protocol
+        # v2 firmware may advertise only ``proto`` on a beat, and losing
+        # the envelopes would darken values + patch corrections for every
+        # deep-sleep v2 device (bench, 2026-07-25).
+        sticky = (current_app.config.get("DEVICE_STATUS") or {}).get(device.id)
         overlay_cap = advertised_overlay(body)
-        if overlay_cap is not None:
+        if (
+            overlay_cap is None
+            and isinstance(sticky, dict)
+            and isinstance(sticky.get("overlay"), dict)
+        ):
+            overlay_cap = dict(sticky["overlay"])
+        proto_v = _device_proto_v(device.id)
+        if overlay_cap is not None or proto_v >= 2:
             try:
                 push_mgr = current_app.config.get("PUSH_MANAGER")
                 latest = push_mgr.latest_render_for(device.id) if push_mgr else None
@@ -1129,11 +1142,12 @@ def post_status(device_id: str) -> Response:
                 latest_digest = ""
             if values is not None:
                 response["overlay_values"] = values
-            # Patch document piggyback (overlay schema 2): a pending
-            # post-action patch rides the heartbeat as a sibling of
-            # ``overlay_values``, so a device that beats before its next
-            # /frame/data poll catches up one hop earlier.
-            if int(overlay_cap.get("schema") or 0) >= 2 and latest_digest:
+            # Patch document piggyback (overlay schema 2 / proto v2): a
+            # pending post-action patch rides the heartbeat as a sibling
+            # of ``overlay_values``, so a device that beats before its
+            # next /frame/data poll catches up one hop earlier.
+            schema = int((overlay_cap or {}).get("schema") or 0)
+            if (schema >= 2 or proto_v >= 2) and latest_digest:
                 patches = _frame_patches_doc(device.id, latest_digest)
                 if patches is not None:
                     response["overlay_patches"] = patches
@@ -1223,13 +1237,20 @@ def get_deck_frame(device_id: str, digest: str) -> Response:
 
 def _frame_info_for_digest(device: Device, wanted: str) -> dict[str, Any] | None:
     """Render info for a digest the device may be showing: its live
-    frame, or a deck-cached one (deck-painted pages get manifests too)."""
+    frame, a just-superseded frame still inside the grace window (a
+    device mid-linger on the old digest keeps its manifest and values
+    until its next /frame poll moves it forward), or a deck-cached one
+    (deck-painted pages get manifests too)."""
     push_mgr = current_app.config.get("PUSH_MANAGER")
     if push_mgr is None or not wanted:
         return None
     info = push_mgr.latest_render_for(device.id)
     if info and str(info.get("digest") or "") == wanted:
         return dict(info)
+    previous_fn = getattr(push_mgr, "previous_render_for", None)
+    prev = previous_fn(device.id) if callable(previous_fn) else None
+    if prev and str(prev.get("digest") or "") == wanted:
+        return dict(prev)
     deck = _bound_deck(device.id)
     if deck is not None:
         from app.deck_sync import frame_entry_by_digest
@@ -1263,9 +1284,21 @@ def _atlas_provider_for(device: Device) -> Any:
 
 
 def _build_manifest_for(device: Device, wanted: str) -> dict[str, Any] | None:
-    """The interaction manifest for one served frame, or None when the
-    digest is unknown, the frame has no composition sidecar, or the
-    manifest would be empty (no regions, no text)."""
+    """The interaction manifest for one served frame, or None only when
+    the digest resolves to no known frame (or the frame has no
+    composition at all, e.g. an image push).
+
+    A manifest with empty ``regions`` + ``text`` is VALID and served: a
+    proto-2 device that gets a /frame 200 without a manifest block
+    treats the server as v1 and latches out of region dispatch (bench,
+    2026-07-25), so a non-interactive dashboard must say "nothing
+    tappable" explicitly rather than go silent.
+
+    The last successfully-built manifest per device is cached; when the
+    frame's sidecar can't reproduce one (sidecar lost, geometry hiccup)
+    but the composition digest still matches the cache, the cached
+    document is re-anchored to ``wanted`` so a re-render can never
+    strand the device without its manifest."""
     info = _frame_info_for_digest(device, wanted)
     if info is None:
         return None
@@ -1273,10 +1306,30 @@ def _build_manifest_for(device: Device, wanted: str) -> dict[str, Any] | None:
     comp_digest = str(info.get("composition_digest") or "")
     if push_mgr is None or not comp_digest:
         return None
+    cache: dict[str, dict[str, Any]] = current_app.config.setdefault("MANIFEST_CACHE", {})
+    cached = cache.get(device.id)
+
+    def _reanchored() -> dict[str, Any] | None:
+        if cached is None or cached.get("comp") != comp_digest:
+            return None
+        doc = dict(cached["doc"])
+        doc["frame_digest"] = wanted
+        return doc
+
     regions = push_mgr.touch_regions_for(comp_digest)
     slots = push_mgr.overlay_slots_for(comp_digest)
     if not regions and not slots:
-        return None
+        # Sidecar empty OR lost. Same composition as the cached build
+        # means lost: re-anchor rather than downgrade the device.
+        recovered = _reanchored()
+        if recovered is not None:
+            current_app.logger.warning(
+                "rest: manifest sidecar missing for comp=%s; re-anchored cached "
+                "manifest for device=%s",
+                comp_digest,
+                device.id,
+            )
+            return recovered
     from app.manifest import build_interaction_manifest
 
     status = (current_app.config.get("DEVICE_STATUS") or {}).get(device.id)
@@ -1290,8 +1343,9 @@ def _build_manifest_for(device: Device, wanted: str) -> dict[str, Any] | None:
         atlas_provider=_atlas_provider_for(device) if slots else None,
         max_regions=int(max_targets),
     )
-    if doc is None or (not doc["regions"] and not doc["text"]):
-        return None
+    if doc is None:
+        return _reanchored()
+    cache[device.id] = {"comp": comp_digest, "doc": dict(doc)}
     return doc
 
 
@@ -1562,18 +1616,13 @@ def _ha_get_state() -> Any | None:
 
 def _overlay_values_doc(device: Device, frame_digest: str) -> dict[str, Any] | None:
     """The values document for a device's frame, or None when the frame
-    is unknown, has no slots, or HA isn't configured."""
+    is unknown, has no slots, or HA isn't configured. Resolution shares
+    ``_frame_info_for_digest`` (live / grace-window / deck), so a 1 s
+    linger poll against a just-superseded digest keeps its values."""
     push_mgr = current_app.config.get("PUSH_MANAGER")
     if push_mgr is None or not frame_digest:
         return None
-    info = push_mgr.latest_render_for(device.id)
-    if not (info and str(info.get("digest") or "") == frame_digest):
-        info = None
-        deck = _bound_deck(device.id)
-        if deck is not None:
-            from app.deck_sync import frame_entry_by_digest
-
-            info = frame_entry_by_digest(deck, device.id, frame_digest, push_mgr=push_mgr)
+    info = _frame_info_for_digest(device, frame_digest)
     if info is None:
         return None
     slots = push_mgr.overlay_slots_for(str(info.get("composition_digest") or ""))

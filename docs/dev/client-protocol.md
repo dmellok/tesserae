@@ -832,10 +832,12 @@ single repaint under newest-wins.
 Values are pre-formatted display strings (state + declared suffix,
 clipped to 47 chars); the firmware applies zero formatting. Poll only
 while awake in the touch-linger window (1-2 s cadence). The same
-document also arrives as `overlay_values` on `/status` responses when
-the capability was advertised on that beat, so slots refresh on every
-normal wake for free; both sources are interchangeable, newest `seq`
-wins, equal `seq` = no repaint. `404` = no values for this frame
+document also arrives as `overlay_values` on `/status` responses for
+any device whose STICKY capability includes `overlay` or `proto >= 2`
+(v0.199: a beat that omits the capability, or a pure-v2 firmware that
+only sends `proto`, keeps the envelopes flowing), so slots refresh on
+every normal wake for free; both sources are interchangeable, newest
+`seq` wins, equal `seq` = no repaint. `404` = no values for this frame
 (unknown digest, no slots, or Home Assistant not configured); treat as
 values-off. An entity that is `unknown` / `unavailable` is simply
 absent from `values`, and the firmware keeps showing whatever the
@@ -940,10 +942,16 @@ surfaces:
   interaction manifest: wire-space region rects with stable ids,
   gesture + tier + feedback declarations, and device-rendered text
   regions with glyph atlases. Action payloads never leave the server.
-  `404` = no manifest (feature off for the frame). `/frame` `200`
-  responses for proto-2 devices carry
-  `"manifest": {"digest", "url"}` so an unchanged layout never costs a
-  re-fetch.
+  Guarantees (v0.199): EVERY `/frame` `200` for a proto-2 device
+  carries `"manifest": {"digest", "url"}`, including re-renders that
+  mint a new frame digest — a non-interactive dashboard gets a valid
+  EMPTY manifest (`regions: []`, `text: []`), never a manifest-less
+  `200` (which a v2 client reads as "v1 server"). A pixel-only
+  re-render keeps `manifest.digest` identical, so the device
+  re-anchors its held manifest with no re-fetch. The endpoint also
+  answers for a just-superseded frame digest for a ~60 s grace window
+  (a device mid-linger on the old digest is not orphaned); the same
+  grace applies to `/frame/data`. `404` = genuinely unknown digest.
 - `POST /api/v1/device/<id>/tap` with
   `{"region_id", "gesture", "value"?, "digest", "event_id"}` — the v2
   action report. The server re-mints the id from the frame's own

@@ -6,6 +6,22 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **Protocol v2 manifest delivery survives re-renders (live bench, 2026-07-25).** Every `/frame`
+  200 for a proto-2 device now carries the manifest block: non-interactive frames get a valid
+  empty manifest instead of silence (a manifest-less 200 reads as "v1 server" and latched the
+  device out of region dispatch), a lost sidecar re-anchors the last built manifest for the same
+  composition, and pixel-only re-renders keep the manifest digest stable so the device re-anchors
+  without a re-fetch. `/frame/manifest` and `/frame/data` also keep answering for a
+  just-superseded frame digest for a ~60 s grace window, so a device mid-linger on the old digest
+  is not orphaned by a re-render (its artifacts and sidecars are prune-protected for the window).
+
+- **`/status` value/patch envelopes now gate on the sticky capability.** A beat that omits the
+  `overlay` advert, or a pure-v2 firmware that only sends `proto`, no longer loses
+  `overlay_values` / `overlay_patches`; patch reconciles and push diverts likewise accept
+  `proto >= 2` as patch-capable alongside overlay schema 2.
+
 ### Added
 
 - **Protocol v2 server surfaces (device-owned touch).** Devices advertising `proto: {v: 2}`

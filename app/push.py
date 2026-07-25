@@ -488,6 +488,11 @@ class PushManager:
         # the documents that reference them.
         self._patch_docs: dict[str, dict[str, Any]] = {}
         self._patch_seq = 0
+        # Grace slot: the entry each device's live frame most recently
+        # replaced, kept answering digest-addressed lookups for ~60 s so
+        # a device mid-linger on the old digest isn't orphaned by a
+        # re-render (see previous_render_for). In-memory only.
+        self._previous_renders: dict[str, dict[str, Any]] = {}
         for stale in self._renders_dir.glob("overlay-patch-*.bin"):
             with contextlib.suppress(OSError):
                 stale.unlink()
@@ -513,6 +518,33 @@ class PushManager:
                 logger.exception("push listener %r raised", cb)
 
     # -- latest-render lookup --------------------------------------------
+
+    def previous_render_for(
+        self, device_id: str, *, max_age_s: float = 60.0
+    ) -> dict[str, Any] | None:
+        """The render a device's live frame most recently replaced,
+        while it is still inside the grace window. A device mid-linger
+        on the old digest (1 s /frame/data polls, a manifest fetch it
+        was about to make) must not be orphaned the instant a re-render
+        lands; digest-addressed lookups fall back to this entry so the
+        old frame keeps answering until the device's next /frame poll
+        moves it forward."""
+        with self._lock:
+            entry = self._previous_renders.get(device_id)
+            if entry is None:
+                return None
+            superseded = float(entry.get("superseded_at") or 0)
+            if time.time() - superseded > max_age_s:
+                return None
+            return dict(entry)
+
+    def _retire_live_locked(self, device_id: str, new_digest: str) -> None:
+        """Move the current live entry into the grace slot before a new
+        frame replaces it (no-op when the digest isn't changing)."""
+        old = self._latest_renders.get(device_id)
+        if old is None or str(old.get("digest") or "") == new_digest:
+            return
+        self._previous_renders[device_id] = {**old, "superseded_at": time.time()}
 
     def latest_render_for(self, device_id: str) -> dict[str, Any] | None:
         """The most recently published render for a device, or ``None``
@@ -604,6 +636,7 @@ class PushManager:
             info = self._deck_renders.get(device_id, {}).get(page_id)
             if info is None:
                 return False
+            self._retire_live_locked(device_id, str(info.get("digest") or ""))
             self._latest_renders[device_id] = dict(info)
             self._save_latest_renders()
             # The live frame changed; a patch anchored to the old frame
@@ -697,6 +730,7 @@ class PushManager:
             cur = self._latest_renders.get(device_id)
             if cur is not None and cur.get("digest") != anchor_digest:
                 return "superseded"
+            self._retire_live_locked(device_id, str(info.get("digest") or ""))
             self._latest_renders[device_id] = dict(info)
             self._save_latest_renders()
             self._drop_patches_locked(device_id, keep_digest=str(info.get("digest") or ""))
@@ -856,7 +890,11 @@ class PushManager:
         status = (self._device_status_fn() or {}).get(device_id)
         cap = status.get("overlay") if isinstance(status, dict) else None
         schema = cap.get("schema") if isinstance(cap, dict) else None
-        if not isinstance(schema, int) or isinstance(schema, bool) or schema < 2:
+        proto = status.get("proto") if isinstance(status, dict) else None
+        proto_v = proto.get("v") if isinstance(proto, dict) else None
+        schema_ok = isinstance(schema, int) and not isinstance(schema, bool) and schema >= 2
+        proto_ok = isinstance(proto_v, int) and not isinstance(proto_v, bool) and proto_v >= 2
+        if not (schema_ok or proto_ok):
             return False
         payload = self._build_patch_payload(prev, render_info, panel.model_dump())
         if isinstance(payload, str):
@@ -1353,6 +1391,10 @@ class PushManager:
         live: set[str] = set()
         # Shallow copy: callers may or may not hold self._lock.
         entries = list(self._latest_renders.values())
+        # Grace-window entries stay lookupable for ~60 s after being
+        # superseded; their artifacts + sidecars must survive a prune
+        # that races the window.
+        entries.extend(list(self._previous_renders.values()))
         # Warmed deck frames are live too: they're ready to promote onto a
         # panel, so their artifact + regions must survive the prune even though
         # no device is serving them yet and their event row may have been capped.
@@ -1831,6 +1873,7 @@ class PushManager:
                         self._latest_renders.get(renderer.device, {}).get("digest"),
                     )
                 else:
+                    self._retire_live_locked(renderer.device, result.digest)
                     self._latest_renders[renderer.device] = render_info
                     self._save_latest_renders()
                     # The live frame changed; a pending patch document

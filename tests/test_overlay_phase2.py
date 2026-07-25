@@ -318,6 +318,14 @@ def test_status_piggybacks_overlay_values_for_capable_device(app: Flask) -> None
     _seed(app, "e1003", slots=normalize_slots([_raw_slot()]))
     _stub_ha(app, {"sensor.temp": "21.4"})
 
+    # A device that never advertised any capability gets no piggyback.
+    bare = client.post(
+        "/api/v1/device/e1003/status",
+        headers=_auth(token),
+        data=json.dumps({"battery_mv": 4000}),
+    )
+    assert "overlay_values" not in bare.get_json()
+
     resp = client.post(
         "/api/v1/device/e1003/status",
         headers=_auth(token),
@@ -326,10 +334,11 @@ def test_status_piggybacks_overlay_values_for_capable_device(app: Flask) -> None
     assert resp.status_code == 200
     assert resp.get_json()["overlay_values"]["values"] == {"ha:sensor.temp": "21.4°"}
 
-    # No capability on the beat -> no piggyback.
+    # The capability is STICKY: a later beat that omits it (partial
+    # beats, proto-only v2 firmware) keeps the envelopes flowing.
     resp2 = client.post(
         "/api/v1/device/e1003/status",
         headers=_auth(token),
         data=json.dumps({"battery_mv": 4000}),
     )
-    assert "overlay_values" not in resp2.get_json()
+    assert resp2.get_json()["overlay_values"]["values"] == {"ha:sensor.temp": "21.4°"}

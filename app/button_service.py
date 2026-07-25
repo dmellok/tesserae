@@ -1339,18 +1339,24 @@ class ButtonService:
 
     def _patch_capable(self, device_id: str) -> bool:
         """True when the device's sticky heartbeat capability advertises
-        overlay schema >= 2 (it can apply patch-rect documents)."""
+        overlay schema >= 2 OR protocol v2 (fb-rect patch application is
+        part of both contracts, and a v2 firmware need not keep sending
+        the v1 overlay advert)."""
         if self._device_status is None:
             return False
         try:
             status = (self._device_status() or {}).get(device_id)
         except Exception:
             return False
-        cap = status.get("overlay") if isinstance(status, dict) else None
-        if not isinstance(cap, dict):
+        if not isinstance(status, dict):
             return False
-        schema = cap.get("schema")
-        return isinstance(schema, int) and not isinstance(schema, bool) and schema >= 2
+        cap = status.get("overlay")
+        schema = cap.get("schema") if isinstance(cap, dict) else None
+        if isinstance(schema, int) and not isinstance(schema, bool) and schema >= 2:
+            return True
+        proto = status.get("proto")
+        v = proto.get("v") if isinstance(proto, dict) else None
+        return isinstance(v, int) and not isinstance(v, bool) and v >= 2
 
     def _reconcile_debounce_seconds(self, device_id: str) -> float:
         if self._patch_capable(device_id):
