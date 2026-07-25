@@ -1320,6 +1320,118 @@ def get_frame_manifest(device_id: str) -> Response:
     return jsonify(doc)
 
 
+# -- device event stream (protocol v2) --------------------------------------
+
+# SSE cadence knobs. The stream is an optimisation over the 1 s linger
+# poll, not a correctness surface: events derive from a periodic scan of
+# the same server state /frame/data and /status expose, so a device that
+# can't hold the connection loses nothing but latency.
+_STREAM_SCAN_S = 2.0
+_STREAM_KEEPALIVE_S = 25.0
+
+
+def _sse(event: str, data: dict[str, Any]) -> str:
+    return f"event: {event}\ndata: {json.dumps(data, separators=(',', ':'))}\n\n"
+
+
+def _stream_events(
+    app_obj: Any,
+    device: Device,
+    *,
+    max_ticks: int | None = None,
+    scan_s: float = _STREAM_SCAN_S,
+    keepalive_s: float = _STREAM_KEEPALIVE_S,
+) -> Any:
+    """The SSE generator for one device: ``values`` / ``patches`` /
+    ``sync`` events on change, comment keepalives in between. Runs
+    outside any request context (waitress streams it on its own
+    thread), so everything is read through ``app_obj.config`` directly.
+    ``max_ticks`` bounds the loop for tests."""
+    last_values: str | None = None
+    last_patch_seq = 0
+    last_sync: tuple[str, str] | None = None
+    last_ka = time.monotonic()
+    ticks = 0
+    while max_ticks is None or ticks < max_ticks:
+        ticks += 1
+        try:
+            push_mgr = app_obj.config.get("PUSH_MANAGER")
+            latest = push_mgr.latest_render_for(device.id) if push_mgr else None
+            digest = str(latest.get("digest") or "") if latest else ""
+            if push_mgr is not None and digest:
+                # Patches: newest-wins by seq, so emit each staged doc once.
+                doc = push_mgr.frame_patches_for(device.id, digest)
+                if doc is not None and int(doc.get("seq") or 0) > last_patch_seq:
+                    last_patch_seq = int(doc.get("seq") or 0)
+                    yield _sse("patches", doc)
+                # Values: emit when the resolved strings change.
+                comp = str(latest.get("composition_digest") or "") if latest else ""
+                slots = push_mgr.overlay_slots_for(comp) if comp else []
+                if slots:
+                    registry = app_obj.config.get("PLUGIN_REGISTRY")
+                    plugin = registry.get("ha_core") if registry is not None else None
+                    mod = getattr(plugin, "server_module", None) if plugin is not None else None
+                    if mod is not None and getattr(mod, "is_configured", lambda: False)():
+                        from app.overlay_sync import values_document
+
+                        vals = values_document(slots, ha_get_state=mod.get_state, now=time.time())
+                        fingerprint = json.dumps(vals.get("values") or {}, sort_keys=True)
+                        if fingerprint != last_values:
+                            last_values = fingerprint
+                            yield _sse("values", vals)
+                # Sync: digest pointers, emitted on change.
+                bundle = _bundle_digest_for(app_obj, device)
+                sync_now = (digest, bundle)
+                if sync_now != last_sync:
+                    last_sync = sync_now
+                    sync_payload: dict[str, Any] = {
+                        "frame_digest": digest,
+                        "seq": int(time.time() * 1000),
+                    }
+                    if bundle:
+                        sync_payload["bundle_digest"] = bundle
+                    yield _sse("sync", sync_payload)
+        except GeneratorExit:
+            raise
+        except Exception:
+            logging.getLogger(__name__).exception("device stream scan failed for %s", device.id)
+        now = time.monotonic()
+        if now - last_ka >= keepalive_s:
+            last_ka = now
+            yield ":ka\n\n"
+        if max_ticks is None or ticks < max_ticks:
+            time.sleep(scan_s)
+
+
+def _bundle_digest_for(app_obj: Any, device: Device) -> str:
+    """The device's current state-bundle version, or empty. Placeholder
+    until the bundle producer lands; kept here so the sync event shape
+    is stable."""
+    del app_obj, device
+    return ""
+
+
+@bp.get("/<device_id>/stream")
+def get_device_stream(device_id: str) -> Response:
+    """Protocol v2 push channel: a Server-Sent Events feed of ``values``
+    / ``patches`` / ``sync`` envelopes (identical payloads to the
+    /status piggybacks and /frame/data), with a comment keepalive every
+    25 s. One waitress thread per connected device; deep-sleep clients
+    should keep polling instead. Reverse proxies must not buffer this
+    route (Caddy: ``flush_interval -1``)."""
+    device, err = _auth_device(device_id)
+    if err is not None or device is None:
+        return err  # type: ignore[return-value]
+    app_obj = current_app._get_current_object()  # type: ignore[attr-defined]
+    resp = Response(
+        _stream_events(app_obj, device),
+        mimetype="text/event-stream",
+    )
+    resp.headers["Cache-Control"] = "no-cache"
+    resp.headers["X-Accel-Buffering"] = "no"
+    return resp
+
+
 # -- overlay atlases + frame data (hybrid render mode) ---------------------
 # The schema-1 overlay-spec endpoint (GET /frame/overlay/<digest>) was
 # removed with protocol v2 (docs/protocol-v2-touch.md): firmware that
