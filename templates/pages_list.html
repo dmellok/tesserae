@@ -88,6 +88,19 @@
             </div>
           </div>
         </a>
+        <form method="post" action="{{ url_for('pages.update', page_id=page.id) }}"
+              class="dx-updates-ctl" title="How often this page's content re-renders while it's on a panel. Delivery respects quiet hours; battery panels pick changes up at their next wake.">
+          <span class="dx-meta-k">Updates</span>
+          <select name="refresh_minutes" onchange="this.form.submit()">
+            <option value="0" {% if page.refresh_minutes == 0 %}selected{% endif %}>only when pushed</option>
+            <option value="1" {% if page.refresh_minutes == 1 %}selected{% endif %}>every minute</option>
+            <option value="5" {% if page.refresh_minutes == 5 %}selected{% endif %}>every 5 min</option>
+            <option value="15" {% if page.refresh_minutes == 15 %}selected{% endif %}>every 15 min</option>
+            <option value="60" {% if page.refresh_minutes == 60 %}selected{% endif %}>hourly</option>
+            <option value="1440" {% if page.refresh_minutes == 1440 %}selected{% endif %}>daily</option>
+          </select>
+          <noscript><button type="submit" class="ghost">Set</button></noscript>
+        </form>
         <div class="dx-discovered-actions">
           <a class="dx-btn-primary-sm" href="{{ url_for('pages.edit', page_id=page.id) }}">
             <i class="ph ph-pencil-simple" aria-hidden="true"></i><span>Edit</span>

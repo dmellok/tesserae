@@ -175,6 +175,14 @@ class Page(BaseModel):
     canvas: CanvasLayout | None = None
     panel: Panel | None = None
     device_ids: list[str] = Field(default_factory=list)
+    # Content-update cadence ("Updates" in the UI): how often this
+    # page's content is worth re-rendering, in minutes. 0 (default) =
+    # only when pushed (the original behaviour). Delivery is handled by
+    # the scheduler's page-refresh pass, which re-renders on cadence and
+    # sends ONLY to devices currently showing the page, so freshness is
+    # a property of the page rather than a side effect of rotation
+    # dwell (discussion #140).
+    refresh_minutes: int = Field(default=0, ge=0, le=1440)
     cells: list[Cell] = Field(default_factory=list)
     font: str | None = None
     # Spectra theme id, picks one of the self-contained semantic blocks

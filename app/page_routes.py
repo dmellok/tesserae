@@ -953,6 +953,10 @@ def update(page_id: str) -> Response:
         updates["style"] = form.get("style") or "standard"
     if "font" in form:
         updates["font"] = form.get("font") or None
+    if "refresh_minutes" in form:
+        updates["refresh_minutes"] = _coerce_int(
+            form.get("refresh_minutes"), page.refresh_minutes, lo=0, hi=1440
+        )
     if "gap" in form:
         updates["gap"] = _coerce_int(form.get("gap"), page.gap, lo=0)
     if "corner_radius" in form:

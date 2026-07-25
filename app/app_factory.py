@@ -872,6 +872,7 @@ def create_app(
         rotation_state_store=device_rotation_state_store,
         deck_store=deck_store,
         deck_nav_store=deck_nav_store,
+        page_store=page_store,
         push_manager=lambda: app.config["PUSH_MANAGER"],
         event_log=event_log,
         timezone_provider=_resolve_timezone,

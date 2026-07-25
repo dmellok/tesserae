@@ -245,3 +245,8 @@
 .dxe-fallback { border: 1px dashed var(--t-border); border-radius: var(--t-radius-sm); margin-top: 12px; padding: 10px; display: flex; flex-direction: column; gap: 6px; }
 .dxe-fb-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font-size: 13px; }
 .dxe-fb-row input[type="number"] { width: 58px; }
+
+/* ---- "Updates" cadence control on the dashboards list ------------------ */
+.dx-updates-ctl { display: flex; align-items: center; gap: 6px; margin-left: 10px; flex: none; }
+.dx-updates-ctl select { font-size: 12px; padding: 2px 6px; border-radius: var(--t-radius-sm); border: 1px solid var(--t-border); background: var(--t-bg); color: var(--t-fg-soft); }
+.dx-updates-ctl select:has(option:checked:not([value="0"])) { border-color: var(--t-accent); color: var(--t-fg); }

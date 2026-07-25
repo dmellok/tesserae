@@ -220,6 +220,7 @@ class Scheduler:
         rotation_state_store: Any = None,
         deck_store: DeckStore | None = None,
         deck_nav_store: Any = None,
+        page_store: Any = None,
         # Conditional schedules + rotation steps (v0.48). Optional; None
         # means every condition resolves to True (legacy behaviour) so
         # existing tests don't need updating. Production wires a real
@@ -251,6 +252,10 @@ class Scheduler:
         self._rotation_state_store = rotation_state_store
         self._deck_store = deck_store
         self._deck_nav_store = deck_nav_store
+        self._page_store = page_store
+        # Page content-refresh bookkeeping: page_id -> POSIX timestamp of
+        # the last refresh attempt that reached devices (discussion #140).
+        self._page_last_refresh: dict[str, float] = {}
         # deck_id -> last warm POSIX timestamp, so a deck's pages are re-warmed
         # (in the background, silently) at its refresh cadence. The lock keeps
         # warm passes from stacking when one runs longer than a tick.
@@ -452,6 +457,11 @@ class Scheduler:
         # long-dwell step never transitions, so a paged-away panel
         # stayed on the manual page forever (discussion #140).
         self._maybe_rejoin_rotations(now)
+        # Page content refresh (discussion #140): pages carry their own
+        # update cadence; re-render on it and deliver only to devices
+        # currently showing the page. Runs before schedules so a due
+        # schedule's frame still lands last on the panel.
+        self._maybe_refresh_pages(now)
         for schedule in self.find_due(now):
             self._fire(schedule, now, respect_quiet_hours=True)
         # Deck pre-render refresh (silent, off the tick thread).
@@ -545,6 +555,126 @@ class Scheduler:
                         "rejoin_device": state.device_id,
                     },
                 )
+
+    def _devices_showing_pages(self, now: datetime) -> dict[str, set[str]]:
+        """Best-effort map of ``page_id -> devices currently displaying
+        it``, resolved from (in priority order per device): the deck nav
+        record, the rotation position (manual hold else computed step),
+        and finally "the device is bound to exactly one page" for plain
+        single-dashboard panels. Devices whose current page can't be
+        determined are simply absent, the refresh pass never guesses."""
+        showing: dict[str, set[str]] = {}
+        claimed: set[str] = set()
+
+        if self._deck_store is not None and self._deck_nav_store is not None:
+            for deck in self._deck_store.all():
+                if not deck.enabled:
+                    continue
+                for device_id in deck.device_ids:
+                    if device_id in claimed:
+                        continue
+                    try:
+                        rec = self._deck_nav_store.get(device_id)
+                    except Exception:
+                        continue
+                    if rec is None or rec.get("deck_id") != deck.id:
+                        continue
+                    page_id = rec.get("page_id")
+                    if isinstance(page_id, str) and page_id:
+                        showing.setdefault(page_id, set()).add(device_id)
+                        claimed.add(device_id)
+
+        if self._rotation_store is not None and self._device_ids_for_page is not None:
+            for rotation in self._rotation_store.all():
+                if not rotation.enabled or not rotation.steps:
+                    continue
+                state = self.compute_step_state(rotation, now)
+                if state is None:
+                    continue
+                picked = self._pick_eligible_step(rotation, state.step_index, now)
+                if picked is None:
+                    continue
+                current_page = rotation.steps[picked].page_id
+                rotation_devices: set[str] = set()
+                for step in rotation.steps:
+                    rotation_devices.update(self._device_ids_for_page(step.page_id) or [])
+                held: dict[str, str] = {}
+                if self._rotation_state_store is not None:
+                    try:
+                        states = self._rotation_state_store.all()
+                    except Exception:
+                        states = {}
+                    for dev_state in states.values():
+                        if (
+                            dev_state.rotation_id == rotation.id
+                            and dev_state.override_until is not None
+                            and now < dev_state.override_until
+                            and 0 <= dev_state.step_index < len(rotation.steps)
+                        ):
+                            held[dev_state.device_id] = rotation.steps[dev_state.step_index].page_id
+                for device_id in rotation_devices:
+                    if device_id in claimed:
+                        continue
+                    page_id = held.get(device_id, current_page)
+                    showing.setdefault(page_id, set()).add(device_id)
+                    claimed.add(device_id)
+
+        if self._page_store is not None:
+            try:
+                pages = self._page_store.list()
+            except Exception:
+                pages = []
+            bound_count: dict[str, int] = {}
+            for page in pages:
+                for device_id in page.device_ids or []:
+                    bound_count[device_id] = bound_count.get(device_id, 0) + 1
+            for page in pages:
+                for device_id in page.device_ids or []:
+                    if device_id in claimed or bound_count.get(device_id, 0) != 1:
+                        continue
+                    showing.setdefault(page.id, set()).add(device_id)
+                    claimed.add(device_id)
+        return showing
+
+    def _maybe_refresh_pages(self, now: datetime) -> None:
+        """Re-render pages on their own ``refresh_minutes`` cadence,
+        delivering only to devices currently showing them (discussion
+        #140: freshness belongs to the page, not to rotation dwell).
+        Nobody showing a page = no render at all. Quiet hours are
+        respected via the push's own gating."""
+        if self._page_store is None:
+            return
+        try:
+            pages = self._page_store.list()
+        except Exception:
+            return
+        due = [
+            p
+            for p in pages
+            if getattr(p, "refresh_minutes", 0) > 0
+            and now.timestamp() - self._page_last_refresh.get(p.id, 0.0) >= p.refresh_minutes * 60
+        ]
+        if not due:
+            return
+        showing = self._devices_showing_pages(now)
+        for page in due:
+            devices = showing.get(page.id) or set()
+            if not devices:
+                continue
+            result = self._push_factory().push(
+                page.id,
+                device_ids=devices,
+                respect_quiet_hours=True,
+                source="page_refresh",
+            )
+            with self._lock:
+                self._page_last_refresh[page.id] = now.timestamp()
+            logger.info(
+                "page refresh: page=%s devices=%s (%s)",
+                page.id,
+                ",".join(sorted(devices)),
+                result.status,
+            )
 
     def _maybe_return_decks_home(self, now: datetime) -> None:
         """Return idle deck panels to the home card (deck editor's

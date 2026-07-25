@@ -6,6 +6,18 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added
+
+- **Pages own their update cadence (discussion #140).** Every dashboard gains an "Updates"
+  setting on the Dashboards list (only when pushed / every minute / 5 min / 15 min / hourly /
+  daily). The scheduler re-renders the page on that cadence and delivers only to panels
+  currently showing it (resolved from deck position, rotation position including manual holds,
+  or a device bound to exactly one page); nobody showing it means no render at all. Freshness is
+  now a property of the page's content, not a side effect of rotation dwell: a clock page set to
+  "every minute" stays live through a 15-minute rotation step. Delivery respects quiet hours,
+  and unchanged renders still answer battery panels' polls with 304. Default is "only when
+  pushed" (no behaviour change for existing pages).
+
 ### Fixed
 
 - **Deck home-return now respects quiet hours on its promote fast path.** The timer-driven
