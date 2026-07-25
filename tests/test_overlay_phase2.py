@@ -287,7 +287,6 @@ def app(tmp_path: Path) -> Flask:
         devices_dir=REPO_ROOT / "devices",
     )
     a.config["TESTING"] = True
-    a.config["OVERLAY_ATLAS_RASTERIZER"] = _fake_rasterize
     return a
 
 
@@ -340,25 +339,29 @@ def _stub_ha(app: Flask, states: dict[str, str]) -> None:
     app.config["PLUGIN_REGISTRY"] = _Registry()
 
 
-def test_overlay_spec_carries_slots_and_atlas(app: Flask) -> None:
+def test_atlas_bytes_fetch_by_digest(app: Flask) -> None:
+    """The content-addressed atlas endpoint serves the packed strip
+    (kept surface; the schema-1 spec endpoint that used to link to it
+    was removed with protocol v2)."""
     client = app.test_client()
     token = _register(app, client)
-    _seed(app, "e1003", slots=normalize_slots([_raw_slot()]))
+    atlas = overlay_sync.build_atlas(
+        32, 700, renders_dir=app.config["RENDERS_DIR"], rasterize=_fake_rasterize
+    )
+    assert atlas is not None
 
-    resp = client.get(f"/api/v1/device/e1003/frame/overlay/{'a' * 16}", headers=_auth(token))
-    assert resp.status_code == 200
-    body = resp.get_json()
-    assert len(body["slots"]) == 1
-    assert body["slots"][0]["key"] == "ha:sensor.temp"
-    atlas = body["atlases"][0]
-    assert atlas["id"] == "a1" and atlas["format"] == "4bpp-gray"
-    assert atlas["url"].startswith("/api/v1/device/e1003/frame/overlay/atlas/")
-
-    # And the atlas bytes are fetchable at that URL.
-    got = client.get(atlas["url"], headers=_auth(token))
+    got = client.get(
+        f"/api/v1/device/e1003/frame/overlay/atlas/{atlas['digest']}", headers=_auth(token)
+    )
     assert got.status_code == 200
     assert len(got.data) > 0
+    assert "immutable" in got.headers.get("Cache-Control", "")
     got.close()
+
+    missing = client.get(
+        f"/api/v1/device/e1003/frame/overlay/atlas/{'f' * 16}", headers=_auth(token)
+    )
+    assert missing.status_code == 404
 
 
 def test_frame_data_serves_values(app: Flask) -> None:

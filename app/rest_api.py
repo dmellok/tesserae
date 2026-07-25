@@ -1172,80 +1172,11 @@ def get_deck_frame(device_id: str, digest: str) -> Response:
     return resp
 
 
-# -- overlay spec (hybrid render mode) ------------------------------------
-
-
-@bp.get("/<device_id>/frame/overlay/<digest>")
-def get_frame_overlay(device_id: str, digest: str) -> Response:
-    """The overlay spec for one served frame (schema 1, rect-only for
-    now): tap-echo target rects derived from the frame's touch-region
-    sidecar, transformed into wire-framebuffer pixel space so the
-    firmware applies them verbatim. Contract in client-protocol.md;
-    404 whenever there's nothing for this digest (unknown frame, no
-    composition sidecar), which the firmware treats as feature-off for
-    the frame."""
-    device, err = _auth_device(device_id)
-    if err is not None or device is None:
-        return err  # type: ignore[return-value]
-
-    push_mgr = current_app.config.get("PUSH_MANAGER")
-    if push_mgr is None:
-        return _error(404, "no overlay for this frame")
-    wanted = _normalize_digest(digest)
-    if not wanted:
-        return _error(404, "no overlay for this frame")
-
-    # The digest may be the device's live frame or a deck-cached one
-    # (deck-painted pages deserve tap echo too).
-    info = push_mgr.latest_render_for(device.id)
-    if not (info and str(info.get("digest") or "") == wanted):
-        info = None
-        deck = _bound_deck(device.id)
-        if deck is not None:
-            from app.deck_sync import frame_entry_by_digest
-
-            info = frame_entry_by_digest(deck, device.id, wanted, push_mgr=push_mgr)
-    if info is None:
-        return _error(404, "unknown frame digest")
-
-    comp_digest = str(info.get("composition_digest") or "")
-    regions = push_mgr.touch_regions_for(comp_digest) if comp_digest else []
-    slots = push_mgr.overlay_slots_for(comp_digest) if comp_digest else []
-
-    from app.overlay_sync import browser_rasterizer, build_atlas, build_spec
-
-    renders_dir = current_app.config.get("RENDERS_DIR")
-
-    def atlas_provider(px: int, weight: int) -> dict[str, Any] | None:
-        if renders_dir is None:
-            return None
-        rasterize = current_app.config.get("OVERLAY_ATLAS_RASTERIZER") or browser_rasterizer(
-            request.url_root
-        )
-        atlas = build_atlas(px, weight, renders_dir=Path(renders_dir), rasterize=rasterize)
-        if atlas is None:
-            return None
-        atlas["url"] = f"/api/v1/device/{device.id}/frame/overlay/atlas/{atlas['digest']}"
-        return atlas
-
-    # The device's advertised target budget (v1.9 firmware sends
-    # overlay.max_targets; absent = the v1.8 baseline of 8). Sticky in
-    # the status cache, so it survives beats that omit the capability.
-    status = (current_app.config.get("DEVICE_STATUS") or {}).get(device.id)
-    overlay_cap = status.get("overlay") if isinstance(status, dict) else None
-    max_targets = overlay_cap.get("max_targets", 8) if isinstance(overlay_cap, dict) else 8
-
-    spec = build_spec(
-        frame_digest=wanted,
-        regions=regions,
-        panel=device.panel or {},
-        slots=slots,
-        atlas_provider=atlas_provider if slots else None,
-        max_targets=max_targets,
-    )
-    if spec is None:
-        return _error(404, "no overlay for this frame")
-    return jsonify(spec)
+# -- overlay atlases + frame data (hybrid render mode) ---------------------
+# The schema-1 overlay-spec endpoint (GET /frame/overlay/<digest>) was
+# removed with protocol v2 (docs/protocol-v2-touch.md): firmware that
+# probes it gets a 404, which the v1 client contract already defines as
+# feature-off for the frame. Atlases, values, and patches remain.
 
 
 @bp.get("/<device_id>/frame/overlay/atlas/<digest>")
