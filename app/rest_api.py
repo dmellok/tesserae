@@ -1404,11 +1404,73 @@ def _stream_events(
 
 
 def _bundle_digest_for(app_obj: Any, device: Device) -> str:
-    """The device's current state-bundle version, or empty. Placeholder
-    until the bundle producer lands; kept here so the sync event shape
-    is stable."""
-    del app_obj, device
-    return ""
+    """The device's current state-bundle version, or empty (no deck
+    bound, nothing warmed). The SSE sync event's change detector."""
+    try:
+        from app.bundle_sync import bundle_digest_for
+
+        deck_store = app_obj.config.get("DECK_STORE")
+        decks = deck_store.for_device(device.id) if deck_store is not None else []
+        return bundle_digest_for(
+            decks[0] if decks else None,
+            device.id,
+            push_mgr=app_obj.config.get("PUSH_MANAGER"),
+        )
+    except Exception:
+        return ""
+
+
+@bp.get("/<device_id>/bundle")
+def get_bundle(device_id: str) -> Response:
+    """The protocol-v2 state bundle for this device: every warmed deck
+    page as a digest-addressed ``frame`` state plus the navigation
+    links table, so capable firmware fills its SD cache and navigates
+    tier-0. Content-hash keyed; the SSE ``sync`` event repeats the
+    bundle digest so the device knows when to re-diff. 204 when no deck
+    is bound or nothing is warmed yet."""
+    device, err = _auth_device(device_id)
+    if err is not None or device is None:
+        return err  # type: ignore[return-value]
+    deck = _bound_deck(device.id)
+    push_mgr = current_app.config.get("PUSH_MANAGER")
+    renders_dir = current_app.config.get("RENDERS_DIR")
+    if deck is None or push_mgr is None or renders_dir is None:
+        return _error(204, "no bundle for this device")
+    from app.bundle_sync import build_bundle
+
+    doc = build_bundle(deck, device.id, push_mgr=push_mgr, renders_dir=Path(renders_dir))
+    if doc is None:
+        return _error(204, "no bundle for this device")
+    return jsonify({"status": 200, **doc})
+
+
+@bp.get("/<device_id>/bundle/frame/<digest>")
+def get_bundle_frame(device_id: str, digest: str) -> Response:
+    """One bundle frame by digest (raw wire framebuffer bytes).
+    Digest-addressed and immutable; 404 means the client's bundle
+    manifest is stale — re-sync."""
+    device, err = _auth_device(device_id)
+    if err is not None or device is None:
+        return err  # type: ignore[return-value]
+    deck = _bound_deck(device.id)
+    push_mgr = current_app.config.get("PUSH_MANAGER")
+    renders_dir = current_app.config.get("RENDERS_DIR")
+    if deck is None or push_mgr is None or renders_dir is None:
+        return _error(404, "no bundle for this device")
+    from app.deck_sync import frame_entry_by_digest
+
+    info = frame_entry_by_digest(deck, device.id, _normalize_digest(digest), push_mgr=push_mgr)
+    if info is None:
+        return _error(404, "unknown frame digest; re-fetch the bundle")
+    path = Path(renders_dir) / str(info.get("filename") or "")
+    if not path.is_file():
+        return _error(404, "frame artifact missing; re-fetch the bundle")
+    from flask import send_file
+
+    resp = send_file(path, mimetype="application/octet-stream")
+    resp.headers["ETag"] = f'"{info["digest"]}"'
+    resp.headers["Cache-Control"] = "immutable, max-age=31536000"
+    return resp
 
 
 @bp.get("/<device_id>/stream")
