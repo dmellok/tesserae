@@ -335,22 +335,27 @@ touch actions when the user asks for interactivity, and confirm before wiring a 
 
 LIVE VALUE SLOTS (overlay-capable panels): devices whose list_devices entry carries an "overlay"
 object repaint small regions locally in under a second; its "max_targets" is how many tap zones
-get instant echo on that panel (8 on older firmware, 32 on current). Two things follow:
+get instant echo on that panel (8 on older firmware, 32 on current). Three things follow:
 - Tap targets on those panels get instant visual echo automatically -- nothing to author.
-- In an AUTHORED WIDGET's markup (install_widget / authored widgets), the element showing a live
-  value can carry data-overlay-key="ha:<entity_id>" (optional data-overlay-suffix, e.g. a degree
-  sign). The panel then repaints just that value with fresh Home Assistant state between full
-  renders. GUARDRAILS the server enforces (stay inside them by design, not by luck): at most 8
-  slots per frame; at most 2 distinct (font-size, weight) pairs across all slots (each pair costs
-  a glyph atlas and the firmware carries two); values are the RAW entity state + suffix, clipped
-  to 47 chars, drawn from a numeric charset (0-9 . , : - + % degree C F space) -- free text
-  renders as blanks, so only annotate numeric-ish values; keys must be ha:<entity_id>. NOT
-  extracted from a canvas code-element's markup (it renders in an iframe the extractor skips);
-  widget markup only. Verify with render_report(): "overlay_slots" lists the annotations that
-  actually extracted, and an empty list against your markup means the annotation was lost. On
-  panels without an "overlay" entry the attribute is inert and harmless. Keep interactive zones
-  within "max_targets" or accept that navigation targets win the echo budget and the rest respond
-  without the instant flash.
+- If "overlay" reports "schema": 2, taps that fire Home Assistant actions also self-heal: the
+  server re-renders after the action and the panel partial-paints just the changed regions within
+  a couple of seconds (schema 1 panels converge via a full re-push a few seconds after the tap
+  burst). Design the dashboard to SHOW state normally; do not encode state in tap-echo inversion
+  tricks or warn the user about stale control panels.
+- The element showing a live value can carry data-overlay-key (optional data-overlay-suffix, e.g.
+  a degree sign) -- in an authored widget's markup AND inside a canvas code element (its sandbox
+  reports slots out the same way it reports touch regions). Keys are "ha:<entity_id>" (state) or
+  an attribute path "ha:<entity_id>:attributes.<name>" (e.g. ha:light.desk:attributes.brightness).
+  GUARDRAILS the server enforces (stay inside them by design, not by luck): at most 8 slots per
+  frame; at most 2 distinct (font-size, weight) pairs across all slots (each pair costs a glyph
+  atlas and the firmware carries two); values are the RAW resolved value + suffix, clipped to 47
+  chars, drawn from a numeric charset (0-9 . , : - + % degree C F space) -- free text renders as
+  blanks, so annotate numeric-ish values, or add data-overlay-map='{"on":"1","off":"0"}' to remap
+  non-numeric states into that charset. Verify with render_report(): "overlay_slots" lists the
+  annotations that actually extracted, and an empty list against your markup means the annotation
+  was lost (zero-size box, hidden, or malformed key). On panels without an "overlay" entry the
+  attribute is inert and harmless. Keep interactive zones within "max_targets" or accept that
+  navigation targets win the echo budget and the rest respond without the instant flash.
 
 PUSH: once the render looks right, push_to_device to the same panel(s) you bound at the start --
 device_ids may name several panels and the one render fans out to each, fitted to its own dims.
@@ -443,13 +448,18 @@ def build_server() -> Any:
         touch actions expecting them to work there.
 
         Firmware capability flags ride along when the hardware reports them:
-        "overlay": {max_targets} means the panel repaints small regions locally (instant
-        tap echo, plus data-overlay-key live value slots in authored widget
-        markup -- see the LIVE VALUE SLOTS section of the server instructions
-        for the guardrails); "deck_cache": {capacity_bytes} means the device
-        caches deck frames on local storage and navigates decks instantly with
-        the radio off. "kind" is the hardware model id. All read-only facts;
-        never ask the user to enable them, the firmware advertises them."""
+        "overlay": {schema, max_targets} means the panel repaints small regions
+        locally (instant tap echo, plus data-overlay-key live value slots --
+        see the LIVE VALUE SLOTS section of the server instructions for the
+        guardrails). "schema": 2 additionally means post-action frame patches:
+        after a tap fires a Home Assistant action, the panel partial-paints the
+        changed regions within a couple of seconds on its own, so control
+        dashboards stay truthful without any authoring tricks ("schema": 1
+        panels converge via a full re-push a few seconds after a tap burst).
+        "deck_cache": {capacity_bytes} means the device caches deck frames on
+        local storage and navigates decks instantly with the radio off. "kind"
+        is the hardware model id. All read-only facts; never ask the user to
+        enable them, the firmware advertises them."""
         return _json("GET", "/devices")
 
     def list_pages() -> Any:
