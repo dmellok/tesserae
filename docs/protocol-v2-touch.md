@@ -33,7 +33,7 @@ at the end of the v1 window).
 |---|---|---|
 | `GET /frame` `touch_*` query params (~line 757) | Tap coordinates dispatched server-side *before* the frame lookup, so a nav action's repaint returns on the same wake | **ADAPT** — becomes an *action report* (`region_id` + digest + gesture + value); coordinates stay as diagnostics. The same-wake-repaint contract is dropped for v2 clients (feedback is already on glass) |
 | `POST /tap` (~line 878) | Standalone stroke dispatch for continuously-powered clients | **ADAPT** — same report shape; keeps coordinate fallback for v1 clients |
-| `GET /frame/overlay/<digest>` | Schema-1 overlay spec: tap-echo targets, value slots, atlas refs | **DELETE** — folds into the interaction manifest (§B1). Served until v1 window closes |
+| `GET /frame/overlay/<digest>` | Schema-1 overlay spec: tap-echo targets, value slots, atlas refs | **DELETE** — folds into the interaction manifest (§B1). *Removed in v0.196*; firmware's 404-as-feature-off contract covers the gap until manifests ship |
 | `GET /frame/overlay/atlas/<digest>` | 4bpp glyph-atlas strips, content-addressed | **KEEP** — becomes the bitmap-font store for text regions (§B5) |
 | `GET /frame/data` | Values doc + pending patch doc for a digest | **ADAPT** — values keyed by region id; also mirrored on the push channel (§B4) |
 | `GET /frame/patch/<digest>` | Content-addressed patch blobs (`fb-rect`) | **KEEP** — tier-1 corrections and state-bundle tiles reuse this format |
@@ -62,7 +62,7 @@ at the end of the v1 window).
 | `EXTRACT_INTERACTIVE_JS` + code-element mirror collection (`touch_regions.py`, `static/panels/decorate.js`) | One Playwright pass extracts touch regions + value slots, incl. sandbox mirrors | **ADAPT** — same extraction feeds the manifest builder; new requirement: stable region IDs (§B1, open question 1) |
 | Region/slot sidecars (`<comp>.regions.json`) | Persisted per composition digest | **ADAPT** — sidecar gains ids/feedback fields; becomes the manifest's source of truth |
 | `overlay_sync.rect_to_wire` + `_panel_geometry` | Composition→wire transform chain | **KEEP** — manifests are wire-space, same as v1 specs |
-| `overlay_sync.build_spec` (schema-1 doc) | Targets/slots/atlases doc | **DELETE** — manifest supersedes |
+| `overlay_sync.build_spec` (schema-1 doc) | Targets/slots/atlases doc | **DELETE** — manifest supersedes. *Removed in v0.196* with its private helpers and unit tests |
 | `overlay_sync.build_atlas` / `pack_atlas_strip` / `browser_rasterizer` | Glyph atlas pipeline | **KEEP** — §B5 |
 | `overlay_sync.values_document` (+ maps, attribute paths) | Pre-formatted value strings, ms seq | **ADAPT** — keyed by region id; delivered on the push channel too |
 | `frame_patch.py` (composition-space diff, `fb-rect` blobs, caps) | Patch payloads | **KEEP** — unchanged; bundles reuse `fb-rect` for tiles |

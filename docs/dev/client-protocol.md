@@ -775,72 +775,47 @@ stays the source of truth; the overlay is cosmetic and optimistic.
 
 Advertise `"overlay": {"schema": 1, "max_targets": 32}` in
 register/status bodies. The capability is sticky (a firmware property,
-unlike `deck_cache`). `max_targets` (additive, firmware v1.9+) is the
-device's tap-echo target buffer; the server trims target lists to it,
-treating absence as the v1.8 baseline of 8. When a frame carries more
-touch regions than the budget, navigation targets (`page:`, `step:`,
-`rotate_*`) win the echo slots and the rest still dispatch normally,
-just without the instant flash; survivors are always emitted in
-document order. Spec documents never exceed 8 KB.
+unlike `deck_cache`) and persists across server restarts; it gates the
+values document, the `/status` piggybacks, and (schema 2) patch
+documents. `max_targets` (additive, firmware v1.9+) declares the
+device's target buffer for forward compatibility with the protocol-v2
+interaction manifest, which inherits the same budget discipline.
 
-`GET /api/v1/device/<id>/frame/overlay/<frame_digest>` (Bearer) returns
-the spec for one served frame, or `404` meaning "feature off for this
-frame" (unknown digest, or a server predating the feature):
-
-```json
-{
-  "schema": 1,
-  "frame_digest": "<the frame's ETag value, quotes stripped>",
-  "targets": [
-    {"id": "t1", "x": 120, "y": 640, "w": 300, "h": 90, "echo": "invert"}
-  ]
-}
-```
-
-All coordinates are in the same pixel space as the wire framebuffer the
-device paints; the server performs every transform (rotation, flip,
-scaling, underscan) at spec-build time and the firmware applies rects
-verbatim. Schema 1 target rects are derived from the frame's touch
-regions, and `echo: "invert"` means: on a tap inside the rect, invert
-it, partial-refresh that rect immediately, then dispatch the stroke to
-the server exactly as normal (the echo never replaces the dispatch).
-The invert is restored by the next full paint. Hygiene: after ~8
-partial refreshes do a full-quality repaint to clear ghosting.
+**Removed in v0.196** (protocol v2, `docs/protocol-v2-touch.md`): the
+schema-1 overlay spec endpoint
+`GET /api/v1/device/<id>/frame/overlay/<frame_digest>` no longer exists.
+Firmware probing it receives a plain `404`, which this contract has
+always defined as "feature off for this frame" — v1 clients degrade
+gracefully to dispatch-without-echo. Tap-echo targets and slot geometry
+return as the protocol-v2 interaction manifest. Until then the
+coordinate conventions below still apply to everything that remains
+(values, atlases, patch documents): all coordinates are in the wire
+framebuffer's pixel space; the server performs every transform
+(rotation, flip, scaling, underscan) and the firmware applies rects
+verbatim.
 
 ### Value slots and glyph atlases
 
 Widgets opt into live value text by annotating an element with
 `data-overlay-key="ha:<entity_id>"` (optional `data-overlay-suffix`,
 e.g. a degree sign). At render time the slot's box, alignment, font
-size, and weight are extracted alongside the touch regions, and the
-overlay spec then also carries:
+size, and weight are extracted alongside the touch regions into the
+composition sidecar.
 
-```json
-{
-  "slots": [
-    {"id": "s1", "x": 140, "y": 660, "w": 200, "h": 32,
-     "key": "ha:sensor.temp", "align": "right", "atlas": "a1"}
-  ],
-  "atlases": [
-    {"id": "a1", "digest": "<16-hex>", "format": "4bpp-gray",
-     "height": 32,
-     "url": "/api/v1/device/<id>/frame/overlay/atlas/<digest>",
-     "glyphs": {"0": {"x": 0, "w": 18}, ".": {"x": 18, "w": 8}}}
-  ]
-}
-```
+**Delivery note (v0.196):** slot geometry and atlas references used to
+ship inside the schema-1 overlay spec, which has been removed; they
+return as `text` regions in the protocol-v2 interaction manifest. The
+values document below and the atlas store keep working unchanged and
+are what the manifest will reference.
 
 Atlases are rasterized server-side through the same browser and fonts
 as the composition (Inter, at the slot's exact size and weight), so
 blitted text is pixel-consistent with the baked-in render. The strip is
 packed at exactly `max(glyph.x + glyph.w)` pixels wide, 4bpp gray, high
-nibble = left pixel; fetch by digest with immutable caching. The glyph
+nibble = left pixel; fetch by digest with immutable caching at
+`GET /api/v1/device/<id>/frame/overlay/atlas/<digest>`. The glyph
 charset covers numeric values (`0-9 . , : - + % ° C F` and space); a
 character outside it renders as a mean-width blank on the device.
-
-`targets`, `slots`, and `atlases` are independent and optional; a spec
-can be rect-only (no annotated slots, or the atlas build failed and the
-spec degraded gracefully).
 
 ### Values document
 

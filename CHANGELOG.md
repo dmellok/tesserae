@@ -6,6 +6,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Removed
+
+- **Schema-1 overlay specs** (protocol v2 cleanup, see `docs/protocol-v2-touch.md`). The
+  `GET /frame/overlay/<digest>` endpoint and the `build_spec` document builder are gone: v1
+  firmware probing the endpoint gets a 404, which its contract has always defined as
+  feature-off, so it degrades to dispatch-without-echo until the protocol-v2 interaction
+  manifest ships. The atlas store, values document, patch documents, touch dispatch, and the
+  overlay capability handshake are unchanged; non-touch rendering is byte-identical.
+
 ### Added
 
 - **Frame patches now actually stage under real dithering, and periodic small changes ride them
