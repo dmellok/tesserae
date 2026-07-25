@@ -542,7 +542,9 @@ def values_document(
     ``{"on": "1", "off": "0"}``) so non-numeric states land inside the
     numeric glyph charset. A failed or unknown key is simply absent
     (the firmware keeps showing the baked-in render). Strings clip to
-    the firmware's 47-char cap."""
+    the firmware's 47-char cap. ``seq`` is wall time in MILLISECONDS
+    (int64 on the wire): second-granularity seqs made two value changes
+    inside one second dedup to a single repaint on the device."""
     values: dict[str, str] = {}
     for slot in slots:
         key = slot.get("key")
@@ -558,4 +560,4 @@ def values_document(
                 raw = mapped
         suffix = str(slot.get("suffix") or "")
         values[key] = (raw + suffix)[:MAX_VALUE_CHARS]
-    return {"seq": int(now), "values": values}
+    return {"seq": int(now * 1000), "values": values}

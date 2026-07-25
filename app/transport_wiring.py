@@ -333,6 +333,7 @@ def record_status_heartbeat(
             device.id,
             fw_version=str(fw) if isinstance(fw, (str, int, float)) else None,
             ota_schema=entry.get("ota_schema"),
+            overlay=entry.get("overlay"),
         )
     # Automatic updates (opt-in per-device switch): make sure an auto-update
     # device is queued for its kind's newest release before the response is

@@ -847,8 +847,12 @@ spec degraded gracefully).
 `GET /api/v1/device/<id>/frame/data?digest=<frame_digest>` (Bearer):
 
 ```json
-{"seq": 1753305600, "values": {"ha:sensor.temp": "21.4°"}}
+{"seq": 1753305600123, "values": {"ha:sensor.temp": "21.4°"}}
 ```
+
+`seq` is wall time in **milliseconds** (int64). Prior to v0.195 it was
+seconds, which made two value changes inside one second dedup to a
+single repaint under newest-wins.
 
 Values are pre-formatted display strings (state + declared suffix,
 clipped to 47 chars); the firmware applies zero formatting. Poll only
@@ -877,12 +881,25 @@ code dashboard gets the same live values a widget does.
 Boards that advertise `"overlay": {"schema": 2, ...}` also receive
 **post-action frame patches**: after a touch action changes external
 state (a Home Assistant service call), the server re-renders the page
-headless, diffs the new wire framebuffer against the frame the device
-is showing, and stages the changed rects. The device's frame digest
+headless, diffs the new render against the frame the device is
+showing, and stages the changed rects. The device's frame digest
 never changes (its `/frame` poll keeps 304ing); the patches ARE the
 repaint. A burst of taps coalesces server-side
 (`app.touch_patch_debounce_s`, default 0.4 s after the last action)
 into one document.
+
+The same mechanism also carries **periodic small changes** (v0.195):
+when a scheduled or push-triggered re-render of the page a schema-2
+REST device is showing differs only a little (a header clock tick),
+the server stages patches on the current digest instead of minting a
+new frame. The digest therefore stays stable for long stretches — no
+full flash per clock tick, and a tap fired mid-render can't be
+invalidated by digest churn. Big changes (page edits, renderer setting
+changes, cross-page pushes, diffs past the caps) still mint a new
+digest and arrive as a normal full frame; the firmware needs no new
+behaviour for either case. Diffing runs in composition space (before
+per-renderer dithering), so error-diffusion dither noise never inflates
+a patch; the blob content is still byte-exact with the new artifact.
 
 The document arrives under `patches` on `GET /frame/data` (poll at
 1-2 s cadence during the touch-linger window) and as `overlay_patches`

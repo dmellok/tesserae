@@ -46,15 +46,24 @@ class DeviceFactsStore:
         entry = self._load().get(device_id)
         return entry if isinstance(entry, dict) else None
 
+    def all(self) -> dict[str, dict[str, Any]]:
+        """Every device's facts, for startup seeding of the status cache."""
+        return {k: v for k, v in self._load().items() if isinstance(v, dict)}
+
     def record(
         self,
         device_id: str,
         *,
         fw_version: str | None = None,
         ota_schema: int | None = None,
+        overlay: dict[str, Any] | None = None,
     ) -> None:
         """Merge the given facts for ``device_id``; writes only on change.
-        ``None`` values mean "no new information", never "clear"."""
+        ``None`` values mean "no new information", never "clear".
+        ``overlay`` is the advertised overlay capability (a firmware
+        property like ``ota_schema``); persisting it means a server
+        restart doesn't demote a patch-capable panel to full-repaint
+        reconciles until its next heartbeat."""
         with self._lock:
             data = self._load()
             raw = data.get(device_id)
@@ -65,6 +74,9 @@ class DeviceFactsStore:
                 changed = True
             if ota_schema is not None and entry.get("ota_schema") != ota_schema:
                 entry["ota_schema"] = ota_schema
+                changed = True
+            if isinstance(overlay, dict) and entry.get("overlay") != overlay:
+                entry["overlay"] = overlay
                 changed = True
             if not changed:
                 return

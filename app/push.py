@@ -702,75 +702,127 @@ class PushManager:
             self._drop_patches_locked(device_id, keep_digest=str(info.get("digest") or ""))
         return "promoted"
 
-    def reconcile_via_patches(self, device_id: str, page_id: str, *, panel: dict[str, Any]) -> str:
-        """Post-action reconcile for a patch-capable device: re-render
-        the page headless, diff the wire framebuffer against the frame
-        the device is showing, and stage the changed rects as a patch
-        document the device picks up on its next ``/frame/data`` poll
-        (or ``/status`` beat). The device's frame digest never changes,
-        so its ETag polling keeps 304ing and no full download or full
-        e-ink flash happens.
+    def _build_patch_payload(
+        self,
+        anchor: dict[str, Any],
+        info: dict[str, Any],
+        panel: dict[str, Any],
+    ) -> tuple[bytes, list[dict[str, int]]] | str:
+        """The patch blob + rect entries turning the ``anchor`` frame
+        into the ``info`` frame, or a fallback-reason string when
+        patching isn't the right delivery (caller then ships a full
+        frame).
 
-        Returns ``patched`` (document staged), ``no_change`` (re-render
-        produced the identical artifact), ``superseded`` (a newer frame
-        landed while rendering; it already covers this), ``promoted``
-        (patching wasn't possible, the shadow render was promoted so the
-        next poll full-paints), or ``failed``."""
+        The diff runs in COMPOSITION space (the pre-dither PNGs) and the
+        rects map through the same transform chain as tap targets. That
+        matters because the .bin family's default dither is
+        error-diffusion: a one-tile change perturbs the dithered bytes
+        of everything after it in scan order, so a wire-space byte diff
+        of two honest renders is nearly global and would always blow the
+        budget. The composition diff stays tight; the blob content still
+        comes from the new dithered artifact, so a painted rect is
+        byte-exact with a full download of the new frame (the dither
+        seam at rect edges is sub-noise on the gray panels)."""
         from app import frame_patch
+        from app.overlay_sync import _panel_geometry, rect_to_wire
 
-        anchor = self.latest_render_for(device_id)
-        anchor_digest = str(anchor.get("digest") or "") if anchor else ""
-        if not anchor_digest or anchor is None:
-            return "failed"
-        info = self.shadow_render_page(page_id, device_id)
-        if info is None:
-            return "failed"
-        new_digest = str(info.get("digest") or "")
-        if new_digest == anchor_digest:
-            return "no_change"
         try:
             native_w = int(panel.get("native_w") or panel.get("w") or 0)
             native_h = int(panel.get("native_h") or panel.get("h") or 0)
             old = (self._renders_dir / str(anchor.get("filename") or "")).read_bytes()
             new = (self._renders_dir / str(info.get("filename") or "")).read_bytes()
         except (OSError, TypeError, ValueError):
-            return "failed"
-        rects = frame_patch.diff_rects(old, new, width=native_w, height=native_h)
-        if not rects:  # None = not a packed framebuffer; [] can't happen (digests differ)
-            return self._promote_shadow(device_id, anchor_digest, info)
-        built = frame_patch.build_patch_blob(new, rects, width=native_w, height=native_h)
-        if built is None or len(built[0]) > frame_patch.MAX_PATCH_BYTES:
-            if built is not None:
-                logger.info(
-                    "frame patch: %d bytes over budget %d for device=%s; full frame instead",
-                    len(built[0]),
-                    frame_patch.MAX_PATCH_BYTES,
-                    device_id,
-                )
-            return self._promote_shadow(device_id, anchor_digest, info)
-        blob, entries = built
-        blob_digest = hashlib.sha256(blob).hexdigest()[:16]
-        with self._lock:
-            cur = self._latest_renders.get(device_id)
-            if cur is None or cur.get("digest") != anchor_digest:
-                return "superseded"
+            return "artifact_unreadable"
+        bpp = frame_patch.infer_bpp(len(new), native_w, native_h)
+        if bpp is None or len(old) != len(new):
+            return "not_a_packed_framebuffer"
+
+        rects: list[tuple[int, int, int, int]] | None = None
+        comp_old = str(anchor.get("composition_digest") or "")
+        comp_new = str(info.get("composition_digest") or "")
+        if comp_old and comp_new and comp_old == comp_new:
+            # Identical composition but a different artifact means the
+            # renderer settings changed (gamut, dither, contrast); the
+            # whole frame legitimately repaints.
+            return "render_settings_changed"
+        if comp_old and comp_new:
+            geo = _panel_geometry(panel)
             try:
-                (self._renders_dir / f"overlay-patch-{blob_digest}.bin").write_bytes(blob)
+                png_old = (self._renders_dir / f"{comp_old}.png").read_bytes()
+                png_new = (self._renders_dir / f"{comp_new}.png").read_bytes()
             except OSError:
-                logger.exception("frame patch: blob write failed for device=%s", device_id)
-                return "failed"
-            self._drop_patches_locked(device_id)
-            self._patch_seq = max(self._patch_seq + 1, int(time.time() * 1000))
-            self._patch_docs[device_id] = {
-                "schema": 2,
-                "frame_digest": anchor_digest,
-                "seq": self._patch_seq,
-                "format": "fb-rect",
-                "url": f"/api/v1/device/{device_id}/frame/patch/{blob_digest}",
-                "bytes": len(blob),
-                "rects": entries,
-                "blob_digest": blob_digest,
-            }
+                png_old = png_new = b""
+            if geo is not None and png_old and png_new:
+                comp_rects = frame_patch.diff_composition_rects(
+                    png_old, png_new, expected_w=geo["comp_w"], expected_h=geo["comp_h"]
+                )
+                if comp_rects:
+                    aligned: list[tuple[int, int, int, int]] = []
+                    for r in comp_rects:
+                        wire = rect_to_wire(
+                            (float(r[0]), float(r[1]), float(r[2]), float(r[3])),
+                            comp_w=geo["comp_w"],
+                            comp_h=geo["comp_h"],
+                            native_w=geo["native_w"],
+                            native_h=geo["native_h"],
+                            flip=geo["flip"],
+                            underscan=geo["underscan"],
+                        )
+                        if wire is None:
+                            continue
+                        snapped = frame_patch.align_rect(
+                            wire, width=native_w, height=native_h, bpp=bpp
+                        )
+                        if snapped is not None:
+                            aligned.append(snapped)
+                    rects = aligned or None
+        if rects is None:
+            # No composition PNGs (image push, pruned thumbnail): the raw
+            # byte diff still works for local changes; error-diffusion
+            # content lands in over_budget and ships as a full frame.
+            rects = frame_patch.diff_rects(old, new, width=native_w, height=native_h)
+            if not rects:
+                return "wire_diff_unavailable"
+        built = frame_patch.build_patch_blob(new, rects, width=native_w, height=native_h)
+        if built is None:
+            return "blob_build_failed"
+        if len(built[0]) > frame_patch.MAX_PATCH_BYTES:
+            return f"over_budget:{len(built[0])}"
+        return built
+
+    def _stage_patches_locked(
+        self,
+        device_id: str,
+        anchor_digest: str,
+        blob: bytes,
+        entries: list[dict[str, int]],
+    ) -> bool:
+        """Install a patch document for a device (caller holds
+        ``_lock``). False when the live frame moved past the anchor (the
+        newer frame already covers the change) or the blob can't be
+        written; the previous document and blob are replaced atomically
+        from the client's point of view (old blob 404s afterwards)."""
+        cur = self._latest_renders.get(device_id)
+        if cur is None or cur.get("digest") != anchor_digest:
+            return False
+        blob_digest = hashlib.sha256(blob).hexdigest()[:16]
+        try:
+            (self._renders_dir / f"overlay-patch-{blob_digest}.bin").write_bytes(blob)
+        except OSError:
+            logger.exception("frame patch: blob write failed for device=%s", device_id)
+            return False
+        self._drop_patches_locked(device_id)
+        self._patch_seq = max(self._patch_seq + 1, int(time.time() * 1000))
+        self._patch_docs[device_id] = {
+            "schema": 2,
+            "frame_digest": anchor_digest,
+            "seq": self._patch_seq,
+            "format": "fb-rect",
+            "url": f"/api/v1/device/{device_id}/frame/patch/{blob_digest}",
+            "bytes": len(blob),
+            "rects": entries,
+            "blob_digest": blob_digest,
+        }
         logger.info(
             "frame patch: %d rect(s), %d bytes staged for device=%s (anchor=%s)",
             len(entries),
@@ -778,6 +830,82 @@ class PushManager:
             device_id,
             anchor_digest,
         )
+        return True
+
+    def _divert_to_patches_locked(
+        self, renderer: Renderer, render_info: dict[str, Any], panel: Panel
+    ) -> bool:
+        """Deliver a freshly-rendered frame as patches on the CURRENT
+        digest instead of stamping it live, when the target is a
+        patch-capable REST device showing the same page and the visual
+        diff is small (the header-clock case). Holds the digest stable,
+        which both avoids a full e-ink repaint for chrome-only changes
+        and stops digest churn from invalidating in-flight taps. Caller
+        holds ``_lock``. False = stamp normally."""
+        device_id = renderer.device
+        prev = self._latest_renders.get(device_id)
+        if prev is None or prev.get("digest") == render_info.get("digest"):
+            return False
+        prev_page = str(prev.get("page_id") or "")
+        if not prev_page or prev_page != str(render_info.get("page_id") or ""):
+            # Different (or unknown) page: the on-glass touch regions
+            # would no longer match what the patches paint.
+            return False
+        if not self._renderer_is_http_polled(renderer):
+            return False
+        status = (self._device_status_fn() or {}).get(device_id)
+        cap = status.get("overlay") if isinstance(status, dict) else None
+        schema = cap.get("schema") if isinstance(cap, dict) else None
+        if not isinstance(schema, int) or isinstance(schema, bool) or schema < 2:
+            return False
+        payload = self._build_patch_payload(prev, render_info, panel.model_dump())
+        if isinstance(payload, str):
+            logger.info("push not diverted to patches for device=%s (%s)", device_id, payload)
+            return False
+        blob, entries = payload
+        if not self._stage_patches_locked(device_id, str(prev.get("digest") or ""), blob, entries):
+            return False
+        # Freshness bump only; digest / filename / signature stay the
+        # anchor's, so the device keeps 304ing and the next render
+        # re-diffs against the same base.
+        prev["timestamp"] = time.time()
+        self._save_latest_renders()
+        return True
+
+    def reconcile_via_patches(self, device_id: str, page_id: str, *, panel: dict[str, Any]) -> str:
+        """Post-action reconcile for a patch-capable device: re-render
+        the page headless, diff against the frame the device is showing,
+        and stage the changed rects as a patch document the device picks
+        up on its next ``/frame/data`` poll (or ``/status`` beat). The
+        device's frame digest never changes, so its ETag polling keeps
+        304ing and no full download or full e-ink flash happens.
+
+        Returns ``patched`` (document staged), ``no_change`` (re-render
+        produced the identical artifact), ``superseded`` (a newer frame
+        landed while rendering; it already covers this), ``promoted``
+        (patching wasn't the right delivery, the shadow render was
+        promoted so the next poll full-paints), or ``failed``."""
+        anchor = self.latest_render_for(device_id)
+        anchor_digest = str(anchor.get("digest") or "") if anchor else ""
+        if not anchor_digest or anchor is None:
+            return "failed"
+        info = self.shadow_render_page(page_id, device_id)
+        if info is None:
+            return "failed"
+        if str(info.get("digest") or "") == anchor_digest:
+            return "no_change"
+        payload = self._build_patch_payload(anchor, info, panel)
+        if isinstance(payload, str):
+            logger.info(
+                "frame patch: full frame instead of patches for device=%s (%s)",
+                device_id,
+                payload,
+            )
+            return self._promote_shadow(device_id, anchor_digest, info)
+        blob, entries = payload
+        with self._lock:
+            if not self._stage_patches_locked(device_id, anchor_digest, blob, entries):
+                return "superseded"
         return "patched"
 
     # -- speculative pre-compose (issue #49 linger) ----------------------
@@ -1686,6 +1814,22 @@ class PushManager:
                     # touching the live map, so the device keeps serving its
                     # current frame until navigation promotes this one.
                     stamp_into[renderer.device] = render_info
+                elif (
+                    not force_publish
+                    and not force_client_refetch
+                    and self._divert_to_patches_locked(renderer, render_info, panel)
+                ):
+                    # Patch-capable REST device, same page, small visual
+                    # diff (a header clock tick): the change shipped as
+                    # partial-refresh patches on the CURRENT digest, so
+                    # the live entry deliberately does not move. Explicit
+                    # repaint intents (force_publish / resend refetch)
+                    # skip the divert above and stamp normally.
+                    logger.info(
+                        "push diverted to patches for device=%s (digest held at %s)",
+                        renderer.device,
+                        self._latest_renders.get(renderer.device, {}).get("digest"),
+                    )
                 else:
                     self._latest_renders[renderer.device] = render_info
                     self._save_latest_renders()

@@ -8,6 +8,29 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Frame patches now actually stage under real dithering, and periodic small changes ride them
+  too.** The patch diff moved to composition space (before per-renderer dithering): the .bin
+  family's default error-diffusion dither made a one-tile change perturb the packed bytes of
+  nearly the whole frame, so the wire-space diff always blew the budget and every reconcile fell
+  back to a full frame — the schema-2 path never engaged on hardware. Composition rects now map
+  through the same transform chain as tap targets and the blob is cut from the new artifact.
+  On top of that, scheduled and push-triggered re-renders whose visual diff is small (a header
+  clock tick) are delivered as patches on the current digest for schema-2 REST devices showing
+  the same page: no full e-ink flash per clock tick, and stable digests mean a tap fired around
+  a render can no longer be dropped as stale. Explicit repaint intents (resend, force publish)
+  and big diffs still mint a new digest.
+
+- **Overlay capability survives restarts.** The advertised overlay schema persists in the
+  device-facts store and re-seeds the status cache at startup, so a patch-capable panel isn't
+  demoted to full-repaint reconciles between a server restart and its next heartbeat.
+
+### Fixed
+
+- **Overlay values `seq` is now milliseconds.** Second-granularity seqs made two value changes
+  inside one second dedup to a single repaint under the firmware's newest-wins rule.
+
+### Added
+
 - **Post-action frame patches (overlay schema 2).** After a touch action fires a Home Assistant
   service call, the server re-renders the page headless, diffs the wire framebuffer against the
   frame on glass, and stages only the changed rects as a patch document (`patches` on

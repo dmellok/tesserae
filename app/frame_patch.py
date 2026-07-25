@@ -23,6 +23,7 @@ mypy --strict does not apply here; shapes mirror app.overlay_sync.
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -120,6 +121,39 @@ def _merge_to_cap(
     return out
 
 
+def _cluster_changes(
+    neq: Any, *, tile_cols: int, max_rects: int
+) -> list[tuple[int, int, int, int]]:
+    """Cluster a 2D change mask into at most ``max_rects`` tight rects
+    ``(y, x, h, w)`` in the mask's own column units: coarse tile grid,
+    connected components, per-component tighten, greedy merge."""
+    import numpy as np
+
+    height, width = neq.shape
+    counts = np.add.reduceat(neq, np.arange(0, height, _TILE_ROWS), axis=0)
+    counts = np.add.reduceat(counts, np.arange(0, width, tile_cols), axis=1)
+    boxes = _components(counts > 0)
+    rects: list[tuple[int, int, int, int]] = []
+    for rmin, cmin, rmax, cmax in boxes:
+        y0 = rmin * _TILE_ROWS
+        y1 = min(height, (rmax + 1) * _TILE_ROWS)
+        x0 = cmin * tile_cols
+        x1 = min(width, (cmax + 1) * tile_cols)
+        # Tighten the tile bbox to the true changed extents inside it.
+        sub = neq[y0:y1, x0:x1]
+        rows = np.flatnonzero(sub.any(axis=1))
+        cols = np.flatnonzero(sub.any(axis=0))
+        rects.append(
+            (
+                y0 + int(rows[0]),
+                x0 + int(cols[0]),
+                int(rows[-1] - rows[0]) + 1,
+                int(cols[-1] - cols[0]) + 1,
+            )
+        )
+    return _merge_to_cap(rects, max_rects)
+
+
 def diff_rects(
     old: bytes,
     new: bytes,
@@ -131,7 +165,14 @@ def diff_rects(
     """Changed regions between two same-size packed framebuffers, as
     wire-space pixel rects ``(x, y, w, h)`` with x/w on byte boundaries.
     Empty list = identical buffers. None = the buffers aren't a packed
-    framebuffer for these dims (caller falls back to a full push)."""
+    framebuffer for these dims (caller falls back to a full push).
+
+    Only sound for local pixel changes: error-diffusion dither
+    (floyd-steinberg, the .bin family default) propagates a change's
+    quantisation error through the rest of the scan, so two renders
+    differing in one tile differ nearly everywhere at the byte level.
+    Prefer :func:`diff_composition_rects` when the composition PNGs are
+    available; this byte diff is the fallback."""
     import numpy as np
 
     bpp = infer_bpp(len(old), width, height)
@@ -143,34 +184,77 @@ def diff_rects(
     neq = a != b
     if not neq.any():
         return []
-
-    # Coarse tile grid of "anything changed in here", then connected
-    # components so each cluster of change becomes one candidate rect.
-    counts = np.add.reduceat(neq, np.arange(0, height, _TILE_ROWS), axis=0)
-    counts = np.add.reduceat(counts, np.arange(0, stride, _TILE_BYTES), axis=1)
-    boxes = _components(counts > 0)
-
+    byte_rects = _cluster_changes(neq, tile_cols=_TILE_BYTES, max_rects=max_rects)
     px_per_byte = 8 // bpp
-    byte_rects: list[tuple[int, int, int, int]] = []
-    for rmin, cmin, rmax, cmax in boxes:
-        y0 = rmin * _TILE_ROWS
-        y1 = min(height, (rmax + 1) * _TILE_ROWS)
-        x0 = cmin * _TILE_BYTES
-        x1 = min(stride, (cmax + 1) * _TILE_BYTES)
-        # Tighten the tile bbox to the true changed extents inside it.
-        sub = neq[y0:y1, x0:x1]
-        rows = np.flatnonzero(sub.any(axis=1))
-        cols = np.flatnonzero(sub.any(axis=0))
-        byte_rects.append(
-            (
-                y0 + int(rows[0]),
-                x0 + int(cols[0]),
-                int(rows[-1] - rows[0]) + 1,
-                int(cols[-1] - cols[0]) + 1,
-            )
-        )
-    byte_rects = _merge_to_cap(byte_rects, max_rects)
     return [(x * px_per_byte, y, w * px_per_byte, h) for (y, x, h, w) in byte_rects]
+
+
+def diff_composition_rects(
+    old_png: bytes,
+    new_png: bytes,
+    *,
+    expected_w: int | None = None,
+    expected_h: int | None = None,
+    max_rects: int = MAX_PATCH_RECTS,
+) -> list[tuple[int, int, int, int]] | None:
+    """Changed regions between two composition PNGs, as composition-space
+    pixel rects ``(x, y, w, h)``. Empty list = pixel-identical. None =
+    undecodable or different dims (caller falls back).
+
+    This is the diff that matters for the .bin family: it happens BEFORE
+    the per-renderer dither, where a one-tile change stays one tile, so
+    the rects are tight even under error-diffusion dithering. The caller
+    transforms them into wire space (``overlay_sync.rect_to_wire``) and
+    cuts the blob from the dithered artifact."""
+    import io
+
+    import numpy as np
+    from PIL import Image
+
+    try:
+        a = np.asarray(Image.open(io.BytesIO(old_png)).convert("RGB"))
+        b = np.asarray(Image.open(io.BytesIO(new_png)).convert("RGB"))
+    except Exception:
+        return None
+    if a.shape != b.shape:
+        return None
+    if expected_w is not None and (a.shape[1] != expected_w or a.shape[0] != expected_h):
+        return None  # PNG isn't this panel's composition (image push, resize)
+    neq = (a != b).any(axis=2)
+    if not neq.any():
+        return []
+    return [
+        (x, y, w, h) for (y, x, h, w) in _cluster_changes(neq, tile_cols=32, max_rects=max_rects)
+    ]
+
+
+def align_rect(
+    rect: tuple[int, int, int, int],
+    *,
+    width: int,
+    height: int,
+    bpp: int,
+    pad: int = 2,
+) -> tuple[int, int, int, int] | None:
+    """Snap a wire-space pixel rect outward onto byte-aligned columns
+    (multiples of ``8/bpp`` px) and clamp to the panel, growing by
+    ``pad`` px first so a rect derived from a scaled composition diff
+    can't shave the edge of the changed area. None when it degenerates."""
+    px_per_byte = 8 // bpp
+    x, y, w, h = rect
+    if x >= width or y >= height or x + w <= 0 or y + h <= 0:
+        return None  # no intersection with the panel even before padding
+    x0 = max(0, x - pad)
+    y0 = max(0, y - pad)
+    x1 = min(width, x + w + pad)
+    y1 = min(height, y + h + pad)
+    x0 -= x0 % px_per_byte
+    if x1 % px_per_byte:
+        x1 += px_per_byte - (x1 % px_per_byte)
+    x1 = min(width, x1)
+    if x1 - x0 <= 0 or y1 - y0 <= 0:
+        return None
+    return (x0, y0, x1 - x0, y1 - y0)
 
 
 def build_patch_blob(

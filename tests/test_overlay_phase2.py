@@ -267,7 +267,7 @@ def test_values_document_resolves_formats_and_clips() -> None:
         return states[entity_id]
 
     doc = overlay_sync.values_document(slots, ha_get_state=get_state, now=1234.9)
-    assert doc["seq"] == 1234
+    assert doc["seq"] == 1234900  # milliseconds
     assert doc["values"]["ha:sensor.temp"] == "21.4°"
     assert len(doc["values"]["ha:sensor.long"]) == overlay_sync.MAX_VALUE_CHARS
     assert "ha:sensor.gone" not in doc["values"]

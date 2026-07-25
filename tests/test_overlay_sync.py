@@ -261,7 +261,7 @@ def test_values_document_applies_slot_map_then_suffix() -> None:
         {"key": "ha:light.desk:attributes.brightness", "suffix": ""},
     ]
     doc = overlay_sync.values_document(slots, ha_get_state=_get_state, now=1000.0)
-    assert doc["seq"] == 1000
+    assert doc["seq"] == 1_000_000  # milliseconds
     assert doc["values"] == {
         "ha:light.desk": "1",
         "ha:sensor.temp": "21.4°",

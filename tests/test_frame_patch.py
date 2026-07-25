@@ -93,3 +93,53 @@ def test_1bpp_alignment_uses_eight_pixel_columns() -> None:
     new[10:12, 5:7] = 0xFF  # byte cols 5-6 -> px 40..55
     rects = diff_rects(old.tobytes(), new.tobytes(), width=W, height=H)
     assert rects == [(40, 10, 16, 2)]
+
+
+# -- composition-space diff (pre-dither) ----------------------------------
+
+
+def _png(arr: np.ndarray) -> bytes:
+    import io
+
+    from PIL import Image
+
+    buf = io.BytesIO()
+    Image.fromarray(arr).save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def test_composition_diff_is_tight_under_global_dither_noise() -> None:
+    """The reason this function exists: a wire-space byte diff of two
+    error-diffusion renders is nearly global, but the composition diff
+    of the same change is one tight rect."""
+    from app.frame_patch import diff_composition_rects
+
+    old = np.full((H, W, 3), 255, dtype=np.uint8)
+    new = old.copy()
+    new[40:46, 200:222] = 0
+    rects = diff_composition_rects(_png(old), _png(new), expected_w=W, expected_h=H)
+    assert rects == [(200, 40, 22, 6)]
+
+
+def test_composition_diff_identical_and_mismatched() -> None:
+    from app.frame_patch import diff_composition_rects
+
+    base = np.full((H, W, 3), 255, dtype=np.uint8)
+    assert diff_composition_rects(_png(base), _png(base)) == []
+    assert diff_composition_rects(_png(base), _png(base), expected_w=W + 2, expected_h=H) is None
+    other = np.full((H // 2, W, 3), 255, dtype=np.uint8)
+    assert diff_composition_rects(_png(base), _png(other)) is None
+    assert diff_composition_rects(b"not a png", _png(base)) is None
+
+
+def test_align_rect_pads_and_snaps_to_byte_columns() -> None:
+    from app.frame_patch import align_rect
+
+    # 4bpp -> 2 px/byte: pad 2 then snap outward to even columns.
+    assert align_rect((5, 5, 10, 10), width=W, height=H, bpp=4) == (2, 3, 16, 14)
+    # 1bpp -> 8 px/byte columns.
+    assert align_rect((9, 0, 4, 4), width=W, height=H, bpp=1) == (0, 0, 16, 6)
+    # Clamps at the panel edge and never exceeds it.
+    x, y, w, h = align_rect((W - 3, H - 3, 3, 3), width=W, height=H, bpp=4)
+    assert x + w <= W and y + h <= H
+    assert align_rect((0, H, 4, 4), width=W, height=H, bpp=4) is None

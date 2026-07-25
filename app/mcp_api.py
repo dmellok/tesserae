@@ -657,12 +657,13 @@ def devices() -> Response:
     present: ``overlay: {schema, max_targets}`` means the panel does local
     partial-refresh overlays, so up to ``max_targets`` tap zones echo
     instantly and ``data-overlay-key`` value slots repaint with live values
-    between full renders. ``schema: 2`` additionally means post-action frame
-    patches: after a tap fires an HA action, the server re-renders and the
-    panel partial-paints just the changed regions within a couple of
-    seconds, so a control dashboard's state stays truthful without
-    designing around stale frames (``schema: 1`` panels converge via a
-    debounced full re-push a few seconds after a tap burst instead).
+    between full renders. ``schema: 2`` additionally means frame patches:
+    after a tap fires an HA action, and on periodic re-renders that only
+    move small chrome (a header clock), the panel partial-paints just the
+    changed regions instead of full-flashing, so a control dashboard's
+    state stays truthful and a clock in the header doesn't cost a full
+    e-ink repaint per tick (``schema: 1`` panels converge via a debounced
+    full re-push a few seconds after a tap burst instead).
     ``deck_cache: {capacity_bytes}`` means the device caches deck frames on
     local storage and navigates decks without a network round trip. All are
     read-only facts about the hardware; their absence just means those

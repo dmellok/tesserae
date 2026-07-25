@@ -340,8 +340,10 @@ get instant echo on that panel (8 on older firmware, 32 on current). Three thing
 - If "overlay" reports "schema": 2, taps that fire Home Assistant actions also self-heal: the
   server re-renders after the action and the panel partial-paints just the changed regions within
   a couple of seconds (schema 1 panels converge via a full re-push a few seconds after the tap
-  burst). Design the dashboard to SHOW state normally; do not encode state in tap-echo inversion
-  tricks or warn the user about stale control panels.
+  burst). Periodic re-renders that only move small chrome (a header clock) arrive the same way,
+  so a clock on the dashboard does not cost these panels a full e-ink flash every tick. Design
+  the dashboard to SHOW state normally; do not encode state in tap-echo inversion tricks, avoid
+  clocks for flash reasons, or warn the user about stale control panels.
 - The element showing a live value can carry data-overlay-key (optional data-overlay-suffix, e.g.
   a degree sign) -- in an authored widget's markup AND inside a canvas code element (its sandbox
   reports slots out the same way it reports touch regions). Keys are "ha:<entity_id>" (state) or
@@ -451,11 +453,13 @@ def build_server() -> Any:
         "overlay": {schema, max_targets} means the panel repaints small regions
         locally (instant tap echo, plus data-overlay-key live value slots --
         see the LIVE VALUE SLOTS section of the server instructions for the
-        guardrails). "schema": 2 additionally means post-action frame patches:
-        after a tap fires a Home Assistant action, the panel partial-paints the
-        changed regions within a couple of seconds on its own, so control
-        dashboards stay truthful without any authoring tricks ("schema": 1
-        panels converge via a full re-push a few seconds after a tap burst).
+        guardrails). "schema": 2 additionally means frame patches: after a tap
+        fires a Home Assistant action, and on periodic re-renders that only
+        move small chrome (a header clock), the panel partial-paints the
+        changed regions on its own instead of full-flashing, so control
+        dashboards stay truthful and clock chrome is flash-free without any
+        authoring tricks ("schema": 1 panels converge via a full re-push a
+        few seconds after a tap burst).
         "deck_cache": {capacity_bytes} means the device caches deck frames on
         local storage and navigates decks instantly with the radio off. "kind"
         is the hardware model id. All read-only facts; never ask the user to

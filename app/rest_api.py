@@ -1350,7 +1350,7 @@ def get_frame_data(device_id: str) -> Response:
     patches = _frame_patches_doc(device.id, digest)
     if doc is None and patches is None:
         return _error(404, "no values for this frame")
-    out: dict[str, Any] = doc if doc is not None else {"seq": int(time.time()), "values": {}}
+    out: dict[str, Any] = doc if doc is not None else {"seq": int(time.time() * 1000), "values": {}}
     if patches is not None:
         out["patches"] = patches
     return jsonify(out)
