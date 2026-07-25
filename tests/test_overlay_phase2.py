@@ -1,7 +1,8 @@
-"""Phase-2 overlay tests: slot normalization + sidecar v3, atlas
-packing/build (fake rasterizer, no Playwright), slot/atlas grouping in
-build_spec, the values document, and the REST surface (spec with slots,
-atlas fetch, /frame/data, /status overlay_values piggyback)."""
+"""Overlay value-slot tests: slot normalization + sidecar v3, atlas
+packing/build (fake rasterizer, no Playwright), the values document, and
+the REST surface (atlas fetch, /frame/data, /status overlay_values
+piggyback). The schema-1 build_spec tests that used to live here were
+removed with the spec builder (protocol v2)."""
 
 from __future__ import annotations
 
@@ -158,10 +159,7 @@ def test_build_atlas_failure_returns_none(tmp_path: Path) -> None:
     assert overlay_sync.build_atlas(32, 400, renders_dir=tmp_path, rasterize=boom) is None
 
 
-# -- build_spec with slots ------------------------------------------------------
-
-
-PANEL = {"w": 800, "h": 480, "orientation": "landscape", "native_w": 800, "native_h": 480}
+# -- values document -----------------------------------------------------------
 
 
 def _norm_slot(x: int = 10, px: int = 32, weight: int = 700, key: str = "ha:sensor.temp"):
@@ -176,76 +174,6 @@ def _norm_slot(x: int = 10, px: int = 32, weight: int = 700, key: str = "ha:sens
         "px": px,
         "weight": weight,
     }
-
-
-def _atlas_provider(px: int, weight: int) -> dict[str, Any]:
-    return {
-        "digest": f"{px:02d}{weight}" + "e" * 10,
-        "url": f"/atlas/{px}-{weight}",
-        "format": "4bpp-gray",
-        "height": px,
-        "glyphs": {"0": {"x": 0, "w": 8}},
-    }
-
-
-def test_build_spec_emits_slots_and_atlases() -> None:
-    spec = overlay_sync.build_spec(
-        frame_digest="a" * 16,
-        regions=[],
-        panel=PANEL,
-        slots=[_norm_slot(), _norm_slot(x=200, key="ha:sensor.hum")],
-        atlas_provider=_atlas_provider,
-    )
-    assert spec is not None
-    assert len(spec["atlases"]) == 1
-    assert spec["atlases"][0]["id"] == "a1"
-    assert [s["atlas"] for s in spec["slots"]] == ["a1", "a1"]
-    assert spec["slots"][0] == {
-        "id": "s1",
-        "x": 10,
-        "y": 20,
-        "w": 100,
-        "h": 40,
-        "key": "ha:sensor.temp",
-        "align": "right",
-        "atlas": "a1",
-    }
-
-
-def test_build_spec_caps_atlas_groups_largest_first() -> None:
-    slots = (
-        [_norm_slot(x=10 * i, px=32) for i in range(3)]
-        + [_norm_slot(x=100 + 10 * i, px=48) for i in range(2)]
-        + [_norm_slot(x=300, px=64)]  # smallest group, dropped
-    )
-    spec = overlay_sync.build_spec(
-        frame_digest="b" * 16,
-        regions=[],
-        panel=PANEL,
-        slots=slots,
-        atlas_provider=_atlas_provider,
-    )
-    assert spec is not None
-    assert len(spec["atlases"]) == overlay_sync.MAX_ATLASES
-    assert len(spec["slots"]) == 5
-    heights = {a["height"] for a in spec["atlases"]}
-    assert heights == {32, 48}
-
-
-def test_build_spec_failed_atlas_degrades_to_rect_only() -> None:
-    spec = overlay_sync.build_spec(
-        frame_digest="c" * 16,
-        regions=[{"x": 1, "y": 2, "w": 30, "h": 40}],
-        panel=PANEL,
-        slots=[_norm_slot()],
-        atlas_provider=lambda px, weight: None,
-    )
-    assert spec is not None
-    assert "slots" not in spec and "atlases" not in spec
-    assert len(spec["targets"]) == 1
-
-
-# -- values document -----------------------------------------------------------
 
 
 def test_values_document_resolves_formats_and_clips() -> None:

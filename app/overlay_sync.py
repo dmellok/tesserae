@@ -1,19 +1,18 @@
-"""Device-facing overlay specs (hybrid render mode, schema 1).
+"""Device-facing overlay machinery (hybrid render mode).
 
 Touch boards with partial refresh (E1003 first) advertise
-``overlay: {"schema": 1}`` and fetch a per-frame overlay spec: a small
-draw list the firmware applies over the served frame for sub-second
-feedback (tap-echo inverts today; value slots + glyph atlases are the
-next schema slice). The firmware applies coordinates verbatim in the
-wire-framebuffer pixel space it paints, so ALL transforms happen here.
+``overlay: {"schema": N}`` and receive live values (``values_document``,
+drawn on-device through glyph atlases) and post-action frame patches
+(:mod:`app.frame_patch`). The firmware applies coordinates verbatim in
+the wire-framebuffer pixel space it paints, so ALL transforms happen
+here: :func:`rect_to_wire` mirrors the .bin renderer's chain exactly
+(rotate on orientation mismatch, 180-degree flip, scale to
+firmware-native dims, underscan inset). Contract in
+docs/dev/client-protocol.md.
 
-Slice 1 ships rect-only specs: the tap-echo targets are derived from
-the touch-region sidecar the render already produced (issue #49), moved
-from composition space into wire space by mirroring the .bin renderer's
-transform chain exactly: rotate on orientation mismatch, 180-degree
-flip, scale to firmware-native dims, underscan inset. The contract is
-documented in docs/dev/client-protocol.md; firmware behaviour and caps
-in the v1.8 firmware report (8 targets / 8 slots / 2 atlases).
+The schema-1 overlay-spec builder (tap-echo target lists) was removed
+with protocol v2 (docs/protocol-v2-touch.md); its successor is the
+interaction manifest.
 
 mypy --strict does not apply here; shapes mirror app.deck_sync.
 """
@@ -29,37 +28,6 @@ from app.panel import is_flipped_orientation
 
 logger = logging.getLogger(__name__)
 
-# Firmware-side caps from the v1.8 implementation report (v1.9 raised
-# the target buffer and advertises its own limit via
-# ``overlay.max_targets``; 8 stays the floor for firmware that doesn't
-# send the field). The server must stay within them; anything past a
-# cap is dropped with a log line (no silent truncation).
-MAX_TARGETS = 8
-# Firmware parses spec documents into a fixed 8 KB buffer; the v1.9
-# worst-case host test (32 targets + 8 slots + 2 full atlases) measures
-# ~6.5 KB, so exceeding this indicates a server-side regression.
-MAX_SPEC_BYTES = 8192
-
-
-def _is_nav_region(region: dict[str, Any]) -> bool:
-    """True when a touch region's action navigates (page jump, rotation
-    step): the targets that most deserve instant echo when a frame has
-    more regions than the device's target budget."""
-    specs: list[str] = []
-    tap = region.get("tap")
-    if isinstance(tap, str):
-        specs.append(tap)
-    swipe = region.get("swipe")
-    if isinstance(swipe, dict):
-        specs.extend(str(s) for s in swipe.values())
-    return any(
-        s.startswith(("page:", "step:")) or s in ("rotate_next", "rotate_prev") for s in specs
-    )
-
-
-MAX_SLOTS = 8
-MAX_ATLASES = 2
-MAX_GLYPHS = 32
 MAX_VALUE_CHARS = 47
 
 # Every glyph a slice-2 atlas carries. Sized for numeric sensor values:
@@ -201,152 +169,6 @@ def _panel_geometry(panel: dict[str, Any]) -> dict[str, Any] | None:
         "flip": is_flipped_orientation(panel.get("orientation")),
         "underscan": max(0, underscan),
     }
-
-
-def _rect_from(entry: dict[str, Any], geo: dict[str, Any]) -> tuple[int, int, int, int] | None:
-    try:
-        rect = (float(entry["x"]), float(entry["y"]), float(entry["w"]), float(entry["h"]))
-    except (KeyError, TypeError, ValueError):
-        return None
-    return rect_to_wire(
-        rect,
-        comp_w=geo["comp_w"],
-        comp_h=geo["comp_h"],
-        native_w=geo["native_w"],
-        native_h=geo["native_h"],
-        flip=geo["flip"],
-        underscan=geo["underscan"],
-    )
-
-
-def build_spec(
-    *,
-    frame_digest: str,
-    regions: list[dict[str, Any]],
-    panel: dict[str, Any],
-    slots: list[dict[str, Any]] | None = None,
-    atlas_provider: Any | None = None,
-    max_targets: int = MAX_TARGETS,
-) -> dict[str, Any] | None:
-    """The schema-1 overlay spec for one frame, wire-space coordinates:
-    tap-echo targets from the touch-region sidecar, plus (when the
-    sidecar carries value slots and an ``atlas_provider`` is supplied)
-    ``slots`` + ``atlases`` for live value text.
-
-    ``atlas_provider(px, weight)`` returns an atlas dict
-    ``{id, digest, url, format, height, glyphs}`` or None on failure; a
-    failed atlas drops its slots (the spec degrades to rect-only rather
-    than erroring). Slots group by (px, weight); the firmware carries at
-    most MAX_ATLASES groups, so the largest groups win and the rest are
-    dropped with a log line. None when the panel block can't provide the
-    transform inputs."""
-    geo = _panel_geometry(panel)
-    if geo is None:
-        return None
-    # Resolve every region to a wire rect first; when the frame carries
-    # more regions than the device's advertised target budget, trim with
-    # navigation-priority (page/rotation targets echo first, document
-    # order within each class) instead of blind document order, so the
-    # targets most likely to be pressed repeatedly keep their echo.
-    resolved = [(region, wire) for region in regions if (wire := _rect_from(region, geo))]
-    if len(resolved) > max_targets:
-        logger.info(
-            "overlay spec: %d regions > device budget %d for frame %s; nav targets win",
-            len(resolved),
-            max_targets,
-            frame_digest,
-        )
-        by_priority = sorted(enumerate(resolved), key=lambda p: (not _is_nav_region(p[1][0]), p[0]))
-        # Survivors go back to document position: the firmware's own
-        # overflow rule is first-in-document-order, so emitting in
-        # document order keeps behaviour identical even if a stale
-        # device ignores its advertised budget.
-        resolved = [rw for _i, rw in sorted(by_priority[:max_targets], key=lambda p: p[0])]
-    targets = [
-        {
-            "id": f"t{n + 1}",
-            "x": wire[0],
-            "y": wire[1],
-            "w": wire[2],
-            "h": wire[3],
-            "echo": "invert",
-        }
-        for n, (_region, wire) in enumerate(resolved)
-    ]
-
-    spec: dict[str, Any] = {"schema": 1, "frame_digest": frame_digest, "targets": targets}
-
-    usable = [s for s in (slots or []) if isinstance(s, dict)]
-    if usable and atlas_provider is not None:
-        # Group by the (px, weight) pair that defines an atlas; largest
-        # groups win the MAX_ATLASES budget.
-        groups: dict[tuple[int, int], list[dict[str, Any]]] = {}
-        for s in usable:
-            try:
-                groups.setdefault((int(s["px"]), int(s["weight"])), []).append(s)
-            except (KeyError, TypeError, ValueError):
-                continue
-        ranked = sorted(groups.items(), key=lambda kv: (-len(kv[1]), kv[0]))
-        if len(ranked) > MAX_ATLASES:
-            dropped = sum(len(v) for _k, v in ranked[MAX_ATLASES:])
-            logger.info(
-                "overlay spec: dropping %d slot(s) beyond %d atlas groups for frame %s",
-                dropped,
-                MAX_ATLASES,
-                frame_digest,
-            )
-        out_slots: list[dict[str, Any]] = []
-        out_atlases: list[dict[str, Any]] = []
-        for idx, ((px, weight), members) in enumerate(ranked[:MAX_ATLASES]):
-            atlas = atlas_provider(px, weight)
-            if atlas is None:
-                logger.warning(
-                    "overlay spec: atlas build failed px=%d weight=%d; dropping %d slot(s)",
-                    px,
-                    weight,
-                    len(members),
-                )
-                continue
-            atlas_id = f"a{idx + 1}"
-            out_atlases.append({**atlas, "id": atlas_id})
-            for s in members:
-                if len(out_slots) >= MAX_SLOTS:
-                    logger.info(
-                        "overlay spec: dropping slots past firmware cap %d for frame %s",
-                        MAX_SLOTS,
-                        frame_digest,
-                    )
-                    break
-                wire = _rect_from(s, geo)
-                if wire is None:
-                    continue
-                out_slots.append(
-                    {
-                        "id": f"s{len(out_slots) + 1}",
-                        "x": wire[0],
-                        "y": wire[1],
-                        "w": wire[2],
-                        "h": wire[3],
-                        "key": str(s.get("key") or ""),
-                        "align": str(s.get("align") or "left"),
-                        "atlas": atlas_id,
-                    }
-                )
-        if out_slots:
-            spec["slots"] = out_slots
-            spec["atlases"] = out_atlases
-    size = len(json.dumps(spec, separators=(",", ":")))
-    if size > MAX_SPEC_BYTES:
-        # Shouldn't be reachable within the caps (firmware's worst-case
-        # host test measures ~6.5 KB); a breach means a regression here,
-        # so log loudly rather than ship a document the parser rejects.
-        logger.error(
-            "overlay spec: %d bytes exceeds firmware buffer %d for frame %s",
-            size,
-            MAX_SPEC_BYTES,
-            frame_digest,
-        )
-    return spec
 
 
 # -- glyph atlases ---------------------------------------------------------
