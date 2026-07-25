@@ -927,6 +927,41 @@ server re-pushes the page asynchronously ~3 s after the last action
 (`app.touch_repush_debounce_s`), and the next `/frame` poll or MQTT
 publish delivers a normal full frame.
 
+## Protocol v2 (device-owned touch)
+
+Advertise `"proto": {"v": 2}` in register/status bodies (sticky,
+persisted). A v2 device owns hit testing and immediate feedback; the
+full client contract, including the manifest schema, byte layouts, tier
+model, and reconnect rules, is the v2 firmware specification
+(`docs/protocol-v2-touch.md` and its implementation prompt). Server
+surfaces:
+
+- `GET /api/v1/device/<id>/frame/manifest?digest=<frame>` — the
+  interaction manifest: wire-space region rects with stable ids,
+  gesture + tier + feedback declarations, and device-rendered text
+  regions with glyph atlases. Action payloads never leave the server.
+  `404` = no manifest (feature off for the frame). `/frame` `200`
+  responses for proto-2 devices carry
+  `"manifest": {"digest", "url"}` so an unchanged layout never costs a
+  re-fetch.
+- `POST /api/v1/device/<id>/tap` with
+  `{"region_id", "gesture", "value"?, "digest", "event_id"}` — the v2
+  action report. The server re-mints the id from the frame's own
+  sidecar (a stale or forged id resolves to `no_target`), applies the
+  same dedup/stale/provenance guards as coordinate strokes, and
+  dispatches. Coordinate bodies remain the v1 path on the same
+  endpoint.
+- `GET /api/v1/device/<id>/stream` — Server-Sent Events: `values` /
+  `patches` / `sync` envelopes (identical payloads to the `/status`
+  piggybacks and `/frame/data`), comment keepalive every 25 s. An
+  optimisation over the 1 s linger poll, never a correctness
+  requirement; reverse proxies must not buffer the route.
+- `GET /api/v1/device/<id>/bundle` (+ `/bundle/frame/<digest>`) — the
+  state bundle: warmed deck pages as digest-addressed frame states plus
+  a navigation links table, content-hash versioned; the `sync` event
+  repeats the bundle digest. `tile` states are contract-reserved and
+  not yet produced.
+
 ## MQTT topics
 
 All topics are namespaced under `tesserae/<device_id>/`.

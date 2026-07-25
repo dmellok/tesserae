@@ -6,6 +6,18 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added
+
+- **Protocol v2 server surfaces (device-owned touch).** Devices advertising `proto: {v: 2}`
+  (sticky, persisted) get: interaction manifests (`GET /frame/manifest?digest=`, plus a pointer
+  on `/frame` responses) with stable region ids, tier/type classification, feedback modes, and
+  text regions; region-id action reports on `POST /tap` validated by re-minting ids from the
+  frame's own sidecar; a Server-Sent Events channel (`GET /stream`) carrying values / patches /
+  sync envelopes with keepalives; and state bundles (`GET /bundle`) projecting the warmed deck
+  cache into digest-addressed frame states with a navigation links table. v1 responses stay
+  byte-identical for devices that don't advertise the capability. Contract:
+  `docs/protocol-v2-touch.md`.
+
 ### Removed
 
 - **Schema-1 overlay specs** (protocol v2 cleanup, see `docs/protocol-v2-touch.md`). The

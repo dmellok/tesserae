@@ -668,9 +668,7 @@ def create_app(
     # heartbeat. The sticky carry-forward in record_status_heartbeat then
     # preserves the seed through beats that omit the capability.
     for _dev_id, _fact in app.config["DEVICE_FACTS"].all().items():
-        _seed = {
-            k: _fact[k] for k in ("overlay", "proto") if isinstance(_fact.get(k), dict)
-        }
+        _seed = {k: _fact[k] for k in ("overlay", "proto") if isinstance(_fact.get(k), dict)}
         if _seed and _dev_id not in status_cache:
             status_cache[_dev_id] = _seed
     app.config["PREVIEW_CACHE"] = {}
