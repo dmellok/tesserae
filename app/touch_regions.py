@@ -163,6 +163,8 @@ EXTRACT_REGIONS_JS: Final[str] = """async () => {
                         slide: null,
                         origin: elOrigin,
                         dangling: [],
+                        tid: el.getAttribute('data-touch-id')
+                            || el.getAttribute('data-el-id') || null,
                     };
                     const t = resolveRef(tap, elActions, region);
                     const s = resolveRef(swipe, elActions, region);
@@ -248,22 +250,28 @@ def normalize_regions(raw: Any) -> list[dict[str, Any]]:
             reason = action_invalid_reason(slide.get("action"))
             if reason:
                 invalid.append({"gesture": "slide", "reason": reason})
-        out.append(
-            {
-                "x": x,
-                "y": y,
-                "w": w,
-                "h": h,
-                "depth": depth,
-                "order": order,
-                "tap": tap,
-                "swipe": swipe,
-                "slide": slide,
-                "origin": "config" if entry.get("origin") == "config" else "markup",
-                "dangling": dangling,
-                "invalid": invalid,
-            }
-        )
+        record = {
+            "x": x,
+            "y": y,
+            "w": w,
+            "h": h,
+            "depth": depth,
+            "order": order,
+            "tap": tap,
+            "swipe": swipe,
+            "slide": slide,
+            "origin": "config" if entry.get("origin") == "config" else "markup",
+            "dangling": dangling,
+            "invalid": invalid,
+        }
+        # Stable-id hint for the protocol-v2 interaction manifest: an
+        # explicit data-touch-id (author-pinned) or the canvas element id
+        # the compose template stamps as data-el-id. Optional; regions
+        # without one get a content-hash id at manifest build time.
+        tid = entry.get("tid")
+        if isinstance(tid, str) and tid.strip():
+            record["touch_id"] = tid.strip()[:64]
+        out.append(record)
     return out
 
 

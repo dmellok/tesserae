@@ -852,6 +852,24 @@ def get_frame(device_id: str) -> Response:
                 "rest /frame: renderer.payload() failed for renderer %s",
                 renderer.id,
             )
+    # Interaction manifest pointer (protocol v2): devices whose sticky
+    # capability advertises proto >= 2 learn the manifest digest on
+    # every frame response, so an unchanged layout never costs a
+    # manifest re-fetch. v1 responses stay byte-identical.
+    if _device_proto_v(device.id) >= 2:
+        try:
+            manifest_doc = _build_manifest_for(device, str(latest["digest"]))
+        except Exception:
+            current_app.logger.exception(
+                "rest /frame: manifest build failed for device=%s", device.id
+            )
+            manifest_doc = None
+        if manifest_doc is not None:
+            payload["manifest"] = {
+                "digest": manifest_doc["manifest_digest"],
+                "url": (f"/api/v1/device/{device.id}/frame/manifest?digest={latest['digest']}"),
+            }
+
     # Rotation envelope: current position, page id, and manual-override
     # state so the firmware (and any admin UI polling this endpoint)
     # can display where the device is. Omitted when the device isn't
@@ -1170,6 +1188,108 @@ def get_deck_frame(device_id: str, digest: str) -> Response:
     resp.headers["ETag"] = f'"{info["digest"]}"'
     resp.headers["Cache-Control"] = "immutable, max-age=31536000"
     return resp
+
+
+# -- interaction manifest (protocol v2) ------------------------------------
+
+
+def _frame_info_for_digest(device: Device, wanted: str) -> dict[str, Any] | None:
+    """Render info for a digest the device may be showing: its live
+    frame, or a deck-cached one (deck-painted pages get manifests too)."""
+    push_mgr = current_app.config.get("PUSH_MANAGER")
+    if push_mgr is None or not wanted:
+        return None
+    info = push_mgr.latest_render_for(device.id)
+    if info and str(info.get("digest") or "") == wanted:
+        return dict(info)
+    deck = _bound_deck(device.id)
+    if deck is not None:
+        from app.deck_sync import frame_entry_by_digest
+
+        entry = frame_entry_by_digest(deck, device.id, wanted, push_mgr=push_mgr)
+        if entry is not None:
+            return dict(entry)
+    return None
+
+
+def _atlas_provider_for(device: Device) -> Any:
+    """The manifest builder's atlas source: build (or reuse) the glyph
+    strip for a (px, weight) pair and hand back its device-scoped URL."""
+    renders_dir = current_app.config.get("RENDERS_DIR")
+    rasterizer = current_app.config.get("OVERLAY_ATLAS_RASTERIZER")
+    url_root = request.url_root
+
+    def provider(px: int, weight: int) -> dict[str, Any] | None:
+        if renders_dir is None:
+            return None
+        from app.overlay_sync import browser_rasterizer, build_atlas
+
+        rasterize = rasterizer or browser_rasterizer(url_root)
+        atlas = build_atlas(px, weight, renders_dir=Path(renders_dir), rasterize=rasterize)
+        if atlas is None:
+            return None
+        atlas["url"] = f"/api/v1/device/{device.id}/frame/overlay/atlas/{atlas['digest']}"
+        return atlas
+
+    return provider
+
+
+def _build_manifest_for(device: Device, wanted: str) -> dict[str, Any] | None:
+    """The interaction manifest for one served frame, or None when the
+    digest is unknown, the frame has no composition sidecar, or the
+    manifest would be empty (no regions, no text)."""
+    info = _frame_info_for_digest(device, wanted)
+    if info is None:
+        return None
+    push_mgr = current_app.config.get("PUSH_MANAGER")
+    comp_digest = str(info.get("composition_digest") or "")
+    if push_mgr is None or not comp_digest:
+        return None
+    regions = push_mgr.touch_regions_for(comp_digest)
+    slots = push_mgr.overlay_slots_for(comp_digest)
+    if not regions and not slots:
+        return None
+    from app.manifest import build_interaction_manifest
+
+    status = (current_app.config.get("DEVICE_STATUS") or {}).get(device.id)
+    overlay_cap = status.get("overlay") if isinstance(status, dict) else None
+    max_targets = overlay_cap.get("max_targets", 32) if isinstance(overlay_cap, dict) else 32
+    doc = build_interaction_manifest(
+        frame_digest=wanted,
+        regions=regions,
+        slots=slots,
+        panel=device.panel or {},
+        atlas_provider=_atlas_provider_for(device) if slots else None,
+        max_regions=int(max_targets),
+    )
+    if doc is None or (not doc["regions"] and not doc["text"]):
+        return None
+    return doc
+
+
+def _device_proto_v(device_id: str) -> int:
+    status = (current_app.config.get("DEVICE_STATUS") or {}).get(device_id)
+    cap = status.get("proto") if isinstance(status, dict) else None
+    v = cap.get("v") if isinstance(cap, dict) else None
+    return v if isinstance(v, int) and not isinstance(v, bool) else 1
+
+
+@bp.get("/<device_id>/frame/manifest")
+def get_frame_manifest(device_id: str) -> Response:
+    """The protocol-v2 interaction manifest for one served frame
+    (``?digest=<frame_digest>``): wire-space region rects with stable
+    ids, gesture + tier + feedback declarations, and device-rendered
+    text regions. Action payloads never leave the server; the device
+    reports region ids back on /tap. 404 = no manifest for this digest
+    (unknown frame, no interactivity), which the firmware treats as
+    feature-off."""
+    device, err = _auth_device(device_id)
+    if err is not None or device is None:
+        return err  # type: ignore[return-value]
+    doc = _build_manifest_for(device, _normalize_digest(request.args.get("digest", "")))
+    if doc is None:
+        return _error(404, "no manifest for this frame")
+    return jsonify(doc)
 
 
 # -- overlay atlases + frame data (hybrid render mode) ---------------------

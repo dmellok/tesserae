@@ -231,7 +231,7 @@
     "if(cs.display==='none'||cs.visibility==='hidden')continue;" +
     "out.push({x:Math.round(r.x),y:Math.round(r.y),w:Math.round(r.width),h:Math.round(r.height)," +
     "tap:n.getAttribute('data-on-tap'),swipe:n.getAttribute('data-on-swipe')," +
-    "slide:n.getAttribute('data-on-slide')});}return out;}" +
+    "slide:n.getAttribute('data-on-slide'),tid:n.getAttribute('data-touch-id')});}return out;}" +
     "function snapSlots(){var out=[];var ns=document.querySelectorAll('[data-overlay-key]');" +
     "for(var i=0;i<ns.length;i++){var n=ns[i];var r=n.getBoundingClientRect();" +
     "if(r.width<=0||r.height<=0)continue;var cs=getComputedStyle(n);" +
@@ -363,6 +363,7 @@
         if (r.tap) m.setAttribute("data-on-tap", r.tap);
         if (r.swipe) m.setAttribute("data-on-swipe", r.swipe);
         if (r.slide) m.setAttribute("data-on-slide", r.slide);
+        if (r.tid) m.setAttribute("data-touch-id", r.tid);
         m.setAttribute("data-touch-origin", "markup");
         wrap.appendChild(m);
       });
