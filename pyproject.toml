@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tesserae"
-version = "0.201.3"
+version = "0.201.4"
 description = "E-ink dashboard companion. Compose tile-based dashboards, render headless, push frames over MQTT."
 requires-python = ">=3.11"
 license = { text = "AGPL-3.0-or-later" }
@@ -13,14 +13,14 @@ dependencies = [
     "flask>=3.0,<4",
     "pydantic>=2.6,<3",
     "jsonschema>=4.21,<5",
-    "pillow>=10.2,<12",
+    "pillow>=10.2,<13",
     # HEIF / HEIC decoder, registered with Pillow at import time. iPhone
     # photos arrive HEIC by default; without this the picture_* widget
     # family falls through to "broken image" tiles whenever a library
     # holds an unprocessed HEIC asset. Wheel-bundled libheif on every
     # tier-1 platform (linux x86_64/arm64, macOS arm64), so this stays
     # pure pip with no system-package step.
-    "pillow-heif>=0.22,<2",
+    "pillow-heif>=1.1,<2",
     "numpy>=1.26,<3",
     "paho-mqtt>=2.0,<3",
     # Pinned to a minor: Playwright's Python client and the bundled
@@ -54,7 +54,7 @@ dependencies = [
     # (HA tokens, plugin API keys, etc.). PyCA cryptography is the de
     # facto Python crypto library; Rust-backed primitives, well-audited,
     # available as a manylinux wheel so the Docker image stays slim.
-    "cryptography>=42,<46",
+    "cryptography>=42,<50",
     # Optional mDNS advertiser (Settings → opt-in): publishes
     # tesserae.local + an _http._tcp service so the appliance is
     # reachable by name without touching the host's hostname.
@@ -158,6 +158,11 @@ addopts = "-ra --strict-markers --import-mode=importlib"
 filterwarnings = [
     "error",
     "ignore::DeprecationWarning:flask.*",
+    # Pillow 12 deprecates Image.getdata() (removal in Pillow 14, 2027). Only
+    # test assertions call it; the app doesn't. The replacement
+    # get_flattened_data() is 12-only, so we can't swap while the floor is
+    # pillow>=10.2. Revisit when the floor reaches 12.
+    "ignore:Image.Image.getdata is deprecated:DeprecationWarning",
 ]
 
 # ---------- coverage ----------

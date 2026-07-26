@@ -104,11 +104,11 @@ jobs:
         # are too noisy to block the build on.
         run: bandit -r app -q --severity-level high --confidence-level high
       - name: pip-audit
-        # Advisory for now: the pillow (<12) and cryptography (<46) pins hold
-        # the runtime below the versions that carry current fixes, and lifting
-        # those is a major-version bump that needs its own test pass. Runs on
-        # every push so new advisories stay visible; promote to a hard gate
-        # once the pins are current.
+        # Advisory. The pillow + cryptography advisories that motivated #142 are
+        # resolved (pins lifted to <13 / <50). What remains is a minor transitive
+        # advisory in click, which typer pins to <8.2 so it can't reach the fix
+        # yet. Kept non-blocking so an unresolvable transitive doesn't red main;
+        # promote to a hard gate once the runtime graph audits clean.
         continue-on-error: true
         run: pip-audit --progress-spinner off
 

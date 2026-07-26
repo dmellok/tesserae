@@ -1934,7 +1934,7 @@ wheels = [
 
 [[package]]
 name = "tesserae"
-version = "0.201.3"
+version = "0.201.4"
 source = { editable = "." }
 dependencies = [
     { name = "amqtt" },
@@ -1974,7 +1974,7 @@ docs = [
 [package.metadata]
 requires-dist = [
     { name = "amqtt", specifier = ">=0.11,<1" },
-    { name = "cryptography", specifier = ">=42,<46" },
+    { name = "cryptography", specifier = ">=42,<50" },
     { name = "defusedxml", specifier = ">=0.7,<1" },
     { name = "flask", specifier = ">=3.0,<4" },
     { name = "icalendar", specifier = ">=5.0,<7" },
@@ -1984,8 +1984,8 @@ requires-dist = [
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.9" },
     { name = "numpy", specifier = ">=1.26,<3" },
     { name = "paho-mqtt", specifier = ">=2.0,<3" },
-    { name = "pillow", specifier = ">=10.2,<12" },
-    { name = "pillow-heif", specifier = ">=0.22,<2" },
+    { name = "pillow", specifier = ">=10.2,<13" },
+    { name = "pillow-heif", specifier = ">=1.1,<2" },
     { name = "playwright", specifier = ">=1.60,<1.61" },
     { name = "pydantic", specifier = ">=2.6,<3" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
