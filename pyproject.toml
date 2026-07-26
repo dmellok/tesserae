@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tesserae"
-version = "0.201.2"
+version = "0.201.3"
 description = "E-ink dashboard companion. Compose tile-based dashboards, render headless, push frames over MQTT."
 requires-python = ">=3.11"
 license = { text = "AGPL-3.0-or-later" }
@@ -158,4 +158,18 @@ addopts = "-ra --strict-markers --import-mode=importlib"
 filterwarnings = [
     "error",
     "ignore::DeprecationWarning:flask.*",
+]
+
+# ---------- coverage ----------
+# CI runs `pytest --cov=app --cov-fail-under=80`. Local runs stay coverage-free
+# (addopts above) so the default suite is fast; opt in with --cov when needed.
+[tool.coverage.run]
+source = ["app"]
+
+[tool.coverage.report]
+# Lines that never execute at runtime shouldn't count against the floor.
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
 ]

@@ -42,11 +42,16 @@ A failing pre-commit or CI run is on you to fix; don't `--no-verify`.
 
 ## Add a widget / renderer / device
 
-The drop-a-folder plugin model is documented in
-[docs/dev/writing-a-plugin.md](docs/dev/writing-a-plugin.md). That's
-the canonical guide, manifest schema, lifecycle hooks, and how to
+The drop-a-folder plugin model applies to all four plugin kinds. For
+widgets, [docs/dev/writing-a-widget.md](../docs/dev/writing-a-widget.md)
+is the canonical guide: manifest schema, lifecycle hooks, and how to
 test in the dev gallery. Read it once before writing your first
-plugin; it'll save you guessing at field names.
+widget; it'll save you guessing at field names.
+
+For renderers, transports, and device kinds there's no step-by-step
+walkthrough yet; read [docs/dev/architecture.md](../docs/dev/architecture.md)
+(the drop-a-folder contract), the matching `schema/*.schema.json`, and
+a sample implementation under `renderers/`, `transports/`, or `devices/`.
 
 ## Commit and PR conventions
 

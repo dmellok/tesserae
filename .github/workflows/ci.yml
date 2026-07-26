@@ -55,7 +55,62 @@ jobs:
       - name: pytest
         # -n auto fans the suite across the runner's vCPUs (pytest-xdist).
         # The suite is parallel-safe (tmp_path isolation, no shared ports).
+        # --cov gates on app/ line coverage; the floor sits just under the
+        # current ~82% so a genuine regression fails the build while normal
+        # churn doesn't. Raise the floor as coverage climbs.
+        run: pytest -n auto -q --cov=app --cov-report=term-missing --cov-fail-under=80
+
+  pytest-forward:
+    name: pytest (forward-compat)
+    runs-on: ubuntu-latest
+    # 3.12 / 3.13 run informationally: requires-python is >=3.11 and the
+    # shipped runtime (Docker base, HA add-on) is 3.11. Failures surface as a
+    # warning instead of blocking main. Promote to a required matrix once
+    # these are consistently green.
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Install dev deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      - name: pytest
         run: pytest -n auto -q
+
+  security:
+    name: security scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install app + scanners
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e . bandit pip-audit
+      - name: bandit
+        # Hard gate on high-severity, high-confidence findings only (0 today).
+        # Lower-severity smells show up under `bandit -r app -ll` locally but
+        # are too noisy to block the build on.
+        run: bandit -r app -q --severity-level high --confidence-level high
+      - name: pip-audit
+        # Advisory for now: the pillow (<12) and cryptography (<46) pins hold
+        # the runtime below the versions that carry current fixes, and lifting
+        # those is a major-version bump that needs its own test pass. Runs on
+        # every push so new advisories stay visible; promote to a hard gate
+        # once the pins are current.
+        continue-on-error: true
+        run: pip-audit --progress-spinner off
 
   mypy:
     name: mypy (strict modules)
@@ -74,6 +129,45 @@ jobs:
         # Only the contract modules are checked under --strict per the
         # pyproject overrides; plugin code passes default mypy.
         run: mypy app
+
+  frontend-lint:
+    name: frontend lint (advisory)
+    runs-on: ubuntu-latest
+    # Advisory: the hand-rolled static/ JS+CSS predates any linter, so ESLint /
+    # Stylelint / Prettier run for visibility without blocking main. Each step
+    # is continue-on-error so all three report independently. Baseline today is
+    # small (ESLint ~36, Stylelint ~19, Prettier ~45 files); once worked down,
+    # drop continue-on-error to make them required.
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - name: Install lint deps
+        run: npm ci
+      - name: eslint
+        continue-on-error: true
+        run: npm run lint:js
+      - name: stylelint
+        continue-on-error: true
+        run: npm run lint:css
+      - name: prettier
+        continue-on-error: true
+        run: npm run format:check
+
+  lockfile:
+    name: lockfile
+    runs-on: ubuntu-latest
+    # uv.lock is a reproducibility reference for the pip-installed runtime.
+    # This fails if pyproject.toml changed without re-running `uv lock`, so the
+    # pinned resolution can't silently drift from the declared dependencies.
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+      - name: uv lock --check
+        run: uv lock --check
 
   mcp-bridge:
     name: mcp bridge

@@ -126,6 +126,9 @@ nav:
   - Client development:
       - Add hardware support: dev/adding-hardware.md
       - Client protocol spec: dev/client-protocol.md
+      - Protocol v2 (device-owned touch): protocol-v2-touch.md
+      - OTA firmware updates: ota/contract.md
+      - Panel colour calibration: dev/calibration.md
       - OpenAPI spec & SDK generation: dev/openapi.md
   - Build dashboards with AI (MCP): dev/mcp.md
   - MCP servers (install & use): dev/mcp-servers.md

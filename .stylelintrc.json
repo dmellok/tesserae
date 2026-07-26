@@ -1,0 +1,7 @@
+{
+  "extends": "stylelint-config-recommended",
+  "ignoreFiles": ["static/vendor/**", "static/icons/**", "site/**", "node_modules/**"],
+  "rules": {
+    "no-descending-specificity": null
+  }
+}
