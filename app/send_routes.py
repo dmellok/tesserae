@@ -38,6 +38,7 @@ from flask import (
 from werkzeug.wrappers import Response
 
 from app.device_loader import DeviceRegistry
+from app.net_guard import BlockedURLError, assert_operator_url
 from app.panel import device_panel, resolve_settings_panel
 from app.push import PushManager, PushResult
 from app.state.event_log import EventLog
@@ -423,6 +424,11 @@ def send_webpage() -> Response:
     url = (request.form.get("url") or "").strip()
     if not url:
         flash("Paste a webpage URL first.", "error")
+        return redirect(url_for("send.index", tab="webpage"))
+    try:
+        assert_operator_url(url)
+    except BlockedURLError as err:
+        flash(str(err), "error")
         return redirect(url_for("send.index", tab="webpage"))
     try:
         viewport_w = int(request.form.get("viewport_w") or 1600)

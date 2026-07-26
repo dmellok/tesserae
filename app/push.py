@@ -52,6 +52,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from app.device_loader import DeviceRegistry
 from app.dither_regions import has_nearest_region, regions_from_page
+from app.net_guard import BlockedURLError, assert_operator_url, fetch_bytes
 from app.palette_profiles import (
     PaletteProfile,
     PaletteProfileStore,
@@ -1318,6 +1319,13 @@ class PushManager:
         bypass_coalesce: bool = True,
     ) -> PushResult:
         """Screenshot an arbitrary URL with Playwright, then publish."""
+        # SSRF pre-flight. Playwright follows redirects internally, so this is
+        # an initial-URL check only; allow_local keeps same-host / LAN capture
+        # working and just refuses link-local / cloud metadata.
+        try:
+            assert_operator_url(url)
+        except BlockedURLError as err:
+            return self._log_failure(source="webpage", target=url, error=str(err))
         supersede = self._acquire_or_supersede(
             device_id=device_id,
             source="webpage",
@@ -2379,18 +2387,25 @@ class PushManager:
         return out2
 
     def _fetch_remote_image(self, url: str) -> bytes:
-        """Download an image URL with bounded size + timeout."""
-        if not (url.startswith("http://") or url.startswith("https://")):
-            raise ValueError("URL must be http:// or https://")
-        req = urllib.request.Request(url, headers={"User-Agent": "tesserae/0.1"})
+        """Download an image URL through the SSRF guard, bounded size + timeout.
+
+        Routes through ``net_guard`` so the scheme allowlist, per-redirect-hop
+        host check, and size cap match the widget fetch path. ``allow_local``
+        keeps same-host / LAN image sources usable while still refusing
+        link-local / cloud metadata. ``BlockedURLError`` (a ``ValueError``) and
+        the oversize ``ValueError`` propagate to the caller, which logs them as
+        a failed ``url`` push."""
         try:
-            with urllib.request.urlopen(req, timeout=_HTTP_TIMEOUT_S) as resp:
-                data = resp.read(_MAX_REMOTE_IMAGE_BYTES + 1)
+            data, _ = fetch_bytes(
+                url,
+                headers={"User-Agent": "tesserae/0.1"},
+                timeout=_HTTP_TIMEOUT_S,
+                max_bytes=_MAX_REMOTE_IMAGE_BYTES,
+                allow_local=True,
+            )
         except urllib.error.URLError as err:
             raise RuntimeError(f"download failed: {err}") from err
-        if len(data) > _MAX_REMOTE_IMAGE_BYTES:
-            raise RuntimeError(f"image exceeds {_MAX_REMOTE_IMAGE_BYTES // (1024 * 1024)} MiB cap")
-        return bytes(data)
+        return data
 
     def _render_timezone_id(self) -> str | None:
         """See :func:`resolve_render_timezone_id`."""
