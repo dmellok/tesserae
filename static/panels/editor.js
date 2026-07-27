@@ -263,6 +263,9 @@
         "An invisible touch region: position it over anything (including a code element's " +
         "rendered output) to make that area tappable on touch displays."));
     }
+    if (isPrimitive(e.kind)) primitiveBindingSection(mount, e);
+    // A switch's action is the bound entity's toggle: no tap/swipe/slide picker.
+    if (e.kind === "switch") return;
     if (typeof TouchInteraction === "undefined") return;
     mount.appendChild(TouchInteraction.render({
       value: { on_tap: e.on_tap, on_swipe: e.on_swipe, on_slide: e.on_slide },
@@ -278,6 +281,68 @@
       },
     }));
   }
+  // Touch-v3 primitive bindings: the entity a switch/slider/stepper reflects +
+  // acts on, plus the slider/stepper numeric range and slider axis. Kept lenient
+  // (an unbound primitive is allowed; the server drops it from the wire spec).
+  function primitiveBindingSection(mount, e) {
+    function row(labelText, input) {
+      var r = el("div", "prow");
+      r.style.cssText = "display:flex;align-items:center;gap:8px;margin-bottom:6px";
+      var lab = el("label");
+      lab.textContent = labelText;
+      lab.style.cssText = "flex:0 0 92px;font-size:12px;color:var(--t-muted, #6b6b6b)";
+      input.style.flex = "1";
+      input.addEventListener("pointerdown", function (ev) { ev.stopPropagation(); });
+      r.appendChild(lab);
+      r.appendChild(input);
+      mount.appendChild(r);
+    }
+    function textField(val, ph, set) {
+      var i = el("input", "dinput");
+      i.type = "text"; i.value = val || ""; i.placeholder = ph || "";
+      i.addEventListener("change", function () {
+        pushHistory(); set(i.value.trim()); scheduleSave(); paint();
+      });
+      return i;
+    }
+    function numField(val, set) {
+      var i = el("input", "dinput");
+      i.type = "number"; i.value = val == null ? 0 : val;
+      i.addEventListener("change", function () {
+        pushHistory(); set(Number(i.value)); scheduleSave(); paint();
+      });
+      return i;
+    }
+    function selectField(val, opts, set) {
+      var s = el("select", "dinput");
+      opts.forEach(function (o) {
+        var opt = document.createElement("option");
+        opt.value = o[0]; opt.textContent = o[1];
+        if ((val || "") === o[0]) opt.selected = true;
+        s.appendChild(opt);
+      });
+      s.addEventListener("change", function () {
+        pushHistory(); set(s.value); scheduleSave(); paint();
+      });
+      return s;
+    }
+
+    row("Entity", textField(e.value_key, "ha:light.desk", function (v) { e.value_key = v; }));
+    if (e.kind === "slider" || e.kind === "stepper") {
+      row("Min", numField(e.value_min, function (v) { e.value_min = v; }));
+      row("Max", numField(e.value_max, function (v) { e.value_max = v; }));
+      row("Step", numField(e.value_step, function (v) { e.value_step = v; }));
+    }
+    if (e.kind === "slider") {
+      row("Axis", selectField(e.axis, [["x", "Horizontal"], ["y", "Vertical"]],
+        function (v) { e.axis = v; }));
+    }
+    if (e.kind === "switch") {
+      row("Preview state", selectField(e.state, [["", "—"], ["off", "Off"], ["on", "On"]],
+        function (v) { e.state = v; }));
+    }
+  }
+
   // Named actions for a code element (mirrors the Sources card: sources
   // are data in, actions are touches out). Markup references them as
   // data-on-tap="@name"; structured actions stay in validated config.
@@ -2144,6 +2209,37 @@
     propRowBtns(mount, e);
   }
 
+  // Inspector for a touch-v3 primitive: name, label (button/switch), and the
+  // interaction section (entity binding + range + action picker). No color/fill
+  // controls: the firmware draws the control, not the render.
+  function renderPrimitiveProps(mount, e) {
+    var name = { button: "Button", switch: "Switch", slider: "Slider", stepper: "Stepper" }[e.kind]
+      || "Control";
+    mount.appendChild(el("div", "psec", '<i class="ph-bold ph-hand-tap"></i>' + name));
+    if (e.kind === "button" || e.kind === "switch") {
+      var lrow = el("div", "prow");
+      lrow.style.cssText = "display:flex;align-items:center;gap:8px;margin-bottom:6px";
+      var lab = el("label");
+      lab.textContent = "Label";
+      lab.style.cssText = "flex:0 0 92px;font-size:12px;color:var(--t-muted, #6b6b6b)";
+      var lin = el("input", "dinput");
+      lin.value = e.label || "";
+      lin.style.flex = "1";
+      lin.addEventListener("pointerdown", function (ev) { ev.stopPropagation(); });
+      lin.addEventListener("change", function () {
+        pushHistory(); e.label = lin.value; scheduleSave(); paint();
+      });
+      lrow.appendChild(lab);
+      lrow.appendChild(lin);
+      mount.appendChild(lrow);
+    }
+    interactionSection(mount, e);
+    arrangeGeom(mount, e);
+    mount.appendChild(el("div", "psec", '<i class="ph-bold ph-frame-corners"></i>Align to canvas'));
+    mount.appendChild(alignButtons("canvas"));
+    propRowBtns(mount, e);
+  }
+
   function renderDecoProps(mount, e) {
     mount.textContent = "";
     if (e.kind === "hotspot") {
@@ -2154,6 +2250,7 @@
       propRowBtns(mount, e);
       return;
     }
+    if (isPrimitive(e.kind)) { renderPrimitiveProps(mount, e); return; }
     if (e.kind === "html" || e.kind === "svg") { renderHtmlProps(mount, e); return; }
     if (e.kind === "code") { renderCodeProps(mount, e); return; }
     if (e.kind === "data") { renderDataProps(mount, e); return; }
