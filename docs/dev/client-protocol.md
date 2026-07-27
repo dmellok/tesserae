@@ -557,7 +557,7 @@ overridable via `settings.app.button_debounce_s`).
   "status": 200,
   "config": { "sleep_interval_s": 300 },
   "next_poll_s": 300,
-  "server_time": 1687000060.123,
+  "server_time": 1687000060,
   "local_time": "2026-06-22T19:00:00+02:00",
   "tz": "Europe/Berlin",
   "tz_offset_seconds": 7200,
@@ -583,8 +583,12 @@ above).
 - `next_poll_s`: how long the firmware should sleep before the next
   status POST. Resolves in priority order: device-instance settings →
   kind-schema default → fallback 60.
-- `server_time`: Unix epoch float (UTC). Useful for RTC sync on
-  devices without a battery-backed clock.
+- `server_time`: Unix epoch **integer** (UTC, whole seconds). Useful
+  for RTC sync on devices without a battery-backed clock. Sent as an
+  integer, not a float: a MicroPython / CircuitPython client parses a
+  JSON float into a single-precision float32, whose resolution near the
+  current epoch is ~128s, so a float would round to the nearest ~2
+  minutes. An integer literal parses exactly on a longint-capable client.
 - `local_time`: ISO 8601 string with offset suffix, resolved for the
   device's effective timezone (precedence below). Clients without an
   RTC just use this directly.

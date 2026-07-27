@@ -1116,7 +1116,11 @@ def post_status(device_id: str) -> Response:
         "status": 200,
         "config": _current_config(device),
         "next_poll_s": _next_poll_s(device),
-        "server_time": time.time(),
+        # Integer epoch, NOT a float: CircuitPython / MicroPython clients parse a
+        # JSON float into a single-precision float32, whose resolution near 1.78e9
+        # is ~128s, so a float server_time rounds to the nearest ~2 minutes (#143).
+        # An integer literal parses exactly on a longint-capable client.
+        "server_time": int(time.time()),
         **_resolve_local_time_fields(request_tz),
     }
     if button_result is not None and button_result.rotation_id is not None:
@@ -2178,7 +2182,7 @@ def _discover() -> Response:
                         "device_token": token,
                         "device_id": current.id,
                         "config": _current_config(current),
-                        "server_time": time.time(),
+                        "server_time": int(time.time()),
                     }
                 )
 
@@ -2322,7 +2326,7 @@ def _register() -> Response:
                 "status": 200,
                 "device_token": token,
                 "device_id": current.id,
-                "server_time": time.time(),
+                "server_time": int(time.time()),
                 "config": _current_config(current),
                 "reused_existing": True,
             }
@@ -2396,7 +2400,7 @@ def _register() -> Response:
             "status": 201,
             "device_token": token,
             "device_id": result.device.id,
-            "server_time": time.time(),
+            "server_time": int(time.time()),
             "config": _current_config(result.device),
             "reused_existing": False,
         }

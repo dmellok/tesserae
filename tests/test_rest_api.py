@@ -675,6 +675,26 @@ def test_status_endpoint_accepts_x_tesserae_token_header(app: Flask) -> None:
     assert resp.status_code == 200
 
 
+def test_status_server_time_is_integer_epoch(app: Flask) -> None:
+    """server_time must be an int, not a float (#143): a MicroPython /
+    CircuitPython client parses a JSON float into a float32, which rounds the
+    current epoch to the nearest ~2 minutes. register() carries it too."""
+    client = app.test_client()
+    _sign_in(client)
+    code = _issue_pairing(app)
+    reg = _register_via_api(client, code=code, device_id="bedroom_pico")
+    assert isinstance(reg.get_json()["server_time"], int)
+    token = reg.get_json()["device_token"]
+
+    resp = client.post(
+        "/api/v1/device/bedroom_pico/status",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        data=json.dumps({"battery_pct": 72}),
+    )
+    assert resp.status_code == 200
+    assert isinstance(resp.get_json()["server_time"], int)
+
+
 # -- frame -------------------------------------------------------------
 
 

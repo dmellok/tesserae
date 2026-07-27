@@ -170,7 +170,7 @@ cadence:
   "status": 200,
   "config": { "sleep_interval_s": 900 },
   "next_poll_s": 900,
-  "server_time": 1700000100.5
+  "server_time": 1700000100
 }
 ```
 
