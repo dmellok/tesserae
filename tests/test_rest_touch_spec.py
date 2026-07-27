@@ -92,6 +92,37 @@ def test_frame_spec_returns_primitives(app: Flask, monkeypatch: pytest.MonkeyPat
     assert len(doc["layout_digest"]) == 16
 
 
+def test_frame_spec_layout_param_is_advisory_not_blocking(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # ?layout=<held digest> is advisory: the endpoint returns the current spec
+    # immediately regardless, it never long-polls waiting for a change (#146).
+    # Passing the CURRENT layout digest (the "I already hold this" case) must
+    # return the same body, not hang.
+    client = app.test_client()
+    token = _register(app, client, "e1003")
+    app.config["PAGE_STORE"].save(
+        Page(
+            id="p1",
+            name="Touch",
+            layout_kind="canvas",
+            canvas=CanvasLayout(
+                els=[Element(id="btn", kind="button", x=10, y=10, w=160, h=80, on_tap="refresh")]
+            ),
+        )
+    )
+    _seed_frame(app, monkeypatch, "p1")
+
+    plain = client.get("/api/v1/device/e1003/frame/spec", headers=_auth(token)).get_json()
+    held = client.get(
+        f"/api/v1/device/e1003/frame/spec?layout={plain['layout_digest']}",
+        headers=_auth(token),
+    )
+    assert held.status_code == 200
+    assert held.get_json()["layout_digest"] == plain["layout_digest"]
+    assert held.get_json()["primitives"] == plain["primitives"]
+
+
 def test_frame_spec_grid_page_is_empty(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
     client = app.test_client()
     token = _register(app, client, "e1003")

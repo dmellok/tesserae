@@ -39,6 +39,7 @@ from __future__ import annotations
 import json
 import logging
 import secrets
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -1446,11 +1447,21 @@ def _canvas_for_page(page_id: str) -> Any:
 
 @bp.get("/<device_id>/frame/spec")
 def get_frame_spec(device_id: str) -> Response:
-    """The touch-v3 spec for the device's current frame (``?layout=<digest>``):
-    typed primitives the firmware draws and hit-tests locally. Anchored to a
-    layout digest stable across data-only redraws, so a clock tick doesn't
-    invalidate touch. An empty ``primitives`` list is valid (a non-interactive
-    dashboard)."""
+    """The touch-v3 spec for the device's current frame: typed primitives the
+    firmware draws and hit-tests locally. Anchored to a layout digest stable
+    across data-only redraws, so a clock tick doesn't invalidate touch. An empty
+    ``primitives`` list is valid (a non-interactive dashboard).
+
+    ``?layout=<digest>`` is ADVISORY, not a long-poll: the firmware passes the
+    digest it currently holds, but the endpoint always builds and returns the
+    current spec immediately and never blocks waiting for the layout to change.
+    (The firmware compares ``layout_digest`` itself and repaints only on a
+    change.) The response never drives a synchronous browser render either: glyph
+    atlases are attached only when already cached, and warmed out-of-band
+    otherwise, so a device poll can't stall behind the render queue."""
+    # Read (and ignore) the advisory layout hint so the contract is explicit:
+    # the endpoint is non-blocking regardless of what the device holds.
+    _ = request.args.get("layout")
     device, err = _auth_device(device_id)
     if err is not None or device is None:
         return err  # type: ignore[return-value]
@@ -1472,10 +1483,20 @@ def get_frame_spec(device_id: str) -> Response:
     return jsonify(spec)
 
 
+# Roles currently being warmed in a background thread, so concurrent /frame/spec
+# polls don't each spawn a duplicate build for the same (static) atlas.
+_touch_atlas_warming: set[str] = set()
+_touch_atlas_warm_lock = threading.Lock()
+
+
 def _attach_touch_atlases(spec: dict[str, Any], device: Device) -> None:
-    """Build and attach the glyph atlases the spec's primitive text refs
-    reference (label / value_text). Left off on any build failure: the firmware
-    renders chrome without text rather than failing the whole spec."""
+    """Attach the glyph atlases the spec's primitive text refs reference
+    (label / value_text), CACHE-ONLY. A device poll must never drive a Playwright
+    render inline (the render queue is single-browser and serialized, so an
+    inline build can stall the request for seconds or hang behind other work).
+    Cached atlases are attached; any that are missing are omitted (the firmware
+    draws chrome without text, per the contract) and warmed in the background so
+    the next poll carries them."""
     roles: set[str] = set()
     for prim in spec.get("primitives", []):
         for key in ("label", "value_text"):
@@ -1485,20 +1506,64 @@ def _attach_touch_atlases(spec: dict[str, Any], device: Device) -> None:
     renders_dir = current_app.config.get("RENDERS_DIR")
     if not roles or renders_dir is None:
         return
-    from app.overlay_sync import browser_rasterizer
     from app.touch_atlas import build_touch_atlas
 
-    rasterize = current_app.config.get("OVERLAY_ATLAS_RASTERIZER") or browser_rasterizer(
-        request.url_root
-    )
     atlases: list[dict[str, Any]] = []
+    missing: list[str] = []
     for role in sorted(roles):
-        desc = build_touch_atlas(role, renders_dir=Path(renders_dir), rasterize=rasterize)
+        # rasterize=None -> cache-only, returns None on a cold cache without
+        # touching the browser.
+        desc = build_touch_atlas(role, renders_dir=Path(renders_dir), rasterize=None)
         if desc is not None:
             desc["url"] = f"/api/v1/device/{device.id}/atlas/{desc['digest']}"
             atlases.append(desc)
+        else:
+            missing.append(role)
     if atlases:
         spec["atlases"] = atlases
+    if missing:
+        _schedule_touch_atlas_warm(missing)
+
+
+def _schedule_touch_atlas_warm(roles: list[str]) -> None:
+    """Kick a daemon thread to build the given (static) touch atlases so a later
+    poll finds them cached. De-duped against in-flight roles; never blocks."""
+    with _touch_atlas_warm_lock:
+        todo = [r for r in roles if r not in _touch_atlas_warming]
+        _touch_atlas_warming.update(todo)
+    if not todo:
+        return
+    app_obj = current_app._get_current_object()  # type: ignore[attr-defined]
+    url_root = request.url_root
+    thread = threading.Thread(
+        target=_warm_touch_atlases, args=(app_obj, todo, url_root), daemon=True
+    )
+    thread.start()
+
+
+def _warm_touch_atlases(app_obj: Flask, roles: list[str], url_root: str) -> None:
+    """Background: build each touch atlas role through the real rasterizer (the
+    serialized render queue) so it lands in the cache. Runs off the request path,
+    so the browser render can take as long as it needs without stalling a poll."""
+    try:
+        with app_obj.app_context():
+            renders_dir = app_obj.config.get("RENDERS_DIR")
+            if renders_dir is None:
+                return
+            from app.overlay_sync import browser_rasterizer
+            from app.touch_atlas import build_touch_atlas
+
+            rasterize = app_obj.config.get("OVERLAY_ATLAS_RASTERIZER") or browser_rasterizer(
+                url_root
+            )
+            for role in roles:
+                try:
+                    build_touch_atlas(role, renders_dir=Path(renders_dir), rasterize=rasterize)
+                except Exception:
+                    logger.exception("touch atlas warm failed role=%s", role)
+    finally:
+        with _touch_atlas_warm_lock:
+            _touch_atlas_warming.difference_update(roles)
 
 
 @bp.get("/<device_id>/atlas/<digest>")

@@ -126,6 +126,12 @@ def test_full_touch_v3_round_trip(app: Flask, monkeypatch: pytest.MonkeyPatch) -
     calls: list = []
     _stub_ha(app, {"light.desk": "on"}, calls)
 
+    # Prime the (static) atlas cache, as the background warmer would. The spec
+    # endpoint attaches atlases cache-only and never drives a render inline.
+    from app.touch_atlas import build_touch_atlas
+
+    build_touch_atlas("l20", renders_dir=Path(app.config["RENDERS_DIR"]), rasterize=_fake_rasterize)
+
     # 1. spec: the switch, in device-framebuffer coords (scaled up from canvas),
     #    with its label atlas attached.
     spec = client.get("/api/v1/device/e1003/frame/spec", headers=_h(token)).get_json()

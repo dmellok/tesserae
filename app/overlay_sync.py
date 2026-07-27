@@ -259,7 +259,7 @@ def build_atlas(
     weight: int,
     *,
     renders_dir: Path,
-    rasterize: Any,
+    rasterize: Any = None,
     charset: str = ATLAS_CHARSET,
     prefix: str = "overlay",
 ) -> dict[str, Any] | None:
@@ -272,7 +272,12 @@ def build_atlas(
     default implementation captures the ``/compose/_overlay_atlas``
     strip through the same browser + fonts as compositions. Cached per
     (px, weight, charset) in a meta sidecar; None on any failure (the
-    spec then degrades to rect-only)."""
+    spec then degrades to rect-only).
+
+    ``rasterize=None`` is CACHE-ONLY: return the cached atlas if present,
+    else None without rendering. Callers on a latency-sensitive path (a
+    device request) use this so they never drive a Playwright render
+    inline, warming the cache out-of-band instead."""
     import io
 
     from PIL import Image
@@ -288,6 +293,9 @@ def build_atlas(
             return {k: meta[k] for k in ("digest", "format", "height", "glyphs")}
     except (OSError, json.JSONDecodeError, KeyError):
         pass
+
+    if rasterize is None:
+        return None
 
     try:
         png_bytes, boxes = rasterize(px, weight, charset)

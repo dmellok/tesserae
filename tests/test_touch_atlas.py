@@ -136,10 +136,46 @@ def _atlas_validator() -> Draft202012Validator:
     return Draft202012Validator(json.loads((_SCHEMA_DIR / "atlas.schema.json").read_text()))
 
 
+def _warm(app: Flask) -> None:
+    """Prime the (static) touch atlas cache, standing in for the background
+    warmer, so a cache-only /frame/spec attaches them."""
+    rd = Path(app.config["RENDERS_DIR"])
+    for role in ("l20", "v28"):
+        build_touch_atlas(role, renders_dir=rd, rasterize=_fake_rasterize)
+
+
+def test_frame_spec_cold_cache_omits_atlases(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    # A device poll must NEVER drive a browser render inline. On a cold cache the
+    # spec ships without atlases (firmware draws chrome, per contract) and the
+    # build is scheduled out-of-band. Stub the scheduler so no thread runs.
+    monkeypatch.setattr(rest_api, "_schedule_touch_atlas_warm", lambda roles: None)
+    client = app.test_client()
+    token = _register(app, client)
+    _seed(app, monkeypatch)
+    doc = client.get("/api/v1/device/e1003/frame/spec", headers=_auth(token)).get_json()
+    assert doc["primitives"]  # controls still present
+    assert "atlases" not in doc  # but no atlases on a cold cache
+
+
+def test_frame_spec_schedules_warm_on_cold_cache(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    scheduled: list[list[str]] = []
+    monkeypatch.setattr(
+        rest_api, "_schedule_touch_atlas_warm", lambda roles: scheduled.append(roles)
+    )
+    client = app.test_client()
+    token = _register(app, client)
+    _seed(app, monkeypatch)
+    client.get("/api/v1/device/e1003/frame/spec", headers=_auth(token))
+    assert scheduled and sorted(scheduled[0]) == ["l20", "v28"]
+
+
 def test_frame_spec_attaches_valid_atlases(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
     client = app.test_client()
     token = _register(app, client)
     _seed(app, monkeypatch)
+    _warm(app)  # cache primed, as the background warmer would leave it
     doc = client.get("/api/v1/device/e1003/frame/spec", headers=_auth(token)).get_json()
     atlases = doc["atlases"]
     # switch label -> l20, slider value_text -> v28.
@@ -154,6 +190,7 @@ def test_atlas_binary_is_served(app: Flask, monkeypatch: pytest.MonkeyPatch) -> 
     client = app.test_client()
     token = _register(app, client)
     _seed(app, monkeypatch)
+    _warm(app)
     doc = client.get("/api/v1/device/e1003/frame/spec", headers=_auth(token)).get_json()
     digest = doc["atlases"][0]["digest"]
     resp = client.get(f"/api/v1/device/e1003/atlas/{digest}", headers=_auth(token))
