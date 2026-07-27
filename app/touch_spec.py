@@ -14,6 +14,8 @@ this is where the model's leniency (`app.state.panel_store`) is enforced.
 
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Iterable
 from typing import Any
 
@@ -119,11 +121,23 @@ def _primitive_for(el: Element) -> dict[str, Any] | None:
     return base
 
 
-def build_frame_spec(layout_digest: str, els: Iterable[Element]) -> dict[str, Any]:
+def touch_layout_digest(primitives: list[dict[str, Any]]) -> str:
+    """Stable 16-hex hash of the primitives' STRUCTURE (id, kind, rect, action,
+    binding, geometry), excluding seeded ``value``/``state`` so a switch flip or
+    slider move is a data change, not a layout change. The device holds this and
+    re-fetches the spec only when it changes."""
+    structural = [{k: v for k, v in p.items() if k not in ("value", "state")} for p in primitives]
+    blob = json.dumps(structural, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
+
+
+def build_frame_spec(els: Iterable[Element]) -> dict[str, Any]:
     """Build the frame spec from a layout's elements.
 
-    Returns a doc conforming to ``schema/frame-spec.schema.json``. ``atlases`` is
-    omitted here; the atlas pipeline attaches descriptors for the roles the
-    primitives reference. Invalid primitives are skipped."""
+    Returns a doc conforming to ``schema/frame-spec.schema.json``. The
+    ``layout_digest`` is derived from the primitive structure (stable across
+    data-only redraws). ``atlases`` is omitted here; the atlas pipeline attaches
+    descriptors for the roles the primitives reference. Invalid primitives are
+    skipped."""
     primitives = [p for p in (_primitive_for(el) for el in els) if p is not None]
-    return {"layout_digest": layout_digest, "primitives": primitives}
+    return {"layout_digest": touch_layout_digest(primitives), "primitives": primitives}

@@ -10,7 +10,7 @@ from jsonschema import Draft202012Validator
 from referencing import Registry, Resource
 
 from app.state.panel_store import Element
-from app.touch_spec import build_frame_spec, classify_action
+from app.touch_spec import build_frame_spec, classify_action, touch_layout_digest
 
 _SCHEMA_DIR = Path(__file__).resolve().parents[1] / "schema"
 
@@ -22,8 +22,8 @@ def _validator() -> Draft202012Validator:
     return Draft202012Validator(spec, registry=reg)
 
 
-def test_full_spec_validates_against_schema() -> None:
-    els = [
+def _sample_els() -> list[Element]:
+    return [
         Element(id="w1", kind="widget", widget="weather_now"),  # not a primitive
         Element(
             id="btn",
@@ -75,21 +75,40 @@ def test_full_spec_validates_against_schema() -> None:
             value_now=12,
         ),
     ]
-    doc = build_frame_spec("8603c4372c14", els)
+
+
+def test_full_spec_validates_against_schema() -> None:
+    doc = build_frame_spec(_sample_els())
     errors = sorted(_validator().iter_errors(doc), key=lambda e: list(e.path))
     assert not errors, errors[0].message if errors else ""
     # The plain widget is dropped; the four primitives remain, in order.
     assert [p["id"] for p in doc["primitives"]] == ["btn", "sw", "sl", "st"]
-    assert doc["layout_digest"] == "8603c4372c14"
+    assert isinstance(doc["layout_digest"], str) and len(doc["layout_digest"]) == 16
+
+
+def test_layout_digest_stable_across_data_changes() -> None:
+    # Flipping a switch and moving a slider are DATA changes, not layout changes,
+    # so the layout digest must not move (a clock tick can't invalidate touch).
+    base = build_frame_spec(_sample_els())
+    els = _sample_els()
+    for el in els:
+        if el.id == "sw":
+            el.state = "off"
+        if el.id == "sl":
+            el.value_now = 15
+    changed = build_frame_spec(els)
+    assert changed["layout_digest"] == base["layout_digest"]
+
+
+def test_layout_digest_moves_on_structural_change() -> None:
+    base = build_frame_spec(_sample_els())
+    els = _sample_els()
+    els.append(Element(id="btn2", kind="button", x=0, y=0, w=50, h=50, on_tap="refresh"))
+    assert build_frame_spec(els)["layout_digest"] != base["layout_digest"]
 
 
 def test_button_action_classified() -> None:
-    doc = build_frame_spec(
-        "d",
-        [
-            Element(id="b", kind="button", w=10, h=10, on_tap="ha:light.toggle"),
-        ],
-    )
+    doc = build_frame_spec([Element(id="b", kind="button", w=10, h=10, on_tap="ha:light.toggle")])
     assert doc["primitives"][0]["action"] == {"tier": 1, "type": "ha"}
 
 
@@ -119,10 +138,11 @@ def test_invalid_primitives_are_skipped() -> None:
         Element(id="off", kind="button", x=-5, y=0, w=10, h=10, on_tap="refresh"),  # off-panel
         Element(id="ok", kind="button", w=10, h=10, on_tap="refresh"),  # valid
     ]
-    doc = build_frame_spec("d", els)
+    doc = build_frame_spec(els)
     assert [p["id"] for p in doc["primitives"]] == ["ok"]
 
 
 def test_empty_layout_yields_no_primitives() -> None:
-    doc = build_frame_spec("d", [])
-    assert doc == {"layout_digest": "d", "primitives": []}
+    doc = build_frame_spec([])
+    assert doc["primitives"] == []
+    assert doc["layout_digest"] == touch_layout_digest([])

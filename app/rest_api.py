@@ -1426,6 +1426,37 @@ def get_frame_manifest(device_id: str) -> Response:
     return jsonify(doc)
 
 
+def _canvas_els_for_page(page_id: str) -> list[Any]:
+    """The placed elements of a canvas page, or [] for a grid page / unknown id."""
+    page_store = current_app.config.get("PAGE_STORE")
+    page = page_store.get(page_id) if page_store is not None and page_id else None
+    if page is not None and page.layout_kind == "canvas" and page.canvas is not None:
+        return list(page.canvas.els)
+    return []
+
+
+@bp.get("/<device_id>/frame/spec")
+def get_frame_spec(device_id: str) -> Response:
+    """The touch-v3 spec for the device's current frame (``?layout=<digest>``):
+    typed primitives the firmware draws and hit-tests locally. Anchored to a
+    layout digest stable across data-only redraws, so a clock tick doesn't
+    invalidate touch. An empty ``primitives`` list is valid (a non-interactive
+    dashboard); the device reads it and holds no controls."""
+    device, err = _auth_device(device_id)
+    if err is not None or device is None:
+        return err  # type: ignore[return-value]
+    push_mgr = current_app.config.get("PUSH_MANAGER")
+    latest = push_mgr.latest_render_for(device.id) if push_mgr is not None else None
+    if not latest:
+        return _error(404, "no frame")
+    info = _frame_info_for_digest(device, str(latest.get("digest") or ""))
+    page_id = str(info.get("page_id") or "") if info else ""
+
+    from app.touch_spec import build_frame_spec
+
+    return jsonify(build_frame_spec(_canvas_els_for_page(page_id)))
+
+
 # -- device event stream (protocol v2) --------------------------------------
 
 # SSE cadence knobs. The stream is an optimisation over the 1 s linger
