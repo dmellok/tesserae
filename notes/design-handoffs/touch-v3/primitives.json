@@ -1,0 +1,81 @@
+{
+  "version": "3.0.0",
+  "note": "Shared geometric visual language for Tesserae touch-v3 primitives. The server's canvas preview and the device firmware BOTH render from this file, so WYSIWYG holds. All lengths are device pixels; ink levels are 4bpp grayscale (0 = paper .. 15 = full ink). Geometry is defined WITHIN each primitive's rect, local origin top-left, x right, y down. Strokes/radii/insets are absolute (kept crisp on e-ink); track/thumb extents derive from the rect so controls scale.",
+  "palette": {
+    "paper": 0,
+    "soft": 3,
+    "mid": 8,
+    "ink": 15
+  },
+  "duotone": {
+    "primary": 15,
+    "secondary": 3
+  },
+  "tokens": {
+    "stroke": 2,
+    "stroke_bold": 3,
+    "corner_radius": 12,
+    "pad": 12,
+    "gap": 8,
+    "min_touch_px": 44,
+    "press_refresh": "du"
+  },
+  "atlas_roles": {
+    "label": { "px": 20, "weight": 400 },
+    "value": { "px": 28, "weight": 700 }
+  },
+  "primitives": {
+    "button": {
+      "frame": { "shape": "round_rect", "corner_radius": 12, "stroke": 2, "ink": "ink", "fill": "paper" },
+      "content": {
+        "modes": ["label", "icon", "icon_label"],
+        "default": "label",
+        "align": "center",
+        "gap": 8,
+        "icon": { "px": 40, "weight": "bold", "ink": "ink" },
+        "label": { "atlas_role": "label", "ink": "ink" }
+      },
+      "press": { "mode": "invert", "target": "rect" }
+    },
+    "switch": {
+      "label": { "placement": "left", "atlas_role": "label", "gap": 10, "ink": "ink" },
+      "track": {
+        "shape": "pill",
+        "height": "min(rect.h, 44)",
+        "width": "control_w",
+        "stroke": 2,
+        "ink": "ink",
+        "fill": { "off": "paper", "on": "mid" }
+      },
+      "thumb": { "shape": "circle", "inset": 4, "diameter": "track.height - 2*inset", "fill": "ink" },
+      "positions": { "off": "left", "on": "right" },
+      "press": { "mode": "thumb_move", "target": "track" }
+    },
+    "slider": {
+      "orientation_from": "axis",
+      "track": {
+        "thickness": 8,
+        "corner_radius": 4,
+        "ink": "ink",
+        "fill_active": "mid",
+        "fill_rest": "paper",
+        "inset": 20
+      },
+      "thumb": { "shape": "circle", "diameter": 36, "stroke": 2, "ink": "ink", "fill": "paper" },
+      "value_text": { "atlas_role": "value", "placement": "leading", "ink": "ink" },
+      "press": { "mode": "thumb_move", "target": "track" }
+    },
+    "stepper": {
+      "frame": { "shape": "round_rect", "corner_radius": 12, "stroke": 2, "ink": "ink" },
+      "zones": {
+        "minus": "left_third",
+        "value": "center_third",
+        "plus": "right_third",
+        "divider": { "stroke": 2, "ink": "soft" }
+      },
+      "marks": { "stroke": 3, "length_frac": 0.28, "ink": "ink" },
+      "value_text": { "atlas_role": "value", "align": "center", "ink": "ink" },
+      "press": { "mode": "invert_zone", "target": "zone" }
+    }
+  }
+}

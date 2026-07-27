@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tesserae.ink/schema/touch-v3/frame-spec.schema.json",
+  "title": "Tesserae touch-v3 frame spec",
+  "description": "Declarative touch spec the server ships alongside a frame image. The firmware draws the primitives into their (blank) rects, owns hit-testing, and reports semantic events. Action payloads are never included; the device learns only a tier + type.",
+  "type": "object",
+  "required": ["layout_digest", "primitives"],
+  "additionalProperties": false,
+  "properties": {
+    "layout_digest": {
+      "type": "string",
+      "description": "Anchors the spec to the frame's LAYOUT, stable across data-only redraws (a clock tick does not invalidate it)."
+    },
+    "atlases": {
+      "type": "array",
+      "description": "Glyph atlases referenced by primitive text refs.",
+      "items": { "$ref": "atlas.schema.json" }
+    },
+    "primitives": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/primitive" }
+    }
+  },
+  "$defs": {
+    "rect": {
+      "type": "object",
+      "required": ["x", "y", "w", "h"],
+      "additionalProperties": false,
+      "properties": {
+        "x": { "type": "integer", "minimum": 0 },
+        "y": { "type": "integer", "minimum": 0 },
+        "w": { "type": "integer", "minimum": 1 },
+        "h": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "action": {
+      "type": "object",
+      "required": ["tier", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "tier": {
+          "type": "integer",
+          "enum": [0, 1, 2],
+          "description": "0 = local only; 1 = optimistic local + server confirm; 2 = must round-trip before feedback settles."
+        },
+        "type": { "type": "string", "enum": ["nav", "ha", "webhook", "refresh", "fetch"] }
+      }
+    },
+    "text_ref": {
+      "type": "object",
+      "required": ["atlas"],
+      "additionalProperties": false,
+      "properties": {
+        "atlas": { "type": "string", "description": "Atlas id from the atlases array." },
+        "text": { "type": "string", "description": "Static label text. Omit for value-bound text." },
+        "align": { "type": "string", "enum": ["left", "center", "right"], "default": "center" },
+        "suffix": { "type": "string", "description": "Appended to a resolved value, e.g. % or the degree sign." },
+        "max_chars": { "type": "integer", "minimum": 1, "description": "Footprint bound for dynamic values so layout stays stable." }
+      }
+    },
+    "icon_ref": {
+      "type": "object",
+      "required": ["name", "px"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "description": "Phosphor icon name (resolved via the pinned name to codepoint map)." },
+        "weight": { "type": "string", "enum": ["thin", "light", "regular", "bold", "fill", "duotone"], "default": "bold" },
+        "px": { "type": "integer", "minimum": 8 }
+      }
+    },
+    "primitive": {
+      "type": "object",
+      "required": ["id", "type", "rect"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9_]{1,32}$" },
+        "type": { "type": "string", "enum": ["button", "switch", "slider", "stepper"] },
+        "rect": { "$ref": "#/$defs/rect" }
+      },
+      "allOf": [
+        { "if": { "properties": { "type": { "const": "button" } } }, "then": { "$ref": "#/$defs/button_fields" } },
+        { "if": { "properties": { "type": { "const": "switch" } } }, "then": { "$ref": "#/$defs/switch_fields" } },
+        { "if": { "properties": { "type": { "const": "slider" } } }, "then": { "$ref": "#/$defs/slider_fields" } },
+        { "if": { "properties": { "type": { "const": "stepper" } } }, "then": { "$ref": "#/$defs/stepper_fields" } }
+      ]
+    },
+    "button_fields": {
+      "required": ["action"],
+      "properties": {
+        "label": { "$ref": "#/$defs/text_ref" },
+        "icon": { "$ref": "#/$defs/icon_ref" },
+        "action": { "$ref": "#/$defs/action" }
+      }
+    },
+    "switch_fields": {
+      "required": ["value_key", "action"],
+      "properties": {
+        "label": { "$ref": "#/$defs/text_ref" },
+        "value_key": { "type": "string", "description": "State source, e.g. ha:light.desk." },
+        "state": { "type": "string", "enum": ["on", "off"], "description": "Current state seeded by the server." },
+        "action": { "$ref": "#/$defs/action" }
+      }
+    },
+    "slider_fields": {
+      "required": ["axis", "min", "max", "action"],
+      "properties": {
+        "axis": { "type": "string", "enum": ["x", "y"] },
+        "min": { "type": "number" },
+        "max": { "type": "number" },
+        "step": { "type": "number", "default": 1 },
+        "value": { "type": "number", "description": "Current value seeded by the server." },
+        "value_key": { "type": "string" },
+        "value_text": { "$ref": "#/$defs/text_ref" },
+        "action": { "$ref": "#/$defs/action" }
+      }
+    },
+    "stepper_fields": {
+      "required": ["min", "max", "action"],
+      "properties": {
+        "min": { "type": "number" },
+        "max": { "type": "number" },
+        "step": { "type": "number", "default": 1 },
+        "value": { "type": "number" },
+        "value_key": { "type": "string" },
+        "value_text": { "$ref": "#/$defs/text_ref" },
+        "action": { "$ref": "#/$defs/action" }
+      }
+    }
+  }
+}

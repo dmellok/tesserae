@@ -1,0 +1,14 @@
+{
+  "_contract": "Name -> codepoint map for the pinned Phosphor release. The SAME file is embedded by the server (canvas preview + atlas rasterizer) and the firmware (font renderer). Regenerate whenever the pinned Phosphor version changes; never hand-edit.",
+  "_generation": "Produced by a build script that walks the Phosphor assets already in the repo (static/icons/phosphor/<weight>/) for the pinned version and emits {name: codepoint}. Ship it as a build artifact to both sides.",
+  "_note": "The codepoints below are ILLUSTRATIVE PLACEHOLDERS to show the shape. Do not trust these values; regenerate from the pinned font.",
+  "version": "TBD-pin-me",
+  "weight": "bold",
+  "map": {
+    "lightbulb": "PLACEHOLDER",
+    "film-slate": "PLACEHOLDER",
+    "fan": "PLACEHOLDER",
+    "house": "PLACEHOLDER",
+    "gear-six": "PLACEHOLDER"
+  }
+}
