@@ -133,6 +133,17 @@ TOUCH ACTIONS ("on_tap"/"on_swipe"/"on_slide" on ANY element -- respond to taps 
   On-device requirement: the target panel must be touch-capable (list_devices() shows "touch": true,
     e.g. the reTerminal E1003) AND running firmware that reports touch. On a display-only panel these
     fields render but never fire.
+
+DEVICE-OWNED TOUCH PRIMITIVES (touch_v3 experiment, off by default -- Settings -> experiments):
+  Typed controls the FIRMWARE draws + owns (the render reserves a blank rect); it hit-tests locally
+  and reports the action. Add one as an element:
+    {"kind":"button",  <box>, "label":"Movie", "icon":"<phosphor>"?, "on_tap":<action spec>} -- fires on_tap.
+    {"kind":"switch",  <box>, "label":"Desk", "value_key":"ha:<entity>", "state":"on"|"off"?} -- taps
+      toggle the bound entity and reflect its live state (no on_tap; the toggle is derived).
+    {"kind":"slider",  <box>, "axis":"x"|"y", "value_key":"ha:<entity>[:<attr>]",
+      "value_min":0, "value_max":100, "value_step":5} -- drag sets the bound value.
+    {"kind":"stepper", <box>, "value_key":"ha:<entity>", "value_min":0, "value_max":30, "value_step":1}.
+  Only on can_stay_awake touch panels running the touch_v3 firmware; inert until the experiment is on.
   Code element named actions: give a "code" element "actions":{"<name>":<spec>, ...} and reference
     them from its markup as data-on-tap="@name" (also data-on-swipe / data-on-slide), in static HTML
     or JS-built DOM. Structured (HA) specs stay in validated config; the markup holds a plain @name.
