@@ -167,7 +167,6 @@ def editor(canvas_id: str) -> str:
     return render_template(
         "panels_editor.html",
         canvas_id=canvas_id,
-        touch_v3=experiments.is_enabled("touch_v3"),
         font_face_css=_font_face_css(_registry().fonts),
         code_fonts=[{"id": f.id, "name": f.name} for f in _registry().fonts.values()],
     )

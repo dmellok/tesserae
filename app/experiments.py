@@ -35,11 +35,6 @@ _DEFAULTS: dict[str, bool] = {
     # token-authed surface. Off by default since it opens a new (auth-gated)
     # API; opt in from Settings → System → MCP.
     "mcp": False,
-    # Touch v3 (device-owned touch): the button/switch/slider/stepper primitives
-    # in the canvas editor + their device-facing endpoints (/frame/spec,
-    # /interact, /atlas). Off by default while firmware support lands; opt in to
-    # author touch controls. See notes/design-handoffs/touch-v3/.
-    "touch_v3": False,
 }
 
 

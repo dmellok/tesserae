@@ -1440,26 +1440,16 @@ def _canvas_for_page(page_id: str) -> Any:
     return None
 
 
-def _touch_v3_on() -> bool:
-    from app.experiments import is_enabled
-
-    return is_enabled("touch_v3")
-
-
 @bp.get("/<device_id>/frame/spec")
 def get_frame_spec(device_id: str) -> Response:
     """The touch-v3 spec for the device's current frame (``?layout=<digest>``):
     typed primitives the firmware draws and hit-tests locally. Anchored to a
     layout digest stable across data-only redraws, so a clock tick doesn't
     invalidate touch. An empty ``primitives`` list is valid (a non-interactive
-    dashboard) and is also what's served when the touch_v3 experiment is off."""
+    dashboard)."""
     device, err = _auth_device(device_id)
     if err is not None or device is None:
         return err  # type: ignore[return-value]
-    if not _touch_v3_on():
-        from app.touch_spec import build_frame_spec
-
-        return jsonify(build_frame_spec([]))
     push_mgr = current_app.config.get("PUSH_MANAGER")
     latest = push_mgr.latest_render_for(device.id) if push_mgr is not None else None
     if not latest:
@@ -1515,8 +1505,6 @@ def get_touch_atlas(device_id: str, digest: str) -> Response:
     device, err = _auth_device(device_id)
     if err is not None or device is None:
         return err  # type: ignore[return-value]
-    if not _touch_v3_on():
-        return _error(404, "no atlas")
     safe = _normalize_digest(digest)
     if not safe or len(safe) > 40 or any(c not in "0123456789abcdef" for c in safe):
         return _error(404, "no atlas")
@@ -1575,8 +1563,6 @@ def post_interact(device_id: str) -> Response:
     device, err = _auth_device(device_id)
     if err is not None or device is None:
         return err  # type: ignore[return-value]
-    if not _touch_v3_on():
-        return jsonify({"outcome": "no_target", "primitive_id": ""})
     body = request.get_json(silent=True)
     body = body if isinstance(body, dict) else {}
     primitive_id = str(body.get("primitive_id") or "")

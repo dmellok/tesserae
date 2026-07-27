@@ -11,11 +11,10 @@ earlier deltas are RESOLVED, so text rendering and live state are now unblocked.
 Update the firmware to the finalized contract below.
 
 STATUS
-- Server backend, canvas authoring, opt-in gating, and MCP authoring all shipped
-  and tested. The firmware is the remaining half.
-- The touch_v3 feature is behind an experiment, DEFAULT OFF. Build for both:
-  when off, the server serves an EMPTY spec (no primitives) -- render the image,
-  hold no controls, and latch touch off. When on, everything below applies.
+- Server backend, canvas authoring, and MCP authoring all shipped and tested.
+  touch-v3 is ON by default (no experiment gate). The firmware is the remaining half.
+- /frame/spec carries primitives whenever the current page has them; an EMPTY spec
+  just means a non-touch page -- render the image and hold no controls.
 
 CAPABILITIES (advertise on register + heartbeat)
   { "touch": {"v":3,"primitives":["button","switch","slider","stepper"]},

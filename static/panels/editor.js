@@ -1225,8 +1225,6 @@
 
     // Shapes / lines / icons at the top of the palette.
     var decos = DECOS.filter(function (d) {
-      // Touch-v3 primitives only appear when the experiment is enabled.
-      if (isPrimitive(d.kind) && !(S.cfg && S.cfg.touchV3)) return false;
       return !q || d.label.toLowerCase().indexOf(q) >= 0 || d.kind.indexOf(q) >= 0;
     });
     if (decos.length) {
@@ -3273,7 +3271,6 @@
       canvasId: root.dataset.canvasId,
       pagesUrl: root.dataset.pagesUrl,
       touchRegionsUrl: root.dataset.touchRegionsUrl,
-      touchV3: root.dataset.touchV3 === "on",
     };
     // Canvas-management URLs derive from this editor's own path
     // (…/c/<id>), so they carry any ingress prefix for free.

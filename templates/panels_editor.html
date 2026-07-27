@@ -127,8 +127,7 @@
        data-source-form-url="{{ url_for('panels.source_form') }}"
        data-source-options-url="{{ url_for('panels.source_options') }}"
        data-pages-url="{{ url_for('panels.pages_list') }}"
-       data-touch-regions-url="{{ url_for('panels.touch_regions', canvas_id=canvas_id) }}"
-       data-touch-v3="{{ 'on' if touch_v3 else '' }}">
+       data-touch-regions-url="{{ url_for('panels.touch_regions', canvas_id=canvas_id) }}">
 
     <div class="tbar" style="grid-column:1/4">
       <a class="tbtn" href="{{ url_for('pages.index') }}" title="Back to Tesserae dashboards" id="panels-back"><i class="ph-bold ph-arrow-left"></i></a>

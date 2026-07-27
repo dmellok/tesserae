@@ -30,7 +30,6 @@ def app(tmp_path: Path) -> Flask:
         devices_dir=REPO_ROOT / "devices",
     )
     a.config["TESTING"] = True
-    a.config["SETTINGS_STORE"].update_section("experiments", {"touch_v3": True})
     return a
 
 
