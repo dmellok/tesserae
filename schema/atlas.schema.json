@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tesserae.ink/schema/touch-v3/atlas.schema.json",
+  "title": "Tesserae touch-v3 glyph atlas descriptor",
+  "description": "Describes one text glyph strip the firmware blits. Text-only by default; may also carry named icon glyphs (e.g. @bulb) for devices that use the atlas icon-fallback path.",
+  "type": "object",
+  "required": ["id", "digest", "url", "format", "px", "weight", "strip_h", "ascent", "descent", "glyphs"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "description": "Handle referenced by primitive text refs, e.g. l20, v28." },
+    "digest": { "type": "string", "description": "Content hash of the strip binary; immutable cache key. Derived from (charset, font, px, weight)." },
+    "url": { "type": "string", "description": "GET path for the strip binary." },
+    "format": { "const": "gray4", "description": "4bpp grayscale strip, high nibble = left pixel, 0 = paper .. 15 = full ink." },
+    "font": { "type": "string", "default": "Inter" },
+    "px": { "type": "integer", "minimum": 6 },
+    "weight": { "type": "integer", "enum": [400, 700] },
+    "strip_w": { "type": "integer", "minimum": 1 },
+    "strip_h": { "type": "integer", "minimum": 1, "description": "Uniform glyph height across the strip." },
+    "ascent": { "type": "integer", "description": "Baseline offset from top, for vertical centering in a rect." },
+    "descent": { "type": "integer" },
+    "space_adv": { "type": "integer", "description": "Advance width for the space character." },
+    "glyphs": {
+      "type": "object",
+      "description": "Map of character (or @icon-name for atlas-icon fallback) to its strip slot.",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["x", "w", "adv"],
+        "additionalProperties": false,
+        "properties": {
+          "x": { "type": "integer", "minimum": 0, "description": "Left offset in the strip (px)." },
+          "w": { "type": "integer", "minimum": 0, "description": "Ink width (px). 0 for space." },
+          "adv": { "type": "integer", "minimum": 0, "description": "Cursor advance (px), side bearings included." }
+        }
+      }
+    }
+  }
+}
