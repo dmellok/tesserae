@@ -261,6 +261,7 @@ def build_atlas(
     renders_dir: Path,
     rasterize: Any,
     charset: str = ATLAS_CHARSET,
+    prefix: str = "overlay",
 ) -> dict[str, Any] | None:
     """Build (or reuse) the glyph atlas for one (px, weight) pair:
     ``{digest, format, height, glyphs}``, with the strip bytes persisted
@@ -276,13 +277,13 @@ def build_atlas(
 
     from PIL import Image
 
-    meta_path = renders_dir / f"overlay-atlas-{px}-{weight}.json"
+    meta_path = renders_dir / f"{prefix}-atlas-{px}-{weight}.json"
     try:
         meta = json.loads(meta_path.read_text(encoding="utf-8"))
         if (
             isinstance(meta, dict)
             and meta.get("charset") == charset
-            and (renders_dir / f"overlay-atlas-{meta.get('digest')}.bin").is_file()
+            and (renders_dir / f"{prefix}-atlas-{meta.get('digest')}.bin").is_file()
         ):
             return {k: meta[k] for k in ("digest", "format", "height", "glyphs")}
     except (OSError, json.JSONDecodeError, KeyError):
@@ -314,7 +315,7 @@ def build_atlas(
         import hashlib as _hashlib
 
         digest = _hashlib.sha256(packed).hexdigest()[:16]
-        (renders_dir / f"overlay-atlas-{digest}.bin").write_bytes(packed)
+        (renders_dir / f"{prefix}-atlas-{digest}.bin").write_bytes(packed)
         atlas = {"digest": digest, "format": "4bpp-gray", "height": height, "glyphs": table}
         meta_path.write_text(json.dumps({**atlas, "charset": charset}), encoding="utf-8")
         return atlas

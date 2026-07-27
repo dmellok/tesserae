@@ -1463,7 +1463,62 @@ def get_frame_spec(device_id: str) -> Response:
     if canvas is None:
         return jsonify(build_frame_spec([]))
     wire = wire_transform(device.panel or {}, int(canvas.w), int(canvas.h))
-    return jsonify(build_frame_spec(canvas.els, wire=wire))
+    spec = build_frame_spec(canvas.els, wire=wire)
+    _attach_touch_atlases(spec, device)
+    return jsonify(spec)
+
+
+def _attach_touch_atlases(spec: dict[str, Any], device: Device) -> None:
+    """Build and attach the glyph atlases the spec's primitive text refs
+    reference (label / value_text). Left off on any build failure: the firmware
+    renders chrome without text rather than failing the whole spec."""
+    roles: set[str] = set()
+    for prim in spec.get("primitives", []):
+        for key in ("label", "value_text"):
+            ref = prim.get(key)
+            if isinstance(ref, dict) and isinstance(ref.get("atlas"), str):
+                roles.add(ref["atlas"])
+    renders_dir = current_app.config.get("RENDERS_DIR")
+    if not roles or renders_dir is None:
+        return
+    from app.overlay_sync import browser_rasterizer
+    from app.touch_atlas import build_touch_atlas
+
+    rasterize = current_app.config.get("OVERLAY_ATLAS_RASTERIZER") or browser_rasterizer(
+        request.url_root
+    )
+    atlases: list[dict[str, Any]] = []
+    for role in sorted(roles):
+        desc = build_touch_atlas(role, renders_dir=Path(renders_dir), rasterize=rasterize)
+        if desc is not None:
+            desc["url"] = f"/api/v1/device/{device.id}/atlas/{desc['digest']}"
+            atlases.append(desc)
+    if atlases:
+        spec["atlases"] = atlases
+
+
+@bp.get("/<device_id>/atlas/<digest>")
+def get_touch_atlas(device_id: str, digest: str) -> Response:
+    """The 4bpp-gray glyph strip for a touch-v3 atlas digest: content-addressed
+    and immutable, so the firmware fetches it once per digest to render primitive
+    labels and value readouts."""
+    device, err = _auth_device(device_id)
+    if err is not None or device is None:
+        return err  # type: ignore[return-value]
+    safe = _normalize_digest(digest)
+    if not safe or len(safe) > 40 or any(c not in "0123456789abcdef" for c in safe):
+        return _error(404, "no atlas")
+    renders_dir = current_app.config.get("RENDERS_DIR")
+    if renders_dir is None:
+        return _error(404, "no atlas")
+    path = Path(renders_dir) / f"touch-atlas-{safe}.bin"
+    if not path.is_file():
+        return _error(404, "no atlas")
+    return Response(
+        path.read_bytes(),
+        mimetype="application/octet-stream",
+        headers={"Cache-Control": "public, max-age=31536000, immutable"},
+    )
 
 
 _TOUCH_PRIMITIVE_KINDS = frozenset({"button", "switch", "slider", "stepper"})
