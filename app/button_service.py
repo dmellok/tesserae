@@ -837,6 +837,103 @@ class ButtonService:
             base=base,
         )
 
+    def dispatch_touch_spec(
+        self,
+        *,
+        device_id: str,
+        spec: str | dict[str, Any],
+        value: int | None = None,
+        event_id: int | None = None,
+        region_box: dict[str, Any] | None = None,
+    ) -> TouchHandleResult:
+        """Dispatch a resolved touch-v3 primitive action (device-owned touch).
+
+        The firmware hit-tested a primitive locally and reported it; the endpoint
+        resolved it to an action spec. This runs that spec through the same
+        dispatch machinery as a coordinate touch, with ``{value}`` substitution
+        for sliders, but the HA path passes ``reconcile=False``: the device
+        already drew its own feedback and dashboard data arrives via the values
+        channel, so the old post-action re-render/frame-patch is skipped.
+        Primitives are authored in the canvas editor (config origin), so the
+        markup-origin side-effect gate does not apply."""
+        now = self._clock()
+        state = self._state.get(device_id) or DeviceRotationState(device_id=device_id)
+        diag = TouchStroke(x0=0, y0=0, x1=0, y1=0)
+        if (
+            event_id is not None
+            and state.last_button_event_id is not None
+            and event_id == state.last_button_event_id
+        ):
+            result = TouchHandleResult(
+                outcome="deduped", gesture=None, base=self.snapshot(device_id)
+            )
+            self._emit_touch_row(result, stroke=diag, event_id=event_id)
+            return result
+
+        magnitude = int(value) if value is not None else 0
+        if isinstance(spec, str) and value is not None:
+            spec = substitute_value(spec, value)
+
+        if isinstance(spec, dict):
+            result = self._dispatch_structured(
+                device_id=device_id,
+                action=spec,
+                gesture="tap",
+                magnitude=magnitude,
+                value=value,
+                stroke=diag,
+                event_id=event_id,
+                region_box=region_box or {},
+                state=state,
+                now=now,
+                reconcile=False,
+            )
+            self._spawn_prewarm(device_id)
+            return result
+
+        rotation = self._resolve_rotation(device_id)
+        current_step_index, manual = self._effective_step_index(rotation, state)
+        ctx = ActionContext(
+            device_id=device_id,
+            current_step_index=current_step_index,
+            rotation_step_count=len(rotation.steps) if rotation is not None else 0,
+            rotation_id=rotation.id if rotation is not None else None,
+            known_page_ids=frozenset(p.id for p in self._pages.list()),
+        )
+        base = self._dispatch_spec(
+            device_id=device_id,
+            spec=spec,
+            ctx=ctx,
+            rotation=rotation,
+            state=state,
+            now=now,
+            current_step_index=current_step_index,
+            manual=manual,
+            trigger_label="touch",
+            event_id=event_id,
+            origin="touch",
+            origin_extra={"touch_event_id": event_id, "value": value},
+        )
+        if base.action_spec is not None and base.unmapped:
+            outcome = "error"
+        elif base.pushed_page_id is not None:
+            outcome = "dispatched"
+        elif base.force_download:
+            outcome = "fetched"
+        elif spec.startswith("webhook"):
+            outcome = "webhook_dispatched"
+        else:
+            outcome = "noop"
+        self._spawn_prewarm(device_id)
+        return TouchHandleResult(
+            outcome=outcome,
+            gesture="tap",
+            magnitude=magnitude,
+            action_spec=spec,
+            value=value,
+            base=base,
+        )
+
     def _spawn_prewarm(self, device_id: str) -> None:
         """Fire ``_prewarm_adjacent`` on a daemon thread. Split out so
         tests can run it synchronously."""
@@ -1107,6 +1204,7 @@ class ButtonService:
         region_box: dict[str, Any] | None,
         state: DeviceRotationState,
         now: datetime,
+        reconcile: bool = True,
     ) -> TouchHandleResult:
         """Dispatch a structured (dict) touch action. Currently the Home
         Assistant service call: ``{"action": "ha", "domain", "service",
@@ -1155,7 +1253,7 @@ class ButtonService:
             )
         )
         push_result: PushResult | None = None
-        if outcome == "ha_dispatched":
+        if outcome == "ha_dispatched" and reconcile:
             # Catch the panel up with the new HA state OFF this wake: a
             # debounced background reconcile re-renders whatever the
             # device is showing (rotation step, deck page, or the last

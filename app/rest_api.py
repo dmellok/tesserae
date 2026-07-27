@@ -1457,6 +1457,94 @@ def get_frame_spec(device_id: str) -> Response:
     return jsonify(build_frame_spec(_canvas_els_for_page(page_id)))
 
 
+_TOUCH_PRIMITIVE_KINDS = frozenset({"button", "switch", "slider", "stepper"})
+
+
+def _entity_from_value_key(value_key: str) -> str:
+    """The HA entity id in a ``ha:<entity>[:<attr>]`` binding, or ""."""
+    if not value_key.startswith("ha:"):
+        return ""
+    return value_key[3:].split(":", 1)[0]
+
+
+def _action_for_primitive(el: Any) -> str | dict[str, Any] | None:
+    """The action spec to dispatch for a touch-v3 primitive. A button uses its
+    ``on_tap``; a switch toggles the entity in ``value_key``; a slider/stepper
+    uses its ``on_slide`` action (with ``{value}`` substituted at dispatch)."""
+    if el.kind == "button":
+        return el.on_tap or None
+    if el.kind == "switch":
+        entity = _entity_from_value_key(el.value_key)
+        if not entity:
+            return None
+        return {
+            "action": "ha",
+            "domain": entity.split(".", 1)[0],
+            "service": "toggle",
+            "data": {"entity_id": entity},
+        }
+    if el.kind in ("slider", "stepper"):
+        slide = el.on_slide if isinstance(el.on_slide, dict) else None
+        return slide.get("action") if slide else None
+    return None
+
+
+@bp.post("/<device_id>/interact")
+def post_interact(device_id: str) -> Response:
+    """Device-owned touch report: the firmware hit-tested a primitive locally and
+    reports ``{primitive_id, interaction, value}``. The server resolves the
+    primitive's action and dispatches it (payloads never left the server).
+    Always 200 with an ``outcome`` (never an error status), mirroring /tap; the
+    device already showed feedback and doesn't branch on the response."""
+    device, err = _auth_device(device_id)
+    if err is not None or device is None:
+        return err  # type: ignore[return-value]
+    body = request.get_json(silent=True)
+    body = body if isinstance(body, dict) else {}
+    primitive_id = str(body.get("primitive_id") or "")
+    raw_value = body.get("value")
+    value = (
+        int(raw_value)
+        if isinstance(raw_value, (int, float)) and not isinstance(raw_value, bool)
+        else None
+    )
+    raw_event = body.get("event_id")
+    event_id = (
+        int(raw_event)
+        if isinstance(raw_event, (int, float)) and not isinstance(raw_event, bool)
+        else None
+    )
+
+    push_mgr = current_app.config.get("PUSH_MANAGER")
+    latest = push_mgr.latest_render_for(device.id) if push_mgr is not None else None
+    if not latest:
+        return jsonify({"outcome": "no_frame", "primitive_id": primitive_id})
+    info = _frame_info_for_digest(device, str(latest.get("digest") or ""))
+    page_id = str(info.get("page_id") or "") if info else ""
+    el = next(
+        (
+            e
+            for e in _canvas_els_for_page(page_id)
+            if getattr(e, "id", "") == primitive_id and e.kind in _TOUCH_PRIMITIVE_KINDS
+        ),
+        None,
+    )
+    if el is None:
+        return jsonify({"outcome": "no_target", "primitive_id": primitive_id})
+    spec = _action_for_primitive(el)
+    svc = current_app.config.get("BUTTON_SERVICE")
+    if spec is None or svc is None:
+        return jsonify({"outcome": "noop", "primitive_id": primitive_id})
+    result = svc.dispatch_touch_spec(
+        device_id=device.id,
+        spec=spec,
+        value=value,
+        event_id=event_id,
+        region_box={"x": el.x, "y": el.y, "w": el.w, "h": el.h},
+    )
+    return jsonify({"outcome": result.outcome, "primitive_id": primitive_id})
+
+
 # -- device event stream (protocol v2) --------------------------------------
 
 # SSE cadence knobs. The stream is an optimisation over the 1 s linger
