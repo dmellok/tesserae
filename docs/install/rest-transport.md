@@ -125,121 +125,27 @@ per-device bearer token. Pick whichever matches your bring-up flow.
 
 ## REST API reference
 
-All endpoints under `/api/v1/device/`. Auth is per-device bearer token
-(`Authorization: Bearer <token>` or `X-Tesserae-Token: <token>` for
-firmware HTTP libs that hate Authorization headers).
+The device-facing endpoints and their full request / response shapes,
+status codes, auth, pairing, frame formats, scheduling behaviour, and
+the steady-state loop are documented once, authoritatively, in the
+**[Client protocol spec](../dev/client-protocol.md)**. That page tracks
+`main` and is the reference to build a client against; this page stays
+focused on the operator story (when to choose REST, adding and switching
+devices, migrating from MQTT).
 
-### `GET /api/v1/device/<id>/frame`
+Quick orientation, see the spec for the full shapes:
 
-Returns the latest rendered frame URL + format + panel dims for this
-device.
-
-| Status | Meaning |
+| Endpoint | Purpose |
 |---|---|
-| 200 | JSON `{url, format, panel_w, panel_h, render_id, renderer_id}`. `ETag` header carries the render digest. |
-| 304 | `If-None-Match` matches current ETag; skip fetch + paint. |
-| 204 | No frame has been rendered yet for this device. |
-| 401 | Missing or invalid bearer token. |
-| 403 | Token valid but for a different device than the URL claims. |
+| `GET /api/v1/device/<id>/frame` | Latest frame URL + format + panel dims; ETag-driven `304` when unchanged. |
+| `POST /api/v1/device/<id>/status` | Heartbeat; response carries `config`, `next_poll_s`, `server_time`, and local-time fields. |
+| `POST /api/v1/device/discover` | First-boot announce (unauthenticated); lands in the Discovered strip. |
+| `POST /api/v1/device/register` | Pre-pairing with a 6-digit code (optional; idempotent on retry). |
+| `POST /api/v1/device/<id>/log` | Forward a client log line to Settings → Events. |
 
-Use the ETag-driven 304 to save battery: a freshly-woken device whose
-composition hasn't changed gets a 304 in <100 ms instead of pulling
-the .bin and triggering a 10-second Spectra 6 refresh.
-
-### `POST /api/v1/device/<id>/status`
-
-Heartbeat. Body JSON:
-
-```json
-{
-  "battery_mv": 3850,
-  "battery_pct": 72,
-  "rssi": -64,
-  "ip": "10.0.0.42",
-  "sleep_until": 1700000300.5,
-  "next_sleep_s": 600,
-  "fw_version": "0.1.0"
-}
-```
-
-Response piggybacks the current per-device config AND the next poll
-cadence:
-
-```json
-{
-  "status": 200,
-  "config": { "sleep_interval_s": 900 },
-  "next_poll_s": 900,
-  "server_time": 1700000100
-}
-```
-
-One round trip per wake. The firmware doesn't need a separate config
-poll.
-
-### `POST /api/v1/device/register` (first boot, optional)
-
-Used by the pre-pairing flow above. The default first-boot path is
-`/discover` + admin Register click; only reach for this endpoint
-when you need to pre-mint a token. Headers + body:
-
-```
-X-Pairing-Code: 123456
-Content-Type: application/json
-
-{"device_id": "bedroom_pico", "kind": "pico_bin_client",
- "panel_w": 1600, "panel_h": 1200, "fw_version": "0.1.0",
- "mac": "aabbccddeeff"}
-```
-
-Response (201):
-
-```json
-{
-  "status": 201,
-  "device_token": "abc1...XYZ",
-  "server_time": 1700000000,
-  "config": { "sleep_interval_s": 900 },
-  "reused_existing": false
-}
-```
-
-If `device_id` already exists (firmware retry case), the response is
-`200` + `reused_existing: true` + the existing token rather than
-failing.
-
-Rate-limited per client IP (10 failed attempts / 60s window). Successful
-registrations release the bucket; an attacker can't grind one IP
-without the rate limiter biting.
-
-### `POST /api/v1/device/discover` (first boot)
-
-The default first-boot endpoint. Firmware announces itself here so
-the device shows up under the Discovered strip in Settings →
-Devices; admin clicks **Register** and Tesserae returns the token
-on the firmware's next poll.
-
-Body:
-
-```json
-{"device_id": "fresh_pico", "kind": "pico_bin_client",
- "panel_w": 1600, "panel_h": 1200, "fw_version": "0.1.0",
- "mac": "aabbccddeeff"}
-```
-
-Response (200): `{"status": 200, "discovered": true, "next_step": "..."}`.
-
-The entry shows up in the Discovered strip on Settings → Devices
-alongside MQTT-discovered devices.
-
-### `POST /api/v1/device/<id>/log` (optional, client diagnostics)
-
-```json
-{"level": "warn", "msg": "panel busy timeout", "extra": {...}}
-```
-
-Appended to the Tesserae EventLog so firmware logs surface on the
-Events page alongside server-side events.
+All under `/api/v1/device/`, per-device bearer token
+(`Authorization: Bearer <token>`, or the `X-Tesserae-Token` header for
+firmware HTTP libs that dislike `Authorization`).
 
 ## Switching a device between transports
 

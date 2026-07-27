@@ -1145,6 +1145,53 @@ Validate client-side too. The ESP32 reference bounds are
 `30 ≤ sleep_interval_s ≤ 604800` (7 days). A bad value sneaking
 through here means a flat battery.
 
+## Scheduling and polling
+
+Scheduling is orthogonal to the poll interval. A schedule or rotation
+never changes how often a device wakes; it only changes *what frame is
+waiting* the next time the device polls.
+
+- `next_poll_s` is only ever the device's `sleep_interval_s`
+  (device-instance setting → kind-schema default → 60s). A bound
+  schedule does not shorten or lengthen it.
+- A schedule is a server-side push. When it fires, the server renders
+  the target page and stores the result in that device's single
+  latest-frame slot (`data/core/latest_renders.json`, latest-wins).
+  The device sees it on its next `/frame` poll: `200` + a new ETag,
+  otherwise `304`.
+- Nothing wakes a sleeping device. A deep-sleeping REST panel is
+  unreachable between polls, so a scheduled change is only ever seen on
+  the device's own next wake. Set `sleep_interval_s` to the cadence you
+  actually want the panel to refresh at, and use schedules to decide
+  what lands on those wakes. A once-daily schedule against a 5-minute
+  poll means ~288 wakes/day, ~287 of them `304`.
+
+**Offline devices get only the last iteration.** The latest-frame slot
+holds one render per device with latest-wins coalescing; there is no
+queue of missed iterations. If an hourly schedule fires 24 times while a
+device is offline, each render supersedes the previous one in the slot,
+so on reconnect the next `/frame` returns just the current frame, not a
+backlog. This is deliberate: an e-ink panel only ever wants the newest
+frame.
+
+**Smart sync (optional)** times the render to land *just before* the
+device wakes instead of on a fixed server cadence. It relies on the
+wake-prediction fields the device publishes in `/status`:
+
+- `sleep_until` (absolute unix wake timestamp) is the most accurate; it
+  bypasses clock-skew math on the server.
+- `next_sleep_s` (seconds until the device wakes) is the fallback; the
+  server adds it to the receipt time.
+- Publish neither and the server predicts from the configured
+  `sleep_interval_s`.
+
+A device becomes *trusted* after three consecutive wakes landing within
+±60s of prediction, at which point the scheduler JIT-renders
+`smart_sync_lead_s` (default 10s) before the predicted wake. Publishing
+`sleep_until` is the fastest, most reliable way to earn trust. Smart
+sync only improves render freshness; it never changes `next_poll_s` or
+wakes the device.
+
 ## Reference implementations
 
 In-tree clients you can read as worked examples:
