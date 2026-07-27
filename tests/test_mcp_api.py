@@ -91,6 +91,25 @@ def test_remote_with_bad_token_401(app: Flask) -> None:
     assert resp.status_code == 401
 
 
+# -- agent docs (served to the bridge) ----------------------------------
+
+
+def test_instructions_served_with_schema_and_text(app: Flask) -> None:
+    from app import mcp_docs
+
+    _enable(app)
+    body = app.test_client().get("/api/mcp/instructions").get_json()
+    assert body["schema"] == mcp_docs.DOCS_SCHEMA
+    # Full canonical text, byte-for-byte, so the bridge can use it verbatim.
+    assert body["instructions"] == mcp_docs.INSTRUCTIONS
+    assert body["doc_shape"] == mcp_docs.DOC_SHAPE
+
+
+def test_instructions_gated_by_experiment(app: Flask) -> None:
+    # Same gate as the rest of the surface: off → 404.
+    assert app.test_client().get("/api/mcp/instructions").status_code == 404
+
+
 # -- discovery ----------------------------------------------------------
 
 

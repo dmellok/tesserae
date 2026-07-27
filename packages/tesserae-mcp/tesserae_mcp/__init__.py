@@ -23,10 +23,16 @@ import urllib.error
 import urllib.request
 from typing import Any
 
-__version__ = "0.6.3"
+__version__ = "0.11.0"
 
 _BASE = os.environ.get("TESSERAE_URL", "http://127.0.0.1:8765").rstrip("/")
 _TOKEN = os.environ.get("TESSERAE_MCP_TOKEN", "").strip()
+
+# Payload shape of GET /api/mcp/instructions this bridge understands. The server
+# bumps its own schema only when the response *shape* changes; the docs text can
+# change freely without a bump. A mismatch means the bridge falls back to the
+# embedded copy below rather than trusting a shape it can't read.
+_DOCS_SCHEMA = 1
 
 # The canvas-document shape, embedded in the set_canvas tool description so the
 # agent knows exactly what to write.
@@ -288,6 +294,36 @@ def _json(method: str, path: str, body: dict[str, Any] | None = None) -> Any:
     if status >= 400 and isinstance(parsed, dict):
         parsed.setdefault("_status", status)
     return parsed
+
+
+def _fetch_docs() -> dict[str, str]:
+    """Pull the canonical agent-facing docs (handshake instructions + canvas
+    doc-shape) from a running Tesserae, so a server-side copy / capability change
+    goes live on the next agent connection with no bridge republish.
+
+    Returns a dict with any of ``instructions`` / ``doc_shape`` it could read, or
+    ``{}`` on any failure -- unreachable server, ``mcp`` experiment off (404),
+    an older Tesserae without the endpoint, or a payload schema this bridge
+    doesn't understand. The caller falls back to the embedded copy per key, so
+    the bridge always works offline."""
+    try:
+        status, raw, _ = _request("GET", "/instructions")
+    except Exception:
+        return {}
+    if status != 200 or not raw:
+        return {}
+    try:
+        data = json.loads(raw)
+    except ValueError:
+        return {}
+    if not isinstance(data, dict) or data.get("schema") != _DOCS_SCHEMA:
+        return {}
+    out: dict[str, str] = {}
+    for key in ("instructions", "doc_shape"):
+        val = data.get(key)
+        if isinstance(val, str) and val.strip():
+            out[key] = val
+    return out
 
 
 # Sent to the connecting agent at handshake (FastMCP ``instructions``) so it drives
@@ -782,7 +818,14 @@ def build_server() -> Any:
         """Delete a deck by id."""
         return _json("DELETE", f"/decks/{deck_id}")
 
-    mcp = FastMCP("tesserae", instructions=_INSTRUCTIONS)
+    # Prefer the running server's docs (so a Tesserae-side copy change needs no
+    # bridge republish); fall back to the embedded copy per key when it's
+    # unreachable, the mcp experiment is off, or the server predates the endpoint.
+    docs = _fetch_docs()
+    instructions = docs.get("instructions") or _INSTRUCTIONS
+    doc_shape = docs.get("doc_shape") or _DOC_SHAPE
+
+    mcp = FastMCP("tesserae", instructions=instructions)
     for fn in (
         list_widgets,
         list_services,
@@ -827,7 +870,7 @@ def build_server() -> Any:
             "if the document is invalid, so you can correct it and retry. Pass base_rev (the rev "
             "from get_canvas) to be warned with HTTP 409 if the page changed under you. For a "
             "one-field change prefer update_element / patch_canvas. After setting, call "
-            "render_preview() (or render_report()) to check the result.\n\n" + _DOC_SHAPE
+            "render_preview() (or render_report()) to check the result.\n\n" + doc_shape
         ),
     )
     mcp.add_tool(
@@ -836,7 +879,7 @@ def build_server() -> Any:
             "Append ONE element to a canvas and save (each call is a separate save, so an "
             "open editor updates live as you build). 'element' is a single element object; "
             "returns {ok,id,rev,elements,element_id}. Use set_canvas to replace the whole "
-            "layout at once.\n\n" + _DOC_SHAPE
+            "layout at once.\n\n" + doc_shape
         ),
     )
     return mcp

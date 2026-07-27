@@ -76,6 +76,54 @@ def test_server_ships_compose_instructions() -> None:
     assert "on_tap" in text and "on_slide" in text and "hotspot" in text
 
 
+def _fake_request(status: int, body: bytes):
+    return lambda *a, **k: (status, body, "application/json")
+
+
+def test_fetch_docs_prefers_server_copy(monkeypatch: pytest.MonkeyPatch) -> None:
+    """When Tesserae serves /instructions, the bridge uses that text verbatim
+    (so a server-side copy change needs no bridge republish)."""
+    import json
+
+    payload = json.dumps(
+        {
+            "schema": bridge._DOCS_SCHEMA,
+            "instructions": "SERVER INSTRUCTIONS xyz",
+            "doc_shape": "SERVER DOC SHAPE canvas document is JSON abc",
+        }
+    ).encode()
+    monkeypatch.setattr(bridge, "_request", _fake_request(200, payload))
+    import asyncio
+
+    server = bridge.build_server()
+    assert "SERVER INSTRUCTIONS xyz" in (server.instructions or "")
+    tools = asyncio.run(server.list_tools())
+    set_canvas = next(t for t in tools if t.name == "set_canvas")
+    assert "SERVER DOC SHAPE" in (set_canvas.description or "")
+
+
+def test_fetch_docs_falls_back_when_unreachable(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An unreachable / experiment-off server leaves the embedded copy in place."""
+
+    def _boom(*a, **k):
+        raise RuntimeError("cannot reach Tesserae")
+
+    monkeypatch.setattr(bridge, "_request", _boom)
+    server = bridge.build_server()
+    assert server.instructions == bridge._INSTRUCTIONS
+
+
+def test_fetch_docs_rejects_schema_mismatch(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A payload shape this bridge doesn't understand is ignored (embedded copy wins)."""
+    import json
+
+    payload = json.dumps({"schema": 999, "instructions": "NEW SHAPE"}).encode()
+    monkeypatch.setattr(bridge, "_request", _fake_request(200, payload))
+    assert bridge._fetch_docs() == {}
+    server = bridge.build_server()
+    assert server.instructions == bridge._INSTRUCTIONS
+
+
 def test_json_wraps_http_error(monkeypatch: pytest.MonkeyPatch) -> None:
     """A non-2xx response is returned as data (with _status), not raised, so the
     agent can read 422 validation details."""

@@ -1856,5 +1856,24 @@ def mcp_suggest_decks() -> Response:
     return jsonify({"suggestions": suggestions})
 
 
+@bp.get("/instructions")
+def instructions() -> Response:
+    """The agent-facing MCP docs (handshake instructions + canvas doc-shape).
+
+    The tesserae-mcp bridge fetches this at startup so a capability / copy change
+    goes live on the next agent connection with no bridge republish; the bridge
+    keeps an embedded copy as a fallback. ``schema`` lets an older bridge tell
+    whether it understands the payload shape."""
+    from app import mcp_docs
+
+    return jsonify(
+        {
+            "schema": mcp_docs.DOCS_SCHEMA,
+            "instructions": mcp_docs.INSTRUCTIONS,
+            "doc_shape": mcp_docs.DOC_SHAPE,
+        }
+    )
+
+
 def register(app: Flask) -> None:
     app.register_blueprint(bp)
