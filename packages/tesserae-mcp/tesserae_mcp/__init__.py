@@ -97,7 +97,15 @@ plus optional "opacity" (0-100) and "rotate" (degrees). By "kind":
            "new Chart(document.getElementById('c'),{type:'line',data:{labels:[...],
            datasets:[{data: ctx.data.weather.hourly.map(h=>h.temp)}]}})".
 
-TOUCH ACTIONS ("on_tap"/"on_swipe"/"on_slide" on ANY element -- respond to taps on a touch panel):
+INTERACTIVE CONTROLS -- two ways, don't mix them up:
+  * Want a BUTTON, SWITCH, SLIDER, or STEPPER (a control the user names)? Use a TYPED TOUCH PRIMITIVE
+    {"kind":"button"|"switch"|"slider"|"stepper", ...} (see "TOUCH PRIMITIVES" below). This is the
+    DEFAULT for any control asked for by name; the firmware draws it, you don't style it. "Add a
+    button" -> {"kind":"button"}, NOT a rect with on_tap.
+  * Want to make an EXISTING visual (a widget, a shape, a code element's output) respond to a tap
+    without drawing a control? Add "on_tap"/"on_swipe"/"on_slide" to that element (TAP ACTIONS below).
+
+TAP ACTIONS ("on_tap"/"on_swipe"/"on_slide" on ANY element -- make an existing element respond to taps):
   Touch-capable displays report a stroke; the server hit-tests it against regions extracted from the
   RENDERED layout (so they track the design, no coordinates to hand-place) and dispatches the action.
   Add any of these optional fields to an element:
@@ -134,16 +142,17 @@ TOUCH ACTIONS ("on_tap"/"on_swipe"/"on_slide" on ANY element -- respond to taps 
     e.g. the reTerminal E1003) AND running firmware that reports touch. On a display-only panel these
     fields render but never fire.
 
-DEVICE-OWNED TOUCH PRIMITIVES (touch_v3 experiment, off by default -- Settings -> experiments):
+TOUCH PRIMITIVES (button / switch / slider / stepper -- the DEFAULT for interactive controls):
   Typed controls the FIRMWARE draws + owns (the render reserves a blank rect); it hit-tests locally
-  and reports the action. Add one as an element:
+  and reports the action. Reach for these whenever the user asks for a button/switch/slider/stepper:
     {"kind":"button",  <box>, "label":"Movie", "icon":"<phosphor>"?, "on_tap":<action spec>} -- fires on_tap.
     {"kind":"switch",  <box>, "label":"Desk", "value_key":"ha:<entity>", "state":"on"|"off"?} -- taps
       toggle the bound entity and reflect its live state (no on_tap; the toggle is derived).
     {"kind":"slider",  <box>, "axis":"x"|"y", "value_key":"ha:<entity>[:<attr>]",
       "value_min":0, "value_max":100, "value_step":5} -- drag sets the bound value.
     {"kind":"stepper", <box>, "value_key":"ha:<entity>", "value_min":0, "value_max":30, "value_step":1}.
-  Only on can_stay_awake touch panels running the touch_v3 firmware; inert until the experiment is on.
+  On-device: shown on touch panels running the touch-v3 firmware; a display-only panel renders the
+  reserved (blank) rect but no control. The action spec forms (HA object, etc.) match TAP ACTIONS above.
   Code element named actions: give a "code" element "actions":{"<name>":<spec>, ...} and reference
     them from its markup as data-on-tap="@name" (also data-on-swipe / data-on-slide), in static HTML
     or JS-built DOM. Structured (HA) specs stay in validated config; the markup holds a plain @name.
