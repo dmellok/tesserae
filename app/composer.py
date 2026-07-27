@@ -1185,7 +1185,10 @@ def compose_overlay_atlas() -> str:
     except ValueError:
         abort(400)
     chars = request.args.get("chars") or ""
-    if not chars or len(chars) > 64:
+    # Cap is a loopback-only sanity bound, not a UX limit. The touch-v3 atlas
+    # charset (printable ASCII + °) is 96 glyphs; a 64 cap silently 400'd every
+    # touch atlas build, dropping text labels from the frame spec.
+    if not chars or len(chars) > 256:
         abort(400)
     registry = current_app.config["PLUGIN_REGISTRY"]
     spans = "".join(f'<span data-ch="{escape(ch)}">{escape(ch)}</span>' for ch in chars)

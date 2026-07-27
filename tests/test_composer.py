@@ -33,6 +33,23 @@ def test_font_face_datauri_unknown_404s(client: FlaskClient) -> None:
     assert client.get("/fonts/face/not_a_font.css").status_code == 404
 
 
+def test_overlay_atlas_route_accepts_full_touch_charset(client: FlaskClient) -> None:
+    # The touch-v3 atlas charset is 96 glyphs; the route's length cap must be
+    # comfortably above it, or every touch atlas build 400s and the frame spec
+    # ships without text labels.
+    from app.touch_atlas import TOUCH_CHARSET
+
+    resp = client.get(
+        "/compose/_overlay_atlas",
+        query_string={"px": 28, "weight": 700, "chars": TOUCH_CHARSET},
+    )
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert 'id="strip"' in body or "id='strip'" in body
+    # Every requested glyph made it into the strip.
+    assert body.count("<span") == len(TOUCH_CHARSET)
+
+
 def test_test_render_unknown_plugin_still_routes(client: FlaskClient) -> None:
     # /_test/render mounts whatever plugin id you give it; the client-side
     # composer surfaces the load failure rather than the server refusing.
