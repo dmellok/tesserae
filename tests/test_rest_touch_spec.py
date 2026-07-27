@@ -96,7 +96,7 @@ def test_frame_spec_layout_param_is_advisory_not_blocking(
     app: Flask, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     # ?layout=<held digest> is advisory: the endpoint returns the current spec
-    # immediately regardless, it never long-polls waiting for a change (#146).
+    # immediately regardless, it never long-polls waiting for a change.
     # Passing the CURRENT layout digest (the "I already hold this" case) must
     # return the same body, not hang.
     client = app.test_client()
