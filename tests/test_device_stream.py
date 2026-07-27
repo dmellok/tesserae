@@ -61,6 +61,75 @@ def _events(chunks: list[str]) -> list[tuple[str, dict[str, Any]]]:
     return out
 
 
+def _stub_ha(app: Flask, states: dict[str, str]) -> None:
+    class _Mod:
+        @staticmethod
+        def is_configured() -> bool:
+            return True
+
+        @staticmethod
+        def get_state(entity_id: str) -> dict[str, Any]:
+            return {"state": states[entity_id]}
+
+    class _Plugin:
+        server_module = _Mod()
+
+    class _Registry:
+        @staticmethod
+        def get(pid: str) -> Any:
+            return _Plugin() if pid == "ha_core" else None
+
+    app.config["PLUGIN_REGISTRY"] = _Registry()
+
+
+def _canvas_page(app: Flask) -> None:
+    from app.state.page_store import Page
+    from app.state.panel_store import CanvasLayout, Element
+
+    app.config["PAGE_STORE"].save(
+        Page(
+            id="p1",
+            name="T",
+            layout_kind="canvas",
+            canvas=CanvasLayout(
+                els=[
+                    Element(id="sw", kind="switch", value_key="ha:light.desk"),
+                    Element(id="dup", kind="switch", value_key="ha:light.desk"),  # deduped
+                    Element(id="btn", kind="button", on_tap="refresh"),  # no binding
+                    Element(id="w", kind="widget", widget="weather_now"),  # not a primitive
+                ]
+            ),
+        )
+    )
+
+
+def test_touch_value_key_slots_collects_bindings(app: Flask) -> None:
+    from app.rest_api import _touch_value_key_slots
+
+    _canvas_page(app)
+    slots = _touch_value_key_slots(app, "p1")
+    assert [s["key"] for s in slots] == ["ha:light.desk"]
+    assert _touch_value_key_slots(app, "") == []
+    assert _touch_value_key_slots(app, "missing") == []
+
+
+def test_touch_primitive_values_streamed(app: Flask) -> None:
+    _register(app, app.test_client())
+    device = app.config["DEVICE_REGISTRY"].get("e1003")
+    _canvas_page(app)
+    app.config["PUSH_MANAGER"]._latest_renders["e1003"] = {
+        "digest": "a" * 16,
+        "ext": "bin",
+        "filename": "a.bin",
+        "composition_digest": "c" * 16,
+        "page_id": "p1",
+    }
+    _stub_ha(app, {"light.desk": "on"})
+    evs = _events(list(_stream_events(app, device, max_ticks=1, scan_s=0)))
+    values = [d for name, d in evs if name == "values"]
+    assert values and values[0]["values"]["ha:light.desk"] == "on"
+
+
 def test_sync_emitted_on_frame_change_and_deduped(app: Flask) -> None:
     _register(app, app.test_client())
     device = app.config["DEVICE_REGISTRY"].get("e1003")

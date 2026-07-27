@@ -1625,6 +1625,27 @@ def _sse(event: str, data: dict[str, Any]) -> str:
     return f"event: {event}\ndata: {json.dumps(data, separators=(',', ':'))}\n\n"
 
 
+def _touch_value_key_slots(app_obj: Any, page_id: str) -> list[dict[str, Any]]:
+    """Minimal value slots for the touch primitives on a canvas page, so the SSE
+    values stream carries live state for switches/sliders/steppers keyed by
+    value_key (which the firmware maps back to its primitives). Runs outside a
+    request context, so the page store is read through ``app_obj.config``."""
+    if not page_id:
+        return []
+    store = app_obj.config.get("PAGE_STORE")
+    page = store.get(page_id) if store is not None else None
+    if page is None or page.layout_kind != "canvas" or page.canvas is None:
+        return []
+    slots: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for el in page.canvas.els:
+        vk = getattr(el, "value_key", "")
+        if el.kind in ("switch", "slider", "stepper") and vk and vk not in seen:
+            seen.add(vk)
+            slots.append({"key": vk})
+    return slots
+
+
 def _stream_events(
     app_obj: Any,
     device: Device,
@@ -1655,17 +1676,23 @@ def _stream_events(
                 if doc is not None and int(doc.get("seq") or 0) > last_patch_seq:
                     last_patch_seq = int(doc.get("seq") or 0)
                     yield _sse("patches", doc)
-                # Values: emit when the resolved strings change.
+                # Values: emit when the resolved strings change. Overlay value
+                # slots plus the current page's touch-primitive bindings, so a
+                # switch/slider reflects HA changing externally (touch-v3).
                 comp = str(latest.get("composition_digest") or "") if latest else ""
                 slots = push_mgr.overlay_slots_for(comp) if comp else []
-                if slots:
+                page_id = str(latest.get("page_id") or "") if latest else ""
+                all_slots = list(slots) + _touch_value_key_slots(app_obj, page_id)
+                if all_slots:
                     registry = app_obj.config.get("PLUGIN_REGISTRY")
                     plugin = registry.get("ha_core") if registry is not None else None
                     mod = getattr(plugin, "server_module", None) if plugin is not None else None
                     if mod is not None and getattr(mod, "is_configured", lambda: False)():
                         from app.overlay_sync import values_document
 
-                        vals = values_document(slots, ha_get_state=mod.get_state, now=time.time())
+                        vals = values_document(
+                            all_slots, ha_get_state=mod.get_state, now=time.time()
+                        )
                         fingerprint = json.dumps(vals.get("values") or {}, sort_keys=True)
                         if fingerprint != last_values:
                             last_values = fingerprint
