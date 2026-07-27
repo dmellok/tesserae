@@ -39,6 +39,12 @@
     { kind: "code", label: "Code (data)", icon: "ph-brackets-curly", w: 220, h: 140 },
     { kind: "svg", label: "SVG", icon: "ph-bezier-curve", w: 120, h: 120 },
     { kind: "hotspot", label: "Touch region", icon: "ph-hand-tap", w: 160, h: 120 },
+    // Touch-v3 primitives: the firmware draws the control on-device; the editor
+    // reserves + previews it, matching primitives.json geometry.
+    { kind: "button", label: "Button", icon: "ph-hand-tap", w: 180, h: 80 },
+    { kind: "switch", label: "Switch", icon: "ph-toggle-left", w: 160, h: 72 },
+    { kind: "slider", label: "Slider", icon: "ph-faders-horizontal", w: 300, h: 64 },
+    { kind: "stepper", label: "Stepper", icon: "ph-plus-minus", w: 180, h: 72 },
   ];
   // Base colour palette: Spectra semantic tokens (follow the theme) offered
   // alongside a native colour picker.
@@ -205,7 +211,8 @@
       icon: kind === "icon" ? "star" : "", weight: "bold",
       text: kind === "text" ? "Text" : "", align: "left", size: 0, opacity: 100,
       // data primitive
-      source: "", field: "", display: "text", unit: "", precision: 0, label: "",
+      source: "", field: "", display: "text", unit: "", precision: 0,
+      label: kind === "button" || kind === "switch" ? "Label" : "",
       // custom html / svg / code
       html: kind === "html" ? '<div class="mini">Edit me</div>'
         : kind === "svg" ? '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#1B1A16"/></svg>'
@@ -221,6 +228,9 @@
         : "",
       sources: kind === "code" ? [] : undefined,
       format: "",
+      // touch-v3 primitive bindings (button/switch/slider/stepper).
+      value_key: "", state: "", axis: "x",
+      value_min: 0, value_max: 100, value_step: 1, value_now: 0,
       x: x, y: y, w: w, h: h, dither: true, visible: true, locked: false, group: null,
     };
   }
@@ -641,6 +651,85 @@
     }
   }
 
+  function isPrimitive(k) {
+    return k === "button" || k === "switch" || k === "slider" || k === "stepper";
+  }
+
+  // Editor-only preview of a touch-v3 primitive, matching primitives.json
+  // geometry so it reads like the on-device control. The real render leaves the
+  // rect blank (the firmware draws it); this chrome is editor-only. Keep the
+  // geometry in sync with primitives.json.
+  function primitiveChrome(e) {
+    var ink = "var(--text-primary, #1B1A16)";
+    var paper = "var(--bg, #FFFFFF)";
+    var soft = "var(--surface-sunken, #E7E4DC)";
+    var wrap = el("div", "el-prim");
+    wrap.style.cssText = "position:absolute;inset:0;pointer-events:none;color:" + ink +
+      ";font-family:var(--font-family, inherit)";
+    function span(text, css) {
+      var s = document.createElement("span");
+      s.textContent = text;
+      if (css) s.style.cssText = css;
+      return s;
+    }
+
+    if (e.kind === "button") {
+      wrap.style.cssText += ";border:2px solid " + ink + ";border-radius:12px;background:" + paper +
+        ";display:flex;align-items:center;justify-content:center;gap:8px;font-weight:700;overflow:hidden";
+      if (e.icon) {
+        var wcls = e.weight === "regular" ? "ph" : "ph-" + (e.weight || "bold");
+        var ic = el("i", wcls + " ph-" + String(e.icon).replace(/^ph-/, ""));
+        ic.style.fontSize = "22px";
+        wrap.appendChild(ic);
+      }
+      if (e.label) wrap.appendChild(span(e.label));
+      return wrap;
+    }
+
+    if (e.kind === "switch") {
+      var on = e.state === "on";
+      var track = el("div");
+      track.style.cssText = "position:absolute;right:4px;top:50%;transform:translateY(-50%);width:64px;" +
+        "height:36px;border:2px solid " + ink + ";border-radius:999px;background:" + (on ? soft : paper);
+      var thumb = el("div");
+      thumb.style.cssText = "position:absolute;top:50%;transform:translateY(-50%);width:26px;height:26px;" +
+        "border-radius:50%;background:" + ink + ";" + (on ? "right:5px" : "left:5px");
+      track.appendChild(thumb);
+      wrap.appendChild(track);
+      if (e.label) wrap.appendChild(span(e.label,
+        "position:absolute;left:4px;top:50%;transform:translateY(-50%);font-weight:700"));
+      return wrap;
+    }
+
+    if (e.kind === "slider") {
+      var span01 = Math.max(1, Number(e.value_max) - Number(e.value_min));
+      var t = Math.max(0, Math.min(1, (Number(e.value_now) - Number(e.value_min)) / span01 || 0));
+      var trk = el("div");
+      trk.style.cssText = "position:absolute;left:20px;right:20px;top:50%;transform:translateY(-50%);" +
+        "height:8px;border-radius:4px;background:" + soft;
+      var fill = el("div");
+      fill.style.cssText = "position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:" + ink +
+        ";width:" + (t * 100) + "%";
+      trk.appendChild(fill);
+      var th = el("div");
+      th.style.cssText = "position:absolute;top:50%;transform:translate(-50%,-50%);width:32px;height:32px;" +
+        "border:2px solid " + ink + ";border-radius:50%;background:" + paper +
+        ";left:calc(20px + " + t + " * (100% - 40px))";
+      wrap.appendChild(trk);
+      wrap.appendChild(th);
+      return wrap;
+    }
+
+    // stepper: [ - | value | + ]
+    wrap.style.cssText += ";border:2px solid " + ink + ";border-radius:12px;display:flex;" +
+      "align-items:stretch;overflow:hidden;background:" + paper;
+    var cell = "flex:1;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:22px";
+    wrap.appendChild(span("−", cell + ";border-right:2px solid " + soft));
+    wrap.appendChild(span(String(e.value_now == null ? 0 : e.value_now), cell + ";border-right:2px solid " + soft));
+    wrap.appendChild(span("+", cell));
+    return wrap;
+  }
+
   function elNode(e) {
     var node = el("div", "el" + (isSel(e.id) ? " psel" : "") +
       (isWidget(e) && !e.widget ? " el-empty" : ""));
@@ -667,6 +756,8 @@
         // Editor-only affordance: the hotspot paints nothing in the real
         // render, so show a dashed outline + hand glyph here.
         node.appendChild(el("div", "el-hotspot", '<i class="ph-bold ph-hand-tap"></i>'));
+      } else if (isPrimitive(e.kind)) {
+        node.appendChild(primitiveChrome(e));
       }
     } else {
       // Reuse the cached widget host when nothing that affects the render
