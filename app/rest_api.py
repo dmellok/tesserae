@@ -615,13 +615,18 @@ def _current_config(device: Device) -> dict[str, Any]:
     stored = section.get(device.id)
     if isinstance(stored, dict):
         # Copy so the caller can mutate without disturbing the store.
-        return dict(stored)
-    # No stored values, fall back to schema defaults so the firmware
-    # always sees a usable config block.
-    out: dict[str, Any] = {}
-    for key, spec in (device.config_schema or {}).items():
-        if isinstance(spec, dict) and "default" in spec:
-            out[key] = spec["default"]
+        out = dict(stored)
+    else:
+        # No stored values, fall back to schema defaults so the firmware
+        # always sees a usable config block.
+        out = {}
+        for key, spec in (device.config_schema or {}).items():
+            if isinstance(spec, dict) and "default" in spec:
+                out[key] = spec["default"]
+    # always_on (touch-v3): a per-device Tesserae setting delivered like the
+    # sleep interval. Default false so the firmware always sees the field; a
+    # stored true (set only for can_stay_awake devices) overrides.
+    out.setdefault("always_on", False)
     return out
 
 
