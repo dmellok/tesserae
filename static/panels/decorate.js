@@ -53,6 +53,15 @@
       hs.style.cssText = "width:100%;height:100%";
       return hs;
     }
+    if (kind === "button" || kind === "switch" || kind === "slider" || kind === "stepper") {
+      // Touch-v3 primitives (device-owned touch): the FIRMWARE draws the control
+      // on top of the served image, so the render reserves a blank rect filled
+      // with the canvas background, covering anything behind it. The editor draws
+      // its own chrome affordance separately, like the hotspot.
+      var rsv = document.createElement("div");
+      rsv.style.cssText = "width:100%;height:100%;background:var(--bg, #FFFFFF)";
+      return rsv;
+    }
     if (kind === "html") return renderHtml(el, false);
     if (kind === "svg") return renderHtml(el, true);
     if (kind === "code") return renderCode(el, data);
