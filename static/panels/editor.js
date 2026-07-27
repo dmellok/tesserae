@@ -126,6 +126,10 @@
       case "html": return "Custom HTML";
       case "svg": return "SVG";
       case "hotspot": return "Touch region";
+      case "button": return e.label ? "Button: " + e.label : "Button";
+      case "switch": return e.label ? "Switch: " + e.label : "Switch";
+      case "slider": return "Slider" + (e.value_key ? " · " + e.value_key : "");
+      case "stepper": return "Stepper" + (e.value_key ? " · " + e.value_key : "");
       case "code":
         return "Code" + (e.source ? " · " + e.source : "");
       case "data":
@@ -2232,6 +2236,16 @@
       lrow.appendChild(lab);
       lrow.appendChild(lin);
       mount.appendChild(lrow);
+    }
+    if (e.kind === "button") {
+      var irow = el("div", "prow");
+      irow.innerHTML = '<span class="plab">Icon</span>';
+      var ibtn = el("button", "minibtn", e.icon
+        ? '<i class="ph-bold ph-' + esc(e.icon) + '"></i> ' + esc(e.icon)
+        : '<i class="ph-bold ph-plus"></i> Add icon');
+      ibtn.addEventListener("click", function () { openIconPicker(e); });
+      irow.appendChild(ibtn);
+      mount.appendChild(irow);
     }
     interactionSection(mount, e);
     arrangeGeom(mount, e);
