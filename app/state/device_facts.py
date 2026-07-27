@@ -58,6 +58,7 @@ class DeviceFactsStore:
         ota_schema: int | None = None,
         overlay: dict[str, Any] | None = None,
         proto: dict[str, Any] | None = None,
+        can_stay_awake: bool | None = None,
     ) -> None:
         """Merge the given facts for ``device_id``; writes only on change.
         ``None`` values mean "no new information", never "clear".
@@ -81,6 +82,9 @@ class DeviceFactsStore:
                 changed = True
             if isinstance(proto, dict) and entry.get("proto") != proto:
                 entry["proto"] = proto
+                changed = True
+            if can_stay_awake is not None and entry.get("can_stay_awake") != can_stay_awake:
+                entry["can_stay_awake"] = can_stay_awake
                 changed = True
             if not changed:
                 return

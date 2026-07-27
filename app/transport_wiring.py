@@ -329,6 +329,12 @@ def record_status_heartbeat(
         entry["proto"] = proto
     elif prev_entry.get("proto") is not None:
         entry["proto"] = prev_entry["proto"]
+    # can_stay_awake capability (touch-v3 always-on eligibility): same sticky rules.
+    can_stay_awake = overlay_sync.advertised_can_stay_awake(payload)
+    if can_stay_awake is not None:
+        entry["can_stay_awake"] = can_stay_awake
+    elif prev_entry.get("can_stay_awake") is not None:
+        entry["can_stay_awake"] = prev_entry["can_stay_awake"]
     status_cache[device.id] = entry
     # Persist the stable facts (fw version, OTA capability) so a restart
     # doesn't forget them until the device's next wake; write-on-change only.
@@ -341,6 +347,7 @@ def record_status_heartbeat(
             ota_schema=entry.get("ota_schema"),
             overlay=entry.get("overlay"),
             proto=entry.get("proto"),
+            can_stay_awake=entry.get("can_stay_awake"),
         )
     # Automatic updates (opt-in per-device switch): make sure an auto-update
     # device is queued for its kind's newest release before the response is

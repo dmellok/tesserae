@@ -107,3 +107,29 @@ def test_advertised_proto_validation() -> None:
     assert advertised_proto({"proto": "2"}) is None
     assert advertised_proto(b'{"proto": {"v": 3}}') == {"v": 3}
     assert advertised_proto({}) is None
+
+
+def test_can_stay_awake_is_sticky_and_persisted(app: Flask) -> None:
+    client = app.test_client()
+    token = _register_esp32(app, client, "e1003")
+
+    def post_status(body: dict[str, Any]):
+        return client.post(
+            "/api/v1/device/e1003/status", headers=_auth(token), data=json.dumps(body)
+        )
+
+    post_status({"can_stay_awake": True})
+    assert app.config["DEVICE_STATUS"]["e1003"]["can_stay_awake"] is True
+    post_status({"battery_mv": 3990})  # omitting keeps it
+    assert app.config["DEVICE_STATUS"]["e1003"]["can_stay_awake"] is True
+    assert app.config["DEVICE_FACTS"].get("e1003")["can_stay_awake"] is True
+
+
+def test_advertised_can_stay_awake_validation() -> None:
+    from app.overlay_sync import advertised_can_stay_awake
+
+    assert advertised_can_stay_awake({"can_stay_awake": True}) is True
+    assert advertised_can_stay_awake({"can_stay_awake": False}) is False
+    assert advertised_can_stay_awake({"can_stay_awake": "yes"}) is None
+    assert advertised_can_stay_awake({}) is None
+    assert advertised_can_stay_awake(b'{"can_stay_awake": true}') is True

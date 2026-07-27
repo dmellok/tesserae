@@ -63,6 +63,25 @@ def advertised_proto(payload: bytes | str | dict[str, Any]) -> dict[str, int] | 
     return {"v": min(64, v)}
 
 
+def advertised_can_stay_awake(payload: bytes | str | dict[str, Any]) -> bool | None:
+    """The ``can_stay_awake`` hardware capability a device advertises: it *can*
+    run mains-powered without deep sleep (touch-v3). Sticky like ``proto`` /
+    ``overlay``, a firmware property carried forward across beats that omit it.
+    Whether the device *does* stay awake is the per-device ``always_on`` setting,
+    not this; the server offers that setting only to can_stay_awake devices."""
+    if isinstance(payload, (bytes, bytearray, str)):
+        try:
+            body = json.loads(payload)
+        except (ValueError, TypeError):
+            return None
+    else:
+        body = payload
+    if not isinstance(body, dict):
+        return None
+    cap = body.get("can_stay_awake")
+    return cap if isinstance(cap, bool) else None
+
+
 def advertised_overlay(payload: bytes | str | dict[str, Any]) -> dict[str, int] | None:
     """The overlay capability a device advertises in its register /
     heartbeat body (``{"overlay": {"schema": 1, "max_targets": 32}}``),
