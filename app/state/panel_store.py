@@ -116,7 +116,7 @@ class Element(BaseModel):
     id: str
     # What this element is: a placed widget, a decoration shape, a data-bound
     # primitive, a custom-HTML block, or an invisible touch hotspot.
-    kind: str = "widget"  # widget | rect | ellipse | line | icon | text | data | html | svg | code | hotspot
+    kind: str = "widget"  # widget | rect | ellipse | line | icon | text | data | html | svg | code | hotspot | button | switch | slider | stepper
     # Plugin id whose render() paints this element. Empty = an unassigned box
     # (placed but not yet pointed at a widget).
     widget: str = ""
@@ -234,6 +234,24 @@ class Element(BaseModel):
     # the same spec forms as ``on_tap`` (string grammar, or a direction map for
     # ``data-on-swipe="@name"``).
     actions: dict[str, Any] = Field(default_factory=dict)
+    # --- Touch v3 typed primitives (device-owned touch; kind == button | switch
+    # | slider | stepper). The firmware draws these from the served spec and owns
+    # interaction; see notes/design-handoffs/touch-v3/. ``value_key`` binds a
+    # switch/slider/stepper to an entity ("ha:light.desk"); ``state`` seeds a
+    # switch ("on"/"off"); ``axis`` is the slider fill direction ("x"|"y");
+    # ``value_min``/``value_max``/``value_step``/``value_now`` are the
+    # slider/stepper numeric range and seeded value. A button's action is its
+    # ``on_tap`` spec (reused); switch/slider/stepper derive their action from
+    # ``value_key`` when the wire spec is built. Left lenient here (an in-progress
+    # primitive may lack ``value_key``); required fields are enforced at
+    # spec-build time. Ignored for every other kind.
+    value_key: str = ""
+    state: str = ""
+    axis: str = ""
+    value_min: float = 0.0
+    value_max: float = 100.0
+    value_step: float = 1.0
+    value_now: float = 0.0
 
     @model_validator(mode="after")
     def _canonicalize_touch(self) -> Element:
