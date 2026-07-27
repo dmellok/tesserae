@@ -66,6 +66,7 @@ def app(tmp_path: Path) -> Flask:
         devices_dir=REPO_ROOT / "devices",
     )
     a.config["TESTING"] = True
+    a.config["SETTINGS_STORE"].update_section("experiments", {"touch_v3": True})
     a.config["OVERLAY_ATLAS_RASTERIZER"] = _fake_rasterize
     Path(a.config["RENDERS_DIR"]).mkdir(parents=True, exist_ok=True)
     return a
