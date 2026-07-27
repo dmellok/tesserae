@@ -16,10 +16,45 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from typing import Any
 
+from app.overlay_sync import _panel_geometry, rect_to_wire
 from app.state.panel_store import Element
+
+# A canvas-space -> device-framebuffer rect transform, or None if the rect
+# degenerates (off-panel / zero-area).
+WireFn = Callable[[float, float, float, float], "tuple[int, int, int, int] | None"]
+
+
+def wire_transform(panel: dict[str, Any], canvas_w: int, canvas_h: int) -> WireFn | None:
+    """A canvas-space -> device-framebuffer rect transform for one device.
+
+    Scales an authored canvas rect to the device's composition dims (the panel
+    renders the artboard scaled to fill), then runs it through the .bin
+    renderer's composition->wire chain (rotate / flip / scale / underscan), so the
+    firmware draws at final framebuffer coordinates and never has to know the
+    artboard size or panel orientation. Returns None if the panel geometry is
+    unusable (the caller then serves canvas-space rects unchanged)."""
+    geo = _panel_geometry(panel)
+    if geo is None or canvas_w <= 0 or canvas_h <= 0:
+        return None
+    sx = geo["comp_w"] / canvas_w
+    sy = geo["comp_h"] / canvas_h
+
+    def _to_wire(x: float, y: float, w: float, h: float) -> tuple[int, int, int, int] | None:
+        return rect_to_wire(
+            (x * sx, y * sy, w * sx, h * sy),
+            comp_w=geo["comp_w"],
+            comp_h=geo["comp_h"],
+            native_w=geo["native_w"],
+            native_h=geo["native_h"],
+            flip=geo["flip"],
+            underscan=geo["underscan"],
+        )
+
+    return _to_wire
+
 
 # Atlas role ids referenced by primitive text. The atlas descriptors themselves
 # are attached downstream by the atlas pipeline; here we only reference them.
@@ -65,12 +100,18 @@ def _text_ref(
     return ref
 
 
-def _primitive_for(el: Element) -> dict[str, Any] | None:
+def _primitive_for(el: Element, wire: WireFn | None) -> dict[str, Any] | None:
     if el.kind not in _PRIMITIVE_KINDS:
         return None
     if el.x < 0 or el.y < 0:
         return None  # a touch control must sit fully on-panel
-    rect = {"x": el.x, "y": el.y, "w": el.w, "h": el.h}
+    if wire is not None:
+        wired = wire(el.x, el.y, el.w, el.h)
+        if wired is None:
+            return None  # degenerates in wire space (off-panel / zero-area)
+        rect = {"x": wired[0], "y": wired[1], "w": wired[2], "h": wired[3]}
+    else:
+        rect = {"x": el.x, "y": el.y, "w": el.w, "h": el.h}
     base: dict[str, Any] = {"id": el.id, "type": el.kind, "rect": rect}
 
     if el.kind == "button":
@@ -131,13 +172,14 @@ def touch_layout_digest(primitives: list[dict[str, Any]]) -> str:
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
 
 
-def build_frame_spec(els: Iterable[Element]) -> dict[str, Any]:
+def build_frame_spec(els: Iterable[Element], *, wire: WireFn | None = None) -> dict[str, Any]:
     """Build the frame spec from a layout's elements.
 
-    Returns a doc conforming to ``schema/frame-spec.schema.json``. The
-    ``layout_digest`` is derived from the primitive structure (stable across
-    data-only redraws). ``atlases`` is omitted here; the atlas pipeline attaches
-    descriptors for the roles the primitives reference. Invalid primitives are
-    skipped."""
-    primitives = [p for p in (_primitive_for(el) for el in els) if p is not None]
+    Returns a doc conforming to ``schema/frame-spec.schema.json``. Pass ``wire``
+    (from :func:`wire_transform`) to emit rects in device-framebuffer coordinates;
+    without it, rects stay in canvas space (preview / tests). The ``layout_digest``
+    is derived from the primitive structure (stable across data-only redraws).
+    ``atlases`` is omitted here; the atlas pipeline attaches descriptors for the
+    roles the primitives reference. Invalid primitives are skipped."""
+    primitives = [p for p in (_primitive_for(el, wire) for el in els) if p is not None]
     return {"layout_digest": touch_layout_digest(primitives), "primitives": primitives}

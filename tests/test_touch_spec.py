@@ -10,7 +10,7 @@ from jsonschema import Draft202012Validator
 from referencing import Registry, Resource
 
 from app.state.panel_store import Element
-from app.touch_spec import build_frame_spec, classify_action, touch_layout_digest
+from app.touch_spec import build_frame_spec, classify_action, touch_layout_digest, wire_transform
 
 _SCHEMA_DIR = Path(__file__).resolve().parents[1] / "schema"
 
@@ -146,3 +146,30 @@ def test_empty_layout_yields_no_primitives() -> None:
     doc = build_frame_spec([])
     assert doc["primitives"] == []
     assert doc["layout_digest"] == touch_layout_digest([])
+
+
+def test_wire_transform_identity_when_canvas_matches_panel() -> None:
+    # Canvas dims == composition dims, native == comp, no flip/underscan: the
+    # rect passes through unchanged.
+    wire = wire_transform({"w": 600, "h": 400}, 600, 400)
+    assert wire is not None
+    assert wire(10, 20, 100, 50) == (10, 20, 100, 50)
+
+
+def test_wire_transform_scales_canvas_to_panel() -> None:
+    # Canvas 300x200 authored, panel composition 600x400: a 2x scale each axis.
+    wire = wire_transform({"w": 600, "h": 400}, 300, 200)
+    assert wire is not None
+    assert wire(10, 20, 100, 50) == (20, 40, 200, 100)
+
+
+def test_build_frame_spec_emits_wired_rects() -> None:
+    wire = wire_transform({"w": 1200, "h": 800}, 600, 400)  # 2x
+    els = [Element(id="b", kind="button", x=10, y=10, w=100, h=50, on_tap="refresh")]
+    doc = build_frame_spec(els, wire=wire)
+    assert doc["primitives"][0]["rect"] == {"x": 20, "y": 20, "w": 200, "h": 100}
+
+
+def test_wire_transform_none_for_bad_panel() -> None:
+    assert wire_transform({}, 600, 400) is None
+    assert wire_transform({"w": 600, "h": 400}, 0, 0) is None

@@ -41,7 +41,10 @@ spec (it reuses `rect_to_wire`, retained from the audit's KEEP list). Therefore:
   calibration only. It does **not** reimplement the composition orientation chain.
 
 This keeps orientation logic in exactly one place (server) and removes the class
-of "touch landed 90° off" bugs. **[confirm: server emits spec in wire space]**
+of "touch landed 90° off" bugs. Implemented: `touch_spec.wire_transform` scales
+the authored canvas rect to composition dims, then runs `rect_to_wire` (the .bin
+renderer's rotate/flip/scale/underscan chain), so `/frame/spec` rects are final
+framebuffer coordinates.
 
 ## 3. Data structures (illustrative C)
 

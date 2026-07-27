@@ -1431,13 +1431,13 @@ def get_frame_manifest(device_id: str) -> Response:
     return jsonify(doc)
 
 
-def _canvas_els_for_page(page_id: str) -> list[Any]:
-    """The placed elements of a canvas page, or [] for a grid page / unknown id."""
+def _canvas_for_page(page_id: str) -> Any:
+    """The CanvasLayout of a canvas page, or None for a grid page / unknown id."""
     page_store = current_app.config.get("PAGE_STORE")
     page = page_store.get(page_id) if page_store is not None and page_id else None
     if page is not None and page.layout_kind == "canvas" and page.canvas is not None:
-        return list(page.canvas.els)
-    return []
+        return page.canvas
+    return None
 
 
 @bp.get("/<device_id>/frame/spec")
@@ -1457,9 +1457,13 @@ def get_frame_spec(device_id: str) -> Response:
     info = _frame_info_for_digest(device, str(latest.get("digest") or ""))
     page_id = str(info.get("page_id") or "") if info else ""
 
-    from app.touch_spec import build_frame_spec
+    from app.touch_spec import build_frame_spec, wire_transform
 
-    return jsonify(build_frame_spec(_canvas_els_for_page(page_id)))
+    canvas = _canvas_for_page(page_id)
+    if canvas is None:
+        return jsonify(build_frame_spec([]))
+    wire = wire_transform(device.panel or {}, int(canvas.w), int(canvas.h))
+    return jsonify(build_frame_spec(canvas.els, wire=wire))
 
 
 _TOUCH_PRIMITIVE_KINDS = frozenset({"button", "switch", "slider", "stepper"})
@@ -1526,10 +1530,12 @@ def post_interact(device_id: str) -> Response:
         return jsonify({"outcome": "no_frame", "primitive_id": primitive_id})
     info = _frame_info_for_digest(device, str(latest.get("digest") or ""))
     page_id = str(info.get("page_id") or "") if info else ""
+    canvas = _canvas_for_page(page_id)
+    els = canvas.els if canvas is not None else []
     el = next(
         (
             e
-            for e in _canvas_els_for_page(page_id)
+            for e in els
             if getattr(e, "id", "") == primitive_id and e.kind in _TOUCH_PRIMITIVE_KINDS
         ),
         None,
