@@ -109,8 +109,14 @@ def test_capabilities_probe_is_unauthenticated_and_valid(app: Flask) -> None:
     # Advertised pairing facts agree with the store the server actually uses.
     assert body["pairing"]["code_length"] == 6
     assert body["pairing"]["ttl_seconds"] == 600
-    # Phase 1 advertises only what it serves.
-    assert set(body["features"]) == {"devices", "dashboards"}
+    # All Phase 1 + Phase 2 read/write surfaces are served.
+    assert set(body["features"]) == {
+        "devices",
+        "dashboards",
+        "dashboard_push",
+        "image_push",
+        "jobs",
+    }
     # No household content leaks from the unauthenticated probe.
     assert "devices" not in body and "dashboards" not in body
 

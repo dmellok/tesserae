@@ -962,12 +962,32 @@ def create_app(
     # code can't mint a companion token) and its own credential registry
     # (scoped, revocable per-client bearer tokens, hashed at rest).
     from app import companion_api
+    from app.companion_jobs import CompanionJobs
     from app.state.companion_token_store import CompanionTokenStore
+    from app.state.idempotency_store import IdempotencyStore
+    from app.state.job_store import JobStore
 
     app.config["COMPANION_PAIRING_STORE"] = PairingStore()
     app.config["COMPANION_TOKENS"] = CompanionTokenStore(
         data_root / "core" / "companion_tokens.json"
     )
+    # Async write path: dashboard / image pushes run on a small worker pool
+    # and are polled as jobs; the idempotency ledger dedupes Share / Shortcut
+    # resubmits. Both records persist with a 24h retention (server-advertised
+    # via the capability probe).
+    companion_job_store = JobStore(data_root / "core" / "companion_jobs.json")
+    app.config["JOB_STORE"] = companion_job_store
+    app.config["IDEMPOTENCY_STORE"] = IdempotencyStore(
+        data_root / "core" / "companion_idempotency.json"
+    )
+    companion_jobs = CompanionJobs(app, companion_job_store)
+    app.config["COMPANION_JOBS"] = companion_jobs
+    # Own local import: the ``_atexit`` alias above lives inside the
+    # browser-pool branch, which is skipped under ``testing``, so it isn't
+    # bound here on every path.
+    import atexit
+
+    atexit.register(companion_jobs.shutdown)
     companion_api.register(app)
 
     if not testing:

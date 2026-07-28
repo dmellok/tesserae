@@ -8,12 +8,13 @@ companion clients pair once for a revocable, scoped bearer token and
 never touch firmware device tokens, the webhook credential, the MCP API,
 or Flask session cookies.
 
-This module implements **Phase 1** of the contract: discovery, pairing,
-session revocation, and the two read models (devices + dashboards). The
-async job model and the two write routes (dashboard push, image push)
-plus ``_tesserae._tcp`` discovery land in later slices; capabilities
-advertises only the features this server actually serves so the client
-degrades cleanly.
+This module covers the discovery, pairing, session, read-model, and write
+surfaces of the contract: capability probe, pairing, session revocation,
+device + dashboard read models, the two async write routes (dashboard
+push, image push), and job polling. Writes return ``202`` with a persisted
+job the client polls; quiet-hours suppression surfaces as a *successful*
+``quiet`` outcome, never a failure. ``_tesserae._tcp`` discovery lives in
+app.mdns.
 
 Contract: ``charmmmz/tesserae-companion-ios`` ``Contracts/app-v1.openapi.yaml``
 (OpenAPI 0.2.0). The vendored copy + fixtures under ``tests/companion/``
@@ -24,6 +25,8 @@ mypy --strict applies to this module, see pyproject.toml.
 
 from __future__ import annotations
 
+import json as _json
+import logging
 import re
 import secrets
 import time
@@ -31,16 +34,35 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from functools import wraps
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from flask import Blueprint, Flask, current_app, g, jsonify, request
 from werkzeug.wrappers import Response
 
+from app.companion_jobs import CompanionJobs, JobOutcome
 from app.device_loader import Device, DeviceRegistry
 from app.panel import device_panel, resolve_settings_panel
+from app.quiet_hours import device_is_quiet
 from app.state.companion_token_store import COMPANION_SCOPES, CompanionTokenStore
+from app.state.idempotency_store import IdempotencyStore
+from app.state.idempotency_store import fingerprint as _idempotency_fingerprint
+from app.state.job_store import JobKind, JobStore
 from app.state.page_store import PageStore
 from app.state.pairing_store import PairingStore
 from app.state.settings_store import SettingsStore
+
+logger = logging.getLogger(__name__)
+
+# Register the HEIF/HEIC opener so Pillow can decode iPhone photos both for
+# our edge/size validation and downstream in the renderer. pillow-heif is a
+# hard dependency (pyproject.toml); guard the import only so a broken wheel
+# degrades to "HEIC unsupported" rather than failing app import.
+try:
+    import pillow_heif
+
+    pillow_heif.register_heif_opener()
+except Exception:
+    logger.warning("pillow-heif unavailable; HEIC/HEIF companion uploads will not decode")
 
 bp = Blueprint("companion_api", __name__, url_prefix="/api/app/v1")
 
@@ -56,11 +78,12 @@ IMAGE_CONTENT_TYPES = ("image/jpeg", "image/png", "image/heic", "image/heif", "i
 JOB_RETENTION_SECONDS = 86_400
 IDEMPOTENCY_RETENTION_SECONDS = 86_400
 
-# Features this server actually serves. Phase 2 adds
-# dashboard_push / image_push / jobs as those routes land.
-FEATURES = ("devices", "dashboards")
+# Features this server serves. The client gates on this list rather than
+# assuming the full set, so unshipped surfaces degrade cleanly.
+FEATURES = ("devices", "dashboards", "dashboard_push", "image_push", "jobs")
 
 _PAIRING_CODE_RE = re.compile(r"^[0-9]{6,12}$")
+_IMAGE_CONTENT_TYPES = frozenset(IMAGE_CONTENT_TYPES)
 
 
 # -- CORS ----------------------------------------------------------------
@@ -84,6 +107,7 @@ def _cors_headers(resp: Response) -> Response:
     resp.headers["Access-Control-Allow-Origin"] = "*"
     resp.headers["Access-Control-Allow-Methods"] = "GET, POST, DELETE, OPTIONS"
     resp.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type, Idempotency-Key"
+    resp.headers["Access-Control-Expose-Headers"] = "Location, Retry-After"
     resp.headers["Access-Control-Max-Age"] = "86400"
     return resp
 
@@ -113,6 +137,22 @@ def _settings() -> SettingsStore:
 
 def _device_status() -> dict[str, dict[str, Any]]:
     return current_app.config.get("DEVICE_STATUS") or {}
+
+
+def _jobs_store() -> JobStore:
+    return current_app.config["JOB_STORE"]  # type: ignore[no-any-return]
+
+
+def _idempotency() -> IdempotencyStore:
+    return current_app.config["IDEMPOTENCY_STORE"]  # type: ignore[no-any-return]
+
+
+def _job_runner() -> CompanionJobs:
+    return current_app.config["COMPANION_JOBS"]  # type: ignore[no-any-return]
+
+
+def _push_manager() -> Any:
+    return current_app.config.get("PUSH_MANAGER")
 
 
 # -- error envelope ------------------------------------------------------
@@ -413,6 +453,284 @@ def list_dashboards() -> Any:
             }
         )
     return jsonify({"dashboards": out})
+
+
+# -- write routes: shared plumbing ---------------------------------------
+
+
+def _resolve_tz() -> Any:
+    raw = str((_settings().get_section("app") or {}).get("timezone") or "system").strip()
+    if not raw or raw.lower() == "system":
+        return None
+    try:
+        return ZoneInfo(raw)
+    except ZoneInfoNotFoundError:
+        return None
+
+
+def _require_idempotency_key() -> tuple[str | None, tuple[Response, int] | None]:
+    """Both write routes require an ``Idempotency-Key`` (16-128 chars) so a
+    Share/Shortcut resubmit resolves to the same job."""
+    key = (request.headers.get("Idempotency-Key") or "").strip()
+    if not (16 <= len(key) <= 128):
+        return None, _error(
+            "invalid_request", "A 16-128 character Idempotency-Key header is required.", 400
+        )
+    return key, None
+
+
+def _valid_target_ids(raw: Any) -> list[str] | None:
+    """Coerce a request ``device_ids`` array to a unique, non-empty list of
+    known instance ids, or None if any entry is unknown / the shape is
+    wrong. The caller maps None to ``invalid_target``."""
+    if not isinstance(raw, list) or not raw:
+        return None
+    seen: list[str] = []
+    for item in raw:
+        if not isinstance(item, str) or not item:
+            return None
+        device = _devices().get(item)
+        if device is None or device.kind_of is None:
+            return None
+        if item not in seen:
+            seen.append(item)
+    return seen
+
+
+def _partition_quiet(target_ids: list[str], *, override: bool) -> tuple[list[str], list[str]]:
+    """Split targets into (active, quiet). An explicit override sends to
+    everything; otherwise devices currently inside their quiet-hours window
+    are held back. Mirrors the server's own push policy so the app can tell
+    "sent" from "held for quiet hours"."""
+    if override:
+        return list(target_ids), []
+    app_settings = _settings().get_section("app") or {}
+    now = datetime.now(UTC)
+    tz = _resolve_tz()
+    active: list[str] = []
+    quiet: list[str] = []
+    for did in target_ids:
+        device = _devices().get(did)
+        if device is not None and device_is_quiet(app_settings, device, now, tz):
+            quiet.append(did)
+        else:
+            active.append(did)
+    return active, quiet
+
+
+_PUBLISHED_STATUSES = frozenset({"sent", "no_change"})
+
+
+def _job_response(job: Any, status_code: int) -> Any:
+    resp = jsonify({"job": job.public_dict()})
+    resp.status_code = status_code
+    if status_code == 202:
+        resp.headers["Location"] = f"/api/app/v1/jobs/{job.id}"
+        resp.headers["Retry-After"] = "2"
+    return resp
+
+
+def _reserve_and_run(
+    *,
+    kind: JobKind,
+    key: str,
+    payload: bytes,
+    target_ids: list[str],
+    label: str | None,
+    work: Callable[[], JobOutcome],
+) -> tuple[Response, int] | Any:
+    """Resolve the idempotency key, mint-or-replay the job, and enqueue the
+    work on first creation. Returns a 202 job response, or a 409 conflict
+    envelope when the key was reused with a different payload."""
+    token_id = str(g.companion.token_id)
+    fp = _idempotency_fingerprint(request.method, request.path, payload)
+
+    def _make_job() -> str:
+        return _jobs_store().create(kind=kind, target_device_ids=target_ids, label=label).id
+
+    job_id, created, conflict = _idempotency().reserve(
+        token_id=token_id, key=key, fingerprint=fp, make_job=_make_job
+    )
+    if conflict:
+        return _error(
+            "idempotency_conflict",
+            "The idempotency key was already used with a different payload.",
+            409,
+        )
+    if created:
+        _job_runner().enqueue(job_id, work)
+    job = _jobs_store().get(job_id)
+    if job is None:  # retention swept the replayed job; nothing to return
+        return _error("not_found", "The job is no longer available.", 404)
+    return _job_response(job, 202)
+
+
+# -- dashboard push ------------------------------------------------------
+
+
+@bp.post("/dashboards/<dashboard_id>/push")
+@_require_companion("push:write")
+def push_dashboard(dashboard_id: str) -> Any:
+    key, err = _require_idempotency_key()
+    if err is not None:
+        return err
+    assert key is not None
+
+    raw = request.get_data(cache=True)
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict) or not isinstance(body.get("override_quiet_hours"), bool):
+        return _error("invalid_request", "override_quiet_hours (boolean) is required.", 400)
+    override = bool(body["override_quiet_hours"])
+
+    page = _pages().get(dashboard_id)
+    if page is None:
+        return _error("not_found", "No dashboard with that id.", 404)
+
+    if "device_ids" in body:
+        targets = _valid_target_ids(body.get("device_ids"))
+        if targets is None:
+            return _error("invalid_target", "One or more target displays are unknown.", 400)
+    else:
+        targets = list(dict.fromkeys(page.device_ids))
+        if not targets:
+            return _error("invalid_target", "The dashboard has no bound displays.", 400)
+
+    page_id = page.id
+    resolved_targets = list(targets)
+
+    def _work() -> JobOutcome:
+        active, _quiet = _partition_quiet(resolved_targets, override=override)
+        if not active:
+            return JobOutcome.quiet(resolved_targets, "all_targets_in_quiet_hours")
+        manager = _push_manager()
+        if manager is None:
+            return JobOutcome.failed("temporarily_unavailable", "The push pipeline is offline.")
+        result = manager.push(
+            page_id,
+            device_ids=set(active),
+            respect_quiet_hours=False,
+            source="companion",
+            bypass_coalesce=True,
+        )
+        if result.status in _PUBLISHED_STATUSES:
+            return JobOutcome.published(active)
+        return JobOutcome.failed("render_failed", result.error or f"push {result.status}")
+
+    return _reserve_and_run(
+        kind="dashboard_push",
+        key=key,
+        payload=raw,
+        target_ids=resolved_targets,
+        label=page.name or page.id,
+        work=_work,
+    )
+
+
+# -- image push ----------------------------------------------------------
+
+
+def _decode_edge(image_bytes: bytes) -> int | None:
+    """Longest edge of the decoded image, or None if it can't be decoded."""
+    from io import BytesIO
+
+    try:
+        from PIL import Image
+
+        with Image.open(BytesIO(image_bytes)) as img:
+            return max(int(img.width), int(img.height))
+    except Exception:
+        return None
+
+
+@bp.post("/images")
+@_require_companion("media:write")
+def push_image() -> Any:
+    key, err = _require_idempotency_key()
+    if err is not None:
+        return err
+    assert key is not None
+
+    upload = request.files.get("image")
+    if upload is None:
+        return _error("invalid_request", "A multipart 'image' part is required.", 400)
+    if (upload.mimetype or "").lower() not in _IMAGE_CONTENT_TYPES:
+        return _error("unsupported_image", "Unsupported still-image media type.", 415)
+
+    image_bytes = upload.read()
+    if len(image_bytes) > IMAGE_UPLOAD_BYTES:
+        return _error("image_too_large", "The encoded image exceeds the size limit.", 413)
+    edge = _decode_edge(image_bytes)
+    if edge is None:
+        return _error("unsupported_image", "The image could not be decoded.", 415)
+    if edge > IMAGE_MAX_EDGE:
+        return _error("image_too_large", "The image exceeds the maximum edge length.", 413)
+
+    request_raw = request.form.get("request") or ""
+    try:
+        spec = _json.loads(request_raw)
+    except ValueError:
+        return _error("invalid_request", "The 'request' part must be JSON.", 400)
+    if not isinstance(spec, dict):
+        return _error("invalid_request", "The 'request' part must be a JSON object.", 400)
+    if spec.get("fit") not in ("fit", "fill") or not isinstance(
+        spec.get("override_quiet_hours"), bool
+    ):
+        return _error("invalid_request", "fit and override_quiet_hours are required.", 400)
+    targets = _valid_target_ids(spec.get("device_ids"))
+    if targets is None:
+        return _error("invalid_target", "One or more target displays are unknown.", 400)
+
+    fit = str(spec["fit"])
+    override = bool(spec["override_quiet_hours"])
+    resolved_targets = list(targets)
+    payload = image_bytes + b"\x00" + request_raw.encode("utf-8")
+
+    def _work() -> JobOutcome:
+        active, _quiet = _partition_quiet(resolved_targets, override=override)
+        if not active:
+            return JobOutcome.quiet(resolved_targets, "all_targets_in_quiet_hours")
+        manager = _push_manager()
+        if manager is None:
+            return JobOutcome.failed("temporarily_unavailable", "The push pipeline is offline.")
+        published: list[str] = []
+        for did in active:
+            result = manager.push_image(
+                image_bytes,
+                source_label="Shared photo",
+                device_id=did,
+                fit=fit,
+                bypass_coalesce=True,
+                force_publish=True,
+            )
+            if result.status in _PUBLISHED_STATUSES:
+                published.append(did)
+        if published:
+            return JobOutcome.published(published)
+        return JobOutcome.failed("render_failed", "The image could not be published.")
+
+    return _reserve_and_run(
+        kind="image_push",
+        key=key,
+        payload=payload,
+        target_ids=resolved_targets,
+        label="Shared photo",
+        work=_work,
+    )
+
+
+# -- jobs ----------------------------------------------------------------
+
+
+@bp.get("/jobs/<job_id>")
+@_require_companion()
+def get_job(job_id: str) -> Any:
+    job = _jobs_store().get(job_id)
+    if job is None:
+        return _error("not_found", "No job with that id.", 404)
+    resp = jsonify({"job": job.public_dict()})
+    if not job.terminal:
+        resp.headers["Retry-After"] = "2"
+    return resp
 
 
 def register(app: Flask) -> None:
