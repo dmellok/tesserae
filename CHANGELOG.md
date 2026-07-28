@@ -8,6 +8,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **Photo sends to portrait-native ESP32 panels keep their visual orientation.**
+  Send-page and Companion uploads are now fitted into the display's composition
+  dimensions before the renderer reconciles that composition with the
+  firmware-native row stride. Landscape photos sent to devices such as the
+  reTerminal E1004 no longer rotate 90 degrees clockwise while History remains
+  upright.
+
 - **v2 staleness is anchored to layout, not pixels (live bench round 3, 2026-07-25).** A region
   report against a superseded frame digest now dispatches when that frame's untrimmed region-id
   set matches the live one, resolved through a new ~10-generation digest lineage per device; a

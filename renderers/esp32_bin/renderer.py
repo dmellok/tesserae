@@ -27,14 +27,18 @@ Pipeline:
 
 1. Use ``panel.native_w / panel.native_h`` if present, else fall back
    to ``(panel.w, panel.h)`` for custom panels.
-2. If the input image's orientation doesn't match the firmware's,
-   rotate 90° CW so its left edge lands at the panel's top edge.
-3. Apply ``panel.flip`` (180° for upside-down mounts).
-4. Letterbox (white) to fit the firmware-native dims exactly.
-5. Apply per-device underscan.
-6. Apply ``panel.vflip`` (row reverse for panels whose hardware scans
+2. Fit uploaded images into the panel's composition dimensions
+   (``panel.w × panel.h``). A landscape photo sent to a portrait display
+   stays landscape content; Fit/Fill decides how it is letterboxed/cropped.
+3. If the *composition* orientation doesn't match the firmware-native
+   stride, rotate the completed composition 90° CW.
+4. Apply ``panel.flip`` (180° for upside-down mounts).
+5. Fit to the firmware-native dims if a non-standard panel declaration
+   requires it.
+6. Apply per-device underscan.
+7. Apply ``panel.vflip`` (row reverse for panels whose hardware scans
    bottom-to-top, e.g. the PicPak 4-colour BWRY).
-7. Pack at the firmware-native dims.
+8. Pack at the firmware-native dims.
 """
 
 from __future__ import annotations
@@ -85,21 +89,41 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
     if regions:
         mask_img = rasterize_region_mask(regions, img.width, img.height)
     native_w, native_h = _firmware_native_dims(panel)
+    fit = str(settings.get("image_fit") or "fit")
+
+    # A Send-page / Companion upload is arbitrary source media, not a
+    # pre-composed panel frame. Fit it into the display's *composition*
+    # dimensions before considering the firmware-native row stride.
+    #
+    # Comparing the raw photo's aspect to the firmware aspect here used
+    # to rotate every landscape photo sent to a portrait-native E1004 by
+    # 90° CW. History stayed correct because it stores the source image;
+    # only the packed device artifact was wrong.
+    if img.size != (panel.w, panel.h):
+        img = fit_to_panel(
+            img,
+            target_w=panel.w,
+            target_h=panel.h,
+            scale=fit,
+            bg="white",
+        )
+
     firmware_landscape = native_w > native_h
-    img_landscape = img.size[0] > img.size[1]
-    orientation_mismatch = firmware_landscape != img_landscape
+    composition_landscape = panel.w > panel.h
+    orientation_mismatch = firmware_landscape != composition_landscape
     if orientation_mismatch:
-        # Orientation mismatch (either input PNG or user-calibrated
-        # composition), rotate 90° CW so the input's left edge lands
-        # at the panel's top edge. PIL ``rotate(angle)`` is
+        # The user-calibrated composition orientation differs from the
+        # hardware row stride. Rotate the completed composition 90° CW
+        # so its left edge lands at the panel's top edge. PIL ``rotate`` is
         # counter-clockwise; ``-90`` gives CW.
         img = img.rotate(-90, expand=True)
     if panel.flip:
         # Upside-down physical mount, turn 180° so it reads upright.
         img = img.rotate(180, expand=True)
     if img.size != (native_w, native_h):
-        # Send-page per-push fit mode (fit/fill/stretch/center/blur).
-        fit = str(settings.get("image_fit") or "fit")
+        # Normally the composition dims equal the native dims (or are the
+        # exact swapped pair after rotation). Keep a bounded fallback for
+        # custom/legacy manifests whose declared sizes differ.
         img = fit_to_panel(img, target_w=native_w, target_h=native_h, scale=fit, bg="white")
     # Per-device underscan: inset content so it clears a physical mat/bezel.
     if panel.underscan:

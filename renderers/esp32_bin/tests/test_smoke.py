@@ -7,9 +7,9 @@ panel orientations:
   * 13.3" Waveshare: portrait native (1200, 1600)
   * 7.3" PhotoPainter: landscape native (800, 480)
 
-When the composition's orientation doesn't match the panel's, the
-input gets a 90° CW rotation before packing so the bytes land at the
-firmware's expected row stride."""
+Uploaded images are first fitted into the panel's composition dimensions.
+Only a mismatch between that composition orientation and the firmware's
+native row stride gets a 90° CW rotation before packing."""
 
 from __future__ import annotations
 
@@ -109,67 +109,63 @@ def test_matching_orientation_round_trip(registry, panel_w: int, panel_h: int) -
         assert _decode_pixel(out, panel_w // 2, 3 * panel_h // 4, panel_w) == blue_nibble
 
 
-def test_landscape_source_to_portrait_panel_rotates_cw(registry) -> None:
-    """13.3" Waveshare is portrait native. A landscape composition gets
-    a 90° CW rotation so its left edge lands at the panel top. Solid
-    red on the left and solid blue on the right of the 1600×400 input
-    must end up as red TOP and blue BOTTOM of the 1200×1600 buffer."""
-    img = Image.new("RGB", (1600, 400), "white")
-    img.paste((255, 0, 0), (0, 0, 800, 400))
-    img.paste((0, 0, 255), (800, 0, 1600, 400))
+def test_landscape_photo_to_portrait_panel_fits_without_rotation(registry) -> None:
+    """Regression: a 4:3 landscape photo sent to a portrait-native E1004
+    is source media, not a landscape-calibrated composition. Fit must
+    letterbox it without turning the photo 90°."""
+    img = Image.new("RGB", (400, 300), "white")
+    img.paste((255, 0, 0), (0, 0, 200, 300))
+    img.paste((0, 0, 255), (200, 0, 400, 300))
 
     esp = registry.get("esp32_bin")
     assert esp is not None
     out = esp.transform(
         _png_bytes(img),
-        panel=Panel(w=1200, h=1600),  # portrait native
-        settings={"dither": "none", "saturation": 1.0, "contrast": 1.0},
+        panel=Panel(w=120, h=160, native_w=120, native_h=160),
+        settings={
+            "dither": "none",
+            "saturation": 1.0,
+            "contrast": 1.0,
+            "image_fit": "fit",
+        },
     )
-    assert len(out) == 1200 * 1600 // 2
+    assert len(out) == 120 * 160 // 2
 
     red_nibble = 0x3
     blue_nibble = 0x5
     white_nibble = 0x1
-    # After CW rotation + letterbox-fit to 1200×1600, the 400-wide CW-
-    # rotated strip lands centred. Red (was left) is the top half of
-    # the centre strip; blue (was right) is the bottom half.
-    assert _decode_pixel(out, 600, 400, 1200) == red_nibble
-    assert _decode_pixel(out, 600, 1200, 1200) == blue_nibble
-    # Letterbox columns left + right of the strip stay white.
-    assert _decode_pixel(out, 100, 800, 1200) == white_nibble
-    assert _decode_pixel(out, 1100, 800, 1200) == white_nibble
+    # The landscape photo stays left-to-right, centred vertically.
+    assert _decode_pixel(out, 30, 80, 120) == red_nibble
+    assert _decode_pixel(out, 90, 80, 120) == blue_nibble
+    assert _decode_pixel(out, 60, 10, 120) == white_nibble
+    assert _decode_pixel(out, 60, 150, 120) == white_nibble
 
 
-def test_portrait_source_to_landscape_panel_rotates_cw(registry) -> None:
-    """7.3" PhotoPainter is landscape native. A portrait composition
-    gets a 90° CW rotation so its top edge lands at the panel's RIGHT
-    edge (think of physically rotating the image clockwise: north →
-    east). Red TOP + blue BOTTOM portrait input ends up as red on the
-    RIGHT, blue on the LEFT of the 800×480 landscape buffer.
-
-    Without this, the firmware would feed the panel a 400-byte/row
-    stride against the renderer's 240-byte/row pack, paints garbled
-    vertical ghosts (the reported PhotoPainter symptom)."""
-    img = Image.new("RGB", (480, 800), "white")
-    img.paste((255, 0, 0), (0, 0, 480, 400))
-    img.paste((0, 0, 255), (0, 400, 480, 800))
+def test_landscape_photo_to_portrait_panel_fills_without_rotation(registry) -> None:
+    """Fill crops a 4:3 photo to the portrait panel while preserving
+    its visual orientation. This is the Companion app's reported path."""
+    img = Image.new("RGB", (400, 300), "white")
+    img.paste((255, 0, 0), (0, 0, 200, 300))
+    img.paste((0, 0, 255), (200, 0, 400, 300))
 
     esp = registry.get("esp32_bin")
     assert esp is not None
     out = esp.transform(
         _png_bytes(img),
-        panel=Panel(w=800, h=480),  # landscape native
-        settings={"dither": "none", "saturation": 1.0, "contrast": 1.0},
+        panel=Panel(w=120, h=160, native_w=120, native_h=160),
+        settings={
+            "dither": "none",
+            "saturation": 1.0,
+            "contrast": 1.0,
+            "image_fit": "fill",
+        },
     )
-    assert len(out) == 800 * 480 // 2  # 192000 bytes, matches the firmware report
+    assert len(out) == 120 * 160 // 2
 
     red_nibble = 0x3
     blue_nibble = 0x5
-    # CW rotation maps original top → right, original bottom → left.
-    # Red (was on top) lands on the panel's RIGHT half; blue (was on
-    # bottom) lands on the LEFT half.
-    assert _decode_pixel(out, 200, 240, 800) == blue_nibble  # mid of left half
-    assert _decode_pixel(out, 600, 240, 800) == red_nibble  # mid of right half
+    assert _decode_pixel(out, 10, 80, 120) == red_nibble
+    assert _decode_pixel(out, 110, 80, 120) == blue_nibble
 
 
 def test_portrait_calibration_on_landscape_native_panel(registry) -> None:
