@@ -1,320 +1,321 @@
-/* Deck editor ("dense rail + inspector"): progressive enhancement over
- * the no-JS fallback fieldset. The fallback's inputs (member checkboxes,
- * order numbers, home radios, override selects, timeout range) remain
- * the single source of truth; the rail/inspector UI reads and writes
- * them, so submit semantics are identical with or without JS. */
+/* Deck editor (device-first filmstrip + reveal drawer).
+ *
+ * Progressive enhancement: the no-JS <fieldset id="dxe-fallback"> (member
+ * checkboxes, order numbers, home radios, override selects, timeout range)
+ * stays the single source of truth. This script hides it and drives the same
+ * inputs from a filmstrip of page thumbnails plus a per-card settings drawer.
+ * The chosen display (#dxe-device) filters the "add a dashboard" library to the
+ * pages assigned to that device.
+ */
 (function () {
   "use strict";
+
   const root = document.getElementById("deck-editor");
   if (!root) return;
   const data = JSON.parse(document.getElementById("dxe-data").textContent);
-  const byId = {};
-  data.pages.forEach((p) => (byId[p.id] = p));
 
+  const form = document.getElementById("deck-form");
   const fallback = document.getElementById("dxe-fallback");
   const rail = document.getElementById("dxe-rail");
-  const inspector = document.getElementById("dxe-inspector");
+  const drawer = document.getElementById("dxe-drawer");
   const library = document.getElementById("dxe-library");
   const libPills = document.getElementById("dxe-lib-pills");
-  const libSuggested = document.getElementById("dxe-lib-suggested");
   const behavior = document.getElementById("dxe-behavior");
-  const graphBox = document.getElementById("dxe-graph");
   const pagesField = document.getElementById("dxe-pages-field");
-  const wrapHint = document.getElementById("dxe-wrap-hint");
-  const timeoutInput = document.getElementById("dxe-timeout");
+  const deviceSel = document.getElementById("dxe-device");
+  const deviceHint = document.getElementById("dxe-device-hint");
   const nameInput = document.getElementById("dxe-name");
   const title = document.getElementById("dxe-title");
-  const cadenceSel = document.getElementById("dxe-cadence");
+  const timeoutInput = document.getElementById("dxe-timeout");
+  const timeoutMirror = document.getElementById("dxe-timeout-mirror");
 
-  fallback.classList.add("js-hidden");
-  let selected = null;
+  const pagesById = {};
+  (data.pages || []).forEach((p) => (pagesById[p.id] = p));
 
-  /* ----- fallback input accessors (source of truth) ----- */
+  const OVERRIDES = [
+    ["", "deck default"],
+    ["5", "every 5 min"],
+    ["15", "every 15 min"],
+    ["60", "every 60 min"],
+    ["0", "only on Push"],
+  ];
+
+  let selected = null; // page id whose drawer is open
+
+  // -- fallback accessors (the source of truth) -----------------------------
   const row = (id) => fallback.querySelector(`.dxe-fb-row[data-page="${CSS.escape(id)}"]`);
   const memberBox = (id) => row(id) && row(id).querySelector('input[name="member"]');
   const orderInput = (id) => row(id) && row(id).querySelector('input[type="number"]');
   const homeRadio = (id) => row(id) && row(id).querySelector('input[name="home"]');
   const overrideSel = (id) => row(id) && row(id).querySelector("select");
 
+  function members() {
+    return (data.pages || [])
+      .map((p) => p.id)
+      .filter((id) => memberBox(id) && memberBox(id).checked);
+  }
   function orderedIds() {
-    return data.pages
-      .filter((p) => memberBox(p.id) && memberBox(p.id).checked)
-      .sort((a, b) => (+orderInput(a.id).value || 0) - (+orderInput(b.id).value || 0))
-      .map((p) => p.id);
+    return members().sort((a, b) => (+orderInput(a).value || 0) - (+orderInput(b).value || 0));
   }
   function setOrder(ids) {
     ids.forEach((id, i) => {
       if (orderInput(id)) orderInput(id).value = String(i + 1);
     });
-    pagesField.value = ids.join(",");
   }
   function homeId() {
     const checked = fallback.querySelector('input[name="home"]:checked');
     const ids = orderedIds();
-    if (checked && ids.includes(checked.value)) return checked.value;
-    return ids[0] || "";
+    return checked && ids.includes(checked.value) ? checked.value : ids[0] || "";
   }
   function setHome(id) {
     if (homeRadio(id)) homeRadio(id).checked = true;
     render();
   }
+  function addMember(id) {
+    if (!memberBox(id)) return;
+    memberBox(id).checked = true;
+    if (orderInput(id)) orderInput(id).value = String(orderedIds().length + 1);
+    selected = id;
+    render();
+  }
+  function removeMember(id) {
+    if (memberBox(id)) memberBox(id).checked = false;
+    if (selected === id) selected = null;
+    setOrder(orderedIds());
+    render();
+  }
 
-  /* ----- rail ----- */
-  function cardEl(id, pos, n) {
-    const p = byId[id];
+  // -- filmstrip cards ------------------------------------------------------
+  function card(id, pos) {
+    const p = pagesById[id] || { name: id, thumb: "" };
     const el = document.createElement("div");
-    el.className = "dxe-page-card" + (selected === id ? " is-selected" : "");
-    el.setAttribute("role", "button");
-    el.tabIndex = 0;
+    el.className = "dxe-card2" + (selected === id ? " is-selected" : "");
+    el.draggable = true;
+    el.dataset.page = id;
+
     const thumb = document.createElement("div");
     thumb.className = "dxe-thumb";
-    const img = document.createElement("img");
-    img.alt = "";
-    img.src = p.thumb;
-    img.addEventListener("error", () => {
+    if (p.thumb) {
+      const img = document.createElement("img");
+      img.src = p.thumb;
+      img.alt = "";
+      img.loading = "lazy";
+      img.addEventListener("error", () => {
+        thumb.classList.add("is-missing");
+        thumb.textContent = "not rendered";
+      });
+      thumb.appendChild(img);
+    } else {
       thumb.classList.add("is-missing");
-      img.remove();
       thumb.textContent = "not rendered";
-    });
-    thumb.appendChild(img);
+    }
+    el.appendChild(thumb);
+
     const foot = document.createElement("div");
     foot.className = "dxe-page-foot";
-    foot.innerHTML =
-      `<span class="dxe-mono">${pos}</span>` +
-      `<span class="dxe-page-name" title="${p.name}">${p.name}</span>` +
-      (homeId() === id ? '<span class="dxe-home-star">★</span>' : "");
-    el.append(thumb, foot);
+    const badge = document.createElement("span");
+    badge.className = "dxe-pos";
+    badge.textContent = pos;
+    const name = document.createElement("span");
+    name.className = "dxe-page-name";
+    name.textContent = p.name;
+    foot.appendChild(badge);
+    foot.appendChild(name);
+    if (homeId() === id) {
+      const star = document.createElement("span");
+      star.className = "dxe-home-star";
+      star.textContent = "★";
+      star.title = "home page";
+      foot.appendChild(star);
+    }
+    el.appendChild(foot);
+
     el.addEventListener("click", () => {
-      selected = id;
+      selected = selected === id ? null : id;
       render();
     });
-    el.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        selected = id;
-        render();
-      }
+
+    // drag to reorder
+    el.addEventListener("dragstart", (e) => {
+      e.dataTransfer.setData("text/plain", id);
+      e.dataTransfer.effectAllowed = "move";
+      el.classList.add("is-dragging");
+    });
+    el.addEventListener("dragend", () => el.classList.remove("is-dragging"));
+    el.addEventListener("dragover", (e) => e.preventDefault());
+    el.addEventListener("drop", (e) => {
+      e.preventDefault();
+      const dragId = e.dataTransfer.getData("text/plain");
+      if (!dragId || dragId === id) return;
+      const ids = orderedIds().filter((x) => x !== dragId);
+      const at = ids.indexOf(id);
+      ids.splice(at, 0, dragId);
+      setOrder(ids);
+      render();
     });
     return el;
   }
 
-  function renderRail() {
-    const ids = orderedIds();
-    rail.textContent = "";
-    ids.forEach((id, i) => rail.appendChild(cardEl(id, i + 1, ids.length)));
-    const add = document.createElement("button");
-    add.type = "button";
-    add.className = "dxe-add-tile";
-    add.textContent = "+ Add page";
-    add.addEventListener("click", () => {
-      library.hidden = !library.hidden;
-      renderLibrary();
+  function addTile() {
+    const el = document.createElement("button");
+    el.type = "button";
+    el.className = "dxe-add-tile";
+    el.innerHTML = '<span class="dxe-add-plus">+</span><span>add page</span>';
+    el.addEventListener("click", () => {
+      library.hidden = false;
+      library.scrollIntoView({ block: "nearest", behavior: "smooth" });
     });
-    rail.appendChild(add);
-    wrapHint.textContent = ids.length > 1 ? `↺ wraps ${ids.length} → 1` : "";
+    el.disabled = !deviceSel.value;
+    return el;
   }
 
-  /* ----- library ----- */
-  function appendPage(id) {
-    if (!memberBox(id)) return;
-    memberBox(id).checked = true;
-    const ids = orderedIds().filter((x) => x !== id);
-    ids.push(id);
-    setOrder(ids);
-    selected = id;
-    render();
-  }
-  function renderLibrary() {
-    const memberSet = new Set(orderedIds());
-    libPills.textContent = "";
-    data.pages
-      .filter((p) => !memberSet.has(p.id))
-      .forEach((p) => {
-        const b = document.createElement("button");
-        b.type = "button";
-        b.className = "dxe-lib-pill";
-        b.innerHTML = `${p.name} <span class="dxe-mono">#${p.id}</span>`;
-        b.addEventListener("click", () => appendPage(p.id));
-        libPills.appendChild(b);
-      });
-    if (!libPills.childElementCount) {
-      libPills.innerHTML = '<span class="dxe-hint">every page is already in the deck</span>';
-    }
-    libSuggested.textContent = "";
-    const clusters = (data.suggestions || []).filter((sg) =>
-      sg.page_ids.some((id) => !memberSet.has(id) && byId[id])
-    );
-    if (clusters.length) {
-      const label = document.createElement("div");
-      label.className = "dxe-eyebrow";
-      label.textContent = "SUGGESTED";
-      libSuggested.appendChild(label);
-      clusters.forEach((sg) => {
-        const names = sg.page_ids.map((id) => (byId[id] ? byId[id].name : id)).join(" · ");
-        const b = document.createElement("button");
-        b.type = "button";
-        b.className = "dxe-lib-pill dxe-lib-cluster";
-        b.innerHTML = `${sg.name} — ${names} <strong>add all</strong>`;
-        b.addEventListener("click", () => {
-          sg.page_ids.forEach((id) => {
-            if (byId[id] && !orderedIds().includes(id)) appendPage(id);
-          });
-        });
-        libSuggested.appendChild(b);
-      });
-    }
-  }
-
-  /* ----- inspector ----- */
-  function renderInspector() {
-    const ids = orderedIds();
-    if (!selected || !ids.includes(selected)) selected = ids[0] || null;
-    if (!selected) {
-      inspector.hidden = true;
+  // -- reveal drawer --------------------------------------------------------
+  function renderDrawer() {
+    drawer.innerHTML = "";
+    if (!selected || !memberBox(selected) || !memberBox(selected).checked) {
+      drawer.hidden = true;
       return;
     }
-    inspector.hidden = false;
-    const id = selected;
-    const p = byId[id];
-    const isHome = homeId() === id;
-    const pos = ids.indexOf(id) + 1;
-    inspector.textContent = "";
+    const p = pagesById[selected] || { name: selected };
+    drawer.hidden = false;
 
     const head = document.createElement("div");
-    head.className = "dxe-card-head";
-    head.innerHTML =
-      `<span class="dxe-eyebrow">PAGE</span>` +
-      `<span class="dxe-insp-name">${p.name} <span class="dxe-mono">#${p.id}</span></span>`;
-    inspector.appendChild(head);
+    head.className = "dxe-drawer-head";
+    head.textContent = p.name;
+    drawer.appendChild(head);
 
-    const homeRow = document.createElement("div");
-    homeRow.className = "dxe-home-row" + (isHome ? " is-home" : "");
-    homeRow.innerHTML =
-      `<span class="dxe-radio${isHome ? " on" : ""}" aria-hidden="true"></span>` +
-      `<span>★ Home page — the deck returns here and Push sends it to the panel first.</span>`;
-    homeRow.addEventListener("click", () => setHome(id));
-    inspector.appendChild(homeRow);
+    const controls = document.createElement("div");
+    controls.className = "dxe-drawer-controls";
 
-    if (isHome) {
-      const slider = document.createElement("div");
-      slider.className = "dxe-slider-row";
-      const label = document.createElement("label");
-      label.textContent = "Return here after";
-      label.htmlFor = "dxe-timeout";
-      const out = document.createElement("span");
-      out.className = "dxe-mono dxe-timeout-read";
-      slider.append(label, timeoutInput, out);
-      const helper = document.createElement("p");
-      helper.className = "dxe-hint";
-      helper.textContent = "0 = never · counts from the last button press or tap";
-      inspector.append(slider, helper);
-      const paint = () => {
-        const v = +timeoutInput.value;
-        out.textContent = v ? `${v} min` : "never";
-        updateBehavior();
-      };
-      timeoutInput.addEventListener("input", paint);
-      paint();
-    } else {
-      // Keep the range submitted from the fallback area when not shown.
-      fallback.querySelector(".dxe-fb-row:last-child").appendChild(timeoutInput);
+    // make home
+    const homeBtn = document.createElement("button");
+    homeBtn.type = "button";
+    homeBtn.className = "dxe-mini" + (homeId() === selected ? " is-on" : "");
+    homeBtn.innerHTML = homeId() === selected ? "★ home page" : "☆ make home";
+    homeBtn.addEventListener("click", () => setHome(selected));
+    controls.appendChild(homeBtn);
+
+    // refresh override
+    const wrap = document.createElement("label");
+    wrap.className = "dxe-mini-field";
+    wrap.innerHTML = "<span>↻ refresh</span>";
+    const sel = document.createElement("select");
+    OVERRIDES.forEach(([v, label]) => {
+      const o = document.createElement("option");
+      o.value = v;
+      o.textContent = label;
+      if ((overrideSel(selected).value || "") === v) o.selected = true;
+      sel.appendChild(o);
+    });
+    sel.addEventListener("change", () => {
+      overrideSel(selected).value = sel.value;
+    });
+    wrap.appendChild(sel);
+    controls.appendChild(wrap);
+
+    // remove
+    const rm = document.createElement("button");
+    rm.type = "button";
+    rm.className = "dxe-mini dxe-mini-danger";
+    rm.innerHTML = "✕ remove";
+    rm.addEventListener("click", () => removeMember(selected));
+    controls.appendChild(rm);
+
+    drawer.appendChild(controls);
+  }
+
+  // -- add-page library, filtered by the chosen display ---------------------
+  function renderLibrary() {
+    libPills.innerHTML = "";
+    const dev = deviceSel.value;
+    const inDeck = new Set(members());
+    const assigned = (data.pages || []).filter(
+      (p) => !inDeck.has(p.id) && dev && (p.devices || []).includes(dev)
+    );
+    const unassigned = (data.pages || []).filter(
+      (p) => !inDeck.has(p.id) && (!p.devices || p.devices.length === 0)
+    );
+
+    if (!dev) {
+      library.hidden = true;
+      return;
     }
 
-    const ovWrap = document.createElement("div");
-    ovWrap.className = "dxe-set";
-    const ovLabel = document.createElement("span");
-    ovLabel.className = "dxe-eyebrow";
-    ovLabel.textContent = "REFRESH OVERRIDE";
-    ovWrap.appendChild(ovLabel);
-    const mirror = overrideSel(id).cloneNode(true);
-    mirror.value = overrideSel(id).value;
-    mirror.removeAttribute("name");
-    mirror.querySelector('option[value=""]').textContent = `deck default (${cadenceSel.options[cadenceSel.selectedIndex].text.replace("every ", "")})`;
-    mirror.addEventListener("change", () => {
-      overrideSel(id).value = mirror.value;
-    });
-    ovWrap.appendChild(mirror);
-    inspector.appendChild(ovWrap);
+    const mkPill = (p, muted) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "dxe-lib-pill" + (muted ? " is-muted" : "");
+      b.textContent = p.name;
+      b.addEventListener("click", () => addMember(p.id));
+      return b;
+    };
 
-    const foot = document.createElement("div");
-    foot.className = "dxe-insp-foot";
-    const posLbl = document.createElement("span");
-    posLbl.className = "dxe-hint";
-    posLbl.textContent = `Position ${pos} of ${ids.length}`;
-    const left = document.createElement("button");
-    left.type = "button";
-    left.className = "ghost";
-    left.textContent = "←";
-    left.disabled = pos === 1;
-    left.addEventListener("click", () => move(id, -1));
-    const right = document.createElement("button");
-    right.type = "button";
-    right.className = "ghost";
-    right.textContent = "→";
-    right.disabled = pos === ids.length;
-    right.addEventListener("click", () => move(id, 1));
-    const remove = document.createElement("button");
-    remove.type = "button";
-    remove.className = "ghost danger";
-    remove.textContent = "Remove";
-    remove.disabled = ids.length <= 1;
-    remove.addEventListener("click", () => {
-      memberBox(id).checked = false;
-      const rest = orderedIds();
-      setOrder(rest);
-      if (homeId() === "" || !rest.includes(homeId())) setHome(rest[0]);
-      selected = rest[0] || null;
-      render();
-    });
-    foot.append(posLbl, left, right, remove);
-    inspector.appendChild(foot);
+    assigned.forEach((p) => libPills.appendChild(mkPill(p, false)));
+    if (!assigned.length) {
+      const empty = document.createElement("p");
+      empty.className = "dxe-hint";
+      empty.textContent =
+        "No dashboards are assigned to this display. Bind pages to it under Dashboards, or add an unassigned one below.";
+      libPills.appendChild(empty);
+    }
+    if (unassigned.length) {
+      const sep = document.createElement("div");
+      sep.className = "dxe-eyebrow dxe-lib-sep";
+      sep.textContent = "NOT ASSIGNED TO A DISPLAY";
+      libPills.appendChild(sep);
+      unassigned.forEach((p) => libPills.appendChild(mkPill(p, true)));
+    }
   }
 
-  function move(id, delta) {
-    const ids = orderedIds();
-    const i = ids.indexOf(id);
-    const j = i + delta;
-    if (j < 0 || j >= ids.length) return;
-    [ids[i], ids[j]] = [ids[j], ids[i]];
-    setOrder(ids);
-    render();
-  }
-
-  /* ----- behavior line + graph preview ----- */
-  function updateBehavior() {
-    const ids = orderedIds();
-    const home = homeId();
-    const t = +timeoutInput.value;
-    let line = "◀ ▶ buttons flip through this order and wrap around";
-    if (data.touchBound) line += " · tap the left / right edge on touch panels";
-    line += t
-      ? ` · returns to ★ ${byId[home] ? byId[home].name : home} after ${t} min idle.`
-      : " · never returns automatically.";
-    behavior.textContent = ids.length > 1 ? line : "";
-    const graph = {};
-    ids.forEach((id, i) => {
-      graph[id] = {
-        prev: ids[(i - 1 + ids.length) % ids.length],
-        next: ids[(i + 1) % ids.length],
-        home: id === home ? true : undefined,
-      };
-    });
-    graphBox.value = JSON.stringify(graph, null, 2);
-  }
-
+  // -- main render ----------------------------------------------------------
   function render() {
-    setOrder(orderedIds());
-    renderRail();
-    renderInspector();
-    if (!library.hidden) renderLibrary();
-    updateBehavior();
+    const ids = orderedIds();
+    setOrder(ids);
+
+    rail.innerHTML = "";
+    ids.forEach((id, i) => rail.appendChild(card(id, i + 1)));
+    rail.appendChild(addTile());
+
+    pagesField.value = ids.join(",");
+    renderDrawer();
+    renderLibrary();
+
+    // behaviour line
+    if (!deviceSel.value) {
+      behavior.textContent = "Choose a display above to start adding dashboards.";
+    } else if (!ids.length) {
+      behavior.textContent = "Add one or more dashboards from the library below.";
+    } else if (ids.length === 1) {
+      behavior.textContent = "A single-page deck just keeps this page warm on the display.";
+    } else {
+      behavior.textContent =
+        ids.length +
+        " pages, flipping " +
+        ids.map((id) => (pagesById[id] || {}).name || id).join(" → ") +
+        " ↺";
+    }
+
+    // timeout mirror
+    const t = +(timeoutInput ? timeoutInput.value : 0) || 0;
+    if (timeoutMirror) timeoutMirror.textContent = t === 0 ? "off" : t + " min";
+
+    // title
+    if (title) title.textContent = (nameInput.value || "").trim() || "New deck";
   }
 
-  nameInput.addEventListener("input", () => {
-    title.textContent = nameInput.value || "New deck";
+  // -- wiring ---------------------------------------------------------------
+  fallback.hidden = true;
+  deviceSel.addEventListener("change", () => {
+    if (deviceHint) {
+      deviceHint.textContent = deviceSel.value
+        ? "The deck runs on this display, and only its dashboards are offered below."
+        : "Choose a display to see its dashboards.";
+    }
+    render();
   });
-  cadenceSel.addEventListener("change", render);
-  document.getElementById("deck-form").addEventListener("submit", () => {
+  if (nameInput) nameInput.addEventListener("input", render);
+  if (timeoutInput) timeoutInput.addEventListener("input", render);
+  form.addEventListener("submit", () => {
     pagesField.value = orderedIds().join(",");
   });
 

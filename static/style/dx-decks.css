@@ -184,7 +184,34 @@
   margin-bottom: var(--t-space-3);
 }
 
-/* ---- deck editor (dense rail + inspector) ------------------------------ */
+/* ---- deck editor (device-first filmstrip + reveal drawer) -------------- */
+/* numbered steps */
+.dxe-step { display: flex; gap: 14px; align-items: flex-start; }
+.dxe-step-num { flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 600; background: var(--t-fg); color: var(--t-bg); margin-top: 2px; }
+.dxe-step-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.dxe-device-select { font-size: 15px; padding: 8px 12px; border-radius: var(--t-radius-sm); border: 1px solid var(--t-border-strong); background: var(--t-bg); color: var(--t-fg); max-width: 340px; }
+.dxe-settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; align-items: start; }
+/* filmstrip card */
+.dxe-card2 { width: 140px; border: 2px solid var(--t-border); border-radius: var(--t-radius-sm); background: var(--t-bg); cursor: grab; overflow: hidden; transition: border-color .12s, transform .12s; }
+.dxe-card2:hover { border-color: var(--t-fg-soft); }
+.dxe-card2.is-selected { border-color: var(--t-fg); box-shadow: 0 0 0 1px var(--t-fg); }
+.dxe-card2.is-dragging { opacity: .5; transform: scale(.97); }
+.dxe-pos { flex: none; width: 18px; height: 18px; border-radius: 50%; background: var(--t-inset); color: var(--t-muted); font-size: 11px; display: grid; place-items: center; font-family: var(--t-font-mono); }
+.dxe-add-plus { font-size: 20px; display: block; line-height: 1; }
+/* reveal drawer */
+.dxe-drawer { margin-top: 12px; border: 1px solid var(--t-border); border-radius: var(--t-radius-sm); background: var(--t-surface-soft); padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.dxe-drawer-head { font-weight: 600; font-size: 14px; }
+.dxe-drawer-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.dxe-mini { border: 1px solid var(--t-border); border-radius: var(--t-radius-pill); background: var(--t-bg); padding: 5px 12px; font-size: 13px; cursor: pointer; color: var(--t-fg); }
+.dxe-mini:hover { border-color: var(--t-fg-soft); }
+.dxe-mini.is-on { background: var(--t-danger-bg); border-color: var(--t-pill-danger-border); color: var(--t-danger); }
+.dxe-mini-danger { color: var(--t-danger); }
+.dxe-mini-field { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--t-muted); }
+.dxe-mini-field select { font-size: 13px; padding: 4px 8px; border-radius: var(--t-radius-sm); border: 1px solid var(--t-border); background: var(--t-bg); color: var(--t-fg); }
+.dxe-lib-pill.is-muted { opacity: .7; border-style: dashed; }
+.dxe-lib-sep { width: 100%; margin-top: 4px; }
+.dxe-timeout-mirror { font-size: 15px; font-weight: 500; }
+
 .dxe { max-width: 1020px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
 .dxe-eyebrow { font-family: var(--t-font-mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--t-muted); }
 .dxe-mono { font-family: var(--t-font-mono); font-size: .85em; color: var(--t-muted); }

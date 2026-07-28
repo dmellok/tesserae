@@ -302,6 +302,9 @@ def editor(deck_id: str | None = None) -> str | Response:
                 "id": p.id,
                 "name": p.name,
                 "thumb": url_for("composer.compose_preview", page_id=p.id) + f"?v={token}",
+                # Device bindings, so the editor can filter the page library to the
+                # dashboards assigned to the chosen display. Empty = unassigned.
+                "devices": list(p.device_ids),
             }
         )
 
@@ -341,6 +344,10 @@ def editor(deck_id: str | None = None) -> str | Response:
         "cadence": deck.refresh_interval_minutes if deck else 30,
         "touchBound": touch_bound,
         "suggestions": suggestions,
+        # Device-first flow: the primary display drives the page-library filter.
+        # Pre-select the deck's first bound device when editing; empty for a new deck.
+        "devices": device_meta,
+        "primaryDevice": (deck.device_ids[0] if deck and deck.device_ids else ""),
     }
     return render_template(
         "deck_editor.html",

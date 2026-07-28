@@ -23,22 +23,48 @@
     <input type="hidden" name="deck_id" value="{{ deck.id if deck else '' }}">
     <input type="hidden" name="pages" id="dxe-pages-field" value="">
 
-    <div class="dxe-grid">
-      <section class="dxe-card dxe-rail-card">
+    {# Step 1 — the display. Choosing it filters the page library below. #}
+    <section class="dxe-card dxe-step">
+      <div class="dxe-step-num">1</div>
+      <div class="dxe-step-body">
+        <label class="dxe-eyebrow" for="dxe-device">DISPLAY</label>
+        <select name="device_ids" id="dxe-device" class="dxe-device-select">
+          <option value="">Choose a display…</option>
+          {% for d in device_meta %}
+          <option value="{{ d.id }}"
+                  {% if deck and d.id in deck.device_ids %}selected{% endif %}>{{ d.name }}</option>
+          {% else %}
+          {% endfor %}
+        </select>
+        <p class="dxe-hint" id="dxe-device-hint">The deck runs on this display, and only its dashboards are offered below.</p>
+      </div>
+    </section>
+
+    {# Step 2 — the flip order (filmstrip). #}
+    <section class="dxe-card dxe-step">
+      <div class="dxe-step-num">2</div>
+      <div class="dxe-step-body">
         <div class="dxe-card-head">
-          <span class="dxe-eyebrow">FLIP ORDER</span>
+          <span class="dxe-eyebrow">FLIP ORDER <span class="dxe-hint">— drag to reorder</span></span>
           <span class="dxe-hint" id="dxe-wrap-hint">&#8634; wraps</span>
         </div>
+
         <div class="dxe-rail" id="dxe-rail"></div>
+
+        {# Reveal drawer: opens under the strip when a card is selected. #}
+        <div class="dxe-drawer" id="dxe-drawer" hidden></div>
+
+        {# Add-page library, filtered to the chosen display. #}
         <div class="dxe-library" id="dxe-library" hidden>
-          <div class="dxe-eyebrow">PAGE LIBRARY — click to append</div>
+          <div class="dxe-eyebrow">ADD A DASHBOARD</div>
           <div class="dxe-lib-pills" id="dxe-lib-pills"></div>
           <div class="dxe-lib-suggested" id="dxe-lib-suggested"></div>
         </div>
+
         <p class="dxe-behavior" id="dxe-behavior"></p>
 
         {# No-JS source of truth: membership, order, home, overrides, timeout.
-           JS hides this fieldset and drives the same inputs from the rail. #}
+           JS hides this and drives the same inputs from the strip + drawer. #}
         <fieldset class="dxe-fallback" id="dxe-fallback">
           <legend>Deck pages</legend>
           {% for p in page_meta %}
@@ -71,60 +97,48 @@
             <output id="dxe-timeout-out" for="dxe-timeout"></output>
           </div>
         </fieldset>
-      </section>
+      </div>
+    </section>
 
-      <aside class="dxe-card dxe-inspector" id="dxe-inspector" hidden></aside>
-    </div>
-
-    <section class="dxe-card dxe-settings-bar">
-      <div class="dxe-set">
-        <span class="dxe-eyebrow">NAME</span>
-        <input type="text" name="name" id="dxe-name" required
-               value="{{ deck.name if deck else '' }}" placeholder="Kitchen deck">
-      </div>
-      <div class="dxe-set">
-        <span class="dxe-eyebrow">DEVICES</span>
-        <div class="dxe-chips">
-          {% for d in device_meta %}
-          <label class="dxe-chip">
-            <input type="checkbox" name="device_ids" value="{{ d.id }}"
-                   {% if deck and d.id in deck.device_ids %}checked{% endif %}>
-            <span>{{ d.name }}</span>
-          </label>
-          {% else %}
-          <span class="dxe-hint">no devices registered</span>
-          {% endfor %}
-        </div>
-      </div>
-      <div class="dxe-set">
-        <span class="dxe-eyebrow">REFRESH</span>
-        <select name="refresh_interval_minutes" id="dxe-cadence">
-          {% set cad = deck.refresh_interval_minutes if deck else 30 %}
-          <option value="15" {% if cad == 15 %}selected{% endif %}>every 15 min</option>
-          <option value="30" {% if cad == 30 %}selected{% endif %}>every 30 min</option>
-          <option value="60" {% if cad == 60 %}selected{% endif %}>every 60 min</option>
-          <option value="360" {% if cad == 360 %}selected{% endif %}>every 6 h</option>
-        </select>
-      </div>
-      <details class="dxe-advanced">
-        <summary>&#9656; Advanced</summary>
+    {# Step 3 — deck settings. #}
+    <section class="dxe-card dxe-step">
+      <div class="dxe-step-num">3</div>
+      <div class="dxe-step-body dxe-settings-grid">
         <div class="dxe-set">
-          <span class="dxe-eyebrow">ENTRY PAGE</span>
-          <select name="entry">
-            <option value="">same as home (default)</option>
-            {% for p in page_meta %}
-            <option value="{{ p.id }}" {% if deck and deck.entry_page_id == p.id %}selected{% endif %}>{{ p.name }}</option>
-            {% endfor %}
+          <span class="dxe-eyebrow">NAME</span>
+          <input type="text" name="name" id="dxe-name" required
+                 value="{{ deck.name if deck else '' }}" placeholder="Kitchen deck">
+        </div>
+        <div class="dxe-set">
+          <span class="dxe-eyebrow">REFRESH</span>
+          <select name="refresh_interval_minutes" id="dxe-cadence">
+            {% set cad = deck.refresh_interval_minutes if deck else 30 %}
+            <option value="15" {% if cad == 15 %}selected{% endif %}>every 15 min</option>
+            <option value="30" {% if cad == 30 %}selected{% endif %}>every 30 min</option>
+            <option value="60" {% if cad == 60 %}selected{% endif %}>every 60 min</option>
+            <option value="360" {% if cad == 360 %}selected{% endif %}>every 6 h</option>
           </select>
-          <p class="dxe-hint">what a device shows when first bound</p>
+          <p class="dxe-hint">how often the deck's pages re-render in the background</p>
         </div>
         <div class="dxe-set">
-          <span class="dxe-eyebrow">NAVIGATION GRAPH</span>
-          <textarea id="dxe-graph" class="dxe-mono" rows="8" readonly
-            title="derived automatically from the flip order — edit only if you need custom links"></textarea>
-          <p class="dxe-hint">derived automatically from the flip order — edit only if you need custom links{% if deck %} (<a href="{{ url_for('decks.index', edit=deck.id) }}#deck-{{ deck.id }}">raw editor</a>){% endif %}</p>
+          <span class="dxe-eyebrow">RETURN HOME AFTER</span>
+          <output id="dxe-timeout-mirror" class="dxe-timeout-mirror">off</output>
+          <p class="dxe-hint">idle minutes before the deck snaps back to &#9733; home (set on a card)</p>
         </div>
-      </details>
+        <details class="dxe-advanced">
+          <summary>&#9656; Advanced</summary>
+          <div class="dxe-set">
+            <span class="dxe-eyebrow">ENTRY PAGE</span>
+            <select name="entry">
+              <option value="">same as home (default)</option>
+              {% for p in page_meta %}
+              <option value="{{ p.id }}" {% if deck and deck.entry_page_id == p.id %}selected{% endif %}>{{ p.name }}</option>
+              {% endfor %}
+            </select>
+            <p class="dxe-hint">what a device shows when first bound</p>
+          </div>
+        </details>
+      </div>
     </section>
   </form>
 
