@@ -5,7 +5,7 @@
 {% block main %}
 <header class="page-head">
   <h1><i class="ph ph-battery-medium"></i> Device batteries</h1>
-  <p class="lede">Drain trends and projected days-to-empty for every battery-powered display.</p>
+  <p class="lede">Charging and drain trends for every battery-powered display.</p>
 </header>
 
 {# Window picker as the v0.56 filter chip strip, page-level above the
@@ -21,7 +21,7 @@
 </nav>
 
 {% call section_card(icon='battery-medium', title='Device batteries',
-                     description='Each card shows a ' ~ window_days ~ '-day drain curve plus current state, projected days to 20% / 0%, and sample count.') %}
+                     description='Each card separates active charging from the latest clean drain phase across the selected ' ~ window_days ~ '-day window.') %}
   {% if not cards %}
   <div class="dx-empty">
     <div class="dx-empty-icon"><i class="ph ph-battery-low" aria-hidden="true"></i></div>
@@ -69,10 +69,52 @@
           <div class="dx-stat-value">{{ c.samples }}</div>
           <div class="dx-stat-sub">in window</div>
         </div>
+        {% if c.prediction and c.prediction.is_charging %}
+        <div class="dx-stat-tile">
+          <div class="dx-stat-label">Charging</div>
+          <div class="dx-stat-value">active</div>
+          <div class="dx-stat-sub">live phase</div>
+        </div>
+        <div class="dx-stat-tile">
+          <div class="dx-stat-label">Charge rate</div>
+          <div class="dx-stat-value">
+            {{ '%+.1f' % c.prediction.charge_rate_per_day }}
+          </div>
+          <div class="dx-stat-sub">%/day</div>
+        </div>
+        <div class="dx-stat-tile">
+          <div class="dx-stat-label">Full in</div>
+          <div class="dx-stat-value">
+            {% if c.prediction.days_to_full == 0 %}
+              now
+            {% elif c.prediction.days_to_full < 1 %}
+              {{ '%.1f' % (c.prediction.days_to_full * 24) }}
+            {% else %}
+              {{ '%.1f' % c.prediction.days_to_full }}
+            {% endif %}
+          </div>
+          <div class="dx-stat-sub">
+            {% if c.prediction.days_to_full == 0 %}charged
+            {% elif c.prediction.days_to_full < 1 %}hours
+            {% else %}days{% endif %}
+          </div>
+        </div>
+        <div class="dx-stat-tile">
+          <div class="dx-stat-label">Last drain rate</div>
+          <div class="dx-stat-value">
+            {% if c.prediction.slope_per_day is not none %}
+              {{ '%+.1f' % c.prediction.slope_per_day }}
+            {% else %}—{% endif %}
+          </div>
+          <div class="dx-stat-sub">%/day</div>
+        </div>
+        {% else %}
         <div class="dx-stat-tile">
           <div class="dx-stat-label">Drain rate</div>
           <div class="dx-stat-value">
-            {% if c.prediction %}{{ '%+.1f' % c.prediction.slope_per_day }}{% else %}—{% endif %}
+            {% if c.prediction and c.prediction.slope_per_day is not none %}
+              {{ '%+.1f' % c.prediction.slope_per_day }}
+            {% else %}—{% endif %}
           </div>
           <div class="dx-stat-sub">%/day</div>
         </div>
@@ -93,28 +135,6 @@
             {% else %}—{% endif %}
           </div>
           <div class="dx-stat-sub">days</div>
-        </div>
-        {# When the latest samples show sustained charging, this tile
-           replaces "Reaches 0%" in the user's mental model: an actively
-           charging battery doesn't drain, so the empty-projection is
-           meaningless, and "Full in Xh" is the genuinely useful number. #}
-        {% if c.prediction and c.prediction.days_to_full is not none %}
-        <div class="dx-stat-tile">
-          <div class="dx-stat-label">Full in</div>
-          <div class="dx-stat-value">
-            {% if c.prediction.days_to_full == 0 %}
-              now
-            {% elif c.prediction.days_to_full < 1 %}
-              {{ '%.1f' % (c.prediction.days_to_full * 24) }}
-            {% else %}
-              {{ '%.1f' % c.prediction.days_to_full }}
-            {% endif %}
-          </div>
-          <div class="dx-stat-sub">
-            {% if c.prediction.days_to_full == 0 %}charged
-            {% elif c.prediction.days_to_full < 1 %}hours
-            {% else %}days{% endif %}
-          </div>
         </div>
         {% endif %}
       </div>

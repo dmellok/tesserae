@@ -8,6 +8,12 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **Battery analytics now separate charging from drain phases.** The Device batteries page
+  shows live `Charging` / `Charge rate` / `Full in` values without labelling a positive charge
+  ramp as `Drain rate`, and retains the preceding clean discharge slope as `Last drain rate`
+  when available. Robust Theil-Sen fits prevent a single glitched reading or post-unplug voltage
+  relaxation drop from dominating either estimate, while raw chart samples remain unchanged.
+
 - **v2 staleness is anchored to layout, not pixels (live bench round 3, 2026-07-25).** A region
   report against a superseded frame digest now dispatches when that frame's untrimmed region-id
   set matches the live one, resolved through a new ~10-generation digest lineage per device; a

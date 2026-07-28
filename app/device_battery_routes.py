@@ -143,6 +143,8 @@ def _device_card(
         "series": series,
         "prediction": {
             "slope_per_day": prediction.slope_per_day,
+            "is_charging": prediction.is_charging,
+            "charge_rate_per_day": prediction.charge_rate_per_day,
             "days_to_20pct": prediction.days_to_20pct,
             "days_to_empty": prediction.days_to_empty,
             "days_to_full": prediction.days_to_full,
@@ -227,8 +229,11 @@ def series_json(device_id: str) -> Any:
             "series": series,
             "prediction": {
                 "slope_per_day": prediction.slope_per_day,
+                "is_charging": prediction.is_charging,
+                "charge_rate_per_day": prediction.charge_rate_per_day,
                 "days_to_20pct": prediction.days_to_20pct,
                 "days_to_empty": prediction.days_to_empty,
+                "days_to_full": prediction.days_to_full,
                 "samples": prediction.samples,
             }
             if prediction is not None
