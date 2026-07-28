@@ -192,6 +192,30 @@
     const controls = document.createElement("div");
     controls.className = "dxe-drawer-controls";
 
+    // move earlier / later (tap-based reorder; drag is desktop-only)
+    const ids = orderedIds();
+    const at = ids.indexOf(selected);
+    const moveBtn = (label, delta, disabled) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "dxe-mini";
+      b.textContent = label;
+      b.disabled = disabled;
+      b.addEventListener("click", () => {
+        const cur = orderedIds();
+        const i = cur.indexOf(selected);
+        const j = i + delta;
+        if (j < 0 || j >= cur.length) return;
+        cur.splice(i, 1);
+        cur.splice(j, 0, selected);
+        setOrder(cur);
+        render();
+      });
+      return b;
+    };
+    controls.appendChild(moveBtn("← earlier", -1, at <= 0));
+    controls.appendChild(moveBtn("later →", 1, at >= ids.length - 1));
+
     // make home
     const homeBtn = document.createElement("button");
     homeBtn.type = "button";
