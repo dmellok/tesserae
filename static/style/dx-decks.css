@@ -216,10 +216,10 @@
 
 /* advance bar */
 .dxe-advance { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; background: var(--t-inset); border: 1px solid var(--t-border); border-radius: var(--t-radius-md); padding: 12px 14px; margin-bottom: 20px; }
-.dxe-seg-track { display: inline-flex; gap: 3px; background: var(--t-border); border-radius: 9px; padding: 3px; }
+.dxe-seg-track { display: inline-flex; align-items: stretch; height: var(--dxe-ctl-h, 36px); box-sizing: border-box; gap: 3px; background: var(--t-border); border-radius: 9px; padding: 3px; }
 .dxe-seg { position: relative; display: inline-flex; }
 .dxe-seg input { position: absolute; opacity: 0; }
-.dxe-seg span { display: inline-block; padding: 6px 14px; font-size: 13px; font-weight: 500; border-radius: 7px; cursor: pointer; color: var(--t-fg-soft); }
+.dxe-seg span { display: inline-flex; align-items: center; padding: 0 14px; font-size: 13px; font-weight: 500; border-radius: 7px; cursor: pointer; color: var(--t-fg-soft); }
 .dxe-seg input:checked + span { background: var(--t-surface); color: var(--t-fg); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
 .dxe-seg input:focus-visible + span { outline: 2px solid var(--t-accent); outline-offset: 1px; }
 .dxe-interval { display: inline-flex; align-items: center; gap: 8px; }
@@ -232,7 +232,7 @@
 .dxe-days { display: flex; flex-wrap: wrap; gap: 4px; }
 .dxe-day { position: relative; display: inline-flex; }
 .dxe-day input { position: absolute; opacity: 0; }
-.dxe-day span { display: inline-block; padding: 4px 8px; font-size: 12px; border: 1px solid var(--t-border-strong); border-radius: var(--t-radius-sm); cursor: pointer; color: var(--t-fg-soft); }
+.dxe-day span { display: inline-flex; align-items: center; height: var(--dxe-ctl-h, 36px); box-sizing: border-box; padding: 0 11px; font-size: 12px; border: 1px solid var(--t-border-strong); border-radius: var(--t-radius-sm); cursor: pointer; color: var(--t-fg-soft); }
 .dxe-day input:checked + span { background: var(--t-fg); color: var(--t-bg); border-color: var(--t-fg); }
 .dxe-smart { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; }
 
@@ -263,17 +263,15 @@
 .dxe-remove:hover { background: var(--t-danger-bg); border-color: var(--t-pill-danger-border); }
 .dxe-fieldgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(148px, 1fr)); gap: 14px; padding: 15px 16px 17px; }
 .dxe-field { display: flex; flex-direction: column; gap: 7px; }
-.dxe-fbtn { background: var(--t-surface); border: 1px solid var(--t-border-strong); border-radius: 8px; padding: 7px 11px; font-size: 13px; color: var(--t-fg); cursor: pointer; }
+.dxe-fbtn { display: inline-flex; align-items: center; justify-content: center; height: var(--dxe-ctl-h); box-sizing: border-box; background: var(--t-surface); border: 1px solid var(--t-border-strong); border-radius: var(--t-radius-sm); padding: 0 11px; font-size: 13px; color: var(--t-fg); cursor: pointer; }
 .dxe-fbtn:hover:not(:disabled) { border-color: var(--t-fg); }
 .dxe-fbtn:disabled { opacity: .45; cursor: default; }
-.dxe-home-btn { text-align: left; white-space: nowrap; }
+.dxe-home-btn { justify-content: flex-start; white-space: nowrap; }
 .dxe-pos-btns { display: flex; gap: 6px; }
 .dxe-pos-btns .dxe-fbtn { flex: 1; }
-.dxe-dwell-box { display: flex; align-items: center; background: var(--t-surface); border: 1px solid var(--t-border-strong); border-radius: 8px; padding-right: 11px; }
-.dxe-dwell-box:hover { border-color: var(--t-fg); }
-.dxe-dwell-inp { flex: 1; min-width: 0; border: none; background: transparent; padding: 7px 11px; font: inherit; font-size: 13px; color: var(--t-fg); }
-.dxe-dwell-inp:focus { outline: none; }
-.dxe-dwell-suf { font-size: 12px; color: var(--t-fg-soft); }
+.dxe-dwell-box { display: flex; align-items: center; gap: 7px; }
+.dxe-dwell-inp { flex: 1; min-width: 0; }
+.dxe-dwell-suf { font-size: 12px; color: var(--t-fg-soft); flex: none; }
 
 /* right rail */
 .dxe-rail-col { display: flex; flex-direction: column; gap: 20px; }
@@ -286,13 +284,17 @@
 .dxe-chip:hover { border-color: var(--t-fg); background: var(--t-surface); }
 .dxe-chip-plus { color: var(--t-fg-soft); font-size: 13px; }
 
-/* form controls reuse the app's field styling */
-.dxe input[type="number"], .dxe select {
-  width: 100%; padding: var(--t-space-2) var(--t-space-3); border: 1px solid var(--t-border-strong);
-  border-radius: var(--t-radius-sm); background: var(--t-surface); font: inherit; font-size: 13px;
-  color: var(--t-fg); transition: border-color var(--t-trans-fast), box-shadow var(--t-trans-fast); }
-.dxe .dxe-dwell-inp, .dxe .dxe-fb-row input[type="number"] { width: auto; border: none; }
-.dxe .dxe-fb-row input[type="number"] { width: 60px; border: 1px solid var(--t-border-strong); }
+/* form controls reuse the app's field styling, all one height */
+.dxe { --dxe-ctl-h: 36px; }
+.dxe input[type="text"]:not(.dxe-title-input),
+.dxe input[type="number"],
+.dxe input[type="time"],
+.dxe select {
+  width: 100%; height: var(--dxe-ctl-h); box-sizing: border-box; padding: 0 var(--t-space-3);
+  border: 1px solid var(--t-border-strong); border-radius: var(--t-radius-sm); background: var(--t-surface);
+  font: inherit; font-size: 13px; color: var(--t-fg);
+  transition: border-color var(--t-trans-fast), box-shadow var(--t-trans-fast); }
+.dxe .dxe-fb-row input[type="number"] { width: 60px; }
 .dxe select { -webkit-appearance: none; -moz-appearance: none; appearance: none;
   background-image: linear-gradient(45deg, transparent 50%, var(--t-fg-soft) 50%), linear-gradient(135deg, var(--t-fg-soft) 50%, transparent 50%);
   background-position: calc(100% - 18px) 50%, calc(100% - 12px) 50%; background-size: 6px 6px, 6px 6px; background-repeat: no-repeat; padding-right: 30px; cursor: pointer; }
