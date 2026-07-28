@@ -65,6 +65,32 @@ def test_index_renders_card_with_history_and_prediction(app: Flask, tmp_path: Pa
     assert "Drain rate" in body or "Need at least 8 samples" in body
 
 
+def test_index_labels_live_charge_and_historical_drain_separately(app: Flask) -> None:
+    store: BatteryHistory = app.config["BATTERY_HISTORY"]
+    client = app.test_client()
+    _sign_in(client)
+    client.post(
+        "/settings/devices/add",
+        data={"id": "e1004", "kind": "esp32_client", "name": "E1004"},
+    )
+    now = time.time()
+    for i in range(12):
+        store.record(
+            "e1004",
+            pct=76 - round(8 * i / 11),
+            timestamp=now - (36 - i) * 3600,
+        )
+    for i, pct in enumerate((76, 77, 78, 79, 80, 81, 82)):
+        store.record("e1004", pct=pct, timestamp=now - (6 - i) * 5 * 60)
+
+    body = client.get("/devices/battery?window=7").get_data(as_text=True)
+    assert '<div class="dx-stat-label">Charging</div>' in body
+    assert '<div class="dx-stat-label">Charge rate</div>' in body
+    assert '<div class="dx-stat-label">Full in</div>' in body
+    assert '<div class="dx-stat-label">Last drain rate</div>' in body
+    assert '<div class="dx-stat-label">Drain rate</div>' not in body
+
+
 def test_index_hides_orphan_history_for_unregistered_devices(app: Flask, tmp_path: Path) -> None:
     """Historical battery rows for a device that's no longer in the
     registry must not render. The previous logic was
@@ -101,6 +127,29 @@ def test_series_json_returns_points_and_prediction(app: Flask) -> None:
     # 12 samples * 4% drop = strong negative slope, prediction populated.
     assert payload["prediction"] is not None
     assert payload["prediction"]["slope_per_day"] < 0
+
+
+def test_series_json_exposes_phase_aware_charge_fields(app: Flask) -> None:
+    store: BatteryHistory = app.config["BATTERY_HISTORY"]
+    now = time.time()
+    for i in range(12):
+        store.record(
+            "e1004",
+            pct=76 - round(8 * i / 11),
+            timestamp=now - (36 - i) * 3600,
+        )
+    for i, pct in enumerate((76, 77, 78, 79, 80, 81, 82)):
+        store.record("e1004", pct=pct, timestamp=now - (6 - i) * 5 * 60)
+
+    client = app.test_client()
+    _sign_in(client)
+    payload = client.get("/devices/battery/e1004/series.json?window=7").get_json()
+    prediction = payload["prediction"]
+    assert prediction["is_charging"] is True
+    assert prediction["charge_rate_per_day"] > 0
+    assert prediction["slope_per_day"] < 0
+    assert prediction["days_to_full"] is not None
+    assert prediction["days_to_empty"] is None
 
 
 def test_window_query_param_clamps(app: Flask) -> None:

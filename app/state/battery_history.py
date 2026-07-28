@@ -11,15 +11,14 @@ default 15-min wake cadence) the table grows by ~35 k rows / device /
 year. SQLite handles low-millions easily; we'll add a rolldown when
 someone hits multi-year retention.
 
-The prediction is a plain linear regression of percentage vs unix
-time over the most recent ``window_days`` of samples. ``slope_per_day``
-is a negative number for a draining battery; we project to the 20%
-and 0% intercepts. We bail out (return ``None``) when:
+The prediction separates the trailing charging phase from the latest
+clean discharge phase, then fits each phase with a robust Theil-Sen
+median slope. ``slope_per_day`` is reserved for drain data (negative
+or zero); live charging speed is exposed separately as
+``charge_rate_per_day``. We bail out (return ``None``) when:
 
 * there are fewer than ``MIN_SAMPLES`` points in the window, OR
-* the slope is non-negative (battery flat or charging), OR
-* the slope is so shallow the projection would exceed 10 years (the
-  battery's probably plugged in).
+* no fitted phase has enough distinct timestamps.
 """
 
 from __future__ import annotations
@@ -27,6 +26,7 @@ from __future__ import annotations
 import contextlib
 import logging
 import sqlite3
+import statistics
 import threading
 import time
 from collections.abc import Iterator
@@ -65,6 +65,13 @@ MIN_CHARGE_PER_DAY: float = 0.5
 # discharge episode mid-window from pulling the regression
 # downward and masking an in-progress charge.
 MIN_CHARGE_SEGMENT_SAMPLES: int = 4
+# A two-point net rise is enough to distinguish a real charge from the
+# common +/-1 percentage-point ADC wobble.
+MIN_CHARGE_GAIN_PCT: int = 2
+# Theil-Sen considers every pair (O(n^2)). A deterministic, evenly
+# spaced cap keeps long high-frequency windows cheap while retaining
+# the shape of the full series.
+MAX_THEIL_SEN_SAMPLES: int = 300
 
 
 @dataclass(frozen=True)
@@ -72,7 +79,10 @@ class Prediction:
     """One-shot regression result for a device's last N days.
 
     ``slope_per_day`` is negative on a draining battery (e.g. -3.2
-    means it loses 3.2 % per day) and positive when charging.
+    means it loses 3.2 % per day), zero when flat, and ``None`` when
+    no clean discharge segment is available. It is never a charging
+    slope. ``charge_rate_per_day`` carries the positive live charging
+    slope when ``is_charging`` is true.
     ``days_to_20pct`` / ``days_to_empty`` are projections from
     ``current_pct``; both ``None`` when the battery's flat or rising.
     ``days_to_full`` is the inverse: present only when the recent
@@ -82,7 +92,9 @@ class Prediction:
 
     device_id: str
     current_pct: float
-    slope_per_day: float
+    slope_per_day: float | None
+    is_charging: bool
+    charge_rate_per_day: float | None
     days_to_20pct: float | None
     days_to_empty: float | None
     days_to_full: float | None
@@ -217,79 +229,87 @@ class BatteryHistory:
         *,
         window_days: int = DEFAULT_WINDOW_DAYS,
     ) -> Prediction | None:
-        """Linear regression of percent vs time over the last
-        ``window_days``. ``None`` when there isn't enough data; a
-        Prediction with ``days_to_*=None`` when the battery's flat
-        or charging.
+        """Robust phase-aware battery trend over the last
+        ``window_days``.
 
-        Critically, if the window contains a charge event (a jump
-        of ``CHARGE_JUMP_PCT`` or more between consecutive samples),
-        the regression fits ONLY the most recent discharge segment
-        — otherwise the upward jump dominates the linear fit and we
-        end up projecting a non-draining battery on a fleet that's
-        actually draining between charges. Falls back to the full
-        window when the latest segment is too short to be useful."""
+        A trailing rising phase is fitted independently and reported
+        through ``is_charging`` / ``charge_rate_per_day`` /
+        ``days_to_full``. While charging, ``slope_per_day`` comes only
+        from the preceding clean discharge phase, so a positive charge
+        ramp can never surface as a drain rate. All fits use Theil-Sen
+        to keep a single glitched reading or unplug relaxation drop
+        from dominating the estimate."""
         all_rows = self.recent(device_id, window_days=window_days)
         if len(all_rows) < MIN_SAMPLES:
             return None
-        rows = _last_discharge_segment(all_rows)
-        if len(rows) < MIN_SEGMENT_SAMPLES:
-            # Either no charge event in the window, or the segment
-            # after the last charge is too short for a meaningful
-            # fit. Fall back to the full window so a long flat or
-            # gently-draining battery still gets a slope reading.
-            # ``all_rows`` already cleared MIN_SAMPLES above, so we
-            # don't re-check here (segments intentionally accept
-            # fewer points than the full window).
-            rows = all_rows
-        # x is days since the oldest sample so the regression's
-        # numerical conditioning is reasonable.
-        t0 = rows[0].timestamp
-        xs = [(r.timestamp - t0) / 86400.0 for r in rows]
-        ys = [float(r.pct) for r in rows]
-        n = len(xs)
-        sum_x = sum(xs)
-        sum_y = sum(ys)
-        mean_x = sum_x / n
-        mean_y = sum_y / n
-        num = sum((x - mean_x) * (y - mean_y) for x, y in zip(xs, ys, strict=True))
-        den = sum((x - mean_x) ** 2 for x in xs)
-        if den == 0:
-            return None
-        slope = num / den  # %-points per day
-        intercept = mean_y - slope * mean_x
-        # Current pct: take the LAST sample of the full series, not
-        # the segment, so the projection projects from where the
-        # device actually is right now (the segment may end on an
-        # older sample if we fell back).
-        current_pct = max(0.0, min(100.0, float(all_rows[-1].pct)))
 
-        if slope >= -MIN_DRAIN_PER_DAY:
-            # Flat or charging. Fit a separate regression to just the
-            # latest charging segment so a half-window-old discharge
-            # doesn't drag the slope below the charging threshold.
-            # When the segment fit shows sustained positive slope we
-            # produce a days_to_full projection; otherwise it's a
-            # genuinely flat battery and only the slope reading goes
-            # back.
-            days_to_full = _maybe_days_to_full(all_rows, current_pct)
+        current_pct = max(0.0, min(100.0, float(all_rows[-1].pct)))
+        charging_rows = _last_charging_segment(all_rows)
+        charge_slope = _theil_sen_slope(charging_rows) if charging_rows else None
+        is_charging = (
+            charge_slope is not None
+            and charge_slope >= MIN_CHARGE_PER_DAY
+            and max(r.pct for r in charging_rows) - min(r.pct for r in charging_rows)
+            >= MIN_CHARGE_GAIN_PCT
+        )
+
+        if is_charging:
+            assert charge_slope is not None
+            prior_rows = all_rows[: len(all_rows) - len(charging_rows)]
+            drain_rows = _last_discharge_segment(prior_rows)
+            drain_slope = (
+                _theil_sen_slope(drain_rows) if len(drain_rows) >= MIN_SEGMENT_SAMPLES else None
+            )
+            if drain_slope is not None and drain_slope >= -MIN_DRAIN_PER_DAY:
+                drain_slope = None
+            days_to_full = (
+                0.0 if current_pct >= 100.0 else max(0.0, (100.0 - current_pct) / charge_slope)
+            )
             return Prediction(
                 device_id=device_id,
                 current_pct=current_pct,
-                slope_per_day=slope,
+                slope_per_day=drain_slope,
+                is_charging=True,
+                charge_rate_per_day=charge_slope,
                 days_to_20pct=None,
                 days_to_empty=None,
                 days_to_full=days_to_full,
+                samples=len(drain_rows) if drain_slope is not None else len(charging_rows),
+                window_days=window_days,
+            )
+
+        rows = _last_discharge_segment(all_rows)
+        if len(rows) < MIN_SEGMENT_SAMPLES:
+            # A single recent jump is not enough to establish a charge
+            # phase. Preserve the older fallback for that ambiguous
+            # case, but never expose a positive result as drain.
+            rows = all_rows
+        slope = _theil_sen_slope(rows)
+        if slope is None:
+            return None
+        n = len(rows)
+
+        if slope >= -MIN_DRAIN_PER_DAY:
+            return Prediction(
+                device_id=device_id,
+                current_pct=current_pct,
+                slope_per_day=min(0.0, slope),
+                is_charging=False,
+                charge_rate_per_day=None,
+                days_to_20pct=None,
+                days_to_empty=None,
+                days_to_full=None,
                 samples=n,
                 window_days=window_days,
             )
-        del intercept  # not exposed; kept for clarity if we add a chart trendline
         days_to_20pct = (current_pct - 20.0) / (-slope) if current_pct > 20.0 else 0.0
         days_to_empty = current_pct / (-slope)
         return Prediction(
             device_id=device_id,
             current_pct=current_pct,
             slope_per_day=slope,
+            is_charging=False,
+            charge_rate_per_day=None,
             days_to_20pct=max(0.0, days_to_20pct),
             days_to_empty=max(0.0, days_to_empty),
             days_to_full=None,
@@ -314,71 +334,61 @@ def _last_discharge_segment(rows: list[BatteryRow]) -> list[BatteryRow]:
 
 
 def _last_charging_segment(rows: list[BatteryRow]) -> list[BatteryRow]:
-    """Return the trailing slice of ``rows`` where the percent is
-    monotonically non-decreasing across at least
-    ``MIN_CHARGE_SEGMENT_SAMPLES`` consecutive samples ending at the
-    last row.
+    """Return the candidate trailing charging phase.
 
-    Walks back from the tail until the first sample that DROPS, which
-    marks the boundary between "the last discharge" and "the charge
-    currently in progress". Wobble of one percent point is allowed
-    within the segment (firmware ADC noise; a 4.16 V cell can read as
-    99 / 100 / 99 / 100 over four consecutive heartbeats), so we look
-    for drops of more than one percent rather than strict monotonicity.
-    Returns an empty list when the latest segment is too short to fit
-    on; the caller treats that as "not currently charging"."""
-    if not rows:
+    A large upward step is the strongest boundary signal, and its high
+    sample starts the fit so an instantaneous firmware correction does
+    not inflate the charge rate. Without a step, walk backward to the
+    latest trough, tolerating one point of ADC wobble. This stops a slow
+    prior discharge from being absorbed into the charging fit (the old
+    "break only on a two-point drop" rule could consume the whole
+    previous discharge).
+    """
+    if len(rows) < MIN_CHARGE_SEGMENT_SAMPLES:
         return []
-    end = len(rows) - 1
-    start = end
-    for i in range(end - 1, -1, -1):
-        # A drop of more than one percent breaks the segment; this
-        # cell IS discharging (or at best flat) over this gap.
-        if rows[i + 1].pct - rows[i].pct < -1:
+
+    for i in range(len(rows) - 1, 0, -1):
+        if rows[i].pct - rows[i - 1].pct >= CHARGE_JUMP_PCT:
+            segment = rows[i:]
+            if len(segment) >= MIN_CHARGE_SEGMENT_SAMPLES:
+                return segment
+
+    min_pct = rows[-1].pct
+    min_idx = len(rows) - 1
+    for i in range(len(rows) - 2, -1, -1):
+        pct = rows[i].pct
+        if pct > min_pct + 1:
             break
-        start = i
-    segment = rows[start : end + 1]
+        if pct < min_pct:
+            min_pct = pct
+            min_idx = i
+    segment = rows[min_idx:]
     if len(segment) < MIN_CHARGE_SEGMENT_SAMPLES:
         return []
     return segment
 
 
-def _maybe_days_to_full(rows: list[BatteryRow], current_pct: float) -> float | None:
-    """Return the projected days until ``current_pct`` reaches 100%,
-    or ``None`` when the latest samples don't show sustained charging.
+def _theil_sen_slope(rows: list[BatteryRow]) -> float | None:
+    """Median pairwise slope in percentage points per day.
 
-    Uses :func:`_last_charging_segment` to isolate the trailing
-    charging slice, then fits the same simple linear regression as
-    ``predict()`` on that subset. Two reasons to gate this beyond the
-    main slope:
-
-    * The main slope is fit to the most recent DISCHARGE segment for
-      the days-to-empty projection; it's the wrong signal for the
-      charge case (it can be slightly negative even while a charge is
-      mid-progress).
-    * A genuinely flat battery shouldn't get a "Full in ∞" indicator;
-      requiring ``MIN_CHARGE_PER_DAY`` of charging slope filters that
-      out cleanly.
-
-    Returns 0 (not None) when the battery is already at or above 100%
-    so the UI can render "Full now" rather than hiding the indicator.
+    Long series are evenly subsampled to cap the quadratic pair count.
+    Duplicate timestamps are skipped; ``None`` means no usable pair.
     """
-    if current_pct >= 100.0:
-        return 0.0
-    segment = _last_charging_segment(rows)
-    if not segment:
+    if len(rows) < 2:
         return None
-    t0 = segment[0].timestamp
-    xs = [(r.timestamp - t0) / 86400.0 for r in segment]
-    ys = [float(r.pct) for r in segment]
-    n = len(xs)
-    mean_x = sum(xs) / n
-    mean_y = sum(ys) / n
-    num = sum((x - mean_x) * (y - mean_y) for x, y in zip(xs, ys, strict=True))
-    den = sum((x - mean_x) ** 2 for x in xs)
-    if den == 0:
-        return None
-    slope = num / den
-    if slope < MIN_CHARGE_PER_DAY:
-        return None
-    return max(0.0, (100.0 - current_pct) / slope)
+    fitted_rows = rows
+    if len(rows) > MAX_THEIL_SEN_SAMPLES:
+        last = len(rows) - 1
+        indices = {
+            round(i * last / (MAX_THEIL_SEN_SAMPLES - 1)) for i in range(MAX_THEIL_SEN_SAMPLES)
+        }
+        fitted_rows = [rows[i] for i in sorted(indices)]
+
+    slopes: list[float] = []
+    for i, left in enumerate(fitted_rows[:-1]):
+        for right in fitted_rows[i + 1 :]:
+            elapsed_days = (right.timestamp - left.timestamp) / 86400.0
+            if elapsed_days == 0:
+                continue
+            slopes.append((right.pct - left.pct) / elapsed_days)
+    return float(statistics.median(slopes)) if slopes else None

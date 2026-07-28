@@ -1,4 +1,4 @@
-"""BatteryHistory store + linear regression coverage."""
+"""BatteryHistory store + phase-aware robust regression coverage."""
 
 from __future__ import annotations
 
@@ -162,7 +162,12 @@ def test_predict_returns_days_to_full_on_a_sustained_charge(
         store.record("esp32_charging", pct=round(pct), timestamp=now - days_ago * 86400)
     pred = store.predict("esp32_charging", window_days=7)
     assert pred is not None
-    assert pred.slope_per_day > 0
+    assert pred.is_charging is True
+    assert pred.charge_rate_per_day is not None
+    assert pred.charge_rate_per_day > 0
+    # No prior clean discharge exists, so charging must not leak its
+    # positive slope into the drain-rate field.
+    assert pred.slope_per_day is None
     assert pred.days_to_full is not None
     # current 90%, slope 10 %/day → 1 day to 100%
     assert pred.days_to_full == pytest.approx(1.0, abs=0.3)
@@ -220,7 +225,102 @@ def test_predict_days_to_full_zero_when_already_at_or_above_100(
     pred = store.predict("esp32_topup", window_days=7)
     assert pred is not None
     assert pred.current_pct >= 100.0
+    assert pred.is_charging is True
     assert pred.days_to_full == 0.0
+
+
+def test_predict_separates_frequent_charge_ramp_from_last_drain(
+    store: BatteryHistory,
+) -> None:
+    """Regression for Discussion #137's live E1004 shape.
+
+    A long clean discharge ends at 68%, then a charge jump and nine
+    frequent rising samples follow. The old heuristic fitted those
+    nine samples as +475%/day and labelled that value Drain rate.
+    """
+    now = time.time()
+    drain_start = now - 2.2 * 86400
+    drain_span = 45.5 * 3600
+    for i in range(500):
+        fraction = i / 499
+        store.record(
+            "e1004",
+            pct=round(76 - 8 * fraction),
+            timestamp=drain_start + drain_span * fraction,
+        )
+
+    charge_start = drain_start + drain_span + 300
+    for i, pct in enumerate((76, 77, 78, 79, 79, 80, 81, 81, 82)):
+        store.record("e1004", pct=pct, timestamp=charge_start + i * 128)
+
+    pred = store.predict("e1004", window_days=7)
+    assert pred is not None
+    assert pred.is_charging is True
+    assert pred.charge_rate_per_day is not None
+    assert pred.charge_rate_per_day > 100
+    assert pred.slope_per_day == pytest.approx(-4.2, abs=0.8)
+    assert pred.slope_per_day < 0
+    assert pred.days_to_20pct is None
+    assert pred.days_to_empty is None
+    assert pred.days_to_full is not None
+
+
+def test_predict_charge_rate_excludes_pre_charge_plateau(
+    store: BatteryHistory,
+) -> None:
+    """A 68-69% plateau before plug-in must not dilute Full in."""
+    now = time.time()
+    start = now - 2 * 86400
+    for i in range(16):
+        store.record(
+            "plateau",
+            pct=80 - round(11 * i / 15),
+            timestamp=start + i * 2 * 3600,
+        )
+    plateau_start = start + 32 * 3600
+    for i in range(24):
+        store.record(
+            "plateau",
+            pct=68 + (i % 2),
+            timestamp=plateau_start + i * 15 * 60,
+        )
+    charge_start = plateau_start + 24 * 15 * 60
+    for i, pct in enumerate((76, 77, 78, 79, 80, 81, 82)):
+        store.record("plateau", pct=pct, timestamp=charge_start + i * 5 * 60)
+
+    pred = store.predict("plateau", window_days=7)
+    assert pred is not None
+    assert pred.is_charging is True
+    assert pred.charge_rate_per_day == pytest.approx(288.0, abs=5.0)
+    assert pred.days_to_full == pytest.approx(0.0625, abs=0.01)
+
+
+def test_theil_sen_ignores_single_post_unplug_relaxation_drop(
+    store: BatteryHistory,
+) -> None:
+    """One immediate voltage correction must not steepen normal drain."""
+    now = time.time()
+    points = [
+        (6.0, 70),
+        (5.0, 60),
+        (4.0, 50),
+        (3.0, 40),
+        (2.1, 85),  # charge event
+        (2.0, 76),  # immediate unplug relaxation
+        (1.5, 75),
+        (1.0, 73),
+        (0.5, 72),
+        (0.0, 70),
+    ]
+    for days_ago, pct in points:
+        store.record("relaxation", pct=pct, timestamp=now - days_ago * 86400)
+
+    pred = store.predict("relaxation", window_days=7)
+    assert pred is not None
+    assert pred.is_charging is False
+    assert pred.slope_per_day == pytest.approx(-3.0, abs=1.0)
+    assert pred.slope_per_day > -6.0
+    assert pred.days_to_empty is not None
 
 
 def test_device_ids_returns_distinct_devices(store: BatteryHistory) -> None:
