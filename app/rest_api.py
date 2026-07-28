@@ -50,6 +50,7 @@ from werkzeug.wrappers import Response
 from app.button_service import ButtonService, TouchStroke
 from app.device_loader import Device, DeviceRegistry
 from app.device_service import create_instance, generate_access_token
+from app.render_signing import sign_render_query
 from app.renderer_loader import RendererRegistry
 from app.state.event_log import EventLog
 from app.state.pairing_store import PairingStore
@@ -805,7 +806,15 @@ def get_frame(device_id: str) -> Response:
     # RFC 7231 §3.1.4.2 explicitly permits Content-Location here as
     # "the specific resource location that would be returned". Cost
     # to existing clients: zero (they ignore unknown headers).
-    image_url = f"{request.url_root.rstrip('/')}/renders/{latest['filename']}"
+    # Sign the render path so a device on a public host can fetch the
+    # artifact even though ``/renders/`` is otherwise LAN/session-gated
+    # (issue #151). The signature is bound to this exact path + a timestamp;
+    # on a LAN install it's harmless (the private-client check passes first).
+    render_path = f"/renders/{latest['filename']}"
+    image_url = f"{request.url_root.rstrip('/')}{render_path}"
+    sig_query = sign_render_query(current_app.secret_key, render_path)
+    if sig_query:
+        image_url = f"{image_url}?{sig_query}"
     # Resend intent (#119): a "resend" from History flags the frame so a
     # REST client re-fetches once even when the bytes are identical to
     # what it already shows (MQTT gets this via force_publish). Skip the

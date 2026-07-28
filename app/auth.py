@@ -269,6 +269,34 @@ def _path_is_lan_reachable(path: str) -> bool:
     return any(path.startswith(p) for p in _LAN_PATHS)
 
 
+def _public_rest_clients_enabled() -> bool:
+    """Operator opt-in (Settings → Server → Network, default off). Enabling
+    it accepts that a device's signed, short-lived frame URL is fetchable
+    from a public address; off, render artifacts stay LAN/session only."""
+    store = current_app.config.get("SETTINGS_STORE")
+    if store is None:
+        return False
+    return bool((store.get_section("app") or {}).get("public_rest_clients_enabled"))
+
+
+def _has_valid_render_signature(path: str) -> bool:
+    """True iff public REST access is enabled AND the request carries a valid
+    render signature for ``path``.
+
+    Gated behind the operator opt-in so a public instance doesn't serve
+    signed render URLs unless the admin deliberately turned it on. Only
+    ``/renders/`` artifacts are ever handed out signed by ``/frame``;
+    ``/preview/`` and ``/mirror/`` never carry one, so they stay strictly
+    LAN/session-reachable. Keyed off the Flask session secret."""
+    if not path.startswith("/renders/"):
+        return False
+    if not _public_rest_clients_enabled():
+        return False
+    from app.render_signing import render_signature_valid
+
+    return render_signature_valid(current_app.secret_key, path, request.args.get("sig"))
+
+
 def install_gate(app: Flask, settings: SettingsStore) -> None:
     """Register the before_request handler that redirects unauthenticated
     traffic. Idempotent, calling twice replaces the handler (Flask
@@ -289,6 +317,14 @@ def install_gate(app: Flask, settings: SettingsStore) -> None:
         # bypass auth.
         if current_app.config.get("HA_INGRESS_MODE") and request.headers.get("X-Ingress-Path"):
             return None
+        # A valid, unexpired render signature (minted by /frame) grants
+        # access to that one artifact from any origin, independent of the
+        # password gate and the LAN check (issue #151). Scoped to
+        # ``/renders/`` inside the helper, so nothing else is affected. This
+        # sits ahead of the password-disabled branch so a public-hosted
+        # device can still fetch its own frame on a no-password install.
+        if _has_valid_render_signature(path):
+            return None
         # Admin opted out of the password (Settings → System → Auth).
         # Private network + loopback clients reach anything; public IPs
         # still 403 so a disabled-auth LAN install doesn't expose the
@@ -307,7 +343,9 @@ def install_gate(app: Flask, settings: SettingsStore) -> None:
             return Response("forbidden", status=403)
         # /renders/ is reachable from any private-network client so the
         # Pi / ESP32 can fetch frame artifacts without a session. Still
-        # blocked for anything coming in on a public IP.
+        # blocked for anything coming in on a public IP (a valid render
+        # signature is handled earlier and lets a public-hosted device
+        # through without opening /renders/ to the internet wholesale).
         if _path_is_lan_reachable(path):
             if _is_private_client():
                 return None

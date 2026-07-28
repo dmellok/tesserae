@@ -739,7 +739,10 @@ def test_frame_returns_url_and_etag_when_rendered(app: Flask) -> None:
     body = resp.get_json()
     assert body["render_id"] == "abc123"
     assert body["format"] == "bin"
-    assert body["url"].endswith("/renders/abc123.bin")
+    # The render URL carries a short-lived signature (issue #151) so a
+    # device on a public host can fetch it; the path is unchanged.
+    assert "/renders/abc123.bin" in body["url"]
+    assert "sig=" in body["url"]
     assert resp.headers["ETag"] == '"abc123"'
 
 
@@ -1054,7 +1057,7 @@ def test_frame_returns_304_when_if_none_match_matches(app: Flask) -> None:
     # client that boots without a cached URL (non-e-ink panels, factory
     # reset, etc.) can still re-fetch the image. RFC 7231 §3.1.4.2
     # explicitly permits Content-Location on 304.
-    assert resp.headers["Content-Location"].endswith("/renders/abc123.bin")
+    assert "/renders/abc123.bin" in resp.headers["Content-Location"]
 
 
 def test_fetch_latest_action_bypasses_matching_etag_without_rendering(app: Flask) -> None:
@@ -1201,7 +1204,7 @@ def test_frame_returns_content_location_on_200(app: Flask) -> None:
         headers={"Authorization": f"Bearer {token}"},
     )
     assert resp.status_code == 200
-    assert resp.headers["Content-Location"].endswith("/renders/def456.png")
+    assert "/renders/def456.png" in resp.headers["Content-Location"]
     # And matches the body's ``url`` field.
     assert resp.get_json()["url"] == resp.headers["Content-Location"]
 

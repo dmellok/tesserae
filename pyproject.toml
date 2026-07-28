@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tesserae"
-version = "0.209.0"
+version = "0.210.0"
 description = "E-ink dashboard companion. Compose tile-based dashboards, render headless, push frames over MQTT."
 requires-python = ">=3.11"
 license = { text = "AGPL-3.0-or-later" }
@@ -145,6 +145,7 @@ module = [
     "app.renderer_loader",
     "app.device_loader",
     "app.renderer",
+    "app.render_signing",
 ]
 strict = true
 

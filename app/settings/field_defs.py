@@ -165,6 +165,22 @@ APP_FIELDS: list[dict[str, Any]] = [
         ),
     },
     {
+        "name": "public_rest_clients_enabled",
+        "type": "switch",
+        "label": "Allow REST clients on public networks",
+        "default": False,
+        "group": "network",
+        "help": (
+            "Let a REST device fetch its rendered frame when it reaches this "
+            "server over a public (non-LAN) address, using a signed, short-lived "
+            "URL the server hands it after it authenticates. Off by default: "
+            "render artifacts stay reachable only from your LAN or an authed "
+            "session. Turn on only if you deliberately host Tesserae on a public "
+            "address (e.g. a VPS) and accept that a device's signed frame URL is "
+            "fetchable from the internet until it expires."
+        ),
+    },
+    {
         "name": "unbound_broadcast",
         "type": "switch",
         "label": "Broadcast unbound dashboards (legacy single-head MQTT)",

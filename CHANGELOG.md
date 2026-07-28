@@ -6,6 +6,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added
+
+- **REST devices work on publicly-hosted instances (opt-in).** A new Settings → Server → Network
+  toggle, "Allow REST clients on public networks" (off by default), lets a device fetch its
+  rendered frame over a public address using a signed, short-lived URL the server hands it after
+  it authenticates. Off, render artifacts stay reachable only from your LAN or an authed session;
+  on, the operator accepts that a device's signed frame URL is fetchable from the internet until
+  it expires. Unsigned public access is always refused, and no firmware change is needed.
+
 ### Fixed
 
 - **Photo sends to portrait-native ESP32 panels keep their visual orientation.**
