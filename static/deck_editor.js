@@ -26,7 +26,9 @@
   const enabledBox = form.querySelector('input[name="enabled"]');
   const statusWord = el("dxe-status-word");
   const deviceSel = el("dxe-device");
-  const cadenceSel = el("dxe-cadence");
+  const cadenceRange = el("dxe-cadence-range");
+  const cadenceNum = el("dxe-cadence-num");
+  const cadenceHelp = el("dxe-cadence-help");
   const returnSel = el("dxe-returnhome");
   const returnHelp = el("dxe-returnhome-help");
   const intervalWrap = el("dxe-interval-wrap");
@@ -387,9 +389,25 @@
   if (titleInput) titleInput.addEventListener("input", markDirty);
   if (enabledBox) enabledBox.addEventListener("change", () => { markDirty(); renderStatus(); });
   form.querySelectorAll('input[name="advance"]').forEach((r) => r.addEventListener("change", () => { markDirty(); render(); }));
-  [el("dxe-interval"), deviceSel, cadenceSel, returnSel].forEach(
+  [el("dxe-interval"), deviceSel, returnSel].forEach(
     (c) => c && c.addEventListener("change", () => { markDirty(); render(); })
   );
+  // Background-refresh slider <-> number box, kept in sync; 0 = manual only.
+  function syncCadence(from) {
+    if (!cadenceRange || !cadenceNum) return;
+    let v = parseInt(from.value, 10);
+    if (isNaN(v)) v = 0;
+    v = Math.max(0, Math.min(1440, v));
+    cadenceNum.value = String(v);
+    cadenceRange.value = String(Math.min(v, +cadenceRange.max));
+    if (cadenceHelp) {
+      cadenceHelp.textContent =
+        v === 0 ? "Manual only, pages re-render when pushed." : "How often pages re-render out of view.";
+    }
+  }
+  if (cadenceRange) cadenceRange.addEventListener("input", () => { syncCadence(cadenceRange); markDirty(); });
+  if (cadenceNum) cadenceNum.addEventListener("input", () => { syncCadence(cadenceNum); markDirty(); });
+  if (cadenceNum) syncCadence(cadenceNum);
   const discard = el("dxe-discard");
   if (discard) discard.addEventListener("click", () => window.location.reload());
   form.addEventListener("submit", () => (pagesField.value = orderedIds().join(",")));

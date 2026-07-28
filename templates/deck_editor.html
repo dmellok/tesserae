@@ -9,7 +9,6 @@
   <form method="post" action="{{ url_for('decks.editor_save') }}" id="deck-form">
     <input type="hidden" name="deck_id" value="{{ deck.id if deck else '' }}">
     <input type="hidden" name="pages" id="dxe-pages-field" value="">
-    <input type="hidden" name="advance_anchor" value="{{ deck.advance_anchor if deck else '00:00' }}">
 
     {# Header: breadcrumb + editable title, and the enabled switch. #}
     <div class="dxe-head">
@@ -75,6 +74,12 @@
                        {% if i in dows %}checked{% endif %}><span>{{ lbl }}</span></label>
                 {% endfor %}
               </div>
+            </div>
+            <div class="dxe-set">
+              <span class="dxe-mono-label">START AT</span>
+              <input type="time" name="advance_anchor"
+                     value="{{ deck.advance_anchor if deck else '00:00' }}">
+              <p class="dxe-help">daily time the cycle begins</p>
             </div>
             <div class="dxe-set">
               <span class="dxe-mono-label">STOP AT</span>
@@ -154,15 +159,18 @@
             <p class="dxe-help">Only dashboards bound to this display can be added to the deck.</p>
           </div>
           <div class="dxe-set">
-            <label class="dxe-mono-label" for="dxe-cadence">BACKGROUND REFRESH</label>
-            <select name="refresh_interval_minutes" id="dxe-cadence">
-              {% set cad = deck.refresh_interval_minutes if deck else 30 %}
-              <option value="15" {% if cad == 15 %}selected{% endif %}>every 15 min</option>
-              <option value="30" {% if cad == 30 %}selected{% endif %}>every 30 min</option>
-              <option value="60" {% if cad == 60 %}selected{% endif %}>every 60 min</option>
-              <option value="0" {% if cad == 0 %}selected{% endif %}>manual only</option>
-            </select>
-            <p class="dxe-help">How often pages re-render out of view.</p>
+            <label class="dxe-mono-label" for="dxe-cadence-num">BACKGROUND REFRESH</label>
+            {% set cad = deck.refresh_interval_minutes if deck else 30 %}
+            <div class="dxe-slider-row">
+              <input type="range" id="dxe-cadence-range" min="0" max="360" step="5" value="{{ cad }}"
+                     aria-label="Background refresh minutes">
+              <div class="dxe-dwell-box dxe-num-box">
+                <input type="number" id="dxe-cadence-num" name="refresh_interval_minutes"
+                       min="0" max="1440" value="{{ cad }}" class="dxe-dwell-inp">
+                <span class="dxe-dwell-suf">min</span>
+              </div>
+            </div>
+            <p class="dxe-help" id="dxe-cadence-help">How often pages re-render out of view.</p>
           </div>
           <div class="dxe-set">
             <label class="dxe-mono-label" for="dxe-returnhome">RETURN HOME AFTER</label>

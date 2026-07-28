@@ -272,6 +272,9 @@
 .dxe-dwell-box { display: flex; align-items: center; gap: 7px; }
 .dxe-dwell-inp { flex: 1; min-width: 0; }
 .dxe-dwell-suf { font-size: 12px; color: var(--t-fg-soft); flex: none; }
+.dxe-slider-row { display: flex; align-items: center; gap: 12px; }
+.dxe-slider-row input[type="range"] { flex: 1; min-width: 60px; accent-color: var(--t-accent); }
+.dxe-num-box { flex: none; width: 118px; }
 
 /* right rail */
 .dxe-rail-col { display: flex; flex-direction: column; gap: 20px; }
