@@ -357,6 +357,8 @@
 
     const mode = advanceMode();
     if (intervalWrap) intervalWrap.style.display = mode === "manual" ? "none" : "";
+    const advMore = el("dxe-adv-more");
+    if (advMore) advMore.style.display = mode === "manual" ? "none" : "";
     if (advHint) {
       advHint.textContent =
         mode === "manual"

@@ -80,6 +80,32 @@ def test_editor_save_defaults_to_manual(app: Flask) -> None:
     assert _decks(app)[0].advance == "manual"
 
 
+def test_editor_save_persists_advanced_timing(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    client.post(
+        "/decks/editor-save",
+        data={
+            "name": "Adv",
+            "pages": "overview,calendar",
+            "advance": "timer",
+            "advance_days": ["0", "2", "4"],
+            "advance_end_at": "22:00",
+            "advance_mode": "priority",
+            "advance_min_hold_minutes": "10",
+            "advance_priority": "7",
+            "advance_smart_sync": "on",
+            "advance_smart_sync_lead_s": "20",
+        },
+        follow_redirects=True,
+    )
+    d = _decks(app)[0]
+    assert d.advance_days_of_week == [0, 2, 4] and d.advance_end_at == "22:00"
+    assert d.advance_mode == "priority" and d.advance_min_hold_minutes == 10
+    assert d.advance_priority == 7 and d.advance_smart_sync is True
+    assert d.advance_smart_sync_lead_s == 20
+
+
 def test_create_deck(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)

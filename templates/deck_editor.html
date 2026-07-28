@@ -62,6 +62,54 @@
           <span class="dxe-adv-hint" id="dxe-adv-hint"></span>
         </div>
 
+        {# Advanced timing (rotation parity): only meaningful when auto-advancing. #}
+        <details class="dxe-adv-more" id="dxe-adv-more">
+          <summary>Advanced timing</summary>
+          <div class="dxe-adv-grid">
+            <div class="dxe-set">
+              <span class="dxe-mono-label">DAYS</span>
+              {% set dows = deck.advance_days_of_week if deck else [0,1,2,3,4,5,6] %}
+              <div class="dxe-days">
+                {% for i, lbl in [(0,'Mon'),(1,'Tue'),(2,'Wed'),(3,'Thu'),(4,'Fri'),(5,'Sat'),(6,'Sun')] %}
+                <label class="dxe-day"><input type="checkbox" name="advance_days" value="{{ i }}"
+                       {% if i in dows %}checked{% endif %}><span>{{ lbl }}</span></label>
+                {% endfor %}
+              </div>
+            </div>
+            <div class="dxe-set">
+              <span class="dxe-mono-label">STOP AT</span>
+              <input type="time" name="advance_end_at"
+                     value="{{ deck.advance_end_at if deck and deck.advance_end_at else '' }}">
+              <p class="dxe-help">blank cycles until midnight</p>
+            </div>
+            <div class="dxe-set">
+              <span class="dxe-mono-label">MODE</span>
+              <select name="advance_mode">
+                {% set amode = deck.advance_mode if deck else 'scheduled' %}
+                <option value="scheduled" {% if amode == 'scheduled' %}selected{% endif %}>timed cycle</option>
+                <option value="priority" {% if amode == 'priority' %}selected{% endif %}>first page whose conditions match</option>
+              </select>
+            </div>
+            <div class="dxe-set">
+              <span class="dxe-mono-label">MIN HOLD (MIN)</span>
+              <input type="number" name="advance_min_hold_minutes" min="0" max="120"
+                     value="{{ deck.advance_min_hold_minutes if deck else 5 }}">
+              <p class="dxe-help">minimum time on a page before switching</p>
+            </div>
+            <div class="dxe-set">
+              <span class="dxe-mono-label">PRIORITY</span>
+              <input type="number" name="advance_priority"
+                     value="{{ deck.advance_priority if deck else 0 }}">
+              <p class="dxe-help">higher wins when a schedule is also due</p>
+            </div>
+            <div class="dxe-set">
+              <label class="dxe-smart"><input type="checkbox" name="advance_smart_sync"
+                     {% if deck and deck.advance_smart_sync %}checked{% endif %}> Smart sync</label>
+              <p class="dxe-help">render just before a battery panel wakes</p>
+            </div>
+          </div>
+        </details>
+
         <div class="dxe-rail" id="dxe-rail"></div>
         <div class="dxe-panel" id="dxe-panel" hidden></div>
 

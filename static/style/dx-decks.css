@@ -225,6 +225,16 @@
 .dxe-interval { display: inline-flex; align-items: center; gap: 8px; }
 .dxe-every { font-size: 13px; color: var(--t-fg-soft); }
 .dxe-adv-hint { font-size: 13px; color: var(--t-fg-soft); }
+.dxe-adv-more { margin: -6px 0 18px; font-size: 13px; }
+.dxe-adv-more > summary { cursor: pointer; color: var(--t-fg-soft); list-style-position: inside; padding: 4px 0; }
+.dxe-adv-more > summary:hover { color: var(--t-fg); }
+.dxe-adv-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; padding: 12px 2px 4px; }
+.dxe-days { display: flex; flex-wrap: wrap; gap: 4px; }
+.dxe-day { position: relative; display: inline-flex; }
+.dxe-day input { position: absolute; opacity: 0; }
+.dxe-day span { display: inline-block; padding: 4px 8px; font-size: 12px; border: 1px solid var(--t-border-strong); border-radius: var(--t-radius-sm); cursor: pointer; color: var(--t-fg-soft); }
+.dxe-day input:checked + span { background: var(--t-fg); color: var(--t-bg); border-color: var(--t-fg); }
+.dxe-smart { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; }
 
 /* page grid */
 .dxe-rail { display: grid; grid-template-columns: repeat(auto-fill, minmax(196px, 1fr)); gap: 12px; }
