@@ -15,7 +15,6 @@ from app.state.deck_model import Deck, DeckPage
 from app.state.deck_store import DeckStore
 from app.state.schedule_store import ScheduleStore
 
-
 # -- model ---------------------------------------------------------------
 
 
