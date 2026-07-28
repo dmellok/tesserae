@@ -11,13 +11,13 @@ function escapeHtml(s) {
   }[c]));
 }
 
-// Cap iframe wait so a slow / hung site doesn't block the whole
-// render forever. The renderer's outer wait_for_function timeout
-// will eventually fire anyway, but resolving here means the rest
-// of the cell mount Promise.all settles cleanly and
-// ``__tesseraeComposed`` only fires once this widget has visible
-// content rather than the instant the iframe element exists.
-const IFRAME_LOAD_TIMEOUT_MS = 6000;
+// Absolute cap on the whole wait (load + settle) so a slow / hung site
+// can't pin the render. Kept comfortably under the renderer's 15s
+// ``__tesseraeComposed`` budget so the screenshot still happens even when
+// the iframe never fires ``load`` or the settle is set high.
+const IFRAME_HARD_CAP_MS = 12000;
+// Default settle window (seconds) after ``load`` when the cell doesn't set one.
+const DEFAULT_SETTLE_S = 2;
 
 export default async function render(shadow, ctx) {
   const opts = ctx?.cell?.options || {};
@@ -61,19 +61,39 @@ export default async function render(shadow, ctx) {
   // independent of the parent compose page's network state. Without
   // this await, the renderer's __tesseraeComposed signal fires the
   // instant the iframe element exists, and Playwright screenshots a
-  // blank cell. Hold the mount Promise open until the iframe's load
-  // event fires (or the cap, so a hung site doesn't pin the render).
+  // blank cell.
+  //
+  // ``load`` is necessary but not sufficient: it fires once the HTML /
+  // CSS / JS have downloaded, which is BEFORE a data-driven page (a
+  // weather dashboard, an SPA) runs its post-load fetch and updates the
+  // DOM. Screenshotting on ``load`` alone captures the empty pre-data
+  // state (issue #152). So after ``load`` we hold for a settle window to
+  // let that async work paint, capped by ``IFRAME_HARD_CAP_MS`` so a
+  // never-loading or deliberately-slow site can't pin the render.
   const iframe = shadow.querySelector("iframe");
   if (!iframe) return;
+  const rawSettle = Number(opts.settle_seconds);
+  const settleMs = Math.max(
+    0,
+    Math.min(IFRAME_HARD_CAP_MS, (Number.isFinite(rawSettle) ? rawSettle : DEFAULT_SETTLE_S) * 1000),
+  );
   await new Promise((resolve) => {
     let settled = false;
+    let settleTimer = null;
     const done = () => {
       if (settled) return;
       settled = true;
+      if (settleTimer) clearTimeout(settleTimer);
       resolve();
     };
-    iframe.addEventListener("load", done, { once: true });
+    const afterLoad = () => {
+      // Page finished loading; give its scripts the settle window to
+      // fetch + paint before the composer screenshots.
+      settleTimer = setTimeout(done, settleMs);
+    };
+    iframe.addEventListener("load", afterLoad, { once: true });
     iframe.addEventListener("error", done, { once: true });
-    setTimeout(done, IFRAME_LOAD_TIMEOUT_MS);
+    // Absolute cap regardless of load / settle.
+    setTimeout(done, IFRAME_HARD_CAP_MS);
   });
 }

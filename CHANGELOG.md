@@ -17,6 +17,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **The Webpage widget captures JavaScript pages after their data loads.** It was
+  screenshotting the moment the embedded page fired its `load` event, before a data-driven
+  page (a weather dashboard, an SPA) ran its post-load fetch and painted, so the panel showed a
+  blank frame even though the editor preview looked right. The widget now waits a short settle
+  window after load, with a "Settle delay (seconds)" cell option (default 2) you can raise for
+  slow pages.
+
 - **Photo sends to portrait-native ESP32 panels keep their visual orientation.**
   Send-page and Companion uploads are now fitted into the display's composition
   dimensions before the renderer reconciles that composition with the

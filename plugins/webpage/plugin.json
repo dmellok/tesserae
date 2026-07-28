@@ -1,9 +1,9 @@
 {
   "tesserae_compat": "1.x",
   "name": "Webpage",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "kind": "widget",
-  "description": "Embed an external URL in a cell. The composer captures whatever the iframe renders, handy for status pages, public dashboards, or any site that doesn't deny embedding. Same headless-render path as the Send tab is used when the panel renders. Sites that set X-Frame-Options:DENY or strict CSP cannot be embedded.",
+  "description": "Embed an external URL in a cell. The composer captures whatever the iframe renders, handy for status pages, public dashboards, or any site that doesn't deny embedding. Same headless-render path as the Send tab is used when the panel renders. Pages that fetch their data with JavaScript get a short settle delay after load so the content is captured, not a blank frame; raise it for slow pages. Sites that set X-Frame-Options:DENY or strict CSP cannot be embedded.",
   "icon": "ph-globe",
   "supports": { "sizes": ["sm", "md", "lg"] },
   "cell_options": [
@@ -44,6 +44,15 @@
       "default": 0,
       "min": 0,
       "max": 86400
+    },
+    {
+      "name": "settle_seconds",
+      "type": "number",
+      "label": "Settle delay (seconds)",
+      "help": "Extra wait after the page loads before capture, so scripts that fetch data and then update the page (weather pages, dashboards, SPAs) have time to render. Raise it for slow pages; 0 captures the instant the page finishes loading.",
+      "default": 2,
+      "min": 0,
+      "max": 12
     }
   ],
   "render": { "dither": "ordered", "needs_network": true }
