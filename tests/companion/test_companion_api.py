@@ -100,6 +100,10 @@ def _seed_page(app: Flask, device_id: str) -> str:
 
 
 def test_capabilities_probe_is_unauthenticated_and_valid(app: Flask) -> None:
+    # Validate against the frozen 0.2.0 contract, whose features enum is the
+    # five baseline surfaces. The additive `previews` feature (gated on the
+    # browser pool) is covered separately in test_companion_previews.
+    app.config["BROWSER_POOL"] = None
     resp = app.test_client().get("/api/app/v1")
     assert resp.status_code == 200
     body = resp.get_json()
@@ -109,7 +113,7 @@ def test_capabilities_probe_is_unauthenticated_and_valid(app: Flask) -> None:
     # Advertised pairing facts agree with the store the server actually uses.
     assert body["pairing"]["code_length"] == 6
     assert body["pairing"]["ttl_seconds"] == 600
-    # All Phase 1 + Phase 2 read/write surfaces are served.
+    # All read/write surfaces are served.
     assert set(body["features"]) == {
         "devices",
         "dashboards",

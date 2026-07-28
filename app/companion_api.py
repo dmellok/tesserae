@@ -33,6 +33,7 @@ import time
 from collections.abc import Callable
 from datetime import UTC, datetime
 from functools import wraps
+from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -107,7 +108,7 @@ def _cors_headers(resp: Response) -> Response:
     resp.headers["Access-Control-Allow-Origin"] = "*"
     resp.headers["Access-Control-Allow-Methods"] = "GET, POST, DELETE, OPTIONS"
     resp.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type, Idempotency-Key"
-    resp.headers["Access-Control-Expose-Headers"] = "Location, Retry-After"
+    resp.headers["Access-Control-Expose-Headers"] = "Location, Retry-After, ETag"
     resp.headers["Access-Control-Max-Age"] = "86400"
     return resp
 
@@ -247,6 +248,17 @@ def _instance() -> dict[str, Any]:
 # -- capabilities --------------------------------------------------------
 
 
+def _features() -> list[str]:
+    """Advertised features. ``previews`` is additive and only offered when a
+    browser pool exists to prepare on-demand dashboard renders (device
+    previews serve existing renders, but the pair is advertised together so
+    the client enables the whole preview surface at once)."""
+    feats = list(FEATURES)
+    if current_app.config.get("BROWSER_POOL") is not None:
+        feats.append("previews")
+    return feats
+
+
 def _capabilities() -> dict[str, Any]:
     return {
         "product": "tesserae",
@@ -257,7 +269,7 @@ def _capabilities() -> dict[str, Any]:
             "code_length": 6,
             "ttl_seconds": 600,
         },
-        "features": list(FEATURES),
+        "features": _features(),
         "limits": {
             "image_upload_bytes": IMAGE_UPLOAD_BYTES,
             "image_max_edge": IMAGE_MAX_EDGE,
@@ -730,6 +742,123 @@ def get_job(job_id: str) -> Any:
     resp = jsonify({"job": job.public_dict()})
     if not job.terminal:
         resp.headers["Retry-After"] = "2"
+    return resp
+
+
+# -- previews ------------------------------------------------------------
+#
+# Read-only PNG previews for the app's Displays / Dashboards cards
+# (additive `previews` feature, discussion #147). Both reuse the same
+# render machinery the internal `/preview/<device>` and
+# `/compose/<page>/preview.png` routes use, but under companion bearer auth
+# and off the LAN/session-gated internal routes. No token appears in a URL.
+
+
+@bp.get("/devices/<device_id>/preview")
+@_require_companion("devices:read")
+def device_preview(device_id: str) -> Any:
+    """Latest full composition PNG for a display. ETag is the composition
+    digest (content-addressed), so `If-None-Match` short-circuits to 304.
+    404 when the display is unknown or nothing has rendered for it yet.
+
+    This is the composition (what the renderer drew), not the on-glass
+    patched frame, so a live tap overlay may be newer than what's served."""
+    device = _devices().get(device_id)
+    if device is None or device.kind_of is None:
+        return _error("not_found", "No display with that id.", 404)
+    manager = _push_manager()
+    latest = manager.latest_render_for(device_id) if manager is not None else None
+    digest = latest.get("composition_digest") if isinstance(latest, dict) else None
+    if not digest:
+        return _error("not_found", "No frame has been rendered for this display yet.", 404)
+
+    etag = str(digest)
+    if request.if_none_match and etag in request.if_none_match:
+        resp = current_app.response_class(status=304)
+        resp.set_etag(etag)
+        return resp
+
+    png_path = Path(current_app.config["RENDERS_DIR"]) / f"{etag}.png"
+    if not png_path.exists():
+        return _error("not_found", "The rendered frame is no longer available.", 404)
+    resp = current_app.response_class(png_path.read_bytes(), mimetype="image/png")
+    resp.set_etag(etag)
+    # Content-addressed by digest, but the "latest" pointer moves, so the
+    # client must revalidate rather than hold it blindly.
+    resp.headers["Cache-Control"] = "private, no-cache"
+    return resp
+
+
+def _preview_dims_for_device(device: Device) -> tuple[int, int]:
+    """Preview render dims for an explicit target display: its panel scaled
+    so the longest edge is PREVIEW_MAX_DIM, matching the composer's own
+    preview sizing."""
+    from app.composer import PREVIEW_MAX_DIM
+
+    panel = device_panel(device) or resolve_settings_panel(_settings())
+    pw, ph = max(1, int(panel.w)), max(1, int(panel.h))
+    longest = max(pw, ph)
+    if longest > PREVIEW_MAX_DIM:
+        scale = PREVIEW_MAX_DIM / longest
+        pw, ph = max(1, round(pw * scale)), max(1, round(ph * scale))
+    return pw, ph
+
+
+@bp.get("/dashboards/<dashboard_id>/preview")
+@_require_companion("dashboards:read")
+def dashboard_preview(dashboard_id: str) -> Any:
+    """Cached composition PNG for a dashboard. Never rendered while listing:
+    on a cache miss a background render is enqueued and 202 + Retry-After is
+    returned, so the client re-polls. ETag is the content+dims token, so an
+    unchanged dashboard revalidates to 304. Optional `device_id` query picks
+    the target dimensions; otherwise the dashboard's resolved preview target
+    (or the virtual panel) is used.
+
+    A faithful cached visual preview, invalidated by layout / config /
+    target-dimension changes; it does not promise live widget data."""
+    from app import preview_cache
+    from app.composer import page_preview_token, preview_dims
+
+    page = _pages().get(dashboard_id)
+    if page is None:
+        return _error("not_found", "No dashboard with that id.", 404)
+
+    devices = _devices()
+    dev_q = request.args.get("device_id")
+    if dev_q:
+        device = devices.get(dev_q)
+        if device is None or device.kind_of is None:
+            return _error("invalid_target", "Unknown target display.", 400)
+        width, height = _preview_dims_for_device(device)
+    else:
+        width, height = preview_dims(page, devices, _settings())
+
+    token = page_preview_token(page, (width, height))
+    cache_path = (
+        Path(current_app.config["DATA_ROOT"]) / "core" / "previews" / f"{dashboard_id}__{token}.png"
+    )
+
+    if not cache_path.exists():
+        preview_cache.submit(
+            key=f"{dashboard_id}__{token}",
+            base_url=request.host_url.rstrip("/"),
+            page_id=dashboard_id,
+            width=width,
+            height=height,
+            cache_path=cache_path,
+            pool=current_app.config.get("BROWSER_POOL"),
+        )
+        resp = current_app.response_class(status=202)
+        resp.headers["Retry-After"] = "2"
+        resp.headers["Cache-Control"] = "no-store"
+        return resp
+
+    if request.if_none_match and token in request.if_none_match:
+        resp = current_app.response_class(status=304)
+    else:
+        resp = current_app.response_class(cache_path.read_bytes(), mimetype="image/png")
+    resp.set_etag(token)
+    resp.headers["Cache-Control"] = "private, max-age=86400"
     return resp
 
 
