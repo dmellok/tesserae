@@ -1,0 +1,7 @@
+{
+  "device_ids": [
+    "picpak-kitchen"
+  ],
+  "fit": "fill",
+  "override_quiet_hours": false
+}

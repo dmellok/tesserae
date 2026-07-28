@@ -1,0 +1,24 @@
+{
+  "dashboards": [
+    {
+      "id": "pantry",
+      "name": "Pantry",
+      "kind": "canvas",
+      "device_ids": [
+        "picpak-kitchen"
+      ],
+      "updated_at": "2026-07-28T07:45:00Z",
+      "web_url": "/pages/pantry"
+    },
+    {
+      "id": "morning",
+      "name": "Morning",
+      "kind": "grid",
+      "device_ids": [
+        "e1004-desk"
+      ],
+      "updated_at": null,
+      "web_url": null
+    }
+  ]
+}

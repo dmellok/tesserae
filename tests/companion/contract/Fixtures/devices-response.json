@@ -1,0 +1,36 @@
+{
+  "devices": [
+    {
+      "id": "picpak-kitchen",
+      "name": "Kitchen",
+      "kind": "picpak",
+      "panel": {
+        "width": 800,
+        "height": 480,
+        "gamut": "spectra_6",
+        "orientation": "landscape"
+      },
+      "freshness": "fresh",
+      "last_seen_at": "2026-07-28T07:58:30Z",
+      "battery_percent": 86,
+      "rssi_dbm": -54,
+      "firmware_version": "1.8.0"
+    },
+    {
+      "id": "e1004-desk",
+      "name": "Desk",
+      "kind": "reterminal_e1004",
+      "panel": {
+        "width": 1200,
+        "height": 1600,
+        "gamut": "waveshare_e6",
+        "orientation": "portrait"
+      },
+      "freshness": "unknown",
+      "last_seen_at": null,
+      "battery_percent": null,
+      "rssi_dbm": null,
+      "firmware_version": null
+    }
+  ]
+}

@@ -955,6 +955,21 @@ def create_app(
     app.config["REGISTER_RATE_LIMITER"] = RateLimiter(max_attempts=10, window_s=60)
     rest_api.register(app)
 
+    # Companion API: a separately versioned, stable adapter under
+    # /api/app/v1 for community-built client apps (the iOS companion,
+    # discussion #147). A different trust boundary from the firmware
+    # device API, so it gets its own pairing-code purpose (a firmware
+    # code can't mint a companion token) and its own credential registry
+    # (scoped, revocable per-client bearer tokens, hashed at rest).
+    from app import companion_api
+    from app.state.companion_token_store import CompanionTokenStore
+
+    app.config["COMPANION_PAIRING_STORE"] = PairingStore()
+    app.config["COMPANION_TOKENS"] = CompanionTokenStore(
+        data_root / "core" / "companion_tokens.json"
+    )
+    companion_api.register(app)
+
     if not testing:
         auth.install_gate(app, settings)
 

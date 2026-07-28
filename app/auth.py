@@ -64,6 +64,12 @@ _OPEN_PATHS: Final[tuple[str, ...]] = (
     "/api/setup",
     "/api/log",
     "/api/trmnl/",
+    # Companion API (/api/app/v1/*) for community client apps. Every route
+    # bar the unauthenticated capability probe carries its own scoped
+    # bearer token (app.companion_api._require_companion); the session gate
+    # must not bounce companion clients, which never hold a Flask session,
+    # to /login.
+    "/api/app/",
 )
 _LOOPBACK_PATHS: Final[tuple[str, ...]] = (
     "/compose/",

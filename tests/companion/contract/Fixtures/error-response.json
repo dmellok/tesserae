@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "idempotency_conflict",
+    "message": "The idempotency key was already used with a different payload.",
+    "request_id": "req_01JABCDEF"
+  }
+}

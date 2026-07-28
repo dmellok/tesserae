@@ -1,0 +1,6 @@
+{
+  "device_ids": [
+    "picpak-kitchen"
+  ],
+  "override_quiet_hours": false
+}

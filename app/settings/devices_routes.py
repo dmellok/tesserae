@@ -266,6 +266,46 @@ def devices_pair_revoke(code: str) -> Response:
     return redirect(url_for("auth.settings_area", area="devices") + "#pair-device")
 
 
+@bp.post("/settings/devices/companion/pair")
+def devices_companion_pair_issue() -> Response:
+    """Mint a companion pairing code from the "Companion app" card. The
+    operator reads the code into the iOS app, which exchanges it at
+    ``POST /api/app/v1/pair`` for a per-client token. Distinct store from
+    firmware pairing so a firmware code can't pair the app."""
+    store = current_app.config.get("COMPANION_PAIRING_STORE")
+    if store is None:
+        flash("The companion API is not configured on this install.", "error")
+        return redirect(url_for("auth.settings_area", area="devices"))
+    note = (request.form.get("note") or "").strip()[:64]
+    record = store.issue(note=note)
+    session["_companion_pairing_reveal"] = {
+        "code": record.code,
+        "expires_at": record.expires_at,
+        "note": record.note,
+    }
+    flash("Companion pairing code issued. Enter it in the companion app.", "ok")
+    return redirect(url_for("auth.settings_area", area="devices") + "#companion-app")
+
+
+@bp.post("/settings/devices/companion/pair/<code>/revoke")
+def devices_companion_pair_revoke(code: str) -> Response:
+    """Drop a pending companion pairing code."""
+    store = current_app.config.get("COMPANION_PAIRING_STORE")
+    if store is not None and store.revoke(code):
+        flash(f"Companion pairing code {code} revoked.", "ok")
+    return redirect(url_for("auth.settings_area", area="devices") + "#companion-app")
+
+
+@bp.post("/settings/devices/companion/session/<token_id>/revoke")
+def devices_companion_session_revoke(token_id: str) -> Response:
+    """Revoke a paired companion client by its token id. The client's
+    bearer stops working immediately; it can re-pair with a fresh code."""
+    store = current_app.config.get("COMPANION_TOKENS")
+    if store is not None and store.revoke(token_id):
+        flash("Companion app disconnected.", "ok")
+    return redirect(url_for("auth.settings_area", area="devices") + "#companion-app")
+
+
 @bp.post("/settings/devices/<instance_id>/set-transport")
 def devices_set_transport(instance_id: str) -> Response:
     """Flip a device instance between MQTT and REST transports.

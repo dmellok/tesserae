@@ -1,0 +1,625 @@
+openapi: 3.0.3
+info:
+  title: Tesserae Companion API
+  version: 0.2.0
+  description: >-
+    Proposed minimal stable API for community-built companion clients. This
+    document is a contract proposal, not evidence that an endpoint is deployed.
+servers:
+  - url: /
+tags:
+  - name: Discovery
+  - name: Pairing
+  - name: Displays
+  - name: Dashboards
+  - name: Images
+  - name: Jobs
+paths:
+  /api/app/v1:
+    get:
+      tags: [Discovery]
+      operationId: getCompanionCapabilities
+      summary: Probe Companion API support without exposing household content
+      security: []
+      responses:
+        "200":
+          description: Supported capabilities and current resource limits
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Capabilities"
+  /api/app/v1/pair:
+    post:
+      tags: [Pairing]
+      operationId: pairCompanion
+      summary: Exchange a single-use Companion code for a client credential
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PairingRequest"
+      responses:
+        "201":
+          description: Credential returned once
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PairingResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /api/app/v1/session:
+    delete:
+      tags: [Pairing]
+      operationId: revokeCompanionSession
+      summary: Revoke the presented Companion credential
+      responses:
+        "204":
+          description: Credential revoked
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/app/v1/devices:
+    get:
+      tags: [Displays]
+      operationId: listCompanionDevices
+      summary: List stable display targets and lightweight status
+      responses:
+        "200":
+          description: Displays visible to the Companion role
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DevicesResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/app/v1/dashboards:
+    get:
+      tags: [Dashboards]
+      operationId: listCompanionDashboards
+      summary: List dashboards without forcing preview renders
+      responses:
+        "200":
+          description: Saved dashboards
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardsResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/app/v1/dashboards/{dashboard_id}/push:
+    parameters:
+      - $ref: "#/components/parameters/DashboardID"
+    post:
+      tags: [Dashboards]
+      operationId: pushCompanionDashboard
+      summary: Render a dashboard for its bindings or explicit targets
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DashboardPushRequest"
+      responses:
+        "202":
+          $ref: "#/components/responses/JobAccepted"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /api/app/v1/images:
+    post:
+      tags: [Images]
+      operationId: pushCompanionImage
+      summary: Send one still image to explicit display targets
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [image, request]
+              properties:
+                image:
+                  type: string
+                  format: binary
+                request:
+                  $ref: "#/components/schemas/ImagePushRequest"
+            encoding:
+              request:
+                contentType: application/json
+      responses:
+        "202":
+          $ref: "#/components/responses/JobAccepted"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "413":
+          description: Encoded or decoded image exceeds advertised limits
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "415":
+          description: Unsupported still-image media type
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/app/v1/jobs/{job_id}:
+    parameters:
+      - $ref: "#/components/parameters/JobID"
+    get:
+      tags: [Jobs]
+      operationId: getCompanionJob
+      summary: Poll an asynchronous render and publish job
+      responses:
+        "200":
+          description: Current job state
+          headers:
+            Retry-After:
+              description: Suggested poll delay in seconds while non-terminal
+              schema:
+                type: integer
+                minimum: 1
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+components:
+  securitySchemes:
+    CompanionBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+  parameters:
+    DashboardID:
+      in: path
+      name: dashboard_id
+      required: true
+      schema:
+        type: string
+    JobID:
+      in: path
+      name: job_id
+      required: true
+      schema:
+        type: string
+    IdempotencyKey:
+      in: header
+      name: Idempotency-Key
+      required: true
+      description: >-
+        Opaque client-generated key. Reusing a key with the same credential,
+        method, path, and payload returns the original job; changing the payload
+        returns idempotency_conflict.
+      schema:
+        type: string
+        minLength: 16
+        maxLength: 128
+  responses:
+    JobAccepted:
+      description: Job persisted for asynchronous execution
+      headers:
+        Location:
+          description: Relative URL of the job resource
+          schema:
+            type: string
+        Retry-After:
+          description: Suggested first poll delay in seconds
+          schema:
+            type: integer
+            minimum: 1
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/JobResponse"
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: Missing, invalid, or revoked Companion credential
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Resource not found or not visible to this client
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Conflict:
+      description: Pairing code or idempotency-key conflict
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+  schemas:
+    Capabilities:
+      type: object
+      additionalProperties: false
+      required: [product, server_version, api, pairing, features, limits, web_url]
+      properties:
+        product:
+          type: string
+          enum: [tesserae]
+        server_version:
+          type: string
+        api:
+          type: object
+          additionalProperties: false
+          required: [name, version]
+          properties:
+            name:
+              type: string
+              enum: [companion]
+            version:
+              type: integer
+              minimum: 1
+        pairing:
+          type: object
+          additionalProperties: false
+          required: [supported, code_length, ttl_seconds]
+          properties:
+            supported:
+              type: boolean
+            code_length:
+              type: integer
+              minimum: 6
+              maximum: 12
+            ttl_seconds:
+              type: integer
+              minimum: 60
+        features:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            enum: [devices, dashboards, dashboard_push, image_push, jobs]
+        limits:
+          $ref: "#/components/schemas/Limits"
+        web_url:
+          type: string
+    Limits:
+      type: object
+      additionalProperties: false
+      required:
+        - image_upload_bytes
+        - image_max_edge
+        - image_content_types
+        - job_retention_seconds
+        - idempotency_retention_seconds
+      properties:
+        image_upload_bytes:
+          type: integer
+          minimum: 1
+        image_max_edge:
+          type: integer
+          minimum: 1
+        image_content_types:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+            enum:
+              - image/jpeg
+              - image/png
+              - image/heic
+              - image/heif
+              - image/webp
+        job_retention_seconds:
+          type: integer
+          minimum: 60
+        idempotency_retention_seconds:
+          type: integer
+          minimum: 60
+    PairingRequest:
+      type: object
+      additionalProperties: false
+      required: [code, client]
+      properties:
+        code:
+          type: string
+          pattern: "^[0-9]{6,12}$"
+        client:
+          type: object
+          additionalProperties: false
+          required: [name, platform, app_version, installation_id]
+          properties:
+            name:
+              type: string
+              minLength: 1
+              maxLength: 80
+            platform:
+              type: string
+              enum: [ios]
+            app_version:
+              type: string
+            installation_id:
+              type: string
+              minLength: 16
+              maxLength: 128
+    PairingResponse:
+      type: object
+      additionalProperties: false
+      required: [token, token_id, scopes, created_at, instance]
+      properties:
+        token:
+          type: string
+          minLength: 24
+          writeOnly: true
+        token_id:
+          type: string
+        scopes:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            enum: [devices:read, dashboards:read, push:write, media:write]
+        created_at:
+          type: string
+          format: date-time
+        instance:
+          $ref: "#/components/schemas/Instance"
+    Instance:
+      type: object
+      additionalProperties: false
+      required: [id, name, server_version, timezone, web_url]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        server_version:
+          type: string
+        timezone:
+          type: string
+        web_url:
+          type: string
+    DevicesResponse:
+      type: object
+      additionalProperties: false
+      required: [devices]
+      properties:
+        devices:
+          type: array
+          items:
+            $ref: "#/components/schemas/Device"
+    Device:
+      type: object
+      additionalProperties: false
+      required: [id, name, kind, panel, freshness]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        kind:
+          type: string
+        panel:
+          $ref: "#/components/schemas/Panel"
+        freshness:
+          type: string
+          enum: [fresh, stale, unknown]
+        last_seen_at:
+          type: string
+          format: date-time
+          nullable: true
+        battery_percent:
+          type: integer
+          minimum: 0
+          maximum: 100
+          nullable: true
+        rssi_dbm:
+          type: integer
+          nullable: true
+        firmware_version:
+          type: string
+          nullable: true
+    Panel:
+      type: object
+      additionalProperties: false
+      required: [width, height, gamut, orientation]
+      properties:
+        width:
+          type: integer
+          minimum: 1
+        height:
+          type: integer
+          minimum: 1
+        gamut:
+          type: string
+        orientation:
+          type: string
+          enum: [portrait, landscape]
+    DashboardsResponse:
+      type: object
+      additionalProperties: false
+      required: [dashboards]
+      properties:
+        dashboards:
+          type: array
+          items:
+            $ref: "#/components/schemas/Dashboard"
+    Dashboard:
+      type: object
+      additionalProperties: false
+      required: [id, name, kind, device_ids]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        kind:
+          type: string
+          enum: [grid, canvas]
+        device_ids:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+        updated_at:
+          type: string
+          format: date-time
+          nullable: true
+        web_url:
+          type: string
+          nullable: true
+    DashboardPushRequest:
+      type: object
+      additionalProperties: false
+      required: [override_quiet_hours]
+      properties:
+        device_ids:
+          description: Omit to use dashboard bindings
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+        override_quiet_hours:
+          type: boolean
+          default: false
+    ImagePushRequest:
+      type: object
+      additionalProperties: false
+      required: [device_ids, fit, override_quiet_hours]
+      properties:
+        device_ids:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+        fit:
+          type: string
+          enum: [fit, fill]
+        override_quiet_hours:
+          type: boolean
+          default: false
+    JobResponse:
+      type: object
+      additionalProperties: false
+      required: [job]
+      properties:
+        job:
+          $ref: "#/components/schemas/Job"
+    Job:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - kind
+        - status
+        - target_device_ids
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+        kind:
+          type: string
+          enum: [dashboard_push, image_push]
+        status:
+          description: Execution lifecycle only; quiet is a successful result
+          type: string
+          enum: [accepted, running, succeeded, failed]
+        label:
+          type: string
+          nullable: true
+        target_device_ids:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        result:
+          allOf:
+            - $ref: "#/components/schemas/JobResult"
+          nullable: true
+        error:
+          allOf:
+            - $ref: "#/components/schemas/JobFailure"
+          nullable: true
+    JobResult:
+      type: object
+      additionalProperties: false
+      required: [status, device_ids]
+      properties:
+        status:
+          type: string
+          enum: [published, quiet]
+        reason:
+          type: string
+          nullable: true
+        device_ids:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+    JobFailure:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum:
+                - invalid_request
+                - unauthorized
+                - not_found
+                - pairing_expired
+                - pairing_code_used
+                - invalid_target
+                - unsupported_image
+                - image_too_large
+                - idempotency_conflict
+                - temporarily_unavailable
+            message:
+              type: string
+            request_id:
+              type: string
+              nullable: true
+security:
+  - CompanionBearer: []
