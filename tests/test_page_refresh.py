@@ -23,6 +23,8 @@ T0 = datetime(2026, 6, 15, 12, 0, tzinfo=UTC)
 @dataclass
 class FakePush:
     pushes: list[tuple[str, frozenset, bool, str]] = field(default_factory=list)
+    # device_id -> latest render record (as the real PushManager stores it).
+    latest: dict[str, dict] = field(default_factory=dict)
 
     def push(self, page_id: str, *, device_ids=None, respect_quiet_hours=False, source="page"):
         self.pushes.append((page_id, frozenset(device_ids or ()), respect_quiet_hours, source))
@@ -34,6 +36,9 @@ class FakePush:
             event_id = None
 
         return R()
+
+    def latest_render_for(self, device_id: str):
+        return self.latest.get(device_id)
 
 
 def _pages(tmp_path: Path, *pages: Page) -> PageStore:
@@ -139,3 +144,20 @@ def test_rotation_position_decides_the_shown_page(tmp_path: Path) -> None:
     # 12:00 -> minute 720 -> cycle pos 0 -> step 0 ("clock") is showing.
     sched._maybe_refresh_pages(T0)
     assert pusher.pushes == [("clock", frozenset({"panel"}), True, "page_refresh")]
+
+
+def test_multi_bound_device_refreshes_the_shown_page(tmp_path: Path) -> None:
+    """A device bound to several dashboards auto-updates the one it is actually
+    showing (from the last render), not none of them (regression: the binding
+    count could not disambiguate, so multi-bound pages never refreshed)."""
+    ps = _pages(
+        tmp_path,
+        Page(id="a", name="A", device_ids=["panel"], refresh_minutes=1),
+        Page(id="b", name="B", device_ids=["panel"], refresh_minutes=1),
+    )
+    pusher = FakePush()
+    pusher.latest = {"panel": {"page_id": "b"}}  # panel currently shows b
+    sched = _sched(tmp_path, ps, pusher)
+    sched._maybe_refresh_pages(T0)
+    pushed = {p[0] for p in pusher.pushes}
+    assert pushed == {"b"}

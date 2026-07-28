@@ -672,6 +672,24 @@ class Scheduler:
                 pages = self._page_store.list()
             except Exception:
                 pages = []
+            device_ids: set[str] = set()
+            for page in pages:
+                device_ids.update(page.device_ids or [])
+            # Authoritative source: the page whose frame was actually last pushed
+            # to the device (persisted across restart in latest_renders.json).
+            # Covers a device bound to SEVERAL dashboards, where a binding count
+            # can't say which one is on the glass, so its page auto-updates fire.
+            latest_for = getattr(self._push_factory(), "latest_render_for", None)
+            if callable(latest_for):
+                for device_id in device_ids:
+                    if device_id in claimed:
+                        continue
+                    rec = latest_for(device_id)
+                    pid = rec.get("page_id") if isinstance(rec, dict) else None
+                    if isinstance(pid, str) and pid:
+                        showing.setdefault(pid, set()).add(device_id)
+                        claimed.add(device_id)
+            # Fallback: a device never rendered yet but bound to exactly one page.
             bound_count: dict[str, int] = {}
             for page in pages:
                 for device_id in page.device_ids or []:
