@@ -293,7 +293,7 @@ def test_editor_renders_blank_and_existing(app: Flask) -> None:
     )
     deck = _decks(app)[0]
     html = client.get(f"/decks/{deck.id}/edit").get_data(as_text=True)
-    assert "FLIP ORDER" in html and "dxe-data" in html
+    assert "Flip order" in html and "dxe-data" in html
     assert 'name="member" value="overview" checked' in html.replace("\n", " ") or "overview" in html
 
 

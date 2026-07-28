@@ -1,5 +1,4 @@
 {% extends "_base.html" %}
-{% from "_components.html" import button %}
 
 {% block title %}{{ deck.name if deck else 'New deck' }} · Decks{% endblock %}
 
@@ -7,185 +6,157 @@
 <div class="dxe" id="deck-editor">
   <script type="application/json" id="dxe-data">{{ editor_state | tojson }}</script>
 
-  <div class="dxe-head">
-    <div>
-      <div class="dxe-eyebrow">SETTINGS / DECKS</div>
-      <h1 class="dxe-title" id="dxe-title">{{ deck.name if deck else 'New deck' }}</h1>
-    </div>
-    <label class="dxe-enabled-pill" id="dxe-enabled-pill">
-      <input type="checkbox" name="enabled" form="deck-form"
-             {% if deck is none or deck.enabled %}checked{% endif %}>
-      <span class="dot" aria-hidden="true"></span><span class="lbl">Enabled</span>
-    </label>
-  </div>
-
   <form method="post" action="{{ url_for('decks.editor_save') }}" id="deck-form">
     <input type="hidden" name="deck_id" value="{{ deck.id if deck else '' }}">
     <input type="hidden" name="pages" id="dxe-pages-field" value="">
+    <input type="hidden" name="advance_anchor" value="{{ deck.advance_anchor if deck else '00:00' }}">
 
-    {# Step 1 — the display. Choosing it filters the page library below. #}
-    <section class="dxe-card dxe-step">
-      <div class="dxe-step-num">1</div>
-      <div class="dxe-step-body">
-        <label class="dxe-eyebrow" for="dxe-device">DISPLAY</label>
-        <select name="device_ids" id="dxe-device" class="dxe-device-select">
-          <option value="">Choose a display…</option>
-          {% for d in device_meta %}
-          <option value="{{ d.id }}"
-                  {% if deck and d.id in deck.device_ids %}selected{% endif %}>{{ d.name }}</option>
-          {% else %}
-          {% endfor %}
-        </select>
-        <p class="dxe-hint" id="dxe-device-hint">The deck runs on this display, and only its dashboards are offered below.</p>
+    {# Header: breadcrumb + editable title, and the enabled switch. #}
+    <div class="dxe-head">
+      <div class="dxe-head-left">
+        <nav class="dxe-crumb">
+          <a href="{{ url_for('auth.settings') }}">SETTINGS</a>
+          <span>/</span>
+          <a href="{{ url_for('decks.index') }}">DECKS</a>
+        </nav>
+        <input type="text" name="name" id="dxe-title" class="dxe-title-input"
+               value="{{ deck.name if deck else '' }}" placeholder="Untitled deck" autocomplete="off">
       </div>
-    </section>
+      <div class="dxe-head-right">
+        <span class="dxe-status-word" id="dxe-status-word">{{ 'Enabled' if deck is none or deck.enabled else 'Disabled' }}</span>
+        <label class="switch dxe-switch">
+          <input type="checkbox" name="enabled" {% if deck is none or deck.enabled %}checked{% endif %}>
+          <span class="switch-track"><span class="switch-thumb"></span></span>
+        </label>
+      </div>
+    </div>
 
-    {# Step 2 — the flip order (filmstrip). #}
-    <section class="dxe-card dxe-step">
-      <div class="dxe-step-num">2</div>
-      <div class="dxe-step-body">
-        <div class="dxe-card-head">
-          <span class="dxe-eyebrow">FLIP ORDER <span class="dxe-hint">— drag to reorder</span></span>
-          <span class="dxe-hint" id="dxe-wrap-hint">&#8634; wraps</span>
+    <div class="dxe-body">
+      {# ---- Left: flip order ---- #}
+      <section class="dxe-card dxe-main">
+        <div class="dxe-main-head">
+          <h2 class="dxe-h2">Flip order</h2>
+          <span class="dxe-meta" id="dxe-meta"></span>
+          <span class="dxe-wraps">&#8635; wraps to first</span>
         </div>
 
-        {# Advance mode (Phase 1 rotations merge): tap, timer, or both. #}
-        {% set adv = deck.advance if deck else 'manual' %}
-        <div class="dxe-advance" id="dxe-advance">
-          <span class="dxe-eyebrow">ADVANCE</span>
-          <label class="dxe-seg"><input type="radio" name="advance" value="manual"
-                 {% if adv == 'manual' %}checked{% endif %}> On tap</label>
-          <label class="dxe-seg"><input type="radio" name="advance" value="timer"
-                 {% if adv == 'timer' %}checked{% endif %}> On a timer</label>
-          <label class="dxe-seg"><input type="radio" name="advance" value="both"
-                 {% if adv == 'both' %}checked{% endif %}> Both</label>
-          <select name="advance_interval_minutes" id="dxe-adv-interval" class="dxe-adv-interval">
-            {% set ai = deck.advance_interval_minutes if deck else 30 %}
-            <option value="5" {% if ai == 5 %}selected{% endif %}>every 5 min</option>
-            <option value="15" {% if ai == 15 %}selected{% endif %}>every 15 min</option>
-            <option value="30" {% if ai == 30 %}selected{% endif %}>every 30 min</option>
-            <option value="60" {% if ai == 60 %}selected{% endif %}>every 60 min</option>
-            <option value="360" {% if ai == 360 %}selected{% endif %}>every 6 h</option>
-          </select>
-          <span class="dxe-hint" id="dxe-adv-hint"></span>
+        {# Advance: segmented control + conditional interval + hint. #}
+        <div class="dxe-advance">
+          <span class="dxe-mono-label">ADVANCE</span>
+          {% set adv = deck.advance if deck else 'manual' %}
+          <div class="dxe-seg-track" role="radiogroup" aria-label="Advance mode">
+            <label class="dxe-seg"><input type="radio" name="advance" value="manual" {% if adv == 'manual' %}checked{% endif %}><span>On tap</span></label>
+            <label class="dxe-seg"><input type="radio" name="advance" value="timer" {% if adv == 'timer' %}checked{% endif %}><span>On a timer</span></label>
+            <label class="dxe-seg"><input type="radio" name="advance" value="both" {% if adv == 'both' %}checked{% endif %}><span>Both</span></label>
+          </div>
+          <span class="dxe-interval" id="dxe-interval-wrap">
+            <span class="dxe-every">every</span>
+            <select name="advance_interval_minutes" id="dxe-interval">
+              {% set ai = deck.advance_interval_minutes if deck else 30 %}
+              <option value="5" {% if ai == 5 %}selected{% endif %}>5 min</option>
+              <option value="15" {% if ai == 15 %}selected{% endif %}>15 min</option>
+              <option value="30" {% if ai == 30 %}selected{% endif %}>30 min</option>
+              <option value="60" {% if ai == 60 %}selected{% endif %}>1 hour</option>
+            </select>
+          </span>
+          <span class="dxe-adv-hint" id="dxe-adv-hint"></span>
         </div>
 
         <div class="dxe-rail" id="dxe-rail"></div>
+        <div class="dxe-panel" id="dxe-panel" hidden></div>
 
-        {# Reveal drawer: opens under the strip when a card is selected. #}
-        <div class="dxe-drawer" id="dxe-drawer" hidden></div>
-
-        {# Add-page library, filtered to the chosen display. #}
-        <div class="dxe-library" id="dxe-library" hidden>
-          <div class="dxe-eyebrow">ADD A DASHBOARD</div>
-          <div class="dxe-lib-pills" id="dxe-lib-pills"></div>
-          <div class="dxe-lib-suggested" id="dxe-lib-suggested"></div>
-        </div>
-
-        <p class="dxe-behavior" id="dxe-behavior"></p>
-
-        {# No-JS source of truth: membership, order, home, overrides, timeout.
-           JS hides this and drives the same inputs from the strip + drawer. #}
+        {# No-JS source of truth for per-page data. JS hides this. #}
         <fieldset class="dxe-fallback" id="dxe-fallback">
           <legend>Deck pages</legend>
           {% for p in page_meta %}
           {% set idx = member_ids.index(p.id) if p.id in member_ids else none %}
           <div class="dxe-fb-row" data-page="{{ p.id }}">
-            <label>
-              <input type="checkbox" name="member" value="{{ p.id }}"
-                     {% if p.id in member_ids %}checked{% endif %}> {{ p.name }}
-              <span class="dxe-mono">#{{ p.id }}</span>
-            </label>
+            <label><input type="checkbox" name="member" value="{{ p.id }}"
+                     {% if p.id in member_ids %}checked{% endif %}> {{ p.name }}</label>
             <input type="number" name="order[{{ p.id }}]" min="1" max="99"
-                   value="{{ (idx + 1) if idx is not none else loop.index }}"
-                   aria-label="Position of {{ p.name }}">
+                   value="{{ (idx + 1) if idx is not none else loop.index }}" aria-label="Position">
             <label><input type="radio" name="home" value="{{ p.id }}"
-                   {% if home_id == p.id %}checked{% endif %}> &#9733; home</label>
-            <select name="override[{{ p.id }}]" aria-label="Refresh override for {{ p.name }}">
+                     {% if home_id == p.id %}checked{% endif %}> home</label>
+            <select name="override[{{ p.id }}]" aria-label="Refresh override">
               {% set ov = override_map.get(p.id) %}
               <option value="">deck default</option>
               <option value="5" {% if ov == 5 %}selected{% endif %}>every 5 min</option>
-              <option value="15" {% if ov == 15 %}selected{% endif %}>every 15 min</option>
-              <option value="60" {% if ov == 60 %}selected{% endif %}>every 60 min</option>
-              <option value="0" {% if ov == 0 %}selected{% endif %}>only on Push</option>
+              <option value="30" {% if ov == 30 %}selected{% endif %}>every 30 min</option>
+              <option value="0" {% if ov == 0 %}selected{% endif %}>never</option>
             </select>
             <input type="number" name="dwell[{{ p.id }}]" min="1" max="10080"
-                   value="{{ dwell_map.get(p.id, '') }}" placeholder="dwell"
-                   aria-label="Timer dwell minutes for {{ p.name }}">
+                   value="{{ dwell_map.get(p.id, '') }}" placeholder="dwell" aria-label="Dwell minutes">
           </div>
           {% endfor %}
-          <div class="dxe-fb-row">
-            <label for="dxe-timeout">Return to &#9733; home after (minutes, 0 = never)</label>
-            <input type="range" name="timeout" id="dxe-timeout" min="0" max="120" step="1"
-                   value="{{ deck.home_timeout_minutes if deck else 0 }}">
-            <output id="dxe-timeout-out" for="dxe-timeout"></output>
-          </div>
         </fieldset>
-      </div>
-    </section>
+      </section>
 
-    {# Step 3 — deck settings. #}
-    <section class="dxe-card dxe-step">
-      <div class="dxe-step-num">3</div>
-      <div class="dxe-step-body dxe-settings-grid">
-        <div class="dxe-set">
-          <span class="dxe-eyebrow">NAME</span>
-          <input type="text" name="name" id="dxe-name" required
-                 value="{{ deck.name if deck else '' }}" placeholder="Kitchen deck">
-        </div>
-        <div class="dxe-set">
-          <span class="dxe-eyebrow">REFRESH</span>
-          <select name="refresh_interval_minutes" id="dxe-cadence">
-            {% set cad = deck.refresh_interval_minutes if deck else 30 %}
-            <option value="15" {% if cad == 15 %}selected{% endif %}>every 15 min</option>
-            <option value="30" {% if cad == 30 %}selected{% endif %}>every 30 min</option>
-            <option value="60" {% if cad == 60 %}selected{% endif %}>every 60 min</option>
-            <option value="360" {% if cad == 360 %}selected{% endif %}>every 6 h</option>
-          </select>
-          <p class="dxe-hint">how often the deck's pages re-render in the background</p>
-        </div>
-        <div class="dxe-set">
-          <span class="dxe-eyebrow">RETURN HOME AFTER</span>
-          <output id="dxe-timeout-mirror" class="dxe-timeout-mirror">off</output>
-          <p class="dxe-hint">idle minutes before the deck snaps back to &#9733; home (set on a card)</p>
-        </div>
-        <details class="dxe-advanced">
-          <summary>&#9656; Advanced</summary>
+      {# ---- Right rail ---- #}
+      <aside class="dxe-rail-col">
+        <section class="dxe-card dxe-rail-card">
+          <h2 class="dxe-h2">Deck</h2>
           <div class="dxe-set">
-            <span class="dxe-eyebrow">ENTRY PAGE</span>
-            <select name="entry">
-              <option value="">same as home (default)</option>
-              {% for p in page_meta %}
-              <option value="{{ p.id }}" {% if deck and deck.entry_page_id == p.id %}selected{% endif %}>{{ p.name }}</option>
+            <label class="dxe-mono-label" for="dxe-device">DISPLAY</label>
+            <select name="device_ids" id="dxe-device">
+              <option value="">Choose a display…</option>
+              {% for d in device_meta %}
+              <option value="{{ d.id }}" {% if deck and d.id in deck.device_ids %}selected{% endif %}>{{ d.name }}</option>
               {% endfor %}
             </select>
-            <p class="dxe-hint">what a device shows when first bound</p>
+            <p class="dxe-help">Only dashboards bound to this display can be added to the deck.</p>
           </div>
           <div class="dxe-set">
-            <span class="dxe-eyebrow">TIMER ANCHOR</span>
-            <input type="time" name="advance_anchor"
-                   value="{{ deck.advance_anchor if deck else '00:00' }}">
-            <p class="dxe-hint">daily wall-clock moment the timer cycle reseeds (advance on a timer only)</p>
+            <label class="dxe-mono-label" for="dxe-cadence">BACKGROUND REFRESH</label>
+            <select name="refresh_interval_minutes" id="dxe-cadence">
+              {% set cad = deck.refresh_interval_minutes if deck else 30 %}
+              <option value="15" {% if cad == 15 %}selected{% endif %}>every 15 min</option>
+              <option value="30" {% if cad == 30 %}selected{% endif %}>every 30 min</option>
+              <option value="60" {% if cad == 60 %}selected{% endif %}>every 60 min</option>
+              <option value="0" {% if cad == 0 %}selected{% endif %}>manual only</option>
+            </select>
+            <p class="dxe-help">How often pages re-render out of view.</p>
           </div>
-        </details>
-      </div>
-    </section>
+          <div class="dxe-set">
+            <label class="dxe-mono-label" for="dxe-returnhome">RETURN HOME AFTER</label>
+            <select name="timeout" id="dxe-returnhome">
+              {% set to = deck.home_timeout_minutes if deck else 0 %}
+              <option value="0" {% if to == 0 %}selected{% endif %}>off</option>
+              <option value="5" {% if to == 5 %}selected{% endif %}>5 idle min</option>
+              <option value="15" {% if to == 15 %}selected{% endif %}>15 idle min</option>
+              <option value="60" {% if to == 60 %}selected{% endif %}>60 idle min</option>
+            </select>
+            <p class="dxe-help" id="dxe-returnhome-help">Snaps back to the home page.</p>
+          </div>
+        </section>
+
+        <section class="dxe-card dxe-rail-card">
+          <div class="dxe-avail-head">
+            <h2 class="dxe-h2">Available pages</h2>
+            <span class="dxe-avail-count" id="dxe-avail-count"></span>
+          </div>
+          <p class="dxe-help" id="dxe-avail-sub"></p>
+          <div class="dxe-chips" id="dxe-avail"></div>
+        </section>
+      </aside>
+    </div>
   </form>
 
-  <div class="dxe-actions">
-    <button class="button" type="submit" form="deck-form">Save</button>
-    {% if deck %}
-    <form method="post" action="{{ url_for('decks.push', deck_id=deck.id) }}" class="inline">
-      <button type="submit" class="ghost">Push to panel</button>
-    </form>
-    <form method="post" action="{{ url_for('decks.sync', deck_id=deck.id) }}" class="inline">
-      <button type="submit" class="ghost">Sync from links</button>
-    </form>
-    <form method="post" action="{{ url_for('decks.delete', deck_id=deck.id) }}" class="inline dxe-right"
-          onsubmit="return confirm('Delete deck {{ deck.name }}?');">
-      <button type="submit" class="ghost danger">Delete deck</button>
-    </form>
-    {% endif %}
+  {# Sticky action bar #}
+  <div class="dxe-actionbar">
+    <span class="dxe-actionbar-status" id="dxe-status"></span>
+    <div class="dxe-actionbar-btns">
+      {% if deck %}
+      <form method="post" action="{{ url_for('decks.push', deck_id=deck.id) }}" class="inline">
+        <button type="submit" class="dxe-btn-ghost">Push to panel</button>
+      </form>
+      <form method="post" action="{{ url_for('decks.delete', deck_id=deck.id) }}" class="inline"
+            onsubmit="return confirm('Delete deck {{ deck.name }}?');">
+        <button type="submit" class="dxe-btn-ghost dxe-btn-danger">Delete</button>
+      </form>
+      {% endif %}
+      <button type="button" class="dxe-btn-ghost" id="dxe-discard">Discard</button>
+      <button type="submit" class="dxe-btn-primary" form="deck-form">Save deck</button>
+    </div>
   </div>
 </div>
 <script src="{{ url_for('static', filename='deck_editor.js') }}" defer></script>

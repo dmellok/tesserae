@@ -305,6 +305,7 @@ def editor(deck_id: str | None = None) -> str | Response:
                 # Device bindings, so the editor can filter the page library to the
                 # dashboards assigned to the chosen display. Empty = unassigned.
                 "devices": list(p.device_ids),
+                "kind": p.layout_kind,
             }
         )
 
@@ -358,6 +359,14 @@ def editor(deck_id: str | None = None) -> str | Response:
         "advanceInterval": deck.advance_interval_minutes if deck else 30,
         "advanceAnchor": deck.advance_anchor if deck else "00:00",
         "dwells": dwell_map,
+        "returnHome": deck.home_timeout_minutes if deck else 0,
+        # Dashboards bound to no display: the "Available pages" chips. Adding one
+        # binds it to the deck's display on save.
+        "unassigned": [
+            {"id": p.id, "name": p.name}
+            for p in pages
+            if not p.device_ids and p.id not in member_ids
+        ],
     }
     return render_template(
         "deck_editor.html",
@@ -491,6 +500,14 @@ def editor_save() -> Response:
             url_for("decks.editor", deck_id=deck_id) if existing else url_for("decks.index")
         )
     _store().upsert(deck)
+    # An unassigned dashboard added to the deck binds to the deck's display, so
+    # the "only dashboards bound to this display" invariant holds next time.
+    display = deck.device_ids[0] if deck.device_ids else None
+    if display:
+        for pid in ordered:
+            page = _pages().get(pid)
+            if page is not None and not page.device_ids:
+                _pages().save(page.model_copy(update={"device_ids": [display]}))
     _invalidate(deck)
     flash(f"Deck {deck.name!r} saved.", "ok")
     return redirect(url_for("decks.editor", deck_id=deck.id))
