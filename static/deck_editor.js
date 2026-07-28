@@ -28,6 +28,10 @@
   const title = document.getElementById("dxe-title");
   const timeoutInput = document.getElementById("dxe-timeout");
   const timeoutMirror = document.getElementById("dxe-timeout-mirror");
+  const advInterval = document.getElementById("dxe-adv-interval");
+  const advHint = document.getElementById("dxe-adv-hint");
+  const advRadios = () => Array.from(form.querySelectorAll('input[name="advance"]'));
+  const advanceMode = () => (advRadios().find((r) => r.checked) || {}).value || "manual";
 
   const pagesById = {};
   (data.pages || []).forEach((p) => (pagesById[p.id] = p));
@@ -48,6 +52,7 @@
   const orderInput = (id) => row(id) && row(id).querySelector('input[type="number"]');
   const homeRadio = (id) => row(id) && row(id).querySelector('input[name="home"]');
   const overrideSel = (id) => row(id) && row(id).querySelector("select");
+  const dwellInput = (id) => row(id) && row(id).querySelector('input[name^="dwell"]');
 
   function members() {
     return (data.pages || [])
@@ -213,6 +218,25 @@
     wrap.appendChild(sel);
     controls.appendChild(wrap);
 
+    // per-page dwell (only when the deck advances on a timer)
+    if (advanceMode() !== "manual") {
+      const dwrap = document.createElement("label");
+      dwrap.className = "dxe-mini-field";
+      dwrap.innerHTML = "<span>⏱ dwell</span>";
+      const din = document.createElement("input");
+      din.type = "number";
+      din.min = "1";
+      din.max = "10080";
+      din.placeholder = "deck interval";
+      din.className = "dxe-dwell-in";
+      din.value = (dwellInput(selected) && dwellInput(selected).value) || "";
+      din.addEventListener("input", () => {
+        if (dwellInput(selected)) dwellInput(selected).value = din.value;
+      });
+      dwrap.appendChild(din);
+      controls.appendChild(dwrap);
+    }
+
     // remove
     const rm = document.createElement("button");
     rm.type = "button";
@@ -295,6 +319,18 @@
         " ↺";
     }
 
+    // advance mode
+    const mode = advanceMode();
+    if (advInterval) advInterval.style.display = mode === "manual" ? "none" : "";
+    if (advHint) {
+      advHint.textContent =
+        mode === "manual"
+          ? "moves on a tap / button / swipe"
+          : mode === "timer"
+            ? "auto-cycles the pages on a timer"
+            : "auto-cycles on a timer, and also moves on a tap";
+    }
+
     // timeout mirror
     const t = +(timeoutInput ? timeoutInput.value : 0) || 0;
     if (timeoutMirror) timeoutMirror.textContent = t === 0 ? "off" : t + " min";
@@ -304,7 +340,8 @@
   }
 
   // -- wiring ---------------------------------------------------------------
-  fallback.hidden = true;
+  // Class-based hide: a bare [hidden] loses to `.dxe-fallback { display: flex }`.
+  fallback.classList.add("js-hidden");
   deviceSel.addEventListener("change", () => {
     if (deviceHint) {
       deviceHint.textContent = deviceSel.value
@@ -315,6 +352,8 @@
   });
   if (nameInput) nameInput.addEventListener("input", render);
   if (timeoutInput) timeoutInput.addEventListener("input", render);
+  advRadios().forEach((r) => r.addEventListener("change", render));
+  if (advInterval) advInterval.addEventListener("change", render);
   form.addEventListener("submit", () => {
     pagesField.value = orderedIds().join(",");
   });

@@ -211,6 +211,11 @@
 .dxe-lib-pill.is-muted { opacity: .7; border-style: dashed; }
 .dxe-lib-sep { width: 100%; margin-top: 4px; }
 .dxe-timeout-mirror { font-size: 15px; font-weight: 500; }
+/* advance mode (tap / timer / both) */
+.dxe-advance { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 4px 0 2px; }
+.dxe-seg { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; cursor: pointer; }
+.dxe-adv-interval { font-size: 13px; padding: 4px 8px; border-radius: var(--t-radius-sm); border: 1px solid var(--t-border); background: var(--t-bg); color: var(--t-fg); }
+.dxe-dwell-in { width: 96px; font-size: 13px; padding: 4px 6px; border-radius: var(--t-radius-sm); border: 1px solid var(--t-border); background: var(--t-bg); color: var(--t-fg); }
 
 .dxe { max-width: 1020px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
 .dxe-eyebrow { font-family: var(--t-font-mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--t-muted); }

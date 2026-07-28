@@ -261,6 +261,10 @@ class Scheduler:
         # warm passes from stacking when one runs longer than a tick.
         self._deck_last_warm: dict[str, float] = {}
         self._deck_warm_lock = threading.Lock()
+        # "<deck_id>:<device_id>" -> the page last pushed by timer advance, so we
+        # push only at step transitions (a manual nav in "both" mode holds until
+        # the next boundary, matching rotation behaviour).
+        self._deck_last_advance: dict[str, str] = {}
         self._push_factory = push_manager
         self._event_log = event_log
         self._tz_provider = timezone_provider or (lambda: None)
@@ -457,6 +461,11 @@ class Scheduler:
         # long-dwell step never transitions, so a paged-away panel
         # stayed on the manual page forever (discussion #140).
         self._maybe_rejoin_rotations(now)
+        # Timer decks (Phase 1 of the rotations merge): a deck set to advance on
+        # a timer cycles its pages on a wall-clock anchor, same shape as a
+        # rotation. Fires here (before schedules) so a same-tick schedule lands
+        # last on the panel.
+        self._advance_timer_decks(now)
         # Page content refresh (discussion #140): pages carry their own
         # update cadence; re-render on it and deliver only to devices
         # currently showing the page. Runs before schedules so a due
@@ -744,6 +753,77 @@ class Scheduler:
                         target=deck.id,
                         status="sent",
                         extra={"home_return_device": device_id, "page_id": home},
+                    )
+
+    def _advance_timer_decks(self, now: datetime) -> None:
+        """Advance ``timer`` / ``both`` decks through their pages on a wall-clock
+        anchor (Phase 1 of the rotations merge).
+
+        For each such deck, compute the page whose dwell window the current time
+        falls into (``Deck.advance_page_at`` on minutes-since-anchor), and push it
+        to any bound device not already parked there BY THE TIMER. Pushes only at
+        step transitions: a device moved by a manual tap in ``both`` mode holds
+        until the next boundary, matching how rotations treat a manual page-away.
+        Manual-only decks are ignored."""
+        if self._deck_store is None or self._deck_nav_store is None:
+            return
+        tz = self._tz_provider()
+        for deck in self._deck_store.all():
+            if (
+                not deck.enabled
+                or deck.advance == "manual"
+                or not deck.device_ids
+                or not deck.pages
+            ):
+                continue
+            local_now = _local(now, tz)
+            anchor_t = _parse_hhmm(deck.advance_anchor)
+            anchor_dt = local_now.replace(
+                hour=anchor_t.hour, minute=anchor_t.minute, second=0, microsecond=0
+            )
+            if local_now < anchor_dt:
+                anchor_dt -= timedelta(days=1)
+            offset_min = (local_now - anchor_dt).total_seconds() / 60.0
+            target = deck.advance_page_at(offset_min)
+            if not target:
+                continue
+            for device_id in deck.device_ids:
+                key = f"{deck.id}:{device_id}"
+                # Only push at a step boundary: skip when the timer already put
+                # this page here (so a manual nav between boundaries survives).
+                if self._deck_last_advance.get(key) == target:
+                    continue
+                pusher = self._push_factory()
+                quiet_check = getattr(pusher, "device_in_quiet_hours", None)
+                if callable(quiet_check) and quiet_check(device_id):
+                    continue
+                promoter = getattr(pusher, "promote_deck_page", None)
+                promoted = callable(promoter) and promoter(device_id, target)
+                if not promoted:
+                    result = pusher.push(
+                        target,
+                        device_ids={device_id},
+                        respect_quiet_hours=True,
+                        source="deck",
+                    )
+                    if result.status == "failed":
+                        continue  # retry next tick; don't record the transition
+                self._deck_nav_store.set(device_id, deck.id, target)
+                self._deck_last_advance[key] = target
+                logger.info(
+                    "deck timer advance: device=%s deck=%s -> %s (%s)",
+                    device_id,
+                    deck.id,
+                    target,
+                    "promoted" if promoted else "pushed",
+                )
+                if self._event_log is not None:
+                    self._event_log.record(
+                        type="deck",
+                        source="deck",
+                        target=deck.id,
+                        status="sent",
+                        extra={"timer_advance_device": device_id, "page_id": target},
                     )
 
     def _maybe_warm_decks(self, now: datetime) -> None:

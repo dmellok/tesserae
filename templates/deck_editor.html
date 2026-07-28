@@ -49,6 +49,27 @@
           <span class="dxe-hint" id="dxe-wrap-hint">&#8634; wraps</span>
         </div>
 
+        {# Advance mode (Phase 1 rotations merge): tap, timer, or both. #}
+        {% set adv = deck.advance if deck else 'manual' %}
+        <div class="dxe-advance" id="dxe-advance">
+          <span class="dxe-eyebrow">ADVANCE</span>
+          <label class="dxe-seg"><input type="radio" name="advance" value="manual"
+                 {% if adv == 'manual' %}checked{% endif %}> On tap</label>
+          <label class="dxe-seg"><input type="radio" name="advance" value="timer"
+                 {% if adv == 'timer' %}checked{% endif %}> On a timer</label>
+          <label class="dxe-seg"><input type="radio" name="advance" value="both"
+                 {% if adv == 'both' %}checked{% endif %}> Both</label>
+          <select name="advance_interval_minutes" id="dxe-adv-interval" class="dxe-adv-interval">
+            {% set ai = deck.advance_interval_minutes if deck else 30 %}
+            <option value="5" {% if ai == 5 %}selected{% endif %}>every 5 min</option>
+            <option value="15" {% if ai == 15 %}selected{% endif %}>every 15 min</option>
+            <option value="30" {% if ai == 30 %}selected{% endif %}>every 30 min</option>
+            <option value="60" {% if ai == 60 %}selected{% endif %}>every 60 min</option>
+            <option value="360" {% if ai == 360 %}selected{% endif %}>every 6 h</option>
+          </select>
+          <span class="dxe-hint" id="dxe-adv-hint"></span>
+        </div>
+
         <div class="dxe-rail" id="dxe-rail"></div>
 
         {# Reveal drawer: opens under the strip when a card is selected. #}
@@ -88,6 +109,9 @@
               <option value="60" {% if ov == 60 %}selected{% endif %}>every 60 min</option>
               <option value="0" {% if ov == 0 %}selected{% endif %}>only on Push</option>
             </select>
+            <input type="number" name="dwell[{{ p.id }}]" min="1" max="10080"
+                   value="{{ dwell_map.get(p.id, '') }}" placeholder="dwell"
+                   aria-label="Timer dwell minutes for {{ p.name }}">
           </div>
           {% endfor %}
           <div class="dxe-fb-row">
@@ -136,6 +160,12 @@
               {% endfor %}
             </select>
             <p class="dxe-hint">what a device shows when first bound</p>
+          </div>
+          <div class="dxe-set">
+            <span class="dxe-eyebrow">TIMER ANCHOR</span>
+            <input type="time" name="advance_anchor"
+                   value="{{ deck.advance_anchor if deck else '00:00' }}">
+            <p class="dxe-hint">daily wall-clock moment the timer cycle reseeds (advance on a timer only)</p>
           </div>
         </details>
       </div>

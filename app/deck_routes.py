@@ -12,7 +12,7 @@ from __future__ import annotations
 import contextlib
 import json
 import re
-from typing import Any
+from typing import Any, Literal, cast
 
 from flask import (
     Blueprint,
@@ -334,6 +334,11 @@ def editor(deck_id: str | None = None) -> str | Response:
         if deck
         else {}
     )
+    dwell_map = (
+        {p.page_id: p.dwell_minutes for p in deck.pages if p.dwell_minutes is not None}
+        if deck
+        else {}
+    )
     editor_state = {
         "deckId": deck.id if deck else "",
         "pages": page_meta,
@@ -348,6 +353,11 @@ def editor(deck_id: str | None = None) -> str | Response:
         # Pre-select the deck's first bound device when editing; empty for a new deck.
         "devices": device_meta,
         "primaryDevice": (deck.device_ids[0] if deck and deck.device_ids else ""),
+        # Timer advance (Phase 1 of the rotations merge).
+        "advance": deck.advance if deck else "manual",
+        "advanceInterval": deck.advance_interval_minutes if deck else 30,
+        "advanceAnchor": deck.advance_anchor if deck else "00:00",
+        "dwells": dwell_map,
     }
     return render_template(
         "deck_editor.html",
@@ -357,6 +367,7 @@ def editor(deck_id: str | None = None) -> str | Response:
         member_ids=member_ids,
         home_id=editor_state["home"],
         override_map=override_map,
+        dwell_map=dwell_map,
         editor_state=editor_state,
     )
 
@@ -411,6 +422,7 @@ def editor_save() -> Response:
     old_refresh = (
         {p.page_id: p.refresh_interval_minutes for p in existing.pages} if existing else {}
     )
+    old_dwell = {p.page_id: p.dwell_minutes for p in existing.pages} if existing else {}
 
     pages: list[DeckPage] = []
     for pid in ordered:
@@ -422,7 +434,16 @@ def editor_save() -> Response:
                 refresh = max(0, min(1440, int(raw_override)))
         elif raw_override == "":
             refresh = None
-        pages.append(base.model_copy(update={"refresh_interval_minutes": refresh}))
+        dwell = old_dwell.get(pid)
+        raw_dwell = form.get(f"dwell[{pid}]")
+        if raw_dwell is not None and raw_dwell != "":
+            with contextlib.suppress(ValueError):
+                dwell = max(1, min(10_080, int(raw_dwell)))
+        elif raw_dwell == "":
+            dwell = None
+        pages.append(
+            base.model_copy(update={"refresh_interval_minutes": refresh, "dwell_minutes": dwell})
+        )
 
     home = (form.get("home") or "").strip() or None
     if home is not None and home not in ordered:
@@ -439,6 +460,16 @@ def editor_save() -> Response:
     except ValueError:
         cadence = 30
 
+    advance_raw = form.get("advance") or "manual"
+    if advance_raw not in ("manual", "timer", "both"):
+        advance_raw = "manual"
+    advance = cast(Literal["manual", "timer", "both"], advance_raw)
+    try:
+        adv_interval = max(1, min(10_080, int(form.get("advance_interval_minutes") or 30)))
+    except ValueError:
+        adv_interval = 30
+    adv_anchor = (form.get("advance_anchor") or "00:00").strip() or "00:00"
+
     try:
         deck = Deck(
             id=deck_id,
@@ -450,6 +481,9 @@ def editor_save() -> Response:
             home_page_id=home,
             home_timeout_minutes=timeout,
             refresh_interval_minutes=cadence,
+            advance=advance,
+            advance_interval_minutes=adv_interval,
+            advance_anchor=adv_anchor,
         )
     except ValidationError as exc:
         flash(f"Invalid deck: {_first_error(exc)}", "error")

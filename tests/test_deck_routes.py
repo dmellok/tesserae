@@ -44,6 +44,42 @@ def _decks(app: Flask) -> list:
     return app.config["DECK_STORE"].all()
 
 
+def test_editor_save_persists_timer_advance(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    client.post(
+        "/decks/editor-save",
+        data={
+            "name": "Loop",
+            "pages": "overview,calendar",
+            "advance": "timer",
+            "advance_interval_minutes": "15",
+            "advance_anchor": "07:30",
+            "dwell[overview]": "45",
+            "home": "overview",
+        },
+        follow_redirects=True,
+    )
+    decks = _decks(app)
+    assert len(decks) == 1
+    d = decks[0]
+    assert d.advance == "timer"
+    assert d.advance_interval_minutes == 15 and d.advance_anchor == "07:30"
+    assert d.page("overview").dwell_minutes == 45
+    assert d.page("calendar").dwell_minutes is None
+
+
+def test_editor_save_defaults_to_manual(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    client.post(
+        "/decks/editor-save",
+        data={"name": "Tap", "pages": "overview,calendar"},
+        follow_redirects=True,
+    )
+    assert _decks(app)[0].advance == "manual"
+
+
 def test_create_deck(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)

@@ -39,7 +39,10 @@ mypy --strict applies via re-export through app.state.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+import re
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class DeckZone(BaseModel):
@@ -93,6 +96,12 @@ class DeckPage(BaseModel):
     # same deck.
     refresh_interval_minutes: int | None = Field(default=None, ge=0, le=1440)
 
+    # Timer-advance dwell (Phase 1 of the rotations merge): how long this page is
+    # shown before the deck advances to the next, when the deck's ``advance`` is
+    # ``timer`` / ``both``. None inherits ``Deck.advance_interval_minutes``. Unused
+    # when the deck advances on tap only.
+    dwell_minutes: int | None = Field(default=None, ge=1, le=10_080)
+
     def effective_refresh_minutes(self, deck_default: int) -> int:
         """The refresh cadence to use for this page: its own override, else the
         deck default."""
@@ -101,6 +110,11 @@ class DeckPage(BaseModel):
             if self.refresh_interval_minutes is not None
             else deck_default
         )
+
+    def effective_dwell_minutes(self, deck_default: int) -> int:
+        """The timer-advance dwell for this page: its own override, else the deck
+        default advance interval."""
+        return self.dwell_minutes if self.dwell_minutes is not None else deck_default
 
 
 class Deck(BaseModel):
@@ -138,6 +152,30 @@ class Deck(BaseModel):
     # and only re-rendered when their data is pushed by other means).
     refresh_interval_minutes: int = Field(default=15, ge=0, le=1440)
 
+    # How the deck advances between pages (Phase 1 of the rotations merge):
+    #   manual — move on a tap / button / swipe (the classic deck).
+    #   timer  — auto-cycle through the pages in order on a wall-clock anchor
+    #            (what a Rotation did); links are ignored for advancing.
+    #   both   — auto-cycle AND accept taps.
+    # ``manual`` (the default) keeps every existing deck behaving exactly as before.
+    advance: Literal["manual", "timer", "both"] = "manual"
+
+    # Default per-step dwell for timer advance, in minutes. A page can override
+    # it via ``DeckPage.dwell_minutes``. Only used when ``advance`` != ``manual``.
+    advance_interval_minutes: int = Field(default=30, ge=1, le=10_080)
+
+    # Daily re-anchor for timer advance (local HH:MM). The cycle reseeds at this
+    # wall-clock moment each day, so DST flips and long cycles stay aligned, same
+    # semantics as the old Rotation anchor. Only used when ``advance`` != ``manual``.
+    advance_anchor: str = "00:00"
+
+    @field_validator("advance_anchor")
+    @classmethod
+    def _validate_advance_anchor(cls, v: str) -> str:
+        if not re.match(r"^([01]\d|2[0-3]):[0-5]\d$", v):
+            raise ValueError("advance_anchor must be 'HH:MM' 24-hour")
+        return v
+
     @model_validator(mode="after")
     def _validate_graph(self) -> Deck:
         page_ids = [p.page_id for p in self.pages]
@@ -170,6 +208,28 @@ class Deck(BaseModel):
     @property
     def page_ids(self) -> list[str]:
         return [p.page_id for p in self.pages]
+
+    @property
+    def advance_cycle_minutes(self) -> int:
+        """Total timer-advance cycle length: the sum of each page's effective
+        dwell (its override, else ``advance_interval_minutes``)."""
+        return sum(p.effective_dwell_minutes(self.advance_interval_minutes) for p in self.pages)
+
+    def advance_page_at(self, offset_minutes: float) -> str:
+        """The page id shown at ``offset_minutes`` into the timer cycle. Wraps at
+        the cycle length; used by the scheduler for ``timer`` / ``both`` decks."""
+        if not self.pages:
+            return ""
+        cycle = self.advance_cycle_minutes
+        if cycle <= 0:
+            return self.pages[0].page_id
+        pos = offset_minutes % cycle
+        acc = 0.0
+        for p in self.pages:
+            acc += p.effective_dwell_minutes(self.advance_interval_minutes)
+            if pos < acc:
+                return p.page_id
+        return self.pages[-1].page_id
 
     def page(self, page_id: str) -> DeckPage | None:
         for p in self.pages:
