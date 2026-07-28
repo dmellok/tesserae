@@ -44,6 +44,12 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.state.conditions import Condition
+
+# 0=Mon .. 6=Sun (ISO weekday minus 1), mirrored from Rotation for the timer
+# advance day-of-week filter.
+_DAYS_ALL: list[int] = [0, 1, 2, 3, 4, 5, 6]
+
 
 class DeckZone(BaseModel):
     """A touch target as a rectangle in normalised panel coordinates (0..1),
@@ -101,6 +107,12 @@ class DeckPage(BaseModel):
     # ``timer`` / ``both``. None inherits ``Deck.advance_interval_minutes``. Unused
     # when the deck advances on tap only.
     dwell_minutes: int | None = Field(default=None, ge=1, le=10_080)
+
+    # Timer-advance conditions (rotations-merge parity): AND'd predicates that
+    # gate this page in the cycle. An unmet condition advances past it in
+    # ``scheduled`` mode, or makes it ineligible in ``priority`` mode. Empty
+    # (default) = always eligible.
+    conditions: list[Condition] = Field(default_factory=list)
 
     def effective_refresh_minutes(self, deck_default: int) -> int:
         """The refresh cadence to use for this page: its own override, else the
@@ -169,12 +181,38 @@ class Deck(BaseModel):
     # semantics as the old Rotation anchor. Only used when ``advance`` != ``manual``.
     advance_anchor: str = "00:00"
 
+    # Timer-advance parity with rotations (Tier A + B). All only apply when
+    # ``advance`` != ``manual``; defaults reproduce a plain daily cycle.
+    advance_end_at: str | None = None  # optional daily stop (HH:MM); None = until midnight
+    advance_days_of_week: list[int] = Field(default_factory=lambda: list(_DAYS_ALL))
+    advance_priority: int = 0  # vs schedules + other timer decks when both are due
+    advance_smart_sync: bool = False
+    advance_smart_sync_lead_s: int = Field(default=10, ge=0, le=600)
+    advance_mode: Literal["scheduled", "priority"] = "scheduled"
+    advance_min_hold_minutes: int = Field(default=5, ge=0, le=120)
+
     @field_validator("advance_anchor")
     @classmethod
     def _validate_advance_anchor(cls, v: str) -> str:
         if not re.match(r"^([01]\d|2[0-3]):[0-5]\d$", v):
             raise ValueError("advance_anchor must be 'HH:MM' 24-hour")
         return v
+
+    @field_validator("advance_end_at")
+    @classmethod
+    def _validate_advance_end_at(cls, v: str | None) -> str | None:
+        if v is None or v == "":
+            return None
+        if not re.match(r"^([01]\d|2[0-3]):[0-5]\d$", v):
+            raise ValueError("advance_end_at must be 'HH:MM' 24-hour or empty")
+        return v
+
+    @field_validator("advance_days_of_week")
+    @classmethod
+    def _validate_advance_dow(cls, v: list[int]) -> list[int]:
+        if not all(0 <= d <= 6 for d in v):
+            raise ValueError("advance_days_of_week entries must be 0..6 (0=Mon, 6=Sun)")
+        return sorted(set(v))
 
     @model_validator(mode="after")
     def _validate_graph(self) -> Deck:

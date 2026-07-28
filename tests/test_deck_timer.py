@@ -77,6 +77,7 @@ def wiring(tmp_path: Path):
         deck_nav_store=nav,
         push_manager=lambda: push,
         page_exists=lambda _pid: True,
+        timezone_provider=lambda: UTC,  # deterministic across host TZ
     )
     return scheduler, push, deck_store, nav
 
@@ -110,3 +111,44 @@ def test_quiet_hours_skips_advance(wiring) -> None:
     store.upsert(_deck())
     scheduler._tick_once(datetime(2026, 6, 15, 0, 0, tzinfo=UTC))
     push.push.assert_not_called()
+
+
+# -- parity: windows, min-hold (Tier A + B via the rotation engine) -------
+
+
+def test_timer_deck_off_day_does_not_advance(wiring) -> None:
+    scheduler, push, store, _nav = wiring
+    dow = datetime(2026, 6, 15).weekday()
+    store.upsert(_deck(advance_days_of_week=[d for d in range(7) if d != dow]))
+    scheduler._tick_once(datetime(2026, 6, 15, 0, 0, tzinfo=UTC))
+    push.push.assert_not_called()
+
+
+def test_timer_deck_past_end_at_window_does_not_advance(wiring) -> None:
+    scheduler, push, store, _nav = wiring
+    store.upsert(_deck(advance_end_at="00:15"))  # cycle stops after 00:15
+    scheduler._tick_once(datetime(2026, 6, 15, 0, 20, tzinfo=UTC))
+    push.push.assert_not_called()
+
+
+def test_timer_deck_min_hold_blocks_early_transition(wiring) -> None:
+    scheduler, push, store, _nav = wiring
+    # 30-min steps but a 60-min min hold: the boundary transition to b is held.
+    store.upsert(_deck(advance_min_hold_minutes=60))
+    scheduler._tick_once(datetime(2026, 6, 15, 0, 0, tzinfo=UTC))
+    assert push.push.call_args[0][0] == "a"
+    push.push.reset_mock()
+    scheduler._tick_once(datetime(2026, 6, 15, 0, 30, tzinfo=UTC))  # within min-hold
+    push.push.assert_not_called()
+
+
+def test_deck_to_rotation_rejects_overlong_cycle() -> None:
+    from app.scheduler import _deck_to_rotation
+
+    big = _deck(
+        pages=[
+            DeckPage(page_id="a", dwell_minutes=10_000),
+            DeckPage(page_id="b", dwell_minutes=10_000),
+        ]
+    )
+    assert _deck_to_rotation(big) is None

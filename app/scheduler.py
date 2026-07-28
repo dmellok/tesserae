@@ -30,8 +30,11 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, time, timedelta, tzinfo
 from typing import Any
 
+from pydantic import ValidationError
+
 from app.push import PushManager, PushResult
 from app.scheduler_conditions import ConditionEvaluator
+from app.state.deck_model import Deck
 from app.state.deck_store import DeckStore
 from app.state.event_log import EventLog
 from app.state.rotation_model import Rotation, RotationStep
@@ -89,6 +92,40 @@ def compute_current_step(
     if state is None:
         return None
     return state.step_index, rotation.steps[state.step_index]
+
+
+def _deck_to_rotation(deck: Deck) -> Rotation | None:
+    """Adapt a timer deck to an in-memory ``Rotation`` so it can ride the exact
+    rotation step engine (day-of-week + anchor + end_at windows, per-page
+    conditions, scheduled/priority mode, min-hold, smart-sync, priority). Returns
+    None when the deck can't form a valid cycle (e.g. total dwell exceeds a week).
+    Not persisted; rebuilt each tick."""
+    steps = [
+        RotationStep(
+            page_id=p.page_id,
+            dwell_minutes=p.effective_dwell_minutes(deck.advance_interval_minutes),
+            conditions=list(p.conditions),
+        )
+        for p in deck.pages
+    ]
+    try:
+        return Rotation(
+            id=deck.id,
+            name=deck.name,
+            enabled=deck.enabled,
+            device_ids=list(deck.device_ids),
+            steps=steps,
+            anchor=deck.advance_anchor,
+            end_at=deck.advance_end_at,
+            days_of_week=list(deck.advance_days_of_week),
+            priority=deck.advance_priority,
+            smart_sync=deck.advance_smart_sync,
+            smart_sync_lead_s=deck.advance_smart_sync_lead_s,
+            mode=deck.advance_mode,
+            min_hold_minutes=deck.advance_min_hold_minutes,
+        )
+    except ValidationError:
+        return None
 
 
 @dataclass(frozen=True)
@@ -265,6 +302,8 @@ class Scheduler:
         # push only at step transitions (a manual nav in "both" mode holds until
         # the next boundary, matching rotation behaviour).
         self._deck_last_advance: dict[str, str] = {}
+        # Same key -> POSIX timestamp of that last advance, for the min-hold gate.
+        self._deck_last_advance_at: dict[str, float] = {}
         self._push_factory = push_manager
         self._event_log = event_log
         self._tz_provider = timezone_provider or (lambda: None)
@@ -756,18 +795,17 @@ class Scheduler:
                     )
 
     def _advance_timer_decks(self, now: datetime) -> None:
-        """Advance ``timer`` / ``both`` decks through their pages on a wall-clock
-        anchor (Phase 1 of the rotations merge).
-
-        For each such deck, compute the page whose dwell window the current time
-        falls into (``Deck.advance_page_at`` on minutes-since-anchor), and push it
-        to any bound device not already parked there BY THE TIMER. Pushes only at
-        step transitions: a device moved by a manual tap in ``both`` mode holds
-        until the next boundary, matching how rotations treat a manual page-away.
-        Manual-only decks are ignored."""
+        """Advance ``timer`` / ``both`` decks through their pages, with full
+        rotation parity. Each such deck is adapted to an in-memory Rotation and
+        run through the same engine rotations use: day-of-week + anchor + end_at
+        windows, per-page conditions, scheduled / priority mode, min-hold, and
+        smart-sync. Pushes only at a step transition (or a new dwell window, for a
+        keep-fresh single page), so a manual tap in ``both`` mode holds until the
+        next boundary. High-priority decks fire first; manual decks are ignored."""
         if self._deck_store is None or self._deck_nav_store is None:
             return
         tz = self._tz_provider()
+        pairs: list[tuple[Deck, Rotation]] = []
         for deck in self._deck_store.all():
             if (
                 not deck.enabled
@@ -776,22 +814,39 @@ class Scheduler:
                 or not deck.pages
             ):
                 continue
-            local_now = _local(now, tz)
-            anchor_t = _parse_hhmm(deck.advance_anchor)
-            anchor_dt = local_now.replace(
-                hour=anchor_t.hour, minute=anchor_t.minute, second=0, microsecond=0
-            )
-            if local_now < anchor_dt:
-                anchor_dt -= timedelta(days=1)
-            offset_min = (local_now - anchor_dt).total_seconds() / 60.0
-            target = deck.advance_page_at(offset_min)
-            if not target:
+            rot = _deck_to_rotation(deck)
+            if rot is not None:
+                pairs.append((deck, rot))
+        pairs.sort(key=lambda p: (-p[1].priority, p[1].id))
+        for deck, rot in pairs:
+            state = _compute_step_state(rot, now, tz, forced=None)
+            if state is None:
+                continue  # off-day, before the anchor, or past the end_at window
+            picked = self._pick_eligible_step(rot, state.step_index, now)
+            if picked is None:
+                continue  # no page's conditions are met right now; hold
+            target = rot.steps[picked].page_id
+            if self._page_exists is not None and not self._page_exists(target):
                 continue
             for device_id in deck.device_ids:
                 key = f"{deck.id}:{device_id}"
-                # Only push at a step boundary: skip when the timer already put
-                # this page here (so a manual nav between boundaries survives).
-                if self._deck_last_advance.get(key) == target:
+                with self._lock:
+                    last = self._deck_last_advance.get(key)
+                    last_at = self._deck_last_advance_at.get(key)
+                if last == target:
+                    # Same page: re-fire only when a new dwell window has begun
+                    # (keep-fresh), matching a single-step rotation.
+                    if last_at is not None and last_at >= state.step_started_at.timestamp():
+                        continue
+                elif (
+                    rot.min_hold_minutes > 0
+                    and last_at is not None
+                    and now.timestamp() - last_at < rot.min_hold_minutes * 60
+                ):
+                    continue  # min-hold anti-flap
+                if rot.smart_sync and self._smart_sync_should_wait(
+                    target, rot.smart_sync_lead_s, now
+                ):
                     continue
                 pusher = self._push_factory()
                 quiet_check = getattr(pusher, "device_in_quiet_hours", None)
@@ -801,15 +856,14 @@ class Scheduler:
                 promoted = callable(promoter) and promoter(device_id, target)
                 if not promoted:
                     result = pusher.push(
-                        target,
-                        device_ids={device_id},
-                        respect_quiet_hours=True,
-                        source="deck",
+                        target, device_ids={device_id}, respect_quiet_hours=True, source="deck"
                     )
                     if result.status == "failed":
                         continue  # retry next tick; don't record the transition
                 self._deck_nav_store.set(device_id, deck.id, target)
-                self._deck_last_advance[key] = target
+                with self._lock:
+                    self._deck_last_advance[key] = target
+                    self._deck_last_advance_at[key] = now.timestamp()
                 logger.info(
                     "deck timer advance: device=%s deck=%s -> %s (%s)",
                     device_id,

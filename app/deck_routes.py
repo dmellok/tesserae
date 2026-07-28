@@ -432,6 +432,9 @@ def editor_save() -> Response:
         {p.page_id: p.refresh_interval_minutes for p in existing.pages} if existing else {}
     )
     old_dwell = {p.page_id: p.dwell_minutes for p in existing.pages} if existing else {}
+    # Per-page conditions aren't authored in the editor yet; preserve whatever a
+    # migrated rotation or the MCP set so a re-save doesn't drop them.
+    old_conditions = {p.page_id: p.conditions for p in existing.pages} if existing else {}
 
     pages: list[DeckPage] = []
     for pid in ordered:
@@ -451,7 +454,13 @@ def editor_save() -> Response:
         elif raw_dwell == "":
             dwell = None
         pages.append(
-            base.model_copy(update={"refresh_interval_minutes": refresh, "dwell_minutes": dwell})
+            base.model_copy(
+                update={
+                    "refresh_interval_minutes": refresh,
+                    "dwell_minutes": dwell,
+                    "conditions": old_conditions.get(pid, []),
+                }
+            )
         )
 
     home = (form.get("home") or "").strip() or None
@@ -479,6 +488,44 @@ def editor_save() -> Response:
         adv_interval = 30
     adv_anchor = (form.get("advance_anchor") or "00:00").strip() or "00:00"
 
+    # Advance parity fields (Tier A + B). A missing form field falls back to the
+    # existing deck's value (the Advanced fold may omit some) then the model
+    # default, so a plain save never clobbers a migrated rotation's config.
+    def _adv_int(field: str, lo: int, hi: int, default: int) -> int:
+        raw = form.get(field)
+        if raw is None:
+            return default
+        try:
+            return max(lo, min(hi, int(raw)))
+        except ValueError:
+            return default
+
+    adv_end_at = (form.get("advance_end_at") or "").strip() or None
+    if "advance_days" in form:
+        adv_dow = sorted({int(d) for d in form.getlist("advance_days") if d.isdigit()})
+    elif existing is not None:
+        adv_dow = list(existing.advance_days_of_week)
+    else:
+        adv_dow = [0, 1, 2, 3, 4, 5, 6]
+    adv_priority = _adv_int(
+        "advance_priority", -1000, 1000, existing.advance_priority if existing else 0
+    )
+    if "advance_smart_sync" in form:
+        adv_smart = form.get("advance_smart_sync") in ("on", "true", "1")
+    else:
+        adv_smart = existing.advance_smart_sync if existing else False
+    adv_lead = _adv_int(
+        "advance_smart_sync_lead_s", 0, 600, existing.advance_smart_sync_lead_s if existing else 10
+    )
+    adv_mode_raw = form.get("advance_mode") or (existing.advance_mode if existing else "scheduled")
+    adv_mode = cast(
+        Literal["scheduled", "priority"],
+        adv_mode_raw if adv_mode_raw in ("scheduled", "priority") else "scheduled",
+    )
+    adv_min_hold = _adv_int(
+        "advance_min_hold_minutes", 0, 120, existing.advance_min_hold_minutes if existing else 5
+    )
+
     try:
         deck = Deck(
             id=deck_id,
@@ -493,6 +540,13 @@ def editor_save() -> Response:
             advance=advance,
             advance_interval_minutes=adv_interval,
             advance_anchor=adv_anchor,
+            advance_end_at=adv_end_at,
+            advance_days_of_week=adv_dow,
+            advance_priority=adv_priority,
+            advance_smart_sync=adv_smart,
+            advance_smart_sync_lead_s=adv_lead,
+            advance_mode=adv_mode,
+            advance_min_hold_minutes=adv_min_hold,
         )
     except ValidationError as exc:
         flash(f"Invalid deck: {_first_error(exc)}", "error")
