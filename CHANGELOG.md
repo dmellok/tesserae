@@ -8,6 +8,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Companion API 0.4 adds canonical History and all five photo layout modes.**
+  Community clients can page through the same push History shown in the web UI,
+  fetch retained composition previews, and idempotently resend an entry to its
+  original display snapshot while respecting quiet hours. Successful jobs may
+  include the exact new History event IDs, and image uploads now advertise and
+  accept Fit, Fill, Blur, Stretch, and Center.
+
 - **The opt-in daily heartbeat now includes a bucketed count of paired companion apps.** Same
   `0`/`1`/`2-3`/… bucketing as the device count, derived server-side from the live companion
   tokens (never a client name, install id, or app version), so adoption of the community

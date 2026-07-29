@@ -10,14 +10,14 @@ or Flask session cookies.
 
 This module covers the discovery, pairing, session, read-model, and write
 surfaces of the contract: capability probe, pairing, session revocation,
-device + dashboard read models, the two async write routes (dashboard
-push, image push), and job polling. Writes return ``202`` with a persisted
+device + dashboard read models, canonical History reads and resend, the
+async write routes, and job polling. Writes return ``202`` with a persisted
 job the client polls; quiet-hours suppression surfaces as a *successful*
 ``quiet`` outcome, never a failure. ``_tesserae._tcp`` discovery lives in
 app.mdns.
 
 Contract: ``charmmmz/tesserae-companion-ios`` ``Contracts/app-v1.openapi.yaml``
-(OpenAPI 0.2.0). The vendored copy + fixtures under ``tests/companion/``
+(OpenAPI 0.4.0). The vendored copy + fixtures under ``tests/companion/``
 guard these shapes.
 
 mypy --strict applies to this module, see pyproject.toml.
@@ -40,11 +40,21 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from flask import Blueprint, Flask, current_app, g, jsonify, request
 from werkzeug.wrappers import Response
 
+from app.companion_history import (
+    DEFAULT_HISTORY_LIMIT,
+    MAX_HISTORY_LIMIT,
+    InvalidHistoryCursor,
+    list_history,
+    parse_history_id,
+    retained_composition_for_history,
+    retained_resend_composition_for_row,
+)
 from app.companion_jobs import CompanionJobs, JobOutcome
 from app.device_loader import Device, DeviceRegistry
 from app.panel import device_panel, resolve_settings_panel
 from app.quiet_hours import device_is_quiet
 from app.state.companion_token_store import COMPANION_SCOPES, CompanionTokenStore
+from app.state.event_log import EventLog, EventRow
 from app.state.idempotency_store import IdempotencyStore
 from app.state.idempotency_store import fingerprint as _idempotency_fingerprint
 from app.state.job_store import JobKind, JobStore
@@ -76,15 +86,17 @@ bp = Blueprint("companion_api", __name__, url_prefix="/api/app/v1")
 IMAGE_UPLOAD_BYTES = 26_214_400  # 25 MiB
 IMAGE_MAX_EDGE = 8192
 IMAGE_CONTENT_TYPES = ("image/jpeg", "image/png", "image/heic", "image/heif", "image/webp")
+IMAGE_FIT_MODES = ("fit", "fill", "blur", "stretch", "center")
 JOB_RETENTION_SECONDS = 86_400
 IDEMPOTENCY_RETENTION_SECONDS = 86_400
 
 # Features this server serves. The client gates on this list rather than
 # assuming the full set, so unshipped surfaces degrade cleanly.
-FEATURES = ("devices", "dashboards", "dashboard_push", "image_push", "jobs")
+FEATURES = ("devices", "dashboards", "dashboard_push", "image_push", "jobs", "history")
 
 _PAIRING_CODE_RE = re.compile(r"^[0-9]{6,12}$")
 _IMAGE_CONTENT_TYPES = frozenset(IMAGE_CONTENT_TYPES)
+_IMAGE_FIT_MODES = frozenset(IMAGE_FIT_MODES)
 
 
 # -- CORS ----------------------------------------------------------------
@@ -154,6 +166,10 @@ def _job_runner() -> CompanionJobs:
 
 def _push_manager() -> Any:
     return current_app.config.get("PUSH_MANAGER")
+
+
+def _events() -> EventLog:
+    return current_app.config["EVENT_LOG"]  # type: ignore[no-any-return]
 
 
 # -- error envelope ------------------------------------------------------
@@ -274,6 +290,7 @@ def _capabilities() -> dict[str, Any]:
             "image_upload_bytes": IMAGE_UPLOAD_BYTES,
             "image_max_edge": IMAGE_MAX_EDGE,
             "image_content_types": list(IMAGE_CONTENT_TYPES),
+            "image_fit_modes": list(IMAGE_FIT_MODES),
             "job_retention_seconds": JOB_RETENTION_SECONDS,
             "idempotency_retention_seconds": IDEMPOTENCY_RETENTION_SECONDS,
         },
@@ -533,6 +550,14 @@ def _partition_quiet(target_ids: list[str], *, override: bool) -> tuple[list[str
 _PUBLISHED_STATUSES = frozenset({"sent", "no_change"})
 
 
+def _history_event_ids(result: Any) -> list[str] | None:
+    """Exact canonical History correlation for a successful push result."""
+    event_id = getattr(result, "event_id", None)
+    if isinstance(event_id, int) and event_id > 0:
+        return [str(event_id)]
+    return None
+
+
 def _job_response(job: Any, status_code: int) -> Any:
     resp = jsonify({"job": job.public_dict()})
     resp.status_code = status_code
@@ -625,7 +650,7 @@ def push_dashboard(dashboard_id: str) -> Any:
             bypass_coalesce=True,
         )
         if result.status in _PUBLISHED_STATUSES:
-            return JobOutcome.published(active)
+            return JobOutcome.published(active, history_event_ids=_history_event_ids(result))
         return JobOutcome.failed("render_failed", result.error or f"push {result.status}")
 
     return _reserve_and_run(
@@ -684,15 +709,18 @@ def push_image() -> Any:
         return _error("invalid_request", "The 'request' part must be JSON.", 400)
     if not isinstance(spec, dict):
         return _error("invalid_request", "The 'request' part must be a JSON object.", 400)
-    if spec.get("fit") not in ("fit", "fill") or not isinstance(
-        spec.get("override_quiet_hours"), bool
+    fit_value = spec.get("fit")
+    if (
+        not isinstance(fit_value, str)
+        or fit_value not in _IMAGE_FIT_MODES
+        or not isinstance(spec.get("override_quiet_hours"), bool)
     ):
         return _error("invalid_request", "fit and override_quiet_hours are required.", 400)
     targets = _valid_target_ids(spec.get("device_ids"))
     if targets is None:
         return _error("invalid_target", "One or more target displays are unknown.", 400)
 
-    fit = str(spec["fit"])
+    fit = fit_value
     override = bool(spec["override_quiet_hours"])
     resolved_targets = list(targets)
     payload = image_bytes + b"\x00" + request_raw.encode("utf-8")
@@ -705,6 +733,7 @@ def push_image() -> Any:
         if manager is None:
             return JobOutcome.failed("temporarily_unavailable", "The push pipeline is offline.")
         published: list[str] = []
+        history_event_ids: list[str] = []
         for did in active:
             result = manager.push_image(
                 image_bytes,
@@ -716,8 +745,12 @@ def push_image() -> Any:
             )
             if result.status in _PUBLISHED_STATUSES:
                 published.append(did)
+                history_event_ids.extend(_history_event_ids(result) or [])
         if published:
-            return JobOutcome.published(published)
+            return JobOutcome.published(
+                published,
+                history_event_ids=history_event_ids or None,
+            )
         return JobOutcome.failed("render_failed", "The image could not be published.")
 
     return _reserve_and_run(
@@ -726,6 +759,151 @@ def push_image() -> Any:
         payload=payload,
         target_ids=resolved_targets,
         label="Shared photo",
+        work=_work,
+    )
+
+
+# -- History -------------------------------------------------------------
+
+
+def _history_label(row: EventRow) -> str:
+    """Resolve the same friendly target labels the admin History page uses."""
+    if row.source == "button":
+        device = _devices().get(row.target)
+        if device is not None and device.kind_of is not None:
+            return device.display_name
+    page = _pages().get(row.target)
+    if page is not None:
+        return page.name or page.id
+    return row.target or row.source
+
+
+def _history_row(history_id: str) -> EventRow | None:
+    try:
+        event_id = parse_history_id(history_id)
+    except InvalidHistoryCursor:
+        return None
+    row = _events().get(event_id)
+    return row if row is not None and row.type == "push" else None
+
+
+@bp.get("/history")
+@_require_companion("devices:read")
+def get_history() -> Any:
+    before_id = request.args.get("before_id")
+    raw_limit = request.args.get("limit")
+    limit = DEFAULT_HISTORY_LIMIT
+    if raw_limit is not None:
+        try:
+            limit = int(raw_limit)
+        except ValueError:
+            return _error("invalid_request", "limit must be an integer from 1 to 100.", 400)
+        if limit < 1 or limit > MAX_HISTORY_LIMIT:
+            return _error("invalid_request", "limit must be an integer from 1 to 100.", 400)
+    try:
+        body = list_history(
+            _events(),
+            Path(current_app.config["RENDERS_DIR"]),
+            before_id=before_id,
+            limit=limit,
+            label_resolver=_history_label,
+        )
+    except InvalidHistoryCursor:
+        return _error("invalid_request", "before_id is not a valid History cursor.", 400)
+    return jsonify(body)
+
+
+@bp.get("/history/<history_id>/preview")
+@_require_companion("devices:read")
+def history_preview(history_id: str) -> Any:
+    retained = retained_composition_for_history(
+        _events(),
+        Path(current_app.config["RENDERS_DIR"]),
+        history_id,
+    )
+    if retained is None:
+        return _error("not_found", "No retained preview for that History row.", 404)
+    if request.if_none_match and retained.etag in request.if_none_match:
+        resp = current_app.response_class(status=304)
+    else:
+        try:
+            payload = retained.path.read_bytes()
+        except OSError:
+            return _error("not_found", "The retained preview is no longer available.", 404)
+        resp = current_app.response_class(payload, mimetype="image/png")
+    resp.set_etag(retained.etag)
+    resp.headers["Cache-Control"] = "private, no-cache"
+    return resp
+
+
+@bp.post("/history/<history_id>/resend")
+@_require_companion("push:write")
+def resend_history(history_id: str) -> Any:
+    key, err = _require_idempotency_key()
+    if err is not None:
+        return err
+    assert key is not None
+
+    raw = request.get_data(cache=True)
+    body = request.get_json(silent=True)
+    if (
+        not isinstance(body, dict)
+        or set(body) != {"override_quiet_hours"}
+        or not isinstance(body.get("override_quiet_hours"), bool)
+    ):
+        return _error("invalid_request", "override_quiet_hours (boolean) is required.", 400)
+
+    row = _history_row(history_id)
+    if row is None:
+        return _error("not_found", "No History row with that id.", 404)
+    retained = retained_resend_composition_for_row(
+        row,
+        Path(current_app.config["RENDERS_DIR"]),
+    )
+    original_targets = list(
+        dict.fromkeys(
+            value for value in row.extra.get("device_ids", []) if isinstance(value, str) and value
+        )
+    )
+    if retained is None or not original_targets:
+        return _error(
+            "not_resendable",
+            "The original composition or target snapshot is no longer available.",
+            409,
+        )
+    targets = _valid_target_ids(original_targets)
+    if targets is None:
+        return _error(
+            "not_resendable",
+            "One or more original target displays are no longer available.",
+            409,
+        )
+
+    override = bool(body["override_quiet_hours"])
+    event_id = row.id
+    resolved_targets = list(targets)
+
+    def _work() -> JobOutcome:
+        active, _quiet = _partition_quiet(resolved_targets, override=override)
+        if not active:
+            return JobOutcome.quiet(resolved_targets, "all_targets_in_quiet_hours")
+        manager = _push_manager()
+        if manager is None:
+            return JobOutcome.failed("temporarily_unavailable", "The push pipeline is offline.")
+        result = manager.republish(event_id, device_ids=set(active))
+        if result.status in _PUBLISHED_STATUSES:
+            return JobOutcome.published(
+                active,
+                history_event_ids=_history_event_ids(result),
+            )
+        return JobOutcome.failed("render_failed", result.error or f"resend {result.status}")
+
+    return _reserve_and_run(
+        kind="history_resend",
+        key=key,
+        payload=raw,
+        target_ids=resolved_targets,
+        label=_history_label(row),
         work=_work,
     )
 

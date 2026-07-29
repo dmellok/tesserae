@@ -39,13 +39,26 @@ class JobOutcome:
     ok: bool
     result_status: ResultStatus = "published"
     device_ids: tuple[str, ...] = ()
+    history_event_ids: tuple[str, ...] | None = None
     reason: str | None = None
     code: str = ""
     message: str = ""
 
     @classmethod
-    def published(cls, device_ids: list[str]) -> JobOutcome:
-        return cls(ok=True, result_status="published", device_ids=tuple(device_ids))
+    def published(
+        cls,
+        device_ids: list[str],
+        *,
+        history_event_ids: list[str] | None = None,
+    ) -> JobOutcome:
+        return cls(
+            ok=True,
+            result_status="published",
+            device_ids=tuple(device_ids),
+            history_event_ids=(
+                tuple(dict.fromkeys(history_event_ids)) if history_event_ids is not None else None
+            ),
+        )
 
     @classmethod
     def quiet(cls, device_ids: list[str], reason: str) -> JobOutcome:
@@ -86,6 +99,11 @@ class CompanionJobs:
                 result_status=outcome.result_status,
                 device_ids=list(outcome.device_ids),
                 reason=outcome.reason,
+                history_event_ids=(
+                    list(outcome.history_event_ids)
+                    if outcome.history_event_ids is not None
+                    else None
+                ),
             )
         else:
             self._jobs.mark_failed(job_id, code=outcome.code, message=outcome.message)
