@@ -448,7 +448,7 @@
     <section class="dx-section-card">
       {{ card_head('Layout', icon_name='grid-four', blurb='Pick a preset to (re)split the panel. Open “Custom layout” to drag edges or insert cells freely.') }}
 
-      <div class="layout-grid" style="--panel-aspect: {{ panel.w }} / {{ panel.h }};">
+      <div class="layout-grid">
         {% for layout in layouts %}
         <form method="post" action="{{ url_for('pages.apply_layout', page_id=page.id) }}" class="layout-form" data-confirm-if-cells>
           <input type="hidden" name="layout" value="{{ layout.slug }}">

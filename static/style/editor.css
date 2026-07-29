@@ -1020,7 +1020,12 @@
   position: relative;
   display: block;
   height: var(--thumb-h);
-  aspect-ratio: var(--panel-aspect);
+  /* Preset thumbnails are schematic hints of the split pattern, not a
+     scale model of the panel, so they use a fixed aspect rather than the
+     panel's. Matching the real aspect turned the hints into unreadable
+     strips on extreme panels (e.g. a 296x128 Magtag), issue #156. The
+     interactive custom-layout board still uses --panel-aspect. */
+  aspect-ratio: 4 / 3;
   background: var(--t-surface-soft);
   border: 1px solid var(--t-border);
   border-radius: 4px;

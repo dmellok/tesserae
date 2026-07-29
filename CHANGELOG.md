@@ -30,6 +30,12 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **Layout preset thumbnails no longer distort on extreme panels.** The little
+  split-pattern hints in the dashboard editor now use a fixed aspect ratio
+  instead of the panel's, so a very wide or small display (e.g. a 296x128
+  Magtag) gets readable, uniform preset tiles. The interactive custom-layout
+  board still matches the real panel shape.
+
 - **Companion Activity now keeps exact History and display identity.** Multi-panel
   dashboard pushes preserve every canonical History event ID in their terminal
   Job, and button-triggered fetch rows snapshot the originating device ID, so
