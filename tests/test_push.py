@@ -163,6 +163,10 @@ def test_push_fans_out_to_every_renderer(tmp_path: Path, composition_png: bytes)
     assert result.status == "sent"
     assert {r.renderer_id for r in result.renderers} == {"pi_png", "esp32_bin"}
     assert all(r.error is None for r in result.renderers)
+    assert all(r.preview_digest is not None for r in result.renderers)
+    assert all(
+        (tmp_path / "renders" / f"{r.preview_digest}.png").exists() for r in result.renderers
+    )
 
     # Both renderers' artifacts on disk.
     written = sorted(p.name for p in (tmp_path / "renders").iterdir())
@@ -206,6 +210,52 @@ def test_push_skips_publish_when_composition_matches_last_served(
     assert all(r.unchanged and r.error is None for r in second.renderers)
     # No additional publish for the same digest.
     assert len(mqtt_client.published) == publishes_after_first
+
+
+def test_no_change_backfills_missing_device_preview_without_repaint(
+    tmp_path: Path, composition_png: bytes
+) -> None:
+    renderers = [_make_renderer(tmp_path, "pi_png", "png", retain=False)]
+    manager, mqtt_client, png = _wired(tmp_path, composition_png, renderers)
+
+    with patch("app.push.capture_composed", return_value=(png, [])):
+        first = manager.push("home")
+    assert first.status == "sent"
+    latest = manager.latest_render_for("pi_png")
+    assert latest is not None
+    old_preview = str(latest.pop("preview_digest"))
+    (manager._renders_dir / f"{old_preview}.png").unlink()
+    publishes = len(mqtt_client.published)
+
+    with patch("app.push.capture_composed", return_value=(png, [])):
+        second = manager.push("home")
+
+    assert second.status == "no_change"
+    latest = manager.latest_render_for("pi_png")
+    assert latest is not None
+    preview_digest = str(latest["preview_digest"])
+    assert (manager._renders_dir / f"{preview_digest}.png").exists()
+    assert len(mqtt_client.published) == publishes
+
+
+def test_device_preview_failure_does_not_fail_physical_delivery(
+    tmp_path: Path, composition_png: bytes
+) -> None:
+    renderers = [_make_renderer(tmp_path, "pi_png", "png", retain=False)]
+    manager, mqtt_client, png = _wired(tmp_path, composition_png, renderers)
+
+    with (
+        patch("app.push.capture_composed", return_value=(png, [])),
+        patch("app.push.write_device_preview", side_effect=OSError("disk full")),
+    ):
+        result = manager.push("home")
+
+    assert result.status == "sent"
+    assert len(mqtt_client.published) == 1
+    assert result.renderers[0].preview_digest is None
+    latest = manager.latest_render_for("pi_png")
+    assert latest is not None
+    assert latest["preview_digest"] is None
 
 
 def test_push_force_publish_bypasses_content_skip(tmp_path: Path, composition_png: bytes) -> None:
@@ -1145,9 +1195,11 @@ def test_prune_keeps_live_frame_artifacts_without_event_rows(
         "ext": "bin",
         "filename": "liveart123456.bin",
         "composition_digest": "livecomp12345",
+        "preview_digest": "liveprev123456",
     }
     (renders / "liveart123456.bin").write_bytes(b"x")
     (renders / "livecomp12345.png").write_bytes(b"x")
+    (renders / "liveprev123456.png").write_bytes(b"x")
     (renders / "livecomp12345.regions.json").write_text('{"v":1,"regions":[]}')
     (renders / "orphan99999999.png").write_bytes(b"x")
 
@@ -1155,6 +1207,7 @@ def test_prune_keeps_live_frame_artifacts_without_event_rows(
     assert removed == 1
     assert (renders / "liveart123456.bin").exists()
     assert (renders / "livecomp12345.png").exists()
+    assert (renders / "liveprev123456.png").exists()
     assert (renders / "livecomp12345.regions.json").exists(), (
         "the live frame's touch-region sidecar must survive the prune"
     )

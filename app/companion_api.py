@@ -51,6 +51,7 @@ from app.companion_history import (
 )
 from app.companion_jobs import CompanionJobs, JobOutcome
 from app.device_loader import Device, DeviceRegistry
+from app.device_preview import retained_device_preview
 from app.panel import device_panel, resolve_settings_panel
 from app.quiet_hours import device_is_quiet
 from app.state.companion_token_store import COMPANION_SCOPES, CompanionTokenStore
@@ -935,32 +936,35 @@ def get_job(job_id: str) -> Any:
 @bp.get("/devices/<device_id>/preview")
 @_require_companion("devices:read")
 def device_preview(device_id: str) -> Any:
-    """Latest full composition PNG for a display. ETag is the composition
-    digest (content-addressed), so `If-None-Match` short-circuits to 304.
-    404 when the display is unknown or nothing has rendered for it yet.
+    """Latest logical full-frame PNG for a display.
 
-    This is the composition (what the renderer drew), not the on-glass
-    patched frame, so a live tap overlay may be newer than what's served."""
+    The preview includes the selected image-fit mode and logical panel
+    geometry, but excludes hardware-only row-stride and mount compensation.
+    A live partial-refresh patch may be newer than this last full frame.
+    """
     device = _devices().get(device_id)
     if device is None or device.kind_of is None:
         return _error("not_found", "No display with that id.", 404)
     manager = _push_manager()
     latest = manager.latest_render_for(device_id) if manager is not None else None
-    digest = latest.get("composition_digest") if isinstance(latest, dict) else None
-    if not digest:
+    if not isinstance(latest, dict):
         return _error("not_found", "No frame has been rendered for this display yet.", 404)
+    digest = latest.get("preview_digest")
+    if digest is None:
+        return _error("not_found", "No preview is available for the latest frame yet.", 404)
 
-    etag = str(digest)
-    if request.if_none_match and etag in request.if_none_match:
+    retained = retained_device_preview(Path(current_app.config["RENDERS_DIR"]), digest)
+    if retained is None:
+        return _error("not_found", "The rendered frame is no longer available.", 404)
+
+    if request.if_none_match and request.if_none_match.contains_weak(retained.etag):
         resp = current_app.response_class(status=304)
-        resp.set_etag(etag)
+        resp.set_etag(retained.etag)
+        resp.headers["Cache-Control"] = "private, no-cache"
         return resp
 
-    png_path = Path(current_app.config["RENDERS_DIR"]) / f"{etag}.png"
-    if not png_path.exists():
-        return _error("not_found", "The rendered frame is no longer available.", 404)
-    resp = current_app.response_class(png_path.read_bytes(), mimetype="image/png")
-    resp.set_etag(etag)
+    resp = current_app.response_class(retained.path.read_bytes(), mimetype="image/png")
+    resp.set_etag(retained.etag)
     # Content-addressed by digest, but the "latest" pointer moves, so the
     # client must revalidate rather than hold it blindly.
     resp.headers["Cache-Control"] = "private, no-cache"

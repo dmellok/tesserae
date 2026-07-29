@@ -1,7 +1,7 @@
 """Companion API previews (additive `previews` feature, discussion #147).
 
 Two read-only PNG endpoints, exercised through the real Flask app. No
-Playwright: the device preview serves an existing composition PNG (seeded
+Playwright: the device preview serves an existing logical-screen PNG (seeded
 on disk + a fake PushManager pointing at it), and the dashboard preview's
 cached path is pre-seeded while the cache-miss path only needs to return
 202 (the background render is a no-op without a browser pool).
@@ -74,15 +74,20 @@ def _seed_device(app: Flask, device_id: str = "kitchen") -> str:
 
 
 class _FakePush:
-    """Returns a fixed latest-render pointing at a seeded composition PNG."""
+    """Returns a fixed latest-render pointing at a seeded device preview."""
 
-    def __init__(self, composition_digest: str | None) -> None:
-        self._digest = composition_digest
+    def __init__(self, preview_digest: object | None) -> None:
+        self._digest = preview_digest
 
     def latest_render_for(self, device_id: str) -> Any:
         if self._digest is None:
             return None
-        return {"composition_digest": self._digest}
+        return {"preview_digest": self._digest}
+
+
+class _FakeLegacyPush:
+    def latest_render_for(self, device_id: str) -> Any:
+        return {"composition_digest": "deadbeefcafe0000"}
 
 
 def _seed_render(app: Flask, digest: str) -> None:
@@ -94,7 +99,7 @@ def _seed_render(app: Flask, digest: str) -> None:
 # -- device preview ------------------------------------------------------
 
 
-def test_device_preview_serves_composition_with_etag(app: Flask) -> None:
+def test_device_preview_serves_logical_frame_with_etag(app: Flask) -> None:
     device = _seed_device(app)
     _seed_render(app, "deadbeefcafe0001")
     app.config["PUSH_MANAGER"] = _FakePush("deadbeefcafe0001")
@@ -104,23 +109,72 @@ def test_device_preview_serves_composition_with_etag(app: Flask) -> None:
     assert resp.mimetype == "image/png"
     assert resp.get_data() == _PNG
     assert resp.headers["ETag"].strip('"') == "deadbeefcafe0001"
+    assert resp.headers["Cache-Control"] == "private, no-cache"
 
 
-def test_device_preview_304_on_matching_etag(app: Flask) -> None:
+@pytest.mark.parametrize(
+    "if_none_match",
+    ['"deadbeefcafe0002"', 'W/"deadbeefcafe0002"', '"other", "deadbeefcafe0002"', "*"],
+)
+def test_device_preview_304_on_matching_etag(app: Flask, if_none_match: str) -> None:
     device = _seed_device(app)
     _seed_render(app, "deadbeefcafe0002")
     app.config["PUSH_MANAGER"] = _FakePush("deadbeefcafe0002")
     token = _token(app)
     resp = app.test_client().get(
         f"/api/app/v1/devices/{device}/preview",
-        headers={**_auth(token), "If-None-Match": '"deadbeefcafe0002"'},
+        headers={**_auth(token), "If-None-Match": if_none_match},
     )
     assert resp.status_code == 304
+    assert resp.headers["ETag"].strip('"') == "deadbeefcafe0002"
+    assert resp.headers["Cache-Control"] == "private, no-cache"
+
+
+def test_device_preview_missing_file_is_404_even_when_etag_matches(app: Flask) -> None:
+    device = _seed_device(app)
+    app.config["PUSH_MANAGER"] = _FakePush("deadbeefcafe0003")
+    token = _token(app)
+    resp = app.test_client().get(
+        f"/api/app/v1/devices/{device}/preview",
+        headers={**_auth(token), "If-None-Match": '"deadbeefcafe0003"'},
+    )
+    assert resp.status_code == 404
+
+
+@pytest.mark.parametrize("digest", ["../deadbeefcafe0004", "not-a-digest", 42])
+def test_device_preview_rejects_untrusted_digest_metadata(app: Flask, digest: object) -> None:
+    device = _seed_device(app)
+    app.config["PUSH_MANAGER"] = _FakePush(digest)
+    token = _token(app)
+    resp = app.test_client().get(f"/api/app/v1/devices/{device}/preview", headers=_auth(token))
+    assert resp.status_code == 404
+
+
+def test_device_preview_rejects_symlink(app: Flask, tmp_path: Path) -> None:
+    device = _seed_device(app)
+    renders = Path(app.config["RENDERS_DIR"])
+    outside = tmp_path / "outside.png"
+    outside.write_bytes(_PNG)
+    (renders / "deadbeefcafe0005.png").symlink_to(outside)
+    app.config["PUSH_MANAGER"] = _FakePush("deadbeefcafe0005")
+    token = _token(app)
+    resp = app.test_client().get(f"/api/app/v1/devices/{device}/preview", headers=_auth(token))
+    assert resp.status_code == 404
 
 
 def test_device_preview_404_when_no_frame(app: Flask) -> None:
     device = _seed_device(app)
     app.config["PUSH_MANAGER"] = _FakePush(None)
+    token = _token(app)
+    resp = app.test_client().get(f"/api/app/v1/devices/{device}/preview", headers=_auth(token))
+    assert resp.status_code == 404
+    assert resp.get_json()["error"]["code"] == "not_found"
+
+
+def test_device_preview_404_for_legacy_latest_without_logical_preview(app: Flask) -> None:
+    device = _seed_device(app)
+    _seed_render(app, "deadbeefcafe0000")
+    app.config["PUSH_MANAGER"] = _FakeLegacyPush()
     token = _token(app)
     resp = app.test_client().get(f"/api/app/v1/devices/{device}/preview", headers=_auth(token))
     assert resp.status_code == 404

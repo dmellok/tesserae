@@ -30,6 +30,14 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **Companion display previews now match each display's selected photo layout.**
+  The server retains a separate logical-screen PNG after Fit, Fill, Blur,
+  Stretch, or Center and device underscan are applied, so portrait displays no
+  longer show the unfitted source composition in the iOS app. Hardware-only
+  row-stride rotation and mount compensation remain confined to the device
+  artifact, while preview ETags, upgrade backfill, and artifact pruning track
+  the logical frame independently.
+
 - **The Webpage widget captures JavaScript pages after their data loads.** It was
   screenshotting the moment the embedded page fired its `load` event, before a data-driven
   page (a weather dashboard, an SPA) ran its post-load fetch and painted, so the panel showed a

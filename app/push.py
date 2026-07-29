@@ -51,6 +51,7 @@ from typing import Any, Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from app.device_loader import DeviceRegistry
+from app.device_preview import retained_device_preview, write_device_preview
 from app.dither_regions import has_nearest_region, regions_from_page
 from app.net_guard import BlockedURLError, assert_operator_url, fetch_bytes
 from app.palette_profiles import (
@@ -334,6 +335,7 @@ class RendererResult:
     digest: str
     url: str
     bytes_written: int
+    preview_digest: str | None = None
     error: str | None = None
     # v0.71.x (r/eink launch feedback): True when the composition_digest
     # matched the device's last-served digest and publish was skipped
@@ -582,13 +584,14 @@ class PushManager:
 
     def latest_render_for(self, device_id: str) -> dict[str, Any] | None:
         """The most recently published render for a device, or ``None``
-         if nothing has been pushed since startup.
+        if nothing has been pushed since startup.
 
-         Returns a dict ``{digest, ext, filename, timestamp, renderer_id}``
-        , same shape ``_fan_out`` writes into the in-memory map. Used
-         by pull-based transports (``app.trmnl_api.display``) so a TRMNL
-         client polling ``/api/display`` gets the URL of the actual
-         frame the renderer just wrote, not a stale guess."""
+        Returns a dict ``{digest, ext, filename, preview_digest, timestamp,
+        renderer_id}``, same shape ``_fan_out`` writes into the in-memory
+        map. Used
+        by pull-based transports (``app.trmnl_api.display``) so a TRMNL
+        client polling ``/api/display`` gets the URL of the actual
+        frame the renderer just wrote, not a stale guess."""
         return self._latest_renders.get(device_id)
 
     def consume_force_refetch(self, device_id: str) -> None:
@@ -1473,11 +1476,12 @@ class PushManager:
         return result
 
     def _live_digests(self) -> set[str]:
-        """Digests that must survive any artifact GC: the latest render
-        for every device (artifact digest + composition digest). Deleting
-        these while the frame is still on a panel kills its thumbnail and
-        its touch-region sidecar, after which every tap resolves
-        ``no_target`` and the touch monitor has nothing to overlay."""
+        """Digests that must survive artifact GC for every live frame.
+
+        This includes the device artifact, source composition, and logical
+        Companion preview. Deleting them while a frame is live breaks device
+        fetches, phone thumbnails, or touch-region resolution.
+        """
         live: set[str] = set()
         # Shallow copy: callers may or may not hold self._lock.
         entries = list(self._latest_renders.values())
@@ -1491,7 +1495,7 @@ class PushManager:
         for per_page in list(self._deck_renders.values()):
             entries.extend(per_page.values())
         for entry in entries:
-            for key in ("digest", "composition_digest"):
+            for key in ("digest", "composition_digest", "preview_digest"):
                 value = entry.get(key)
                 if isinstance(value, str) and value:
                     live.add(value)
@@ -1875,12 +1879,36 @@ class PushManager:
             )
             last = self._latest_renders.get(renderer.device)
             if not force_publish and last and last.get("render_signature") == signature:
+                # Upgrade/backfill path for servers whose latest-render record
+                # predates logical device previews, or whose preview PNG was
+                # pruned independently.  Do not repaint the e-ink panel merely
+                # to restore a phone thumbnail.
+                retained_preview = retained_device_preview(
+                    self._renders_dir, last.get("preview_digest")
+                )
+                if retained_preview is None:
+                    preview_source = self._overlay_low_battery_if_needed(
+                        composition_png, renderer.device
+                    )
+                    preview_digest = self._write_device_preview_best_effort(
+                        renderer,
+                        preview_source,
+                        panel,
+                        settings=render_settings,
+                    )
+                    if preview_digest is not None:
+                        last["preview_digest"] = preview_digest
                 result = RendererResult(
                     renderer_id=renderer.id,
                     topic=renderer.topic,
                     digest=str(last.get("digest") or ""),
                     url="",
                     bytes_written=0,
+                    preview_digest=(
+                        str(last.get("preview_digest"))
+                        if isinstance(last.get("preview_digest"), str)
+                        else None
+                    ),
                     unchanged=True,
                 )
                 results.append(result)
@@ -1943,6 +1971,7 @@ class PushManager:
                     # URL that always serves a viewable frame, even when
                     # the per-renderer artifact is a packed binary buffer.
                     "composition_digest": comp_digest,
+                    "preview_digest": result.preview_digest,
                     # Full render-input fingerprint (composition + panel +
                     # settings). The next push skips re-rendering only when
                     # this matches, so a gamut / calibration change repaints
@@ -2334,13 +2363,48 @@ class PushManager:
                 qos=1,
                 retain=renderer.retain,
             )
+        # Keep a separate logical-screen PNG for Companion display cards.
+        # This is deliberately best-effort: a disk/PNG failure must never
+        # turn a successful physical-device publish into a failed send.
+        preview_digest = self._write_device_preview_best_effort(
+            renderer,
+            composition_png,
+            panel,
+            settings=settings,
+        )
         return RendererResult(
             renderer_id=renderer.id,
             topic=renderer.topic,
             digest=digest,
             url=url,
             bytes_written=len(artifact),
+            preview_digest=preview_digest,
         )
+
+    def _write_device_preview_best_effort(
+        self,
+        renderer: Renderer,
+        composition_png: bytes,
+        panel: Panel,
+        *,
+        settings: dict[str, Any],
+    ) -> str | None:
+        """Retain a logical device preview without affecting delivery."""
+
+        try:
+            return write_device_preview(
+                self._renders_dir,
+                composition_png,
+                panel=panel,
+                settings=settings,
+            )
+        except Exception:
+            logger.exception(
+                "logical device preview failed for renderer=%s device=%s",
+                renderer.id,
+                renderer.device,
+            )
+            return None
 
     def _renderer_is_http_polled(self, renderer: Renderer) -> bool:
         """Return True when the renderer's bound device fetches frames
