@@ -355,6 +355,7 @@ class PushResult:
     error: str | None = None
     renderers: list[RendererResult] = field(default_factory=list)
     event_id: int | None = None
+    event_ids: tuple[int, ...] = ()
 
 
 class PushManager:
@@ -1724,6 +1725,16 @@ class PushManager:
         else:
             status = "sent"
         digest = next((r.composition_digest for r in group_results if r.composition_digest), "")
+        event_ids = tuple(
+            dict.fromkeys(
+                event_id
+                for result in group_results
+                for event_id in (
+                    result.event_ids or ((result.event_id,) if result.event_id is not None else ())
+                )
+                if event_id > 0
+            )
+        )
         return PushResult(
             status=status,
             page_id=page_id,
@@ -1731,6 +1742,8 @@ class PushManager:
             duration_s=time.monotonic() - started,
             renderers=all_renderers,
             error=None if status == "sent" else "one or more panels failed to render/publish",
+            event_id=event_ids[0] if len(event_ids) == 1 else None,
+            event_ids=event_ids,
         )
 
     def _push_bytes_locked(
@@ -2110,6 +2123,7 @@ class PushManager:
             error=error,
             renderers=results,
             event_id=event_id,
+            event_ids=(event_id,),
         )
 
     def _overlay_low_battery_if_needed(self, composition_png: bytes, device_id: str) -> bytes:

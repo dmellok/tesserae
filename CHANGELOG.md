@@ -30,6 +30,12 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **Companion Activity now keeps exact History and display identity.** Multi-panel
+  dashboard pushes preserve every canonical History event ID in their terminal
+  Job, and button-triggered fetch rows snapshot the originating device ID, so
+  clients no longer need title/time heuristics to suppress duplicate Activity
+  cards or identify the display that fetched a frame.
+
 - **Companion display previews now match each display's selected photo layout.**
   The server retains a separate logical-screen PNG after Fit, Fill, Blur,
   Stretch, or Center and device underscan are applied, so portrait displays no

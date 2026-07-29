@@ -846,6 +846,7 @@ def test_fetch_latest_press_emits_fetched_history_row(
     assert len(rows) == 1
     assert rows[0].status == "fetched"
     assert rows[0].digest is None
+    assert rows[0].extra["device_ids"] == ["kitchen"]
     assert rows[0].extra["action_spec"] == "fetch_latest"
     assert rows[0].extra["composition_digest"] == "composition456"
     assert rows[0].extra["pushed_page_id"] is None
@@ -877,6 +878,7 @@ def test_fetch_latest_without_existing_frame_keeps_preview_empty(
     row = _button_rows(event_log)[0]
     assert row.status == "fetched"
     assert row.digest is None
+    assert row.extra["device_ids"] == ["kitchen"]
     assert "composition_digest" not in row.extra
 
 

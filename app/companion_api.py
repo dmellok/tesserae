@@ -553,10 +553,18 @@ _PUBLISHED_STATUSES = frozenset({"sent", "no_change"})
 
 def _history_event_ids(result: Any) -> list[str] | None:
     """Exact canonical History correlation for a successful push result."""
+    correlated: list[str] = []
+    raw_event_ids = getattr(result, "event_ids", ())
+    if isinstance(raw_event_ids, (list, tuple)):
+        correlated.extend(
+            str(event_id)
+            for event_id in raw_event_ids
+            if isinstance(event_id, int) and event_id > 0
+        )
     event_id = getattr(result, "event_id", None)
     if isinstance(event_id, int) and event_id > 0:
-        return [str(event_id)]
-    return None
+        correlated.append(str(event_id))
+    return list(dict.fromkeys(correlated)) or None
 
 
 def _job_response(job: Any, status_code: int) -> Any:

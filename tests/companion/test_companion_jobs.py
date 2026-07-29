@@ -176,6 +176,15 @@ def test_dashboard_push_creates_job_that_publishes(app: Flask) -> None:
     assert fake.push_calls == [{"page_id": "pantry", "device_ids": {device}}]
 
 
+def test_history_event_ids_preserve_multi_panel_aggregate() -> None:
+    result = SimpleNamespace(
+        event_id=None,
+        event_ids=(101, 102, 101),
+    )
+
+    assert companion_api._history_event_ids(result) == ["101", "102"]
+
+
 def test_dashboard_push_unknown_dashboard_is_404(app: Flask) -> None:
     _install_fake_push(app)
     token = _token(app)
