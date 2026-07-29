@@ -33,6 +33,7 @@ def _app(
     devices: list[Any] | None = None,
     ha: bool = False,
     status: dict[str, Any] | None = None,
+    companion: int | None = None,
 ) -> tuple[_FakeApp, list[dict[str, Any]]]:
     app_section: dict[str, Any] = {"ha_discovery_enabled": ha, "online_features": online_on}
     settings = SimpleNamespace(get_section=lambda name, _s=app_section: _s if name == "app" else {})
@@ -48,6 +49,11 @@ def _app(
         "DEVICE_STATUS": status or {},
         "EVENT_LOG": event_log,
     }
+    if companion is not None:
+        # Only ``len(list_active())`` is read; the contents don't matter.
+        config["COMPANION_TOKENS"] = SimpleNamespace(
+            list_active=lambda _n=companion: list(range(_n))
+        )
     return _FakeApp(config), records
 
 
@@ -78,6 +84,21 @@ def test_build_payload_no_devices(tmp_path: Path, test_install_uuid: Any) -> Non
     app, _ = _app(tmp_path, install=test_install_uuid(), devices=[])
     p = heartbeat.build_payload(app)  # type: ignore[arg-type]
     assert p["devices"] == "0" and p["device_kinds"] == [] and p["transport"] == "none"
+
+
+def test_build_payload_companion_is_bucketed(tmp_path: Path, test_install_uuid: Any) -> None:
+    app, _ = _app(tmp_path, install=test_install_uuid(), companion=2)
+    p = heartbeat.build_payload(app)  # type: ignore[arg-type]
+    # Bucketed, never an exact count, and only the count, no client identity.
+    assert p["companion"] == "2-3"
+
+
+def test_build_payload_companion_defaults_to_zero_when_unwired(
+    tmp_path: Path, test_install_uuid: Any
+) -> None:
+    app, _ = _app(tmp_path, install=test_install_uuid())
+    p = heartbeat.build_payload(app)  # type: ignore[arg-type]
+    assert p["companion"] == "0"
 
 
 def test_build_payload_ignores_builtin_kinds(tmp_path: Path, test_install_uuid: Any) -> None:

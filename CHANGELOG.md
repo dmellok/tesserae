@@ -8,6 +8,12 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **The opt-in daily heartbeat now includes a bucketed count of paired companion apps.** Same
+  `0`/`1`/`2-3`/… bucketing as the device count, derived server-side from the live companion
+  tokens (never a client name, install id, or app version), so adoption of the community
+  companion app is visible without the app itself ever contacting api.tesserae.ink. Sent only
+  when online features are enabled, like the rest of the heartbeat; see the privacy page.
+
 - **REST devices work on publicly-hosted instances (opt-in).** A new Settings → Server → Network
   toggle, "Allow REST clients on public networks" (off by default), lets a device fetch its
   rendered frame over a public address using a signed, short-lived URL the server hands it after

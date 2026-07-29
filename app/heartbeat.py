@@ -2,9 +2,10 @@
 
 A once-a-day, best-effort ping that reports low-cardinality, aggregate facts
 about this install (version, platform family, deployment kind, transport, the
-set of registered device kinds, per-kind firmware versions, and a bucketed
-device count) so the maintainer can see how many installs are active, what
-firmware is in the field, and what to prioritise.
+set of registered device kinds, per-kind firmware versions, a bucketed device
+count, and a bucketed count of paired companion apps) so the maintainer can see
+how many installs are active, what firmware is in the field, and what to
+prioritise.
 
 Privacy: gated by the master online-features switch (nothing is sent when it's
 off); no personal data, no exact device counts, no exact timestamps (the server
@@ -169,6 +170,19 @@ def build_payload(app: Flask) -> dict[str, Any]:
     except Exception:
         ha = False
 
+    # Companion-app adoption: a bucketed count of paired companion clients
+    # (the community iOS app, issue #147). Derived from persistent state (the
+    # live tokens in CompanionTokenStore), not from any companion request, so
+    # nothing fires on the API call itself. Bucketed + anonymous: only the
+    # count leaves, never a client's name, installation id, or app version.
+    companion_count = 0
+    try:
+        companion_store = app.config.get("COMPANION_TOKENS")
+        if companion_store is not None:
+            companion_count = len(companion_store.list_active())
+    except Exception:
+        companion_count = 0
+
     return {
         "install": app.config.get("INSTALL_ID") or "",
         "version": app.config.get("APP_VERSION") or "",
@@ -182,6 +196,7 @@ def build_payload(app: Flask) -> dict[str, Any]:
         "device_kinds": kinds,
         "fw_by_kind": fw_by_kind,
         "ha": ha,
+        "companion": _devices_bucket(companion_count),
     }
 
 
