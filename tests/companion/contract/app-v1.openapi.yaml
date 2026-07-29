@@ -1,10 +1,11 @@
 openapi: 3.0.3
 info:
   title: Tesserae Companion API
-  version: 0.2.0
+  version: 0.4.0
   description: >-
-    Proposed minimal stable API for community-built companion clients. This
-    document is a contract proposal, not evidence that an endpoint is deployed.
+    Companion API contract for community-built clients. Previews, History,
+    resend, and server-advertised image fit modes are optional additive
+    extensions over the five-feature compatibility floor.
 servers:
   - url: /
 tags:
@@ -14,6 +15,7 @@ tags:
   - name: Dashboards
   - name: Images
   - name: Jobs
+  - name: History
 paths:
   /api/app/v1:
     get:
@@ -75,6 +77,38 @@ paths:
                 $ref: "#/components/schemas/DevicesResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
+  /api/app/v1/devices/{device_id}/preview:
+    parameters:
+      - $ref: "#/components/parameters/DeviceID"
+    get:
+      tags: [Displays]
+      operationId: getCompanionDevicePreview
+      summary: Read the latest device-specific viewable preview
+      parameters:
+        - $ref: "#/components/parameters/IfNoneMatch"
+      responses:
+        "200":
+          description: >-
+            Latest viewable PNG after image fit and device geometry have been
+            applied. Renderer-specific palette and quantisation should be
+            represented when a reusable PNG can be produced from that stage.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        "304":
+          description: The cached device preview is still current
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /api/app/v1/dashboards:
     get:
       tags: [Dashboards]
@@ -89,6 +123,51 @@ paths:
                 $ref: "#/components/schemas/DashboardsResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
+  /api/app/v1/dashboards/{dashboard_id}/preview:
+    parameters:
+      - $ref: "#/components/parameters/DashboardID"
+    get:
+      tags: [Dashboards]
+      operationId: getCompanionDashboardPreview
+      summary: Read or asynchronously prepare a cached dashboard preview
+      parameters:
+        - $ref: "#/components/parameters/IfNoneMatch"
+        - in: query
+          name: device_id
+          required: false
+          description: Optional target display whose panel dimensions should be used
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Cached dashboard composition PNG
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        "202":
+          description: A background preview render has been accepted
+          headers:
+            Retry-After:
+              description: Suggested retry delay in seconds
+              schema:
+                type: integer
+                minimum: 1
+        "304":
+          description: The cached composition is still current
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /api/app/v1/dashboards/{dashboard_id}/push:
     parameters:
       - $ref: "#/components/parameters/DashboardID"
@@ -183,6 +262,95 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
+  /api/app/v1/history:
+    get:
+      tags: [History]
+      operationId: listCompanionHistory
+      summary: List canonical server push History, newest first
+      parameters:
+        - in: query
+          name: before_id
+          required: false
+          description: Opaque cursor returned as next_before_id by the previous page
+          schema:
+            type: string
+        - in: query
+          name: limit
+          required: false
+          description: Requested page size, bounded by the server
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 30
+      responses:
+        "200":
+          description: Canonical push History page
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HistoryResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/app/v1/history/{history_id}/preview:
+    parameters:
+      - $ref: "#/components/parameters/HistoryID"
+    get:
+      tags: [History]
+      operationId: getCompanionHistoryPreview
+      summary: Read the retained composition thumbnail for a History row
+      parameters:
+        - $ref: "#/components/parameters/IfNoneMatch"
+      responses:
+        "200":
+          description: >-
+            Stored composition PNG identifying what was sent. This is not a
+            device-final preview.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        "304":
+          description: The cached History composition is still current
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /api/app/v1/history/{history_id}/resend:
+    parameters:
+      - $ref: "#/components/parameters/HistoryID"
+    post:
+      tags: [History]
+      operationId: resendCompanionHistory
+      summary: Republish a retained composition to its original target snapshot
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HistoryResendRequest"
+      responses:
+        "202":
+          $ref: "#/components/responses/JobAccepted"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
 components:
   securitySchemes:
     CompanionBearer:
@@ -190,6 +358,12 @@ components:
       scheme: bearer
       bearerFormat: opaque
   parameters:
+    DeviceID:
+      in: path
+      name: device_id
+      required: true
+      schema:
+        type: string
     DashboardID:
       in: path
       name: dashboard_id
@@ -199,6 +373,12 @@ components:
     JobID:
       in: path
       name: job_id
+      required: true
+      schema:
+        type: string
+    HistoryID:
+      in: path
+      name: history_id
       required: true
       schema:
         type: string
@@ -214,6 +394,18 @@ components:
         type: string
         minLength: 16
         maxLength: 128
+    IfNoneMatch:
+      in: header
+      name: If-None-Match
+      required: false
+      description: ETag from a previously returned preview
+      schema:
+        type: string
+  headers:
+    ETag:
+      description: Content-addressed preview validator
+      schema:
+        type: string
   responses:
     JobAccepted:
       description: Job persisted for asynchronous execution
@@ -296,7 +488,7 @@ components:
           uniqueItems: true
           items:
             type: string
-            enum: [devices, dashboards, dashboard_push, image_push, jobs]
+            enum: [devices, dashboards, dashboard_push, image_push, jobs, previews, history]
         limits:
           $ref: "#/components/schemas/Limits"
         web_url:
@@ -329,6 +521,15 @@ components:
               - image/heic
               - image/heif
               - image/webp
+        image_fit_modes:
+          description: >-
+            Image layout modes accepted by POST /images. When absent, clients
+            must assume only fit and fill for compatibility with contract 0.2.0.
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/ImageFitMode"
         job_retention_seconds:
           type: integer
           minimum: 60
@@ -514,8 +715,79 @@ components:
           items:
             type: string
         fit:
+          $ref: "#/components/schemas/ImageFitMode"
+        override_quiet_hours:
+          type: boolean
+          default: false
+    ImageFitMode:
+      type: string
+      enum: [fit, fill, blur, stretch, center]
+    HistoryResponse:
+      type: object
+      additionalProperties: false
+      required: [items, next_before_id]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/HistoryItem"
+        next_before_id:
+          description: Opaque cursor for the next older page, or null at the end
           type: string
-          enum: [fit, fill]
+          nullable: true
+    HistoryItem:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - created_at
+        - source
+        - label
+        - device_ids
+        - status
+        - preview_available
+        - resendable
+      properties:
+        id:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        source:
+          description: Stable server source identifier, additive over time
+          type: string
+        label:
+          type: string
+        device_ids:
+          description: Snapshot of the original delivery targets
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+        status:
+          description: Stable push outcome identifier, additive over time
+          type: string
+        duration_seconds:
+          type: number
+          minimum: 0
+          nullable: true
+        error:
+          type: string
+          nullable: true
+        preview_available:
+          type: boolean
+        resendable:
+          type: boolean
+        fit:
+          description: Original image fit mode when the source was arbitrary media
+          allOf:
+            - $ref: "#/components/schemas/ImageFitMode"
+          nullable: true
+    HistoryResendRequest:
+      type: object
+      additionalProperties: false
+      required: [override_quiet_hours]
+      properties:
         override_quiet_hours:
           type: boolean
           default: false
@@ -541,7 +813,7 @@ components:
           type: string
         kind:
           type: string
-          enum: [dashboard_push, image_push]
+          enum: [dashboard_push, image_push, history_resend]
         status:
           description: Execution lifecycle only; quiet is a successful result
           type: string
@@ -584,6 +856,14 @@ components:
           uniqueItems: true
           items:
             type: string
+        history_event_ids:
+          description: >-
+            Optional exact correlation to canonical History rows produced by
+            this job. Clients may otherwise refresh History after termination.
+          type: array
+          uniqueItems: true
+          items:
+            type: string
     JobFailure:
       type: object
       additionalProperties: false
@@ -615,6 +895,7 @@ components:
                 - unsupported_image
                 - image_too_large
                 - idempotency_conflict
+                - not_resendable
                 - temporarily_unavailable
             message:
               type: string

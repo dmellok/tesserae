@@ -38,14 +38,17 @@ class _FakePush:
         self.status = status
         self.push_calls: list[dict[str, Any]] = []
         self.image_calls: list[dict[str, Any]] = []
+        self._next_event_id = 100
 
     def push(self, page_id: str, **kwargs: Any) -> Any:
         self.push_calls.append({"page_id": page_id, "device_ids": set(kwargs["device_ids"])})
-        return SimpleNamespace(status=self.status, error=None)
+        self._next_event_id += 1
+        return SimpleNamespace(status=self.status, error=None, event_id=self._next_event_id)
 
     def push_image(self, image_bytes: bytes, **kwargs: Any) -> Any:
         self.image_calls.append({"device_id": kwargs["device_id"], "fit": kwargs["fit"]})
-        return SimpleNamespace(status=self.status, error=None)
+        self._next_event_id += 1
+        return SimpleNamespace(status=self.status, error=None, event_id=self._next_event_id)
 
 
 @pytest.fixture
@@ -169,6 +172,7 @@ def test_dashboard_push_creates_job_that_publishes(app: Flask) -> None:
     assert job["status"] == "succeeded"
     assert job["result"]["status"] == "published"
     assert job["result"]["device_ids"] == [device]
+    assert job["result"]["history_event_ids"] == ["101"]
     assert fake.push_calls == [{"page_id": "pantry", "device_ids": {device}}]
 
 
@@ -307,15 +311,14 @@ def test_reused_key_with_different_payload_conflicts(app: Flask) -> None:
 # -- image push ----------------------------------------------------------
 
 
-def test_image_push_creates_job_that_publishes(app: Flask) -> None:
+@pytest.mark.parametrize("fit", companion_api.IMAGE_FIT_MODES)
+def test_image_push_accepts_every_advertised_fit_mode(app: Flask, fit: str) -> None:
     fake = _install_fake_push(app)
     device = _seed_device(app)
     token = _token(app)
     data = {
         "image": (BytesIO(_png_bytes()), "photo.png", "image/png"),
-        "request": json.dumps(
-            {"device_ids": [device], "fit": "fill", "override_quiet_hours": True}
-        ),
+        "request": json.dumps({"device_ids": [device], "fit": fit, "override_quiet_hours": True}),
     }
     resp = app.test_client().post(
         "/api/app/v1/images",
@@ -332,7 +335,29 @@ def test_image_push_creates_job_that_publishes(app: Flask) -> None:
     assert job["status"] == "succeeded"
     assert job["result"]["status"] == "published"
     assert job["result"]["device_ids"] == [device]
-    assert fake.image_calls == [{"device_id": device, "fit": "fill"}]
+    assert job["result"]["history_event_ids"] == ["101"]
+    assert fake.image_calls == [{"device_id": device, "fit": fit}]
+
+
+@pytest.mark.parametrize("invalid_fit", ["tile", ["fit"]], ids=["unknown", "non-string"])
+def test_image_push_rejects_unadvertised_fit_mode(app: Flask, invalid_fit: Any) -> None:
+    _install_fake_push(app)
+    device = _seed_device(app)
+    token = _token(app)
+    data = {
+        "image": (BytesIO(_png_bytes()), "photo.png", "image/png"),
+        "request": json.dumps(
+            {"device_ids": [device], "fit": invalid_fit, "override_quiet_hours": True}
+        ),
+    }
+    resp = app.test_client().post(
+        "/api/app/v1/images",
+        data=data,
+        content_type="multipart/form-data",
+        headers=_auth(token, "idem-image-invalid-fit"),
+    )
+    assert resp.status_code == 400
+    assert resp.get_json()["error"]["code"] == "invalid_request"
 
 
 def test_image_push_rejects_unsupported_media_type(app: Flask) -> None:

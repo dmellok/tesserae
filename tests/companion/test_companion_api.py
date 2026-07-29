@@ -18,6 +18,7 @@ import jsonschema
 import pytest
 from flask import Flask
 
+from app import companion_api
 from app.main import REPO_ROOT, create_app
 from app.state.page_store import Page
 
@@ -100,9 +101,9 @@ def _seed_page(app: Flask, device_id: str) -> str:
 
 
 def test_capabilities_probe_is_unauthenticated_and_valid(app: Flask) -> None:
-    # Validate against the frozen 0.2.0 contract, whose features enum is the
-    # five baseline surfaces. The additive `previews` feature (gated on the
-    # browser pool) is covered separately in test_companion_previews.
+    # The additive `previews` feature is gated on the browser pool and covered
+    # separately in test_companion_previews. Canonical History is available
+    # whenever Companion 0.4 is served.
     app.config["BROWSER_POOL"] = None
     resp = app.test_client().get("/api/app/v1")
     assert resp.status_code == 200
@@ -120,7 +121,9 @@ def test_capabilities_probe_is_unauthenticated_and_valid(app: Flask) -> None:
         "dashboard_push",
         "image_push",
         "jobs",
+        "history",
     }
+    assert body["limits"]["image_fit_modes"] == list(companion_api.IMAGE_FIT_MODES)
     # No household content leaks from the unauthenticated probe.
     assert "devices" not in body and "dashboards" not in body
 

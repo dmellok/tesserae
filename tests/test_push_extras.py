@@ -162,6 +162,9 @@ def test_republish_reuses_stored_composition(tmp_path: Path, panel_png: bytes) -
     rows = event_log.list(type="push")
     assert rows[0].source == "resend"
     assert rows[0].target == "src.png"
+    # Companion 0.4 job correlation can use this exact returned ID; it
+    # never needs to infer the new row from timestamps or composition data.
+    assert resend.event_id == rows[0].id
     # The original target is preserved as the resend's target.
     assert len(client.published) == 1
 
@@ -194,6 +197,38 @@ def test_republish_replays_original_device_targets(tmp_path: Path, panel_png: by
     rows = event_log.list(type="push")
     assert rows[0].source == "resend"
     assert rows[0].extra["device_ids"] == ["dev1"]
+
+
+def test_republish_preserves_image_fit_and_can_narrow_original_targets(
+    tmp_path: Path, panel_png: bytes
+) -> None:
+    renderers = [
+        _stub_renderer(tmp_path, "pi_png__dev1", "png", False, device="dev1"),
+        _stub_renderer(tmp_path, "pi_png__dev2", "png", False, device="dev2"),
+    ]
+    manager, event_log, _client, _ = _wire(tmp_path, panel_png, renderers=renderers)
+
+    first = manager._fan_out(
+        panel_png,
+        {"w": 100, "h": 80},
+        source="file",
+        target="shared.png",
+        started=0.0,
+        device_filters={"dev1", "dev2"},
+        image_fit="blur",
+    )
+    assert first.status == "sent"
+    original = event_log.get(first.event_id)  # type: ignore[arg-type]
+    assert original is not None
+    assert original.extra["fit"] == "blur"
+
+    resend = manager.republish(first.event_id, device_ids={"dev2"})  # type: ignore[arg-type]
+    assert resend.status == "sent"
+    replay = event_log.get(resend.event_id)  # type: ignore[arg-type]
+    assert replay is not None
+    assert replay.source == "resend"
+    assert replay.extra["device_ids"] == ["dev2"]
+    assert replay.extra["fit"] == "blur"
 
 
 def test_republish_fails_when_thumbnail_evicted(tmp_path: Path, panel_png: bytes) -> None:

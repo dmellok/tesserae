@@ -1,9 +1,9 @@
 """Async job records for the Companion API write routes.
 
-A companion dashboard push or image push takes 5-15 seconds to render and
-publish, longer than an iOS Share Extension survives, so the write routes
-return ``202 accepted`` with a persisted job the client polls at
-``GET /api/app/v1/jobs/{id}`` until it reaches a terminal state.
+A companion dashboard push, image push, or history resend takes 5-15
+seconds to render and publish, longer than an iOS Share Extension survives,
+so the write routes return ``202 accepted`` with a persisted job the client
+polls at ``GET /api/app/v1/jobs/{id}`` until it reaches a terminal state.
 
 Two orthogonal axes, kept deliberately separate (discussion #147):
 
@@ -35,7 +35,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 
-JobKind = Literal["dashboard_push", "image_push"]
+JobKind = Literal["dashboard_push", "image_push", "history_resend"]
 JobStatus = Literal["accepted", "running", "succeeded", "failed"]
 ResultStatus = Literal["published", "quiet"]
 
@@ -148,15 +148,23 @@ class JobStore:
         result_status: ResultStatus,
         device_ids: list[str],
         reason: str | None = None,
+        history_event_ids: list[str] | None = None,
     ) -> None:
+        result: dict[str, Any] = {
+            "status": result_status,
+            "reason": reason,
+            "device_ids": list(device_ids),
+        }
+        # Optional so persisted jobs written before Companion 0.4 retain
+        # exactly their old public shape. New write paths include the IDs
+        # only when the server can correlate a terminal job with the
+        # canonical EventLog rows it created.
+        if history_event_ids is not None:
+            result["history_event_ids"] = list(dict.fromkeys(history_event_ids))
         self._transition(
             job_id,
             status="succeeded",
-            result={
-                "status": result_status,
-                "reason": reason,
-                "device_ids": list(device_ids),
-            },
+            result=result,
         )
 
     def mark_failed(self, job_id: str, *, code: str, message: str) -> None:

@@ -290,6 +290,7 @@ class EventLog:
         *,
         type: str | None = None,
         source: str | None = None,
+        before_id: int | None = None,
         exclude_statuses: tuple[str, ...] | None = None,
         limit: int = 100,
     ) -> list[EventRow]:
@@ -302,6 +303,9 @@ class EventLog:
         if source is not None:
             clauses.append("source = ?")
             params.append(source)
+        if before_id is not None:
+            clauses.append("id < ?")
+            params.append(before_id)
         if exclude_statuses:
             placeholders = ",".join("?" * len(exclude_statuses))
             clauses.append(f"status NOT IN ({placeholders})")

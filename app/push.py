@@ -94,6 +94,7 @@ from app.transport import MqttTransport
 # hundred KB).
 _PRECOMPOSE_TTL_S = 60.0
 _PRECOMPOSE_CAP = 6
+_IMAGE_FIT_MODES = frozenset({"fit", "fill", "blur", "stretch", "center"})
 
 
 def _resolve_full_profile(
@@ -1377,10 +1378,20 @@ class PushManager:
         self._notify(result)
         return result
 
-    def republish(self, event_id: int) -> PushResult:
+    def republish(
+        self,
+        event_id: int,
+        *,
+        device_ids: set[str] | None = None,
+    ) -> PushResult:
         """Re-publish a past push from its stored composition PNG. No
         re-render, no re-download. Records a new event row tagged
-        ``source="resend"`` so history keeps the link to the original."""
+        ``source="resend"`` so history keeps the link to the original.
+
+        ``device_ids`` optionally narrows the original target snapshot. The
+        Companion resend route uses that to respect per-device quiet hours;
+        callers that omit it retain the History page's existing behaviour.
+        """
         record = self._event_log.get(event_id)
         if record is None:
             result = PushResult(status="not_found", page_id="", error="history record not found")
@@ -1408,9 +1419,28 @@ class PushManager:
                 # device's latest-render entry never updates and its
                 # /frame poll keeps 304-ing on the OLD frame (#119).
                 extra = record.extra if isinstance(record.extra, dict) else {}
-                device_ids = [
+                original_device_ids = [
                     d for d in (extra.get("device_ids") or []) if isinstance(d, str) and d
                 ]
+                if device_ids is not None:
+                    selected_ids = [d for d in original_device_ids if d in device_ids]
+                    if not selected_ids:
+                        result = PushResult(
+                            status="failed",
+                            page_id=record.target,
+                            composition_digest=record.digest,
+                            error="no original targets remain eligible for resend",
+                        )
+                        self._notify(result)
+                        return result
+                else:
+                    selected_ids = original_device_ids
+                fit_candidate = extra.get("fit", extra.get("image_fit"))
+                original_fit = (
+                    fit_candidate
+                    if isinstance(fit_candidate, str) and fit_candidate in _IMAGE_FIT_MODES
+                    else None
+                )
                 # Republish is a user-initiated resend from the History
                 # page; treat it as user intent (bypass coalescing) so
                 # the user's re-send never gets silently superseded.
@@ -1428,11 +1458,12 @@ class PushManager:
                     # virtual panel, same as the original unbound push).
                     result = self._fan_out(
                         comp_path.read_bytes(),
-                        self._panel_dims_for_send(device_ids[0] if device_ids else None),
+                        self._panel_dims_for_send(selected_ids[0] if selected_ids else None),
                         source="resend",
                         target=record.target,
                         started=time.monotonic(),
-                        device_filters=set(device_ids) if device_ids else None,
+                        device_filters=set(selected_ids) if selected_ids else None,
+                        image_fit=original_fit,
                         force_publish=True,
                         force_client_refetch=True,
                     )
@@ -2016,6 +2047,12 @@ class PushManager:
                 }
                 - {""}
             )
+        event_extra: dict[str, Any] = {
+            "renderers": [asdict(r) for r in results],
+            "device_ids": targeted_ids,
+        }
+        if image_fit in _IMAGE_FIT_MODES:
+            event_extra["fit"] = image_fit
         event_id = self._event_log.record(
             type="push",
             source=source,
@@ -2024,10 +2061,7 @@ class PushManager:
             digest=comp_digest,
             error=error,
             duration_s=duration,
-            extra={
-                "renderers": [asdict(r) for r in results],
-                "device_ids": targeted_ids,
-            },
+            extra=event_extra,
         )
 
         # Roll the orphan-render sweep on a cadence (the just-written
