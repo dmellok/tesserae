@@ -30,6 +30,11 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **The refresh button now works on a plain bound dashboard.** Pressing refresh on a
+  display that isn't driven by a rotation or deck re-renders whatever dashboard it is
+  currently showing and sends it, instead of doing nothing. A device that has never
+  displayed a dashboard still no-ops, since there is nothing to refresh.
+
 - **Layout preset thumbnails no longer distort on extreme panels.** The little
   split-pattern hints in the dashboard editor now use a fixed aspect ratio
   instead of the panel's, so a very wide or small display (e.g. a 296x128

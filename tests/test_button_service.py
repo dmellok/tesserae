@@ -285,6 +285,62 @@ def test_refresh_forces_push_of_current_page(
     assert result.pushed_page_id == "morning"
 
 
+def test_refresh_rerenders_current_page_when_no_rotation_bound(
+    rotation_store: RotationStore,
+    state_store: DeviceRotationStateStore,
+    settings_store: SettingsStore,
+    page_store: PageStore,
+    push_manager: StubPushManager,
+    clock: FakeClock,
+) -> None:
+    """Issue #146: a bare refresh on a device that isn't driven by a
+    rotation/deck re-renders whatever dashboard it last displayed."""
+    # No rotation bound; the device is simply showing a pushed dashboard.
+    push_manager.latest_renders["standalone"] = {"page_id": "morning"}
+    settings_store.patch_section("app", {"button_map": {"refresh": "refresh"}})
+    svc = _wire(
+        rotation_store=rotation_store,
+        state_store=state_store,
+        settings_store=settings_store,
+        page_store=page_store,
+        push_manager=push_manager,
+        clock=clock,
+    )
+
+    result = svc.handle_button(device_id="standalone", button="refresh", event_id=1)
+
+    assert result.rotation_id is None
+    assert result.pushed_page_id == "morning"
+    assert push_manager.calls[0]["page_id"] == "morning"
+    assert push_manager.calls[0]["device_ids"] == {"standalone"}
+
+
+def test_refresh_without_prior_render_is_noop(
+    rotation_store: RotationStore,
+    state_store: DeviceRotationStateStore,
+    settings_store: SettingsStore,
+    page_store: PageStore,
+    push_manager: StubPushManager,
+    clock: FakeClock,
+) -> None:
+    """A device that has never displayed a dashboard has nothing to
+    re-render, so a bare refresh still no-ops."""
+    settings_store.patch_section("app", {"button_map": {"refresh": "refresh"}})
+    svc = _wire(
+        rotation_store=rotation_store,
+        state_store=state_store,
+        settings_store=settings_store,
+        page_store=page_store,
+        push_manager=push_manager,
+        clock=clock,
+    )
+
+    result = svc.handle_button(device_id="never_rendered", button="refresh", event_id=1)
+
+    assert result.pushed_page_id is None
+    assert push_manager.calls == []
+
+
 def test_fetch_latest_does_not_push_or_set_manual_override(
     rotation_store: RotationStore,
     state_store: DeviceRotationStateStore,

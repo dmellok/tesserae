@@ -1608,6 +1608,13 @@ class ButtonService:
         # new state on this same wake. If we can't push (missing
         # PushManager, quiet hours, lock contention), leave the state
         # updated so the next timer wake catches up.
+        # Resolve the action name once; the refresh fallback below and the
+        # webhook dispatch further down both need it.
+        try:
+            action_name, action_arg = parse_action_spec(spec)
+        except ButtonActionError:
+            action_name, action_arg = ("", None)
+
         pushed_page_id: str | None = None
         push_result: PushResult | None = None
         pusher = self._push_getter()
@@ -1616,6 +1623,16 @@ class ButtonService:
                 pushed_page_id = result.target_page_id
             elif rotation is not None and (rotation_changed or result.force_refresh):
                 pushed_page_id = rotation.steps[result.new_step_index].page_id
+            elif action_name == "refresh" and result.force_refresh:
+                # No rotation, deck, or target page drove this wake. Honour a
+                # bare refresh by re-rendering whatever dashboard is currently
+                # on the device (issue #146): the authoritative "what's on the
+                # glass" is the page whose frame we last pushed here.
+                latest_for = getattr(pusher, "latest_render_for", None)
+                rec = latest_for(device_id) if callable(latest_for) else None
+                candidate = rec.get("page_id") if isinstance(rec, dict) else None
+                if isinstance(candidate, str) and candidate:
+                    pushed_page_id = candidate
             if pushed_page_id is not None:
                 try:
                     push_result = pusher.push(
@@ -1637,10 +1654,6 @@ class ButtonService:
         # doesn't block on external endpoints. ``dispatch`` has already
         # validated the URL shape (http(s), non-empty), so we just
         # extract the arg and hand it off to the daemon thread.
-        try:
-            action_name, action_arg = parse_action_spec(spec)
-        except ButtonActionError:
-            action_name, action_arg = ("", None)
         if action_name == "webhook" and action_arg:
             payload: dict[str, object] = {
                 "device_id": device_id,
