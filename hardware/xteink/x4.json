@@ -1,0 +1,22 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "xteink_x4",
+  "name": "Xteink X4",
+  "vendor": "Xteink",
+  "url": "https://www.xteink.com/",
+  "icon": "device-tablet",
+  "description": "4.26 inch monochrome ePaper e-reader, ESP32-C3, 800x480 panel mounted portrait (480x800 presentation). Speaks Tesserae's v1 REST device API when running CrossInk firmware with Tesserae client support: the dashboard is painted as the reader's sleep screen on an explicit sleep transition, so the radio never comes up on a timer. Server-side pack via esp32_bw_bin produces a raw 1-bpp mono buffer (48000 bytes) that is byte-identical to the firmware's framebuffer and is painted with no on-device decode.",
+  "protocol": "esp32_bw_client",
+  "panel": {
+    "w": 480,
+    "h": 800,
+    "orientation": "portrait_flipped",
+    "name": "4.26 inch monochrome ePaper (800x480 native)",
+    "gamut": "mono",
+    "native_w": 800,
+    "native_h": 480
+  },
+  "refresh_floor_s": 60,
+  "image_format": "bin",
+  "notes_md": "Tested on real hardware (GDEQ0426T82 / SSD1677) running CrossInk 1.4.0 with Tesserae client support. Wire format is exactly 48000 bytes (800*480/8), MSB=leftmost pixel, bit-set=white, bit-clear=black; no header, no padding, no checksum, identical to seeed_reterminal_e1001 and xiao_epaper_75. A frame fetched and painted end-to-end on the device.\n\nThe panel is physically mounted portrait, so compose at 480x800 and let the renderer pack at the 800x480 firmware-native stride.\n\nWhat was measured: registering the same unit against the landscape `xiao_epaper_75` kind, which applies no rotation at all, painted the dashboard 180 degrees out. That establishes a uniform 180-degree offset between the renderer's default scan origin and the firmware's framebuffer, which is what `portrait_flipped` corrects.\n\nWhat was derived rather than measured: the specific 480x800 `portrait_flipped` combination here. It follows from the measured offset plus the firmware's portrait coordinate transform (90 degrees CW, so logical top-left lands at physical bottom-left), but it has not itself been round-tripped on the panel yet. If a dashboard renders upside-down with this entry, change `orientation` to `portrait`.\n\nXteink shipped a second panel revision mid-production (SSD1677 -> UC8179). The firmware detects the controller at boot and both revisions consume the same buffer, so no separate SKU is needed."
+}

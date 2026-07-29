@@ -33,6 +33,7 @@ A renderer turns the composition PNG into the exact bytes a client wants. Each s
 | `circuitpython_png` | `.png` | - | Composition PNG quantized to the panel's palette and emitted as an indexed PNG sized for adafruit_imageload on CircuitPython microcontrollers. |
 | `esp32_bin` | `.bin` | [tesserae-device-esp32-bin (13.3" Waveshare)](https://github.com/dmellok/tesserae-device-esp32-bin)<br>[tesserae-device-photopainter-7.3-bin (7.3" PhotoPainter)](https://github.com/dmellok/tesserae-device-photopainter-7.3-bin) | Composition PNG packed into the Waveshare E6 4-bpp buffer the ESP32 firmware streams to SPI. |
 | `esp32_bw_bin` | `.bin` | - | Composition PNG dithered to mono B/W and packed into a 1-bpp raw buffer the ESP32 firmware (e.g. |
+| `esp32_gray2_bin` | `.bin` | - | Composition PNG dithered to 4-level grayscale and packed into a 2-bpp raw buffer for UC8179-class mono panels driven in their 4-gray waveform mode. |
 | `esp32_gray_bin` | `.bin` | - | Composition PNG dithered to 16-level grayscale and packed into a 4-bpp raw buffer the ESP32 firmware streams straight to the IT8951 controller's image buffer. |
 | `pi_bin` | `.bin` | [tesserae-device-pi-bin](https://github.com/dmellok/tesserae-device-pi-bin) | Composition PNG packed into the panel-native 4-bpp buffer the .bin Pi client consumes. |
 | `pi_png` | `.png` | [tesserae-device-pi-png](https://github.com/dmellok/tesserae-device-pi-png) | Composition PNG, rotated to the Pi client's landscape-native pixel grid. |
@@ -71,11 +72,13 @@ The reTerminal E-Series and XIAO ePaper family run the [Tesserae-native firmware
 | [Seeed XIAO ePaper EE04 (7.3" Spectra 6)](https://www.seeedstudio.com/XIAO-ePaper-Display-Board-EE04-p-6560.html) | 800×480 | `spectra_6` | `esp32_client` (inherit) | `seeed_ee04_73e6` |
 | [Seeed XIAO ePaper EE04 (7.5" mono)](https://www.seeedstudio.com/XIAO-ePaper-Display-Board-EE04-p-6560.html) | 800×480 | `mono` | `esp32_bw_client` (inherit) | `seeed_ee04_75` |
 | [Seeed reTerminal E1001](https://www.seeedstudio.com/reTerminal-E1001-p-6534.html) | 800×480 | `mono` | `esp32_bw_client` (inherit) | `seeed_reterminal_e1001` |
+| [Seeed reTerminal E1001 (4-level grayscale)](https://www.seeedstudio.com/reTerminal-E1001-p-6534.html) | 800×480 | `mono` | `esp32_bw_client` <br> `esp32_gray2_bin` | `seeed_reterminal_e1001_gray` |
 | [Seeed reTerminal E1002](https://www.seeedstudio.com/reTerminal-E1002-p-6533.html) | 800×480 | `spectra_6` | `esp32_client` (inherit) | `seeed_reterminal_e1002` |
 | [Seeed reTerminal E1003](https://www.seeedstudio.com/reTerminal-E1003-p-6731.html) | 1872×1404 | `mono` | `esp32_client` <br> `esp32_gray_bin` | `seeed_reterminal_e1003` |
 | [Seeed reTerminal E1004](https://www.seeedstudio.com/reTerminal-E1004-p-6692.html) | 1200×1600 portrait | `spectra_6` | `esp32_client` (inherit) | `seeed_reterminal_e1004` |
 | [Seeed XIAO 7.5" ePaper Panel](https://www.seeedstudio.com/XIAO-7-5-ePaper-Panel-p-6416.html) | 800×480 | `mono` | `trmnl_client` (inherit) | `seeed_xiao_75` |
 | [Seeed XIAO ePaper 7.5" (mono)](https://www.seeedstudio.com/XIAO-7-5-ePaper-Panel-p-6416.html) | 800×480 | `mono` | `esp32_bw_client` (inherit) | `xiao_epaper_75` |
+| [Seeed XIAO ePaper 7.5" (black/white/red)](https://www.seeedstudio.com/XIAO-7-5-ePaper-Panel-p-6416.html) | 800×480 | `bwr_3` | `esp32_bw_client` <br> `esp32_bin` | `xiao_epaper_75_bwr` |
 
 ### [Pimoroni](https://shop.pimoroni.com/)
 
@@ -98,6 +101,16 @@ The reTerminal E-Series and XIAO ePaper family run the [Tesserae-native firmware
 | [Waveshare 4.2" B/W e-paper](https://www.waveshare.com/4.2inch-e-paper-module.htm) | 400×300 | `mono` | `esp32_bw_client` (inherit) | `waveshare_4_2_bw` |
 | [Waveshare 13.3" Spectra E6 (ESP32-S3)](https://www.waveshare.com/esp32-s3-epaper-13.3e6.htm) | 1200×1600 portrait | `waveshare_e6` | `esp32_client` (inherit) | `waveshare_133e6` |
 
+### [Xteink](https://www.xteink.com/)
+
+E-readers rather than dedicated dashboard panels. These run [CrossInk](https://github.com/uxjulia/CrossInk) firmware with Tesserae client support, which paints the dashboard as the reader's sleep screen on an explicit sleep transition rather than on a timer, so the radio never wakes the device on its own. The panels are mounted portrait, so the manifests compose at the portrait dimensions and let `esp32_bw_bin` pack at the landscape firmware-native stride.
+
+| SKU | Panel | Gamut | Protocol / Renderer | Kind id |
+|---|---|---|---|---|
+| [Xteink X3](https://www.xteink.com/) | 528×792 portrait_flipped | `mono` | `esp32_bw_client` (inherit) | `xteink_x3` |
+| [Xteink X4](https://www.xteink.com/) | 480×800 portrait_flipped | `mono` | `esp32_bw_client` (inherit) | `xteink_x4` |
+| [Xteink X4 Pro](https://www.xteink.com/) | 480×800 portrait_flipped | `mono` | `esp32_bw_client` (inherit) | `xteink_x4_pro` |
+
 ### Community
 
 Hardware supported by community-authored firmware. Each SKU below links to the firmware repo that talks Tesserae's device API on that hardware; credit sits with the firmware's author on the linked repo.
@@ -115,7 +128,8 @@ Honest status from the maintainer's own bench. Untested doesn't mean broken, it 
 | `circuitpython_bmp` | - | :material-circle-outline: Not yet tested | - |
 | `circuitpython_png` | - | :material-circle-outline: Not yet tested | - |
 | `esp32_bin` | Waveshare 13.3" Spectra 6 (ESP32-S3-WROOM-2) + Waveshare 7.3" PhotoPainter (ESP32-S3) | :material-check-circle: Tested | Primary daily driver, battery-powered, deep-sleep. The 13.3" client lives at tesserae-device-esp32-bin; the 7.3" PhotoPainter client at tesserae-device-photopainter-7.3-bin. Both pair with the same renderer; the panel preset (waveshare_e6_13_3 vs waveshare_photopainter_7_3) selects the firmware-native row stride. |
-| `esp32_bw_bin` | - | :material-circle-outline: Not yet tested | - |
+| `esp32_bw_bin` | Xteink X4 (GDEQ0426T82 / SSD1677, 800x480 mono) running CrossInk with Tesserae client support | :material-progress-helper: Partial | 1-bpp packing confirmed end-to-end: a 48000-byte frame fetched and painted on the panel with no on-device decode. The X4 is an e-reader, so the dashboard is its sleep screen rather than a wake-cycle refresh. Marked Partial because the portrait_flipped composition path is derived from a measured 180-degree offset rather than round-tripped on the panel, and the Seeed 800x480 mono SKUs sharing this renderer are still unconfirmed. |
+| `esp32_gray2_bin` | - | :material-circle-outline: Not yet tested | - |
 | `esp32_gray_bin` | - | :material-circle-outline: Not yet tested | - |
 | `pi_bin` | Pimoroni Inky Impression (Spectra 6 / Waveshare E6) | :material-check-circle: Tested | Fastest Pi path, packed buffer written straight to inky's _buf. |
 | `pi_png` | Pimoroni Inky Impression (via inky set_image) | :material-check-circle: Tested | Works on every inky-supported panel; quantises on the Pi each frame. |

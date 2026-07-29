@@ -1,0 +1,22 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "xteink_x4_pro",
+  "name": "Xteink X4 Pro",
+  "vendor": "Xteink",
+  "url": "https://www.xteink.com/",
+  "icon": "device-tablet",
+  "description": "4.2 inch monochrome ePaper e-reader, ESP32-S3 sibling of the X4 with capacitive touch and a warm/cool frontlight. Same 800x480 SSD1677 panel mounted portrait (480x800 presentation) and the same 48000-byte 1-bpp wire format, so the frame is byte-identical to the xteink_x4 target.",
+  "protocol": "esp32_bw_client",
+  "panel": {
+    "w": 480,
+    "h": 800,
+    "orientation": "portrait_flipped",
+    "name": "4.2 inch monochrome ePaper (800x480 native)",
+    "gamut": "mono",
+    "native_w": 800,
+    "native_h": 480
+  },
+  "refresh_floor_s": 60,
+  "image_format": "bin",
+  "notes_md": "Awaiting confirmed test on real hardware. Panel geometry and controller are identical to the X4 (SSD1677, 800x480, 48000 bytes), and the board profile differs only in MCU (ESP32-S3), touch, frontlight and a PSRAM-backed framebuffer, so this entry mirrors `xteink_x4` exactly.\n\n`portrait_flipped` is carried over from the hardware-verified X4 entry on the assumption that the framebuffer scan origin is the same. That assumption is untested here: if a dashboard renders upside-down on an X4 Pro, change `orientation` to `portrait` and report it, because it would mean the two boards differ in framebuffer presentation despite sharing a controller."
+}
