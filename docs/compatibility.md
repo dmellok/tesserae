@@ -109,6 +109,7 @@ E-readers rather than dedicated dashboard panels. These run [CrossInk](https://g
 |---|---|---|---|---|
 | [Xteink X3](https://www.xteink.com/) | 528×792 portrait_flipped | `mono` | `esp32_bw_client` (inherit) | `xteink_x3` |
 | [Xteink X4](https://www.xteink.com/) | 480×800 portrait_flipped | `mono` | `esp32_bw_client` (inherit) | `xteink_x4` |
+| [Xteink X4 (4-level grayscale)](https://www.xteink.com/) | 480×800 portrait_flipped | `mono` | `esp32_bw_client` <br> `esp32_gray2_bin` | `xteink_x4_gray` |
 | [Xteink X4 Pro](https://www.xteink.com/) | 480×800 portrait_flipped | `mono` | `esp32_bw_client` (inherit) | `xteink_x4_pro` |
 
 ### Community
