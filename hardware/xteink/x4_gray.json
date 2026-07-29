@@ -1,0 +1,23 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "xteink_x4_gray",
+  "name": "Xteink X4 (4-level grayscale)",
+  "vendor": "Xteink",
+  "url": "https://www.xteink.com/",
+  "icon": "device-tablet",
+  "description": "Xteink X4 driven in its 4-level grayscale mode rather than pure 1-bit mono. Same 800x480 panel mounted portrait (480x800 presentation) and the same CrossInk sleep-screen client as xteink_x4, but the server packs a 2-bpp buffer (96000 bytes) via esp32_gray2_bin and the firmware composites it as a base frame plus two grayscale planes. Pick this over xteink_x4 when the dashboard has photos or shading; stay on xteink_x4 for text and line art, where the extra levels buy little and the frame is half the size.",
+  "protocol": "esp32_bw_client",
+  "panel": {
+    "w": 480,
+    "h": 800,
+    "orientation": "portrait_flipped",
+    "name": "4.26 inch ePaper, 4-level grayscale (800x480 native)",
+    "gamut": "mono",
+    "native_w": 800,
+    "native_h": 480
+  },
+  "renderers": ["esp32_gray2_bin"],
+  "refresh_floor_s": 60,
+  "image_format": "bin",
+  "notes_md": "Grayscale sibling of `xteink_x4`. Mirrors the `seeed_reterminal_e1001_gray` pattern: same `esp32_bw_client` protocol and panel block as the mono entry, with the renderer overridden to `esp32_gray2_bin`.\n\nWire format is exactly 96000 bytes (800*480/4), 4 px/byte, MSB-first, `0b00` black to `0b11` white, linear. That packing and those level semantics match CrossInk's own 2-bpp bitmap reader byte for byte, so the firmware expands the frame straight into its `GRAYSCALE_LSB` / `GRAYSCALE_MSB` planes with no decode: LSB set where the level is 1, MSB set where it is 1 or 2, and the base frame white only where the level is 3.\n\nThe X4's newer panel revision (SSD1677 -> UC8179) is the UC81xx-class silicon this renderer targets; the firmware detects the controller at boot and both revisions take the same buffer.\n\nCosts relative to `xteink_x4`: double the download per refresh, and three panel passes instead of one (base frame plus two planes), so a noticeably longer sleep-entry paint on a battery shared with an e-reader.\n\nAwaiting confirmed test on real hardware, including whether `portrait_flipped` is right here — it is inherited from the mono entry, which shares the panel and scan origin, so it should be, but the grayscale composite has not been round-tripped on the panel yet."
+}
