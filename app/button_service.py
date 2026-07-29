@@ -1767,6 +1767,7 @@ class ButtonService:
                 duration_s=0.0,
                 extra={
                     **origin_extra,
+                    "device_ids": [result.device_id],
                     "action_spec": result.action_spec,
                     "action_description": result.action_description,
                     "rotation_id": result.rotation_id,

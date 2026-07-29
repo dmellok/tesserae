@@ -681,6 +681,10 @@ def test_multi_device_page_renders_once_per_panel_and_routes(
         "esp32_bin__esp32_land",
         "esp32_bin__esp32_port",
     }
+    assert result.event_id is None
+    assert len(result.event_ids) == 2
+    assert len(set(result.event_ids)) == 2
+    assert all(manager._event_log.get(event_id) is not None for event_id in result.event_ids)
 
 
 def test_push_device_filter_targets_single_display(tmp_path: Path, composition_png: bytes) -> None:
