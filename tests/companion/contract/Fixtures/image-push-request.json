@@ -2,6 +2,6 @@
   "device_ids": [
     "picpak-kitchen"
   ],
-  "fit": "fill",
+  "fit": "blur",
   "override_quiet_hours": false
 }
