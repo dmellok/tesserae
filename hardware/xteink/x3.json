@@ -1,0 +1,22 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "xteink_x3",
+  "name": "Xteink X3",
+  "vendor": "Xteink",
+  "url": "https://www.xteink.com/",
+  "icon": "device-tablet",
+  "description": "Monochrome ePaper e-reader, ESP32-C3, 792x528 panel mounted portrait (528x792 presentation). Sibling of the Xteink X4 sharing the same firmware binary and the same Tesserae client path, but with a larger panel and a different controller family (UC8253, or UC8279d on later production runs). Server-side pack via esp32_bw_bin produces a raw 1-bpp mono buffer of 52272 bytes.",
+  "protocol": "esp32_bw_client",
+  "panel": {
+    "w": 528,
+    "h": 792,
+    "orientation": "portrait_flipped",
+    "name": "Monochrome ePaper (792x528 native)",
+    "gamut": "mono",
+    "native_w": 792,
+    "native_h": 528
+  },
+  "refresh_floor_s": 60,
+  "image_format": "bin",
+  "notes_md": "Awaiting confirmed test on real hardware, and not yet usable: CrossInk's Tesserae client currently validates the downloaded frame against a hard 48000-byte expectation and refuses anything else, so an X3 falls back to its normal sleep screen rather than painting. This entry exists so the server side is ready when the firmware gains a per-device frame size.\n\nWire format follows the esp32_bw_bin contract: exactly 52272 bytes (792*528/8), MSB=leftmost pixel, bit-set=white, bit-clear=black, no header or padding. 792 is a multiple of 8, so the packer needs no row padding.\n\nBoth `orientation` and the controller behaviour are unverified. `portrait_flipped` is inherited from the hardware-verified `xteink_x4` entry, but the X3 uses a different controller family (UC8253 / UC8279d rather than SSD1677) and a different resolution, so its framebuffer scan origin may well differ. Treat the flip as a starting guess: if a dashboard renders upside-down, switch to `portrait`."
+}

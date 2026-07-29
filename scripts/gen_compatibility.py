@@ -35,6 +35,7 @@ VENDOR_ORDER: list[tuple[str, str]] = [
     ("pimoroni", "Pimoroni"),
     ("trmnl", "TRMNL"),
     ("waveshare", "Waveshare"),
+    ("xteink", "Xteink"),
     ("community", "Community"),
 ]
 
@@ -45,6 +46,7 @@ VENDOR_URL: dict[str, str] = {
     "pimoroni": "https://shop.pimoroni.com/",
     "trmnl": "https://usetrmnl.com/",
     "waveshare": "https://www.waveshare.com/",
+    "xteink": "https://www.xteink.com/",
 }
 
 # Vendor id -> intro paragraph. Rendered between the vendor heading and
@@ -60,6 +62,16 @@ VENDOR_INTRO: dict[str, str] = {
         "Web Serial, no toolchain). Battery-powered, no assembly required. "
         'The XIAO 7.5" and TRMNL 7.5" OG DIY Kit also run the TRMNL BYOS '
         "firmware path if you'd rather stay on stock."
+    ),
+    "xteink": (
+        "E-readers rather than dedicated dashboard panels. These run "
+        "[CrossInk](https://github.com/uxjulia/CrossInk) firmware with "
+        "Tesserae client support, which paints the dashboard as the reader's "
+        "sleep screen on an explicit sleep transition rather than on a timer, "
+        "so the radio never wakes the device on its own. The panels are "
+        "mounted portrait, so the manifests compose at the portrait "
+        "dimensions and let `esp32_bw_bin` pack at the landscape "
+        "firmware-native stride."
     ),
     "community": (
         "Hardware supported by community-authored firmware. Each SKU below "

@@ -16,6 +16,11 @@
       "hardware": "Pimoroni Inky Impression (via inky set_image)",
       "notes": "Works on every inky-supported panel; quantises on the Pi each frame."
     },
+    "esp32_bw_bin": {
+      "status": "Partial",
+      "hardware": "Xteink X4 (GDEQ0426T82 / SSD1677, 800x480 mono) running CrossInk with Tesserae client support",
+      "notes": "1-bpp packing confirmed end-to-end: a 48000-byte frame fetched and painted on the panel with no on-device decode. The X4 is an e-reader, so the dashboard is its sleep screen rather than a wake-cycle refresh. Marked Partial because the portrait_flipped composition path is derived from a measured 180-degree offset rather than round-tripped on the panel, and the Seeed 800x480 mono SKUs sharing this renderer are still unconfirmed."
+    },
     "trmnl_png": {
       "status": "Tested",
       "hardware": "Amazon Kindle Paperwhite 2 (jailbroken) via KOReader trmnl-display plugin",
