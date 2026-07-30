@@ -14,7 +14,8 @@
       "last_seen_at": "2026-07-28T07:58:30Z",
       "battery_percent": 86,
       "rssi_dbm": -54,
-      "firmware_version": "1.8.0"
+      "firmware_version": "1.8.0",
+      "has_pending_render": true
     },
     {
       "id": "e1004-desk",
@@ -30,7 +31,8 @@
       "last_seen_at": null,
       "battery_percent": null,
       "rssi_dbm": null,
-      "firmware_version": null
+      "firmware_version": null,
+      "has_pending_render": false
     }
   ]
 }

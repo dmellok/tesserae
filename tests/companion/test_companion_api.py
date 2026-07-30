@@ -211,6 +211,33 @@ def test_devices_listing_is_contract_valid(app: Flask) -> None:
     # Never seen a heartbeat yet.
     assert device["freshness"] == "unknown"
     assert device["last_seen_at"] is None
+    assert device["has_pending_render"] is False
+
+
+def test_devices_listing_reports_a_pending_rest_render_until_frame_is_served(app: Flask) -> None:
+    device_id = _seed_device(app)
+    manager = app.config["PUSH_MANAGER"]
+    latest = {
+        "digest": "latest123456789",
+        "ext": "bin",
+        "filename": "latest123456789.bin",
+        "renderer_id": "pico_bin",
+        "timestamp": 1.0,
+        "composition_digest": "composition12345",
+        "preview_digest": "preview123456789",
+    }
+    manager._latest_renders[device_id] = latest
+    token = _token(app)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    pending = app.test_client().get("/api/app/v1/devices", headers=headers).get_json()
+    device = next(d for d in pending["devices"] if d["id"] == device_id)
+    assert device["has_pending_render"] is True
+
+    manager.record_frame_served(device_id, latest)
+    caught_up = app.test_client().get("/api/app/v1/devices", headers=headers).get_json()
+    device = next(d for d in caught_up["devices"] if d["id"] == device_id)
+    assert device["has_pending_render"] is False
 
 
 def test_dashboards_listing_is_contract_valid(app: Flask) -> None:

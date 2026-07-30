@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Tesserae Companion API
-  version: 0.4.0
+  version: 0.4.1
   description: >-
     Companion API contract for community-built clients. Previews, History,
     resend, and server-advertised image fit modes are optional additive
@@ -83,14 +83,16 @@ paths:
     get:
       tags: [Displays]
       operationId: getCompanionDevicePreview
-      summary: Read the latest device-specific viewable preview
+      summary: Read the device's last-served viewable preview
       parameters:
         - $ref: "#/components/parameters/IfNoneMatch"
       responses:
         "200":
           description: >-
-            Latest viewable PNG after image fit and device geometry have been
-            applied. Renderer-specific palette and quantisation should be
+            For REST polling devices, the last viewable PNG served through the
+            device frame endpoint after image fit and device geometry have
+            been applied. Other transports fall back to the latest server
+            render. Renderer-specific palette and quantisation should be
             represented when a reusable PNG can be produced from that stage.
           headers:
             ETag:
@@ -639,6 +641,12 @@ components:
         firmware_version:
           type: string
           nullable: true
+        has_pending_render:
+          type: boolean
+          description: >-
+            True when a REST polling device has not yet fetched the server's
+            latest render. False for transports without a reliable served
+            signal.
     Panel:
       type: object
       additionalProperties: false

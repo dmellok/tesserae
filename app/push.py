@@ -595,6 +595,81 @@ class PushManager:
         frame the renderer just wrote, not a stale guess."""
         return self._latest_renders.get(device_id)
 
+    def last_served_render_for(self, device_id: str) -> dict[str, Any] | None:
+        """The full frame most recently handed to a REST device.
+
+        This is deliberately a delivery-side snapshot, not a claim that the
+        physical panel completed its download or refresh.  The fields live on
+        the persisted latest-render entry so they survive restarts without a
+        second state store.
+        """
+        entry = self._latest_renders.get(device_id)
+        if not isinstance(entry, dict):
+            return None
+        digest = entry.get("last_served_digest")
+        if not isinstance(digest, str) or not digest:
+            return None
+        return {
+            "digest": digest,
+            "preview_digest": entry.get("last_served_preview_digest"),
+        }
+
+    def record_frame_served(self, device_id: str, render: dict[str, Any]) -> None:
+        """Persist the render snapshot returned by a REST ``/frame`` poll.
+
+        ``render`` is the response's captured latest-render entry.  A newer
+        render may land while that response is being assembled, so record the
+        captured digest on the current entry rather than assuming it is still
+        the current digest.
+        """
+        digest = render.get("digest")
+        if not isinstance(digest, str) or not digest:
+            return
+        preview_digest = render.get("preview_digest")
+        with self._lock:
+            current = self._latest_renders.get(device_id)
+            if current is None:
+                return
+            changed = current.get("last_served_digest") != digest
+            current["last_served_digest"] = digest
+            if isinstance(preview_digest, str) and preview_digest:
+                changed = changed or current.get("last_served_preview_digest") != preview_digest
+                current["last_served_preview_digest"] = preview_digest
+            else:
+                changed = changed or "last_served_preview_digest" in current
+                current.pop("last_served_preview_digest", None)
+            if changed:
+                self._save_latest_renders()
+
+    def has_pending_render(self, device_id: str) -> bool:
+        """Whether the latest render differs from the last REST-served frame."""
+        entry = self._latest_renders.get(device_id)
+        if not isinstance(entry, dict):
+            return False
+        latest_digest = entry.get("digest")
+        if not isinstance(latest_digest, str) or not latest_digest:
+            return False
+        return latest_digest != entry.get("last_served_digest")
+
+    def _replace_latest_render_locked(self, device_id: str, info: dict[str, Any]) -> None:
+        """Replace a live render while carrying its delivery-side snapshot.
+
+        Callers hold ``_lock``.  A render promotion changes what the server
+        wants to serve next; it must not rewrite what the device fetched last.
+        """
+        previous = self._latest_renders.get(device_id)
+        replacement = dict(info)
+        for key in (
+            "last_served_digest",
+            "last_served_preview_digest",
+        ):
+            replacement.pop(key, None)
+            if previous is not None and key in previous:
+                replacement[key] = previous[key]
+        self._retire_live_locked(device_id, str(replacement.get("digest") or ""))
+        self._latest_renders[device_id] = replacement
+        self._save_latest_renders()
+
     def consume_force_refetch(self, device_id: str) -> None:
         """Clear the one-shot resend refetch flag (#119) after a REST
         client has been served a 200 for it, so subsequent polls of the
@@ -674,9 +749,7 @@ class PushManager:
             info = self._deck_renders.get(device_id, {}).get(page_id)
             if info is None:
                 return False
-            self._retire_live_locked(device_id, str(info.get("digest") or ""))
-            self._latest_renders[device_id] = dict(info)
-            self._save_latest_renders()
+            self._replace_latest_render_locked(device_id, info)
             # The live frame changed; a patch anchored to the old frame
             # must not survive it.
             self._drop_patches_locked(device_id, keep_digest=str(info.get("digest") or ""))
@@ -768,9 +841,7 @@ class PushManager:
             cur = self._latest_renders.get(device_id)
             if cur is not None and cur.get("digest") != anchor_digest:
                 return "superseded"
-            self._retire_live_locked(device_id, str(info.get("digest") or ""))
-            self._latest_renders[device_id] = dict(info)
-            self._save_latest_renders()
+            self._replace_latest_render_locked(device_id, info)
             self._drop_patches_locked(device_id, keep_digest=str(info.get("digest") or ""))
         return "promoted"
 
@@ -1496,7 +1567,12 @@ class PushManager:
         for per_page in list(self._deck_renders.values()):
             entries.extend(per_page.values())
         for entry in entries:
-            for key in ("digest", "composition_digest", "preview_digest"):
+            for key in (
+                "digest",
+                "composition_digest",
+                "preview_digest",
+                "last_served_preview_digest",
+            ):
                 value = entry.get(key)
                 if isinstance(value, str) and value:
                     live.add(value)
@@ -2025,9 +2101,7 @@ class PushManager:
                         self._latest_renders.get(renderer.device, {}).get("digest"),
                     )
                 else:
-                    self._retire_live_locked(renderer.device, result.digest)
-                    self._latest_renders[renderer.device] = render_info
-                    self._save_latest_renders()
+                    self._replace_latest_render_locked(renderer.device, render_info)
                     # The live frame changed; a pending patch document
                     # anchored to the previous frame must not survive it.
                     self._drop_patches_locked(renderer.device, keep_digest=result.digest)

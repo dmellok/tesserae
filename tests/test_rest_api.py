@@ -729,6 +729,7 @@ def test_frame_returns_url_and_etag_when_rendered(app: Flask) -> None:
         "renderer_id": "pico_bin",
         "timestamp": time.time(),
         "composition_digest": "comp123",
+        "preview_digest": "preview123",
     }
 
     resp = client.get(
@@ -744,6 +745,10 @@ def test_frame_returns_url_and_etag_when_rendered(app: Flask) -> None:
     assert "/renders/abc123.bin" in body["url"]
     assert "sig=" in body["url"]
     assert resp.headers["ETag"] == '"abc123"'
+    assert push_mgr.last_served_render_for("bedroom_pico") == {
+        "digest": "abc123",
+        "preview_digest": "preview123",
+    }
 
 
 def test_frame_carries_button_wake_for_button_kind(app: Flask) -> None:
@@ -1042,6 +1047,7 @@ def test_frame_returns_304_when_if_none_match_matches(app: Flask) -> None:
         "renderer_id": "pico_bin",
         "timestamp": time.time(),
         "composition_digest": "comp123",
+        "preview_digest": "preview123",
     }
 
     resp = client.get(
@@ -1058,11 +1064,14 @@ def test_frame_returns_304_when_if_none_match_matches(app: Flask) -> None:
     # reset, etc.) can still re-fetch the image. RFC 7231 §3.1.4.2
     # explicitly permits Content-Location on 304.
     assert "/renders/abc123.bin" in resp.headers["Content-Location"]
+    assert push_mgr.last_served_render_for("bedroom_pico")["digest"] == "abc123"
+    assert push_mgr.last_served_render_for("bedroom_pico")["preview_digest"] == "preview123"
+    assert push_mgr.has_pending_render("bedroom_pico") is False
 
 
 def test_fetch_latest_action_bypasses_matching_etag_without_rendering(app: Flask) -> None:
     """``fetch_latest`` returns the existing artefact with 200 while
-    leaving the render pipeline and latest-render entry untouched."""
+    leaving the render pipeline and latest-render content untouched."""
     client = app.test_client()
     _sign_in(client)
     code = _issue_pairing(app)
@@ -1098,7 +1107,9 @@ def test_fetch_latest_action_bypasses_matching_etag_without_rendering(app: Flask
 
     assert resp.status_code == 200
     assert resp.get_json()["render_id"] == "abc123"
-    assert push_mgr._latest_renders["bedroom_pico"] == latest
+    stored = push_mgr._latest_renders["bedroom_pico"]
+    assert {key: stored[key] for key in latest} == latest
+    assert stored["last_served_digest"] == "abc123"
 
 
 def test_frame_accepts_legacy_event_alias_and_prefers_canonical_id(app: Flask) -> None:

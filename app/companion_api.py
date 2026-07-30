@@ -17,7 +17,7 @@ job the client polls; quiet-hours suppression surfaces as a *successful*
 app.mdns.
 
 Contract: ``charmmmz/tesserae-companion-ios`` ``Contracts/app-v1.openapi.yaml``
-(OpenAPI 0.4.0). The vendored copy + fixtures under ``tests/companion/``
+(OpenAPI 0.4.1). The vendored copy + fixtures under ``tests/companion/``
 guard these shapes.
 
 mypy --strict applies to this module, see pyproject.toml.
@@ -415,7 +415,11 @@ def _nullable_int(value: Any, *, lo: int | None = None, hi: int | None = None) -
     return out
 
 
-def _device_view(device: Device, status: dict[str, Any] | None) -> dict[str, Any]:
+def _device_view(
+    device: Device,
+    status: dict[str, Any] | None,
+    push_manager: Any,
+) -> dict[str, Any]:
     panel = device_panel(device) or resolve_settings_panel(_settings())
     parsed = status.get("parsed", {}) if isinstance(status, dict) else {}
     received_at = status.get("received_at") if isinstance(status, dict) else None
@@ -430,6 +434,11 @@ def _device_view(device: Device, status: dict[str, Any] | None) -> dict[str, Any
         freshness = "fresh" if age <= _freshness_threshold_s(device) else "stale"
 
     fw = parsed.get("fw_version") if isinstance(parsed, dict) else None
+    has_pending_render = False
+    if device.transport == "rest" and push_manager is not None:
+        pending_lookup = getattr(push_manager, "has_pending_render", None)
+        if callable(pending_lookup):
+            has_pending_render = bool(pending_lookup(device.id))
 
     return {
         "id": device.id,
@@ -448,6 +457,7 @@ def _device_view(device: Device, status: dict[str, Any] | None) -> dict[str, Any
         ),
         "rssi_dbm": _nullable_int(parsed.get("rssi") if isinstance(parsed, dict) else None),
         "firmware_version": (str(fw) if isinstance(fw, (str, int, float)) else None),
+        "has_pending_render": has_pending_render,
     }
 
 
@@ -455,8 +465,9 @@ def _device_view(device: Device, status: dict[str, Any] | None) -> dict[str, Any
 @_require_companion("devices:read")
 def list_devices() -> Any:
     status_cache = _device_status()
+    manager = _push_manager()
     devices = [
-        _device_view(d, status_cache.get(d.id))
+        _device_view(d, status_cache.get(d.id), manager)
         for d in _devices().all()
         if d.kind_of is not None  # instances only, never built-in kinds
     ]
@@ -944,22 +955,36 @@ def get_job(job_id: str) -> Any:
 @bp.get("/devices/<device_id>/preview")
 @_require_companion("devices:read")
 def device_preview(device_id: str) -> Any:
-    """Latest logical full-frame PNG for a display.
+    """Last-served logical full-frame PNG for a display.
 
-    The preview includes the selected image-fit mode and logical panel
-    geometry, but excludes hardware-only row-stride and mount compensation.
-    A live partial-refresh patch may be newer than this last full frame.
+    REST polling devices use the frame most recently returned by ``/frame``;
+    transports without a reliable served signal fall back to server-latest.
+    The preview includes the selected image-fit mode and logical panel geometry,
+    but excludes hardware-only row-stride and mount compensation. A live
+    partial-refresh patch may be newer than this last full frame.
     """
     device = _devices().get(device_id)
     if device is None or device.kind_of is None:
         return _error("not_found", "No display with that id.", 404)
     manager = _push_manager()
-    latest = manager.latest_render_for(device_id) if manager is not None else None
-    if not isinstance(latest, dict):
-        return _error("not_found", "No frame has been rendered for this display yet.", 404)
-    digest = latest.get("preview_digest")
+    render: dict[str, Any] | None = None
+    if manager is not None:
+        if device.transport == "rest":
+            served_lookup = getattr(manager, "last_served_render_for", None)
+            if callable(served_lookup):
+                render = served_lookup(device_id)
+        else:
+            render = manager.latest_render_for(device_id)
+    if not isinstance(render, dict):
+        message = (
+            "No frame has been served to this display yet."
+            if device.transport == "rest"
+            else "No frame has been rendered for this display yet."
+        )
+        return _error("not_found", message, 404)
+    digest = render.get("preview_digest")
     if digest is None:
-        return _error("not_found", "No preview is available for the latest frame yet.", 404)
+        return _error("not_found", "No preview is available for the served frame yet.", 404)
 
     retained = retained_device_preview(Path(current_app.config["RENDERS_DIR"]), digest)
     if retained is None:
