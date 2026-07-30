@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import time
+from datetime import UTC, datetime
 from pathlib import Path
 
 from flask import Flask
@@ -53,6 +54,10 @@ def test_history_resend_job_persists_correlated_event_ids(tmp_path: Path) -> Non
 
 def test_pre_04_job_without_history_ids_remains_compatible(tmp_path: Path) -> None:
     path = tmp_path / "jobs.json"
+    # Timestamps are anchored to "now" so the record stays inside the 24h
+    # retention window regardless of the calendar date the suite runs on; the
+    # test is about parsing a pre-0.4 record shape, not retention sweeping.
+    created = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     path.write_text(
         json.dumps(
             {
@@ -62,8 +67,8 @@ def test_pre_04_job_without_history_ids_remains_compatible(tmp_path: Path) -> No
                         "kind": "image_push",
                         "status": "succeeded",
                         "target_device_ids": ["kitchen"],
-                        "created_at": "2026-07-29T00:00:00Z",
-                        "updated_at": "2026-07-29T00:00:01Z",
+                        "created_at": created,
+                        "updated_at": created,
                         "label": "Shared photo",
                         "result": {
                             "status": "published",
