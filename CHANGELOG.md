@@ -8,6 +8,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Companion API 0.5: send a public image URL or a webpage to your displays.** Community
+  clients can push a public image URL, or a server-rendered screenshot of a public webpage,
+  to explicit displays as asynchronous jobs, with the same History, resend, and photo
+  layout-mode handling as an uploaded image. Both run a strict public-only URL policy with no
+  client override: private, loopback, link-local, reserved, and embedded-credential
+  destinations are refused, including redirect hops (re-validated during the fetch, and by a
+  per-request interceptor during the webpage render). Webpage sends need a browser pool and are
+  advertised only when one is present.
+
 - **Companion display cards distinguish served and pending frames.** REST
   `/frame` polls now retain the last frame handed to each device, including
   matching `304 Not Modified` confirmations. The Companion device preview uses

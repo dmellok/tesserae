@@ -17,7 +17,7 @@ job the client polls; quiet-hours suppression surfaces as a *successful*
 app.mdns.
 
 Contract: ``charmmmz/tesserae-companion-ios`` ``Contracts/app-v1.openapi.yaml``
-(OpenAPI 0.4.1). The vendored copy + fixtures under ``tests/companion/``
+(OpenAPI 0.5.0). The vendored copy + fixtures under ``tests/companion/``
 guard these shapes.
 
 mypy --strict applies to this module, see pyproject.toml.
@@ -30,6 +30,7 @@ import logging
 import re
 import secrets
 import time
+import urllib.parse
 from collections.abc import Callable
 from datetime import UTC, datetime
 from functools import wraps
@@ -52,6 +53,7 @@ from app.companion_history import (
 from app.companion_jobs import CompanionJobs, JobOutcome
 from app.device_loader import Device, DeviceRegistry
 from app.device_preview import retained_device_preview
+from app.net_guard import BlockedURLError, assert_public_url
 from app.panel import device_panel, resolve_settings_panel
 from app.quiet_hours import device_is_quiet
 from app.state.companion_token_store import COMPANION_SCOPES, CompanionTokenStore
@@ -93,7 +95,15 @@ IDEMPOTENCY_RETENTION_SECONDS = 86_400
 
 # Features this server serves. The client gates on this list rather than
 # assuming the full set, so unshipped surfaces degrade cleanly.
-FEATURES = ("devices", "dashboards", "dashboard_push", "image_push", "jobs", "history")
+FEATURES = (
+    "devices",
+    "dashboards",
+    "dashboard_push",
+    "image_push",
+    "image_url_push",
+    "jobs",
+    "history",
+)
 
 _PAIRING_CODE_RE = re.compile(r"^[0-9]{6,12}$")
 _IMAGE_CONTENT_TYPES = frozenset(IMAGE_CONTENT_TYPES)
@@ -272,7 +282,10 @@ def _features() -> list[str]:
     the client enables the whole preview surface at once)."""
     feats = list(FEATURES)
     if current_app.config.get("BROWSER_POOL") is not None:
+        # Both need a browser pool: previews to prepare on-demand renders,
+        # webpage_push to screenshot an arbitrary URL server-side.
         feats.append("previews")
+        feats.append("webpage_push")
     return feats
 
 
@@ -779,6 +792,191 @@ def push_image() -> Any:
         payload=payload,
         target_ids=resolved_targets,
         label="Shared photo",
+        work=_work,
+    )
+
+
+# -- link send (image URL + webpage) -------------------------------------
+
+
+def _valid_remote_source_url(raw: Any) -> str | None:
+    """Validate a contract ``RemoteSourceURL``: an absolute http(s) URL, no
+    embedded credentials, 8-4096 chars, no whitespace. Returns the URL or
+    ``None``. Shape only; the public-network policy is enforced separately
+    (synchronously via ``assert_public_url`` and per-hop during fetch/render)."""
+    if not isinstance(raw, str):
+        return None
+    url = raw.strip()
+    if not (8 <= len(url) <= 4096) or any(ch.isspace() for ch in url):
+        return None
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme not in ("http", "https") or not parsed.hostname:
+        return None
+    if parsed.username or parsed.password:
+        return None
+    return url
+
+
+def _link_send_common(body: Any) -> tuple[str, str, bool, list[str]] | tuple[Response, int]:
+    """Shared validation for the image-URL / webpage routes: url, fit,
+    override_quiet_hours, device_ids, and the synchronous strict URL
+    pre-check. Returns ``(url, fit, override, targets)`` or an error tuple."""
+    if not isinstance(body, dict):
+        return _error("invalid_request", "A JSON body is required.", 400)
+    url = _valid_remote_source_url(body.get("url"))
+    if url is None:
+        return _error("invalid_request", "A valid absolute http(s) url is required.", 400)
+    fit_value = body.get("fit")
+    if (
+        not isinstance(fit_value, str)
+        or fit_value not in _IMAGE_FIT_MODES
+        or not isinstance(body.get("override_quiet_hours"), bool)
+    ):
+        return _error("invalid_request", "fit and override_quiet_hours are required.", 400)
+    targets = _valid_target_ids(body.get("device_ids"))
+    if targets is None:
+        return _error("invalid_target", "One or more target displays are unknown.", 400)
+    # Strict public-only pre-check. Redirect hops are re-validated during the
+    # fetch (fetch_bytes) / render (the Chromium interceptor), so a redirect to
+    # a private host still fails the job even though this check passes.
+    try:
+        assert_public_url(url)
+    except BlockedURLError:
+        return _error("url_blocked", "That URL isn't a public destination.", 400)
+    return url, fit_value, bool(body["override_quiet_hours"]), list(targets)
+
+
+def _fan_out_bytes(
+    manager: Any,
+    image_bytes: bytes,
+    *,
+    source: str,
+    label: str,
+    fit: str,
+    active: list[str],
+) -> tuple[list[str], list[str]]:
+    """Push already-fetched / rendered bytes to each active target, tagging the
+    canonical History ``source`` (``url`` / ``webpage``). Returns
+    ``(published_device_ids, history_event_ids)``."""
+    published: list[str] = []
+    history_event_ids: list[str] = []
+    for did in active:
+        result = manager.push_image(
+            image_bytes,
+            source_label=label,
+            device_id=did,
+            fit=fit,
+            bypass_coalesce=True,
+            force_publish=True,
+            source=source,
+        )
+        if result.status in _PUBLISHED_STATUSES:
+            published.append(did)
+            history_event_ids.extend(_history_event_ids(result) or [])
+    return published, history_event_ids
+
+
+@bp.post("/image-urls")
+@_require_companion("push:write")
+def push_image_url() -> Any:
+    key, err = _require_idempotency_key()
+    if err is not None:
+        return err
+    assert key is not None
+
+    raw = request.get_data(cache=True)
+    common = _link_send_common(request.get_json(silent=True))
+    if isinstance(common, tuple) and len(common) == 2 and isinstance(common[1], int):
+        return common  # error envelope
+    url, fit, override, resolved_targets = common
+
+    def _work() -> JobOutcome:
+        active, _quiet = _partition_quiet(resolved_targets, override=override)
+        if not active:
+            return JobOutcome.quiet(resolved_targets, "all_targets_in_quiet_hours")
+        manager = _push_manager()
+        if manager is None:
+            return JobOutcome.failed("temporarily_unavailable", "The push pipeline is offline.")
+        # Fetch once through the strict policy, then fan the bytes out per
+        # target (no per-display re-fetch). A redirect to a private host is
+        # refused here (fetch_bytes re-validates every hop).
+        try:
+            image_bytes = manager.fetch_remote_image_strict(url)
+        except BlockedURLError:
+            return JobOutcome.failed("url_blocked", "The URL (or a redirect) wasn't public.")
+        except Exception as err:
+            return JobOutcome.failed("fetch_failed", f"The image URL could not be fetched: {err}")
+        published, history_event_ids = _fan_out_bytes(
+            manager, image_bytes, source="url", label=url, fit=fit, active=active
+        )
+        if published:
+            return JobOutcome.published(published, history_event_ids=history_event_ids or None)
+        return JobOutcome.failed("render_failed", "The image could not be published.")
+
+    return _reserve_and_run(
+        kind="image_url_push",
+        key=key,
+        payload=raw,
+        target_ids=resolved_targets,
+        label=url,
+        work=_work,
+    )
+
+
+@bp.post("/webpages")
+@_require_companion("push:write")
+def push_webpage_url() -> Any:
+    key, err = _require_idempotency_key()
+    if err is not None:
+        return err
+    assert key is not None
+
+    if current_app.config.get("BROWSER_POOL") is None:
+        return _error("temporarily_unavailable", "Webpage rendering isn't available.", 503)
+
+    body = request.get_json(silent=True)
+    # viewport_w is optional (server owns the logical height); validate before
+    # the shared checks so a bad value fails fast with invalid_request.
+    viewport_w = 1280
+    if isinstance(body, dict) and "viewport_w" in body:
+        vw = body.get("viewport_w")
+        if not isinstance(vw, int) or isinstance(vw, bool) or not (200 <= vw <= 4096):
+            return _error("invalid_request", "viewport_w must be an integer 200-4096.", 400)
+        viewport_w = vw
+
+    raw = request.get_data(cache=True)
+    common = _link_send_common(body)
+    if isinstance(common, tuple) and len(common) == 2 and isinstance(common[1], int):
+        return common  # error envelope
+    url, fit, override, resolved_targets = common
+
+    def _work() -> JobOutcome:
+        active, _quiet = _partition_quiet(resolved_targets, override=override)
+        if not active:
+            return JobOutcome.quiet(resolved_targets, "all_targets_in_quiet_hours")
+        manager = _push_manager()
+        if manager is None:
+            return JobOutcome.failed("temporarily_unavailable", "The push pipeline is offline.")
+        # Strict pre-check refused the initial URL synchronously; the renderer's
+        # interceptor holds every hop Chromium follows to the same policy. Render
+        # once at the logical viewport, then fan the bytes out per target.
+        try:
+            page_bytes = manager.render_webpage_png(url, viewport_w=viewport_w, allow_local=False)
+        except Exception as err:
+            return JobOutcome.failed("render_failed", f"The webpage could not be rendered: {err}")
+        published, history_event_ids = _fan_out_bytes(
+            manager, page_bytes, source="webpage", label=url, fit=fit, active=active
+        )
+        if published:
+            return JobOutcome.published(published, history_event_ids=history_event_ids or None)
+        return JobOutcome.failed("render_failed", "The webpage could not be published.")
+
+    return _reserve_and_run(
+        kind="webpage_push",
+        key=key,
+        payload=raw,
+        target_ids=resolved_targets,
+        label=url,
         work=_work,
     )
 

@@ -35,7 +35,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 
-JobKind = Literal["dashboard_push", "image_push", "history_resend"]
+JobKind = Literal[
+    "dashboard_push", "image_push", "image_url_push", "webpage_push", "history_resend"
+]
 JobStatus = Literal["accepted", "running", "succeeded", "failed"]
 ResultStatus = Literal["published", "quiet"]
 

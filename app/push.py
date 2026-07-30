@@ -1314,6 +1314,7 @@ class PushManager:
         fit: str | None = None,
         bypass_coalesce: bool = True,
         force_publish: bool = True,
+        source: str = "file",
     ) -> PushResult:
         """Hand arbitrary image bytes to every renderer.
 
@@ -1324,10 +1325,13 @@ class PushManager:
         ``device_id`` (optional): when set, only that device's renderers
         fire and its panel dims are used, same routing as a page bound
         to the device. ``fit`` (optional): the fit mode for non-panel-sized
-        input (``fit``/``fill``/``stretch``/``center``/``blur``)."""
+        input (``fit``/``fill``/``stretch``/``center``/``blur``). ``source``
+        tags the History row: the Companion link-send routes fetch / render
+        once and fan the resulting bytes out through here with ``"url"`` /
+        ``"webpage"`` so History keeps the real origin (default ``"file"``)."""
         supersede = self._acquire_or_supersede(
             device_id=device_id,
-            source="file",
+            source=source,
             target=source_label,
             bypass_coalesce=bypass_coalesce,
         )
@@ -1342,7 +1346,7 @@ class PushManager:
                 result = self._push_bytes_locked(
                     image_bytes,
                     source_label,
-                    source="file",
+                    source=source,
                     device_id=device_id,
                     fit=fit,
                     force_publish=force_publish,
@@ -1473,6 +1477,42 @@ class PushManager:
                 self._lock.release()
         self._notify(result)
         return result
+
+    def fetch_remote_image_strict(self, url: str) -> bytes:
+        """Fetch an image URL under the strict public-only policy, once.
+
+        The Companion ``/image-urls`` route fetches here a single time, then
+        fans the bytes out per target through :meth:`push_image`, so a
+        redirect-to-private is refused (fetch_bytes re-validates each hop) and
+        the source is fetched once rather than per display."""
+        return self._fetch_remote_image(url, allow_local=False)
+
+    def render_webpage_png(
+        self,
+        url: str,
+        *,
+        viewport_w: int,
+        viewport_h: int = 1200,
+        allow_local: bool = True,
+    ) -> bytes:
+        """Render a webpage to a composition PNG once (raises on failure).
+
+        The Companion ``/webpages`` route renders here a single time at the
+        logical viewport, then fans the bytes out per target through
+        :meth:`push_image` (no per-target re-render). ``allow_local=False``
+        installs the renderer's request interceptor so every hop Chromium
+        follows is held to the strict public-only policy."""
+        return render_to_png(
+            RenderRequest(
+                url=url,
+                viewport_w=viewport_w,
+                viewport_h=viewport_h,
+                timezone_id=self._render_timezone_id(),
+                is_composer=False,
+                allow_local=allow_local,
+            ),
+            pool=self._browser_pool_fn(),
+        )
 
     def republish(
         self,
