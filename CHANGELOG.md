@@ -37,6 +37,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **CalDAV discovery tolerates a stray BOM or whitespace before the XML declaration.**
+  Some servers (notably Nextcloud behind certain PHP / output-buffering setups) emit a
+  newline ahead of `<?xml`, which a browser ignores but a strict parser rejects, so an
+  otherwise-valid calendar listing failed with "wasn't valid CalDAV XML." Discovery now
+  trims anything before the first tag, and logs the raw response start when a body still
+  won't parse.
+
 - **The Schedules "Next 24 hours" timeline and last-fired times respect the configured
   timezone.** They were computed from the server's clock (UTC on a typical Docker install),
   so the "Now" marker, hour ticks, and projected fire times sat an offset away from the

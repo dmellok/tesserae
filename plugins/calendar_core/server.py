@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import logging
 import re
 import secrets
 import time
@@ -45,6 +46,8 @@ from flask import (
     url_for,
 )
 from werkzeug.wrappers import Response
+
+_log = logging.getLogger(__name__)
 
 CACHE_TTL_S = 15 * 60
 HTTP_TIMEOUT_S = 15
@@ -526,9 +529,23 @@ def _propfind(
             "collections": [],
             "error": f"Couldn't reach the server: {type(err).__name__}.",
         }
+    # Some servers (misconfigured PHP / Nextcloud output buffering, an app
+    # that emits a stray newline before the response) prepend a BOM or
+    # whitespace ahead of the ``<?xml`` declaration. A browser or curl
+    # tolerates it, but a strict XML parser rejects "text before the
+    # declaration" and the whole discovery fails on an otherwise-valid 207.
+    # Trim any junk ahead of the first ``<`` so a real multistatus still
+    # parses; a body with no ``<`` at all is left to fail below.
+    lt = body.find(b"<")
+    if lt > 0:
+        body = body[lt:]
     try:
         return DET.fromstring(body), None
     except Exception:
+        _log.warning(
+            "CalDAV PROPFIND response not parseable as XML; first bytes: %r",
+            body[:160],
+        )
         return None, {"collections": [], "error": "The server's response wasn't valid CalDAV XML."}
 
 

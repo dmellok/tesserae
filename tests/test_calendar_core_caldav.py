@@ -225,6 +225,24 @@ def test_discover_collections_parses_calendars_and_todos(
     assert cols["Tasks"]["export_url"] == "http://baikal.lan/dav/cal/you/tasks/?export"
 
 
+def test_discover_collections_tolerates_junk_before_xml_declaration(
+    cc: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A BOM / stray newline before ``<?xml`` (a PHP / Nextcloud output-
+    buffering quirk) makes a strict parser reject an otherwise-valid 207.
+    Discovery must trim it and still enumerate the calendars (#168)."""
+    dirty = b"\xef\xbb\xbf\n   " + PROPFIND_XML.lstrip()
+
+    class _FakeOpener:
+        def open(self, req: Any, timeout: float = 0) -> Any:
+            return _FakeResp(dirty)
+
+    monkeypatch.setattr(cc, "_build_opener", lambda url, auth: _FakeOpener())
+    result = cc.discover_collections("http://nextcloud.lan/remote.php/dav/calendars/you/", None)
+    assert result["error"] is None
+    assert {c["name"] for c in result["collections"]} == {"Home", "Tasks"}
+
+
 # sabre/dav (Baikal, Nextcloud) splits a response's props across a 200
 # propstat (props it has) and a 404 propstat (props it lacks), and the
 # 404 block can come first. A colourless calendar therefore has its
