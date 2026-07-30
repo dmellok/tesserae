@@ -15,7 +15,12 @@
       "battery_percent": 86,
       "rssi_dbm": -54,
       "firmware_version": "1.8.0",
-      "has_pending_render": true
+      "has_pending_render": true,
+      "pending_render": {
+        "revision": "a1b2c3d4e5f67890",
+        "rendered_at": "2026-07-28T08:00:00Z",
+        "preview_url": "/api/app/v1/devices/picpak-kitchen/preview?revision=a1b2c3d4e5f67890"
+      }
     },
     {
       "id": "e1004-desk",

@@ -64,6 +64,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   per-request interceptor during the webpage render). Webpage sends need a browser pool and are
   advertised only when one is present.
 
+- **Companion clients can inspect the exact frame waiting for a sleeping
+  display.** A REST device with `has_pending_render` now includes an optional
+  `pending_render` revision and authenticated preview URL. The existing device
+  preview endpoint accepts that revision while preserving its default
+  last-served meaning, so clients can present Current and Next without guessing
+  from global History or racing a newer render.
+
 - **Companion display cards distinguish served and pending frames.** REST
   `/frame` polls now retain the last frame handed to each device, including
   matching `304 Not Modified` confirmations. The Companion device preview uses

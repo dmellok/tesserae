@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Tesserae Companion API
-  version: 0.5.1
+  version: 0.5.2
   description: >-
     Companion API contract for community-built clients. Previews, History,
     resend, remote-image push, webpage push, and server-advertised image fit
@@ -88,6 +88,14 @@ paths:
       summary: Read the device's last-served viewable preview
       parameters:
         - $ref: "#/components/parameters/IfNoneMatch"
+        - in: query
+          name: revision
+          required: false
+          description: >-
+            Exact pending-render revision advertised by the devices list.
+            When omitted, REST devices return their last-served frame.
+          schema:
+            type: string
       responses:
         "200":
           description: >-
@@ -717,6 +725,27 @@ components:
             True when a REST polling device has not yet fetched the server's
             latest render. False for transports without a reliable served
             signal. Absent on older compatible servers.
+        pending_render:
+          allOf:
+            - $ref: "#/components/schemas/PendingRender"
+          description: >-
+            The exact newer render waiting for a REST device's next fetch.
+            Omitted when no render is pending or its viewable preview is
+            unavailable.
+    PendingRender:
+      type: object
+      additionalProperties: false
+      required: [revision, preview_url]
+      properties:
+        revision:
+          type: string
+          description: Opaque revision accepted by the device preview endpoint
+        rendered_at:
+          type: string
+          format: date-time
+        preview_url:
+          type: string
+          description: Authenticated relative URL for this exact pending preview
     Panel:
       type: object
       additionalProperties: false

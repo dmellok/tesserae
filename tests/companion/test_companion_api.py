@@ -238,11 +238,45 @@ def test_devices_listing_reports_a_pending_rest_render_until_frame_is_served(app
     pending = app.test_client().get("/api/app/v1/devices", headers=headers).get_json()
     device = next(d for d in pending["devices"] if d["id"] == device_id)
     assert device["has_pending_render"] is True
+    assert device["pending_render"] == {
+        "revision": "latest123456789",
+        "rendered_at": "1970-01-01T00:00:01Z",
+        "preview_url": (f"/api/app/v1/devices/{device_id}/preview?revision=latest123456789"),
+    }
 
     manager.record_frame_served(device_id, latest)
     caught_up = app.test_client().get("/api/app/v1/devices", headers=headers).get_json()
     device = next(d for d in caught_up["devices"] if d["id"] == device_id)
     assert device["has_pending_render"] is False
+    assert "pending_render" not in device
+
+
+def test_devices_listing_omits_pending_render_when_no_preview_exists(app: Flask) -> None:
+    device_id = _seed_device(app)
+    manager = app.config["PUSH_MANAGER"]
+    manager._latest_renders[device_id] = {
+        "digest": "latest123456789",
+        "ext": "bin",
+        "filename": "latest123456789.bin",
+        "renderer_id": "pico_bin",
+        "timestamp": 1.0,
+        "composition_digest": "composition12345",
+        "preview_digest": None,
+    }
+    token = _token(app)
+
+    body = (
+        app.test_client()
+        .get(
+            "/api/app/v1/devices",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        .get_json()
+    )
+
+    device = next(d for d in body["devices"] if d["id"] == device_id)
+    assert device["has_pending_render"] is True
+    assert "pending_render" not in device
 
 
 def test_dashboards_listing_is_contract_valid(app: Flask) -> None:
