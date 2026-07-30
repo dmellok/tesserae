@@ -973,6 +973,46 @@ def test_gamut_info_palette_and_mono() -> None:
     assert unknown["colors"] == [] and unknown["mono"] is True
 
 
+def test_gamut_info_resolves_chemistry_aliases() -> None:
+    """Panels declare ``spectra_6``/``acep_7colour``; these must report their
+    full palette, not fall through to the mono default (the e1002 bug)."""
+    from app import mcp_api
+
+    spectra = mcp_api._gamut_info("spectra_6")
+    assert spectra["color_mode"].startswith("6-colour")
+    assert len(spectra["colors"]) == 6
+    assert spectra["mono"] is False
+    # The declared alias is preserved in the reported gamut field.
+    assert spectra["gamut"] == "spectra_6"
+
+    acep = mcp_api._gamut_info("acep_7colour")
+    assert acep["color_mode"].startswith("7-colour")
+    assert len(acep["colors"]) == 7
+    assert acep["mono"] is False
+
+
+def test_gamut_info_grayscale_and_mono_flags() -> None:
+    from app import mcp_api
+
+    # gray_4 carries four ink levels but is still a grayscale design target.
+    gray = mcp_api._gamut_info("gray_4")
+    assert len(gray["colors"]) == 4
+    assert gray["mono"] is True
+
+    # gray_16 (E1003 / TRMNL X class) reports a 16-step ramp, still grayscale.
+    gray16 = mcp_api._gamut_info("gray_16")
+    assert gray16["color_mode"].startswith("16-level")
+    assert len(gray16["colors"]) == 16
+    assert gray16["mono"] is True
+
+    mono = mcp_api._gamut_info("mono")
+    assert mono["colors"] == [] and mono["mono"] is True
+
+    # Full-colour transports are not mono despite carrying no fixed palette.
+    rgb = mcp_api._gamut_info("rgb24")
+    assert rgb["colors"] == [] and rgb["mono"] is False
+
+
 # -- probe data_source + fields (#1/#5) ---------------------------------
 
 

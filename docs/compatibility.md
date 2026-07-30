@@ -72,9 +72,9 @@ The reTerminal E-Series and XIAO ePaper family run the [Tesserae-native firmware
 | [Seeed XIAO ePaper EE04 (7.3" Spectra 6)](https://www.seeedstudio.com/XIAO-ePaper-Display-Board-EE04-p-6560.html) | 800×480 | `spectra_6` | `esp32_client` (inherit) | `seeed_ee04_73e6` |
 | [Seeed XIAO ePaper EE04 (7.5" mono)](https://www.seeedstudio.com/XIAO-ePaper-Display-Board-EE04-p-6560.html) | 800×480 | `mono` | `esp32_bw_client` (inherit) | `seeed_ee04_75` |
 | [Seeed reTerminal E1001](https://www.seeedstudio.com/reTerminal-E1001-p-6534.html) | 800×480 | `mono` | `esp32_bw_client` (inherit) | `seeed_reterminal_e1001` |
-| [Seeed reTerminal E1001 (4-level grayscale)](https://www.seeedstudio.com/reTerminal-E1001-p-6534.html) | 800×480 | `mono` | `esp32_bw_client` <br> `esp32_gray2_bin` | `seeed_reterminal_e1001_gray` |
+| [Seeed reTerminal E1001 (4-level grayscale)](https://www.seeedstudio.com/reTerminal-E1001-p-6534.html) | 800×480 | `gray_4` | `esp32_bw_client` <br> `esp32_gray2_bin` | `seeed_reterminal_e1001_gray` |
 | [Seeed reTerminal E1002](https://www.seeedstudio.com/reTerminal-E1002-p-6533.html) | 800×480 | `spectra_6` | `esp32_client` (inherit) | `seeed_reterminal_e1002` |
-| [Seeed reTerminal E1003](https://www.seeedstudio.com/reTerminal-E1003-p-6731.html) | 1872×1404 | `mono` | `esp32_client` <br> `esp32_gray_bin` | `seeed_reterminal_e1003` |
+| [Seeed reTerminal E1003](https://www.seeedstudio.com/reTerminal-E1003-p-6731.html) | 1872×1404 | `gray_16` | `esp32_client` <br> `esp32_gray_bin` | `seeed_reterminal_e1003` |
 | [Seeed reTerminal E1004](https://www.seeedstudio.com/reTerminal-E1004-p-6692.html) | 1200×1600 portrait | `spectra_6` | `esp32_client` (inherit) | `seeed_reterminal_e1004` |
 | [Seeed XIAO 7.5" ePaper Panel](https://www.seeedstudio.com/XIAO-7-5-ePaper-Panel-p-6416.html) | 800×480 | `mono` | `trmnl_client` (inherit) | `seeed_xiao_75` |
 | [Seeed XIAO ePaper 7.5" (mono)](https://www.seeedstudio.com/XIAO-7-5-ePaper-Panel-p-6416.html) | 800×480 | `mono` | `esp32_bw_client` (inherit) | `xiao_epaper_75` |
@@ -109,7 +109,7 @@ E-readers rather than dedicated dashboard panels. These run [CrossInk](https://g
 |---|---|---|---|---|
 | [Xteink X3](https://www.xteink.com/) | 528×792 portrait_flipped | `mono` | `esp32_bw_client` (inherit) | `xteink_x3` |
 | [Xteink X4](https://www.xteink.com/) | 480×800 portrait_flipped | `mono` | `esp32_bw_client` (inherit) | `xteink_x4` |
-| [Xteink X4 (4-level grayscale)](https://www.xteink.com/) | 480×800 portrait_flipped | `mono` | `esp32_bw_client` <br> `esp32_gray2_bin` | `xteink_x4_gray` |
+| [Xteink X4 (4-level grayscale)](https://www.xteink.com/) | 480×800 portrait_flipped | `gray_4` | `esp32_bw_client` <br> `esp32_gray2_bin` | `xteink_x4_gray` |
 | [Xteink X4 Pro](https://www.xteink.com/) | 480×800 portrait_flipped | `mono` | `esp32_bw_client` (inherit) | `xteink_x4_pro` |
 
 ### Community

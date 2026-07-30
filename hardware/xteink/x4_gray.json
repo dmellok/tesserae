@@ -12,7 +12,7 @@
     "h": 800,
     "orientation": "portrait_flipped",
     "name": "4.26 inch ePaper, 4-level grayscale (800x480 native)",
-    "gamut": "mono",
+    "gamut": "gray_4",
     "native_w": 800,
     "native_h": 480
   },

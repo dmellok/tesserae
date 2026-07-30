@@ -30,6 +30,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **Grayscale and Spectra 6 / ACeP panels report their real palette to companion and MCP
+  clients.** The colour-capability lookup only matched the canonical gamut ids, so a panel
+  declared with a chemistry alias (`spectra_6`, `acep_7colour`) fell through and was reported
+  as monochrome; it now resolves aliases and returns the full 6/7-colour palette. Three
+  grayscale kinds that already render multiple grey levels but were tagged `mono` are corrected
+  (reTerminal E1001 grayscale and Xteink X4 grayscale to 4-level; reTerminal E1003 to a new
+  16-level `gray_16` gamut), and editing a grayscale panel's settings no longer rewrites it to a
+  colour gamut.
+
 - **The refresh button now works on a plain bound dashboard.** Pressing refresh on a
   display that isn't driven by a rotation or deck re-renders whatever dashboard it is
   currently showing and sends it, instead of doing nothing. A device that has never

@@ -166,6 +166,13 @@ GRAY_4_PALETTE: tuple[tuple[int, int, int], ...] = (
     (255, 255, 255),  # white
 )
 
+# 16-level (4-bit) grayscale ramp for the IT8951-class panels (Seeed
+# reTerminal E1003, TRMNL X). Even 0..255 ramp in 17-step increments;
+# these panels dither a full-range source to 16 greys, so the palette is
+# metadata / dither guidance, not a packer target (the 4-bpp gray packer
+# emits the level index directly). Same rationale as GRAY_4 for the drift.
+GRAY_16_PALETTE: tuple[tuple[int, int, int], ...] = tuple((v, v, v) for v in range(0, 256, 17))
+
 
 # Calibrated targets, what the panels actually reproduce under normal
 # viewing light. Used **only** when the per-device ``calibrated`` toggle
@@ -249,6 +256,7 @@ ACCEPTED_GAMUTS: frozenset[str] = frozenset(
         "bwry_4",
         "bwr_3",
         "gray_4",
+        "gray_16",
     }
 )
 

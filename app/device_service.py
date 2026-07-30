@@ -27,7 +27,7 @@ from pathlib import Path
 from typing import Any
 
 from app.device_loader import Device, DeviceRegistry, load_instance_file
-from app.quantizer import PANEL_GAMUTS
+from app.quantizer import canonicalise_gamut
 from app.renderer_loader import RendererRegistry, clone_for_instances
 
 logger = logging.getLogger(__name__)
@@ -523,7 +523,14 @@ def update_instance_panel(
     panel_block = dict(raw.get("panel") or {})
     panel_block["w"], panel_block["h"], panel_block["orientation"] = w, h, o
     if gamut is not None:
-        panel_block["gamut"] = gamut if gamut in PANEL_GAMUTS else "waveshare_e6"
+        # Normalise through the canonical resolver rather than clamping to the
+        # .bin packer targets: that dropped metadata gamuts the packer doesn't
+        # own (``mono``, ``gray_4``, ``gray_16``, ``rgb*``) to ``waveshare_e6``,
+        # which would silently turn a grayscale panel into a fake 6-colour one
+        # on any panel-settings edit. ``canonicalise_gamut`` maps chemistry
+        # aliases, preserves accepted values, and still defaults garbage to a
+        # safe packer target.
+        panel_block["gamut"] = canonicalise_gamut(gamut)
     if underscan is not None:
         # Clamp so the inset can't swallow the panel (keep at least half).
         panel_block["underscan"] = max(0, min(underscan, min(w, h) // 2 - 1))

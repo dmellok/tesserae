@@ -242,6 +242,9 @@ def test_canonicalise_gamut_passes_bwr3_and_gray4_through() -> None:
     itself so a client can declare it over /discover."""
     assert canonicalise_gamut("bwr_3") == "bwr_3"
     assert canonicalise_gamut("gray_4") == "gray_4"
+    # gray_16 (IT8951 16-level panels, E1003 / TRMNL X) is metadata-only and
+    # canonicalises to itself rather than a .bin packer target.
+    assert canonicalise_gamut("gray_16") == "gray_16"
 
 
 def test_pack_inky_7colour_red_nibble_differs_from_e6() -> None:

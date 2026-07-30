@@ -15,7 +15,7 @@
     "h": 1404,
     "orientation": "landscape",
     "name": "10.3 inch monochrome ePaper (16-level greyscale, 1872x1404)",
-    "gamut": "mono",
+    "gamut": "gray_16",
     "native_w": 1872,
     "native_h": 1404
   },

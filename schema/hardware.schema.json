@@ -41,7 +41,7 @@
           "enum": ["landscape", "landscape_flipped", "portrait", "portrait_flipped"]
         },
         "name": { "type": "string" },
-        "gamut": { "type": "string", "description": "Panel colour gamut id (e.g. 'waveshare_e6', 'spectra_6', 'inky_7colour', 'mono'). Read by the quantizer when packing the .bin buffer." },
+        "gamut": { "type": "string", "description": "Panel colour gamut id (e.g. 'waveshare_e6'/'spectra_6', 'inky_7colour'/'acep_7colour', 'bwry_4', 'bwr_3', 'gray_4', 'gray_16', 'mono'). Colour gamuts are read by the quantizer when packing the .bin buffer; grayscale/mono ids are metadata for the renderer and colour-capability surfaces." },
         "native_w": { "type": "integer", "minimum": 1 },
         "native_h": { "type": "integer", "minimum": 1 },
         "underscan": { "type": "integer", "minimum": 0 }

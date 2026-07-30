@@ -13,7 +13,7 @@
     "h": 480,
     "orientation": "landscape",
     "name": "7.5 inch monochrome ePaper, 4-level grayscale (800x480)",
-    "gamut": "mono",
+    "gamut": "gray_4",
     "native_w": 800,
     "native_h": 480
   },

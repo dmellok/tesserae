@@ -622,20 +622,45 @@ def _gamut_info(gamut: str) -> dict[str, Any]:
     for a genuinely grayscale (``mono``) panel."""
     from app import quantizer as q
 
+    # Panels declare chemistry aliases (``spectra_6``, ``acep_7colour``) that the
+    # rest of the stack collapses onto the canonical packer targets
+    # (``waveshare_e6``, ``inky_7colour``). Resolve the alias here too, otherwise
+    # a Spectra 6 / ACeP panel misses the table below, falls through to the empty
+    # palette, and reports as mono. Only accepted values are canonicalised so an
+    # unrecognised string still degrades to the conservative "unknown" default
+    # rather than the ``waveshare_e6`` fallback ``canonicalise_gamut`` applies.
+    resolved = q.canonicalise_gamut(gamut) if gamut in q.ACCEPTED_GAMUTS else gamut
+
+    # Full-colour transports carry no fixed ink palette but must not read as mono.
+    if resolved in ("rgb24", "rgb16"):
+        bits = "24" if resolved == "rgb24" else "16"
+        return {
+            "gamut": gamut,
+            "color_mode": f"full colour ({bits}-bit)",
+            "colors": [],
+            "mono": False,
+        }
+
     table: dict[str, tuple[str, tuple[tuple[int, int, int], ...]]] = {
         "waveshare_e6": ("6-colour (Spectra 6)", q.WAVESHARE_E6_PALETTE),
         "inky_7colour": ("7-colour (ACeP)", q.INKY_7COLOUR_PALETTE),
         "bwry_4": ("4-colour · black/white/red/yellow", q.BWRY_4_PALETTE),
         "bwr_3": ("3-colour · black/white/red", q.BWR_3_PALETTE),
         "gray_4": ("4-level grayscale", q.GRAY_4_PALETTE),
+        "gray_16": ("16-level grayscale", q.GRAY_16_PALETTE),
+        "mono": ("black & white", ()),
     }
-    label, palette = table.get(gamut, (gamut or "unknown", ()))
+    label, palette = table.get(resolved, (resolved or "unknown", ()))
     colors = [_hex(c) for c in palette]
+    # ``gray_4`` / ``gray_16`` carry multiple ink levels but are chromatically
+    # grayscale, so they should still force a grayscale layout; ``mono`` is
+    # grayscale by definition.
+    grayscale = resolved in ("mono", "gray_4", "gray_16")
     return {
         "gamut": gamut,
         "color_mode": label,
         "colors": colors,
-        "mono": len(colors) <= 2,
+        "mono": grayscale or len(colors) <= 2,
     }
 
 
