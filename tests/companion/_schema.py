@@ -1,5 +1,5 @@
 """Shared helpers for validating Companion API payloads against the
-vendored OpenAPI 0.4.1 contract.
+vendored OpenAPI 0.5.0 contract.
 
 The spec + fixtures under ``contract/`` are a verbatim copy of
 ``charmmmz/tesserae-companion-ios`` ``Contracts/``. Keeping them in-tree

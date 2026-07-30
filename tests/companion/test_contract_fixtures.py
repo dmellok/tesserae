@@ -39,7 +39,7 @@ CASES = {
 
 def test_openapi_shape_and_operation_ids_are_stable() -> None:
     assert SPEC["openapi"] == "3.0.3"
-    assert SPEC["info"]["version"] == "0.4.1"
+    assert SPEC["info"]["version"] == "0.5.0"
     assert set(SPEC["paths"]) == {
         "/api/app/v1",
         "/api/app/v1/pair",
@@ -50,6 +50,8 @@ def test_openapi_shape_and_operation_ids_are_stable() -> None:
         "/api/app/v1/dashboards/{dashboard_id}/preview",
         "/api/app/v1/dashboards/{dashboard_id}/push",
         "/api/app/v1/images",
+        "/api/app/v1/image-urls",
+        "/api/app/v1/webpages",
         "/api/app/v1/jobs/{job_id}",
         "/api/app/v1/history",
         "/api/app/v1/history/{history_id}/preview",

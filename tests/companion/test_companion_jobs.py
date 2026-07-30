@@ -38,6 +38,8 @@ class _FakePush:
         self.status = status
         self.push_calls: list[dict[str, Any]] = []
         self.image_calls: list[dict[str, Any]] = []
+        self.render_calls: list[dict[str, Any]] = []
+        self.fetch_calls: list[str] = []
         self._next_event_id = 100
 
     def push(self, page_id: str, **kwargs: Any) -> Any:
@@ -46,9 +48,24 @@ class _FakePush:
         return SimpleNamespace(status=self.status, error=None, event_id=self._next_event_id)
 
     def push_image(self, image_bytes: bytes, **kwargs: Any) -> Any:
-        self.image_calls.append({"device_id": kwargs["device_id"], "fit": kwargs["fit"]})
+        self.image_calls.append(
+            {
+                "device_id": kwargs["device_id"],
+                "fit": kwargs["fit"],
+                "source": kwargs.get("source", "file"),
+            }
+        )
         self._next_event_id += 1
         return SimpleNamespace(status=self.status, error=None, event_id=self._next_event_id)
+
+    # Companion link-send: fetch / render once, then fan out via push_image.
+    def fetch_remote_image_strict(self, url: str) -> bytes:
+        self.fetch_calls.append(url)
+        return b"\x89PNG-fake"
+
+    def render_webpage_png(self, url: str, **kwargs: Any) -> bytes:
+        self.render_calls.append({"url": url, **kwargs})
+        return b"\x89PNG-fake"
 
 
 @pytest.fixture
@@ -345,7 +362,7 @@ def test_image_push_accepts_every_advertised_fit_mode(app: Flask, fit: str) -> N
     assert job["result"]["status"] == "published"
     assert job["result"]["device_ids"] == [device]
     assert job["result"]["history_event_ids"] == ["101"]
-    assert fake.image_calls == [{"device_id": device, "fit": fit}]
+    assert fake.image_calls == [{"device_id": device, "fit": fit, "source": "file"}]
 
 
 @pytest.mark.parametrize("invalid_fit", ["tile", ["fit"]], ids=["unknown", "non-string"])
@@ -417,3 +434,212 @@ def test_unknown_job_is_404(app: Flask) -> None:
     resp = app.test_client().get("/api/app/v1/jobs/job_missing", headers=_auth(token))
     assert resp.status_code == 404
     assert resp.get_json()["error"]["code"] == "not_found"
+
+
+# -- link send: image URL + webpage (#163) -------------------------------
+
+# Public IP literals keep the strict-policy checks offline-deterministic:
+# assert_public_url resolves hostnames, but an IP literal is classified
+# directly with no DNS. 93.184.216.34 is a public address.
+_PUBLIC_IMG = "http://93.184.216.34/photo.png"
+_PUBLIC_WEB = "http://93.184.216.34/dashboard"
+
+
+def _image_url_body(**over: Any) -> dict[str, Any]:
+    body = {
+        "url": _PUBLIC_IMG,
+        "device_ids": ["kitchen"],
+        "fit": "fit",
+        "override_quiet_hours": True,
+    }
+    body.update(over)
+    return body
+
+
+def test_image_url_push_fetches_once_and_fans_out_with_url_source(app: Flask) -> None:
+    fake = _install_fake_push(app)
+    d1 = _seed_device(app, "kitchen")
+    d2 = _seed_device(app, "hallway")
+    token = _token(app)
+    resp = app.test_client().post(
+        "/api/app/v1/image-urls",
+        data=json.dumps(_image_url_body(device_ids=[d1, d2])),
+        content_type="application/json",
+        headers=_auth(token, "idem-imageurl-00001"),
+    )
+    assert resp.status_code == 202, resp.get_data(as_text=True)
+    job = _poll(app, token, resp.get_json()["job"]["id"])
+    assert job["status"] == "succeeded"
+    assert job["result"]["status"] == "published"
+    assert set(job["result"]["device_ids"]) == {d1, d2}
+    # Fetched exactly once, then fanned out per target tagged source="url".
+    assert fake.fetch_calls == [_PUBLIC_IMG]
+    assert {c["device_id"] for c in fake.image_calls} == {d1, d2}
+    assert {c["source"] for c in fake.image_calls} == {"url"}
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://127.0.0.1/x",
+        "http://192.168.1.10/x",
+        "http://10.0.0.5/x",
+        "http://169.254.169.254/latest/meta-data/",
+        "http://[::1]/x",
+    ],
+)
+def test_image_url_push_refuses_non_public_url_synchronously(app: Flask, url: str) -> None:
+    fake = _install_fake_push(app)
+    _seed_device(app, "kitchen")
+    token = _token(app)
+    resp = app.test_client().post(
+        "/api/app/v1/image-urls",
+        data=json.dumps(_image_url_body(url=url)),
+        content_type="application/json",
+        headers=_auth(token, "idem-blocked-000001"),
+    )
+    assert resp.status_code == 400
+    assert resp.get_json()["error"]["code"] == "url_blocked"
+    # Rejected before any fetch or job enqueue.
+    assert fake.fetch_calls == []
+
+
+def test_image_url_push_rejects_embedded_credentials(app: Flask) -> None:
+    _install_fake_push(app)
+    _seed_device(app, "kitchen")
+    token = _token(app)
+    resp = app.test_client().post(
+        "/api/app/v1/image-urls",
+        data=json.dumps(_image_url_body(url="http://user:pw@93.184.216.34/x")),
+        content_type="application/json",
+        headers=_auth(token, "idem-creds-0000001"),
+    )
+    assert resp.status_code == 400
+    assert resp.get_json()["error"]["code"] == "invalid_request"
+
+
+def test_image_url_push_requires_idempotency_key(app: Flask) -> None:
+    _install_fake_push(app)
+    _seed_device(app, "kitchen")
+    token = _token(app)
+    resp = app.test_client().post(
+        "/api/app/v1/image-urls",
+        data=json.dumps(_image_url_body()),
+        content_type="application/json",
+        headers=_auth(token),
+    )
+    assert resp.status_code == 400
+
+
+def test_image_url_push_requires_push_scope(app: Flask) -> None:
+    _install_fake_push(app)
+    _seed_device(app, "kitchen")
+    token = _token(app)
+    app.config["COMPANION_TOKENS"].list_active()[0].scopes = ["devices:read"]
+    resp = app.test_client().post(
+        "/api/app/v1/image-urls",
+        data=json.dumps(_image_url_body()),
+        content_type="application/json",
+        headers=_auth(token, "idem-noscope-00001"),
+    )
+    assert resp.status_code == 401
+
+
+def test_image_url_push_idempotent_replay_returns_same_job(app: Flask) -> None:
+    _install_fake_push(app)
+    _seed_device(app, "kitchen")
+    token = _token(app)
+    client = app.test_client()
+    body = json.dumps(_image_url_body())
+    first = client.post(
+        "/api/app/v1/image-urls",
+        data=body,
+        content_type="application/json",
+        headers=_auth(token, "idem-replay-000001"),
+    )
+    second = client.post(
+        "/api/app/v1/image-urls",
+        data=body,
+        content_type="application/json",
+        headers=_auth(token, "idem-replay-000001"),
+    )
+    assert first.status_code == 202 and second.status_code == 202
+    assert first.get_json()["job"]["id"] == second.get_json()["job"]["id"]
+
+
+def test_webpage_push_requires_browser_pool(app: Flask) -> None:
+    _install_fake_push(app)
+    app.config["BROWSER_POOL"] = None
+    _seed_device(app, "kitchen")
+    token = _token(app)
+    resp = app.test_client().post(
+        "/api/app/v1/webpages",
+        data=json.dumps(_image_url_body(url=_PUBLIC_WEB)),
+        content_type="application/json",
+        headers=_auth(token, "idem-nopool-000001"),
+    )
+    assert resp.status_code == 503
+    assert resp.get_json()["error"]["code"] == "temporarily_unavailable"
+
+
+def test_webpage_push_renders_once_and_fans_out_with_webpage_source(app: Flask) -> None:
+    fake = _install_fake_push(app)
+    app.config["BROWSER_POOL"] = object()  # presence gate only; render is faked
+    d1 = _seed_device(app, "kitchen")
+    d2 = _seed_device(app, "hallway")
+    token = _token(app)
+    resp = app.test_client().post(
+        "/api/app/v1/webpages",
+        data=json.dumps(
+            {
+                "url": _PUBLIC_WEB,
+                "device_ids": [d1, d2],
+                "fit": "fill",
+                "viewport_w": 1024,
+                "override_quiet_hours": True,
+            }
+        ),
+        content_type="application/json",
+        headers=_auth(token, "idem-webpage-00001"),
+    )
+    assert resp.status_code == 202, resp.get_data(as_text=True)
+    job = _poll(app, token, resp.get_json()["job"]["id"])
+    assert job["status"] == "succeeded"
+    assert job["result"]["status"] == "published"
+    # Rendered exactly once at the requested viewport, in strict mode.
+    assert len(fake.render_calls) == 1
+    assert fake.render_calls[0]["url"] == _PUBLIC_WEB
+    assert fake.render_calls[0]["viewport_w"] == 1024
+    assert fake.render_calls[0]["allow_local"] is False
+    assert {c["source"] for c in fake.image_calls} == {"webpage"}
+
+
+def test_webpage_push_refuses_private_url(app: Flask) -> None:
+    fake = _install_fake_push(app)
+    app.config["BROWSER_POOL"] = object()
+    _seed_device(app, "kitchen")
+    token = _token(app)
+    resp = app.test_client().post(
+        "/api/app/v1/webpages",
+        data=json.dumps(_image_url_body(url="http://127.0.0.1/admin")),
+        content_type="application/json",
+        headers=_auth(token, "idem-webblock-0001"),
+    )
+    assert resp.status_code == 400
+    assert resp.get_json()["error"]["code"] == "url_blocked"
+    assert fake.render_calls == []
+
+
+def test_webpage_push_rejects_out_of_range_viewport(app: Flask) -> None:
+    _install_fake_push(app)
+    app.config["BROWSER_POOL"] = object()
+    _seed_device(app, "kitchen")
+    token = _token(app)
+    resp = app.test_client().post(
+        "/api/app/v1/webpages",
+        data=json.dumps(_image_url_body(url=_PUBLIC_WEB, viewport_w=99)),
+        content_type="application/json",
+        headers=_auth(token, "idem-badvp-0000001"),
+    )
+    assert resp.status_code == 400
+    assert resp.get_json()["error"]["code"] == "invalid_request"

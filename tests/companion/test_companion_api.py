@@ -114,15 +114,19 @@ def test_capabilities_probe_is_unauthenticated_and_valid(app: Flask) -> None:
     # Advertised pairing facts agree with the store the server actually uses.
     assert body["pairing"]["code_length"] == 6
     assert body["pairing"]["ttl_seconds"] == 600
-    # All read/write surfaces are served.
+    # All read/write surfaces served without a browser pool. image_url_push is
+    # always on (plain fetch); webpage_push + previews are gated on the pool and
+    # covered in test_companion_previews.
     assert set(body["features"]) == {
         "devices",
         "dashboards",
         "dashboard_push",
         "image_push",
+        "image_url_push",
         "jobs",
         "history",
     }
+    assert "webpage_push" not in body["features"]
     assert body["limits"]["image_fit_modes"] == list(companion_api.IMAGE_FIT_MODES)
     # No household content leaks from the unauthenticated probe.
     assert "devices" not in body and "dashboards" not in body
