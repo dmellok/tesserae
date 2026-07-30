@@ -195,8 +195,10 @@ def test_timeline_now_uses_configured_timezone(app: Flask) -> None:
     """#164 / #170: the Next-24h timeline anchored "now" to the server's
     container TZ (UTC on Docker) instead of the configured app timezone, so
     the now-marker and hour ticks read an offset off the user's wall clock.
-    A daily schedule also exercises the tz-aware fire-time comparison that
-    would otherwise raise once "now" became tz-aware."""
+    An interval schedule guarantees fires in any 24h window regardless of the
+    wall-clock hour the test runs at; a daily schedule additionally exercises
+    the tz-aware fire-time comparison that would otherwise raise once "now"
+    became tz-aware."""
     from datetime import datetime, timedelta
 
     from app.schedule_routes import _build_timeline
@@ -204,21 +206,32 @@ def test_timeline_now_uses_configured_timezone(app: Flask) -> None:
 
     with app.app_context():
         app.config["SETTINGS_STORE"].update_section("app", {"timezone": "Asia/Hong_Kong"})
+        interval = Schedule(
+            id="every30",
+            name="Every 30",
+            page_id="p1",
+            type="interval",
+            interval_minutes=30,
+        )
         daily = Schedule(
             id="morning",
             name="Morning",
-            page_id="p1",
+            page_id="p2",
             type="daily",
             fires_at=datetime(2020, 1, 1, 7, 0),
         )
-        tl = _build_timeline([daily])
+        tl = _build_timeline([interval, daily])
 
     now = tl["now"]
     assert now.tzinfo is not None
     assert now.utcoffset() == timedelta(hours=8)  # Hong Kong, no DST
+    # The interval schedule always projects fires; all must carry the zone.
     fires = tl["rows"][0]["fires"]
-    assert fires, "a daily every-day schedule should project a fire within 24h"
+    assert fires, "an interval schedule should project fires within 24h"
     assert all(f["at"].utcoffset() == timedelta(hours=8) for f in fires)
+    # The daily projection must not raise on the tz-aware comparison, and any
+    # fires it does yield carry the same zone.
+    assert all(f["at"].utcoffset() == timedelta(hours=8) for f in tl["rows"][1]["fires"])
 
 
 def test_last_fired_abs_uses_configured_timezone(app: Flask) -> None:
