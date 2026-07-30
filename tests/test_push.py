@@ -1200,10 +1200,13 @@ def test_prune_keeps_live_frame_artifacts_without_event_rows(
         "filename": "liveart123456.bin",
         "composition_digest": "livecomp12345",
         "preview_digest": "liveprev123456",
+        "last_served_digest": "servedart12345",
+        "last_served_preview_digest": "servedprev12345",
     }
     (renders / "liveart123456.bin").write_bytes(b"x")
     (renders / "livecomp12345.png").write_bytes(b"x")
     (renders / "liveprev123456.png").write_bytes(b"x")
+    (renders / "servedprev12345.png").write_bytes(b"x")
     (renders / "livecomp12345.regions.json").write_text('{"v":1,"regions":[]}')
     (renders / "orphan99999999.png").write_bytes(b"x")
 
@@ -1212,10 +1215,44 @@ def test_prune_keeps_live_frame_artifacts_without_event_rows(
     assert (renders / "liveart123456.bin").exists()
     assert (renders / "livecomp12345.png").exists()
     assert (renders / "liveprev123456.png").exists()
+    assert (renders / "servedprev12345.png").exists()
     assert (renders / "livecomp12345.regions.json").exists(), (
         "the live frame's touch-region sidecar must survive the prune"
     )
     assert not (renders / "orphan99999999.png").exists()
+
+
+def test_latest_render_replacement_preserves_last_served_snapshot(
+    tmp_path: Path, composition_png: bytes
+) -> None:
+    renderers = [_make_renderer(tmp_path, "pi_png", "png", retain=False)]
+    manager, _, _ = _wired(tmp_path, composition_png, renderers)
+    manager._latest_renders["hall_e1003"] = {
+        "digest": "oldart12345678",
+        "filename": "oldart12345678.bin",
+        "preview_digest": "oldprev1234567",
+        "last_served_digest": "servedart12345",
+        "last_served_preview_digest": "servedprev12345",
+    }
+
+    with manager._lock:
+        manager._replace_latest_render_locked(
+            "hall_e1003",
+            {
+                "digest": "newart12345678",
+                "filename": "newart12345678.bin",
+                "preview_digest": "newprev1234567",
+            },
+        )
+
+    latest = manager.latest_render_for("hall_e1003")
+    assert latest["digest"] == "newart12345678"
+    assert latest["last_served_digest"] == "servedart12345"
+    assert latest["last_served_preview_digest"] == "servedprev12345"
+    assert manager.has_pending_render("hall_e1003") is True
+
+    persisted = json.loads(manager._latest_renders_path.read_text(encoding="utf-8"))
+    assert persisted["hall_e1003"]["last_served_preview_digest"] == "servedprev12345"
 
 
 def test_delete_history_keeps_live_frame_artifacts(tmp_path: Path, composition_png: bytes) -> None:

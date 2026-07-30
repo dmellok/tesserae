@@ -8,6 +8,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Companion display cards distinguish served and pending frames.** REST
+  `/frame` polls now retain the last frame handed to each device, including
+  matching `304 Not Modified` confirmations. The Companion device preview uses
+  that served frame while `has_pending_render` reports when a newer render is
+  waiting for the panel's next wake; MQTT and push transports continue to use
+  the latest server render.
+
 - **Companion API 0.4 adds canonical History and all five photo layout modes.**
   Community clients can page through the same push History shown in the web UI,
   fetch retained composition previews, and idempotently resend an entry to its

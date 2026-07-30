@@ -74,18 +74,34 @@ def _seed_device(app: Flask, device_id: str = "kitchen") -> str:
 
 
 class _FakePush:
-    """Returns a fixed latest-render pointing at a seeded device preview."""
+    """Returns a fixed served render pointing at a seeded device preview."""
 
-    def __init__(self, preview_digest: object | None) -> None:
-        self._digest = preview_digest
+    def __init__(
+        self,
+        preview_digest: object | None,
+        *,
+        latest_preview_digest: object | None = None,
+    ) -> None:
+        self._served_digest = preview_digest
+        self._latest_digest = (
+            preview_digest if latest_preview_digest is None else latest_preview_digest
+        )
 
     def latest_render_for(self, device_id: str) -> Any:
-        if self._digest is None:
+        if self._latest_digest is None:
             return None
-        return {"preview_digest": self._digest}
+        return {"preview_digest": self._latest_digest}
+
+    def last_served_render_for(self, device_id: str) -> Any:
+        if self._served_digest is None:
+            return None
+        return {"preview_digest": self._served_digest}
 
 
 class _FakeLegacyPush:
+    def last_served_render_for(self, device_id: str) -> Any:
+        return {"composition_digest": "deadbeefcafe0000"}
+
     def latest_render_for(self, device_id: str) -> Any:
         return {"composition_digest": "deadbeefcafe0000"}
 
@@ -110,6 +126,43 @@ def test_device_preview_serves_logical_frame_with_etag(app: Flask) -> None:
     assert resp.get_data() == _PNG
     assert resp.headers["ETag"].strip('"') == "deadbeefcafe0001"
     assert resp.headers["Cache-Control"] == "private, no-cache"
+
+
+def test_device_preview_prefers_last_served_over_newer_server_render(app: Flask) -> None:
+    device = _seed_device(app)
+    _seed_render(app, "deadbeefcafe0010")
+    _seed_render(app, "deadbeefcafe0011")
+    app.config["PUSH_MANAGER"] = _FakePush(
+        "deadbeefcafe0010",
+        latest_preview_digest="deadbeefcafe0011",
+    )
+    token = _token(app)
+
+    resp = app.test_client().get(f"/api/app/v1/devices/{device}/preview", headers=_auth(token))
+
+    assert resp.status_code == 200
+    assert resp.headers["ETag"].strip('"') == "deadbeefcafe0010"
+
+
+def test_device_preview_uses_server_latest_for_non_rest_transport(app: Flask) -> None:
+    device_id = _seed_device(app)
+    device = app.config["DEVICE_REGISTRY"].get(device_id)
+    device.manifest["transport"] = "mqtt"
+    _seed_render(app, "deadbeefcafe0012")
+    _seed_render(app, "deadbeefcafe0013")
+    app.config["PUSH_MANAGER"] = _FakePush(
+        "deadbeefcafe0012",
+        latest_preview_digest="deadbeefcafe0013",
+    )
+    token = _token(app)
+
+    resp = app.test_client().get(
+        f"/api/app/v1/devices/{device_id}/preview",
+        headers=_auth(token),
+    )
+
+    assert resp.status_code == 200
+    assert resp.headers["ETag"].strip('"') == "deadbeefcafe0013"
 
 
 @pytest.mark.parametrize(

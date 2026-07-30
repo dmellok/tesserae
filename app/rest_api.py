@@ -832,6 +832,11 @@ def get_frame(device_id: str) -> Response:
         resp = Response(status=304)
         resp.headers["ETag"] = etag
         resp.headers["Content-Location"] = image_url
+        if push_mgr is not None:
+            # A matching 304 confirms the device already holds this frame.
+            # Advancing last-served here clears Companion's pending badge
+            # without forcing an otherwise unnecessary download.
+            push_mgr.record_frame_served(device.id, latest)
         return resp
     if force_refetch and push_mgr is not None:
         push_mgr.consume_force_refetch(device.id)
@@ -902,6 +907,8 @@ def get_frame(device_id: str) -> Response:
     resp.headers["ETag"] = etag
     resp.headers["Content-Location"] = image_url
     resp.headers["Cache-Control"] = "no-cache"
+    if push_mgr is not None:
+        push_mgr.record_frame_served(device.id, latest)
     return resp
 
 
