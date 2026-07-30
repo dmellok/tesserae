@@ -53,7 +53,12 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from app.device_loader import DeviceRegistry
 from app.device_preview import retained_device_preview, write_device_preview
 from app.dither_regions import has_nearest_region, regions_from_page
-from app.net_guard import BlockedURLError, assert_operator_url, fetch_bytes
+from app.net_guard import (
+    BlockedURLError,
+    assert_operator_url,
+    assert_public_url,
+    fetch_bytes,
+)
 from app.palette_profiles import (
     PaletteProfile,
     PaletteProfileStore,
@@ -1354,9 +1359,15 @@ class PushManager:
         device_id: str | None = None,
         fit: str | None = None,
         bypass_coalesce: bool = True,
+        allow_local: bool = True,
     ) -> PushResult:
         """Download an image URL, then ``push_image``. Networking errors
-        surface as failed events with the URL as the target."""
+        surface as failed events with the URL as the target.
+
+        ``allow_local`` defaults to operator trust (loopback / LAN allowed);
+        the Companion route passes ``False`` for the strict public-only
+        policy, refusing private / loopback / link-local / reserved hosts,
+        including on redirect hops."""
         supersede = self._acquire_or_supersede(
             device_id=device_id,
             source="url",
@@ -1372,7 +1383,7 @@ class PushManager:
         else:
             try:
                 try:
-                    image_bytes = self._fetch_remote_image(url)
+                    image_bytes = self._fetch_remote_image(url, allow_local=allow_local)
                 except Exception as err:
                     result = self._log_failure(source="url", target=url, error=f"fetch: {err}")
                 else:
@@ -1393,13 +1404,20 @@ class PushManager:
         device_id: str | None = None,
         fit: str | None = None,
         bypass_coalesce: bool = True,
+        allow_local: bool = True,
     ) -> PushResult:
-        """Screenshot an arbitrary URL with Playwright, then publish."""
+        """Screenshot an arbitrary URL with Playwright, then publish.
+
+        ``allow_local`` defaults to operator trust (loopback / LAN capture
+        allowed). The Companion route passes ``False``: the pre-flight refuses
+        non-public hosts, and the strict flag rides into the renderer so a
+        request interceptor also blocks every redirect hop / subresource
+        Chromium follows internally (a pre-check alone can't see those)."""
         # SSRF pre-flight. Playwright follows redirects internally, so this is
-        # an initial-URL check only; allow_local keeps same-host / LAN capture
-        # working and just refuses link-local / cloud metadata.
+        # only the initial-URL check; the renderer's interceptor (via
+        # RenderRequest.allow_local) enforces the policy on each hop.
         try:
-            assert_operator_url(url)
+            assert_operator_url(url) if allow_local else assert_public_url(url)
         except BlockedURLError as err:
             return self._log_failure(source="webpage", target=url, error=str(err))
         supersede = self._acquire_or_supersede(
@@ -1429,6 +1447,9 @@ class PushManager:
                             # mount wait and to use networkidle for the
                             # initial goto so SPAs hydrate before screenshot.
                             is_composer=False,
+                            # Strict callers (Companion) refuse non-public hosts
+                            # on every hop the browser follows internally.
+                            allow_local=allow_local,
                         ),
                         pool=self._browser_pool_fn(),
                     )
@@ -2572,22 +2593,25 @@ class PushManager:
             out2["native_h"] = panel.native_h
         return out2
 
-    def _fetch_remote_image(self, url: str) -> bytes:
+    def _fetch_remote_image(self, url: str, *, allow_local: bool = True) -> bytes:
         """Download an image URL through the SSRF guard, bounded size + timeout.
 
         Routes through ``net_guard`` so the scheme allowlist, per-redirect-hop
         host check, and size cap match the widget fetch path. ``allow_local``
         keeps same-host / LAN image sources usable while still refusing
-        link-local / cloud metadata. ``BlockedURLError`` (a ``ValueError``) and
-        the oversize ``ValueError`` propagate to the caller, which logs them as
-        a failed ``url`` push."""
+        link-local / cloud metadata (operator flows); untrusted callers (the
+        Companion route) pass ``allow_local=False`` so loopback / RFC1918 /
+        reserved hosts are refused, including on redirect hops (fetch_bytes
+        re-validates each). ``BlockedURLError`` (a ``ValueError``) and the
+        oversize ``ValueError`` propagate to the caller, which logs them as a
+        failed ``url`` push."""
         try:
             data, _ = fetch_bytes(
                 url,
                 headers={"User-Agent": "tesserae/0.1"},
                 timeout=_HTTP_TIMEOUT_S,
                 max_bytes=_MAX_REMOTE_IMAGE_BYTES,
-                allow_local=True,
+                allow_local=allow_local,
             )
         except urllib.error.URLError as err:
             raise RuntimeError(f"download failed: {err}") from err

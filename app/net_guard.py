@@ -108,6 +108,20 @@ def assert_operator_url(url: str) -> None:
     _validate_url(url, allow_local=True)
 
 
+def assert_public_url(url: str) -> None:
+    """Strict variant of :func:`assert_operator_url` for untrusted callers.
+
+    Refuses loopback, private (RFC1918), link-local, reserved, and cloud
+    metadata destinations with no override. Used by the Companion link-send
+    routes, which must never reach the operator's LAN. This is only the
+    initial-URL check: fetch / render paths that follow redirects must ALSO
+    run in strict mode (``fetch_bytes(allow_local=False)`` re-validates every
+    hop; the webpage renderer's request interceptor guards each Chromium
+    navigation), because this call alone can't see a redirect to a private
+    host."""
+    _validate_url(url, allow_local=False)
+
+
 class _GuardedRedirect(urllib.request.HTTPRedirectHandler):
     """Re-run the URL guard on every redirect target before following it."""
 
