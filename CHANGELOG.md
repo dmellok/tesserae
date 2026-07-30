@@ -37,6 +37,11 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **The Schedules "Next 24 hours" timeline and last-fired times respect the configured
+  timezone.** They were computed from the server's clock (UTC on a typical Docker install),
+  so the "Now" marker, hour ticks, and projected fire times sat an offset away from the
+  operator's wall clock and reloading didn't help. They now use the configured app timezone.
+
 - **Grayscale and Spectra 6 / ACeP panels report their real palette to companion and MCP
   clients.** The colour-capability lookup only matched the canonical gamut ids, so a panel
   declared with a chemistry alias (`spectra_6`, `acep_7colour`) fell through and was reported

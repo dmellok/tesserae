@@ -35,6 +35,7 @@ from app.scheduler import Scheduler
 from app.state.page_store import PageStore
 from app.state.schedule_model import Schedule
 from app.state.schedule_store import ScheduleStore
+from app.tz_resolve import app_timezone
 
 bp = Blueprint("schedules", __name__, url_prefix="/schedules")
 
@@ -198,7 +199,10 @@ def _project_fires(schedule: Schedule, start: datetime, end: datetime) -> list[d
         day = cur.date()
         while day <= end.date():
             if day.weekday() in schedule.days_of_week:
-                candidate = datetime.combine(day, target_t)
+                # Match the tz-awareness of the window bounds so the comparison
+                # is valid (start/end are tz-aware from _build_timeline; naive
+                # when a caller passes naive bounds).
+                candidate = datetime.combine(day, target_t, tzinfo=start.tzinfo)
                 if start <= candidate < end:
                     fires.append(candidate)
             day = day + timedelta(days=1)
@@ -235,7 +239,11 @@ def _build_timeline(schedules: Iterable[Schedule], hours: int = 24) -> dict[str,
     its start to the top of the current hour so the now-marker falls
     visibly inside the timeline rather than flush against the left
     edge (which is what you'd get if start == now)."""
-    now = datetime.now()
+    # Anchor "now" in the operator's configured timezone, not the server's
+    # container TZ (UTC on typical Docker installs). A naive datetime.now()
+    # here put the now-marker and hour ticks an offset off the wall clock the
+    # user actually reads (#164, #170; same class as #143).
+    now = datetime.now(app_timezone())
     start = now.replace(minute=0, second=0, microsecond=0)
     end = start + timedelta(hours=hours)
     total_seconds = (end - start).total_seconds()
@@ -293,7 +301,7 @@ def _last_fired_view(epoch: float | None) -> dict[str, str] | None:
         return None
     return {
         "rel": _relative(epoch),
-        "abs": datetime.fromtimestamp(epoch).strftime("%Y-%m-%d %H:%M"),
+        "abs": datetime.fromtimestamp(epoch, app_timezone()).strftime("%Y-%m-%d %H:%M"),
     }
 
 

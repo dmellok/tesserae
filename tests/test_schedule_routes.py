@@ -189,3 +189,47 @@ def test_nav_links_to_schedules(app: Flask) -> None:
     body = client.get("/settings", follow_redirects=True).get_data(as_text=True)
     assert "Schedules" in body
     assert "/schedules" in body
+
+
+def test_timeline_now_uses_configured_timezone(app: Flask) -> None:
+    """#164 / #170: the Next-24h timeline anchored "now" to the server's
+    container TZ (UTC on Docker) instead of the configured app timezone, so
+    the now-marker and hour ticks read an offset off the user's wall clock.
+    A daily schedule also exercises the tz-aware fire-time comparison that
+    would otherwise raise once "now" became tz-aware."""
+    from datetime import datetime, timedelta
+
+    from app.schedule_routes import _build_timeline
+    from app.state.schedule_model import Schedule
+
+    with app.app_context():
+        app.config["SETTINGS_STORE"].update_section("app", {"timezone": "Asia/Hong_Kong"})
+        daily = Schedule(
+            id="morning",
+            name="Morning",
+            page_id="p1",
+            type="daily",
+            fires_at=datetime(2020, 1, 1, 7, 0),
+        )
+        tl = _build_timeline([daily])
+
+    now = tl["now"]
+    assert now.tzinfo is not None
+    assert now.utcoffset() == timedelta(hours=8)  # Hong Kong, no DST
+    fires = tl["rows"][0]["fires"]
+    assert fires, "a daily every-day schedule should project a fire within 24h"
+    assert all(f["at"].utcoffset() == timedelta(hours=8) for f in fires)
+
+
+def test_last_fired_abs_uses_configured_timezone(app: Flask) -> None:
+    """The last-fired tooltip rendered its absolute time in the container TZ;
+    it must use the configured app timezone (#170)."""
+    from app.schedule_routes import _last_fired_view
+
+    with app.app_context():
+        app.config["SETTINGS_STORE"].update_section("app", {"timezone": "Asia/Hong_Kong"})
+        # 1609459200 == 2021-01-01 00:00 UTC == 08:00 in Hong Kong (+8).
+        view = _last_fired_view(1609459200.0)
+
+    assert view is not None
+    assert view["abs"] == "2021-01-01 08:00"
