@@ -17,14 +17,19 @@
       "notes": "Works on every inky-supported panel; quantises on the Pi each frame."
     },
     "esp32_bw_bin": {
-      "status": "Partial",
+      "status": "Tested",
       "hardware": "Xteink X4 (GDEQ0426T82 / SSD1677, 800x480 mono) running CrossInk with Tesserae client support",
-      "notes": "1-bpp packing confirmed end-to-end: a 48000-byte frame fetched and painted on the panel with no on-device decode. The X4 is an e-reader, so the dashboard is its sleep screen rather than a wake-cycle refresh. Marked Partial because the portrait_flipped composition path is derived from a measured 180-degree offset rather than round-tripped on the panel, and the Seeed 800x480 mono SKUs sharing this renderer are still unconfirmed."
+      "notes": "1-bpp packing confirmed end-to-end: a 48000-byte frame fetched and painted on the panel with no on-device decode, upright in the portrait_flipped composition. The X4 is an e-reader, so the dashboard is its sleep screen rather than a wake-cycle refresh. The Seeed 800x480 mono SKUs share this renderer but are still unconfirmed."
     },
     "trmnl_png": {
       "status": "Tested",
       "hardware": "Amazon Kindle Paperwhite 2 (jailbroken) via KOReader trmnl-display plugin",
       "notes": "1-bit greyscale PNG fitted to the panel + dithered server-side. TRMNL devices (Seeed hardware running the TRMNL firmware) are supported but not yet confirmed here."
+    },
+    "esp32_gray2_bin": {
+      "status": "Tested",
+      "hardware": "Xteink X4 (GDEQ0426T82 / SSD1677, 800x480) running CrossInk with Tesserae client support",
+      "notes": "4-level grayscale confirmed end-to-end: a 96000-byte 2-bpp frame fetched and composited on the panel as a base frame plus LSB/MSB planes, with distinct grey levels. Packing is byte-identical to the firmware's own 2-bpp bitmap reader, so no decode step is involved. Not yet confirmed on the Seeed reTerminal E1001 in its 4-gray mode."
     }
   }
 }
