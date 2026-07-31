@@ -90,6 +90,7 @@ def _seed_page(app: Flask, device_id: str) -> str:
         id="pantry",
         name="Pantry",
         layout_kind="canvas",
+        icon="ph-cooking-pot",
         device_ids=[device_id],
         updated_at="2026-07-28T07:45:00Z",
     )
@@ -256,6 +257,7 @@ def test_dashboards_listing_is_contract_valid(app: Flask) -> None:
     _validate(body, "DashboardsResponse")
     pantry = next(d for d in body["dashboards"] if d["id"] == "pantry")
     assert pantry["kind"] == "canvas"
+    assert pantry["icon"] == "cooking-pot"
     assert pantry["device_ids"] == [device_id]
 
 

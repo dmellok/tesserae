@@ -4,6 +4,7 @@
       "id": "pantry",
       "name": "Pantry",
       "kind": "canvas",
+      "icon": "cooking-pot",
       "device_ids": [
         "picpak-kitchen"
       ],
@@ -14,6 +15,7 @@
       "id": "morning",
       "name": "Morning",
       "kind": "grid",
+      "icon": null,
       "device_ids": [
         "e1004-desk"
       ],

@@ -17,7 +17,7 @@ job the client polls; quiet-hours suppression surfaces as a *successful*
 app.mdns.
 
 Contract: ``charmmmz/tesserae-companion-ios`` ``Contracts/app-v1.openapi.yaml``
-(OpenAPI 0.5.0). The vendored copy + fixtures under ``tests/companion/``
+(OpenAPI 0.5.1). The vendored copy + fixtures under ``tests/companion/``
 guard these shapes.
 
 mypy --strict applies to this module, see pyproject.toml.
@@ -501,6 +501,7 @@ def list_dashboards() -> Any:
                 "id": page.id,
                 "name": page.name or page.id,
                 "kind": kind,
+                "icon": page.icon,
                 "device_ids": list(dict.fromkeys(page.device_ids)),
                 "updated_at": page.updated_at,
                 "web_url": f"/pages/{page.id}",

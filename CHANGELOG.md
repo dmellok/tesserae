@@ -8,6 +8,11 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Companion dashboard listings now include their Phosphor icon name.** The
+  optional `icon` field uses the same bare identifier as the web dashboard
+  list, so companion clients can render a consistent icon and safely fall back
+  when a dashboard has no icon.
+
 - **The MCP surfaces the icon set and code-element toolkit to agents.** `list_widgets()` now
   returns the vendored code-element libraries (Chart.js incl. the datalabels and Sankey plugins,
   canvas-gauges, Day.js, qrcode, marked, chroma, SVG.js, Phosphor) and an icon descriptor, and a
