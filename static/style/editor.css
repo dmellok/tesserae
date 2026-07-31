@@ -54,7 +54,9 @@
   position: absolute;
   inset: 0;
 }
-.preview-placeholder[hidden] { display: none !important; }
+.preview-placeholder[hidden] {
+  display: none !important;
+}
 
 /* Live-preview throbber (v0.69.8). Sits on top of the faded iframe
    while the composer server-renders the page (waiting on each
@@ -70,7 +72,9 @@
   z-index: 2;
   animation: preview-throbber-fade-in 180ms ease 100ms both;
 }
-.preview-throbber[hidden] { display: none; }
+.preview-throbber[hidden] {
+  display: none;
+}
 .preview-throbber > i {
   font-size: 40px;
   color: var(--t-accent);
@@ -78,15 +82,23 @@
   animation: preview-throbber-spin 0.9s linear infinite;
 }
 @keyframes preview-throbber-spin {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 @keyframes preview-throbber-fade-in {
   /* Small delay + fade so a fast render (cached widget data, no
      network hit) doesn't flash the throbber. Anything under ~280 ms
      stays invisible; longer waits get the spinner. */
-  from { opacity: 0; }
-  to   { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 /* ----- Dashboards index (mirrors inky-dash) ----------------------- */
@@ -121,7 +133,9 @@
   border-color: var(--t-accent);
   box-shadow: 0 0 0 3px color-mix(in oklab, var(--t-accent) 20%, transparent);
 }
-.dashboard-create-btn { flex: 0 0 auto; }
+.dashboard-create-btn {
+  flex: 0 0 auto;
+}
 
 .dashboard-count {
   font-size: var(--t-size-xs);
@@ -161,7 +175,9 @@
   box-shadow: var(--t-shadow-sm);
   transform: translateY(-1px);
 }
-.page-row:hover .page-name { color: var(--t-accent); }
+.page-row:hover .page-name {
+  color: var(--t-accent);
+}
 
 .page-icon-tile {
   flex: 0 0 auto;
@@ -202,7 +218,11 @@
   opacity: 0.75;
 }
 
-.page-actions { display: flex; gap: var(--t-space-2); align-items: center; }
+.page-actions {
+  display: flex;
+  gap: var(--t-space-2);
+  align-items: center;
+}
 
 /* Outlined pill actions (Edit / Push / Delete). */
 .page-action {
@@ -219,15 +239,21 @@
   font-weight: 500;
   text-decoration: none;
   cursor: pointer;
-  transition: border-color var(--t-trans-fast), color var(--t-trans-fast),
-              background var(--t-trans-fast);
+  transition:
+    border-color var(--t-trans-fast),
+    color var(--t-trans-fast),
+    background var(--t-trans-fast);
 }
-.page-action .ph { font-size: 15px; }
+.page-action .ph {
+  font-size: 15px;
+}
 .page-action:hover {
   border-color: var(--t-accent);
   color: var(--t-accent);
 }
-.page-action-danger { color: var(--t-danger); }
+.page-action-danger {
+  color: var(--t-danger);
+}
 .page-action-danger:hover {
   border-color: var(--t-danger);
   color: var(--t-danger);
@@ -236,8 +262,12 @@
 
 @media (max-width: 640px) {
   /* Collapse action labels to icons on narrow screens. */
-  .page-action span { display: none; }
-  .page-action { padding: var(--t-space-2) var(--t-space-3); }
+  .page-action span {
+    display: none;
+  }
+  .page-action {
+    padding: var(--t-space-2) var(--t-space-3);
+  }
 }
 
 .cell-list {
@@ -257,7 +287,9 @@
   background: var(--t-surface-soft);
   border: 1px solid transparent;
   border-radius: var(--t-radius-sm);
-  transition: background var(--t-trans-fast), border-color var(--t-trans-fast);
+  transition:
+    background var(--t-trans-fast),
+    border-color var(--t-trans-fast);
 }
 .cell-row:hover {
   background: var(--t-surface);
@@ -270,10 +302,19 @@
   min-width: 0;
 }
 
-.cell-row-name { font-weight: 600; font-size: 14px; }
-.cell-row-meta { font-size: 12px; }
+.cell-row-name {
+  font-weight: 600;
+  font-size: 14px;
+}
+.cell-row-meta {
+  font-size: 12px;
+}
 
-.add-cell { padding-top: var(--t-space-1); border-top: 1px dashed var(--t-border); margin-top: var(--t-space-1); }
+.add-cell {
+  padding-top: var(--t-space-1);
+  border-top: 1px dashed var(--t-border);
+  margin-top: var(--t-space-1);
+}
 
 .form-group {
   border: 1px solid var(--t-border);
@@ -298,7 +339,9 @@
   color: var(--t-fg-soft);
   padding: var(--t-space-1) 0;
 }
-.form-group[open] summary { margin-bottom: var(--t-space-3); }
+.form-group[open] summary {
+  margin-bottom: var(--t-space-3);
+}
 
 .header-action {
   display: inline-flex;
@@ -340,7 +383,9 @@
     0 0 0 4px color-mix(in oklab, var(--t-accent) 18%, transparent);
   transform: translateY(-1px);
 }
-.header-action:active { transform: translateY(0); }
+.header-action:active {
+  transform: translateY(0);
+}
 .header-action:focus-visible {
   outline: none;
   box-shadow:
@@ -352,7 +397,9 @@
   color: var(--t-fg-soft);
   text-decoration: none;
 }
-.header-back:hover { color: var(--t-accent); }
+.header-back:hover {
+  color: var(--t-accent);
+}
 
 .page-id-tag {
   font-size: 13px;
@@ -383,7 +430,9 @@
   margin-right: calc(-1 * var(--t-space-1));
 }
 @supports not (backdrop-filter: blur(1px)) {
-  .editor-header { background: var(--t-bg); }
+  .editor-header {
+    background: var(--t-bg);
+  }
 }
 
 .editor-header .header-back {
@@ -393,7 +442,10 @@
   border-radius: var(--t-radius-sm);
   color: var(--t-fg-soft);
 }
-.editor-header .header-back:hover { background: var(--t-surface-soft); color: var(--t-accent); }
+.editor-header .header-back:hover {
+  background: var(--t-surface-soft);
+  color: var(--t-accent);
+}
 
 .editor-name-icon {
   display: inline-grid;
@@ -406,11 +458,18 @@
   font-size: 18px;
   flex-shrink: 0;
 }
-.editor-name-icon:empty { display: none; }
+.editor-name-icon:empty {
+  display: none;
+}
 
-.inline-name-form { flex: 1; max-width: 480px; }
+.inline-name-form {
+  flex: 1;
+  max-width: 480px;
+}
 .inline-name-input {
-  font: 700 18px/1.2 system-ui, sans-serif;
+  font:
+    700 18px/1.2 system-ui,
+    sans-serif;
   padding: var(--t-space-2) var(--t-space-3);
   border: 1px solid transparent;
   border-radius: var(--t-radius-sm);
@@ -418,8 +477,14 @@
   width: 100%;
   color: var(--t-fg);
 }
-.inline-name-input:hover { background: var(--t-surface-soft); }
-.inline-name-input:focus { background: var(--t-surface); border-color: var(--t-border-strong); outline: none; }
+.inline-name-input:hover {
+  background: var(--t-surface-soft);
+}
+.inline-name-input:focus {
+  background: var(--t-surface);
+  border-color: var(--t-border-strong);
+  outline: none;
+}
 
 .save-status {
   display: inline-flex;
@@ -434,16 +499,23 @@
   border: 1px solid color-mix(in oklab, var(--t-ok) 25%, transparent);
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.005em;
-  transition: background var(--t-trans), color var(--t-trans),
-              border-color var(--t-trans);
+  transition:
+    background var(--t-trans),
+    color var(--t-trans),
+    border-color var(--t-trans);
 }
-.save-status .ph, .save-status [class^="ph-"] { font-size: 13px; }
+.save-status .ph,
+.save-status [class^="ph-"] {
+  font-size: 13px;
+}
 .save-status[data-state="saving"] {
   background: var(--t-surface-sunk);
   color: var(--t-fg-soft);
   border-color: var(--t-border);
 }
-.save-status[data-state="saving"] .ph { animation: ts-spin 0.9s linear infinite; }
+.save-status[data-state="saving"] .ph {
+  animation: ts-spin 0.9s linear infinite;
+}
 .save-status[data-state="dirty"] {
   background: color-mix(in oklab, var(--t-warn) 14%, transparent);
   color: var(--t-warn);
@@ -456,25 +528,37 @@
 }
 
 @keyframes ts-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
-.editor-spacer { flex: 1; }
+.editor-spacer {
+  flex: 1;
+}
 
 .editor-actions {
   display: inline-flex;
   align-items: center;
   gap: var(--t-space-2);
 }
-.editor-actions button { padding: var(--t-space-2) var(--t-space-3); font-size: var(--t-size-md); }
-.editor-actions button[disabled] { opacity: 0.5; cursor: not-allowed; }
+.editor-actions button {
+  padding: var(--t-space-2) var(--t-space-3);
+  font-size: var(--t-size-md);
+}
+.editor-actions button[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
 /* ----- Editor grid: options on the left, preview pinned on the right - */
 
 @media (min-width: 1100px) {
   /* Bumps the shared page-column variable so .page and the topbar's
      padding-inline both pick up the wider column. */
-  :root { --t-page-max: 1440px; }
+  :root {
+    --t-page-max: 1440px;
+  }
   .editor-grid {
     grid-template-columns: minmax(0, 1fr) minmax(360px, 620px);
     grid-template-areas: "column preview";
@@ -514,7 +598,9 @@
 }
 
 @media (max-width: 1099px) {
-  .editor-grid { gap: var(--t-space-4); }
+  .editor-grid {
+    gap: var(--t-space-4);
+  }
   /* Mobile: editor header is NOT sticky, scrolls away naturally so
      the save/send/delete row only exists at the top of the page.
      Preview card scrolls with the rest of the content; the
@@ -554,9 +640,17 @@
   /* Shorter cap on phone-portrait so the cell editors get most of the
      viewport. The sticky preview at the top is meant for live-eyeing
      edits, not dominating the screen. */
-  :root { --mobile-preview-h: 30vh; }
-  .editor-grid { gap: var(--t-space-3); }
-  .preview-dims { font-size: var(--t-size-xs); margin-top: var(--t-space-2); text-align: center; }
+  :root {
+    --mobile-preview-h: 30vh;
+  }
+  .editor-grid {
+    gap: var(--t-space-3);
+  }
+  .preview-dims {
+    font-size: var(--t-size-xs);
+    margin-top: var(--t-space-2);
+    text-align: center;
+  }
 
   /* Two-row header. Row 1: back · icon · name input (takes the rest).
      Row 2: save-status (left) · actions (right). page-id-tag and the
@@ -568,12 +662,30 @@
     gap: var(--t-space-2);
     padding: var(--t-space-2) var(--t-space-1);
   }
-  .editor-header .header-back { grid-row: 1; grid-column: 1; }
-  .editor-name-icon            { grid-row: 1; grid-column: 2; }
-  .inline-name-form            { grid-row: 1; grid-column: 3 / span 2; max-width: none; }
-  .save-status                 { grid-row: 2; grid-column: 1 / span 2; justify-self: start; }
-  .editor-spacer               { display: none; }
-  .page-id-tag                 { display: none; }
+  .editor-header .header-back {
+    grid-row: 1;
+    grid-column: 1;
+  }
+  .editor-name-icon {
+    grid-row: 1;
+    grid-column: 2;
+  }
+  .inline-name-form {
+    grid-row: 1;
+    grid-column: 3 / span 2;
+    max-width: none;
+  }
+  .save-status {
+    grid-row: 2;
+    grid-column: 1 / span 2;
+    justify-self: start;
+  }
+  .editor-spacer {
+    display: none;
+  }
+  .page-id-tag {
+    display: none;
+  }
   .editor-actions {
     grid-row: 2;
     grid-column: 3 / span 2;
@@ -581,7 +693,9 @@
     flex-wrap: nowrap;
   }
   /* Action button labels collapse, icons only at this width. */
-  .editor-actions button > span:not(.icon) { display: none; }
+  .editor-actions button > span:not(.icon) {
+    display: none;
+  }
   .editor-actions button {
     padding: var(--t-space-2) var(--t-space-3);
     min-width: 40px;
@@ -589,7 +703,9 @@
   }
 }
 
-.preview-card .preview-frame { margin: 0 auto; }
+.preview-card .preview-frame {
+  margin: 0 auto;
+}
 .preview-dims {
   text-align: right;
   font-size: var(--t-size-sm);
@@ -660,9 +776,7 @@
   outline: none;
 }
 .scroll-to-preview:focus-visible {
-  box-shadow:
-    var(--t-shadow-xl),
-    var(--t-ring);
+  box-shadow: var(--t-shadow-xl), var(--t-ring);
 }
 /* Hover lift on desktop pointers, the icon nudges up to telegraph the
    "back to top" action. Skipped on touch (`hover: none`) so a finger
@@ -753,7 +867,10 @@
 /* Cell cards inherit .card-head + .card-head h2 verbatim from
    shell.css, no overrides needed. The plugin tag inside the title
    reads as secondary. */
-.cell-card-plugin { font-weight: 500; color: var(--t-fg-soft); }
+.cell-card-plugin {
+  font-weight: 500;
+  color: var(--t-fg-soft);
+}
 
 /* ----- Layout editor (interactive grid) --------------------------- */
 
@@ -788,7 +905,10 @@
   align-items: center;
   gap: var(--t-space-2);
 }
-.layout-editor-hint .ph { font-size: 14px; color: var(--t-accent); }
+.layout-editor-hint .ph {
+  font-size: 14px;
+  color: var(--t-accent);
+}
 
 /* Snap-to-grid controls live below the board + hint. The dashed
    gridline overlay is painted by the JS directly on
@@ -801,7 +921,9 @@
   flex-direction: column;
   gap: var(--t-space-2);
 }
-.layout-snap-dims[hidden] { display: none; }
+.layout-snap-dims[hidden] {
+  display: none;
+}
 
 .le-cell {
   position: absolute;
@@ -826,7 +948,10 @@
   background: var(--t-danger);
   border-color: var(--t-danger);
   color: var(--t-bg, #fff);
-  transition: background 600ms linear, border-color 600ms linear, color 200ms ease;
+  transition:
+    background 600ms linear,
+    border-color 600ms linear,
+    color 200ms ease;
 }
 .le-cell.is-pressing .le-cell-label,
 .le-cell.is-pressing .le-cell-delete {
@@ -861,14 +986,21 @@
   color: var(--t-fg-soft);
   cursor: pointer;
   opacity: 0;
-  transition: opacity 120ms ease, color 120ms ease, border-color 120ms ease;
+  transition:
+    opacity 120ms ease,
+    color 120ms ease,
+    border-color 120ms ease;
 }
-.le-cell:hover .le-cell-delete { opacity: 1; }
+.le-cell:hover .le-cell-delete {
+  opacity: 1;
+}
 .le-cell-delete:hover {
   color: var(--t-danger);
   border-color: var(--t-danger);
 }
-.le-cell-delete .ph { font-size: 13px; }
+.le-cell-delete .ph {
+  font-size: 13px;
+}
 
 /* Insert affordances, thin invisible strips on each side that show a
    "+ insert here" hint on hover. Click splits the cell along the
@@ -894,7 +1026,9 @@
   display: grid;
   place-items: center;
   opacity: 0;
-  transition: opacity 120ms ease, transform 120ms ease;
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease;
 }
 .le-insert:hover {
   background: color-mix(in oklab, var(--t-accent) 18%, transparent);
@@ -903,10 +1037,30 @@
   opacity: 1;
   transform: scale(1.05);
 }
-.le-insert--top    { top: 0;    left: 0; right: 0; height: 14px; }
-.le-insert--bottom { bottom: 0; left: 0; right: 0; height: 14px; }
-.le-insert--left   { left: 0;   top: 0; bottom: 0; width: 14px; }
-.le-insert--right  { right: 0;  top: 0; bottom: 0; width: 14px; }
+.le-insert--top {
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 14px;
+}
+.le-insert--bottom {
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 14px;
+}
+.le-insert--left {
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 14px;
+}
+.le-insert--right {
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 14px;
+}
 
 /* Resize handles for shared edges. Sit ON TOP of the cells with a
    generous hit-target (24px) for touch; the visible bar inside is
@@ -927,7 +1081,9 @@
   transition: opacity 120ms ease;
 }
 .le-edge:hover::after,
-.layout-editor-board.is-dragging .le-edge::after { opacity: 0.7; }
+.layout-editor-board.is-dragging .le-edge::after {
+  opacity: 0.7;
+}
 
 .le-edge--h {
   height: 24px;
@@ -935,7 +1091,8 @@
   cursor: ns-resize;
 }
 .le-edge--h::after {
-  left: 0; right: 0;
+  left: 0;
+  right: 0;
   top: 11px;
   height: 2px;
 }
@@ -945,7 +1102,8 @@
   cursor: ew-resize;
 }
 .le-edge--v::after {
-  top: 0; bottom: 0;
+  top: 0;
+  bottom: 0;
   left: 11px;
   width: 2px;
 }
@@ -962,7 +1120,10 @@
   color: var(--t-fg-soft);
   padding: var(--t-space-2) 0;
 }
-.custom-layout[open] summary { color: var(--t-fg); margin-bottom: var(--t-space-2); }
+.custom-layout[open] summary {
+  color: var(--t-fg);
+  margin-bottom: var(--t-space-2);
+}
 
 /* ----- Layout picker (thumbnails) --------------------------------- */
 
@@ -977,7 +1138,9 @@
   --thumb-h: 96px;
 }
 
-.layout-form { margin: 0; }
+.layout-form {
+  margin: 0;
+}
 
 .layout-card {
   display: grid;
@@ -991,9 +1154,13 @@
   cursor: pointer;
   width: 100%;
   text-align: center;
-  font: var(--t-size-sm)/1.2 system-ui, sans-serif;
+  font:
+    var(--t-size-sm)/1.2 system-ui,
+    sans-serif;
   color: var(--t-fg);
-  transition: border-color 80ms ease, transform 80ms ease;
+  transition:
+    border-color 80ms ease,
+    transform 80ms ease;
   /* Reset the global button inline-flex so the grid-rows take effect. */
   white-space: normal;
 }
@@ -1051,7 +1218,6 @@
   border-style: dashed;
 }
 
-
 /* ----- Schedules card on the page editor --------------------------- */
 /* Compact list of schedules pinned to this dashboard, surfaced under
    the live preview so the composer can see "what fires this" at a
@@ -1073,7 +1239,9 @@
   border-radius: 8px;
   background: color-mix(in srgb, var(--t-fg-soft, #9aa0aa) 6%, transparent);
 }
-.schedules-card-row.is-disabled .schedules-card-row-name { color: var(--t-fg-soft); }
+.schedules-card-row.is-disabled .schedules-card-row-name {
+  color: var(--t-fg-soft);
+}
 .schedules-card-row-main {
   display: flex;
   flex-direction: column;
@@ -1104,4 +1272,35 @@
   align-items: center;
   gap: var(--t-space-3);
   margin-top: var(--t-space-3);
+}
+
+/* Panel-view toggle (#45): Fit view / Panel view segmented control over the
+   live preview. Panel view shows the composition quantised + dithered to the
+   panel's palette (crisp 1:1, so image-rendering is pixelated). */
+.preview-modes {
+  display: inline-flex;
+  gap: 2px;
+  margin: 0 0 var(--t-space-3);
+  padding: 2px;
+  background: var(--t-surface-sunk);
+  border-radius: var(--t-radius-pill);
+}
+.preview-mode {
+  border: 0;
+  background: transparent;
+  color: var(--t-fg-soft);
+  font: inherit;
+  font-size: var(--t-size-sm);
+  padding: 4px 12px;
+  border-radius: var(--t-radius-pill);
+  cursor: pointer;
+}
+.preview-mode.is-active {
+  background: var(--t-surface);
+  color: var(--t-fg);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+.preview-panel-img {
+  display: block;
+  image-rendering: pixelated;
 }

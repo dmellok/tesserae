@@ -1431,16 +1431,19 @@ def compose_panel_preview(page_id: str) -> Response:
     width, height = preview_dims(page, devices, settings_store)
     token = page_preview_token(page, (width, height))
 
-    gamut = "waveshare_e6"
-    device_id = (request.args.get("device") or "").strip()
-    if not device_id and page.device_ids:
-        device_id = page.device_ids[0]
-    if device_id and devices is not None:
-        dev = devices.get(device_id)
-        panel = device_panel(dev) if dev is not None else None
-        if panel is not None and getattr(panel, "gamut", None):
-            gamut = str(panel.gamut)
-    gamut = canonicalise_gamut(gamut)
+    # An explicit ?gamut wins (the editor passes the preview group's gamut);
+    # else resolve it from ?device or the page's first bound device.
+    gamut = (request.args.get("gamut") or "").strip()
+    if not gamut:
+        device_id = (request.args.get("device") or "").strip()
+        if not device_id and page.device_ids:
+            device_id = page.device_ids[0]
+        if device_id and devices is not None:
+            dev = devices.get(device_id)
+            panel = device_panel(dev) if dev is not None else None
+            if panel is not None and getattr(panel, "gamut", None):
+                gamut = str(panel.gamut)
+    gamut = canonicalise_gamut(gamut or "waveshare_e6")
 
     dither = (request.args.get("dither") or "floyd-steinberg").strip()
     if dither not in get_args(DitherMode):

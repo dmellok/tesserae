@@ -324,12 +324,24 @@ def preview_groups_for_page(
     panels = _selected_device_panels(page, devices)
     if not panels:
         p = resolve_page_panel(page.panel, settings)
-        return [{"w": p.w, "h": p.h, "label": "Virtual panel", "devices": []}]
+        return [
+            {"w": p.w, "h": p.h, "label": "Virtual panel", "devices": [], "gamut": "waveshare_e6"}
+        ]
     groups: dict[tuple[int, int], dict[str, Any]] = {}
     for device, panel in panels:
         g = gcd(panel.w, panel.h) or 1
         key = (panel.w // g, panel.h // g)
-        grp = groups.setdefault(key, {"w": panel.w, "h": panel.h, "devices": []})
+        # First device in an aspect group also sets the group's gamut, so the
+        # editor's Panel view can quantise to that panel's palette (#45).
+        grp = groups.setdefault(
+            key,
+            {
+                "w": panel.w,
+                "h": panel.h,
+                "devices": [],
+                "gamut": str(getattr(panel, "gamut", None) or "waveshare_e6"),
+            },
+        )
         grp["devices"].append(device.display_name)
     out: list[dict[str, Any]] = []
     for (aw, ah), grp in groups.items():
