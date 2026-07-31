@@ -577,6 +577,80 @@ def test_combined_save_persists_panel_and_quiet_hours_in_one_post(
     assert qh == {"enabled": True, "start": "22:30", "end": "07:00"}
 
 
+def test_combined_save_rest_device_with_dormant_topic_does_not_publish(
+    app_with_gate: Flask,
+) -> None:
+    """REST devices retain MQTT topics for a future transport switch.
+    Saving their config must still be a disk-only operation; otherwise a
+    healthy REST save also emits a misleading broker failure toast."""
+    client = app_with_gate.test_client()
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+    client.post(
+        "/settings/devices/add",
+        data={"id": "rest_lab", "kind": "esp32_client", "panel_preset": "inky_7_3"},
+    )
+    client.post("/settings/devices/rest_lab/set-transport", data={"transport": "rest"})
+    device = app_with_gate.config["DEVICE_REGISTRY"].get("rest_lab")
+    assert device is not None
+    assert device.transport == "rest"
+    assert device.config_topic is not None
+
+    transport = MagicMock()
+    app_with_gate.config["MQTT_TRANSPORT"] = transport
+    app_with_gate.config["REBUILD_TRANSPORT"] = MagicMock()
+    with client.session_transaction() as sess:
+        sess.pop("_flashes", None)
+
+    resp = client.post(
+        "/settings/devices/rest_lab/save",
+        data={"sleep_interval_s": "300", "button_wake_s": "0"},
+        follow_redirects=False,
+    )
+
+    assert resp.status_code == 302
+    transport.publish.assert_not_called()
+    with client.session_transaction() as sess:
+        flashes = sess.get("_flashes", [])
+    assert any(category == "ok" and "config saved" in msg for category, msg in flashes)
+    assert not any(category == "error" for category, _msg in flashes)
+
+
+def test_legacy_save_rest_device_with_dormant_topic_does_not_publish(
+    app_with_gate: Flask,
+) -> None:
+    """The legacy per-section save route follows the same REST rule as
+    the combined device-card form."""
+    client = app_with_gate.test_client()
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+    client.post(
+        "/settings/devices/add",
+        data={"id": "rest_lab", "kind": "esp32_client", "panel_preset": "inky_7_3"},
+    )
+    client.post("/settings/devices/rest_lab/set-transport", data={"transport": "rest"})
+    device = app_with_gate.config["DEVICE_REGISTRY"].get("rest_lab")
+    assert device is not None
+    assert device.transport == "rest"
+    assert device.config_topic is not None
+
+    transport = MagicMock()
+    app_with_gate.config["MQTT_TRANSPORT"] = transport
+    with client.session_transaction() as sess:
+        sess.pop("_flashes", None)
+
+    resp = client.post(
+        "/settings/device-rest_lab",
+        data={"sleep_interval_s": "300", "button_wake_s": "0"},
+        follow_redirects=False,
+    )
+
+    assert resp.status_code == 302
+    transport.publish.assert_not_called()
+    with client.session_transaction() as sess:
+        flashes = sess.get("_flashes", [])
+    assert any(category == "ok" and "config saved" in msg for category, msg in flashes)
+    assert not any(category == "error" for category, _msg in flashes)
+
+
 def test_renderer_card_hides_device_settings(app_with_gate: Flask) -> None:
     """Fields flagged ``device_setting: true`` belong on the device
     card. The renderer card must drop them, and surface a hint in the

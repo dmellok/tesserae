@@ -101,6 +101,11 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   letterboxed `object-fit: contain` box). The HTML-view button is also renamed from
   "Fit view", which read as a sizing control.
 
+- **Saving a REST device no longer emits a misleading MQTT publish failure.**
+  REST instances can retain dormant MQTT topics for a later transport switch;
+  device settings now follow the active transport, save to disk, and return on
+  the next status poll without attempting a broker publish.
+
 - **CalDAV discovery handles compressed responses.** A Nextcloud behind a proxy or CDN
   can return a gzip- or deflate-compressed body; Python's HTTP client doesn't request or
   decompress that, so the parser saw a binary blob and discovery failed with "wasn't valid
