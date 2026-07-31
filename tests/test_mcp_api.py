@@ -1400,3 +1400,52 @@ def test_create_deck_keeps_explicit_graph_verbatim(app: Flask) -> None:
     assert resp.status_code == 200
     deck = app.config["DECK_STORE"].get("explicit")
     assert deck.pages[0].links[0].target_page_id == "b"
+
+
+# -- icon search + library catalog (agent discoverability) --------------
+
+
+def test_catalog_advertises_libraries_and_icon_search(app: Flask) -> None:
+    _enable(app)
+    body = app.test_client().get("/api/mcp/catalog").get_json()
+    libs = {lib["name"]: lib for lib in body["libraries"]}
+    # The vendored toolkit is enumerated, including the previously-undocumented
+    # Sankey chart plugin (surfaced in the Chart.js entry).
+    assert {"Chart.js", "chroma.js", "SVG.js", "Phosphor icons"} <= set(libs)
+    assert "Sankey" in libs["Chart.js"]["purpose"]
+    # The icon set is discoverable: total count + weights + the search endpoint.
+    assert body["icons"]["total"] > 1000
+    assert set(body["icons"]["weights"]) == {
+        "thin",
+        "light",
+        "regular",
+        "bold",
+        "fill",
+        "duotone",
+    }
+    assert "/api/mcp/icons" in body["icons"]["search_endpoint"]
+
+
+def test_icons_search_filters_by_query(app: Flask) -> None:
+    _enable(app)
+    client = app.test_client()
+    # Unfiltered: capped list plus the true total.
+    full = client.get("/api/mcp/icons").get_json()
+    assert full["total"] > 1000
+    assert len(full["icons"]) <= 100
+    assert "regular" in full["weights"]
+    # Filtered: every returned slug contains the query substring.
+    res = client.get("/api/mcp/icons?q=cloud").get_json()
+    assert res["matched"] >= 1
+    assert res["matched"] <= res["total"]
+    assert all("cloud" in slug for slug in res["icons"])
+    assert "cloud" in res["icons"]  # the base 'cloud' slug exists
+
+
+def test_icons_respects_limit(app: Flask) -> None:
+    _enable(app)
+    res = app.test_client().get("/api/mcp/icons?limit=5").get_json()
+    assert len(res["icons"]) == 5
+    # Out-of-range / garbage limits fall back rather than error.
+    assert app.test_client().get("/api/mcp/icons?limit=99999").status_code == 200
+    assert app.test_client().get("/api/mcp/icons?limit=abc").status_code == 200

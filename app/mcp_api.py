@@ -23,6 +23,7 @@ import json
 import logging
 import secrets
 import uuid
+from pathlib import Path
 from typing import Any
 
 from flask import Blueprint, Flask, abort, current_app, jsonify, request, url_for
@@ -99,19 +100,136 @@ def _data_root() -> Any:
     return current_app.config["DATA_ROOT"]
 
 
+# -- vendored code-element toolkit + icon set ---------------------------
+
+_PHOSPHOR_MANIFEST = (
+    Path(__file__).resolve().parents[1] / "static" / "icons" / "phosphor" / "manifest.json"
+)
+_PHOSPHOR_WEIGHTS = ("thin", "light", "regular", "bold", "fill", "duotone")
+_ICON_CACHE: list[str] | None = None
+
+# The JS libraries preloaded in the code-element sandbox, so an agent can
+# discover the toolkit structurally instead of only from the prose docs. Each
+# auto-loads when its global is referenced; unused ones cost nothing.
+_LIBRARIES: list[dict[str, str]] = [
+    {
+        "name": "Chart.js",
+        "global": "Chart",
+        "purpose": (
+            "Charts to a <canvas> (animations already off). Plugins auto-registered: "
+            "ChartDataLabels (window.ChartDataLabels) to bake values onto bars/points, "
+            "and a Sankey chart type (chartjs-chart-sankey) for flow diagrams."
+        ),
+    },
+    {
+        "name": "canvas-gauges",
+        "global": "RadialGauge / LinearGauge",
+        "purpose": "Dials and meters (temperature, fuel-style).",
+    },
+    {
+        "name": "Day.js",
+        "global": "dayjs",
+        "purpose": "Date/time parse + format; utc + timezone plugins pre-extended.",
+    },
+    {
+        "name": "qrcode",
+        "global": "qrcode",
+        "purpose": "QR codes via .createSvgTag() / .createImgTag().",
+    },
+    {"name": "marked", "global": "marked", "purpose": "Markdown -> HTML string."},
+    {
+        "name": "chroma.js",
+        "global": "chroma",
+        "purpose": "Colour parsing/scales for rich fills + gradients.",
+    },
+    {
+        "name": "SVG.js",
+        "global": "SVG",
+        "purpose": "Programmatic vector graphics (rings, arcs, badges).",
+    },
+    {
+        "name": "Phosphor icons",
+        "global": "(CSS classes, not a JS global)",
+        "purpose": (
+            "Icon font, six weights (ph, ph-bold, ph-thin, ph-light, ph-fill, ph-duotone). "
+            "Search valid names at GET /api/mcp/icons?q=<term>."
+        ),
+    },
+]
+
+
+def _phosphor_icons() -> list[str]:
+    """The vendored Phosphor icon slugs (from the on-disk manifest), cached."""
+    global _ICON_CACHE
+    if _ICON_CACHE is None:
+        try:
+            raw = json.loads(_PHOSPHOR_MANIFEST.read_text(encoding="utf-8"))
+            _ICON_CACHE = (
+                sorted(s for s in raw if isinstance(s, str)) if isinstance(raw, list) else []
+            )
+        except Exception:
+            _ICON_CACHE = []
+    return _ICON_CACHE
+
+
 # -- catalog / widget options -------------------------------------------
 
 
 @bp.get("/catalog")
 def catalog() -> Response:
     """Every renderable widget (with its fragments) plus theme/style/font options,
-    so the agent knows what it can place and how to style the canvas.
+    the vendored code-element libraries, and the icon set, so the agent knows what
+    it can place, how to style the canvas, and what's in the code-element toolkit.
 
     The per-widget ``sample`` payload is omitted here to keep the response small;
-    fetch a widget's live data shape with ``POST /widgets/<key>/data`` instead."""
+    fetch a widget's live data shape with ``POST /widgets/<key>/data`` instead.
+    The full icon name list is searched via ``GET /icons?q=`` rather than inlined."""
     widgets = build_catalog(_pr._registry())
     lean = [{k: v for k, v in w.items() if k != "sample"} for w in widgets]
-    return jsonify({"widgets": lean, "appearance": _pr._appearance()})
+    return jsonify(
+        {
+            "widgets": lean,
+            "appearance": _pr._appearance(),
+            "libraries": _LIBRARIES,
+            "icons": {
+                "total": len(_phosphor_icons()),
+                "weights": list(_PHOSPHOR_WEIGHTS),
+                "search_endpoint": "/api/mcp/icons?q=<term>",
+                "usage": (
+                    'icon element {"kind":"icon","icon":"<slug>"}; '
+                    'in code markup <i class="ph-bold ph-<slug>"></i>'
+                ),
+            },
+        }
+    )
+
+
+@bp.get("/icons")
+def icons() -> Response:
+    """Search the vendored Phosphor icon set (all six weights). Use a returned
+    slug as an ``icon`` element's ``"icon"`` value, or in code markup as
+    ``ph-<slug>`` (weight via ph / ph-bold / ph-thin / ph-light / ph-fill /
+    ph-duotone). ``?q=`` substring-filters the names; without it a capped sample
+    is returned alongside the total. ``?limit=`` caps results (default 100, max 500)."""
+    all_icons = _phosphor_icons()
+    q = (request.args.get("q") or "").strip().lower()
+    try:
+        limit = max(1, min(int(request.args.get("limit", 100)), 500))
+    except (TypeError, ValueError):
+        limit = 100
+    matches = [s for s in all_icons if q in s] if q else all_icons
+    return jsonify(
+        {
+            "weights": list(_PHOSPHOR_WEIGHTS),
+            "total": len(all_icons),
+            "matched": len(matches),
+            "icons": matches[:limit],
+            "usage": (
+                'icon element {"kind":"icon","icon":"<slug>"}; '
+                'in code markup <i class="ph-bold ph-<slug>"></i>'
+            ),
+        }
+    )
 
 
 @bp.get("/services")

@@ -37,6 +37,7 @@ plus optional "opacity" (0-100) and "rotate" (degrees). By "kind":
 - ellipse: {"kind":"ellipse","color":"...","fill":true,"stroke":<px>}
 - line:    {"kind":"line","color":"...","stroke":<px>}
 - icon:    {"kind":"icon","icon":"<name or ph-name>","color":"...","weight":"thin|light|regular|bold|fill|duotone"}
+           1500+ Phosphor names; don't guess, search them with GET /api/mcp/icons?q=<term>.
 - data:    {"kind":"data","source":"<widget key>","options":{...},"field":"<path>",
             "display":"text|number|line|bar|sparkline","format":"","unit":"","precision":0,
             "label":"","color":"...","size":<px, 0=auto>,"align":"..."}
@@ -65,6 +66,8 @@ plus optional "opacity" (0-100) and "rotate" (degrees). By "kind":
              - Chart.js -> window.Chart. Charts to a <canvas>. Animations are already off. On e-ink there's
                no hover, so bake values in: also reference ChartDataLabels (chartjs-plugin-datalabels,
                auto-registered) and add datalabels to a dataset/options to print values on bars/points.
+               A Sankey chart type (chartjs-chart-sankey) is registered too, for flow diagrams
+               (type:'sankey'). The full toolkit is enumerated in list_widgets().libraries.
              - canvas-gauges -> RadialGauge / LinearGauge. Dials + meters (temperature, fuel-style).
              - dayjs -> dayjs(...). Date/time parse + format; utc + timezone plugins are pre-extended, so
                dayjs.utc(...) and dayjs(...).tz("Europe/Berlin") work. Use for formatting ctx.data times.
@@ -77,7 +80,8 @@ plus optional "opacity" (0-100) and "rotate" (degrees). By "kind":
              - SVG -> SVG(). @svgdotjs/svg.js for programmatic vector graphics (rings, arcs, badges).
              - Phosphor icons, all six weights: <i class="ph-bold ph-heart"></i> (also ph (regular),
                ph-thin, ph-light, ph-fill, ph-duotone). Each weight's font is inlined only when its
-               class appears in your code.
+               class appears in your code. Search the 1500+ valid names with GET /api/mcp/icons?q=<term>
+               rather than guessing slugs.
              - Fonts: any bundled font (the names in appearance.fonts from list_widgets) works in the
                sandbox by family name, e.g. `font-family: "Fira Code"` or `"Press Start 2P"`. Only
                fonts your code actually names are inlined, so there's a broad programming + pixel set

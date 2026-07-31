@@ -8,6 +8,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **The MCP surfaces the icon set and code-element toolkit to agents.** `list_widgets()` now
+  returns the vendored code-element libraries (Chart.js incl. the datalabels and Sankey plugins,
+  canvas-gauges, Day.js, qrcode, marked, chroma, SVG.js, Phosphor) and an icon descriptor, and a
+  new `GET /api/mcp/icons?q=` searches the 1500+ Phosphor names so an agent picks real slugs
+  instead of guessing. Previously these were only described in the prose instructions, so
+  agent-built dashboards under-used icons, charts, and the toolkit.
+
 - **Companion API 0.5: send a public image URL or a webpage to your displays.** Community
   clients can push a public image URL, or a server-rendered screenshot of a public webpage,
   to explicit displays as asynchronous jobs, with the same History, resend, and photo
