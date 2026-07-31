@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Tesserae Companion API
-  version: 0.5.0
+  version: 0.5.1
   description: >-
     Companion API contract for community-built clients. Previews, History,
     resend, remote-image push, webpage push, and server-advertised image fit
@@ -754,6 +754,10 @@ components:
         kind:
           type: string
           enum: [grid, canvas]
+        icon:
+          description: Bare Phosphor icon name used by the dashboard
+          type: string
+          nullable: true
         device_ids:
           type: array
           uniqueItems: true

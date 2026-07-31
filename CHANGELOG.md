@@ -8,6 +8,11 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Companion dashboard listings now include their Phosphor icon name.** The
+  optional `icon` field uses the same bare identifier as the web dashboard
+  list, so companion clients can render a consistent icon and safely fall back
+  when a dashboard has no icon.
+
 - **Icon references that resolve to no glyph are named instead of rendering a blank box.**
   `render_report` now always includes `icon_invalid` (mirroring `tap_invalid`): unknown slugs or
   weights on `icon` elements, bad `icon`-transform bind-table values, and a heuristic scan of
