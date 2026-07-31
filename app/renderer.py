@@ -141,6 +141,13 @@ class RenderRequest:
     #   (defaulting to ``networkidle`` so JS-driven hydration completes
     #   before screenshot), and skip the composer-signal wait.
     is_composer: bool = True
+    # When False, refuse any Chromium request (navigation or subresource) to a
+    # loopback / private / link-local / reserved host, including redirect hops
+    # the browser follows internally. Set by untrusted callers (the Companion
+    # /webpages route) so a paired token can't screenshot the operator's LAN or
+    # cloud metadata. Operator flows (Web-UI Server preview, HA push) leave it
+    # True to keep same-host / LAN capture working.
+    allow_local: bool = True
 
 
 @dataclass(frozen=True)
@@ -298,6 +305,34 @@ def _screenshot_one(browser: Browser, request: RenderRequest) -> bytes:
     raise last_err
 
 
+def _install_ssrf_guard(page: Any, request: RenderRequest) -> None:
+    """Abort Chromium requests to non-public hosts when the request is strict.
+
+    Chromium follows redirects and loads subresources internally, outside
+    net_guard's urllib path, so this per-request interceptor is the only place
+    a webpage render can enforce a public-only policy on every hop. Matches
+    net_guard's guarantee level (host resolved and checked per request; no
+    IP pinning against DNS rebinding, same as the fetch path). A resolution
+    failure or any handler error blocks the request rather than fail-open."""
+    if request.allow_local:
+        return
+    import urllib.parse as _urlparse
+
+    from app.net_guard import host_is_blocked
+
+    def _route(route: Any) -> None:
+        try:
+            host = _urlparse.urlparse(route.request.url).hostname or ""
+            blocked = host_is_blocked(host, allow_local=False)
+        except Exception:
+            blocked = True
+        # Page/context may be torn down mid-flight; nothing to do then.
+        with contextlib.suppress(PlaywrightError):
+            route.abort() if blocked else route.continue_()
+
+    page.route("**/*", _route)
+
+
 def _new_composer_page(browser: Browser, request: RenderRequest) -> tuple[Any, Any]:
     """Open a fresh context + page sized to the request and return
     ``(context, page)``. Caller owns closing the context."""
@@ -310,6 +345,7 @@ def _new_composer_page(browser: Browser, request: RenderRequest) -> tuple[Any, A
         context_kwargs["timezone_id"] = request.timezone_id
     context = browser.new_context(**context_kwargs)
     page = context.new_page()
+    _install_ssrf_guard(page, request)
     page.set_default_timeout(request.timeout_ms)
     page.set_default_navigation_timeout(request.timeout_ms)
     return context, page
@@ -376,6 +412,7 @@ def _screenshot_attempt(browser: Browser, request: RenderRequest, attempt: int) 
     context = browser.new_context(**context_kwargs)
     try:
         page = context.new_page()
+        _install_ssrf_guard(page, request)
         page.set_default_timeout(request.timeout_ms)
         # ``set_default_timeout`` covers actions (evaluate, click, …) but
         # NOT navigation, ``goto`` uses Playwright's 30s default unless

@@ -1,11 +1,12 @@
 openapi: 3.0.3
 info:
   title: Tesserae Companion API
-  version: 0.4.1
+  version: 0.5.0
   description: >-
     Companion API contract for community-built clients. Previews, History,
-    resend, and server-advertised image fit modes are optional additive
-    extensions over the five-feature compatibility floor.
+    resend, remote-image push, webpage push, and server-advertised image fit
+    modes are optional additive extensions over the five-feature compatibility
+    floor.
 servers:
   - url: /
 tags:
@@ -14,6 +15,7 @@ tags:
   - name: Displays
   - name: Dashboards
   - name: Images
+  - name: Webpages
   - name: Jobs
   - name: History
 paths:
@@ -240,6 +242,65 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /api/app/v1/image-urls:
+    post:
+      tags: [Images]
+      operationId: pushCompanionImageURL
+      summary: Fetch one public image URL and send it to explicit display targets
+      description: >-
+        Persist an asynchronous Job that fetches the source once through the
+        strict Companion URL policy, then applies the selected fit per target
+        through the existing push fan-out. The server must refuse private,
+        loopback, link-local, and embedded-credential destinations, including
+        redirect targets. There is no Companion override for this policy.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImageURLPushRequest"
+      responses:
+        "202":
+          $ref: "#/components/responses/JobAccepted"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /api/app/v1/webpages:
+    post:
+      tags: [Webpages]
+      operationId: pushCompanionWebpage
+      summary: Render one public webpage and send it to explicit display targets
+      description: >-
+        Persist an asynchronous Job that performs one bounded server-side
+        top-level Chromium render at the logical viewport, then applies the
+        selected fit per target through the existing push fan-out. The render
+        must reuse the same queue, timeout, concurrency, cache, and rendering
+        primitive as the Web UI's manual Server preview, without relying on
+        whether the page permits iframe embedding. The Companion call uses the
+        strict URL policy and, unlike a preview-only render, publishes and
+        records canonical History.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebpagePushRequest"
+      responses:
+        "202":
+          $ref: "#/components/responses/JobAccepted"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/Conflict"
   /api/app/v1/jobs/{job_id}:
     parameters:
       - $ref: "#/components/parameters/JobID"
@@ -490,7 +551,16 @@ components:
           uniqueItems: true
           items:
             type: string
-            enum: [devices, dashboards, dashboard_push, image_push, jobs, previews, history]
+            enum:
+              - devices
+              - dashboards
+              - dashboard_push
+              - image_push
+              - jobs
+              - previews
+              - history
+              - image_url_push
+              - webpage_push
         limits:
           $ref: "#/components/schemas/Limits"
         web_url:
@@ -646,7 +716,7 @@ components:
           description: >-
             True when a REST polling device has not yet fetched the server's
             latest render. False for transports without a reliable served
-            signal.
+            signal. Absent on older compatible servers.
     Panel:
       type: object
       additionalProperties: false
@@ -724,6 +794,62 @@ components:
             type: string
         fit:
           $ref: "#/components/schemas/ImageFitMode"
+        override_quiet_hours:
+          type: boolean
+          default: false
+    RemoteSourceURL:
+      description: >-
+        Absolute HTTP(S) URL without embedded credentials. Companion-triggered
+        fetches use a strict public-network policy: private, loopback,
+        link-local, reserved, unspecified, and equivalent redirect destinations
+        are refused. The client cannot override that policy.
+      type: string
+      format: uri
+      minLength: 8
+      maxLength: 4096
+      pattern: "^https?://[^\\s]+$"
+    ImageURLPushRequest:
+      type: object
+      additionalProperties: false
+      required: [url, device_ids, fit, override_quiet_hours]
+      properties:
+        url:
+          $ref: "#/components/schemas/RemoteSourceURL"
+        device_ids:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+        fit:
+          $ref: "#/components/schemas/ImageFitMode"
+        override_quiet_hours:
+          type: boolean
+          default: false
+    WebpagePushRequest:
+      type: object
+      additionalProperties: false
+      required: [url, device_ids, fit, override_quiet_hours]
+      properties:
+        url:
+          $ref: "#/components/schemas/RemoteSourceURL"
+        device_ids:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+        fit:
+          $ref: "#/components/schemas/ImageFitMode"
+        viewport_w:
+          description: >-
+            Optional advanced logical browser width. The server defaults to
+            1280 and owns the logical capture height. It renders once at that
+            logical size and does not re-render for each target display.
+          type: integer
+          minimum: 200
+          maximum: 4096
+          default: 1280
         override_quiet_hours:
           type: boolean
           default: false
@@ -821,7 +947,12 @@ components:
           type: string
         kind:
           type: string
-          enum: [dashboard_push, image_push, history_resend]
+          enum:
+            - dashboard_push
+            - image_push
+            - image_url_push
+            - webpage_push
+            - history_resend
         status:
           description: Execution lifecycle only; quiet is a successful result
           type: string
@@ -873,6 +1004,10 @@ components:
           items:
             type: string
     JobFailure:
+      description: >-
+        Stable failure details. URL-backed Jobs should distinguish policy
+        refusal, fetch failure, render failure, and temporary renderer
+        unavailability with safe machine-readable codes.
       type: object
       additionalProperties: false
       required: [code, message]
@@ -902,6 +1037,7 @@ components:
                 - invalid_target
                 - unsupported_image
                 - image_too_large
+                - url_blocked
                 - idempotency_conflict
                 - not_resendable
                 - temporarily_unavailable

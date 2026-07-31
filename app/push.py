@@ -53,7 +53,12 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from app.device_loader import DeviceRegistry
 from app.device_preview import retained_device_preview, write_device_preview
 from app.dither_regions import has_nearest_region, regions_from_page
-from app.net_guard import BlockedURLError, assert_operator_url, fetch_bytes
+from app.net_guard import (
+    BlockedURLError,
+    assert_operator_url,
+    assert_public_url,
+    fetch_bytes,
+)
 from app.palette_profiles import (
     PaletteProfile,
     PaletteProfileStore,
@@ -1309,6 +1314,7 @@ class PushManager:
         fit: str | None = None,
         bypass_coalesce: bool = True,
         force_publish: bool = True,
+        source: str = "file",
     ) -> PushResult:
         """Hand arbitrary image bytes to every renderer.
 
@@ -1319,10 +1325,13 @@ class PushManager:
         ``device_id`` (optional): when set, only that device's renderers
         fire and its panel dims are used, same routing as a page bound
         to the device. ``fit`` (optional): the fit mode for non-panel-sized
-        input (``fit``/``fill``/``stretch``/``center``/``blur``)."""
+        input (``fit``/``fill``/``stretch``/``center``/``blur``). ``source``
+        tags the History row: the Companion link-send routes fetch / render
+        once and fan the resulting bytes out through here with ``"url"`` /
+        ``"webpage"`` so History keeps the real origin (default ``"file"``)."""
         supersede = self._acquire_or_supersede(
             device_id=device_id,
-            source="file",
+            source=source,
             target=source_label,
             bypass_coalesce=bypass_coalesce,
         )
@@ -1337,7 +1346,7 @@ class PushManager:
                 result = self._push_bytes_locked(
                     image_bytes,
                     source_label,
-                    source="file",
+                    source=source,
                     device_id=device_id,
                     fit=fit,
                     force_publish=force_publish,
@@ -1354,9 +1363,15 @@ class PushManager:
         device_id: str | None = None,
         fit: str | None = None,
         bypass_coalesce: bool = True,
+        allow_local: bool = True,
     ) -> PushResult:
         """Download an image URL, then ``push_image``. Networking errors
-        surface as failed events with the URL as the target."""
+        surface as failed events with the URL as the target.
+
+        ``allow_local`` defaults to operator trust (loopback / LAN allowed);
+        the Companion route passes ``False`` for the strict public-only
+        policy, refusing private / loopback / link-local / reserved hosts,
+        including on redirect hops."""
         supersede = self._acquire_or_supersede(
             device_id=device_id,
             source="url",
@@ -1372,7 +1387,7 @@ class PushManager:
         else:
             try:
                 try:
-                    image_bytes = self._fetch_remote_image(url)
+                    image_bytes = self._fetch_remote_image(url, allow_local=allow_local)
                 except Exception as err:
                     result = self._log_failure(source="url", target=url, error=f"fetch: {err}")
                 else:
@@ -1393,13 +1408,20 @@ class PushManager:
         device_id: str | None = None,
         fit: str | None = None,
         bypass_coalesce: bool = True,
+        allow_local: bool = True,
     ) -> PushResult:
-        """Screenshot an arbitrary URL with Playwright, then publish."""
+        """Screenshot an arbitrary URL with Playwright, then publish.
+
+        ``allow_local`` defaults to operator trust (loopback / LAN capture
+        allowed). The Companion route passes ``False``: the pre-flight refuses
+        non-public hosts, and the strict flag rides into the renderer so a
+        request interceptor also blocks every redirect hop / subresource
+        Chromium follows internally (a pre-check alone can't see those)."""
         # SSRF pre-flight. Playwright follows redirects internally, so this is
-        # an initial-URL check only; allow_local keeps same-host / LAN capture
-        # working and just refuses link-local / cloud metadata.
+        # only the initial-URL check; the renderer's interceptor (via
+        # RenderRequest.allow_local) enforces the policy on each hop.
         try:
-            assert_operator_url(url)
+            assert_operator_url(url) if allow_local else assert_public_url(url)
         except BlockedURLError as err:
             return self._log_failure(source="webpage", target=url, error=str(err))
         supersede = self._acquire_or_supersede(
@@ -1429,6 +1451,9 @@ class PushManager:
                             # mount wait and to use networkidle for the
                             # initial goto so SPAs hydrate before screenshot.
                             is_composer=False,
+                            # Strict callers (Companion) refuse non-public hosts
+                            # on every hop the browser follows internally.
+                            allow_local=allow_local,
                         ),
                         pool=self._browser_pool_fn(),
                     )
@@ -1452,6 +1477,42 @@ class PushManager:
                 self._lock.release()
         self._notify(result)
         return result
+
+    def fetch_remote_image_strict(self, url: str) -> bytes:
+        """Fetch an image URL under the strict public-only policy, once.
+
+        The Companion ``/image-urls`` route fetches here a single time, then
+        fans the bytes out per target through :meth:`push_image`, so a
+        redirect-to-private is refused (fetch_bytes re-validates each hop) and
+        the source is fetched once rather than per display."""
+        return self._fetch_remote_image(url, allow_local=False)
+
+    def render_webpage_png(
+        self,
+        url: str,
+        *,
+        viewport_w: int,
+        viewport_h: int = 1200,
+        allow_local: bool = True,
+    ) -> bytes:
+        """Render a webpage to a composition PNG once (raises on failure).
+
+        The Companion ``/webpages`` route renders here a single time at the
+        logical viewport, then fans the bytes out per target through
+        :meth:`push_image` (no per-target re-render). ``allow_local=False``
+        installs the renderer's request interceptor so every hop Chromium
+        follows is held to the strict public-only policy."""
+        return render_to_png(
+            RenderRequest(
+                url=url,
+                viewport_w=viewport_w,
+                viewport_h=viewport_h,
+                timezone_id=self._render_timezone_id(),
+                is_composer=False,
+                allow_local=allow_local,
+            ),
+            pool=self._browser_pool_fn(),
+        )
 
     def republish(
         self,
@@ -2572,22 +2633,25 @@ class PushManager:
             out2["native_h"] = panel.native_h
         return out2
 
-    def _fetch_remote_image(self, url: str) -> bytes:
+    def _fetch_remote_image(self, url: str, *, allow_local: bool = True) -> bytes:
         """Download an image URL through the SSRF guard, bounded size + timeout.
 
         Routes through ``net_guard`` so the scheme allowlist, per-redirect-hop
         host check, and size cap match the widget fetch path. ``allow_local``
         keeps same-host / LAN image sources usable while still refusing
-        link-local / cloud metadata. ``BlockedURLError`` (a ``ValueError``) and
-        the oversize ``ValueError`` propagate to the caller, which logs them as
-        a failed ``url`` push."""
+        link-local / cloud metadata (operator flows); untrusted callers (the
+        Companion route) pass ``allow_local=False`` so loopback / RFC1918 /
+        reserved hosts are refused, including on redirect hops (fetch_bytes
+        re-validates each). ``BlockedURLError`` (a ``ValueError``) and the
+        oversize ``ValueError`` propagate to the caller, which logs them as a
+        failed ``url`` push."""
         try:
             data, _ = fetch_bytes(
                 url,
                 headers={"User-Agent": "tesserae/0.1"},
                 timeout=_HTTP_TIMEOUT_S,
                 max_bytes=_MAX_REMOTE_IMAGE_BYTES,
-                allow_local=True,
+                allow_local=allow_local,
             )
         except urllib.error.URLError as err:
             raise RuntimeError(f"download failed: {err}") from err
