@@ -198,6 +198,40 @@ reference, library suggestions, constraints, acceptance criteria).
   (Caddy, NGINX Proxy Manager, Cloudflare Tunnel) and have firmware
   point at the HTTPS-fronted endpoint.
 
+## Remote access over the internet (Cloudflare Tunnel)
+
+You can run the server at home and drive a device that lives somewhere
+else (a frame at the office, a relative's house) by putting Tesserae
+behind a Cloudflare Tunnel, so nothing on your home router is
+port-forwarded. Two settings make this safe.
+
+1. **Turn on signed render URLs.** Settings → Server → Network →
+   *Allow REST clients on public networks* (off by default). With it on,
+   the server hands each device a short-lived, signed URL for its frame
+   image; unsigned requests to `/renders/` are refused even from the
+   public side. Leave it off and render artifacts stay reachable only
+   from your LAN or an authenticated session, so a remote device can't
+   fetch its image.
+
+2. **If you add Cloudflare Access, exclude the device paths.** Access
+   puts an interactive login (SSO, email OTP) in front of the tunnel.
+   That is right for the web UI, but a headless device can't complete a
+   login, so an Access policy covering everything will break it. Add a
+   **Bypass** policy (or scope your Access policy to exclude) these two
+   paths:
+
+   | Path | Why it's safe to exclude from Access |
+   |---|---|
+   | `/api/v1/device/*` | Requires the per-device bearer token; cross-device access is refused with 403. |
+   | `/renders/*` | Served through the short-lived signed URLs from step 1; unsigned requests are refused. |
+
+   Everything else, including the admin UI, stays behind Access.
+
+Pre-pair the device on your LAN before it leaves (see *Pre-pairing with a
+6-digit code* above) so you never expose `/register` to the internet.
+The registration endpoint is rate-limited regardless, but pre-pairing
+removes the surface entirely.
+
 ## Migrating an MQTT install to REST
 
 You don't need to. Existing MQTT installs keep working unchanged; the
