@@ -237,6 +237,54 @@ def test_canvas_page_renders_via_compose(app: Flask) -> None:
     assert 'class="deco"' in body and "HeyThere" in body  # decoration element present
 
 
+def test_compose_fresh_flag_threads_to_canvas_fetch(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``/compose/<id>?fresh=1`` reaches every canvas widget fetch as
+    ``fresh=True`` (skip last-good fallback, set ctx["fresh"]), so the MCP
+    render_preview/render_report fresh flag really bypasses data caches."""
+    from app.state.page_store import Page
+    from app.state.panel_store import CanvasLayout, Element
+
+    app.config["PAGE_STORE"].save(
+        Page(
+            id="cvsf",
+            name="F",
+            layout_kind="canvas",
+            canvas=CanvasLayout(
+                w=400,
+                h=300,
+                els=[
+                    Element(
+                        id="d1",
+                        kind="data",
+                        source="weather_now",
+                        field="temp",
+                        x=0,
+                        y=0,
+                        w=100,
+                        h=50,
+                    )
+                ],
+            ),
+        )
+    )
+    seen: list[bool] = []
+    real = composer._fetch_plugin_data
+
+    def spy(*args: object, **kwargs: object) -> object:
+        seen.append(bool(kwargs.get("fresh", False)))
+        return real(*args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(composer, "_fetch_plugin_data", spy)
+    client = app.test_client()
+    assert client.get("/compose/cvsf").status_code == 200
+    assert seen and all(f is False for f in seen)
+    seen.clear()
+    assert client.get("/compose/cvsf?fresh=1").status_code == 200
+    assert seen and all(f is True for f in seen)
+
+
 def test_canvas_data_and_html_render_via_compose(app: Flask) -> None:
     """A data primitive (bound to a widget field) and a custom-HTML element render
     through compose, and an element may sit partly off-canvas (negative x)."""

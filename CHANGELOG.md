@@ -13,6 +13,33 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   list, so companion clients can render a consistent icon and safely fall back
   when a dashboard has no icon.
 
+- **Icon references that resolve to no glyph are named instead of rendering a blank box.**
+  `render_report` now always includes `icon_invalid` (mirroring `tap_invalid`): unknown slugs or
+  weights on `icon` elements, bad `icon`-transform bind-table values, and a heuristic scan of
+  code/html/svg markup for `ph-<name>` classes that aren't real Phosphor icons, each with the
+  element id and reason. The `GET /api/mcp/icons` search normalises its query to slug form
+  (`ph-` prefix stripped, underscores as dashes), so `ph-heart` and `calendar_heart` now match
+  instead of returning zero results. The canvas renderer falls back to bold for an unknown icon
+  weight rather than building a class that matches no stylesheet. Agent docs (server and bridge)
+  spell out the two markup traps: regular weight needs both classes (`ph ph-heart`), and a wrong
+  slug fails silently.
+
+- **Render diagnostics: `render_report` gains `debug=1`, so silent render failures name
+  themselves.** The diagnostics section reports, per render: console errors/warnings from every
+  frame (a throwing code-element script surfaces tagged `[code-el <id>]`, including uncaught
+  async errors and CSP-blocked loads inside the sandbox), uncaught page errors, failed and
+  4xx/5xx network requests with URLs, per-font-face load status
+  (`loaded | pending-at-capture | failed | never-requested`, with the `@font-face` src), authored
+  element CSS the browser silently dropped (selector + declaration + reason, via a re-parse
+  diff), which vendored bundles each code element inlined, and the settle record that gated the
+  screenshot (goto / compose-signal / image-wait / font-wait outcome + elapsed ms). One
+  `render_report(debug=True)` call now names problems that previously took pixel-diffing dozens
+  of renders. `render_preview` and `render_report` also accept `fresh=1` to bypass the last-good
+  fallback and widget data caches (`?fresh=1` now works on `/compose/<id>` itself), so a stale
+  cached result can't derail an investigation. A live-Chromium regression suite pins the
+  acceptance case (throwing script + 404 font + dropped CSS rule, one call names all three) and
+  that identical page content yields identical font/asset outcomes across runs.
+
 - **The MCP surfaces the icon set and code-element toolkit to agents.** `list_widgets()` now
   returns the vendored code-element libraries (Chart.js incl. the datalabels and Sankey plugins,
   canvas-gauges, Day.js, qrcode, marked, chroma, SVG.js, Phosphor) and an icon descriptor, and a

@@ -210,6 +210,190 @@ def test_render_report_extracts_overlay_slots(app: Flask, monkeypatch: pytest.Mo
     assert body["overlay_slots"][0]["key"] == "ha:sensor.temp"
 
 
+def test_render_report_debug_and_fresh(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    """``?debug=1`` flips the InspectRequest to diagnostics mode, unwraps the
+    renderer's ``{result, diagnostics}`` envelope, and merges the in-page diag
+    (fonts / css / libraries) with the renderer-side capture (settle / console /
+    network) into one ``diagnostics`` section. ``?fresh=1`` rides on the compose
+    URL so widget-data caches are bypassed."""
+    _enable(app)
+    captured: dict[str, Any] = {}
+
+    def fake_inspect(req: Any, pool: Any = None) -> Any:
+        captured["req"] = req
+        return {
+            "result": {
+                "board": {},
+                "elements": [],
+                "interactive": None,
+                "diag": {"fonts": [{"family": "Inter", "status": "loaded"}], "css": []},
+            },
+            "diagnostics": {
+                "settle": {"compose_signal": "fired", "goto_ms": 12},
+                "console": [{"level": "error", "text": "[code-el x] script threw: boom"}],
+                "page_errors": [],
+                "network": [{"url": "http://x/f.woff2", "status": 404, "resource_type": "font"}],
+            },
+        }
+
+    monkeypatch.setattr("app.renderer.inspect_composed", fake_inspect)
+    client = app.test_client()
+    pid = _create_page(client)
+    body = client.get(f"/api/mcp/pages/{pid}/render_report?debug=1&fresh=1").get_json()
+    req = captured["req"]
+    assert req.diagnostics is True
+    assert "fresh=1" in req.render.url
+    diag = body["diagnostics"]
+    assert diag["settle"]["compose_signal"] == "fired"
+    assert diag["console"][0]["text"].startswith("[code-el x]")
+    assert diag["network"][0]["status"] == 404
+    assert diag["fonts"][0]["family"] == "Inter"  # in-page half merged in
+    assert "diag" not in body  # merged, not duplicated
+
+
+def test_render_report_debug_survives_fields_trim(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _enable(app)
+
+    def fake_inspect(req: Any, pool: Any = None) -> Any:
+        return {
+            "result": {"board": {}, "elements": [], "diag": {"fonts": []}},
+            "diagnostics": {"settle": {}, "console": [], "page_errors": [], "network": []},
+        }
+
+    monkeypatch.setattr("app.renderer.inspect_composed", fake_inspect)
+    client = app.test_client()
+    pid = _create_page(client)
+    body = client.get(f"/api/mcp/pages/{pid}/render_report?debug=1&fields=board").get_json()
+    assert "diagnostics" in body and "elements" not in body
+
+
+def test_render_report_default_has_no_diagnostics(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _enable(app)
+    captured: dict[str, Any] = {}
+
+    def fake_inspect(req: Any, pool: Any = None) -> Any:
+        captured["req"] = req
+        return {"board": {}, "elements": []}
+
+    monkeypatch.setattr("app.renderer.inspect_composed", fake_inspect)
+    client = app.test_client()
+    pid = _create_page(client)
+    body = client.get(f"/api/mcp/pages/{pid}/render_report").get_json()
+    assert captured["req"].diagnostics is False
+    assert "fresh" not in captured["req"].render.url
+    assert "diagnostics" not in body
+
+
+def test_preview_fresh_bypasses_caches(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    _enable(app)
+    urls: list[str] = []
+
+    def fake_render(req: Any, pool: Any = None) -> bytes:
+        urls.append(req.url)
+        return _FAKE_PNG
+
+    monkeypatch.setattr("app.renderer.render_to_png", fake_render)
+    client = app.test_client()
+    pid = _create_page(client)
+    assert client.get(f"/api/mcp/pages/{pid}/preview.png").status_code == 200
+    assert client.get(f"/api/mcp/pages/{pid}/preview.png?fresh=1").status_code == 200
+    assert "fresh" not in urls[0]
+    assert "fresh=1" in urls[1]
+
+
+def test_icons_search_normalises_query(app: Flask) -> None:
+    """A prefixed or underscored query still finds slugs: q=ph-heart and
+    q=calendar_heart match, since the search normalises to bare slug form."""
+    _enable(app)
+    client = app.test_client()
+    plain = client.get("/api/mcp/icons?q=heart").get_json()
+    assert plain["matched"] > 0 and "heart" in plain["icons"]
+    prefixed = client.get("/api/mcp/icons?q=ph-heart").get_json()
+    assert prefixed["icons"] == plain["icons"]
+    underscored = client.get("/api/mcp/icons?q=calendar_heart").get_json()
+    assert "calendar-heart" in underscored["icons"]
+
+
+def test_render_report_flags_invalid_icons(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    """icon_invalid names every icon reference that would render a blank box:
+    an unknown icon-element slug, an unknown weight, a bad bind-table value,
+    and a ph-<name> markup class that isn't a real Phosphor icon. Valid refs
+    (including the ph-/underscore spelling variants) stay unflagged."""
+    _enable(app)
+    monkeypatch.setattr(
+        "app.renderer.inspect_composed", lambda req, pool=None: {"board": {}, "elements": []}
+    )
+    client = app.test_client()
+    pid = _create_page(client)
+    body = {
+        "w": 800,
+        "h": 480,
+        "els": [
+            {"id": "ok1", "kind": "icon", "icon": "heart", "x": 0, "y": 0, "w": 40, "h": 40},
+            {"id": "ok2", "kind": "icon", "icon": "ph-heart", "x": 40, "y": 0, "w": 40, "h": 40},
+            {
+                "id": "bad_slug",
+                "kind": "icon",
+                "icon": "temperature",
+                "x": 80,
+                "y": 0,
+                "w": 40,
+                "h": 40,
+            },
+            {
+                "id": "bad_weight",
+                "kind": "icon",
+                "icon": "heart",
+                "weight": "solid",
+                "x": 120,
+                "y": 0,
+                "w": 40,
+                "h": 40,
+            },
+            {
+                "id": "bad_bind",
+                "kind": "rect",
+                "x": 160,
+                "y": 0,
+                "w": 40,
+                "h": 40,
+                "bind": [
+                    {
+                        "source": "weather_now",
+                        "field": "code",
+                        "transform": "icon",
+                        "params": {"table": {"0": "ph-sun"}, "default": "ph-not-an-icon"},
+                    }
+                ],
+            },
+            {
+                "id": "bad_markup",
+                "kind": "code",
+                "x": 200,
+                "y": 0,
+                "w": 100,
+                "h": 100,
+                "html": "<i class='ph-bold ph-heart'></i><i class='ph-bold ph-fake-glyph'></i>",
+                "js": "",
+            },
+        ],
+    }
+    assert client.put(f"/api/mcp/pages/{pid}/canvas", json=body).status_code == 200
+    report = client.get(f"/api/mcp/pages/{pid}/render_report").get_json()
+    bad = {(e["el"], e.get("icon") or e.get("weight")) for e in report["icon_invalid"]}
+    assert ("bad_slug", "temperature") in bad
+    assert ("bad_weight", "solid") in bad
+    assert ("bad_bind", "ph-not-an-icon") in bad
+    assert ("bad_markup", "ph-fake-glyph") in bad
+    flagged_els = {e["el"] for e in report["icon_invalid"]}
+    assert "ok1" not in flagged_els and "ok2" not in flagged_els
+    assert not any(e.get("icon") in ("ph-heart", "heart", "ph-sun") for e in report["icon_invalid"])
+
+
 def test_services_listed_and_excluded_from_catalog(app: Flask) -> None:
     _enable(app)
     client = app.test_client()

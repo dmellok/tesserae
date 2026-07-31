@@ -70,7 +70,10 @@
     if (kind === "icon") {
       var i = document.createElement("i");
       // Phosphor weight class: regular is the bare "ph", others are "ph-<weight>".
+      // An unknown weight would build a class matching no stylesheet (blank
+      // box), so fall back to bold; render_report's icon_invalid names it.
       var weight = el.weight || "bold";
+      if (!/^(thin|light|regular|bold|fill|duotone)$/.test(weight)) weight = "bold";
       var wcls = weight === "regular" ? "ph" : "ph-" + weight;
       // Accept both "star" and "ph-star" (widget icon fields use the ph- prefix).
       var iname = String(el.icon || "star").replace(/^ph-/, "");
@@ -281,6 +284,13 @@
     // Escape "<" so a "</script>" inside the injected JSON can't close the tag.
     var ctxJson = JSON.stringify(ctx).replace(/</g, "\\u003c");
 
+    // Per-element record of which vendored bundles were inlined (or matched
+    // but couldn't be), read by the render-report diagnostics so "why is my
+    // chart/icon missing" is answerable without pixel-diffing. Libs always
+    // inline BEFORE the ctx + user script in srcdoc document order.
+    var libReport = { el: String(el.id || ""), libs: [] };
+    (window.__tesseraeLibReport = window.__tesseraeLibReport || []).push(libReport);
+
     // Inline only the vendored libs this element references.
     var probe = (el.html || "") + "\n" + (el.css || "") + "\n" + (el.js || "");
     var urls = window.__TESSERAE_LIBS || {};
@@ -295,7 +305,11 @@
         var s = libSource(urls[lib.files[j]]);
         if (s) joined += s + "\n;\n";
       }
-      if (!joined) continue;
+      if (!joined) {
+        libReport.libs.push({ name: lib.name, injected: false, reason: "source fetch failed" });
+        continue;
+      }
+      libReport.libs.push({ name: lib.name, injected: true, kind: lib.kind });
       if (lib.kind === "css") {
         headCss += joined;
         needFont = true; // fonts (phosphor) arrive as data: URLs
@@ -315,6 +329,10 @@
       if (!fnt || !fnt.name || probe.indexOf(fnt.name) === -1) continue;
       var fcss = libSource(fnt.url);
       if (fcss) { headCss += fcss + "\n"; needFont = true; }
+      libReport.libs.push({
+        name: "font:" + fnt.name, injected: !!fcss, kind: "css",
+        reason: fcss ? undefined : "font css fetch failed",
+      });
     }
     // img-src allows the web so a code element can show remote artwork
     // (Spotify album covers, Unsplash photos, etc.), the same external images
@@ -328,14 +346,34 @@
       "img-src data: blob: https: http:" +
       (needFont ? "; font-src data:" : "");
 
+    // Surface sandbox failures to the render-report diagnostics. The frame is
+    // an opaque origin, so nothing outside can reach in; but console + error
+    // events DO propagate to the page target headless Chromium listens on.
+    // Tag every entry with the element id so the report names the culprit.
+    // Registered before the <style> so CSP violations (a blocked font/img
+    // URL) fired during parse are caught too.
+    // Same "<" escape as ctxJson so an id can't close the inline script tag.
+    var tag = JSON.stringify("[code-el " + String(el.id || "?") + "]").replace(/</g, "\\u003c");
+    var diagHooks =
+      "<script>(function(){var t=" + tag + ";" +
+      "window.addEventListener('error',function(ev){" +
+      "console.error(t+' uncaught: '+(ev.message||ev.error)+(ev.lineno?' (line '+ev.lineno+')':''));});" +
+      "window.addEventListener('unhandledrejection',function(ev){" +
+      "console.error(t+' unhandled rejection: '+String(ev.reason&&ev.reason.message||ev.reason));});" +
+      "document.addEventListener('securitypolicyviolation',function(ev){" +
+      "console.error(t+' csp blocked '+ev.violatedDirective+': '+(ev.blockedURI||'inline'));});" +
+      "})();</" + "script>";
+
     f.srcdoc =
       "<!doctype html><html><head><meta charset='utf-8'>" +
       "<meta http-equiv='Content-Security-Policy' content=\"" + csp + "\">" +
+      diagHooks +
       "<style>" + reset + headCss + (el.css || "") + "</style></head><body>" +
       (el.html || "") +
       libScripts +
       "<script>window.ctx=" + ctxJson + ";</" + "script>" +
       "<script>try{" + (el.js || "") + "}catch(e){" +
+      "console.error(" + tag + "+' script threw: '+String(e&&e.stack||e));" +
       "document.body.innerHTML='<pre style=\"color:#900;font:12px monospace;white-space:pre-wrap\">'" +
       "+String(e&&e.message||e)+'</pre>';}</" + "script>" +
       "<script>" + TOUCH_COLLECT_JS + "</" + "script>" +

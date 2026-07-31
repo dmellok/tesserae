@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import secrets
 import uuid
 from pathlib import Path
@@ -172,6 +173,94 @@ def _phosphor_icons() -> list[str]:
     return _ICON_CACHE
 
 
+def _norm_icon_slug(name: Any) -> str:
+    """Normalise an icon reference to the manifest's bare slug form: lowercase,
+    the ``ph-`` prefix stripped, underscores as dashes. The surfaces disagree
+    (icon elements accept both ``heart`` and ``ph-heart``; bind tables and code
+    markup use ``ph-heart``), so validation and search meet them all halfway."""
+    return str(name).strip().lower().removeprefix("ph-").replace("_", "-")
+
+
+# ``ph-<slug>`` tokens in authored markup, excluding tokens preceded by a word
+# char or "-" (so ``--ph-color`` custom properties and ``graph-line`` class
+# names don't false-match).
+_PH_TOKEN_RE = re.compile(r"(?<![\w-])ph-([a-z0-9]+(?:-[a-z0-9]+)*)\b")
+
+
+def _invalid_icons(layout: CanvasLayout) -> list[dict[str, Any]]:
+    """Icon references on the canvas that resolve to NO glyph, so a blank box
+    is named instead of silently rendered. Checked per element: an ``icon``
+    kind's slug and weight, every ``icon``-transform bind table value, and a
+    heuristic scan of code/html/svg markup for ``ph-<slug>`` classes that
+    aren't real Phosphor names (weight classes excluded). Purely server-side
+    against the vendored manifest; an empty manifest disables the check
+    rather than flagging everything."""
+    icons = set(_phosphor_icons())
+    if not icons:
+        return []
+    weights = set(_PHOSPHOR_WEIGHTS)
+    out: list[dict[str, Any]] = []
+    for e in layout.els:
+        if e.kind == "icon":
+            slug = _norm_icon_slug(e.icon or "")
+            if slug and slug not in icons:
+                out.append(
+                    {
+                        "el": e.id,
+                        "icon": str(e.icon),
+                        "reason": "no such Phosphor icon; search list_icons(q) for a real slug",
+                    }
+                )
+            w = (e.weight or "bold").strip().lower()
+            if w not in weights:
+                out.append(
+                    {
+                        "el": e.id,
+                        "weight": str(e.weight),
+                        "reason": (
+                            "weight must be one of thin|light|regular|bold|fill|duotone "
+                            "(the renderer falls back to bold)"
+                        ),
+                    }
+                )
+        for b in e.bind or []:
+            if b.transform != "icon":
+                continue
+            table = b.params.get("table")
+            names = list(table.values()) if isinstance(table, dict) else []
+            if b.params.get("default"):
+                names.append(b.params["default"])
+            for n in names:
+                slug = _norm_icon_slug(n)
+                if slug and slug not in icons:
+                    out.append(
+                        {
+                            "el": e.id,
+                            "icon": str(n),
+                            "reason": (
+                                "bind icon transform maps to no Phosphor icon; "
+                                "search list_icons(q) for a real slug"
+                            ),
+                        }
+                    )
+        if e.kind in ("code", "html", "svg"):
+            blob = "\n".join(filter(None, (e.html or "", e.css or "", e.js or "")))
+            for tok in sorted(set(_PH_TOKEN_RE.findall(blob))):
+                if tok in weights or tok in icons:
+                    continue
+                out.append(
+                    {
+                        "el": e.id,
+                        "icon": f"ph-{tok}",
+                        "reason": (
+                            "no such Phosphor icon (heuristic markup scan); "
+                            "search list_icons(q) for a real slug"
+                        ),
+                    }
+                )
+    return out[:50]
+
+
 # -- catalog / widget options -------------------------------------------
 
 
@@ -209,10 +298,12 @@ def icons() -> Response:
     """Search the vendored Phosphor icon set (all six weights). Use a returned
     slug as an ``icon`` element's ``"icon"`` value, or in code markup as
     ``ph-<slug>`` (weight via ph / ph-bold / ph-thin / ph-light / ph-fill /
-    ph-duotone). ``?q=`` substring-filters the names; without it a capped sample
+    ph-duotone). ``?q=`` substring-filters the names; the query is normalised
+    to slug form first (``ph-`` prefix stripped, underscores as dashes), so
+    ``ph-heart`` and ``calendar_heart`` match. Without a query a capped sample
     is returned alongside the total. ``?limit=`` caps results (default 100, max 500)."""
     all_icons = _phosphor_icons()
-    q = (request.args.get("q") or "").strip().lower()
+    q = _norm_icon_slug(request.args.get("q") or "")
     try:
         limit = max(1, min(int(request.args.get("limit", 100)), 500))
     except (TypeError, ValueError):
@@ -1453,12 +1544,15 @@ def layout() -> Response:
 # -- preview + push -----------------------------------------------------
 
 
-def _render_png(page_id: str, layout: CanvasLayout) -> bytes:
+def _render_png(page_id: str, layout: CanvasLayout, *, fresh: bool = False) -> bytes:
     """Screenshot the shared ``/compose/<id>`` target at the canvas dims, the same
-    path a device push and the editor preview use."""
+    path a device push and the editor preview use. ``fresh`` re-fetches widget
+    data (skips the last-good fallback + widget caches via ``ctx["fresh"]``)."""
     from app.renderer import RenderRequest, render_to_png, to_loopback_url
 
     path = url_for("composer.compose", page_id=page_id)
+    if fresh:
+        path += "?fresh=1"
     url = to_loopback_url(request.host_url.rstrip("/") + path)
     return render_to_png(
         RenderRequest(url=url, viewport_w=layout.w, viewport_h=layout.h),
@@ -1468,11 +1562,16 @@ def _render_png(page_id: str, layout: CanvasLayout) -> bytes:
 
 @bp.get("/pages/<page_id>/preview.png")
 def preview(page_id: str) -> Response:
-    """Render the canvas to a PNG at its authored dims (the agent's feedback loop)."""
+    """Render the canvas to a PNG at its authored dims (the agent's feedback loop).
+
+    ``?fresh=1`` bypasses widget-data caches (last-good fallback +
+    ``ctx["fresh"]``), so a mid-debug preview reflects the current data, not a
+    stale cached result."""
     page = _pr._get_canvas(page_id)
     if page is None or page.canvas is None:
         return _err(404, f"no canvas dashboard {page_id!r}")
-    png = _render_png(page_id, page.canvas)
+    fresh = request.args.get("fresh") in ("1", "true", "True")
+    png = _render_png(page_id, page.canvas, fresh=fresh)
     return current_app.response_class(png, mimetype="image/png")
 
 
@@ -1520,6 +1619,148 @@ _REPORT_JS: str = r"""() => {
 }"""
 
 
+# In-page half of the ``?debug=1`` diagnostics (the Playwright-event half
+# lives in app.renderer._attach_diag_listeners). Collects what only the page
+# itself can see: per-font-face load status (with the @font-face src when
+# reachable), a best-effort report of authored element CSS the browser
+# silently dropped (parser-rejected rules, invalid declarations, @import in
+# the no-network sandbox), and which vendored bundles each code element
+# actually inlined. Runs AFTER the settle waits, so "pending-at-capture"
+# means exactly that: the screenshot would have shipped without this font.
+_DIAG_JS: str = r"""() => {
+  const unq = (s) => String(s || '').trim().replace(/^['"]|['"]$/g, '');
+  const diag = {
+    document: {
+      ready_state: document.readyState,
+      fonts_status: document.fonts ? document.fonts.status : 'unavailable',
+    },
+    fonts: [],
+    css: [],
+    libraries: {
+      page: { chart_global: typeof window.Chart !== 'undefined' },
+      elements: window.__tesseraeLibReport || [],
+      note: 'element libs inline before the ctx + user script in sandbox document order',
+    },
+  };
+  // family -> src from reachable @font-face rules, so a failed face names its
+  // URL. Cross-origin sheets throw on cssRules access; skip those.
+  const srcByFamily = {};
+  for (const sheet of document.styleSheets) {
+    let rules = null;
+    try { rules = sheet.cssRules; } catch (e) { continue; }
+    for (const r of rules || []) {
+      if (r instanceof CSSFontFaceRule) {
+        const fam = unq(r.style.getPropertyValue('font-family'));
+        if (fam && !(fam in srcByFamily)) {
+          srcByFamily[fam] = String(r.style.getPropertyValue('src') || '').slice(0, 300);
+        }
+      }
+    }
+  }
+  if (document.fonts) {
+    document.fonts.forEach((f) => {
+      const status = f.status === 'loaded' ? 'loaded'
+        : f.status === 'error' ? 'failed'
+        : f.status === 'loading' ? 'pending-at-capture' : 'never-requested';
+      const fam = unq(f.family);
+      const entry = { family: fam, weight: f.weight, style: f.style, status };
+      if (srcByFamily[fam]) entry.src = srcByFamily[fam];
+      diag.fonts.push(entry);
+    });
+  }
+  // -- authored-CSS report ------------------------------------------------
+  // The browser drops invalid rules/declarations without a trace; re-parse
+  // each element's authored CSS with the browser's own parser and diff.
+  // Best-effort: native nesting and exotic at-rules are skipped, not flagged.
+  const normSel = (s) => String(s).replace(/\s+/g, '').replace(/['"]/g, '').toLowerCase();
+  const walkBlocks = (text) => {
+    const blocks = [];
+    let depth = 0, buf = '', body = '', sel = '';
+    for (const ch of text) {
+      if (ch === '{') {
+        if (depth === 0) { sel = buf.trim(); buf = ''; body = ''; } else body += ch;
+        depth++;
+      } else if (ch === '}') {
+        depth--;
+        if (depth === 0) { blocks.push({ sel, body }); sel = ''; } else body += ch;
+      } else if (depth === 0) buf += ch;
+      else body += ch;
+    }
+    return blocks;
+  };
+  const analyze = (elId, kind, src) => {
+    const out = [];
+    const clean = String(src || '').replace(/\/\*[\s\S]*?\*\//g, ' ');
+    if (!clean.trim()) return out;
+    let parsedSelectors = null;
+    try {
+      const sheet = new CSSStyleSheet();
+      sheet.replaceSync(clean);
+      parsedSelectors = new Set(
+        Array.from(sheet.cssRules).filter((r) => r.selectorText)
+          .map((r) => normSel(r.selectorText)),
+      );
+    } catch (e) { /* no constructable sheets: skip the parse diff */ }
+    const checkDecls = (sel, body) => {
+      for (const part of body.split(';')) {
+        const idx = part.indexOf(':');
+        if (idx < 1) continue;
+        const prop = part.slice(0, idx).trim();
+        const value = part.slice(idx + 1).trim();
+        if (!prop || !value || prop.startsWith('--')) continue;
+        if (!/^-?[a-zA-Z-]+$/.test(prop)) continue; // nested block fragments etc.
+        let ok = true;
+        try { ok = CSS.supports(prop, value); } catch (e) { /* keep ok */ }
+        if (!ok) {
+          out.push({
+            el: elId, selector: sel.slice(0, 120),
+            declaration: (prop + ': ' + value).slice(0, 200),
+            reason: 'invalid or unsupported declaration; the browser drops it silently',
+          });
+        }
+      }
+    };
+    for (const b of walkBlocks(clean)) {
+      if (!b.sel) continue;
+      if (b.sel.startsWith('@')) {
+        const at = b.sel.split(/[\s(]/)[0];
+        if (at === '@media' || at === '@supports') {
+          for (const inner of walkBlocks(b.body)) {
+            if (inner.sel && !inner.sel.startsWith('@')) checkDecls(inner.sel, inner.body);
+          }
+        }
+        continue;
+      }
+      if (parsedSelectors && !parsedSelectors.has(normSel(b.sel))) {
+        out.push({
+          el: elId, selector: b.sel.replace(/\s+/g, ' ').slice(0, 120),
+          reason: 'rule dropped by the CSS parser (invalid selector or syntax)',
+        });
+        continue;
+      }
+      checkDecls(b.sel.replace(/\s+/g, ' '), b.body);
+    }
+    for (const im of clean.match(/@import[^;]+;/g) || []) {
+      out.push({
+        el: elId, selector: '@import', declaration: im.slice(0, 200),
+        reason: kind === 'code'
+          ? 'blocked: the code-element sandbox has no network'
+          : '@import does not load in a sandboxed element',
+      });
+    }
+    return out;
+  };
+  for (const n of document.querySelectorAll('.deco[data-el]')) {
+    let el = null;
+    try { el = JSON.parse(n.getAttribute('data-el') || '{}'); } catch (e) { continue; }
+    if (!el || !el.css) continue;
+    diag.css.push(...analyze(String(el.id || ''), String(el.kind || ''), el.css));
+    if (diag.css.length >= 50) { diag.css.length = 50; break; }
+  }
+  return diag;
+}"""
+
+
 @bp.get("/pages/<page_id>/render_report")
 def render_report(page_id: str) -> Response:
     """A machine-readable companion to preview.png. Renders the canvas headless and
@@ -1538,6 +1779,13 @@ def render_report(page_id: str) -> Response:
     its domain/service, with the box + gesture + reason). ``tap_invalid == []``
     is the real "this dashboard is wired" signal, a region appearing in
     ``tap_regions`` only means it was stored, not that it will fire.
+
+    ``icon_invalid`` (always on, same spirit as ``tap_invalid``): icon
+    references that resolve to NO glyph and would render a blank box, each
+    with the element id and reason. Covers ``icon`` elements (unknown slug or
+    weight), ``icon``-transform bind tables, and a heuristic scan of
+    code/html/svg markup for ``ph-<name>`` classes that aren't real Phosphor
+    names. Fix with a slug from ``GET /icons?q=``.
 
     ``overlay_slots`` (hybrid render mode) lists the ``data-overlay-key``
     annotations that actually extracted (box + key + font bucket): the
@@ -1558,7 +1806,23 @@ def render_report(page_id: str) -> Response:
     ``elements`` / ``tap_regions`` / ``tap_invalid`` / ``tap_dangling`` /
     ``overlay_slots``) to trim the response, or ``?view=touch`` for the
     touch-and-overlay wiring subset, so verifying interactions doesn't pull
-    the whole ``elements`` array. ``id`` + ``rev`` always ride along."""
+    the whole ``elements`` array. ``id`` + ``rev`` always ride along.
+
+    ``?debug=1`` adds a ``diagnostics`` section that surfaces the failures a
+    PNG hides: ``console`` (error/warn output from every frame, INCLUDING
+    code-element sandboxes; a throwing element script lands here tagged
+    ``[code-el <id>]``), ``page_errors`` (uncaught exceptions), ``network``
+    (failed and 4xx/5xx requests, so a 404 font names its URL), ``settle``
+    (what gated the capture: goto / compose-signal / image-wait / font-wait
+    outcome + elapsed ms per phase), ``fonts`` (every font face with
+    loaded | pending-at-capture | failed | never-requested and its src),
+    ``css`` (authored element CSS the browser silently dropped, with selector
+    + declaration + reason), and ``libraries`` (which vendored bundles each
+    code element inlined). Diagnose from this instead of pixel-diffing.
+
+    ``?fresh=1`` re-fetches widget data (bypasses the last-good fallback and
+    widget-side caches via ``ctx["fresh"]``), so a mid-debug report can't be
+    poisoned by a stale cached result."""
     page = _pr._get_canvas(page_id)
     if page is None or page.canvas is None:
         return _err(404, f"no canvas dashboard {page_id!r}")
@@ -1570,29 +1834,50 @@ def render_report(page_id: str) -> Response:
         split_capture_result,
     )
 
+    debug = request.args.get("debug") in ("1", "true", "True")
+    fresh = request.args.get("fresh") in ("1", "true", "True")
     path = url_for("composer.compose", page_id=page_id)
+    if fresh:
+        path += "?fresh=1"
     url = to_loopback_url(request.host_url.rstrip("/") + path)
     # One navigation, two scripts: the element report plus the combined
     # touch-region + overlay-slot map (issue #49 / hybrid render mode),
     # so an agent can verify which boxes its data-on-tap / @name /
-    # data-overlay-key annotations actually produced.
+    # data-overlay-key annotations actually produced. ``?debug=1`` rides a
+    # third script along (the in-page diagnostics) plus the renderer's own
+    # event capture, still one navigation.
     combined = (
         "async () => ({ ...("
         + _REPORT_JS
         + ")(), interactive: await ("
         + EXTRACT_INTERACTIVE_JS
-        + ")() })"
+        + ")()"
+        + (", diag: (" + _DIAG_JS + ")()" if debug else "")
+        + " })"
     )
     ir = InspectRequest(
         render=RenderRequest(url=url, viewport_w=page.canvas.w, viewport_h=page.canvas.h),
         script=combined,
+        diagnostics=debug,
     )
     try:
         report = inspect_composed(ir, pool=current_app.config.get("BROWSER_POOL"))
     except Exception as err:
         return _err(502, f"render report failed: {type(err).__name__}: {err}")
+    renderer_diag: dict[str, Any] = {}
+    if debug and isinstance(report, dict) and "diagnostics" in report:
+        renderer_diag = report.get("diagnostics") or {}
+        report = report.get("result")
     if not isinstance(report, dict):
         report = {"board": {}, "elements": []}
+    if debug:
+        # Merge the renderer-side capture (console / errors / network /
+        # settle) with the in-page report (fonts / css / libraries).
+        page_diag = report.pop("diag", None)
+        report["diagnostics"] = {
+            **renderer_diag,
+            **(page_diag if isinstance(page_diag, dict) else {}),
+        }
     raw_regions, raw_slots = split_capture_result(report.pop("interactive", None))
     regions = normalize_regions(raw_regions)
     report["tap_regions"] = regions
@@ -1604,6 +1889,11 @@ def render_report(page_id: str) -> Response:
     # the extractor deliberately skips).
     report["overlay_slots"] = normalize_slots(raw_slots)
     report["tap_dangling"] = sorted({n for r in regions for n in r.get("dangling", [])})
+    # Icon references that resolve to no glyph (bad slug / weight / bind table
+    # / ph-<name> markup class). Server-side against the vendored manifest,
+    # always on, mirroring tap_invalid: a blank icon box is named here instead
+    # of being pixel-hunted.
+    report["icon_invalid"] = _invalid_icons(page.canvas)
     # Regions whose declared action wouldn't dispatch (issue #49). Empty
     # tap_invalid means every region will actually fire; a non-empty list
     # is the honest signal that a dashboard looks wired but is dead, e.g.
@@ -1625,7 +1915,10 @@ def render_report(page_id: str) -> Response:
         "tap_invalid",
         "tap_dangling",
         "overlay_slots",
+        "icon_invalid",
     }
+    if debug:
+        selectable.add("diagnostics")
     view = (request.args.get("view") or "").strip().lower()
     raw_fields = (request.args.get("fields") or "").strip()
     wanted: set[str] | None = None
@@ -1633,6 +1926,10 @@ def render_report(page_id: str) -> Response:
         wanted = {"tap_regions", "tap_invalid", "tap_dangling", "overlay_slots"}
     elif raw_fields:
         wanted = {f.strip() for f in raw_fields.split(",") if f.strip() in selectable}
+    if wanted is not None and debug:
+        # debug=1 asked for the diagnostics explicitly; a fields/view trim
+        # shouldn't silently drop them.
+        wanted.add("diagnostics")
     out: dict[str, Any] = {"id": page_id, "rev": _pr._canvas_rev(page)}
     for key in selectable:
         if wanted is None or key in wanted:

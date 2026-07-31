@@ -171,10 +171,23 @@ class InspectRequest:
     the JSON-serialisable result of evaluating ``script`` in it, instead of a
     screenshot. Powers the MCP structured render report and text measurement, so
     an agent can read what actually rendered (values, overflow, computed colours)
-    rather than eyeballing a PNG."""
+    rather than eyeballing a PNG.
+
+    With ``diagnostics=True`` the attempt also records what went wrong INSIDE
+    the page: console error/warning output (all frames, including code-element
+    sandboxes), uncaught page errors, failed / 4xx-5xx network requests, and
+    the settle record from :func:`_navigate_and_settle`. The return shape then
+    becomes ``{"result": <script result>, "diagnostics": {...}}`` so the silent
+    failure modes (a throwing element script, a 404 font) surface as data."""
 
     render: RenderRequest
     script: str
+    diagnostics: bool = False
+
+
+# Cap per diagnostics stream so a console-spamming page can't balloon the
+# report (or the JSON response carrying it).
+_DIAG_MAX_EVENTS: Final = 100
 
 
 @dataclass(frozen=True)
@@ -202,14 +215,18 @@ _IMAGE_WAIT_JS: Final[str] = """async () => {
     // and the screenshot captured an empty / broken-image frame.
     // Capped at 5 s so a single hung CDN doesn't block the whole
     // render, we ship the best frame we have.
+    // Returns a status object for the diagnostics path; the screenshot
+    // path ignores it.
     function* allImages(root) {
         for (const img of root.querySelectorAll('img')) yield img;
         for (const el of root.querySelectorAll('*')) {
             if (el.shadowRoot) yield* allImages(el.shadowRoot);
         }
     }
+    let total = 0;
     const pending = [];
     for (const img of allImages(document)) {
+        total += 1;
         if (img.complete && img.naturalWidth > 0) continue;
         pending.push(new Promise((resolve) => {
             const done = () => resolve();
@@ -217,16 +234,17 @@ _IMAGE_WAIT_JS: Final[str] = """async () => {
             img.addEventListener('error', done, { once: true });
         }));
     }
-    if (!pending.length) return;
-    await Promise.race([
-        Promise.all(pending),
-        new Promise((r) => setTimeout(r, 5000)),
+    if (!pending.length) return { total, awaited: 0, timed_out: false };
+    const outcome = await Promise.race([
+        Promise.all(pending).then(() => 'done'),
+        new Promise((r) => setTimeout(() => r('timeout'), 5000)),
     ]);
+    return { total, awaited: pending.length, timed_out: outcome === 'timeout' };
 }"""
 
 
 _FONT_WAIT_JS: Final[str] = """async () => {
-    if (!document.fonts || !document.fonts.load) return;
+    if (!document.fonts || !document.fonts.load) return { families: [] };
     const families = new Set();
     // Take both the cell's inline font-family (the page/per-cell font
     // picker) AND the cell's cascaded --font-family (the active Spectra
@@ -266,6 +284,12 @@ _FONT_WAIT_JS: Final[str] = """async () => {
     }
     await Promise.all(loads);
     await document.fonts.ready;
+    // Status for the diagnostics path (screenshot path ignores it):
+    // which families the wait force-loaded, and the FontFaceSet's
+    // state once ready resolved (failed faces count as "done", so a
+    // 404 font face still shows up as status "error" in the per-face
+    // report, not here).
+    return { families: [...families] };
 }"""
 
 
@@ -351,10 +375,17 @@ def _new_composer_page(browser: Browser, request: RenderRequest) -> tuple[Any, A
     return context, page
 
 
-def _navigate_and_settle(page: Any, request: RenderRequest, attempt: int) -> None:
+def _navigate_and_settle(page: Any, request: RenderRequest, attempt: int) -> dict[str, Any]:
     """Navigate to the request URL and wait until the composed page is ready to
     read (compose-done signal, images, fonts). Shared by the screenshot and the
-    inspect paths so both see the same fully-hydrated DOM."""
+    inspect paths so both see the same fully-hydrated DOM.
+
+    Returns a settle record naming what actually gated the capture: per-phase
+    elapsed ms plus each wait's outcome (``fired`` / ``timeout`` / ``skipped``
+    and the image/font wait's own status object). The screenshot path ignores
+    it; the diagnostics path surfaces it so a race shows up as data instead of
+    needing to be inferred from pixel diffs."""
+    settle: dict[str, Any] = {"attempt": attempt}
     t0 = time.monotonic()
     if not request.is_composer:
         page.goto(request.url, wait_until="load")
@@ -367,21 +398,31 @@ def _navigate_and_settle(page: Any, request: RenderRequest, attempt: int) -> Non
     else:
         page.goto(request.url, wait_until=request.wait_until)
     t_goto = time.monotonic()
+    settle["goto_ms"] = int((t_goto - t0) * 1000)
     if request.is_composer:
         try:
             page.wait_for_function("window.__tesseraeComposed === true", timeout=request.timeout_ms)
+            settle["compose_signal"] = "fired"
         except PlaywrightError as err:
             logger.warning("composer mount wait timed out: %s", err)
+            settle["compose_signal"] = "timeout"
+    else:
+        settle["compose_signal"] = "skipped"
     t1 = time.monotonic()
+    settle["compose_ms"] = int((t1 - t_goto) * 1000)
     try:
-        page.evaluate(_IMAGE_WAIT_JS)
+        settle["images"] = page.evaluate(_IMAGE_WAIT_JS)
     except PlaywrightError as err:
         logger.warning("image wait skipped: %s", err)
+        settle["images"] = {"error": str(err).splitlines()[0][:200]}
     t_img = time.monotonic()
+    settle["images_ms"] = int((t_img - t1) * 1000)
     try:
-        page.evaluate(_FONT_WAIT_JS)
+        settle["fonts"] = page.evaluate(_FONT_WAIT_JS)
     except PlaywrightError as err:
         logger.warning("font wait skipped: %s", err)
+        settle["fonts"] = {"error": str(err).splitlines()[0][:200]}
+    settle["fonts_ms"] = int((time.monotonic() - t_img) * 1000)
     logger.info(
         "render nav (s): attempt=%d goto=%.2f compose=%.2f images=%.2f fonts=%.2f (url=%s)",
         attempt,
@@ -391,6 +432,7 @@ def _navigate_and_settle(page: Any, request: RenderRequest, attempt: int) -> Non
         time.monotonic() - t_img,
         request.url,
     )
+    return settle
 
 
 def _screenshot_attempt(browser: Browser, request: RenderRequest, attempt: int) -> bytes:
@@ -565,13 +607,80 @@ def _fetch_one(browser: Browser, request: FetchRequest) -> str:
             logger.debug("fetch context close failed (continuing)", exc_info=True)
 
 
+def _attach_diag_listeners(page: Any) -> dict[str, list[dict[str, Any]]]:
+    """Wire Playwright page events into capped event lists and return them.
+
+    Console + pageerror events aggregate across every frame of the page,
+    including the origin-less code-element sandboxes (same page target), so a
+    script throwing inside a sandbox surfaces here without any bridge into the
+    frame. Network events catch hard failures (DNS, aborts) AND soft ones
+    (a 404 font URL returns a response, not a failure)."""
+    events: dict[str, list[dict[str, Any]]] = {"console": [], "page_errors": [], "network": []}
+
+    def _add(stream: str, entry: dict[str, Any]) -> None:
+        bucket = events[stream]
+        if len(bucket) < _DIAG_MAX_EVENTS:
+            bucket.append(entry)
+
+    def _on_console(msg: Any) -> None:
+        if msg.type not in ("error", "warning"):
+            return
+        loc = msg.location or {}
+        _add(
+            "console",
+            {
+                "level": msg.type,
+                "text": msg.text[:500],
+                "url": str(loc.get("url", ""))[:300],
+                "line": loc.get("lineNumber"),
+            },
+        )
+
+    def _on_pageerror(err: Any) -> None:
+        _add("page_errors", {"message": str(err)[:500]})
+
+    def _on_requestfailed(req: Any) -> None:
+        _add(
+            "network",
+            {
+                "url": req.url[:300],
+                "resource_type": req.resource_type,
+                "error": str(req.failure or "failed")[:200],
+            },
+        )
+
+    def _on_response(resp: Any) -> None:
+        if resp.status < 400:
+            return
+        _add(
+            "network",
+            {
+                "url": resp.url[:300],
+                "resource_type": resp.request.resource_type,
+                "status": resp.status,
+            },
+        )
+
+    page.on("console", _on_console)
+    page.on("pageerror", _on_pageerror)
+    page.on("requestfailed", _on_requestfailed)
+    page.on("response", _on_response)
+    return events
+
+
 def _inspect_attempt(browser: Browser, request: InspectRequest, attempt: int) -> Any:
     """Navigate the composed page and return ``page.evaluate(script)``. Fresh
-    context per attempt, same hydration waits the screenshot path uses."""
+    context per attempt, same hydration waits the screenshot path uses. With
+    ``request.diagnostics`` the result is wrapped as
+    ``{"result": ..., "diagnostics": ...}`` (see :class:`InspectRequest`)."""
     context, page = _new_composer_page(browser, request.render)
     try:
-        _navigate_and_settle(page, request.render, attempt)
-        return page.evaluate(request.script)
+        events = _attach_diag_listeners(page) if request.diagnostics else None
+        settle = _navigate_and_settle(page, request.render, attempt)
+        result = page.evaluate(request.script)
+        if events is None:
+            return result
+        return {"result": result, "diagnostics": {"settle": settle, **events}}
     finally:
         try:
             context.close()

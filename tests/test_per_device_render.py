@@ -157,7 +157,14 @@ def _captured_target(app: Flask, page: Page, query: str) -> str:
     app.config["PAGE_STORE"].save(page)
     seen: dict[str, str] = {}
 
-    def _spy(layout: Any, *, target_w: int, target_h: int, target_device_id: str = "") -> str:
+    def _spy(
+        layout: Any,
+        *,
+        target_w: int,
+        target_h: int,
+        target_device_id: str = "",
+        fresh: bool = False,
+    ) -> str:
         seen["t"] = target_device_id
         return ""
 
