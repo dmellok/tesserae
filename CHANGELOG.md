@@ -46,6 +46,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **CalDAV discovery handles compressed responses.** A Nextcloud behind a proxy or CDN
+  can return a gzip- or deflate-compressed body; Python's HTTP client doesn't request or
+  decompress that, so the parser saw a binary blob and discovery failed with "wasn't valid
+  CalDAV XML." Discovery and the feed fetch now request an uncompressed body and decode
+  gzip/deflate if the server compresses regardless, and the diagnostic log includes the
+  response's content type and encoding.
+
 - **CalDAV discovery tolerates a stray BOM or whitespace before the XML declaration.**
   Some servers (notably Nextcloud behind certain PHP / output-buffering setups) emit a
   newline ahead of `<?xml`, which a browser ignores but a strict parser rejects, so an

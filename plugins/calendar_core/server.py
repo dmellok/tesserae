@@ -156,9 +156,14 @@ def _http_get(url: str, auth: dict[str, str] | None) -> bytes | None:
     fixed = url.replace("webcal://", "https://", 1) if url.startswith("webcal://") else url
     try:
         opener = _build_opener(fixed, auth)
-        req = urllib.request.Request(fixed, headers={"User-Agent": USER_AGENT})
+        # Ask for an uncompressed body (urllib doesn't decompress); decode
+        # defensively if a proxy compresses the feed anyway (#168).
+        req = urllib.request.Request(
+            fixed, headers={"User-Agent": USER_AGENT, "Accept-Encoding": "identity"}
+        )
         with opener.open(req, timeout=HTTP_TIMEOUT_S) as resp:
             blob: bytes = resp.read()
+            blob = _decode_content_encoding(blob, str(resp.headers.get("Content-Encoding", "")))
         return blob
     except Exception:
         return None
@@ -493,6 +498,32 @@ def _prop_find(props: list[Any], tag: str) -> Any:
     return None
 
 
+def _decode_content_encoding(body: bytes, content_encoding: str) -> bytes:
+    """Decode a ``Content-Encoding`` the response carried anyway.
+
+    urllib never sends ``Accept-Encoding``, and RFC 7231 lets a server treat
+    an absent header as "any coding acceptable", so a Nextcloud behind a
+    compressing proxy / CDN can hand back gzip or deflate that urllib does
+    *not* transparently decompress, i.e. an unparseable binary blob. We ask
+    for ``identity`` up front; this is the belt-and-suspenders decode for a
+    server that ignores that. gzip and deflate are stdlib; anything else
+    (e.g. brotli) is left untouched and surfaces in the diagnostic log."""
+    enc = content_encoding.lower().strip()
+    if enc in ("gzip", "x-gzip"):
+        import gzip
+
+        with contextlib.suppress(Exception):
+            return gzip.decompress(body)
+    elif enc == "deflate":
+        import zlib
+
+        # deflate is ambiguous in the wild: zlib-wrapped or raw. Try both.
+        for wbits in (zlib.MAX_WBITS, -zlib.MAX_WBITS):
+            with contextlib.suppress(Exception):
+                return zlib.decompress(body, wbits)
+    return body
+
+
 def _propfind(
     url: str, auth: dict[str, str] | None, depth: str
 ) -> tuple[Any, dict[str, Any] | None]:
@@ -501,6 +532,8 @@ def _propfind(
     shape (``{"collections": [], "error": <msg>}``). Never raises."""
     import defusedxml.ElementTree as DET
 
+    content_encoding = ""
+    content_type = ""
     try:
         opener = _build_opener(url, auth)
         req = urllib.request.Request(
@@ -511,10 +544,16 @@ def _propfind(
                 "User-Agent": USER_AGENT,
                 "Depth": depth,
                 "Content-Type": 'application/xml; charset="utf-8"',
+                # Ask for an uncompressed body: urllib won't decompress a
+                # gzip/brotli response, and an absent Accept-Encoding lets the
+                # server compress at will (#168).
+                "Accept-Encoding": "identity",
             },
         )
         with opener.open(req, timeout=HTTP_TIMEOUT_S) as resp:
             body = resp.read()
+            content_encoding = str(resp.headers.get("Content-Encoding", ""))
+            content_type = str(resp.headers.get("Content-Type", ""))
     except urllib.error.HTTPError as err:
         code = err.code
         err.close()  # HTTPError is a response object; don't leak the handle.
@@ -529,6 +568,10 @@ def _propfind(
             "collections": [],
             "error": f"Couldn't reach the server: {type(err).__name__}.",
         }
+    # Decode a compressed body the server sent despite our identity request
+    # (a proxy / CDN in front of Nextcloud is the usual cause), otherwise the
+    # parser just sees a binary blob (#168).
+    body = _decode_content_encoding(body, content_encoding)
     # Some servers (misconfigured PHP / Nextcloud output buffering, an app
     # that emits a stray newline before the response) prepend a BOM or
     # whitespace ahead of the ``<?xml`` declaration. A browser or curl
@@ -543,7 +586,10 @@ def _propfind(
         return DET.fromstring(body), None
     except Exception:
         _log.warning(
-            "CalDAV PROPFIND response not parseable as XML; first bytes: %r",
+            "CalDAV PROPFIND response not parseable as XML "
+            "(content-type=%r content-encoding=%r); first bytes: %r",
+            content_type,
+            content_encoding,
             body[:160],
         )
         return None, {"collections": [], "error": "The server's response wasn't valid CalDAV XML."}

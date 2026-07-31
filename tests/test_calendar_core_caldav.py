@@ -197,6 +197,10 @@ def test_build_opener_installs_basic_handler(cc: Any) -> None:
 
 
 class _FakeResp(io.BytesIO):
+    def __init__(self, data: bytes, headers: dict[str, str] | None = None) -> None:
+        super().__init__(data)
+        self.headers: dict[str, str] = headers or {}
+
     def __enter__(self) -> Any:
         return self
 
@@ -223,6 +227,26 @@ def test_discover_collections_parses_calendars_and_todos(
     assert cols["Tasks"]["components"] == ["VTODO"]
     # export URL is absolute + ?export, resolved against the base.
     assert cols["Tasks"]["export_url"] == "http://baikal.lan/dav/cal/you/tasks/?export"
+
+
+def test_discover_collections_decodes_gzip_response(
+    cc: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A Nextcloud behind a compressing proxy can return gzip even though we
+    ask for identity; urllib doesn't decompress, so discovery must decode it
+    rather than choke on the binary blob (#168)."""
+    import gzip
+
+    payload = gzip.compress(PROPFIND_XML)
+
+    class _FakeOpener:
+        def open(self, req: Any, timeout: float = 0) -> Any:
+            return _FakeResp(payload, headers={"Content-Encoding": "gzip"})
+
+    monkeypatch.setattr(cc, "_build_opener", lambda url, auth: _FakeOpener())
+    result = cc.discover_collections("http://nextcloud.lan/remote.php/dav/calendars/you/", None)
+    assert result["error"] is None
+    assert {c["name"] for c in result["collections"]} == {"Home", "Tasks"}
 
 
 def test_discover_collections_tolerates_junk_before_xml_declaration(
