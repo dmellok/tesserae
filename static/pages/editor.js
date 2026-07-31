@@ -166,7 +166,7 @@
   }
 
   // --- Panel view: quantised + dithered preview (#45) ------------------
-  // "Fit view" shows the live HTML iframe; "Panel view" swaps in a PNG the
+  // "HTML view" shows the live HTML iframe; "Panel view" swaps in a PNG the
   // server quantises + dithers to the panel's palette, so the editor shows the
   // exact per-pixel e-ink output. That PNG needs a headless render, so it can
   // 202 briefly while the render lands; poll until it's ready.

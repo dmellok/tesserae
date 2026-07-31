@@ -37,6 +37,12 @@
   background: var(--t-surface-soft);
   transform-origin: 0 0;
 }
+/* This ``display: block`` overrides the UA ``[hidden] { display: none }``,
+   so the Panel-view toggle (which sets ``iframe.hidden``) can't hide the
+   iframe without this explicit override. Same pattern as the placeholder. */
+.preview-frame > iframe[hidden] {
+  display: none !important;
+}
 .preview-frame > img.preview-image {
   /* Raster previews fit the frame with letterboxing; the source is
      panel-content already so we don't need the iframe's transform
@@ -1274,7 +1280,7 @@
   margin-top: var(--t-space-3);
 }
 
-/* Panel-view toggle (#45): Fit view / Panel view segmented control over the
+/* Panel-view toggle (#45): HTML view / Panel view segmented control over the
    live preview. Panel view shows the composition quantised + dithered to the
    panel's palette (crisp 1:1, so image-rendering is pixelated). */
 .preview-modes {
@@ -1300,7 +1306,21 @@
   color: var(--t-fg);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
-.preview-panel-img {
+/* Panel-view raster: reuse the raster-preview box (absolute, letterboxed
+   into the frame via object-fit) so the full-resolution quantised PNG scales
+   to fit instead of overflowing at its natural pixel size. ``pixelated``
+   keeps the e-ink dither crisp rather than smoothed on downscale. */
+.preview-frame > img.preview-panel-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
   display: block;
+  background: var(--t-surface-soft);
+  object-fit: contain;
   image-rendering: pixelated;
+}
+.preview-frame > img.preview-panel-img[hidden] {
+  display: none !important;
 }

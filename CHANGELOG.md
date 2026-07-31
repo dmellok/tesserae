@@ -9,7 +9,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 ### Added
 
 - **Panel view: preview a dashboard as the e-ink panel will actually paint it.** The
-  dashboard editor's live preview gains a Fit view / Panel view toggle. Panel view
+  dashboard editor's live preview gains an HTML view / Panel view toggle. Panel view
   quantises and dithers the render to the target panel's colour palette, so you see the
   exact per-pixel output (dithering, palette reduction) before pushing, per preview group's
   gamut. Also adds a shared source-crop primitive (a normalized crop + rotate applied before
@@ -92,6 +92,14 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   it expires. Unsigned public access is always refused, and no firmware change is needed.
 
 ### Fixed
+
+- **Panel view toggle now actually switches.** Selecting Panel view appeared to do
+  nothing: the preview iframe's `display: block` overrode the `hidden` attribute the
+  toggle set, so the live render stayed on top of the quantised image, which itself
+  rendered at full panel resolution outside the frame. Both are fixed (explicit
+  `[hidden]` override on the iframe; the panel image reuses the raster preview's
+  letterboxed `object-fit: contain` box). The HTML-view button is also renamed from
+  "Fit view", which read as a sizing control.
 
 - **CalDAV discovery handles compressed responses.** A Nextcloud behind a proxy or CDN
   can return a gzip- or deflate-compressed body; Python's HTTP client doesn't request or
