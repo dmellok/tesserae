@@ -247,6 +247,16 @@
 
   <section class="dx-section-card preview-card">
     {{ card_head('Live preview', icon_name='monitor-play', blurb='Click a cell to edit it. Updates after every change.') }}
+    {# Fit view = the live full-colour HTML render; Panel view = that render
+       quantised + dithered to the panel's palette, the exact per-pixel e-ink
+       output (#45). Editor JS swaps the iframe for the panel <img> per group. #}
+    <div class="preview-modes" data-preview-modes role="group" aria-label="Preview mode">
+      <button type="button" class="preview-mode is-active" data-preview-mode="fit">Fit view</button>
+      <button type="button" class="preview-mode" data-preview-mode="panel"
+              title="Quantised and dithered to the panel's palette, the exact per-pixel e-ink output">
+        Panel view
+      </button>
+    </div>
     {# One preview per distinct aspect ratio among the selected devices.
        preview_groups is a single virtual-panel group when nothing is
        picked, or one group per shape when devices of differing aspect
@@ -272,6 +282,13 @@
                 style="width: {{ g.w }}px; height: {{ g.h }}px;"
                 loading="lazy" sandbox="allow-scripts allow-same-origin"
                 data-preview-iframe></iframe>
+        {# Panel view target: quantised PNG for this group's gamut. Its src is
+           set lazily by editor.js when Panel view is active (kept out of the
+           DOM src so it doesn't render until asked). #}
+        <img class="preview-panel-img" data-panel-preview
+             data-panel-src="{{ url_for('composer.compose_panel_preview', page_id=page.id) }}?gamut={{ g.gamut }}&amp;dither=floyd-steinberg"
+             alt="Panel view (quantised)" hidden
+             style="width: {{ g.w }}px; height: {{ g.h }}px;">
       </div>
       <p class="muted preview-dims">
         {{ g.w }} × {{ g.h }}

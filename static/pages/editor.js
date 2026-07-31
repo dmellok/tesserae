@@ -55,15 +55,21 @@
     if (!status) return;
     status.dataset.state = state;
     const label =
-      state === "saving" ? "Saving…" :
-      state === "error" ? "Save failed" :
-      state === "dirty" ? "Unsaved changes" :
-      "Saved";
+      state === "saving"
+        ? "Saving…"
+        : state === "error"
+          ? "Save failed"
+          : state === "dirty"
+            ? "Unsaved changes"
+            : "Saved";
     const iconClass =
-      state === "saving" ? "ph ph-arrows-clockwise" :
-      state === "error" ? "ph-fill ph-warning-circle" :
-      state === "dirty" ? "ph ph-circle-dashed" :
-      "ph-fill ph-check-circle";
+      state === "saving"
+        ? "ph ph-arrows-clockwise"
+        : state === "error"
+          ? "ph-fill ph-warning-circle"
+          : state === "dirty"
+            ? "ph ph-circle-dashed"
+            : "ph-fill ph-check-circle";
     status.innerHTML =
       '<i class="' + iconClass + '" aria-hidden="true"></i><span>' + label + "</span>";
   }
@@ -89,7 +95,13 @@
   // step-wise widget options where each keystroke isn't a meaningful
   // value; the 'change' (blur) commit is the natural preview point.
   const _DEFER_INPUT_TYPES = new Set([
-    "text", "search", "email", "url", "password", "tel", "number",
+    "text",
+    "search",
+    "email",
+    "url",
+    "password",
+    "tel",
+    "number",
   ]);
   function _deferToBlur(el) {
     if (!el) return false;
@@ -144,11 +156,100 @@
           // the next preview cycle diffs against what's actually painted.
           lastStateByFrame.delete(iframe);
         },
-        { once: true },
+        { once: true }
       );
       iframe.src = url.pathname + url.search;
     });
+    // In Panel view an edit means a fresh composition, so re-poll the
+    // quantised preview (the hidden iframes still reload above, harmless).
+    if (_previewMode === "panel") refreshPanelPreviews();
   }
+
+  // --- Panel view: quantised + dithered preview (#45) ------------------
+  // "Fit view" shows the live HTML iframe; "Panel view" swaps in a PNG the
+  // server quantises + dithers to the panel's palette, so the editor shows the
+  // exact per-pixel e-ink output. That PNG needs a headless render, so it can
+  // 202 briefly while the render lands; poll until it's ready.
+  let _previewMode = "fit";
+  const _panelPollTimers = new Map();
+
+  function _panelImg(frame) {
+    return frame.querySelector("[data-panel-preview]");
+  }
+  function _clearPanelPoll(frame) {
+    const t = _panelPollTimers.get(frame);
+    if (t) {
+      clearTimeout(t);
+      _panelPollTimers.delete(frame);
+    }
+  }
+
+  function loadPanelPreview(frame) {
+    const img = _panelImg(frame);
+    if (!img || !img.dataset.panelSrc) return;
+    _clearPanelPoll(frame);
+    const base = img.dataset.panelSrc;
+    const url = base + (base.includes("?") ? "&" : "?") + "_t=" + Date.now();
+    const iframe = frame.querySelector("[data-preview-iframe]");
+    if (iframe) showPreviewThrobber(iframe);
+    let tries = 0;
+    const attempt = () => {
+      if (_previewMode !== "panel") return;
+      fetch(url, { cache: "no-store" })
+        .then((r) => {
+          if (r.status === 200) {
+            img.onload = () => {
+              if (iframe) hidePreviewThrobber(iframe);
+            };
+            img.src = url;
+          } else if (r.status === 202 && tries++ < 40) {
+            _panelPollTimers.set(frame, setTimeout(attempt, 500));
+          } else if (iframe) {
+            hidePreviewThrobber(iframe);
+          }
+        })
+        .catch(() => {
+          if (iframe) hidePreviewThrobber(iframe);
+        });
+    };
+    attempt();
+  }
+
+  function refreshPanelPreviews() {
+    document.querySelectorAll(".preview-frame").forEach(loadPanelPreview);
+  }
+
+  function setPreviewMode(mode) {
+    _previewMode = mode === "panel" ? "panel" : "fit";
+    document.querySelectorAll("[data-preview-mode]").forEach((b) => {
+      const on = b.dataset.previewMode === _previewMode;
+      b.classList.toggle("is-active", on);
+      b.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+    document.querySelectorAll(".preview-frame").forEach((frame) => {
+      _clearPanelPoll(frame);
+      const iframe = frame.querySelector("[data-preview-iframe]");
+      const img = _panelImg(frame);
+      if (_previewMode === "panel") {
+        if (iframe) iframe.hidden = true;
+        if (img) img.hidden = false;
+      } else {
+        if (img) {
+          img.hidden = true;
+          img.removeAttribute("src");
+        }
+        if (iframe) {
+          iframe.hidden = false;
+          hidePreviewThrobber(iframe);
+        }
+      }
+    });
+    if (_previewMode === "panel") refreshPanelPreviews();
+  }
+
+  document.querySelectorAll("[data-preview-mode]").forEach((btn) => {
+    btn.addEventListener("click", () => setPreviewMode(btn.dataset.previewMode));
+  });
 
   // Bounded-lifetime preview iframes.
   //
@@ -190,11 +291,11 @@
               hidePreviewThrobber(iframe);
               lastStateByFrame.delete(iframe);
             },
-            { once: true },
+            { once: true }
           );
           iframe.src = finalUrl;
         },
-        { once: true },
+        { once: true }
       );
       iframe.src = "about:blank";
     });
@@ -214,9 +315,7 @@
     const u = new URL(iframe.src, location.origin);
     const w = Number(u.searchParams.get("w"));
     const h = Number(u.searchParams.get("h"));
-    return Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0
-      ? { w, h }
-      : null;
+    return Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0 ? { w, h } : null;
   }
 
   // Decide whether two hydrated states can be reconciled in-place via a
@@ -263,7 +362,10 @@
       cells: next.cells.map((c) => ({
         id: c.id,
         plugin: c.plugin || "",
-        x: c.x, y: c.y, w: c.w, h: c.h,
+        x: c.x,
+        y: c.y,
+        w: c.w,
+        h: c.h,
         zoom: typeof c.zoom === "number" ? c.zoom : 1,
         options: c.options,
         data: c.data,
@@ -295,10 +397,7 @@
       const prev = lastStateByFrame.get(iframe);
       if (canPatch(prev, match.state)) {
         try {
-          iframe.contentWindow.postMessage(
-            buildPatch(match.state),
-            location.origin,
-          );
+          iframe.contentWindow.postMessage(buildPatch(match.state), location.origin);
           lastStateByFrame.set(iframe, match.state);
           appliedAny = true;
         } catch (err) {
@@ -331,7 +430,7 @@
             iframe.style.opacity = "1";
             lastStateByFrame.set(iframe, match.state);
           },
-          { once: true },
+          { once: true }
         );
         iframe.src = u.pathname + u.search;
       }
@@ -438,7 +537,11 @@
       mount.dataset.touchBound = "1";
       const input = mount.parentElement.querySelector("[data-touch-input]");
       let value = {};
-      try { value = JSON.parse(mount.dataset.touchValue || "{}") || {}; } catch (e) { value = {}; }
+      try {
+        value = JSON.parse(mount.dataset.touchValue || "{}") || {};
+      } catch (e) {
+        value = {};
+      }
       const node = TouchInteraction.render({
         value: value,
         pagesUrl: mount.dataset.pagesUrl,
@@ -670,15 +773,18 @@
     target.scrollIntoView({ behavior: "smooth", block: "nearest" });
     const field = target.querySelector("select, input, textarea, button");
     if (field) {
-      try { field.focus({ preventScroll: true }); } catch (e) { field.focus(); }
+      try {
+        field.focus({ preventScroll: true });
+      } catch (e) {
+        field.focus();
+      }
     }
     previewFrames().forEach((iframe) => {
       try {
-        iframe.contentWindow.postMessage(
-          { type: "tesserae-focus-cell", cellId },
-          location.origin,
-        );
-      } catch (e) { /* iframe not ready / cross-origin */ }
+        iframe.contentWindow.postMessage({ type: "tesserae-focus-cell", cellId }, location.origin);
+      } catch (e) {
+        /* iframe not ready / cross-origin */
+      }
     });
   }
 

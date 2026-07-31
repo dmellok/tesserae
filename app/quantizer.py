@@ -22,7 +22,7 @@ palette to firmware-nibble LUT) is byte-compatible with the existing
 from __future__ import annotations
 
 import io
-from typing import Literal
+from typing import Any, Literal, TypedDict
 
 import numpy as np
 from PIL import Image, ImageEnhance, ImageFilter
@@ -349,6 +349,26 @@ _GAMUT_TABLE: dict[str, tuple[tuple[tuple[int, int, int], ...], tuple[int, ...]]
 # panels and the XIAO 7.5" BWR class.
 _NATIVE_2BPP_GAMUTS: frozenset[str] = frozenset({"bwry_4", "bwr_3"})
 
+_MONO_PALETTE: tuple[tuple[int, int, int], ...] = ((0, 0, 0), (255, 255, 255))
+
+
+def palette_for_gamut(gamut: str) -> tuple[tuple[int, int, int], ...]:
+    """The viewable RGB palette a panel of ``gamut`` reproduces, for quantise
+    previews (Panel view). Colour gamuts use the .bin packer's palette; the
+    grayscale ramps and mono map to their grey levels; anything unrecognised
+    canonicalises to the 6-colour Spectra palette so a preview never fails."""
+    g = canonicalise_gamut(gamut)
+    table_entry = _GAMUT_TABLE.get(g)
+    if table_entry is not None:
+        return table_entry[0]
+    if g == "gray_16":
+        return GRAY_16_PALETTE
+    if g == "gray_4":
+        return GRAY_4_PALETTE
+    if g == "mono":
+        return _MONO_PALETTE
+    return WAVESHARE_E6_PALETTE
+
 
 def _apply_exposure(img: Image.Image, exposure: int) -> Image.Image:
     """Linear brightness shift. ``exposure`` in -100..+100 maps to a
@@ -574,6 +594,67 @@ def apply_underscan(png_bytes: bytes, *, underscan: int, fill: str = "#ffffff") 
     return out.getvalue()
 
 
+class SourceCrop(TypedDict, total=False):
+    """A source-image crop, in the image's own normalized coordinate space.
+
+    ``x``/``y``/``w``/``h`` are fractions in [0, 1] of the source dimensions, so
+    the rect stays valid if the image is later re-uploaded at a different
+    resolution. ``rotate`` is a clockwise quarter-turn (0/90/180/270). This is
+    the shared crop shape: the Send / gallery path resolves an editor rectangle
+    into it, and the Companion image push resolves focus + zoom into it per
+    target panel, then both feed it through :func:`apply_source_crop`.
+    """
+
+    x: float
+    y: float
+    w: float
+    h: float
+    rotate: int
+
+
+def _clamp01(value: Any) -> float:
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return 0.0
+    return max(0.0, min(1.0, v))
+
+
+# PIL's ``Transpose.ROTATE_*`` turns counter-clockwise; ``rotate`` is clockwise.
+_CW_ROTATE: dict[int, Image.Transpose] = {
+    90: Image.Transpose.ROTATE_270,
+    180: Image.Transpose.ROTATE_180,
+    270: Image.Transpose.ROTATE_90,
+}
+
+
+def apply_source_crop(img: Image.Image, crop: SourceCrop | None) -> Image.Image:
+    """Crop and rotate a source image by a normalized rect before it's fit.
+
+    Clamps the rect into the image and enforces a minimum 1px extent, so a
+    zero/negative/out-of-range box can never resolve to an empty crop (the
+    server owns this clamp; a caller's rect is advisory). An absent crop, or one
+    that resolves to the whole image with no rotation, returns ``img`` unchanged.
+    """
+    if not crop:
+        return img
+    w0, h0 = img.width, img.height
+    x = _clamp01(crop.get("x", 0.0))
+    y = _clamp01(crop.get("y", 0.0))
+    cw = min(_clamp01(crop.get("w", 1.0)), 1.0 - x)
+    ch = min(_clamp01(crop.get("h", 1.0)), 1.0 - y)
+    left = round(x * w0)
+    top = round(y * h0)
+    right = min(w0, max(left + 1, round((x + cw) * w0)))
+    bottom = min(h0, max(top + 1, round((y + ch) * h0)))
+    if (left, top, right, bottom) != (0, 0, w0, h0):
+        img = img.crop((left, top, right, bottom))
+    transpose = _CW_ROTATE.get(int(crop.get("rotate", 0) or 0) % 360)
+    if transpose is not None:
+        img = img.transpose(transpose)
+    return img
+
+
 def fit_to_panel(
     img: Image.Image,
     *,
@@ -581,6 +662,7 @@ def fit_to_panel(
     target_h: int,
     scale: str = "fit",
     bg: str = "white",
+    crop: SourceCrop | None = None,
 ) -> Image.Image:
     """Resize ``img`` to (target_w, target_h) using the requested scale mode.
 
@@ -593,8 +675,12 @@ def fit_to_panel(
                     copy of the image so the letterbox area is filled.
 
     Used by the Send page when the uploaded image isn't already panel
-    sized. Dashboard renders skip this, the composer emits panel-exact PNGs."""
-    src = img.convert("RGB")
+    sized. Dashboard renders skip this, the composer emits panel-exact PNGs.
+
+    ``crop`` (optional) is a normalized source crop applied *before* the fit, so
+    a chosen subject survives the panel fit rather than being centre-cropped by
+    ``fill``. See :func:`apply_source_crop`."""
+    src = apply_source_crop(img.convert("RGB"), crop)
     if src.size == (target_w, target_h) and scale != "blur":
         return src
     if scale == "stretch":

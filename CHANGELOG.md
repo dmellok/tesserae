@@ -8,6 +8,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Panel view: preview a dashboard as the e-ink panel will actually paint it.** The
+  dashboard editor's live preview gains a Fit view / Panel view toggle. Panel view
+  quantises and dithers the render to the target panel's colour palette, so you see the
+  exact per-pixel output (dithering, palette reduction) before pushing, per preview group's
+  gamut. Also adds a shared source-crop primitive (a normalized crop + rotate applied before
+  the panel fit) that the Send and Companion image paths will build framing on.
+
 - **Companion dashboard listings now include their Phosphor icon name.** The
   optional `icon` field uses the same bare identifier as the web dashboard
   list, so companion clients can render a consistent icon and safely fall back
