@@ -542,3 +542,20 @@ def test_fit_to_panel_applies_crop_before_fill() -> None:
     )
     assert out.size == (60, 60)
     assert out.getpixel((30, 30)) == (0, 0, 255)
+
+
+def test_palette_for_gamut_maps_colour_and_grayscale() -> None:
+    from app.quantizer import (
+        GRAY_4_PALETTE,
+        GRAY_16_PALETTE,
+        INKY_7COLOUR_PALETTE,
+        palette_for_gamut,
+    )
+
+    assert palette_for_gamut("waveshare_e6") == WAVESHARE_E6_PALETTE
+    assert palette_for_gamut("spectra_6") == WAVESHARE_E6_PALETTE  # chemistry alias
+    assert palette_for_gamut("acep_7colour") == INKY_7COLOUR_PALETTE  # alias
+    assert palette_for_gamut("gray_4") == GRAY_4_PALETTE
+    assert palette_for_gamut("gray_16") == GRAY_16_PALETTE
+    assert palette_for_gamut("mono") == ((0, 0, 0), (255, 255, 255))
+    assert palette_for_gamut("nonsense") == WAVESHARE_E6_PALETTE  # safe fallback

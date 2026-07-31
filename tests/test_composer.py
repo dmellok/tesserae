@@ -651,3 +651,56 @@ def test_resolved_options_migrates_legacy_flat_lat_lon(app: Flask) -> None:
         # Legacy fields have no ``name`` so no auto-label; ``label`` stays
         # unset and the cell can render "no label" cleanly.
         assert not out.get("label")
+
+
+def test_compose_panel_preview_quantises_existing_composition(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Panel view (#45) serves a quantised+dithered PNG built from the cached
+    composition, without a re-render, and caches the quantised result keyed by
+    gamut + dither."""
+    import io
+
+    from PIL import Image
+
+    from app.state.page_store import Page
+
+    page = Page(id="pg", name="Grid", layout_kind="grid")
+    app.config["PAGE_STORE"].save(page)
+    width, height = composer.preview_dims(
+        page, app.config.get("DEVICE_REGISTRY"), app.config["SETTINGS_STORE"]
+    )
+    token = composer.page_preview_token(page, (width, height))
+    cache_dir = app.config["DATA_ROOT"] / "core" / "previews"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    buf = io.BytesIO()
+    Image.new("RGB", (24, 18), (123, 200, 60)).save(buf, "PNG")
+    (cache_dir / f"pg__{token}.png").write_bytes(buf.getvalue())
+
+    def _boom(req: object, pool: object = None) -> bytes:
+        raise AssertionError("should not render when the composition is cached")
+
+    monkeypatch.setattr("app.renderer.render_to_png", _boom)
+    resp = app.test_client().get("/compose/pg/panel.png?dither=none")
+    assert resp.status_code == 200 and resp.mimetype == "image/png"
+    # A quantised cache file was written (keyed by gamut + dither).
+    assert list(cache_dir.glob("pg__*__none.png"))
+    out = Image.open(io.BytesIO(resp.data))
+    assert out.size == (24, 18)
+
+
+def test_compose_panel_preview_202_when_composition_missing(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With no cached composition yet, Panel view enqueues the render and 202s,
+    same fallback as preview.png."""
+    from app.state.page_store import Page
+
+    monkeypatch.setattr("app.preview_cache.submit", lambda **kw: None)
+    app.config["PAGE_STORE"].save(Page(id="pg2", name="Grid", layout_kind="grid"))
+    resp = app.test_client().get("/compose/pg2/panel.png")
+    assert resp.status_code == 202
+
+
+def test_compose_panel_preview_unknown_page_404(client: FlaskClient) -> None:
+    assert client.get("/compose/nope/panel.png").status_code == 404

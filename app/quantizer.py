@@ -349,6 +349,26 @@ _GAMUT_TABLE: dict[str, tuple[tuple[tuple[int, int, int], ...], tuple[int, ...]]
 # panels and the XIAO 7.5" BWR class.
 _NATIVE_2BPP_GAMUTS: frozenset[str] = frozenset({"bwry_4", "bwr_3"})
 
+_MONO_PALETTE: tuple[tuple[int, int, int], ...] = ((0, 0, 0), (255, 255, 255))
+
+
+def palette_for_gamut(gamut: str) -> tuple[tuple[int, int, int], ...]:
+    """The viewable RGB palette a panel of ``gamut`` reproduces, for quantise
+    previews (Panel view). Colour gamuts use the .bin packer's palette; the
+    grayscale ramps and mono map to their grey levels; anything unrecognised
+    canonicalises to the 6-colour Spectra palette so a preview never fails."""
+    g = canonicalise_gamut(gamut)
+    table_entry = _GAMUT_TABLE.get(g)
+    if table_entry is not None:
+        return table_entry[0]
+    if g == "gray_16":
+        return GRAY_16_PALETTE
+    if g == "gray_4":
+        return GRAY_4_PALETTE
+    if g == "mono":
+        return _MONO_PALETTE
+    return WAVESHARE_E6_PALETTE
+
 
 def _apply_exposure(img: Image.Image, exposure: int) -> Image.Image:
     """Linear brightness shift. ``exposure`` in -100..+100 maps to a

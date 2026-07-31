@@ -1405,6 +1405,84 @@ def compose_preview(page_id: str) -> Response:
     return resp
 
 
+@bp.get("/compose/<page_id>/panel.png")
+def compose_panel_preview(page_id: str) -> Response:
+    """Panel view (#45): the dashboard preview quantised and dithered to a target
+    device's palette, so the editor can show the exact per-pixel output the e-ink
+    panel paints rather than the full-colour composition.
+
+    Reuses the same rendered composition as ``preview.png`` (returning ``202``
+    while that render is in flight), then runs it through the quantiser.
+    ``?device=<id>`` selects the panel's gamut (falls back to the page's first
+    bound device, then 6-colour Spectra); ``?dither=<mode>`` overrides the dither
+    (default floyd-steinberg). The quantised result is cached per
+    (token, gamut, dither)."""
+    from typing import cast, get_args
+
+    from app.panel import device_panel
+    from app.quantizer import DitherMode, canonicalise_gamut, palette_for_gamut, quantize_to_png
+
+    preview_pages: dict[str, Page] = current_app.config.get("PREVIEW_CACHE", {}) or {}
+    page = preview_pages.get(page_id) or current_app.config["PAGE_STORE"].get(page_id)
+    if page is None:
+        abort(404)
+    devices = current_app.config.get("DEVICE_REGISTRY")
+    settings_store = current_app.config["SETTINGS_STORE"]
+    width, height = preview_dims(page, devices, settings_store)
+    token = page_preview_token(page, (width, height))
+
+    gamut = "waveshare_e6"
+    device_id = (request.args.get("device") or "").strip()
+    if not device_id and page.device_ids:
+        device_id = page.device_ids[0]
+    if device_id and devices is not None:
+        dev = devices.get(device_id)
+        panel = device_panel(dev) if dev is not None else None
+        if panel is not None and getattr(panel, "gamut", None):
+            gamut = str(panel.gamut)
+    gamut = canonicalise_gamut(gamut)
+
+    dither = (request.args.get("dither") or "floyd-steinberg").strip()
+    if dither not in get_args(DitherMode):
+        dither = "floyd-steinberg"
+
+    cache_dir = Path(current_app.config["DATA_ROOT"]) / "core" / "previews"
+    comp_path = cache_dir / f"{page_id}__{token}.png"
+    if not comp_path.exists():
+        from app import preview_cache
+
+        preview_cache.submit(
+            key=f"{page_id}__{token}",
+            base_url=request.host_url.rstrip("/"),
+            page_id=page_id,
+            width=width,
+            height=height,
+            cache_path=comp_path,
+            pool=current_app.config.get("BROWSER_POOL"),
+        )
+        resp = current_app.response_class(status=202)
+        resp.headers["Cache-Control"] = "no-store"
+        return resp
+
+    panel_path = cache_dir / f"{page_id}__{token}__{gamut}__{dither}.png"
+    if not panel_path.exists():
+        quantised = quantize_to_png(
+            comp_path.read_bytes(),
+            dither=cast(DitherMode, dither),
+            palette=palette_for_gamut(gamut),
+        )
+        panel_path.write_bytes(quantised)
+
+    etag = f"{token}-{gamut}-{dither}"
+    if request.if_none_match and etag in request.if_none_match:
+        resp = current_app.response_class(status=304)
+    else:
+        resp = current_app.response_class(panel_path.read_bytes(), mimetype="image/png")
+    resp.set_etag(etag)
+    resp.headers["Cache-Control"] = "private, max-age=86400"
+    return resp
+
+
 @bp.get("/compose/canvas/<canvas_id>")
 def compose_canvas(canvas_id: str) -> str:
     """Render target for a Panels canvas document (issue #60).
