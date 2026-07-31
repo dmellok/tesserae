@@ -23,7 +23,7 @@ import urllib.error
 import urllib.request
 from typing import Any
 
-__version__ = "0.11.0"
+__version__ = "0.11.1"
 
 _BASE = os.environ.get("TESSERAE_URL", "http://127.0.0.1:8765").rstrip("/")
 _TOKEN = os.environ.get("TESSERAE_MCP_TOKEN", "").strip()
@@ -54,6 +54,7 @@ plus optional "opacity" (0-100) and "rotate" (degrees). By "kind":
 - ellipse: {"kind":"ellipse","color":"...","fill":true,"stroke":<px>}
 - line:    {"kind":"line","color":"...","stroke":<px>}
 - icon:    {"kind":"icon","icon":"<name or ph-name>","color":"...","weight":"thin|light|regular|bold|fill|duotone"}
+           1500+ Phosphor names; don't guess, search them with list_icons(q).
 - data:    {"kind":"data","source":"<widget key>","options":{...},"field":"<path>",
             "display":"text|number|line|bar|sparkline","format":"","unit":"","precision":0,
             "label":"","color":"...","size":<px, 0=auto>,"align":"..."}
@@ -82,6 +83,7 @@ plus optional "opacity" (0-100) and "rotate" (degrees). By "kind":
              - Chart.js -> window.Chart. Charts to a <canvas>. Animations are already off. On e-ink there's
                no hover, so bake values in: also reference ChartDataLabels (chartjs-plugin-datalabels,
                auto-registered) and add datalabels to a dataset/options to print values on bars/points.
+               A Sankey chart type (chartjs-chart-sankey) is registered too (type:'sankey') for flow diagrams.
              - canvas-gauges -> RadialGauge / LinearGauge. Dials + meters (temperature, fuel-style).
              - dayjs -> dayjs(...). Date/time parse + format; utc + timezone plugins are pre-extended, so
                dayjs.utc(...) and dayjs(...).tz("Europe/Berlin") work. Use for formatting ctx.data times.
@@ -94,7 +96,7 @@ plus optional "opacity" (0-100) and "rotate" (degrees). By "kind":
              - SVG -> SVG(). @svgdotjs/svg.js for programmatic vector graphics (rings, arcs, badges).
              - Phosphor icons, all six weights: <i class="ph-bold ph-heart"></i> (also ph (regular),
                ph-thin, ph-light, ph-fill, ph-duotone). Each weight's font is inlined only when its
-               class appears in your code.
+               class appears in your code. Search the 1500+ valid names with list_icons(q) rather than guessing.
              - Fonts: any bundled font (the names in appearance.fonts from list_widgets) works in the
                sandbox by family name, e.g. `font-family: "Fira Code"` or `"Press Start 2P"`. Only
                fonts your code actually names are inlined, so there's a broad programming + pixel set
@@ -463,9 +465,22 @@ def build_server() -> Any:
     from mcp.server.fastmcp import FastMCP, Image
 
     def list_widgets() -> Any:
-        """List every widget that can be placed on a canvas (with its fragments) and
-        the available theme/style/font appearance options."""
+        """List every widget that can be placed on a canvas (with its fragments), the
+        available theme/style/font appearance options, the vendored code-element
+        libraries (Chart.js, canvas-gauges, dayjs, qrcode, marked, chroma, SVG.js,
+        Phosphor), and an icon-set descriptor. Search icon names with list_icons()."""
         return _json("GET", "/catalog")
+
+    def list_icons(q: str = "", limit: int = 100) -> Any:
+        """Search the vendored Phosphor icon set (all six weights) by case-insensitive
+        substring, so you pick a real slug instead of guessing. Use a returned slug as
+        an icon element's "icon" value, or in code-element markup as ph-<slug> (weight
+        via ph / ph-bold / ph-thin / ph-light / ph-fill / ph-duotone). Empty "q"
+        returns a capped sample plus the total; "limit" caps results (max 500)."""
+        path = f"/icons?limit={limit}"
+        if q:
+            path += f"&q={q}"
+        return _json("GET", path)
 
     def list_services() -> Any:
         """List SERVICE data sources (kind "service") -- non-placeable plugins that
@@ -828,6 +843,7 @@ def build_server() -> Any:
     mcp = FastMCP("tesserae", instructions=instructions)
     for fn in (
         list_widgets,
+        list_icons,
         list_services,
         get_widget_options,
         get_widget_choices,
