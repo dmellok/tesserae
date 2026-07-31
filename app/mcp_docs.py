@@ -280,6 +280,13 @@ LOOP: probe -> place -> render_preview -> render_report -> adjust -> (push).
 - render_preview(page_id) = the image; render_report(page_id) = machine-readable
   (resolved box, rendered text, overflow_x/y, data_source, colours). Use render_report to
   catch clipping and confirm live data without eyeballing pixels.
+- Render looks wrong and the cause isn't visible? render_report(page_id, debug=True) BEFORE
+  pixel-hunting: its "diagnostics" section names sandbox script errors (tagged [code-el <id>]),
+  failed/404'd assets with URLs (fonts included), per-font-face load status, authored CSS the
+  browser silently dropped (selector + declaration + reason), which vendored libs each code
+  element inlined, and what gated the screenshot (settle phases + ms). One call, no bisecting.
+- Debugging data staleness? Pass fresh=True to render_preview / render_report to bypass the
+  last-good fallback and widget caches, so you never chase a stale cached frame.
 - If a just-pushed widget shows "Failed to fetch dynamically imported module .../client.js",
   the widget isn't loaded yet (not a canvas problem): it adds an admin blueprint() (a
   restart is pending, poll /healthz then retry), the reload hasn't completed, or client.js

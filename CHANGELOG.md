@@ -8,6 +8,22 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Render diagnostics: `render_report` gains `debug=1`, so silent render failures name
+  themselves.** The diagnostics section reports, per render: console errors/warnings from every
+  frame (a throwing code-element script surfaces tagged `[code-el <id>]`, including uncaught
+  async errors and CSP-blocked loads inside the sandbox), uncaught page errors, failed and
+  4xx/5xx network requests with URLs, per-font-face load status
+  (`loaded | pending-at-capture | failed | never-requested`, with the `@font-face` src), authored
+  element CSS the browser silently dropped (selector + declaration + reason, via a re-parse
+  diff), which vendored bundles each code element inlined, and the settle record that gated the
+  screenshot (goto / compose-signal / image-wait / font-wait outcome + elapsed ms). One
+  `render_report(debug=True)` call now names problems that previously took pixel-diffing dozens
+  of renders. `render_preview` and `render_report` also accept `fresh=1` to bypass the last-good
+  fallback and widget data caches (`?fresh=1` now works on `/compose/<id>` itself), so a stale
+  cached result can't derail an investigation. A live-Chromium regression suite pins the
+  acceptance case (throwing script + 404 font + dropped CSS rule, one call names all three) and
+  that identical page content yields identical font/asset outcomes across runs.
+
 - **The MCP surfaces the icon set and code-element toolkit to agents.** `list_widgets()` now
   returns the vendored code-element libraries (Chart.js incl. the datalabels and Sankey plugins,
   canvas-gauges, Day.js, qrcode, marked, chroma, SVG.js, Phosphor) and an icon descriptor, and a

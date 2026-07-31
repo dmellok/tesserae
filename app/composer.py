@@ -889,7 +889,7 @@ def _crop_layout(e: Any) -> dict[str, float] | None:
 
 
 def _build_canvas_els(
-    els: list[Any], cw: int, ch: int, *, target_device_id: str = ""
+    els: list[Any], cw: int, ch: int, *, target_device_id: str = "", fresh: bool = False
 ) -> list[dict[str, Any]]:
     """Shape a canvas's elements for ``panels_compose.html``: decorations pass
     their raw props (drawn client-side), widget elements get resolved options +
@@ -899,7 +899,10 @@ def _build_canvas_els(
     (``tesserae_status`` battery / signal) reflect the panel receiving this
     render rather than a min-across-all-devices aggregate. The grid path carries
     this through ``page_dict["target_device_id"]``; canvas needs it passed in
-    because :func:`_render_canvas` fetches server-side here."""
+    because :func:`_render_canvas` fetches server-side here.
+
+    ``fresh`` (from ``?fresh=1``) skips the last-good fallback and sets
+    ``ctx["fresh"]`` on each widget fetch, mirroring the grid path."""
     from app.widget_samples import get_sample
 
     # Dedupe fetches across elements that resolve to the same widget +
@@ -924,6 +927,7 @@ def _build_canvas_els(
                 preview=False,
                 cell_w=cell_w,
                 cell_h=cell_h,
+                fresh=fresh,
                 target_device_id=target_device_id,
             )
         except Exception:
@@ -1119,13 +1123,21 @@ def _build_canvas_els(
     return els_out
 
 
-def _render_canvas(layout: Any, *, target_w: int, target_h: int, target_device_id: str = "") -> str:
+def _render_canvas(
+    layout: Any,
+    *,
+    target_w: int,
+    target_h: int,
+    target_device_id: str = "",
+    fresh: bool = False,
+) -> str:
     """Render a canvas layout (authored at ``layout.w x layout.h``) scaled to fit
     a ``target_w x target_h`` panel, aspect preserved and centred. When the
     authored size already matches the target the scale is 1 (no transform).
 
     ``target_device_id`` names which bound device this render is for, so
-    per-device widgets (``tesserae_status``) resolve to that device's telemetry."""
+    per-device widgets (``tesserae_status``) resolve to that device's telemetry.
+    ``fresh`` bypasses widget-data caches (see :func:`_build_canvas_els`)."""
     cw = max(1, int(layout.w))
     ch = max(1, int(layout.h))
     scale = min(target_w / cw, target_h / ch)
@@ -1137,7 +1149,7 @@ def _render_canvas(layout: Any, *, target_w: int, target_h: int, target_device_i
     font = _resolve_font(layout.font or None, registry)
     return render_template(
         "panels_compose.html",
-        els=_build_canvas_els(layout.els, cw, ch, target_device_id=target_device_id),
+        els=_build_canvas_els(layout.els, cw, ch, target_device_id=target_device_id, fresh=fresh),
         cw=cw,
         ch=ch,
         w=target_w,
@@ -1230,6 +1242,10 @@ def compose(page_id: str) -> str:
         abort(404)
     for_push = request.args.get("for_push") == "1"
     preview_mode = request.args.get("preview") == "1" and not for_push
+    # ``?fresh=1`` (MCP render_preview / render_report debug loop): bypass the
+    # last-good fallback and set ``ctx["fresh"]`` on widget fetches, so a
+    # render mid-investigation can't be poisoned by a stale cached result.
+    fresh = request.args.get("fresh") in ("1", "true", "True")
     # Inject the resolved panel before hydrate, _hydrate_page expects
     # page_dict["panel"] to always be present. An explicit ?w=&h= override
     # wins (the editor's per-aspect previews and the per-panel push render
@@ -1274,6 +1290,7 @@ def compose(page_id: str) -> str:
             target_w=target_w,
             target_h=target_h,
             target_device_id=target_device_id,
+            fresh=fresh,
         )
 
     page_dict["panel"] = {"w": panel_w, "h": panel_h}
@@ -1281,7 +1298,7 @@ def compose(page_id: str) -> str:
         page_dict["target_device_id"] = target_device_id
     return render_template(
         "compose.html",
-        page=_hydrate_page(page_dict, preview=not for_push),
+        page=_hydrate_page(page_dict, preview=not for_push, fresh=fresh),
         for_push=for_push,
         preview_mode=preview_mode,
     )

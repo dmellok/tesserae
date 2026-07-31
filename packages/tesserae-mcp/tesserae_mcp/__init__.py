@@ -23,7 +23,7 @@ import urllib.error
 import urllib.request
 from typing import Any
 
-__version__ = "0.11.1"
+__version__ = "0.12.0"
 
 _BASE = os.environ.get("TESSERAE_URL", "http://127.0.0.1:8765").rstrip("/")
 _TOKEN = os.environ.get("TESSERAE_MCP_TOKEN", "").strip()
@@ -363,6 +363,13 @@ LOOP: probe -> place -> render_preview -> render_report -> adjust -> (push).
 - render_preview(page_id) = the image; render_report(page_id) = machine-readable
   (resolved box, rendered text, overflow_x/y, data_source, colours). Use render_report to
   catch clipping and confirm live data without eyeballing pixels.
+- Render looks wrong and the cause isn't visible? render_report(page_id, debug=True) BEFORE
+  pixel-hunting: its "diagnostics" section names sandbox script errors (tagged [code-el <id>]),
+  failed/404'd assets with URLs (fonts included), per-font-face load status, authored CSS the
+  browser silently dropped (selector + declaration + reason), which vendored libs each code
+  element inlined, and what gated the screenshot (settle phases + ms). One call, no bisecting.
+- Debugging data staleness? Pass fresh=True to render_preview / render_report to bypass the
+  last-good fallback and widget caches, so you never chase a stale cached frame.
 - If a just-pushed widget shows "Failed to fetch dynamically imported module .../client.js",
   the widget isn't loaded yet (not a canvas problem): it adds an admin blueprint() (a
   restart is pending, poll /healthz then retry), the reload hasn't completed, or client.js
@@ -699,7 +706,9 @@ def build_server() -> Any:
         the text is within max_width. Font names come from list_widgets().appearance."""
         return _json("POST", "/measure-text", {"items": items})
 
-    def render_report(page_id: str, view: str = "", fields: str = "") -> Any:
+    def render_report(
+        page_id: str, view: str = "", fields: str = "", debug: bool = False, fresh: bool = False
+    ) -> Any:
         """Read back what a canvas actually rendered, as JSON (a companion to
         render_preview's image). Per element: the resolved box, the text that
         rendered, overflow/clip flags (overflow_x when content is wider than its box),
@@ -717,12 +726,30 @@ def build_server() -> Any:
         On a large board the full report can be big. Pass view="touch" for just the
         touch-wiring sections (tap_regions / tap_invalid / tap_dangling), or
         fields="tap_invalid,tap_dangling" (any of board / elements / tap_regions /
-        tap_invalid / tap_dangling) to trim it. id + rev always ride along."""
+        tap_invalid / tap_dangling) to trim it. id + rev always ride along.
+
+        debug=True adds a "diagnostics" section -- reach for it whenever a render
+        looks wrong and the cause isn't visible: "console" (error/warn output from
+        every frame; a throwing code-element script lands here tagged
+        [code-el <id>]), "page_errors" (uncaught exceptions), "network" (failed and
+        4xx/5xx requests -- a 404 font names its URL), "settle" (what gated the
+        capture: goto / compose-signal / image-wait / font-wait outcome + ms),
+        "fonts" (every face: loaded | pending-at-capture | failed | never-requested,
+        with src), "css" (authored element CSS the browser silently dropped:
+        selector + declaration + reason), "libraries" (which vendored bundles each
+        code element inlined). Diagnose from this instead of pixel-hunting.
+
+        fresh=True re-fetches widget data (bypasses the last-good fallback and
+        widget caches), so a stale cached result can't mislead a debugging pass."""
         params = []
         if view:
             params.append(f"view={view}")
         if fields:
             params.append(f"fields={fields}")
+        if debug:
+            params.append("debug=1")
+        if fresh:
+            params.append("fresh=1")
         suffix = ("?" + "&".join(params)) if params else ""
         return _json("GET", f"/pages/{page_id}/render_report{suffix}")
 
@@ -736,12 +763,15 @@ def build_server() -> Any:
         Element-level actions are NOT part of get_widget_options (that's cell data)."""
         return _json("GET", "/actions/describe")
 
-    def render_preview(page_id: str) -> Any:
+    def render_preview(page_id: str, fresh: bool = False) -> Any:
         """Render the canvas to a PNG at its authored size and return the image, so you
         can visually check the layout and iterate. This is your feedback loop: place →
         render_preview → adjust → set_canvas → render_preview again. For a
-        machine-readable check (values, overflow, colours), use render_report()."""
-        status, raw, ctype = _request("GET", f"/pages/{page_id}/preview.png")
+        machine-readable check (values, overflow, colours), use render_report().
+        fresh=True re-fetches widget data (bypasses the last-good fallback and widget
+        caches) -- use it while debugging so a stale cached result can't mislead you."""
+        suffix = "?fresh=1" if fresh else ""
+        status, raw, ctype = _request("GET", f"/pages/{page_id}/preview.png{suffix}")
         if status >= 400 or not ctype.startswith("image/"):
             raise RuntimeError(
                 f"preview failed (HTTP {status}): {raw.decode('utf-8', 'replace')[:300]}"
