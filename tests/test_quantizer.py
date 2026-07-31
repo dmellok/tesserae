@@ -466,3 +466,79 @@ def test_fit_to_panel_fill_crops() -> None:
     img = Image.new("RGB", (200, 100), (0, 0, 0))
     out = fit_to_panel(img, target_w=100, target_h=80, scale="fill")
     assert out.size == (100, 80)
+
+
+# -- source crop primitive (#45) ----------------------------------------
+
+
+def _swatch(w: int, h: int, left_rgb: tuple, right_rgb: tuple) -> Image.Image:
+    """An image whose left and right halves are distinct solid colours."""
+    img = Image.new("RGB", (w, h), left_rgb)
+    img.paste(Image.new("RGB", (w - w // 2, h), right_rgb), (w // 2, 0))
+    return img
+
+
+def test_apply_source_crop_none_and_full_are_identity() -> None:
+    from PIL import Image
+
+    from app.quantizer import apply_source_crop
+
+    img = Image.new("RGB", (40, 30), (10, 20, 30))
+    assert apply_source_crop(img, None) is img
+    same = apply_source_crop(img, {"x": 0.0, "y": 0.0, "w": 1.0, "h": 1.0})
+    assert same.size == (40, 30)
+
+
+def test_apply_source_crop_selects_the_rect() -> None:
+    from app.quantizer import apply_source_crop
+
+    img = _swatch(100, 100, (255, 0, 0), (0, 0, 255))  # left red, right blue
+    # Right half only -> all blue, half width.
+    right = apply_source_crop(img, {"x": 0.5, "y": 0.0, "w": 0.5, "h": 1.0})
+    assert right.size == (50, 100)
+    assert right.getpixel((0, 0)) == (0, 0, 255)
+    assert right.getpixel((49, 99)) == (0, 0, 255)
+
+
+def test_apply_source_crop_clamps_out_of_range_to_non_empty() -> None:
+    from app.quantizer import apply_source_crop
+
+    img = _swatch(80, 60, (0, 0, 0), (255, 255, 255))
+    # Garbage / out-of-range rect must clamp, never produce an empty crop.
+    for crop in (
+        {"x": -1.0, "y": -1.0, "w": 5.0, "h": 5.0},
+        {"x": 0.9, "y": 0.9, "w": 0.0, "h": 0.0},
+        {"x": "nonsense", "y": None, "w": 2.0, "h": 2.0},
+    ):
+        out = apply_source_crop(img, crop)  # type: ignore[arg-type]
+        assert out.width >= 1 and out.height >= 1
+
+
+def test_apply_source_crop_rotate_transposes_dims() -> None:
+    from app.quantizer import apply_source_crop
+
+    img = _swatch(100, 40, (255, 0, 0), (0, 0, 255))
+    r90 = apply_source_crop(img, {"x": 0.0, "y": 0.0, "w": 1.0, "h": 1.0, "rotate": 90})
+    assert r90.size == (40, 100)  # quarter turn swaps w/h
+    r180 = apply_source_crop(img, {"rotate": 180})
+    assert r180.size == (100, 40)
+    # 180 flips left/right: the top-left pixel was red, now reads blue.
+    assert r180.getpixel((0, 0)) == (0, 0, 255)
+
+
+def test_fit_to_panel_applies_crop_before_fill() -> None:
+    from app.quantizer import fit_to_panel
+
+    # Left red, right blue. Crop to the right half, then fill a square panel:
+    # the panel should be entirely blue (the chosen subject survives the fit),
+    # whereas an uncropped fill would centre-crop and keep red.
+    img = _swatch(200, 100, (255, 0, 0), (0, 0, 255))
+    out = fit_to_panel(
+        img,
+        target_w=60,
+        target_h=60,
+        scale="fill",
+        crop={"x": 0.5, "y": 0.0, "w": 0.5, "h": 1.0},
+    )
+    assert out.size == (60, 60)
+    assert out.getpixel((30, 30)) == (0, 0, 255)
