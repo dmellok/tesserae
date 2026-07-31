@@ -37,7 +37,8 @@ plus optional "opacity" (0-100) and "rotate" (degrees). By "kind":
 - ellipse: {"kind":"ellipse","color":"...","fill":true,"stroke":<px>}
 - line:    {"kind":"line","color":"...","stroke":<px>}
 - icon:    {"kind":"icon","icon":"<name or ph-name>","color":"...","weight":"thin|light|regular|bold|fill|duotone"}
-           1500+ Phosphor names; don't guess, search them with GET /api/mcp/icons?q=<term>.
+           1500+ Phosphor names; don't guess, search them with GET /api/mcp/icons?q=<term>
+           (a wrong name renders a blank box, no error; render_report().icon_invalid flags it).
 - data:    {"kind":"data","source":"<widget key>","options":{...},"field":"<path>",
             "display":"text|number|line|bar|sparkline","format":"","unit":"","precision":0,
             "label":"","color":"...","size":<px, 0=auto>,"align":"..."}
@@ -81,7 +82,10 @@ plus optional "opacity" (0-100) and "rotate" (degrees). By "kind":
              - Phosphor icons, all six weights: <i class="ph-bold ph-heart"></i> (also ph (regular),
                ph-thin, ph-light, ph-fill, ph-duotone). Each weight's font is inlined only when its
                class appears in your code. Search the 1500+ valid names with GET /api/mcp/icons?q=<term>
-               rather than guessing slugs.
+               rather than guessing slugs. Two traps: regular weight needs BOTH classes
+               (class="ph ph-heart" -- ph-heart alone renders nothing), and a wrong slug renders a
+               BLANK BOX with no error; render_report().icon_invalid names bad icon refs, check it
+               whenever you placed icons.
              - Fonts: any bundled font (the names in appearance.fonts from list_widgets) works in the
                sandbox by family name, e.g. `font-family: "Fira Code"` or `"Press Start 2P"`. Only
                fonts your code actually names are inlined, so there's a broad programming + pixel set

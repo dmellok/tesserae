@@ -8,6 +8,17 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Icon references that resolve to no glyph are named instead of rendering a blank box.**
+  `render_report` now always includes `icon_invalid` (mirroring `tap_invalid`): unknown slugs or
+  weights on `icon` elements, bad `icon`-transform bind-table values, and a heuristic scan of
+  code/html/svg markup for `ph-<name>` classes that aren't real Phosphor icons, each with the
+  element id and reason. The `GET /api/mcp/icons` search normalises its query to slug form
+  (`ph-` prefix stripped, underscores as dashes), so `ph-heart` and `calendar_heart` now match
+  instead of returning zero results. The canvas renderer falls back to bold for an unknown icon
+  weight rather than building a class that matches no stylesheet. Agent docs (server and bridge)
+  spell out the two markup traps: regular weight needs both classes (`ph ph-heart`), and a wrong
+  slug fails silently.
+
 - **Render diagnostics: `render_report` gains `debug=1`, so silent render failures name
   themselves.** The diagnostics section reports, per render: console errors/warnings from every
   frame (a throwing code-element script surfaces tagged `[code-el <id>]`, including uncaught

@@ -70,7 +70,10 @@
     if (kind === "icon") {
       var i = document.createElement("i");
       // Phosphor weight class: regular is the bare "ph", others are "ph-<weight>".
+      // An unknown weight would build a class matching no stylesheet (blank
+      // box), so fall back to bold; render_report's icon_invalid names it.
       var weight = el.weight || "bold";
+      if (!/^(thin|light|regular|bold|fill|duotone)$/.test(weight)) weight = "bold";
       var wcls = weight === "regular" ? "ph" : "ph-" + weight;
       // Accept both "star" and "ph-star" (widget icon fields use the ph- prefix).
       var iname = String(el.icon || "star").replace(/^ph-/, "");

@@ -305,6 +305,95 @@ def test_preview_fresh_bypasses_caches(app: Flask, monkeypatch: pytest.MonkeyPat
     assert "fresh=1" in urls[1]
 
 
+def test_icons_search_normalises_query(app: Flask) -> None:
+    """A prefixed or underscored query still finds slugs: q=ph-heart and
+    q=calendar_heart match, since the search normalises to bare slug form."""
+    _enable(app)
+    client = app.test_client()
+    plain = client.get("/api/mcp/icons?q=heart").get_json()
+    assert plain["matched"] > 0 and "heart" in plain["icons"]
+    prefixed = client.get("/api/mcp/icons?q=ph-heart").get_json()
+    assert prefixed["icons"] == plain["icons"]
+    underscored = client.get("/api/mcp/icons?q=calendar_heart").get_json()
+    assert "calendar-heart" in underscored["icons"]
+
+
+def test_render_report_flags_invalid_icons(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    """icon_invalid names every icon reference that would render a blank box:
+    an unknown icon-element slug, an unknown weight, a bad bind-table value,
+    and a ph-<name> markup class that isn't a real Phosphor icon. Valid refs
+    (including the ph-/underscore spelling variants) stay unflagged."""
+    _enable(app)
+    monkeypatch.setattr(
+        "app.renderer.inspect_composed", lambda req, pool=None: {"board": {}, "elements": []}
+    )
+    client = app.test_client()
+    pid = _create_page(client)
+    body = {
+        "w": 800,
+        "h": 480,
+        "els": [
+            {"id": "ok1", "kind": "icon", "icon": "heart", "x": 0, "y": 0, "w": 40, "h": 40},
+            {"id": "ok2", "kind": "icon", "icon": "ph-heart", "x": 40, "y": 0, "w": 40, "h": 40},
+            {
+                "id": "bad_slug",
+                "kind": "icon",
+                "icon": "temperature",
+                "x": 80,
+                "y": 0,
+                "w": 40,
+                "h": 40,
+            },
+            {
+                "id": "bad_weight",
+                "kind": "icon",
+                "icon": "heart",
+                "weight": "solid",
+                "x": 120,
+                "y": 0,
+                "w": 40,
+                "h": 40,
+            },
+            {
+                "id": "bad_bind",
+                "kind": "rect",
+                "x": 160,
+                "y": 0,
+                "w": 40,
+                "h": 40,
+                "bind": [
+                    {
+                        "source": "weather_now",
+                        "field": "code",
+                        "transform": "icon",
+                        "params": {"table": {"0": "ph-sun"}, "default": "ph-not-an-icon"},
+                    }
+                ],
+            },
+            {
+                "id": "bad_markup",
+                "kind": "code",
+                "x": 200,
+                "y": 0,
+                "w": 100,
+                "h": 100,
+                "html": "<i class='ph-bold ph-heart'></i><i class='ph-bold ph-fake-glyph'></i>",
+                "js": "",
+            },
+        ],
+    }
+    assert client.put(f"/api/mcp/pages/{pid}/canvas", json=body).status_code == 200
+    report = client.get(f"/api/mcp/pages/{pid}/render_report").get_json()
+    bad = {(e["el"], e.get("icon") or e.get("weight")) for e in report["icon_invalid"]}
+    assert ("bad_slug", "temperature") in bad
+    assert ("bad_weight", "solid") in bad
+    assert ("bad_bind", "ph-not-an-icon") in bad
+    assert ("bad_markup", "ph-fake-glyph") in bad
+    flagged_els = {e["el"] for e in report["icon_invalid"]}
+    assert "ok1" not in flagged_els and "ok2" not in flagged_els
+    assert not any(e.get("icon") in ("ph-heart", "heart", "ph-sun") for e in report["icon_invalid"])
+
+
 def test_services_listed_and_excluded_from_catalog(app: Flask) -> None:
     _enable(app)
     client = app.test_client()

@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import secrets
 import uuid
 from pathlib import Path
@@ -172,6 +173,94 @@ def _phosphor_icons() -> list[str]:
     return _ICON_CACHE
 
 
+def _norm_icon_slug(name: Any) -> str:
+    """Normalise an icon reference to the manifest's bare slug form: lowercase,
+    the ``ph-`` prefix stripped, underscores as dashes. The surfaces disagree
+    (icon elements accept both ``heart`` and ``ph-heart``; bind tables and code
+    markup use ``ph-heart``), so validation and search meet them all halfway."""
+    return str(name).strip().lower().removeprefix("ph-").replace("_", "-")
+
+
+# ``ph-<slug>`` tokens in authored markup, excluding tokens preceded by a word
+# char or "-" (so ``--ph-color`` custom properties and ``graph-line`` class
+# names don't false-match).
+_PH_TOKEN_RE = re.compile(r"(?<![\w-])ph-([a-z0-9]+(?:-[a-z0-9]+)*)\b")
+
+
+def _invalid_icons(layout: CanvasLayout) -> list[dict[str, Any]]:
+    """Icon references on the canvas that resolve to NO glyph, so a blank box
+    is named instead of silently rendered. Checked per element: an ``icon``
+    kind's slug and weight, every ``icon``-transform bind table value, and a
+    heuristic scan of code/html/svg markup for ``ph-<slug>`` classes that
+    aren't real Phosphor names (weight classes excluded). Purely server-side
+    against the vendored manifest; an empty manifest disables the check
+    rather than flagging everything."""
+    icons = set(_phosphor_icons())
+    if not icons:
+        return []
+    weights = set(_PHOSPHOR_WEIGHTS)
+    out: list[dict[str, Any]] = []
+    for e in layout.els:
+        if e.kind == "icon":
+            slug = _norm_icon_slug(e.icon or "")
+            if slug and slug not in icons:
+                out.append(
+                    {
+                        "el": e.id,
+                        "icon": str(e.icon),
+                        "reason": "no such Phosphor icon; search list_icons(q) for a real slug",
+                    }
+                )
+            w = (e.weight or "bold").strip().lower()
+            if w not in weights:
+                out.append(
+                    {
+                        "el": e.id,
+                        "weight": str(e.weight),
+                        "reason": (
+                            "weight must be one of thin|light|regular|bold|fill|duotone "
+                            "(the renderer falls back to bold)"
+                        ),
+                    }
+                )
+        for b in e.bind or []:
+            if b.transform != "icon":
+                continue
+            table = b.params.get("table")
+            names = list(table.values()) if isinstance(table, dict) else []
+            if b.params.get("default"):
+                names.append(b.params["default"])
+            for n in names:
+                slug = _norm_icon_slug(n)
+                if slug and slug not in icons:
+                    out.append(
+                        {
+                            "el": e.id,
+                            "icon": str(n),
+                            "reason": (
+                                "bind icon transform maps to no Phosphor icon; "
+                                "search list_icons(q) for a real slug"
+                            ),
+                        }
+                    )
+        if e.kind in ("code", "html", "svg"):
+            blob = "\n".join(filter(None, (e.html or "", e.css or "", e.js or "")))
+            for tok in sorted(set(_PH_TOKEN_RE.findall(blob))):
+                if tok in weights or tok in icons:
+                    continue
+                out.append(
+                    {
+                        "el": e.id,
+                        "icon": f"ph-{tok}",
+                        "reason": (
+                            "no such Phosphor icon (heuristic markup scan); "
+                            "search list_icons(q) for a real slug"
+                        ),
+                    }
+                )
+    return out[:50]
+
+
 # -- catalog / widget options -------------------------------------------
 
 
@@ -209,10 +298,12 @@ def icons() -> Response:
     """Search the vendored Phosphor icon set (all six weights). Use a returned
     slug as an ``icon`` element's ``"icon"`` value, or in code markup as
     ``ph-<slug>`` (weight via ph / ph-bold / ph-thin / ph-light / ph-fill /
-    ph-duotone). ``?q=`` substring-filters the names; without it a capped sample
+    ph-duotone). ``?q=`` substring-filters the names; the query is normalised
+    to slug form first (``ph-`` prefix stripped, underscores as dashes), so
+    ``ph-heart`` and ``calendar_heart`` match. Without a query a capped sample
     is returned alongside the total. ``?limit=`` caps results (default 100, max 500)."""
     all_icons = _phosphor_icons()
-    q = (request.args.get("q") or "").strip().lower()
+    q = _norm_icon_slug(request.args.get("q") or "")
     try:
         limit = max(1, min(int(request.args.get("limit", 100)), 500))
     except (TypeError, ValueError):
@@ -1689,6 +1780,13 @@ def render_report(page_id: str) -> Response:
     is the real "this dashboard is wired" signal, a region appearing in
     ``tap_regions`` only means it was stored, not that it will fire.
 
+    ``icon_invalid`` (always on, same spirit as ``tap_invalid``): icon
+    references that resolve to NO glyph and would render a blank box, each
+    with the element id and reason. Covers ``icon`` elements (unknown slug or
+    weight), ``icon``-transform bind tables, and a heuristic scan of
+    code/html/svg markup for ``ph-<name>`` classes that aren't real Phosphor
+    names. Fix with a slug from ``GET /icons?q=``.
+
     ``overlay_slots`` (hybrid render mode) lists the ``data-overlay-key``
     annotations that actually extracted (box + key + font bucket): the
     live-value slots overlay-capable panels repaint locally between full
@@ -1791,6 +1889,11 @@ def render_report(page_id: str) -> Response:
     # the extractor deliberately skips).
     report["overlay_slots"] = normalize_slots(raw_slots)
     report["tap_dangling"] = sorted({n for r in regions for n in r.get("dangling", [])})
+    # Icon references that resolve to no glyph (bad slug / weight / bind table
+    # / ph-<name> markup class). Server-side against the vendored manifest,
+    # always on, mirroring tap_invalid: a blank icon box is named here instead
+    # of being pixel-hunted.
+    report["icon_invalid"] = _invalid_icons(page.canvas)
     # Regions whose declared action wouldn't dispatch (issue #49). Empty
     # tap_invalid means every region will actually fire; a non-empty list
     # is the honest signal that a dashboard looks wired but is dead, e.g.
@@ -1812,6 +1915,7 @@ def render_report(page_id: str) -> Response:
         "tap_invalid",
         "tap_dangling",
         "overlay_slots",
+        "icon_invalid",
     }
     if debug:
         selectable.add("diagnostics")
