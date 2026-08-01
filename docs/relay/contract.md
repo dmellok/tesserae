@@ -229,6 +229,10 @@ sealed (hex)  = 00112233445566778899aabb4fa3210211222b8aa47f010d2a30fc71c
 4. On the normal wake cadence: `GET .../frame` with `If-None-Match`; on `200`,
    `unseal` the body with `frame_key` and paint; on `304`/`204`, keep the
    current image. No long-poll in v1.
+5. On the same wake, `POST .../status` with the device's status JSON (battery,
+   RSSI, `fw_version`, etc. — the same body a REST client posts to a home
+   `/status` endpoint), so the Devices UI shows battery / signal / firmware /
+   last-seen. Optional, but recommended.
 
 The panel talks only to the relay in steady state; it never needs the home
 instance's address.
