@@ -1,0 +1,213 @@
+"""Home-side cloud-relay wiring: create_instance relay support, the sealing
+publisher, and the rendezvous pairing poller (ECDH tying both sides together)."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+from app import device_loader, device_service, renderer_loader
+from app.main import REPO_ROOT
+from app.ota._codec import b64u_decode, b64u_encode
+from app.relay_config import RELAY_SECTION
+from app.relay_crypto import derive_shared_key, generate_keypair, unseal
+from app.relay_pairing import RelayPairingPoller
+from app.relay_publisher import RelayPublisher
+from app.state.settings_store import SettingsStore
+
+
+@pytest.fixture
+def registries(tmp_path: Path) -> Any:
+    data_root = tmp_path / "devices"
+    devices = device_loader.discover(
+        REPO_ROOT / "devices",
+        schema_path=REPO_ROOT / "schema" / "device.schema.json",
+        data_root=data_root,
+    )
+    renderers = renderer_loader.discover(
+        REPO_ROOT / "renderers",
+        schema_path=REPO_ROOT / "schema" / "renderer.schema.json",
+        data_root=tmp_path / "rdata",
+    )
+    assert devices.errors == []
+    assert renderers.errors == []
+    return devices, renderers, data_root
+
+
+# --- create_instance relay support -----------------------------------------
+
+
+def test_create_instance_relay_mints_token_and_persists_frame_key(registries: Any) -> None:
+    devices, renderers, data_root = registries
+    frame_key = b64u_encode(b"\x11" * 32)
+    result = device_service.create_instance(
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="parents_panel",
+        kind_id="esp32_client",
+        transport="relay",
+        relay_frame_key=frame_key,
+    )
+    assert result.error is None and result.device is not None
+    device = result.device
+    assert device.transport == "relay"
+    assert device.manifest.get("relay_frame_key") == frame_key
+    # A relay panel authenticates its poll with a native-strength token.
+    assert isinstance(device.manifest.get("access_token"), str)
+    assert len(str(device.manifest["access_token"])) >= 20
+
+
+# --- RelayPublisher --------------------------------------------------------
+
+
+class _FakeClient:
+    def __init__(self) -> None:
+        self.uploads: list[dict[str, Any]] = []
+
+    def put_frame(self, **kwargs: Any) -> None:
+        self.uploads.append(kwargs)
+
+
+class _Dev:
+    def __init__(self, id: str, key_b64: str) -> None:
+        self.id = id
+        self.transport = "relay"
+        self.manifest = {"relay_frame_key": key_b64}
+        self.panel = {"w": 800, "h": 480}
+
+
+def test_publisher_seals_uploads_and_dedupes(tmp_path: Path) -> None:
+    renders_dir = tmp_path / "renders"
+    renders_dir.mkdir()
+    frame = b"packed-e-ink-frame-bytes"
+    (renders_dir / "abc123.bin").write_bytes(frame)
+
+    key = b"\x22" * 32
+    dev = _Dev("panel1", b64u_encode(key))
+    latest = {
+        "digest": "abc123",
+        "filename": "abc123.bin",
+        "ext": "bin",
+        "renderer_id": "esp32_bin",
+    }
+
+    pub = RelayPublisher(
+        app=None,  # type: ignore[arg-type]
+        devices=type("R", (), {"devices": {"panel1": dev}})(),
+        settings=None,
+        renders_dir=renders_dir,
+        latest_render_fn=lambda _id: latest,
+        run_async=False,
+    )
+    client = _FakeClient()
+
+    pub._maybe_send(client, dev)  # type: ignore[arg-type]
+    assert len(client.uploads) == 1
+    up = client.uploads[0]
+    assert up["etag"] == "abc123"
+    assert up["panel_w"] == 800 and up["panel_h"] == 480
+    # The uploaded body is sealed and decrypts back to the packed frame.
+    assert unseal(up["sealed"], key) == frame
+
+    # Same digest again → deduped, no second upload.
+    pub._maybe_send(client, dev)  # type: ignore[arg-type]
+    assert len(client.uploads) == 1
+
+
+# --- Rendezvous pairing poller ---------------------------------------------
+
+
+class _FakePairingClient:
+    def __init__(self, pending: list[dict[str, str]]) -> None:
+        self._pending = pending
+        self.completed: list[dict[str, Any]] = []
+
+    def pending_pairings(self) -> list[dict[str, str]]:
+        return self._pending
+
+    def complete_pairing(self, **kwargs: Any) -> None:
+        self.completed.append(kwargs)
+
+
+def test_pairing_poller_completes_ecdh_and_creates_relay_device(
+    registries: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    devices, renderers, data_root = registries
+    settings = SettingsStore(tmp_path / "settings.json")
+
+    # Home keypair (as register_this_install would persist it).
+    home_priv, home_pub = generate_keypair()
+    settings.patch_section(
+        RELAY_SECTION,
+        {
+            "enabled": True,
+            "base_url": "https://relay.example",
+            "install_id": "inst_1",
+            "publisher_token_secret": "ptok",
+            "install_privkey_secret": b64u_encode(home_priv),
+            "pending_pairings": {
+                "CODE42": {"device_id": "parents_panel", "kind": "esp32_client", "panel": {}}
+            },
+        },
+    )
+
+    # Panel side generates its own keypair and presents its public key.
+    panel_priv, panel_pub = generate_keypair()
+    client = _FakePairingClient([{"code": "CODE42", "panel_pubkey": b64u_encode(panel_pub)}])
+    monkeypatch.setattr("app.relay_pairing.build_client", lambda _cfg: client)
+
+    poller = RelayPairingPoller(
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        settings=settings,
+        run_async=False,
+    )
+    assert poller.poll_once() == 1
+
+    # A relay device was created with the ECDH-derived frame key.
+    device = devices.get("parents_panel")
+    assert device is not None and device.transport == "relay"
+    stored_key = b64u_decode(str(device.manifest["relay_frame_key"]))
+    assert stored_key == derive_shared_key(home_priv, panel_pub)
+
+    # The panel derives the identical key from its own private key + home pub.
+    completion = client.completed[0]
+    assert completion["home_pubkey_b64u"] == b64u_encode(home_pub)
+    panel_derived = derive_shared_key(panel_priv, b64u_decode(completion["home_pubkey_b64u"]))
+    assert panel_derived == stored_key
+
+    # The relay is handed the token hash it will validate polls against.
+    import hashlib
+
+    token = str(device.manifest["access_token"])
+    assert completion["device_token"] == token
+    assert completion["device_token_sha256"] == hashlib.sha256(token.encode()).hexdigest()
+
+    # The consumed pairing slot is dropped so it isn't retried.
+    assert "CODE42" not in (settings.get_section(RELAY_SECTION).get("pending_pairings") or {})
+
+
+def test_pairing_poller_noops_when_not_linked(tmp_path: Path) -> None:
+    settings = SettingsStore(tmp_path / "settings.json")
+    poller = RelayPairingPoller(
+        devices=type("R", (), {"devices": {}, "get": lambda self, _i: None})(),
+        renderers=None,  # type: ignore[arg-type]
+        data_root=tmp_path,
+        settings=settings,
+        run_async=False,
+    )
+    assert poller.poll_once() == 0
+
+
+def test_relay_settings_json_roundtrips(tmp_path: Path) -> None:
+    """Sanity: the relay section (incl. pending_pairings) survives a store
+    reload as plain JSON."""
+    settings = SettingsStore(tmp_path / "settings.json")
+    settings.patch_section(RELAY_SECTION, {"install_id": "x", "pending_pairings": {"c": {"k": 1}}})
+    reloaded = json.loads((tmp_path / "settings.json").read_text())
+    assert reloaded[RELAY_SECTION]["install_id"] == "x"

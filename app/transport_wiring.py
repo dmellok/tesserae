@@ -774,6 +774,38 @@ def _rebuild_transport(
     except Exception:
         logger.exception("wiring OpenDisplay-HA publisher")
 
+    # Cloud relay (remote panels): seal-and-upload publisher + rendezvous
+    # pairing poller. Both no-op until the install is linked to a relay, so
+    # they're always wired; they re-attach to the fresh PUSH_MANAGER like the
+    # OpenDisplay publisher above. The old poller thread is stopped first.
+    try:
+        from app.relay_pairing import RelayPairingPoller
+        from app.relay_publisher import RelayPublisher
+
+        push_mgr = app.config["PUSH_MANAGER"]
+        relay_pub = RelayPublisher(
+            app=app,
+            devices=devices,
+            settings=settings,
+            renders_dir=renders_dir,
+            latest_render_fn=push_mgr.latest_render_for,
+        )
+        push_mgr.add_listener(relay_pub.on_push)
+
+        old_poller = app.config.get("RELAY_PAIRING_POLLER")
+        if old_poller is not None:
+            old_poller.stop()
+        poller = RelayPairingPoller(
+            devices=devices,
+            renderers=renderers,
+            data_root=app.config["DATA_ROOT"],
+            settings=settings,
+        )
+        poller.start()
+        app.config["RELAY_PAIRING_POLLER"] = poller
+    except Exception:
+        logger.exception("wiring cloud relay")
+
     # mDNS: opt-in advertiser for tesserae.local (+ an _http._tcp service)
     # so the appliance is reachable by name without touching the host's
     # hostname. Stop any previous instance before (re)starting.

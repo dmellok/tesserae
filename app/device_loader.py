@@ -110,11 +110,15 @@ class Device:
 
         Unlike ``"rest"`` / ``"mqtt"`` (chosen per-instance), ``"push"``
         is declared on the kind manifest: a push kind's instances are
-        always push. A missing field reads as the ``"mqtt"`` default."""
+        always push. ``"relay"`` is a per-instance out-of-band transport
+        like ``"push"``, but the frame is sealed and uploaded to a cloud
+        relay mailbox the remote panel polls (see app/relay_publisher.py);
+        it skips the broker the same way ``"rest"`` does. A missing field
+        reads as the ``"mqtt"`` default."""
         raw = self.manifest.get("transport")
         if isinstance(raw, str):
             val = raw.strip().lower()
-            if val in ("rest", "push"):
+            if val in ("rest", "push", "relay"):
                 return val
         return "mqtt"
 
@@ -568,6 +572,11 @@ def load_instance_file(
     # device on incoming /api/display requests.
     if isinstance(raw_inst.get("access_token"), str) and raw_inst["access_token"].strip():
         inst_manifest["access_token"] = raw_inst["access_token"].strip()
+    # Per-panel cloud-relay frame key (base64url of the 32-byte X25519+HKDF
+    # shared secret, set at rendezvous pairing). Carried through so
+    # app.relay_publisher can seal each frame for a transport="relay" device.
+    if isinstance(raw_inst.get("relay_frame_key"), str) and raw_inst["relay_frame_key"].strip():
+        inst_manifest["relay_frame_key"] = raw_inst["relay_frame_key"].strip()
     # TRMNL ``friendly_id`` (six-character human-readable id, e.g.
     # ``7B3X9K``). Surfaced in /api/setup + /api/display so the BYOS
     # firmware can show it on the setup screen / about screen the way

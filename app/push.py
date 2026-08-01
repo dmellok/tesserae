@@ -2562,10 +2562,12 @@ class PushManager:
         * ``device.status_topic is None`` — the legacy signal for
           TRMNL / KOReader / anything that hits ``/api/display``.
           Kinds opt in by declaring no MQTT topics at all.
-        * ``device.transport == "rest"`` — the new per-instance signal
-          for the v0.52 REST API. Same kind can have MQTT instances
-          AND REST instances; the transport field on each instance
-          decides.
+        * ``device.transport in ("rest", "relay")`` — per-instance
+          out-of-band transports. ``rest`` devices poll ``/api/display``;
+          ``relay`` devices have their sealed frame uploaded to a cloud
+          mailbox they poll (app/relay_publisher.py). Neither wants a
+          broker publish. Same kind can mix MQTT / REST / relay instances;
+          the transport field on each instance decides.
 
         Clones set ``renderer.device`` to the instance id, which the
         device registry indexes the same way as the kind, so the same
@@ -2583,7 +2585,7 @@ class PushManager:
             return False
         if device.status_topic is None:
             return True
-        return device.transport == "rest"
+        return device.transport in ("rest", "relay")
 
     def _panel_dims_for_send(self, device_id: str | None = None) -> dict[str, Any]:
         """Pick panel dims for a Send-page push.

@@ -239,6 +239,7 @@ def create_instance(
     api_key_strength: str = "typeable",
     transport: str | None = None,
     renderer_id: str | None = None,
+    relay_frame_key: str | None = None,
 ) -> InstanceResult:
     """Validate, persist, load, and clone-renderers for a new instance.
 
@@ -274,8 +275,12 @@ def create_instance(
     # written when explicitly "rest" so existing v0.51-and-earlier
     # instances continue to read as MQTT without any field at all.
     normalised_transport: str | None = None
-    if isinstance(transport, str) and transport.strip().lower() == "rest":
-        normalised_transport = "rest"
+    forced_transport = transport.strip().lower() if isinstance(transport, str) else ""
+    if forced_transport in ("rest", "relay"):
+        # "relay" is an out-of-band transport like "push", but chosen
+        # per-instance (a remote panel paired through the cloud relay). It
+        # skips the broker the way "rest" does and mints its own token.
+        normalised_transport = forced_transport
     else:
         # A kind can declare its own transport (OpenDisplay-via-HA is
         # "push"; the OpenDisplay bridge kind is "rest"). Inherit it when
@@ -290,7 +295,7 @@ def create_instance(
         "kind": kind_id,
         "name": name.strip() or f"{kind.name} ({instance_id})",
     }
-    if normalised_transport in ("rest", "push"):
+    if normalised_transport in ("rest", "push", "relay"):
         manifest["transport"] = normalised_transport
     # Pin a renderer when the kind offers a choice (multi-renderer kinds
     # like circuitpython_generic). Only recorded when it names one of the
@@ -324,7 +329,7 @@ def create_instance(
     #  * Discovered register: caller hands us the token the client is
     #    already polling with, preserve it so the user doesn't have
     #    to update the client config after registering.
-    if _kind_uses_access_token(kind) or normalised_transport == "rest":
+    if _kind_uses_access_token(kind) or normalised_transport in ("rest", "relay"):
         # api_key_strength="native" mints the high-entropy 20-char
         # alphanumeric used by the official Terminus BYOS contract,
         # safe to use when the device stores its key in flash. The
@@ -334,7 +339,7 @@ def create_instance(
         # because they store the token in NVS/flash + match it via
         # bearer header; no human typing involved after pairing.
         effective_strength = api_key_strength
-        if normalised_transport == "rest" and not _kind_uses_access_token(kind):
+        if normalised_transport in ("rest", "relay") and not _kind_uses_access_token(kind):
             effective_strength = "native"
         if access_token:
             manifest["access_token"] = access_token
@@ -355,6 +360,12 @@ def create_instance(
         # alongside battery / IP.
         if mac:
             manifest["mac"] = mac.strip()
+
+    # Relay panels carry their per-panel frame key (base64url of the 32-byte
+    # X25519+HKDF shared secret) on the manifest, stored like access_token so
+    # the publisher can seal each frame. Only written for relay transport.
+    if normalised_transport == "relay" and relay_frame_key:
+        manifest["relay_frame_key"] = relay_frame_key
 
     data_root.mkdir(parents=True, exist_ok=True)
     inst_file = data_root / f"{instance_id}.json"
