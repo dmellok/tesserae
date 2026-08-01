@@ -8,6 +8,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Phone photos no longer land on the panel sideways.** `fit_to_panel` now normalizes EXIF
+  orientation before cropping and fitting. Cameras commonly store a landscape pixel buffer
+  plus an orientation tag instead of rotating the pixels, and Pillow does not apply that tag
+  on open, so a portrait phone photo rendered rotated. Doing this before the crop also makes
+  normalized crop coordinates mean the same thing on both sides of the wire, which the
+  Companion's proposed focus/zoom framing depends on.
+
 - **Templates can be reported for takedown.** Every template in the browser gets a Report
   button that files a takedown request into the same review channel, with Take down and
   Dismiss buttons beside it. Anyone can file one, including the install that published the

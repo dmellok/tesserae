@@ -559,3 +559,71 @@ def test_palette_for_gamut_maps_colour_and_grayscale() -> None:
     assert palette_for_gamut("gray_16") == GRAY_16_PALETTE
     assert palette_for_gamut("mono") == ((0, 0, 0), (255, 255, 255))
     assert palette_for_gamut("nonsense") == WAVESHARE_E6_PALETTE  # safe fallback
+
+
+# -- EXIF orientation ----------------------------------------------------
+
+
+def _exif_portrait_jpeg() -> bytes:
+    """A phone-style photo: landscape pixels plus orientation 6 (rotate 90 CW
+    for display), which is how iPhones store a portrait shot. The left half of
+    the stored buffer is red, so after transposition it must sit along the top.
+    """
+    import io
+
+    from PIL import Image
+
+    img = Image.new("RGB", (200, 100), (0, 0, 255))
+    img.paste(Image.new("RGB", (100, 100), (255, 0, 0)), (0, 0))
+    exif = img.getexif()
+    exif[0x0112] = 6  # Orientation: rotate 90 CW when displayed
+    buffer = io.BytesIO()
+    img.save(buffer, format="JPEG", exif=exif, quality=95)
+    return buffer.getvalue()
+
+
+def test_fit_to_panel_applies_exif_orientation() -> None:
+    """A portrait phone photo must not land on the panel sideways: Pillow does
+    not apply the orientation tag on open(), so fit_to_panel normalizes it."""
+    import io
+
+    from PIL import Image
+
+    src = Image.open(io.BytesIO(_exif_portrait_jpeg()))
+    assert src.size == (200, 100)  # stored landscape, tagged portrait
+
+    out = fit_to_panel(src, target_w=100, target_h=200, scale="fill")
+    assert out.size == (100, 200)
+    # Transposed: the red half is now the top, not the left.
+    top = out.getpixel((50, 20))
+    bottom = out.getpixel((50, 180))
+    assert top[0] > 180 and top[2] < 80, f"expected red at top, got {top}"
+    assert bottom[2] > 180 and bottom[0] < 80, f"expected blue at bottom, got {bottom}"
+
+
+def test_source_crop_coordinates_are_orientation_normalized() -> None:
+    """The contract the Companion framing intent relies on: normalized crop
+    coordinates address the image as displayed, not the raw pixel buffer."""
+    import io
+
+    from PIL import Image
+
+    src = Image.open(io.BytesIO(_exif_portrait_jpeg()))
+    # Top-left quarter of the DISPLAYED (portrait) image is red.
+    out = fit_to_panel(
+        src,
+        target_w=50,
+        target_h=50,
+        scale="fill",
+        crop={"x": 0.0, "y": 0.0, "w": 1.0, "h": 0.4},
+    )
+    pixel = out.getpixel((25, 25))
+    assert pixel[0] > 180 and pixel[2] < 80, f"expected red crop, got {pixel}"
+
+
+def test_fit_to_panel_without_exif_is_unchanged() -> None:
+    from PIL import Image
+
+    img = Image.new("RGB", (100, 80), "white")
+    out = fit_to_panel(img, target_w=100, target_h=80)
+    assert out.size == (100, 80)

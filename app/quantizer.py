@@ -25,7 +25,7 @@ import io
 from typing import Any, Literal, TypedDict
 
 import numpy as np
-from PIL import Image, ImageEnhance, ImageFilter
+from PIL import Image, ImageEnhance, ImageFilter, ImageOps
 
 # DitherMode covers both the Pillow-only callers and the numpy-backed ones.
 # pack_to_panel_bin dispatches on the full set; callers that don't own a
@@ -679,8 +679,17 @@ def fit_to_panel(
 
     ``crop`` (optional) is a normalized source crop applied *before* the fit, so
     a chosen subject survives the panel fit rather than being centre-cropped by
-    ``fill``. See :func:`apply_source_crop`."""
-    src = apply_source_crop(img.convert("RGB"), crop)
+    ``fill``. See :func:`apply_source_crop`.
+
+    EXIF orientation is normalized first. Phone cameras commonly store a
+    landscape pixel buffer plus an orientation tag rather than rotating the
+    pixels, and Pillow does not apply that tag on ``open()``, so without this a
+    portrait phone photo lands on the panel sideways. It also has to happen
+    *before* the crop: normalized crop coordinates are meaningless unless both
+    the client picking them and the server applying them agree on which way up
+    the image is. Rendered dashboard compositions carry no EXIF, so this is a
+    no-op for them."""
+    src = apply_source_crop(ImageOps.exif_transpose(img).convert("RGB"), crop)
     if src.size == (target_w, target_h) and scale != "blur":
         return src
     if scale == "stretch":
