@@ -190,7 +190,7 @@ def submit(page_id: str) -> Response | tuple[Response, int]:
     from app.mcp_api import _render_png
 
     try:
-        png = _render_png(page_id, page.canvas)
+        png = template_export.shrink_preview(_render_png(page_id, page.canvas))
     except Exception as err:
         return jsonify({"error": f"preview render failed: {type(err).__name__}"}), 502
 

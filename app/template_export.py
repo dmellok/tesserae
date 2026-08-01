@@ -374,3 +374,80 @@ def apply_inputs(template: dict[str, Any], values: dict[str, Any]) -> dict[str, 
                 if isinstance(index, int) and 0 <= index < len(binds):
                     binds[index].setdefault("options", {})[key] = value
     return canvas
+
+
+# -- preview image -------------------------------------------------------
+
+# A dashboard renders at its authored size (up to 1600x1200 on a 13.3"
+# panel), which routinely blows the submission size cap, so downsample before
+# submitting. The target is NOT the browse card (~260px): the same image is
+# what a reviewer judges the submission by in the Discord embed, so it stays
+# big enough to read the dashboard's text and spot anything off. 1200px on the
+# long edge is comfortably readable when opened full-size in Discord, and
+# supersampling down from the full render looks better than rendering small.
+PREVIEW_MAX_EDGE = 1200
+# Under the server's 1MB cap with headroom, so a different Pillow version on
+# the submitting machine can't push an accepted encoding over the line.
+PREVIEW_TARGET_BYTES = 900_000
+# Tried in order; the first encoding that fits wins. With the palette fallback
+# below, a dashboard essentially always fits at the first edge, so the smaller
+# steps exist only for pathological photographic renders.
+_PREVIEW_EDGES = (PREVIEW_MAX_EDGE, 1000, 800, 640)
+
+
+def _encode_png(image: Any, *, quantize: bool) -> bytes:
+    import io
+
+    from PIL import Image
+
+    out = image
+    if quantize:
+        # e-ink dashboards are mostly flat fills and text, so an adaptive
+        # 256-colour palette is visually near-identical and much smaller.
+        out = image.quantize(colors=256, method=Image.Quantize.MEDIANCUT)
+    buffer = io.BytesIO()
+    out.save(buffer, format="PNG", optimize=True)
+    return buffer.getvalue()
+
+
+def shrink_preview(png: bytes, *, target_bytes: int = PREVIEW_TARGET_BYTES) -> bytes:
+    """Downscale a rendered dashboard PNG to catalog size.
+
+    Returns the first encoding at or under ``target_bytes``, trying full
+    colour before a palette at each step down; if even the smallest attempt
+    is over (a pathological render), the smallest one is returned and the
+    server's cap decides. Unreadable input is passed through untouched so a
+    preview problem can never be worse than the original bytes."""
+    import io
+
+    from PIL import Image
+
+    # Already small enough: send the full-resolution render untouched. Most
+    # dashboards are flat colour blocks and text, which compress far better at
+    # native size than after resampling (interpolation adds noise PNG can't
+    # pack), so shrinking one of those makes the file BIGGER and the reviewer's
+    # view worse. Only pay the cost when the budget actually demands it.
+    if len(png) <= target_bytes:
+        return png
+
+    try:
+        opened = Image.open(io.BytesIO(png))
+        opened.load()
+    except Exception:
+        return png
+    source = opened.convert("RGB")
+
+    smallest = png
+    for edge in _PREVIEW_EDGES:
+        candidate = source.copy()
+        candidate.thumbnail((edge, edge), Image.Resampling.LANCZOS)
+        for quantize in (False, True):
+            try:
+                encoded = _encode_png(candidate, quantize=quantize)
+            except Exception:
+                continue
+            if len(encoded) <= target_bytes:
+                return encoded
+            if len(encoded) < len(smallest):
+                smallest = encoded
+    return smallest

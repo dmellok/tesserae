@@ -298,3 +298,56 @@ def test_export_data_uri_bg_round_trips_valid_base64(app: Flask) -> None:
     result = _export(app, _page([el], bg_image="/page-assets/pg1/bg.png"))
     encoded = result["template"]["canvas"]["bg_image"].split(",", 1)[1]
     assert base64.b64decode(encoded) == raw
+
+
+# -- preview downscaling -------------------------------------------------
+
+
+def _png_bytes(w: int, h: int, *, noisy: bool) -> bytes:
+    """A PNG of the given size: noisy (incompressible, worst case) or flat."""
+    import io
+    import os
+
+    from PIL import Image
+
+    if noisy:
+        image = Image.frombytes("RGB", (w, h), os.urandom(w * h * 3))
+    else:
+        image = Image.new("RGB", (w, h), (240, 238, 232))
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+def test_shrink_preview_fits_target_and_stays_readable() -> None:
+    """A full-size 13.3" render (1600x1200) is downsampled under the cap while
+    staying large enough to review in the Discord embed."""
+    from PIL import Image
+
+    original = _png_bytes(1600, 1200, noisy=True)
+    assert len(original) > template_export.PREVIEW_TARGET_BYTES  # worst case
+
+    shrunk = template_export.shrink_preview(original)
+    assert len(shrunk) <= template_export.PREVIEW_TARGET_BYTES
+
+    import io
+
+    image = Image.open(io.BytesIO(shrunk))
+    assert max(image.size) <= template_export.PREVIEW_MAX_EDGE
+    # Even the fallback steps stay big enough to judge a dashboard by.
+    assert max(image.size) >= 640
+    assert abs((image.size[0] / image.size[1]) - (1600 / 1200)) < 0.01  # aspect kept
+
+
+def test_shrink_preview_leaves_already_small_renders_untouched() -> None:
+    """Flat dashboard art compresses better at native size than after
+    resampling, so a render already inside the budget is passed through
+    byte-identical: full resolution for the reviewer, no size regression."""
+    small = _png_bytes(1600, 1200, noisy=False)
+    assert len(small) < template_export.PREVIEW_TARGET_BYTES
+    assert template_export.shrink_preview(small) == small
+
+
+def test_shrink_preview_passes_through_unreadable_bytes() -> None:
+    junk = b"\x89PNG\r\n\x1a\nnot-actually-an-image"
+    assert template_export.shrink_preview(junk) == junk

@@ -8,6 +8,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Large dashboards can be shared again: template previews are downsampled to fit.** A
+  1600x1200 render with a photo background exceeded the submission size cap and was rejected
+  outright. Previews are now resampled to at most 1200px on the long edge (with a palette
+  fallback) before submitting, which keeps them readable in the Discord review embed rather
+  than shrinking them to card size, and the server cap is 1MB to match. A render already
+  inside the budget is sent untouched at full resolution: flat dashboard art compresses
+  better at native size, so resampling it would have made the file bigger and the reviewer's
+  view worse.
+
 - **Community templates get their own page, grouped by resolution.** Browse now links to a
   dedicated Templates page where templates are grouped by canvas size, each group labelled
   with the devices that fit those dimensions (portrait mounts matched as "rotated") and the
