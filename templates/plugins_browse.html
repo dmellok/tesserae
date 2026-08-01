@@ -132,17 +132,16 @@
 {% endif %}
 
 {% if templates_enabled %}
-{# Community dashboard templates (hosted catalog, human-reviewed). Rendered
-   client-side by template_browse.js from the server-side proxy at
-   /plugins/templates/index.json, so a slow catalog never blocks this page. #}
-<section class="dx-section-card" id="tpl-market" style="margin:16px 0;padding:16px">
-  <h2 style="margin:0 0 4px"><i class="ph ph-layout" aria-hidden="true"></i> Community templates</h2>
-  <p style="margin:0 0 12px;opacity:.75">Complete dashboards shared by other Tesserae users,
-     reviewed before publishing. Installing one creates a new dashboard you can edit and bind
-     to your panels.</p>
-  <div id="tpl-market-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px">
-    <div style="opacity:.7">Loading templates…</div>
+{# Community dashboard templates live on their own page (grouped by
+   resolution > device); this is just the doorway from the widget Browse. #}
+<section class="dx-section-card" style="margin:16px 0;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+  <div>
+    <strong><i class="ph ph-layout" aria-hidden="true"></i> Community templates</strong>
+    <div class="field-help" style="margin:2px 0 0">Complete dashboards shared by other users,
+      reviewed before publishing and grouped by the panels they fit.</div>
   </div>
+  <a class="dx-btn-sm" href="{{ url_for('template_market.page') }}">Browse templates
+    <i class="ph ph-arrow-right" aria-hidden="true"></i></a>
 </section>
 {% endif %}
 
@@ -589,9 +588,6 @@
   }
 </style>
 <script src="{{ url_for('static', filename='plugins_browse_carousel.js') }}" defer></script>
-{% if templates_enabled %}
-<script src="{{ url_for('static', filename='template_browse.js') }}" defer></script>
-{% endif %}
 <script>
   // Client-side catalog search. Filters the marketplace grid by
   // showing/hiding article cards in the DOM as the user types, so

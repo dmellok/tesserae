@@ -203,6 +203,11 @@ def test_install_creates_unbound_page_with_inputs(
     page = app.config["PAGE_STORE"].get(page_id)
     assert page.layout_kind == "canvas" and page.device_ids == []
     assert page.canvas.els[0].options["location"] == "Melbourne"
+    # The editor URL comes from the server and must actually resolve (a
+    # hardcoded client path 404'd here once).
+    page_url = resp.get_json()["page_url"]
+    assert page_url.endswith(f"/c/{page_id}")
+    assert app.test_client().get(page_url).status_code == 200
 
 
 def test_install_409_on_missing_requires(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -243,3 +248,50 @@ def test_missing_requirements_helper() -> None:
     registry = SimpleNamespace(get=lambda pid: object() if pid == "bundled" else None)
     template = {"requires": ["have-it", "bundled", "nope"]}
     assert missing_requirements(template, records, registry) == ["nope"]
+
+
+# -- templates page (resolution > device grouping) ------------------------
+
+
+def test_templates_page_renders_with_grouping_data(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _enable(app, monkeypatch)
+    resp = app.test_client().get("/plugins/templates/")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "tpl-market-data" in body and "resolution_devices" in body
+    assert "800x480" in body  # preset resolutions serialized for grouping
+    assert "template_browse.js" in body
+
+
+def test_templates_page_offline_shows_notice_not_403(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("TESSERAE_EXPERIMENT_TEMPLATES", "1")
+    app.config["SETTINGS_STORE"].patch_section("app", {"online_features": False})
+    resp = app.test_client().get("/plugins/templates/")
+    assert resp.status_code == 200
+    assert "Online features are disabled" in resp.get_data(as_text=True)
+    # Data + install endpoints stay strict.
+    assert app.test_client().get("/plugins/templates/index.json").status_code == 403
+
+
+def test_templates_page_404_when_experiment_off(app: Flask) -> None:
+    assert app.test_client().get("/plugins/templates/").status_code == 404
+
+
+def test_resolution_device_labels_and_my_resolutions() -> None:
+    from app.template_market import registered_device_resolutions, resolution_device_labels
+
+    labels = resolution_device_labels()
+    assert "800x480" in labels
+    joined = " ".join(labels["800x480"])
+    assert "Inky Impression 7.3" in joined
+    assert "800x480" not in joined  # dims suffix stripped from names
+
+    dev = SimpleNamespace(panel={"w": 800, "h": 480})
+    reg = SimpleNamespace(devices={"d1": dev, "d2": dev})
+
+    assert registered_device_resolutions(reg) == ["800x480"]
+    assert registered_device_resolutions(None) == []

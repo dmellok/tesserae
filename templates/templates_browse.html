@@ -1,0 +1,36 @@
+{% extends "_base.html" %}
+{% block title %}Community templates, Tesserae{% endblock %}
+{% block page_class %}page-wide{% endblock %}
+{% block main %}
+<header class="page-head">
+  <h1>
+    <a href="{{ url_for('marketplace.browse') }}" class="ghost-link" style="margin-right: 0.5rem;">
+      <i class="ph ph-arrow-left" aria-hidden="true"></i>
+    </a>
+    <i class="ph ph-layout"></i> Community templates
+  </h1>
+  <p class="lede">
+    Complete dashboards shared by other Tesserae users, reviewed before
+    publishing. Grouped by resolution so you can jump straight to the ones
+    that fit your panels; installing one creates a new dashboard you can
+    edit and bind to your devices.
+  </p>
+</header>
+
+{% if not online_enabled %}
+<section class="dx-section-card" style="padding:16px">
+  <p><i class="ph ph-wifi-slash" aria-hidden="true"></i>
+     Online features are disabled in Settings, so the community catalog can't
+     be fetched. Enable them under Settings to browse templates.</p>
+</section>
+{% else %}
+<script type="application/json" id="tpl-market-data">{
+  "resolution_devices": {{ resolution_devices_json | safe }},
+  "my_resolutions": {{ my_resolutions_json | safe }}
+}</script>
+<div id="tpl-market-groups">
+  <div style="opacity:.7;padding:8px 2px">Loading templates…</div>
+</div>
+<script src="{{ url_for('static', filename='template_browse.js') }}" defer></script>
+{% endif %}
+{% endblock %}

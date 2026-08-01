@@ -88,3 +88,43 @@ def install_template(
     )
     pages_store.save(page)
     return page
+
+
+def _strip_dims_suffix(label: str) -> str:
+    """PANEL_PRESETS labels embed dims ("Inky Impression 7.3\", 800x480");
+    the resolution group header already shows the dims, so drop the suffix."""
+    head, _, tail = label.rpartition(", ")
+    if head and "x" in tail and tail.replace("x", "").isdigit():
+        return head
+    return label
+
+
+def resolution_device_labels() -> dict[str, list[str]]:
+    """ "WxH" -> known device/panel names at that resolution, from the curated
+    panel presets. Drives the resolution > device grouping on the Templates
+    page (which devices a template natively fits)."""
+    from app.panel import PANEL_PRESETS
+
+    out: dict[str, list[str]] = {}
+    for preset in PANEL_PRESETS.values():
+        key = f"{preset.w}x{preset.h}"
+        name = _strip_dims_suffix(preset.label)
+        if name not in out.setdefault(key, []):
+            out[key].append(name)
+    return out
+
+
+def registered_device_resolutions(devices: Any) -> list[str]:
+    """ "WxH" for each panel the user actually has registered, so their
+    resolutions group first on the Templates page. Best-effort."""
+    from app.panel import device_panel
+
+    out: set[str] = set()
+    for device in (getattr(devices, "devices", None) or {}).values():
+        try:
+            panel = device_panel(device)
+        except Exception:
+            continue
+        if panel is not None:
+            out.add(f"{panel.w}x{panel.h}")
+    return sorted(out)

@@ -12,8 +12,9 @@
 
   var btn = document.getElementById("panels-share");
   if (!btn) return;
-  var canvasId = (window.PANELS_CANVAS_ID ||
-    (location.pathname.match(/\/c\/([a-z0-9]+)/) || [])[1] || "");
+  var host = document.querySelector("[data-canvas-id]");
+  var canvasId = (host && host.getAttribute("data-canvas-id")) ||
+    (location.pathname.match(/\/c\/([a-z0-9]+)/) || [])[1] || "";
   if (!canvasId) return;
 
   var overlay = null;
@@ -71,7 +72,7 @@
 
     var img = el("img", { alt: "Preview" });
     img.style.cssText = "max-width:100%;border:1px solid var(--t-border,#ddd);border-radius:8px;margin:8px 0";
-    img.src = "/panels/c/" + canvasId + "/preview.png?t=" + Date.now();
+    img.src = "/pages/canvas/c/" + canvasId + "/preview.png?t=" + Date.now();
     card.appendChild(img);
 
     // Quality warnings from the headless render report.

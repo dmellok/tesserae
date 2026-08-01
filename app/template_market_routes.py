@@ -4,13 +4,18 @@ Routes under ``/plugins/templates``, gated on the ``templates`` experiment AND
 the master online-features switch. The browser never talks to
 api.tesserae.ink directly: the catalog is proxied (consistent with how widget
 install counts are fetched) and installs re-fetch the doc server-side.
+
+``GET /plugins/templates/`` is the dedicated Browse page: templates grouped
+by resolution, each group labelled with the known devices at those dims, and
+the user's own device resolutions pinned first.
 """
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
-from flask import Blueprint, Response, current_app, jsonify, request
+from flask import Blueprint, Response, current_app, jsonify, render_template, request, url_for
 
 from app import experiments, online, template_market
 
@@ -21,10 +26,29 @@ bp = Blueprint("template_market", __name__, url_prefix="/plugins/templates")
 def _gate() -> Response | tuple[Response, int] | None:
     if not experiments.is_enabled("templates"):
         return Response("Not found", status=404)
+    # The HTML page renders its own friendly offline notice; the data/install
+    # endpoints hard-fail so nothing silently no-ops.
+    if request.endpoint == "template_market.page":
+        return None
     settings = current_app.config.get("SETTINGS_STORE")
     if not online.online_enabled(settings):
         return jsonify({"error": "online features are disabled in Settings"}), 403
     return None
+
+
+@bp.get("/")
+def page() -> str:
+    """The Templates page: client-rendered groups (resolution > devices) fed
+    by ``/plugins/templates/index.json``; server supplies the device-name map
+    and which resolutions the user actually owns."""
+    settings = current_app.config.get("SETTINGS_STORE")
+    devices = current_app.config.get("DEVICE_REGISTRY")
+    return render_template(
+        "templates_browse.html",
+        online_enabled=online.online_enabled(settings),
+        resolution_devices_json=json.dumps(template_market.resolution_device_labels()),
+        my_resolutions_json=json.dumps(template_market.registered_device_resolutions(devices)),
+    )
 
 
 def _installed_records() -> dict[str, Any]:
@@ -94,4 +118,12 @@ def install() -> Response | tuple[Response, int]:
             status="sent" if sent else "failed",
             extra={"page": page.id},
         )
-    return jsonify({"page_id": page.id, "name": page.name})
+    # Hand back the editor URL rather than letting the client assemble one:
+    # a hardcoded path in JS silently 404s if the route ever moves.
+    return jsonify(
+        {
+            "page_id": page.id,
+            "name": page.name,
+            "page_url": url_for("panels.editor", canvas_id=page.id),
+        }
+    )

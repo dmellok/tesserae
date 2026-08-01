@@ -9,7 +9,7 @@
 (function () {
   "use strict";
 
-  var grid = document.getElementById("tpl-market-grid");
+  var grid = document.getElementById("tpl-market-groups");
   if (!grid) return;
 
   function el(tag, attrs, children) {
@@ -119,7 +119,7 @@
             return;
           }
           status.textContent = "Installed. Opening the editor…";
-          location.href = "/experiments/composer/c/" + r.body.page_id;
+          location.href = r.body.page_url || ("/pages/canvas/c/" + r.body.page_id);
         })
         .catch(function () { status.textContent = "Install failed: network error"; go.disabled = false; });
     });
@@ -148,20 +148,90 @@
     return node;
   }
 
+  // -- resolution > device grouping ---------------------------------------
+  // Config from the page: known device names per "WxH", and which resolutions
+  // the user's registered panels have (those groups pin to the top). A
+  // template matches a resolution exactly or transposed (portrait mount).
+
+  function readConfig() {
+    var node = document.getElementById("tpl-market-data");
+    if (!node) return { resolution_devices: {}, my_resolutions: [] };
+    try { return JSON.parse(node.textContent); } catch (e) {
+      return { resolution_devices: {}, my_resolutions: [] };
+    }
+  }
+
+  function transpose(key) {
+    var parts = key.split("x");
+    return parts[1] + "x" + parts[0];
+  }
+
+  function deviceNamesFor(key, config) {
+    var exact = config.resolution_devices[key] || [];
+    var rotated = (config.resolution_devices[transpose(key)] || []).map(function (n) {
+      return n + " (rotated)";
+    });
+    return exact.concat(rotated);
+  }
+
+  function groupHeader(key, config, count) {
+    var dims = key.split("x");
+    var head = el("div", { style: "display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:18px 0 10px" });
+    head.appendChild(el("h2", { text: dims[0] + " × " + dims[1], style: "margin:0" }));
+    var mine = config.my_resolutions.indexOf(key) !== -1 ||
+      config.my_resolutions.indexOf(transpose(key)) !== -1;
+    if (mine) head.appendChild(el("span", { class: "pill is-ok", text: "your device" }));
+    var names = deviceNamesFor(key, config);
+    head.appendChild(el("span", {
+      text: names.length ? "fits " + names.join(", ") : "custom size",
+      style: "opacity:.65;font-size:.92em",
+    }));
+    head.appendChild(el("span", { text: count + " template" + (count === 1 ? "" : "s"), style: "opacity:.5;font-size:.85em" }));
+    return head;
+  }
+
+  function render(templates, config) {
+    grid.textContent = "";
+    if (!templates.length) {
+      grid.appendChild(el("div", { text: "No templates published yet. Share one from the panels editor!", style: "opacity:.7" }));
+      return;
+    }
+    var groups = {};
+    templates.forEach(function (t) {
+      var key = (t.w || 0) + "x" + (t.h || 0);
+      (groups[key] = groups[key] || []).push(t);
+    });
+    var keys = Object.keys(groups);
+    keys.sort(function (a, b) {
+      // The user's own resolutions first (exact or transposed), then by
+      // template count, then by area descending for a stable order.
+      function mine(k) {
+        return config.my_resolutions.indexOf(k) !== -1 ||
+          config.my_resolutions.indexOf(transpose(k)) !== -1 ? 0 : 1;
+      }
+      if (mine(a) !== mine(b)) return mine(a) - mine(b);
+      if (groups[b].length !== groups[a].length) return groups[b].length - groups[a].length;
+      function area(k) { var p = k.split("x"); return (+p[0]) * (+p[1]); }
+      return area(b) - area(a);
+    });
+    keys.forEach(function (key) {
+      grid.appendChild(groupHeader(key, config, groups[key].length));
+      var section = el("div", { style: "display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px" });
+      groups[key].forEach(function (t) { section.appendChild(card(t)); });
+      grid.appendChild(section);
+    });
+  }
+
+  var config = readConfig();
   fetch("/plugins/templates/index.json")
     .then(function (resp) { return resp.json().then(function (b) { return { ok: resp.ok, body: b }; }); })
     .then(function (r) {
-      grid.textContent = "";
       if (!r.ok) {
+        grid.textContent = "";
         grid.appendChild(el("div", { text: r.body.error || "Template catalog unavailable right now.", style: "opacity:.7" }));
         return;
       }
-      var templates = r.body.templates || [];
-      if (!templates.length) {
-        grid.appendChild(el("div", { text: "No templates published yet. Share one from the panels editor!", style: "opacity:.7" }));
-        return;
-      }
-      templates.forEach(function (t) { grid.appendChild(card(t)); });
+      render(r.body.templates || [], config);
     })
     .catch(function () {
       grid.textContent = "";

@@ -8,6 +8,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Community templates get their own page, grouped by resolution.** Browse now links to a
+  dedicated Templates page where templates are grouped by canvas size, each group labelled
+  with the devices that fit those dimensions (portrait mounts matched as "rotated") and the
+  resolutions of your own registered panels pinned to the top. Fixes the Install button
+  landing on a 404: the editor URL now comes from the server rather than a hardcoded client
+  path (the share dialog's preview URL had the same stale path).
+
 - **Settings → System gains an Experiments card.** Every experiment flag (canvas editor,
   MCP API, template marketplace) is now a labelled toggle with its description and resolved
   state; flips take effect immediately with no restart. Flags pinned by a
