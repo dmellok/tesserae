@@ -208,3 +208,53 @@ def test_backup_restore_runs_under_docker(
     # Updates-card upgrade instructions on the system page.
     assert "aren&#39;t supported in the Docker image" not in body
     assert f"Restored from {backup_id}" in body
+
+
+# -- experiments card ---------------------------------------------------
+
+
+def test_experiments_card_renders_and_toggles(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    body = client.get("/settings/system").get_data(as_text=True)
+    assert "Experiments" in body and "Template marketplace" in body
+
+    # Enable the templates experiment via the card's form.
+    resp = client.post(
+        "/settings/system/experiments/toggle",
+        data={"name": "templates", "enable": "1"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    assert app.config["SETTINGS_STORE"].get_section("experiments").get("templates") is True
+
+    # Disable round-trips too (enable="0" must NOT parse truthy).
+    client.post(
+        "/settings/system/experiments/toggle",
+        data={"name": "templates", "enable": "0"},
+    )
+    assert app.config["SETTINGS_STORE"].get_section("experiments").get("templates") is False
+
+
+def test_experiments_toggle_rejects_unknown_and_env_forced(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    client.post("/settings/system/experiments/toggle", data={"name": "nope", "enable": "1"})
+    assert "nope" not in (app.config["SETTINGS_STORE"].get_section("experiments") or {})
+
+    monkeypatch.setenv("TESSERAE_EXPERIMENT_TEMPLATES", "0")
+    client.post("/settings/system/experiments/toggle", data={"name": "templates", "enable": "1"})
+    assert (app.config["SETTINGS_STORE"].get_section("experiments") or {}).get("templates") is None
+
+
+def test_mcp_toggle_disable_actually_disables(app: Flask) -> None:
+    """Regression: the disable button posts enable="0", and bool("0") is True,
+    which used to re-enable the experiment instead of disabling it."""
+    client = app.test_client()
+    _sign_in(client)
+    client.post("/settings/system/mcp/toggle", data={"enable": "1"})
+    assert app.config["SETTINGS_STORE"].get_section("experiments").get("mcp") is True
+    client.post("/settings/system/mcp/toggle", data={"enable": "0"})
+    assert app.config["SETTINGS_STORE"].get_section("experiments").get("mcp") is False

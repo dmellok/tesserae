@@ -168,6 +168,16 @@ def settings_area(area: str) -> str | Response:
     system_mcp_enabled = _experiments.is_enabled("mcp")
     system_mcp_token_set = False
     system_mcp_reveal_token = session.pop("_mcp_token_reveal", "") if area == "system" else ""
+    # Experiments card: one row per catalogued flag, with the resolved state
+    # and whether an env var pins it (row renders read-only then).
+    system_experiments = [
+        {
+            **entry,
+            "enabled": _experiments.is_enabled(entry["name"]),
+            "env_forced": _experiments.env_override(entry["name"]) is not None,
+        }
+        for entry in _experiments.CATALOG
+    ]
     # Same one-shot pattern for TRMNL access tokens after devices_add
     # creates a trmnl_client instance. Only honoured on the Devices
     # tab, that's where the modal lives and where the user is when
@@ -282,6 +292,7 @@ def settings_area(area: str) -> str | Response:
         system_mcp_enabled=system_mcp_enabled,
         system_mcp_token_set=system_mcp_token_set,
         system_mcp_reveal_token=system_mcp_reveal_token,
+        system_experiments=system_experiments,
         system_password_set=system_password_set,
         system_password_required=system_password_required,
         # v0.70.0: install-identifier metadata for the Settings -> System

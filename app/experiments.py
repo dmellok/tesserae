@@ -43,12 +43,48 @@ _DEFAULTS: dict[str, bool] = {
 }
 
 
+# Settings → System → Experiments card: one row per flag. Kept here beside
+# _DEFAULTS so adding a flag and describing it happen in the same file.
+CATALOG: tuple[dict[str, str], ...] = (
+    {
+        "name": "composer",
+        "label": "Panels canvas editor",
+        "description": (
+            "The freeform WYSIWYG dashboard editor at /experiments/composer/. "
+            "On by default but unlinked from the nav."
+        ),
+    },
+    {
+        "name": "mcp",
+        "label": "MCP API (agent access)",
+        "description": (
+            "The token-authed /api/mcp surface AI agents use to build canvas "
+            "dashboards. Managed in detail by the MCP card below."
+        ),
+    },
+    {
+        "name": "templates",
+        "label": "Template marketplace",
+        "description": (
+            "Share dashboards to the community catalog and install templates "
+            "from Browse. Submissions are reviewed before they go public."
+        ),
+    },
+)
+
+
 def _env_flag(name: str) -> bool | None:
     """The env override for ``name``, or None when the var is unset."""
     raw = os.environ.get(f"TESSERAE_EXPERIMENT_{name.upper()}")
     if raw is None:
         return None
     return raw.strip().lower() in _TRUTHY
+
+
+def env_override(name: str) -> bool | None:
+    """The forced env-var value for ``name`` (None = not forced). The Settings
+    card disables a row's toggle when a deployment pins the flag this way."""
+    return _env_flag(name)
 
 
 def is_enabled(name: str) -> bool:

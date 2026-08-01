@@ -8,6 +8,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Settings → System gains an Experiments card.** Every experiment flag (canvas editor,
+  MCP API, template marketplace) is now a labelled toggle with its description and resolved
+  state; flips take effect immediately with no restart. Flags pinned by a
+  `TESSERAE_EXPERIMENT_*` env var render locked with the reason. Also fixes the MCP card's
+  Disable button, which posted a value that parsed truthy and silently re-enabled the API
+  instead of disabling it.
+
 - **Template marketplace (experimental): share and install community dashboard templates.**
   Behind the new `templates` experiment flag and the master online switch. Sharing (a new
   action in the panels editor) exports a canvas dashboard through a sanitizer that strips

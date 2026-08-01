@@ -311,6 +311,33 @@ def system_webhook_set() -> Response:
     return system_redirect()
 
 
+# -- experiments --------------------------------------------------------
+
+
+@bp.post("/settings/system/experiments/toggle")
+def system_experiments_toggle() -> Response:
+    """Flip one experiment flag from the Settings → System → Experiments card.
+    Only names in the experiments catalog are accepted; an env-var-forced flag
+    is refused (the UI disables those rows, this is the backstop)."""
+    from app import experiments as _experiments
+
+    name = (request.form.get("name") or "").strip()
+    if not any(entry["name"] == name for entry in _experiments.CATALOG):
+        flash(f"Unknown experiment: {name}", "error")
+        return system_redirect()
+    if _experiments.env_override(name) is not None:
+        flash(
+            f"'{name}' is forced by TESSERAE_EXPERIMENT_{name.upper()}; "
+            "unset the env var to control it here.",
+            "error",
+        )
+        return system_redirect()
+    enable = request.form.get("enable") == "1"
+    settings_store().patch_section("experiments", {name: enable})
+    flash(f"Experiment '{name}' {'enabled' if enable else 'disabled'}.", "ok")
+    return system_redirect()
+
+
 # -- MCP ----------------------------------------------------------------
 
 
@@ -318,7 +345,9 @@ def system_webhook_set() -> Response:
 def system_mcp_toggle() -> Response:
     """Enable or disable the ``mcp`` experiment (the agent-facing canvas API).
     Off by default; while off, ``/api/mcp/*`` 404s entirely."""
-    enable = bool(request.form.get("enable"))
+    # ``== "1"`` not ``bool(...)``: the disable button posts enable="0", and
+    # bool("0") is True, which used to re-enable instead of disabling.
+    enable = request.form.get("enable") == "1"
     settings_store().patch_section("experiments", {"mcp": enable})
     flash("MCP API enabled." if enable else "MCP API disabled.", "ok")
     return system_redirect()
