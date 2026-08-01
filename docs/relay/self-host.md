@@ -1,0 +1,44 @@
+# Self-host the relay
+
+The [remote-panel feature](../install/remote-panel.md) can use the hosted
+`relay.tesserae.ink`, or your own relay running in your own Cloudflare account.
+Self-hosting keeps the whole path under your control; the relay is
+zero-knowledge either way, so it only ever sees encrypted frames.
+
+## Deploy
+
+The Worker source lives in `packages/relay/` in the Tesserae repo. You need a
+Cloudflare account and [`wrangler`](https://developers.cloudflare.com/workers/wrangler/).
+
+```sh
+cd packages/relay
+npm install
+wrangler r2 bucket create tesserae-relay   # one-time
+wrangler deploy
+```
+
+`wrangler deploy` prints your Worker URL (e.g.
+`https://tesserae-relay.<you>.workers.dev`). Bind a custom domain in the
+Cloudflare dashboard for a stable hostname if you like.
+
+## Point Tesserae at it
+
+**Settings → Cloud relay**, set the relay URL to your Worker's origin, and
+**Register this install**. Everything else (adding a remote panel, pairing) is
+the same as with the hosted relay.
+
+## Cost
+
+One R2 bucket holds the sealed frames and the small install/token/pairing
+records. A panel polling every 15–60 minutes is a few requests per day and a few
+KB per frame, well inside Cloudflare's free tier. There are no Durable Objects
+(v1 is scheduled-poll-only and R2 is strongly consistent), so no paid Workers
+plan is required.
+
+## Restricting who can register (hosted operators)
+
+If you run a relay for other people, override `checkEntitlement(env, request)`
+in `packages/relay/src/index.js` to add a Sponsors or billing check before an
+install may register. It defaults to allow; a rejection is returned as `403`.
+
+See `packages/relay/README.md` for the same steps alongside the source.

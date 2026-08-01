@@ -92,6 +92,7 @@ nav:
   - Physical buttons: install/buttons.md
   - Touch interactions: install/touch.md
   - REST transport (no broker): install/rest-transport.md
+  - Remote panel (cloud relay): install/remote-panel.md
   - OpenDisplay tags: install/opendisplay.md
   - Hardware quickstarts:
       - Overview: quickstart/index.md
@@ -128,6 +129,8 @@ nav:
       - Client protocol spec: dev/client-protocol.md
       - Protocol v2 (device-owned touch): protocol-v2-touch.md
       - OTA firmware updates: ota/contract.md
+      - Cloud relay contract: relay/contract.md
+      - Self-host the cloud relay: relay/self-host.md
       - Panel colour calibration: dev/calibration.md
       - OpenAPI spec & SDK generation: dev/openapi.md
   - Build dashboards with AI (MCP): dev/mcp.md

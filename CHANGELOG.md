@@ -8,6 +8,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Run a panel at another location, without a VPN or opening your network.** A new
+  cloud-relay transport lets a remote e-ink panel show your home instance's dashboards
+  over the internet. Both ends connect outbound to a small relay mailbox (a Cloudflare
+  Worker, hosted or self-hosted), so your home network never accepts an inbound
+  connection. Frames are sealed end-to-end (X25519 + AES-256-GCM), so the relay stores
+  ciphertext only and can never read a dashboard. Pairing is done remotely through the
+  relay, no LAN access to the panel needed. See the remote-panel guide. Panel firmware
+  must support decrypting relay frames.
+
 - **Installing a template now asks its questions with real controls, not blank text boxes.**
   A template's declared inputs are resolved against the *installing* server's own widget option
   schemas, so a question about Home Assistant sensors renders as a picker over your entities,

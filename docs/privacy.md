@@ -168,6 +168,20 @@ path is a Home Assistant feature, not Tesserae phoning home; the
 [Home Assistant privacy policy](https://www.home-assistant.io/privacy/)
 covers what Supervisor sends.
 
+## Cloud relay (remote panels)
+
+Separate from the switches above, and off unless you set it up: the
+[remote-panel feature](install/remote-panel.md) lets a panel at another
+location show your dashboards by way of a cloud relay (the hosted
+`relay.tesserae.ink` or [your own](relay/self-host.md)). When enabled,
+your server uploads each rendered frame to the relay for the paired remote
+panel to fetch. The frame is **sealed end-to-end** with a key only your
+server and that panel share, so the relay stores ciphertext only and cannot
+read your dashboards; it sees the encrypted frame plus routing metadata
+(which install and device, frame size, timing). Nothing is sent for a
+device until you pair it, and self-hosting the relay keeps even that
+metadata under your control.
+
 ## Per-device telemetry (stays on the server)
 
 Tesserae *does* track per-device diagnostics for the displays you
