@@ -26,25 +26,47 @@ transits the relay.
 
 ## Set it up
 
-### 1. Link your install to the relay
+Your **home instance must be running** during pairing, it is what completes the
+handshake.
 
-**Settings → Cloud relay.** Set the relay URL (default `https://relay.tesserae.ink`)
-and choose **Register this install**. Tesserae generates a keypair, registers its
-public key with the relay, and stores the returned credentials. This only runs
-outbound; nothing is opened on your network.
+### 1. Link your install to the relay (once)
+
+Only needed the first time you use the relay. **Settings → Cloud relay**, set
+the relay URL (default `https://relay.tesserae.ink`) and choose **Register this
+install**. Tesserae generates a keypair, registers its public key, and stores
+the returned credentials. Outbound only; nothing is opened on your network.
 
 ### 2. Add the remote panel
 
-Choose **Add a remote panel**, pick the panel kind and screen size as you would
-for any device, and Tesserae shows a **pairing code** plus the relay URL.
+**Settings → Cloud relay → Add a remote panel.** Pick the device kind, screen
+size, and an id/name (e.g. `parents_panel`) as you would for any device.
+Tesserae shows a **pairing code** plus the relay URL. The code expires in about
+10 minutes.
 
 ### 3. Enter the code on the panel
 
 At the remote location, give the panel the relay URL and the pairing code (via
-its captive portal or companion app). The panel and your home instance complete
-the handshake through the relay; within a poll or two the panel is paired and
-starts showing frames. You can take the panel to its destination first, the
-pairing happens over the internet, not your LAN.
+its captive portal / companion app). The panel generates its keypair and pairs
+**over the internet**, so it can already be at its destination, no LAN access
+needed. Within a poll or two (about 30 seconds) your home instance completes the
+handshake and the device appears under **Settings → Devices** and **Cloud relay
+→ Remote panels**.
+
+### 4. Give it a dashboard
+
+It is a normal device now. Compose a page bound to it (or add it to a rotation /
+schedule) and **Send**, exactly like a local panel. That render is what gets
+sealed and uploaded to its relay mailbox. It appears on the panel at its next
+wake, and each later render lands on the following poll.
+
+### If it does not pair
+
+- **Code expired** — mint a fresh one (10-minute window).
+- **Nothing after ~1 min** — confirm the home instance is running and the Cloud
+  relay page shows "linked", and the panel's relay URL exactly matches.
+- **Paired but blank** — it has no dashboard yet; do step 4.
+- **Start over** — Cloud relay → Remote panels → **Remove** drops the mailbox +
+  token, then re-add.
 
 ## How fresh is it?
 
