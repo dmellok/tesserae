@@ -1,0 +1,14 @@
+{
+  "name": "tesserae-relay",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Cloudflare Worker: zero-knowledge store-and-forward mailbox for remote Tesserae e-ink panels.",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4"
+  }
+}

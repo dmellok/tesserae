@@ -1,0 +1,21 @@
+{
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"name": "tesserae-relay",
+	"main": "src/index.js",
+	"compatibility_date": "2026-07-01",
+	// Sealed frames + the small install/token/pairing records all live in one
+	// R2 bucket (strongly consistent; the free tier covers a household). Create
+	// it with: wrangler r2 bucket create tesserae-relay
+	"r2_buckets": [
+		{
+			"binding": "RELAY_BUCKET",
+			"bucket_name": "tesserae-relay"
+		}
+	],
+	"observability": {
+		"enabled": true
+	}
+	// The relay is zero-knowledge: it stores opaque sealed frames and never
+	// holds a frame key, so there are no signing secrets to configure. Gate
+	// hosted registration by overriding checkEntitlement() in src/index.js.
+}
