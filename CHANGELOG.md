@@ -8,6 +8,20 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Template marketplace (experimental): share and install community dashboard templates.**
+  Behind the new `templates` experiment flag and the master online switch. Sharing (a new
+  action in the panels editor) exports a canvas dashboard through a sanitizer that strips
+  request headers and secret-flagged options (a new `secret` flag on `cell_options`;
+  `rest_service` url/headers carry it), clears install-specific values (HA entities,
+  locations) into declared install-time inputs, inlines small page-asset backgrounds, and
+  runs a credential lint that blocks anything key-shaped; submissions go to api.tesserae.ink
+  and are human-reviewed before appearing publicly. Browse gains a Community Templates
+  section: cards show a stable pseudonymous author (sponsors get an emblem and a custom
+  name), installing fills the template's declared inputs (secrets entered masked, staying
+  local) and creates a new unbound dashboard. Removing a template from the catalog never
+  touches dashboards already created from it. The privacy page documents exactly what a
+  submission contains.
+
 - **Panel view: preview a dashboard as the e-ink panel will actually paint it.** The
   dashboard editor's live preview gains an HTML view / Panel view toggle. Panel view
   quantises and dithers the render to the target panel's colour palette, so you see the

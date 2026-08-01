@@ -35,6 +35,11 @@ _DEFAULTS: dict[str, bool] = {
     # token-authed surface. Off by default since it opens a new (auth-gated)
     # API; opt in from Settings → System → MCP.
     "mcp": False,
+    # Template marketplace (share + browse community dashboard templates via
+    # api.tesserae.ink). Off by default while the hosted review pipeline is
+    # settling in; gates the Share dialog, the share routes, and the Browse
+    # Templates tab in one switch.
+    "templates": False,
 }
 
 

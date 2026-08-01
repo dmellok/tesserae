@@ -85,6 +85,24 @@ The Browse page reads the aggregate counts from
 `https://api.tesserae.ink/widgets/installs`. A coarse country is derived
 from the request IP on the server side and the IP is then discarded.
 
+### Template marketplace (share + browse)
+
+Sharing a dashboard template is always an explicit action: nothing is sent
+until you press Submit in the Share dialog. A submission POSTs to
+`https://api.tesserae.ink/templates/submit` with the sanitized template JSON
+(the export step strips request headers, options marked secret, and
+install-specific values like Home Assistant entity ids; a credential lint
+blocks the submission if anything key-shaped remains), a rendered preview
+image of the dashboard, your install's random ID, and your running version.
+Submissions are human-reviewed before they appear publicly. Your public
+author name is a stable pseudonym derived server-side from your install ID
+(e.g. `amber-heron-42`); no real name, email, or account is involved.
+Browsing templates fetches the public catalog from
+`https://api.tesserae.ink/templates/index.json`; installing one fetches its
+JSON and POSTs an anonymous install count event (same shape as the widget
+install count above). A coarse country is derived from the request IP on the
+server side and the IP is then discarded.
+
 ### Daily heartbeat
 
 Once a day, Tesserae POSTs to `https://api.tesserae.ink/heartbeat` so the

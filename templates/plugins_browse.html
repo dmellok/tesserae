@@ -131,6 +131,21 @@
 </section>
 {% endif %}
 
+{% if templates_enabled %}
+{# Community dashboard templates (hosted catalog, human-reviewed). Rendered
+   client-side by template_browse.js from the server-side proxy at
+   /plugins/templates/index.json, so a slow catalog never blocks this page. #}
+<section class="dx-section-card" id="tpl-market" style="margin:16px 0;padding:16px">
+  <h2 style="margin:0 0 4px"><i class="ph ph-layout" aria-hidden="true"></i> Community templates</h2>
+  <p style="margin:0 0 12px;opacity:.75">Complete dashboards shared by other Tesserae users,
+     reviewed before publishing. Installing one creates a new dashboard you can edit and bind
+     to your panels.</p>
+  <div id="tpl-market-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px">
+    <div style="opacity:.7">Loading templates…</div>
+  </div>
+</section>
+{% endif %}
+
 {% if entries %}
 <div class="marketplace-grid">
   {% for e in entries %}
@@ -574,6 +589,9 @@
   }
 </style>
 <script src="{{ url_for('static', filename='plugins_browse_carousel.js') }}" defer></script>
+{% if templates_enabled %}
+<script src="{{ url_for('static', filename='template_browse.js') }}" defer></script>
+{% endif %}
 <script>
   // Client-side catalog search. Filters the marketplace grid by
   // showing/hiding article cards in the DOM as the user types, so

@@ -1,17 +1,24 @@
 """Outbound calls to api.tesserae.ink, behind a single master opt-out.
 
 Everything Tesserae sends to api.tesserae.ink (app + device-firmware update
-checks, the marketplace install count, and the daily heartbeat) is gated by one
-setting, ``settings.app.online_features``. It is ON by default; turning it off
-means the app never contacts api.tesserae.ink.
+checks, the marketplace install count, the daily heartbeat, and the template
+marketplace calls) is gated by one setting, ``settings.app.online_features``.
+It is ON by default; turning it off means the app never contacts
+api.tesserae.ink.
 
 What is sent is documented on the privacy page: the install's random id (from
-``data/core/install_id.json``), the widget id, and the running version. A coarse
-country is derived from the caller IP on the server side and the IP is then
-discarded. No account, no personal data, no IP or User-Agent is stored.
+``data/core/install_id.json``), the widget/template id, and the running
+version. Sharing a dashboard template additionally sends, ONLY when the user
+explicitly submits one: the sanitized template JSON (secrets and
+install-specific values stripped at export), the rendered preview image, the
+install id, and the app version. A coarse country is derived from the caller
+IP on the server side and the IP is then discarded. No account, no personal
+data, no IP or User-Agent is stored.
 
-Every call here is best-effort: it never raises, and a failure (endpoint down,
-offline, opted out) degrades to "no data" rather than surfacing an error.
+Every call here is best-effort and never raises, EXCEPT
+:func:`submit_template` (a user-initiated action whose failure must surface
+in the Share dialog). A failure elsewhere (endpoint down, offline, opted out)
+degrades to "no data" rather than surfacing an error.
 """
 
 from __future__ import annotations
@@ -230,3 +237,183 @@ def latest_version(
     except Exception as exc:
         logger.debug("online: version check failed: %s", exc)
     return None
+
+
+# -- template marketplace ------------------------------------------------
+#
+# Unlike the fire-and-forget telemetry above, submitting a template is a
+# USER-INITIATED action whose failure must surface in the dialog, so
+# ``submit_template`` raises. Everything else here stays best-effort. What a
+# submission contains is documented on the privacy page: the sanitized
+# template JSON (secrets stripped at export), the rendered preview PNG, the
+# install id, and the app version.
+
+_SUBMIT_TIMEOUT_SECONDS = 15.0
+_template_index_cache: tuple[float, dict[str, Any]] | None = None
+
+
+class TemplateSubmitError(Exception):
+    """Submission failed; ``str(err)`` is safe to show in the dialog."""
+
+
+class TemplateRevokedError(Exception):
+    """The requested template was removed by the moderators (HTTP 410)."""
+
+
+def submit_template(
+    template: dict[str, Any],
+    preview_png_b64: str,
+    install_id: str | None,
+    version: str | None,
+    *,
+    api_base: str = API_BASE,
+) -> dict[str, Any]:
+    """POST a template submission; returns the server ack
+    (``{status, id, slug, author}``). Raises :class:`TemplateSubmitError`
+    with a user-facing message on any failure. The caller checks
+    :func:`online_enabled` first."""
+    body = json.dumps(
+        {
+            "template": template,
+            "preview_png_b64": preview_png_b64,
+            "install": install_id or "",
+            "version": version or "",
+        }
+    ).encode("utf-8")
+    req = urllib.request.Request(
+        f"{api_base.rstrip('/')}/templates/submit",
+        data=body,
+        method="POST",
+        headers={"Content-Type": "application/json", "User-Agent": "tesserae-template"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=_SUBMIT_TIMEOUT_SECONDS) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+            if not isinstance(payload, dict):
+                raise TemplateSubmitError("unexpected response from the template service")
+            return payload
+    except urllib.error.HTTPError as exc:
+        detail = ""
+        with contextlib.suppress(Exception):
+            raw = json.loads(exc.read().decode("utf-8"))
+            d = raw.get("detail")
+            detail = str(d.get("message") or "") if isinstance(d, dict) else str(d or "")
+        with contextlib.suppress(Exception):
+            exc.close()
+        if exc.code == 429:
+            raise TemplateSubmitError(
+                detail or "submission limit reached; try again later"
+            ) from exc
+        if exc.code == 413:
+            raise TemplateSubmitError(detail or "template or preview too large") from exc
+        raise TemplateSubmitError(detail or f"submission rejected (HTTP {exc.code})") from exc
+    except TemplateSubmitError:
+        raise
+    except Exception as exc:
+        raise TemplateSubmitError("could not reach the template service") from exc
+
+
+def fetch_template_author(
+    install_id: str | None, *, api_base: str = API_BASE
+) -> dict[str, Any] | None:
+    """The pseudonym this install would publish under (share-dialog preview).
+    Best-effort: None on any failure."""
+    if not install_id:
+        return None
+    url = f"{api_base.rstrip('/')}/templates/author?install={install_id}"
+    req = urllib.request.Request(url, headers={"User-Agent": "tesserae-template"})
+    try:
+        with urllib.request.urlopen(req, timeout=_TIMEOUT_SECONDS) as resp:
+            if int(resp.status) == 200:
+                payload = json.loads(resp.read().decode("utf-8"))
+                author = payload.get("author") if isinstance(payload, dict) else None
+                return author if isinstance(author, dict) else None
+    except Exception as exc:
+        logger.debug("online: template author fetch failed: %s", exc)
+    return None
+
+
+def fetch_template_index(
+    *, api_base: str = API_BASE, ttl: float = _COUNTS_TTL_SECONDS
+) -> dict[str, Any] | None:
+    """``GET /templates/index.json`` (approved templates), TTL-cached.
+    Best-effort: None means the catalog is unreachable (the Browse tab shows
+    an offline state rather than an empty gallery)."""
+    global _template_index_cache
+    now = time.time()
+    if _template_index_cache is not None and (now - _template_index_cache[0]) < ttl:
+        return _template_index_cache[1]
+    url = f"{api_base.rstrip('/')}/templates/index.json"
+    req = urllib.request.Request(url, headers={"User-Agent": "tesserae-template"})
+    try:
+        with urllib.request.urlopen(req, timeout=_TIMEOUT_SECONDS) as resp:
+            if int(resp.status) == 200:
+                payload = json.loads(resp.read().decode("utf-8"))
+                if isinstance(payload, dict):
+                    _template_index_cache = (now, payload)
+                    return payload
+    except Exception as exc:
+        logger.debug("online: template index fetch failed: %s", exc)
+    return None
+
+
+def clear_template_index_cache() -> None:
+    """Drop the cached template index (tests + explicit refresh)."""
+    global _template_index_cache
+    _template_index_cache = None
+
+
+def fetch_template_doc(slug: str, *, api_base: str = API_BASE) -> dict[str, Any] | None:
+    """``GET /templates/<slug>.json`` -> the full template payload, fetched
+    server-side at install time (same trust posture as the widget marketplace:
+    never install from a client-supplied doc). Raises
+    :class:`TemplateRevokedError` on 410; returns None on other failures."""
+    url = f"{api_base.rstrip('/')}/templates/{slug}.json"
+    req = urllib.request.Request(url, headers={"User-Agent": "tesserae-template"})
+    try:
+        with urllib.request.urlopen(req, timeout=_SUBMIT_TIMEOUT_SECONDS) as resp:
+            if int(resp.status) == 200:
+                payload = json.loads(resp.read().decode("utf-8"))
+                return payload if isinstance(payload, dict) else None
+    except urllib.error.HTTPError as exc:
+        code = exc.code
+        with contextlib.suppress(Exception):
+            exc.close()
+        if code == 410:
+            raise TemplateRevokedError(slug) from exc
+        logger.debug("online: template doc fetch failed: %s", exc)
+    except Exception as exc:
+        logger.debug("online: template doc fetch failed: %s", exc)
+    return None
+
+
+def report_template_install(
+    slug: str,
+    install_id: str | None,
+    version: str | None,
+    *,
+    api_base: str = API_BASE,
+) -> bool:
+    """POST one template-install event. Best-effort, mirrors
+    :func:`report_widget_install`."""
+    if not slug:
+        return False
+    body = json.dumps({"slug": slug, "install": install_id or "", "version": version or ""}).encode(
+        "utf-8"
+    )
+    req = urllib.request.Request(
+        f"{api_base.rstrip('/')}/templates/install",
+        data=body,
+        method="POST",
+        headers={"Content-Type": "application/json", "User-Agent": "tesserae-template"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=_TIMEOUT_SECONDS) as resp:
+            return 200 <= int(resp.status) < 300
+    except urllib.error.HTTPError as exc:
+        with contextlib.suppress(Exception):
+            exc.close()
+        logger.debug("online: template install report failed: %s", exc)
+    except Exception as exc:
+        logger.debug("online: template install report failed: %s", exc)
+    return False

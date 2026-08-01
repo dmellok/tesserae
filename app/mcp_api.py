@@ -1761,6 +1761,89 @@ _DIAG_JS: str = r"""() => {
 }"""
 
 
+def build_render_report(
+    page_id: str, page: Any, *, host_url: str, debug: bool = False, fresh: bool = False
+) -> dict[str, Any]:
+    """Render ``page`` headless and build the full report dict (elements,
+    touch wiring, icon_invalid, optional diagnostics). Extracted from the
+    route (move-only) so the template Share flow can run the same quality
+    gate without going through the token-gated MCP blueprint. Raises on
+    renderer failure; the callers translate that to their own error shape."""
+    from app.renderer import InspectRequest, RenderRequest, inspect_composed, to_loopback_url
+    from app.touch_regions import (
+        EXTRACT_INTERACTIVE_JS,
+        normalize_regions,
+        normalize_slots,
+        split_capture_result,
+    )
+
+    path = url_for("composer.compose", page_id=page_id)
+    if fresh:
+        path += "?fresh=1"
+    url = to_loopback_url(host_url.rstrip("/") + path)
+    # One navigation, two scripts: the element report plus the combined
+    # touch-region + overlay-slot map (issue #49 / hybrid render mode),
+    # so an agent can verify which boxes its data-on-tap / @name /
+    # data-overlay-key annotations actually produced. ``debug`` rides a
+    # third script along (the in-page diagnostics) plus the renderer's own
+    # event capture, still one navigation.
+    combined = (
+        "async () => ({ ...("
+        + _REPORT_JS
+        + ")(), interactive: await ("
+        + EXTRACT_INTERACTIVE_JS
+        + ")()"
+        + (", diag: (" + _DIAG_JS + ")()" if debug else "")
+        + " })"
+    )
+    ir = InspectRequest(
+        render=RenderRequest(url=url, viewport_w=page.canvas.w, viewport_h=page.canvas.h),
+        script=combined,
+        diagnostics=debug,
+    )
+    report = inspect_composed(ir, pool=current_app.config.get("BROWSER_POOL"))
+    renderer_diag: dict[str, Any] = {}
+    if debug and isinstance(report, dict) and "diagnostics" in report:
+        renderer_diag = report.get("diagnostics") or {}
+        report = report.get("result")
+    if not isinstance(report, dict):
+        report = {"board": {}, "elements": []}
+    if debug:
+        # Merge the renderer-side capture (console / errors / network /
+        # settle) with the in-page report (fonts / css / libraries).
+        page_diag = report.pop("diag", None)
+        report["diagnostics"] = {
+            **renderer_diag,
+            **(page_diag if isinstance(page_diag, dict) else {}),
+        }
+    raw_regions, raw_slots = split_capture_result(report.pop("interactive", None))
+    regions = normalize_regions(raw_regions)
+    report["tap_regions"] = regions
+    # Overlay value slots (hybrid render mode): the data-overlay-key
+    # elements that actually extracted, with their resolved box + font
+    # bucket, so an agent can confirm a slot annotation survived the
+    # render (an empty list against authored annotations means the
+    # element collapsed, or sits inside a code-element iframe, which
+    # the extractor deliberately skips).
+    report["overlay_slots"] = normalize_slots(raw_slots)
+    report["tap_dangling"] = sorted({n for r in regions for n in r.get("dangling", [])})
+    # Icon references that resolve to no glyph (bad slug / weight / bind table
+    # / ph-<name> markup class). Server-side against the vendored manifest,
+    # always on, mirroring tap_invalid: a blank icon box is named here instead
+    # of being pixel-hunted.
+    report["icon_invalid"] = _invalid_icons(page.canvas)
+    # Regions whose declared action wouldn't dispatch (issue #49). Empty
+    # tap_invalid means every region will actually fire; a non-empty list
+    # is the honest signal that a dashboard looks wired but is dead, e.g.
+    # an HA call missing its domain/service or a bad structured shape.
+    report["tap_invalid"] = [
+        {"x": r["x"], "y": r["y"], "w": r["w"], "h": r["h"], **bad}
+        for r in regions
+        for bad in r.get("invalid", [])
+    ]
+    return report
+
+
 @bp.get("/pages/<page_id>/render_report")
 def render_report(page_id: str) -> Response:
     """A machine-readable companion to preview.png. Renders the canvas headless and
@@ -1826,83 +1909,14 @@ def render_report(page_id: str) -> Response:
     page = _pr._get_canvas(page_id)
     if page is None or page.canvas is None:
         return _err(404, f"no canvas dashboard {page_id!r}")
-    from app.renderer import InspectRequest, RenderRequest, inspect_composed, to_loopback_url
-    from app.touch_regions import (
-        EXTRACT_INTERACTIVE_JS,
-        normalize_regions,
-        normalize_slots,
-        split_capture_result,
-    )
-
     debug = request.args.get("debug") in ("1", "true", "True")
     fresh = request.args.get("fresh") in ("1", "true", "True")
-    path = url_for("composer.compose", page_id=page_id)
-    if fresh:
-        path += "?fresh=1"
-    url = to_loopback_url(request.host_url.rstrip("/") + path)
-    # One navigation, two scripts: the element report plus the combined
-    # touch-region + overlay-slot map (issue #49 / hybrid render mode),
-    # so an agent can verify which boxes its data-on-tap / @name /
-    # data-overlay-key annotations actually produced. ``?debug=1`` rides a
-    # third script along (the in-page diagnostics) plus the renderer's own
-    # event capture, still one navigation.
-    combined = (
-        "async () => ({ ...("
-        + _REPORT_JS
-        + ")(), interactive: await ("
-        + EXTRACT_INTERACTIVE_JS
-        + ")()"
-        + (", diag: (" + _DIAG_JS + ")()" if debug else "")
-        + " })"
-    )
-    ir = InspectRequest(
-        render=RenderRequest(url=url, viewport_w=page.canvas.w, viewport_h=page.canvas.h),
-        script=combined,
-        diagnostics=debug,
-    )
     try:
-        report = inspect_composed(ir, pool=current_app.config.get("BROWSER_POOL"))
+        report = build_render_report(
+            page_id, page, host_url=request.host_url, debug=debug, fresh=fresh
+        )
     except Exception as err:
         return _err(502, f"render report failed: {type(err).__name__}: {err}")
-    renderer_diag: dict[str, Any] = {}
-    if debug and isinstance(report, dict) and "diagnostics" in report:
-        renderer_diag = report.get("diagnostics") or {}
-        report = report.get("result")
-    if not isinstance(report, dict):
-        report = {"board": {}, "elements": []}
-    if debug:
-        # Merge the renderer-side capture (console / errors / network /
-        # settle) with the in-page report (fonts / css / libraries).
-        page_diag = report.pop("diag", None)
-        report["diagnostics"] = {
-            **renderer_diag,
-            **(page_diag if isinstance(page_diag, dict) else {}),
-        }
-    raw_regions, raw_slots = split_capture_result(report.pop("interactive", None))
-    regions = normalize_regions(raw_regions)
-    report["tap_regions"] = regions
-    # Overlay value slots (hybrid render mode): the data-overlay-key
-    # elements that actually extracted, with their resolved box + font
-    # bucket, so an agent can confirm a slot annotation survived the
-    # render (an empty list against authored annotations means the
-    # element collapsed, or sits inside a code-element iframe, which
-    # the extractor deliberately skips).
-    report["overlay_slots"] = normalize_slots(raw_slots)
-    report["tap_dangling"] = sorted({n for r in regions for n in r.get("dangling", [])})
-    # Icon references that resolve to no glyph (bad slug / weight / bind table
-    # / ph-<name> markup class). Server-side against the vendored manifest,
-    # always on, mirroring tap_invalid: a blank icon box is named here instead
-    # of being pixel-hunted.
-    report["icon_invalid"] = _invalid_icons(page.canvas)
-    # Regions whose declared action wouldn't dispatch (issue #49). Empty
-    # tap_invalid means every region will actually fire; a non-empty list
-    # is the honest signal that a dashboard looks wired but is dead, e.g.
-    # an HA call missing its domain/service or a bad structured shape.
-    report["tap_invalid"] = [
-        {"x": r["x"], "y": r["y"], "w": r["w"], "h": r["h"], **bad}
-        for r in regions
-        for bad in r.get("invalid", [])
-    ]
     # ``?fields=a,b`` trims the response to the named top-level sections so a
     # feedback loop can ask for just what it needs (e.g. ``tap_invalid,
     # tap_dangling``) instead of pulling the whole ``elements`` array, which

@@ -322,6 +322,7 @@ def browse() -> str:
             stale=False,
             error=None,
             restart_pending=_restart_pending(),
+            templates_enabled=_templates_enabled(),
         )
     error: str | None = None
     stale = False
@@ -360,6 +361,17 @@ def browse() -> str:
         stale=stale,
         error=error,
         restart_pending=_restart_pending(),
+        templates_enabled=_templates_enabled(),
+    )
+
+
+def _templates_enabled() -> bool:
+    """Whether the community-templates section shows on Browse: the experiment
+    flag AND the master online switch (the section is pure hosted content)."""
+    from app import experiments, online
+
+    return experiments.is_enabled("templates") and online.online_enabled(
+        current_app.config.get("SETTINGS_STORE")
     )
 
 

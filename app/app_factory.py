@@ -909,6 +909,12 @@ def create_app(
     from app import marketplace_routes
 
     marketplace_routes.register(app)
+    # Template marketplace (experiment-gated inside the blueprints): the Share
+    # flow on canvas pages and the hosted-catalog browse/install proxy.
+    from app import template_market_routes, template_share_routes
+
+    app.register_blueprint(template_share_routes.bp)
+    app.register_blueprint(template_market_routes.bp)
     app.register_blueprint(composer.bp)
     from app import panels_routes
 

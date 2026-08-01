@@ -146,6 +146,9 @@
       <div class="tbtn" id="panels-touch" title="Show touch targets (renders headless and overlays the extracted regions)"><i class="ph-bold ph-hand-tap"></i></div>
       <div class="tbtn" id="panels-assets" title="Dashboard images: cache remote images or upload your own, referenced locally"><i class="ph-bold ph-images"></i></div>
       <div class="tbtn" id="panels-preview" title="Preview at panel resolution"><i class="ph-bold ph-image"></i></div>
+      {% if templates_enabled %}
+      <div class="tbtn" id="panels-share" title="Share as a community template"><i class="ph-bold ph-share-network"></i></div>
+      {% endif %}
       <div class="tbtn" id="panels-theme" title="Toggle dark mode"><i class="ph-bold ph-moon"></i></div>
       <div class="tdiv"></div>
       <div class="tbtn" id="panels-toggle-left" title="Collapse left sidebar"><i class="ph-bold ph-sidebar-simple"></i></div>
@@ -338,5 +341,8 @@
   <script src="{{ url_for('static', filename='icon-picker.js') }}"></script>
   <script src="{{ url_for('static', filename='entity-overrides.js') }}"></script>
   <script src="{{ url_for('static', filename='panels/editor.js') }}"></script>
+  {% if templates_enabled %}
+  <script src="{{ url_for('static', filename='template_share.js') }}"></script>
+  {% endif %}
 </body>
 </html>

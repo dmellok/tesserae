@@ -74,6 +74,7 @@
           "type": { "enum": ["string", "textarea", "variables_textarea", "entity_overrides", "location_search", "number", "slider", "select", "multiselect", "boolean", "color"] },
           "label": { "type": "string" },
           "default": {},
+          "secret": { "type": "boolean" },
           "choices": {
             "type": "array",
             "items": {

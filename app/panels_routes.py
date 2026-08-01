@@ -169,6 +169,7 @@ def editor(canvas_id: str) -> str:
         canvas_id=canvas_id,
         font_face_css=_font_face_css(_registry().fonts),
         code_fonts=[{"id": f.id, "name": f.name} for f in _registry().fonts.values()],
+        templates_enabled=experiments.is_enabled("templates"),
     )
 
 

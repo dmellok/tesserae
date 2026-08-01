@@ -1,0 +1,376 @@
+"""Build a shareable template from a canvas dashboard (issue: template marketplace).
+
+The exporter's contract: nothing install-specific and nothing secret leaves the
+machine. It starts from the page's :class:`CanvasLayout`, then
+
+* strips ``device_ids`` (by construction: only the layout is exported) and
+  every ``CodeSource.headers`` entry, converting each into a suggested
+  ``secret`` input targeting that slot;
+* redacts option values whose ``cell_options`` schema marks them
+  ``secret: true`` (e.g. ``rest_service`` url/headers), likewise suggesting
+  inputs;
+* suggests non-secret inputs for install-specific values (Home Assistant
+  entity ids, locations) so a template asks its installer instead of leaking
+  the author's home;
+* inlines a page-asset background image as a ``data:`` URI (small ones) or
+  blocks the export;
+* collects ``requires[]`` (marketplace catalog ids for non-bundled widgets and
+  themes) so install can offer the missing pieces;
+* runs the credential lint (:mod:`app.template_lint`, duplicated on the API)
+  and blocks on errors.
+
+``apply_inputs`` is the other half of the contract: the installer (and the
+server-side rebuild) patch input values into the doc through the same
+``targets`` vocabulary, so a round-trip is testable end to end.
+"""
+
+from __future__ import annotations
+
+import base64
+import mimetypes
+from pathlib import Path
+from typing import Any
+
+from app import template_lint
+from app.state.page_store import Page
+
+# bg_image inline cap. Larger backgrounds must be re-hosted by the author.
+MAX_INLINE_ASSET_BYTES = 262_144
+
+# Option names that are install-specific rather than secret: the exporter
+# suggests a (non-secret) input so the installer supplies their own.
+_INSTALL_SPECIFIC_OPTION_NAMES = {"entity", "entity_id", "entities", "location", "calendar_url"}
+
+TEMPLATE_SCHEMA_VERSION = 1
+
+
+def _walk_option_schema(manifest: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """name -> cell_options entry for a plugin manifest."""
+    return {
+        str(opt.get("name")): opt
+        for opt in manifest.get("cell_options") or []
+        if isinstance(opt, dict) and opt.get("name")
+    }
+
+
+class ExportBlocked(Exception):
+    """The dashboard cannot be shared as-is; ``problems`` says why."""
+
+    def __init__(self, problems: list[str]) -> None:
+        super().__init__("; ".join(problems))
+        self.problems = problems
+
+
+def _suggest_input(
+    inputs: dict[str, dict[str, Any]],
+    *,
+    name: str,
+    label: str,
+    type_: str,
+    secret: bool,
+    target: dict[str, Any],
+    note: str,
+) -> None:
+    """Add or extend a suggested input (same name = same value fans out to
+    every target that referenced it)."""
+    entry = inputs.setdefault(
+        name,
+        {
+            "name": name,
+            "label": label,
+            "type": type_,
+            "secret": secret,
+            "required": secret,  # secret slots don't work when left empty
+            "default": "",
+            "targets": [],
+            "note": note,
+        },
+    )
+    if target not in entry["targets"]:
+        entry["targets"].append(target)
+
+
+def _input_name(base: str, taken: dict[str, dict[str, Any]]) -> str:
+    slug = "".join(ch if ch.isalnum() else "_" for ch in base.lower()).strip("_")[:28] or "value"
+    name = slug
+    n = 2
+    while name in taken and taken[name].get("_base") != base:
+        name = f"{slug}_{n}"
+        n += 1
+    return name
+
+
+def build_template(
+    page: Page,
+    *,
+    registry: Any,
+    installed_records: dict[str, Any],
+    data_root: Path,
+) -> dict[str, Any]:
+    """Export ``page`` as a template. Returns
+    ``{template, inputs_suggested, redactions, lint, blocking}``; a non-empty
+    ``blocking`` list means the dashboard can't be shared until fixed.
+
+    ``registry`` is the plugin registry (``app.config["PLUGIN_REGISTRY"]``);
+    ``installed_records`` the marketplace's ``installed()`` map (catalog id ->
+    InstalledRecord), used to reverse-map plugin folders / theme ids / font
+    plugin ids to catalog ids for ``requires[]``."""
+    if page.layout_kind != "canvas" or page.canvas is None:
+        raise ExportBlocked(["only canvas dashboards can be shared as templates"])
+
+    layout = page.canvas.model_copy(deep=True)
+    blocking: list[str] = []
+    redactions: list[str] = []
+    requires: set[str] = set()
+    inputs: dict[str, dict[str, Any]] = {}
+
+    def folder_to_catalog_id(folder: str) -> str | None:
+        for catalog_id, record in installed_records.items():
+            if folder in getattr(record, "folders", ()):  # widgets, fonts, bundles
+                return catalog_id
+        return None
+
+    def note_widget(plugin_id: str, where: str) -> None:
+        if not plugin_id:
+            return
+        plugin = registry.get(plugin_id)
+        if plugin is None:
+            blocking.append(f"{where}: widget {plugin_id!r} is not installed here")
+            return
+        catalog_id = folder_to_catalog_id(plugin_id)
+        if catalog_id is not None:
+            requires.add(catalog_id)
+        # No catalog record = bundled plugin; every install has it.
+
+    def redact_options(
+        el_id: str, plugin_id: str, options: dict[str, Any], slot: str, index: int | None
+    ) -> None:
+        plugin = registry.get(plugin_id) if plugin_id else None
+        schema = _walk_option_schema(getattr(plugin, "manifest", None) or {}) if plugin else {}
+        for key in list(options.keys()):
+            value = options.get(key)
+            if value in (None, "", [], {}):
+                continue
+            opt = schema.get(key) or {}
+            target: dict[str, Any] = {"el": el_id, "slot": slot, "key": key}
+            if index is not None:
+                target["index"] = index
+            if opt.get("secret"):
+                options[key] = ""
+                redactions.append(f"{el_id}: removed secret option {plugin_id}.{key}")
+                _suggest_input(
+                    inputs,
+                    name=_input_name(f"{plugin_id}_{key}", inputs),
+                    label=str(opt.get("label") or f"{plugin_id} {key}"),
+                    type_="string",
+                    secret=True,
+                    target=target,
+                    note=f"was the author's {plugin_id} {key}",
+                )
+            elif key in _INSTALL_SPECIFIC_OPTION_NAMES or (
+                isinstance(value, str) and value.startswith(("sensor.", "light.", "switch."))
+            ):
+                if isinstance(value, list):
+                    options[key] = []
+                elif isinstance(value, dict):
+                    options[key] = {}
+                else:
+                    options[key] = ""
+                redactions.append(f"{el_id}: cleared install-specific option {key}")
+                _suggest_input(
+                    inputs,
+                    name=_input_name(key, inputs),
+                    label=str(opt.get("label") or key.replace("_", " ").title()),
+                    type_="location_search" if opt.get("type") == "location_search" else "string",
+                    secret=False,
+                    target=target,
+                    note="install-specific value; the installer picks their own",
+                )
+
+    for el in layout.els:
+        el_id = el.id
+        if el.kind == "widget" or el.widget:
+            note_widget(el.widget, f"element {el_id}")
+            redact_options(el_id, el.widget, el.options, "options", None)
+        if getattr(el, "source", ""):
+            note_widget(el.source, f"element {el_id}")
+            redact_options(el_id, el.source, el.options, "options", None)
+        for i, source in enumerate(el.sources or []):
+            if source.key:
+                note_widget(source.key, f"element {el_id} source {i}")
+                redact_options(el_id, source.key, source.options, "source_options", i)
+            if source.headers:
+                source.headers = {}
+                redactions.append(f"{el_id}: removed request headers on source {i}")
+                _suggest_input(
+                    inputs,
+                    name=_input_name(f"{source.name or source.key or 'source'}_headers", inputs),
+                    label=f"Request headers for {source.name or source.url or 'source'} (JSON)",
+                    type_="textarea",
+                    secret=True,
+                    target={"el": el_id, "slot": "source_header", "index": i},
+                    note="request headers never leave the author's machine",
+                )
+        for i, bind in enumerate(el.bind or []):
+            if bind.source:
+                note_widget(bind.source, f"element {el_id} bind {i}")
+                redact_options(el_id, bind.source, bind.options, "bind_options", i)
+        value_key = getattr(el, "value_key", "") or ""
+        if value_key.startswith("ha:"):
+            el.value_key = ""
+            redactions.append(f"{el_id}: cleared HA entity binding {value_key!r}")
+
+    # Theme: bundled themes travel by id; user themes are local-only; community
+    # themes become requirements (their catalog id doubles as the theme id).
+    theme = layout.theme or ""
+    if theme.startswith("user-"):
+        blocking.append(
+            f"theme {theme!r} is a local user theme; switch to a bundled or "
+            "marketplace theme before sharing"
+        )
+    elif theme:
+        for catalog_id, record in installed_records.items():
+            if getattr(record, "kind", "") == "theme" and theme in getattr(record, "folders", ()):
+                requires.add(catalog_id)
+                break
+
+    # Font: bundled fonts pass; marketplace fonts become requirements.
+    if layout.font:
+        font = (getattr(registry, "fonts", None) or {}).get(layout.font)
+        if font is None:
+            blocking.append(f"font {layout.font!r} is not available here")
+        else:
+            font_catalog_id = folder_to_catalog_id(font.plugin_id)
+            if font_catalog_id is not None:
+                requires.add(font_catalog_id)
+
+    # Background image: local page assets inline (small) or block; other local
+    # paths can't travel at all.
+    bg = layout.bg_image or ""
+    if bg.startswith("/page-assets/"):
+        name = bg.rsplit("/", 1)[-1]
+        from app.page_assets import assets_dir
+
+        path = assets_dir(data_root, page.id) / name
+        try:
+            raw = path.read_bytes()
+        except OSError:
+            raw = b""
+        if not raw:
+            blocking.append(f"background image {name!r} could not be read")
+        elif len(raw) > MAX_INLINE_ASSET_BYTES:
+            blocking.append(
+                f"background image {name!r} is too large to share "
+                f"({len(raw) // 1024}KB > {MAX_INLINE_ASSET_BYTES // 1024}KB); "
+                "use a smaller image or a public URL"
+            )
+        else:
+            mime = mimetypes.guess_type(name)[0] or "image/png"
+            layout.bg_image = f"data:{mime};base64,{base64.b64encode(raw).decode()}"
+            redactions.append(f"background image {name!r} inlined ({len(raw) // 1024}KB)")
+    elif bg and not bg.startswith(("https://", "data:image/")):
+        blocking.append(f"background image {bg!r} is not shareable (https or inline only)")
+
+    doc = layout.model_dump(mode="json", exclude_none=True)
+    template = {
+        "schema_version": TEMPLATE_SCHEMA_VERSION,
+        "title": page.name or "Untitled",
+        "description": "",
+        "tags": [],
+        "requires": sorted(requires),
+        "inputs": [],  # the dialog finalises which suggestions become inputs
+        "canvas": doc,
+    }
+
+    lint_items = _collect_lint_items(template)
+    lint = template_lint.lint_strings(lint_items)
+    for err in lint["errors"]:
+        blocking.append(
+            f"credential material at {err['where']} ({err['rule']}); remove it "
+            "or turn it into a secret input"
+        )
+
+    suggestions = list(inputs.values())
+    for suggestion in suggestions:
+        suggestion.pop("_base", None)
+    return {
+        "template": template,
+        "inputs_suggested": suggestions,
+        "redactions": redactions,
+        "lint": lint,
+        "blocking": blocking,
+    }
+
+
+def _collect_lint_items(template: dict[str, Any]) -> list[tuple[str, str]]:
+    items: list[tuple[str, str]] = []
+
+    def walk(node: Any, path: str) -> None:
+        if len(items) >= 2000:
+            return
+        if isinstance(node, str):
+            items.append((path, node))
+        elif isinstance(node, dict):
+            for key, value in node.items():
+                walk(value, f"{path}.{key}" if path else str(key))
+        elif isinstance(node, list):
+            for i, value in enumerate(node):
+                walk(value, f"{path}[{i}]")
+
+    walk(template, "")
+    return items
+
+
+def apply_inputs(template: dict[str, Any], values: dict[str, Any]) -> dict[str, Any]:
+    """Patch input ``values`` into a template's canvas through the declared
+    ``targets``. Returns a deep-copied canvas dict ready for
+    ``CanvasLayout.model_validate``. Unknown input names are ignored; declared
+    inputs without a supplied value keep their (redacted/empty) slot."""
+    import copy
+
+    canvas = copy.deepcopy(template.get("canvas") or {})
+    els_by_id = {el.get("id"): el for el in canvas.get("els") or [] if isinstance(el, dict)}
+    for input_spec in template.get("inputs") or []:
+        name = input_spec.get("name")
+        if name not in values:
+            continue
+        value = values[name]
+        for target in input_spec.get("targets") or []:
+            el = els_by_id.get(target.get("el"))
+            if el is None:
+                continue
+            slot = target.get("slot")
+            key = target.get("key")
+            index = target.get("index")
+            if slot == "options":
+                el.setdefault("options", {})[key] = value
+            elif slot == "source_options":
+                sources = el.get("sources") or []
+                if isinstance(index, int) and 0 <= index < len(sources):
+                    sources[index].setdefault("options", {})[key] = value
+            elif slot == "source_header":
+                sources = el.get("sources") or []
+                if isinstance(index, int) and 0 <= index < len(sources):
+                    headers = sources[index].setdefault("headers", {})
+                    if key:
+                        headers[key] = value
+                    elif isinstance(value, dict):
+                        headers.update(value)
+                    elif isinstance(value, str) and value.strip():
+                        import json as _json
+
+                        try:
+                            parsed = _json.loads(value)
+                        except ValueError:
+                            parsed = None
+                        if isinstance(parsed, dict):
+                            headers.update(parsed)
+            elif slot == "source_url":
+                sources = el.get("sources") or []
+                if isinstance(index, int) and 0 <= index < len(sources):
+                    sources[index]["url"] = value
+            elif slot == "bind_options":
+                binds = el.get("bind") or []
+                if isinstance(index, int) and 0 <= index < len(binds):
+                    binds[index].setdefault("options", {})[key] = value
+    return canvas

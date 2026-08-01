@@ -1,0 +1,77 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Tesserae shared dashboard template (v1)",
+  "description": "The portable contract for community dashboard templates: a sanitized CanvasLayout plus metadata and declared install-time inputs. Mirrored by pydantic validation on api.tesserae.ink; author identity is server-side (seeded pseudonym), so there is deliberately no author field.",
+  "type": "object",
+  "required": ["schema_version", "title", "canvas"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": 1 },
+    "title": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "description": { "type": "string", "maxLength": 1000 },
+    "tags": {
+      "type": "array",
+      "maxItems": 8,
+      "items": { "type": "string", "pattern": "^[a-z0-9-]{1,24}$" }
+    },
+    "requires": {
+      "type": "array",
+      "maxItems": 32,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "inputs": {
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "required": ["name", "label", "type", "targets"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "pattern": "^[a-z0-9_]{1,32}$" },
+          "label": { "type": "string", "minLength": 1, "maxLength": 80 },
+          "type": { "enum": ["string", "textarea", "number", "boolean", "select", "location_search"] },
+          "secret": { "type": "boolean" },
+          "required": { "type": "boolean" },
+          "default": {},
+          "choices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["value", "label"],
+              "properties": { "value": {}, "label": { "type": "string" } }
+            }
+          },
+          "targets": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 20,
+            "items": {
+              "type": "object",
+              "required": ["el", "slot"],
+              "additionalProperties": false,
+              "properties": {
+                "el": { "type": "string", "minLength": 1 },
+                "slot": { "enum": ["options", "source_options", "source_header", "source_url", "bind_options"] },
+                "index": { "type": "integer", "minimum": 0 },
+                "key": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "canvas": {
+      "type": "object",
+      "required": ["w", "h", "els"],
+      "properties": {
+        "w": { "type": "integer", "minimum": 16, "maximum": 4096 },
+        "h": { "type": "integer", "minimum": 16, "maximum": 4096 },
+        "els": { "type": "array", "minItems": 1, "maxItems": 200 },
+        "bg_image": {
+          "type": "string",
+          "pattern": "^$|^https://|^data:image/"
+        }
+      }
+    }
+  }
+}
