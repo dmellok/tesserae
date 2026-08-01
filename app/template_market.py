@@ -128,3 +128,118 @@ def registered_device_resolutions(devices: Any) -> list[str]:
         if panel is not None:
             out.add(f"{panel.w}x{panel.h}")
     return sorted(out)
+
+
+# -- install-time input editors -----------------------------------------
+
+# Slots that address a widget's ``cell_options``, mapped to how the target's
+# widget id is found on the element. ``source_header`` / ``source_url`` are
+# deliberately absent: they're transport fields on a raw URL source with no
+# option schema behind them, so they stay plain text.
+_SCHEMA_SLOTS = ("options", "source_options", "bind_options")
+
+
+def _target_widget_id(element: dict[str, Any], target: dict[str, Any]) -> str:
+    """The widget whose option schema governs this target, or ``""``."""
+    slot = target.get("slot")
+    index = target.get("index")
+    if slot == "options":
+        return str(element.get("widget") or element.get("source") or "")
+    if slot == "source_options":
+        sources = element.get("sources") or []
+        if isinstance(index, int) and 0 <= index < len(sources):
+            return str(sources[index].get("key") or "")
+    elif slot == "bind_options":
+        binds = element.get("bind") or []
+        if isinstance(index, int) and 0 <= index < len(binds):
+            return str(binds[index].get("source") or "")
+    return ""
+
+
+def resolve_input_specs(template: dict[str, Any], registry: Any) -> list[dict[str, Any]]:
+    """Turn a template's declared inputs into field specs for the install form.
+
+    The author's declared ``type`` is only a fallback. Where an input targets a
+    widget option, the option's schema is looked up **on this install** and
+    materialised (``choices_from`` resolved against the installer's own Home
+    Assistant, calendars, and plugins), so the installer gets the same control
+    the widget's own config form would show, populated with their entities
+    rather than the author's. That's the whole point: the author cannot know
+    what is valid here.
+
+    Secret inputs keep a masked text field regardless; an API key has no
+    picker. Unresolvable targets (widget not installed, transport slots) fall
+    back to the declared type."""
+    from app.page_routes import _materialize_cell_options
+
+    canvas = template.get("canvas") or {}
+    els = {
+        el.get("id"): el for el in canvas.get("els") or [] if isinstance(el, dict) and el.get("id")
+    }
+    materialised: dict[str, list[dict[str, Any]]] = {}
+
+    def options_for(widget_id: str) -> list[dict[str, Any]]:
+        if widget_id not in materialised:
+            plugin = registry.get(widget_id) if registry is not None else None
+            materialised[widget_id] = (
+                _materialize_cell_options([plugin]).get(widget_id, []) if plugin else []
+            )
+        return materialised[widget_id]
+
+    specs: list[dict[str, Any]] = []
+    for item in template.get("inputs") or []:
+        if not isinstance(item, dict) or not item.get("name"):
+            continue
+        name = str(item["name"])
+        # Start from the author's declaration, then let the local schema win.
+        spec: dict[str, Any] = {
+            "name": name,
+            "type": str(item.get("type") or "string"),
+            "label": str(item.get("label") or name),
+            "default": item.get("default", ""),
+            "secret": bool(item.get("secret")),
+            "required": bool(item.get("required")),
+            "resolved": False,
+        }
+        if item.get("choices"):
+            spec["choices"] = item["choices"]
+        if not spec["secret"]:
+            for target in item.get("targets") or []:
+                if not isinstance(target, dict) or target.get("slot") not in _SCHEMA_SLOTS:
+                    continue
+                element = els.get(target.get("el"))
+                key = target.get("key")
+                if not isinstance(element, dict) or not key:
+                    continue
+                widget_id = _target_widget_id(element, target)
+                match = next(
+                    (o for o in options_for(widget_id) if str(o.get("name")) == str(key)), None
+                )
+                if match is None:
+                    continue
+                # Local schema wins on control type and choices; the author's
+                # label survives, since they wrote it to explain the template.
+                spec.update({k: v for k, v in match.items() if k not in ("name", "label")})
+                spec["name"] = name
+                spec["label"] = str(item.get("label") or match.get("label") or name)
+                spec["resolved"] = True
+                spec["widget"] = widget_id
+                break
+        if spec["secret"]:
+            # Force a masked text field whatever the schema said.
+            spec["type"] = "string"
+        specs.append(spec)
+    return specs
+
+
+def coerce_input_values(specs: list[dict[str, Any]], form: Any) -> dict[str, Any]:
+    """Parse submitted ``opt_<name>`` fields into input values, reusing the
+    per-cell coercion so complex controls (multiselect, location search,
+    entity overrides) demux exactly as they do in widget config."""
+    from app.page_routes import _coerce_cell_option
+
+    out: dict[str, Any] = {}
+    for spec in specs:
+        name = str(spec["name"])
+        out[name] = _coerce_cell_option(spec, form.get(f"opt_{name}"), form)
+    return out

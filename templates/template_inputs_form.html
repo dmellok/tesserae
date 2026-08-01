@@ -1,0 +1,18 @@
+{# Install-time inputs for a community template.
+
+   Rendered by ``template_market.inputs_form`` and injected into the install
+   modal. Reuses the grid editor's ``auto_field`` macro, and the field names
+   match the ``opt_<name>`` convention ``_coerce_cell_option`` expects, so a
+   template's questions are answered with exactly the controls the underlying
+   widget's own config form uses: the installer's Home Assistant entities,
+   their calendars, a real location search, rather than a text box they have
+   to guess the format of. #}
+{% from "_components.html" import auto_field %}
+{% if specs %}
+  {% for spec in specs %}
+    {{ auto_field('tplin-' ~ spec.name, 'opt_' ~ spec.name, spec, spec.get('default', ''),
+                  help=spec.get('note')) }}
+  {% endfor %}
+{% else %}
+  <p class="note" style="padding:4px 2px">This template asks for nothing; install it as-is.</p>
+{% endif %}

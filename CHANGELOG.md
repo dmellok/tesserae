@@ -8,6 +8,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Installing a template now asks its questions with real controls, not blank text boxes.**
+  A template's declared inputs are resolved against the *installing* server's own widget option
+  schemas, so a question about Home Assistant sensors renders as a picker over your entities,
+  a location question gets the location search, and selects get their real options. It reuses
+  the same `auto_field` controls and coercion as widget configuration, so the two stay in sync.
+  The author's declared type is only a fallback, which is the correct inversion: they can't
+  know what is valid on your system. Secret inputs stay masked text (an API key has no picker),
+  and inputs targeting a raw URL source's transport fields fall back to plain text.
+
 - **Phone photos no longer land on the panel sideways.** `fit_to_panel` now normalizes EXIF
   orientation before cropping and fitting. Cameras commonly store a landscape pixel buffer
   plus an orientation tag instead of rotating the pixels, and Pillow does not apply that tag

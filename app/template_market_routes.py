@@ -81,6 +81,33 @@ def index() -> Response | tuple[Response, int]:
     return jsonify({"templates": entries})
 
 
+def _template_or_error(slug: str) -> tuple[dict[str, Any] | None, tuple[Response, int] | None]:
+    """Fetch an approved template server-side, or the error to return."""
+    try:
+        payload = online.fetch_template_doc(slug)
+    except online.TemplateRevokedError:
+        return None, (jsonify({"error": "this template was removed by the moderators"}), 410)
+    if payload is None or not isinstance(payload.get("template"), dict):
+        return None, (jsonify({"error": "template could not be fetched"}), 502)
+    return payload["template"], None
+
+
+@bp.get("/<slug>/inputs")
+def inputs_form(slug: str) -> Response | tuple[Response, int]:
+    """The install form for one template, as an HTML fragment.
+
+    Each declared input is resolved against THIS install's widget option
+    schemas, so an entity question renders as a picker over the installer's own
+    Home Assistant entities rather than a text box. See
+    :func:`app.template_market.resolve_input_specs`."""
+    template, err = _template_or_error(slug)
+    if err is not None or template is None:
+        return err or (jsonify({"error": "template could not be fetched"}), 502)
+    specs = template_market.resolve_input_specs(template, current_app.config.get("PLUGIN_REGISTRY"))
+    html = render_template("template_inputs_form.html", specs=specs)
+    return current_app.response_class(html, mimetype="text/html")
+
+
 @bp.post("/report")
 def report() -> Response | tuple[Response, int]:
     """Ask for a template to be taken down. Anyone can file one, including the
@@ -113,13 +140,29 @@ def report() -> Response | tuple[Response, int]:
 
 @bp.post("/install")
 def install() -> Response | tuple[Response, int]:
-    body = request.get_json(silent=True) or {}
-    slug = str(body.get("slug") or "").strip()
-    if not slug:
-        return jsonify({"error": "slug is required"}), 400
-    inputs = body.get("inputs") or {}
-    if not isinstance(inputs, dict):
-        return jsonify({"error": "inputs must be an object"}), 400
+    # Two shapes: the install modal posts the rendered form (so complex
+    # controls demux through the shared coercion), while API/JSON callers post
+    # already-typed values.
+    if request.form:
+        slug = str(request.form.get("slug") or "").strip()
+        if not slug:
+            return jsonify({"error": "slug is required"}), 400
+        template, err = _template_or_error(slug)
+        if err is not None or template is None:
+            return err or (jsonify({"error": "template could not be fetched"}), 502)
+        specs = template_market.resolve_input_specs(
+            template, current_app.config.get("PLUGIN_REGISTRY")
+        )
+        inputs: dict[str, Any] = template_market.coerce_input_values(specs, request.form)
+    else:
+        body = request.get_json(silent=True) or {}
+        slug = str(body.get("slug") or "").strip()
+        if not slug:
+            return jsonify({"error": "slug is required"}), 400
+        raw_inputs = body.get("inputs") or {}
+        if not isinstance(raw_inputs, dict):
+            return jsonify({"error": "inputs must be an object"}), 400
+        inputs = raw_inputs
     try:
         page = template_market.install_template(
             slug,

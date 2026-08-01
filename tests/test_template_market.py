@@ -331,3 +331,184 @@ def test_report_gated_like_the_rest(app: Flask) -> None:
     assert (
         app.test_client().post("/plugins/templates/report", json={"slug": "s"}).status_code == 404
     )
+
+
+# -- install-time input editors ------------------------------------------
+
+
+def _template_with_input(target: dict[str, Any], element: dict[str, Any], **input_kw: Any) -> dict:
+    spec = {"name": "pick", "label": "Pick one", "type": "string", "targets": [target]}
+    spec.update(input_kw)
+    return {
+        "schema_version": 1,
+        "title": "T",
+        "inputs": [spec],
+        "canvas": {"w": 400, "h": 300, "els": [element]},
+    }
+
+
+def test_input_resolves_to_the_widgets_own_control(app: Flask) -> None:
+    """The author declares 'string'; the installer gets the real control from
+    their own copy of the widget's schema. ha_sensor.entities is a multiselect
+    whose choices come from the installer's Home Assistant, which is precisely
+    what the author cannot know."""
+    from app.template_market import resolve_input_specs
+
+    template = _template_with_input(
+        {"el": "w1", "slot": "options", "key": "entities"},
+        {"id": "w1", "kind": "widget", "widget": "ha_sensor", "options": {}},
+    )
+    with app.app_context():
+        specs = resolve_input_specs(template, app.config["PLUGIN_REGISTRY"])
+    assert len(specs) == 1
+    spec = specs[0]
+    assert spec["resolved"] is True and spec["widget"] == "ha_sensor"
+    assert spec["type"] == "multiselect"  # not the author's "string"
+    assert spec["label"] == "Pick one"  # the author's wording survives
+    assert "choices" in spec  # materialised against this install
+
+
+def test_location_input_resolves_to_location_search(app: Flask) -> None:
+    from app.template_market import resolve_input_specs
+
+    template = _template_with_input(
+        {"el": "w1", "slot": "options", "key": "location"},
+        {"id": "w1", "kind": "widget", "widget": "weather_now", "options": {}},
+    )
+    with app.app_context():
+        spec = resolve_input_specs(template, app.config["PLUGIN_REGISTRY"])[0]
+    assert spec["type"] == "location_search" and spec["resolved"] is True
+
+
+def test_secret_inputs_never_get_a_picker(app: Flask) -> None:
+    """An API key has no picker, and must stay masked whatever the schema says."""
+    from app.template_market import resolve_input_specs
+
+    template = _template_with_input(
+        {"el": "c1", "slot": "source_options", "index": 0, "key": "headers"},
+        {
+            "id": "c1",
+            "kind": "code",
+            "sources": [{"key": "rest_service", "options": {}}],
+        },
+        secret=True,
+    )
+    with app.app_context():
+        spec = resolve_input_specs(template, app.config["PLUGIN_REGISTRY"])[0]
+    assert spec["secret"] is True and spec["type"] == "string" and spec["resolved"] is False
+
+
+def test_unresolvable_targets_fall_back_to_declared_type(app: Flask) -> None:
+    from app.template_market import resolve_input_specs
+
+    # Transport slot (no option schema behind it) and a widget not installed.
+    for target, element in (
+        (
+            {"el": "c1", "slot": "source_url", "index": 0},
+            {"id": "c1", "kind": "code", "sources": [{"url": "https://x"}]},
+        ),
+        (
+            {"el": "w1", "slot": "options", "key": "thing"},
+            {"id": "w1", "kind": "widget", "widget": "not_installed", "options": {}},
+        ),
+    ):
+        template = _template_with_input(target, element, type="textarea")
+        with app.app_context():
+            spec = resolve_input_specs(template, app.config["PLUGIN_REGISTRY"])[0]
+        assert spec["resolved"] is False and spec["type"] == "textarea"
+
+
+def test_bind_options_slot_resolves(app: Flask) -> None:
+    from app.template_market import resolve_input_specs
+
+    template = _template_with_input(
+        {"el": "r1", "slot": "bind_options", "index": 0, "key": "location"},
+        {
+            "id": "r1",
+            "kind": "rect",
+            "bind": [{"source": "weather_now", "field": "temp", "transform": "length"}],
+        },
+    )
+    with app.app_context():
+        spec = resolve_input_specs(template, app.config["PLUGIN_REGISTRY"])[0]
+    assert spec["type"] == "location_search" and spec["resolved"] is True
+
+
+def test_coerce_input_values_uses_shared_option_coercion() -> None:
+    from werkzeug.datastructures import MultiDict
+
+    from app.template_market import coerce_input_values
+
+    specs = [
+        {"name": "entities", "type": "multiselect", "choices": []},
+        {"name": "count", "type": "number", "default": 1},
+        {"name": "on", "type": "boolean"},
+        {"name": "note", "type": "string"},
+    ]
+    form = MultiDict(
+        [
+            ("opt_entities", "sensor.a"),
+            ("opt_entities", "sensor.b"),
+            ("opt_count", "7"),
+            ("opt_on", "1"),
+            ("opt_note", "hello"),
+        ]
+    )
+    values = coerce_input_values(specs, form)
+    assert values == {
+        "entities": ["sensor.a", "sensor.b"],  # demuxed to a list
+        "count": 7,  # typed as int
+        "on": True,  # presence means checked
+        "note": "hello",
+    }
+
+
+def test_inputs_form_route_renders_real_controls(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _enable(app, monkeypatch)
+    payload = _doc_payload()
+    payload["template"]["inputs"] = [
+        {
+            "name": "entities",
+            "label": "Which sensors?",
+            "type": "string",
+            "targets": [{"el": "w1", "slot": "options", "key": "entities"}],
+        }
+    ]
+    payload["template"]["canvas"]["els"][0] = {
+        "id": "w1",
+        "kind": "widget",
+        "widget": "ha_sensor",
+        "options": {},
+        "x": 0,
+        "y": 0,
+        "w": 200,
+        "h": 200,
+    }
+    monkeypatch.setattr(online, "fetch_template_doc", lambda slug: payload)
+    resp = app.test_client().get("/plugins/templates/shareable-abc123/inputs")
+    assert resp.status_code == 200 and resp.mimetype == "text/html"
+    body = resp.get_data(as_text=True)
+    assert "Which sensors?" in body  # the author's label survives
+    # The widget's real control, not a bare text box. With no Home Assistant
+    # configured here it renders the multiselect plus the same setup hint the
+    # widget's own config form shows, which is the point of reusing it.
+    assert 'class="multiselect"' in body
+    assert "Home Assistant Core" in body
+    assert 'type="text"' not in body
+
+
+def test_install_accepts_the_rendered_form(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The modal posts the rendered form; values coerce server-side through the
+    same machinery widget config uses."""
+    _enable(app, monkeypatch)
+    monkeypatch.setattr(online, "fetch_template_doc", lambda slug: _doc_payload())
+    monkeypatch.setattr(online, "report_template_install", lambda *a, **k: True)
+    resp = app.test_client().post(
+        "/plugins/templates/install",
+        data={"slug": "shareable-abc123", "opt_city": "Melbourne"},
+    )
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    page = app.config["PAGE_STORE"].get(resp.get_json()["page_id"])
+    assert page.canvas.els[0].options["location"] == "Melbourne"

@@ -67,33 +67,54 @@
       card.appendChild(note);
     }
 
-    var form = el("div", { style: "display:flex;flex-direction:column;gap:8px;margin-top:6px" });
-    var fields = [];
-    var count = Number(entry.inputs || 0);
-    if (count > 0) {
-      form.appendChild(el("div", { text: "This template asks for " + count + " value(s) at install:", style: "font-weight:600" }));
+    // The install questions are rendered SERVER-side and injected here: each
+    // input resolves against this install's widget option schemas, so an
+    // entity question becomes a picker over the installer's own Home
+    // Assistant entities instead of a text box they have to guess at. The
+    // author cannot know what is valid on someone else's system.
+    var form = el("form", { style: "display:flex;flex-direction:column;gap:8px;margin-top:6px" });
+    form.addEventListener("submit", function (ev) { ev.preventDefault(); });
+    if (Number(entry.inputs || 0) > 0) {
+      form.appendChild(el("div", {
+        text: "This template needs a few details from you:",
+        style: "font-weight:600",
+      }));
     }
-    // Full input specs ride the doc fetch server-side; the modal collects
-    // values keyed by name from the catalog's lightweight spec list.
-    (entry.input_specs || []).forEach(function (spec) {
-      var label = el("label", { text: spec.label || spec.name, style: "display:flex;flex-direction:column;gap:3px;font-size:.95em" });
-      var input;
-      if (spec.type === "textarea") input = el("textarea", { rows: "2" });
-      else if (spec.type === "boolean") input = el("input", { type: "checkbox" });
-      else if (spec.type === "select") {
-        input = el("select", {});
-        (spec.choices || []).forEach(function (c) {
-          var opt = el("option", { value: String(c.value), text: c.label || String(c.value) });
-          input.appendChild(opt);
-        });
-      } else input = el("input", { type: spec.secret ? "password" : (spec.type === "number" ? "number" : "text") });
-      if (input.style) input.style.cssText += ";padding:7px 9px;border:1px solid var(--t-border,#ccc);border-radius:7px;font:inherit;background:transparent;color:inherit";
-      if (spec.default != null && input.type !== "checkbox") input.value = spec.default;
-      label.appendChild(input);
-      form.appendChild(label);
-      fields.push({ spec: spec, input: input });
-    });
+    var fields = el("div", {});
+    fields.appendChild(el("div", { text: "Loading…", style: "opacity:.7" }));
+    form.appendChild(fields);
+    var slugField = el("input", { type: "hidden", name: "slug", value: entry.slug });
+    form.appendChild(slugField);
     card.appendChild(form);
+
+    fetch("/plugins/templates/" + encodeURIComponent(entry.slug) + "/inputs")
+      .then(function (resp) {
+        if (!resp.ok) throw new Error("inputs");
+        return resp.text();
+      })
+      .then(function (html) {
+        fields.innerHTML = html;
+        // Light up the injected controls: location search, multiselects,
+        // sliders, preset numbers, and entity overrides all bind by data
+        // attribute and expose a rebind hook for dynamically added markup.
+        var c = window.tesseraeComponents;
+        if (c) {
+          if (c.attachLocationSearch) c.attachLocationSearch(fields);
+          if (c.attachMultiSelect) c.attachMultiSelect(fields);
+          if (c.attachSliders) c.attachSliders(fields);
+          if (c.attachPresetNumbers) c.attachPresetNumbers(fields);
+        }
+        if (typeof window.tesseraeEntityOverridesBindAll === "function") {
+          window.tesseraeEntityOverridesBindAll();
+        }
+      })
+      .catch(function () {
+        fields.textContent = "";
+        fields.appendChild(el("div", {
+          text: "Couldn't load this template's questions. Installing will use its defaults.",
+          style: "opacity:.75",
+        }));
+      });
 
     var status = el("div", { style: "margin-top:8px;opacity:.85" });
     var actions = el("div", { style: "display:flex;gap:8px;justify-content:flex-end;margin-top:12px" });
@@ -103,15 +124,8 @@
     go.addEventListener("click", function () {
       go.disabled = true;
       status.textContent = "Installing…";
-      var values = {};
-      fields.forEach(function (f) {
-        values[f.spec.name] = f.input.type === "checkbox" ? f.input.checked : f.input.value;
-      });
-      fetch("/plugins/templates/install", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug: entry.slug, inputs: values }),
-      }).then(function (resp) { return resp.json().then(function (b) { return { ok: resp.ok, body: b }; }); })
+      fetch("/plugins/templates/install", { method: "POST", body: new FormData(form) })
+        .then(function (resp) { return resp.json().then(function (b) { return { ok: resp.ok, body: b }; }); })
         .then(function (r) {
           if (!r.ok) {
             status.textContent = r.body.error || "Install failed";
