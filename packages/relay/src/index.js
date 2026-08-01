@@ -102,6 +102,21 @@ async function putJson(env, key, value) {
   });
 }
 
+// Aggregate operational metrics for a dashboard (frames pushed, mailboxes).
+// Fire-and-forget to Workers Analytics Engine; a no-op when the optional
+// ANALYTICS binding isn't configured, so self-hosters can drop it. The ids are
+// opaque random values (not PII) and frame content stays sealed, so this is
+// operational counting, not content. Query aggregates via the external
+// Analytics Engine SQL API (see packages/relay/README.md); the Worker only writes.
+function track(env, event, installId, deviceId) {
+  if (!env.ANALYTICS) return;
+  env.ANALYTICS.writeDataPoint({
+    blobs: [event, installId || "", deviceId || ""],
+    doubles: [1],
+    indexes: [installId || ""],
+  });
+}
+
 // Default entitlement gate: allow. A gated relay overrides this (Sponsors /
 // paid check) without any contract change; a rejection becomes 403.
 async function checkEntitlement(_env, _request) {
@@ -205,6 +220,7 @@ async function completePairing(env, request, installId, code) {
     install_id: installId,
     device_id,
   });
+  track(env, "mailbox_created", installId, device_id);
   return json({});
 }
 
@@ -250,6 +266,7 @@ async function putFrame(env, request, installId, deviceId) {
   if (previous?.blob_key && previous.blob_key !== blobKey) {
     await env.RELAY_BUCKET.delete(previous.blob_key);
   }
+  track(env, "frame_push", installId, deviceId);
   return json({});
 }
 
@@ -280,6 +297,7 @@ async function revokeDevice(env, request, installId, deviceId) {
   if (!(await requirePublisher(env, request, installId))) return fail("unauthorized", "", 401);
   const listed = await env.RELAY_BUCKET.list({ prefix: `frame/${installId}/${deviceId}/` });
   await Promise.all(listed.objects.map((o) => env.RELAY_BUCKET.delete(o.key)));
+  track(env, "mailbox_removed", installId, deviceId);
   return json({});
 }
 

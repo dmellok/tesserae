@@ -50,6 +50,15 @@ deleted, so add an R2 **lifecycle rule** to expire those prefixes after a day:
 
 Nothing else grows unbounded; frame and token records are one-per-device.
 
+## Analytics (optional)
+
+The Worker writes aggregate counts (frames pushed, mailboxes created / removed)
+to a Workers Analytics Engine dataset for a dashboard. It's fire-and-forget and
+a no-op if you remove the `analytics_engine_datasets` binding from
+`wrangler.jsonc`. No frame content is involved (it's sealed); the recorded ids
+are opaque. Query it via the Analytics Engine SQL API, sample queries are in
+`packages/relay/README.md`.
+
 ## Restricting who can register (hosted operators)
 
 If you run a relay for other people, override `checkEntitlement(env, request)`

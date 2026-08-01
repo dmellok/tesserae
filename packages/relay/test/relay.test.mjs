@@ -205,6 +205,54 @@ test("auth is enforced", async () => {
   assert.equal(r.status, 403);
 });
 
+test("emits analytics data points for frame push and mailbox lifecycle", async () => {
+  const points = [];
+  const e = { ...env(), ANALYTICS: { writeDataPoint: (p) => points.push(p) } };
+  let r = await worker.fetch(req("POST", "/v1/install/register", { body: { install_pubkey: "PUB" } }), e);
+  const { install_id, publisher_token } = await r.json();
+  r = await worker.fetch(
+    req("POST", `/v1/i/${install_id}/pair/codes`, { headers: authHdr(publisher_token) }),
+    e,
+  );
+  const { code } = await r.json();
+  await worker.fetch(
+    req("POST", `/v1/i/${install_id}/pair/${code}/complete`, {
+      headers: authHdr(publisher_token),
+      body: { device_id: "panel1", device_token: "t", device_token_sha256: await sha256Hex("t"), home_pubkey: "H" },
+    }),
+    e,
+  );
+  await worker.fetch(
+    new Request(`https://relay.test/v1/i/${install_id}/d/panel1/frame`, {
+      method: "PUT",
+      headers: { authorization: "Bearer " + publisher_token, ETag: '"aaa"' },
+      body: new Uint8Array([1]),
+    }),
+    e,
+  );
+  await worker.fetch(
+    req("DELETE", `/v1/i/${install_id}/d/panel1`, { headers: authHdr(publisher_token) }),
+    e,
+  );
+
+  const events = points.map((p) => p.blobs[0]);
+  assert.ok(events.includes("mailbox_created"));
+  assert.ok(events.includes("frame_push"));
+  assert.ok(events.includes("mailbox_removed"));
+  // Every point carries a count double + the install as the index.
+  for (const p of points) {
+    assert.deepEqual(p.doubles, [1]);
+    assert.equal(p.indexes[0], install_id);
+  }
+});
+
+test("works without the analytics binding", async () => {
+  // No ANALYTICS in env → track() is a no-op, nothing throws.
+  const e = env();
+  const r = await worker.fetch(req("POST", "/v1/install/register", { body: { install_pubkey: "P" } }), e);
+  assert.equal(r.status, 201);
+});
+
 test("unknown code is rejected", async () => {
   const e = env();
   const r = await worker.fetch(req("POST", "/v1/pair", { body: { code: "NOPE99", panel_pubkey: "P" } }), e);

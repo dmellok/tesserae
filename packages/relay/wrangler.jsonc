@@ -14,7 +14,17 @@
 	],
 	"observability": {
 		"enabled": true
-	}
+	},
+	// Aggregate operational metrics (frames pushed, mailboxes created/removed)
+	// for a dashboard. Optional: the Worker no-ops without it, so remove this
+	// binding if you don't want analytics. Query via the Analytics Engine SQL
+	// API (see README.md); the dataset is created on first write.
+	"analytics_engine_datasets": [
+		{
+			"binding": "ANALYTICS",
+			"dataset": "relay_events"
+		}
+	]
 	// The relay is zero-knowledge: it stores opaque sealed frames and never
 	// holds a frame key, so there are no signing secrets to configure. Gate
 	// hosted registration by overriding checkEntitlement() in src/index.js.
