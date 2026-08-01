@@ -112,10 +112,10 @@ def settings_update(section_kind: str) -> Response:
             flash(f"Invalid {device.name} config: {err}", "error")
             return redirect_to_section(section_kind)
         store.update_for_namespace("devices", did, values, fields)
-        if device.config_topic is None:
-            # Non-MQTT device (e.g. HTTP-polled TRMNL). Config flows
-            # back to the device via the next /api/display response,
-            # not a transport publish, the save itself is the action.
+        if device.transport == "rest" or device.config_topic is None:
+            # REST instances may retain dormant MQTT topics for a later
+            # transport switch. They still receive saved config through
+            # the next status poll, never through a broker publish.
             flash(f"{device.name} config saved.", "ok")
             return redirect_to_section(section_kind)
         tr = transport()

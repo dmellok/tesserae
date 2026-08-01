@@ -1026,16 +1026,18 @@ def devices_update_combined(instance_id: str) -> Response:
                 any_change = True
 
     # 1. Renderer-defined config fields. Mirror settings_update("device-<id>").
-    # Two paths: MQTT publish (when ``config_topic`` is set) and
-    # save-only (when it isn't, HTTP-polled TRMNL clients pick up
-    # config from the next /api/display response).
+    # Two paths: MQTT devices publish when ``config_topic`` is set;
+    # REST devices save only and pick up config on their next status
+    # poll. REST instances may retain dormant MQTT topics so they can
+    # be switched back later, so topic presence alone is not enough to
+    # decide whether to publish.
     schema_fields = config_fields_from_schema(device.config_schema)
     if schema_fields:
         values = values_from_form(schema_fields)
         ok, err = device.validate_config(values)
         if not ok:
             flash(f"Invalid {device.name} config: {err}", "error")
-        elif device.config_topic is None:
+        elif device.transport == "rest" or device.config_topic is None:
             store.update_for_namespace("devices", instance_id, values, schema_fields)
             ok_messages.append("config saved")
             any_change = True
