@@ -417,3 +417,38 @@ def report_template_install(
     except Exception as exc:
         logger.debug("online: template install report failed: %s", exc)
     return False
+
+
+def report_template(
+    slug: str,
+    reason: str,
+    install_id: str | None,
+    version: str | None,
+    *,
+    api_base: str = API_BASE,
+) -> bool:
+    """Ask for a published template to be taken down (``POST
+    /templates/<slug>/report``). Routed to the same human review queue as
+    submissions; a submitter reporting their own template is flagged there.
+    Returns True when the request was accepted."""
+    if not slug:
+        return False
+    body = json.dumps(
+        {"reason": reason or "", "install": install_id or "", "version": version or ""}
+    ).encode("utf-8")
+    req = urllib.request.Request(
+        f"{api_base.rstrip('/')}/templates/{slug}/report",
+        data=body,
+        method="POST",
+        headers={"Content-Type": "application/json", "User-Agent": "tesserae-template"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=_TIMEOUT_SECONDS) as resp:
+            return 200 <= int(resp.status) < 300
+    except urllib.error.HTTPError as exc:
+        with contextlib.suppress(Exception):
+            exc.close()
+        logger.debug("online: template report failed: %s", exc)
+    except Exception as exc:
+        logger.debug("online: template report failed: %s", exc)
+    return False

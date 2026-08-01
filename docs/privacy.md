@@ -101,6 +101,10 @@ placeholder values first if it contains anything you'd rather not publish.
 Submissions are human-reviewed before they appear publicly. Your public
 author name is a stable pseudonym derived server-side from your install ID
 (e.g. `amber-heron-42`); no real name, email, or account is involved.
+Reporting a template for takedown sends its public slug, your short reason,
+your install's random ID, and your version; the request goes to the same human
+review queue, and a report from the install that published the template is
+flagged there so an author can pull their own work back.
 Browsing templates fetches the public catalog from
 `https://api.tesserae.ink/templates/index.json`; installing one fetches its
 JSON and POSTs an anonymous install count event (same shape as the widget

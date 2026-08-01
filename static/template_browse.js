@@ -123,6 +123,38 @@
         })
         .catch(function () { status.textContent = "Install failed: network error"; go.disabled = false; });
     });
+    // Takedown request. Anyone can file one, including the template's own
+    // author (this is how they pull their own work back); it goes to the same
+    // human review queue rather than acting directly.
+    var report = el("button", { class: "dx-btn-ghost-sm", text: "Report" });
+    report.title = "Ask the moderators to take this template down";
+    report.style.cssText = "margin-right:auto";
+    report.addEventListener("click", function () {
+      var reason = window.prompt(
+        "Report \"" + entry.title + "\" for takedown?\n\n" +
+        "Say briefly what's wrong (shows private data, doesn't work, not yours, " +
+        "inappropriate). This goes to the moderators, not the author."
+      );
+      if (reason === null) return;
+      report.disabled = true;
+      status.textContent = "Sending report…";
+      fetch("/plugins/templates/report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug: entry.slug, reason: reason }),
+      }).then(function (resp) { return resp.json().then(function (b) { return { ok: resp.ok, body: b }; }); })
+        .then(function (r) {
+          status.textContent = r.ok
+            ? "Report sent. A moderator will take a look."
+            : (r.body.error || "Couldn't send the report");
+          if (!r.ok) report.disabled = false;
+        })
+        .catch(function () {
+          status.textContent = "Couldn't send the report: network error";
+          report.disabled = false;
+        });
+    });
+    actions.appendChild(report);
     actions.appendChild(cancel);
     actions.appendChild(go);
     card.appendChild(actions);

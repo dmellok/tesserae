@@ -81,6 +81,36 @@ def index() -> Response | tuple[Response, int]:
     return jsonify({"templates": entries})
 
 
+@bp.post("/report")
+def report() -> Response | tuple[Response, int]:
+    """Ask for a template to be taken down. Anyone can file one, including the
+    install that submitted it (how an author pulls their own work back); the
+    request goes to the same human review queue rather than acting directly."""
+    body = request.get_json(silent=True) or {}
+    slug = str(body.get("slug") or "").strip()
+    if not slug:
+        return jsonify({"error": "slug is required"}), 400
+    reason = str(body.get("reason") or "").strip()[:1000]
+    sent = online.report_template(
+        slug,
+        reason,
+        current_app.config.get("INSTALL_ID"),
+        current_app.config.get("APP_VERSION"),
+    )
+    event_log = current_app.config.get("EVENT_LOG")
+    if event_log is not None:
+        event_log.record(
+            type="telemetry",
+            source="template_report",
+            target=slug,
+            status="sent" if sent else "failed",
+            extra={"reason": reason[:200]},
+        )
+    if not sent:
+        return jsonify({"error": "couldn't reach the template service"}), 502
+    return jsonify({"status": "received"})
+
+
 @bp.post("/install")
 def install() -> Response | tuple[Response, int]:
     body = request.get_json(silent=True) or {}

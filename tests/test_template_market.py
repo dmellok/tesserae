@@ -295,3 +295,39 @@ def test_resolution_device_labels_and_my_resolutions() -> None:
 
     assert registered_device_resolutions(reg) == ["800x480"]
     assert registered_device_resolutions(None) == []
+
+
+# -- takedown reports ----------------------------------------------------
+
+
+def test_report_proxies_to_api_and_logs(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    _enable(app, monkeypatch)
+    sent: dict[str, Any] = {}
+
+    def fake_report(slug: str, reason: str, install_id: Any, version: Any) -> bool:
+        sent.update({"slug": slug, "reason": reason})
+        return True
+
+    monkeypatch.setattr(online, "report_template", fake_report)
+    resp = app.test_client().post(
+        "/plugins/templates/report",
+        json={"slug": "board-abc123", "reason": "shows a private address"},
+    )
+    assert resp.status_code == 200 and resp.get_json()["status"] == "received"
+    assert sent == {"slug": "board-abc123", "reason": "shows a private address"}
+
+
+def test_report_requires_slug_and_surfaces_failure(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _enable(app, monkeypatch)
+    assert app.test_client().post("/plugins/templates/report", json={}).status_code == 400
+    monkeypatch.setattr(online, "report_template", lambda *a, **k: False)
+    resp = app.test_client().post("/plugins/templates/report", json={"slug": "s", "reason": "x"})
+    assert resp.status_code == 502
+
+
+def test_report_gated_like_the_rest(app: Flask) -> None:
+    assert (
+        app.test_client().post("/plugins/templates/report", json={"slug": "s"}).status_code == 404
+    )

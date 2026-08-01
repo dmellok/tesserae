@@ -8,6 +8,14 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Templates can be reported for takedown.** Every template in the browser gets a Report
+  button that files a takedown request into the same review channel, with Take down and
+  Dismiss buttons beside it. Anyone can file one, including the install that published the
+  template, which is how an author pulls their own work back; a self-report is flagged in the
+  review message (advisory, since install ids are forgeable). Taking a template down from
+  either message closes any open reports against it, and requests are rate-limited per
+  install and per IP.
+
 - **The Share dialog now warns that the preview image is a live render.** The screenshot
   submitted with a template shows whatever the dashboard was displaying at that moment, and
   it reaches reviewers immediately and the public catalog on approval. The dialog says so
