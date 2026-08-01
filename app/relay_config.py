@@ -49,7 +49,9 @@ def _str(cfg: dict[str, Any], key: str) -> str:
 def is_linked(cfg: dict[str, Any]) -> bool:
     """True when the install has registered (has an id + publisher token), so
     the publisher and pairing poller have something to talk to."""
-    return bool(cfg.get("enabled") and _str(cfg, "install_id") and _str(cfg, "publisher_token_secret"))
+    return bool(
+        cfg.get("enabled") and _str(cfg, "install_id") and _str(cfg, "publisher_token_secret")
+    )
 
 
 def base_url(cfg: dict[str, Any]) -> str:

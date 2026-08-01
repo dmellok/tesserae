@@ -1,0 +1,122 @@
+{% extends "_base.html" %}
+{% from "_components.html" import settings_tabs, card_head, empty_state %}
+{% block title %}Cloud relay, Tesserae{% endblock %}
+
+{% block main %}
+<header class="page-head">
+  <h1><i class="ph ph-cloud" aria-hidden="true"></i> Cloud relay</h1>
+  <p class="lede">
+    Run a panel at another location without opening your network. Frames are sealed
+    end-to-end and relayed through a cloud mailbox both ends reach outbound, so there's
+    no VPN, port-forwarding, or dynamic DNS.
+    <a href="https://tesserae.ink/install/remote-panel/">Learn more</a>.
+  </p>
+</header>
+
+{{ settings_tabs('relay') }}
+
+{# ---- Link this install --------------------------------------------------- #}
+<section class="card">
+  {{ card_head('Relay link', blurb='This install ' + ('is linked.' if linked else 'is not linked yet.')) }}
+  {% if linked %}
+    <p class="muted">Linked to <code>{{ base_url }}</code> as <code>{{ install_id }}</code>.</p>
+  {% endif %}
+  <form method="post" action="{{ url_for('auth.relay_register') }}" class="form">
+    <div class="field">
+      <label for="relay-url">Relay URL</label>
+      <input id="relay-url" type="url" name="base_url" value="{{ base_url }}"
+             placeholder="{{ default_base_url }}">
+      <p class="help">The hosted <code>{{ default_base_url }}</code>, or your own self-hosted Worker.</p>
+    </div>
+    <label class="switch">
+      <input type="checkbox" name="allow_local" value="1" {% if allow_local %}checked{% endif %}>
+      <span>Allow a LAN / localhost relay (development only)</span>
+    </label>
+    <div class="actions">
+      <button type="submit" class="btn">
+        {{ 'Re-register this install' if linked else 'Register this install' }}
+      </button>
+    </div>
+  </form>
+</section>
+
+{% if linked %}
+{# ---- Add a remote panel -------------------------------------------------- #}
+<section class="card">
+  {{ card_head('Add a remote panel', blurb='Creates a pairing code to enter on the panel.') }}
+  {% if new_code %}
+    <div class="callout callout-ok">
+      <p>Pairing code for <strong>{{ new_code_device }}</strong>:</p>
+      <p class="pairing-code"><code>{{ new_code }}</code></p>
+      <p class="help">
+        On the panel, set the relay URL to <code>{{ base_url }}</code> and enter this code.
+        It expires in about 10 minutes. The panel pairs over the internet, no LAN access needed.
+      </p>
+    </div>
+  {% endif %}
+  <form method="post" action="{{ url_for('auth.relay_add_panel') }}" class="form">
+    <div class="field-grid">
+      <div class="field">
+        <label for="rp-id">Device id</label>
+        <input id="rp-id" name="device_id" required pattern="[a-z][a-z0-9_-]{1,31}"
+               placeholder="parents_panel">
+      </div>
+      <div class="field">
+        <label for="rp-name">Name</label>
+        <input id="rp-name" name="name" placeholder="Parents' hallway">
+      </div>
+      <div class="field">
+        <label for="rp-kind">Panel kind</label>
+        <select id="rp-kind" name="kind" required>
+          {% for k in panel_kinds %}
+          <option value="{{ k.id }}">{{ k.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="field-grid">
+      <div class="field">
+        <label for="rp-w">Panel width (px)</label>
+        <input id="rp-w" name="panel_w" type="number" min="1" placeholder="800">
+      </div>
+      <div class="field">
+        <label for="rp-h">Panel height (px)</label>
+        <input id="rp-h" name="panel_h" type="number" min="1" placeholder="480">
+      </div>
+    </div>
+    <div class="actions">
+      <button type="submit" class="btn">Create pairing code</button>
+    </div>
+  </form>
+</section>
+
+{# ---- Remote panels ------------------------------------------------------- #}
+<section class="card">
+  {{ card_head('Remote panels', blurb='Devices delivered through the relay.') }}
+  {% if relay_devices %}
+  <ul class="pages-list">
+    {% for d in relay_devices %}
+    <li class="page-row">
+      <span class="page-icon-tile"><i class="ph ph-cloud" aria-hidden="true"></i></span>
+      <div class="page-row-main">
+        <span class="page-name">{{ d.display_name }}</span>
+        <span class="page-meta">{{ d.id }}</span>
+      </div>
+      <div class="page-actions">
+        <form method="post" action="{{ url_for('auth.relay_revoke') }}"
+              onsubmit="return confirm('Remove remote panel {{ d.id }}?');">
+          <input type="hidden" name="device_id" value="{{ d.id }}">
+          <button type="submit" class="page-action page-action-danger">
+            <i class="ph ph-trash" aria-hidden="true"></i><span>Remove</span>
+          </button>
+        </form>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+    {{ empty_state('cloud', 'No remote panels yet', 'Add one above to pair a panel at another location.') }}
+  {% endif %}
+</section>
+{% endif %}
+{% endblock %}
