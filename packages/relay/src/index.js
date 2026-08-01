@@ -270,13 +270,20 @@ async function putFrame(env, request, installId, deviceId) {
   return json({});
 }
 
-async function getFrame(env, request, installId, deviceId) {
-  const tokenSha = await sha256Hex(bearer(request));
-  const tokenRec = await getJson(env, `token/${tokenSha}.json`);
+// True when the bearer is the device token for exactly (installId, deviceId).
+// Returns a status code to fail with, or null when authorized.
+async function deviceAuthFailure(env, request, installId, deviceId) {
+  const tokenRec = await getJson(env, `token/${await sha256Hex(bearer(request))}.json`);
   if (!tokenRec) return fail("unauthorized", "", 401);
   if (tokenRec.install_id !== installId || tokenRec.device_id !== deviceId) {
     return fail("forbidden", "token is for another device", 403);
   }
+  return null;
+}
+
+async function getFrame(env, request, installId, deviceId) {
+  const denied = await deviceAuthFailure(env, request, installId, deviceId);
+  if (denied) return denied;
   const pointer = await getJson(env, `frame/${installId}/${deviceId}/latest.json`);
   if (!pointer) return new Response(null, { status: 204 });
   const ifNoneMatch = (request.headers.get("if-none-match") || "").replace(/"/g, "");
@@ -293,10 +300,32 @@ async function getFrame(env, request, installId, deviceId) {
   return new Response(blob.body, { status: 200, headers });
 }
 
+// Panel telemetry (battery/RSSI/fw). The panel posts the same status JSON it
+// would send a home REST server; the relay stores the latest verbatim and the
+// home instance pulls it. Plaintext operational data, not dashboard content.
+async function postDeviceStatus(env, request, installId, deviceId) {
+  const denied = await deviceAuthFailure(env, request, installId, deviceId);
+  if (denied) return denied;
+  const body = await request.text();
+  await putJson(env, `status/${installId}/${deviceId}.json`, {
+    body,
+    received_at: new Date().toISOString(),
+  });
+  return json({});
+}
+
+async function getDeviceStatus(env, request, installId, deviceId) {
+  if (!(await requirePublisher(env, request, installId))) return fail("unauthorized", "", 401);
+  const rec = await getJson(env, `status/${installId}/${deviceId}.json`);
+  if (!rec) return new Response(null, { status: 204 });
+  return json(rec);
+}
+
 async function revokeDevice(env, request, installId, deviceId) {
   if (!(await requirePublisher(env, request, installId))) return fail("unauthorized", "", 401);
   const listed = await env.RELAY_BUCKET.list({ prefix: `frame/${installId}/${deviceId}/` });
   await Promise.all(listed.objects.map((o) => env.RELAY_BUCKET.delete(o.key)));
+  await env.RELAY_BUCKET.delete(`status/${installId}/${deviceId}.json`);
   track(env, "mailbox_removed", installId, deviceId);
   return json({});
 }
@@ -337,6 +366,8 @@ export default {
           const deviceId = seg[4];
           if (m === "PUT" && seg[5] === "frame") return await putFrame(env, request, installId, deviceId);
           if (m === "GET" && seg[5] === "frame") return await getFrame(env, request, installId, deviceId);
+          if (m === "POST" && seg[5] === "status") return await postDeviceStatus(env, request, installId, deviceId);
+          if (m === "GET" && seg[5] === "status") return await getDeviceStatus(env, request, installId, deviceId);
           if (m === "DELETE" && seg.length === 5) return await revokeDevice(env, request, installId, deviceId);
         }
       }

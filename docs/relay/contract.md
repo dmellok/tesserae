@@ -161,6 +161,32 @@ sealed = nonce (12 bytes) || AES-256-GCM(frame_bytes, key, nonce, aad="")
 The 16-byte GCM tag is appended by the cipher, so `len(sealed) == 12 + len(frame)
 + 16`. The nonce is random per seal.
 
+## Device status (telemetry)
+
+A relay panel never reaches the home instance, so its heartbeat is relayed too.
+The panel `POST`s the **same status JSON it would send a home REST server**
+(battery, RSSI, firmware, etc. — whatever the device kind's `parse_status`
+consumes); the relay stores the latest; the home instance pulls it and feeds it
+through its normal status pipeline (live cache, battery history, events).
+
+```
+POST /v1/i/<install>/d/<device>/status      (device token)
+Body: the status JSON (as posted to a home REST /status endpoint)
+→ 200 {}
+
+GET  /v1/i/<install>/d/<device>/status      (publisher token)
+→ 200 { "body": "<verbatim status JSON>", "received_at": "<iso8601>" }
+   204   (none posted yet)
+```
+
+Status is **plaintext** (operational telemetry, not dashboard content), stored
+one-per-device and overwritten on each post; it's dropped when the device is
+revoked. `received_at` is the relay's receive time, so it doubles as
+`last_seen` for the panel. The panel should post status on its normal wake
+cadence (typically alongside the frame poll). This channel is optional: without
+it, a relay device simply shows no battery / signal / firmware and an unknown
+last-seen.
+
 ## Key derivation
 
 X25519 ECDH, then HKDF-SHA256 to the 32-byte AES key:

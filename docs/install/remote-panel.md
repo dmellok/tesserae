@@ -52,6 +52,14 @@ The panel fetches on its normal e-ink sleep cadence (every 15–60 minutes,
 typically). A new frame appears at the next scheduled wake. This keeps battery
 life the same as a local panel.
 
+## Device status
+
+A remote panel still reports its telemetry (battery, signal, firmware, last
+seen) through the relay, so its Devices card stays populated just like a
+local panel. This rides the panel's normal poll and is plaintext operational
+data, not dashboard content. Firmware that doesn't send it simply leaves those
+fields blank.
+
 ## If something goes offline
 
 - **Home offline:** the relay keeps serving the last frame; e-ink holds the

@@ -228,6 +228,24 @@ class RelayClient:
             allow_local=self.allow_local,
         )
 
+    def get_device_status(self, device_id: str) -> dict[str, Any] | None:
+        """``GET d/<device>/status``. The panel's last-relayed telemetry as
+        ``{body, received_at}``, or ``None`` when it hasn't posted any."""
+        status, _h, raw = _call(
+            "GET",
+            self._install_url(f"/d/{quote(device_id, safe='')}/status"),
+            token=self.publisher_token,
+            allow_local=self.allow_local,
+        )
+        if status == 204 or not raw:
+            return None
+        data = _json(status, raw)
+        body = data.get("body")
+        if not isinstance(body, str):
+            return None
+        received = data.get("received_at")
+        return {"body": body, "received_at": received if isinstance(received, str) else ""}
+
     def revoke_device(self, device_id: str) -> None:
         """``DELETE d/<device>``. Drops the mailbox + token so the panel 401s."""
         _call(

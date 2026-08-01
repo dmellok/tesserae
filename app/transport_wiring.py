@@ -800,6 +800,7 @@ def _rebuild_transport(
             renderers=renderers,
             data_root=app.config["DATA_ROOT"],
             settings=settings,
+            app=app,
         )
         poller.start()
         app.config["RELAY_PAIRING_POLLER"] = poller

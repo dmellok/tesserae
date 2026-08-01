@@ -192,6 +192,61 @@ def test_pairing_poller_completes_ecdh_and_creates_relay_device(
     assert "CODE42" not in (settings.get_section(RELAY_SECTION).get("pending_pairings") or {})
 
 
+def test_poller_pulls_relay_status_into_heartbeat_pipeline(
+    registries: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    devices, renderers, data_root = registries
+    device_service.create_instance(
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="parents_panel",
+        kind_id="esp32_client",
+        transport="relay",
+        relay_frame_key=b64u_encode(b"\x44" * 32),
+    )
+    settings = SettingsStore(tmp_path / "settings.json")
+
+    status = {"body": '{"battery":87}', "received_at": "2026-08-02T00:00:00Z"}
+
+    class _StatusClient:
+        def get_device_status(self, _id: str) -> Any:
+            return status
+
+    monkeypatch.setattr("app.relay_pairing.build_client", lambda _cfg: _StatusClient())
+
+    calls: list[dict[str, Any]] = []
+    monkeypatch.setattr(
+        "app.transport_wiring.record_status_heartbeat",
+        lambda **kw: calls.append(kw),
+    )
+
+    fake_app = type("A", (), {"config": {"DEVICE_STATUS": {}, "EVENT_LOG": object()}})()
+    poller = RelayPairingPoller(
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        settings=settings,
+        app=fake_app,
+        run_async=False,
+    )
+
+    poller.poll_once()
+    assert len(calls) == 1
+    assert calls[0]["device"].id == "parents_panel"
+    assert calls[0]["payload"] == b'{"battery":87}'
+    assert calls[0]["event_target"] == "relay://parents_panel/status"
+
+    # Same received_at → de-duped, no second ingest.
+    poller.poll_once()
+    assert len(calls) == 1
+
+    # New received_at → ingested again.
+    status["received_at"] = "2026-08-02T00:05:00Z"
+    poller.poll_once()
+    assert len(calls) == 2
+
+
 def test_pairing_poller_noops_when_not_linked(tmp_path: Path) -> None:
     settings = SettingsStore(tmp_path / "settings.json")
     poller = RelayPairingPoller(

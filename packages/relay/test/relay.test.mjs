@@ -205,6 +205,51 @@ test("auth is enforced", async () => {
   assert.equal(r.status, 403);
 });
 
+test("device status: panel posts, home pulls", async () => {
+  const e = env();
+  let r = await worker.fetch(req("POST", "/v1/install/register", { body: { install_pubkey: "P" } }), e);
+  const { install_id, publisher_token } = await r.json();
+  r = await worker.fetch(
+    req("POST", `/v1/i/${install_id}/pair/codes`, { headers: authHdr(publisher_token) }),
+    e,
+  );
+  const { code } = await r.json();
+  const dtok = "statustok";
+  await worker.fetch(
+    req("POST", `/v1/i/${install_id}/pair/${code}/complete`, {
+      headers: authHdr(publisher_token),
+      body: { device_id: "panel1", device_token: dtok, device_token_sha256: await sha256Hex(dtok), home_pubkey: "H" },
+    }),
+    e,
+  );
+
+  // 204 before any status posted.
+  r = await worker.fetch(req("GET", `/v1/i/${install_id}/d/panel1/status`, { headers: authHdr(publisher_token) }), e);
+  assert.equal(r.status, 204);
+
+  // Panel posts telemetry with its device token.
+  r = await worker.fetch(
+    req("POST", `/v1/i/${install_id}/d/panel1/status`, {
+      headers: authHdr(dtok),
+      body: { battery: 87, rssi: -60, fw_version: "1.0.0" },
+    }),
+    e,
+  );
+  assert.equal(r.status, 200);
+
+  // Home pulls it (publisher auth) and gets the verbatim body + received_at.
+  r = await worker.fetch(req("GET", `/v1/i/${install_id}/d/panel1/status`, { headers: authHdr(publisher_token) }), e);
+  assert.equal(r.status, 200);
+  const rec = await r.json();
+  assert.equal(JSON.parse(rec.body).battery, 87);
+  assert.ok(rec.received_at);
+
+  // A device token for another device can't post here (403); the publisher
+  // token can't post as a device (401, no token record).
+  r = await worker.fetch(req("POST", `/v1/i/${install_id}/d/panel1/status`, { headers: authHdr(publisher_token), body: {} }), e);
+  assert.equal(r.status, 401);
+});
+
 test("emits analytics data points for frame push and mailbox lifecycle", async () => {
   const points = [];
   const e = { ...env(), ANALYTICS: { writeDataPoint: (p) => points.push(p) } };

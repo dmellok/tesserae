@@ -113,6 +113,7 @@ class RelayPairingPoller:
         renderers: RendererRegistry,
         data_root: Path,
         settings: Any,
+        app: Any = None,
         rebuild_transport: Any = None,
         interval_s: float = DEFAULT_INTERVAL_S,
         run_async: bool = True,
@@ -121,10 +122,15 @@ class RelayPairingPoller:
         self._renderers = renderers
         self._data_root = Path(data_root)
         self._settings = settings
+        self._app = app
         self._rebuild_transport = rebuild_transport
         self._interval_s = interval_s
         self._run_async = run_async
         self._stop = threading.Event()
+        # De-dupe relayed heartbeats: only ingest a device's status when its
+        # relay ``received_at`` advances, so we don't replay the same beat every
+        # tick (which would spam battery history + the event log).
+        self._last_status_at: dict[str, str] = {}
 
     def start(self) -> None:
         if not self._run_async:
@@ -145,9 +151,14 @@ class RelayPairingPoller:
         """One poll. Returns the number of pairings completed."""
         cfg = relay_config(self._settings)
         client = build_client(cfg)
+        if client is None:
+            return 0
+        # Relayed heartbeats: pull each relay device's telemetry and feed the
+        # normal status pipeline. Independent of pairing, so it runs first.
+        self._pull_statuses(client)
         privkey_b64 = install_privkey(cfg)
         slots = cfg.get("pending_pairings")
-        if client is None or not privkey_b64 or not isinstance(slots, dict) or not slots:
+        if not privkey_b64 or not isinstance(slots, dict) or not slots:
             return 0
         try:
             remote = client.pending_pairings()
@@ -221,6 +232,41 @@ class RelayPairingPoller:
         if callable(self._rebuild_transport):
             self._rebuild_transport()
         logger.info("relay: paired remote panel %s (code %s)", device_id, code)
+
+    def _pull_statuses(self, client: RelayClient) -> None:
+        """Fetch each relay device's relayed telemetry and feed it through the
+        shared heartbeat pipeline, so relay devices populate DEVICE_STATUS
+        (battery / signal / firmware / last-seen) like any other device."""
+        if self._app is None:
+            return
+        from app.transport_wiring import record_status_heartbeat
+
+        relay_devices = [d for d in self._devices.devices.values() if d.transport == "relay"]
+        for device in relay_devices:
+            try:
+                status = client.get_device_status(device.id)
+            except RelayError as exc:
+                logger.debug("relay: status pull for %s failed (%s)", device.id, exc)
+                continue
+            if not status:
+                continue
+            received = str(status.get("received_at") or "")
+            if received and self._last_status_at.get(device.id) == received:
+                continue  # already ingested this beat
+            body = str(status.get("body") or "")
+            try:
+                record_status_heartbeat(
+                    app=self._app,
+                    device=device,
+                    payload=body.encode("utf-8"),
+                    status_cache=self._app.config["DEVICE_STATUS"],
+                    event_log=self._app.config["EVENT_LOG"],
+                    event_target=f"relay://{device.id}/status",
+                )
+            except Exception:
+                logger.exception("relay: ingesting status for %s failed", device.id)
+                continue
+            self._last_status_at[device.id] = received
 
     def _drop_slot(self, code: str) -> None:
         cfg = relay_config(self._settings)
