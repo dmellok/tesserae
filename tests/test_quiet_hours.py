@@ -181,6 +181,8 @@ def test_push_with_respect_quiet_hours_skips_when_all_devices_quiet(
     the caller passed ``respect_quiet_hours=True``, the push returns
     ``status="quiet"`` and never enters the render path."""
     import io
+    from datetime import datetime as _datetime
+    from datetime import timedelta as _timedelta
     from pathlib import Path
     from unittest.mock import patch
 
@@ -194,16 +196,23 @@ def test_push_with_respect_quiet_hours_skips_when_all_devices_quiet(
     from app.state.settings_store import SettingsStore
     from app.transport import BrokerConfig, MqttTransport
 
-    # Hard-disabled quiet hours don't accidentally fire, we need this
-    # set so the helper sees the window and is_in_window evaluates True.
-    # Pick a window guaranteed to be currently inside: 00:00 → 23:59.
+    # A window that reliably contains "now". A fixed 00:00-23:59 window
+    # looks all-day but leaves the final 59 s of the day uncovered:
+    # is_in_window compares at HH:MM granularity inclusively, so
+    # 23:59:00-23:59:59 falls outside and this test flaked when CI ran it
+    # in that minute. Centre a two-hour window on the current local time
+    # instead (the push path resolves no timezone here, so it evaluates
+    # naive datetime.now()); now then sits ~1 h from either boundary,
+    # clear of the boundary-minute gap. is_in_window handles the midnight
+    # wrap when the window straddles 00:00.
+    now_local = _datetime.now()
     settings = SettingsStore(Path(tmp_path) / "settings.json")  # type: ignore[arg-type]
     settings.update_section(
         "app",
         {
             "quiet_hours_enabled": True,
-            "quiet_hours_start": "00:00",
-            "quiet_hours_end": "23:59",
+            "quiet_hours_start": (now_local - _timedelta(hours=1)).strftime("%H:%M"),
+            "quiet_hours_end": (now_local + _timedelta(hours=1)).strftime("%H:%M"),
         },
     )
 
