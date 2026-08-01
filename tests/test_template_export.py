@@ -351,3 +351,97 @@ def test_shrink_preview_leaves_already_small_renders_untouched() -> None:
 def test_shrink_preview_passes_through_unreadable_bytes() -> None:
     junk = b"\x89PNG\r\n\x1a\nnot-actually-an-image"
     assert template_export.shrink_preview(junk) == junk
+
+
+# -- telling one element's questions from another's ----------------------
+
+
+def _sensor(el_id: str, title: str | None, entity: str, x: int, y: int) -> Element:
+    options: dict[str, Any] = {"entities": [entity]}
+    if title:
+        options["title"] = title
+    return Element(
+        id=el_id, kind="widget", widget="ha_sensor", x=x, y=y, w=200, h=150, options=options
+    )
+
+
+def test_multiple_same_widget_questions_are_distinguishable(app: Flask) -> None:
+    """Three sensor tiles must not ask "Entities" three times with no way to
+    tell which tile an answer lands on: the element's own title disambiguates,
+    and an untitled one falls back to where it sits on the canvas."""
+    els = [
+        _sensor("e1", "Kitchen", "sensor.kitchen", 0, 0),
+        _sensor("e2", "Bedroom", "sensor.bedroom", 600, 0),
+        _sensor("e3", None, "binary_sensor.garage", 0, 380),
+    ]
+    result = _export(app, _page(els))
+    suggested = result["inputs_suggested"]
+    assert len(suggested) == 3  # distinct values stay distinct questions
+    labels = [s["label"] for s in suggested]
+    assert "Kitchen: Entities" in labels
+    assert "Bedroom: Entities" in labels
+    assert len(set(labels)) == 3, f"labels must be distinguishable: {labels}"
+    # Each question points at exactly one element, and names are unique.
+    assert len({s["name"] for s in suggested}) == 3
+    for spec in suggested:
+        assert len(spec["targets"]) == 1
+    # The untitled tile is locatable by position instead.
+    untitled = next(s for s in suggested if s["label"] == "Entities")
+    assert "bottom left" in untitled["note"]
+
+
+def test_same_value_in_two_slots_becomes_one_question(app: Flask) -> None:
+    """One API key used by two sources should be asked for once, not twice."""
+    el = Element(
+        id="c1",
+        kind="code",
+        x=0,
+        y=0,
+        w=200,
+        h=100,
+        js="1",
+        sources=[
+            CodeSource(url="https://a", headers={"Authorization": "Bearer shared"}),
+            CodeSource(url="https://b", headers={"Authorization": "Bearer shared"}),
+        ],
+    )
+    result = _export(app, _page([el]))
+    header_inputs = [
+        s
+        for s in result["inputs_suggested"]
+        if any(t["slot"] == "source_header" for t in s["targets"])
+    ]
+    assert len(header_inputs) == 1
+    assert len(header_inputs[0]["targets"]) == 2  # one answer fans out to both
+
+
+def test_different_values_in_two_slots_stay_separate(app: Flask) -> None:
+    el = Element(
+        id="c1",
+        kind="code",
+        x=0,
+        y=0,
+        w=200,
+        h=100,
+        js="1",
+        sources=[
+            CodeSource(url="https://a", headers={"Authorization": "Bearer one"}),
+            CodeSource(url="https://b", headers={"Authorization": "Bearer two"}),
+        ],
+    )
+    result = _export(app, _page([el]))
+    header_inputs = [
+        s
+        for s in result["inputs_suggested"]
+        if any(t["slot"] == "source_header" for t in s["targets"])
+    ]
+    assert len(header_inputs) == 2
+
+
+def test_element_context_position_buckets(app: Flask) -> None:
+    from app.template_export import _element_context
+
+    with app.app_context():
+        assert _element_context(_sensor("a", None, "s.x", 0, 0), 800, 480)[1] == "top left"
+        assert _element_context(_sensor("b", None, "s.x", 600, 380), 800, 480)[1] == "bottom right"
+        assert _element_context(_sensor("c", "Titled", "s.x", 0, 0), 800, 480)[0] == "Titled"

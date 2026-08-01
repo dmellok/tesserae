@@ -43,6 +43,36 @@ _INSTALL_SPECIFIC_OPTION_NAMES = {"entity", "entity_id", "entities", "location",
 
 TEMPLATE_SCHEMA_VERSION = 1
 
+# Option names that hold a human-facing label for an element. Used to tell one
+# element's questions apart from another's on the install form: a dashboard
+# with three sensor tiles otherwise asks "Entities" three times with no way to
+# know which tile each answer lands on.
+_CONTEXT_OPTION_NAMES = ("title", "label", "name", "heading", "caption")
+
+
+def _element_context(element: Any, canvas_w: int, canvas_h: int) -> tuple[str, str]:
+    """(name, position) describing an element to a human.
+
+    ``name`` is the element's own title/label if it has one, else "". Position
+    is a coarse ninth of the canvas ("top left"), which is enough to find the
+    tile being asked about when it has no title of its own."""
+    options = getattr(element, "options", None) or {}
+    name = ""
+    for key in _CONTEXT_OPTION_NAMES:
+        value = options.get(key)
+        if isinstance(value, str) and value.strip():
+            name = value.strip()[:40]
+            break
+    if not name and getattr(element, "kind", "") == "text":
+        text = (getattr(element, "text", "") or "").strip()
+        name = text[:40]
+    cx = (getattr(element, "x", 0) or 0) + (getattr(element, "w", 0) or 0) / 2
+    cy = (getattr(element, "y", 0) or 0) + (getattr(element, "h", 0) or 0) / 2
+    col = ("left", "centre", "right")[min(2, max(0, int(cx / max(1, canvas_w) * 3)))]
+    row = ("top", "middle", "bottom")[min(2, max(0, int(cy / max(1, canvas_h) * 3)))]
+    position = f"{row} {col}" if row != "middle" or col != "centre" else "centre"
+    return name, position
+
 
 def _walk_option_schema(manifest: dict[str, Any]) -> dict[str, dict[str, Any]]:
     """name -> cell_options entry for a plugin manifest."""
@@ -70,31 +100,63 @@ def _suggest_input(
     secret: bool,
     target: dict[str, Any],
     note: str,
+    group: str,
 ) -> None:
-    """Add or extend a suggested input (same name = same value fans out to
-    every target that referenced it)."""
-    entry = inputs.setdefault(
-        name,
-        {
-            "name": name,
-            "label": label,
-            "type": type_,
-            "secret": secret,
-            "required": secret,  # secret slots don't work when left empty
-            "default": "",
-            "targets": [],
-            "note": note,
-        },
-    )
-    if target not in entry["targets"]:
-        entry["targets"].append(target)
+    """Add a suggested input, or attach this target to an existing one.
+
+    ``group`` decides sharing: two slots that held the *same original value*
+    (one API key used by two sources) become one question answered once, while
+    slots that held different values (three tiles watching three sensors) stay
+    separate questions. Grouping on the value rather than the option name is
+    what keeps those two cases apart; the values themselves never leave the
+    machine, they only decide the grouping here."""
+    for entry in inputs.values():
+        if entry.get("_group") == group:
+            if target not in entry["targets"]:
+                entry["targets"].append(target)
+            return
+    inputs[name] = {
+        "name": name,
+        "label": label,
+        "type": type_,
+        "secret": secret,
+        "required": secret,  # secret slots don't work when left empty
+        "default": "",
+        "targets": [target],
+        "note": note,
+        "_group": group,
+    }
+
+
+def _contextual_label(option_label: str, context: tuple[str, str]) -> str:
+    """ "Kitchen: Entities" rather than three fields all called "Entities"."""
+    name = context[0]
+    if not name or name.lower() == option_label.lower():
+        return option_label
+    return f"{name}: {option_label}"
+
+
+def _where(context: tuple[str, str], note: str) -> str:
+    """Append the element's position so an untitled tile is still findable."""
+    position = context[1]
+    return f"{note} ({position} of the dashboard)" if position else note
+
+
+def _group_key(plugin_id: str, key: str, value: Any) -> str:
+    """Identity for input sharing: same widget option holding the same original
+    value means one question. The value is hashed and never stored."""
+    import hashlib as _hashlib
+    import json as _json
+
+    blob = _json.dumps(value, sort_keys=True, default=str)
+    return f"{plugin_id}:{key}:{_hashlib.sha256(blob.encode()).hexdigest()[:12]}"
 
 
 def _input_name(base: str, taken: dict[str, dict[str, Any]]) -> str:
     slug = "".join(ch if ch.isalnum() else "_" for ch in base.lower()).strip("_")[:28] or "value"
     name = slug
     n = 2
-    while name in taken and taken[name].get("_base") != base:
+    while name in taken:
         name = f"{slug}_{n}"
         n += 1
     return name
@@ -143,8 +205,16 @@ def build_template(
         # No catalog record = bundled plugin; every install has it.
 
     def redact_options(
-        el_id: str, plugin_id: str, options: dict[str, Any], slot: str, index: int | None
+        el_id: str,
+        plugin_id: str,
+        options: dict[str, Any],
+        slot: str,
+        index: int | None,
+        context: tuple[str, str] = ("", ""),
     ) -> None:
+        """``context`` is (element name, position) used to tell one element's
+        questions from another's when a dashboard has several of the same
+        widget."""
         plugin = registry.get(plugin_id) if plugin_id else None
         schema = _walk_option_schema(getattr(plugin, "manifest", None) or {}) if plugin else {}
         for key in list(options.keys()):
@@ -160,12 +230,13 @@ def build_template(
                 redactions.append(f"{el_id}: removed secret option {plugin_id}.{key}")
                 _suggest_input(
                     inputs,
-                    name=_input_name(f"{plugin_id}_{key}", inputs),
-                    label=str(opt.get("label") or f"{plugin_id} {key}"),
+                    name=_input_name(f"{context[0] or plugin_id}_{key}", inputs),
+                    label=_contextual_label(str(opt.get("label") or key), context),
                     type_="string",
                     secret=True,
                     target=target,
-                    note=f"was the author's {plugin_id} {key}",
+                    note=_where(context, f"was the author's {plugin_id} {key}"),
+                    group=_group_key(plugin_id, key, value),
                 )
             elif key in _INSTALL_SPECIFIC_OPTION_NAMES or (
                 isinstance(value, str) and value.startswith(("sensor.", "light.", "switch."))
@@ -179,27 +250,35 @@ def build_template(
                 redactions.append(f"{el_id}: cleared install-specific option {key}")
                 _suggest_input(
                     inputs,
-                    name=_input_name(key, inputs),
-                    label=str(opt.get("label") or key.replace("_", " ").title()),
+                    name=_input_name(f"{context[0]}_{key}" if context[0] else key, inputs),
+                    label=_contextual_label(
+                        str(opt.get("label") or key.replace("_", " ").title()), context
+                    ),
                     type_="location_search" if opt.get("type") == "location_search" else "string",
                     secret=False,
                     target=target,
-                    note="install-specific value; the installer picks their own",
+                    note=_where(context, "the installer picks their own"),
+                    group=_group_key(plugin_id, key, value),
                 )
 
     for el in layout.els:
         el_id = el.id
+        # Captured before redaction: the element's own title is the clearest
+        # way to tell one tile's questions from another's, and some titles are
+        # themselves cleared below.
+        context = _element_context(el, layout.w, layout.h)
         if el.kind == "widget" or el.widget:
             note_widget(el.widget, f"element {el_id}")
-            redact_options(el_id, el.widget, el.options, "options", None)
+            redact_options(el_id, el.widget, el.options, "options", None, context)
         if getattr(el, "source", ""):
             note_widget(el.source, f"element {el_id}")
-            redact_options(el_id, el.source, el.options, "options", None)
+            redact_options(el_id, el.source, el.options, "options", None, context)
         for i, source in enumerate(el.sources or []):
             if source.key:
                 note_widget(source.key, f"element {el_id} source {i}")
-                redact_options(el_id, source.key, source.options, "source_options", i)
+                redact_options(el_id, source.key, source.options, "source_options", i, context)
             if source.headers:
+                original_headers = dict(source.headers)
                 source.headers = {}
                 redactions.append(f"{el_id}: removed request headers on source {i}")
                 _suggest_input(
@@ -209,12 +288,13 @@ def build_template(
                     type_="textarea",
                     secret=True,
                     target={"el": el_id, "slot": "source_header", "index": i},
-                    note="request headers never leave the author's machine",
+                    note=_where(context, "request headers never leave the author's machine"),
+                    group=_group_key("source", "headers", original_headers),
                 )
         for i, bind in enumerate(el.bind or []):
             if bind.source:
                 note_widget(bind.source, f"element {el_id} bind {i}")
-                redact_options(el_id, bind.source, bind.options, "bind_options", i)
+                redact_options(el_id, bind.source, bind.options, "bind_options", i, context)
         value_key = getattr(el, "value_key", "") or ""
         if value_key.startswith("ha:"):
             el.value_key = ""

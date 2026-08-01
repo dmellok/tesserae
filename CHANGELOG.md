@@ -17,6 +17,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   know what is valid on your system. Secret inputs stay masked text (an API key has no picker),
   and inputs targeting a raw URL source's transport fields fall back to plain text.
 
+  Each question is also labelled by the element it configures, so a dashboard with three
+  sensor tiles asks "Kitchen: Entities" and "Bedroom: Entities" rather than "Entities" three
+  times; an untitled element falls back to its position ("bottom left of the dashboard").
+  Questions are grouped by the value they replaced, so one API key shared by two sources is
+  asked for once and fans out to both, while three tiles watching three different sensors
+  stay three separate questions.
+
 - **Phone photos no longer land on the panel sideways.** `fit_to_panel` now normalizes EXIF
   orientation before cropping and fitting. Cameras commonly store a landscape pixel buffer
   plus an orientation tag instead of rotating the pixels, and Pillow does not apply that tag
