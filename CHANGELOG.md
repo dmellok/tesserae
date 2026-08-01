@@ -8,6 +8,12 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **The Share dialog now warns that the preview image is a live render.** The screenshot
+  submitted with a template shows whatever the dashboard was displaying at that moment, and
+  it reaches reviewers immediately and the public catalog on approval. The dialog says so
+  beside the image, suggests duplicating the dashboard with placeholder values if it shows
+  anything private, and confirms once more at submit.
+
 - **Large dashboards can be shared again: template previews are downsampled to fit.** A
   1600x1200 render with a photo background exceeded the submission size cap and was rejected
   outright. Previews are now resampled to at most 1200px on the long edge (with a palette

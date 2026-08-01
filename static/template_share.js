@@ -70,6 +70,28 @@
         " <span style='opacity:.7'>(a stable pseudonym; sponsors can pick a custom name)</span>" }));
     }
 
+    // The preview is a LIVE render of this dashboard, and it travels with the
+    // submission: reviewers see it while the template is pending, and it
+    // becomes the public catalog card once approved. Whatever the widgets are
+    // showing right now (calendar entries, addresses, sensor readings) is in
+    // that image, so say so plainly right next to it rather than burying it.
+    var notice = el("div", {});
+    notice.style.cssText = "background:rgba(184,134,11,.10);border:1px solid rgba(184,134,11,.45);" +
+      "border-radius:8px;padding:10px 12px;margin:10px 0 4px";
+    notice.appendChild(el("strong", { text: "This image gets shared, exactly as you see it" }));
+    notice.appendChild(el("div", {
+      text: "It's a live render of your dashboard right now. Reviewers see it while " +
+        "your template is pending, and it becomes the public preview once approved.",
+      style: "margin-top:2px",
+    }));
+    notice.appendChild(el("div", {
+      text: "If it's showing anything you'd rather not publish (names, addresses, " +
+        "appointments, sensor readings), duplicate this dashboard, swap in " +
+        "placeholder values, and share the copy instead.",
+      style: "margin-top:6px",
+    }));
+    card.appendChild(notice);
+
     var img = el("img", { alt: "Preview" });
     img.style.cssText = "max-width:100%;border:1px solid var(--t-border,#ddd);border-radius:8px;margin:8px 0";
     img.src = "/pages/canvas/c/" + canvasId + "/preview.png?t=" + Date.now();
@@ -145,6 +167,11 @@
     var status = el("div", {});
     status.style.cssText = "margin-top:8px;opacity:.85";
     submit.addEventListener("click", function () {
+      if (!window.confirm(
+        "Submit this dashboard as a community template?\n\n" +
+        "The preview image above is sent with it: reviewers see it now, and it " +
+        "becomes public once approved. Check it isn't showing anything private."
+      )) return;
       submit.disabled = true;
       status.textContent = "Submitting…";
       var chosen = inputRows.filter(function (r) { return r.include.checked; }).map(function (r) {

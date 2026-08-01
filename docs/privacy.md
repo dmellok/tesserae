@@ -94,6 +94,10 @@ until you press Submit in the Share dialog. A submission POSTs to
 install-specific values like Home Assistant entity ids; a credential lint
 blocks the submission if anything key-shaped remains), a rendered preview
 image of the dashboard, your install's random ID, and your running version.
+That preview is a **live render**, so it shows whatever your widgets were
+displaying when you shared: the Share dialog shows you the exact image and
+warns you before you submit, so you can duplicate the dashboard and swap in
+placeholder values first if it contains anything you'd rather not publish.
 Submissions are human-reviewed before they appear publicly. Your public
 author name is a stable pseudonym derived server-side from your install ID
 (e.g. `amber-heron-42`); no real name, email, or account is involved.
