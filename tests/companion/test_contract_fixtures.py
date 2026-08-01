@@ -39,7 +39,7 @@ CASES = {
 
 def test_openapi_shape_and_operation_ids_are_stable() -> None:
     assert SPEC["openapi"] == "3.0.3"
-    assert SPEC["info"]["version"] == "0.5.1"
+    assert SPEC["info"]["version"] == "0.5.2"
     assert set(SPEC["paths"]) == {
         "/api/app/v1",
         "/api/app/v1/pair",
@@ -132,6 +132,23 @@ def test_preview_endpoints_are_read_only_and_conditional() -> None:
     extension = json.loads((FIXTURES_DIR / "capabilities-previews.json").read_text())
     assert "previews" not in base["features"]
     assert "previews" in extension["features"]
+
+
+def test_pending_render_identifies_an_exact_retrievable_preview() -> None:
+    devices = json.loads((FIXTURES_DIR / "devices-response.json").read_text())["devices"]
+    pending = next(device for device in devices if device["has_pending_render"])
+
+    assert pending["pending_render"] == {
+        "revision": "a1b2c3d4e5f67890",
+        "rendered_at": "2026-07-28T08:00:00Z",
+        "preview_url": ("/api/app/v1/devices/picpak-kitchen/preview?revision=a1b2c3d4e5f67890"),
+    }
+
+    revision_parameter = SPEC["paths"]["/api/app/v1/devices/{device_id}/preview"]["get"][
+        "parameters"
+    ][1]
+    assert revision_parameter["name"] == "revision"
+    assert revision_parameter["required"] is False
 
 
 def test_extended_capabilities_advertise_history_and_all_image_fit_modes() -> None:

@@ -17,7 +17,7 @@ job the client polls; quiet-hours suppression surfaces as a *successful*
 app.mdns.
 
 Contract: ``charmmmz/tesserae-companion-ios`` ``Contracts/app-v1.openapi.yaml``
-(OpenAPI 0.5.1). The vendored copy + fixtures under ``tests/companion/``
+(OpenAPI 0.5.2). The vendored copy + fixtures under ``tests/companion/``
 guard these shapes.
 
 mypy --strict applies to this module, see pyproject.toml.
@@ -38,7 +38,7 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from flask import Blueprint, Flask, current_app, g, jsonify, request
+from flask import Blueprint, Flask, current_app, g, jsonify, request, url_for
 from werkzeug.wrappers import Response
 
 from app.companion_history import (
@@ -448,12 +448,38 @@ def _device_view(
 
     fw = parsed.get("fw_version") if isinstance(parsed, dict) else None
     has_pending_render = False
+    pending_render: dict[str, Any] | None = None
     if device.transport == "rest" and push_manager is not None:
         pending_lookup = getattr(push_manager, "has_pending_render", None)
         if callable(pending_lookup):
             has_pending_render = bool(pending_lookup(device.id))
+        if has_pending_render:
+            latest_lookup = getattr(push_manager, "latest_render_for", None)
+            latest = latest_lookup(device.id) if callable(latest_lookup) else None
+            if isinstance(latest, dict):
+                revision = latest.get("digest")
+                preview_digest = latest.get("preview_digest")
+                if (
+                    isinstance(revision, str)
+                    and revision
+                    and isinstance(preview_digest, str)
+                    and preview_digest
+                ):
+                    pending_render = {
+                        "revision": revision,
+                        "preview_url": url_for(
+                            ".device_preview",
+                            device_id=device.id,
+                            revision=revision,
+                        ),
+                    }
+                    rendered_at = latest.get("timestamp")
+                    if isinstance(rendered_at, (int, float)):
+                        pending_render["rendered_at"] = datetime.fromtimestamp(
+                            float(rendered_at), UTC
+                        ).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    return {
+    view = {
         "id": device.id,
         "name": device.display_name,
         "kind": str(device.kind_of or ""),
@@ -472,6 +498,9 @@ def _device_view(
         "firmware_version": (str(fw) if isinstance(fw, (str, int, float)) else None),
         "has_pending_render": has_pending_render,
     }
+    if pending_render is not None:
+        view["pending_render"] = pending_render
+    return view
 
 
 @bp.get("/devices")
@@ -1154,10 +1183,14 @@ def get_job(job_id: str) -> Any:
 @bp.get("/devices/<device_id>/preview")
 @_require_companion("devices:read")
 def device_preview(device_id: str) -> Any:
-    """Last-served logical full-frame PNG for a display.
+    """Logical full-frame PNG for a display.
 
-    REST polling devices use the frame most recently returned by ``/frame``;
-    transports without a reliable served signal fall back to server-latest.
+    Without ``revision``, REST polling devices use the frame most recently
+    returned by ``/frame``; transports without a reliable served signal fall
+    back to server-latest. A ``revision`` advertised by ``pending_render``
+    selects that exact server-latest render, including during the normal
+    superseded-render grace window.
+
     The preview includes the selected image-fit mode and logical panel geometry,
     but excludes hardware-only row-stride and mount compensation. A live
     partial-refresh patch may be newer than this last full frame.
@@ -1168,18 +1201,32 @@ def device_preview(device_id: str) -> Any:
     manager = _push_manager()
     render: dict[str, Any] | None = None
     if manager is not None:
-        if device.transport == "rest":
+        revision = request.args.get("revision", "").strip()
+        if revision:
+            latest_lookup = getattr(manager, "latest_render_for", None)
+            latest = latest_lookup(device_id) if callable(latest_lookup) else None
+            if isinstance(latest, dict) and latest.get("digest") == revision:
+                render = latest
+            else:
+                previous_lookup = getattr(manager, "previous_render_for", None)
+                previous = previous_lookup(device_id) if callable(previous_lookup) else None
+                if isinstance(previous, dict) and previous.get("digest") == revision:
+                    render = previous
+        elif device.transport == "rest":
             served_lookup = getattr(manager, "last_served_render_for", None)
             if callable(served_lookup):
                 render = served_lookup(device_id)
         else:
             render = manager.latest_render_for(device_id)
     if not isinstance(render, dict):
-        message = (
-            "No frame has been served to this display yet."
-            if device.transport == "rest"
-            else "No frame has been rendered for this display yet."
-        )
+        if request.args.get("revision", "").strip():
+            message = "No retained preview exists for that display revision."
+        else:
+            message = (
+                "No frame has been served to this display yet."
+                if device.transport == "rest"
+                else "No frame has been rendered for this display yet."
+            )
         return _error("not_found", message, 404)
     digest = render.get("preview_digest")
     if digest is None:

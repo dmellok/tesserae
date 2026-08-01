@@ -81,21 +81,38 @@ class _FakePush:
         preview_digest: object | None,
         *,
         latest_preview_digest: object | None = None,
+        latest_revision: str = "latest000000001",
+        previous_preview_digest: object | None = None,
+        previous_revision: str = "previous0000001",
     ) -> None:
         self._served_digest = preview_digest
         self._latest_digest = (
             preview_digest if latest_preview_digest is None else latest_preview_digest
         )
+        self._latest_revision = latest_revision
+        self._previous_digest = previous_preview_digest
+        self._previous_revision = previous_revision
 
     def latest_render_for(self, device_id: str) -> Any:
         if self._latest_digest is None:
             return None
-        return {"preview_digest": self._latest_digest}
+        return {
+            "digest": self._latest_revision,
+            "preview_digest": self._latest_digest,
+        }
 
     def last_served_render_for(self, device_id: str) -> Any:
         if self._served_digest is None:
             return None
         return {"preview_digest": self._served_digest}
+
+    def previous_render_for(self, device_id: str) -> Any:
+        if self._previous_digest is None:
+            return None
+        return {
+            "digest": self._previous_revision,
+            "preview_digest": self._previous_digest,
+        }
 
 
 class _FakeLegacyPush:
@@ -142,6 +159,68 @@ def test_device_preview_prefers_last_served_over_newer_server_render(app: Flask)
 
     assert resp.status_code == 200
     assert resp.headers["ETag"].strip('"') == "deadbeefcafe0010"
+
+
+def test_device_preview_serves_exact_pending_revision(app: Flask) -> None:
+    device = _seed_device(app)
+    _seed_render(app, "deadbeefcafe0010")
+    _seed_render(app, "deadbeefcafe0011")
+    app.config["PUSH_MANAGER"] = _FakePush(
+        "deadbeefcafe0010",
+        latest_preview_digest="deadbeefcafe0011",
+        latest_revision="latest000000011",
+    )
+    token = _token(app)
+
+    resp = app.test_client().get(
+        f"/api/app/v1/devices/{device}/preview?revision=latest000000011",
+        headers=_auth(token),
+    )
+
+    assert resp.status_code == 200
+    assert resp.headers["ETag"].strip('"') == "deadbeefcafe0011"
+
+
+def test_device_preview_serves_superseded_advertised_revision_during_grace_window(
+    app: Flask,
+) -> None:
+    device = _seed_device(app)
+    _seed_render(app, "deadbeefcafe0014")
+    app.config["PUSH_MANAGER"] = _FakePush(
+        "deadbeefcafe0010",
+        latest_preview_digest="deadbeefcafe0011",
+        latest_revision="latest000000011",
+        previous_preview_digest="deadbeefcafe0014",
+        previous_revision="previous0000014",
+    )
+    token = _token(app)
+
+    resp = app.test_client().get(
+        f"/api/app/v1/devices/{device}/preview?revision=previous0000014",
+        headers=_auth(token),
+    )
+
+    assert resp.status_code == 200
+    assert resp.headers["ETag"].strip('"') == "deadbeefcafe0014"
+
+
+def test_device_preview_rejects_unknown_revision(app: Flask) -> None:
+    device = _seed_device(app)
+    _seed_render(app, "deadbeefcafe0011")
+    app.config["PUSH_MANAGER"] = _FakePush(
+        "deadbeefcafe0010",
+        latest_preview_digest="deadbeefcafe0011",
+        latest_revision="latest000000011",
+    )
+    token = _token(app)
+
+    resp = app.test_client().get(
+        f"/api/app/v1/devices/{device}/preview?revision=unknown",
+        headers=_auth(token),
+    )
+
+    assert resp.status_code == 404
+    assert resp.get_json()["error"]["code"] == "not_found"
 
 
 def test_device_preview_uses_server_latest_for_non_rest_transport(app: Flask) -> None:
