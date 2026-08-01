@@ -35,6 +35,11 @@ All routes are under `/v1`. The hosted relay is `https://relay.tesserae.ink`;
 a self-hosted Worker uses its own origin (`packages/relay/`). The relay base URL
 is per-install configuration on the home side, so the two are interchangeable.
 
+**Send a descriptive `User-Agent`.** The hosted relay sits behind Cloudflare bot
+protection, which blocks known-bot user agents (e.g. `Python-urllib`) with a
+`403` before the request reaches the Worker. Any non-default UA passes; the home
+client sends `tesserae/relay`.
+
 ## Authentication
 
 Bearer tokens in `Authorization: Bearer <token>`, compared timing-safe. The

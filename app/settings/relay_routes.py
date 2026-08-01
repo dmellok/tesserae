@@ -54,7 +54,8 @@ def relay_index() -> str:
 @bp.post("/settings/relay/register")
 def relay_register() -> Response:
     base = (request.form.get("base_url") or "").strip() or DEFAULT_BASE_URL
-    allow_local = request.form.get("allow_local") == "1"
+    # The switch submits its value only when on; unchecked omits the key.
+    allow_local = request.form.get("allow_local") is not None
     try:
         register_this_install(settings_store(), base=base, allow_local=allow_local)
         flash("Install registered with the relay.", "ok")

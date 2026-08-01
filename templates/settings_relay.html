@@ -1,5 +1,5 @@
 {% extends "_base.html" %}
-{% from "_components.html" import settings_tabs, card_head, empty_state %}
+{% from "_components.html" import settings_tabs, card_head, empty_state, switch %}
 {% block title %}Cloud relay, Tesserae{% endblock %}
 
 {% block main %}
@@ -28,10 +28,10 @@
              placeholder="{{ default_base_url }}">
       <p class="help">The hosted <code>{{ default_base_url }}</code>, or your own self-hosted Worker.</p>
     </div>
-    <label class="switch">
-      <input type="checkbox" name="allow_local" value="1" {% if allow_local %}checked{% endif %}>
-      <span>Allow a LAN / localhost relay (development only)</span>
-    </label>
+    {{ switch('relay-allow-local', 'allow_local',
+              'Allow a LAN / localhost relay (development only)',
+              checked=allow_local,
+              help='Off by default: the relay URL must be a public address. Turn on only to point at a relay you run locally (e.g. wrangler dev) or on your LAN while testing.') }}
     <div class="actions">
       <button type="submit" class="btn">
         {{ 'Re-register this install' if linked else 'Register this install' }}

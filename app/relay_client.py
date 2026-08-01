@@ -25,6 +25,11 @@ from app.net_guard import assert_operator_url, assert_public_url
 
 _TIMEOUT_S: float = 10.0
 
+# A descriptive UA. The stdlib default (``Python-urllib/x``) is blocked by
+# Cloudflare Bot Fight Mode / managed WAF rules (the relay sits behind those on
+# tesserae.ink), which surfaced as a 403 on every relay call.
+_USER_AGENT: str = "tesserae/relay (+https://tesserae.ink)"
+
 
 class RelayError(Exception):
     """A relay call failed. ``status`` is the HTTP code (``None`` for transport
@@ -57,7 +62,8 @@ def _call(
         assert_operator_url(url)
     else:
         assert_public_url(url)
-    hdrs: dict[str, str] = dict(headers or {})
+    hdrs: dict[str, str] = {"User-Agent": _USER_AGENT}
+    hdrs.update(headers or {})
     data: bytes | None = None
     if json_body is not None:
         data = json.dumps(json_body).encode("utf-8")
