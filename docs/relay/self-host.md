@@ -43,12 +43,14 @@ records (the `code/` and `pair/` prefixes) are checked for expiry on read but no
 deleted, so add an R2 **lifecycle rule** to expire those prefixes after a day:
 
 ```sh
-# Cloudflare dashboard: R2 → tesserae-relay → Settings → Object lifecycle rules
-#   delete objects under prefix "code/" older than 1 day
-#   delete objects under prefix "pair/" older than 1 day
+wrangler r2 bucket lifecycle add tesserae-relay expire-pairing-codes   "code/" --expire-days 1 -y
+wrangler r2 bucket lifecycle add tesserae-relay expire-pairing-records "pair/" --expire-days 1 -y
+wrangler r2 bucket lifecycle list tesserae-relay   # confirm
 ```
 
-Nothing else grows unbounded; frame and token records are one-per-device.
+(Or the same thing via the Cloudflare dashboard: R2 → tesserae-relay →
+Settings → Object lifecycle rules.) Nothing else grows unbounded; frame and
+token records are one-per-device.
 
 ## Analytics (optional)
 
