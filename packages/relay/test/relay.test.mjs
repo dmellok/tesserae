@@ -136,6 +136,38 @@ test("full rendezvous + frame round-trip", async () => {
   assert.equal(r.status, 304);
 });
 
+test("a new frame supersedes and deletes the previous blob", async () => {
+  const e = env();
+  const bucket = e.RELAY_BUCKET;
+  let r = await worker.fetch(req("POST", "/v1/install/register", { body: { install_pubkey: "PUB" } }), e);
+  const { install_id, publisher_token } = await r.json();
+
+  const put = async (etag, bytes) =>
+    worker.fetch(
+      new Request(`https://relay.test/v1/i/${install_id}/d/panel1/frame`, {
+        method: "PUT",
+        headers: { authorization: "Bearer " + publisher_token, ETag: `"${etag}"` },
+        body: new Uint8Array(bytes),
+      }),
+      e,
+    );
+
+  await put("aaa", [1]);
+  const listAfterFirst = await bucket.list({ prefix: `frame/${install_id}/panel1/` });
+  assert.ok(listAfterFirst.objects.some((o) => o.key.endsWith("aaa.bin")));
+
+  // Second render → old blob gone, only the new one + the pointer remain.
+  await put("bbb", [2, 3]);
+  const keys = (await bucket.list({ prefix: `frame/${install_id}/panel1/` })).objects.map((o) => o.key);
+  assert.ok(keys.some((k) => k.endsWith("bbb.bin")));
+  assert.ok(!keys.some((k) => k.endsWith("aaa.bin")), "superseded blob should be deleted");
+
+  // Re-PUT the same ETag → the current blob must survive (not delete itself).
+  await put("bbb", [2, 3]);
+  const still = await bucket.get(`frame/${install_id}/panel1/bbb.bin`);
+  assert.ok(still, "idempotent re-PUT must keep the current blob");
+});
+
 test("auth is enforced", async () => {
   const e = env();
   let r = await worker.fetch(req("POST", "/v1/install/register", { body: { install_pubkey: "PUB" } }), e);

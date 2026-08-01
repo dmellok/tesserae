@@ -238,10 +238,18 @@ async function putFrame(env, request, installId, deviceId) {
   if (!etag) return fail("invalid_request", "ETag header required", 400);
   const meta = {};
   for (const [header, field] of META_HEADERS) meta[field] = request.headers.get(header) || "";
+  const pointerKey = `frame/${installId}/${deviceId}/latest.json`;
   const blobKey = `frame/${installId}/${deviceId}/${etag}.bin`;
+  const previous = await getJson(env, pointerKey);
   const body = await request.arrayBuffer();
   await env.RELAY_BUCKET.put(blobKey, body);
-  await putJson(env, `frame/${installId}/${deviceId}/latest.json`, { etag, blob_key: blobKey, meta });
+  await putJson(env, pointerKey, { etag, blob_key: blobKey, meta });
+  // Delete the frame this one supersedes so the mailbox holds only the latest
+  // sealed blob (each render is a new digest; without this, blobs accumulate
+  // forever). A repeated ETag points at the same blob, so never delete that.
+  if (previous?.blob_key && previous.blob_key !== blobKey) {
+    await env.RELAY_BUCKET.delete(previous.blob_key);
+  }
   return json({});
 }
 

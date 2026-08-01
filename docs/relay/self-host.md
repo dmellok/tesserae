@@ -35,6 +35,21 @@ KB per frame, well inside Cloudflare's free tier. There are no Durable Objects
 (v1 is scheduled-poll-only and R2 is strongly consistent), so no paid Workers
 plan is required.
 
+## Storage cleanup
+
+Frame blobs are self-cleaning: each upload deletes the frame it supersedes, so a
+device's mailbox holds only its latest sealed frame. The short-lived pairing
+records (the `code/` and `pair/` prefixes) are checked for expiry on read but not
+deleted, so add an R2 **lifecycle rule** to expire those prefixes after a day:
+
+```sh
+# Cloudflare dashboard: R2 → tesserae-relay → Settings → Object lifecycle rules
+#   delete objects under prefix "code/" older than 1 day
+#   delete objects under prefix "pair/" older than 1 day
+```
+
+Nothing else grows unbounded; frame and token records are one-per-device.
+
 ## Restricting who can register (hosted operators)
 
 If you run a relay for other people, override `checkEntitlement(env, request)`
