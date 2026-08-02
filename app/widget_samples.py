@@ -445,6 +445,25 @@ def _todo() -> dict[str, Any]:
     }
 
 
+def _reminders_fridge() -> dict[str, Any]:
+    return {
+        "title": "Fridge",
+        "accent": "accent-1",
+        "items": [
+            {"title": "Yogurt", "high": True, "due": "Today", "urgent": True},
+            {"title": "Spinach", "high": False, "due": "Mon", "urgent": False},
+            {"title": "Leftovers", "high": False, "due": "", "urgent": False},
+            {"title": "Milk", "high": False, "due": "", "urgent": False},
+            {"title": "Eggs", "high": False, "due": "", "urgent": False},
+        ],
+        "count": 6,
+        "shown": 5,
+        "state": "fresh",
+        "updated_label": "2h ago",
+        "empty": False,
+    }
+
+
 _GALLERY_SAMPLE_DATA_URL = (
     "data:image/svg+xml;utf8,"
     "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 400'>"
@@ -870,6 +889,7 @@ SAMPLES: dict[str, Any] = {
     "ha_zones": _ha_zones,
     "picture_gallery": _picture_gallery,
     "todo": _todo,
+    "reminders_fridge": _reminders_fridge,
 }
 
 

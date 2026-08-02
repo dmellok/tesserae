@@ -1,0 +1,42 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "Reminders, Fridge",
+  "version": "0.1.0",
+  "kind": "widget",
+  "description": "A fridge grocery list from your iPhone. The Tesserae Companion app publishes one chosen Apple Reminders list (incomplete items only) to the server as a minimal, expiring snapshot; this widget renders it as a framed checklist with the count as the hero. Nothing leaves the phone except the selected list, and the snapshot is deleted when you turn the source off or it expires. Needs the Companion app paired with the personal-data source enabled.",
+  "icon": "ph-basket",
+  "supports": {
+    "sizes": ["xs", "sm", "md", "lg"]
+  },
+  "cell_options": [
+    {
+      "name": "title",
+      "type": "string",
+      "label": "Title (blank = \"Fridge\")",
+      "default": ""
+    },
+    {
+      "name": "max_items",
+      "type": "number",
+      "label": "Max items shown (0 = all)",
+      "default": 0
+    },
+    {
+      "name": "accent",
+      "type": "select",
+      "label": "Accent",
+      "default": "accent-1",
+      "choices": [
+        { "value": "accent-1", "label": "Terracotta" },
+        { "value": "accent-2", "label": "Ochre" },
+        { "value": "accent-4", "label": "Teal" },
+        { "value": "accent-5", "label": "Slate blue" },
+        { "value": "accent-6", "label": "Plum" }
+      ]
+    }
+  ],
+  "render": {
+    "dither": "none",
+    "needs_network": false
+  }
+}
