@@ -872,9 +872,7 @@ class PushManager:
                     stamp_into=stamp,
                 )
             except Exception:
-                logger.exception(
-                    "album warm failed frame=%s device=%s", frame_id, device_id
-                )
+                logger.exception("album warm failed frame=%s device=%s", frame_id, device_id)
                 return False
             info = stamp.get(device_id)
             if info is None:
@@ -892,9 +890,7 @@ class PushManager:
             info = self._album_renders.get(device_id, {}).get(frame_id)
             return dict(info) if info is not None else None
 
-    def clear_album_cache(
-        self, device_id: str, *, keep_frames: set[str] | None = None
-    ) -> None:
+    def clear_album_cache(self, device_id: str, *, keep_frames: set[str] | None = None) -> None:
         """Drop warmed album frames for a device: all of them, or all except
         ``keep_frames``. Used when an album's image set / order changes or a
         device unbinds so stale warmed frames don't linger."""
