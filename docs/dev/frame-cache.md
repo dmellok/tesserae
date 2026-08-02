@@ -13,8 +13,11 @@ concrete form of the "state bundles" direction sketched in
 [protocol-v2-touch.md §B3](../protocol-v2-touch.md). Everything here is optional:
 a client that never advertises the capability sees no change on any endpoint.
 
-Status: **proposed / pinning.** This document is the thing both sides build
-against; it is not implemented yet. Discussion: #177.
+Status: **slice 1 implemented server-side.** The album producer, the
+`/collection` manifest + frame endpoints, the `frame_cache` capability, and the
+`/status` `collection` envelope are built; authoring is the Gallery folder's
+"Use as offline album" action. Firmware (the cache + playback side) is the
+remaining half. Discussion: #177.
 
 ## Design split
 

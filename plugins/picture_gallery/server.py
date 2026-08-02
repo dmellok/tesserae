@@ -340,6 +340,38 @@ def resolve_image_path(folder: str, filename: str) -> Path | None:
     return path
 
 
+def list_folder_files(folder: str) -> list[str]:
+    """Public: a folder's image filenames in natural (filename) sort. Used by
+    the offline-album producer (#177) to enumerate an album's frames. Empty for
+    an unknown / empty folder."""
+    data_dir = _data_dir()
+    if folder and folder != ROOT_FOLDER_VALUE and not _FOLDER_NAME_RE.match(folder):
+        return []
+    return [p.name for p in _list_images(_folder_path(folder, data_dir))]
+
+
+# ----- offline album authoring (#177) ---------------------------------
+
+
+def _bindable_devices() -> list[dict[str, str]]:
+    """Device instances an offline album can be bound to (id + label)."""
+    reg = current_app.config.get("DEVICE_REGISTRY")
+    if reg is None:
+        return []
+    out: list[dict[str, str]] = []
+    for dev in sorted(reg.devices.values(), key=lambda d: d.name.lower()):
+        if dev.kind_of is None:
+            continue
+        out.append({"id": dev.id, "label": dev.display_name})
+    return out
+
+
+def _album_for_folder(folder: str) -> Any | None:
+    """The saved album whose id is this folder, or None. One album per folder."""
+    store = current_app.config.get("ALBUM_STORE")
+    return store.get(folder) if store is not None else None
+
+
 # ----- admin blueprint ------------------------------------------------
 
 
@@ -465,6 +497,7 @@ def blueprint() -> Blueprint:
         external_path = None
         if external:
             external_path = _load_meta(data_dir).get(folder, {}).get("external_path")
+        album = _album_for_folder(folder)
         return render_template(
             "picture_gallery/folder.html",
             folder_id=folder,
@@ -474,6 +507,8 @@ def blueprint() -> Blueprint:
             images=[{"name": p.name} for p in images],
             allowed_exts=sorted(ALLOWED_SUFFIXES),
             max_upload_mb=MAX_UPLOAD_BYTES // (1024 * 1024),
+            devices=_bindable_devices(),
+            album=album,
         )
 
     @bp.post("/folders/<folder>/upload")
@@ -558,5 +593,71 @@ def blueprint() -> Blueprint:
             _save_meta(data_dir, meta)
         flash(f"Deleted folder '{folder}'.", "ok")
         return redirect(url_for("picture_gallery_admin.index"))
+
+    @bp.post("/folders/<folder>/use-as-album")
+    def use_as_album(folder: str) -> Response:
+        """Turn this folder into an offline photo album (#177): save an Album
+        bound to the picked device(s) so a storage-capable panel caches the
+        rendered frames and plays them back locally. Contract:
+        docs/dev/frame-cache.md. Re-submitting updates the folder's album."""
+        from pydantic import ValidationError
+
+        from app.state.album_model import Album
+
+        if folder != ROOT_FOLDER_VALUE and not _FOLDER_NAME_RE.match(folder):
+            abort(404)
+        store = current_app.config.get("ALBUM_STORE")
+        if store is None:
+            flash("Album store is unavailable.", "warn")
+            return redirect(url_for("picture_gallery_admin.show_folder", folder=folder))
+        if not list_folder_files(folder):
+            flash("This folder has no images to make an album from.", "warn")
+            return redirect(url_for("picture_gallery_admin.show_folder", folder=folder))
+
+        default_name = "Root album" if folder == ROOT_FOLDER_VALUE else folder
+        name = (request.form.get("name") or "").strip() or default_name
+        device_ids = [d for d in request.form.getlist("device_ids") if d]
+        fit = request.form.get("fit") or "fill"
+        mode = request.form.get("mode") or "sequential"
+        repeat = request.form.get("repeat") or "loop"
+        try:
+            interval_min = int(request.form.get("interval_min") or 30)
+        except ValueError:
+            interval_min = 30
+        interval_s = max(60, min(interval_min * 60, 86_400))
+
+        prev = store.get(folder)
+        try:
+            album = Album.model_validate(
+                {
+                    "id": folder,
+                    "name": name,
+                    "device_ids": device_ids,
+                    "source_folder": folder,
+                    "fit": fit,
+                    "playback": {"mode": mode, "interval_s": interval_s, "repeat": repeat},
+                }
+            )
+        except ValidationError:
+            flash("Could not save the album: invalid playback settings.", "warn")
+            return redirect(url_for("picture_gallery_admin.show_folder", folder=folder))
+        store.upsert(album)
+
+        # Drop cached frames for every affected device (newly bound, still
+        # bound, or just unbound) so the next manifest fetch re-renders with the
+        # current order / fit / membership rather than serving stale frames.
+        push = current_app.config.get("PUSH_MANAGER")
+        if push is not None:
+            affected = set(device_ids) | set(prev.device_ids if prev is not None else [])
+            for dev_id in affected:
+                with contextlib.suppress(Exception):
+                    push.clear_album_cache(dev_id)
+
+        count = len(device_ids)
+        flash(
+            f"Saved album '{name}', bound to {count} device{'' if count == 1 else 's'}.",
+            "ok",
+        )
+        return redirect(url_for("picture_gallery_admin.show_folder", folder=folder))
 
     return bp

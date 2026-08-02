@@ -25,7 +25,7 @@ from typing import Any
 
 from flask import Flask
 
-from app import deck_sync, device_loader, overlay_sync, renderer_loader
+from app import collection_sync, deck_sync, device_loader, overlay_sync, renderer_loader
 from app.discovery import DiscoveryCache, device_id_from_status_topic
 from app.embedded_broker import EmbeddedBroker
 from app.ha_discovery import HomeAssistantDiscovery
@@ -316,6 +316,12 @@ def record_status_heartbeat(
     deck_cache = deck_sync.advertised_deck_cache(payload)
     if deck_cache is not None:
         entry["deck_cache"] = deck_cache
+    # Frame-cache capability (#177, producer-neutral on-device frame cache):
+    # same current-state rule as deck_cache, NOT carried forward. The collection
+    # endpoints read capacity_bytes + max_frames from here to size the manifest.
+    frame_cache = collection_sync.advertised_frame_cache(payload)
+    if frame_cache is not None:
+        entry["frame_cache"] = frame_cache
     # Overlay capability (hybrid render mode): sticky like ota_schema, it's
     # a firmware property (partial-refresh support), not removable hardware.
     overlay = overlay_sync.advertised_overlay(payload)

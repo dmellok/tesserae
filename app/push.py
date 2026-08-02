@@ -537,6 +537,12 @@ class PushManager:
         # (re-warmed on restart) but its digests are GC-protected via
         # ``_live_digests`` so the prune can't delete a warmed artifact.
         self._deck_renders: dict[str, dict[str, dict[str, Any]]] = {}
+        # Offline-album frame cache (frame-cache collections, #177): the same
+        # silent-warm mechanism as decks, keyed device_id -> frame_id -> render
+        # info. An album frame is one gallery image rendered to the device's
+        # panel; warmed via ``warm_album_frame`` so it never disturbs the live
+        # frame, and served through the ``/collection`` manifest endpoints.
+        self._album_renders: dict[str, dict[str, dict[str, Any]]] = {}
         # Post-action frame patches (hybrid render mode, schema 2):
         # device_id -> patch document, each anchored to the frame digest
         # the device is showing and superseded whenever a newer frame
@@ -836,6 +842,73 @@ class PushManager:
                 per.pop(pid, None)
             if not per:
                 self._deck_renders.pop(device_id, None)
+
+    # -- offline-album frame cache (frame-cache collections, #177) -------
+
+    def warm_album_frame(
+        self, frame_id: str, device_id: str, image_bytes: bytes, *, fit: str
+    ) -> bool:
+        """Render one album image for a device into the pre-render cache WITHOUT
+        changing the frame the device is currently serving. ``frame_id`` is the
+        album's stable id for the image; ``fit`` is the panel fit mode
+        (``fit`` / ``fill``). Returns True when a frame was cached; best-effort,
+        a render miss / failure returns False.
+
+        Renders under the push lock (like ``warm_deck_page``), so warms
+        serialise with real pushes rather than racing them."""
+        stamp: dict[str, dict[str, Any]] = {}
+        with self._lock:
+            try:
+                panel_dims = self._panel_dims_for_send(device_id)
+                self._fan_out(
+                    image_bytes,
+                    panel_dims,
+                    source="album_warm",
+                    target=frame_id,
+                    started=time.monotonic(),
+                    device_filters={device_id},
+                    image_fit=fit,
+                    force_publish=True,
+                    stamp_into=stamp,
+                )
+            except Exception:
+                logger.exception(
+                    "album warm failed frame=%s device=%s", frame_id, device_id
+                )
+                return False
+            info = stamp.get(device_id)
+            if info is None:
+                return False
+            self._album_renders.setdefault(device_id, {})[frame_id] = info
+        return True
+
+    def album_render_for(self, device_id: str, frame_id: str) -> dict[str, Any] | None:
+        """The warmed render info for one album frame of a device
+        (``{digest, ext, filename, ...}``, same shape as
+        :meth:`latest_render_for`), or None when not warmed. Used by the
+        device-facing collection manifest / frame endpoints
+        (``app.collection_sync``)."""
+        with self._lock:
+            info = self._album_renders.get(device_id, {}).get(frame_id)
+            return dict(info) if info is not None else None
+
+    def clear_album_cache(
+        self, device_id: str, *, keep_frames: set[str] | None = None
+    ) -> None:
+        """Drop warmed album frames for a device: all of them, or all except
+        ``keep_frames``. Used when an album's image set / order changes or a
+        device unbinds so stale warmed frames don't linger."""
+        with self._lock:
+            if keep_frames is None:
+                self._album_renders.pop(device_id, None)
+                return
+            per = self._album_renders.get(device_id)
+            if per is None:
+                return
+            for fid in [f for f in per if f not in keep_frames]:
+                per.pop(fid, None)
+            if not per:
+                self._album_renders.pop(device_id, None)
 
     # -- post-action frame patches (hybrid render mode, schema 2) --------
 
@@ -1685,6 +1758,10 @@ class PushManager:
         # no device is serving them yet and their event row may have been capped.
         for per_page in list(self._deck_renders.values()):
             entries.extend(per_page.values())
+        # Warmed album frames (#177) are protected the same way: they back the
+        # /collection manifest and firmware fetches them by digest.
+        for per_frame in list(self._album_renders.values()):
+            entries.extend(per_frame.values())
         for entry in entries:
             for key in (
                 "digest",

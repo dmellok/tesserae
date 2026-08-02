@@ -515,6 +515,83 @@ def _bound_deck(device_id: str) -> Any:
     return bound_deck_for(store, device_id)
 
 
+def _album_store() -> Any:
+    return current_app.config.get("ALBUM_STORE")
+
+
+def _gallery_module() -> Any:
+    reg = current_app.config.get("PLUGIN_REGISTRY")
+    plugin = reg.get("picture_gallery") if reg is not None else None
+    return plugin.server_module if plugin is not None else None
+
+
+def _bound_album(device_id: str) -> Any:
+    """The enabled album bound to this device, or None. Thin wrapper so every
+    collection-cache path resolves the album the same way."""
+    store = _album_store()
+    if store is None:
+        return None
+    from app.collection_sync import bound_album_for
+
+    return bound_album_for(store, device_id)
+
+
+def _collection_frames(album: Any) -> list[tuple[str, str]]:
+    """The album's ordered ``(frame_id, filename)`` frames, resolved against the
+    live gallery folder. Empty when the gallery plugin or folder is missing."""
+    gallery = _gallery_module()
+    if gallery is None:
+        return []
+    from app.collection_sync import ordered_frames
+
+    files = gallery.list_folder_files(album.source_folder)
+    return ordered_frames(album, files)
+
+
+def _collection_image_loader(album: Any) -> Any:
+    """A ``filename -> bytes | None`` loader for the album's source folder."""
+    gallery = _gallery_module()
+
+    def load(filename: str) -> bytes | None:
+        if gallery is None:
+            return None
+        path = gallery.resolve_image_path(album.source_folder, filename)
+        if path is None:
+            return None
+        try:
+            return Path(path).read_bytes()
+        except OSError:
+            return None
+
+    return load
+
+
+def _collection_status_envelope(device: Device, body: dict[str, Any]) -> dict[str, Any] | None:
+    """``{"id", "kind", "version"}`` for the /status response, when this device
+    advertised the frame-cache capability on this beat AND has a bound album.
+    Absent otherwise, so /status stays byte-identical for devices without the
+    feature. Computed without warming (cheap)."""
+    from app import collection_sync
+
+    if collection_sync.advertised_frame_cache(body) is None:
+        return None
+    album = _bound_album(device.id)
+    push_mgr = current_app.config.get("PUSH_MANAGER")
+    renders_dir = current_app.config.get("RENDERS_DIR")
+    if album is None or push_mgr is None or renders_dir is None:
+        return None
+    frames = _collection_frames(album)
+    version = collection_sync.current_version(
+        album,
+        device.id,
+        push_mgr=push_mgr,
+        renders_dir=renders_dir,
+        frames=frames,
+        device_id_for_url=device.id,
+    )
+    return {"id": f"album:{album.id}", "kind": "album", "version": version}
+
+
 def _deck_status_envelope(device: Device, body: dict[str, Any]) -> dict[str, Any] | None:
     """``{"version": ...}`` for the /status response, when this device
     advertised the deck-cache capability on this beat AND has a bound
@@ -1146,6 +1223,19 @@ def post_status(device_id: str) -> Response:
             deck_env = None
         if deck_env is not None:
             response["deck"] = deck_env
+        # Frame-cache collections (#177): repeat the bound album's id + current
+        # version so a capable device knows when its cached collection is stale
+        # and re-syncs the manifest. Same current-state gating as the deck
+        # envelope; absent means no collection is active (drop local playback).
+        try:
+            collection_env = _collection_status_envelope(device, body)
+        except Exception:
+            current_app.logger.exception(
+                "rest /status: collection envelope failed for device=%s", device.id
+            )
+            collection_env = None
+        if collection_env is not None:
+            response["collection"] = collection_env
         # Overlay values piggyback (hybrid render mode): a capable device
         # gets its live frame's values on every heartbeat for free, so
         # slots refresh on every wake even outside a linger window.
@@ -1261,6 +1351,87 @@ def get_deck_frame(device_id: str, digest: str) -> Response:
     path = Path(renders_dir) / str(info.get("filename") or "")
     if not path.is_file():
         return _error(404, "frame artifact missing; re-fetch the deck manifest")
+    from flask import send_file
+
+    resp = send_file(path, mimetype="application/octet-stream")
+    resp.headers["ETag"] = f'"{info["digest"]}"'
+    resp.headers["Cache-Control"] = "immutable, max-age=31536000"
+    return resp
+
+
+@bp.get("/<device_id>/collection")
+def get_collection_manifest(device_id: str) -> Response:
+    """The bound collection's sync manifest for this device: per-frame ids,
+    positions, digests, byte sizes, ttls, cache eligibility, and the opaque
+    producer block, so capable firmware can fill its cache and play back
+    locally. Contract in docs/dev/frame-cache.md.
+
+    The first producer is the offline photo album (#177). Cold frames are
+    rendered on demand so the manifest ships complete; expect a few seconds on
+    the first call after an album edit. 204 when nothing is bound."""
+    device, err = _auth_device(device_id)
+    if err is not None or device is None:
+        return err  # type: ignore[return-value]
+
+    album = _bound_album(device.id)
+    push_mgr = current_app.config.get("PUSH_MANAGER")
+    renders_dir = current_app.config.get("RENDERS_DIR")
+    if album is None or push_mgr is None or renders_dir is None:
+        return _error(204, "no collection bound to this device")
+
+    from app.collection_sync import build_manifest
+
+    # The device's advertised card capacity + frame cap (current-state, from its
+    # heartbeats); frames beyond either get cache=false.
+    status = (current_app.config.get("DEVICE_STATUS") or {}).get(device.id)
+    cache_cap = status.get("frame_cache") if isinstance(status, dict) else None
+    capacity = cache_cap.get("capacity_bytes") if isinstance(cache_cap, dict) else None
+    max_frames = cache_cap.get("max_frames") if isinstance(cache_cap, dict) else None
+
+    manifest = build_manifest(
+        album,
+        device.id,
+        push_mgr=push_mgr,
+        renders_dir=renders_dir,
+        frames=_collection_frames(album),
+        image_loader=_collection_image_loader(album),
+        device_id_for_url=device.id,
+        warm_missing=True,
+        capacity_bytes=capacity if isinstance(capacity, int) and capacity > 0 else None,
+        max_frames=max_frames if isinstance(max_frames, int) and max_frames > 0 else None,
+    )
+    return jsonify({"status": 200, **manifest})
+
+
+@bp.get("/<device_id>/collection/frame/<digest>")
+def get_collection_frame(device_id: str, digest: str) -> Response:
+    """One collection frame by digest, for the cache fill. Digest-addressed
+    (content never changes under a digest), so firmware can cache forever and
+    only fetch digests its manifest diff says are new. 404 on an unknown digest
+    means the client's manifest is stale: re-sync."""
+    device, err = _auth_device(device_id)
+    if err is not None or device is None:
+        return err  # type: ignore[return-value]
+
+    album = _bound_album(device.id)
+    push_mgr = current_app.config.get("PUSH_MANAGER")
+    renders_dir = current_app.config.get("RENDERS_DIR")
+    if album is None or push_mgr is None or renders_dir is None:
+        return _error(404, "no collection bound to this device")
+
+    from app.collection_sync import frame_entry_by_digest
+
+    info = frame_entry_by_digest(
+        device.id,
+        _normalize_digest(digest),
+        push_mgr=push_mgr,
+        frames=_collection_frames(album),
+    )
+    if info is None:
+        return _error(404, "unknown frame digest; re-fetch the collection manifest")
+    path = Path(renders_dir) / str(info.get("filename") or "")
+    if not path.is_file():
+        return _error(404, "frame artifact missing; re-fetch the collection manifest")
     from flask import send_file
 
     resp = send_file(path, mimetype="application/octet-stream")

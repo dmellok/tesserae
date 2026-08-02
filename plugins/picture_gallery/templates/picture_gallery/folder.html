@@ -63,6 +63,68 @@
   {% endif %}
 </section>
 
+{% if images %}
+<section class="card">
+  {{ card_head('Offline photo album', icon_name='images-square', level=2,
+               blurb='Render this folder to a storage-capable panel so it caches the frames and plays them back locally, even when your server is unreachable. Needs firmware with a frame cache (SD card).') }}
+  <form method="post" action="{{ url_for('picture_gallery_admin.use_as_album', folder=folder_id) }}" class="form">
+    <div class="field">
+      <label for="album-name">Album name</label>
+      <input type="text" id="album-name" name="name" maxlength="80"
+             value="{{ album.name if album else folder_name }}" placeholder="{{ folder_name }}">
+    </div>
+    <div class="field">
+      <label>Play on</label>
+      {% if devices %}
+      <div class="pg-dev-list">
+        {% for dev in devices %}
+        <label class="pg-dev">
+          <input type="checkbox" name="device_ids" value="{{ dev.id }}"
+                 {{ 'checked' if album and dev.id in album.device_ids else '' }}>
+          <span>{{ dev.label }}</span>
+        </label>
+        {% endfor %}
+      </div>
+      <p class="pg-hint">One album plays per device (slice 1). Leave all unchecked to save the album without binding it yet.</p>
+      {% else %}
+      <p class="pg-hint">No devices registered yet. Add one under Settings → Devices, then bind it here.</p>
+      {% endif %}
+    </div>
+    <div class="pg-album-grid">
+      <div class="field">
+        <label for="album-fit">Fit</label>
+        <select id="album-fit" name="fit">
+          <option value="fill" {{ 'selected' if not album or album.fit == 'fill' else '' }}>Fill (crop to edges)</option>
+          <option value="fit" {{ 'selected' if album and album.fit == 'fit' else '' }}>Fit (letterbox)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="album-mode">Order</label>
+        <select id="album-mode" name="mode">
+          <option value="sequential" {{ 'selected' if not album or album.playback.mode == 'sequential' else '' }}>Sequential</option>
+          <option value="shuffle" {{ 'selected' if album and album.playback.mode == 'shuffle' else '' }}>Shuffle</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="album-interval">Every (minutes)</label>
+        <input type="number" id="album-interval" name="interval_min" min="1" max="1440"
+               value="{{ (album.playback.interval_s // 60) if album else 30 }}">
+      </div>
+      <div class="field">
+        <label for="album-repeat">At the end</label>
+        <select id="album-repeat" name="repeat">
+          <option value="loop" {{ 'selected' if not album or album.playback.repeat == 'loop' else '' }}>Loop</option>
+          <option value="reshuffle" {{ 'selected' if album and album.playback.repeat == 'reshuffle' else '' }}>Reshuffle</option>
+          <option value="once" {{ 'selected' if album and album.playback.repeat == 'once' else '' }}>Hold last</option>
+        </select>
+      </div>
+    </div>
+    <p class="pg-hint">The panel clamps the interval to its own power limits, so very short intervals may run slower on battery displays.</p>
+    <div class="actions">{{ button('Save album' if album else 'Create album', icon='images-square') }}</div>
+  </form>
+</section>
+{% endif %}
+
 {% if folder_id != '_root' %}
 <section class="card">
   {{ card_head('Danger zone', icon_name='trash', level=2,
@@ -143,5 +205,29 @@
     font-size: 14px;
   }
   .card-empty .ph-duotone { font-size: 20px; }
+  .pg-dev-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+  }
+  .pg-dev {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .pg-dev input { margin: 0; }
+  .pg-album-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px 14px;
+  }
+  .pg-hint {
+    font-size: 12px;
+    color: var(--t-fg-soft);
+    margin: 4px 0 0;
+  }
 </style>
 {% endblock %}
