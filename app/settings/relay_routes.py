@@ -48,7 +48,23 @@ def relay_index() -> str:
         # operator can read it off the page (it isn't stored server-side).
         new_code=request.args.get("code", ""),
         new_code_device=request.args.get("device", ""),
+        new_code_ttl_label=_ttl_label(request.args.get("ttl", "")),
     )
+
+
+def _ttl_label(raw: str) -> str:
+    """Human wording for the minted code's lifetime ('10 minutes', '2 hours')."""
+    try:
+        seconds = int(raw)
+    except ValueError:
+        return "10 minutes"
+    if seconds <= 0:
+        return "10 minutes"
+    if seconds < 3600:
+        minutes = max(1, round(seconds / 60))
+        return f"{minutes} minute{'s' if minutes != 1 else ''}"
+    hours = max(1, round(seconds / 3600))
+    return f"{hours} hour{'s' if hours != 1 else ''}"
 
 
 @bp.post("/settings/relay/register")
@@ -79,16 +95,29 @@ def relay_add_panel() -> Response:
     if not device_id:
         flash("Pick a device id for the remote panel.", "error")
         return redirect(url_for("auth.relay_index"))
+    # Code lifetime: someone may have to travel to the remote location
+    # before they can enter the code, so 10 minutes is offered alongside
+    # longer windows. The relay clamps to 5 minutes - 24 hours.
+    try:
+        ttl_seconds = int(request.form.get("ttl_seconds") or 600)
+    except ValueError:
+        ttl_seconds = 600
+    ttl_seconds = max(300, min(ttl_seconds, 86_400))
     # kind + panel are optional: the panel reports its model + geometry at
     # pairing, so home fills in anything left blank here.
     try:
         code, _expires = mint_remote_panel_code(
-            settings_store(), device_id=device_id, kind=kind, name=name, panel=panel or None
+            settings_store(),
+            device_id=device_id,
+            kind=kind,
+            name=name,
+            panel=panel or None,
+            ttl_seconds=ttl_seconds,
         )
     except RelayError as exc:
         flash(f"Couldn't create a pairing code: {exc}", "error")
         return redirect(url_for("auth.relay_index"))
-    return redirect(url_for("auth.relay_index", code=code, device=device_id))
+    return redirect(url_for("auth.relay_index", code=code, device=device_id, ttl=str(ttl_seconds)))
 
 
 @bp.post("/settings/relay/revoke")

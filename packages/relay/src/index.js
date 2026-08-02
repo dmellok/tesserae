@@ -156,8 +156,21 @@ async function registerInstall(env, request) {
 
 async function mintCode(env, request, installId) {
   if (!(await requirePublisher(env, request, installId))) return fail("unauthorized", "", 401);
+  // Optional { ttl_seconds }: the operator may need hours to reach the
+  // remote location before entering the code. Clamped to 5 minutes - 24
+  // hours; absent/invalid keeps the 10-minute default.
+  let ttlMs = CODE_TTL_MS;
+  try {
+    const body = await request.json();
+    const ttl = Number(body?.ttl_seconds);
+    if (Number.isFinite(ttl) && ttl > 0) {
+      ttlMs = Math.min(Math.max(ttl, 300), 86400) * 1000;
+    }
+  } catch {
+    // No/invalid body: default TTL.
+  }
   const code = randomCode();
-  const expiresAt = new Date(Date.now() + CODE_TTL_MS).toISOString();
+  const expiresAt = new Date(Date.now() + ttlMs).toISOString();
   await putJson(env, `code/${code}.json`, { install_id: installId, expires_at: expiresAt });
   await putJson(env, `pair/${installId}/${code}.json`, { code, expires_at: expiresAt });
   return json({ code, expires_at: expiresAt }, 201);

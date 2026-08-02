@@ -342,6 +342,36 @@ test("works without the analytics binding", async () => {
   assert.equal(r.status, 201);
 });
 
+test("pair-code TTL is honoured and clamped", async () => {
+  const e = env();
+  let r = await worker.fetch(req("POST", "/v1/install/register", { body: { install_pubkey: "P" } }), e);
+  const { install_id, publisher_token } = await r.json();
+  const mint = async (body) => {
+    const resp = await worker.fetch(
+      req("POST", `/v1/i/${install_id}/pair/codes`, { headers: authHdr(publisher_token), body }),
+      e,
+    );
+    assert.equal(resp.status, 201);
+    return resp.json();
+  };
+  const ttlMinutes = (json) => (Date.parse(json.expires_at) - Date.now()) / 60000;
+
+  // Default (no body): ~10 minutes.
+  let minted = await mint(undefined);
+  assert.ok(Math.abs(ttlMinutes(minted) - 10) < 1, minted.expires_at);
+  // Requested 2 hours: honoured.
+  minted = await mint({ ttl_seconds: 7200 });
+  assert.ok(Math.abs(ttlMinutes(minted) - 120) < 1, minted.expires_at);
+  // Over the 24h cap and under the 5min floor: clamped.
+  minted = await mint({ ttl_seconds: 999999 });
+  assert.ok(Math.abs(ttlMinutes(minted) - 1440) < 1, minted.expires_at);
+  minted = await mint({ ttl_seconds: 10 });
+  assert.ok(Math.abs(ttlMinutes(minted) - 5) < 1, minted.expires_at);
+  // Garbage keeps the default.
+  minted = await mint({ ttl_seconds: "soon" });
+  assert.ok(Math.abs(ttlMinutes(minted) - 10) < 1, minted.expires_at);
+});
+
 test("unknown code is rejected", async () => {
   const e = env();
   const r = await worker.fetch(req("POST", "/v1/pair", { body: { code: "NOPE99", panel_pubkey: "P" } }), e);

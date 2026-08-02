@@ -40,8 +40,9 @@ the returned credentials. Outbound only; nothing is opened on your network.
 
 **Settings → Cloud relay → Add a remote panel.** Pick the device kind, screen
 size, and an id/name (e.g. `parents_panel`) as you would for any device.
-Tesserae shows a **pairing code** plus the relay URL. The code expires in about
-10 minutes.
+Tesserae shows a **pairing code** plus the relay URL. The code expires after
+the window you pick under "Code valid for": 10 minutes by default, up to 24
+hours if someone has to travel to the remote location before entering it.
 
 ### 3. Enter the code on the panel
 
@@ -68,7 +69,9 @@ next wake, if its firmware supports the config fetch.
 
 ### If it does not pair
 
-- **Code expired** — mint a fresh one (10-minute window).
+- **Code expired** — mint a fresh one. The default window is 10 minutes;
+  pick a longer "Code valid for" (up to 24 hours) when someone has to
+  travel to the remote location to enter it.
 - **Nothing after ~1 min** — confirm the home instance is running and the Cloud
   relay page shows "linked", and the panel's relay URL exactly matches.
 - **Paired but blank** — it has no dashboard yet; do step 4.

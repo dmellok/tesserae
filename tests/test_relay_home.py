@@ -14,7 +14,7 @@ from app.main import REPO_ROOT
 from app.ota._codec import b64u_decode, b64u_encode
 from app.relay_config import RELAY_SECTION
 from app.relay_crypto import derive_shared_key, generate_keypair, unseal
-from app.relay_pairing import RelayPairingPoller
+from app.relay_pairing import RelayPairingPoller, mint_remote_panel_code
 from app.relay_publisher import RelayPublisher
 from app.state.settings_store import SettingsStore
 
@@ -26,6 +26,10 @@ def registries(tmp_path: Path) -> Any:
         REPO_ROOT / "devices",
         schema_path=REPO_ROOT / "schema" / "device.schema.json",
         data_root=data_root,
+        # Hardware-catalog kinds included: relay pairing resolves a panel's
+        # (protocol, gamut) self-report to a catalog SKU kind.
+        hardware_dir=REPO_ROOT / "hardware",
+        hardware_schema_path=REPO_ROOT / "schema" / "hardware.schema.json",
     )
     renderers = renderer_loader.discover(
         REPO_ROOT / "renderers",
@@ -365,6 +369,147 @@ def test_pairing_poller_uses_panel_self_report_when_slot_blank(
     assert device.panel.get("gamut") == "waveshare_e6"  # from the panel's self-report
 
 
+def _poller(registries: Any, tmp_path: Path) -> RelayPairingPoller:
+    devices, renderers, data_root = registries
+    return RelayPairingPoller(
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        settings=SettingsStore(tmp_path / "settings.json"),
+        run_async=False,
+    )
+
+
+@pytest.mark.parametrize(
+    "model,gamut,expected",
+    [
+        # The gamut names a catalog SKU whose renderer override packs at
+        # the right bit depth; the bare kind's default would mis-pack.
+        ("esp32_bw_client", "gray_4", "seeed_reterminal_e1001_gray"),
+        ("esp32_bw_client", "bwr_3", "xiao_epaper_75_bwr"),
+        ("esp32_client", "gray_16", "seeed_reterminal_e1003"),
+        # Default-gamut reports keep the bare kind: catalog SKUs for these
+        # rows pack identically, so upgrading would only mislabel hardware.
+        ("esp32_bw_client", "mono", "esp32_bw_client"),
+        ("esp32_client", "spectra_6", "esp32_client"),
+        # Unknown / absent gamut regresses nothing.
+        ("esp32_bw_client", "plasma_9000", "esp32_bw_client"),
+        ("esp32_bw_client", "", "esp32_bw_client"),
+    ],
+)
+def test_resolve_kind_prefers_catalog_kind_for_reported_gamut(
+    registries: Any, tmp_path: Path, model: str, gamut: str, expected: str
+) -> None:
+    poller = _poller(registries, tmp_path)
+    reported = {"model": model, "gamut": gamut, "panel_w": 800, "panel_h": 480}
+    assert poller._resolve_kind("", model, reported) == expected
+
+
+def test_resolve_kind_slot_value_still_wins(registries: Any, tmp_path: Path) -> None:
+    poller = _poller(registries, tmp_path)
+    reported = {"model": "esp32_bw_client", "gamut": "gray_4"}
+    assert poller._resolve_kind("esp32_client", "esp32_bw_client", reported) == "esp32_client"
+
+
+def test_resolve_kind_breaks_gamut_ties_on_reported_geometry(
+    registries: Any, tmp_path: Path
+) -> None:
+    # gray_4 maps to two SKUs with the same renderer override; the declared
+    # panel geometry picks the right one, and either packs correct bytes.
+    poller = _poller(registries, tmp_path)
+    x4 = {"model": "esp32_bw_client", "gamut": "gray_4", "panel_w": 480, "panel_h": 800}
+    assert poller._resolve_kind("", "esp32_bw_client", x4) == "xteink_x4_gray"
+
+
+def test_gray_e1001_self_report_creates_a_device_that_packs_2bpp(
+    registries: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """End-to-end (#the E1001-gray field failure): pairing with the grayscale
+    build's self-report must yield frames of 96000 bytes (800*480 at 2bpp),
+    not the bare kind's 1bpp 48000, and the mono report must stay 1bpp."""
+    import io
+
+    from PIL import Image
+
+    from app.panel import device_panel
+
+    devices, renderers, data_root = registries
+    settings = SettingsStore(tmp_path / "settings.json")
+    home_priv, _home_pub = generate_keypair()
+    settings.patch_section(
+        RELAY_SECTION,
+        {
+            "enabled": True,
+            "install_id": "i1",
+            "publisher_token_secret": "p",
+            "install_privkey_secret": b64u_encode(home_priv),
+            "pending_pairings": {
+                "GRAY1": {"device_id": "gray_panel"},
+                "MONO1": {"device_id": "mono_panel"},
+            },
+        },
+    )
+    _panel_priv, panel_pub = generate_keypair()
+
+    class _Client:
+        def __init__(self) -> None:
+            self.completed: list[Any] = []
+
+        def pending_pairings(self) -> Any:
+            return [
+                {
+                    "code": "GRAY1",
+                    "panel_pubkey": b64u_encode(panel_pub),
+                    "panel_w": 800,
+                    "panel_h": 480,
+                    "model": "esp32_bw_client",
+                    "gamut": "gray_4",
+                },
+                {
+                    "code": "MONO1",
+                    "panel_pubkey": b64u_encode(panel_pub),
+                    "panel_w": 800,
+                    "panel_h": 480,
+                    "model": "esp32_bw_client",
+                    "gamut": "mono",
+                },
+            ]
+
+        def complete_pairing(self, **kw: Any) -> None:
+            self.completed.append(kw)
+
+    monkeypatch.setattr("app.relay_pairing.build_client", lambda _cfg: _Client())
+    poller = RelayPairingPoller(
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        settings=settings,
+        run_async=False,
+    )
+    assert poller.poll_once() == 2
+
+    composition = io.BytesIO()
+    Image.new("RGB", (800, 480), (128, 128, 128)).save(composition, "PNG")
+    png = composition.getvalue()
+
+    def packed_size(device_id: str) -> int:
+        device = devices.get(device_id)
+        assert device is not None
+        panel = device_panel(device)
+        assert panel is not None
+        clones = renderers.for_device(device_id)
+        assert len(clones) == 1, [c.id for c in clones]
+        return len(clones[0].transform(png, panel=panel, settings={}))
+
+    gray = devices.get("gray_panel")
+    assert gray is not None and gray.kind_of == "seeed_reterminal_e1001_gray"
+    assert packed_size("gray_panel") == 800 * 480 // 4  # 2bpp -> 96000
+
+    mono = devices.get("mono_panel")
+    assert mono is not None and mono.kind_of == "esp32_bw_client"
+    assert packed_size("mono_panel") == 800 * 480 // 8  # 1bpp -> 48000
+
+
 def test_pairing_poller_noops_when_not_linked(tmp_path: Path) -> None:
     settings = SettingsStore(tmp_path / "settings.json")
     poller = RelayPairingPoller(
@@ -375,6 +520,46 @@ def test_pairing_poller_noops_when_not_linked(tmp_path: Path) -> None:
         run_async=False,
     )
     assert poller.poll_once() == 0
+
+
+def test_mint_remote_panel_code_forwards_the_requested_ttl(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    settings = SettingsStore(tmp_path / "settings.json")
+    settings.patch_section(
+        RELAY_SECTION,
+        {
+            "enabled": True,
+            "base_url": "https://relay.example",
+            "install_id": "i1",
+            "publisher_token_secret": "p",
+        },
+    )
+    seen: dict[str, Any] = {}
+
+    class _Client:
+        def mint_pair_code(self, *, ttl_seconds: int | None = None) -> tuple[str, str]:
+            seen["ttl"] = ttl_seconds
+            return "CODE77", "2026-08-02T12:00:00Z"
+
+    monkeypatch.setattr("app.relay_pairing.build_client", lambda _cfg: _Client())
+    code, expires = mint_remote_panel_code(settings, device_id="p1", ttl_seconds=7200)
+    assert code == "CODE77" and expires
+    assert seen["ttl"] == 7200
+    # Default: no TTL forwarded, the relay's 10-minute default applies.
+    mint_remote_panel_code(settings, device_id="p2")
+    assert seen["ttl"] is None
+
+
+def test_pairing_code_ttl_label_is_human() -> None:
+    from app.settings.relay_routes import _ttl_label
+
+    assert _ttl_label("600") == "10 minutes"
+    assert _ttl_label("1800") == "30 minutes"
+    assert _ttl_label("7200") == "2 hours"
+    assert _ttl_label("86400") == "24 hours"
+    assert _ttl_label("") == "10 minutes"
+    assert _ttl_label("junk") == "10 minutes"
 
 
 def test_relay_settings_json_roundtrips(tmp_path: Path) -> None:

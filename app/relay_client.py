@@ -137,13 +137,21 @@ class RelayClient:
     def _install_url(self, suffix: str) -> str:
         return f"{self.base_url.rstrip('/')}/v1/i/{quote(self.install_id, safe='')}{suffix}"
 
-    def mint_pair_code(self) -> tuple[str, str]:
+    def mint_pair_code(self, *, ttl_seconds: int | None = None) -> tuple[str, str]:
         """``POST pair/codes``. Returns ``(code, expires_at)`` for the user to
-        enter on the remote panel."""
+        enter on the remote panel.
+
+        ``ttl_seconds`` (optional) asks the relay for a longer-lived code
+        (clamped server-side to 5 minutes - 24 hours); ``None`` keeps the
+        relay's 10-minute default."""
+        body: dict[str, Any] | None = None
+        if ttl_seconds is not None:
+            body = {"ttl_seconds": int(ttl_seconds)}
         status, _h, raw = _call(
             "POST",
             self._install_url("/pair/codes"),
             token=self.publisher_token,
+            json_body=body,
             allow_local=self.allow_local,
         )
         data = _json(status, raw)

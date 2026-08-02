@@ -76,8 +76,11 @@ def test_add_panel_mints_code_and_records_slot(
     client.post("/settings/relay/register", data={"base_url": "https://relay.example"})
 
     # Stub the code mint at the client layer.
+    minted: dict[str, Any] = {}
+
     class _FakeClient:
-        def mint_pair_code(self) -> tuple[str, str]:
+        def mint_pair_code(self, *, ttl_seconds: int | None = None) -> tuple[str, str]:
+            minted["ttl_seconds"] = ttl_seconds
             return "ABC234", "2099-01-01T00:00:00Z"
 
     monkeypatch.setattr("app.relay_pairing.build_client", lambda _cfg: _FakeClient())
@@ -89,11 +92,15 @@ def test_add_panel_mints_code_and_records_slot(
             "kind": "esp32_client",
             "panel_w": "800",
             "panel_h": "480",
+            "ttl_seconds": "7200",
         },
         follow_redirects=True,
     )
     assert resp.status_code == 200
-    assert "ABC234" in resp.get_data(as_text=True)  # code shown on the page
+    body = resp.get_data(as_text=True)
+    assert "ABC234" in body  # code shown on the page
+    assert "2 hours" in body  # chosen lifetime echoed in the expiry copy
+    assert minted["ttl_seconds"] == 7200
     cfg = app_with_gate.config["SETTINGS_STORE"].get_section(RELAY_SECTION)
     slot = cfg["pending_pairings"]["ABC234"]
     assert slot["device_id"] == "parents_panel"

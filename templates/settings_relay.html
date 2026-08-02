@@ -50,7 +50,7 @@
       <p class="pairing-code"><code>{{ new_code }}</code></p>
       <p class="help">
         On the panel, set the relay URL to <code>{{ base_url }}</code> and enter this code.
-        It expires in about 10 minutes. The panel pairs over the internet, no LAN access needed.
+        It expires in about {{ new_code_ttl_label }}. The panel pairs over the internet, no LAN access needed.
       </p>
     </div>
   {% endif %}
@@ -58,12 +58,14 @@
     <div class="field-grid">
       <div class="field">
         <label for="rp-id">Device id</label>
-        <input id="rp-id" name="device_id" required pattern="[a-z][a-z0-9_-]{1,31}"
+        {# type="text" matters: the form styling keys on input[type], so a
+           bare <input> renders at the browser default height. #}
+        <input type="text" id="rp-id" name="device_id" required pattern="[a-z][a-z0-9_-]{1,31}"
                placeholder="parents_panel">
       </div>
       <div class="field">
         <label for="rp-name">Name</label>
-        <input id="rp-name" name="name" placeholder="Parents' hallway">
+        <input type="text" id="rp-name" name="name" placeholder="Parents' hallway">
       </div>
       <div class="field">
         <label for="rp-kind">Panel kind</label>
@@ -72,6 +74,15 @@
           {% for k in panel_kinds %}
           <option value="{{ k.id }}">{{ k.name }}</option>
           {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="rp-ttl">Code valid for</label>
+        <select id="rp-ttl" name="ttl_seconds">
+          <option value="600">10 minutes</option>
+          <option value="1800">30 minutes</option>
+          <option value="7200">2 hours</option>
+          <option value="86400">24 hours</option>
         </select>
       </div>
     </div>

@@ -87,6 +87,7 @@ def mint_remote_panel_code(
     panel: dict[str, Any] | None = None,
     orientation: str | None = None,
     config: dict[str, Any] | None = None,
+    ttl_seconds: int | None = None,
 ) -> tuple[str, str]:
     """Ask the relay for a pairing code and record the slot it fills. Returns
     ``(code, expires_at)`` to show the operator. Raises :class:`RelayError`
@@ -94,12 +95,14 @@ def mint_remote_panel_code(
 
     ``kind`` and ``panel`` are optional: left blank, the panel's self-report at
     pairing (model + geometry) fills them in, so the operator only needs a
-    device id."""
+    device id. ``ttl_seconds`` (optional) requests a longer-lived code for
+    when the panel is at the remote location already and someone has to
+    travel to it; the relay clamps to 5 minutes - 24 hours."""
     cfg = relay_config(settings)
     client = build_client(cfg)
     if client is None:
         raise RelayError("relay is not linked; register the install first")
-    code, expires = client.mint_pair_code()
+    code, expires = client.mint_pair_code(ttl_seconds=ttl_seconds)
     pending = dict(cfg.get("pending_pairings") or {})
     pending[code] = {
         "device_id": device_id,
@@ -194,16 +197,98 @@ class RelayPairingPoller:
             completed += 1
         return completed
 
-    def _resolve_kind(self, slot_kind: str, reported_model: str) -> str:
+    def _resolve_kind(
+        self,
+        slot_kind: str,
+        reported_model: str,
+        reported: dict[str, Any] | None = None,
+    ) -> str:
         """Pick the device kind: the operator's slot value if set, else the
-        panel's self-reported model, else the default relay panel kind. Only a
-        value that names a real device *kind* (not an instance) is accepted."""
-        for candidate in (slot_kind.strip(), reported_model.strip()):
-            if candidate:
-                dev = self._devices.get(candidate)
-                if dev is not None and dev.kind_of is None:
-                    return candidate
+        panel's self-report, else the default relay panel kind. Only a value
+        that names a real device *kind* (not an instance) is accepted.
+
+        The self-report's ``model`` is a protocol-level kind id (that's all
+        the wire vocabulary has), but the panel also reports its ``gamut``,
+        and the renderer that packs at the right bit depth for a non-default
+        gamut lives on the hardware-catalog kind, not the bare protocol kind
+        (an E1001 running the grayscale build needs ``esp32_gray2_bin``'s
+        2-bpp 96000-byte frames, while the bare ``esp32_bw_client`` packs
+        1-bpp 48000). Catalog SKUs register as kinds, so when the report
+        carries a gamut we upgrade to the most specific catalog kind for
+        (protocol, gamut) - see :meth:`_catalog_kind_for`. Slot values and
+        gamut-less reports keep the old behaviour exactly."""
+        slot = slot_kind.strip()
+        if slot:
+            dev = self._devices.get(slot)
+            if dev is not None and dev.kind_of is None:
+                return slot
+        model = reported_model.strip()
+        if model:
+            dev = self._devices.get(model)
+            if dev is not None and dev.kind_of is None:
+                gamut = str((reported or {}).get("gamut") or "").strip()
+                if gamut:
+                    specific = self._catalog_kind_for(model, gamut, reported or {})
+                    if specific is not None:
+                        return specific
+                return model
         return DEFAULT_RELAY_KIND
+
+    def _catalog_kind_for(self, protocol: str, gamut: str, reported: dict[str, Any]) -> str | None:
+        """The catalog kind that packs correctly for (protocol, gamut).
+
+        Scans registered kinds (catalog SKUs register as kinds carrying
+        their ``protocol`` + ``panel``/``renderers`` overrides) rather than
+        hardcoding a table, so a new SKU with a renderer override is picked
+        up automatically. A candidate must change the renderer set: a SKU
+        that packs identically to the bare kind (mono / spectra_6 rows)
+        adds no correctness, and relabeling the hardware on a guess would
+        be wrong more often than right. When several SKUs share the same
+        (protocol, gamut) override (E1001-gray vs Xteink X4 gray), the one
+        whose declared panel matches the reported geometry wins; a stable
+        id sort settles anything left, since by then every candidate packs
+        the same bytes."""
+        from app.quantizer import canonicalise_gamut
+
+        base = self._devices.get(protocol)
+        if base is None or base.kind_of is not None:
+            return None
+        base_renderers = list(base.manifest.get("renderers") or [])
+        wanted = canonicalise_gamut(gamut)
+        candidates = []
+        for dev in self._devices.devices.values():
+            if dev.kind_of is not None:
+                continue
+            manifest = dev.manifest
+            # Catalog-derived kinds record their origin protocol under
+            # ``_catalog_entry`` (the top-level ``protocol`` key doesn't
+            # survive the manifest merge).
+            catalog = manifest.get("_catalog_entry")
+            if not isinstance(catalog, dict) or str(catalog.get("protocol") or "") != protocol:
+                continue
+            declared = str((manifest.get("panel") or {}).get("gamut") or "")
+            if not declared or canonicalise_gamut(declared) != wanted:
+                continue
+            if list(manifest.get("renderers") or base_renderers) == base_renderers:
+                continue
+            candidates.append(dev)
+        if not candidates:
+            return None
+        if len(candidates) > 1:
+            try:
+                rw = int(reported.get("panel_w") or 0)
+                rh = int(reported.get("panel_h") or 0)
+            except (TypeError, ValueError):
+                rw = rh = 0
+            dims_matched = [
+                d
+                for d in candidates
+                if (d.manifest.get("panel") or {}).get("w") == rw
+                and (d.manifest.get("panel") or {}).get("h") == rh
+            ]
+            if dims_matched:
+                candidates = dims_matched
+        return min(candidates, key=lambda d: d.id).id
 
     def _resolve_panel(
         self, slot: dict[str, Any], reported: dict[str, Any]
@@ -246,7 +331,9 @@ class RelayPairingPoller:
                 data_root=self._data_root,
                 instance_id=device_id,
                 kind_id=self._resolve_kind(
-                    str(slot.get("kind") or ""), str(reported.get("model") or "")
+                    str(slot.get("kind") or ""),
+                    str(reported.get("model") or ""),
+                    reported,
                 ),
                 name=str(slot.get("name") or ""),
                 panel_overrides=self._resolve_panel(slot, reported),

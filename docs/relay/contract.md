@@ -105,6 +105,7 @@ The panel never reaches the home LAN. Pairing is brokered through the relay:
 
 ```
 POST /v1/i/<install>/pair/codes            (publisher)
+Body (optional): { "ttl_seconds": <int> }   (clamped to 300..86400; default 600)
 → 201 { "code": "<6+ chars>", "expires_at": "<iso8601>" }
 
 POST /v1/pair                              (unauthenticated)
@@ -119,7 +120,11 @@ doesn't have to pre-enter them. Home uses them to fill in anything the pairing
 slot left blank (slot wins when both are present). `model` is a Tesserae
 device-kind id (e.g. `esp32_client`), and home falls back to that default when
 neither names a valid kind; `gamut` is a Tesserae gamut id (e.g. `waveshare_e6`,
-`mono`) and matters for correct colour on non-mono panels.
+`mono`). Report the gamut whenever the build's differs from the kind's default:
+home resolves (`model`, `gamut`) to the most specific hardware-catalog kind, so
+a grayscale or BWR build gets the renderer that packs at its bit depth (an
+E1001 grayscale build needs 2-bpp 96000-byte frames, not the mono kind's 1-bpp
+48000) without the operator pre-selecting the SKU.
 
 GET  /v1/i/<install>/pair/pending          (publisher)
 → 200 { "pending": [ { "code": "…", "panel_pubkey": "…", "panel_w": <int?>,

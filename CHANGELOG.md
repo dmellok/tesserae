@@ -8,6 +8,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **Relay pairing now honours the panel's self-reported colour gamut when
+  picking the device kind.** A remote panel reporting a non-default gamut
+  (a grayscale or BWR firmware build) is created from the most specific
+  hardware-catalog kind for its protocol + gamut, so frames pack at the
+  right bit depth: an 800x480 4-gray panel now receives 96000-byte 2-bpp
+  frames instead of the mono kind's 48000-byte 1-bpp frames, which its
+  firmware rightly refused to paint. The operator's explicit kind choice
+  still wins, and gamut-less reports behave exactly as before.
+
 - **RSS feeds and webpage screenshots behind bot protection no longer 403**
   (#178). The RSS widget now falls back to fetching through the headless
   browser's network stack (a genuine browser TLS fingerprint, same approach
@@ -17,6 +26,11 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   Akamai/Cloudflare-class protection blocks on sight.
 
 ### Added
+
+- **Pairing codes for remote panels can now live longer than 10 minutes.**
+  "Add a remote panel" gains a "Code valid for" choice (10 minutes to 24
+  hours, relay-clamped) for when someone has to travel to the remote
+  location before entering the code. Relay Worker redeploy required.
 
 - **Remote relay panels are now configured exactly like local displays.** A
   remote panel's card on Settings → Devices carries the full set of controls
