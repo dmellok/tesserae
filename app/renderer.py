@@ -435,6 +435,27 @@ def _navigate_and_settle(page: Any, request: RenderRequest, attempt: int) -> dic
     return settle
 
 
+def external_user_agent(browser: Browser | None = None) -> str:
+    """UA for external-site renders, derived from the real engine version.
+
+    Headless Chromium's default UA contains ``HeadlessChrome/…``, which
+    Akamai/Cloudflare-class bot filters block on sight (#178) - the same
+    engine with the honest version string minus the headless marker gets
+    through. The TLS fingerprint underneath is genuinely Chromium's, so
+    unlike a urllib request this isn't pretending to be something it isn't.
+    Falls back to a pinned version when the browser handle can't say
+    (``playwright`` pins the bundled Chromium per minor, so it goes stale
+    slowly and only affects the label, not the engine)."""
+    version = ""
+    if browser is not None:
+        with contextlib.suppress(Exception):
+            version = str(browser.version).strip().split(" ")[0]
+    return (
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+        f"(KHTML, like Gecko) Chrome/{version or '140.0.0.0'} Safari/537.36"
+    )
+
+
 def _screenshot_attempt(browser: Browser, request: RenderRequest, attempt: int) -> bytes:
     """A single render pass, opens a fresh context on ``browser``,
     navigates, screenshots, and disposes. Reused by both cold and warm
@@ -451,6 +472,10 @@ def _screenshot_attempt(browser: Browser, request: RenderRequest, attempt: int) 
     }
     if request.timezone_id:
         context_kwargs["timezone_id"] = request.timezone_id
+    if not request.is_composer:
+        # External site: don't advertise HeadlessChrome (#178). Composer
+        # self-renders keep the default UA; nothing gates localhost.
+        context_kwargs["user_agent"] = external_user_agent(browser)
     context = browser.new_context(**context_kwargs)
     try:
         page = context.new_page()

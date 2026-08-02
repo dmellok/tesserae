@@ -6,6 +6,16 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **RSS feeds and webpage screenshots behind bot protection no longer 403**
+  (#178). The RSS widget now falls back to fetching through the headless
+  browser's network stack (a genuine browser TLS fingerprint, same approach
+  the Reddit widget already used) when a plain fetch is refused, and sends
+  browser-shaped headers on the plain path. Webpage screenshots no longer
+  advertise the HeadlessChrome user agent on external sites, which
+  Akamai/Cloudflare-class protection blocks on sight.
+
 ### Added
 
 - **Remote relay panels are now configured exactly like local displays.** A
