@@ -116,14 +116,48 @@ class RelayPublisher:
             except RelayError as exc:
                 # Leave _last_sent unset so the next push retries this frame.
                 logger.warning("relay %s: upload failed (%s)", device.id, exc)
+                self._record_event(device, "frame", error=str(exc))
             except Exception:
                 logger.exception("relay: send failed for %s", device.id)
             try:
                 self._maybe_send_config(client, device)
             except RelayError as exc:
                 logger.warning("relay %s: config upload failed (%s)", device.id, exc)
+                self._record_event(device, "config", error=str(exc))
             except Exception:
                 logger.exception("relay: config send failed for %s", device.id)
+
+    def _record_event(
+        self,
+        device: Any,
+        mailbox: str,
+        *,
+        error: str | None = None,
+        extra: dict[str, Any] | None = None,
+    ) -> None:
+        """EventLog row for a relay-mailbox upload (or its failure).
+
+        The MQTT/REST hop of a push is visible as renderer rows; without
+        this the relay's extra hop is invisible on /events and a "did the
+        frame actually leave the house?" question has no answer. Uploads
+        are already deduped by digest/etag, so success rows can't churn
+        the capped log. Best-effort: no app handle (tests) means no log."""
+        if self._app is None:
+            return
+        event_log = self._app.config.get("EVENT_LOG")
+        if event_log is None:
+            return
+        try:
+            event_log.record(
+                type="device",
+                source=device.id,
+                target=f"relay://{device.id}/{mailbox}",
+                status="error" if error else "ok",
+                error=error,
+                extra=extra,
+            )
+        except Exception:
+            logger.exception("relay: event-log record failed for %s", device.id)
 
     def _relay_devices(self) -> list[Any]:
         return [d for d in self._devices.devices.values() if d.transport == "relay"]
@@ -171,6 +205,7 @@ class RelayPublisher:
         with self._lock:
             self._last_sent[device.id] = digest
         logger.info("relay %s: uploaded frame %s", device.id, digest)
+        self._record_event(device, "frame", extra={"digest": digest, "sealed_bytes": len(sealed)})
 
     def _maybe_send_config(self, client: RelayClient, device: Any) -> None:
         """Seal + upload the device's config doc when its content changed.
@@ -195,3 +230,4 @@ class RelayPublisher:
         with self._lock:
             self._last_config_sent[device.id] = etag
         logger.info("relay %s: uploaded config %s", device.id, etag)
+        self._record_event(device, "config", extra={"etag": etag})

@@ -8,6 +8,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **Relay deliveries now show up in the events log.** Each sealed frame or
+  config upload to a relay mailbox records a device event row
+  (`relay://<id>/frame`, `relay://<id>/config`), and upload failures record
+  error rows, so the relay hop of a push is as auditable as an MQTT or REST
+  publish. Uploads are deduplicated by digest, so steady pushes don't churn
+  the log.
+
 - **Relay pairing now honours the panel's self-reported colour gamut when
   picking the device kind.** A remote panel reporting a non-default gamut
   (a grayscale or BWR firmware build) is created from the most specific

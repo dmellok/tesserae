@@ -165,6 +165,48 @@ def test_publisher_syncs_sealed_config_and_dedupes(tmp_path: Path) -> None:
     assert json.loads(unseal(client.config_uploads[1]["sealed"], key))["sleep_interval_s"] == 900
 
 
+def test_publisher_uploads_are_visible_on_the_event_log(tmp_path: Path) -> None:
+    """Every actual relay upload (frame + config) writes a device-type
+    event row, so /events answers "did the frame leave the house?"; the
+    digest/etag dedup means steady pushes add nothing."""
+    from types import SimpleNamespace
+
+    from app.state.event_log import EventLog
+
+    renders_dir = tmp_path / "renders"
+    renders_dir.mkdir()
+    (renders_dir / "abc123.bin").write_bytes(b"frame")
+    settings = SettingsStore(tmp_path / "settings.json")
+    event_log = EventLog(tmp_path / "events.db", cap=50)
+
+    key = b"\x55" * 32
+    dev = _Dev("panel1", b64u_encode(key))
+    latest = {"digest": "abc123", "filename": "abc123.bin", "ext": "bin", "renderer_id": "r"}
+    pub = RelayPublisher(
+        app=SimpleNamespace(config={"EVENT_LOG": event_log}),  # type: ignore[arg-type]
+        devices=type("R", (), {"devices": {"panel1": dev}})(),
+        settings=settings,
+        renders_dir=renders_dir,
+        latest_render_fn=lambda _id: latest,
+        run_async=False,
+    )
+    client = _FakeClient()
+
+    pub._maybe_send(client, dev)  # type: ignore[arg-type]
+    pub._maybe_send_config(client, dev)  # type: ignore[arg-type]
+    rows = event_log.list(type="device", limit=10)
+    targets = sorted(row.target for row in rows)
+    assert targets == ["relay://panel1/config", "relay://panel1/frame"]
+    frame_row = next(r for r in rows if r.target.endswith("/frame"))
+    assert frame_row.status == "ok"
+    assert frame_row.extra.get("digest") == "abc123"
+
+    # Deduped re-sends add no rows.
+    pub._maybe_send(client, dev)  # type: ignore[arg-type]
+    pub._maybe_send_config(client, dev)  # type: ignore[arg-type]
+    assert len(event_log.list(type="device", limit=10)) == 2
+
+
 def test_publisher_skips_config_for_unpaired_device(tmp_path: Path) -> None:
     settings = SettingsStore(tmp_path / "settings.json")
     dev = _Dev("panel1", "")
