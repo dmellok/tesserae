@@ -288,7 +288,11 @@ def test_pairing_poller_uses_panel_self_report_when_slot_blank(
     monkeypatch.setattr("app.relay_pairing.build_client", lambda _cfg: _Client())
 
     poller = RelayPairingPoller(
-        devices=devices, renderers=renderers, data_root=data_root, settings=settings, run_async=False
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        settings=settings,
+        run_async=False,
     )
     assert poller.poll_once() == 1
 
