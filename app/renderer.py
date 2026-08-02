@@ -335,21 +335,31 @@ def _install_ssrf_guard(page: Any, request: RenderRequest) -> None:
     Chromium follows redirects and loads subresources internally, outside
     net_guard's urllib path, so this per-request interceptor is the only place
     a webpage render can enforce a public-only policy on every hop. Matches
-    net_guard's guarantee level (host resolved and checked per request; no
-    IP pinning against DNS rebinding, same as the fetch path). A resolution
-    failure or any handler error blocks the request rather than fail-open."""
+    net_guard's guarantee level (each distinct host is resolved and checked;
+    no IP pinning against DNS rebinding, same as the fetch path). The result is
+    cached for this page attempt so a site with many same-host assets does not
+    spend its navigation deadline repeating the same DNS lookup. A retry gets
+    a fresh page and cache. Resolution failures and handler errors are cached
+    as blocked rather than failing open."""
     if request.allow_local:
         return
     import urllib.parse as _urlparse
 
     from app.net_guard import host_is_blocked
 
+    host_blocked: dict[str, bool] = {}
+
     def _route(route: Any) -> None:
+        host: str | None = None
         try:
             host = _urlparse.urlparse(route.request.url).hostname or ""
-            blocked = host_is_blocked(host, allow_local=False)
+            if host not in host_blocked:
+                host_blocked[host] = host_is_blocked(host, allow_local=False)
+            blocked = host_blocked[host]
         except Exception:
             blocked = True
+            if host is not None:
+                host_blocked[host] = True
         # Page/context may be torn down mid-flight; nothing to do then.
         with contextlib.suppress(PlaywrightError):
             route.abort() if blocked else route.continue_()

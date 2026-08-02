@@ -8,6 +8,12 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **Companion webpage sends no longer time out on asset-heavy sites because
+  of repeated DNS safety checks.** The strict public-only Chromium guard now
+  classifies each hostname once per page attempt while continuing to validate
+  every distinct redirect and subresource host and to fail closed on lookup
+  errors.
+
 - **Relay deliveries now show up in the events log.** Each sealed frame or
   config upload to a relay mailbox records a device event row
   (`relay://<id>/frame`, `relay://<id>/config`), and upload failures record
