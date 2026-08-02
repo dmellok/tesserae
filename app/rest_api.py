@@ -1368,7 +1368,11 @@ def get_collection_manifest(device_id: str) -> Response:
 
     The first producer is the offline photo album (#177). Cold frames are
     rendered on demand so the manifest ships complete; expect a few seconds on
-    the first call after an album edit. 204 when nothing is bound."""
+    the first call after an album edit. 204 when nothing is bound.
+
+    Responses are paged (``?cursor=<next_cursor>`` continues) so a large album
+    stays inside constrained firmware receive buffers; every ``cache: true``
+    frame is in page one as long as the advertised ``max_frames`` fits a page."""
     device, err = _auth_device(device_id)
     if err is not None or device is None:
         return err  # type: ignore[return-value]
@@ -1379,7 +1383,7 @@ def get_collection_manifest(device_id: str) -> Response:
     if album is None or push_mgr is None or renders_dir is None:
         return _error(204, "no collection bound to this device")
 
-    from app.collection_sync import build_manifest
+    from app.collection_sync import build_manifest, paged_manifest
 
     # The device's advertised card capacity + frame cap (current-state, from its
     # heartbeats); frames beyond either get cache=false.
@@ -1400,6 +1404,7 @@ def get_collection_manifest(device_id: str) -> Response:
         capacity_bytes=capacity if isinstance(capacity, int) and capacity > 0 else None,
         max_frames=max_frames if isinstance(max_frames, int) and max_frames > 0 else None,
     )
+    manifest = paged_manifest(manifest, request.args.get("cursor"))
     return jsonify({"status": 200, **manifest})
 
 

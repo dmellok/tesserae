@@ -142,6 +142,70 @@ def test_collection_manifest_returns_frames(app: Flask) -> None:
     assert frames[1]["digest"] == db
 
 
+def test_collection_manifest_pages_with_cursor(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(collection_sync, "PAGE_MAX_FRAMES", 2)
+    client = app.test_client()
+    token = _register_esp32(app, client, "frame01")
+    _seed_folder(app, "holidays", ["a.jpg", "b.jpg", "c.jpg"])
+    _bind_album(app, "frame01")
+    for name in ["a.jpg", "b.jpg", "c.jpg"]:
+        _warm(app, "frame01", name, f"frame-{name}".encode())
+
+    p1 = client.get("/api/v1/device/frame01/collection", headers=_auth(token)).get_json()
+    assert [f["position"] for f in p1["frames"]] == [0, 1]
+    assert p1["cursor"] is None
+    assert p1["total_frames"] == 3
+    assert p1["next_cursor"]
+
+    p2 = client.get(
+        f"/api/v1/device/frame01/collection?cursor={p1['next_cursor']}",
+        headers=_auth(token),
+    ).get_json()
+    assert [f["position"] for f in p2["frames"]] == [2]
+    assert p2["cursor"] == p1["next_cursor"]
+    assert p2["next_cursor"] is None
+    assert p2["version"] == p1["version"]
+
+    # A stale cursor (collection changed mid-walk) restarts at page one.
+    stale = client.get(
+        "/api/v1/device/frame01/collection?cursor=deadbeef00000000.2",
+        headers=_auth(token),
+    ).get_json()
+    assert stale["cursor"] is None
+    assert [f["position"] for f in stale["frames"]] == [0, 1]
+
+
+def test_large_album_first_page_holds_every_cacheable_frame(app: Flask) -> None:
+    """A folder well past max_frames pages instead of shipping one huge
+    manifest (the firmware REST receive ceiling is 32 KiB); all cache:true
+    frames land on page one for slice-1 single-page firmware."""
+    client = app.test_client()
+    token = _register_esp32(app, client, "frame01")
+    names = [f"{i:03d}.jpg" for i in range(70)]
+    _seed_folder(app, "holidays", names)
+    _bind_album(app, "frame01")
+    for name in names:
+        _warm(app, "frame01", name, f"frame-{name}".encode())
+    # Advertise the slice-1 cap so cache eligibility is bounded at 32.
+    client.post("/api/v1/device/frame01/status", headers=_auth(token), data=json.dumps(CAP))
+
+    p1 = client.get("/api/v1/device/frame01/collection", headers=_auth(token)).get_json()
+    assert p1["total_frames"] == 70
+    assert len(p1["frames"]) == collection_sync.PAGE_MAX_FRAMES
+    assert p1["next_cursor"]
+    cacheable = [f for f in p1["frames"] if f["cache"]]
+    assert len(cacheable) == 32
+    assert len(json.dumps(p1).encode()) < 32 * 1024
+
+    p2 = client.get(
+        f"/api/v1/device/frame01/collection?cursor={p1['next_cursor']}",
+        headers=_auth(token),
+    ).get_json()
+    assert [f["position"] for f in p2["frames"]] == list(range(64, 70))
+    assert all(not f["cache"] for f in p2["frames"])
+    assert p2["next_cursor"] is None
+
+
 # -- frame by digest -------------------------------------------------------
 
 
@@ -208,6 +272,73 @@ def test_status_omits_collection_without_capability(app: Flask) -> None:
     )
     assert resp.status_code == 200
     assert "collection" not in resp.get_json()
+
+
+# -- /status playback-report ingest -----------------------------------------
+
+
+REPORT = {
+    "id": "album:holidays",
+    "version": "b" * 16,
+    "cached": 1,
+    "total": 1,
+    "state": "playing",
+}
+
+
+def test_status_ingests_playback_report_and_carries_forward(app: Flask) -> None:
+    client = app.test_client()
+    token = _register_esp32(app, client, "frame01")
+    _seed_folder(app, "holidays", ["a.jpg"])
+    _bind_album(app, "frame01")
+    _warm(app, "frame01", "a.jpg", b"frame-a")
+
+    resp = client.post(
+        "/api/v1/device/frame01/status",
+        headers=_auth(token),
+        data=json.dumps({**CAP, "collection": REPORT}),
+    )
+    assert resp.status_code == 200
+    stored = app.config["DEVICE_STATUS"]["frame01"]["collection_report"]
+    assert stored["id"] == "album:holidays"
+    assert stored["state"] == "playing"
+    assert stored["received_at"] > 0
+
+    # A beat that omits the report keeps the last observation (with its
+    # original received_at) rather than forgetting playback state.
+    client.post("/api/v1/device/frame01/status", headers=_auth(token), data=json.dumps(CAP))
+    kept = app.config["DEVICE_STATUS"]["frame01"]["collection_report"]
+    assert kept["state"] == "playing"
+    assert kept["received_at"] == stored["received_at"]
+
+
+def test_devices_card_shows_report_only_for_bound_album(app: Flask) -> None:
+    from app.settings.index_routes import _collection_view
+
+    client = app.test_client()
+    token = _register_esp32(app, client, "frame01")
+    _seed_folder(app, "holidays", ["a.jpg"])
+    _bind_album(app, "frame01")
+    _warm(app, "frame01", "a.jpg", b"frame-a")
+    client.post(
+        "/api/v1/device/frame01/status",
+        headers=_auth(token),
+        data=json.dumps({**CAP, "collection": REPORT}),
+    )
+
+    device = next(d for d in app.config["DEVICE_REGISTRY"].all() if d.id == "frame01")
+    cache = app.config["DEVICE_STATUS"]["frame01"]
+    with app.test_request_context("/settings/devices"):
+        view = _collection_view(device, cache)
+        assert view is not None
+        assert view["album_name"] == "Holidays"
+        assert view["state"] == "playing"
+        assert view["pill_class"] == "is-ok"
+        assert view["counts"] == "1 of 1 frames cached"
+
+        # Unbinding the album hides the (now-irrelevant) report.
+        app.config["ALBUM_STORE"].delete("holidays")
+        assert _collection_view(device, cache) is None
 
 
 # -- authoring: Gallery "Use as offline album" ------------------------------

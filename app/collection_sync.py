@@ -34,6 +34,14 @@ _ALBUM_TTL_S = 0
 # advertised frame_cache without a max_frames (older firmware). The contract
 # pins 32 for the first slice.
 DEFAULT_MAX_FRAMES = 32
+# Frame entries per manifest page. A manifest response must stay parseable by
+# constrained firmware: the ESP32 REST receive ceiling is 32 KiB per response
+# body and one frame entry is ~220 bytes of JSON, so 64 entries (~15 KiB plus
+# envelope) leaves comfortable headroom. Deliberately above DEFAULT_MAX_FRAMES
+# so every ``cache: true`` frame lands in page one and slice-1 firmware that
+# reads a single page still syncs its whole cacheable set; firmware advertising
+# max_frames > 64 must walk ``next_cursor``.
+PAGE_MAX_FRAMES = 64
 
 
 class _AlbumRenderSource(Protocol):
@@ -79,6 +87,58 @@ def advertised_frame_cache(payload: bytes | str | dict[str, Any]) -> dict[str, i
     if isinstance(max_frames, int) and not isinstance(max_frames, bool) and max_frames >= 1:
         out["max_frames"] = max_frames
     return out
+
+
+_REPORT_STATES = ("playing", "paused", "syncing", "error")
+
+
+def reported_collection(payload: bytes | str | dict[str, Any]) -> dict[str, Any] | None:
+    """The device's playback/sync report from a /status REQUEST body's
+    ``collection`` block (``docs/dev/frame-cache.md`` §Reporting): ``{id,
+    version, cached, total, state}``, validated, or None.
+
+    Distinct from the ``collection`` envelope the server puts in the /status
+    RESPONSE (what should be active): this is what the device observed. Once
+    playback is local the server is not the authority on the current frame, so
+    the report is an observation with a timestamp, never a live "current
+    screen" claim."""
+    if isinstance(payload, (bytes, bytearray, str)):
+        try:
+            body = json.loads(payload)
+        except (ValueError, TypeError):
+            return None
+    else:
+        body = payload
+    if not isinstance(body, dict):
+        return None
+    report = body.get("collection")
+    if not isinstance(report, dict):
+        return None
+    coll_id = report.get("id")
+    state = report.get("state")
+    if not isinstance(coll_id, str) or not coll_id.strip():
+        return None
+    if state not in _REPORT_STATES:
+        return None
+    out: dict[str, Any] = {"id": coll_id.strip(), "state": state}
+    version = report.get("version")
+    if isinstance(version, str) and version.strip():
+        out["version"] = version.strip()
+    for key in ("cached", "total"):
+        value = report.get(key)
+        if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+            out[key] = value
+    return out
+
+
+def report_changed(prev: dict[str, Any] | None, new: dict[str, Any]) -> bool:
+    """Whether a report is a meaningful transition worth an event-log row:
+    the collection, its version, or the playback state changed. ``cached``
+    counts churn on every beat of a sync, so they don't qualify."""
+    if prev is None:
+        return True
+    keys = ("id", "state", "version")
+    return any(prev.get(k) != new.get(k) for k in keys)
 
 
 def bound_album_for(store: Any, device_id: str) -> Album | None:
@@ -158,10 +218,12 @@ def build_manifest(
     are rendered now so the manifest ships complete; without it (the ``/status``
     version check) it reflects only what's warmed, which is cheap and converges.
 
-    Slice 1 emits a single page: every frame is listed, ``next_cursor`` is null.
-    ``cache`` is true for the lowest-``position`` frames that fit BOTH the frame
-    count cap (``max_frames``) and the byte budget (``capacity_bytes``); the rest
-    are ``cache: false`` and fetched on demand."""
+    The result lists EVERY frame (the endpoint slices it into bounded pages via
+    :func:`paged_manifest`; ``version`` must cover the whole collection, so it
+    is computed here, before any slicing). ``cache`` is true for the
+    lowest-``position`` frames that fit BOTH the frame count cap
+    (``max_frames``) and the byte budget (``capacity_bytes``); the rest are
+    ``cache: false`` and fetched on demand."""
     cap_count = max_frames if (max_frames and max_frames > 0) else DEFAULT_MAX_FRAMES
     budget = capacity_bytes if (capacity_bytes and capacity_bytes > 0) else None
 
@@ -228,6 +290,55 @@ def build_manifest(
     }
     manifest["version"] = version_digest(manifest)
     return manifest
+
+
+def page_cursor(version: str, offset: int) -> str:
+    """The opaque continuation token for the page starting at ``offset``.
+    Bound to ``version`` so a mid-walk collection change invalidates the walk
+    (contract: a stale cursor restarts at a fresh first page)."""
+    return f"{version}.{offset}"
+
+
+def _cursor_offset(cursor: str | None, version: str) -> tuple[int, str | None]:
+    """Resolve a requested cursor against the current version, as
+    ``(offset, echoed_cursor)``. A missing, malformed, or stale (other-version)
+    cursor starts a fresh walk: offset 0, ``cursor: null`` in the response."""
+    if not isinstance(cursor, str) or not cursor:
+        return 0, None
+    prefix, sep, raw_offset = cursor.rpartition(".")
+    if not sep or prefix != version:
+        return 0, None
+    try:
+        offset = int(raw_offset)
+    except ValueError:
+        return 0, None
+    return (offset, cursor) if offset >= 0 else (0, None)
+
+
+def paged_manifest(
+    manifest: dict[str, Any], cursor: str | None, *, page_size: int | None = None
+) -> dict[str, Any]:
+    """One bounded page of a full manifest from :func:`build_manifest`.
+
+    ``version`` stays the full-collection digest (computed before slicing and
+    excluding the volatile paging fields), so paging never reads as a content
+    change. ``total_frames`` stays the full count. Bounding the page keeps the
+    response inside constrained firmware receive buffers (32 KiB on the ESP32
+    REST client), which a large single-page manifest would overflow before the
+    parser ever saw the cacheable frames."""
+    if page_size is None:
+        page_size = PAGE_MAX_FRAMES
+    frames = manifest["frames"]
+    version = str(manifest["version"])
+    offset, echoed = _cursor_offset(cursor, version)
+    page = frames[offset : offset + page_size]
+    end = offset + len(page)
+    return {
+        **manifest,
+        "cursor": echoed,
+        "next_cursor": page_cursor(version, end) if end < len(frames) else None,
+        "frames": page,
+    }
 
 
 def current_version(

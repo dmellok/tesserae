@@ -201,6 +201,111 @@ def test_capacity_and_max_frames_mark_overflow_cache_false(tmp_path: Path) -> No
     assert [f["cache"] for f in manifest2["frames"]] == [True, False, False, False]
 
 
+# -- paging --------------------------------------------------------------
+
+
+def _built_manifest(tmp_path: Path, count: int) -> dict[str, Any]:
+    src = FakeRenderSource(tmp_path)
+    album = _album(order=[])
+    files = [f"{i:02d}.jpg" for i in range(count)]
+    frames = collection_sync.ordered_frames(album, files)
+    return collection_sync.build_manifest(
+        album,
+        "frame01",
+        push_mgr=src,
+        renders_dir=tmp_path,
+        frames=frames,
+        image_loader=lambda f: f.encode(),
+        device_id_for_url="frame01",
+        warm_missing=True,
+    )
+
+
+def test_paged_manifest_bounds_pages_and_walks(tmp_path: Path) -> None:
+    full = _built_manifest(tmp_path, 5)
+    p1 = collection_sync.paged_manifest(full, None, page_size=2)
+    assert [f["position"] for f in p1["frames"]] == [0, 1]
+    assert p1["cursor"] is None
+    # total_frames and version describe the whole collection on every page.
+    assert p1["total_frames"] == 5
+    assert p1["version"] == full["version"]
+
+    p2 = collection_sync.paged_manifest(full, p1["next_cursor"], page_size=2)
+    assert [f["position"] for f in p2["frames"]] == [2, 3]
+    assert p2["cursor"] == p1["next_cursor"]
+
+    p3 = collection_sync.paged_manifest(full, p2["next_cursor"], page_size=2)
+    assert [f["position"] for f in p3["frames"]] == [4]
+    assert p3["next_cursor"] is None
+    assert p3["version"] == full["version"]
+
+
+def test_paged_manifest_stale_or_malformed_cursor_restarts(tmp_path: Path) -> None:
+    full = _built_manifest(tmp_path, 3)
+    bad_cursors = (
+        "deadbeef00000000.1",  # other version: collection changed mid-walk
+        "not-a-cursor",
+        f"{full['version']}.x",
+        f"{full['version']}.-1",
+    )
+    for bad in bad_cursors:
+        page = collection_sync.paged_manifest(full, bad, page_size=2)
+        assert page["cursor"] is None
+        assert [f["position"] for f in page["frames"]] == [0, 1]
+
+
+def test_default_page_size_holds_all_cacheable_frames() -> None:
+    # Slice-1 firmware reads a single page; every cache:true frame (bounded by
+    # DEFAULT_MAX_FRAMES) must therefore fit in page one.
+    assert collection_sync.PAGE_MAX_FRAMES >= collection_sync.DEFAULT_MAX_FRAMES
+
+
+# -- device playback report ----------------------------------------------
+
+
+def test_reported_collection_parses_and_validates() -> None:
+    report = collection_sync.reported_collection(
+        {
+            "collection": {
+                "id": "album:holidays",
+                "version": "a" * 16,
+                "cached": 32,
+                "total": 127,
+                "state": "playing",
+            }
+        }
+    )
+    assert report == {
+        "id": "album:holidays",
+        "version": "a" * 16,
+        "cached": 32,
+        "total": 127,
+        "state": "playing",
+    }
+
+
+def test_reported_collection_rejects_bad_shapes() -> None:
+    assert collection_sync.reported_collection({}) is None
+    assert collection_sync.reported_collection({"collection": {"id": "x"}}) is None
+    assert (
+        collection_sync.reported_collection({"collection": {"id": "", "state": "playing"}}) is None
+    )
+    assert collection_sync.reported_collection({"collection": {"id": "x", "state": "nope"}}) is None
+    # Bad optional fields are dropped, not fatal.
+    report = collection_sync.reported_collection(
+        {"collection": {"id": "x", "state": "error", "cached": -1, "total": True, "version": 7}}
+    )
+    assert report == {"id": "x", "state": "error"}
+
+
+def test_report_changed_ignores_count_churn() -> None:
+    prev = {"id": "album:x", "state": "syncing", "version": "v1", "cached": 3, "total": 40}
+    assert collection_sync.report_changed(None, prev)
+    assert not collection_sync.report_changed(prev, {**prev, "cached": 9, "total": 41})
+    assert collection_sync.report_changed(prev, {**prev, "state": "playing"})
+    assert collection_sync.report_changed(prev, {**prev, "version": "v2"})
+
+
 # -- version -------------------------------------------------------------
 
 

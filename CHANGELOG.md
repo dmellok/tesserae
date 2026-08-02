@@ -6,7 +6,22 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added
+
+- **Offline-album playback state on the Devices card.** The server now ingests
+  the collection playback report a storage-capable display sends on its
+  heartbeat (state, cached/total frames, synced version) and shows it on the
+  device's Status tab while that album is bound, with state/version transitions
+  recorded in the events log. Shown as an observation with its age, never as a
+  claimed current frame.
+
 ### Fixed
+
+- **Large offline albums no longer overflow constrained firmware receive
+  buffers.** The `/collection` manifest is now paged (at most 64 frame entries
+  per response, `?cursor=` continues) instead of listing every folder frame in
+  one document; every cache-eligible frame still lands on page one, so
+  single-page slice-1 firmware is unaffected.
 
 - **Companion webpage sends no longer time out on asset-heavy sites because
   of repeated DNS safety checks.** The strict public-only Chromium guard now

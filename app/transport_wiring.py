@@ -322,6 +322,29 @@ def record_status_heartbeat(
     frame_cache = collection_sync.advertised_frame_cache(payload)
     if frame_cache is not None:
         entry["frame_cache"] = frame_cache
+    # Collection playback report (#177): what the device says its local album
+    # playback is doing (state + cached/total + synced version). An observation
+    # with its own received_at, never a live current-frame claim, so it carries
+    # forward on beats that omit it; the Devices UI decides relevance by
+    # matching it against the currently bound album. Event-log transitions only
+    # (cached counts churn on every beat of a sync).
+    collection_prev = prev_entry.get("collection_report")
+    collection_report = collection_sync.reported_collection(payload)
+    if collection_report is not None:
+        collection_report = {**collection_report, "received_at": received_at}
+        entry["collection_report"] = collection_report
+        if collection_sync.report_changed(collection_prev, collection_report):
+            event_log.record(
+                type="device",
+                source=device.id,
+                target=event_target,
+                status="error" if collection_report.get("state") == "error" else "ok",
+                extra={
+                    "collection": {k: v for k, v in collection_report.items() if k != "received_at"}
+                },
+            )
+    elif collection_prev is not None:
+        entry["collection_report"] = collection_prev
     # Overlay capability (hybrid render mode): sticky like ota_schema, it's
     # a firmware property (partial-refresh support), not removable hardware.
     overlay = overlay_sync.advertised_overlay(payload)

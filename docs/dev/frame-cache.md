@@ -14,8 +14,9 @@ concrete form of the "state bundles" direction sketched in
 a client that never advertises the capability sees no change on any endpoint.
 
 Status: **slice 1 implemented server-side.** The album producer, the
-`/collection` manifest + frame endpoints, the `frame_cache` capability, and the
-`/status` `collection` envelope are built; authoring is the Gallery folder's
+`/collection` manifest + frame endpoints (paged), the `frame_cache` capability,
+the `/status` `collection` envelope, and ingest of the device playback report
+(surfaced on the Devices card) are built; authoring is the Gallery folder's
 "Use as offline album" action. Firmware (the cache + playback side) is the
 remaining half. Discussion: #177.
 
@@ -124,15 +125,22 @@ Per-frame fields (the shared primitive):
 
 ### Paging
 
-`total_frames` is the full count. Slice 1 firmware consumes a single page and
-enforces `max_frames == 32`; the wire shape carries paging from day one so later
-firmware can walk without a contract change:
+`total_frames` is the full count. Responses are paged: a page carries at most
+**64** frame entries, chosen so any page fits constrained firmware receive
+buffers (the ESP32 REST client reads at most 32 KiB per response body; a large
+album in one page would truncate before the parser ever saw the cacheable
+frames). Slice 1 firmware consumes a single page and enforces
+`max_frames == 32`; because the page size exceeds `max_frames`, every
+`cache: true` frame is always on page one. Firmware advertising `max_frames`
+above the page size must walk the cursor chain.
 
 - `cursor` is the page you requested (`null` for the first page); pass
   `?cursor=<next_cursor>` to continue.
 - `next_cursor` is opaque and **bound to `version`**. If it no longer resolves
   (the collection changed mid-walk), the server returns the current manifest with
   a fresh `version`; firmware discards the partial walk and restarts at page one.
+- `version` and `total_frames` describe the whole collection on every page;
+  paging never changes `version`.
 
 ## Frame fetch
 
@@ -204,6 +212,14 @@ An exact frame digest, if reported at all, is a **last-reported observation**,
 not a live "current screen" contract. The Companion / Devices UI shows collection
 id, version, cached/total, and state, not a guaranteed current image.
 
+The server ingests this report from the `/status` body (both transports go
+through the shared heartbeat recorder), event-logs state/version transitions
+(`cached`/`total` churn during a sync does not qualify), and shows the report on
+the Devices card while the described album is still the one bound to the device.
+Surfacing it through the Companion API is a contract addition (a device-view
+field), agreed through the usual contract-first flow rather than shipped
+unilaterally.
+
 ## Interruption semantics
 
 While a collection is playing:
@@ -218,12 +234,13 @@ While a collection is playing:
 
 - Single active producer per device; the album producer on the new path, Decks
   still on `deck_cache`.
-- Single manifest page, `max_frames = 32`, `next_cursor` present but the server
-  may return one page.
+- Paged manifest (at most 64 frame entries per page), `max_frames = 32`;
+  slice-1 firmware reads only the first page, which always holds every
+  cache-eligible frame.
 - Album playback: `sequential` / `shuffle`, clamped `interval_s`, `loop` /
   `reshuffle` / `once`.
 - Authoring: a Gallery folder gains a "Use as offline album" action that renders
   the folder's images to panel frames (fit/fill, order) and emits this manifest.
 
-Later, without a contract change: manifest paging past 32, Decks as a
-`collection` producer, and multiple concurrent producers per device.
+Later, without a contract change: Decks as a `collection` producer, and
+multiple concurrent producers per device.

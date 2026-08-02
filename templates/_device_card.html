@@ -302,6 +302,26 @@
         </section>
         {% endif %}
 
+        {# OFFLINE ALBUM -- the device's own playback report (state +
+           cached/total + age). Never a specific frame: once playback is
+           local the server can't truthfully claim what's on glass. #}
+        {% set coll = section.status.collection %}
+        {% if coll %}
+        <div class="dx-status-line">
+          <span class="dx-status-muted">Offline album</span>
+          <span class="dx-status-headline">{{ coll.album_name }}</span>
+          <span class="pill {{ coll.pill_class }}">{{ coll.state }}</span>
+          {% if coll.counts %}
+          <span class="dx-status-muted">·</span>
+          <span class="dx-status-muted">{{ coll.counts }}</span>
+          {% endif %}
+          {% if coll.relative %}
+          <span class="dx-status-muted">·</span>
+          <span class="dx-status-muted">reported {{ coll.relative }}</span>
+          {% endif %}
+        </div>
+        {% endif %}
+
         {# Raw parsed dict, kept as an opt-in disclosure so debugging
            is one click away without crowding the tiles. #}
         {% if section.status.parsed %}
