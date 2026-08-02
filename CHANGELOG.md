@@ -8,6 +8,18 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Remote relay panels are now configured exactly like local displays.** A
+  remote panel's card on Settings → Devices carries the full set of controls
+  (sleep interval, button wake, quiet hours, orientation, panel dims,
+  calibration), and config edits now actually reach the panel: the home
+  instance seals the device's config document with the pairing key and uploads
+  it to a new relay config mailbox, which the panel fetches on its next wake
+  (conditional GET; the status response now carries the current config etag).
+  The relay tab links each remote panel to its device card, the card's badge
+  reads "Relay" with relay-appropriate connection details, and the MQTT/REST
+  transport switch is disabled for relay panels since flipping one would
+  orphan it. Relay Worker redeploy required for the config mailbox routes.
+
 - **Photos sent from the Companion app can now be framed.** The Companion API
   accepts an optional focus + zoom on image uploads (contract 0.6
   `image_framing`, Fill only) and resolves it into a separate source crop for

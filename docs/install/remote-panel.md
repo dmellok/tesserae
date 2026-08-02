@@ -59,6 +59,13 @@ schedule) and **Send**, exactly like a local panel. That render is what gets
 sealed and uploaded to its relay mailbox. It appears on the panel at its next
 wake, and each later render lands on the following poll.
 
+Configuration also works exactly like a local panel: open its card under
+**Settings → Devices** (the Cloud relay page links each remote panel to it) to
+set the sleep interval, quiet hours, orientation, and calibration. Server-side
+settings apply on the next render; device-side settings (sleep interval, button
+wake) are sealed into the panel's relay config mailbox and picked up on its
+next wake, if its firmware supports the config fetch.
+
 ### If it does not pair
 
 - **Code expired** — mint a fresh one (10-minute window).

@@ -204,6 +204,41 @@ cadence (typically alongside the frame poll). This channel is optional: without
 it, a relay device simply shows no battery / signal / firmware and an unknown
 last-seen.
 
+The status POST's response carries the current config etag when a config doc
+exists (see below), so a firmware that posts status learns about a config
+change without an extra request:
+
+```
+→ 200 { "config_etag": "<etag>" }    (or {} before any config was pushed)
+```
+
+## Device config
+
+Settings edits on the home instance (sleep interval, button wake window,
+button map, always-on) reach a local device through its broker config topic or
+its next REST poll. A relay panel gets the same document through a config
+mailbox, sealed exactly like frames so the relay stores ciphertext only:
+
+```
+PUT /v1/i/<install>/d/<device>/config       (publisher)
+Headers: ETag: "<config etag>"
+Body: sealed config JSON (application/octet-stream)
+→ 200 {}   (idempotent on a repeated ETag)
+
+GET /v1/i/<install>/d/<device>/config       (device token)
+Headers: If-None-Match: "<last etag>"
+→ 304                        (unchanged)
+   204                        (no config pushed yet)
+   200 + sealed body, with ETag
+```
+
+The plaintext (after `unseal` with `frame_key`) is the same JSON object a
+local REST device receives in the `config` field of its status response,
+e.g. `{"sleep_interval_s": 300, "always_on": false}`. The home instance
+uploads it at pairing completion (via the pairing `config` field) and again
+whenever the stored per-device config changes; the mailbox holds only the
+latest document. It's dropped when the device is revoked.
+
 ## Key derivation
 
 X25519 ECDH, then HKDF-SHA256 to the 32-byte AES key:
@@ -254,6 +289,12 @@ sealed (hex)  = 00112233445566778899aabb4fa3210211222b8aa47f010d2a30fc71c
    RSSI, `fw_version`, etc. — the same body a REST client posts to a home
    `/status` endpoint), so the Devices UI shows battery / signal / firmware /
    last-seen. Optional, but recommended.
+6. When the status response's `config_etag` differs from the stored one (or
+   on a wake where status wasn't posted), `GET .../config` with
+   `If-None-Match`; on `200`, `unseal` with `frame_key`, apply the JSON
+   (sleep interval, button wake, button map — same fields as a REST status
+   response's `config` block), and store the new etag. Optional: a firmware
+   that skips this simply keeps its pairing-time config.
 
 The panel talks only to the relay in steady state; it never needs the home
 instance's address.

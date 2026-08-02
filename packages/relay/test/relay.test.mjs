@@ -349,6 +349,78 @@ test("unknown code is rejected", async () => {
   assert.equal((await r.json()).error.code, "pairing_expired");
 });
 
+test("config mailbox: push, conditional fetch, status piggyback, revoke cleanup", async () => {
+  const e = env();
+  let r = await worker.fetch(req("POST", "/v1/install/register", { body: { install_pubkey: "P" } }), e);
+  const { install_id, publisher_token } = await r.json();
+  const deviceToken = "cfg_dev_token";
+  // Register the device token directly (pairing is covered elsewhere).
+  await e.RELAY_BUCKET.put(
+    `token/${await sha256Hex(deviceToken)}.json`,
+    JSON.stringify({ install_id, device_id: "panel1" }),
+  );
+
+  // No config yet: device GET is 204, status response has no etag.
+  r = await worker.fetch(req("GET", `/v1/i/${install_id}/d/panel1/config`, { headers: authHdr(deviceToken) }), e);
+  assert.equal(r.status, 204);
+  r = await worker.fetch(
+    req("POST", `/v1/i/${install_id}/d/panel1/status`, { headers: authHdr(deviceToken), body: { battery: 88 } }),
+    e,
+  );
+  assert.equal(r.status, 200);
+  assert.deepEqual(await r.json(), {});
+
+  // Home pushes a sealed config doc; ETag is required and publisher-only.
+  const sealed = new Uint8Array([9, 8, 7, 6]);
+  const putConfig = (headers) =>
+    worker.fetch(
+      new Request(`https://relay.test/v1/i/${install_id}/d/panel1/config`, {
+        method: "PUT",
+        headers,
+        body: sealed,
+      }),
+      e,
+    );
+  r = await putConfig({ authorization: "Bearer " + publisher_token });
+  assert.equal(r.status, 400); // missing ETag
+  r = await putConfig({ authorization: "Bearer " + deviceToken, ETag: '"cfg1"' });
+  assert.equal(r.status, 401); // device token can't publish
+  r = await putConfig({ authorization: "Bearer " + publisher_token, ETag: '"cfg1"' });
+  assert.equal(r.status, 200);
+
+  // Panel fetch: 200 with body + ETag, then 304 on the same etag.
+  r = await worker.fetch(req("GET", `/v1/i/${install_id}/d/panel1/config`, { headers: authHdr(deviceToken) }), e);
+  assert.equal(r.status, 200);
+  assert.equal(r.headers.get("etag"), '"cfg1"');
+  assert.deepEqual(new Uint8Array(await r.arrayBuffer()), sealed);
+  r = await worker.fetch(
+    req("GET", `/v1/i/${install_id}/d/panel1/config`, {
+      headers: { ...authHdr(deviceToken), "If-None-Match": '"cfg1"' },
+    }),
+    e,
+  );
+  assert.equal(r.status, 304);
+
+  // The status response now piggybacks the current config etag.
+  r = await worker.fetch(
+    req("POST", `/v1/i/${install_id}/d/panel1/status`, { headers: authHdr(deviceToken), body: { battery: 87 } }),
+    e,
+  );
+  assert.deepEqual(await r.json(), { config_etag: "cfg1" });
+
+  // Revoke drops the config mailbox with the rest.
+  r = await worker.fetch(
+    new Request(`https://relay.test/v1/i/${install_id}/d/panel1`, {
+      method: "DELETE",
+      headers: authHdr(publisher_token),
+    }),
+    e,
+  );
+  assert.equal(r.status, 200);
+  assert.equal(await e.RELAY_BUCKET.get(`config/${install_id}/panel1.bin`), null);
+  assert.equal(await e.RELAY_BUCKET.get(`config/${install_id}/panel1.json`), null);
+});
+
 async function sha256Hex(text) {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");

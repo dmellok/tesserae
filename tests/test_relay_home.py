@@ -67,9 +67,13 @@ def test_create_instance_relay_mints_token_and_persists_frame_key(registries: An
 class _FakeClient:
     def __init__(self) -> None:
         self.uploads: list[dict[str, Any]] = []
+        self.config_uploads: list[dict[str, Any]] = []
 
     def put_frame(self, **kwargs: Any) -> None:
         self.uploads.append(kwargs)
+
+    def put_config(self, **kwargs: Any) -> None:
+        self.config_uploads.append(kwargs)
 
 
 class _Dev:
@@ -78,6 +82,7 @@ class _Dev:
         self.transport = "relay"
         self.manifest = {"relay_frame_key": key_b64}
         self.panel = {"w": 800, "h": 480}
+        self.config_schema = {"sleep_interval_s": {"type": "int", "default": 60}}
 
 
 def test_publisher_seals_uploads_and_dedupes(tmp_path: Path) -> None:
@@ -116,6 +121,61 @@ def test_publisher_seals_uploads_and_dedupes(tmp_path: Path) -> None:
     # Same digest again → deduped, no second upload.
     pub._maybe_send(client, dev)  # type: ignore[arg-type]
     assert len(client.uploads) == 1
+
+
+def test_publisher_syncs_sealed_config_and_dedupes(tmp_path: Path) -> None:
+    """A Settings edit reaches the relay as a sealed config doc; unchanged
+    content never re-uploads; a change re-uploads under a new etag."""
+    settings = SettingsStore(tmp_path / "settings.json")
+    settings.patch_section("devices", {"panel1": {"sleep_interval_s": 300}})
+
+    key = b"\x33" * 32
+    dev = _Dev("panel1", b64u_encode(key))
+    pub = RelayPublisher(
+        app=None,  # type: ignore[arg-type]
+        devices=type("R", (), {"devices": {"panel1": dev}})(),
+        settings=settings,
+        renders_dir=tmp_path,
+        latest_render_fn=lambda _id: None,
+        run_async=False,
+    )
+    client = _FakeClient()
+
+    pub._maybe_send_config(client, dev)  # type: ignore[arg-type]
+    assert len(client.config_uploads) == 1
+    up = client.config_uploads[0]
+    doc = json.loads(unseal(up["sealed"], key))
+    # The doc is what a local REST device would see: stored values + the
+    # always_on default the firmware contract requires.
+    assert doc == {"sleep_interval_s": 300, "always_on": False}
+
+    # Unchanged content → deduped.
+    pub._maybe_send_config(client, dev)  # type: ignore[arg-type]
+    assert len(client.config_uploads) == 1
+
+    # A config change re-uploads under a new etag.
+    settings.patch_section("devices", {"panel1": {"sleep_interval_s": 900}})
+    pub._maybe_send_config(client, dev)  # type: ignore[arg-type]
+    assert len(client.config_uploads) == 2
+    assert client.config_uploads[1]["etag"] != up["etag"]
+    assert json.loads(unseal(client.config_uploads[1]["sealed"], key))["sleep_interval_s"] == 900
+
+
+def test_publisher_skips_config_for_unpaired_device(tmp_path: Path) -> None:
+    settings = SettingsStore(tmp_path / "settings.json")
+    dev = _Dev("panel1", "")
+    dev.manifest = {}  # not paired yet: no frame key to seal with
+    pub = RelayPublisher(
+        app=None,  # type: ignore[arg-type]
+        devices=type("R", (), {"devices": {"panel1": dev}})(),
+        settings=settings,
+        renders_dir=tmp_path,
+        latest_render_fn=lambda _id: None,
+        run_async=False,
+    )
+    client = _FakeClient()
+    pub._maybe_send_config(client, dev)  # type: ignore[arg-type]
+    assert client.config_uploads == []
 
 
 # --- Rendezvous pairing poller ---------------------------------------------
@@ -324,3 +384,109 @@ def test_relay_settings_json_roundtrips(tmp_path: Path) -> None:
     settings.patch_section(RELAY_SECTION, {"install_id": "x", "pending_pairings": {"c": {"k": 1}}})
     reloaded = json.loads((tmp_path / "settings.json").read_text())
     assert reloaded[RELAY_SECTION]["install_id"] == "x"
+
+
+# --- Settings UI: relay devices are first-class -----------------------------
+
+
+class _FakeRelayPublisher:
+    def __init__(self) -> None:
+        self.nudges: list[str | None] = []
+
+    def on_config_change(self, device_id: str | None = None) -> None:
+        self.nudges.append(device_id)
+
+
+@pytest.fixture
+def relay_app(tmp_path: Path) -> Any:
+    from app.main import create_app
+
+    app = create_app(
+        testing=False,
+        data_root=tmp_path,
+        plugins_dir=REPO_ROOT / "plugins",
+        renderers_dir=REPO_ROOT / "renderers",
+        devices_dir=REPO_ROOT / "devices",
+    )
+    app.config["TESTING"] = True
+    with app.app_context():
+        result = device_service.create_instance(
+            devices=app.config["DEVICE_REGISTRY"],
+            renderers=app.config["RENDERER_REGISTRY"],
+            data_root=tmp_path,
+            instance_id="parents_panel",
+            kind_id="esp32_client",
+            name="Parents panel",
+            panel_overrides={"w": 800, "h": 480},
+            transport="relay",
+            relay_frame_key=b64u_encode(b"\x44" * 32),
+        )
+        assert result.error is None
+    client = app.test_client()
+    client.post("/setup", data={"password": "hunter22z", "password_confirm": "hunter22z"})
+    return app, client
+
+
+def test_devices_tab_treats_relay_device_as_first_class(relay_app: Any) -> None:
+    _app, client = relay_app
+    html = client.get("/settings/devices").get_data(as_text=True)
+    card_start = html.find('id="device-parents_panel"')
+    assert card_start != -1
+    # The relay panel is this app's only device instance, so everything from
+    # its card onward belongs to it (the card body nests <section>s, which
+    # defeats a clean single-section slice).
+    card = html[card_start:]
+    # Full config card: the same knobs a local device gets.
+    for marker in ("sleep_interval_s", "quiet_hours_enabled", "panel_orientation", "panel_w"):
+        assert marker in card, marker
+    # Relay-aware header + connection details, no misleading LAN rows.
+    assert ">Relay</span>" in card
+    assert "Cloud relay (sealed frames)" in card
+    # No MQTT/REST transport switch anywhere: the relay panel is the only
+    # instance on this page, and flipping it would orphan the panel.
+    assert "Switch to" not in html
+
+
+def test_relay_device_transport_switch_is_refused(relay_app: Any) -> None:
+    app, client = relay_app
+    resp = client.post(
+        "/settings/devices/parents_panel/set-transport",
+        data={"transport": "rest"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    device = app.config["DEVICE_REGISTRY"].get("parents_panel")
+    assert device is not None and device.transport == "relay"
+
+
+def test_relay_config_save_queues_a_relay_sync_not_a_broker_publish(relay_app: Any) -> None:
+    app, client = relay_app
+    fake = _FakeRelayPublisher()
+    app.config["RELAY_PUBLISHER"] = fake
+    resp = client.post(
+        "/settings/devices/parents_panel/save",
+        data={
+            "_active_tab": "general",
+            "sleep_interval_s": "900",
+            "button_wake_s": "30",
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    stored = app.config["SETTINGS_STORE"].get_section("devices").get("parents_panel", {})
+    assert stored.get("sleep_interval_s") == 900
+    # The save nudged the relay publisher instead of publishing to a broker.
+    assert "parents_panel" in fake.nudges
+
+
+def test_relay_tab_links_each_panel_to_its_device_card(relay_app: Any) -> None:
+    app, client = relay_app
+    with app.app_context():
+        settings = app.config["SETTINGS_STORE"]
+        settings.patch_section(
+            RELAY_SECTION,
+            {"enabled": True, "install_id": "i1", "publisher_token_secret": "p"},
+        )
+    html = client.get("/settings/relay").get_data(as_text=True)
+    assert "#device-parents_panel" in html
+    assert "Configure" in html

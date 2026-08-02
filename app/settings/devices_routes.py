@@ -339,6 +339,12 @@ def devices_set_transport(instance_id: str) -> Response:
     if device is None or device.kind_of is None:
         flash(f"Unknown device {instance_id!r}.", "error")
         return redirect_to
+    if device.transport == "relay":
+        # A remote panel reaches this server only through the relay; flipping
+        # it to MQTT/REST would silently orphan it. The card hides the switch
+        # for relay devices, so this only guards a hand-crafted POST.
+        flash(f"{device.name} is a remote relay panel; its transport can't be switched.", "error")
+        return redirect_to
 
     new_transport = (request.form.get("transport") or "").strip().lower()
     if new_transport not in ("mqtt", "rest"):
@@ -1037,6 +1043,19 @@ def devices_update_combined(instance_id: str) -> Response:
         ok, err = device.validate_config(values)
         if not ok:
             flash(f"Invalid {device.name} config: {err}", "error")
+        elif device.transport == "relay":
+            # Relay devices have no broker and no direct poll against this
+            # server: save, then nudge the relay publisher so the sealed
+            # config doc lands in the panel's relay mailbox for its next
+            # wake. The device may retain dormant MQTT topics (kind
+            # manifests declare them), so this branch must come before the
+            # config_topic check.
+            store.update_for_namespace("devices", instance_id, values, schema_fields)
+            publisher = current_app.config.get("RELAY_PUBLISHER")
+            if publisher is not None:
+                publisher.on_config_change(instance_id)
+            ok_messages.append("config saved and queued for the relay")
+            any_change = True
         elif device.transport == "rest" or device.config_topic is None:
             store.update_for_namespace("devices", instance_id, values, schema_fields)
             ok_messages.append("config saved")
@@ -1233,6 +1252,13 @@ def devices_update_combined(instance_id: str) -> Response:
 
     if any_change:
         rebuild_transport_fn()()
+        if device.transport == "relay":
+            # Config-adjacent values outside the schema branch (button map,
+            # always_on) also ride the relay config doc; sync after the
+            # rebuild so the nudge lands on the freshly wired publisher.
+            publisher = current_app.config.get("RELAY_PUBLISHER")
+            if publisher is not None:
+                publisher.on_config_change(instance_id)
     if ok_messages:
         flash(f"{device.name}: {', '.join(ok_messages)}.", "ok")
     return redirect_to

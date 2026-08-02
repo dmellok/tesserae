@@ -51,6 +51,36 @@ class InstanceResult:
         return self.error is None
 
 
+def device_config_doc(settings: Any, device: Device) -> dict[str, Any]:
+    """Per-device config as it stands right now, context-free.
+
+    The single source every config-delivery path reads: the REST status
+    response, the MQTT ``config_topic`` publish, and the relay config
+    mailbox all serve exactly this document, so a device sees the same
+    config regardless of transport. Stored values win; otherwise the
+    kind's schema defaults, so firmware always sees a usable block.
+    ``settings`` is a ``SettingsStore`` (typed ``Any`` to keep this module
+    free of a store import cycle).
+    """
+    section = settings.get_section("devices") or {}
+    if not isinstance(section, dict):
+        return {}
+    stored = section.get(device.id)
+    if isinstance(stored, dict):
+        # Copy so the caller can mutate without disturbing the store.
+        out = dict(stored)
+    else:
+        out = {}
+        for key, spec in (device.config_schema or {}).items():
+            if isinstance(spec, dict) and "default" in spec:
+                out[key] = spec["default"]
+    # always_on (touch-v3): a per-device Tesserae setting delivered like the
+    # sleep interval. Default false so the firmware always sees the field; a
+    # stored true (set only for can_stay_awake devices) overrides.
+    out.setdefault("always_on", False)
+    return out
+
+
 def _kind_uses_access_token(kind: Device) -> bool:
     """True for kinds whose protocol uses an HTTP access token instead
     of (or in addition to) an MQTT status/config topic. Currently just

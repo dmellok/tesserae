@@ -283,6 +283,38 @@ async function putFrame(env, request, installId, deviceId) {
   return json({});
 }
 
+// Per-device config mailbox: the home instance seals the device's config
+// document (same shape a local REST device receives in its status response)
+// and PUTs it here whenever it changes; the panel conditionally GETs it on
+// wake. Ciphertext only, like frames — the relay never sees sleep intervals
+// or button maps in plaintext.
+async function putDeviceConfig(env, request, installId, deviceId) {
+  if (!(await requirePublisher(env, request, installId))) return fail("unauthorized", "", 401);
+  const etag = (request.headers.get("etag") || "").replace(/"/g, "");
+  if (!etag) return fail("invalid_request", "ETag header required", 400);
+  const body = await request.arrayBuffer();
+  await env.RELAY_BUCKET.put(`config/${installId}/${deviceId}.bin`, body);
+  await putJson(env, `config/${installId}/${deviceId}.json`, { etag });
+  track(env, "config_push", installId, deviceId);
+  return json({});
+}
+
+async function getDeviceConfig(env, request, installId, deviceId) {
+  const denied = await deviceAuthFailure(env, request, installId, deviceId);
+  if (denied) return denied;
+  const pointer = await getJson(env, `config/${installId}/${deviceId}.json`);
+  if (!pointer) return new Response(null, { status: 204 });
+  const ifNoneMatch = (request.headers.get("if-none-match") || "").replace(/"/g, "");
+  const headers = { ETag: `"${pointer.etag}"`, "Cache-Control": "no-store" };
+  if (ifNoneMatch && ifNoneMatch === pointer.etag) {
+    return new Response(null, { status: 304, headers });
+  }
+  const blob = await env.RELAY_BUCKET.get(`config/${installId}/${deviceId}.bin`);
+  if (!blob) return new Response(null, { status: 204 });
+  headers["content-type"] = "application/octet-stream";
+  return new Response(blob.body, { status: 200, headers });
+}
+
 // True when the bearer is the device token for exactly (installId, deviceId).
 // Returns a status code to fail with, or null when authorized.
 async function deviceAuthFailure(env, request, installId, deviceId) {
@@ -324,7 +356,11 @@ async function postDeviceStatus(env, request, installId, deviceId) {
     body,
     received_at: new Date().toISOString(),
   });
-  return json({});
+  // Piggyback the current config etag (mirrors a home REST server's status
+  // response carrying config) so firmware can skip the config GET entirely
+  // when nothing changed. Absent until the home pushes a config doc.
+  const cfg = await getJson(env, `config/${installId}/${deviceId}.json`);
+  return json(cfg && cfg.etag ? { config_etag: cfg.etag } : {});
 }
 
 async function getDeviceStatus(env, request, installId, deviceId) {
@@ -339,6 +375,8 @@ async function revokeDevice(env, request, installId, deviceId) {
   const listed = await env.RELAY_BUCKET.list({ prefix: `frame/${installId}/${deviceId}/` });
   await Promise.all(listed.objects.map((o) => env.RELAY_BUCKET.delete(o.key)));
   await env.RELAY_BUCKET.delete(`status/${installId}/${deviceId}.json`);
+  await env.RELAY_BUCKET.delete(`config/${installId}/${deviceId}.json`);
+  await env.RELAY_BUCKET.delete(`config/${installId}/${deviceId}.bin`);
   track(env, "mailbox_removed", installId, deviceId);
   return json({});
 }
@@ -379,6 +417,8 @@ export default {
           const deviceId = seg[4];
           if (m === "PUT" && seg[5] === "frame") return await putFrame(env, request, installId, deviceId);
           if (m === "GET" && seg[5] === "frame") return await getFrame(env, request, installId, deviceId);
+          if (m === "PUT" && seg[5] === "config") return await putDeviceConfig(env, request, installId, deviceId);
+          if (m === "GET" && seg[5] === "config") return await getDeviceConfig(env, request, installId, deviceId);
           if (m === "POST" && seg[5] === "status") return await postDeviceStatus(env, request, installId, deviceId);
           if (m === "GET" && seg[5] === "status") return await getDeviceStatus(env, request, installId, deviceId);
           if (m === "DELETE" && seg.length === 5) return await revokeDevice(env, request, installId, deviceId);

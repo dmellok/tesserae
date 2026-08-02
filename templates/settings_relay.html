@@ -98,7 +98,7 @@
 
 {# ---- Remote panels ------------------------------------------------------- #}
 <section class="card">
-  {{ card_head('Remote panels', blurb='Devices delivered through the relay.') }}
+  {{ card_head('Remote panels', blurb='Devices delivered through the relay. Configure each one on the Devices tab, same as a local display; changes reach the panel on its next wake.') }}
   {% if relay_devices %}
   <ul class="pages-list">
     {% for d in relay_devices %}
@@ -109,6 +109,10 @@
         <span class="page-meta">{{ d.id }}</span>
       </div>
       <div class="page-actions">
+        <a class="page-action"
+           href="{{ url_for('auth.settings_area', area='devices', opened=d.id) }}#device-{{ d.id }}">
+          <i class="ph ph-sliders" aria-hidden="true"></i><span>Configure</span>
+        </a>
         <form method="post" action="{{ url_for('auth.relay_revoke') }}"
               onsubmit="return confirm('Remove remote panel {{ d.id }}?');">
           <input type="hidden" name="device_id" value="{{ d.id }}">

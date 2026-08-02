@@ -112,6 +112,16 @@ def settings_update(section_kind: str) -> Response:
             flash(f"Invalid {device.name} config: {err}", "error")
             return redirect_to_section(section_kind)
         store.update_for_namespace("devices", did, values, fields)
+        if device.transport == "relay":
+            # No broker, no direct poll: queue a sealed config-doc upload to
+            # the panel's relay mailbox (applied on its next wake). Must
+            # precede the config_topic check; relay instances may retain
+            # dormant MQTT topics from their kind manifest.
+            publisher = current_app.config.get("RELAY_PUBLISHER")
+            if publisher is not None:
+                publisher.on_config_change(did)
+            flash(f"{device.name} config saved and queued for the relay.", "ok")
+            return redirect_to_section(section_kind)
         if device.transport == "rest" or device.config_topic is None:
             # REST instances may retain dormant MQTT topics for a later
             # transport switch. They still receive saved config through

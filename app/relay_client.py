@@ -242,6 +242,20 @@ class RelayClient:
             allow_local=self.allow_local,
         )
 
+    def put_config(self, *, device_id: str, etag: str, sealed: bytes) -> None:
+        """``PUT d/<device>/config`` with the sealed per-device config doc.
+
+        Same mailbox shape as frames: ciphertext body, plaintext ETag for the
+        panel's conditional GET. Idempotent on a repeated ETag."""
+        _call(
+            "PUT",
+            self._install_url(f"/d/{quote(device_id, safe='')}/config"),
+            token=self.publisher_token,
+            raw_body=sealed,
+            headers={"ETag": f'"{etag}"'},
+            allow_local=self.allow_local,
+        )
+
     def get_device_status(self, device_id: str) -> dict[str, Any] | None:
         """``GET d/<device>/status``. The panel's last-relayed telemetry as
         ``{body, received_at}``, or ``None`` when it hasn't posted any."""

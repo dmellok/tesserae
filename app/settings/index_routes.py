@@ -1347,6 +1347,10 @@ def _transport_badge(device: Device) -> str:
         return "REST"
     if device.transport == "push":
         return "HA"
+    if device.transport == "relay":
+        # Before the access-token branch: relay devices carry a device token
+        # too, but it authenticates against the relay, not this server.
+        return "Relay"
     if isinstance(device.manifest.get("access_token"), str) and device.manifest.get("access_token"):
         return "HTTP"
     return _TRANSPORT_BADGE.get(device.transport or "mqtt", "MQTT")
@@ -1425,7 +1429,31 @@ def _device_connection_details(device: Device, is_instance: bool) -> list[dict[s
     if is_instance:
         rows.append({"label": "Instance of", "value": str(device.kind_of), "monospace": True})
     access_token = device.manifest.get("access_token")
-    if device.transport == "rest":
+    if device.transport == "relay":
+        # Remote panel: it never reaches this server directly, so a local
+        # Server URL / broker topic row would be misleading. The token
+        # authenticates the panel against the relay mailbox.
+        rows.append(
+            {"label": "Delivery", "value": "Cloud relay (sealed frames)", "monospace": False}
+        )
+        from app.relay_config import base_url as _relay_base_url
+        from app.relay_config import relay_config
+
+        relay_url = _relay_base_url(relay_config(settings_store()))
+        if relay_url:
+            rows.append({"label": "Relay", "value": relay_url, "monospace": True})
+        if isinstance(access_token, str) and access_token:
+            rows.append(
+                {
+                    "label": "Device token (relay)",
+                    "value": f"{access_token[:4]}··············",
+                    "monospace": True,
+                    "action": "reveal",
+                }
+            )
+        paired = bool(device.manifest.get("relay_frame_key"))
+        rows.append({"label": "Pairing", "value": "Paired" if paired else "Waiting for panel"})
+    elif device.transport == "rest":
         rows.append({"label": "Server URL", "value": f"http://{request.host}", "monospace": True})
         if isinstance(access_token, str) and access_token:
             rows.append(

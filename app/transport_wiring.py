@@ -791,6 +791,9 @@ def _rebuild_transport(
             latest_render_fn=push_mgr.latest_render_for,
         )
         push_mgr.add_listener(relay_pub.on_push)
+        # Handle for the Settings save path: a device-config edit nudges a
+        # config-mailbox sync without waiting for the next render.
+        app.config["RELAY_PUBLISHER"] = relay_pub
 
         old_poller = app.config.get("RELAY_PAIRING_POLLER")
         if old_poller is not None:
