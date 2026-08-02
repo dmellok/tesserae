@@ -267,7 +267,8 @@ def test_pairing_poller_uses_panel_self_report_when_slot_blank(
     _panel_priv, panel_pub = generate_keypair()
 
     class _Client:
-        completed: list[Any] = []
+        def __init__(self) -> None:
+            self.completed: list[Any] = []
 
         def pending_pairings(self) -> Any:
             # The panel reported its geometry + kind at pairing.
