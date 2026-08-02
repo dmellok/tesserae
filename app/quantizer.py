@@ -655,6 +655,42 @@ def apply_source_crop(img: Image.Image, crop: SourceCrop | None) -> Image.Image:
     return img
 
 
+def resolve_framing_crop(
+    *,
+    source_w: int,
+    source_h: int,
+    target_w: int,
+    target_h: int,
+    focus_x: float,
+    focus_y: float,
+    zoom: float,
+) -> SourceCrop:
+    """Resolve a Companion 0.6 framing intent into a :class:`SourceCrop`.
+
+    ``source_w``/``source_h`` must be the orientation-normalized source
+    dimensions (after ``exif_transpose``): the client picks ``focus_x``/
+    ``focus_y`` against the image as displayed, so resolving against the
+    stored pixel buffer of a rotated photo would land the crop in the wrong
+    region. Contract steps: derive the ordinary Fill crop from the aspect
+    ratios, divide both dimensions by ``zoom``, centre on the focus, clamp
+    inside the source. The result always has the target's aspect ratio, so
+    a ``fill`` fit of the cropped image is a pure resize.
+    """
+    source_aspect = source_w / source_h
+    target_aspect = target_w / target_h
+    if source_aspect >= target_aspect:
+        base_w = target_aspect / source_aspect
+        base_h = 1.0
+    else:
+        base_w = 1.0
+        base_h = source_aspect / target_aspect
+    w = base_w / zoom
+    h = base_h / zoom
+    x = min(max(focus_x - w / 2.0, 0.0), 1.0 - w)
+    y = min(max(focus_y - h / 2.0, 0.0), 1.0 - h)
+    return {"x": x, "y": y, "w": w, "h": h}
+
+
 def fit_to_panel(
     img: Image.Image,
     *,

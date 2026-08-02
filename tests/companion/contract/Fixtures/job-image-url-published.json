@@ -1,0 +1,24 @@
+{
+  "job": {
+    "id": "job_01JIMAGEURL",
+    "kind": "image_url_push",
+    "status": "succeeded",
+    "label": "images.example.com/poster.png",
+    "target_device_ids": [
+      "picpak-kitchen"
+    ],
+    "created_at": "2026-07-30T02:00:00Z",
+    "updated_at": "2026-07-30T02:00:05Z",
+    "result": {
+      "status": "published",
+      "reason": null,
+      "device_ids": [
+        "picpak-kitchen"
+      ],
+      "history_event_ids": [
+        "history_0201"
+      ]
+    },
+    "error": null
+  }
+}

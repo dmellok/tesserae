@@ -544,6 +544,63 @@ def test_fit_to_panel_applies_crop_before_fill() -> None:
     assert out.getpixel((30, 30)) == (0, 0, 255)
 
 
+def test_resolve_framing_crop_zoom_one_centred_is_the_plain_fill_crop() -> None:
+    from app.quantizer import resolve_framing_crop
+
+    # Wide source into a square target: ordinary Fill exposes a centred
+    # square. Zoom 1 + centred focus must reproduce it exactly.
+    crop = resolve_framing_crop(
+        source_w=200,
+        source_h=100,
+        target_w=60,
+        target_h=60,
+        focus_x=0.5,
+        focus_y=0.5,
+        zoom=1.0,
+    )
+    assert crop == {"x": 0.25, "y": 0.0, "w": 0.5, "h": 1.0}
+
+
+def test_resolve_framing_crop_narrow_source_uses_the_other_aspect_branch() -> None:
+    from app.quantizer import resolve_framing_crop
+
+    # Source narrower than the target: the width is kept and the height
+    # becomes the Fill crop, source_aspect / target_aspect.
+    crop = resolve_framing_crop(
+        source_w=100,
+        source_h=400,
+        target_w=100,
+        target_h=100,
+        focus_x=0.5,
+        focus_y=0.5,
+        zoom=2.0,
+    )
+    assert crop["w"] == pytest.approx(0.5)
+    assert crop["h"] == pytest.approx(0.125)
+    assert crop["x"] == pytest.approx(0.25)
+    assert crop["y"] == pytest.approx(0.4375)
+
+
+def test_resolve_framing_crop_clamps_edge_focus_inside_source_bounds() -> None:
+    from app.quantizer import resolve_framing_crop
+
+    # Focus in the far corner: centring would push the rect outside the
+    # source, so the origin clamps to keep it fully inside.
+    crop = resolve_framing_crop(
+        source_w=100,
+        source_h=100,
+        target_w=100,
+        target_h=100,
+        focus_x=1.0,
+        focus_y=0.0,
+        zoom=2.0,
+    )
+    assert crop == {"x": 0.5, "y": 0.0, "w": 0.5, "h": 0.5}
+    # The clamped rect still contains the focus point.
+    assert crop["x"] <= 1.0 <= crop["x"] + crop["w"]
+    assert crop["y"] <= 0.0 <= crop["y"] + crop["h"]
+
+
 def test_palette_for_gamut_maps_colour_and_grayscale() -> None:
     from app.quantizer import (
         GRAY_4_PALETTE,

@@ -1,0 +1,18 @@
+{
+  "job": {
+    "id": "job_01JWEBBLOCK",
+    "kind": "webpage_push",
+    "status": "failed",
+    "label": "Blocked webpage",
+    "target_device_ids": [
+      "picpak-kitchen"
+    ],
+    "created_at": "2026-07-30T02:02:00Z",
+    "updated_at": "2026-07-30T02:02:01Z",
+    "result": null,
+    "error": {
+      "code": "url_blocked",
+      "message": "The webpage URL is not permitted by the Companion network policy."
+    }
+  }
+}

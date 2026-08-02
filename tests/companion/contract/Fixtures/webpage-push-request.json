@@ -1,13 +1,10 @@
 {
+  "url": "https://example.com/news",
   "device_ids": [
     "picpak-kitchen",
     "e1004-desk"
   ],
-  "fit": "fill",
-  "framing": {
-    "focus_x": 0.62,
-    "focus_y": 0.38,
-    "zoom": 1.35
-  },
+  "fit": "fit",
+  "viewport_w": 1280,
   "override_quiet_hours": false
 }

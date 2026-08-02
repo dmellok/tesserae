@@ -79,6 +79,7 @@ def test_list_is_newest_first_push_only_and_contract_shaped(tmp_path: Path) -> N
         "preview_available": False,
         "resendable": False,
         "fit": "center",
+        "framing": None,
     }
     assert latest["created_at"].endswith("Z")
     assert oldest["label"] == "Dashboard: pantry"

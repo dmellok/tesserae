@@ -9,6 +9,7 @@ before any server-shape test.
 
 from __future__ import annotations
 
+import base64
 import json
 
 import jsonschema
@@ -20,26 +21,34 @@ CASES = {
     "capabilities.json": "Capabilities",
     "capabilities-previews.json": "Capabilities",
     "capabilities-extended.json": "Capabilities",
+    "capabilities-framing.json": "Capabilities",
     "pair-request.json": "PairingRequest",
     "pair-response.json": "PairingResponse",
     "devices-response.json": "DevicesResponse",
     "dashboards-response.json": "DashboardsResponse",
     "dashboard-push-request.json": "DashboardPushRequest",
     "image-push-request.json": "ImagePushRequest",
+    "image-push-request-basic.json": "ImagePushRequest",
+    "image-url-push-request.json": "ImageURLPushRequest",
+    "webpage-push-request.json": "WebpagePushRequest",
     "history-response.json": "HistoryResponse",
+    "history-link-response.json": "HistoryResponse",
     "history-resend-request.json": "HistoryResendRequest",
     "job-accepted.json": "JobResponse",
     "job-published.json": "JobResponse",
     "job-quiet.json": "JobResponse",
     "job-failed.json": "JobResponse",
     "job-history-resend.json": "JobResponse",
+    "job-image-url-published.json": "JobResponse",
+    "job-webpage-published.json": "JobResponse",
+    "job-webpage-blocked.json": "JobResponse",
     "error-response.json": "ErrorResponse",
 }
 
 
 def test_openapi_shape_and_operation_ids_are_stable() -> None:
     assert SPEC["openapi"] == "3.0.3"
-    assert SPEC["info"]["version"] == "0.5.2"
+    assert SPEC["info"]["version"] == "0.6.0"
     assert set(SPEC["paths"]) == {
         "/api/app/v1",
         "/api/app/v1/pair",
@@ -164,6 +173,8 @@ def test_extended_capabilities_advertise_history_and_all_image_fit_modes() -> No
         "center",
     ]
     assert "history" in extension["features"]
+    assert "image_url_push" in extension["features"]
+    assert "webpage_push" in extension["features"]
     assert SPEC["components"]["schemas"]["ImageFitMode"]["enum"] == [
         "fit",
         "fill",
@@ -173,13 +184,83 @@ def test_extended_capabilities_advertise_history_and_all_image_fit_modes() -> No
     ]
 
 
+def test_image_framing_is_independently_gated_and_fill_only() -> None:
+    base = json.loads((FIXTURES_DIR / "capabilities-extended.json").read_text())
+    framing_capabilities = json.loads((FIXTURES_DIR / "capabilities-framing.json").read_text())
+    basic = json.loads((FIXTURES_DIR / "image-push-request-basic.json").read_text())
+    framed = json.loads((FIXTURES_DIR / "image-push-request.json").read_text())
+
+    assert "image_framing" not in base["features"]
+    assert "image_framing_max_zoom" not in base["limits"]
+    assert "image_framing" in framing_capabilities["features"]
+    assert framing_capabilities["limits"]["image_framing_max_zoom"] == 4
+
+    assert "framing" not in basic
+    assert framed["fit"] == "fill"
+    assert framed["framing"] == {"focus_x": 0.62, "focus_y": 0.38, "zoom": 1.35}
+
+    schema = SPEC["components"]["schemas"]["ImageFraming"]
+    assert schema["required"] == ["focus_x", "focus_y", "zoom"]
+    assert schema["properties"]["focus_x"]["minimum"] == 0
+    assert schema["properties"]["focus_x"]["maximum"] == 1
+    assert schema["properties"]["focus_y"]["minimum"] == 0
+    assert schema["properties"]["focus_y"]["maximum"] == 1
+    assert schema["properties"]["zoom"]["minimum"] == 1
+
+
+def test_image_framing_fixture_matches_the_server_resolver() -> None:
+    """The shared rotated-EXIF fixture drives the REAL server resolver.
+
+    The client repo re-derives the formula in its own tests; here the same
+    fixture must fall out of ``app.quantizer.resolve_framing_crop`` against
+    the orientation-normalized dimensions, and must NOT match when resolved
+    against the raw (stored, sideways) pixel buffer.
+    """
+    from PIL import Image, ImageOps
+
+    from app.quantizer import resolve_framing_crop
+
+    fixture = json.loads((FIXTURES_DIR / "image-framing-exif-rotate-90.json").read_text())
+    image_bytes = base64.b64decode(fixture["jpeg_base64"], validate=True)
+    raw = fixture["raw_source"]
+    normalized = fixture["normalized_source"]
+    target = fixture["target"]
+    framing = fixture["framing"]
+
+    from io import BytesIO
+
+    with Image.open(BytesIO(image_bytes)) as img:
+        assert (img.width, img.height) == (raw["width"], raw["height"])
+        assert img.getexif().get(0x0112) == raw["exif_orientation"]
+        upright = ImageOps.exif_transpose(img)
+    assert (upright.width, upright.height) == (normalized["width"], normalized["height"])
+
+    def resolve(source: dict[str, int]) -> dict[str, float]:
+        crop = resolve_framing_crop(
+            source_w=source["width"],
+            source_h=source["height"],
+            target_w=target["width"],
+            target_h=target["height"],
+            focus_x=framing["focus_x"],
+            focus_y=framing["focus_y"],
+            zoom=framing["zoom"],
+        )
+        return {"x": crop["x"], "y": crop["y"], "width": crop["w"], "height": crop["h"]}
+
+    resolved = resolve(normalized)
+    for key, expected in fixture["expected_crop"].items():
+        assert resolved[key] == pytest.approx(expected)
+    assert resolve(raw)["x"] != pytest.approx(resolved["x"])
+
+
 def test_history_contract_keeps_composition_preview_and_resend_correlatable() -> None:
     history = json.loads((FIXTURES_DIR / "history-response.json").read_text())
     photo = history["items"][0]
     resend = json.loads((FIXTURES_DIR / "job-history-resend.json").read_text())["job"]
 
     assert photo["preview_available"] is True
-    assert photo["fit"] == "blur"
+    assert photo["fit"] == "fill"
+    assert photo["framing"] == {"focus_x": 0.62, "focus_y": 0.38, "zoom": 1.35}
     assert resend["kind"] == "history_resend"
     assert resend["result"]["history_event_ids"]
 

@@ -1,6 +1,6 @@
 {
   "product": "tesserae",
-  "server_version": "0.210.0",
+  "server_version": "0.225.0+framing-fixture",
   "api": {
     "name": "companion",
     "version": 1
@@ -19,7 +19,8 @@
     "previews",
     "history",
     "image_url_push",
-    "webpage_push"
+    "webpage_push",
+    "image_framing"
   ],
   "limits": {
     "image_upload_bytes": 26214400,
@@ -38,6 +39,7 @@
       "stretch",
       "center"
     ],
+    "image_framing_max_zoom": 4,
     "job_retention_seconds": 86400,
     "idempotency_retention_seconds": 86400
   },

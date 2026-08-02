@@ -8,6 +8,16 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Photos sent from the Companion app can now be framed.** The Companion API
+  accepts an optional focus + zoom on image uploads (contract 0.6
+  `image_framing`, Fill only) and resolves it into a separate source crop for
+  each target panel, so one send to a portrait and a landscape display keeps
+  the chosen subject on both. Focus coordinates address the photo the way the
+  phone displays it (EXIF orientation is normalized first), History returns
+  the original framing intent, and resend republishes the retained framed
+  frame exactly. The capability is advertised with a mandatory
+  `image_framing_max_zoom` bound so clients never hard-code the editor range.
+
 - **Run a panel at another location, without a VPN or opening your network.** A new
   cloud-relay transport lets a remote e-ink panel show your home instance's dashboards
   over the internet. Both ends connect outbound to a small relay mailbox (a Cloudflare

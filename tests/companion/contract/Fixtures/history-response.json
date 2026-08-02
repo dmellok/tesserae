@@ -13,7 +13,12 @@
       "error": null,
       "preview_available": true,
       "resendable": true,
-      "fit": "blur"
+      "fit": "fill",
+      "framing": {
+        "focus_x": 0.62,
+        "focus_y": 0.38,
+        "zoom": 1.35
+      }
     },
     {
       "id": "history_0101",
@@ -28,7 +33,8 @@
       "error": null,
       "preview_available": true,
       "resendable": true,
-      "fit": null
+      "fit": null,
+      "framing": null
     }
   ],
   "next_before_id": "history_0100"

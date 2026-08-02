@@ -333,6 +333,55 @@ def _ui_font(size: int) -> Any | None:
     return font
 
 
+def _apply_framing(
+    image_bytes: bytes,
+    panel_dims: dict[str, Any],
+    framing: dict[str, float],
+) -> bytes:
+    """Apply a Companion ``image_framing`` intent to uploaded image bytes.
+
+    Resolves the normalized focus + zoom against this push's composition
+    dims and returns a panel-sized PNG. Producing the final frame here
+    (rather than threading the crop into every renderer's transform) keeps
+    the adapter in one place: the crop's aspect matches the panel by
+    construction, so each renderer's ``fill`` fit degenerates to a no-op,
+    including pi_png whose fit runs client-side. Orientation is normalized
+    before the crop so the focus addresses the image as displayed
+    (``fit_to_panel`` owns both steps in that order).
+    """
+    import io
+
+    from PIL import Image, ImageOps
+
+    from app.quantizer import fit_to_panel, resolve_framing_crop
+
+    target_w = int(panel_dims.get("w") or 0)
+    target_h = int(panel_dims.get("h") or 0)
+    if target_w <= 0 or target_h <= 0:
+        return image_bytes
+    with Image.open(io.BytesIO(image_bytes)) as img:
+        normalized = ImageOps.exif_transpose(img)
+        crop = resolve_framing_crop(
+            source_w=normalized.width,
+            source_h=normalized.height,
+            target_w=target_w,
+            target_h=target_h,
+            focus_x=float(framing["focus_x"]),
+            focus_y=float(framing["focus_y"]),
+            zoom=float(framing["zoom"]),
+        )
+        framed = fit_to_panel(
+            normalized,
+            target_w=target_w,
+            target_h=target_h,
+            scale="fill",
+            crop=crop,
+        )
+    out = io.BytesIO()
+    framed.save(out, format="PNG")
+    return out.getvalue()
+
+
 @dataclass(frozen=True)
 class RendererResult:
     renderer_id: str
@@ -1315,6 +1364,7 @@ class PushManager:
         bypass_coalesce: bool = True,
         force_publish: bool = True,
         source: str = "file",
+        framing: dict[str, float] | None = None,
     ) -> PushResult:
         """Hand arbitrary image bytes to every renderer.
 
@@ -1328,7 +1378,14 @@ class PushManager:
         input (``fit``/``fill``/``stretch``/``center``/``blur``). ``source``
         tags the History row: the Companion link-send routes fetch / render
         once and fan the resulting bytes out through here with ``"url"`` /
-        ``"webpage"`` so History keeps the real origin (default ``"file"``)."""
+        ``"webpage"`` so History keeps the real origin (default ``"file"``).
+
+        ``framing`` (optional, Companion 0.6 ``image_framing``): validated
+        ``{focus_x, focus_y, zoom}`` intent, resolved against this push's
+        panel dims into a :class:`~app.quantizer.SourceCrop` and applied
+        ahead of the fan-out, so the retained composition is the framed,
+        panel-sized frame and resend stays pixel-exact. The intent itself
+        rides the History row's ``extra`` for reproduce / re-target."""
         supersede = self._acquire_or_supersede(
             device_id=device_id,
             source=source,
@@ -1350,6 +1407,7 @@ class PushManager:
                     device_id=device_id,
                     fit=fit,
                     force_publish=force_publish,
+                    framing=framing,
                 )
             finally:
                 self._lock.release()
@@ -1894,10 +1952,13 @@ class PushManager:
         fit: str | None = None,
         force_publish: bool = False,
         force_client_refetch: bool = False,
+        framing: dict[str, float] | None = None,
     ) -> PushResult:
         """Shared tail end of push_image / push_webpage / republish."""
         started = started if started is not None else time.monotonic()
         panel_dims = self._panel_dims_for_send(device_id)
+        if framing is not None:
+            image_bytes = _apply_framing(image_bytes, panel_dims, framing)
         return self._fan_out(
             image_bytes,
             panel_dims,
@@ -1908,6 +1969,7 @@ class PushManager:
             image_fit=fit,
             force_publish=force_publish,
             force_client_refetch=force_client_refetch,
+            framing=framing,
         )
 
     def _fan_out(
@@ -1922,6 +1984,7 @@ class PushManager:
         image_fit: str | None = None,
         force_publish: bool = False,
         force_client_refetch: bool = False,
+        framing: dict[str, float] | None = None,
         dither_regions: list[dict[str, Any]] | None = None,
         touch_regions: list[dict[str, Any]] | None = None,
         overlay_slots: list[dict[str, Any]] | None = None,
@@ -2230,6 +2293,11 @@ class PushManager:
         }
         if image_fit in _IMAGE_FIT_MODES:
             event_extra["fit"] = image_fit
+        if framing is not None:
+            # Original Companion framing intent (never the resolved rect):
+            # History returns it for reproduce / re-target; the retained
+            # composition is already framed, so resend needs nothing more.
+            event_extra["framing"] = dict(framing)
         event_id = self._event_log.record(
             type="push",
             source=source,

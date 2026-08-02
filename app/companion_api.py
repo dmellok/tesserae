@@ -90,6 +90,12 @@ IMAGE_UPLOAD_BYTES = 26_214_400  # 25 MiB
 IMAGE_MAX_EDGE = 8192
 IMAGE_CONTENT_TYPES = ("image/jpeg", "image/png", "image/heic", "image/heif", "image/webp")
 IMAGE_FIT_MODES = ("fit", "fill", "blur", "stretch", "center")
+# Contract 0.6 ``image_framing``: mandatory editor bound whenever the
+# capability is advertised, so clients never hard-code a zoom range. An
+# editor bound rather than a quality promise: the resolved crop is always
+# clamped to source bounds, and a heavy crop of a small photo will be soft
+# on a large panel regardless of what the editor allowed.
+IMAGE_FRAMING_MAX_ZOOM = 4
 JOB_RETENTION_SECONDS = 86_400
 IDEMPOTENCY_RETENTION_SECONDS = 86_400
 
@@ -103,6 +109,7 @@ FEATURES = (
     "image_url_push",
     "jobs",
     "history",
+    "image_framing",
 )
 
 _PAIRING_CODE_RE = re.compile(r"^[0-9]{6,12}$")
@@ -305,6 +312,10 @@ def _capabilities() -> dict[str, Any]:
             "image_max_edge": IMAGE_MAX_EDGE,
             "image_content_types": list(IMAGE_CONTENT_TYPES),
             "image_fit_modes": list(IMAGE_FIT_MODES),
+            # Required whenever ``image_framing`` is advertised (contract
+            # 0.6): a capability that doesn't publish its own bounds just
+            # relocates the hard-coding into the client.
+            "image_framing_max_zoom": IMAGE_FRAMING_MAX_ZOOM,
             "job_retention_seconds": JOB_RETENTION_SECONDS,
             "idempotency_retention_seconds": IDEMPOTENCY_RETENTION_SECONDS,
         },
@@ -742,6 +753,44 @@ def _decode_edge(image_bytes: bytes) -> int | None:
         return None
 
 
+def _valid_framing(
+    spec: dict[str, Any], fit: str
+) -> tuple[dict[str, float] | None, tuple[Response, int] | None]:
+    """Validate the optional contract 0.6 ``framing`` object.
+
+    Returns ``(framing, None)`` on success (``None`` when absent) or
+    ``(None, error_response)``. Framing rides only ``fit: fill`` — for any
+    other mode there is no "ordinary Fill crop" to refine, so the
+    combination is rejected rather than silently ignored. Booleans are
+    explicitly refused: ``bool`` is an ``int`` subclass, so ``zoom: true``
+    would otherwise validate as ``1``.
+    """
+    raw = spec.get("framing")
+    if raw is None:
+        return None, None
+    invalid = _error(
+        "invalid_framing",
+        "framing requires fit 'fill', numeric focus_x/focus_y in 0..1, "
+        f"and zoom in 1..{IMAGE_FRAMING_MAX_ZOOM}.",
+        400,
+    )
+    if not isinstance(raw, dict) or fit != "fill":
+        return None, invalid
+    values: dict[str, float] = {}
+    for key in ("focus_x", "focus_y", "zoom"):
+        value = raw.get(key)
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return None, invalid
+        values[key] = float(value)
+    if not (
+        0 <= values["focus_x"] <= 1
+        and 0 <= values["focus_y"] <= 1
+        and 1 <= values["zoom"] <= IMAGE_FRAMING_MAX_ZOOM
+    ):
+        return None, invalid
+    return values, None
+
+
 @bp.post("/images")
 @_require_companion("media:write")
 def push_image() -> Any:
@@ -782,6 +831,9 @@ def push_image() -> Any:
     targets = _valid_target_ids(spec.get("device_ids"))
     if targets is None:
         return _error("invalid_target", "One or more target displays are unknown.", 400)
+    framing, framing_err = _valid_framing(spec, fit_value)
+    if framing_err is not None:
+        return framing_err
 
     fit = fit_value
     override = bool(spec["override_quiet_hours"])
@@ -805,6 +857,10 @@ def push_image() -> Any:
                 fit=fit,
                 bypass_coalesce=True,
                 force_publish=True,
+                # Resolved per target inside the push pipeline: the same
+                # intent yields a different SourceCrop for each panel's
+                # aspect, which is the point of normalized framing.
+                framing=framing,
             )
             if result.status in _PUBLISHED_STATUSES:
                 published.append(did)

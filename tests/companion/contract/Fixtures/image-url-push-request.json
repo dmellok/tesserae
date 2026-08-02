@@ -1,0 +1,8 @@
+{
+  "url": "https://images.example.com/poster.png",
+  "device_ids": [
+    "picpak-kitchen"
+  ],
+  "fit": "fill",
+  "override_quiet_hours": false
+}

@@ -126,9 +126,12 @@ def test_capabilities_probe_is_unauthenticated_and_valid(app: Flask) -> None:
         "image_url_push",
         "jobs",
         "history",
+        "image_framing",
     }
     assert "webpage_push" not in body["features"]
     assert body["limits"]["image_fit_modes"] == list(companion_api.IMAGE_FIT_MODES)
+    # Contract 0.6: the zoom bound is mandatory alongside image_framing.
+    assert body["limits"]["image_framing_max_zoom"] == companion_api.IMAGE_FRAMING_MAX_ZOOM
     # No household content leaks from the unauthenticated probe.
     assert "devices" not in body and "dashboards" not in body
 

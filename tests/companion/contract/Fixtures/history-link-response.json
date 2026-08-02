@@ -1,0 +1,36 @@
+{
+  "items": [
+    {
+      "id": "history_0202",
+      "created_at": "2026-07-30T02:01:09Z",
+      "source": "webpage",
+      "label": "example.com/news",
+      "device_ids": [
+        "picpak-kitchen",
+        "e1004-desk"
+      ],
+      "status": "sent",
+      "duration_seconds": 9.0,
+      "error": null,
+      "preview_available": true,
+      "resendable": true,
+      "fit": "fit"
+    },
+    {
+      "id": "history_0201",
+      "created_at": "2026-07-30T02:00:05Z",
+      "source": "url",
+      "label": "images.example.com/poster.png",
+      "device_ids": [
+        "picpak-kitchen"
+      ],
+      "status": "sent",
+      "duration_seconds": 5.0,
+      "error": null,
+      "preview_available": true,
+      "resendable": true,
+      "fit": "fill"
+    }
+  ],
+  "next_before_id": null
+}

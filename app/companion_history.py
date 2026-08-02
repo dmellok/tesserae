@@ -120,6 +120,7 @@ def history_item(
         "preview_available": preview is not None,
         "resendable": resend is not None,
         "fit": fit,
+        "framing": _framing(row.extra),
     }
 
 
@@ -205,6 +206,24 @@ def _fit_mode(extra: dict[str, Any]) -> str | None:
     if raw is None:
         raw = extra.get("fit")
     return raw if isinstance(raw, str) and raw in _IMAGE_FIT_MODES else None
+
+
+def _framing(extra: dict[str, Any]) -> dict[str, float] | None:
+    """Original ``image_framing`` intent stored on the push row, or None.
+
+    Only the intent is public contract (reproduce / re-target); resolved
+    per-target crop rectangles are derived state and stay server-internal.
+    """
+    raw = extra.get("framing")
+    if not isinstance(raw, dict):
+        return None
+    values: dict[str, float] = {}
+    for key in ("focus_x", "focus_y", "zoom"):
+        value = raw.get(key)
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return None
+        values[key] = float(value)
+    return values
 
 
 def _device_ids(extra: dict[str, Any]) -> list[str]:

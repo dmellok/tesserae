@@ -1,0 +1,26 @@
+{
+  "job": {
+    "id": "job_01JWEBPAGE",
+    "kind": "webpage_push",
+    "status": "succeeded",
+    "label": "example.com/news",
+    "target_device_ids": [
+      "picpak-kitchen",
+      "e1004-desk"
+    ],
+    "created_at": "2026-07-30T02:01:00Z",
+    "updated_at": "2026-07-30T02:01:09Z",
+    "result": {
+      "status": "published",
+      "reason": null,
+      "device_ids": [
+        "picpak-kitchen",
+        "e1004-desk"
+      ],
+      "history_event_ids": [
+        "history_0202"
+      ]
+    },
+    "error": null
+  }
+}
