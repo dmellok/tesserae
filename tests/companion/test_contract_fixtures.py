@@ -22,6 +22,10 @@ CASES = {
     "capabilities-previews.json": "Capabilities",
     "capabilities-extended.json": "Capabilities",
     "capabilities-framing.json": "Capabilities",
+    "capabilities-personal-data.json": "Capabilities",
+    "personal-data-reminders-fridge.json": "PersonalDataSnapshot",
+    "personal-data-put-response.json": "PersonalDataSourceStatus",
+    "personal-data-status.json": "PersonalDataStatusResponse",
     "pair-request.json": "PairingRequest",
     "pair-response.json": "PairingResponse",
     "devices-response.json": "DevicesResponse",
@@ -48,11 +52,13 @@ CASES = {
 
 def test_openapi_shape_and_operation_ids_are_stable() -> None:
     assert SPEC["openapi"] == "3.0.3"
-    assert SPEC["info"]["version"] == "0.6.0"
+    assert SPEC["info"]["version"] == "0.7.0"
     assert set(SPEC["paths"]) == {
         "/api/app/v1",
         "/api/app/v1/pair",
         "/api/app/v1/session",
+        "/api/app/v1/personal-data/status",
+        "/api/app/v1/personal-data/{source_id}",
         "/api/app/v1/devices",
         "/api/app/v1/devices/{device_id}/preview",
         "/api/app/v1/dashboards",

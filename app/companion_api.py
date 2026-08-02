@@ -17,7 +17,7 @@ job the client polls; quiet-hours suppression surfaces as a *successful*
 app.mdns.
 
 Contract: ``charmmmz/tesserae-companion-ios`` ``Contracts/app-v1.openapi.yaml``
-(OpenAPI 0.5.2). The vendored copy + fixtures under ``tests/companion/``
+(OpenAPI 0.7.0). The vendored copy + fixtures under ``tests/companion/``
 guard these shapes.
 
 mypy --strict applies to this module, see pyproject.toml.
@@ -63,6 +63,7 @@ from app.state.idempotency_store import fingerprint as _idempotency_fingerprint
 from app.state.job_store import JobKind, JobStore
 from app.state.page_store import PageStore
 from app.state.pairing_store import PairingStore
+from app.state.personal_data_store import PersonalDataSnapshotStore
 from app.state.settings_store import SettingsStore
 
 logger = logging.getLogger(__name__)
@@ -99,6 +100,16 @@ IMAGE_FRAMING_MAX_ZOOM = 4
 JOB_RETENTION_SECONDS = 86_400
 IDEMPOTENCY_RETENTION_SECONDS = 86_400
 
+# Personal-data bridge (#176, contract 0.7): a snapshot is fresh until it is
+# this old, then stale, then expired (deleted). ``max_ttl`` bounds how far a
+# client may set expires_at past generated_at. Server-advertised so the app
+# doesn't hard-code them.
+PERSONAL_DATA_STALE_SECONDS = 86_400  # 24 h
+PERSONAL_DATA_MAX_TTL_SECONDS = 172_800  # 48 h
+PERSONAL_DATA_SOURCES = ("reminders.fridge",)
+PERSONAL_DATA_SNAPSHOT_VERSION = "personal_data_bridge_v1"
+_REMINDER_PRIORITIES = frozenset(("none", "low", "medium", "high"))
+
 # Features this server serves. The client gates on this list rather than
 # assuming the full set, so unshipped surfaces degrade cleanly.
 FEATURES = (
@@ -110,6 +121,7 @@ FEATURES = (
     "jobs",
     "history",
     "image_framing",
+    "personal_data_reminders",
 )
 
 _PAIRING_CODE_RE = re.compile(r"^[0-9]{6,12}$")
@@ -136,7 +148,7 @@ def _cors_preflight() -> Response | None:
 @bp.after_request
 def _cors_headers(resp: Response) -> Response:
     resp.headers["Access-Control-Allow-Origin"] = "*"
-    resp.headers["Access-Control-Allow-Methods"] = "GET, POST, DELETE, OPTIONS"
+    resp.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
     resp.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type, Idempotency-Key"
     resp.headers["Access-Control-Expose-Headers"] = "Location, Retry-After, ETag"
     resp.headers["Access-Control-Max-Age"] = "86400"
@@ -188,6 +200,10 @@ def _push_manager() -> Any:
 
 def _events() -> EventLog:
     return current_app.config["EVENT_LOG"]  # type: ignore[no-any-return]
+
+
+def _personal_data() -> PersonalDataSnapshotStore:
+    return current_app.config["PERSONAL_DATA_STORE"]  # type: ignore[no-any-return]
 
 
 # -- error envelope ------------------------------------------------------
@@ -318,6 +334,10 @@ def _capabilities() -> dict[str, Any]:
             "image_framing_max_zoom": IMAGE_FRAMING_MAX_ZOOM,
             "job_retention_seconds": JOB_RETENTION_SECONDS,
             "idempotency_retention_seconds": IDEMPOTENCY_RETENTION_SECONDS,
+            # Required whenever any personal-data capability is advertised
+            # (contract 0.7): the client reads freshness/TTL bounds, not guesses.
+            "personal_data_stale_after_seconds": PERSONAL_DATA_STALE_SECONDS,
+            "personal_data_max_ttl_seconds": PERSONAL_DATA_MAX_TTL_SECONDS,
         },
         "web_url": _web_url(),
     }
@@ -396,6 +416,157 @@ def revoke_session() -> Any:
     token = _bearer_token()
     if token:
         _tokens().revoke_token(token)
+    return Response(status=204)
+
+
+# -- personal data (#176, contract 0.7) ----------------------------------
+#
+# The phone stays the authority for Apple personal data. It publishes only an
+# explicitly enabled, minimal, expiring snapshot; the server keeps the latest
+# per source (no history), renders it in a widget, and deletes it on disable or
+# expiry. This is synchronous state, not a job: no render / publish / History
+# write happens here.
+
+
+def _parse_iso(value: Any) -> float | None:
+    if not isinstance(value, str):
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return None
+
+
+def _iso(epoch: float) -> str:
+    return datetime.fromtimestamp(epoch, UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _personal_data_state(generated_epoch: float, expires_epoch: float, now: float) -> str:
+    if now >= expires_epoch:
+        return "expired"
+    if now >= generated_epoch + PERSONAL_DATA_STALE_SECONDS:
+        return "stale"
+    return "fresh"
+
+
+def _source_status(
+    source_id: str, generated_epoch: float, expires_epoch: float, now: float
+) -> dict[str, Any]:
+    return {
+        "source_id": source_id,
+        "state": _personal_data_state(generated_epoch, expires_epoch, now),
+        "generated_at": _iso(generated_epoch),
+        "stale_at": _iso(generated_epoch + PERSONAL_DATA_STALE_SECONDS),
+        "expires_at": _iso(expires_epoch),
+    }
+
+
+def _validate_reminders_fridge(
+    source_id: str, body: Any
+) -> tuple[tuple[dict[str, Any], float, float] | None, tuple[Response, int] | None]:
+    """Validate a ``reminders.fridge`` snapshot. Returns ``((snapshot, gen, exp),
+    None)`` or ``(None, error)``. Strict: unknown fields are rejected, so the
+    endpoint can never become arbitrary JSON storage."""
+
+    def bad(msg: str) -> tuple[None, tuple[Response, int]]:
+        return None, _error("invalid_snapshot", msg, 400)
+
+    if not isinstance(body, dict):
+        return bad("body must be a JSON object")
+    if set(body) - {"version", "source_id", "generated_at", "expires_at", "data"}:
+        return bad("snapshot has unexpected fields")
+    if body.get("version") != PERSONAL_DATA_SNAPSHOT_VERSION:
+        return bad("unsupported snapshot version")
+    if body.get("source_id") != source_id:
+        return bad("source_id does not match the path")
+    gen = _parse_iso(body.get("generated_at"))
+    exp = _parse_iso(body.get("expires_at"))
+    if gen is None or exp is None:
+        return bad("generated_at and expires_at must be ISO 8601")
+    if exp <= gen:
+        return bad("expires_at must be after generated_at")
+    if exp - gen > PERSONAL_DATA_MAX_TTL_SECONDS:
+        return bad("expires_at exceeds the maximum retention window")
+    data = body.get("data")
+    if not isinstance(data, dict) or set(data) - {"items"}:
+        return bad("data must be an object with only items")
+    items = data.get("items")
+    if not isinstance(items, list):
+        return bad("data.items must be an array")
+    if len(items) > 200:
+        return bad("too many items (max 200)")
+    for item in items:
+        if not isinstance(item, dict):
+            return bad("each item must be an object")
+        if set(item) - {"id", "title", "due_date", "priority", "completed"}:
+            return bad("an item has unexpected fields")
+        iid, title = item.get("id"), item.get("title")
+        if not isinstance(iid, str) or not (1 <= len(iid) <= 256):
+            return bad("item id must be a 1-256 char string")
+        if not isinstance(title, str) or not (1 <= len(title) <= 512):
+            return bad("item title must be a 1-512 char string")
+        due = item.get("due_date")
+        if due is not None and not isinstance(due, str):
+            return bad("item due_date must be a date string or null")
+        if item.get("priority") not in _REMINDER_PRIORITIES:
+            return bad("item priority must be none/low/medium/high")
+        if item.get("completed") is not False:
+            return bad("item completed must be false")
+    return (body, gen, exp), None
+
+
+@bp.put("/personal-data/<source_id>")
+@_require_companion("personal_data:write")
+def put_personal_data(source_id: str) -> Any:
+    """Replace the latest snapshot for one advertised source. Latest-only,
+    synchronous, no render/Job/History. Ordering: identical timestamp + payload
+    is idempotent; an older timestamp or a conflicting payload at the same
+    timestamp is refused so delayed background work can't overwrite newer data."""
+    if source_id not in PERSONAL_DATA_SOURCES:
+        return _error("unsupported_personal_data_source", f"unknown source {source_id!r}", 400)
+    result, err = _validate_reminders_fridge(source_id, request.get_json(silent=True))
+    if err is not None:
+        return err
+    assert result is not None  # narrow for mypy; err is None here
+    snapshot, gen, exp = result
+    now = time.time()
+    store = _personal_data()
+    existing = store.get(source_id)
+    if isinstance(existing, dict) and isinstance(existing.get("generated_epoch"), (int, float)):
+        existing_gen = float(existing["generated_epoch"])
+        if gen < existing_gen:
+            return _error("snapshot_out_of_order", "a newer snapshot is already stored", 409)
+        if gen == existing_gen:
+            if existing.get("snapshot") != snapshot:
+                return _error(
+                    "snapshot_conflict", "a different snapshot exists at this timestamp", 409
+                )
+            # Identical retry: idempotent, don't rewrite.
+            return jsonify(_source_status(source_id, gen, exp, now)), 200
+    store.put(source_id, snapshot=snapshot, generated_epoch=gen, expires_epoch=exp)
+    return jsonify(_source_status(source_id, gen, exp, now)), 200
+
+
+@bp.get("/personal-data/status")
+@_require_companion("personal_data:write")
+def personal_data_status() -> Any:
+    """Freshness metadata only, never the stored values."""
+    now = time.time()
+    store = _personal_data()
+    store.purge_expired(now)
+    sources = []
+    for source_id, rec in sorted(store.all().items()):
+        gen, exp = rec.get("generated_epoch"), rec.get("expires_epoch")
+        if isinstance(gen, (int, float)) and isinstance(exp, (int, float)):
+            sources.append(_source_status(source_id, float(gen), float(exp), now))
+    return jsonify({"sources": sources})
+
+
+@bp.delete("/personal-data/<source_id>")
+@_require_companion("personal_data:write")
+def delete_personal_data(source_id: str) -> Any:
+    """Idempotently drop a source's snapshot (on disable)."""
+    _personal_data().delete(source_id)
     return Response(status=204)
 
 

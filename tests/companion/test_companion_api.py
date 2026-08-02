@@ -127,6 +127,7 @@ def test_capabilities_probe_is_unauthenticated_and_valid(app: Flask) -> None:
         "jobs",
         "history",
         "image_framing",
+        "personal_data_reminders",
     }
     assert "webpage_push" not in body["features"]
     assert body["limits"]["image_fit_modes"] == list(companion_api.IMAGE_FIT_MODES)
@@ -151,6 +152,7 @@ def test_pair_exchanges_code_for_scoped_token(app: Flask) -> None:
         "dashboards:read",
         "push:write",
         "media:write",
+        "personal_data:write",
     }
     assert body["instance"]["server_version"] == app.config["APP_VERSION"]
 

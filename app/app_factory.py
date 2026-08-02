@@ -972,8 +972,14 @@ def create_app(
     from app.state.companion_token_store import CompanionTokenStore
     from app.state.idempotency_store import IdempotencyStore
     from app.state.job_store import JobStore
+    from app.state.personal_data_store import PersonalDataSnapshotStore
 
     app.config["COMPANION_PAIRING_STORE"] = PairingStore()
+    # Personal-data bridge (#176): latest-only Apple-Reminders snapshot the
+    # Companion publishes, kept off any render/History path.
+    app.config["PERSONAL_DATA_STORE"] = PersonalDataSnapshotStore(
+        data_root / "core" / "companion_personal_data.json"
+    )
     app.config["COMPANION_TOKENS"] = CompanionTokenStore(
         data_root / "core" / "companion_tokens.json"
     )

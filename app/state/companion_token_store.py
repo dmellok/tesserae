@@ -54,6 +54,7 @@ COMPANION_SCOPES: tuple[str, ...] = (
     "dashboards:read",
     "push:write",
     "media:write",
+    "personal_data:write",
 )
 
 # How stale ``last_used_at`` may get before a fresh authenticated request

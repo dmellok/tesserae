@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Tesserae Companion API
-  version: 0.6.0
+  version: 0.7.0
   description: >-
     Companion API contract for community-built clients. Previews, History,
     resend, remote-image push, webpage push, and server-advertised image fit
@@ -424,6 +424,55 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+  /api/app/v1/personal-data/status:
+    get:
+      tags: [Personal Data]
+      operationId: getCompanionPersonalDataStatus
+      summary: List snapshot freshness metadata without returning personal values
+      responses:
+        "200":
+          description: Metadata for currently stored or expired snapshot sources
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PersonalDataStatusResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/app/v1/personal-data/{source_id}:
+    parameters:
+      - $ref: "#/components/parameters/PersonalDataSourceID"
+    put:
+      tags: [Personal Data]
+      operationId: putCompanionPersonalDataSnapshot
+      summary: Replace the latest snapshot for one advertised personal-data source
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PersonalDataSnapshot"
+      responses:
+        "200":
+          description: Snapshot accepted as the source's latest value
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PersonalDataSourceStatus"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/Conflict"
+    delete:
+      tags: [Personal Data]
+      operationId: deleteCompanionPersonalDataSnapshot
+      summary: Delete the latest snapshot when its source is disabled
+      responses:
+        "204":
+          description: Snapshot absent after the request
+        "401":
+          $ref: "#/components/responses/Unauthorized"
 components:
   securitySchemes:
     CompanionBearer:
@@ -474,6 +523,13 @@ components:
       description: ETag from a previously returned preview
       schema:
         type: string
+    PersonalDataSourceID:
+      in: path
+      name: source_id
+      required: true
+      description: Source advertised by the corresponding capability flag
+      schema:
+        $ref: "#/components/schemas/PersonalDataSourceID"
   headers:
     ETag:
       description: Content-addressed preview validator
@@ -572,6 +628,7 @@ components:
               - image_url_push
               - webpage_push
               - image_framing
+              - personal_data_reminders
         limits:
           $ref: "#/components/schemas/Limits"
         web_url:
@@ -626,6 +683,12 @@ components:
         idempotency_retention_seconds:
           type: integer
           minimum: 60
+        personal_data_stale_after_seconds:
+          type: integer
+          minimum: 60
+        personal_data_max_ttl_seconds:
+          type: integer
+          minimum: 60
     PairingRequest:
       type: object
       additionalProperties: false
@@ -668,7 +731,7 @@ components:
           uniqueItems: true
           items:
             type: string
-            enum: [devices:read, dashboards:read, push:write, media:write]
+            enum: [devices:read, dashboards:read, push:write, media:write, personal_data:write]
         created_at:
           type: string
           format: date-time
@@ -1117,6 +1180,100 @@ components:
           type: string
         message:
           type: string
+    PersonalDataSourceID:
+      type: string
+      enum:
+        - reminders.fridge
+    PersonalDataSnapshot:
+      oneOf:
+        - $ref: "#/components/schemas/RemindersFridgeSnapshot"
+      discriminator:
+        propertyName: source_id
+        mapping:
+          reminders.fridge: "#/components/schemas/RemindersFridgeSnapshot"
+    RemindersFridgeSnapshot:
+      type: object
+      additionalProperties: false
+      required: [version, source_id, generated_at, expires_at, data]
+      properties:
+        version:
+          type: string
+          enum: [personal_data_bridge_v1]
+        source_id:
+          type: string
+          enum: [reminders.fridge]
+        generated_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+        data:
+          $ref: "#/components/schemas/RemindersFridgeData"
+    RemindersFridgeData:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          maxItems: 200
+          items:
+            $ref: "#/components/schemas/ReminderSnapshotItem"
+    ReminderSnapshotItem:
+      type: object
+      additionalProperties: false
+      required: [id, title, due_date, priority, completed]
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 256
+        title:
+          type: string
+          minLength: 1
+          maxLength: 512
+        due_date:
+          type: string
+          format: date
+          nullable: true
+        priority:
+          type: string
+          enum: [none, low, medium, high]
+        completed:
+          type: boolean
+          enum: [false]
+    PersonalDataFreshness:
+      type: string
+      enum: [fresh, stale, expired]
+    PersonalDataSourceStatus:
+      type: object
+      additionalProperties: false
+      required: [source_id, state, generated_at, stale_at, expires_at]
+      properties:
+        source_id:
+          $ref: "#/components/schemas/PersonalDataSourceID"
+        state:
+          $ref: "#/components/schemas/PersonalDataFreshness"
+        generated_at:
+          type: string
+          format: date-time
+        stale_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+    PersonalDataStatusResponse:
+      type: object
+      additionalProperties: false
+      required: [sources]
+      properties:
+        sources:
+          type: array
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/PersonalDataSourceStatus"
     ErrorResponse:
       type: object
       additionalProperties: false
@@ -1143,6 +1300,10 @@ components:
                 # the published enum missed it. Flagged upstream; drop this
                 # comment when the refreshed contract lands.
                 - invalid_framing
+                - invalid_snapshot
+                - unsupported_personal_data_source
+                - snapshot_out_of_order
+                - snapshot_conflict
                 - url_blocked
                 - idempotency_conflict
                 - not_resendable
