@@ -128,6 +128,7 @@ nav:
       - Add hardware support: dev/adding-hardware.md
       - Client protocol spec: dev/client-protocol.md
       - Protocol v2 (device-owned touch): protocol-v2-touch.md
+      - Frame-cache collections: dev/frame-cache.md
       - OTA firmware updates: ota/contract.md
       - Cloud relay contract: relay/contract.md
       - Self-host the cloud relay: relay/self-host.md

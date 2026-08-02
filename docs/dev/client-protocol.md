@@ -650,6 +650,11 @@ get the latest. Returns `404` if no frame has rendered yet.
 
 ## Deck cache sync (on-device frame cache)
 
+> Being generalized: [Frame-cache collections](frame-cache.md) is the
+> producer-neutral form of this cache (Decks + offline photo albums share one
+> content-addressed frame cache). The deck-cache capability and endpoints below
+> stay unchanged for compatibility. Discussion #177.
+
 Decks are small navigable graphs of pre-rendered pages (Settings →
 Decks). By default the server does all the navigation: a button/touch
 event arrives, the server resolves the graph and serves the target
