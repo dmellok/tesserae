@@ -43,6 +43,10 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_INTERVAL_S: float = 30.0
 
+# Kind used for a relay panel when neither the operator nor the panel's
+# self-report names one. The standard ESP32 relay client.
+DEFAULT_RELAY_KIND: str = "esp32_client"
+
 
 def _sha256_hex(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
@@ -78,7 +82,7 @@ def mint_remote_panel_code(
     settings: Any,
     *,
     device_id: str,
-    kind: str,
+    kind: str = "",
     name: str = "",
     panel: dict[str, Any] | None = None,
     orientation: str | None = None,
@@ -86,7 +90,11 @@ def mint_remote_panel_code(
 ) -> tuple[str, str]:
     """Ask the relay for a pairing code and record the slot it fills. Returns
     ``(code, expires_at)`` to show the operator. Raises :class:`RelayError`
-    when the install isn't linked or the relay call fails."""
+    when the install isn't linked or the relay call fails.
+
+    ``kind`` and ``panel`` are optional: left blank, the panel's self-report at
+    pairing (model + geometry) fills them in, so the operator only needs a
+    device id."""
     cfg = relay_config(settings)
     client = build_client(cfg)
     if client is None:
@@ -175,7 +183,7 @@ class RelayPairingPoller:
             if not isinstance(slot, dict):
                 continue
             try:
-                self._complete(client, privkey_b64, code, panel_pub, slot)
+                self._complete(client, privkey_b64, code, panel_pub, slot, entry)
             except (RelayError, ValueError) as exc:
                 logger.warning("relay: completing pairing %s failed (%s)", code, exc)
                 continue
@@ -186,6 +194,36 @@ class RelayPairingPoller:
             completed += 1
         return completed
 
+    def _resolve_kind(self, slot_kind: str, reported_model: str) -> str:
+        """Pick the device kind: the operator's slot value if set, else the
+        panel's self-reported model, else the default relay panel kind. Only a
+        value that names a real device *kind* (not an instance) is accepted."""
+        for candidate in (slot_kind.strip(), reported_model.strip()):
+            if candidate:
+                dev = self._devices.get(candidate)
+                if dev is not None and dev.kind_of is None:
+                    return candidate
+        return DEFAULT_RELAY_KIND
+
+    def _resolve_panel(
+        self, slot: dict[str, Any], reported: dict[str, Any]
+    ) -> dict[str, Any] | None:
+        """Panel geometry: the slot's if set, else the panel's self-report."""
+        panel = slot.get("panel")
+        if isinstance(panel, dict) and panel.get("w") and panel.get("h"):
+            return panel
+        try:
+            pw, ph = int(reported.get("panel_w") or 0), int(reported.get("panel_h") or 0)
+        except (TypeError, ValueError):
+            return None
+        if pw <= 0 or ph <= 0:
+            return None
+        out: dict[str, Any] = {"w": pw, "h": ph}
+        gamut = reported.get("gamut")
+        if isinstance(gamut, str) and gamut.strip():
+            out["gamut"] = gamut.strip()
+        return out
+
     def _complete(
         self,
         client: RelayClient,
@@ -193,6 +231,7 @@ class RelayPairingPoller:
         code: str,
         panel_pub_b64: str,
         slot: dict[str, Any],
+        reported: dict[str, Any],
     ) -> None:
         frame_key = derive_shared_key(b64u_decode(privkey_b64), b64u_decode(panel_pub_b64))
         device_id = str(slot.get("device_id") or "")
@@ -206,9 +245,11 @@ class RelayPairingPoller:
                 renderers=self._renderers,
                 data_root=self._data_root,
                 instance_id=device_id,
-                kind_id=str(slot.get("kind") or ""),
+                kind_id=self._resolve_kind(
+                    str(slot.get("kind") or ""), str(reported.get("model") or "")
+                ),
                 name=str(slot.get("name") or ""),
-                panel_overrides=slot.get("panel") or None,
+                panel_overrides=self._resolve_panel(slot, reported),
                 orientation=slot.get("orientation"),
                 transport="relay",
                 relay_frame_key=b64u_encode(frame_key),

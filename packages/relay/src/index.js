@@ -181,6 +181,13 @@ async function panelPair(env, request) {
   const pending = await getJson(env, key);
   if (!pending) return fail("pairing_expired", "unknown or expired code", 404);
   pending.panel_pubkey = panelPubkey;
+  // Optional panel self-report so the operator doesn't have to pre-enter the
+  // panel's kind/geometry. Home uses these to fill in anything the pairing slot
+  // left blank. Coerced/ignored if malformed; opaque to the relay otherwise.
+  if (Number.isFinite(body?.panel_w)) pending.panel_w = Math.trunc(body.panel_w);
+  if (Number.isFinite(body?.panel_h)) pending.panel_h = Math.trunc(body.panel_h);
+  if (typeof body?.model === "string" && body.model) pending.model = body.model.slice(0, 64);
+  if (typeof body?.gamut === "string" && body.gamut) pending.gamut = body.gamut.slice(0, 32);
   await putJson(env, key, pending);
   return json({ status: "pending" }, 202);
 }
@@ -192,7 +199,12 @@ async function pendingPairings(env, request, installId) {
   for (const item of listed.objects) {
     const rec = await getJson(env, item.key);
     if (rec && rec.panel_pubkey && !rec.completion) {
-      pending.push({ code: rec.code, panel_pubkey: rec.panel_pubkey });
+      const entry = { code: rec.code, panel_pubkey: rec.panel_pubkey };
+      if (rec.panel_w != null) entry.panel_w = rec.panel_w;
+      if (rec.panel_h != null) entry.panel_h = rec.panel_h;
+      if (rec.model != null) entry.model = rec.model;
+      if (rec.gamut != null) entry.gamut = rec.gamut;
+      pending.push(entry);
     }
   }
   return json({ pending });

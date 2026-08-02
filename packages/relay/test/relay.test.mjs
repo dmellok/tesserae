@@ -207,6 +207,48 @@ test("auth is enforced", async () => {
   assert.equal(r.status, 403);
 });
 
+test("panel self-report (geometry + model) rides pairing to the pending list", async () => {
+  const e = env();
+  let r = await worker.fetch(req("POST", "/v1/install/register", { body: { install_pubkey: "P" } }), e);
+  const { install_id, publisher_token } = await r.json();
+  r = await worker.fetch(
+    req("POST", `/v1/i/${install_id}/pair/codes`, { headers: authHdr(publisher_token) }),
+    e,
+  );
+  const { code } = await r.json();
+
+  r = await worker.fetch(
+    req("POST", "/v1/pair", {
+      body: {
+        code,
+        panel_pubkey: "PP",
+        panel_w: 800,
+        panel_h: 480,
+        model: "esp32_client",
+        gamut: "waveshare_e6",
+      },
+    }),
+    e,
+  );
+  assert.equal(r.status, 202);
+
+  r = await worker.fetch(
+    req("GET", `/v1/i/${install_id}/pair/pending`, { headers: authHdr(publisher_token) }),
+    e,
+  );
+  const { pending } = await r.json();
+  assert.deepEqual(pending, [
+    {
+      code,
+      panel_pubkey: "PP",
+      panel_w: 800,
+      panel_h: 480,
+      model: "esp32_client",
+      gamut: "waveshare_e6",
+    },
+  ]);
+});
+
 test("device status: panel posts, home pulls", async () => {
   const e = env();
   let r = await worker.fetch(req("POST", "/v1/install/register", { body: { install_pubkey: "P" } }), e);

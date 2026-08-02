@@ -67,7 +67,8 @@
       </div>
       <div class="field">
         <label for="rp-kind">Panel kind</label>
-        <select id="rp-kind" name="kind" required>
+        <select id="rp-kind" name="kind">
+          <option value="">Let the panel report it</option>
           {% for k in panel_kinds %}
           <option value="{{ k.id }}">{{ k.name }}</option>
           {% endfor %}
@@ -77,13 +78,18 @@
     <div class="field-grid">
       <div class="field">
         <label for="rp-w">Panel width (px)</label>
-        <input id="rp-w" name="panel_w" type="number" min="1" placeholder="800">
+        <input id="rp-w" name="panel_w" type="number" min="1" placeholder="from panel">
       </div>
       <div class="field">
         <label for="rp-h">Panel height (px)</label>
-        <input id="rp-h" name="panel_h" type="number" min="1" placeholder="480">
+        <input id="rp-h" name="panel_h" type="number" min="1" placeholder="from panel">
       </div>
     </div>
+    <p class="help">
+      Only the device id is required. Leave kind and dimensions blank and the
+      panel reports its own model and geometry when it pairs. Fill them in if you
+      want to compose the dashboard before the panel is online.
+    </p>
     <div class="actions">
       <button type="submit" class="btn">Create pairing code</button>
     </div>

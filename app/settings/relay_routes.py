@@ -76,9 +76,11 @@ def relay_add_panel() -> Response:
     except ValueError:
         flash("Panel width/height must be numbers.", "error")
         return redirect(url_for("auth.relay_index"))
-    if not device_id or not kind:
-        flash("Pick a device id and kind for the remote panel.", "error")
+    if not device_id:
+        flash("Pick a device id for the remote panel.", "error")
         return redirect(url_for("auth.relay_index"))
+    # kind + panel are optional: the panel reports its model + geometry at
+    # pairing, so home fills in anything left blank here.
     try:
         code, _expires = mint_remote_panel_code(
             settings_store(), device_id=device_id, kind=kind, name=name, panel=panel or None

@@ -153,9 +153,10 @@ class RelayClient:
         expires = data.get("expires_at")
         return code, expires if isinstance(expires, str) else ""
 
-    def pending_pairings(self) -> list[dict[str, str]]:
+    def pending_pairings(self) -> list[dict[str, Any]]:
         """``GET pair/pending``. Each entry is ``{code, panel_pubkey}`` awaiting
-        completion by this install."""
+        completion by this install, plus the panel's optional self-report
+        (``panel_w``, ``panel_h``, ``model``) when it sent one."""
         status, _h, raw = _call(
             "GET",
             self._install_url("/pair/pending"),
@@ -164,7 +165,7 @@ class RelayClient:
         )
         data = _json(status, raw)
         pending = data.get("pending")
-        out: list[dict[str, str]] = []
+        out: list[dict[str, Any]] = []
         if isinstance(pending, list):
             for item in pending:
                 if (
@@ -172,7 +173,14 @@ class RelayClient:
                     and isinstance(item.get("code"), str)
                     and isinstance(item.get("panel_pubkey"), str)
                 ):
-                    out.append({"code": item["code"], "panel_pubkey": item["panel_pubkey"]})
+                    entry: dict[str, Any] = {
+                        "code": item["code"],
+                        "panel_pubkey": item["panel_pubkey"],
+                    }
+                    for key in ("panel_w", "panel_h", "model", "gamut"):
+                        if item.get(key) is not None:
+                            entry[key] = item[key]
+                    out.append(entry)
         return out
 
     def complete_pairing(

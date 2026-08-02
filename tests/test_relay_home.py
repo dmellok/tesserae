@@ -247,6 +247,59 @@ def test_poller_pulls_relay_status_into_heartbeat_pipeline(
     assert len(calls) == 2
 
 
+def test_pairing_poller_uses_panel_self_report_when_slot_blank(
+    registries: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    devices, renderers, data_root = registries
+    settings = SettingsStore(tmp_path / "settings.json")
+    home_priv, _home_pub = generate_keypair()
+    # Slot carries only the device id: no kind, no panel dims.
+    settings.patch_section(
+        RELAY_SECTION,
+        {
+            "enabled": True,
+            "install_id": "i1",
+            "publisher_token_secret": "p",
+            "install_privkey_secret": b64u_encode(home_priv),
+            "pending_pairings": {"CODE": {"device_id": "parents_panel"}},
+        },
+    )
+    _panel_priv, panel_pub = generate_keypair()
+
+    class _Client:
+        completed: list[Any] = []
+
+        def pending_pairings(self) -> Any:
+            # The panel reported its geometry + kind at pairing.
+            return [
+                {
+                    "code": "CODE",
+                    "panel_pubkey": b64u_encode(panel_pub),
+                    "panel_w": 800,
+                    "panel_h": 480,
+                    "model": "esp32_client",
+                    "gamut": "waveshare_e6",
+                }
+            ]
+
+        def complete_pairing(self, **kw: Any) -> None:
+            self.completed.append(kw)
+
+    monkeypatch.setattr("app.relay_pairing.build_client", lambda _cfg: _Client())
+
+    poller = RelayPairingPoller(
+        devices=devices, renderers=renderers, data_root=data_root, settings=settings, run_async=False
+    )
+    assert poller.poll_once() == 1
+
+    device = devices.get("parents_panel")
+    assert device is not None
+    assert device.transport == "relay"
+    assert device.kind_of == "esp32_client"  # resolved from the panel's model
+    assert device.panel["w"] == 800 and device.panel["h"] == 480  # from the panel's geometry
+    assert device.panel.get("gamut") == "waveshare_e6"  # from the panel's self-report
+
+
 def test_pairing_poller_noops_when_not_linked(tmp_path: Path) -> None:
     settings = SettingsStore(tmp_path / "settings.json")
     poller = RelayPairingPoller(

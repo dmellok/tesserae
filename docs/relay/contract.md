@@ -108,11 +108,22 @@ POST /v1/i/<install>/pair/codes            (publisher)
 → 201 { "code": "<6+ chars>", "expires_at": "<iso8601>" }
 
 POST /v1/pair                              (unauthenticated)
-Body: { "code": "<code>", "panel_pubkey": "<base64url X25519>" }
+Body: { "code": "<code>", "panel_pubkey": "<base64url X25519>",
+        "panel_w": <int?>, "panel_h": <int?>, "model": "<kind id?>",
+        "gamut": "<gamut id?>" }
 → 202 { "status": "pending" }   (unknown/expired code → 404 pairing_expired)
 
+`panel_w` / `panel_h` / `model` / `gamut` are an **optional self-report**: the
+panel tells home its geometry, device kind, and colour gamut so the operator
+doesn't have to pre-enter them. Home uses them to fill in anything the pairing
+slot left blank (slot wins when both are present). `model` is a Tesserae
+device-kind id (e.g. `esp32_client`), and home falls back to that default when
+neither names a valid kind; `gamut` is a Tesserae gamut id (e.g. `waveshare_e6`,
+`mono`) and matters for correct colour on non-mono panels.
+
 GET  /v1/i/<install>/pair/pending          (publisher)
-→ 200 { "pending": [ { "code": "…", "panel_pubkey": "…" } ] }
+→ 200 { "pending": [ { "code": "…", "panel_pubkey": "…", "panel_w": <int?>,
+                       "panel_h": <int?>, "model": "<id?>", "gamut": "<id?>" } ] }
 
 POST /v1/i/<install>/pair/<code>/complete  (publisher)
 Body: { "device_id": "<id>", "device_token": "<token>",
@@ -228,7 +239,9 @@ sealed (hex)  = 00112233445566778899aabb4fa3210211222b8aa47f010d2a30fc71c
 ## Firmware responsibilities
 
 1. Accept a relay base URL + pairing code (captive portal / companion app).
-2. Generate an X25519 keypair; `POST /v1/pair { code, panel_pubkey }`; poll
+2. Generate an X25519 keypair; `POST /v1/pair { code, panel_pubkey }`, and
+   include your `panel_w`, `panel_h`, and `model` (a Tesserae kind id such as
+   `esp32_client`) so the operator doesn't have to pre-enter them. Poll
    `GET /v1/pair/<code>` until `ready`. The `ready` response carries
    `install_id` + `device_id`, which scope every later route
    (`/v1/i/<install_id>/d/<device_id>/…`).
