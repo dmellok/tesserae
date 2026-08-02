@@ -233,6 +233,7 @@ async function pairStatus(env, code) {
   const c = pending.completion;
   return json({
     status: "ready",
+    install_id: ref.install_id, // panel needs this to address its mailbox
     home_pubkey: c.home_pubkey,
     device_token: c.device_token,
     device_id: c.device_id,

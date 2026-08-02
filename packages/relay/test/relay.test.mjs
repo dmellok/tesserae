@@ -98,6 +98,8 @@ test("full rendezvous + frame round-trip", async () => {
   r = await worker.fetch(req("GET", `/v1/pair/${code}`), e);
   const status = await r.json();
   assert.equal(status.status, "ready");
+  assert.equal(status.install_id, install_id); // panel needs this to build its mailbox URL
+  assert.equal(status.device_id, "panel1");
   assert.equal(status.device_token, deviceToken);
   assert.equal(status.home_pubkey, "HOMEPUB");
   assert.deepEqual(status.config, { sleep: 900 });

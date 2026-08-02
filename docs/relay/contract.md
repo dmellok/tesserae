@@ -94,8 +94,9 @@ The panel never reaches the home LAN. Pairing is brokered through the relay:
    │     { device_id, device_token, device_token_sha256,        │
    │       home_pubkey, config } │                              │
    │                            │ ◀── GET /v1/pair/<code>       │
-   │                            │ ── { home_pubkey, device_token,│
-   │                            │      device_id, config } ──▶  │
+   │                            │ ── { install_id, home_pubkey,  │
+   │                            │      device_token, device_id,  │
+   │                            │      config } ──▶             │
    │                            │ (relay drops plaintext token,  │
    │                            │  keeps only the hash)          │
 ```
@@ -120,8 +121,8 @@ Body: { "device_id": "<id>", "device_token": "<token>",
 → 200 {}
 
 GET  /v1/pair/<code>                        (unauthenticated, poll)
-→ 200 { "status": "ready", "home_pubkey": "…", "device_token": "…",
-        "device_id": "…", "config": { … } }
+→ 200 { "status": "ready", "install_id": "…", "home_pubkey": "…",
+        "device_token": "…", "device_id": "…", "config": { … } }
    or 200 { "status": "pending" }
 ```
 
@@ -228,9 +229,11 @@ sealed (hex)  = 00112233445566778899aabb4fa3210211222b8aa47f010d2a30fc71c
 
 1. Accept a relay base URL + pairing code (captive portal / companion app).
 2. Generate an X25519 keypair; `POST /v1/pair { code, panel_pubkey }`; poll
-   `GET /v1/pair/<code>` until `ready`.
-3. Derive `frame_key` from `home_pubkey`; store `relay_url`, `device_token`,
-   `frame_key` in NVS.
+   `GET /v1/pair/<code>` until `ready`. The `ready` response carries
+   `install_id` + `device_id`, which scope every later route
+   (`/v1/i/<install_id>/d/<device_id>/…`).
+3. Derive `frame_key` from `home_pubkey`; store `relay_url`, `install_id`,
+   `device_id`, `device_token`, `frame_key` in NVS.
 4. On the normal wake cadence: `GET .../frame` with `If-None-Match`; on `200`,
    `unseal` the body with `frame_key` and paint; on `304`/`204`, keep the
    current image. No long-poll in v1.
