@@ -6,6 +6,16 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Changed
+
+- **Priority now arbitrates across schedules, rotations, and timer decks on
+  the same tick** (#167). The scheduler collects all three into one fire
+  pass sorted by priority, so a higher-priority rotation or deck advance
+  beats a lower-priority schedule for the panel. Previously the three fired
+  in fixed passes and a schedule always won the tick regardless of priority.
+  Records with equal priority keep the existing landing order (rotation,
+  then deck, then schedule), so default-priority setups behave as before.
+
 ### Fixed
 
 - **Deleted canvas-born dashboards no longer resurrect after a restart.** The

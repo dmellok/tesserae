@@ -1,17 +1,20 @@
-"""Background scheduler, fires schedules whose time has come.
+"""Background scheduler: the unified timed-content engine (#167 Phase 1).
 
-Runs as a daemon thread (default tick 30 s). On each tick:
+Runs as a daemon thread (default tick 30 s). Each tick collects everything
+due to fire, rotations (anchor-cycle step transitions), timer decks (the
+same engine through an in-memory Rotation adapter), and schedules, into
+ONE list sorted ascending by (priority, kind, id) and fires them in that
+order. E-ink panels show the most recent frame, so the highest-priority
+record fires last and wins the panel; equal priorities keep the historical
+landing order (rotation, then deck, then schedule).
 
-1. Reads enabled schedules from the store
-2. Filters by type-specific rules:
+Schedule gating, by type:
    * **interval**, respects the day-of-week mask AND the time-of-day window
      AND the per-schedule cooldown (last_fired + interval_minutes)
    * **daily**  , respects the day-of-week mask, fires once per local day
      once the wall-clock time passes ``fires_at``. The first_seen guard
      suppresses backfill: enabling a 07:00 daily schedule at 11:00 doesn't
      fire today's missed 07:00, the next fire is tomorrow at 07:00.
-3. Sorts by ``priority`` (high first) and hands each due schedule to the
-   PushManager.
 
 last_fired + first_seen live in memory only. A restart resets both, which
 means a freshly-restarted Tesserae may fire an interval schedule "early"
@@ -28,6 +31,7 @@ import threading
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, time, timedelta, tzinfo
+from functools import partial
 from typing import Any
 
 from pydantic import ValidationError
@@ -487,31 +491,63 @@ class Scheduler:
         # when HA is offline.
         if self._condition_evaluator is not None:
             self._condition_evaluator.refresh_ha_states()
-        # Rotations fire FIRST so any same-tick schedule pushes land
-        # last. Reason: eink panels show the most recent frame. If a
-        # user has set up a daily schedule to override the rotation at
-        # 09:00 (priority knob), the schedule's frame ends up on the
-        # panel because rotation already fired before it.
-        for rotation, step_index in self.find_due_rotations(now):
-            self._fire_rotation(rotation, step_index, now, respect_quiet_hours=True)
         # Rejoin pass: devices manually paged away (physical button /
         # touch) whose hold has lapsed get the rotation's current page
         # pushed back, device-targeted. Without this, a rotation with a
         # long-dwell step never transitions, so a paged-away panel
-        # stayed on the manual page forever (discussion #140).
+        # stayed on the manual page forever (discussion #140). Runs
+        # before the fire pass so a same-tick fire still lands last on
+        # the panel.
         self._maybe_rejoin_rotations(now)
-        # Timer decks (Phase 1 of the rotations merge): a deck set to advance on
-        # a timer cycles its pages on a wall-clock anchor, same shape as a
-        # rotation. Fires here (before schedules) so a same-tick schedule lands
-        # last on the panel.
-        self._advance_timer_decks(now)
         # Page content refresh (discussion #140): pages carry their own
         # update cadence; re-render on it and deliver only to devices
-        # currently showing the page. Runs before schedules so a due
-        # schedule's frame still lands last on the panel.
+        # currently showing the page. Runs before the fire pass so a due
+        # record's frame still lands last on the panel.
         self._maybe_refresh_pages(now)
+        # Unified timed-content pass (#167 Phase 1): rotations, timer
+        # decks, and schedules are collected together and fired in ONE
+        # ascending sort. E-ink shows the most recent frame, so firing
+        # lowest priority first makes the highest-priority record land
+        # last and win the panel. Equal priorities keep the historical
+        # landing order (rotation, then deck, then schedule), so a
+        # default-priority daily schedule still overrides a
+        # default-priority rotation on the same tick. Previously the
+        # three fired in hard-ordered passes, so a schedule always won
+        # the tick regardless of priority, despite the models
+        # documenting priority as cross-comparable.
+        fires: list[tuple[int, int, str, Callable[[], object]]] = []
+        for rotation, step_index in self.find_due_rotations(now):
+            fires.append(
+                (
+                    rotation.priority,
+                    0,
+                    rotation.id,
+                    partial(
+                        self._fire_rotation, rotation, step_index, now, respect_quiet_hours=True
+                    ),
+                )
+            )
+        for deck, rot, picked, state in self.find_due_decks(now):
+            fires.append(
+                (
+                    rot.priority,
+                    1,
+                    deck.id,
+                    partial(self._fire_deck_advance, deck, rot, picked, state, now),
+                )
+            )
         for schedule in self.find_due(now):
-            self._fire(schedule, now, respect_quiet_hours=True)
+            fires.append(
+                (
+                    schedule.priority,
+                    2,
+                    schedule.id,
+                    partial(self._fire, schedule, now, respect_quiet_hours=True),
+                )
+            )
+        fires.sort(key=lambda entry: (entry[0], entry[1], entry[2]))
+        for _priority, _rank, _record_id, fire in fires:
+            fire()
         # Deck pre-render refresh (silent, off the tick thread).
         self._maybe_warm_decks(now)
         # Deck home card: return idle panels to the deck's home page
@@ -812,18 +848,24 @@ class Scheduler:
                         extra={"home_return_device": device_id, "page_id": home},
                     )
 
-    def _advance_timer_decks(self, now: datetime) -> None:
-        """Advance ``timer`` / ``both`` decks through their pages, with full
-        rotation parity. Each such deck is adapted to an in-memory Rotation and
-        run through the same engine rotations use: day-of-week + anchor + end_at
-        windows, per-page conditions, scheduled / priority mode, min-hold, and
-        smart-sync. Pushes only at a step transition (or a new dwell window, for a
-        keep-fresh single page), so a manual tap in ``both`` mode holds until the
-        next boundary. High-priority decks fire first; manual decks are ignored."""
+    def find_due_decks(
+        self, now: datetime | None = None
+    ) -> list[tuple[Deck, Rotation, int, StepState]]:
+        """Timer / ``both`` decks whose rotation-engine state has an eligible
+        step right now, as ``(deck, adapted_rotation, picked_step, state)``.
+
+        Each such deck is adapted to an in-memory Rotation and run through the
+        same engine rotations use: day-of-week + anchor + end_at windows,
+        per-page conditions, scheduled / priority mode. The per-device gates
+        (step transition, min-hold, smart-sync, quiet hours) live in
+        ``_fire_deck_advance`` so a multi-panel deck advances each panel
+        independently. Manual decks are ignored. Unsorted; the unified fire
+        pass in ``_tick_once`` owns the cross-record ordering."""
         if self._deck_store is None or self._deck_nav_store is None:
-            return
+            return []
+        now = now or datetime.now(UTC)
         tz = self._tz_provider()
-        pairs: list[tuple[Deck, Rotation]] = []
+        out: list[tuple[Deck, Rotation, int, StepState]] = []
         for deck in self._deck_store.all():
             if (
                 not deck.enabled
@@ -833,10 +875,8 @@ class Scheduler:
             ):
                 continue
             rot = _deck_to_rotation(deck)
-            if rot is not None:
-                pairs.append((deck, rot))
-        pairs.sort(key=lambda p: (-p[1].priority, p[1].id))
-        for deck, rot in pairs:
+            if rot is None:
+                continue
             state = _compute_step_state(rot, now, tz, forced=None)
             if state is None:
                 continue  # off-day, before the anchor, or past the end_at window
@@ -846,57 +886,71 @@ class Scheduler:
             target = rot.steps[picked].page_id
             if self._page_exists is not None and not self._page_exists(target):
                 continue
-            for device_id in deck.device_ids:
-                key = f"{deck.id}:{device_id}"
-                with self._lock:
-                    last = self._deck_last_advance.get(key)
-                    last_at = self._deck_last_advance_at.get(key)
-                if last == target:
-                    # Same page: re-fire only when a new dwell window has begun
-                    # (keep-fresh), matching a single-step rotation.
-                    if last_at is not None and last_at >= state.step_started_at.timestamp():
-                        continue
-                elif (
-                    rot.min_hold_minutes > 0
-                    and last_at is not None
-                    and now.timestamp() - last_at < rot.min_hold_minutes * 60
-                ):
-                    continue  # min-hold anti-flap
-                if rot.smart_sync and self._smart_sync_should_wait(
-                    target, rot.smart_sync_lead_s, now
-                ):
+            out.append((deck, rot, picked, state))
+        return out
+
+    def _fire_deck_advance(
+        self,
+        deck: Deck,
+        rot: Rotation,
+        picked: int,
+        state: StepState,
+        now: datetime,
+    ) -> None:
+        """Advance one timer deck's bound devices to the picked page. Pushes
+        only at a step transition (or a new dwell window, for a keep-fresh
+        single page), so a manual tap in ``both`` mode holds until the next
+        boundary, matching rotation behaviour."""
+        target = rot.steps[picked].page_id
+        for device_id in deck.device_ids:
+            key = f"{deck.id}:{device_id}"
+            with self._lock:
+                last = self._deck_last_advance.get(key)
+                last_at = self._deck_last_advance_at.get(key)
+            if last == target:
+                # Same page: re-fire only when a new dwell window has begun
+                # (keep-fresh), matching a single-step rotation.
+                if last_at is not None and last_at >= state.step_started_at.timestamp():
                     continue
-                pusher = self._push_factory()
-                quiet_check = getattr(pusher, "device_in_quiet_hours", None)
-                if callable(quiet_check) and quiet_check(device_id):
-                    continue
-                promoter = getattr(pusher, "promote_deck_page", None)
-                promoted = callable(promoter) and promoter(device_id, target)
-                if not promoted:
-                    result = pusher.push(
-                        target, device_ids={device_id}, respect_quiet_hours=True, source="deck"
-                    )
-                    if result.status == "failed":
-                        continue  # retry next tick; don't record the transition
-                self._deck_nav_store.set(device_id, deck.id, target)
-                with self._lock:
-                    self._deck_last_advance[key] = target
-                    self._deck_last_advance_at[key] = now.timestamp()
-                logger.info(
-                    "deck timer advance: device=%s deck=%s -> %s (%s)",
-                    device_id,
-                    deck.id,
-                    target,
-                    "promoted" if promoted else "pushed",
+            elif (
+                rot.min_hold_minutes > 0
+                and last_at is not None
+                and now.timestamp() - last_at < rot.min_hold_minutes * 60
+            ):
+                continue  # min-hold anti-flap
+            if rot.smart_sync and self._smart_sync_should_wait(target, rot.smart_sync_lead_s, now):
+                continue
+            pusher = self._push_factory()
+            quiet_check = getattr(pusher, "device_in_quiet_hours", None)
+            if callable(quiet_check) and quiet_check(device_id):
+                continue
+            promoter = getattr(pusher, "promote_deck_page", None)
+            promoted = callable(promoter) and promoter(device_id, target)
+            if not promoted:
+                result = pusher.push(
+                    target, device_ids={device_id}, respect_quiet_hours=True, source="deck"
                 )
-                if self._event_log is not None:
-                    self._event_log.record(
-                        type="deck",
-                        source="deck",
-                        target=deck.id,
-                        status="sent",
-                        extra={"timer_advance_device": device_id, "page_id": target},
-                    )
+                if result.status == "failed":
+                    continue  # retry next tick; don't record the transition
+            self._deck_nav_store.set(device_id, deck.id, target)
+            with self._lock:
+                self._deck_last_advance[key] = target
+                self._deck_last_advance_at[key] = now.timestamp()
+            logger.info(
+                "deck timer advance: device=%s deck=%s -> %s (%s)",
+                device_id,
+                deck.id,
+                target,
+                "promoted" if promoted else "pushed",
+            )
+            if self._event_log is not None:
+                self._event_log.record(
+                    type="deck",
+                    source="deck",
+                    target=deck.id,
+                    status="sent",
+                    extra={"timer_advance_device": device_id, "page_id": target},
+                )
 
     def _maybe_warm_decks(self, now: datetime) -> None:
         """Kick a background deck-warm pass unless one is already running, so a
