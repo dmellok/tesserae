@@ -8,6 +8,17 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Physical buttons now work on relay-paired panels** (#180). A button press
+  rides the status JSON the panel already posts to its relay mailbox
+  (`button` + `button_event_id`, the same fields as the REST status body); the
+  home instance dispatches it through the normal button pipeline when it pulls
+  the status and uploads the resulting frame for the panel's awake-window
+  re-poll. After a press the home poller drops to a fast interval for a burst
+  so follow-up presses (deck navigation) aren't collapsed by the relay's
+  latest-only status slot, and presses older than five minutes are ingested as
+  telemetry but not dispatched. No relay Worker changes; requires firmware to
+  include the two fields on button wakes.
+
 - **Offline-album playback state on the Devices card.** The server now ingests
   the collection playback report a storage-capable display sends on its
   heartbeat (state, cached/total frames, synced version) and shows it on the
@@ -16,6 +27,20 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   claimed current frame.
 
 ### Fixed
+
+- **Revoking a remote panel now actually cuts it off.** The relay Worker's
+  revoke deleted the panel's mailbox but left its token record, so a revoked
+  panel kept authenticating and saw an empty-mailbox `204` it couldn't tell
+  apart from "freshly paired" — the contract's revoked-token `401` never
+  happened. Revoke now deletes the token record (plus the pairing records
+  holding the plaintext token), so the panel's next poll is a real `401` and
+  firmware can drop its pairing unaided. Completing a pairing for a device
+  that already has a token also invalidates the old token, so a re-paired
+  panel leaves exactly one working credential.
+
+- **Deleting a relay panel from Settings → Devices now revokes its relay
+  pairing too.** Previously only the Cloud relay page's revoke button talked
+  to the relay; the plain device delete left the mailbox and token lingering.
 
 - **Large offline albums no longer overflow constrained firmware receive
   buffers.** The `/collection` manifest is now paged (at most 64 frame entries

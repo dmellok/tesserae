@@ -98,7 +98,10 @@ fields blank.
   image anyway.
 - **Relay offline:** the panel keeps its current frame and retries next wake.
 - **Revoke a panel:** removing it (or revoking its access) drops its relay
-  mailbox, and the panel stops receiving frames.
+  mailbox **and its access token**. The panel's next poll gets a `401`, which
+  firmware treats as "unpaired": it drops its stored pairing and reopens
+  setup, ready for a fresh pairing code. Deleting a relay panel from
+  Settings → Devices revokes it the same way.
 
 ## Related
 

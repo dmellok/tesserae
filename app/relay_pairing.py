@@ -21,12 +21,15 @@ mypy --strict applies to this module, see pyproject.toml.
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import threading
+import time
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from app.device_loader import DeviceRegistry
+from app.device_loader import Device, DeviceRegistry
 from app.device_service import create_instance
 from app.ota._codec import b64u_decode, b64u_encode
 from app.relay_client import RelayClient, RelayError, register_install
@@ -42,6 +45,21 @@ from app.renderer_loader import RendererRegistry
 logger = logging.getLogger(__name__)
 
 DEFAULT_INTERVAL_S: float = 30.0
+
+# Relayed button presses (#180): a press rides the status body, so its
+# worst-case age is one poll interval. Anything older than this is a press
+# the relay held while home was down/unreachable; repainting a panel (or
+# navigating a deck) for a press the user gave up on minutes ago would read
+# as a haunted display, so it's ingested as telemetry but not dispatched.
+BUTTON_MAX_AGE_S: float = 300.0
+
+# After a button-carrying status arrives the panel is inside its awake
+# window, likely being actively pressed (deck navigation is a press every
+# few seconds). Poll fast for a short burst so follow-up presses aren't
+# collapsed by the relay's latest-only status slot while we sleep out a
+# full interval.
+HOT_INTERVAL_S: float = 3.0
+HOT_WINDOW_S: float = 60.0
 
 # Kind used for a relay panel when neither the operator nor the panel's
 # self-report names one. The standard ESP32 relay client.
@@ -142,6 +160,8 @@ class RelayPairingPoller:
         # relay ``received_at`` advances, so we don't replay the same beat every
         # tick (which would spam battery history + the event log).
         self._last_status_at: dict[str, str] = {}
+        # Monotonic deadline of the fast-poll burst after a button press.
+        self._hot_until: float = 0.0
 
     def start(self) -> None:
         if not self._run_async:
@@ -151,8 +171,13 @@ class RelayPairingPoller:
     def stop(self) -> None:
         self._stop.set()
 
+    def _wait_s(self) -> float:
+        if time.monotonic() < self._hot_until:
+            return min(self._interval_s, HOT_INTERVAL_S)
+        return self._interval_s
+
     def _loop(self) -> None:
-        while not self._stop.wait(self._interval_s):
+        while not self._stop.wait(self._wait_s()):
             try:
                 self.poll_once()
             except Exception:
@@ -395,6 +420,79 @@ class RelayPairingPoller:
                 logger.exception("relay: ingesting status for %s failed", device.id)
                 continue
             self._last_status_at[device.id] = received
+            try:
+                self._ingest_interactive_fields(device, body, received)
+            except Exception:
+                logger.exception("relay: interactive status fields for %s failed", device.id)
+
+    def _ingest_interactive_fields(self, device: Device, body: str, received_at: str) -> None:
+        """Dispatch the interactive fields a REST ``/status`` body may carry,
+        for a status that arrived through the relay instead (#180): the deck
+        position report first (so a button on the same beat resolves from the
+        page actually on glass, mirroring the REST ordering), then the button
+        press through the same ButtonService path REST uses. The resulting
+        render flows out through the normal push pipeline, which the relay
+        publisher listens to, so the panel picks the new frame up on its next
+        mailbox poll inside its awake window."""
+        if self._app is None:
+            return
+        try:
+            parsed = json.loads(body)
+        except ValueError:
+            return
+        if not isinstance(parsed, dict):
+            return
+        deck_page_id = parsed.get("deck_page_id")
+        has_deck_report = isinstance(deck_page_id, str) and bool(deck_page_id.strip())
+        raw_button = parsed.get("button")
+        button = raw_button.strip() if isinstance(raw_button, str) else ""
+        if not has_deck_report and not button:
+            return
+        from app.rest_api import _ingest_deck_report, _parse_button_event_id
+
+        with self._app.app_context():
+            if has_deck_report:
+                _ingest_deck_report(device, deck_page_id)
+            if not button:
+                return
+            svc = self._app.config.get("BUTTON_SERVICE")
+            if svc is None:
+                return
+            if self._button_age_s(received_at) > BUTTON_MAX_AGE_S:
+                logger.info(
+                    "relay: dropping stale button %s for %s (relayed at %s)",
+                    button,
+                    device.id,
+                    received_at,
+                )
+                return
+            # The panel is awake and may press again; poll fast for a while.
+            self._hot_until = time.monotonic() + HOT_WINDOW_S
+            try:
+                svc.handle_button(
+                    device_id=device.id,
+                    button=button,
+                    event_id=_parse_button_event_id(parsed.get("button_event_id")),
+                )
+            except Exception:
+                logger.exception(
+                    "relay: button dispatch failed for device=%s button=%s", device.id, button
+                )
+
+    @staticmethod
+    def _button_age_s(received_at: str) -> float:
+        """Age of the relayed status, from the relay's receive stamp. An
+        absent/unparseable stamp counts as fresh: dropping a live press over
+        a formatting quirk is worse than repainting once."""
+        if not received_at:
+            return 0.0
+        try:
+            stamped = datetime.fromisoformat(received_at.replace("Z", "+00:00"))
+        except ValueError:
+            return 0.0
+        if stamped.tzinfo is None:
+            stamped = stamped.replace(tzinfo=UTC)
+        return (datetime.now(UTC) - stamped).total_seconds()
 
     def _drop_slot(self, code: str) -> None:
         cfg = relay_config(self._settings)

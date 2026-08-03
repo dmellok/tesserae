@@ -1286,6 +1286,21 @@ def devices_delete(instance_id: str) -> Response:
         if device_to_delete is not None
         else ""
     )
+    # A relay panel's mailbox + device token live on the relay, and the relay
+    # has no auto-discovery, so deleting the local instance without revoking
+    # would leave the token authenticating forever (the panel keeps polling an
+    # abandoned mailbox). Same best-effort contract as the Cloud-relay page's
+    # revoke: a relay error still removes the device locally.
+    if device_to_delete is not None and device_to_delete.transport == "relay":
+        from app.relay_client import RelayError
+        from app.relay_config import build_client, relay_config
+
+        client = build_client(relay_config(settings_store()))
+        if client is not None:
+            try:
+                client.revoke_device(instance_id)
+            except RelayError as exc:
+                current_app.logger.warning("relay revoke %s: %s", instance_id, exc)
     wipe_orphan = bool(request.form.get("wipe_orphan"))
     result = device_service.delete_instance(
         devices=devices(),

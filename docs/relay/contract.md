@@ -18,8 +18,9 @@ load-bearing.
 - **Home instance** renders locally, holds the per-device frame key, seals each
   frame, and uploads it to the relay. Outbound HTTPS only, never accepts an
   inbound connection.
-- **Relay** (Cloudflare Worker + a Durable Object per device + R2) stores the
-  latest **sealed** frame per device and brokers pairing. It authenticates both
+- **Relay** (Cloudflare Worker + R2; no Durable Object, since scheduled-poll
+  delivery has no long-poll to coordinate) stores the latest **sealed** frame
+  per device and brokers pairing. It authenticates both
   ends but is **zero-knowledge**: it holds ciphertext, both public keys, and the
   read token, never the frame key.
 - **Panel firmware** derives the frame key at pairing, polls its mailbox, and
@@ -54,6 +55,14 @@ relay stores only `sha256(token)`.
 
 Unknown / revoked token → `401`. Token valid but for the wrong install or device
 → `403`.
+
+Revoking a device (`DELETE /v1/i/<install>/d/<device>`, publisher token)
+deletes its mailbox **and its token record**, so a revoked panel's next poll is
+a real `401`, not the empty-mailbox `204` a freshly paired panel sees. `401` is
+therefore an unambiguous "you are no longer paired" signal: firmware should
+drop its stored pairing and reopen setup rather than retry. Completing a
+pairing for a device id that already has a token likewise invalidates the
+previous token, so re-pairing a panel leaves exactly one working credential.
 
 ## Errors
 
@@ -209,6 +218,34 @@ cadence (typically alongside the frame poll). This channel is optional: without
 it, a relay device simply shows no battery / signal / firmware and an unknown
 last-seen.
 
+### Buttons over the relay
+
+A relay panel's frame GET terminates at the relay, so the REST button contract
+(`?button=<name>&button_event_id=<uint>` on the frame poll) can't reach the
+home instance. Instead, on a button wake the panel includes the same two
+fields **in the status JSON body** (exactly as the REST `/status` body-carried
+form in `docs/dev/client-protocol.md`):
+
+```json
+{ "battery": 87, "button": "a", "button_event_id": 12 }
+```
+
+The relay stores and forwards the body verbatim, as always. The home instance
+dispatches the press through its normal button pipeline when it pulls the
+status, and the resulting render arrives through the frame mailbox; the panel
+should keep polling the frame endpoint during its awake window to pick it up.
+Latency is bounded by the home poll interval (the home side polls fast for a
+burst after a press, so follow-up presses in the same awake window land
+quickly).
+
+Because the status slot is latest-only, a button-carrying post could be
+overwritten by a later idle beat before the home instance pulls it. Firmware
+should therefore repeat `button` + `button_event_id` unchanged on **every**
+status post of the same wake; the home side de-duplicates on the event id, so
+repeats are safe and an overwrite no longer loses the press. A monotonically
+increasing `button_event_id` is required on this path (the REST time-window
+fallback is unreliable over a polled relay).
+
 The status POST's response carries the current config etag when a config doc
 exists (see below), so a firmware that posts status learns about a config
 change without an extra request:
@@ -300,6 +337,13 @@ sealed (hex)  = 00112233445566778899aabb4fa3210211222b8aa47f010d2a30fc71c
    (sleep interval, button wake, button map — same fields as a REST status
    response's `config` block), and store the new etag. Optional: a firmware
    that skips this simply keeps its pairing-time config.
+7. On a button wake, include `button` + `button_event_id` in the status body
+   (see "Buttons over the relay" above), repeat them on every status post of
+   that wake, and keep polling `GET .../frame` through the awake window so the
+   resulting render is painted.
+8. Treat a `401` from any device-token route as "this pairing was revoked":
+   drop the stored pairing (token, frame key, install/device ids) and reopen
+   setup. Don't factory-reset anything else, and don't retry the token.
 
 The panel talks only to the relay in steady state; it never needs the home
 instance's address.

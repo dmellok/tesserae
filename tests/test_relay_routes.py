@@ -134,3 +134,39 @@ def test_revoke_removes_device(app_with_gate: Flask, monkeypatch: pytest.MonkeyP
     )
     assert resp.status_code == 302
     assert devices.get("parents_panel") is None
+
+
+def test_devices_delete_revokes_relay_pairing(
+    app_with_gate: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Deleting a relay panel from Settings → Devices (not the Cloud relay
+    # page) must still revoke the relay pairing, or the mailbox + device
+    # token linger on the relay forever.
+    from app import device_service
+
+    app = app_with_gate
+    devices = app.config["DEVICE_REGISTRY"]
+    device_service.create_instance(
+        devices=devices,
+        renderers=app.config["RENDERER_REGISTRY"],
+        data_root=app.config["DEVICE_DATA_ROOT"],
+        instance_id="parents_panel",
+        kind_id="esp32_client",
+        transport="relay",
+        relay_frame_key=b64u_encode(b"\x33" * 32),
+    )
+
+    revoked: list[str] = []
+
+    class _FakeClient:
+        def revoke_device(self, device_id: str) -> None:
+            revoked.append(device_id)
+
+    monkeypatch.setattr("app.relay_config.build_client", lambda _cfg: _FakeClient())
+
+    client = app.test_client()
+    _setup(client)
+    resp = client.post("/settings/devices/parents_panel/delete", follow_redirects=False)
+    assert resp.status_code == 302
+    assert devices.get("parents_panel") is None
+    assert revoked == ["parents_panel"]

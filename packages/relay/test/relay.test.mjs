@@ -451,6 +451,128 @@ test("config mailbox: push, conditional fetch, status piggyback, revoke cleanup"
   assert.equal(await e.RELAY_BUCKET.get(`config/${install_id}/panel1.json`), null);
 });
 
+// Register an install and pair `deviceId` with `deviceToken` through the real
+// rendezvous flow (so the device back-pointer record gets written).
+async function pairDevice(e, deviceId, deviceToken, existing = null) {
+  let install_id, publisher_token;
+  if (existing) {
+    ({ install_id, publisher_token } = existing);
+  } else {
+    const r = await worker.fetch(req("POST", "/v1/install/register", { body: { install_pubkey: "PUB" } }), e);
+    ({ install_id, publisher_token } = await r.json());
+  }
+  let r = await worker.fetch(
+    req("POST", `/v1/i/${install_id}/pair/codes`, { headers: authHdr(publisher_token) }),
+    e,
+  );
+  const { code } = await r.json();
+  r = await worker.fetch(req("POST", "/v1/pair", { body: { code, panel_pubkey: "PANELPUB" } }), e);
+  assert.equal(r.status, 202);
+  r = await worker.fetch(
+    req("POST", `/v1/i/${install_id}/pair/${code}/complete`, {
+      headers: authHdr(publisher_token),
+      body: {
+        device_id: deviceId,
+        device_token: deviceToken,
+        device_token_sha256: await sha256Hex(deviceToken),
+        home_pubkey: "HOMEPUB",
+      },
+    }),
+    e,
+  );
+  assert.equal(r.status, 200);
+  return { install_id, publisher_token, code };
+}
+
+test("revoke invalidates the device token: the panel's next poll is 401, not 204", async () => {
+  const e = env();
+  const deviceToken = "revoke_dev_token";
+  const { install_id, publisher_token, code } = await pairDevice(e, "panel1", deviceToken);
+
+  // Pre-revoke the token works (empty mailbox → 204).
+  let r = await worker.fetch(req("GET", `/v1/i/${install_id}/d/panel1/frame`, { headers: authHdr(deviceToken) }), e);
+  assert.equal(r.status, 204);
+
+  r = await worker.fetch(
+    new Request(`https://relay.test/v1/i/${install_id}/d/panel1`, {
+      method: "DELETE",
+      headers: authHdr(publisher_token),
+    }),
+    e,
+  );
+  assert.equal(r.status, 200);
+
+  // The revoked token no longer authenticates anything.
+  r = await worker.fetch(req("GET", `/v1/i/${install_id}/d/panel1/frame`, { headers: authHdr(deviceToken) }), e);
+  assert.equal(r.status, 401);
+  r = await worker.fetch(
+    req("POST", `/v1/i/${install_id}/d/panel1/status`, { headers: authHdr(deviceToken), body: { battery: 50 } }),
+    e,
+  );
+  assert.equal(r.status, 401);
+  r = await worker.fetch(req("GET", `/v1/i/${install_id}/d/panel1/config`, { headers: authHdr(deviceToken) }), e);
+  assert.equal(r.status, 401);
+
+  // The token record, device record, and the pair record holding the
+  // plaintext token are all gone.
+  assert.equal(await e.RELAY_BUCKET.get(`token/${await sha256Hex(deviceToken)}.json`), null);
+  assert.equal(await e.RELAY_BUCKET.get(`device/${install_id}/panel1.json`), null);
+  assert.equal(await e.RELAY_BUCKET.get(`pair/${install_id}/${code}.json`), null);
+  assert.equal(await e.RELAY_BUCKET.get(`code/${code}.json`), null);
+});
+
+test("revoke invalidates a legacy pairing that has no device record", async () => {
+  const e = env();
+  let r = await worker.fetch(req("POST", "/v1/install/register", { body: { install_pubkey: "PUB" } }), e);
+  const { install_id, publisher_token } = await r.json();
+  // A pre-back-pointer pairing: token + completed pair record only.
+  const deviceToken = "legacy_dev_token";
+  await e.RELAY_BUCKET.put(
+    `token/${await sha256Hex(deviceToken)}.json`,
+    JSON.stringify({ install_id, device_id: "panel1" }),
+  );
+  await e.RELAY_BUCKET.put(
+    `pair/${install_id}/OLDCODE1.json`,
+    JSON.stringify({
+      code: "OLDCODE1",
+      expires_at: "2020-01-01T00:00:00Z",
+      panel_pubkey: "PANELPUB",
+      completion: { home_pubkey: "HOMEPUB", device_token: deviceToken, device_id: "panel1", config: {} },
+    }),
+  );
+
+  r = await worker.fetch(
+    new Request(`https://relay.test/v1/i/${install_id}/d/panel1`, {
+      method: "DELETE",
+      headers: authHdr(publisher_token),
+    }),
+    e,
+  );
+  assert.equal(r.status, 200);
+  r = await worker.fetch(req("GET", `/v1/i/${install_id}/d/panel1/frame`, { headers: authHdr(deviceToken) }), e);
+  assert.equal(r.status, 401);
+  assert.equal(await e.RELAY_BUCKET.get(`token/${await sha256Hex(deviceToken)}.json`), null);
+});
+
+test("re-pairing a device invalidates its previous token", async () => {
+  const e = env();
+  const first = await pairDevice(e, "panel1", "old_dev_token");
+  await pairDevice(e, "panel1", "new_dev_token", first);
+  const { install_id } = first;
+
+  // Old token is dead, new one works.
+  let r = await worker.fetch(
+    req("GET", `/v1/i/${install_id}/d/panel1/frame`, { headers: authHdr("old_dev_token") }),
+    e,
+  );
+  assert.equal(r.status, 401);
+  r = await worker.fetch(
+    req("GET", `/v1/i/${install_id}/d/panel1/frame`, { headers: authHdr("new_dev_token") }),
+    e,
+  );
+  assert.equal(r.status, 204);
+});
+
 async function sha256Hex(text) {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");

@@ -17,8 +17,11 @@
  *   code/<code>.json                   { install_id, expires_at }
  *   pair/<install_id>/<code>.json      { code, expires_at, panel_pubkey?, completion? }
  *   token/<device_token_sha256>.json   { install_id, device_id }
+ *   device/<install_id>/<device_id>.json         { token_sha256, code }
  *   frame/<install_id>/<device_id>/latest.json   { etag, blob_key, meta }
  *   frame/<install_id>/<device_id>/<digest>.bin  sealed frame bytes
+ *   config/<install_id>/<device_id>.json | .bin  { etag } + sealed config doc
+ *   status/<install_id>/<device_id>.json         { body, received_at }
  */
 
 const CODE_TTL_MS = 10 * 60 * 1000;
@@ -240,11 +243,21 @@ async function completePairing(env, request, installId, code) {
   if (!pending) return fail("not_found", "no such pairing", 404);
   pending.completion = { home_pubkey, device_token, device_id, config: config || {} };
   await putJson(env, key, pending);
-  // Store the token hash the device will authenticate future polls with.
+  // Re-pairing mints a fresh token; the one it replaces must stop
+  // authenticating, or a lost/compromised panel keeps a working credential.
+  const deviceKey = `device/${installId}/${device_id}.json`;
+  const previous = await getJson(env, deviceKey);
+  if (previous?.token_sha256 && previous.token_sha256 !== device_token_sha256) {
+    await env.RELAY_BUCKET.delete(`token/${previous.token_sha256}.json`);
+  }
+  // Store the token hash the device will authenticate future polls with,
+  // plus a per-device back-pointer to it so revoke can find the record
+  // (token keys are hashes; there's no way to derive one from a device id).
   await putJson(env, `token/${device_token_sha256}.json`, {
     install_id: installId,
     device_id,
   });
+  await putJson(env, deviceKey, { token_sha256: device_token_sha256, code });
   track(env, "mailbox_created", installId, device_id);
   return json({});
 }
@@ -385,6 +398,28 @@ async function getDeviceStatus(env, request, installId, deviceId) {
 
 async function revokeDevice(env, request, installId, deviceId) {
   if (!(await requirePublisher(env, request, installId))) return fail("unauthorized", "", 401);
+  // Invalidate the device token first so the panel's next poll gets the
+  // contract's revoked-token 401 instead of an empty-mailbox 204 it can't
+  // tell apart from "freshly paired, nothing published yet". The 401 is
+  // what lets firmware drop its pairing on its own.
+  const deviceRec = await getJson(env, `device/${installId}/${deviceId}.json`);
+  if (deviceRec?.token_sha256) {
+    await env.RELAY_BUCKET.delete(`token/${deviceRec.token_sha256}.json`);
+  }
+  await env.RELAY_BUCKET.delete(`device/${installId}/${deviceId}.json`);
+  // This device's pair records hold the completion (with the plaintext token
+  // the panel fetched at pairing): drop them and any token hash they resolve
+  // to. Also covers devices paired before the device back-pointer existed.
+  const pairs = await env.RELAY_BUCKET.list({ prefix: `pair/${installId}/` });
+  for (const item of pairs.objects) {
+    const rec = await getJson(env, item.key);
+    if (rec?.completion?.device_id !== deviceId) continue;
+    if (rec.completion.device_token) {
+      await env.RELAY_BUCKET.delete(`token/${await sha256Hex(rec.completion.device_token)}.json`);
+    }
+    if (rec.code) await env.RELAY_BUCKET.delete(`code/${rec.code}.json`);
+    await env.RELAY_BUCKET.delete(item.key);
+  }
   const listed = await env.RELAY_BUCKET.list({ prefix: `frame/${installId}/${deviceId}/` });
   await Promise.all(listed.objects.map((o) => env.RELAY_BUCKET.delete(o.key)));
   await env.RELAY_BUCKET.delete(`status/${installId}/${deviceId}.json`);

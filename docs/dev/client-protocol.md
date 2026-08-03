@@ -546,10 +546,19 @@ same event on both endpoints is deduped server-side against
 `button` is the button name; `button_event_id` is a monotonically
 increasing uint the firmware maintains per device (persist across
 deep sleep, e.g. in NVS). Retries send the same id, and the server
-treats any incoming id `<= last processed` as a duplicate. A
-firmware without a monotonic counter can omit `button_event_id` and
-fall back to the server's time-window debounce (default 3 seconds,
-overridable via `settings.app.button_debounce_s`).
+treats an id equal to the last processed one as a duplicate (a
+*lower* id is taken as a counter restart after a power cycle and
+still dispatches). A firmware without a monotonic counter can omit
+`button_event_id` and fall back to the server's time-window
+debounce (default 3 seconds, overridable via
+`settings.app.button_debounce_s`).
+
+This status-body form is also the **only** button path for a
+relay-paired panel (its frame poll terminates at the relay, so
+frame query parameters never reach the server). Over the relay,
+repeat `button` + `button_event_id` unchanged on every status post
+of the same wake, and treat the event id as required; see "Buttons
+over the relay" in `docs/relay/contract.md`.
 
 **Response** (`200 OK`):
 ```json

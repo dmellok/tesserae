@@ -4,6 +4,7 @@ publisher, and the rendezvous pairing poller (ECDH tying both sides together).""
 from __future__ import annotations
 
 import json
+from datetime import UTC
 from pathlib import Path
 from typing import Any
 
@@ -717,3 +718,122 @@ def test_relay_tab_links_each_panel_to_its_device_card(relay_app: Any) -> None:
     html = client.get("/settings/relay").get_data(as_text=True)
     assert "#device-parents_panel" in html
     assert "Configure" in html
+
+
+# --- relayed button presses (#180) -----------------------------------------
+
+
+def _button_poller(
+    registries: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, status: dict[str, Any]
+) -> tuple[Any, list[dict[str, Any]], list[dict[str, Any]]]:
+    """A poller wired to a minimal real Flask app (button dispatch enters an
+    app context) with a recording ButtonService, pulling ``status`` from a
+    stubbed relay client."""
+    from flask import Flask
+
+    devices, renderers, data_root = registries
+    device_service.create_instance(
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="parents_panel",
+        kind_id="esp32_client",
+        transport="relay",
+        relay_frame_key=b64u_encode(b"\x44" * 32),
+    )
+
+    class _StatusClient:
+        def get_device_status(self, _id: str) -> Any:
+            return status
+
+    monkeypatch.setattr("app.relay_pairing.build_client", lambda _cfg: _StatusClient())
+    heartbeats: list[dict[str, Any]] = []
+    monkeypatch.setattr(
+        "app.transport_wiring.record_status_heartbeat",
+        lambda **kw: heartbeats.append(kw),
+    )
+
+    presses: list[dict[str, Any]] = []
+
+    class _FakeButtonService:
+        def handle_button(self, *, device_id: str, button: str, event_id: Any = None) -> None:
+            presses.append({"device_id": device_id, "button": button, "event_id": event_id})
+
+    flask_app = Flask("relay-button-test")
+    flask_app.config.update(
+        {"DEVICE_STATUS": {}, "EVENT_LOG": object(), "BUTTON_SERVICE": _FakeButtonService()}
+    )
+    poller = RelayPairingPoller(
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        settings=SettingsStore(tmp_path / "settings.json"),
+        app=flask_app,
+        run_async=False,
+    )
+    return poller, presses, heartbeats
+
+
+def test_poller_dispatches_relayed_button_through_button_service(
+    registries: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from datetime import datetime
+
+    from app.relay_pairing import HOT_INTERVAL_S
+
+    status = {
+        "body": '{"battery":87,"button":"a","button_event_id":"12"}',
+        "received_at": datetime.now(UTC).isoformat(),
+    }
+    poller, presses, heartbeats = _button_poller(registries, tmp_path, monkeypatch, status)
+
+    assert poller._wait_s() == pytest.approx(30.0)  # no hot window yet
+    poller.poll_once()
+    # The press went through the same ButtonService path REST uses, with the
+    # event id parsed like the REST layer parses it (numeric string ok).
+    assert presses == [{"device_id": "parents_panel", "button": "a", "event_id": 12}]
+    # The heartbeat itself was still ingested as telemetry.
+    assert len(heartbeats) == 1
+    # The panel is awake: the poller drops to the fast interval for a burst.
+    assert poller._wait_s() == pytest.approx(HOT_INTERVAL_S)
+
+    # Same received_at → deduped upstream, no re-dispatch.
+    poller.poll_once()
+    assert len(presses) == 1
+
+    # A re-post in the awake window (same event id, new received_at) is passed
+    # through again; the ButtonService's event-id dedup owns idempotency.
+    status["received_at"] = datetime.now(UTC).isoformat()
+    poller.poll_once()
+    assert len(presses) == 2
+    assert presses[1]["event_id"] == 12
+
+
+def test_poller_drops_stale_relayed_button_but_keeps_heartbeat(
+    registries: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    status = {
+        "body": '{"battery":87,"button":"a","button_event_id":5}',
+        "received_at": "2020-01-01T00:00:00.000Z",
+    }
+    poller, presses, heartbeats = _button_poller(registries, tmp_path, monkeypatch, status)
+    poller.poll_once()
+    assert presses == []  # too old to repaint for
+    assert len(heartbeats) == 1  # telemetry still flows
+    assert poller._wait_s() == pytest.approx(30.0)  # no hot window for a dropped press
+
+
+def test_poller_ignores_buttonless_and_malformed_status_bodies(
+    registries: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    status: dict[str, Any] = {"body": "not json{", "received_at": "2026-08-02T00:00:00Z"}
+    poller, presses, heartbeats = _button_poller(registries, tmp_path, monkeypatch, status)
+    poller.poll_once()
+
+    status["body"] = '{"battery":87}'
+    status["received_at"] = "2026-08-02T00:01:00Z"
+    poller.poll_once()
+
+    assert presses == []
+    assert len(heartbeats) == 2  # both bodies ingested as heartbeats
+    assert poller._wait_s() == pytest.approx(30.0)

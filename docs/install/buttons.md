@@ -91,10 +91,26 @@ normally on the next timer wake.
 ## Duplicate presses are dropped
 
 Firmware retries on network flakiness are common. Every event carries
-a monotonically increasing `button_event_id`; the server treats any
-incoming id `<= last processed` as a retry and no-ops. Firmwares
-without a counter fall back to the same-button-within-3-seconds
-window (overridable via `settings.app.button_debounce_s`).
+a monotonically increasing `button_event_id`; the server treats an id
+equal to the last processed one as a retry and no-ops (a lower id
+reads as a counter restart after a power cycle and still dispatches).
+Firmwares without a counter fall back to the
+same-button-within-3-seconds window (overridable via
+`settings.app.button_debounce_s`).
+
+## Buttons on remote (relay) panels
+
+Buttons work on relay-paired panels too. The press rides the panel's
+relayed status report instead of the frame request, so the round trip
+is store-and-forward: the home instance picks the press up on its
+next relay poll (within ~30 seconds, then faster for follow-up
+presses while the panel stays awake), renders, and uploads the new
+frame for the panel to fetch before it goes back to sleep. Expect
+seconds of latency rather than the instant response of a local
+panel; presses older than a few minutes (for example if the home
+instance was offline) are dropped rather than replayed. Firmware
+requirements are in the
+[Cloud relay contract](../relay/contract.md).
 
 ## Seeing button events on the History page
 
