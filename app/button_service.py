@@ -48,7 +48,7 @@ from app.button_actions import (
 )
 from app.device_loader import DeviceRegistry
 from app.push import PushManager, PushResult
-from app.scheduler import RotationSource
+from app.scheduler import RotationSource, _deck_to_rotation
 from app.state.deck_model import Deck
 from app.state.deck_nav_store import DeckNavStore
 from app.state.deck_store import DeckStore
@@ -1831,16 +1831,42 @@ class ButtonService:
     def _resolve_rotation(self, device_id: str) -> Rotation | None:
         """Pick the highest-priority enabled rotation this device is
         bound to. Ties broken by earliest id lexicographically for
-        determinism."""
+        determinism.
+
+        #167 Phase 4: when no rotation is bound, a TIMED deck the device is
+        bound to steps in, adapted through the same mapping the scheduler's
+        engine uses. The rotate_next / rotate_prev / step:<n> actions,
+        manual holds, and the /frame rotation envelope then work on it
+        unchanged (the envelope's rotation_id carries the deck id).
+        Arbitration matches the fire pass: highest ``advance_priority``
+        wins, ties by id. Manual decks stay graph-only, and a ``both`` deck
+        reaches here exactly when the pressed button has no link on the
+        current page, which finally gives it a working rotate_next."""
         matches = [
             r
             for r in self._rotations.all()
             if r.enabled and r.steps and self._rotation_targets_device(r, device_id)
         ]
-        if not matches:
+        if matches:
+            matches.sort(key=lambda r: (-r.priority, r.id))
+            return matches[0]
+        if self._decks is None:
             return None
-        matches.sort(key=lambda r: (-r.priority, r.id))
-        return matches[0]
+        timed = [
+            d
+            for d in self._decks.all()
+            if d.enabled
+            and d.legacy_kind is None
+            and d.advance != "manual"
+            and d.pages
+            and device_id in d.device_ids
+        ]
+        timed.sort(key=lambda d: (-d.advance_priority, d.id))
+        for deck in timed:
+            adapted = _deck_to_rotation(deck)
+            if adapted is not None:
+                return adapted
+        return None
 
     def _rotation_targets_device(self, rotation: Rotation, device_id: str) -> bool:
         """Whether a rotation drives this device. An explicit ``device_ids``

@@ -8,6 +8,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Physical buttons now work on timer decks** (#167). `rotate_next`,
+  `rotate_prev`, and `step:<n>` act on the device's bound timed deck when
+  no rotation targets it, with the same manual-hold behaviour rotations
+  have; the hold lasts until the deck's next dwell boundary. A `both`-mode
+  deck now responds to rotate presses that don't match a page link
+  (previously a silent no-op), and the `/frame` rotation envelope reports
+  the deck's position so firmware stays informed. When several timed decks
+  are bound, the highest `advance_priority` wins.
+
 - **Timer decks can now fire on schedule-style triggers** (#167). Besides the
   classic anchor cycle, a deck's timer advance supports an `interval` trigger
   (cooldown floor since the last fire, optional wrap-around time-of-day
