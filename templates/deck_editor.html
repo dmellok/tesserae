@@ -42,9 +42,9 @@
         {# Advance: segmented control + conditional interval + hint. #}
         <div class="dxe-advance">
           <span class="dxe-mono-label">ADVANCE</span>
-          {% set adv = deck.advance if deck else 'manual' %}
+          {% set adv = deck.advance if deck else advance_default %}
           <div class="dxe-seg-track" role="radiogroup" aria-label="Advance mode">
-            <label class="dxe-seg"><input type="radio" name="advance" value="manual" {% if adv == 'manual' %}checked{% endif %}><span>On tap</span></label>
+            <label class="dxe-seg"><input type="radio" name="advance" value="manual" {% if adv == 'manual' %}checked{% endif %}><span>By hand</span></label>
             <label class="dxe-seg"><input type="radio" name="advance" value="timer" {% if adv == 'timer' %}checked{% endif %}><span>On a timer</span></label>
             <label class="dxe-seg"><input type="radio" name="advance" value="both" {% if adv == 'both' %}checked{% endif %}><span>Both</span></label>
           </div>
@@ -112,8 +112,37 @@
                      {% if deck and deck.advance_smart_sync %}checked{% endif %}> Smart sync</label>
               <p class="dxe-help">render just before a battery panel wakes</p>
             </div>
+            <div class="dxe-set">
+              <label class="dxe-mono-label" for="dxe-lead">RENDER LEAD (S)</label>
+              <input type="number" id="dxe-lead" name="advance_smart_sync_lead_s" min="0" max="600"
+                     value="{{ deck.advance_smart_sync_lead_s if deck else 10 }}">
+              <p class="dxe-help">how early before the predicted wake to render</p>
+            </div>
           </div>
         </details>
+
+        {# Per-page conditions (#167 consolidation): the only place these are
+           authored now that the cycle form is gone. Rendered for saved decks;
+           a brand-new deck saves first, then conditions appear here. #}
+        {% if deck and deck.pages %}
+        <details class="dxe-advanced">
+          <summary>Page conditions</summary>
+          <div class="dxe-advanced-body">
+            <p class="dxe-help">Show a page only while its conditions pass. In
+              scheduled mode the cycle skips a failing page; in priority mode
+              the first passing page wins. Empty = always shown.</p>
+            {% for dp in deck.pages %}
+            <div class="dxe-set">
+              <label class="dxe-mono-label">{{ page_names.get(dp.page_id, dp.page_id) | upper }}</label>
+              <div class="condition-picker" data-condition-picker>
+                <textarea name="conditions[{{ dp.page_id }}]" rows="2" spellcheck="false"
+                          placeholder="[]">{% if dp.conditions %}{{ dp.conditions | tojson(indent=2) }}{% endif %}</textarea>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </details>
+        {% endif %}
 
         <div class="dxe-rail" id="dxe-rail"></div>
         <div class="dxe-panel" id="dxe-panel" hidden></div>
@@ -216,4 +245,5 @@
   </div>
 </div>
 <script src="{{ url_for('static', filename='deck_editor.js') }}" defer></script>
+<script type="module" src="{{ url_for('static', filename='condition-picker.js') }}"></script>
 {% endblock %}

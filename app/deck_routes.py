@@ -271,7 +271,7 @@ def _unified_cards(
                 ],
                 "fire_url": url_for("rotations.fire", rotation_id=r.id),
                 "sync_url": None,
-                "edit_url": url_for("decks.index", redit=r.id) + "#rotation-edit-card",
+                "edit_url": url_for("decks.editor", deck_id=r.id),
                 "toggle_url": url_for("rotations.toggle", rotation_id=r.id),
                 "delete_url": url_for("rotations.delete", rotation_id=r.id),
             }
@@ -330,7 +330,7 @@ def index() -> str:
     # sections (their old pages redirect here), fed from the same helpers
     # their standalone pages used, with prefixed context names so the two
     # sections can't collide.
-    from app.rotation_routes import _build_projection, _current_step_for_each, _devices_for_page
+    from app.rotation_routes import _current_step_for_each
     from app.rotation_routes import _running_state_view as _rotation_state_view
     from app.schedule_routes import (
         _build_timeline,
@@ -364,30 +364,6 @@ def index() -> str:
     except ValueError:
         prefill_interval = None
 
-    def _dwell(token: str) -> int:
-        try:
-            return max(1, min(10_080, int(token)))
-        except ValueError:
-            return 15
-
-    # Per-dashboard display times: wz_dwells is a comma list aligned with
-    # wz_pages; the older single wz_dwell applies to every page. Short
-    # lists pad with their last value.
-    dwell_tokens = [t for t in request.args.get("wz_dwells", "").split(",") if t.strip()]
-    dwells = [_dwell(t) for t in dwell_tokens] or [_dwell(request.args.get("wz_dwell", ""))]
-    known_page_ids = {p.id for p in pages}
-    wizard_steps = [
-        {
-            "page_id": pid,
-            "dwell_minutes": dwells[min(i, len(dwells) - 1)],
-            "conditions": [],
-        }
-        for i, pid in enumerate(
-            s.strip()
-            for s in request.args.get("wz_pages", "").split(",")
-            if s.strip() in known_page_ids
-        )
-    ]
     schedules = current_app.config["SCHEDULE_STORE"].all()
     rotations = current_app.config["ROTATION_STORE"].all()
     scheduler = current_app.config["SCHEDULER"]
@@ -450,14 +426,6 @@ def index() -> str:
         prefill_interval=prefill_interval,
         prefill_fires_at_dt=prefill_fires_at_dt,
         prefill_name=prefill_name,
-        wizard_steps=wizard_steps,
-        # -- rotations section --------------------------------------------
-        rotations=rotations,
-        page_devices=_devices_for_page(pages),
-        current_step=current_step,
-        rotation_edit_id=request.args.get("redit"),
-        projections={r.id: _build_projection(r) for r in rotations},
-        rotation_running_states=rotation_pills,
         show_migration_notice=migration_notice_visible(),
     )
 
@@ -637,6 +605,8 @@ def editor(deck_id: str | None = None) -> str | Response:
     for sd in suggest_decks(pages, [d for d in _store().all() if deck is None or d.id != deck.id]):
         suggestions.append({"name": sd.name, "page_ids": [pg.page_id for pg in sd.pages]})
 
+    # "New timer cycle" entry point preselects timer advance (#167).
+    advance_default = "timer" if request.args.get("mode") == "timer" else "manual"
     member_ids = [p.page_id for p in deck.pages] if deck else []
     override_map = (
         {
@@ -667,7 +637,7 @@ def editor(deck_id: str | None = None) -> str | Response:
         "devices": device_meta,
         "primaryDevice": (deck.device_ids[0] if deck and deck.device_ids else ""),
         # Timer advance (Phase 1 of the rotations merge).
-        "advance": deck.advance if deck else "manual",
+        "advance": deck.advance if deck else advance_default,
         "advanceInterval": deck.advance_interval_minutes if deck else 30,
         "advanceAnchor": deck.advance_anchor if deck else "00:00",
         "dwells": dwell_map,
@@ -690,6 +660,8 @@ def editor(deck_id: str | None = None) -> str | Response:
         override_map=override_map,
         dwell_map=dwell_map,
         editor_state=editor_state,
+        advance_default=advance_default,
+        page_names={p.id: p.name for p in pages},
     )
 
 
@@ -744,9 +716,23 @@ def editor_save() -> Response:
         {p.page_id: p.refresh_interval_minutes for p in existing.pages} if existing else {}
     )
     old_dwell = {p.page_id: p.dwell_minutes for p in existing.pages} if existing else {}
-    # Per-page conditions aren't authored in the editor yet; preserve whatever a
-    # migrated rotation or the MCP set so a re-save doesn't drop them.
+    # Per-page conditions are authored in the editor's Page-conditions fold
+    # (#167 consolidation); an absent field preserves the stored value so
+    # older forms and partial submits never drop them.
     old_conditions = {p.page_id: p.conditions for p in existing.pages} if existing else {}
+
+    def _page_conditions(pid: str) -> list[Any]:
+        raw = form.get(f"conditions[{pid}]")
+        if raw is None:
+            return list(old_conditions.get(pid, []))
+        text = raw.strip()
+        if not text:
+            return []
+        try:
+            parsed = json.loads(text)
+        except json.JSONDecodeError:
+            return list(old_conditions.get(pid, []))
+        return parsed if isinstance(parsed, list) else list(old_conditions.get(pid, []))
 
     pages: list[DeckPage] = []
     for pid in ordered:
@@ -765,15 +751,24 @@ def editor_save() -> Response:
                 dwell = max(1, min(10_080, int(raw_dwell)))
         elif raw_dwell == "":
             dwell = None
-        pages.append(
-            base.model_copy(
-                update={
-                    "refresh_interval_minutes": refresh,
-                    "dwell_minutes": dwell,
-                    "conditions": old_conditions.get(pid, []),
-                }
+        # model_validate (not model_copy) so authored conditions are checked
+        # NOW and bad input flashes, instead of poisoning the stored record.
+        try:
+            pages.append(
+                DeckPage.model_validate(
+                    {
+                        **base.model_dump(mode="json", exclude_none=True),
+                        "refresh_interval_minutes": refresh,
+                        "dwell_minutes": dwell,
+                        "conditions": _page_conditions(pid),
+                    }
+                )
             )
-        )
+        except ValidationError as exc:
+            flash(f"Invalid page {pid!r}: {_first_error(exc)}", "error")
+            return redirect(
+                url_for("decks.editor", deck_id=deck_id) if existing else url_for("decks.index")
+            )
 
     home = (form.get("home") or "").strip() or None
     if home is not None and home not in ordered:

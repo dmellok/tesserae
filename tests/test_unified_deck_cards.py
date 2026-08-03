@@ -90,7 +90,7 @@ def test_cycle_card_wires_play_fire_toggle_delete(app: Flask) -> None:
     assert "/rotations/loop/play/0" in body and "/rotations/loop/play/1" in body
     assert "/rotations/loop/toggle" in body
     assert "/rotations/loop/delete" in body
-    assert "redit=loop" in body  # edit deep-link
+    assert "/decks/loop/edit" in body  # one editor for every shape (#167)
 
 
 def test_send_card_wires_schedule_endpoints_and_next_fire(app: Flask) -> None:
@@ -104,13 +104,19 @@ def test_send_card_wires_schedule_endpoints_and_next_fire(app: Flask) -> None:
     assert "Fires Kitchen every 30 min" in body
 
 
-def test_edit_deeplinks_expand_the_matching_form(app: Flask) -> None:
+def test_edit_paths_open_the_right_editor(app: Flask) -> None:
     _seed_all_shapes(app)
     client = app.test_client()
     _sign_in(client)
-    body = client.get("/decks?redit=loop").get_data(as_text=True)
-    assert 'id="rotation-edit-card"' in body
-    assert "Edit Kitchen loop" in body
+    # Cycles edit in the deck editor (the one editor for every shape),
+    # including the per-page conditions fold and the old-URL deep link.
+    body = client.get("/decks/loop/edit").get_data(as_text=True)
+    assert "Kitchen loop" in body
+    assert "Page conditions" in body
+    assert 'name="conditions[kitchen]"' in body
+    resp = client.get("/rotations?edit=loop", follow_redirects=False)
+    assert resp.status_code in (302, 303) and "/decks/loop/edit" in resp.location
+    # Timed sends keep their inline form via sedit.
     body = client.get("/decks?sedit=brief").get_data(as_text=True)
     assert 'value="Morning brief"' in body  # schedule edit form open
 
@@ -124,3 +130,52 @@ def test_disabled_state_and_summary_render(app: Flask) -> None:
     body = client.get("/decks").get_data(as_text=True)
     assert "is-disabled" in body
     assert ">Enable</span>" in body
+
+
+def test_editor_saves_per_page_conditions_and_lead(app: Flask) -> None:
+    """#167 consolidation: the deck editor is where cycle conditions live now.
+    Authored JSON persists; bad JSON falls back to the stored value instead
+    of poisoning the record."""
+    _seed_all_shapes(app)
+    client = app.test_client()
+    _sign_in(client)
+    cond = (
+        '[{"source_kind": "ha_entity", "source_id": "binary_sensor.printer",'
+        ' "operator": "==", "value": "on"}]'
+    )
+    resp = client.post(
+        "/decks/editor-save",
+        data={
+            "deck_id": "loop",
+            "name": "Kitchen loop",
+            "pages": "kitchen,hall",
+            "advance": "timer",
+            "advance_smart_sync": "on",
+            "advance_smart_sync_lead_s": "45",
+            "conditions[kitchen]": cond,
+            "conditions[hall]": "",
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code in (302, 303)
+    deck = app.config["DECK_STORE"].get("loop")
+    assert deck is not None
+    assert deck.pages[0].conditions[0].source_id == "binary_sensor.printer"
+    assert deck.pages[1].conditions == []
+    assert deck.advance_smart_sync_lead_s == 45
+    # A save omitting the fields preserves what's stored.
+    client.post(
+        "/decks/editor-save",
+        data={"deck_id": "loop", "name": "Kitchen loop", "pages": "kitchen,hall"},
+    )
+    deck = app.config["DECK_STORE"].get("loop")
+    assert deck.pages[0].conditions[0].source_id == "binary_sensor.printer"
+
+
+def test_new_timer_cycle_entry_preselects_timer(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    body = client.get("/decks/new?mode=timer").get_data(as_text=True)
+    assert 'value="timer" checked' in body
+    body = client.get("/decks/new").get_data(as_text=True)
+    assert 'value="manual" checked' in body

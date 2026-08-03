@@ -21,7 +21,7 @@
     <button type="button" class="button ghost" data-toggle-new-schedule>
       <i class="ph ph-clock" aria-hidden="true"></i><span>New timed send</span>
     </button>
-    <a class="button ghost" href="#rotation-form-card">
+    <a class="button ghost" href="{{ url_for('decks.editor', mode='timer') }}">
       <i class="ph ph-arrows-clockwise" aria-hidden="true"></i><span>New timer cycle</span>
     </a>
   </p>
@@ -87,5 +87,4 @@
    listings above replace the old per-shape sections; these includes carry
    only what remains (new/edit forms + the 24h timeline). #}
 {% include "_schedules_section.html" %}
-{% include "_rotations_section.html" %}
 {% endblock %}

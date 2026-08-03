@@ -354,14 +354,13 @@ def _running_state_view(
 
 @bp.get("")
 def index() -> Response:
-    """#167 Phase 3: rotations render as a section of the unified Decks
-    page. The old URL (and every in-app link to it) lands on that section;
-    the ``edit`` param carries across so deep links keep working. Every
-    POST endpoint on this blueprint is unchanged."""
-    params: dict[str, Any] = {}
-    if request.args.get("edit"):
-        params["redit"] = request.args["edit"]
-    return redirect(url_for("decks.index", _anchor="rotations", **params))
+    """#167: cycles are decks; the old URL lands on the unified list, and
+    an ``edit`` deep link opens the deck editor (the one editor for every
+    shape). Every POST endpoint on this blueprint is unchanged."""
+    edit = request.args.get("edit")
+    if edit:
+        return redirect(url_for("decks.editor", deck_id=edit))
+    return redirect(url_for("decks.index"))
 
 
 @bp.post("/new")

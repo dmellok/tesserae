@@ -63,15 +63,6 @@ def test_interval_params_preseed_the_cadence(app: Flask) -> None:
     assert 'value="45"' in body
 
 
-def test_cycle_params_preseed_step_rows(app: Flask) -> None:
-    client = app.test_client()
-    _sign_in(client)
-    body = client.get("/decks?wz_pages=kitchen,hall&wz_dwell=20").get_data(as_text=True)
-    # Two seeded step rows with the chosen dwell; unknown ids are dropped.
-    assert body.count('name="step_page_ids[]"') >= 2
-    assert 'value="20"' in body
-
-
 def test_name_param_preseeds_both_forms(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
@@ -79,8 +70,6 @@ def test_name_param_preseeds_both_forms(app: Flask) -> None:
         as_text=True
     )
     assert 'value="Morning kitchen"' in body
-    body = client.get("/decks?wz_pages=kitchen&wz_name=Lobby+loop").get_data(as_text=True)
-    assert 'value="Lobby loop"' in body
 
 
 def test_wizard_walks_one_question_per_step(app: Flask) -> None:
@@ -100,13 +89,6 @@ def test_garbage_params_degrade_to_the_plain_page(app: Flask) -> None:
     _sign_in(client)
     resp = client.get("/decks?wz_type=nope&wz_time=99:99&wz_interval=x&wz_pages=ghost")
     assert resp.status_code == 200
-
-
-def test_per_page_dwells_preseed_step_rows(app: Flask) -> None:
-    client = app.test_client()
-    _sign_in(client)
-    body = client.get("/decks?wz_pages=kitchen,hall&wz_dwells=10,25").get_data(as_text=True)
-    assert 'value="10"' in body and 'value="25"' in body
 
 
 def test_wizard_direct_create_lands_highlighted(app: Flask) -> None:

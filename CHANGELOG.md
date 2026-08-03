@@ -8,6 +8,17 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Changed
 
+- **One editor for every deck** (#167). The separate timer-cycle form is
+  gone: cycle cards' Edit, the New timer cycle button (which preselects
+  timer advance), and old `/rotations?edit=` links all open the deck
+  editor, which gains a Page-conditions fold (author per-page conditions
+  with the usual picker; bad JSON is rejected with a message, and saves
+  that omit the fields preserve what's stored) and a smart-sync render
+  lead input. The wizard's cycle path creates directly and fine-tuning
+  happens in the editor afterwards.
+
+### Changed
+
 - **Rotations and schedules are decommissioned as separate concepts**
   (#167). A rotation is now stored and edited as a plain timer deck on the
   cycle trigger; a schedule is a one-page timer deck on the interval or

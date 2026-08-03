@@ -100,14 +100,13 @@
       d.textContent = dd;
       review.append(t, d);
     });
-    // Advanced options: the prefilled full form, same values.
-    const params = new URLSearchParams();
-    if (s.name) params.set('wz_name', s.name);
-    if (kind === 'cycle') {
-      params.set('wz_pages', s.pages.map((p) => p.id).join(','));
-      params.set('wz_dwells', s.pages.map((p) => p.dwell).join(','));
-      advanced.href = '/decks?' + params.toString() + '#rotation-form-card';
-    } else {
+    // Advanced options: the prefilled full form for timed sends. Cycles
+    // have no separate form anymore; fine-tuning happens in the deck
+    // editor after Create, so the link hides on that path.
+    advanced.hidden = kind === 'cycle';
+    if (kind !== 'cycle') {
+      const params = new URLSearchParams();
+      if (s.name) params.set('wz_name', s.name);
       params.set('prefill_page', s.page);
       params.set('wz_type', kind);
       if (kind === 'daily') params.set('wz_time', s.time);
