@@ -1,0 +1,20 @@
+{# One-time notice after the #167 migration moved schedules + rotations into
+   the unified deck storage. Shown on the Schedules and Rotations pages until
+   dismissed; the dismissal persists in settings.app. #}
+{% if show_migration_notice %}
+<div class="migration-notice" role="status">
+  <i class="ph-fill ph-info migration-notice-icon" aria-hidden="true"></i>
+  <div class="migration-notice-body">
+    <strong>Schedules and rotations moved house.</strong>
+    They now share one storage with Decks, the first step in bringing the
+    three into a single model. Everything on this page works exactly as
+    before, and your previous files are kept in the data folder as
+    <code>schedules.json.migrated</code> and <code>rotations.json.migrated</code>
+    backups. A later update will bring these pages together under Decks.
+  </div>
+  <form method="post" action="{{ url_for('schedules.dismiss_migration_notice') }}">
+    <input type="hidden" name="back" value="{{ request.path }}">
+    <button type="submit" class="ghost">Got it</button>
+  </form>
+</div>
+{% endif %}

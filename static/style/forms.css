@@ -288,6 +288,25 @@ code {
   .flash.is-leaving { transform: none; }
 }
 
+/* One-time storage-move notice on the Schedules / Rotations pages (#167).
+   Flash vocabulary (surface, border, radius) without the toast slide-in:
+   it's an inline page banner, not a notification. */
+.migration-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--t-space-3);
+  padding: var(--t-space-3) var(--t-space-4);
+  margin-bottom: var(--t-space-4);
+  border-radius: var(--t-radius-md);
+  border: 1px solid color-mix(in oklab, var(--t-accent) 40%, transparent);
+  background: color-mix(in oklab, var(--t-accent) 8%, var(--t-surface));
+  color: var(--t-fg);
+  font-size: var(--t-size-md);
+}
+.migration-notice-icon { font-size: 18px; flex-shrink: 0; color: var(--t-accent); margin-top: 2px; }
+.migration-notice-body { flex: 1; min-width: 0; }
+.migration-notice form { flex-shrink: 0; }
+
 .flash-msg { flex: 1; min-width: 0; }
 .flash-icon { font-size: 18px; flex-shrink: 0; color: var(--t-accent); }
 .flash--ok    { border-color: color-mix(in oklab, var(--t-ok) 45%, transparent); }

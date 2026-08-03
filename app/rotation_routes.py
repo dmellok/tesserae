@@ -33,6 +33,7 @@ from flask import (
 from pydantic import ValidationError
 from werkzeug.wrappers import Response
 
+from app.schedule_routes import migration_notice_visible as _migration_notice_visible
 from app.scheduler import Scheduler, compute_current_step
 from app.state.page_store import PageStore
 from app.state.rotation_model import Rotation, RotationStep
@@ -368,6 +369,7 @@ def index() -> str:
         edit_id=request.args.get("edit"),
         projections={r.id: _build_projection(r) for r in rotations},
         running_states={r.id: _running_state_view(r, rotation_status.get(r.id)) for r in rotations},
+        show_migration_notice=_migration_notice_visible(),
     )
 
 

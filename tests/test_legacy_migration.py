@@ -226,6 +226,45 @@ def test_migrated_rotation_fires_once_via_rotation_pass(tmp_path: Path) -> None:
     assert push.push.call_args.kwargs.get("source") == "rotation"
 
 
+# -- one-time migration notice --------------------------------------------
+
+
+def _sign_in(client) -> None:
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+
+
+def test_migration_notice_shows_once_and_dismisses(tmp_path: Path) -> None:
+    _seed_legacy(tmp_path, rotations=[_rotation()], schedules=[_schedule()])
+    app = _boot(tmp_path)
+    client = app.test_client()
+    _sign_in(client)
+
+    for path in ("/schedules", "/rotations"):
+        assert "moved house" in client.get(path).get_data(as_text=True)
+
+    resp = client.post(
+        "/schedules/migration-notice/dismiss",
+        data={"back": "/rotations"},
+        follow_redirects=False,
+    )
+    assert resp.status_code in (302, 303) and resp.location.endswith("/rotations")
+    for path in ("/schedules", "/rotations"):
+        assert "moved house" not in client.get(path).get_data(as_text=True)
+
+    # Dismissal persists across the restart every update performs.
+    second = _boot(tmp_path)
+    client2 = second.test_client()
+    _sign_in(client2)
+    assert "moved house" not in client2.get("/schedules").get_data(as_text=True)
+
+
+def test_migration_notice_absent_on_fresh_installs(tmp_path: Path) -> None:
+    app = _boot(tmp_path)  # no legacy files: nothing migrated
+    client = app.test_client()
+    _sign_in(client)
+    assert "moved house" not in client.get("/schedules").get_data(as_text=True)
+
+
 def test_legacy_decks_stay_out_of_deck_surfaces(tmp_path: Path) -> None:
     decks = DeckStore(tmp_path / "decks.json")
     RotationProjection(decks).upsert(_rotation(device_ids=["panel"]))

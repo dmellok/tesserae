@@ -16,6 +16,7 @@ import re
 import time
 from collections.abc import Iterable
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 from flask import (
@@ -372,6 +373,40 @@ def _running_state_view(schedule: Schedule, status_row: dict[str, Any] | None) -
     }
 
 
+def migration_notice_visible() -> bool:
+    """Whether the one-time #167 storage-move notice should show on the
+    Schedules / Rotations pages: the startup migration ran on this install
+    (a ``*.json.migrated`` rollback artifact exists) and the notice hasn't
+    been dismissed. Shared with the Rotations page, which imports this."""
+    settings = current_app.config.get("SETTINGS_STORE")
+    try:
+        if settings is not None and settings.get_section("app").get(
+            "legacy_migration_notice_dismissed"
+        ):
+            return False
+    except Exception:
+        return False
+    data_root = current_app.config.get("DATA_ROOT")
+    if data_root is None:
+        return False
+    core = Path(data_root) / "core"
+    return (core / "schedules.json.migrated").exists() or (
+        core / "rotations.json.migrated"
+    ).exists()
+
+
+@bp.post("/migration-notice/dismiss")
+def dismiss_migration_notice() -> Response:
+    """Persist the dismissal so the storage-move notice never reappears."""
+    settings = current_app.config["SETTINGS_STORE"]
+    settings.patch_section("app", {"legacy_migration_notice_dismissed": True})
+    back = request.form.get("back") or url_for("schedules.index")
+    # Only bounce back to a local path; anything else goes to the index.
+    if not back.startswith("/"):
+        back = url_for("schedules.index")
+    return redirect(back)
+
+
 @bp.get("")
 def index() -> str:
     schedules = _store().all()
@@ -395,6 +430,7 @@ def index() -> str:
         # the New-schedule form. Just affects the blank-form default;
         # editing existing schedules is unaffected.
         prefill_page=request.args.get("prefill_page", ""),
+        show_migration_notice=migration_notice_visible(),
     )
 
 
