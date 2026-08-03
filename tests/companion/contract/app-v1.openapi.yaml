@@ -694,7 +694,7 @@ components:
     PersonalDataCapabilities:
       description: >-
         Strict personal-data source schemas accepted by this server. When
-        absent, clients may use legacy feature flags for compatibility.
+        absent, legacy clients may use legacy feature flags for compatibility.
       type: object
       additionalProperties: false
       required: [sources]
