@@ -21,6 +21,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **A "Help me choose" wizard on the Decks page.** A short stepper asks what
+  the display should do in plain language (show one dashboard at a set time,
+  keep one fresh on an interval, cycle several automatically, or flip by
+  hand), teaches what each answer creates, and lands on the matching form
+  with the dashboard, time, cadence, or cycle steps already filled in. It
+  composes the existing forms; nothing new to submit through.
+
 - **Companion API: devices now carry their icon** (#184). `GET
   /api/app/v1/devices` returns each device's resolved Phosphor slug (the
   same identity the device pickers and Settings cards use), so native

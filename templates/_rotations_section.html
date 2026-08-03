@@ -317,10 +317,11 @@
      header gets the v0.56 dx-section-head chrome (teal icon square +
      title + description) instead of going through the legacy
      card_head adapter. #}
+  {# The wizard (#167) can preseed the step rows via wz_pages / wz_dwell. #}
   {% set blank = {
     'id': '', 'name': '', 'anchor': '00:00', 'end_at': '', 'priority': 0,
     'enabled': True, 'days_of_week': [0,1,2,3,4,5,6],
-    'device_ids': [], 'steps': [], 'smart_sync': False, 'smart_sync_lead_s': 10,
+    'device_ids': [], 'steps': (wizard_steps or []), 'smart_sync': False, 'smart_sync_lead_s': 10,
   } %}
   {% call section_card(icon='plus-circle', title='New rotation',
                        description='Rotations cycle one panel through multiple dashboards — step durations, a day-of-week mask, and optional smart-sync.',

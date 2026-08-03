@@ -288,6 +288,58 @@ code {
   .flash.is-leaving { transform: none; }
 }
 
+/* "Help me choose" wizard dialog (#167): native <dialog>, token-styled. */
+.wizard-dialog {
+  width: min(560px, calc(100vw - var(--t-space-6) * 2));
+  padding: var(--t-space-4);
+  border: 1px solid color-mix(in oklab, var(--t-border) 70%, transparent);
+  border-radius: var(--t-radius-md);
+  background: var(--t-surface);
+  color: var(--t-fg);
+  box-shadow: var(--t-shadow-md);
+}
+.wizard-dialog::backdrop { background: rgb(0 0 0 / 0.45); }
+.wizard-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--t-space-3);
+  margin-bottom: var(--t-space-3);
+}
+.wizard-head h2 { margin: 0; font-size: var(--t-size-lg); }
+.wizard-choices { display: flex; flex-direction: column; gap: var(--t-space-2); }
+.wizard-choice {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: var(--t-space-3);
+  align-items: start;
+  padding: var(--t-space-3);
+  border: 1px solid color-mix(in oklab, var(--t-border) 70%, transparent);
+  border-radius: var(--t-radius-md);
+  cursor: pointer;
+}
+.wizard-choice:has(input:checked) {
+  border-color: var(--t-accent);
+  background: color-mix(in oklab, var(--t-accent) 8%, var(--t-surface));
+}
+.wizard-choice input { margin-top: 3px; }
+.wizard-choice strong { grid-column: 2; }
+.wizard-choice .cf-hint { grid-column: 2; }
+.wizard-page-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--t-space-1);
+  max-height: 220px;
+  overflow-y: auto;
+}
+.wizard-page-option { display: flex; gap: var(--t-space-2); align-items: center; }
+.wizard-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--t-space-2);
+  margin-top: var(--t-space-4);
+}
+
 /* One-time storage-move notice on the Schedules / Rotations pages (#167).
    Flash vocabulary (surface, border, radius) without the toast slide-in:
    it's an inline page banner, not a notification. */

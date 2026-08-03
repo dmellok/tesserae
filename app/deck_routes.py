@@ -12,6 +12,7 @@ from __future__ import annotations
 import contextlib
 import json
 import re
+from datetime import datetime
 from typing import Any, Literal, cast
 
 from flask import (
@@ -139,6 +140,33 @@ def index() -> str:
     # the decommissioned rotations and schedules); cards show the navigable
     # decks (manual and both modes).
     decks = [d for d in _store().all() if d.advance != "timer"]
+
+    # "Help me choose" wizard prefills (#167): the dialog collects intent +
+    # details client-side and lands back here with wz_* params; the values
+    # seed the existing new-record forms server-side, so the wizard never
+    # touches submission paths. Everything is validated and clamped; bad
+    # params degrade to the plain page.
+    wz_type = request.args.get("wz_type", "")
+    prefill_type = wz_type if wz_type in ("interval", "daily") else None
+    prefill_fires_at_dt = None
+    wz_time = request.args.get("wz_time", "")
+    if re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", wz_time):
+        hour, minute = (int(part) for part in wz_time.split(":"))
+        prefill_fires_at_dt = datetime(2000, 1, 1, hour, minute)
+    try:
+        prefill_interval = max(1, min(10_080, int(request.args.get("wz_interval", ""))))
+    except ValueError:
+        prefill_interval = None
+    try:
+        wz_dwell = max(1, min(10_080, int(request.args.get("wz_dwell", ""))))
+    except ValueError:
+        wz_dwell = 15
+    known_page_ids = {p.id for p in pages}
+    wizard_steps = [
+        {"page_id": pid, "dwell_minutes": wz_dwell, "conditions": []}
+        for pid in (s.strip() for s in request.args.get("wz_pages", "").split(","))
+        if pid in known_page_ids
+    ]
     schedules = current_app.config["SCHEDULE_STORE"].all()
     rotations = current_app.config["ROTATION_STORE"].all()
     scheduler = current_app.config["SCHEDULER"]
@@ -183,6 +211,10 @@ def index() -> str:
         schedule_edit_id=request.args.get("sedit"),
         smart_sync_states=_smart_sync_states(schedules, pages),
         prefill_page=request.args.get("prefill_page", ""),
+        prefill_type=prefill_type,
+        prefill_interval=prefill_interval,
+        prefill_fires_at_dt=prefill_fires_at_dt,
+        wizard_steps=wizard_steps,
         # -- rotations section --------------------------------------------
         rotations=rotations,
         page_devices=_devices_for_page(pages),

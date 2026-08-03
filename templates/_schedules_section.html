@@ -210,7 +210,8 @@
       <p class="lede">No schedule with that id.</p>
     {% endif %}
   {% else %}
-    {% set blank = {'id': '', 'name': '', 'page_id': (prefill_page or ''), 'enabled': true, 'type': 'interval', 'interval_minutes': 30, 'fires_at': none, 'time_of_day_start': '', 'time_of_day_end': '', 'priority': 0, 'days_of_week': [0,1,2,3,4,5,6], 'smart_sync': false, 'smart_sync_lead_s': 10} %}
+    {# The wizard (#167) can preseed type / cadence / time via wz_* params. #}
+    {% set blank = {'id': '', 'name': '', 'page_id': (prefill_page or ''), 'enabled': true, 'type': (prefill_type or 'interval'), 'interval_minutes': (prefill_interval or 30), 'fires_at': (prefill_fires_at_dt or none), 'time_of_day_start': '', 'time_of_day_end': '', 'priority': 0, 'days_of_week': [0,1,2,3,4,5,6], 'smart_sync': false, 'smart_sync_lead_s': 10} %}
     {{ schedule_form(blank, false, pages) }}
   {% endif %}
 </section>

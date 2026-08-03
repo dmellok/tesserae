@@ -12,7 +12,13 @@
     Further down, <a href="#timed">timed sends</a> fire one dashboard by the clock and
     <a href="#rotations">timer cycles</a> advance through several automatically.
   </p>
+  <p>
+    <button type="button" class="button" data-open-timed-wizard>
+      <i class="ph ph-magic-wand" aria-hidden="true"></i><span>Help me choose</span>
+    </button>
+  </p>
 </header>
+{% include "_timed_wizard.html" %}
 {% include "_legacy_migration_notice.html" %}
 
 {% if suggestions %}
