@@ -87,9 +87,12 @@ def test_wizard_walks_one_question_per_step(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
     body = client.get("/decks").get_data(as_text=True)
-    for step in ("intent", "page", "time", "minutes", "pages", "dwell", "name", "manual"):
+    steps = ("intent", "page", "time", "minutes", "pages", "dwell", "name", "review", "manual")
+    for step in steps:
         assert f'data-wizard-step="{step}"' in body
     assert "data-wizard-progress" in body
+    assert "data-wizard-dwell-rows" in body  # one input per picked dashboard
+    assert "data-wizard-review" in body
 
 
 def test_garbage_params_degrade_to_the_plain_page(app: Flask) -> None:
@@ -97,3 +100,48 @@ def test_garbage_params_degrade_to_the_plain_page(app: Flask) -> None:
     _sign_in(client)
     resp = client.get("/decks?wz_type=nope&wz_time=99:99&wz_interval=x&wz_pages=ghost")
     assert resp.status_code == 200
+
+
+def test_per_page_dwells_preseed_step_rows(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    body = client.get("/decks?wz_pages=kitchen,hall&wz_dwells=10,25").get_data(as_text=True)
+    assert 'value="10"' in body and 'value="25"' in body
+
+
+def test_wizard_direct_create_lands_highlighted(app: Flask) -> None:
+    """The review step's Create submits the existing endpoints; the redirect
+    lands on the unified list with the new card highlighted."""
+    client = app.test_client()
+    _sign_in(client)
+    resp = client.post(
+        "/rotations/new",
+        data={
+            "name": "Lobby loop",
+            "enabled": "on",
+            "anchor": "00:00",
+            "step_page_ids[]": ["kitchen", "hall"],
+            "step_dwell_minutes[]": ["10", "25"],
+            "step_conditions_json[]": ["", ""],
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code in (302, 303)
+    assert "hl=lobby_loop" in resp.location and "#udeck-lobby_loop" in resp.location
+    body = client.get(resp.location).get_data(as_text=True)
+    assert "is-new" in body and "Lobby loop" in body
+
+    resp = client.post(
+        "/schedules/new",
+        data={
+            "name": "Evening brief",
+            "enabled": "on",
+            "page_id": "kitchen",
+            "type": "daily",
+            "fires_at": "19:30",
+        },
+        follow_redirects=False,
+    )
+    assert "hl=evening_brief" in resp.location
+    body = client.get(resp.location).get_data(as_text=True)
+    assert "is-new" in body and "Evening brief" in body

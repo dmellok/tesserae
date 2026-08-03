@@ -3,7 +3,7 @@
    progress bar on the left, then name + kind chip, summary sentence, and a
    uniform action row wired to the shape's existing endpoints. #}
 {% macro deck_card(c) %}
-<article class="ucard{% if not c.enabled %} is-disabled{% endif %}" data-kind="{{ c.kind }}" id="udeck-{{ c.id }}">
+<article class="ucard{% if not c.enabled %} is-disabled{% endif %}{% if c.is_new %} is-new{% endif %}" data-kind="{{ c.kind }}" id="udeck-{{ c.id }}">
   <div class="ucard-status">
     <span class="ucard-state"><i class="ph-fill ph-{{ c.state_icon }}" aria-hidden="true"></i>{{ c.state }}</span>
     <span class="ucard-big">{{ c.big }}</span>

@@ -492,7 +492,8 @@ def create() -> Response:
         return redirect(url_for("schedules.index"))
     _store().upsert(schedule)
     flash(f"Schedule {schedule.name!r} saved.", "ok")
-    return redirect(url_for("schedules.index"))
+    # Land on the unified list with the new card highlighted (#167).
+    return redirect(url_for("decks.index", hl=schedule.id) + f"#udeck-{schedule.id}")
 
 
 @bp.post("/<schedule_id>/update")

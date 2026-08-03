@@ -101,11 +101,10 @@
 
   <div class="wizard-step" data-wizard-step="dwell" hidden>
     <p class="wizard-question">How long should each dashboard stay up?</p>
-    <div class="field wizard-inline-unit">
-      <input type="number" id="wz-dwell" value="15" min="1" max="1440" data-wizard-dwell aria-label="Minutes per dashboard">
-      <span>minutes each</span>
+    <div class="field" data-wizard-dwell-rows>
+      {# Rows are built from the previous step's picks; one minutes input
+         per dashboard so each can have its own display time. #}
     </div>
-    <p class="cf-hint">You can give individual dashboards their own timing on the form.</p>
   </div>
 
   <div class="wizard-step" data-wizard-step="name" hidden>
@@ -113,8 +112,16 @@
     <div class="field">
       <input type="text" id="wz-name" data-wizard-name maxlength="80"
              placeholder="Morning refresh" aria-label="Name">
-      <p class="cf-hint">Next we open the form with everything filled in; review it and press Create.</p>
+      <p class="cf-hint">One more step: a quick review, then it goes live.</p>
     </div>
+  </div>
+
+  <div class="wizard-step" data-wizard-step="review" hidden>
+    <p class="wizard-question">Ready to create</p>
+    <dl class="wizard-review" data-wizard-review></dl>
+    <p class="cf-hint">Create it now, or open the full form for conditions,
+      day masks, active windows, and priorities.</p>
+    <p><a class="dx-btn-ghost-sm" data-wizard-advanced href="#">Advanced options</a></p>
   </div>
 
   <div class="wizard-step" data-wizard-step="manual" hidden>

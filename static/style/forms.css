@@ -1663,3 +1663,39 @@ input[type="range"].slider:focus::-moz-range-thumb {
   font-family: var(--t-font-mono, ui-monospace, "JetBrains Mono", "SF Mono", Menlo, monospace);
   letter-spacing: 0.01em;
 }
+
+/* Wizard review + per-dashboard dwell rows (#167 Phase D). */
+.wizard-review {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 16px;
+  margin: 0 0 var(--t-space-3);
+  padding: var(--t-space-3);
+  border: 1px solid color-mix(in oklab, var(--t-border) 70%, transparent);
+  border-radius: var(--t-radius-md);
+  background: color-mix(in oklab, var(--t-accent) 5%, var(--t-surface));
+}
+.wizard-review dt {
+  font-size: var(--t-size-sm);
+  color: color-mix(in oklab, var(--t-fg) 60%, transparent);
+}
+.wizard-review dd { margin: 0; font-weight: 600; }
+.wizard-dwell-row {
+  display: flex;
+  align-items: center;
+  gap: var(--t-space-2);
+  padding: 4px 0;
+}
+.wizard-dwell-row > span:first-child { flex: 1; }
+.wizard-dwell-row input[type="number"] { width: 80px; }
+.wizard-dwell-unit { color: color-mix(in oklab, var(--t-fg) 55%, transparent); font-size: var(--t-size-sm); }
+
+/* Freshly created card highlight (create routes land with ?hl=<id>). */
+.ucard.is-new {
+  border-color: var(--t-accent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--t-accent) 25%, transparent);
+  animation: ucard-new-fade 2.4s ease-out 1.2s forwards;
+}
+@keyframes ucard-new-fade {
+  to { border-color: color-mix(in oklab, var(--t-border) 80%, transparent); box-shadow: none; }
+}

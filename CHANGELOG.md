@@ -21,6 +21,14 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **The wizard now creates, not just prefills.** Its final step shows a
+  plain-language review and a Create button that submits through the
+  normal endpoints, then lands on the deck list with the new card
+  highlighted; Advanced options still opens the full prefilled form. The
+  cycle path also gained per-dashboard display times: one minutes input
+  per picked dashboard instead of a single shared value (the full cycle
+  form always had per-step dwell; the wizard now matches).
+
 - **One card for every deck.** The Decks page now renders every shape (by
   hand, timer cycle, timed send) as the same card: a teal status pane with
   a live progress bar (through the current dwell, until the next fire, or

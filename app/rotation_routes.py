@@ -376,7 +376,8 @@ def create() -> Response:
         return redirect(url_for("rotations.index"))
     _store().upsert(rotation)
     flash(f"Rotation {rotation.name!r} saved.", "ok")
-    return redirect(url_for("rotations.index"))
+    # Land on the unified list with the new card highlighted (#167).
+    return redirect(url_for("decks.index", hl=rotation.id) + f"#udeck-{rotation.id}")
 
 
 @bp.post("/<rotation_id>/update")

@@ -149,6 +149,7 @@ def _unified_cards(
     schedule_pills: dict[str, dict[str, str]],
     schedule_status: dict[str, dict[str, Any]],
     page_names: dict[str, str],
+    highlight_id: str | None = None,
 ) -> list[dict[str, Any]]:
     """One view-model per deck, regardless of shape (#167 unified list).
 
@@ -316,6 +317,8 @@ def _unified_cards(
             }
         )
 
+    for card in cards:
+        card["is_new"] = highlight_id is not None and card["id"] == highlight_id
     cards.sort(key=lambda c: str(c["name"]).lower())
     return cards
 
@@ -360,15 +363,30 @@ def index() -> str:
         prefill_interval = max(1, min(10_080, int(request.args.get("wz_interval", ""))))
     except ValueError:
         prefill_interval = None
-    try:
-        wz_dwell = max(1, min(10_080, int(request.args.get("wz_dwell", ""))))
-    except ValueError:
-        wz_dwell = 15
+
+    def _dwell(token: str) -> int:
+        try:
+            return max(1, min(10_080, int(token)))
+        except ValueError:
+            return 15
+
+    # Per-dashboard display times: wz_dwells is a comma list aligned with
+    # wz_pages; the older single wz_dwell applies to every page. Short
+    # lists pad with their last value.
+    dwell_tokens = [t for t in request.args.get("wz_dwells", "").split(",") if t.strip()]
+    dwells = [_dwell(t) for t in dwell_tokens] or [_dwell(request.args.get("wz_dwell", ""))]
     known_page_ids = {p.id for p in pages}
     wizard_steps = [
-        {"page_id": pid, "dwell_minutes": wz_dwell, "conditions": []}
-        for pid in (s.strip() for s in request.args.get("wz_pages", "").split(","))
-        if pid in known_page_ids
+        {
+            "page_id": pid,
+            "dwell_minutes": dwells[min(i, len(dwells) - 1)],
+            "conditions": [],
+        }
+        for i, pid in enumerate(
+            s.strip()
+            for s in request.args.get("wz_pages", "").split(",")
+            if s.strip() in known_page_ids
+        )
     ]
     schedules = current_app.config["SCHEDULE_STORE"].all()
     rotations = current_app.config["ROTATION_STORE"].all()
@@ -415,6 +433,7 @@ def index() -> str:
             schedule_pills=schedule_pills,
             schedule_status=schedule_status,
             page_names=page_names,
+            highlight_id=request.args.get("hl"),
         ),
         # -- schedules section --------------------------------------------
         schedules=schedules,
