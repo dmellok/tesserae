@@ -169,148 +169,16 @@
   <span id="rotations"></span>
 
   {# Existing rotations #}
-  {% if rotations %}
-  <div class="rotations-list">
-    {% for r in rotations %}
-    {% set cur = current_step.get(r.id) %}
-    <section class="dx-section-card rotation-card{% if rotation_edit_id == r.id %} is-editing{% endif %}" id="rotation-{{ r.id }}">
-      <header class="dx-section-head dx-rotation-head">
-        <span class="dx-section-icon" aria-hidden="true"><i class="ph ph-arrows-clockwise"></i></span>
-        <div class="dx-section-titleblock">
-          <h3 class="dx-section-title">{{ r.name }}</h3>
-          <p class="dx-section-desc"><code>{{ r.id }}</code></p>
-        </div>
-        <div class="dx-rotation-status">
-          {% if not r.enabled %}
-            <span class="dx-pill is-neutral"><span class="dx-pill-dot"></span>Disabled</span>
-          {% elif cur and cur.active %}
-            <span class="dx-pill is-ok"><span class="dx-pill-dot"></span>Now: step {{ cur.step_index + 1 }}, {{ cur.page_name }}</span>
-          {% else %}
-            <span class="dx-pill is-warn"><span class="dx-pill-dot"></span>Not active right now</span>
-          {% endif %}
-          {# v0.48 running-state pill. Only shown when the scheduler
-             saw something worth surfacing (held / failed); normal
-             flow is covered by the pill above. #}
-          {% set rs = rotation_running_states.get(r.id) if rotation_running_states else none %}
-          {% if rs %}
-          <span class="dx-pill {{ rs.tone|replace('pill--','is-') }}" title="{{ rs.tooltip }}">
-            <i class="ph ph-{{ rs.icon }}" aria-hidden="true"></i>{{ rs.label }}
-          </span>
-          {% endif %}
-        </div>
-      </header>
-
-      <div class="dx-meta-strip dx-rotation-meta">
-        <span>
-          <i class="ph ph-clock" aria-hidden="true"></i>
-          {{ r.anchor }}{% if r.end_at %} to {{ r.end_at }}{% endif %}
-        </span>
-        <span><i class="ph ph-arrows-clockwise" aria-hidden="true"></i> {{ r.cycle_minutes }} min cycle</span>
-        <span><i class="ph ph-list-numbers" aria-hidden="true"></i> {{ r.steps|length }} step{{ '' if r.steps|length == 1 else 's' }}</span>
-      </div>
-
-      {% if cur and cur.active and cur.next_transition_epoch %}
-      <div class="dx-rotation-countdown rotation-countdown"
-           data-rot-countdown
-           data-step-started="{{ cur.step_started_epoch }}"
-           data-next-transition="{{ cur.next_transition_epoch }}"
-           data-dwell-seconds="{{ cur.dwell_seconds }}"
-           aria-live="polite">
-        <div class="rotation-countdown-track">
-          <span class="rotation-countdown-fill" data-rot-countdown-fill></span>
-        </div>
-        <p class="rotation-countdown-meta">
-          <span class="muted">Next in </span>
-          <strong data-rot-countdown-remaining>—</strong>
-          {% if cur.override_in_effect %}
-          <span class="dx-pill is-warn" title="Manual play: the cycle was re-anchored, this lasts until tomorrow's anchor catches up.">
-            <i class="ph ph-fast-forward" aria-hidden="true"></i> manual
-          </span>
-          {% endif %}
-        </p>
-      </div>
-      {% endif %}
-
-      <ul class="dx-rotation-steps">
-        {% for step in r.steps %}
-        {% set step_devices = page_devices.get(step.page_id, []) %}
-        <li class="dx-inset-row dx-rotation-step{% if cur and cur.active and cur.step_index == loop.index0 %} is-current{% endif %}">
-          <span class="dx-rotation-stepnum">{{ loop.index }}</span>
-          <div class="dx-rotation-stepbody">
-            <div class="dx-rotation-stepline">
-              <span class="dx-rotation-steppage">{{ page_names.get(step.page_id, step.page_id) }}</span>
-              <span class="dx-rotation-stepdwell">{{ step.dwell_minutes }} min</span>
-            </div>
-            {% if step_devices %}
-            <ul class="dx-rotation-stepdevices">
-              {% for d in step_devices %}
-              <li>
-                <i class="ph ph-{{ d.icon }}" aria-hidden="true"></i>
-                <span>{{ d.name }}</span>
-              </li>
-              {% endfor %}
-            </ul>
-            {% else %}
-            <p class="dx-rotation-stepwarn">
-              <i class="ph ph-warning-circle" aria-hidden="true"></i>
-              Page has no bound devices
-            </p>
-            {% endif %}
-          </div>
-          {% if cur and cur.active %}
-          <form method="post" action="{{ url_for('rotations.play', rotation_id=r.id, step_index=loop.index0) }}" class="form form--inline">
-            <button type="submit" class="dx-btn-ghost-sm dx-btn-icon-only"
-                    title="Play this step now and continue the cycle from here">
-              <i class="ph ph-play" aria-hidden="true"></i>
-              <span class="sr-only">Play step {{ loop.index }} now</span>
-            </button>
-          </form>
-          {% endif %}
-        </li>
-        {% endfor %}
-      </ul>
-
-      {% set proj = projections.get(r.id) %}
-      {% if proj and proj.bands %}
-      <div class="rotation-timeline" aria-label="Next 24 hours">
-        {% for band in proj.bands %}
-        <span class="rotation-band rotation-band--step-{{ band.index % 5 }}{% if band.held %} is-held{% elif band.conditioned_skipped %} is-shifted{% endif %}"
-              style="left:{{ band.pct }}%; width:{{ band.width_pct }}%;"
-              title="{{ band.page_name }} ({{ band.dwell_minutes }} min){% if band.held %} - all step conditions failed{% elif band.conditioned_skipped %} - original time-slot step gated; this is the next eligible step{% endif %}"></span>
-        {% endfor %}
-      </div>
-      {% endif %}
-
-      <div class="dx-rotation-actions">
-        <form method="post" action="{{ url_for('rotations.toggle', rotation_id=r.id) }}" class="form form--inline">
-          <button type="submit" class="dx-btn-ghost-sm">
-            <i class="ph ph-power" aria-hidden="true"></i>
-            <span>{{ 'Disable' if r.enabled else 'Enable' }}</span>
-          </button>
-        </form>
-        <form method="post" action="{{ url_for('rotations.fire', rotation_id=r.id) }}" class="form form--inline">
-          <button type="submit" class="dx-btn-ghost-sm">
-            <i class="ph ph-paper-plane-tilt" aria-hidden="true"></i><span>Fire now</span>
-          </button>
-        </form>
-        <a class="dx-btn-ghost-sm" href="{{ url_for('rotations.index', edit=r.id) }}#rotation-{{ r.id }}">
-          <i class="ph ph-pencil" aria-hidden="true"></i><span>Edit</span>
-        </a>
-        <form method="post" action="{{ url_for('rotations.delete', rotation_id=r.id) }}" class="form form--inline"
-              onsubmit="return confirm('Delete rotation {{ r.name }}?');">
-          <button type="submit" class="dx-btn-ghost-sm dx-btn-icon-only" title="Delete rotation" aria-label="Delete">
-            <i class="ph ph-trash" aria-hidden="true"></i>
-          </button>
-        </form>
-      </div>
-
-      {% if rotation_edit_id == r.id %}
-      <hr class="dx-divider">
-      {{ rotation_form(r, edit_mode=True, pages=pages) }}
-      {% endif %}
-    </section>
-    {% endfor %}
-  </div>
+  {# #167: the per-shape listing is gone; timer-cycle decks render as
+     unified cards on the Decks page. Editing expands here via ?redit=. #}
+  {% if rotation_edit_id %}
+    {% set editing_rotation = rotations | selectattr('id', 'equalto', rotation_edit_id) | list | first %}
+    {% if editing_rotation %}
+    {% call section_card(icon='pencil-simple', title='Edit ' ~ editing_rotation.name,
+                         description='Timer cycle', id='rotation-edit-card') %}
+      {{ rotation_form(editing_rotation, edit_mode=True, pages=pages) }}
+    {% endcall %}
+    {% endif %}
   {% endif %}
 
   {# New rotation form. Uses the section_card macro now so the
@@ -329,13 +197,6 @@
     {{ rotation_form(blank, edit_mode=False, pages=pages) }}
   {% endcall %}
 
-  {% if not rotations %}
-    {{ empty_state(
-      'shuffle',
-      'No rotations yet',
-      blurb='Add one above and Tesserae will cycle through the dashboards you pick on the cadence you set.',
-    ) }}
-  {% endif %}
 </section>
 
 <script>

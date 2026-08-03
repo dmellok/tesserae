@@ -52,41 +52,40 @@
 </section>
 {% endif %}
 
-{% for deck in decks %}
-<section class="card deck-card" id="deck-{{ deck.id }}">
-  {{ card_head(deck.name, icon_name='cards-three', level=2) }}
-  <div class="deck-meta">
-    <span class="cf-chip">{{ deck.pages|length }} page{{ 's' if deck.pages|length != 1 }}</span>
-    <span class="cf-chip">{{ deck.device_ids|length }} device{{ 's' if deck.device_ids|length != 1 }}</span>
-    <span class="cf-chip">{{ 'refresh %d min'|format(deck.refresh_interval_minutes) if deck.refresh_interval_minutes else 'no deck refresh' }}</span>
-    {% if deck.advance != 'manual' %}<span class="cf-chip">advances on a timer</span>{% endif %}
-    {% if not deck.enabled %}<span class="cf-chip cf-chip--off">disabled</span>{% endif %}
-  </div>
-  <div class="deck-actions">
-    <a class="button ghost" href="{{ url_for('decks.editor', deck_id=deck.id) }}">Edit</a>
-    <form method="post" action="{{ url_for('decks.push', deck_id=deck.id) }}" class="inline">
-      <button type="submit" class="ghost" title="Warm every page for every bound device and send the entry page to the panel(s)"><i class="ph ph-paper-plane-tilt" aria-hidden="true"></i><span>Push</span></button>
-    </form>
-    <form method="post" action="{{ url_for('decks.sync', deck_id=deck.id) }}" class="inline">
-      <button type="submit" class="ghost" title="Re-derive links + zones from the pages' canvas actions"><i class="ph ph-arrows-clockwise" aria-hidden="true"></i><span>Sync from links</span></button>
-    </form>
-    <form method="post" action="{{ url_for('decks.toggle', deck_id=deck.id) }}" class="inline">
-      <button type="submit" class="ghost">{{ 'Disable' if deck.enabled else 'Enable' }}</button>
-    </form>
-    <form method="post" action="{{ url_for('decks.delete', deck_id=deck.id) }}" class="inline"
-          onsubmit="return confirm('Delete deck {{ deck.name }}?');">
-      <button type="submit" class="ghost danger">Delete</button>
-    </form>
-  </div>
-</section>
+{# The one list (#167): every deck shape as the same card, filterable. #}
+{% from "_unified_deck_card.html" import deck_card %}
+<div class="ucard-filters" role="group" aria-label="Filter decks by kind">
+  <button type="button" class="ucf-chip is-on" data-kind-filter="all">All</button>
+  <button type="button" class="ucf-chip" data-kind-filter="nav">
+    <i class="ph ph-hand-tap" aria-hidden="true"></i>By hand</button>
+  <button type="button" class="ucf-chip" data-kind-filter="cycle">
+    <i class="ph ph-arrows-clockwise" aria-hidden="true"></i>Timer cycles</button>
+  <button type="button" class="ucf-chip" data-kind-filter="send">
+    <i class="ph ph-clock" aria-hidden="true"></i>Timed sends</button>
+</div>
+{% for c in unified_cards %}
+{{ deck_card(c) }}
 {% else %}
-{{ empty_state('cards-three', 'No decks yet', 'Wire tap / swipe links between pages in the canvas editor, then create a deck from the suggestions above, or start one from scratch below.') }}
+{{ empty_state('cards-three', 'Nothing here yet', 'Use Help me choose above to set up what your display shows, or start a deck from scratch in the editor.') }}
 {% endfor %}
+<script>
+  // Kind filter for the unified list. Pure show/hide; nothing reloads.
+  (function () {
+    const chips = document.querySelectorAll('[data-kind-filter]');
+    const cards = () => document.querySelectorAll('.ucard');
+    chips.forEach((chip) => chip.addEventListener('click', () => {
+      chips.forEach((c) => c.classList.toggle('is-on', c === chip));
+      const kind = chip.dataset.kindFilter;
+      cards().forEach((card) => {
+        card.hidden = kind !== 'all' && card.dataset.kind !== kind;
+      });
+    }));
+  })();
+</script>
 
-<p><a class="button" href="{{ url_for('decks.editor') }}"><i class="ph ph-plus" aria-hidden="true"></i><span>New deck</span></a></p>
-
-{# #167 Phase 3: schedules + rotations render here as sections of the one
-   Decks surface. Their old pages redirect to these anchors. #}
+{# Forms, timeline, and edit cards for the timed shapes (#167): the
+   listings above replace the old per-shape sections; these includes carry
+   only what remains (new/edit forms + the 24h timeline). #}
 {% include "_schedules_section.html" %}
 {% include "_rotations_section.html" %}
 {% endblock %}

@@ -33,7 +33,7 @@ def test_empty_list_renders(app: Flask) -> None:
     # #167 Phase 3: /schedules redirects to the unified Decks page.
     resp = client.get("/schedules", follow_redirects=True)
     assert resp.status_code == 200
-    assert b"No schedules yet" in resp.data
+    assert b"Nothing here yet" in resp.data  # unified empty state (#167)
 
 
 def test_create_persists_and_lists(app: Flask) -> None:

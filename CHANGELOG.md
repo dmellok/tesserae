@@ -21,6 +21,14 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **One card for every deck.** The Decks page now renders every shape (by
+  hand, timer cycle, timed send) as the same card: a teal status pane with
+  a live progress bar (through the current dwell, until the next fire, or
+  toward home return), the kind as a chip, a one-sentence summary, and a
+  uniform action row (Send now, Play step, Edit, Enable/Disable, Delete).
+  Filter chips narrow the list by kind; the three separate listings are
+  gone. Editing expands the matching form inline via the card's Edit.
+
 - **A "Help me choose" wizard on the Decks page.** A guided stepper asks
   one question per screen (what the display should do, which dashboard or
   dashboards, the time or cadence, and a name), teaches what each answer

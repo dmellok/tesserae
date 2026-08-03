@@ -118,6 +118,208 @@ def _graph_json(deck_pages: Any) -> str:
     return json.dumps([p.model_dump(exclude_none=True) for p in deck_pages], indent=2)
 
 
+def _ago(epoch: Any, now_ts: float) -> str | None:
+    """Compact relative-time label for the unified cards."""
+    if not isinstance(epoch, (int, float)):
+        return None
+    delta = max(0, int(now_ts - epoch))
+    if delta < 90:
+        return "just now"
+    if delta < 5400:
+        return f"{delta // 60} min ago"
+    if delta < 172_800:
+        return f"{delta // 3600} h ago"
+    return f"{delta // 86_400} d ago"
+
+
+def _pct(now_ts: float, start: Any, end: Any) -> int | None:
+    """Progress through [start, end] as 0-100, or None when unknowable."""
+    if not isinstance(start, (int, float)) or not isinstance(end, (int, float)) or end <= start:
+        return None
+    return max(0, min(100, round((now_ts - start) / (end - start) * 100)))
+
+
+def _unified_cards(
+    *,
+    nav_decks: list[Deck],
+    rotations: list[Any],
+    schedules: list[Any],
+    current_step: dict[str, dict[str, Any]],
+    rotation_pills: dict[str, dict[str, str] | None],
+    schedule_pills: dict[str, dict[str, str]],
+    schedule_status: dict[str, dict[str, Any]],
+    page_names: dict[str, str],
+) -> list[dict[str, Any]]:
+    """One view-model per deck, regardless of shape (#167 unified list).
+
+    Every card gets the same anatomy: a status block (state label, headline
+    value, progress bar, sub line), a kind chip, a one-sentence summary, and
+    a uniform action set wired to the shape's existing endpoints."""
+    from datetime import timedelta
+
+    from app.schedule_routes import _project_fires
+    from app.tz_resolve import app_timezone
+
+    now_tz = datetime.now(app_timezone())
+    now_ts = now_tz.timestamp()
+    nav = _nav_store()
+    cards: list[dict[str, Any]] = []
+
+    for deck in nav_decks:
+        rec = None
+        rec_device = None
+        if nav is not None:
+            for device_id in deck.device_ids:
+                candidate = nav.get(device_id)
+                if candidate is not None and candidate.get("deck_id") == deck.id:
+                    rec = candidate
+                    rec_device = device_id
+                    break
+        on_glass = rec.get("page_id") if rec else None
+        updated = rec.get("updated_at") if rec else None
+        if not deck.enabled:
+            state, icon = "DISABLED", "pause"
+        elif on_glass:
+            state, icon = "ON GLASS", "monitor"
+        else:
+            state, icon = "IDLE", "monitor"
+        progress = None
+        if deck.enabled and deck.home_timeout_minutes > 0 and isinstance(updated, (int, float)):
+            progress = _pct(now_ts, updated, updated + deck.home_timeout_minutes * 60)
+        sub = None
+        if on_glass:
+            bits = [b for b in (rec_device, _ago(updated, now_ts)) if b]
+            sub = " · ".join(bits) or None
+        cards.append(
+            {
+                "kind": "nav",
+                "kind_label": "By hand",
+                "kind_icon": "hand-tap",
+                "id": deck.id,
+                "name": deck.name,
+                "enabled": deck.enabled,
+                "state": state,
+                "state_icon": icon,
+                "big": page_names.get(on_glass, on_glass) if on_glass else "—",
+                "sub": sub,
+                "progress_pct": progress,
+                "summary": (
+                    f"{len(deck.pages)} dashboard{'s' if len(deck.pages) != 1 else ''}"
+                    " · button, tap, swipe · pre-rendered on "
+                    f"{len(deck.device_ids)} panel{'s' if len(deck.device_ids) != 1 else ''}"
+                ),
+                "steps": [],
+                "play_urls": [],
+                "fire_url": url_for("decks.push", deck_id=deck.id),
+                "sync_url": url_for("decks.sync", deck_id=deck.id),
+                "edit_url": url_for("decks.editor", deck_id=deck.id),
+                "toggle_url": url_for("decks.toggle", deck_id=deck.id),
+                "delete_url": url_for("decks.delete", deck_id=deck.id),
+            }
+        )
+
+    for r in rotations:
+        cur = current_step.get(r.id) or {}
+        pill = rotation_pills.get(r.id)
+        if not r.enabled:
+            state, icon, big, sub = "DISABLED", "pause", "—", None
+        elif pill is not None:
+            state, icon = pill["label"].upper(), pill["icon"]
+            big, sub = "—", pill.get("tooltip")
+        elif cur.get("active"):
+            nxt = cur.get("next_transition_epoch")
+            nxt_label = (
+                datetime.fromtimestamp(nxt, tz=now_tz.tzinfo).strftime("%H:%M")
+                if isinstance(nxt, (int, float))
+                else "?"
+            )
+            state, icon = "PLAYING", "play"
+            big = str(cur.get("page_name") or "—")
+            sub = f"step {(cur.get('step_index') or 0) + 1} of {len(r.steps)} · next {nxt_label}"
+        else:
+            state, icon = "IDLE", "clock"
+            big = "—"
+            sub = f"cycle starts at {r.anchor}"
+        progress = (
+            _pct(now_ts, cur.get("step_started_epoch"), cur.get("next_transition_epoch"))
+            if r.enabled and cur.get("active")
+            else None
+        )
+        window = f"from {r.anchor}" + (f" to {r.end_at}" if r.end_at else "")
+        cards.append(
+            {
+                "kind": "cycle",
+                "kind_label": "Timer cycle",
+                "kind_icon": "arrows-clockwise",
+                "id": r.id,
+                "name": r.name,
+                "enabled": r.enabled,
+                "state": state,
+                "state_icon": icon,
+                "big": big,
+                "sub": sub,
+                "progress_pct": progress,
+                "summary": (
+                    f"{len(r.steps)} dashboard{'s' if len(r.steps) != 1 else ''}"
+                    f" · cycle {r.cycle_minutes} min · {window}"
+                ),
+                "steps": [(i, page_names.get(s.page_id, s.page_id)) for i, s in enumerate(r.steps)],
+                "play_urls": [
+                    url_for("rotations.play", rotation_id=r.id, step_index=i)
+                    for i in range(len(r.steps))
+                ],
+                "fire_url": url_for("rotations.fire", rotation_id=r.id),
+                "sync_url": None,
+                "edit_url": url_for("decks.index", redit=r.id) + "#rotation-edit-card",
+                "toggle_url": url_for("rotations.toggle", rotation_id=r.id),
+                "delete_url": url_for("rotations.delete", rotation_id=r.id),
+            }
+        )
+
+    for s in schedules:
+        pill = schedule_pills.get(s.id) or {}
+        row = schedule_status.get(s.id) or {}
+        fires = _project_fires(s, now_tz, now_tz + timedelta(hours=24)) if s.enabled else []
+        next_fire = fires[0] if fires else None
+        last = row.get("last_fired")
+        cadence = (
+            f"every {s.interval_minutes} min"
+            if s.type == "interval"
+            else f"daily at {s.fires_at.strftime('%H:%M') if s.fires_at else '?'}"
+        )
+        page_label = page_names.get(s.page_id, s.page_id)
+        progress = None
+        if s.enabled and next_fire is not None and isinstance(last, (int, float)):
+            progress = _pct(now_ts, last, next_fire.timestamp())
+        sub = f"last sent {_ago(last, now_ts)}" if _ago(last, now_ts) else None
+        cards.append(
+            {
+                "kind": "send",
+                "kind_label": "Timed send",
+                "kind_icon": "clock",
+                "id": s.id,
+                "name": s.name,
+                "enabled": s.enabled,
+                "state": pill.get("label", "").upper() or "IDLE",
+                "state_icon": pill.get("icon", "clock"),
+                "big": next_fire.strftime("%H:%M") if next_fire else "—",
+                "sub": sub,
+                "progress_pct": progress,
+                "summary": f"Fires {page_label} {cadence}",
+                "steps": [],
+                "play_urls": [],
+                "fire_url": url_for("schedules.fire", schedule_id=s.id),
+                "sync_url": None,
+                "edit_url": url_for("decks.index", sedit=s.id) + "#schedule-form-card",
+                "toggle_url": url_for("schedules.toggle", schedule_id=s.id),
+                "delete_url": url_for("schedules.delete", schedule_id=s.id),
+            }
+        )
+
+    cards.sort(key=lambda c: str(c["name"]).lower())
+    return cards
+
+
 @bp.get("")
 def index() -> str:
     # #167 Phase 3: the one surface for everything a display shows over
@@ -190,24 +392,37 @@ def index() -> str:
         }
         for s in suggest_decks(pages, decks)
     ]
+    page_names = {p.id: p.name for p in pages}
+    current_step = _current_step_for_each(rotations)
+    rotation_pills = {r.id: _rotation_state_view(r, rotation_status.get(r.id)) for r in rotations}
+    schedule_pills = {s.id: _schedule_state_view(s, schedule_status.get(s.id)) for s in schedules}
     return render_template(
         "decks.html",
         decks=decks,
         pages=pages,
-        page_names={p.id: p.name for p in pages},
+        page_names=page_names,
         devices=instances,
         graphs=graphs,
         suggestions=suggestions,
         edit_id=request.args.get("edit"),
+        # -- the one list (#167): every deck shape as the same card -------
+        unified_cards=_unified_cards(
+            nav_decks=decks,
+            rotations=rotations,
+            schedules=schedules,
+            current_step=current_step,
+            rotation_pills=rotation_pills,
+            schedule_pills=schedule_pills,
+            schedule_status=schedule_status,
+            page_names=page_names,
+        ),
         # -- schedules section --------------------------------------------
         schedules=schedules,
         status=schedule_status,
         last_fired={
             sid: _last_fired_view(st.get("last_fired")) for sid, st in schedule_status.items()
         },
-        schedule_running_states={
-            s.id: _schedule_state_view(s, schedule_status.get(s.id)) for s in schedules
-        },
+        schedule_running_states=schedule_pills,
         timeline=_build_timeline(schedules),
         schedule_edit_id=request.args.get("sedit"),
         smart_sync_states=_smart_sync_states(schedules, pages),
@@ -220,12 +435,10 @@ def index() -> str:
         # -- rotations section --------------------------------------------
         rotations=rotations,
         page_devices=_devices_for_page(pages),
-        current_step=_current_step_for_each(rotations),
+        current_step=current_step,
         rotation_edit_id=request.args.get("redit"),
         projections={r.id: _build_projection(r) for r in rotations},
-        rotation_running_states={
-            r.id: _rotation_state_view(r, rotation_status.get(r.id)) for r in rotations
-        },
+        rotation_running_states=rotation_pills,
         show_migration_notice=migration_notice_visible(),
     )
 

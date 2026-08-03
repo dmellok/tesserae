@@ -1,0 +1,69 @@
+{# The one deck card (#167): every shape (by hand / timer cycle / timed send)
+   renders with the same anatomy: a teal-tinted status block with a live
+   progress bar on the left, then name + kind chip, summary sentence, and a
+   uniform action row wired to the shape's existing endpoints. #}
+{% macro deck_card(c) %}
+<article class="ucard{% if not c.enabled %} is-disabled{% endif %}" data-kind="{{ c.kind }}" id="udeck-{{ c.id }}">
+  <div class="ucard-status">
+    <span class="ucard-state"><i class="ph-fill ph-{{ c.state_icon }}" aria-hidden="true"></i>{{ c.state }}</span>
+    <span class="ucard-big">{{ c.big }}</span>
+    {% if c.progress_pct is not none %}
+    <div class="ucard-bar" role="presentation"><i style="width: {{ c.progress_pct }}%"></i></div>
+    {% endif %}
+    {% if c.sub %}<span class="ucard-sub">{{ c.sub }}</span>{% endif %}
+  </div>
+  <div class="ucard-body">
+    <div class="ucard-top">
+      <span class="ucard-name">{{ c.name }}</span>
+      <span class="ucard-kind ucard-kind--{{ c.kind }}">
+        <i class="ph-bold ph-{{ c.kind_icon }}" aria-hidden="true"></i>{{ c.kind_label }}
+      </span>
+    </div>
+    <p class="ucard-sum">{{ c.summary }}</p>
+    <div class="ucard-actions">
+      <form method="post" action="{{ c.fire_url }}" class="inline">
+        <button type="submit" class="ucard-act is-primary">
+          <i class="ph ph-paper-plane-tilt" aria-hidden="true"></i><span>Send now</span>
+        </button>
+      </form>
+      {% if c.steps %}
+      <details class="ucard-play">
+        <summary class="ucard-act">
+          <i class="ph ph-play" aria-hidden="true"></i><span>Play step</span>
+        </summary>
+        <div class="ucard-play-menu">
+          {% for idx, label in c.steps %}
+          <form method="post" action="{{ c.play_urls[idx] }}" class="inline">
+            <button type="submit" class="ucard-act">{{ idx + 1 }}. {{ label }}</button>
+          </form>
+          {% endfor %}
+        </div>
+      </details>
+      {% endif %}
+      {% if c.sync_url %}
+      <form method="post" action="{{ c.sync_url }}" class="inline">
+        <button type="submit" class="ucard-act"
+                title="Re-derive links + zones from the pages' canvas actions">
+          <i class="ph ph-arrows-clockwise" aria-hidden="true"></i><span>Sync links</span>
+        </button>
+      </form>
+      {% endif %}
+      <a class="ucard-act" href="{{ c.edit_url }}">
+        <i class="ph ph-pencil-simple" aria-hidden="true"></i><span>Edit</span>
+      </a>
+      <span class="ucard-actions-spacer"></span>
+      <form method="post" action="{{ c.toggle_url }}" class="inline">
+        <button type="submit" class="ucard-act">
+          <i class="ph ph-power" aria-hidden="true"></i><span>{{ 'Disable' if c.enabled else 'Enable' }}</span>
+        </button>
+      </form>
+      <form method="post" action="{{ c.delete_url }}" class="inline"
+            onsubmit="return confirm('Delete {{ c.name }}?');">
+        <button type="submit" class="ucard-act is-danger">
+          <i class="ph ph-trash" aria-hidden="true"></i><span>Delete</span>
+        </button>
+      </form>
+    </div>
+  </div>
+</article>
+{% endmacro %}
