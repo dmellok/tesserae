@@ -38,6 +38,7 @@ from pydantic import ValidationError
 
 from app.push import PushManager, PushResult
 from app.scheduler_conditions import ConditionEvaluator
+from app.state.deck_migration import deck_to_schedule
 from app.state.deck_model import Deck
 from app.state.deck_store import DeckStore
 from app.state.event_log import EventLog
@@ -330,13 +331,10 @@ class Scheduler:
         self._deck_last_advance: dict[str, str] = {}
         # Same key -> POSIX timestamp of that last advance, for the min-hold gate.
         self._deck_last_advance_at: dict[str, float] = {}
-        # #167 Phase 2: interval / daily trigger bookkeeping, mirroring the
-        # schedule maps below. deck_id -> POSIX timestamp of the last
-        # successful fire (cooldown / once-a-day gate) and of first
-        # observation (daily backfill guard; GC'd when the deck leaves its
-        # trigger so re-enable resets the window, like schedules).
-        self._deck_trigger_last_fired: dict[str, float] = {}
-        self._deck_trigger_first_seen: dict[str, float] = {}
+        # (#167 decommission: interval / daily trigger decks ride the
+        # schedule engine's _last_fired / _first_seen maps via
+        # _timed_records, so they share the cooldown and backfill state
+        # schedules always had.)
         self._push_factory = push_manager
         self._event_log = event_log
         self._tz_provider = timezone_provider or (lambda: None)
@@ -420,6 +418,54 @@ class Scheduler:
                 logger.exception("scheduler tick crashed")
             self._stop.wait(self._tick)
 
+    def _timed_records(self) -> list[Schedule]:
+        """Every timed (interval / daily) record the engine runs: schedule
+        store entries (the projection in production, raw stores in tests)
+        plus any interval / daily trigger deck not already represented,
+        adapted through the migration mapping. Post-decommission these are
+        the same records seen two ways; the dedup keeps double-wiring
+        harmless (#167)."""
+        records: list[Schedule] = []
+        seen: set[str] = set()
+        for s in self._store.all():
+            records.append(s)
+            seen.add(s.id)
+        if self._deck_store is not None:
+            for d in self._deck_store.all():
+                if (
+                    d.id not in seen
+                    and d.advance == "timer"
+                    and d.advance_trigger != "cycle"
+                    and d.pages
+                ):
+                    records.append(deck_to_schedule(d))
+        return records
+
+    def _cycle_records(self) -> list[Rotation]:
+        """Every cycle record the engine runs: rotation store entries plus
+        any cycle timer deck not already represented, adapted through the
+        engine mapping. Same dedup rationale as ``_timed_records``. Includes
+        disabled records; ``find_due_rotations`` owns the disable handling."""
+        records: list[Rotation] = []
+        seen: set[str] = set()
+        if self._rotation_store is not None:
+            for r in self._rotation_store.all():
+                records.append(r)
+                seen.add(r.id)
+        if self._deck_store is not None:
+            for d in self._deck_store.all():
+                if (
+                    d.id not in seen
+                    and d.advance != "manual"
+                    and d.advance_trigger == "cycle"
+                    and d.legacy_kind != "schedule"
+                    and d.pages
+                ):
+                    adapted = _deck_to_rotation(d)
+                    if adapted is not None:
+                        records.append(adapted)
+        return records
+
     def find_due(self, now: datetime | None = None) -> list[Schedule]:
         """Return schedules that should fire at ``now``, sorted by priority
         descending then id. Records each enabled schedule's first-observed
@@ -428,7 +474,7 @@ class Scheduler:
         tz = self._tz_provider()
         self._observe(now)
         candidates: list[Schedule] = []
-        for s in self._store.all():
+        for s in self._timed_records():
             if not s.enabled:
                 continue
             # Skip schedules pointing at deleted pages. The PushManager
@@ -551,18 +597,7 @@ class Scheduler:
                     rotation.priority,
                     0,
                     rotation.id,
-                    partial(
-                        self._fire_rotation, rotation, step_index, now, respect_quiet_hours=True
-                    ),
-                )
-            )
-        for deck, rot, target, state in self.find_due_decks(now):
-            fires.append(
-                (
-                    rot.priority,
-                    1,
-                    deck.id,
-                    partial(self._fire_deck_advance, deck, rot, target, state, now),
+                    partial(self._fire_cycle, rotation, step_index, now),
                 )
             )
         for schedule in self.find_due(now):
@@ -571,7 +606,7 @@ class Scheduler:
                     schedule.priority,
                     2,
                     schedule.id,
-                    partial(self._fire, schedule, now, respect_quiet_hours=True),
+                    partial(self._fire_timed, schedule, now),
                 )
             )
         fires.sort(key=lambda entry: (entry[0], entry[1], entry[2]))
@@ -599,7 +634,7 @@ class Scheduler:
         current page to JUST that device and clear the hold. Devices
         still inside their hold are untouched, and devices already on
         the current step have the hold cleared silently."""
-        if self._rotation_store is None or self._rotation_state_store is None:
+        if self._rotation_state_store is None:
             return
         try:
             states = self._rotation_state_store.all()
@@ -615,7 +650,7 @@ class Scheduler:
         ]
         if not lapsed:
             return
-        rotations = {r.id: r for r in self._rotation_store.all()}
+        rotations = {r.id: r for r in self._cycle_records()}
         for state in lapsed:
             rotation = rotations.get(state.rotation_id or "")
             if rotation is None or not rotation.enabled or not rotation.steps:
@@ -681,8 +716,8 @@ class Scheduler:
 
         if self._deck_store is not None and self._deck_nav_store is not None:
             for deck in self._deck_store.all():
-                if not deck.enabled or deck.legacy_kind is not None:
-                    continue  # legacy records resolve via the rotation branch below
+                if not deck.enabled:
+                    continue
                 for device_id in deck.device_ids:
                     if device_id in claimed:
                         continue
@@ -697,8 +732,8 @@ class Scheduler:
                         showing.setdefault(page_id, set()).add(device_id)
                         claimed.add(device_id)
 
-        if self._rotation_store is not None and self._device_ids_for_page is not None:
-            for rotation in self._rotation_store.all():
+        if self._device_ids_for_page is not None:
+            for rotation in self._cycle_records():
                 if not rotation.enabled or not rotation.steps:
                     continue
                 state = self.compute_step_state(rotation, now)
@@ -877,136 +912,53 @@ class Scheduler:
                         extra={"home_return_device": device_id, "page_id": home},
                     )
 
-    def find_due_decks(
-        self, now: datetime | None = None
-    ) -> list[tuple[Deck, Rotation, str, StepState]]:
-        """Timer / ``both`` decks with an eligible fire right now, as
-        ``(deck, adapted_rotation, target_page_id, state)``.
-
-        ``cycle`` decks are adapted to an in-memory Rotation and run through
-        the same engine rotations use: day-of-week + anchor + end_at windows,
-        per-page conditions, scheduled / priority mode. ``interval`` and
-        ``daily`` decks (#167 Phase 2, the migrated-schedule shapes) gate
-        through ``_deck_trigger_due`` with schedule-parity semantics instead
-        of the anchor cycle. When no page's conditions pass, the deck's
-        ``advance_fallback_page_id`` fires if set, else the deck holds.
-
-        The per-device gates (step transition, min-hold, smart-sync, quiet
-        hours) live in ``_fire_deck_advance`` so a multi-panel deck advances
-        each panel independently. Manual decks are ignored. Unsorted; the
-        unified fire pass in ``_tick_once`` owns the cross-record ordering."""
-        if self._deck_store is None or self._deck_nav_store is None:
-            return []
-        now = now or datetime.now(UTC)
-        tz = self._tz_provider()
-        decks = self._deck_store.all()
-        # GC daily backfill markers for decks no longer on a trigger, so a
-        # disable + re-enable resets the first-seen window like schedules do.
-        trigger_ids = {
-            d.id
-            for d in decks
-            if d.enabled
-            and d.advance != "manual"
-            and d.advance_trigger != "cycle"
-            and d.legacy_kind is None
-        }
-        with self._lock:
-            for did in list(self._deck_trigger_first_seen):
-                if did not in trigger_ids:
-                    self._deck_trigger_first_seen.pop(did, None)
-        out: list[tuple[Deck, Rotation, str, StepState]] = []
-        for deck in decks:
-            if not deck.enabled or deck.advance == "manual" or not deck.pages:
-                continue
-            # Migrated rotation / schedule records fire through their legacy
-            # projection passes (full parity: holds, rejoin, force-step,
-            # status pills); firing them here too would double-push.
-            if deck.legacy_kind is not None:
-                continue
-            # cycle decks need explicit bindings (classic deck semantics);
-            # interval / daily decks may have none and then fire to the
-            # page's own bound devices, exactly as the schedule they were
-            # migrated from did.
-            if deck.advance_trigger == "cycle" and not deck.device_ids:
-                continue
-            rot = _deck_to_rotation(deck)
-            if rot is None:
-                continue
-            if deck.advance_trigger == "cycle":
-                state = _compute_step_state(rot, now, tz, forced=None)
-                if state is None:
-                    continue  # off-day, before the anchor, or past the end_at window
-                time_index = state.step_index
-            else:
-                if not self._deck_trigger_due(deck, now, tz):
-                    continue
-                # Due now: the fire happens immediately, so the transition
-                # gate's "dwell window" is this very moment; the cooldown /
-                # once-a-day rule is the actual rate limiter.
-                state = StepState(
-                    step_index=0,
-                    step_started_at=now,
-                    next_transition_at=now,
-                    cycle_position_minutes=0.0,
-                    forced_at=None,
-                )
-                time_index = 0
-            picked = self._pick_eligible_step(rot, time_index, now)
-            if picked is None:
-                # No page's conditions are met: fire the fallback if one is
-                # configured (schedule semantics), else hold.
-                if deck.advance_fallback_page_id is None:
-                    continue
-                target = deck.advance_fallback_page_id
-            else:
-                target = rot.steps[picked].page_id
-            if self._page_exists is not None and not self._page_exists(target):
-                continue
-            out.append((deck, rot, target, state))
-        return out
-
-    def _deck_trigger_due(self, deck: Deck, now: datetime, tz: tzinfo | None) -> bool:
-        """Schedule-parity due gate for ``interval`` / ``daily`` trigger decks
-        (#167 Phase 2): the day-of-week mask, then the trigger's own rule.
-
-        ``interval`` keeps the drifting cooldown of ``Schedule(type=
-        "interval")``: due once ``advance_interval_minutes`` have passed since
-        the last successful fire, inside the optional wrap-around time-of-day
-        window. Deliberately NOT the anchor-cycle math, which would align
-        fires to the anchor instead of the last fire.
-
-        ``daily`` fires once per local day once the wall clock passes
-        ``advance_fires_at``, with the same backfill guard schedules have: a
-        deck first observed after today's target skips to tomorrow."""
-        local_now = _local(now, tz)
-        if local_now.weekday() not in deck.advance_days_of_week:
-            return False
-        if deck.advance_trigger == "interval":
-            if not _window_contains(
-                deck.advance_window_start, deck.advance_window_end, local_now.time()
-            ):
-                return False
-            with self._lock:
-                last = self._deck_trigger_last_fired.get(deck.id)
-            return last is None or (now.timestamp() - last) >= deck.advance_interval_minutes * 60
-        if deck.advance_fires_at is None:
-            return False  # unreachable for validated decks; belt and braces
-        with self._lock:
-            first_seen = self._deck_trigger_first_seen.setdefault(deck.id, now.timestamp())
-            last = self._deck_trigger_last_fired.get(deck.id)
-        fires_t = _parse_hhmm(deck.advance_fires_at)
-        target_local = local_now.replace(
-            hour=fires_t.hour, minute=fires_t.minute, second=0, microsecond=0
+    def _fire_cycle(self, rotation: Rotation, step_index: int, now: datetime) -> None:
+        """Fire one due cycle record (#167 decommission). A cycle backed by a
+        deck with explicit bindings advances each panel deck-style: promoted
+        pre-warmed frames when available, nav record updates, per-device
+        transition state, and manually-held panels skipped until their hold
+        lapses (the rejoin pass brings them back). Everything else, unbound
+        cycles included (page-binding fall-through), fires rotation-style."""
+        deck = self._deck_store.get(rotation.id) if self._deck_store is not None else None
+        if (
+            deck is None
+            or deck.advance == "manual"
+            or deck.advance_trigger != "cycle"
+            or not deck.device_ids
+            or self._deck_nav_store is None
+        ):
+            self._fire_rotation(rotation, step_index, now, respect_quiet_hours=True)
+            return
+        state = self.compute_step_state(rotation, now)
+        if state is None:
+            return  # window closed between find and fire; next tick recovers
+        held = self._held_device_ids(rotation.id, now)
+        fired = self._fire_deck_advance(
+            deck, rotation, rotation.steps[step_index].page_id, state, now, held=held
         )
-        if local_now < target_local:
-            return False
-        if first_seen > target_local.astimezone(UTC).timestamp():
-            return False  # backfill guard: wasn't watching when today's slot passed
-        if last is not None:
-            last_local = _local(datetime.fromtimestamp(last, tz=UTC), tz)
-            if last_local.date() == local_now.date():
-                return False  # already fired today (local terms)
-        return True
+        with self._lock:
+            # Arm the same transition / min-hold gates rotations use so the
+            # find pass stays one code path for every cycle record.
+            self._rotation_last_step[rotation.id] = step_index
+            self._rotation_last_pushed_at[rotation.id] = now.timestamp()
+            if fired:
+                self._rotation_last_status[rotation.id] = "sent"
+                self._rotation_last_reason[rotation.id] = None
+
+    def _fire_timed(self, schedule: Schedule, now: datetime) -> None:
+        """Fire one due timed record. A record backed by a bound interval /
+        daily trigger deck targets that deck's panels; anything else keeps
+        the classic schedule delivery (the page's own bound devices)."""
+        deck = self._deck_store.get(schedule.id) if self._deck_store is not None else None
+        device_filter: set[str] | None = None
+        if (
+            deck is not None
+            and deck.advance == "timer"
+            and deck.advance_trigger != "cycle"
+            and deck.device_ids
+        ):
+            device_filter = set(deck.device_ids)
+        self._fire(schedule, now, respect_quiet_hours=True, device_ids=device_filter)
 
     def _fire_deck_advance(
         self,
@@ -1015,36 +967,19 @@ class Scheduler:
         target: str,
         state: StepState,
         now: datetime,
-    ) -> None:
-        """Advance one timer deck's bound devices to the target page. Pushes
+        *,
+        held: set[str] | None = None,
+    ) -> bool:
+        """Advance one bound timer deck's panels to the target page. Pushes
         only at a step transition (or a new dwell window, for a keep-fresh
         single page), so a manual tap in ``both`` mode holds until the next
-        boundary, matching rotation behaviour.
-
-        A deck with no explicit bindings (an ``interval`` / ``daily``
-        migrated-schedule shape) fires one push to the page's own bound
-        devices instead, exactly as the schedule it came from did."""
-        if not deck.device_ids:
-            result = self._push_factory().push(target, respect_quiet_hours=True, source="deck")
-            if result.status in ("sent", "quiet"):
-                # Same cooldown semantics as schedules: quiet counts as a
-                # fire so the trigger doesn't re-attempt (and re-log) every
-                # tick through the quiet window; failures retry next tick.
-                with self._lock:
-                    self._deck_trigger_last_fired[deck.id] = now.timestamp()
-            if self._event_log is not None:
-                self._event_log.record(
-                    type="deck",
-                    source="deck",
-                    target=deck.id,
-                    status=result.status,
-                    error=result.error,
-                    duration_s=result.duration_s,
-                    extra={"page_id": target, "trigger": deck.advance_trigger},
-                )
-            return
+        boundary, matching rotation behaviour. ``held`` panels (manual hold
+        still active) are skipped; the rejoin pass returns them. Returns
+        whether any panel took the frame."""
         fired_any = False
         for device_id in deck.device_ids:
+            if held and device_id in held:
+                continue
             key = f"{deck.id}:{device_id}"
             with self._lock:
                 last = self._deck_last_advance.get(key)
@@ -1094,12 +1029,7 @@ class Scheduler:
                     status="sent",
                     extra={"timer_advance_device": device_id, "page_id": target},
                 )
-        if deck.advance_trigger != "cycle" and fired_any:
-            # Bound interval / daily decks arm the cooldown / once-a-day gate
-            # only after at least one panel actually took the frame, so a
-            # fully-failed fire retries next tick.
-            with self._lock:
-                self._deck_trigger_last_fired[deck.id] = now.timestamp()
+        return fired_any
 
     def _maybe_warm_decks(self, now: datetime) -> None:
         """Kick a background deck-warm pass unless one is already running, so a
@@ -1222,11 +1152,9 @@ class Scheduler:
         Sorted by ``priority`` descending then id, mirroring
         ``find_due``. Stale rotations (target page deleted) are skipped
         with a one-shot warning so the log doesn't fill up."""
-        if self._rotation_store is None:
-            return []
         now = now or datetime.now(UTC)
         out: list[tuple[Rotation, int]] = []
-        for rotation in self._rotation_store.all():
+        for rotation in self._cycle_records():
             if not rotation.enabled:
                 # Clear last-step so re-enable fires the current step
                 # rather than waiting for the next transition.
@@ -1644,7 +1572,7 @@ class Scheduler:
         """Maintain ``_first_seen``. Drop entries for ids no longer enabled
         so a disable+re-enable resets the window, exactly what the user
         expects when they fix a typo and re-toggle a schedule."""
-        enabled_ids = {s.id for s in self._store.all() if s.enabled}
+        enabled_ids = {s.id for s in self._timed_records() if s.enabled}
         with self._lock:
             for sid in list(self._first_seen):
                 if sid not in enabled_ids:
@@ -1659,6 +1587,7 @@ class Scheduler:
         *,
         respect_quiet_hours: bool = False,
         bypass_conditions: bool = False,
+        device_ids: set[str] | None = None,
     ) -> PushResult:
         # Conditional-schedule gate (v0.48). Evaluated before the push
         # so a held schedule incurs zero rendering cost. ``fire_now``
@@ -1703,11 +1632,15 @@ class Scheduler:
         # wake the room. fire_now() is the manual "Fire" button on the
         # Schedules page; user intent always goes through, so it leaves
         # respect_quiet_hours off.
-        result = self._push_factory().push(
-            target_page,
-            respect_quiet_hours=respect_quiet_hours,
-            source="scheduler_fallback" if held else "scheduler",
-        )
+        push_kwargs: dict[str, Any] = {
+            "respect_quiet_hours": respect_quiet_hours,
+            "source": "scheduler_fallback" if held else "scheduler",
+        }
+        # Only bound trigger decks set a device filter; omitting the kwarg
+        # otherwise keeps duck-typed push managers (tests) compatible.
+        if device_ids is not None:
+            push_kwargs["device_ids"] = device_ids
+        result = self._push_factory().push(target_page, **push_kwargs)
         # Successful fires bump last_fired so the daily / interval gates
         # work; a failed push doesn't update it (the next tick can retry).
         # A ``quiet`` result also bumps it, every device was in quiet

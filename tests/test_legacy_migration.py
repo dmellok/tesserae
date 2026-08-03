@@ -267,8 +267,11 @@ def test_migration_notice_absent_on_fresh_installs(tmp_path: Path) -> None:
     assert "moved house" not in client.get("/decks").get_data(as_text=True)
 
 
-def test_legacy_decks_stay_out_of_deck_surfaces(tmp_path: Path) -> None:
+def test_all_deck_shapes_serve_device_surfaces(tmp_path: Path) -> None:
+    # #167 decommission: a bound pure timer deck is a real deck; it serves
+    # for_device (SD sync of its frames is legitimate) alongside navigable
+    # decks, and its lack of links keeps it inert on the button-link path.
     decks = DeckStore(tmp_path / "decks.json")
     RotationProjection(decks).upsert(_rotation(device_ids=["panel"]))
     decks.upsert(Deck(id="real", name="Real", device_ids=["panel"], pages=[DeckPage(page_id="p")]))
-    assert [d.id for d in decks.for_device("panel")] == ["real"]
+    assert {d.id for d in decks.for_device("panel")} == {"evening", "real"}

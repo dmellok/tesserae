@@ -373,13 +373,12 @@ WIRE UP NAVIGATION / SCHEDULING (once the pages exist):
   ("advance": "timer" with advance_interval_minutes / advance_anchor for a page cycle, or
   advance_trigger "interval" / "daily" with advance_fires_at for schedule-style fires, plus
   advance_fallback_page_id). Prefer create_deck for new timed content.
-- rotations (list_rotations / create_rotation / delete_rotation): DEPRECATED compatibility
-  adapters over the deck store; they keep working and edit the same records. Cycle a device
-  through several pages on a wall-clock cadence; steps are [{page_id, dwell_minutes}]. Bind the
-  step pages first.
-- schedules (list_schedules / create_schedule / delete_schedule): DEPRECATED compatibility
-  adapters over the deck store; they keep working and edit the same records. Push a page to its
-  devices on an interval or at a daily time.
+- rotations (list_rotations / create_rotation / delete_rotation): DEPRECATED views over plain
+  timer decks (a rotation IS a deck with advance "timer" on the cycle trigger); they keep
+  working and edit the same records list_decks shows. Steps are [{page_id, dwell_minutes}].
+- schedules (list_schedules / create_schedule / delete_schedule): DEPRECATED views over
+  interval / daily trigger decks; they keep working and edit the same records list_decks
+  shows. Push a page to its devices on an interval or at a daily time.
 - decks (list_decks / create_deck / delete_deck, and suggest_decks): group pages a user navigates
   between (button / touch) and keep them PRE-RENDERED per device so a press or tap is instant. A
   deck is exactly the graph of page:<id> tap/swipe links between pages, so once you have wired

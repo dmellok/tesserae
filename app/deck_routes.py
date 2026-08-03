@@ -135,9 +135,10 @@ def index() -> str:
     from app.schedule_routes import _running_state_view as _schedule_state_view
 
     pages = _pages().list()
-    # Migrated rotation / schedule records (#167) live in this store but
-    # render in the timed sections below, not as deck cards.
-    decks = [d for d in _store().all() if d.legacy_kind is None]
+    # Pure timer decks render in the cycle / timed sections below (they ARE
+    # the decommissioned rotations and schedules); cards show the navigable
+    # decks (manual and both modes).
+    decks = [d for d in _store().all() if d.advance != "timer"]
     schedules = current_app.config["SCHEDULE_STORE"].all()
     rotations = current_app.config["ROTATION_STORE"].all()
     scheduler = current_app.config["SCHEDULER"]

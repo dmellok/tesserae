@@ -98,7 +98,9 @@ def test_manual_decks_stay_graph_only(wiring) -> None:
     assert not push.calls  # rotate_next no-ops without a timed target
 
 
-def test_real_rotation_outranks_the_timed_deck(wiring) -> None:
+def test_form_created_cycles_and_editor_decks_arbitrate_uniformly(wiring) -> None:
+    # #167 decommission: a rotation created through the old form/API is a
+    # plain timer deck; arbitration is priority then id across all of them.
     service, _push, decks = wiring
     decks.upsert(_timed_deck())
     RotationProjection(decks).upsert(
@@ -106,14 +108,16 @@ def test_real_rotation_outranks_the_timed_deck(wiring) -> None:
             id="legacy",
             name="Legacy",
             device_ids=["kitchen"],
+            priority=2,
             steps=[
                 RotationStep(page_id="morning", dwell_minutes=15),
                 RotationStep(page_id="afternoon", dwell_minutes=15),
             ],
         )
     )
-    snap = service.snapshot("kitchen")
-    assert snap.rotation_id == "legacy"
+    assert service.snapshot("kitchen").rotation_id == "legacy"  # priority 2 beats 0
+    stored = decks.get("legacy")
+    assert stored is not None and stored.legacy_kind is None and stored.advance == "timer"
 
 
 def test_highest_advance_priority_deck_wins(wiring) -> None:

@@ -2243,19 +2243,11 @@ def mcp_delete_schedule(schedule_id: str) -> Response:
 
 @bp.get("/decks")
 def mcp_list_decks() -> Response:
-    """All decks (pre-rendered navigable page groups). Migrated rotation /
-    schedule records (#167, ``legacy_kind`` set) are owned by the
-    list_rotations / list_schedules tools and excluded here."""
+    """All decks. This is the full truth post-#167: pure timer decks (the
+    decommissioned rotations and schedules) appear here AND through the
+    deprecated list_rotations / list_schedules views."""
     store = current_app.config["DECK_STORE"]
-    return jsonify(
-        {
-            "decks": [
-                d.model_dump(mode="json", exclude_none=True)
-                for d in store.all()
-                if d.legacy_kind is None
-            ]
-        }
-    )
+    return jsonify({"decks": [d.model_dump(mode="json", exclude_none=True) for d in store.all()]})
 
 
 @bp.post("/decks")

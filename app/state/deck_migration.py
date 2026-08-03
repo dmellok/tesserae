@@ -28,7 +28,7 @@ from app.state.schedule_store import ScheduleStore
 logger = logging.getLogger(__name__)
 
 
-def rotation_to_deck(rotation: Rotation) -> Deck:
+def rotation_to_deck(rotation: Rotation, *, legacy: bool = True) -> Deck:
     """A rotation as a timer deck on the ``cycle`` trigger.
 
     Field-for-field per the #167 survey table: the nine ``advance_*`` fields
@@ -62,11 +62,13 @@ def rotation_to_deck(rotation: Rotation) -> Deck:
         advance_min_hold_minutes=rotation.min_hold_minutes,
         # Rotations never background-warmed; don't start on migration.
         refresh_interval_minutes=0,
-        legacy_kind="rotation",
+        # ``legacy`` marks migration provenance only (keeps re-migrating a
+        # restored backup idempotent); no surface reads it for behaviour.
+        legacy_kind="rotation" if legacy else None,
     )
 
 
-def schedule_to_deck(schedule: Schedule) -> Deck:
+def schedule_to_deck(schedule: Schedule, *, legacy: bool = True) -> Deck:
     """A schedule as a one-page timer deck on the ``interval`` or ``daily``
     trigger.
 
@@ -101,7 +103,7 @@ def schedule_to_deck(schedule: Schedule) -> Deck:
         advance_min_hold_minutes=0,
         # Schedules never background-warmed; don't start on migration.
         refresh_interval_minutes=0,
-        legacy_kind="schedule",
+        legacy_kind="schedule" if legacy else None,
     )
 
 

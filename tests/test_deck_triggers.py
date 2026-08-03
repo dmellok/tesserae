@@ -134,14 +134,17 @@ def test_interval_deck_failed_push_retries_next_tick(wiring) -> None:
     assert push.push.call_count == 2
 
 
-def test_bound_interval_deck_advances_devices_and_arms_cooldown(wiring) -> None:
+def test_bound_interval_deck_targets_its_devices_and_arms_cooldown(wiring) -> None:
+    # #167 decommission: bound trigger decks fire through the schedule
+    # engine with a device filter (one targeted push, no nav record; nav is
+    # a cycle/navigation concept).
     scheduler, push, store, nav = wiring
     store.upsert(_interval_deck(device_ids=["panel"]))
     scheduler._tick_once(datetime(2026, 6, 15, 10, 0, tzinfo=UTC))
     assert push.push.call_args.kwargs.get("device_ids") == {"panel"}
-    nav.set.assert_called_with("panel", "i1", "a")
+    nav.set.assert_not_called()
     scheduler._tick_once(datetime(2026, 6, 15, 10, 10, tzinfo=UTC))
-    assert push.push.call_count == 1  # cooldown armed by the per-device fire
+    assert push.push.call_count == 1  # cooldown armed by the fire
 
 
 # -- daily trigger --------------------------------------------------------

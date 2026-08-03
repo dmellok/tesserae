@@ -1856,8 +1856,8 @@ class ButtonService:
             d
             for d in self._decks.all()
             if d.enabled
-            and d.legacy_kind is None
             and d.advance != "manual"
+            and d.advance_trigger == "cycle"
             and d.pages
             and device_id in d.device_ids
         ]

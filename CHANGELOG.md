@@ -6,6 +6,19 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Changed
+
+- **Rotations and schedules are decommissioned as separate concepts**
+  (#167). A rotation is now stored and edited as a plain timer deck on the
+  cycle trigger; a schedule is a one-page timer deck on the interval or
+  daily trigger. The Decks page sections are relabeled Timer cycles and
+  Timed sends and show every timer deck regardless of how it was created;
+  deck cards show the navigable (manual and both) decks. Everything keeps
+  working: the old forms, MCP tools, and REST envelope operate on the same
+  records as views, bound cycles advance panel-by-panel with pre-warmed
+  frames and manual-hold respect, unbound cycles keep page-binding
+  fall-through delivery, and bound timed sends target their own panels.
+
 ### Added
 
 - **Companion API: devices now carry their icon** (#184). `GET

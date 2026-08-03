@@ -133,18 +133,18 @@
 {% endmacro %}
 
 <header class="page-head">
-  <h2 id="timed"><i class="ph ph-calendar-dots"></i> Schedules
+  <h2 id="timed"><i class="ph ph-calendar-dots"></i> Timed sends
     <button type="button" class="header-action" data-toggle-new-schedule>
-      <i class="ph ph-plus" aria-hidden="true"></i><span>New schedule</span>
+      <i class="ph ph-plus" aria-hidden="true"></i><span>New timed send</span>
     </button>
   </h2>
   <p class="lede">
-    A schedule puts one saved dashboard on its displays at a set time, on an
-    interval or at a daily time. Use it to trigger a page by the clock; to group
-    several pages a display moves through, use a <a href="{{ url_for('decks.index') }}">Deck</a>
-    (by tap) or a <a href="{{ url_for('rotations.index') }}">Rotation</a> (on a timer).
-    Interval schedules respect the day-of-week mask and the time-of-day window;
-    daily schedules respect the mask only.
+    A timed send is a deck that puts one dashboard on its displays by the
+    clock, on an interval or at a daily time. To cycle several dashboards
+    automatically, use a <a href="#rotations">timer cycle</a>; to flip between
+    them by hand, use a deck with links. Interval sends respect the
+    day-of-week mask and the time-of-day window; daily sends respect the mask
+    only.
   </p>
 </header>
 
