@@ -25,6 +25,7 @@ CASES = {
     "capabilities-personal-data.json": "Capabilities",
     "personal-data-reminders-fridge.json": "PersonalDataSnapshot",
     "personal-data-reminders.json": "PersonalDataSnapshot",
+    "personal-data-reminders-empty.json": "PersonalDataSnapshot",
     "personal-data-put-response.json": "PersonalDataSourceStatus",
     "personal-data-reminders-put-response.json": "PersonalDataSourceStatus",
     "personal-data-status.json": "PersonalDataStatusResponse",
