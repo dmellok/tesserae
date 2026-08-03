@@ -163,10 +163,10 @@
 {% endmacro %}
 
 <section class="page">
-  <header class="page-head">
-    <h2 id="rotations"><i class="ph ph-arrows-clockwise" aria-hidden="true"></i> Timer cycles</h2>
-    <p class="lede">A timer cycle is a deck that advances on a wall-clock anchor instead of on a tap: each step dwells for a fixed number of minutes and the cycle repeats from the anchor every day. To flip between pages by hand instead, use a <a href="{{ url_for('decks.index') }}">Deck</a>.</p>
-  </header>
+  {# #167: no separate heading; timer-cycle decks flow in the one deck
+     list. The bare anchor keeps old /rotations redirects and wizard links
+     landing here. #}
+  <span id="rotations"></span>
 
   {# Existing rotations #}
   {% if rotations %}
@@ -319,7 +319,7 @@
      card_head adapter. #}
   {# The wizard (#167) can preseed the step rows via wz_pages / wz_dwell. #}
   {% set blank = {
-    'id': '', 'name': '', 'anchor': '00:00', 'end_at': '', 'priority': 0,
+    'id': '', 'name': (prefill_name or ''), 'anchor': '00:00', 'end_at': '', 'priority': 0,
     'enabled': True, 'days_of_week': [0,1,2,3,4,5,6],
     'device_ids': [], 'steps': (wizard_steps or []), 'smart_sync': False, 'smart_sync_lead_s': 10,
   } %}

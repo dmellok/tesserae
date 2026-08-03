@@ -21,12 +21,18 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
-- **A "Help me choose" wizard on the Decks page.** A short stepper asks what
-  the display should do in plain language (show one dashboard at a set time,
-  keep one fresh on an interval, cycle several automatically, or flip by
-  hand), teaches what each answer creates, and lands on the matching form
-  with the dashboard, time, cadence, or cycle steps already filled in. It
-  composes the existing forms; nothing new to submit through.
+- **A "Help me choose" wizard on the Decks page.** A guided stepper asks
+  one question per screen (what the display should do, which dashboard or
+  dashboards, the time or cadence, and a name), teaches what each answer
+  creates, and lands on the matching form with everything filled in so the
+  last step is just pressing Create. It composes the existing forms;
+  nothing new to submit through.
+
+- **The Decks page reads as one list.** The Timed sends and Timer cycles
+  headings are gone: timer decks flow directly below the navigable deck
+  cards, with a single actions row up top (Help me choose, New deck, New
+  timed send, New timer cycle). Copy now leads with button press, the most
+  common navigation input, ahead of tap and swipe.
 
 - **Companion API: devices now carry their icon** (#184). `GET
   /api/app/v1/devices` returns each device's resolved Phosphor slug (the

@@ -6,16 +6,24 @@
 <header class="page-head">
   <h1><i class="ph ph-cards-three" aria-hidden="true"></i> Decks</h1>
   <p class="lede">
-    Everything a display shows over time is a deck. The cards below move between pages by tap,
-    button, or swipe, kept pre-rendered per device so navigation is instant; author the links in
-    the canvas editor (tap / swipe "go to page" on a tile) and Tesserae turns them into a deck.
-    Further down, <a href="#timed">timed sends</a> fire one dashboard by the clock and
-    <a href="#rotations">timer cycles</a> advance through several automatically.
+    Everything a display shows over time is a deck. Some move between dashboards on a button
+    press, tap, or swipe, kept pre-rendered per device so navigation is instant; some advance
+    through several dashboards on a timer; some put one dashboard up by the clock. They all
+    live in the one list below.
   </p>
-  <p>
+  <p class="deck-actions-row">
     <button type="button" class="button" data-open-timed-wizard>
       <i class="ph ph-magic-wand" aria-hidden="true"></i><span>Help me choose</span>
     </button>
+    <a class="button ghost" href="{{ url_for('decks.editor') }}">
+      <i class="ph ph-plus" aria-hidden="true"></i><span>New deck</span>
+    </a>
+    <button type="button" class="button ghost" data-toggle-new-schedule>
+      <i class="ph ph-clock" aria-hidden="true"></i><span>New timed send</span>
+    </button>
+    <a class="button ghost" href="#rotation-form-card">
+      <i class="ph ph-arrows-clockwise" aria-hidden="true"></i><span>New timer cycle</span>
+    </a>
   </p>
 </header>
 {% include "_timed_wizard.html" %}

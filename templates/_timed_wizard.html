@@ -1,83 +1,92 @@
-{# "Help me choose" wizard (#167): a short stepper that teaches the one-deck
-   model and lands on the matching existing form with values preseeded via
-   wz_* params. No submission paths of its own. #}
+{# "Help me choose" wizard (#167): one question per screen, teaching the
+   one-deck model as it goes, ending on the matching existing form with
+   everything preseeded via wz_* params. Owns no submission paths. #}
 <dialog id="timed-wizard" class="wizard-dialog" aria-labelledby="timed-wizard-title">
   <div class="wizard-head">
-    <h2 id="timed-wizard-title"><i class="ph ph-magic-wand" aria-hidden="true"></i> What should your display do?</h2>
-    <button type="button" class="ghost" data-wizard-close aria-label="Close">
+    <div class="wizard-head-titleblock">
+      <span class="wizard-head-icon" aria-hidden="true"><i class="ph ph-magic-wand"></i></span>
+      <div>
+        <h2 id="timed-wizard-title">Set up your display</h2>
+        <p class="wizard-progress" data-wizard-progress aria-live="polite"></p>
+      </div>
+    </div>
+    <button type="button" class="dx-btn-ghost-sm dx-btn-icon-only" data-wizard-close aria-label="Close">
       <i class="ph ph-x" aria-hidden="true"></i>
     </button>
   </div>
 
   <div class="wizard-step" data-wizard-step="intent">
+    <p class="wizard-question">What should your display do?</p>
     <div class="wizard-choices" role="radiogroup" aria-label="What should your display do?">
       <label class="wizard-choice">
         <input type="radio" name="wz-intent" value="daily">
-        <strong>Show one dashboard at a set time each day</strong>
-        <span class="cf-hint">Creates a timed send: a deck that fires the dashboard once a day.</span>
+        <span class="wizard-choice-icon" aria-hidden="true"><i class="ph ph-clock"></i></span>
+        <span class="wizard-choice-body">
+          <strong>Show one dashboard at a set time each day</strong>
+          <span class="cf-hint">A timed send: the dashboard fires once a day at your time.</span>
+        </span>
       </label>
       <label class="wizard-choice">
         <input type="radio" name="wz-intent" value="interval">
-        <strong>Keep one dashboard fresh every few minutes</strong>
-        <span class="cf-hint">Creates a timed send on an interval: the dashboard re-renders on your cadence.</span>
+        <span class="wizard-choice-icon" aria-hidden="true"><i class="ph ph-timer"></i></span>
+        <span class="wizard-choice-body">
+          <strong>Keep one dashboard fresh every few minutes</strong>
+          <span class="cf-hint">A timed send on an interval: it re-renders on your cadence.</span>
+        </span>
       </label>
       <label class="wizard-choice">
         <input type="radio" name="wz-intent" value="cycle">
-        <strong>Cycle through several dashboards automatically</strong>
-        <span class="cf-hint">Creates a timer cycle: a deck that advances through your picks all day.</span>
+        <span class="wizard-choice-icon" aria-hidden="true"><i class="ph ph-arrows-clockwise"></i></span>
+        <span class="wizard-choice-body">
+          <strong>Cycle through several dashboards automatically</strong>
+          <span class="cf-hint">A timer cycle: it advances through your picks all day.</span>
+        </span>
       </label>
       <label class="wizard-choice">
         <input type="radio" name="wz-intent" value="manual">
-        <strong>Flip between dashboards by hand</strong>
-        <span class="cf-hint">Creates a deck with links: taps, swipes, or buttons move between pages instantly.</span>
+        <span class="wizard-choice-icon" aria-hidden="true"><i class="ph ph-hand-tap"></i></span>
+        <span class="wizard-choice-body">
+          <strong>Flip between dashboards by hand</strong>
+          <span class="cf-hint">A deck with links: button presses, taps, or swipes move between pages instantly.</span>
+        </span>
       </label>
     </div>
     <div class="wizard-actions">
-      <button type="button" class="button" data-wizard-next disabled>Continue</button>
+      <button type="button" class="dx-btn-primary" data-wizard-next disabled>
+        <span>Continue</span><i class="ph ph-arrow-right" aria-hidden="true"></i>
+      </button>
     </div>
   </div>
 
-  <div class="wizard-step" data-wizard-step="daily" hidden>
-    <p class="cf-hint">Pick the dashboard and the time. You can rename it and add
-      conditions on the form this fills in.</p>
+  <div class="wizard-step" data-wizard-step="page" hidden>
+    <p class="wizard-question">Which dashboard?</p>
     <div class="field">
-      <label for="wz-daily-page">Dashboard</label>
-      <select id="wz-daily-page" data-wizard-page>
+      <select id="wz-page" data-wizard-page aria-label="Dashboard">
         {% for p in pages %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
       </select>
-    </div>
-    <div class="field">
-      <label for="wz-daily-time">Time of day</label>
-      <input type="time" id="wz-daily-time" value="07:00" data-wizard-time>
-    </div>
-    <div class="wizard-actions">
-      <button type="button" class="ghost" data-wizard-back>Back</button>
-      <button type="button" class="button" data-wizard-finish="daily">Prefill the form</button>
+      {% if not pages %}<p class="cf-hint">No dashboards yet. Create one first, then come back.</p>{% endif %}
     </div>
   </div>
 
-  <div class="wizard-step" data-wizard-step="interval" hidden>
-    <p class="cf-hint">Pick the dashboard and how often it should refresh.</p>
+  <div class="wizard-step" data-wizard-step="time" hidden>
+    <p class="wizard-question">What time each day?</p>
     <div class="field">
-      <label for="wz-interval-page">Dashboard</label>
-      <select id="wz-interval-page" data-wizard-page>
-        {% for p in pages %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
-      </select>
-    </div>
-    <div class="field">
-      <label for="wz-interval-minutes">Every N minutes</label>
-      <input type="number" id="wz-interval-minutes" value="15" min="1" max="1440" data-wizard-minutes>
-    </div>
-    <div class="wizard-actions">
-      <button type="button" class="ghost" data-wizard-back>Back</button>
-      <button type="button" class="button" data-wizard-finish="interval">Prefill the form</button>
+      <input type="time" id="wz-time" value="07:00" data-wizard-time aria-label="Time of day">
+      <p class="cf-hint">It fires once a day at this time, on the days you keep enabled on the form.</p>
     </div>
   </div>
 
-  <div class="wizard-step" data-wizard-step="cycle" hidden>
-    <p class="cf-hint">Pick two or more dashboards; each shows for the minutes
-      you choose, then the cycle repeats. Per-dashboard timing and conditions
-      are on the form this fills in.</p>
+  <div class="wizard-step" data-wizard-step="minutes" hidden>
+    <p class="wizard-question">How often should it refresh?</p>
+    <div class="field wizard-inline-unit">
+      <span>Every</span>
+      <input type="number" id="wz-minutes" value="15" min="1" max="1440" data-wizard-minutes aria-label="Minutes between refreshes">
+      <span>minutes</span>
+    </div>
+  </div>
+
+  <div class="wizard-step" data-wizard-step="pages" hidden>
+    <p class="wizard-question">Which dashboards should it cycle through?</p>
     <div class="field wizard-page-list" role="group" aria-label="Dashboards to cycle">
       {% for p in pages %}
       <label class="wizard-page-option">
@@ -85,26 +94,47 @@
         <span>{{ p.name }}</span>
       </label>
       {% endfor %}
+      {% if not pages %}<p class="cf-hint">No dashboards yet. Create some first, then come back.</p>{% endif %}
     </div>
+    <p class="cf-hint">Pick two or more. They show in this order and the cycle repeats all day.</p>
+  </div>
+
+  <div class="wizard-step" data-wizard-step="dwell" hidden>
+    <p class="wizard-question">How long should each dashboard stay up?</p>
+    <div class="field wizard-inline-unit">
+      <input type="number" id="wz-dwell" value="15" min="1" max="1440" data-wizard-dwell aria-label="Minutes per dashboard">
+      <span>minutes each</span>
+    </div>
+    <p class="cf-hint">You can give individual dashboards their own timing on the form.</p>
+  </div>
+
+  <div class="wizard-step" data-wizard-step="name" hidden>
+    <p class="wizard-question">Give it a name</p>
     <div class="field">
-      <label for="wz-cycle-dwell">Minutes per dashboard</label>
-      <input type="number" id="wz-cycle-dwell" value="15" min="1" max="1440" data-wizard-dwell>
-    </div>
-    <div class="wizard-actions">
-      <button type="button" class="ghost" data-wizard-back>Back</button>
-      <button type="button" class="button" data-wizard-finish="cycle">Prefill the form</button>
+      <input type="text" id="wz-name" data-wizard-name maxlength="80"
+             placeholder="Morning refresh" aria-label="Name">
+      <p class="cf-hint">Next we open the form with everything filled in; review it and press Create.</p>
     </div>
   </div>
 
   <div class="wizard-step" data-wizard-step="manual" hidden>
-    <p>Hand navigation lives in the canvas editor: put a tap or swipe
-      "go to page" action on any tile, and Tesserae turns the linked pages
-      into a deck kept pre-rendered on the device, so every press is
-      instant. Storage-capable displays even navigate with the radio off.</p>
-    <div class="wizard-actions">
-      <button type="button" class="ghost" data-wizard-back>Back</button>
-      <a class="button" href="{{ url_for('decks.editor') }}">Open the deck editor</a>
-    </div>
+    <p class="wizard-question">Wire it in the deck editor</p>
+    <p>Put a "go to page" action on any tile (button press, tap, or swipe) and
+      Tesserae turns the linked dashboards into a deck, kept pre-rendered on
+      the device so every press is instant. Storage-capable displays even
+      navigate with the radio off.</p>
+  </div>
+
+  <div class="wizard-footer" data-wizard-footer hidden>
+    <button type="button" class="dx-btn-ghost-sm" data-wizard-back>
+      <i class="ph ph-arrow-left" aria-hidden="true"></i><span>Back</span>
+    </button>
+    <button type="button" class="dx-btn-primary" data-wizard-forward>
+      <span>Continue</span><i class="ph ph-arrow-right" aria-hidden="true"></i>
+    </button>
+    <a class="dx-btn-primary" href="{{ url_for('decks.editor') }}" data-wizard-editor-link hidden>
+      <span>Open the deck editor</span><i class="ph ph-arrow-right" aria-hidden="true"></i>
+    </a>
   </div>
 </dialog>
 <script src="{{ url_for('static', filename='timed_wizard.js') }}" defer></script>

@@ -1,66 +1,107 @@
-// "Help me choose" wizard (#167). Collects intent + details in a native
-// <dialog>, then navigates back to /decks with wz_* params; the server
-// preseeds the matching existing form. No submission paths of its own.
+// "Help me choose" wizard (#167). One question per screen; ends by
+// navigating to /decks with wz_* params so the server preseeds the matching
+// existing form. Owns no submission paths.
 (function () {
   const dialog = document.getElementById('timed-wizard');
   const opener = document.querySelector('[data-open-timed-wizard]');
   if (!dialog || !opener || typeof dialog.showModal !== 'function') return;
 
+  const FLOWS = {
+    daily: ['intent', 'page', 'time', 'name'],
+    interval: ['intent', 'page', 'minutes', 'name'],
+    cycle: ['intent', 'pages', 'dwell', 'name'],
+    manual: ['intent', 'manual'],
+  };
+  let flow = ['intent'];
+  let index = 0;
+
   const steps = dialog.querySelectorAll('[data-wizard-step]');
-  const show = (name) => {
+  const footer = dialog.querySelector('[data-wizard-footer]');
+  const backBtn = dialog.querySelector('[data-wizard-back]');
+  const forwardBtn = dialog.querySelector('[data-wizard-forward]');
+  const editorLink = dialog.querySelector('[data-wizard-editor-link]');
+  const progress = dialog.querySelector('[data-wizard-progress]');
+  const intentNext = dialog.querySelector('[data-wizard-next]');
+
+  const stepValid = (name) => {
+    if (name === 'page') {
+      const sel = dialog.querySelector('[data-wizard-page]');
+      return Boolean(sel && sel.value);
+    }
+    if (name === 'pages') {
+      return dialog.querySelectorAll('[data-wizard-cycle-page]:checked').length >= 1;
+    }
+    return true;
+  };
+
+  const render = () => {
+    const name = flow[index];
     steps.forEach((el) => { el.hidden = el.dataset.wizardStep !== name; });
+    const last = index === flow.length - 1;
+    footer.hidden = name === 'intent';
+    editorLink.hidden = name !== 'manual';
+    forwardBtn.hidden = name === 'manual';
+    forwardBtn.querySelector('span').textContent = last ? 'Prefill the form' : 'Continue';
+    forwardBtn.disabled = !stepValid(name);
+    progress.textContent = 'Step ' + (index + 1) + ' of ' + flow.length;
     const focusable = dialog.querySelector(
-      `[data-wizard-step="${name}"] input, [data-wizard-step="${name}"] select, ` +
-      `[data-wizard-step="${name}"] a, [data-wizard-step="${name}"] button`
+      `[data-wizard-step="${name}"] input, [data-wizard-step="${name}"] select`
     );
-    if (focusable) focusable.focus();
+    (focusable || forwardBtn).focus();
   };
 
   opener.addEventListener('click', () => {
-    show('intent');
+    flow = ['intent'];
+    index = 0;
+    render();
     dialog.showModal();
   });
   dialog.querySelector('[data-wizard-close]').addEventListener('click', () => dialog.close());
 
-  const nextBtn = dialog.querySelector('[data-wizard-next]');
-  const intents = dialog.querySelectorAll('input[name="wz-intent"]');
-  intents.forEach((r) => r.addEventListener('change', () => { nextBtn.disabled = false; }));
-  nextBtn.addEventListener('click', () => {
-    const picked = dialog.querySelector('input[name="wz-intent"]:checked');
-    if (picked) show(picked.value);
-  });
-  dialog.querySelectorAll('[data-wizard-back]').forEach((b) =>
-    b.addEventListener('click', () => show('intent'))
+  dialog.querySelectorAll('input[name="wz-intent"]').forEach((r) =>
+    r.addEventListener('change', () => {
+      intentNext.disabled = false;
+      flow = FLOWS[r.value];
+    })
   );
+  intentNext.addEventListener('click', () => { index = 1; render(); });
+  backBtn.addEventListener('click', () => { index = Math.max(0, index - 1); render(); });
 
-  const go = (params, anchor) => {
-    window.location.assign('/decks?' + params.toString() + anchor);
+  // Re-validate the current step as its inputs change.
+  dialog.addEventListener('change', () => { forwardBtn.disabled = !stepValid(flow[index]); });
+
+  const finish = () => {
+    const kind = flow === FLOWS.daily ? 'daily'
+      : flow === FLOWS.interval ? 'interval' : 'cycle';
+    const params = new URLSearchParams();
+    const name = dialog.querySelector('[data-wizard-name]').value.trim();
+    if (name) params.set('wz_name', name);
+    if (kind === 'cycle') {
+      const picked = Array.from(
+        dialog.querySelectorAll('[data-wizard-cycle-page]:checked')
+      ).map((c) => c.value);
+      params.set('wz_pages', picked.join(','));
+      params.set('wz_dwell', dialog.querySelector('[data-wizard-dwell]').value || '15');
+      window.location.assign('/decks?' + params.toString() + '#rotation-form-card');
+      return;
+    }
+    params.set('prefill_page', dialog.querySelector('[data-wizard-page]').value);
+    params.set('wz_type', kind);
+    if (kind === 'daily') {
+      params.set('wz_time', dialog.querySelector('[data-wizard-time]').value || '07:00');
+    } else {
+      params.set('wz_interval', dialog.querySelector('[data-wizard-minutes]').value || '15');
+    }
+    window.location.assign('/decks?' + params.toString() + '#timed');
   };
-  dialog.querySelectorAll('[data-wizard-finish]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const step = btn.closest('[data-wizard-step]');
-      const kind = btn.dataset.wizardFinish;
-      const params = new URLSearchParams();
-      if (kind === 'daily' || kind === 'interval') {
-        const page = step.querySelector('[data-wizard-page]');
-        if (!page || !page.value) return;
-        params.set('prefill_page', page.value);
-        params.set('wz_type', kind);
-        if (kind === 'daily') {
-          params.set('wz_time', step.querySelector('[data-wizard-time]').value || '07:00');
-        } else {
-          params.set('wz_interval', step.querySelector('[data-wizard-minutes]').value || '15');
-        }
-        go(params, '#timed');
-      } else if (kind === 'cycle') {
-        const picked = Array.from(
-          step.querySelectorAll('[data-wizard-cycle-page]:checked')
-        ).map((c) => c.value);
-        if (!picked.length) return;
-        params.set('wz_pages', picked.join(','));
-        params.set('wz_dwell', step.querySelector('[data-wizard-dwell]').value || '15');
-        go(params, '#rotation-form-card');
-      }
-    });
+
+  forwardBtn.addEventListener('click', () => {
+    if (!stepValid(flow[index])) return;
+    if (index === flow.length - 1) {
+      finish();
+      return;
+    }
+    index += 1;
+    render();
   });
 })();

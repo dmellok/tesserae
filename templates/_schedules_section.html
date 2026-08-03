@@ -132,21 +132,11 @@
 </form>
 {% endmacro %}
 
-<header class="page-head">
-  <h2 id="timed"><i class="ph ph-calendar-dots"></i> Timed sends
-    <button type="button" class="header-action" data-toggle-new-schedule>
-      <i class="ph ph-plus" aria-hidden="true"></i><span>New timed send</span>
-    </button>
-  </h2>
-  <p class="lede">
-    A timed send is a deck that puts one dashboard on its displays by the
-    clock, on an interval or at a daily time. To cycle several dashboards
-    automatically, use a <a href="#rotations">timer cycle</a>; to flip between
-    them by hand, use a deck with links. Interval sends respect the
-    day-of-week mask and the time-of-day window; daily sends respect the mask
-    only.
-  </p>
-</header>
+{# #167: no separate heading; timed-send decks flow in the one deck list.
+   The bare anchor keeps old /schedules redirects and wizard links landing
+   here, and the hidden button keeps the reveal JS hook alive for the
+   wizard's prefill path. #}
+<span id="timed"></span>
 
 <section class="dx-section-card timeline-card">
   <header class="dx-section-head">
@@ -211,7 +201,7 @@
     {% endif %}
   {% else %}
     {# The wizard (#167) can preseed type / cadence / time via wz_* params. #}
-    {% set blank = {'id': '', 'name': '', 'page_id': (prefill_page or ''), 'enabled': true, 'type': (prefill_type or 'interval'), 'interval_minutes': (prefill_interval or 30), 'fires_at': (prefill_fires_at_dt or none), 'time_of_day_start': '', 'time_of_day_end': '', 'priority': 0, 'days_of_week': [0,1,2,3,4,5,6], 'smart_sync': false, 'smart_sync_lead_s': 10} %}
+    {% set blank = {'id': '', 'name': (prefill_name or ''), 'page_id': (prefill_page or ''), 'enabled': true, 'type': (prefill_type or 'interval'), 'interval_minutes': (prefill_interval or 30), 'fires_at': (prefill_fires_at_dt or none), 'time_of_day_start': '', 'time_of_day_end': '', 'priority': 0, 'days_of_week': [0,1,2,3,4,5,6], 'smart_sync': false, 'smart_sync_lead_s': 10} %}
     {{ schedule_form(blank, false, pages) }}
   {% endif %}
 </section>

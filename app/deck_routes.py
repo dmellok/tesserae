@@ -148,6 +148,7 @@ def index() -> str:
     # params degrade to the plain page.
     wz_type = request.args.get("wz_type", "")
     prefill_type = wz_type if wz_type in ("interval", "daily") else None
+    prefill_name = request.args.get("wz_name", "").strip()[:80]
     prefill_fires_at_dt = None
     wz_time = request.args.get("wz_time", "")
     if re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", wz_time):
@@ -214,6 +215,7 @@ def index() -> str:
         prefill_type=prefill_type,
         prefill_interval=prefill_interval,
         prefill_fires_at_dt=prefill_fires_at_dt,
+        prefill_name=prefill_name,
         wizard_steps=wizard_steps,
         # -- rotations section --------------------------------------------
         rotations=rotations,

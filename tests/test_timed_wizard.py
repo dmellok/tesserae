@@ -72,6 +72,26 @@ def test_cycle_params_preseed_step_rows(app: Flask) -> None:
     assert 'value="20"' in body
 
 
+def test_name_param_preseeds_both_forms(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    body = client.get("/decks?prefill_page=kitchen&wz_type=daily&wz_name=Morning+kitchen").get_data(
+        as_text=True
+    )
+    assert 'value="Morning kitchen"' in body
+    body = client.get("/decks?wz_pages=kitchen&wz_name=Lobby+loop").get_data(as_text=True)
+    assert 'value="Lobby loop"' in body
+
+
+def test_wizard_walks_one_question_per_step(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    body = client.get("/decks").get_data(as_text=True)
+    for step in ("intent", "page", "time", "minutes", "pages", "dwell", "name", "manual"):
+        assert f'data-wizard-step="{step}"' in body
+    assert "data-wizard-progress" in body
+
+
 def test_garbage_params_degrade_to_the_plain_page(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)

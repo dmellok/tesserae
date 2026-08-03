@@ -288,56 +288,124 @@ code {
   .flash.is-leaving { transform: none; }
 }
 
-/* "Help me choose" wizard dialog (#167): native <dialog>, token-styled. */
+/* "Help me choose" wizard dialog (#167): native <dialog>, dx-styled. */
 .wizard-dialog {
-  width: min(560px, calc(100vw - var(--t-space-6) * 2));
-  padding: var(--t-space-4);
+  width: min(600px, calc(100vw - var(--t-space-6) * 2));
+  padding: var(--t-space-5);
   border: 1px solid color-mix(in oklab, var(--t-border) 70%, transparent);
-  border-radius: var(--t-radius-md);
+  border-radius: var(--t-radius-lg, var(--t-radius-md));
   background: var(--t-surface);
   color: var(--t-fg);
   box-shadow: var(--t-shadow-md);
 }
-.wizard-dialog::backdrop { background: rgb(0 0 0 / 0.45); }
+.wizard-dialog::backdrop {
+  background: rgb(0 0 0 / 0.45);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
 .wizard-head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: var(--t-space-3);
-  margin-bottom: var(--t-space-3);
+  margin-bottom: var(--t-space-4);
+}
+.wizard-head-titleblock {
+  display: flex;
+  align-items: center;
+  gap: var(--t-space-3);
+}
+.wizard-head-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--t-radius-md);
+  background: color-mix(in oklab, var(--t-accent) 14%, var(--t-surface));
+  color: var(--t-accent);
+  font-size: 20px;
+  flex-shrink: 0;
 }
 .wizard-head h2 { margin: 0; font-size: var(--t-size-lg); }
+.wizard-progress {
+  margin: 2px 0 0;
+  font-size: var(--t-size-sm);
+  color: color-mix(in oklab, var(--t-fg) 60%, transparent);
+}
+.wizard-question {
+  margin: 0 0 var(--t-space-3);
+  font-size: var(--t-size-md);
+  font-weight: 600;
+}
 .wizard-choices { display: flex; flex-direction: column; gap: var(--t-space-2); }
 .wizard-choice {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  column-gap: var(--t-space-3);
-  align-items: start;
+  display: flex;
+  gap: var(--t-space-3);
+  align-items: center;
   padding: var(--t-space-3);
   border: 1px solid color-mix(in oklab, var(--t-border) 70%, transparent);
   border-radius: var(--t-radius-md);
   cursor: pointer;
+  transition: border-color 120ms linear, background 120ms linear;
+}
+.wizard-choice:hover {
+  border-color: color-mix(in oklab, var(--t-accent) 50%, var(--t-border));
 }
 .wizard-choice:has(input:checked) {
   border-color: var(--t-accent);
   background: color-mix(in oklab, var(--t-accent) 8%, var(--t-surface));
 }
-.wizard-choice input { margin-top: 3px; }
-.wizard-choice strong { grid-column: 2; }
-.wizard-choice .cf-hint { grid-column: 2; }
+.wizard-choice input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.wizard-choice:has(input:focus-visible) {
+  outline: 2px solid var(--t-accent);
+  outline-offset: 2px;
+}
+.wizard-choice-icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--t-radius-md);
+  background: color-mix(in oklab, var(--t-accent) 12%, var(--t-surface));
+  color: var(--t-accent);
+  font-size: 18px;
+  flex-shrink: 0;
+}
+.wizard-choice-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .wizard-page-list {
   display: flex;
   flex-direction: column;
   gap: var(--t-space-1);
   max-height: 220px;
   overflow-y: auto;
+  padding: var(--t-space-2);
+  border: 1px solid color-mix(in oklab, var(--t-border) 70%, transparent);
+  border-radius: var(--t-radius-md);
 }
 .wizard-page-option { display: flex; gap: var(--t-space-2); align-items: center; }
-.wizard-actions {
+.wizard-inline-unit {
+  display: flex;
+  align-items: center;
+  gap: var(--t-space-2);
+}
+.wizard-inline-unit input[type="number"] { width: 90px; }
+.wizard-actions,
+.wizard-footer {
   display: flex;
   justify-content: flex-end;
   gap: var(--t-space-2);
   margin-top: var(--t-space-4);
+}
+.wizard-footer [data-wizard-back] { margin-right: auto; }
+.deck-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--t-space-2);
+  align-items: center;
 }
 
 /* One-time storage-move notice on the Schedules / Rotations pages (#167).
