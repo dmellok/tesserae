@@ -32,7 +32,7 @@ import secrets
 import time
 import urllib.parse
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from functools import wraps
 from pathlib import Path
 from typing import Any
@@ -101,13 +101,15 @@ JOB_RETENTION_SECONDS = 86_400
 IDEMPOTENCY_RETENTION_SECONDS = 86_400
 
 # Personal-data bridge (#176, contract 0.7): a snapshot is fresh until it is
-# this old, then stale, then expired (deleted). ``max_ttl`` bounds how far a
-# client may set expires_at past generated_at. Server-advertised so the app
-# doesn't hard-code them.
+# this old, then stale, then expired (raw values redacted). ``max_ttl`` bounds
+# how far a client may set expires_at past generated_at. Server-advertised so
+# the app does not hard-code them.
 PERSONAL_DATA_STALE_SECONDS = 86_400  # 24 h
 PERSONAL_DATA_MAX_TTL_SECONDS = 172_800  # 48 h
-PERSONAL_DATA_SOURCES = ("reminders.fridge",)
+PERSONAL_DATA_SOURCES = ("reminders", "reminders.fridge")
 PERSONAL_DATA_SNAPSHOT_VERSION = "personal_data_bridge_v1"
+PERSONAL_DATA_REMINDERS_MAX_LISTS = 20
+PERSONAL_DATA_REMINDERS_MAX_ITEMS = 200
 _REMINDER_PRIORITIES = frozenset(("none", "low", "medium", "high"))
 
 # Features this server serves. The client gates on this list rather than
@@ -323,6 +325,11 @@ def _capabilities() -> dict[str, Any]:
             "ttl_seconds": 600,
         },
         "features": _features(),
+        # Source ids are advertised directly so clients can prefer the most
+        # capable strict schema without growing one feature flag per source.
+        # ``personal_data_reminders`` remains in ``features`` for compatibility
+        # with clients that predate this source list.
+        "personal_data": {"sources": list(PERSONAL_DATA_SOURCES)},
         "limits": {
             "image_upload_bytes": IMAGE_UPLOAD_BYTES,
             "image_max_edge": IMAGE_MAX_EDGE,
@@ -441,6 +448,15 @@ def _iso(epoch: float) -> str:
     return datetime.fromtimestamp(epoch, UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def _is_iso_date(value: Any) -> bool:
+    if not isinstance(value, str) or len(value) != 10:
+        return False
+    try:
+        return date.fromisoformat(value).isoformat() == value
+    except ValueError:
+        return False
+
+
 def _personal_data_state(generated_epoch: float, expires_epoch: float, now: float) -> str:
     if now >= expires_epoch:
         return "expired"
@@ -500,18 +516,102 @@ def _validate_reminders_fridge(
             return bad("each item must be an object")
         if set(item) - {"id", "title", "due_date", "priority", "completed"}:
             return bad("an item has unexpected fields")
+        if "due_date" not in item:
+            return bad("item due_date is required")
         iid, title = item.get("id"), item.get("title")
         if not isinstance(iid, str) or not (1 <= len(iid) <= 256):
             return bad("item id must be a 1-256 char string")
         if not isinstance(title, str) or not (1 <= len(title) <= 512):
             return bad("item title must be a 1-512 char string")
         due = item.get("due_date")
-        if due is not None and not isinstance(due, str):
-            return bad("item due_date must be a date string or null")
+        if due is not None and not _is_iso_date(due):
+            return bad("item due_date must be an ISO date or null")
         if item.get("priority") not in _REMINDER_PRIORITIES:
             return bad("item priority must be none/low/medium/high")
         if item.get("completed") is not False:
             return bad("item completed must be false")
+    return (body, gen, exp), None
+
+
+def _validate_reminders(
+    source_id: str, body: Any
+) -> tuple[tuple[dict[str, Any], float, float] | None, tuple[Response, int] | None]:
+    """Validate the generic, grouped Apple Reminders snapshot.
+
+    The schema stays deliberately bounded and source-specific: list ids are
+    opaque publication identifiers from Companion, not EventKit identifiers,
+    and all items still use the minimal v1 reminder shape.
+    """
+
+    def bad(msg: str) -> tuple[None, tuple[Response, int]]:
+        return None, _error("invalid_snapshot", msg, 400)
+
+    if not isinstance(body, dict):
+        return bad("body must be a JSON object")
+    if set(body) - {"version", "source_id", "generated_at", "expires_at", "data"}:
+        return bad("snapshot has unexpected fields")
+    if body.get("version") != PERSONAL_DATA_SNAPSHOT_VERSION:
+        return bad("unsupported snapshot version")
+    if body.get("source_id") != source_id:
+        return bad("source_id does not match the path")
+    gen = _parse_iso(body.get("generated_at"))
+    exp = _parse_iso(body.get("expires_at"))
+    if gen is None or exp is None:
+        return bad("generated_at and expires_at must be ISO 8601")
+    if exp <= gen:
+        return bad("expires_at must be after generated_at")
+    if exp - gen > PERSONAL_DATA_MAX_TTL_SECONDS:
+        return bad("expires_at exceeds the maximum retention window")
+
+    data = body.get("data")
+    if not isinstance(data, dict) or set(data) - {"lists"}:
+        return bad("data must be an object with only lists")
+    lists = data.get("lists")
+    if not isinstance(lists, list):
+        return bad("data.lists must be an array")
+    if len(lists) > PERSONAL_DATA_REMINDERS_MAX_LISTS:
+        return bad(f"too many lists (max {PERSONAL_DATA_REMINDERS_MAX_LISTS})")
+
+    seen_list_ids: set[str] = set()
+    total_items = 0
+    for reminder_list in lists:
+        if not isinstance(reminder_list, dict):
+            return bad("each list must be an object")
+        if set(reminder_list) - {"id", "title", "items"}:
+            return bad("a list has unexpected fields")
+        list_id, list_title = reminder_list.get("id"), reminder_list.get("title")
+        if not isinstance(list_id, str) or not (1 <= len(list_id) <= 256):
+            return bad("list id must be a 1-256 char string")
+        if list_id in seen_list_ids:
+            return bad("list ids must be unique")
+        seen_list_ids.add(list_id)
+        if not isinstance(list_title, str) or not (1 <= len(list_title) <= 256):
+            return bad("list title must be a 1-256 char string")
+        items = reminder_list.get("items")
+        if not isinstance(items, list):
+            return bad("list items must be an array")
+        total_items += len(items)
+        if total_items > PERSONAL_DATA_REMINDERS_MAX_ITEMS:
+            return bad(f"too many items across all lists (max {PERSONAL_DATA_REMINDERS_MAX_ITEMS})")
+        for item in items:
+            if not isinstance(item, dict):
+                return bad("each item must be an object")
+            if set(item) - {"id", "title", "due_date", "priority", "completed"}:
+                return bad("an item has unexpected fields")
+            if "due_date" not in item:
+                return bad("item due_date is required")
+            item_id, item_title = item.get("id"), item.get("title")
+            if not isinstance(item_id, str) or not (1 <= len(item_id) <= 256):
+                return bad("item id must be a 1-256 char string")
+            if not isinstance(item_title, str) or not (1 <= len(item_title) <= 512):
+                return bad("item title must be a 1-512 char string")
+            due = item.get("due_date")
+            if due is not None and not _is_iso_date(due):
+                return bad("item due_date must be an ISO date or null")
+            if item.get("priority") not in _REMINDER_PRIORITIES:
+                return bad("item priority must be none/low/medium/high")
+            if item.get("completed") is not False:
+                return bad("item completed must be false")
     return (body, gen, exp), None
 
 
@@ -524,7 +624,11 @@ def put_personal_data(source_id: str) -> Any:
     timestamp is refused so delayed background work can't overwrite newer data."""
     if source_id not in PERSONAL_DATA_SOURCES:
         return _error("unsupported_personal_data_source", f"unknown source {source_id!r}", 400)
-    result, err = _validate_reminders_fridge(source_id, request.get_json(silent=True))
+    body = request.get_json(silent=True)
+    if source_id == "reminders":
+        result, err = _validate_reminders(source_id, body)
+    else:
+        result, err = _validate_reminders_fridge(source_id, body)
     if err is not None:
         return err
     assert result is not None  # narrow for mypy; err is None here

@@ -39,6 +39,12 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **Expired personal-data snapshots no longer retain raw values.** The store
+  removes list names and Reminder contents at `expires_at` while preserving a
+  metadata-only tombstone for the `expired` status. Reminder due dates are now
+  also validated as real `YYYY-MM-DD` calendar dates for both the generic and
+  deprecated source schemas.
+
 - **Revoking a remote panel now actually cuts it off.** The relay Worker's
   revoke deleted the panel's mailbox but left its token record, so a revoked
   panel kept authenticating and saw an empty-mailbox `204` it couldn't tell
