@@ -6,6 +6,17 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added
+
+- **Timer decks can now fire on schedule-style triggers** (#167). Besides the
+  classic anchor cycle, a deck's timer advance supports an `interval` trigger
+  (cooldown floor since the last fire, optional wrap-around time-of-day
+  window) and a `daily` trigger (once per local day at a set time, with the
+  backfill guard), plus a whole-deck fallback page for when every page's
+  conditions fail. A deck with no bound devices fires to the page's own
+  devices. These are the shapes the upcoming schedule/rotation migration
+  maps onto; existing decks are unchanged (`cycle` is the default).
+
 ### Changed
 
 - **Priority now arbitrates across schedules, rotations, and timer decks on

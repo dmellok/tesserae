@@ -191,6 +191,50 @@ class Deck(BaseModel):
     advance_mode: Literal["scheduled", "priority"] = "scheduled"
     advance_min_hold_minutes: int = Field(default=5, ge=0, le=120)
 
+    # Trigger shape for timer advance (#167 Phase 2). ``cycle`` is the classic
+    # anchor-based dwell cycle (what rotations do). ``interval`` fires the
+    # eligible page on a cooldown floor inside an optional time-of-day window,
+    # drifting with actual fire times rather than aligning to the anchor, so a
+    # migrated interval schedule keeps its exact cadence semantics. ``daily``
+    # fires once per local day at ``advance_fires_at`` with the schedule
+    # backfill guard. Only used when ``advance`` != ``manual``.
+    advance_trigger: Literal["cycle", "interval", "daily"] = "cycle"
+
+    # ``daily`` trigger: local HH:MM fire time. Required for that trigger.
+    advance_fires_at: str | None = None
+
+    # ``interval`` trigger: optional HH:MM window, wrap-around allowed
+    # (22:00 -> 06:00 spans midnight). Same semantics as the old
+    # Schedule.time_of_day_start/_end, deliberately NOT the anchor gate
+    # (which treats before-anchor as inactive rather than wrapping).
+    advance_window_start: str | None = None
+    advance_window_end: str | None = None
+
+    # When no page's conditions pass, fire this page instead of holding. A
+    # fire target rather than a nav node, so it may reference a page outside
+    # the deck, matching Schedule.fallback_page_id.
+    advance_fallback_page_id: str | None = None
+
+    # Set on records migrated from the legacy rotation / schedule stores so
+    # the compatibility projections know which UI / API surface owns them.
+    # None for decks authored as decks.
+    legacy_kind: Literal["rotation", "schedule"] | None = None
+
+    @field_validator("advance_fires_at", "advance_window_start", "advance_window_end")
+    @classmethod
+    def _validate_trigger_times(cls, v: str | None) -> str | None:
+        if v is None or v == "":
+            return None
+        if not re.match(r"^([01]\d|2[0-3]):[0-5]\d$", v):
+            raise ValueError("trigger times must be 'HH:MM' 24-hour or empty")
+        return v
+
+    @model_validator(mode="after")
+    def _validate_trigger(self) -> Deck:
+        if self.advance_trigger == "daily" and self.advance_fires_at is None:
+            raise ValueError("advance_trigger 'daily' requires advance_fires_at")
+        return self
+
     @field_validator("advance_anchor")
     @classmethod
     def _validate_advance_anchor(cls, v: str) -> str:
