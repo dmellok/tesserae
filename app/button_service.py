@@ -48,6 +48,7 @@ from app.button_actions import (
 )
 from app.device_loader import DeviceRegistry
 from app.push import PushManager, PushResult
+from app.scheduler import RotationSource
 from app.state.deck_model import Deck
 from app.state.deck_nav_store import DeckNavStore
 from app.state.deck_store import DeckStore
@@ -56,7 +57,6 @@ from app.state.device_rotation_state_store import DeviceRotationStateStore
 from app.state.event_log import EventLog
 from app.state.page_store import PageStore
 from app.state.rotation_model import Rotation
-from app.state.rotation_store import RotationStore
 from app.state.settings_store import SettingsStore
 from app.touch_regions import (
     classify_stroke,
@@ -208,7 +208,7 @@ class ButtonService:
     def __init__(
         self,
         *,
-        rotation_store: RotationStore,
+        rotation_store: RotationSource,
         state_store: DeviceRotationStateStore,
         settings_store: SettingsStore,
         page_store: PageStore,

@@ -32,7 +32,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, time, timedelta, tzinfo
 from functools import partial
-from typing import Any
+from typing import Any, Protocol
 
 from pydantic import ValidationError
 
@@ -42,11 +42,25 @@ from app.state.deck_model import Deck
 from app.state.deck_store import DeckStore
 from app.state.event_log import EventLog
 from app.state.rotation_model import Rotation, RotationStep
-from app.state.rotation_store import RotationStore
 from app.state.schedule_model import Schedule
-from app.state.schedule_store import ScheduleStore
 
 logger = logging.getLogger(__name__)
+
+
+class ScheduleSource(Protocol):
+    """What the scheduler needs from a schedule store: the file-backed
+    ScheduleStore and the #167 ScheduleProjection both satisfy this."""
+
+    def all(self) -> list[Schedule]: ...
+
+    def get(self, schedule_id: str) -> Schedule | None: ...
+
+
+class RotationSource(Protocol):
+    """What the scheduler needs from a rotation store: the file-backed
+    RotationStore and the #167 RotationProjection both satisfy this."""
+
+    def all(self) -> list[Rotation]: ...
 
 
 # Returns the active tz or None for host-local. Resolved on every tick so
@@ -254,7 +268,7 @@ class Scheduler:
     def __init__(
         self,
         *,
-        store: ScheduleStore,
+        store: ScheduleSource,
         push_manager: Callable[[], PushManager],
         event_log: EventLog | None = None,
         timezone_provider: TimezoneProvider | None = None,
@@ -265,7 +279,7 @@ class Scheduler:
         device_telemetry: Any = None,
         # Rotations (issue: dashboard rotation). Optional; None means
         # no rotation evaluation runs each tick. Production wires it.
-        rotation_store: RotationStore | None = None,
+        rotation_store: RotationSource | None = None,
         rotation_state_store: Any = None,
         deck_store: DeckStore | None = None,
         deck_nav_store: Any = None,
@@ -667,8 +681,8 @@ class Scheduler:
 
         if self._deck_store is not None and self._deck_nav_store is not None:
             for deck in self._deck_store.all():
-                if not deck.enabled:
-                    continue
+                if not deck.enabled or deck.legacy_kind is not None:
+                    continue  # legacy records resolve via the rotation branch below
                 for device_id in deck.device_ids:
                     if device_id in claimed:
                         continue
@@ -891,7 +905,10 @@ class Scheduler:
         trigger_ids = {
             d.id
             for d in decks
-            if d.enabled and d.advance != "manual" and d.advance_trigger != "cycle"
+            if d.enabled
+            and d.advance != "manual"
+            and d.advance_trigger != "cycle"
+            and d.legacy_kind is None
         }
         with self._lock:
             for did in list(self._deck_trigger_first_seen):
@@ -900,6 +917,11 @@ class Scheduler:
         out: list[tuple[Deck, Rotation, str, StepState]] = []
         for deck in decks:
             if not deck.enabled or deck.advance == "manual" or not deck.pages:
+                continue
+            # Migrated rotation / schedule records fire through their legacy
+            # projection passes (full parity: holds, rejoin, force-step,
+            # status pills); firing them here too would double-push.
+            if deck.legacy_kind is not None:
                 continue
             # cycle decks need explicit bindings (classic deck semantics);
             # interval / daily decks may have none and then fire to the

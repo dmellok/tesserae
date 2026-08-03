@@ -83,9 +83,25 @@ def test_entry_page_must_be_a_page() -> None:
         Deck(id="d", name="d", entry_page_id="ghost", pages=[DeckPage(page_id="a")])
 
 
-def test_duplicate_page_id_rejected() -> None:
+def test_duplicate_page_id_rejected_only_when_navigable() -> None:
+    # A pure timer cycle may repeat a page (#167: A -> B -> A rotations
+    # migrate losslessly); anything that addresses pages by id (links,
+    # entry, home) still requires uniqueness.
+    dupes = [DeckPage(page_id="a"), DeckPage(page_id="a")]
+    assert Deck(id="d", name="d", pages=dupes).page_ids == ["a", "a"]
     with pytest.raises(ValidationError):
-        Deck(id="d", name="d", pages=[DeckPage(page_id="a"), DeckPage(page_id="a")])
+        Deck(id="d", name="d", pages=list(dupes), entry_page_id="a")
+    with pytest.raises(ValidationError):
+        Deck(id="d", name="d", pages=list(dupes), home_page_id="a")
+    with pytest.raises(ValidationError):
+        Deck(
+            id="d",
+            name="d",
+            pages=[
+                DeckPage(page_id="a", links=[{"target_page_id": "a", "button": "left"}]),
+                DeckPage(page_id="a"),
+            ],
+        )
 
 
 def test_single_page_deck_is_legal() -> None:

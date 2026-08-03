@@ -74,5 +74,12 @@ class DeckStore:
 
     def for_device(self, device_id: str) -> list[Deck]:
         """Enabled decks bound to a device. Used by the navigation + refresh
-        paths to find which deck (if any) a device is driving."""
-        return [d for d in self.all() if d.enabled and device_id in d.device_ids]
+        paths to find which deck (if any) a device is driving. Migrated
+        rotation / schedule records (#167, ``legacy_kind`` set) are excluded:
+        they are timed content, not navigable decks, and must not hijack the
+        SD sync manifest or button-link resolution."""
+        return [
+            d
+            for d in self.all()
+            if d.enabled and d.legacy_kind is None and device_id in d.device_ids
+        ]

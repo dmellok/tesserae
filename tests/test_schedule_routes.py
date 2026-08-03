@@ -60,7 +60,6 @@ def test_create_persists_and_lists(app: Flask) -> None:
 def test_duplicate_name_uniquifies_id(app: Flask, tmp_path: Path) -> None:
     """User never enters an id; submitting the same name twice produces
     'x' and 'x_2', not an error."""
-    from app.state.schedule_store import ScheduleStore
 
     client = app.test_client()
     _sign_in(client)
@@ -74,7 +73,8 @@ def test_duplicate_name_uniquifies_id(app: Flask, tmp_path: Path) -> None:
                 "interval_minutes": "15",
             },
         )
-    store = ScheduleStore(tmp_path / "core" / "schedules.json")
+    # #167 Phase 2b: schedules live in the deck store; read through the projection.
+    store = app.config["SCHEDULE_STORE"]
     ids = sorted(s.id for s in store.all())
     assert ids == ["morning_refresh", "morning_refresh_2"]
 
@@ -94,9 +94,9 @@ def test_toggle_flips_enabled(app: Flask, tmp_path: Path) -> None:
         },
     )
     client.post("/schedules/x/toggle")
-    from app.state.schedule_store import ScheduleStore
 
-    store = ScheduleStore(tmp_path / "core" / "schedules.json")
+    # #167 Phase 2b: schedules live in the deck store; read through the projection.
+    store = app.config["SCHEDULE_STORE"]
     s = store.get("x")
     assert s is not None and s.enabled is False
     client.post("/schedules/x/toggle")
@@ -117,9 +117,9 @@ def test_delete_removes_row(app: Flask, tmp_path: Path) -> None:
         },
     )
     client.post("/schedules/doomed/delete")
-    from app.state.schedule_store import ScheduleStore
 
-    store = ScheduleStore(tmp_path / "core" / "schedules.json")
+    # #167 Phase 2b: schedules live in the deck store; read through the projection.
+    store = app.config["SCHEDULE_STORE"]
     assert store.get("doomed") is None
 
 
@@ -148,9 +148,9 @@ def test_update_preserves_id_even_if_form_attempts_rename(app: Flask, tmp_path: 
             "interval_minutes": "30",
         },
     )
-    from app.state.schedule_store import ScheduleStore
 
-    store = ScheduleStore(tmp_path / "core" / "schedules.json")
+    # #167 Phase 2b: schedules live in the deck store; read through the projection.
+    store = app.config["SCHEDULE_STORE"]
     assert store.get("stable") is not None
     assert store.get("stable").name == "Renamed name"
     assert store.get("different") is None

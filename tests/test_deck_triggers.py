@@ -285,7 +285,7 @@ def test_rotation_round_trips_through_deck() -> None:
     assert _deck_to_rotation(deck) == rotation
 
 
-def test_rotation_with_repeated_page_is_not_mappable() -> None:
+def test_rotation_with_repeated_page_maps_losslessly() -> None:
     rotation = Rotation(
         id="r",
         name="R",
@@ -295,7 +295,9 @@ def test_rotation_with_repeated_page_is_not_mappable() -> None:
             RotationStep(page_id="a", dwell_minutes=15),
         ],
     )
-    assert rotation_to_deck(rotation) is None
+    deck = rotation_to_deck(rotation)
+    assert [p.page_id for p in deck.pages] == ["a", "b", "a"]
+    assert _deck_to_rotation(deck) == rotation
 
 
 def test_interval_schedule_maps_to_interval_deck() -> None:

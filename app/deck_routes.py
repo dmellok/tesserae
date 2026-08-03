@@ -120,7 +120,9 @@ def _graph_json(deck_pages: Any) -> str:
 @bp.get("")
 def index() -> str:
     pages = _pages().list()
-    decks = _store().all()
+    # Migrated rotation / schedule records (#167) live in this store but
+    # belong to the Rotations / Schedules pages during the compat window.
+    decks = [d for d in _store().all() if d.legacy_kind is None]
     devices = current_app.config.get("DEVICE_REGISTRY")
     instances = [d for d in (devices.all() if devices is not None else []) if d.kind_of is not None]
     graphs = {d.id: _graph_json(d.pages) for d in decks}

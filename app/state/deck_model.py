@@ -261,7 +261,16 @@ class Deck(BaseModel):
     @model_validator(mode="after")
     def _validate_graph(self) -> Deck:
         page_ids = [p.page_id for p in self.pages]
-        if len(page_ids) != len(set(page_ids)):
+        # A pure timer cycle (no links, no explicit entry/home) may repeat a
+        # page (A -> B -> A -> C), which rotations always allowed and the
+        # #167 migration must preserve. A NAVIGABLE deck may not: links,
+        # entry, and home address pages by id, so repeats would be ambiguous.
+        navigable = (
+            any(p.links for p in self.pages)
+            or self.entry_page_id is not None
+            or self.home_page_id is not None
+        )
+        if navigable and len(page_ids) != len(set(page_ids)):
             raise ValueError("duplicate page_id in deck pages")
         known = set(page_ids)
         for page in self.pages:

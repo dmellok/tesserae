@@ -61,8 +61,6 @@ from app.ha_discovery import HomeAssistantDiscovery
 from app.scheduler import Scheduler
 from app.state.event_log import EventLog
 from app.state.page_store import PageStore, migrate_canvases_to_pages
-from app.state.rotation_store import RotationStore
-from app.state.schedule_store import ScheduleStore
 from app.state.settings_store import SettingsStore
 from app.transport_wiring import _is_reloader_watcher, _rebuild_transport
 
@@ -543,8 +541,30 @@ def create_app(
     from app import page_assets as _page_assets
 
     page_store.add_delete_listener(lambda pid: _page_assets.delete_all(data_root, pid))
-    schedule_store = ScheduleStore(data_root / "core" / "schedules.json")
-    rotation_store = RotationStore(data_root / "core" / "rotations.json")
+    # #167 Phase 2b: decks.json is the one store for timed content. Legacy
+    # schedules.json / rotations.json records are migrated in once at startup
+    # and the source files renamed to *.json.migrated (rollback artifact, and
+    # the guard against deleted records resurrecting on reboot). The old
+    # store APIs live on as projections over the deck store, so the
+    # Rotations / Schedules UIs, MCP tools, ButtonService, and scheduler
+    # passes keep working unchanged against projected objects.
+    from app.state.deck_migration import migrate_legacy_stores
+    from app.state.deck_store import DeckStore
+    from app.state.legacy_projections import RotationProjection, ScheduleProjection
+
+    deck_store = DeckStore(data_root / "core" / "decks.json")
+    legacy_report = migrate_legacy_stores(
+        deck_store=deck_store,
+        schedules_path=data_root / "core" / "schedules.json",
+        rotations_path=data_root / "core" / "rotations.json",
+    )
+    if legacy_report["migrated"]:
+        logger.info(
+            "migrated %d legacy schedule/rotation record(s) into the deck store",
+            len(legacy_report["migrated"]),
+        )
+    schedule_store = ScheduleProjection(deck_store)
+    rotation_store = RotationProjection(deck_store)
     # Per-device rotation position + button dedup state. Written by the
     # button service on every non-dedup'd button wake; read on every
     # /frame call to decide whether to serve the manual step or the
@@ -556,9 +576,8 @@ def create_app(
     )
     from app.state.album_store import AlbumStore
     from app.state.deck_nav_store import DeckNavStore
-    from app.state.deck_store import DeckStore
 
-    deck_store = DeckStore(data_root / "core" / "decks.json")
+    # deck_store constructed above (before the legacy migration).
     deck_nav_store = DeckNavStore(data_root / "core" / "deck_nav.json")
     album_store = AlbumStore(data_root / "core" / "albums.json")
     # User themes live alongside core stores at ``data/themes/user.json``.

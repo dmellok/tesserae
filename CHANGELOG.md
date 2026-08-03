@@ -19,6 +19,18 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Changed
 
+- **Schedules and rotations now live in the deck store** (#167). On first
+  start after updating, `rotations.json` and `schedules.json` records are
+  migrated into `decks.json` as tagged timer decks and the source files are
+  renamed to `*.json.migrated` (kept as rollback artifacts). Nothing
+  user-visible changes: the Rotations and Schedules pages, MCP tools,
+  physical-button behaviour, manual holds, and firing semantics all work
+  exactly as before through compatibility projections, and migrated records
+  do not appear on the Decks page. Rotations that repeat a page across steps
+  migrate too (linkless decks may now repeat pages). An id shared between a
+  legacy record and an existing deck gets a `-rotation` / `-schedule`
+  suffix, noted in the log.
+
 - **Priority now arbitrates across schedules, rotations, and timer decks on
   the same tick** (#167). The scheduler collects all three into one fire
   pass sorted by priority, so a higher-priority rotation or deck advance

@@ -19,9 +19,7 @@ from app.main import REPO_ROOT, create_app
 from app.rotation_routes import _build_projection
 from app.state.conditions import Condition
 from app.state.rotation_model import Rotation, RotationStep
-from app.state.rotation_store import RotationStore
 from app.state.schedule_model import Schedule
-from app.state.schedule_store import ScheduleStore
 
 
 @pytest.fixture
@@ -46,7 +44,8 @@ def test_rotation_index_renders_with_condition_on_step(app: Flask, tmp_path: Pat
     textarea via ``step.conditions | tojson``. With a saved condition
     that's a Pydantic ``Condition`` instance, the page used to 500.
     """
-    store = RotationStore(tmp_path / "core" / "rotations.json")
+    # #167 Phase 2b: rotations live in the deck store; write through the projection.
+    store = app.config["ROTATION_STORE"]
     store.upsert(
         Rotation(
             id="evening",
@@ -84,7 +83,8 @@ def test_rotation_index_renders_with_condition_on_step(app: Flask, tmp_path: Pat
 def test_schedule_index_renders_with_condition(app: Flask, tmp_path: Path) -> None:
     """Same shape, schedule edition: the schedules.html template uses
     ``s.conditions | tojson`` to seed its conditions textarea."""
-    store = ScheduleStore(tmp_path / "core" / "schedules.json")
+    # #167 Phase 2b: schedules live in the deck store; read through the projection.
+    store = app.config["SCHEDULE_STORE"]
     store.upsert(
         Schedule(
             id="morning",
@@ -154,10 +154,8 @@ def test_form_submit_preserves_step_conditions_and_scheduler_skips_failing_step(
     # 302 on success; 200 with flash means validation failure.
     assert resp.status_code == 302, resp.get_data(as_text=True)[:500]
 
-    # Read back what the route persisted.
-    from app.state.rotation_store import RotationStore as _RS
-
-    store = _RS(tmp_path / "core" / "rotations.json")
+    # Read back what the route persisted (#167 Phase 2b: via the projection).
+    store = app.config["ROTATION_STORE"]
     rotation = next(iter(store.all()))
     assert len(rotation.steps) == 4
     assert rotation.steps[3].conditions, (
@@ -213,13 +211,14 @@ def test_manual_fire_button_respects_conditions(app: Flask, tmp_path: Path) -> N
     from app.scheduler import Scheduler as _Scheduler
     from app.scheduler_conditions import ConditionEvaluator
     from app.state.page_store import Page, PageStore
-    from app.state.rotation_store import RotationStore as _RS
 
     pages = PageStore(tmp_path / "core" / "pages.json")
     for pid in ("todo", "three_d_print"):
         pages.save(Page(id=pid, name=pid))
 
-    store = _RS(tmp_path / "core" / "rotations.json")
+    # #167 Phase 2b: the fire endpoint reads the projection off app config,
+    # so seed the rotation there (backed by the deck store).
+    store = app.config["ROTATION_STORE"]
     store.upsert(
         Rotation(
             id="trmnl",
