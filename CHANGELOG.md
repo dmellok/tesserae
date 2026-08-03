@@ -6,6 +6,14 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **Deleted canvas-born dashboards no longer resurrect after a restart.** The
+  legacy standalone-canvas migration runs on every startup and re-created any
+  canvas whose page id was free, so deleting such a dashboard only lasted until
+  the next update. Deleting a page now also drops the same-id legacy canvas
+  doc; canvases that were never deleted keep migrating exactly as before.
+
 ### Added
 
 - **The Companion API contract now supports selected Apple Reminders lists as

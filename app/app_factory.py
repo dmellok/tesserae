@@ -629,6 +629,17 @@ def create_app(
     migrated = migrate_canvases_to_pages(panel_store, page_store)
     if migrated:
         logger.info("migrated %d legacy canvas(es) into the page store", migrated)
+
+    # Deleting a page must also drop any same-id legacy canvas doc: the
+    # migration above runs on every startup and re-creates any canvas whose
+    # page id is free, so without this a deleted canvas-born dashboard
+    # resurrects on the next restart (every update, in practice). Nothing
+    # writes canvases anymore (the panels routes save straight to the
+    # PageStore), so the doc is purely migration fuel at this point.
+    def _drop_legacy_canvas(page_id: str) -> None:
+        panel_store.delete(page_id)
+
+    page_store.add_delete_listener(_drop_legacy_canvas)
     app.config["SCHEDULE_STORE"] = schedule_store
     app.config["ROTATION_STORE"] = rotation_store
     app.config["DEVICE_ROTATION_STATE_STORE"] = device_rotation_state_store

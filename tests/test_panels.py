@@ -346,6 +346,40 @@ def test_migrate_canvases_to_pages(tmp_path: Path) -> None:
     assert migrate_canvases_to_pages(cstore, pstore) == 0  # idempotent
 
 
+def test_deleted_canvas_page_does_not_resurrect_on_restart(tmp_path: Path) -> None:
+    """Deleting a canvas-born page drops the legacy canvas doc too, so the
+    every-startup migration can't re-create it on the next boot (the phantom
+    dashboard that came back after every update)."""
+    (tmp_path / "core").mkdir(parents=True)
+    seed = CanvasStore(tmp_path / "core" / "panels.json")
+    seed.save(
+        CanvasPage(
+            id="phantom",
+            name="Old canvas",
+            els=[Element(id="e", widget="clock", x=0, y=0, w=100, h=100)],
+        )
+    )
+
+    def boot() -> Flask:
+        a = create_app(
+            testing=False,
+            data_root=tmp_path,
+            plugins_dir=REPO_ROOT / "plugins",
+            renderers_dir=REPO_ROOT / "renderers",
+        )
+        a.config["TESTING"] = True
+        return a
+
+    first = boot()
+    assert first.config["PAGE_STORE"].get("phantom") is not None  # migrated in
+    assert first.config["PAGE_STORE"].delete("phantom") is True
+    # The delete listener must have dropped the legacy doc with the page.
+    assert first.config["PANEL_STORE"].get("phantom") is None
+
+    second = boot()  # the restart every update performs
+    assert second.config["PAGE_STORE"].get("phantom") is None
+
+
 def test_compose_renders_decorations(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
