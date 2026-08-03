@@ -7,7 +7,10 @@ info:
     resend, remote-image push, webpage push, and server-advertised image fit
     modes are optional additive extensions over the five-feature compatibility
     floor. Image framing is an accepted additive extension for server-resolved
-    drag and pinch composition across mixed target geometries.
+    drag and pinch composition across mixed target geometries. New Reminders
+    clients require `reminders` in `personal_data.sources`; they do not infer
+    generic support from the legacy feature flag or fall back to
+    `reminders.fridge`.
 servers:
   - url: /
 tags:
@@ -629,6 +632,8 @@ components:
               - webpage_push
               - image_framing
               - personal_data_reminders
+        personal_data:
+          $ref: "#/components/schemas/PersonalDataCapabilities"
         limits:
           $ref: "#/components/schemas/Limits"
         web_url:
@@ -689,6 +694,21 @@ components:
         personal_data_max_ttl_seconds:
           type: integer
           minimum: 60
+    PersonalDataCapabilities:
+      description: >-
+        Strict personal-data source schemas accepted by this server. Absent on
+        servers that predate source advertisement; those servers signal
+        personal-data support through feature flags only.
+      type: object
+      additionalProperties: false
+      required: [sources]
+      properties:
+        sources:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/PersonalDataSourceID"
     PairingRequest:
       type: object
       additionalProperties: false
@@ -1183,15 +1203,83 @@ components:
     PersonalDataSourceID:
       type: string
       enum:
+        - reminders
         - reminders.fridge
     PersonalDataSnapshot:
       oneOf:
+        - $ref: "#/components/schemas/RemindersSnapshot"
         - $ref: "#/components/schemas/RemindersFridgeSnapshot"
       discriminator:
         propertyName: source_id
         mapping:
+          reminders: "#/components/schemas/RemindersSnapshot"
           reminders.fridge: "#/components/schemas/RemindersFridgeSnapshot"
+    RemindersSnapshot:
+      type: object
+      additionalProperties: false
+      required: [version, source_id, generated_at, expires_at, data]
+      properties:
+        version:
+          type: string
+          enum: [personal_data_bridge_v1]
+        source_id:
+          type: string
+          enum: [reminders]
+        generated_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+        data:
+          $ref: "#/components/schemas/RemindersData"
+    RemindersData:
+      description: >-
+        Incomplete items grouped by user-approved Apple Reminders lists. List
+        identifiers are opaque Companion publication identifiers rather than
+        EventKit calendar identifiers and must be unique within one snapshot;
+        duplicate ids are rejected as invalid_snapshot (400). At most 200 items
+        may appear across all lists in one snapshot. Exceeding that aggregate
+        cap is rejected as invalid_snapshot (400), never truncated by the
+        server. An empty lists array means no lists are currently published;
+        the source remains fresh and widgets show their selected-list-
+        unavailable state. DELETE is reserved for disabling the source.
+      type: object
+      additionalProperties: false
+      required: [lists]
+      properties:
+        lists:
+          description: >-
+            Complete atomic set of currently published lists. An empty array is
+            a valid enabled snapshot, not a request to delete the source.
+          type: array
+          maxItems: 20
+          items:
+            $ref: "#/components/schemas/ReminderListSnapshot"
+    ReminderListSnapshot:
+      type: object
+      additionalProperties: false
+      required: [id, title, items]
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 256
+        title:
+          type: string
+          minLength: 1
+          maxLength: 256
+        items:
+          type: array
+          maxItems: 200
+          items:
+            $ref: "#/components/schemas/ReminderSnapshotItem"
     RemindersFridgeSnapshot:
+      description: >-
+        Deprecated one-list compatibility source retained for the already
+        published reminders_fridge widget. New clients and widgets should use
+        the grouped reminders source rather than implement this fallback.
+      deprecated: true
       type: object
       additionalProperties: false
       required: [version, source_id, generated_at, expires_at, data]

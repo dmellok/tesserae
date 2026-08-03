@@ -24,7 +24,10 @@ CASES = {
     "capabilities-framing.json": "Capabilities",
     "capabilities-personal-data.json": "Capabilities",
     "personal-data-reminders-fridge.json": "PersonalDataSnapshot",
+    "personal-data-reminders.json": "PersonalDataSnapshot",
+    "personal-data-reminders-empty.json": "PersonalDataSnapshot",
     "personal-data-put-response.json": "PersonalDataSourceStatus",
+    "personal-data-reminders-put-response.json": "PersonalDataSourceStatus",
     "personal-data-status.json": "PersonalDataStatusResponse",
     "pair-request.json": "PairingRequest",
     "pair-response.json": "PairingResponse",
@@ -188,6 +191,17 @@ def test_extended_capabilities_advertise_history_and_all_image_fit_modes() -> No
         "stretch",
         "center",
     ]
+
+
+def test_personal_data_capabilities_advertise_source_ids_directly() -> None:
+    capabilities = json.loads((FIXTURES_DIR / "capabilities-personal-data.json").read_text())
+
+    assert capabilities["personal_data"]["sources"] == [
+        "reminders",
+        "reminders.fridge",
+    ]
+    assert "personal_data_reminders" in capabilities["features"]
+    assert "personal_data_reminders_multi_list" not in capabilities["features"]
 
 
 def test_image_framing_is_independently_gated_and_fill_only() -> None:

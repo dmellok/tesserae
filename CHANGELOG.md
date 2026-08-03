@@ -8,6 +8,17 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **The Companion API contract now supports selected Apple Reminders lists as
+  one domain source.** Servers advertise accepted schemas through
+  `personal_data.sources`; the new strict `reminders` snapshot carries up to
+  20 named list groups and 200 incomplete items in aggregate without exposing
+  EventKit calendar identifiers. The deprecated `reminders.fridge` source and
+  its legacy feature flag remain available only for the already published
+  fridge widget; new Companion and widget integrations use `reminders` only.
+  The server rejects duplicate list IDs and aggregate item overflow instead of
+  truncating them, while an empty list set remains a fresh enabled snapshot;
+  deleting the source is reserved for disabling the integration.
+
 - **Physical buttons now work on relay-paired panels** (#180). A button press
   rides the status JSON the panel already posts to its relay mailbox
   (`button` + `button_event_id`, the same fields as the REST status body); the
