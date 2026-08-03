@@ -30,7 +30,8 @@ def _sign_in(client) -> None:
 def test_empty_list_renders(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
-    resp = client.get("/schedules")
+    # #167 Phase 3: /schedules redirects to the unified Decks page.
+    resp = client.get("/schedules", follow_redirects=True)
     assert resp.status_code == 200
     assert b"No schedules yet" in resp.data
 
@@ -52,7 +53,7 @@ def test_create_persists_and_lists(app: Flask) -> None:
         },
         follow_redirects=False,
     )
-    body = client.get("/schedules").get_data(as_text=True)
+    body = client.get("/schedules", follow_redirects=True).get_data(as_text=True)
     assert "Morning refresh" in body
     assert "every 15 min" in body
 
@@ -183,12 +184,15 @@ def test_fire_now_invokes_push(app: Flask) -> None:
     pm.push.assert_called_once_with("home", respect_quiet_hours=False, source="scheduler")
 
 
-def test_nav_links_to_schedules(app: Flask) -> None:
+def test_nav_has_single_decks_entry(app: Flask) -> None:
+    # #167 Phase 3: Schedules + Rotations nav entries retired; timed content
+    # lives on the Decks page and the old URLs redirect there.
     client = app.test_client()
     _sign_in(client)
     body = client.get("/settings", follow_redirects=True).get_data(as_text=True)
-    assert "Schedules" in body
-    assert "/schedules" in body
+    assert "Decks" in body
+    assert 'href="/schedules"' not in body
+    assert 'href="/rotations"' not in body
 
 
 def test_timeline_now_uses_configured_timezone(app: Flask) -> None:

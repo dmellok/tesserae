@@ -239,8 +239,10 @@ def test_migration_notice_shows_once_and_dismisses(tmp_path: Path) -> None:
     client = app.test_client()
     _sign_in(client)
 
-    for path in ("/schedules", "/rotations"):
-        assert "moved house" in client.get(path).get_data(as_text=True)
+    # #167 Phase 3: both old pages redirect to the Decks page, which
+    # carries the notice.
+    for path in ("/schedules", "/rotations", "/decks"):
+        assert "moved house" in client.get(path, follow_redirects=True).get_data(as_text=True)
 
     resp = client.post(
         "/schedules/migration-notice/dismiss",
@@ -248,21 +250,21 @@ def test_migration_notice_shows_once_and_dismisses(tmp_path: Path) -> None:
         follow_redirects=False,
     )
     assert resp.status_code in (302, 303) and resp.location.endswith("/rotations")
-    for path in ("/schedules", "/rotations"):
-        assert "moved house" not in client.get(path).get_data(as_text=True)
+    for path in ("/schedules", "/rotations", "/decks"):
+        assert "moved house" not in client.get(path, follow_redirects=True).get_data(as_text=True)
 
     # Dismissal persists across the restart every update performs.
     second = _boot(tmp_path)
     client2 = second.test_client()
     _sign_in(client2)
-    assert "moved house" not in client2.get("/schedules").get_data(as_text=True)
+    assert "moved house" not in client2.get("/decks").get_data(as_text=True)
 
 
 def test_migration_notice_absent_on_fresh_installs(tmp_path: Path) -> None:
     app = _boot(tmp_path)  # no legacy files: nothing migrated
     client = app.test_client()
     _sign_in(client)
-    assert "moved house" not in client.get("/schedules").get_data(as_text=True)
+    assert "moved house" not in client.get("/decks").get_data(as_text=True)
 
 
 def test_legacy_decks_stay_out_of_deck_surfaces(tmp_path: Path) -> None:

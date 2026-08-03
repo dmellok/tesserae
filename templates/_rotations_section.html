@@ -1,6 +1,7 @@
-{% extends "_base.html" %}
+{# #167 Phase 3: rendered inside the unified Decks page. Context comes
+   from deck_routes.index; variable names are prefixed to avoid collisions
+   with the sibling section. #}
 {% from "_components.html" import card_head, section_card, button, empty_state, switch %}
-{% block title %}Rotations, Tesserae{% endblock %}
 
 {% set DAY_NAMES = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] %}
 
@@ -161,20 +162,18 @@
 </form>
 {% endmacro %}
 
-{% block main %}
 <section class="page">
   <header class="page-head">
-    <h1><i class="ph ph-arrows-clockwise" aria-hidden="true"></i> Rotations</h1>
+    <h2 id="rotations"><i class="ph ph-arrows-clockwise" aria-hidden="true"></i> Rotations</h2>
     <p class="lede">A rotation cycles a display through several pages on a timer. It is a deck that advances on a wall-clock anchor instead of on a tap: each step dwells for a fixed number of minutes and the cycle repeats from the anchor every day. To flip between pages by hand instead, use a <a href="{{ url_for('decks.index') }}">Deck</a>.</p>
   </header>
-  {% include "_legacy_migration_notice.html" %}
 
   {# Existing rotations #}
   {% if rotations %}
   <div class="rotations-list">
     {% for r in rotations %}
     {% set cur = current_step.get(r.id) %}
-    <section class="dx-section-card rotation-card{% if edit_id == r.id %} is-editing{% endif %}" id="rotation-{{ r.id }}">
+    <section class="dx-section-card rotation-card{% if rotation_edit_id == r.id %} is-editing{% endif %}" id="rotation-{{ r.id }}">
       <header class="dx-section-head dx-rotation-head">
         <span class="dx-section-icon" aria-hidden="true"><i class="ph ph-arrows-clockwise"></i></span>
         <div class="dx-section-titleblock">
@@ -192,7 +191,7 @@
           {# v0.48 running-state pill. Only shown when the scheduler
              saw something worth surfacing (held / failed); normal
              flow is covered by the pill above. #}
-          {% set rs = running_states.get(r.id) if running_states else none %}
+          {% set rs = rotation_running_states.get(r.id) if rotation_running_states else none %}
           {% if rs %}
           <span class="dx-pill {{ rs.tone|replace('pill--','is-') }}" title="{{ rs.tooltip }}">
             <i class="ph ph-{{ rs.icon }}" aria-hidden="true"></i>{{ rs.label }}
@@ -305,7 +304,7 @@
         </form>
       </div>
 
-      {% if edit_id == r.id %}
+      {% if rotation_edit_id == r.id %}
       <hr class="dx-divider">
       {{ rotation_form(r, edit_mode=True, pages=pages) }}
       {% endif %}
@@ -414,4 +413,3 @@
 </script>
 <script src="{{ url_for('static', filename='rotations.js') }}"></script>
 <script type="module" src="{{ url_for('static', filename='condition-picker.js') }}"></script>
-{% endblock %}

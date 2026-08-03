@@ -6,12 +6,14 @@
 <header class="page-head">
   <h1><i class="ph ph-cards-three" aria-hidden="true"></i> Decks</h1>
   <p class="lede">
-    A deck is a group of pages a display moves through by tap, button, or swipe, kept pre-rendered
-    per device so navigation is instant. Author the links in the canvas editor (tap / swipe "go to
-    page" on a tile) and Tesserae turns them into a deck. To cycle the same pages automatically on a
-    timer instead, use a <a href="{{ url_for('rotations.index') }}">Rotation</a>.
+    Everything a display shows over time lives here. A deck is a group of pages a display moves
+    through by tap, button, or swipe, kept pre-rendered per device so navigation is instant; author
+    the links in the canvas editor (tap / swipe "go to page" on a tile) and Tesserae turns them into
+    a deck. Further down, <a href="#timed">schedules</a> fire one dashboard by the clock and
+    <a href="#rotations">rotations</a> cycle several on a timer.
   </p>
 </header>
+{% include "_legacy_migration_notice.html" %}
 
 {% if suggestions %}
 <section class="card deck-suggest">
@@ -68,4 +70,9 @@
 {% endfor %}
 
 <p><a class="button" href="{{ url_for('decks.editor') }}"><i class="ph ph-plus" aria-hidden="true"></i><span>New deck</span></a></p>
+
+{# #167 Phase 3: schedules + rotations render here as sections of the one
+   Decks surface. Their old pages redirect to these anchors. #}
+{% include "_schedules_section.html" %}
+{% include "_rotations_section.html" %}
 {% endblock %}

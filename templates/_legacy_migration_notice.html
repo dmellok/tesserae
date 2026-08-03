@@ -6,11 +6,11 @@
   <i class="ph-fill ph-info migration-notice-icon" aria-hidden="true"></i>
   <div class="migration-notice-body">
     <strong>Schedules and rotations moved house.</strong>
-    They now share one storage with Decks, the first step in bringing the
-    three into a single model. Everything on this page works exactly as
-    before, and your previous files are kept in the data folder as
+    They now live here on the Decks page and share one storage, part of
+    bringing the three into a single model. Your timed content keeps working
+    exactly as before, and the previous files are kept in the data folder as
     <code>schedules.json.migrated</code> and <code>rotations.json.migrated</code>
-    backups. A later update will bring these pages together under Decks.
+    backups.
   </div>
   <form method="post" action="{{ url_for('schedules.dismiss_migration_notice') }}">
     <input type="hidden" name="back" value="{{ request.path }}">

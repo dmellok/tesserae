@@ -72,7 +72,7 @@ def test_rotation_index_renders_with_condition_on_step(app: Flask, tmp_path: Pat
     )
     client = app.test_client()
     _sign_in(client)
-    resp = client.get("/rotations?edit=evening")
+    resp = client.get("/rotations?edit=evening", follow_redirects=True)
     assert resp.status_code == 200, resp.get_data(as_text=True)[:500]
     body = resp.get_data(as_text=True)
     # The textarea should carry the serialised condition.
@@ -103,7 +103,7 @@ def test_schedule_index_renders_with_condition(app: Flask, tmp_path: Path) -> No
     )
     client = app.test_client()
     _sign_in(client)
-    resp = client.get("/schedules?edit=morning")
+    resp = client.get("/schedules?edit=morning", follow_redirects=True)
     assert resp.status_code == 200, resp.get_data(as_text=True)[:500]
     body = resp.get_data(as_text=True)
     assert "after_sunset" in body

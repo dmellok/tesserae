@@ -19,6 +19,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Changed
 
+- **One Decks page for everything a display shows over time** (#167). The
+  Schedules and Rotations pages fold into the Decks page as sections, with
+  their forms, timeline, status pills, and every action intact; the old
+  URLs and in-app links redirect to the right section, deep edit links
+  included. The top nav has a single Decks entry. The MCP
+  rotation/schedule tools keep working as compatibility adapters and are
+  marked deprecated in the agent docs; `create_deck` now documents the
+  timer and schedule-style triggers as the preferred path.
+
 - **Schedules and rotations now live in the deck store** (#167). On first
   start after updating, `rotations.json` and `schedules.json` records are
   migrated into `decks.json` as tagged timer decks and the source files are

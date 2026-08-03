@@ -1,6 +1,7 @@
-{% extends "_base.html" %}
+{# #167 Phase 3: rendered inside the unified Decks page. Context comes
+   from deck_routes.index; variable names are prefixed to avoid collisions
+   with the sibling section. #}
 {% from "_components.html" import card_head, button, empty_state, info_pop, switch %}
-{% block title %}Schedules, Tesserae{% endblock %}
 
 {% set DAY_NAMES = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] %}
 
@@ -131,13 +132,12 @@
 </form>
 {% endmacro %}
 
-{% block main %}
 <header class="page-head">
-  <h1><i class="ph ph-calendar-dots"></i> Schedules
+  <h2 id="timed"><i class="ph ph-calendar-dots"></i> Schedules
     <button type="button" class="header-action" data-toggle-new-schedule>
       <i class="ph ph-plus" aria-hidden="true"></i><span>New schedule</span>
     </button>
-  </h1>
+  </h2>
   <p class="lede">
     A schedule puts one saved dashboard on its displays at a set time, on an
     interval or at a daily time. Use it to trigger a page by the clock; to group
@@ -147,7 +147,6 @@
     daily schedules respect the mask only.
   </p>
 </header>
-{% include "_legacy_migration_notice.html" %}
 
 <section class="dx-section-card timeline-card">
   <header class="dx-section-head">
@@ -195,16 +194,16 @@
   {% endif %}
 </section>
 
-<section class="dx-section-card" id="schedule-form-card" {% if not edit_id and not prefill_page %}hidden{% endif %} data-new-schedule-form>
+<section class="dx-section-card" id="schedule-form-card" {% if not schedule_edit_id and not prefill_page %}hidden{% endif %} data-new-schedule-form>
   <header class="dx-section-head">
-    <span class="dx-section-icon" aria-hidden="true"><i class="ph ph-{% if edit_id %}pencil-simple{% else %}plus-circle{% endif %}"></i></span>
+    <span class="dx-section-icon" aria-hidden="true"><i class="ph ph-{% if schedule_edit_id %}pencil-simple{% else %}plus-circle{% endif %}"></i></span>
     <div class="dx-section-titleblock">
-      <h3 class="dx-section-title">{% if edit_id %}Edit schedule{% else %}New schedule{% endif %}</h3>
+      <h3 class="dx-section-title">{% if schedule_edit_id %}Edit schedule{% else %}New schedule{% endif %}</h3>
       <p class="dx-section-desc">Pick a dashboard and a cadence. Add conditions to fire only when they're met.</p>
     </div>
   </header>
-  {% if edit_id %}
-    {% set editing = (schedules | selectattr('id', 'equalto', edit_id) | list | first) %}
+  {% if schedule_edit_id %}
+    {% set editing = (schedules | selectattr('id', 'equalto', schedule_edit_id) | list | first) %}
     {% if editing %}
       {{ schedule_form(editing, true, pages) }}
     {% else %}
@@ -285,12 +284,12 @@
           {% if lf %}<time title="{{ lf.abs }}">{{ lf.rel }}</time>{% else %}<span class="muted">never</span>{% endif %}
         </td>
         <td class="col-state">
-          {# v0.48 running-state pill. ``running_states`` view-model
+          {# v0.48 running-state pill. ``schedule_running_states`` view-model
              collapses (enabled? + last_status + last_reason) into a
              single ``{label, tone, icon, tooltip}``. Falls back to the
              old enabled/disabled binary when the view-model is missing
              (older route handler / partial render). #}
-          {% set rs = running_states.get(s.id) if running_states else none %}
+          {% set rs = schedule_running_states.get(s.id) if schedule_running_states else none %}
           {% if rs %}
           <span class="dx-pill {{ rs.tone|replace('pill--','is-') }}" title="{{ rs.tooltip }}">
             <i class="ph ph-{{ rs.icon }}" aria-hidden="true"></i>{{ rs.label }}
@@ -362,4 +361,3 @@
   })();
 </script>
 <script type="module" src="{{ url_for('static', filename='condition-picker.js') }}"></script>
-{% endblock %}

@@ -119,10 +119,30 @@ def _graph_json(deck_pages: Any) -> str:
 
 @bp.get("")
 def index() -> str:
+    # #167 Phase 3: the one surface for everything a display shows over
+    # time. Deck cards render first; schedules + rotations render below as
+    # sections (their old pages redirect here), fed from the same helpers
+    # their standalone pages used, with prefixed context names so the two
+    # sections can't collide.
+    from app.rotation_routes import _build_projection, _current_step_for_each, _devices_for_page
+    from app.rotation_routes import _running_state_view as _rotation_state_view
+    from app.schedule_routes import (
+        _build_timeline,
+        _last_fired_view,
+        _smart_sync_states,
+        migration_notice_visible,
+    )
+    from app.schedule_routes import _running_state_view as _schedule_state_view
+
     pages = _pages().list()
     # Migrated rotation / schedule records (#167) live in this store but
-    # belong to the Rotations / Schedules pages during the compat window.
+    # render in the timed sections below, not as deck cards.
     decks = [d for d in _store().all() if d.legacy_kind is None]
+    schedules = current_app.config["SCHEDULE_STORE"].all()
+    rotations = current_app.config["ROTATION_STORE"].all()
+    scheduler = current_app.config["SCHEDULER"]
+    schedule_status = scheduler.status()
+    rotation_status = scheduler.rotation_status()
     devices = current_app.config.get("DEVICE_REGISTRY")
     instances = [d for d in (devices.all() if devices is not None else []) if d.kind_of is not None]
     graphs = {d.id: _graph_json(d.pages) for d in decks}
@@ -149,6 +169,29 @@ def index() -> str:
         graphs=graphs,
         suggestions=suggestions,
         edit_id=request.args.get("edit"),
+        # -- schedules section --------------------------------------------
+        schedules=schedules,
+        status=schedule_status,
+        last_fired={
+            sid: _last_fired_view(st.get("last_fired")) for sid, st in schedule_status.items()
+        },
+        schedule_running_states={
+            s.id: _schedule_state_view(s, schedule_status.get(s.id)) for s in schedules
+        },
+        timeline=_build_timeline(schedules),
+        schedule_edit_id=request.args.get("sedit"),
+        smart_sync_states=_smart_sync_states(schedules, pages),
+        prefill_page=request.args.get("prefill_page", ""),
+        # -- rotations section --------------------------------------------
+        rotations=rotations,
+        page_devices=_devices_for_page(pages),
+        current_step=_current_step_for_each(rotations),
+        rotation_edit_id=request.args.get("redit"),
+        projections={r.id: _build_projection(r) for r in rotations},
+        rotation_running_states={
+            r.id: _rotation_state_view(r, rotation_status.get(r.id)) for r in rotations
+        },
+        show_migration_notice=migration_notice_visible(),
     )
 
 

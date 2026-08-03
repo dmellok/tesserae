@@ -25,7 +25,6 @@ from flask import (
     current_app,
     flash,
     redirect,
-    render_template,
     request,
     url_for,
 )
@@ -408,30 +407,17 @@ def dismiss_migration_notice() -> Response:
 
 
 @bp.get("")
-def index() -> str:
-    schedules = _store().all()
-    status = _scheduler().status()
-    pages = _pages().list()
-    return render_template(
-        "schedules.html",
-        schedules=schedules,
-        status=status,
-        pages=pages,
-        # id -> display name so the table shows the dashboard's name, not
-        # its opaque id. Missing ids (deleted page) fall back in-template.
-        page_names={p.id: p.name for p in pages},
-        last_fired={sid: _last_fired_view(st.get("last_fired")) for sid, st in status.items()},
-        running_states={s.id: _running_state_view(s, status.get(s.id)) for s in schedules},
-        timeline=_build_timeline(schedules),
-        edit_id=request.args.get("edit"),
-        smart_sync_states=_smart_sync_states(schedules, pages),
-        # ``prefill_page`` lets the page editor's inline schedule card
-        # link straight here with the dashboard already selected in
-        # the New-schedule form. Just affects the blank-form default;
-        # editing existing schedules is unaffected.
-        prefill_page=request.args.get("prefill_page", ""),
-        show_migration_notice=migration_notice_visible(),
-    )
+def index() -> Response:
+    """#167 Phase 3: schedules render as a section of the unified Decks
+    page. The old URL (and every in-app link to it) lands on that section;
+    ``edit`` / ``prefill_page`` params carry across so deep links keep
+    working. Every POST endpoint on this blueprint is unchanged."""
+    params: dict[str, Any] = {}
+    if request.args.get("edit"):
+        params["sedit"] = request.args["edit"]
+    if request.args.get("prefill_page"):
+        params["prefill_page"] = request.args["prefill_page"]
+    return redirect(url_for("decks.index", _anchor="timed", **params))
 
 
 def _smart_sync_states(schedules: list[Schedule], pages: list[Any]) -> dict[str, dict[str, str]]:

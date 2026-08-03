@@ -132,16 +132,10 @@
          class="{% if request.blueprint == 'pages' %}is-active{% endif %}">
          <i class="ph ph-squares-four" aria-hidden="true"></i><span>Dashboards</span>
       </a>
-      <a href="{{ url_for('schedules.index') }}"
-         class="{% if request.blueprint == 'schedules' %}is-active{% endif %}">
-         <i class="ph ph-calendar-dots" aria-hidden="true"></i><span>Schedules</span>
-      </a>
-      <a href="{{ url_for('rotations.index') }}"
-         class="{% if request.blueprint == 'rotations' %}is-active{% endif %}">
-         <i class="ph ph-shuffle" aria-hidden="true"></i><span>Rotations</span>
-      </a>
+      {# #167 Phase 3: Schedules + Rotations fold into the Decks surface;
+         their old routes redirect there. One entry for timed content. #}
       <a href="{{ url_for('decks.index') }}"
-         class="{% if request.blueprint == 'decks' %}is-active{% endif %}">
+         class="{% if request.blueprint in ('decks', 'schedules', 'rotations') %}is-active{% endif %}">
          <i class="ph ph-cards-three" aria-hidden="true"></i><span>Decks</span>
       </a>
       <a href="{{ url_for('history.index') }}"

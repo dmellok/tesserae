@@ -26,14 +26,12 @@ from flask import (
     current_app,
     flash,
     redirect,
-    render_template,
     request,
     url_for,
 )
 from pydantic import ValidationError
 from werkzeug.wrappers import Response
 
-from app.schedule_routes import migration_notice_visible as _migration_notice_visible
 from app.scheduler import Scheduler, compute_current_step
 from app.state.page_store import PageStore
 from app.state.rotation_model import Rotation, RotationStep
@@ -355,22 +353,15 @@ def _running_state_view(
 
 
 @bp.get("")
-def index() -> str:
-    rotations = _store().all()
-    pages = _pages().list()
-    rotation_status = _scheduler().rotation_status()
-    return render_template(
-        "rotations.html",
-        rotations=rotations,
-        pages=pages,
-        page_names={p.id: p.name for p in pages},
-        page_devices=_devices_for_page(pages),
-        current_step=_current_step_for_each(rotations),
-        edit_id=request.args.get("edit"),
-        projections={r.id: _build_projection(r) for r in rotations},
-        running_states={r.id: _running_state_view(r, rotation_status.get(r.id)) for r in rotations},
-        show_migration_notice=_migration_notice_visible(),
-    )
+def index() -> Response:
+    """#167 Phase 3: rotations render as a section of the unified Decks
+    page. The old URL (and every in-app link to it) lands on that section;
+    the ``edit`` param carries across so deep links keep working. Every
+    POST endpoint on this blueprint is unchanged."""
+    params: dict[str, Any] = {}
+    if request.args.get("edit"):
+        params["redit"] = request.args["edit"]
+    return redirect(url_for("decks.index", _anchor="rotations", **params))
 
 
 @bp.post("/new")
