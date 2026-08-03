@@ -769,6 +769,10 @@ def _device_view(
         "id": device.id,
         "name": device.display_name,
         "kind": str(device.kind_of or ""),
+        # Bare Phosphor slug, the same identity the device pickers and
+        # Settings cards use; kind default until the user overrides it
+        # per instance, always resolved (#184).
+        "icon": device.icon,
         "panel": {
             "width": int(panel.w),
             "height": int(panel.h),

@@ -8,6 +8,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Companion API: devices now carry their icon** (#184). `GET
+  /api/app/v1/devices` returns each device's resolved Phosphor slug (the
+  same identity the device pickers and Settings cards use), so native
+  clients can render Display cards with the configured device icon. The
+  field is always present; kind defaults apply until the user overrides
+  per instance.
+
 - **Physical buttons now work on timer decks** (#167). `rotate_next`,
   `rotate_prev`, and `step:<n>` act on the device's bound timed deck when
   no rotation targets it, with the same manual-hold behaviour rotations

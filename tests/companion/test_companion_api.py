@@ -223,6 +223,9 @@ def test_devices_listing_is_contract_valid(app: Flask) -> None:
     assert device["freshness"] == "unknown"
     assert device["last_seen_at"] is None
     assert device["has_pending_render"] is False
+    # #184: the resolved Phosphor slug ships on every device (kind default
+    # until the user overrides it per instance; "monitor" as last resort).
+    assert isinstance(device["icon"], str) and device["icon"]
 
 
 def test_devices_listing_reports_a_pending_rest_render_until_frame_is_served(app: Flask) -> None:

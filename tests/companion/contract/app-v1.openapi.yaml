@@ -784,7 +784,7 @@ components:
     Device:
       type: object
       additionalProperties: false
-      required: [id, name, kind, panel, freshness]
+      required: [id, name, kind, icon, panel, freshness]
       properties:
         id:
           type: string
@@ -792,6 +792,14 @@ components:
           type: string
         kind:
           type: string
+        icon:
+          type: string
+          minLength: 1
+          description: >-
+            Bare Phosphor icon slug (no ph- prefix), the same device identity
+            Tesserae's device pickers and Settings cards use. Inherited from
+            the device kind until the user overrides it per instance; always
+            resolved server-side.
         panel:
           $ref: "#/components/schemas/Panel"
         freshness:

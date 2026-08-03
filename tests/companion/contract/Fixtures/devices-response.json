@@ -4,6 +4,7 @@
       "id": "picpak-kitchen",
       "name": "Kitchen",
       "kind": "picpak",
+      "icon": "device-tablet",
       "panel": {
         "width": 800,
         "height": 480,
@@ -26,6 +27,7 @@
       "id": "e1004-desk",
       "name": "Desk",
       "kind": "reterminal_e1004",
+      "icon": "device-tablet-speaker",
       "panel": {
         "width": 1200,
         "height": 1600,
