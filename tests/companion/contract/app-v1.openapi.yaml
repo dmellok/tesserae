@@ -629,6 +629,8 @@ components:
               - webpage_push
               - image_framing
               - personal_data_reminders
+        personal_data:
+          $ref: "#/components/schemas/PersonalDataCapabilities"
         limits:
           $ref: "#/components/schemas/Limits"
         web_url:
@@ -689,6 +691,20 @@ components:
         personal_data_max_ttl_seconds:
           type: integer
           minimum: 60
+    PersonalDataCapabilities:
+      description: >-
+        Strict personal-data source schemas accepted by this server. When
+        absent, clients may use legacy feature flags for compatibility.
+      type: object
+      additionalProperties: false
+      required: [sources]
+      properties:
+        sources:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/PersonalDataSourceID"
     PairingRequest:
       type: object
       additionalProperties: false
@@ -1183,15 +1199,74 @@ components:
     PersonalDataSourceID:
       type: string
       enum:
+        - reminders
         - reminders.fridge
     PersonalDataSnapshot:
       oneOf:
+        - $ref: "#/components/schemas/RemindersSnapshot"
         - $ref: "#/components/schemas/RemindersFridgeSnapshot"
       discriminator:
         propertyName: source_id
         mapping:
+          reminders: "#/components/schemas/RemindersSnapshot"
           reminders.fridge: "#/components/schemas/RemindersFridgeSnapshot"
+    RemindersSnapshot:
+      type: object
+      additionalProperties: false
+      required: [version, source_id, generated_at, expires_at, data]
+      properties:
+        version:
+          type: string
+          enum: [personal_data_bridge_v1]
+        source_id:
+          type: string
+          enum: [reminders]
+        generated_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+        data:
+          $ref: "#/components/schemas/RemindersData"
+    RemindersData:
+      description: >-
+        Incomplete items grouped by user-approved Apple Reminders lists. List
+        identifiers are opaque Companion publication identifiers rather than
+        EventKit calendar identifiers. At most 200 items may appear across all
+        lists in one snapshot.
+      type: object
+      additionalProperties: false
+      required: [lists]
+      properties:
+        lists:
+          type: array
+          maxItems: 20
+          items:
+            $ref: "#/components/schemas/ReminderListSnapshot"
+    ReminderListSnapshot:
+      type: object
+      additionalProperties: false
+      required: [id, title, items]
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 256
+        title:
+          type: string
+          minLength: 1
+          maxLength: 256
+        items:
+          type: array
+          maxItems: 200
+          items:
+            $ref: "#/components/schemas/ReminderSnapshotItem"
     RemindersFridgeSnapshot:
+      description: >-
+        Deprecated one-list compatibility source. New clients should prefer
+        the grouped reminders source when it is advertised.
+      deprecated: true
       type: object
       additionalProperties: false
       required: [version, source_id, generated_at, expires_at, data]

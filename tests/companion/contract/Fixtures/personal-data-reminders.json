@@ -1,0 +1,36 @@
+{
+  "version": "personal_data_bridge_v1",
+  "source_id": "reminders",
+  "generated_at": "2026-08-03T08:00:00Z",
+  "expires_at": "2026-08-05T08:00:00Z",
+  "data": {
+    "lists": [
+      {
+        "id": "2b684174-fc12-4a28-9e6b-1ef61984e57e",
+        "title": "Grocery List",
+        "items": [
+          {
+            "id": "reminder-yogurt",
+            "title": "Yogurt",
+            "due_date": "2026-08-03",
+            "priority": "high",
+            "completed": false
+          }
+        ]
+      },
+      {
+        "id": "b7b355f7-ce24-431b-b307-998f948613a5",
+        "title": "Weekend",
+        "items": [
+          {
+            "id": "reminder-clean-grill",
+            "title": "Clean grill",
+            "due_date": null,
+            "priority": "none",
+            "completed": false
+          }
+        ]
+      }
+    ]
+  }
+}
