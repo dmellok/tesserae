@@ -1264,8 +1264,9 @@ components:
             $ref: "#/components/schemas/ReminderSnapshotItem"
     RemindersFridgeSnapshot:
       description: >-
-        Deprecated one-list compatibility source. New clients should prefer
-        the grouped reminders source when it is advertised.
+        Deprecated one-list compatibility source retained for the already
+        published reminders_fridge widget. New clients and widgets should use
+        the grouped reminders source rather than implement this fallback.
       deprecated: true
       type: object
       additionalProperties: false

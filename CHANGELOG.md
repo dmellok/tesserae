@@ -13,7 +13,8 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   `personal_data.sources`; the new strict `reminders` snapshot carries up to
   20 named list groups and 200 incomplete items in aggregate without exposing
   EventKit calendar identifiers. The deprecated `reminders.fridge` source and
-  its legacy feature flag remain available during the compatibility period.
+  its legacy feature flag remain available only for the already published
+  fridge widget; new Companion and widget integrations use `reminders` only.
 
 - **Physical buttons now work on relay-paired panels** (#180). A button press
   rides the status JSON the panel already posts to its relay mailbox
