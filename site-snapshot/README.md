@@ -59,22 +59,21 @@ python3 ../tools/crawl_diff.py \
     --new-manifest      new/manifest.jsonl \
     --new-pages         new/pages_raw
 
-# 3b. site-wide NEW IMAGES (the code candidates): urls present now but not before
-python3 - <<'PY'
-import json
-old=set(json.load(open('asset-index.json')))
-new=set(json.load(open('new/asset-index.json')))
-imgs=[u for u in sorted(new-old)
-      if any(e in u.lower() for e in ('.png','.jpg','.jpeg','.webp','.gif','.avif'))]
-print(f"{len(imgs)} new image URLs to fetch & read:")
-for u in imgs: print(" ", u)
-PY
+# 3b. site-wide image changes — catches BOTH brand-new and UPDATED (replaced)
+#     images. An updated image gets a new ?v= stamp, so it is detected too.
+python3 ../tools/find_changed_images.py asset-index.json new/asset-index.json
 ```
 
-Then **fetch each new image URL and read the code off it** (visually or via
-OCR). Because the codes are images, step 3b is the primary detector; step 3a is
-the backup that also catches any accompanying text/markup changes and pins down
-which page each new image lives on.
+Then **fetch each NEW or UPDATED image URL and read the code off it** (visually
+or via OCR). Because the codes are images, step 3b is the primary detector; step
+3a is the backup that also catches any accompanying text/markup changes and pins
+down which page each changed image lives on.
+
+Why updated images are covered: Shopify never serves changed image content at an
+unchanged URL — replacing an image bumps its `?v=` version stamp (and often its
+filename). `find_changed_images.py` groups URLs by underlying image and flags any
+that gained a new version = a replaced picture. The only thing this cannot see is
+a same-URL/same-version byte swap, which the Shopify CDN does not do.
 
 ## Notes / caveats
 
