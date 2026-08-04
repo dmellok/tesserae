@@ -363,26 +363,6 @@
   0%, 100% { opacity: 1; }
   50% { opacity: 0.35; }
 }
-.dk-group-empty {
-  margin: 0;
-  padding: 14px 18px;
-  border: 1px dashed color-mix(in oklab, var(--t-border) 90%, transparent);
-  border-radius: 12px;
-  font-size: 13.5px;
-  color: color-mix(in oklab, var(--t-fg) 55%, transparent);
-}
-.dk-inline-link {
-  background: none;
-  border: 0;
-  box-shadow: none;
-  padding: 0;
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--t-accent);
-  cursor: pointer;
-}
-.dk-inline-link:hover { color: color-mix(in oklab, var(--t-accent) 80%, black); }
-
 .dk-empty {
   text-align: center;
   padding: 56px 20px;

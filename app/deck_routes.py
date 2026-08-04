@@ -374,19 +374,24 @@ def _design_cards(
     cards.sort(key=lambda c: str(c["name"]).lower())
 
     # One section per display, in registry order; a card targeting several
-    # displays appears under each. Cards with no resolvable display land in
-    # a trailing "not on a display yet" group.
+    # displays appears under each. Displays with nothing lined up are
+    # omitted entirely. Cards with no resolvable display land in a trailing
+    # "not on a display yet" group.
     groups: list[dict[str, Any]] = []
     for d in devices:
+        dev_cards = [c for c in cards if d.id in c["device_ids"]]
+        if not dev_cards:
+            continue
         rec = live.get(d.id)
         live_pid = rec[1] if rec else None
         groups.append(
             {
                 "id": d.id,
                 "name": device_names.get(d.id, d.id),
+                "icon": d.icon,
                 "showing": page_names.get(live_pid, live_pid) if live_pid else None,
                 "thumb": thumbs.get(live_pid, "") if live_pid else "",
-                "cards": [c for c in cards if d.id in c["device_ids"]],
+                "cards": dev_cards,
             }
         )
     unbound = [c for c in cards if not c["device_ids"]]
@@ -395,6 +400,7 @@ def _design_cards(
             {
                 "id": "",
                 "name": "Not on a display yet",
+                "icon": "plugs",
                 "showing": None,
                 "thumb": "",
                 "cards": unbound,
