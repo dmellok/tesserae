@@ -93,7 +93,9 @@ def main():
     new_prod_imgs = sorted(set(now["prod_images"]) - set(base["prod_images"]))
     new_home_imgs = sorted(set(now["home_images"]) - set(base["home_images"]))
 
-    changed = bool(new_pages or gone_pages or changed_lm or new_prod_imgs or new_home_imgs)
+    # lastmod churn (product en-masse bumps, collection inventory/sale updates) is
+    # noise, NOT a code-drop signal. Triggers are new pages and new images only.
+    changed = bool(new_pages or gone_pages or new_prod_imgs or new_home_imgs)
     print("CHANGES DETECTED" if changed else "no changes")
     def show(t, items, cap=50):
         if items:
@@ -104,9 +106,9 @@ def main():
                 print(f"   ... (+{len(items)-cap} more)")
     show("NEW PAGES", new_pages)
     show("REMOVED PAGES", gone_pages)
-    show("COLLECTION/PAGE lastmod changed", changed_lm)
-    show("NEW product primary images", new_prod_imgs)
+    show("NEW product primary images (code candidates)", new_prod_imgs)
     show("NEW homepage images (fetch & read — code candidates)", new_home_imgs)
+    show("[info only — inventory noise] collection/page lastmod changed", changed_lm, cap=5)
     sys.exit(0)
 
 
