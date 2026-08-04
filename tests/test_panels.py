@@ -626,6 +626,56 @@ def test_save_and_doc_roundtrip(app: Flask, monkeypatch: pytest.MonkeyPatch) -> 
     assert doc["name"] == "My Panel" and doc["els"][0]["widget"] == "weather_now"
 
 
+def test_save_coerces_update_on_change_to_manifest_capability(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The save endpoint, not only the editor UI, owns placement policy.
+
+    A capable widget keeps its opt-in. An unsupported widget and a decoration
+    cannot persist meaningless true bits, including after a widget swap that
+    sends the previous placement value back to the server.
+    """
+    monkeypatch.setenv("TESSERAE_EXPERIMENT_COMPOSER", "1")
+    weather = app.config["PLUGIN_REGISTRY"].get("weather_now")
+    assert weather is not None
+    monkeypatch.setitem(
+        weather.manifest,
+        "updates",
+        {"on_change": [{"source": "test.weather"}]},
+    )
+    client = app.test_client()
+    _sign_in(client)
+    cid = client.get("/pages/canvas/").location.rsplit("/", 1)[1]
+    resp = client.post(
+        f"/pages/canvas/c/{cid}/save",
+        json={
+            "els": [
+                {
+                    "id": "capable",
+                    "widget": "weather_now",
+                    "update_on_change": True,
+                },
+                {
+                    "id": "unsupported",
+                    "widget": "clock_analog",
+                    "update_on_change": True,
+                },
+                {
+                    "id": "decoration",
+                    "kind": "line",
+                    "update_on_change": True,
+                },
+            ]
+        },
+    )
+    assert resp.status_code == 200
+    doc = client.get(f"/pages/canvas/c/{cid}/doc.json").get_json()
+    by_id = {element["id"]: element for element in doc["els"]}
+    assert by_id["capable"]["update_on_change"] is True
+    assert by_id["unsupported"]["update_on_change"] is False
+    assert by_id["decoration"]["update_on_change"] is False
+
+
 def test_canvas_management(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("TESSERAE_EXPERIMENT_COMPOSER", "1")
     client = app.test_client()

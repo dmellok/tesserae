@@ -108,18 +108,46 @@ def _as_doc(page: Page) -> CanvasPage:
     )
 
 
+def _coerce_canvas_update_policy(page: Page) -> Page:
+    """Drop update opt-ins that the current canvas placement cannot support.
+
+    The editor UI hides the toggle for non-capable widgets, but UI and MCP
+    payloads are both untrusted persistence inputs. Keep the stored policy
+    symmetric with Grid cells: only widget elements whose current manifest
+    declares ``updates.on_change`` may retain a true value.
+    """
+    if page.canvas is None:
+        return page
+    registry = _registry()
+    coerced: list[Element] = []
+    for element in page.canvas.els:
+        plugin = (
+            registry.get(element.widget) if element.kind == "widget" and element.widget else None
+        )
+        supported = bool(plugin and plugin.on_change_updates)
+        coerced.append(
+            element
+            if supported or not element.update_on_change
+            else element.model_copy(update={"update_on_change": False})
+        )
+    page.canvas.els = coerced
+    return page
+
+
 def _doc_to_page(doc: CanvasPage) -> Page:
     """Build a canvas Page from an editor document. Page-level theme/style/font
     mirror the canvas so the dashboards list reflects it."""
-    return Page(
-        id=doc.id,
-        name=doc.name or "Untitled Panel",
-        layout_kind="canvas",
-        device_ids=list(doc.device_ids),
-        theme=doc.theme,
-        style=doc.style,
-        font=doc.font or None,
-        canvas=doc.to_layout(),
+    return _coerce_canvas_update_policy(
+        Page(
+            id=doc.id,
+            name=doc.name or "Untitled Panel",
+            layout_kind="canvas",
+            device_ids=list(doc.device_ids),
+            theme=doc.theme,
+            style=doc.style,
+            font=doc.font or None,
+            canvas=doc.to_layout(),
+        )
     )
 
 

@@ -74,6 +74,8 @@ def catalog_entry(plugin: Plugin) -> dict[str, Any]:
         "desc": str(plugin.manifest.get("description") or ""),
         "fragments": fragments_of(plugin),
         "sample": _preview_sample(plugin),
+        # Deliberately read the manifest instead of Plugin.on_change_updates:
+        # catalog builders accept duck-typed plugin objects in tests and tools.
         "updates_on_change": bool(
             isinstance(plugin.manifest.get("updates"), dict)
             and plugin.manifest["updates"].get("on_change")
