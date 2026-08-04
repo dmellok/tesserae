@@ -220,13 +220,19 @@ def _design_cards(
                 seen.setdefault(did, None)
         return list(seen)
 
-    def screen(pid: str, index: int | None = None, is_live: bool = False) -> dict[str, Any]:
+    def screen(
+        pid: str,
+        index: int | None = None,
+        is_live: bool = False,
+        has_conditions: bool = False,
+    ) -> dict[str, Any]:
         return {
             "id": pid,
             "name": page_names.get(pid, pid),
             "thumb": thumbs.get(pid, ""),
             "index": index,
             "live": is_live,
+            "cond": has_conditions,
         }
 
     cards: list[dict[str, Any]] = []
@@ -254,7 +260,10 @@ def _design_cards(
                     f"{len(deck.pages)} dashboard{'s' if len(deck.pages) != 1 else ''}"
                     " · button, tap, swipe"
                 ),
-                "screens": [screen(dp.page_id, None, dp.page_id == live_page) for dp in deck.pages],
+                "screens": [
+                    screen(dp.page_id, None, dp.page_id == live_page, bool(dp.conditions))
+                    for dp in deck.pages
+                ],
                 "live_name": page_names.get(live_page, live_page) if live_page else None,
                 "fire_url": url_for("decks.push", deck_id=deck.id),
                 "edit_url": url_for("decks.editor", deck_id=deck.id),
@@ -299,7 +308,8 @@ def _design_cards(
                     + (f" to {r.end_at}" if r.end_at else "")
                 ),
                 "screens": [
-                    screen(s.page_id, i, active and i == step_index) for i, s in enumerate(r.steps)
+                    screen(s.page_id, i, active and i == step_index, bool(s.conditions))
+                    for i, s in enumerate(r.steps)
                 ],
                 "steps_total": n,
                 "step_index": step_index,
@@ -350,7 +360,7 @@ def _design_cards(
                 "device_names": [device_names.get(d, d) for d in sched_device_ids],
                 "meta": f"{page_names.get(s.page_id, s.page_id)} · {cadence}"
                 + (f" · last sent {_ago(last, now_ts)}" if _ago(last, now_ts) else ""),
-                "screens": [screen(s.page_id, None, showing)],
+                "screens": [screen(s.page_id, None, showing, bool(s.conditions))],
                 "live_name": page_names.get(s.page_id) if showing else None,
                 "marks": marks[:48],
                 "now_pct": round(now_pct, 2),

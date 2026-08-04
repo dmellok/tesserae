@@ -132,6 +132,38 @@ def test_edit_paths_open_the_right_editor(app: Flask) -> None:
     assert 'value="Morning brief"' in body  # schedule edit form open
 
 
+def test_condition_badge_marks_screens_with_conditions(app: Flask) -> None:
+    """A screen whose page carries conditions gets the funnel badge linking
+    to the record's editor; unconditioned screens stay clean."""
+    _seed_all_shapes(app)
+    app.config["ROTATION_STORE"].upsert(
+        Rotation(
+            id="loop",
+            name="Kitchen loop",
+            steps=[
+                RotationStep(
+                    page_id="kitchen",
+                    dwell_minutes=15,
+                    conditions=[
+                        {
+                            "source_kind": "ha_entity",
+                            "source_id": "binary_sensor.motion",
+                            "operator": "==",
+                            "value": "on",
+                        }
+                    ],
+                ),
+                RotationStep(page_id="hall", dwell_minutes=15),
+            ],
+        )
+    )
+    client = app.test_client()
+    _sign_in(client)
+    body = client.get("/decks").get_data(as_text=True)
+    assert body.count('class="dk-cond"') == 1
+    assert 'class="dk-cond" href="/decks/loop/edit"' in body
+
+
 def test_disabled_state_and_summary_render(app: Flask) -> None:
     _seed_all_shapes(app)
     schedule = app.config["SCHEDULE_STORE"].get("brief")

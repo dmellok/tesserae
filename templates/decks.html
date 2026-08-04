@@ -17,7 +17,7 @@
 {# Lineups page: one section per display, one row per deck inside it, with a
    kind-specific body: screen cards for every dashboard, a 24h rail for
    schedules, steppers for by-hand. #}
-{% macro dk_screen(s, total=None) %}
+{% macro dk_screen(s, total=None, edit_url=None) %}
 <figure class="dk-screen{% if s.live %} is-live{% endif %}">
   <div class="dk-screen-frame">
     {% if s.thumb %}<img src="{{ s.thumb }}" alt="" loading="lazy">{% else %}<i class="ph ph-monitor" aria-hidden="true"></i>{% endif %}
@@ -26,6 +26,10 @@
   <figcaption>
     {% if s.live %}<i class="ph-fill ph-play" aria-hidden="true"></i>{% endif %}
     <span class="dk-screen-name">{{ s.name }}</span>
+    {% if s.cond %}
+    {% if edit_url %}<a class="dk-cond" href="{{ edit_url }}" title="Shows only while its conditions pass. Edit them."><i class="ph-bold ph-funnel" aria-hidden="true"></i></a>
+    {% else %}<span class="dk-cond" title="Shows only while its conditions pass"><i class="ph-bold ph-funnel" aria-hidden="true"></i></span>{% endif %}
+    {% endif %}
     {% if total and s.index is not none %}<span class="dk-step-ix">{{ s.index + 1 }}/{{ total }}</span>{% endif %}
   </figcaption>
 </figure>
@@ -78,7 +82,7 @@
   <div class="dk-body dk-body--cycle">
     {% for s in c.screens %}
     {% if not loop.first %}<i class="ph-bold ph-caret-right dk-chevron" aria-hidden="true"></i>{% endif %}
-    {{ dk_screen(s, total=c.steps_total) }}
+    {{ dk_screen(s, total=c.steps_total, edit_url=c.edit_url) }}
     {% endfor %}
     {% if c.next_advance %}
     <div class="dk-next"><span>next advance</span><strong>{{ c.next_advance }}</strong></div>
@@ -86,7 +90,7 @@
   </div>
   {% elif c.kind == 'send' %}
   <div class="dk-body dk-body--send">
-    {% for s in c.screens %}{{ dk_screen(s) }}{% endfor %}
+    {% for s in c.screens %}{{ dk_screen(s, edit_url=c.edit_url) }}{% endfor %}
     <div class="dk-rail-wrap">
       <div class="dk-rail-scale"><span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>24:00</span></div>
       <div class="dk-rail">
@@ -104,7 +108,7 @@
   </div>
   {% else %}
   <div class="dk-body dk-body--nav">
-    {% for s in c.screens %}{{ dk_screen(s) }}{% endfor %}
+    {% for s in c.screens %}{{ dk_screen(s, edit_url=c.edit_url) }}{% endfor %}
     <span class="dk-nav-note"><i class="ph ph-hand-tap" aria-hidden="true"></i>waiting on a press — no timer</span>
     <div class="dk-steppers">
       <form method="post" action="{{ c.step_url }}" class="inline">

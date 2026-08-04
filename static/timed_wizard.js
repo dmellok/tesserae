@@ -45,6 +45,7 @@
     name: '',
     pending: false,
     handed: false,
+    openEditor: false, // cycle escape hatch: create, then land in the editor
     error: '',
   });
   let state = initial();
@@ -295,11 +296,13 @@
       : 'One last look, then it goes live on the display.';
     el.name.placeholder = autoName();
 
-    // Escape hatch: the prefilled full form exists for schedules only;
-    // rotations and decks are fine-tuned in the deck editor after Create.
+    // Escape hatch: schedules get the prefilled full form; rotations create
+    // and land in the deck editor, where per-dashboard conditions live in
+    // the Page conditions fold. Deck mode already opens the editor.
     const hasFullForm = state.mode === 'daily' || state.mode === 'interval';
-    el.escape.hidden = !hasFullForm;
+    el.escape.hidden = !(hasFullForm || state.mode === 'cycle');
     if (hasFullForm) {
+      el.advanced.textContent = 'Open the full form';
       const params = new URLSearchParams();
       if (state.name.trim()) params.set('wz_name', state.name.trim());
       params.set('prefill_page', state.dash);
@@ -307,6 +310,9 @@
       if (state.mode === 'daily') params.set('wz_time', state.time);
       else params.set('wz_interval', String(state.interval));
       el.advanced.href = URLS.fullForm + '?' + params.toString() + '#timed';
+    } else if (state.mode === 'cycle') {
+      el.advanced.textContent = 'Create and open the editor';
+      el.advanced.href = '#';
     }
   };
 
@@ -447,8 +453,14 @@
           return;
         }
         createdUrl = data.url || null;
-        if (state.mode === 'deck' && data.id) {
+        if ((state.mode === 'deck' || state.mode === 'cycle') && data.id) {
           editorUrl = URLS.editorTemplate.replace('__DECK_ID__', encodeURIComponent(data.id));
+        }
+        if (state.openEditor && editorUrl) {
+          state.handed = true;
+          render(false);
+          window.location.assign(editorUrl);
+          return;
         }
         state.step = 3;
         render(true);
@@ -538,6 +550,16 @@
   });
   el.name.addEventListener('input', () => {
     state.name = el.name.value;
+  });
+
+  // Cycle-mode escape hatch: intercept the anchor (schedules keep their
+  // normal navigation to the prefilled full form).
+  el.advanced.addEventListener('click', (e) => {
+    if (state.mode !== 'cycle') return;
+    e.preventDefault();
+    if (state.pending || !valid()) return;
+    state.openEditor = true;
+    submit();
   });
 
   el.back.addEventListener('click', () => {

@@ -544,6 +544,14 @@
 }
 .dk-screen figcaption .dk-screen-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dk-screen.is-live figcaption { color: var(--t-accent); font-weight: 700; }
+.dk-cond {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  color: color-mix(in oklab, var(--t-fg) 45%, transparent);
+  text-decoration: none;
+}
+.dk-cond:hover { color: var(--t-accent); }
 .dk-step-ix { margin-left: auto; font: 11px var(--t-font-mono); color: color-mix(in oklab, var(--t-fg) 35%, transparent); }
 .dk-chevron { color: color-mix(in oklab, var(--t-fg) 25%, transparent); font-size: 14px; margin-bottom: 28px; align-self: flex-end; }
 
