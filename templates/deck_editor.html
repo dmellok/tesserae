@@ -99,7 +99,7 @@
             <i class="ph-bold ph-caret-right dxe-fold-caret" aria-hidden="true"></i>
             <i class="ph-bold ph-clock-countdown" aria-hidden="true"></i>
             <span>Advanced timing</span>
-            <span class="dxe-fold-hint">days · start/stop · priority · smart sync</span>
+            <span class="dxe-fold-hint">days · start/stop · priority · render lead</span>
           </summary>
           <div class="dxe-adv-grid">
             <div class="dxe-set">
@@ -143,11 +143,6 @@
               <input type="number" name="advance_priority"
                      value="{{ deck.advance_priority if deck else 0 }}">
               <p class="dxe-help">higher wins when a schedule is also due</p>
-            </div>
-            <div class="dxe-set">
-              <label class="dxe-smart"><input type="checkbox" name="advance_smart_sync"
-                     {% if deck and deck.advance_smart_sync %}checked{% endif %}> Smart sync</label>
-              <p class="dxe-help">render just before a battery panel wakes</p>
             </div>
             <div class="dxe-set">
               <label class="dxe-mono-label" for="dxe-lead">RENDER LEAD (S)</label>
@@ -224,6 +219,21 @@
               </div>
             </div>
             <p class="dxe-help" id="dxe-cadence-help">How often pages re-render out of view.</p>
+          </div>
+          {# Smart sync: promoted per-deck switch (the lead window stays under
+             Advanced timing). Hidden by JS while advance is by-hand. #}
+          <div class="dxe-set" id="dxe-smartsync-wrap">
+            <div class="dxe-switch-row">
+              <label class="dxe-mono-label" for="dxe-smartsync">SMART SYNC</label>
+              <label class="switch dxe-switch">
+                <input type="checkbox" id="dxe-smartsync" name="advance_smart_sync"
+                       {% if deck and deck.advance_smart_sync %}checked{% endif %}>
+                <span class="switch-track"><span class="switch-thumb"></span></span>
+              </label>
+            </div>
+            <p class="dxe-help">Render just before a battery panel wakes instead
+              of on the fixed cadence. Needs the device's sleep telemetry;
+              without it the normal timing applies.</p>
           </div>
           <div class="dxe-set">
             <label class="dxe-mono-label" for="dxe-returnhome">RETURN HOME AFTER</label>

@@ -361,6 +361,9 @@
     if (intervalWrap) intervalWrap.style.display = mode === "manual" ? "none" : "";
     const advMore = el("dxe-adv-more");
     if (advMore) advMore.style.display = mode === "manual" ? "none" : "";
+    // Smart sync only means something when a timer drives the deck.
+    const smartWrap = el("dxe-smartsync-wrap");
+    if (smartWrap) smartWrap.style.display = mode === "manual" ? "none" : "";
     if (advHint) {
       advHint.textContent =
         mode === "manual"

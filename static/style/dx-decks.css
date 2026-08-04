@@ -225,6 +225,8 @@
 .dxe-interval { display: inline-flex; align-items: center; gap: 8px; }
 .dxe-every { font-size: 13px; color: var(--t-fg-soft); }
 .dxe-adv-hint { font-size: 13px; color: var(--t-fg-soft); }
+.dxe-switch-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+
 /* Tuning card: timing + conditions folds below the page rail. */
 .dxe-main-col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
 .dxe-tuning { background: var(--t-surface-sunk); padding: 8px 22px; }
