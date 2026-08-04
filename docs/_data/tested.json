@@ -28,8 +28,8 @@
     },
     "esp32_gray2_bin": {
       "status": "Tested",
-      "hardware": "Xteink X4 (GDEQ0426T82 / SSD1677, 800x480) running CrossInk with Tesserae client support",
-      "notes": "4-level grayscale confirmed end-to-end: a 96000-byte 2-bpp frame fetched and composited on the panel as a base frame plus LSB/MSB planes, with distinct grey levels. Packing is byte-identical to the firmware's own 2-bpp bitmap reader, so no decode step is involved. Not yet confirmed on the Seeed reTerminal E1001 in its 4-gray mode."
+      "hardware": "Xteink X4 (SSD1677, 800x480) and Xteink X3 (UC8279d, 792x528), both running CrossInk with Tesserae client support",
+      "notes": "4-level grayscale confirmed end-to-end on both panels: the 2-bpp frame is fetched and composited as a base frame plus LSB/MSB planes, with distinct grey levels. Packing is byte-identical to the firmware's own 2-bpp bitmap reader, so no decode step is involved. Notable that this works on the X3's UC8253/UC8279d silicon as well as the UC8179-class panels the renderer was written for. Not yet confirmed on the Seeed reTerminal E1001 in its 4-gray mode."
     }
   }
 }
