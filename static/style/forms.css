@@ -869,6 +869,40 @@ code {
 }
 .wizard-secondary-btn:hover { background: var(--t-surface-sunk); }
 
+/* ----- suggested-decks intro screen ----- */
+.wizard-dialog.is-suggest .wizard-stepper { display: none; }
+.wizard-suggest { gap: 10px; }
+.wizard-suggestion {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border: 1px solid var(--t-border);
+  border-radius: 12px;
+  background: var(--t-surface);
+}
+.wizard-suggestion-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.wizard-suggestion-meta strong { font-size: 13.5px; }
+.wizard-suggestion-meta span {
+  font: 12px var(--t-font-mono);
+  color: var(--t-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wizard-suggestion .wizard-secondary-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+}
+
 /* ----- created screen ----- */
 .wizard-created {
   align-items: center;

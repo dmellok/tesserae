@@ -4,8 +4,8 @@
 // created screen; deck mode creates the deck and hands off to the editor.
 (function () {
   const dialog = document.getElementById('timed-wizard');
-  const opener = document.querySelector('[data-open-timed-wizard]');
-  if (!dialog || !opener || typeof dialog.showModal !== 'function') return;
+  const openers = Array.from(document.querySelectorAll('[data-open-timed-wizard]'));
+  if (!dialog || !openers.length || typeof dialog.showModal !== 'function') return;
 
   const $ = (sel) => dialog.querySelector(sel);
   const $$ = (sel) => Array.from(dialog.querySelectorAll(sel));
@@ -29,8 +29,12 @@
     fullForm: dialog.dataset.fullFormUrl,
   };
 
+  // Suggested-deck intro screen: present only when the server found page
+  // links worth offering; the wizard opens on it and "Start fresh" moves on.
+  const hasSuggest = Boolean(dialog.querySelector('[data-wizard-view="suggest"]'));
+
   const initial = () => ({
-    step: 0, // 0 behaviour · 1 details · 2 review · 3 created
+    step: hasSuggest ? -1 : 0, // -1 suggest · 0 behaviour · 1 details · 2 review · 3 created
     mode: null, // 'daily' | 'interval' | 'cycle' | 'deck'
     dash: DASHBOARDS.length ? DASHBOARDS[0].id : '',
     time: '07:00',
@@ -291,8 +295,8 @@
       : 'One last look, then it goes live on the display.';
     el.name.placeholder = autoName();
 
-    // Escape hatch: the prefilled full form exists for timed sends only;
-    // cycles and decks are fine-tuned in the deck editor after Create.
+    // Escape hatch: the prefilled full form exists for schedules only;
+    // rotations and decks are fine-tuned in the deck editor after Create.
     const hasFullForm = state.mode === 'daily' || state.mode === 'interval';
     el.escape.hidden = !hasFullForm;
     if (hasFullForm) {
@@ -311,7 +315,11 @@
 
   const primaryLabel = () => {
     if (state.pending) return 'Creating…';
-    if (state.step === 2) return state.mode === 'deck' ? 'Create and open editor' : 'Create schedule';
+    if (state.step === -1) return 'Start fresh';
+    if (state.step === 2) {
+      if (state.mode === 'deck') return 'Create and open editor';
+      return state.mode === 'cycle' ? 'Create rotation' : 'Create schedule';
+    }
     if (state.step === 3) {
       if (state.mode === 'deck') return state.handed ? 'Opening…' : 'Open the deck editor';
       return 'Done';
@@ -321,9 +329,10 @@
 
   const render = (focusHeading) => {
     const labels = STEP_LABELS();
-    el.progress.textContent = state.step === 3
-      ? 'Created'
-      : 'Step ' + (state.step + 1) + ' of 3 · ' + labels[state.step];
+    if (state.step === -1) el.progress.textContent = 'Suggested for you';
+    else if (state.step === 3) el.progress.textContent = 'Created';
+    else el.progress.textContent = 'Step ' + (state.step + 1) + ' of 3 · ' + labels[state.step];
+    dialog.classList.toggle('is-suggest', state.step === -1);
 
     el.stepItems.forEach((item, i) => {
       item.classList.toggle('is-complete', state.step > i);
@@ -333,7 +342,9 @@
       else item.removeAttribute('aria-current');
     });
 
-    const viewName = ['behaviour', 'details', 'review', 'created'][state.step];
+    const viewName = state.step === -1
+      ? 'suggest'
+      : ['behaviour', 'details', 'review', 'created'][state.step];
     el.views.forEach((v) => { v.hidden = v.dataset.wizardView !== viewName; });
 
     if (viewName === 'behaviour') {
@@ -382,7 +393,7 @@
         : plain();
     }
 
-    el.back.hidden = !(state.step === 1 || state.step === 2);
+    el.back.hidden = !(state.step === 1 || state.step === 2 || (state.step === 0 && hasSuggest));
     el.again.hidden = state.step !== 3;
     el.forwardLabel.textContent = primaryLabel();
     el.forward.disabled = !valid() || state.handed;
@@ -460,14 +471,14 @@
   };
 
   // ----- events ------------------------------------------------------------
-  opener.addEventListener('click', () => {
+  openers.forEach((opener) => opener.addEventListener('click', () => {
     state = initial();
     createdUrl = null;
     editorUrl = null;
     syncInputs();
     render(false);
     dialog.showModal();
-  });
+  }));
 
   $('[data-wizard-close]').addEventListener('click', () => dialog.close());
   dialog.addEventListener('close', () => {
@@ -530,7 +541,7 @@
   });
 
   el.back.addEventListener('click', () => {
-    state.step = Math.max(0, state.step - 1);
+    state.step = Math.max(hasSuggest ? -1 : 0, state.step - 1);
     state.error = '';
     render(true);
   });

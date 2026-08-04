@@ -1,6 +1,6 @@
 {% extends "_base.html" %}
 
-{% block title %}{{ deck.name if deck else 'New deck' }} · Decks{% endblock %}
+{% block title %}{{ deck.name if deck else 'New deck' }} · Lineups{% endblock %}
 
 {% block main %}
 <div class="dxe" id="deck-editor">
@@ -16,7 +16,7 @@
         <nav class="dxe-crumb">
           <a href="{{ url_for('auth.settings') }}">SETTINGS</a>
           <span>/</span>
-          <a href="{{ url_for('decks.index') }}">DECKS</a>
+          <a href="{{ url_for('decks.index') }}">LINEUPS</a>
         </nav>
         <input type="text" name="name" id="dxe-title" class="dxe-title-input"
                value="{{ deck.name if deck else '' }}" placeholder="Untitled deck" autocomplete="off">
@@ -91,7 +91,7 @@
               <span class="dxe-mono-label">MODE</span>
               <select name="advance_mode">
                 {% set amode = deck.advance_mode if deck else 'scheduled' %}
-                <option value="scheduled" {% if amode == 'scheduled' %}selected{% endif %}>timed cycle</option>
+                <option value="scheduled" {% if amode == 'scheduled' %}selected{% endif %}>timed rotation</option>
                 <option value="priority" {% if amode == 'priority' %}selected{% endif %}>first page whose conditions match</option>
               </select>
             </div>

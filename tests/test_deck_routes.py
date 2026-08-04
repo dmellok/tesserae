@@ -191,9 +191,11 @@ def test_suggestions_render_from_page_links(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
     body = client.get("/decks").get_data(as_text=True)
-    assert "Suggested from your page links" in body
+    # Suggestions render inside the setup wizard as its intro screen.
+    assert 'data-wizard-view="suggest"' in body
+    assert "Your dashboards already link up" in body
     # A pre-filled create form is rendered for the suggestion.
-    assert "graph_json" in body and "Create deck" in body
+    assert "graph_json" in body and "wizard-suggestion" in body
 
 
 def test_update_sets_per_page_refresh(app: Flask) -> None:

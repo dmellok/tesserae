@@ -32,6 +32,33 @@
 
   <div class="wizard-body">
 
+    {# ---- Step 0 (optional): suggested decks from page links ----------- #}
+    {% if suggestions %}
+    <section class="wizard-view wizard-suggest" data-wizard-view="suggest" hidden>
+      <div class="wizard-section-head">
+        <h3 class="wizard-section-title" tabindex="-1">Your dashboards already link up</h3>
+        <p class="wizard-section-sub">These pages point at each other with tap or swipe actions.
+          Turn a set into a ready-made deck, kept pre-rendered on its display, or start fresh below.</p>
+      </div>
+      {% for s in suggestions %}
+      <form method="post" action="{{ url_for('decks.create') }}" class="wizard-suggestion">
+        <input type="hidden" name="name" value="{{ s.name }}">
+        {% for dev in s.device_ids %}<input type="hidden" name="device_ids" value="{{ dev }}">{% endfor %}
+        <input type="hidden" name="entry_page_id" value="{{ s.entry_page_id or '' }}">
+        <input type="hidden" name="refresh_interval_minutes" value="{{ s.refresh }}">
+        <input type="hidden" name="graph_json" value="{{ s.graph_json }}">
+        <div class="wizard-suggestion-meta">
+          <strong>{{ s.name }}</strong>
+          <span>{% for pid in s.page_ids %}{{ page_names.get(pid, pid) }}{% if not loop.last %} &rarr; {% endif %}{% endfor %}</span>
+        </div>
+        <button type="submit" class="wizard-secondary-btn">
+          <i class="ph ph-plus" aria-hidden="true"></i><span>Create</span>
+        </button>
+      </form>
+      {% endfor %}
+    </section>
+    {% endif %}
+
     {# ---- Step 1: behaviour ------------------------------------------- #}
     <section class="wizard-view" data-wizard-view="behaviour">
       <div class="wizard-section-head">

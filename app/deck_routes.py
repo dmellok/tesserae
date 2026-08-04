@@ -185,11 +185,13 @@ def _design_cards(
     current_step: dict[str, dict[str, Any]],
     schedule_status: dict[str, dict[str, Any]],
     pages: list[Any],
+    devices: list[Any],
+    deck_devices: dict[str, list[str]] | None = None,
     highlight_id: str | None = None,
 ) -> dict[str, Any]:
-    """View-models for the design-handoff Decks page: one row per deck with
-    a kind-specific body (screen cards, 24h rail, steppers), plus the
-    on-air summary. Returns {"cards": [...], "onair": {...} | None}."""
+    """View-models for the Lineups page: one row per deck with a
+    kind-specific body (screen cards, 24h rail, steppers), grouped per
+    display. Returns {"cards": [...], "groups": [...], "now_hhmm": ...}."""
     from datetime import timedelta
 
     from app.schedule_routes import _project_fires
@@ -201,8 +203,22 @@ def _design_cards(
     day_start = now_tz.replace(hour=0, minute=0, second=0, microsecond=0)
     now_pct = min(100.0, max(0.0, (now_ts - day_start.timestamp()) / 864.0 / 100 * 100))
     page_names = {p.id: p.name for p in pages}
+    page_devices = {p.id: list(p.device_ids) for p in pages}
+    device_names = {d.id: d.display_name for d in devices}
+    deck_devices = deck_devices or {}
     thumbs = _page_thumbs(pages)
     live = _live_map()
+
+    def resolve_devices(explicit: list[str], page_ids: list[str]) -> list[str]:
+        """Displays a record lands on: its own binding, else the union of
+        its member pages' bindings (delivery falls through the same way)."""
+        if explicit:
+            return list(explicit)
+        seen: dict[str, None] = {}
+        for pid in page_ids:
+            for did in page_devices.get(pid, []):
+                seen.setdefault(did, None)
+        return list(seen)
 
     def screen(pid: str, index: int | None = None, is_live: bool = False) -> dict[str, Any]:
         return {
@@ -222,6 +238,7 @@ def _design_cards(
             if rec and rec[0] == deck.id:
                 live_page = rec[1]
                 break
+        deck_device_ids = resolve_devices(deck.device_ids, [dp.page_id for dp in deck.pages])
         cards.append(
             {
                 "kind": "nav",
@@ -231,9 +248,10 @@ def _design_cards(
                 "playing": live_page is not None,
                 "badge": "By hand",
                 "badge_icon": "hand-tap",
+                "device_ids": deck_device_ids,
+                "device_names": [device_names.get(d, d) for d in deck_device_ids],
                 "meta": (
                     f"{len(deck.pages)} dashboard{'s' if len(deck.pages) != 1 else ''}"
-                    f" · {len(deck.device_ids)} display{'s' if len(deck.device_ids) != 1 else ''}"
                     " · button, tap, swipe"
                 ),
                 "screens": [screen(dp.page_id, None, dp.page_id == live_page) for dp in deck.pages],
@@ -263,6 +281,7 @@ def _design_cards(
         )
         n = len(r.steps)
         play_next = ((step_index or 0) + 1) % n if n else 0
+        rot_device_ids = resolve_devices(r.device_ids, [s.page_id for s in r.steps])
         cards.append(
             {
                 "kind": "cycle",
@@ -270,8 +289,10 @@ def _design_cards(
                 "name": r.name,
                 "enabled": r.enabled,
                 "playing": playing,
-                "badge": "Playing · Timer cycle" if playing else "Timer cycle",
+                "badge": "Playing · Rotation" if playing else "Rotation",
                 "badge_icon": "arrows-clockwise",
+                "device_ids": rot_device_ids,
+                "device_names": [device_names.get(d, d) for d in rot_device_ids],
                 "meta": (
                     f"{n} dashboard{'s' if n != 1 else ''}"
                     f" · cycle {r.cycle_minutes} min · from {r.anchor}"
@@ -315,6 +336,7 @@ def _design_cards(
         )
         showing = any(rec[1] == s.page_id for rec in live.values())
         last = (schedule_status.get(s.id) or {}).get("last_fired")
+        sched_device_ids = resolve_devices(deck_devices.get(s.id, []), [s.page_id])
         cards.append(
             {
                 "kind": "send",
@@ -322,8 +344,10 @@ def _design_cards(
                 "name": s.name,
                 "enabled": s.enabled,
                 "playing": showing,
-                "badge": "Timed send",
+                "badge": "Schedule",
                 "badge_icon": "clock",
+                "device_ids": sched_device_ids,
+                "device_names": [device_names.get(d, d) for d in sched_device_ids],
                 "meta": f"{page_names.get(s.page_id, s.page_id)} · {cadence}"
                 + (f" · last sent {_ago(last, now_ts)}" if _ago(last, now_ts) else ""),
                 "screens": [screen(s.page_id, None, showing)],
@@ -349,29 +373,34 @@ def _design_cards(
         card["is_new"] = highlight_id is not None and card["id"] == highlight_id
     cards.sort(key=lambda c: str(c["name"]).lower())
 
-    playing_cards = [c for c in cards if c["playing"]]
-    onair = None
-    if playing_cards:
-        primary = next((c for c in playing_cards if c["kind"] == "cycle"), playing_cards[0])
-        detail_bits = []
-        if primary.get("live_name"):
-            detail_bits.append("showing \u201c" + str(primary["live_name"]) + "\u201d")
-        if primary["kind"] == "cycle" and primary.get("step_index") is not None:
-            detail_bits.append(f"step {primary['step_index'] + 1} of {primary['steps_total']}")
-            if primary.get("next_advance"):
-                detail_bits.append(f"advances {primary['next_advance']}")
-        live_displays = sum(1 for rec in live.values() if rec[1])
-        next_fires = sorted(c["next_fire"] for c in cards if c.get("next_fire"))
-        onair = {
-            "name": primary["name"],
-            "detail": " · ".join(detail_bits),
-            "counts": [
-                f"{len(cards)} deck{'s' if len(cards) != 1 else ''}",
-                f"{live_displays} display{'s' if live_displays != 1 else ''} live",
-            ]
-            + ([f"next fire {next_fires[0]}"] if next_fires else []),
-        }
-    return {"cards": cards, "onair": onair, "now_hhmm": now_tz.strftime("%H:%M")}
+    # One section per display, in registry order; a card targeting several
+    # displays appears under each. Cards with no resolvable display land in
+    # a trailing "not on a display yet" group.
+    groups: list[dict[str, Any]] = []
+    for d in devices:
+        rec = live.get(d.id)
+        live_pid = rec[1] if rec else None
+        groups.append(
+            {
+                "id": d.id,
+                "name": device_names.get(d.id, d.id),
+                "showing": page_names.get(live_pid, live_pid) if live_pid else None,
+                "thumb": thumbs.get(live_pid, "") if live_pid else "",
+                "cards": [c for c in cards if d.id in c["device_ids"]],
+            }
+        )
+    unbound = [c for c in cards if not c["device_ids"]]
+    if unbound:
+        groups.append(
+            {
+                "id": "",
+                "name": "Not on a display yet",
+                "showing": None,
+                "thumb": "",
+                "cards": unbound,
+            }
+        )
+    return {"cards": cards, "groups": groups, "now_hhmm": now_tz.strftime("%H:%M")}
 
 
 @bp.get("")
@@ -389,10 +418,11 @@ def index() -> str:
     )
 
     pages = _pages().list()
-    # Pure timer decks render in the cycle / timed sections below (they ARE
-    # the decommissioned rotations and schedules); cards show the navigable
+    # Pure timer decks render as rotation / schedule rows (they ARE the
+    # decommissioned rotations and schedules); cards show the navigable
     # decks (manual and both modes).
-    decks = [d for d in _store().all() if d.advance != "timer"]
+    all_decks = _store().all()
+    decks = [d for d in all_decks if d.advance != "timer"]
 
     # "Help me choose" wizard prefills (#167): the dialog collects intent +
     # details client-side and lands back here with wz_* params; the values
@@ -443,6 +473,8 @@ def index() -> str:
         current_step=current_step,
         schedule_status=schedule_status,
         pages=pages,
+        devices=instances,
+        deck_devices={d.id: list(d.device_ids) for d in all_decks},
         highlight_id=request.args.get("hl"),
     )
     return render_template(
@@ -454,9 +486,9 @@ def index() -> str:
         graphs=graphs,
         suggestions=suggestions,
         edit_id=request.args.get("edit"),
-        # -- the design-handoff list: one row per deck + on-air summary ---
+        # -- the Lineups list: one row per deck, grouped per display -------
         cards=design["cards"],
-        onair=design["onair"],
+        groups=design["groups"],
         now_hhmm=design["now_hhmm"],
         # -- schedules forms ----------------------------------------------
         schedules=schedules,

@@ -181,17 +181,5 @@
     apply();
   });
 
-  // New-schedule button reveals the form card and scrolls to it.
-  (function () {
-    const btn = document.querySelector('[data-toggle-new-schedule]');
-    const card = document.querySelector('[data-new-schedule-form]');
-    if (!btn || !card) return;
-    btn.addEventListener('click', () => {
-      card.hidden = false;
-      card.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      const first = card.querySelector('input[name="name"]');
-      if (first) first.focus();
-    });
-  })();
 </script>
 <script type="module" src="{{ url_for('static', filename='condition-picker.js') }}"></script>

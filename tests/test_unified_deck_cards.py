@@ -1,6 +1,6 @@
-"""The design-handoff Decks page: one row per deck with a kind badge and a
-kind-specific body (screen cards, 24h rail, steppers), an on-air bar when
-something is live, and filter tabs. Noun: deck."""
+"""The Lineups page: one section per display, one row per deck with a kind
+badge and a kind-specific body (screen cards, 24h rail, steppers). Internal
+noun: deck; kinds surface as By hand / Rotation / Schedule."""
 
 from __future__ import annotations
 
@@ -72,7 +72,7 @@ def test_every_shape_renders_as_a_unified_card(app: Flask) -> None:
         assert name in body
     # One row anatomy everywhere: header strip + kind badge + body.
     assert body.count('class="dk-row-head"') == 3
-    assert "Timer cycle" in body and "Timed send" in body and "By hand" in body
+    assert "Rotation" in body and "Schedule" in body and "By hand" in body
     # Kind-specific bodies: cycle chevrons, send 24h rail, nav steppers.
     assert "dk-body--cycle" in body and "dk-rail" in body and "dk-stepper" in body
     # Screen cards carry composer thumbnails.
@@ -80,8 +80,13 @@ def test_every_shape_renders_as_a_unified_card(app: Flask) -> None:
     # The old listings stay gone.
     assert "Saved schedules" not in body
     assert 'class="card deck-card"' not in body
-    # Filter tabs ship.
-    assert 'data-kind-filter="all"' in body
+    # Filter tabs and the per-kind creation links are gone; the wizard is
+    # the one entry point.
+    assert "data-kind-filter" not in body
+    assert "New timed send" not in body and "New timer cycle" not in body
+    assert "data-open-timed-wizard" in body
+    # With no registered displays, everything sits in the unbound group.
+    assert "Not on a display yet" in body
 
 
 def test_cycle_card_wires_play_fire_toggle_delete(app: Flask) -> None:
@@ -220,8 +225,9 @@ def test_manual_stepper_moves_the_display(app: Flask) -> None:
     assert app.config["DECK_NAV_STORE"].get("panel")["page_id"] == first
 
 
-def test_onair_bar_appears_only_when_something_is_live(app: Flask) -> None:
-    """The dark bar renders only while a registered display is live."""
+def test_display_group_carries_live_status_and_device_chip(app: Flask) -> None:
+    """Rows group per display; the section header shows what's on glass and
+    each row bar names the display it targets."""
     import json as _json
 
     from app.state.deck_model import Deck, DeckPage
@@ -230,7 +236,7 @@ def test_onair_bar_appears_only_when_something_is_live(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
     body = client.get("/decks").get_data(as_text=True)
-    assert "dk-onair" not in body  # nothing live yet
+    assert "dk-group-live" not in body  # no registered display, nothing live
 
     # Register a real device instance (the live map only counts those),
     # bind the nav deck to it, and give it a nav record.
@@ -251,7 +257,10 @@ def test_onair_bar_appears_only_when_something_is_live(app: Flask) -> None:
     )
     app.config["DECK_NAV_STORE"].set("panel", "wayfind", "hall")
     body = client.get("/decks").get_data(as_text=True)
-    assert "dk-onair" in body and "On air" in body
-    assert "display live" in body
+    # The display's section exists and reports what it is showing.
+    assert 'id="display-panel"' in body
+    assert "dk-group-live" in body and "showing Hall" in body
+    # The bound row carries a device chip naming the display.
+    assert "dk-devchip" in body
     # The live screen card lights up on the playing row.
     assert "dk-screen is-live" in body
