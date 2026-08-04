@@ -47,3 +47,12 @@
 #schedule-form-card .field-grid {
   margin-top: 0;
 }
+
+/* On the Decks page the form card renders right after the deck list
+   (and above the page's bottom edge); give it room on both sides so
+   it reads as its own section rather than an attachment of the last
+   row. */
+#schedule-form-card {
+  margin-top: 20px;
+  margin-bottom: 20px;
+}

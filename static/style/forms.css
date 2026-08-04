@@ -450,7 +450,10 @@ code {
   flex-direction: column;
   gap: 13px;
 }
-.wizard-view[hidden] { display: none; }
+/* Blocks, footer buttons and empty states inside the dialog toggle via
+   the hidden attribute; their own display rules would beat the UA
+   [hidden] rule on specificity, so re-assert it for the whole dialog. */
+.wizard-dialog [hidden] { display: none !important; }
 .wizard-section-title {
   margin: 0;
   font-size: 14px;
