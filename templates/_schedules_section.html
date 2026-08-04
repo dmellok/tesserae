@@ -138,51 +138,7 @@
    wizard's prefill path. #}
 <span id="timed"></span>
 
-<section class="dx-section-card timeline-card">
-  <header class="dx-section-head">
-    <span class="dx-section-icon" aria-hidden="true"><i class="ph ph-timer"></i></span>
-    <div class="dx-section-titleblock">
-      <h3 class="dx-section-title">Next 24 hours</h3>
-      <p class="dx-section-desc">Visual lookahead for the next 24 hours of scheduled pushes. Each tick is one fire.</p>
-    </div>
-  </header>
-  {% if not schedules %}
-  <p class="lede">No schedules to plot, add one with <strong>New schedule</strong>.</p>
-  {% elif not timeline.any_fires %}
-  <p class="lede">Nothing scheduled to fire in the next 24 hours.</p>
-  {% else %}
-  <div class="timeline" style="--now-pct: {{ '%.2f'|format(timeline.now_pct) }}%;">
-    <div class="timeline-axis" aria-hidden="true">
-      {% for mark in timeline.hour_marks %}
-      <span class="timeline-tick" style="left: {{ '%.2f'|format(mark.pct) }}%;">{{ '%02d'|format(mark.hour) }}:00</span>
-      {% endfor %}
-    </div>
-    {# Vertical "now" line, spans the whole stack of timeline rows
-       so the eye can sight straight down from a row's upcoming fires
-       to wall-clock now. The line uses absolute positioning relative
-       to the timeline; its left coord comes from --now-pct. #}
-    <div class="timeline-now" aria-hidden="true" title="Now {{ timeline.now.strftime('%H:%M') }}">
-      <span class="timeline-now-label">Now</span>
-    </div>
-    {% for row in timeline.rows %}
-    <div class="timeline-row {% if not row.enabled %}is-disabled{% endif %}">
-      <a class="timeline-label" href="{{ url_for('schedules.index', edit=row.id) }}">
-        <i class="ph ph-{{ 'clock' if row.kind == 'daily' else 'repeat' }}" aria-hidden="true"></i>
-        <span>{{ row.name }}</span>
-        <span class="muted">({{ row.count }})</span>
-      </a>
-      <div class="timeline-track">
-        {% for fire in row.fires %}
-        <span class="timeline-fire"
-              style="left: {{ '%.2f'|format(fire.pct) }}%;"
-              title="{{ fire.at.strftime('%a %H:%M') }}"></span>
-        {% endfor %}
-      </div>
-    </div>
-    {% endfor %}
-  </div>
-  {% endif %}
-</section>
+{# The 24h timeline moved into each timed-send row's rail (design handoff). #}
 
 <section class="dx-section-card" id="schedule-form-card" {% if not schedule_edit_id and not prefill_page %}hidden{% endif %} data-new-schedule-form>
   <header class="dx-section-head">

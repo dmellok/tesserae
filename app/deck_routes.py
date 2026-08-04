@@ -119,7 +119,7 @@ def _graph_json(deck_pages: Any) -> str:
 
 
 def _ago(epoch: Any, now_ts: float) -> str | None:
-    """Compact relative-time label for the unified cards."""
+    """Compact relative-time label."""
     if not isinstance(epoch, (int, float)):
         return None
     delta = max(0, int(now_ts - epoch))
@@ -132,195 +132,245 @@ def _ago(epoch: Any, now_ts: float) -> str | None:
     return f"{delta // 86_400} d ago"
 
 
-def _pct(now_ts: float, start: Any, end: Any) -> int | None:
-    """Progress through [start, end] as 0-100, or None when unknowable."""
-    if not isinstance(start, (int, float)) or not isinstance(end, (int, float)) or end <= start:
-        return None
-    return max(0, min(100, round((now_ts - start) / (end - start) * 100)))
+def _page_thumbs(pages: list[Any]) -> dict[str, str]:
+    """Composer live-preview URL per dashboard (the design's screen cards)."""
+    from app.composer import page_preview_token, preview_dims
+
+    devices_reg = current_app.config.get("DEVICE_REGISTRY")
+    settings = current_app.config.get("SETTINGS_STORE")
+    out: dict[str, str] = {}
+    for p in pages:
+        try:
+            token = page_preview_token(p, preview_dims(p, devices_reg, settings))
+        except Exception:
+            token = ""
+        out[p.id] = url_for("composer.compose_preview", page_id=p.id) + f"?v={token}"
+    return out
 
 
-def _unified_cards(
+def _live_map() -> dict[str, tuple[str | None, str | None]]:
+    """device_id -> (deck_id or None, page_id) currently on glass, from the
+    nav record first (deck-driven displays) then the last served render."""
+    out: dict[str, tuple[str | None, str | None]] = {}
+    devices_reg = current_app.config.get("DEVICE_REGISTRY")
+    nav = _nav_store()
+    push = current_app.config.get("PUSH_MANAGER")
+    for d in devices_reg.all() if devices_reg is not None else []:
+        if getattr(d, "kind_of", None) is None:
+            continue
+        rec = None
+        if nav is not None:
+            try:
+                rec = nav.get(d.id)
+            except Exception:
+                rec = None
+        if rec and rec.get("page_id"):
+            out[d.id] = (rec.get("deck_id"), rec.get("page_id"))
+            continue
+        latest = None
+        if push is not None and hasattr(push, "latest_render_for"):
+            latest = push.latest_render_for(d.id)
+        pid = latest.get("page_id") if isinstance(latest, dict) else None
+        if isinstance(pid, str) and pid:
+            out[d.id] = (None, pid)
+    return out
+
+
+def _design_cards(
     *,
     nav_decks: list[Deck],
     rotations: list[Any],
     schedules: list[Any],
     current_step: dict[str, dict[str, Any]],
-    rotation_pills: dict[str, dict[str, str] | None],
-    schedule_pills: dict[str, dict[str, str]],
     schedule_status: dict[str, dict[str, Any]],
-    page_names: dict[str, str],
+    pages: list[Any],
     highlight_id: str | None = None,
-) -> list[dict[str, Any]]:
-    """One view-model per deck, regardless of shape (#167 unified list).
-
-    Every card gets the same anatomy: a status block (state label, headline
-    value, progress bar, sub line), a kind chip, a one-sentence summary, and
-    a uniform action set wired to the shape's existing endpoints."""
+) -> dict[str, Any]:
+    """View-models for the design-handoff Decks page: one row per deck with
+    a kind-specific body (screen cards, 24h rail, steppers), plus the
+    on-air summary. Returns {"cards": [...], "onair": {...} | None}."""
     from datetime import timedelta
 
     from app.schedule_routes import _project_fires
     from app.tz_resolve import app_timezone
 
-    now_tz = datetime.now(app_timezone())
+    tz = app_timezone()
+    now_tz = datetime.now(tz)
     now_ts = now_tz.timestamp()
-    nav = _nav_store()
+    day_start = now_tz.replace(hour=0, minute=0, second=0, microsecond=0)
+    now_pct = min(100.0, max(0.0, (now_ts - day_start.timestamp()) / 864.0 / 100 * 100))
+    page_names = {p.id: p.name for p in pages}
+    thumbs = _page_thumbs(pages)
+    live = _live_map()
+
+    def screen(pid: str, index: int | None = None, is_live: bool = False) -> dict[str, Any]:
+        return {
+            "id": pid,
+            "name": page_names.get(pid, pid),
+            "thumb": thumbs.get(pid, ""),
+            "index": index,
+            "live": is_live,
+        }
+
     cards: list[dict[str, Any]] = []
 
     for deck in nav_decks:
-        rec = None
-        rec_device = None
-        if nav is not None:
-            for device_id in deck.device_ids:
-                candidate = nav.get(device_id)
-                if candidate is not None and candidate.get("deck_id") == deck.id:
-                    rec = candidate
-                    rec_device = device_id
-                    break
-        on_glass = rec.get("page_id") if rec else None
-        updated = rec.get("updated_at") if rec else None
-        if not deck.enabled:
-            state, icon = "DISABLED", "pause"
-        elif on_glass:
-            state, icon = "ON GLASS", "monitor"
-        else:
-            state, icon = "IDLE", "monitor"
-        progress = None
-        if deck.enabled and deck.home_timeout_minutes > 0 and isinstance(updated, (int, float)):
-            progress = _pct(now_ts, updated, updated + deck.home_timeout_minutes * 60)
-        sub = None
-        if on_glass:
-            bits = [b for b in (rec_device, _ago(updated, now_ts)) if b]
-            sub = " · ".join(bits) or None
+        live_page = None
+        for device_id in deck.device_ids:
+            rec = live.get(device_id)
+            if rec and rec[0] == deck.id:
+                live_page = rec[1]
+                break
         cards.append(
             {
                 "kind": "nav",
-                "kind_label": "By hand",
-                "kind_icon": "hand-tap",
                 "id": deck.id,
                 "name": deck.name,
                 "enabled": deck.enabled,
-                "state": state,
-                "state_icon": icon,
-                "big": page_names.get(on_glass, on_glass) if on_glass else "—",
-                "sub": sub,
-                "progress_pct": progress,
-                "summary": (
+                "playing": live_page is not None,
+                "badge": "By hand",
+                "badge_icon": "hand-tap",
+                "meta": (
                     f"{len(deck.pages)} dashboard{'s' if len(deck.pages) != 1 else ''}"
-                    " · button, tap, swipe · pre-rendered on "
-                    f"{len(deck.device_ids)} panel{'s' if len(deck.device_ids) != 1 else ''}"
+                    f" · {len(deck.device_ids)} display{'s' if len(deck.device_ids) != 1 else ''}"
+                    " · button, tap, swipe"
                 ),
-                "steps": [],
-                "play_urls": [],
+                "screens": [screen(dp.page_id, None, dp.page_id == live_page) for dp in deck.pages],
+                "live_name": page_names.get(live_page, live_page) if live_page else None,
                 "fire_url": url_for("decks.push", deck_id=deck.id),
-                "sync_url": url_for("decks.sync", deck_id=deck.id),
                 "edit_url": url_for("decks.editor", deck_id=deck.id),
                 "toggle_url": url_for("decks.toggle", deck_id=deck.id),
                 "delete_url": url_for("decks.delete", deck_id=deck.id),
+                "step_url": url_for("decks.step", deck_id=deck.id),
+                "play_url": None,
             }
         )
 
     for r in rotations:
         cur = current_step.get(r.id) or {}
-        pill = rotation_pills.get(r.id)
-        if not r.enabled:
-            state, icon, big, sub = "DISABLED", "pause", "—", None
-        elif pill is not None:
-            state, icon = pill["label"].upper(), pill["icon"]
-            big, sub = "—", pill.get("tooltip")
-        elif cur.get("active"):
-            nxt = cur.get("next_transition_epoch")
-            nxt_label = (
-                datetime.fromtimestamp(nxt, tz=now_tz.tzinfo).strftime("%H:%M")
-                if isinstance(nxt, (int, float))
-                else "?"
-            )
-            state, icon = "PLAYING", "play"
-            big = str(cur.get("page_name") or "—")
-            sub = f"step {(cur.get('step_index') or 0) + 1} of {len(r.steps)} · next {nxt_label}"
-        else:
-            state, icon = "IDLE", "clock"
-            big = "—"
-            sub = f"cycle starts at {r.anchor}"
-        progress = (
-            _pct(now_ts, cur.get("step_started_epoch"), cur.get("next_transition_epoch"))
-            if r.enabled and cur.get("active")
+        active = bool(cur.get("active")) and r.enabled
+        step_index = cur.get("step_index") if active else None
+        current_page = cur.get("page_id") if active else None
+        nxt = cur.get("next_transition_epoch")
+        next_advance = (
+            datetime.fromtimestamp(nxt, tz=tz).strftime("%H:%M")
+            if active and isinstance(nxt, (int, float))
             else None
         )
-        window = f"from {r.anchor}" + (f" to {r.end_at}" if r.end_at else "")
+        playing = active and any(
+            rec[1] == current_page and (rec[0] in (r.id, None)) for rec in live.values()
+        )
+        n = len(r.steps)
+        play_next = ((step_index or 0) + 1) % n if n else 0
         cards.append(
             {
                 "kind": "cycle",
-                "kind_label": "Timer cycle",
-                "kind_icon": "arrows-clockwise",
                 "id": r.id,
                 "name": r.name,
                 "enabled": r.enabled,
-                "state": state,
-                "state_icon": icon,
-                "big": big,
-                "sub": sub,
-                "progress_pct": progress,
-                "summary": (
-                    f"{len(r.steps)} dashboard{'s' if len(r.steps) != 1 else ''}"
-                    f" · cycle {r.cycle_minutes} min · {window}"
+                "playing": playing,
+                "badge": "Playing · Timer cycle" if playing else "Timer cycle",
+                "badge_icon": "arrows-clockwise",
+                "meta": (
+                    f"{n} dashboard{'s' if n != 1 else ''}"
+                    f" · cycle {r.cycle_minutes} min · from {r.anchor}"
+                    + (f" to {r.end_at}" if r.end_at else "")
                 ),
-                "steps": [(i, page_names.get(s.page_id, s.page_id)) for i, s in enumerate(r.steps)],
-                "play_urls": [
-                    url_for("rotations.play", rotation_id=r.id, step_index=i)
-                    for i in range(len(r.steps))
+                "screens": [
+                    screen(s.page_id, i, active and i == step_index) for i, s in enumerate(r.steps)
                 ],
+                "steps_total": n,
+                "step_index": step_index,
+                "live_name": page_names.get(current_page, current_page) if playing else None,
+                "next_advance": next_advance,
                 "fire_url": url_for("rotations.fire", rotation_id=r.id),
-                "sync_url": None,
+                "play_url": url_for("rotations.play", rotation_id=r.id, step_index=play_next),
                 "edit_url": url_for("decks.editor", deck_id=r.id),
                 "toggle_url": url_for("rotations.toggle", rotation_id=r.id),
                 "delete_url": url_for("rotations.delete", rotation_id=r.id),
+                "step_url": None,
             }
         )
 
     for s in schedules:
-        pill = schedule_pills.get(s.id) or {}
-        row = schedule_status.get(s.id) or {}
-        fires = _project_fires(s, now_tz, now_tz + timedelta(hours=24)) if s.enabled else []
-        next_fire = fires[0] if fires else None
-        last = row.get("last_fired")
+        fires_today = (
+            _project_fires(s, day_start, day_start + timedelta(hours=24)) if s.enabled else []
+        )
+        marks = [
+            max(0.0, min(100.0, (f.timestamp() - day_start.timestamp()) / 864.0))
+            for f in fires_today
+        ]
+        upcoming = [f for f in fires_today if f.timestamp() >= now_ts]
+        if not upcoming and s.enabled:
+            tomorrow = _project_fires(
+                s, day_start + timedelta(hours=24), day_start + timedelta(hours=48)
+            )
+            upcoming = tomorrow[:1]
+        next_fire = upcoming[0].strftime("%H:%M") if upcoming else None
         cadence = (
             f"every {s.interval_minutes} min"
             if s.type == "interval"
             else f"daily at {s.fires_at.strftime('%H:%M') if s.fires_at else '?'}"
         )
-        page_label = page_names.get(s.page_id, s.page_id)
-        progress = None
-        if s.enabled and next_fire is not None and isinstance(last, (int, float)):
-            progress = _pct(now_ts, last, next_fire.timestamp())
-        sub = f"last sent {_ago(last, now_ts)}" if _ago(last, now_ts) else None
+        showing = any(rec[1] == s.page_id for rec in live.values())
+        last = (schedule_status.get(s.id) or {}).get("last_fired")
         cards.append(
             {
                 "kind": "send",
-                "kind_label": "Timed send",
-                "kind_icon": "clock",
                 "id": s.id,
                 "name": s.name,
                 "enabled": s.enabled,
-                "state": pill.get("label", "").upper() or "IDLE",
-                "state_icon": pill.get("icon", "clock"),
-                "big": next_fire.strftime("%H:%M") if next_fire else "—",
-                "sub": sub,
-                "progress_pct": progress,
-                "summary": f"Fires {page_label} {cadence}",
-                "steps": [],
-                "play_urls": [],
+                "playing": showing,
+                "badge": "Timed send",
+                "badge_icon": "clock",
+                "meta": f"{page_names.get(s.page_id, s.page_id)} · {cadence}"
+                + (f" · last sent {_ago(last, now_ts)}" if _ago(last, now_ts) else ""),
+                "screens": [screen(s.page_id, None, showing)],
+                "live_name": page_names.get(s.page_id) if showing else None,
+                "marks": marks[:48],
+                "now_pct": round(now_pct, 2),
+                "fires_label": (
+                    f"fires {s.fires_at.strftime('%H:%M')}"
+                    if s.type == "daily" and s.fires_at
+                    else f"every {s.interval_minutes} min"
+                ),
+                "next_fire": next_fire,
                 "fire_url": url_for("schedules.fire", schedule_id=s.id),
-                "sync_url": None,
                 "edit_url": url_for("decks.index", sedit=s.id) + "#schedule-form-card",
                 "toggle_url": url_for("schedules.toggle", schedule_id=s.id),
                 "delete_url": url_for("schedules.delete", schedule_id=s.id),
+                "step_url": None,
+                "play_url": None,
             }
         )
 
     for card in cards:
         card["is_new"] = highlight_id is not None and card["id"] == highlight_id
     cards.sort(key=lambda c: str(c["name"]).lower())
-    return cards
+
+    playing_cards = [c for c in cards if c["playing"]]
+    onair = None
+    if playing_cards:
+        primary = next((c for c in playing_cards if c["kind"] == "cycle"), playing_cards[0])
+        detail_bits = []
+        if primary.get("live_name"):
+            detail_bits.append("showing \u201c" + str(primary["live_name"]) + "\u201d")
+        if primary["kind"] == "cycle" and primary.get("step_index") is not None:
+            detail_bits.append(f"step {primary['step_index'] + 1} of {primary['steps_total']}")
+            if primary.get("next_advance"):
+                detail_bits.append(f"advances {primary['next_advance']}")
+        live_displays = sum(1 for rec in live.values() if rec[1])
+        next_fires = sorted(c["next_fire"] for c in cards if c.get("next_fire"))
+        onair = {
+            "name": primary["name"],
+            "detail": " · ".join(detail_bits),
+            "counts": [
+                f"{len(cards)} deck{'s' if len(cards) != 1 else ''}",
+                f"{live_displays} display{'s' if live_displays != 1 else ''} live",
+            ]
+            + ([f"next fire {next_fires[0]}"] if next_fires else []),
+        }
+    return {"cards": cards, "onair": onair, "now_hhmm": now_tz.strftime("%H:%M")}
 
 
 @bp.get("")
@@ -331,14 +381,11 @@ def index() -> str:
     # their standalone pages used, with prefixed context names so the two
     # sections can't collide.
     from app.rotation_routes import _current_step_for_each
-    from app.rotation_routes import _running_state_view as _rotation_state_view
+    from app.schedule_routes import _running_state_view as _schedule_state_view
     from app.schedule_routes import (
-        _build_timeline,
-        _last_fired_view,
         _smart_sync_states,
         migration_notice_visible,
     )
-    from app.schedule_routes import _running_state_view as _schedule_state_view
 
     pages = _pages().list()
     # Pure timer decks render in the cycle / timed sections below (they ARE
@@ -368,7 +415,6 @@ def index() -> str:
     rotations = current_app.config["ROTATION_STORE"].all()
     scheduler = current_app.config["SCHEDULER"]
     schedule_status = scheduler.status()
-    rotation_status = scheduler.rotation_status()
     devices = current_app.config.get("DEVICE_REGISTRY")
     instances = [d for d in (devices.all() if devices is not None else []) if d.kind_of is not None]
     graphs = {d.id: _graph_json(d.pages) for d in decks}
@@ -388,8 +434,16 @@ def index() -> str:
     ]
     page_names = {p.id: p.name for p in pages}
     current_step = _current_step_for_each(rotations)
-    rotation_pills = {r.id: _rotation_state_view(r, rotation_status.get(r.id)) for r in rotations}
     schedule_pills = {s.id: _schedule_state_view(s, schedule_status.get(s.id)) for s in schedules}
+    design = _design_cards(
+        nav_decks=decks,
+        rotations=rotations,
+        schedules=schedules,
+        current_step=current_step,
+        schedule_status=schedule_status,
+        pages=pages,
+        highlight_id=request.args.get("hl"),
+    )
     return render_template(
         "decks.html",
         decks=decks,
@@ -399,26 +453,14 @@ def index() -> str:
         graphs=graphs,
         suggestions=suggestions,
         edit_id=request.args.get("edit"),
-        # -- the one list (#167): every deck shape as the same card -------
-        unified_cards=_unified_cards(
-            nav_decks=decks,
-            rotations=rotations,
-            schedules=schedules,
-            current_step=current_step,
-            rotation_pills=rotation_pills,
-            schedule_pills=schedule_pills,
-            schedule_status=schedule_status,
-            page_names=page_names,
-            highlight_id=request.args.get("hl"),
-        ),
-        # -- schedules section --------------------------------------------
+        # -- the design-handoff list: one row per deck + on-air summary ---
+        cards=design["cards"],
+        onair=design["onair"],
+        now_hhmm=design["now_hhmm"],
+        # -- schedules forms ----------------------------------------------
         schedules=schedules,
         status=schedule_status,
-        last_fired={
-            sid: _last_fired_view(st.get("last_fired")) for sid, st in schedule_status.items()
-        },
         schedule_running_states=schedule_pills,
-        timeline=_build_timeline(schedules),
         schedule_edit_id=request.args.get("sedit"),
         smart_sync_states=_smart_sync_states(schedules, pages),
         prefill_page=request.args.get("prefill_page", ""),
@@ -872,6 +914,54 @@ def editor_save() -> Response:
     _invalidate(deck)
     flash(f"Deck {deck.name!r} saved.", "ok")
     return redirect(url_for("decks.editor", deck_id=deck.id))
+
+
+@bp.post("/<deck_id>/step")
+def step(deck_id: str) -> Response:
+    """Manual stepper for a by-hand deck (design handoff): move each bound
+    display one dashboard back or forward through the deck order, promoting
+    the pre-warmed frame when one exists. ``dir`` is ``next`` (default) or
+    ``prev``."""
+    deck = _store().get(deck_id)
+    if deck is None or not deck.pages:
+        flash(f"No deck with id {deck_id!r}.", "error")
+        return redirect(url_for("decks.index"))
+    if not deck.device_ids:
+        flash("Bind a display to the deck first.", "error")
+        return redirect(url_for("decks.index"))
+    delta = -1 if request.form.get("dir") == "prev" else 1
+    order = [dp.page_id for dp in deck.pages]
+    nav = _nav_store()
+    pusher = current_app.config.get("PUSH_MANAGER")
+    moved = 0
+    for device_id in deck.device_ids:
+        rec = None
+        if nav is not None:
+            with contextlib.suppress(Exception):
+                rec = nav.get(device_id)
+        current = rec.get("page_id") if rec and rec.get("deck_id") == deck.id else None
+        try:
+            idx = order.index(current) if current is not None else -delta if delta > 0 else 0
+        except ValueError:
+            idx = 0
+        target = order[(idx + delta) % len(order)]
+        promoted = False
+        if pusher is not None:
+            promoter = getattr(pusher, "promote_deck_page", None)
+            promoted = callable(promoter) and promoter(device_id, target)
+            if not promoted:
+                result = pusher.push(
+                    target, device_ids={device_id}, respect_quiet_hours=False, source="deck"
+                )
+                if result.status == "failed":
+                    continue
+        if nav is not None:
+            with contextlib.suppress(Exception):
+                nav.set(device_id, deck.id, target)
+        moved += 1
+    if not moved:
+        flash("No display took the step; see the events log.", "error")
+    return redirect(url_for("decks.index", hl=deck.id) + f"#udeck-{deck.id}")
 
 
 @bp.post("/<deck_id>/push")

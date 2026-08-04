@@ -15,14 +15,8 @@
     <button type="button" class="button" data-open-timed-wizard>
       <i class="ph ph-magic-wand" aria-hidden="true"></i><span>Help me choose</span>
     </button>
-    <a class="button ghost" href="{{ url_for('decks.editor') }}">
+    <a class="button primary" href="{{ url_for('decks.editor') }}">
       <i class="ph ph-plus" aria-hidden="true"></i><span>New deck</span>
-    </a>
-    <button type="button" class="button ghost" data-toggle-new-schedule>
-      <i class="ph ph-clock" aria-hidden="true"></i><span>New timed send</span>
-    </button>
-    <a class="button ghost" href="{{ url_for('decks.editor', mode='timer') }}">
-      <i class="ph ph-arrows-clockwise" aria-hidden="true"></i><span>New timer cycle</span>
     </a>
   </p>
 </header>
@@ -52,39 +46,155 @@
 </section>
 {% endif %}
 
-{# The one list (#167): every deck shape as the same card, filterable. #}
-{% from "_unified_deck_card.html" import deck_card %}
-<div class="ucard-filters" role="group" aria-label="Filter decks by kind">
-  <button type="button" class="ucf-chip is-on" data-kind-filter="all">All</button>
-  <button type="button" class="ucf-chip" data-kind-filter="nav">
-    <i class="ph ph-hand-tap" aria-hidden="true"></i>By hand</button>
-  <button type="button" class="ucf-chip" data-kind-filter="cycle">
-    <i class="ph ph-arrows-clockwise" aria-hidden="true"></i>Timer cycles</button>
-  <button type="button" class="ucf-chip" data-kind-filter="send">
-    <i class="ph ph-clock" aria-hidden="true"></i>Timed sends</button>
+{# Design-handoff Decks page (option 7a, noun: deck). On-air bar, filter
+   tabs, then one row per deck with a kind-specific body: screen cards for
+   every dashboard, a 24h rail for timed sends, steppers for by-hand. #}
+{% macro dk_screen(s, total=None) %}
+<figure class="dk-screen{% if s.live %} is-live{% endif %}">
+  <div class="dk-screen-frame">
+    {% if s.thumb %}<img src="{{ s.thumb }}" alt="" loading="lazy">{% else %}<i class="ph ph-monitor" aria-hidden="true"></i>{% endif %}
+    {% if s.live %}<span class="dk-screen-wash" aria-hidden="true"></span>{% endif %}
+  </div>
+  <figcaption>
+    {% if s.live %}<i class="ph-fill ph-play" aria-hidden="true"></i>{% endif %}
+    <span class="dk-screen-name">{{ s.name }}</span>
+    {% if total and s.index is not none %}<span class="dk-step-ix">{{ s.index + 1 }}/{{ total }}</span>{% endif %}
+  </figcaption>
+</figure>
+{% endmacro %}
+
+{% if onair %}
+<div class="dk-onair" role="status">
+  <span class="dk-onair-live"><span class="dk-onair-dot" aria-hidden="true"></span>On air</span>
+  <span class="dk-onair-name">{{ onair.name }}</span>
+  <span class="dk-onair-detail">{{ onair.detail }}</span>
+  <div class="dk-onair-counts">
+    {% for count in onair.counts %}<span>{{ count }}</span>{% if not loop.last %}<span class="dk-onair-rule" aria-hidden="true"></span>{% endif %}{% endfor %}
+  </div>
 </div>
-{% for c in unified_cards %}
-{{ deck_card(c) }}
+{% endif %}
+
+<div class="dk-tabs" role="group" aria-label="Filter decks by kind">
+  <button type="button" class="dk-tab is-on" data-kind-filter="all">All</button>
+  <button type="button" class="dk-tab" data-kind-filter="nav">By hand</button>
+  <button type="button" class="dk-tab" data-kind-filter="cycle">Timer cycles</button>
+  <button type="button" class="dk-tab" data-kind-filter="send">Timed sends</button>
+  <div class="dk-tabs-links">
+    <button type="button" class="dk-link" data-toggle-new-schedule>New timed send</button>
+    <a class="dk-link" href="{{ url_for('decks.editor', mode='timer') }}">New timer cycle</a>
+  </div>
+</div>
+
+<div class="dk-rows">
+{% for c in cards %}
+<article class="dk-row{% if c.playing %} is-playing{% endif %}{% if not c.enabled %} is-off{% endif %}{% if c.is_new %} is-new{% endif %}"
+         data-kind="{{ c.kind }}" id="udeck-{{ c.id }}">
+  <div class="dk-row-head">
+    <span class="dk-badge{% if c.playing and c.kind == 'cycle' %} is-live{% endif %}">
+      {% if c.playing and c.kind == 'cycle' %}<i class="ph-fill ph-play" aria-hidden="true"></i>{% else %}<i class="ph-bold ph-{{ c.badge_icon }}" aria-hidden="true"></i>{% endif %}{{ c.badge }}
+    </span>
+    <span class="dk-name">{{ c.name }}</span>
+    <span class="dk-meta">{{ c.meta }}</span>
+    <div class="dk-actions">
+      <form method="post" action="{{ c.fire_url }}" class="inline">
+        <button type="submit" class="dk-act is-primary">Send now</button>
+      </form>
+      {% if c.play_url %}
+      <form method="post" action="{{ c.play_url }}" class="inline">
+        <button type="submit" class="dk-act">Play step</button>
+      </form>
+      {% endif %}
+      <a class="dk-act" href="{{ c.edit_url }}">Edit</a>
+      <span class="dk-act-rule" aria-hidden="true"></span>
+      <form method="post" action="{{ c.toggle_url }}" class="inline">
+        <button type="submit" class="dk-act is-quiet">{{ 'Disable' if c.enabled else 'Enable' }}</button>
+      </form>
+      <form method="post" action="{{ c.delete_url }}" class="inline"
+            onsubmit="return confirm('Delete {{ c.name }}?');">
+        <button type="submit" class="dk-act is-quiet">Delete</button>
+      </form>
+    </div>
+  </div>
+
+  {% if c.kind == 'cycle' %}
+  <div class="dk-body dk-body--cycle">
+    {% for s in c.screens %}
+    {% if not loop.first %}<i class="ph-bold ph-caret-right dk-chevron" aria-hidden="true"></i>{% endif %}
+    {{ dk_screen(s, total=c.steps_total) }}
+    {% endfor %}
+    {% if c.next_advance %}
+    <div class="dk-next"><span>next advance</span><strong>{{ c.next_advance }}</strong></div>
+    {% endif %}
+  </div>
+  {% elif c.kind == 'send' %}
+  <div class="dk-body dk-body--send">
+    {% for s in c.screens %}{{ dk_screen(s) }}{% endfor %}
+    <div class="dk-rail-wrap">
+      <div class="dk-rail-scale"><span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>24:00</span></div>
+      <div class="dk-rail">
+        {% for m in c.marks %}<span class="dk-rail-fire" style="left: {{ m }}%"></span>{% endfor %}
+        <span class="dk-rail-now" data-now-mark style="left: {{ c.now_pct }}%"></span>
+      </div>
+      <div class="dk-rail-legend">
+        <span><i class="dk-swatch" aria-hidden="true"></i>{{ c.fires_label }}</span>
+        <span><i class="dk-hairline" aria-hidden="true"></i>now <span data-now-label>{{ now_hhmm }}</span></span>
+      </div>
+    </div>
+    {% if c.next_fire %}
+    <div class="dk-next"><span>next fire</span><strong class="is-ink">{{ c.next_fire }}</strong></div>
+    {% endif %}
+  </div>
+  {% else %}
+  <div class="dk-body dk-body--nav">
+    {% for s in c.screens %}{{ dk_screen(s) }}{% endfor %}
+    <span class="dk-nav-note"><i class="ph ph-hand-tap" aria-hidden="true"></i>waiting on a press — no timer</span>
+    <div class="dk-steppers">
+      <form method="post" action="{{ c.step_url }}" class="inline">
+        <input type="hidden" name="dir" value="prev">
+        <button type="submit" class="dk-stepper" aria-label="Step back one dashboard"><i class="ph ph-caret-left" aria-hidden="true"></i></button>
+      </form>
+      <form method="post" action="{{ c.step_url }}" class="inline">
+        <input type="hidden" name="dir" value="next">
+        <button type="submit" class="dk-stepper" aria-label="Step forward one dashboard"><i class="ph ph-caret-right" aria-hidden="true"></i></button>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+</article>
 {% else %}
 {{ empty_state('cards-three', 'Nothing here yet', 'Use Help me choose above to set up what your display shows, or start a deck from scratch in the editor.') }}
 {% endfor %}
+</div>
 <script>
-  // Kind filter for the unified list. Pure show/hide; nothing reloads.
   (function () {
-    const chips = document.querySelectorAll('[data-kind-filter]');
-    const cards = () => document.querySelectorAll('.ucard');
-    chips.forEach((chip) => chip.addEventListener('click', () => {
-      chips.forEach((c) => c.classList.toggle('is-on', c === chip));
-      const kind = chip.dataset.kindFilter;
-      cards().forEach((card) => {
-        card.hidden = kind !== 'all' && card.dataset.kind !== kind;
+    // Kind filter tabs. Pure show/hide.
+    const tabs = document.querySelectorAll('[data-kind-filter]');
+    tabs.forEach((tab) => tab.addEventListener('click', () => {
+      tabs.forEach((c) => c.classList.toggle('is-on', c === tab));
+      const kind = tab.dataset.kindFilter;
+      document.querySelectorAll('.dk-row').forEach((row) => {
+        row.hidden = kind !== 'all' && row.dataset.kind !== kind;
       });
     }));
+    // One-shot push animation when we just landed from an action (?hl=).
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        && new URLSearchParams(location.search).has('hl')) {
+      document.querySelectorAll('.dk-row.is-new .dk-screen.is-live .dk-screen-wash')
+        .forEach((wash) => wash.classList.add('do-push'));
+    }
+    // Tick the now marks each minute so the rails stay honest.
+    const tick = () => {
+      const now = new Date();
+      const pct = ((now.getHours() * 60 + now.getMinutes()) / 1440) * 100;
+      document.querySelectorAll('[data-now-mark]').forEach((m) => { m.style.left = pct + '%'; });
+      const label = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+      document.querySelectorAll('[data-now-label]').forEach((l) => { l.textContent = label; });
+    };
+    setInterval(tick, 60000);
   })();
 </script>
 
-{# Forms, timeline, and edit cards for the timed shapes (#167): the
-   listings above replace the old per-shape sections; these includes carry
-   only what remains (new/edit forms + the 24h timeline). #}
+{# Timed-send forms (new + edit): the rows above carry the timing
+   visualisation now, so the include holds forms only. #}
 {% include "_schedules_section.html" %}
 {% endblock %}

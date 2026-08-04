@@ -8,6 +8,19 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Changed
 
+- **The Decks page got its designed look.** Implemented from a design
+  handoff: a dark on-air bar summarising what's live right now, filter
+  tabs, and one row per deck whose body shows the actual dashboards as
+  thumbnail screen cards (live previews from the composer). Timer cycles
+  show their step chain with the current step lit and the next-advance
+  time; timed sends carry their own 24-hour rail with fire marks and a
+  ticking now line (replacing the separate Next 24 hours panel); by-hand
+  decks get manual stepper buttons that move the display back or forward
+  a dashboard. A subtle one-shot flash marks a fresh push, with reduced
+  motion respected.
+
+### Changed
+
 - **One editor for every deck** (#167). The separate timer-cycle form is
   gone: cycle cards' Edit, the New timer cycle button (which preselects
   timer advance), and old `/rotations?edit=` links all open the deck
