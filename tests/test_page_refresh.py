@@ -23,6 +23,7 @@ T0 = datetime(2026, 6, 15, 12, 0, tzinfo=UTC)
 @dataclass
 class FakePush:
     pushes: list[tuple[str, frozenset, bool, str]] = field(default_factory=list)
+    warms: list[tuple[str, str]] = field(default_factory=list)
     # device_id -> latest render record (as the real PushManager stores it).
     latest: dict[str, dict] = field(default_factory=dict)
 
@@ -39,6 +40,10 @@ class FakePush:
 
     def latest_render_for(self, device_id: str):
         return self.latest.get(device_id)
+
+    def warm_deck_page(self, page_id: str, device_id: str) -> bool:
+        self.warms.append((page_id, device_id))
+        return True
 
 
 def _pages(tmp_path: Path, *pages: Page) -> PageStore:
@@ -161,3 +166,60 @@ def test_multi_bound_device_refreshes_the_shown_page(tmp_path: Path) -> None:
     sched._maybe_refresh_pages(T0)
     pushed = {p[0] for p in pusher.pushes}
     assert pushed == {"b"}
+
+
+def test_data_change_refreshes_active_page_and_only_warms_inactive_deck_page(
+    tmp_path: Path,
+) -> None:
+    ps = _pages(
+        tmp_path,
+        Page(id="active", name="Active", device_ids=["panel"]),
+        Page(id="inactive", name="Inactive", device_ids=["panel"]),
+        Page(id="unrelated", name="Unrelated", device_ids=["panel"]),
+    )
+    decks = DeckStore(tmp_path / "decks.json")
+    decks.upsert(
+        Deck(
+            id="kitchen",
+            name="Kitchen",
+            device_ids=["panel"],
+            pages=[DeckPage(page_id="active"), DeckPage(page_id="inactive")],
+        )
+    )
+    nav = DeckNavStore(tmp_path / "nav.json")
+    nav.set("panel", "kitchen", "active")
+    pusher = FakePush()
+    sched = _sched(tmp_path, ps, pusher, deck_store=decks, deck_nav_store=nav)
+
+    sched.refresh_pages_for_data_change({"active", "inactive"}, now=T0)
+
+    assert pusher.pushes == [("active", frozenset({"panel"}), True, "data_change")]
+    assert pusher.warms == [("inactive", "panel")]
+
+
+def test_data_change_warms_shared_deck_page_once_per_device(tmp_path: Path) -> None:
+    ps = _pages(
+        tmp_path,
+        Page(id="shared", name="Shared", device_ids=["panel"]),
+        Page(id="current", name="Current", device_ids=["panel"]),
+    )
+    decks = DeckStore(tmp_path / "decks.json")
+    for deck_id in ("morning", "evening"):
+        decks.upsert(
+            Deck(
+                id=deck_id,
+                name=deck_id.title(),
+                device_ids=["panel"],
+                pages=[DeckPage(page_id="shared")],
+            )
+        )
+    pusher = FakePush()
+    sched = _sched(tmp_path, ps, pusher, deck_store=decks)
+
+    sched.refresh_pages_for_data_change({"shared"}, now=T0)
+
+    assert pusher.pushes == []
+    assert pusher.warms == [("shared", "panel")]
+    assert sched._deck_last_warm == {
+        f"{deck_id}\x00panel\x00shared": T0.timestamp() for deck_id in ("morning", "evening")
+    }

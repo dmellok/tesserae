@@ -12,8 +12,12 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   expose strict `updates.on_change` source declarations, optionally narrowed
   by a declared `selector_option`. Grid cells and Canvas widget elements now
   persist an independent `update_on_change` policy (off by default), and their
-  editors surface the switch only for capable widgets. This stage defines the
-  placement contract only; data-change delivery remains separate.
+  editors surface the switch only for capable widgets. Accepted semantic data
+  changes are quietly debounced for 10 seconds, then active matching pages
+  refresh through the existing quiet-hours-aware push path while inactive Deck
+  pages are re-warmed without being promoted. TTL-only republishes do not
+  refresh, and personal-data PUT/DELETE responses remain independent from
+  background render or delivery outcomes.
 
 ## [0.259.0], 2026-08-04
 
