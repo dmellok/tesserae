@@ -1,0 +1,1800 @@
+{
+  "__PAGE__:index.html": {
+    "bytes": 2157806,
+    "file": "index.html",
+    "sha256": "e2b844a02136cfa18ac25119f4c5ac0986928acae946bef898263522d0c693e3",
+    "status": 200
+  },
+  "http://jamiekay.co.nz/cdn/shop/files/Jamie_Kay_-_Premium_Childrens_Clothing.png?v=1657162442": {
+    "bytes": 29804,
+    "file": "75b5681955__Jamie_Kay_-_Premium_Childrens_Clothing.png",
+    "sha256": "5aa96d5be1a0f53eeba8687473777e8a8b39b0986ca8fb5298a89d0ecd152365",
+    "status": 200
+  },
+  "https://cdn.shopify.com/extensions/019d05a1-5b16-759b-afff-f72794e938a8/wheelio-first-interactive-exit-intent-pop-up-78/assets/index.min.js": {
+    "bytes": 34854,
+    "file": "2518b19109__index.min.js",
+    "sha256": "338163f914ec3dfcffe3ced41af46a9fcce29b0915295b97c5827b6613ffb100",
+    "status": 200
+  },
+  "https://cdn.shopify.com/extensions/019fcb21-b7fc-790d-a53f-df25d5728b8a/easify-product-options-1932/assets/modern-DXuAMD8G.css": {
+    "bytes": 14139,
+    "file": "5a8067dff6__modern-DXuAMD8G.css",
+    "sha256": "577be27c409092da82f533d234b4fda102ea8fe0a247b90733f3f9619f4cfad8",
+    "status": 200
+  },
+  "https://cdn.shopify.com/extensions/019fcb21-b7fc-790d-a53f-df25d5728b8a/easify-product-options-1932/assets/product-options-CE25vw9c.js": {
+    "bytes": 607266,
+    "file": "abbdac3f67__product-options-CE25vw9c.js",
+    "sha256": "008ecd002841304ae680b39bee7157aa304338de0a42160327fadbd43810d1da",
+    "status": 200
+  },
+  "https://cdn.shopify.com/extensions/019fcb21-b7fc-790d-a53f-df25d5728b8a/easify-product-options-1932/assets/style-C5LjUy71.css": {
+    "bytes": 140260,
+    "file": "ecef3c119b__style-C5LjUy71.css",
+    "sha256": "dd0e6e1821f27b3b088e46770606bcc0e4404ca8da2b79e25c32faedb91b84ed",
+    "status": 200
+  },
+  "https://cdn.shopify.com/extensions/019fcb21-b7fc-790d-a53f-df25d5728b8a/easify-product-options-1932/assets/tpo-class-lrydwkkR.js": {
+    "bytes": 1430,
+    "file": "2b1e123217__tpo-class-lrydwkkR.js",
+    "sha256": "7b4f18117f192fa8f475857a4dbbe3c1d69becbba5ef5bacd731cb1adcf59e54",
+    "status": 200
+  },
+  "https://cdn.shopify.com/extensions/019fcb21-b7fc-790d-a53f-df25d5728b8a/easify-product-options-1932/assets/tpo-global-CHiKCI7s.js": {
+    "bytes": 6412,
+    "file": "b6fffbdf7a__tpo-global-CHiKCI7s.js",
+    "sha256": "1ef80b7ad448835b4662ced08782c57b0ebcab722d0a8f89baf8a5a772e3b646",
+    "status": 200
+  },
+  "https://cdn.shopify.com/extensions/019fcb21-b7fc-790d-a53f-df25d5728b8a/easify-product-options-1932/assets/variables-CI2p6uNI.css": {
+    "bytes": 18599,
+    "file": "660fdf1cdc__variables-CI2p6uNI.css",
+    "sha256": "6ad2e4b4e8bcc643d4cd0d6861717b10835bfd1f67829a2fa4ef1cb7011b7cec",
+    "status": 200
+  },
+  "https://cdn.shopify.com/extensions/019fccb3-79a2-712a-ad08-b35c4decd923/essential-cart-drawer-932/assets/app-embed-BAKiCy8t.css": {
+    "bytes": 30260,
+    "file": "eb4c5bc4ce__app-embed-BAKiCy8t.css",
+    "sha256": "bdb2312bd75c29a3b8110910ce45056336847f2a38ec8fabc5a17c9e544a3a9b",
+    "status": 200
+  },
+  "https://cdn.shopify.com/extensions/019fccb3-79a2-712a-ad08-b35c4decd923/essential-cart-drawer-932/assets/app-embed-BRTYs4at.js": {
+    "bytes": 481026,
+    "file": "46aac763c7__app-embed-BRTYs4at.js",
+    "sha256": "7098ca5dedd98b8e7516fdeb8a3c312d5b7a3f0a487eb59179e2c72ed74ab7a9",
+    "status": 200
+  },
+  "https://cdn.shopify.com/extensions/019fcd40-6a66-7624-bfcb-4c6530db577b/swym-relay-795/assets/swym-consent-manager.js": {
+    "bytes": 20822,
+    "file": "396334313c__swym-consent-manager.js",
+    "sha256": "61ebbed2a680bbb445eb1402bf6175b5a15e733d4fd291d81c82bc95eb14d9ca",
+    "status": 200
+  },
+  "https://cdn.shopify.com/extensions/019fce11-6e56-719a-bb67-ab50d97c2be3/easylocation-271/assets/easylocation-storefront.min.js": {
+    "bytes": 77799,
+    "file": "92f37730c3__easylocation-storefront.min.js",
+    "sha256": "b06d2af3ee4227e948a276fa2133d31b01414dc559e94f22e27f8b8668931dfc",
+    "status": 200
+  },
+  "https://cdn.shopify.com/s/files/1/0748/6904/7603/files/image-outline-min.js?v=1742044448": {
+    "bytes": 4455,
+    "file": "0ee60f4131__image-outline-min.js",
+    "sha256": "758a775103bdb91ee61939bfbc5f6b87a072868171fe0b2688ba814673e1f121",
+    "status": 200
+  },
+  "https://cdn.shopify.com/s/files/1/0748/6904/7603/files/pintura.css?v=1727947092": {
+    "bytes": 85145,
+    "file": "a1ee250489__pintura.css",
+    "sha256": "c8ed336dbf4507f1aba34a8c87fe2e9d3adcbfcd47477f0032943c407e4b3cc1",
+    "status": 200
+  },
+  "https://cdn.shopify.com/s/files/1/0748/6904/7603/files/pintura.js?v=1727947077": {
+    "bytes": 562433,
+    "file": "a5911e66e4__pintura.js",
+    "sha256": "d7ff3898ae15356fca7733d050cf7c72a54260fa29fcb5eedbd84bf6c6d43e69",
+    "status": 200
+  },
+  "https://cdn.shopify.com/s/files/1/0748/6904/7603/files/swiper-bundle.min_95051764-3f4c-4415-aff7-848f444cc3d3.js?v=1744710100": {
+    "bytes": 153369,
+    "file": "52f3a67d70__swiper-bundle.min_95051764-3f4c-4415-aff7-848f444cc3d3.js",
+    "sha256": "191f0908efe5b6577cc66cfe9eeb8d218d3280ec5fe18182d03b944c93d175dd",
+    "status": 200
+  },
+  "https://cdn.shopify.com/s/files/1/0748/6904/7603/files/webfontloader.min.js?v=1742044448": {
+    "bytes": 12784,
+    "file": "311358b05d__webfontloader.min.js",
+    "sha256": "37fb17544147c1706bac0578a8e739bd2469f7000268159cc9737e2b362331a2",
+    "status": 200
+  },
+  "https://cdn.shopify.com/s/files/1/1374/4477/files/Luca_Collection_Backgrounds-04.jpg?v=1784768481": {
+    "bytes": 701867,
+    "file": "6b81d5b39f__Luca_Collection_Backgrounds-04.jpg",
+    "sha256": "6149691148608da0ea1ffe5708b8204e19b2baca038e1abd806eeec3d280523c",
+    "status": 200
+  },
+  "https://cdn.shopify.com/shopifycloud/storefront/assets/storefront/origin_trials-5059b83f.js": {
+    "bytes": 1392,
+    "file": "9596abfdfc__origin_trials-5059b83f.js",
+    "sha256": "9aa42303eca1af50ed3ec5b93210c8ab7cc3bbe2e085f8cd4f8f6bfedb46dde6",
+    "status": 200
+  },
+  "https://cdn.shopify.com/storefront/standard-actions.js": {
+    "bytes": 10869,
+    "file": "8408a04556__standard-actions.js",
+    "sha256": "f6959b656e2788e500de7646247723a3905a5d18e7a753b79f0c6aa9ec9ce563",
+    "status": 200
+  },
+  "https://foursixty.com/media/scripts/fs.slider.v2.5.js": {
+    "bytes": 111384,
+    "file": "cb71832101__fs.slider.v2.5.js",
+    "sha256": "39b9ddbe72bc16d8aa915ccdbdfd4adfa5f447827df22301e0915e221db15527",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/s/trekkie.storefront.b774fbf9016c7ae104e7bf1de50f6948c31b8acb.min.js": {
+    "bytes": 109975,
+    "file": "28ddd77853__trekkie.storefront.b774fbf9016c7ae104e7bf1de50f6948c31b8acb.min.js",
+    "sha256": "167c0a4fb312c039ce02a8e1600f422e25ec52febcd52a479c60d55b58a0d45f",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Copy_of_Noopii_Mini_Logo.png?v=1749023892&width=200": {
+    "bytes": 1565,
+    "file": "a8e7adbe46__Copy_of_Noopii_Mini_Logo.png",
+    "sha256": "009f189e4ac1ee425de215df4e1457d832bce291a5d3eaf33d91f2dc8a34ae1f",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-Adalyn-Collection-day3_542_3e1e80eb-800f-4b79-81c6-df8aaab5c8b1_1x1.jpg?v=1758772887": {
+    "bytes": 939,
+    "file": "e425e8a229__JK-Adalyn-Collection-day3_542_3e1e80eb-800f-4b79-81c6-df8aaab5c8b1_1x1.jpg",
+    "sha256": "b7e97adf4f1507402730feff77b9e19f1ea074aac36d403301c64eba7e1153e4",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-Adalyn-Collection-day3_542_3e1e80eb-800f-4b79-81c6-df8aaab5c8b1_360x.jpg?v=1758772887": {
+    "bytes": 28750,
+    "file": "8b129419b9__JK-Adalyn-Collection-day3_542_3e1e80eb-800f-4b79-81c6-df8aaab5c8b1_360x.jpg",
+    "sha256": "ecabb9321a0849a11f5734a9947a354800a3a97f13c755049a825750852039be",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-Adalyn-Collection_7393_7aff61ba-04dc-4cb5-bbed-788dc17048b5_1x1.jpg?v=1758772682": {
+    "bytes": 940,
+    "file": "e8df12f7a6__JK-Adalyn-Collection_7393_7aff61ba-04dc-4cb5-bbed-788dc17048b5_1x1.jpg",
+    "sha256": "7589db0cba4d0d759142bf17a9edf04627c836ffc5c81a2573981dc0941f8446",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-Adalyn-Collection_7393_7aff61ba-04dc-4cb5-bbed-788dc17048b5_360x.jpg?v=1758772682": {
+    "bytes": 32889,
+    "file": "330beb6553__JK-Adalyn-Collection_7393_7aff61ba-04dc-4cb5-bbed-788dc17048b5_360x.jpg",
+    "sha256": "cc551705535becb145e27b82e1e6644e1195df95d84b195a5ca98270463254ac",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-Homeward-FebMarch_day4-1072_1500x.jpg?v=1766908141": {
+    "bytes": 392055,
+    "file": "ee727b2e77__JK-Homeward-FebMarch_day4-1072_1500x.jpg",
+    "sha256": "ab42fdb314a4d6940c089507442b722681a4ab098b6300cc660b52f326ed46e8",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-Homeward-FebMarch_day4-6208_1500x.jpg?v=1766910744": {
+    "bytes": 438188,
+    "file": "6e5af70d56__JK-Homeward-FebMarch_day4-6208_1500x.jpg",
+    "sha256": "1c79d93cf59991267e72edfcd003885cd4fedb83103ddfaaa7a635410154bae7",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-Homeward-FebMarch_day4-6429_4e076ca0-0b56-4351-baa7-249c69ec80b5_1x1.jpg?v=1767650381": {
+    "bytes": 939,
+    "file": "53bc79a1d0__JK-Homeward-FebMarch_day4-6429_4e076ca0-0b56-4351-baa7-249c69ec80b5_1x1.jpg",
+    "sha256": "07ea9414affd19c1cc3a19624f2fe21b8fcf782d104875ef6aa58257da66bb94",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-Homeward-FebMarch_day4-6429_4e076ca0-0b56-4351-baa7-249c69ec80b5_360x.jpg?v=1767650381": {
+    "bytes": 40456,
+    "file": "a6f50c75b7__JK-Homeward-FebMarch_day4-6429_4e076ca0-0b56-4351-baa7-249c69ec80b5_360x.jpg",
+    "sha256": "005025dc8872df8def3e98d0f184bc1140e70bded1ebadaca7f99ec1655ecf7f",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-Homeward-FebMarch_day5-3927_1x1.jpg?v=1767047310": {
+    "bytes": 940,
+    "file": "7a2a78ecec__JK-Homeward-FebMarch_day5-3927_1x1.jpg",
+    "sha256": "fe1f50a5e431faec2553d948e0ba3897de4eee5d65f61ec48bd7c4c21f2cfcf2",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-Homeward-FebMarch_day5-3927_360x.jpg?v=1767047310": {
+    "bytes": 33325,
+    "file": "4ef8cf7629__JK-Homeward-FebMarch_day5-3927_360x.jpg",
+    "sha256": "7bd8006444d5c58b933a9e738613a0366cd69e1089d33f35ecc4b80ea764585d",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-Homeward-FebMarch_day5-4326_1x1.jpg?v=1767129170": {
+    "bytes": 939,
+    "file": "3cd80dd257__JK-Homeward-FebMarch_day5-4326_1x1.jpg",
+    "sha256": "fdce8fe36dd8cd0d3e9a0918babd5fddc712af0357f878d03fba7ca5400f0a0c",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-Homeward-FebMarch_day5-4326_360x.jpg?v=1767129170": {
+    "bytes": 50289,
+    "file": "81e167f148__JK-Homeward-FebMarch_day5-4326_360x.jpg",
+    "sha256": "c00c4729fae754a21ae1b699b3f3f0add55fc4a6be9bb87c0ed8dadfb448353b",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-Homeward-FebMarch_day5-4812_1500x.jpg?v=1773958140": {
+    "bytes": 320721,
+    "file": "688cef4662__JK-Homeward-FebMarch_day5-4812_1500x.jpg",
+    "sha256": "f8c820518eb3b12b029b524d261ec2068f4e083c3b2f12d143c3903b47946207",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-Homeward-FebMarch_day5-4822_1x1.jpg?v=1773958140": {
+    "bytes": 939,
+    "file": "56878234f4__JK-Homeward-FebMarch_day5-4822_1x1.jpg",
+    "sha256": "a685c9237a0057872c47d2df9cc5989b4e51ca244644222e68b9f91822513faa",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-Homeward-FebMarch_day5-4822_360x.jpg?v=1773958140": {
+    "bytes": 45052,
+    "file": "b064a97c4a__JK-Homeward-FebMarch_day5-4822_360x.jpg",
+    "sha256": "793fba9678f5ddea7a76374bf8cfb14a6a69da557d464bad21c157635ffb17e7",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-JuniperFields26-4369_80270e4b-bccc-430c-98a6-dbc63a17336f_1x1.jpg?v=1769468665": {
+    "bytes": 939,
+    "file": "4d041200e1__JK-JuniperFields26-4369_80270e4b-bccc-430c-98a6-dbc63a17336f_1x1.jpg",
+    "sha256": "eaac1dcc23eb7fbc3cfdacfe79ff275d4fda976e3745822d8a817b09a260598d",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-JuniperFields26-4369_80270e4b-bccc-430c-98a6-dbc63a17336f_540x.jpg?v=1769468665": {
+    "bytes": 91226,
+    "file": "63b6a2fd55__JK-JuniperFields26-4369_80270e4b-bccc-430c-98a6-dbc63a17336f_540x.jpg",
+    "sha256": "fd8eb0851c03bfc0bf447257118bf507655ce87634d268ca3eb623f80dce99bd",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-JuniperFields26-4369_80270e4b-bccc-430c-98a6-dbc63a17336f_720x.jpg?v=1769468665": {
+    "bytes": 142286,
+    "file": "36afd8c4ac__JK-JuniperFields26-4369_80270e4b-bccc-430c-98a6-dbc63a17336f_720x.jpg",
+    "sha256": "0e3ba041c2b5832bf33ac1420e052c75b03e0ed7b265e4cb70cf0465b6c0ff05",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-JuniperFields26-7127_a08f9de7-f72a-432b-ae0c-c3f9c133c19d_1x1.jpg?v=1769468668": {
+    "bytes": 939,
+    "file": "29193ae820__JK-JuniperFields26-7127_a08f9de7-f72a-432b-ae0c-c3f9c133c19d_1x1.jpg",
+    "sha256": "3f3a570837a3860574febb9475ab5ecd422ff07f8c17b1ca7ea8fbbf03dfc29f",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-JuniperFields26-7127_a08f9de7-f72a-432b-ae0c-c3f9c133c19d_540x.jpg?v=1769468668": {
+    "bytes": 97140,
+    "file": "d3a2c5555d__JK-JuniperFields26-7127_a08f9de7-f72a-432b-ae0c-c3f9c133c19d_540x.jpg",
+    "sha256": "63fad5eea0a28ed7dc3d34bec99004d7929267ecd8a0734d793d62dadec18c85",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-JuniperFields26-7127_a08f9de7-f72a-432b-ae0c-c3f9c133c19d_720x.jpg?v=1769468668": {
+    "bytes": 157036,
+    "file": "e01f30a078__JK-JuniperFields26-7127_a08f9de7-f72a-432b-ae0c-c3f9c133c19d_720x.jpg",
+    "sha256": "6ee97174599417236459750852b809e45d37e8b3ba5475b308fc7890d0e4aed2",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-JuniperFields26-8549_54b5676f-04dd-4c90-a8f9-5916f746c59f_1x1.jpg?v=1769468662": {
+    "bytes": 940,
+    "file": "992288e7c2__JK-JuniperFields26-8549_54b5676f-04dd-4c90-a8f9-5916f746c59f_1x1.jpg",
+    "sha256": "938697fa1c0cfc7c8578c36650729da8e37bb6f28169ba428fca9de56c6ad65e",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-JuniperFields26-8549_54b5676f-04dd-4c90-a8f9-5916f746c59f_540x.jpg?v=1769468662": {
+    "bytes": 80311,
+    "file": "c808e069b7__JK-JuniperFields26-8549_54b5676f-04dd-4c90-a8f9-5916f746c59f_540x.jpg",
+    "sha256": "42b92e084863f63fcd1a64b9ee38c20c0c1d327b7bd17976a05f3b295fe3dc44",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-JuniperFields26-8549_54b5676f-04dd-4c90-a8f9-5916f746c59f_720x.jpg?v=1769468662": {
+    "bytes": 122298,
+    "file": "0361f1177b__JK-JuniperFields26-8549_54b5676f-04dd-4c90-a8f9-5916f746c59f_720x.jpg",
+    "sha256": "b828c02bc9ab021bfba7b8fa26f2ce272210783416f1608f3bd0ce1e4648847b",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_1192_7c57edc0-8cde-40b6-9189-18fea2305259_1x1.jpg?v=1784152591": {
+    "bytes": 939,
+    "file": "fa913cd6de__JK-LucaCollection_1192_7c57edc0-8cde-40b6-9189-18fea2305259_1x1.jpg",
+    "sha256": "4928f101581d166559ece75cd221ee0495a82dfd6a22b6cc7bf81acd2f7de936",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_1192_7c57edc0-8cde-40b6-9189-18fea2305259_360x.jpg?v=1784152591": {
+    "bytes": 60975,
+    "file": "bc0aa1663f__JK-LucaCollection_1192_7c57edc0-8cde-40b6-9189-18fea2305259_360x.jpg",
+    "sha256": "046b4e520a39b3157c052d8c7074486d995ba54cc74c0d5ad273f62f32aac77d",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_1333_1x1.jpg?v=1784097506": {
+    "bytes": 939,
+    "file": "1eabf9d1c1__JK-LucaCollection_1333_1x1.jpg",
+    "sha256": "6f7b4e345167cf39bb05f946828b16858e1378b3f25a7d3da05376d8afabe079",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_1333_360x.jpg?v=1784097506": {
+    "bytes": 49098,
+    "file": "72c912916c__JK-LucaCollection_1333_360x.jpg",
+    "sha256": "49444e1205f96a907f355d910a823d5732b3b5a5b22fef9f878b74c0ef1b3102",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_1438_1x1.jpg?v=1784156869": {
+    "bytes": 939,
+    "file": "cb38e0db95__JK-LucaCollection_1438_1x1.jpg",
+    "sha256": "b82e648c028bc5953c351eb5569cbefc24c7589d30cdf78bb997ff513b20570c",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_1438_360x.jpg?v=1784156869": {
+    "bytes": 68479,
+    "file": "5b08a6c519__JK-LucaCollection_1438_360x.jpg",
+    "sha256": "5a0b1c5ebdd55ceb064e2dc189e1b3c634adf5d1026f9882545537e6a118dd79",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_1711_1x1.jpg?v=1784149899": {
+    "bytes": 938,
+    "file": "2fae7f3dc9__JK-LucaCollection_1711_1x1.jpg",
+    "sha256": "e7389fb492e75afc2e10cfc2d7061b2a2a6d27dd7f4dd7f8456804c709c4bfa9",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_1711_360x.jpg?v=1784149899": {
+    "bytes": 47260,
+    "file": "87ab6b9b52__JK-LucaCollection_1711_360x.jpg",
+    "sha256": "59a01322ecbda2891a76d106bd71eff1a31648aea469915a5786c71c07cf595a",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_2090_1x1.jpg?v=1784159170": {
+    "bytes": 938,
+    "file": "366356555a__JK-LucaCollection_2090_1x1.jpg",
+    "sha256": "b4c53c85eb2633ffb3e070a9b138fdb95075bed5656299ec7b3883d27dac3ad7",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_2090_360x.jpg?v=1784159170": {
+    "bytes": 50290,
+    "file": "3f1335c5ef__JK-LucaCollection_2090_360x.jpg",
+    "sha256": "0eb98aa770bffa340cb99e0fa35d3b0da1221e2dd1c6db646d489ffeca8f6709",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_2753_1x1.jpg?v=1784097311": {
+    "bytes": 938,
+    "file": "52a13023b5__JK-LucaCollection_2753_1x1.jpg",
+    "sha256": "6fa45b406a0ebfc0a3ca6c864823b5df27c08cb41dc82177d8f06c65400661ac",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_2753_360x.jpg?v=1784097311": {
+    "bytes": 59043,
+    "file": "400f858765__JK-LucaCollection_2753_360x.jpg",
+    "sha256": "a730a7029a789ac54e5f2df6e9dc88d73b57d81bce036285b2d759e8e70f3319",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_2981_44a976a6-9a60-4a7c-8422-1afb71f815b5_1x1.jpg?v=1784150299": {
+    "bytes": 939,
+    "file": "6df13150ae__JK-LucaCollection_2981_44a976a6-9a60-4a7c-8422-1afb71f815b5_1x1.jpg",
+    "sha256": "96cd2a822afd0d67159731d3210159735a1006b4e65879979c6e17d7b0938ea5",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_2981_44a976a6-9a60-4a7c-8422-1afb71f815b5_360x.jpg?v=1784150299": {
+    "bytes": 74333,
+    "file": "e8c14d1b9f__JK-LucaCollection_2981_44a976a6-9a60-4a7c-8422-1afb71f815b5_360x.jpg",
+    "sha256": "054f3dfcb087143c4c8f600d57082b883a0d31ba9d8fd63c701c3ee8d7949c54",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_3374_1x1.jpg?v=1784148992": {
+    "bytes": 938,
+    "file": "d8b7f95724__JK-LucaCollection_3374_1x1.jpg",
+    "sha256": "e013fcbbd3667eea16736b71721ec779df00642705c9a615e947c615bb6ccb01",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_3374_360x.jpg?v=1784148992": {
+    "bytes": 58501,
+    "file": "404d6094a4__JK-LucaCollection_3374_360x.jpg",
+    "sha256": "0862267e5484157ab4bfb9cc9d871888c266c1214ff3da5f65fe3488e254d20b",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_354_1x1.jpg?v=1784157700": {
+    "bytes": 940,
+    "file": "1b44bef76d__JK-LucaCollection_354_1x1.jpg",
+    "sha256": "a6997e6f43f475a6ef0b102a391f7d01c503b8ff758259dd914c0a81bbb8f16f",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_354_360x.jpg?v=1784157700": {
+    "bytes": 58912,
+    "file": "95b91e140c__JK-LucaCollection_354_360x.jpg",
+    "sha256": "9fa47b63d5cbe2aae2b240f74b76e3889b1b10284478d9a53fe052cccad1aeec",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_3719_1x1.jpg?v=1784093870": {
+    "bytes": 938,
+    "file": "bb7e04a974__JK-LucaCollection_3719_1x1.jpg",
+    "sha256": "10d68259ea8835265645730f979afc5245b731c8b5c828faff40dd8896c12842",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_3719_360x.jpg?v=1784093870": {
+    "bytes": 61238,
+    "file": "dddf8e7b02__JK-LucaCollection_3719_360x.jpg",
+    "sha256": "411176cef5d10d8c8abe1f2cb344088cfa062b98f0e8ffce65445eef4cb41593",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_3936_1x1.jpg?v=1784150764": {
+    "bytes": 940,
+    "file": "a681f1cdb0__JK-LucaCollection_3936_1x1.jpg",
+    "sha256": "555dd88c529a40ee9a3ff36dd7a4ccf38bcce577d95bc1916f01d112d488a49b",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_3936_360x.jpg?v=1784150764": {
+    "bytes": 78586,
+    "file": "e41caad209__JK-LucaCollection_3936_360x.jpg",
+    "sha256": "701aafb9e21ca3f58f860f2ead57b1c32580190868d917ed5399f2f6f112aa53",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_4042_1x1.jpg?v=1784154360": {
+    "bytes": 940,
+    "file": "2f51f20dfc__JK-LucaCollection_4042_1x1.jpg",
+    "sha256": "44dc68b3afcb0ab2ba88937780f51873898c89549aa77d9d89754ce72df3b50c",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_4042_360x.jpg?v=1784154360": {
+    "bytes": 53218,
+    "file": "f411e065fc__JK-LucaCollection_4042_360x.jpg",
+    "sha256": "25e5510567ec11a62b06bd51de3748198bc614995dab6438e833d4afcd257565",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_411_1x1.jpg?v=1784148470": {
+    "bytes": 938,
+    "file": "1187a00d08__JK-LucaCollection_411_1x1.jpg",
+    "sha256": "b7515ba66569c819a40bcd35a4096c8caede12802ff3f5a3d5121eab5f61de1b",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_411_360x.jpg?v=1784148470": {
+    "bytes": 57593,
+    "file": "0b3cfacb5f__JK-LucaCollection_411_360x.jpg",
+    "sha256": "5a98e3b2d0fb31c8353849a2418e8806cc592fe319d7390188b89548017da354",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_4268_1x1.jpg?v=1784151619": {
+    "bytes": 939,
+    "file": "27ce6e4e38__JK-LucaCollection_4268_1x1.jpg",
+    "sha256": "1ac4c559e5da7afe22ab3e977498ad47900880c267175812e927796466d0e763",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_4268_360x.jpg?v=1784151619": {
+    "bytes": 45996,
+    "file": "173a611c04__JK-LucaCollection_4268_360x.jpg",
+    "sha256": "24457504c4e85bb0070e01da67d1112daf6bebeaa69bb61554cfa740b71e3bb5",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_4271_1500x.jpg?v=1784151869": {
+    "bytes": 335892,
+    "file": "5c665e629a__JK-LucaCollection_4271_1500x.jpg",
+    "sha256": "3f00dc1bb7a567c10ae24e7a377b03ca13c10a63e33348d8a24fe9c21ca2431b",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_4619_56e6b3da-663f-4b6c-8042-c61c5ca2c4ca_1500x.jpg?v=1784155417": {
+    "bytes": 564628,
+    "file": "6b93060b52__JK-LucaCollection_4619_56e6b3da-663f-4b6c-8042-c61c5ca2c4ca_1500x.jpg",
+    "sha256": "1d968a553485b6537e404fe09169ce4afb45bef05a770ab7c282a5d32665b3d8",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_4619_56e6b3da-663f-4b6c-8042-c61c5ca2c4ca_1x1.jpg?v=1784155417": {
+    "bytes": 938,
+    "file": "f7da7d2f8e__JK-LucaCollection_4619_56e6b3da-663f-4b6c-8042-c61c5ca2c4ca_1x1.jpg",
+    "sha256": "f2406c9a397183deef6f24a4d3af96afec2541d9920fb62d0c89f25d6850fd78",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_4619_56e6b3da-663f-4b6c-8042-c61c5ca2c4ca_360x.jpg?v=1784155417": {
+    "bytes": 60344,
+    "file": "18c45427ea__JK-LucaCollection_4619_56e6b3da-663f-4b6c-8042-c61c5ca2c4ca_360x.jpg",
+    "sha256": "7d7e63654d0d4f13169cfa3cb1583fb158c677227984d9aac4bc50a85e070ce4",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_5020_1x1.jpg?v=1784160448": {
+    "bytes": 938,
+    "file": "725faacfdb__JK-LucaCollection_5020_1x1.jpg",
+    "sha256": "c7bdb322a1900507930985fe181c372aa7f0130de75c0605d7e6403390c551a3",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_5020_360x.jpg?v=1784160448": {
+    "bytes": 50382,
+    "file": "029cd33ddc__JK-LucaCollection_5020_360x.jpg",
+    "sha256": "c1bee6c7899c421be4e32db6fb0f426219d9fb79cca8a008c7d0627e1dc70417",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_5432_1x1.jpg?v=1784160659": {
+    "bytes": 940,
+    "file": "afad8b2249__JK-LucaCollection_5432_1x1.jpg",
+    "sha256": "49bb9e99e39db910206ef84aa2e89b7b3f58527ff08320558fe86c339afca79e",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_5432_360x.jpg?v=1784160659": {
+    "bytes": 46419,
+    "file": "84ef44ee41__JK-LucaCollection_5432_360x.jpg",
+    "sha256": "e740931e112bba5ee6d180afa231072741b6e5a831ff1ffb71140839669566bc",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_5438_1x1.jpg?v=1784160890": {
+    "bytes": 940,
+    "file": "42a0f212a4__JK-LucaCollection_5438_1x1.jpg",
+    "sha256": "7ac36cb7c7fc7a185a5736e67556e526c26cb4b9ae0e544cd6f896f61febbcdb",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_5438_360x.jpg?v=1784160890": {
+    "bytes": 47030,
+    "file": "e7a967f77e__JK-LucaCollection_5438_360x.jpg",
+    "sha256": "9e5c2854c38dd72f1dc079d4a23b02ec525e65367923fc7b34e0ab7264b8bb5d",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_5464_1500x.jpg?v=1784158604": {
+    "bytes": 469177,
+    "file": "72a96c007b__JK-LucaCollection_5464_1500x.jpg",
+    "sha256": "18e83f9b954eef25190298a120feffac3ffb896439dfdb18560e416d33657075",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_5743_1x1.jpg?v=1784156372": {
+    "bytes": 940,
+    "file": "fecd5c5c59__JK-LucaCollection_5743_1x1.jpg",
+    "sha256": "ebb4a2f276e2fb6a162e9dea0b331a00bb51ce65cb24ff0951e50337cbcdba18",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_5743_360x.jpg?v=1784156372": {
+    "bytes": 43132,
+    "file": "381f203d05__JK-LucaCollection_5743_360x.jpg",
+    "sha256": "e6f04cabf47f80d9e354dd8f243d6254d866ba82df27cca4fafaa06280bc28aa",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_582_4a62fb03-d953-4031-abdc-957f70bba397_1x1.jpg?v=1784148603": {
+    "bytes": 939,
+    "file": "95587bbe01__JK-LucaCollection_582_4a62fb03-d953-4031-abdc-957f70bba397_1x1.jpg",
+    "sha256": "b35d386c1de4872a8c9bf13dec9b269e012c7d206dde93d9378f299fd017ac8e",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_582_4a62fb03-d953-4031-abdc-957f70bba397_360x.jpg?v=1784148603": {
+    "bytes": 52973,
+    "file": "f216c3b2c8__JK-LucaCollection_582_4a62fb03-d953-4031-abdc-957f70bba397_360x.jpg",
+    "sha256": "6f45a3b5decd6fabc4bef5e07244c018c48a3a0207645633140a0dbdc41b0234",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_6218_a13c728f-83c8-4195-acda-c63ea7fbcae7_1x1.jpg?v=1784151236": {
+    "bytes": 940,
+    "file": "116c9d6037__JK-LucaCollection_6218_a13c728f-83c8-4195-acda-c63ea7fbcae7_1x1.jpg",
+    "sha256": "183e1df7545be30bd04ab621ac67acdb32d152a53916db6a7937678f2f88cdcb",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_6218_a13c728f-83c8-4195-acda-c63ea7fbcae7_360x.jpg?v=1784151236": {
+    "bytes": 62392,
+    "file": "38f6815ef0__JK-LucaCollection_6218_a13c728f-83c8-4195-acda-c63ea7fbcae7_360x.jpg",
+    "sha256": "65101717962ecc4c6341a3b1e268f1770cfe9872daca5063f6365d62254b6bb3",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_6654_1x1.jpg?v=1784161339": {
+    "bytes": 939,
+    "file": "0f9961901f__JK-LucaCollection_6654_1x1.jpg",
+    "sha256": "1a496b0bd22babe52c1bc44f85a96fa01d0151b4dcd8448dbd3746e296c68ff1",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_6654_360x.jpg?v=1784161339": {
+    "bytes": 42246,
+    "file": "51382a6f45__JK-LucaCollection_6654_360x.jpg",
+    "sha256": "9a00d0522343014c75b47eaabc53a6459783c27a3c47c1df42c977a1bd15f806",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_7703_3438e086-a80f-4f1e-9ca9-02372eb4401a_1x1.jpg?v=1784156976": {
+    "bytes": 940,
+    "file": "430d697e9b__JK-LucaCollection_7703_3438e086-a80f-4f1e-9ca9-02372eb4401a_1x1.jpg",
+    "sha256": "0a1909393179eb711ca1f4682aaa1bc78594db82eaf94cb580cb328cd8b521bc",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_7703_3438e086-a80f-4f1e-9ca9-02372eb4401a_360x.jpg?v=1784156976": {
+    "bytes": 47879,
+    "file": "27f8ece5e2__JK-LucaCollection_7703_3438e086-a80f-4f1e-9ca9-02372eb4401a_360x.jpg",
+    "sha256": "5e4d53aa36f15231c4dfa798c3a7b91d75309581d72d048c9a12ce10da62d3d3",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_7792_dc8d7fce-007f-44a5-aadf-248f818a9d5c_1x1.jpg?v=1784158917": {
+    "bytes": 939,
+    "file": "bd447464df__JK-LucaCollection_7792_dc8d7fce-007f-44a5-aadf-248f818a9d5c_1x1.jpg",
+    "sha256": "1fc9464e0080c9e711b9354158698281f7ae70b13a0187b29f7afe03af79e36f",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_7792_dc8d7fce-007f-44a5-aadf-248f818a9d5c_360x.jpg?v=1784158917": {
+    "bytes": 41002,
+    "file": "93b5160718__JK-LucaCollection_7792_dc8d7fce-007f-44a5-aadf-248f818a9d5c_360x.jpg",
+    "sha256": "970c18da577d36f0381cf381c213196ccc02d5a813938c6f02a5caa1637a8caa",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_8078_4dee3e55-ce39-4d2b-8c31-cd41e1ee650f_1x1.jpg?v=1784149562": {
+    "bytes": 938,
+    "file": "d96c4b5d31__JK-LucaCollection_8078_4dee3e55-ce39-4d2b-8c31-cd41e1ee650f_1x1.jpg",
+    "sha256": "eb85037b0d9a1cc08a41f5d3a4e55e2a9fc6d582d00b840fecbebb301eccdd2a",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_8078_4dee3e55-ce39-4d2b-8c31-cd41e1ee650f_360x.jpg?v=1784149562": {
+    "bytes": 43943,
+    "file": "fa708024b6__JK-LucaCollection_8078_4dee3e55-ce39-4d2b-8c31-cd41e1ee650f_360x.jpg",
+    "sha256": "3d785d7e25e24d024da0a229df0013550b9931532b1ea8797ef44ace81167455",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_8224_1x1.jpg?v=1784151485": {
+    "bytes": 938,
+    "file": "08e028d5d2__JK-LucaCollection_8224_1x1.jpg",
+    "sha256": "94b29614dc0236cbe7ad5cf95a6d81d31f71f15c9136b25fe634cd3e09a14599",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_8224_360x.jpg?v=1784151485": {
+    "bytes": 46518,
+    "file": "716628db00__JK-LucaCollection_8224_360x.jpg",
+    "sha256": "45dd3397184708f37bc6f56f80e6685265fbb3d24f24edf06851878e4a6bd22e",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_8269_1x1.jpg?v=1784155033": {
+    "bytes": 938,
+    "file": "eb157e1fe1__JK-LucaCollection_8269_1x1.jpg",
+    "sha256": "b694da12f1a28cb6237c74841ddce656d70f4f0a8e861a0760c7c4640a3a74fb",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_8269_360x.jpg?v=1784155033": {
+    "bytes": 42323,
+    "file": "9745e1aee1__JK-LucaCollection_8269_360x.jpg",
+    "sha256": "9c01b689bc20db1922ced249fed2e75d2a753f13f9ff3ac054a70f2a78f55825",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_8419_dfe5d842-4759-42f4-bff0-2a7f6ff8ef27_1x1.jpg?v=1784094628": {
+    "bytes": 940,
+    "file": "e6dc348861__JK-LucaCollection_8419_dfe5d842-4759-42f4-bff0-2a7f6ff8ef27_1x1.jpg",
+    "sha256": "0827565e27ca7f2bf38da0e20b3f0bebb85e891d85c92fdb219be66b0a9c5b76",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_8419_dfe5d842-4759-42f4-bff0-2a7f6ff8ef27_360x.jpg?v=1784094628": {
+    "bytes": 40658,
+    "file": "d5306a0da4__JK-LucaCollection_8419_dfe5d842-4759-42f4-bff0-2a7f6ff8ef27_360x.jpg",
+    "sha256": "659e25cdebf4525e204bef41230a05c2e2fec93b3f63f19d2055774684e95b62",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_8546_1x1.jpg?v=1784151155": {
+    "bytes": 938,
+    "file": "7055892950__JK-LucaCollection_8546_1x1.jpg",
+    "sha256": "406582901b047d8c16bd4d7d527e57c4e42c2e3a83c8cb1c9c70b966eb56ec40",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_8546_360x.jpg?v=1784151155": {
+    "bytes": 47041,
+    "file": "0b5f8a63b8__JK-LucaCollection_8546_360x.jpg",
+    "sha256": "9cecc432ad752d6181cefcc94f5ec79b021afba31a0e5501c51806887b33b869",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_9322_1500x.jpg?v=1784160159": {
+    "bytes": 322607,
+    "file": "0c199f4a33__JK-LucaCollection_9322_1500x.jpg",
+    "sha256": "e1b10aac2767ce19520a470e6af9ad83543af28881aae12adafca3b85a9a9a29",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_9501_1x1.jpg?v=1784159630": {
+    "bytes": 938,
+    "file": "1bb4d79ee3__JK-LucaCollection_9501_1x1.jpg",
+    "sha256": "111c93b6970088ca39eb699aa0c8ed69f7d47d383573e682bf4155d478ff3b39",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_9501_360x.jpg?v=1784159630": {
+    "bytes": 42794,
+    "file": "f3764cfaa9__JK-LucaCollection_9501_360x.jpg",
+    "sha256": "479aaddcb53ac50be737112a6e95df129b01b0ced6d50fd4ea7a2f26f70ab672",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_9755_1x1.jpg?v=1784158008": {
+    "bytes": 939,
+    "file": "524c8080ec__JK-LucaCollection_9755_1x1.jpg",
+    "sha256": "170ddd9f46fc15a8b22aaed3b504b83f44a45919258f3c1719658a9d4d2b1bf2",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_9755_360x.jpg?v=1784158008": {
+    "bytes": 49317,
+    "file": "b7dec00797__JK-LucaCollection_9755_360x.jpg",
+    "sha256": "78a32751cc43516a81ce8e80991b1e70cddffd24b3f11deed690b112fc8b8d86",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_9998_1x1.jpg?v=1784150931": {
+    "bytes": 940,
+    "file": "3081184476__JK-LucaCollection_9998_1x1.jpg",
+    "sha256": "1e0bc80ff0cc0647191b89a1955b55a2ba1e3000a9f638220257ec2f6d11073a",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-LucaCollection_9998_360x.jpg?v=1784150931": {
+    "bytes": 46083,
+    "file": "e36db2a4de__JK-LucaCollection_9998_360x.jpg",
+    "sha256": "6def306fd2ed7d0caf7f64e826d878e08b2e1adb440b72346ea4ae5b08ca99df",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-SpecialPlaceCollection_030112772_1x1.jpg?v=1781124271": {
+    "bytes": 3451,
+    "file": "d2b38ea1be__JK-SpecialPlaceCollection_030112772_1x1.jpg",
+    "sha256": "77192b233bcafd3249ff1d21127623106194d96f470c1860515c746d8b86afae",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-SpecialPlaceCollection_030112772_360x.jpg?v=1781124271": {
+    "bytes": 65204,
+    "file": "f2740a5450__JK-SpecialPlaceCollection_030112772_360x.jpg",
+    "sha256": "8326461240c3768bec30ef8c312c6248df997a7aeee8eb1d431bc342716ae160",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-SpecialPlaceCollection_1200_1x1.jpg?v=1780908662": {
+    "bytes": 940,
+    "file": "2c8d42622b__JK-SpecialPlaceCollection_1200_1x1.jpg",
+    "sha256": "378c30784cd1bfbc66937d9919e768cfaa34beb3a72370710731872aa2c25b9c",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-SpecialPlaceCollection_1200_360x.jpg?v=1780908662": {
+    "bytes": 74075,
+    "file": "ff28769215__JK-SpecialPlaceCollection_1200_360x.jpg",
+    "sha256": "0a0da74d9062ffa4e5cc116d460e9e584c062a330898d1a5aa7a19746567de77",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-SpecialPlaceCollection_1244_1x1.jpg?v=1780898559": {
+    "bytes": 940,
+    "file": "3341808b12__JK-SpecialPlaceCollection_1244_1x1.jpg",
+    "sha256": "ac01e0a86de1d946eab4e71481ae53d9bee2e3a34bdc9d0205ebc96067796f98",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-SpecialPlaceCollection_1244_360x.jpg?v=1780898559": {
+    "bytes": 73025,
+    "file": "6af9f7dc56__JK-SpecialPlaceCollection_1244_360x.jpg",
+    "sha256": "2949a291f4b1e044eb1e8737f4e561c491ec0329f7d8a4e7baadce521c12b474",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-SpecialPlaceCollection_1251_9a6506a1-c2b8-4f8e-ae43-dafe23baa089_1x1.jpg?v=1780908169": {
+    "bytes": 940,
+    "file": "ff47dc03a6__JK-SpecialPlaceCollection_1251_9a6506a1-c2b8-4f8e-ae43-dafe23baa089_1x1.jpg",
+    "sha256": "a8faecc83966db9fc08b23d768951f4727cb47ac28f740635a491d9ff052e89a",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-SpecialPlaceCollection_1251_9a6506a1-c2b8-4f8e-ae43-dafe23baa089_360x.jpg?v=1780908169": {
+    "bytes": 71833,
+    "file": "dc7f2bb652__JK-SpecialPlaceCollection_1251_9a6506a1-c2b8-4f8e-ae43-dafe23baa089_360x.jpg",
+    "sha256": "c256d6f915e8a7cdf3bf6c50350c01ba21d1fb6ea01ca9a6e67348376f548cf2",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-SpecialPlaceCollection_1420_1x1.jpg?v=1780907551": {
+    "bytes": 940,
+    "file": "e0fc40a3ff__JK-SpecialPlaceCollection_1420_1x1.jpg",
+    "sha256": "5f443a40435e1cb77d9a4ff1fdf7ca95ae90c72886a8bed96c08dc85bf4c822c",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-SpecialPlaceCollection_1420_360x.jpg?v=1780907551": {
+    "bytes": 50334,
+    "file": "7c599b98a5__JK-SpecialPlaceCollection_1420_360x.jpg",
+    "sha256": "3d3525631b54e6baa38b9e29f3b7e594e00fb3258425cc1f067ecbda8cf72515",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-SpecialPlaceCollection_2805_1x1.jpg?v=1780906869": {
+    "bytes": 938,
+    "file": "a3ec6fc936__JK-SpecialPlaceCollection_2805_1x1.jpg",
+    "sha256": "5072a7aef31b47234a4288f4efa37f25ea6e4f5f5f25b1de01e1b195599c4a89",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-SpecialPlaceCollection_2805_360x.jpg?v=1780906869": {
+    "bytes": 60701,
+    "file": "bf18444825__JK-SpecialPlaceCollection_2805_360x.jpg",
+    "sha256": "bf39df23c4e991d6ef1f40570027599edf036f3a45ee9bd3f17f89ba0030f6c0",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-SpecialPlaceCollection_324_1x1.jpg?v=1780907863": {
+    "bytes": 940,
+    "file": "0a70ab8fd1__JK-SpecialPlaceCollection_324_1x1.jpg",
+    "sha256": "833e094f604f60d88a21410e38f857c5f62116ed126a06aa0e5ffaadb885d958",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-SpecialPlaceCollection_324_360x.jpg?v=1780907863": {
+    "bytes": 72884,
+    "file": "31182978e0__JK-SpecialPlaceCollection_324_360x.jpg",
+    "sha256": "356f2268f1fcfea10a0d88692bbeca5e9b86211352f3cfe8ab6f95335201f9ce",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-SpecialPlaceCollection_3865_1x1.jpg?v=1780899104": {
+    "bytes": 939,
+    "file": "75d4833cc5__JK-SpecialPlaceCollection_3865_1x1.jpg",
+    "sha256": "ac099945bccab52bfb0434d58854ce50a45058faffed8c4b1551c5541f7d6bc1",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-SpecialPlaceCollection_3865_360x.jpg?v=1780899104": {
+    "bytes": 59343,
+    "file": "d990b1692a__JK-SpecialPlaceCollection_3865_360x.jpg",
+    "sha256": "adafa0d5f4b576c6cc368c43d1f619841daf2731eac48fd3c373b395ea784fdd",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-SpecialPlaceCollection_4234_1x1.jpg?v=1780897058": {
+    "bytes": 940,
+    "file": "a62ec40dab__JK-SpecialPlaceCollection_4234_1x1.jpg",
+    "sha256": "8112ab3b6fcef4c6cedd029c29cef3b47a5ffac197f88db5d387edbdb4f670ef",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-SpecialPlaceCollection_4234_360x.jpg?v=1780897058": {
+    "bytes": 47712,
+    "file": "2e40b1ea22__JK-SpecialPlaceCollection_4234_360x.jpg",
+    "sha256": "dc8729750b51818693d6cde752f4d6e286e8c4170c7f58eb70ba81b8aa577b53",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-SpecialPlaceCollection_5775_1x1.jpg?v=1780898760": {
+    "bytes": 938,
+    "file": "b685c505e4__JK-SpecialPlaceCollection_5775_1x1.jpg",
+    "sha256": "55466706c7d58aa86e04459f5b42699431ce6d4fb38fef2e3e8ba1bb8b370ec3",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-SpecialPlaceCollection_5775_360x.jpg?v=1780898760": {
+    "bytes": 64899,
+    "file": "24e09778f6__JK-SpecialPlaceCollection_5775_360x.jpg",
+    "sha256": "845ed3bc1a5a7a05f208a33651b9ef0a1a6c5376f2a3c8f8fa0b345d7e6e8447",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-SpecialPlaceCollection_5992_1x1.jpg?v=1780898014": {
+    "bytes": 939,
+    "file": "b327f3d4cd__JK-SpecialPlaceCollection_5992_1x1.jpg",
+    "sha256": "30227dc755ffdf60cf4ef78c6ff65d3bd1dde968d2bda85e1e79778002b575e9",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JK-SpecialPlaceCollection_5992_360x.jpg?v=1780898014": {
+    "bytes": 60464,
+    "file": "342a57ea54__JK-SpecialPlaceCollection_5992_360x.jpg",
+    "sha256": "7c26230e7b6496766eb8410c8a15f0ce668e17dffd92a9d479e9e15e5c624c46",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie-Kau-With-Love_-Luca---Shop-All_1x1.png?v=1785196822": {
+    "bytes": 560,
+    "file": "b9178f1c02__Jamie-Kau-With-Love_-Luca---Shop-All_1x1.png",
+    "sha256": "c00b76785dae8a43240d498e4939e815a22c09f4176fa0d854b2890417e7e776",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie-Kau-With-Love_-Luca---Shop-All_720x.png?v=1785196822": {
+    "bytes": 674975,
+    "file": "71621192c2__Jamie-Kau-With-Love_-Luca---Shop-All_720x.png",
+    "sha256": "0b11c8568d5d1366ed84c217e5c1025380c6e8f3a7ea882cfd5329d1f5fa05af",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie-Kau-With-Love_-Luca---Shop-Baby_1x1.jpg?v=1785196795": {
+    "bytes": 938,
+    "file": "d4c6086d53__Jamie-Kau-With-Love_-Luca---Shop-Baby_1x1.jpg",
+    "sha256": "1fd9b98e77a3ff46a59baa7a40fbae682a09d7dedd074087284c286994278f13",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie-Kau-With-Love_-Luca---Shop-Baby_720x.jpg?v=1785196795": {
+    "bytes": 169668,
+    "file": "780e56b857__Jamie-Kau-With-Love_-Luca---Shop-Baby_720x.jpg",
+    "sha256": "2c1a40b62b17d946fa1956611df456064d340f8067570f27aa4567654b4103d6",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie-Kau-With-Love_-Luca---Shop-Boys_1x1.jpg?v=1785196813": {
+    "bytes": 940,
+    "file": "4ad80fc893__Jamie-Kau-With-Love_-Luca---Shop-Boys_1x1.jpg",
+    "sha256": "b2682862314aa0500bf7b45e942c3fbd1b23db9ff85bd8f6d62588b79d078b85",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie-Kau-With-Love_-Luca---Shop-Boys_720x.jpg?v=1785196813": {
+    "bytes": 158112,
+    "file": "1d45f97c3b__Jamie-Kau-With-Love_-Luca---Shop-Boys_720x.jpg",
+    "sha256": "bc0195b702a054241def2066a39e7f6e8972b8e236b4265061fdc156512fc398",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie-Kau-With-Love_-Luca---Shop-Girls_1x1.jpg?v=1785196806": {
+    "bytes": 940,
+    "file": "7de2c01650__Jamie-Kau-With-Love_-Luca---Shop-Girls_1x1.jpg",
+    "sha256": "5be412a0dee0cf76911ebc877157eb84a4b846e27895ea9bd159d680ada8fb49",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie-Kau-With-Love_-Luca---Shop-Girls_720x.jpg?v=1785196806": {
+    "bytes": 219767,
+    "file": "bd94b62680__Jamie-Kau-With-Love_-Luca---Shop-Girls_720x.jpg",
+    "sha256": "b95702d88a4146c1343eaa4ec2e7d003290c34ad1974d9390210fe9cb663e5d3",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie-Kay-2026-Desktop-Website-Banner---The-Race.jpg?v=1785707451": {
+    "bytes": 480198,
+    "file": "ecf6e8a92a__Jamie-Kay-2026-Desktop-Website-Banner---The-Race.jpg",
+    "sha256": "3d9584b6966a8c885562f63ba1739910a1496cc2f95de90943601d303b1ba240",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie-Kay-2026-Desktop-Website-Banner---The-Race_1080x.jpg?v=1785707451": {
+    "bytes": 137241,
+    "file": "3155d63536__Jamie-Kay-2026-Desktop-Website-Banner---The-Race_1080x.jpg",
+    "sha256": "a101c7f833520663125a78dae8cc9b0afb12ce6940eb253b2985fca9796e0176",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie-Kay-2026-Desktop-Website-Banner---The-Race_1296x.jpg?v=1785707451": {
+    "bytes": 189746,
+    "file": "68707073d0__Jamie-Kay-2026-Desktop-Website-Banner---The-Race_1296x.jpg",
+    "sha256": "a3b102d8ac3b418268d999145add04e159395ec9aa7da844b14d3e2fb4314217",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie-Kay-2026-Desktop-Website-Banner---The-Race_1512x.jpg?v=1785707451": {
+    "bytes": 250859,
+    "file": "0e4f3a660c__Jamie-Kay-2026-Desktop-Website-Banner---The-Race_1512x.jpg",
+    "sha256": "44aab6c658b7d2734a5ef69799d84da28f23c127f95d59a63d83119cb13de596",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie-Kay-2026-Desktop-Website-Banner---The-Race_1728x.jpg?v=1785707451": {
+    "bytes": 320557,
+    "file": "b07b9c7a4f__Jamie-Kay-2026-Desktop-Website-Banner---The-Race_1728x.jpg",
+    "sha256": "c34ffa4a64fecce9542a4049aee0682f2ce58645f3948241d92a5b06172d43c3",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie-Kay-2026-Desktop-Website-Banner---The-Race_180x.jpg?v=1785707451": {
+    "bytes": 7628,
+    "file": "ef6c464ffb__Jamie-Kay-2026-Desktop-Website-Banner---The-Race_180x.jpg",
+    "sha256": "9661a6e1309a9e4679c2f677c1fba4dbc67b0d20e4420c6c5cad84f82f39f33d",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie-Kay-2026-Desktop-Website-Banner---The-Race_1950x.jpg?v=1785707451": {
+    "bytes": 402770,
+    "file": "2f35c78545__Jamie-Kay-2026-Desktop-Website-Banner---The-Race_1950x.jpg",
+    "sha256": "49060009c484791162c50fb4771d2a6789aaffa6e9cf73cd7e1dc95643da4f98",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie-Kay-2026-Desktop-Website-Banner---The-Race_1x1.jpg?v=1785707451": {
+    "bytes": 940,
+    "file": "362cfb56ae__Jamie-Kay-2026-Desktop-Website-Banner---The-Race_1x1.jpg",
+    "sha256": "d27762d8642ecf19f5acbf6e0e3853fefd088fe07ee2976c262612e648496bc5",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie-Kay-2026-Desktop-Website-Banner---The-Race_2100x.jpg?v=1785707451": {
+    "bytes": 461148,
+    "file": "ee6a76e12e__Jamie-Kay-2026-Desktop-Website-Banner---The-Race_2100x.jpg",
+    "sha256": "b3830cf0adcab6e820541d37099e37463cc1704d63859657a8533a7af689fc13",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie-Kay-2026-Desktop-Website-Banner---The-Race_2260x.jpg?v=1785707451": {
+    "bytes": 418413,
+    "file": "63fdf37de8__Jamie-Kay-2026-Desktop-Website-Banner---The-Race_2260x.jpg",
+    "sha256": "bb7582888a24a5dcec9d2575b15a653af4299fb5e4d7ebe5861e5b985dc97459",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie-Kay-2026-Desktop-Website-Banner---The-Race_360x.jpg?v=1785707451": {
+    "bytes": 21416,
+    "file": "d123bd0186__Jamie-Kay-2026-Desktop-Website-Banner---The-Race_360x.jpg",
+    "sha256": "e6e42a2ef5cc1d367cf7e65c8fa18b56d94daf1efc361ee310ceff1fc4352192",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie-Kay-2026-Desktop-Website-Banner---The-Race_480x.jpg?v=1785707451": {
+    "bytes": 33703,
+    "file": "7e1d81b25d__Jamie-Kay-2026-Desktop-Website-Banner---The-Race_480x.jpg",
+    "sha256": "77ca2a795ace5c63fe98440843d05fa25b12f9c4a0e1c4130cd91dbd5f01241e",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie-Kay-2026-Desktop-Website-Banner---The-Race_540x.jpg?v=1785707451": {
+    "bytes": 42066,
+    "file": "4a636e3ac3__Jamie-Kay-2026-Desktop-Website-Banner---The-Race_540x.jpg",
+    "sha256": "0f11ec1fd40630ba6786d0e1169a4744d1e98019672940d23cbab6555454a1f6",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie-Kay-2026-Desktop-Website-Banner---The-Race_720x.jpg?v=1785707451": {
+    "bytes": 67439,
+    "file": "41d29467ec__Jamie-Kay-2026-Desktop-Website-Banner---The-Race_720x.jpg",
+    "sha256": "ed955c2926add80a3dcc85ba6092354455279bc9e248bba3a021f5576bec469b",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie-Kay-2026-Desktop-Website-Banner---The-Race_900x.jpg?v=1785707451": {
+    "bytes": 98818,
+    "file": "4ae8f5d999__Jamie-Kay-2026-Desktop-Website-Banner---The-Race_900x.jpg",
+    "sha256": "508a92c228259f63372cc1be0b92c9a4ec547d43d85fe77ed3a4d8645805f9fc",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie-Kay-2026-Mobile-Website-Banner---The-Race.jpg?v=1785708394": {
+    "bytes": 329220,
+    "file": "c4acafcf27__Jamie-Kay-2026-Mobile-Website-Banner---The-Race.jpg",
+    "sha256": "12556a6c8008a839a83ac6c71b22d38a2c584b79d7ca91ca446cd43893a8fd2e",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie-Kay-2026-Mobile-Website-Banner---The-Race_180x.jpg?v=1785708394": {
+    "bytes": 15207,
+    "file": "b8b2e0b8a0__Jamie-Kay-2026-Mobile-Website-Banner---The-Race_180x.jpg",
+    "sha256": "8d72aca4f3a35230100a36b5c7683112b173dba49a85d303a6a4760a37f4d27f",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie-Kay-2026-Mobile-Website-Banner---The-Race_1x1.jpg?v=1785708394": {
+    "bytes": 940,
+    "file": "af679b4326__Jamie-Kay-2026-Mobile-Website-Banner---The-Race_1x1.jpg",
+    "sha256": "4f3cdae9a3eaa2a2e77f8916d95a74dfc2215c8d503d301b08efa70af8509048",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie-Kay-2026-Mobile-Website-Banner---The-Race_360x.jpg?v=1785708394": {
+    "bytes": 45819,
+    "file": "f56157e122__Jamie-Kay-2026-Mobile-Website-Banner---The-Race_360x.jpg",
+    "sha256": "5f8789429421a0fdc975cb789a5a1c372db2bec38617ce1741dae989d72ca3ea",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie-Kay-2026-Mobile-Website-Banner---The-Race_480x.jpg?v=1785708394": {
+    "bytes": 74896,
+    "file": "dbe97a6fd6__Jamie-Kay-2026-Mobile-Website-Banner---The-Race_480x.jpg",
+    "sha256": "6e531e13d448fc4188c97a7d741d9712b014553e5c2556fb8236a68401a0d520",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie-Kay-2026-Mobile-Website-Banner---The-Race_540x.jpg?v=1785708394": {
+    "bytes": 93435,
+    "file": "144565b678__Jamie-Kay-2026-Mobile-Website-Banner---The-Race_540x.jpg",
+    "sha256": "3e0c2581cd20d38f818cf437189dfcffa6598edcdc76db67a29c9c3cf1148e7a",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie-Kay-2026-Mobile-Website-Banner---The-Race_720x.jpg?v=1785708394": {
+    "bytes": 157082,
+    "file": "6489c7cec7__Jamie-Kay-2026-Mobile-Website-Banner---The-Race_720x.jpg",
+    "sha256": "c3a5f936184996d42a93d4b1c1900a48da59301425ef78500f30b7aa68242eb9",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie-Kay-2026-Mobile-Website-Banner---The-Race_900x.jpg?v=1785708394": {
+    "bytes": 235569,
+    "file": "623f666241__Jamie-Kay-2026-Mobile-Website-Banner---The-Race_900x.jpg",
+    "sha256": "b7802855078813cac2e6dd022f26a77d3296d41c70a0c9c20defca29d209e2d4",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JamieKay-FebMarch26-HomewardCampaign-267_1x1.jpg?v=1766971829": {
+    "bytes": 940,
+    "file": "c60226b1c3__JamieKay-FebMarch26-HomewardCampaign-267_1x1.jpg",
+    "sha256": "7ebdb90f240fc0e2c3ee6157c4fa94e0d699ed6148ab40daf2ed6f8cda22c1cb",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JamieKay-FebMarch26-HomewardCampaign-267_360x.jpg?v=1766971829": {
+    "bytes": 53247,
+    "file": "f510c5067f__JamieKay-FebMarch26-HomewardCampaign-267_360x.jpg",
+    "sha256": "165de462ac191bfd696a1bc855a5f700442fa7eac2f54c42f4457ea8f19f16f3",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JamieKay-February-2026-Collection-NorahOverallDress-PaulaPowderFrontShadow_1x1.png?v=1764832091": {
+    "bytes": 548,
+    "file": "0e6cf223f7__JamieKay-February-2026-Collection-NorahOverallDress-PaulaPowderFrontShadow_1x1.p",
+    "sha256": "b7877614dd983713da090c03d76531f7edd5359661acfab3dbae837ed8ea997e",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JamieKay-February-2026-Collection-NorahOverallDress-PaulaPowderFrontShadow_360x.png?v=1764832091": {
+    "bytes": 155376,
+    "file": "f978b140b2__JamieKay-February-2026-Collection-NorahOverallDress-PaulaPowderFrontShadow_360x.",
+    "sha256": "8316ce9c00beed6ed774d2c92b0b41f425151f6ec340d5db97ee7ae55f1693aa",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JamieKay-February-2026-Collection-OrganicCottonMuslinFrannieDress-MollyBlue-Shadow_1500x.png?v=1766971829": {
+    "bytes": 2173307,
+    "file": "f6b5a2fc0d__JamieKay-February-2026-Collection-OrganicCottonMuslinFrannieDress-MollyBlue-Shad",
+    "sha256": "5ba9e30710580c65f2fd0140a9c5e5571056f3eb14a40015c50f2648d0e45ace",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JamieKay-July-2026-Collection-AnnabellaKnittedCardigan-AnnabellaJacquardDeepWellShadow_1500x.png?v=1781831212": {
+    "bytes": 1876248,
+    "file": "7b812ada91__JamieKay-July-2026-Collection-AnnabellaKnittedCardigan-AnnabellaJacquardDeepWell",
+    "sha256": "f430ee74d00de40b789eb384b8d8aaa2c115d692e85c40ecd3fb4604236e3075",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JamieKay-July-2026-Collection-BearCardigan-SpiceShadow_1500x.png?v=1781834611": {
+    "bytes": 2593680,
+    "file": "b9bdcc9f30__JamieKay-July-2026-Collection-BearCardigan-SpiceShadow_1500x.png",
+    "sha256": "8ca4876c6c22fabda38d93af24665eeb491e9eabd4631f820648ad1e9e2e3163",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JamieKay-July-2026-Collection-CairoPant-StarryNightFrontShadow_1x1.png?v=1781831583": {
+    "bytes": 548,
+    "file": "ad3cbea0d9__JamieKay-July-2026-Collection-CairoPant-StarryNightFrontShadow_1x1.png",
+    "sha256": "1b309757987e787470c57f38cea51dab99ceeae5b448f4ea9d58cfddd30b22cc",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JamieKay-July-2026-Collection-CairoPant-StarryNightFrontShadow_360x.png?v=1781831583": {
+    "bytes": 83024,
+    "file": "b9a678fb8e__JamieKay-July-2026-Collection-CairoPant-StarryNightFrontShadow_360x.png",
+    "sha256": "ee95ff3a7de05a1feb9f5d522c0b1d05a0624d7ac34a78a121004e1040ad2551",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JamieKay-July-2026-Collection-CairoPant-TreeHouseFrontShadow_1500x.png?v=1783368270": {
+    "bytes": 2162634,
+    "file": "694eb02042__JamieKay-July-2026-Collection-CairoPant-TreeHouseFrontShadow_1500x.png",
+    "sha256": "f85ef09b064fbaeaffd7d329b44ddec0aacbb79a5721846b79c3d7a72dc0f838",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JamieKay-July-2026-Collection-CairoShorts-StarryNightFrontShadow_1500x.png?v=1782024243": {
+    "bytes": 1352612,
+    "file": "35c8e93174__JamieKay-July-2026-Collection-CairoShorts-StarryNightFrontShadow_1500x.png",
+    "sha256": "0c2663941bd52822c6e7e21cb798dfb9fa003fee57e511854ab39b4c10081cae",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JamieKay-July-2026-Collection-JacksonKnittedJumper-JacksonStripeShadow_1500x.png?v=1781831937": {
+    "bytes": 2543077,
+    "file": "f037646df0__JamieKay-July-2026-Collection-JacksonKnittedJumper-JacksonStripeShadow_1500x.png",
+    "sha256": "51b323c42af37cbf285f8b18fb491519af07d03f5bf40daafba0ef73e2390072",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JamieKay-July-2026-Collection-LoganKnittedCardigan-NavyShadow_1x1.png?v=1781832083": {
+    "bytes": 548,
+    "file": "bc441af0b2__JamieKay-July-2026-Collection-LoganKnittedCardigan-NavyShadow_1x1.png",
+    "sha256": "15bef4afd372a7952c3cbdb091c21825845e83aa2590f27e44a636684bcc7152",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JamieKay-July-2026-Collection-LoganKnittedCardigan-NavyShadow_360x.png?v=1781832083": {
+    "bytes": 103432,
+    "file": "7b1090f01a__JamieKay-July-2026-Collection-LoganKnittedCardigan-NavyShadow_360x.png",
+    "sha256": "442cd95c383f6efe83252e650d048b71c83f254c462658bc7272d8fc33615cd9",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JamieKay-July-2026-Collection-LydieTulleDress-SnowAngelFrontShadow_1500x.png?v=1781832132": {
+    "bytes": 1371735,
+    "file": "c6a75f7f07__JamieKay-July-2026-Collection-LydieTulleDress-SnowAngelFrontShadow_1500x.png",
+    "sha256": "2913fb0f5979f05bac41cd95e3e9cd0c523d7b150d472b7681b9a794d8e711bb",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JamieKay-July-2026-Collection-MarietteCottonJacket-PetiteGinghamGraphiteShadow_1500x.png?v=1781832212": {
+    "bytes": 2095690,
+    "file": "687f2a0405__JamieKay-July-2026-Collection-MarietteCottonJacket-PetiteGinghamGraphiteShadow_1",
+    "sha256": "8d1d023af15d19c5c6aee106d788dd8648adbe347433a7ce96a233af666a48d5",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JamieKay-July-2026-Collection-OrganicCottonBanksBlouse-JadeFloralFrontShadow_d9080c5f-f6f3-4ec7-8219-1fa04f1df54e_1500x.png?v=1782683550": {
+    "bytes": 1656880,
+    "file": "2fee1d5e53__JamieKay-July-2026-Collection-OrganicCottonBanksBlouse-JadeFloralFrontShadow_d90",
+    "sha256": "e75c4fb674a529422190f20002ae755ddbc20616d0f63b1f91b281846db5e02a",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JamieKay-July-2026-Collection-OrganicCottonCarineTop-VioletFloralShadow_1500x.png?v=1782679367": {
+    "bytes": 2058608,
+    "file": "bac8136c40__JamieKay-July-2026-Collection-OrganicCottonCarineTop-VioletFloralShadow_1500x.pn",
+    "sha256": "2dc3cbab28d17d9f92455f7119fabac9da9967aad153ff5747ad6c62c04b15ae",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JamieKay-July-2026-Collection-OrganicCottonClassicBloomer-VioletFloralShadow_1500x.png?v=1782679467": {
+    "bytes": 1498364,
+    "file": "b512cd20b8__JamieKay-July-2026-Collection-OrganicCottonClassicBloomer-VioletFloralShadow_150",
+    "sha256": "4f82b4a5431c452e22fb239f1686287787cd22234fe39917c4d63d7d40029586",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JamieKay-July-2026-Collection-OrganicCottonDesireeBow-HuguetteGraphiteShadow_1500x.png?v=1781832693": {
+    "bytes": 801530,
+    "file": "0341e62d55__JamieKay-July-2026-Collection-OrganicCottonDesireeBow-HuguetteGraphiteShadow_150",
+    "sha256": "52d14a74895c4726fe6d3b645c72c78511c6a7599ea460c471ec1668a9f69b69",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JamieKay-July-2026-Collection-OrganicCottonGabrielTop-TinyGinghamMaritimeShadow_19b56165-3270-46e2-b396-bf5df35049bc_1500x.png?v=1784149802": {
+    "bytes": 1537491,
+    "file": "bbab47a74f__JamieKay-July-2026-Collection-OrganicCottonGabrielTop-TinyGinghamMaritimeShadow_",
+    "sha256": "d11a83801da08a6a17afb63401842d7bda36efbfc345ec0276b3e71c4ad924d6",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JamieKay-July-2026-Collection-OrganicCottonHeleneDress-LucaFloralFrontShadow_1500x.png?v=1781832964": {
+    "bytes": 2722425,
+    "file": "7c4f9be5fa__JamieKay-July-2026-Collection-OrganicCottonHeleneDress-LucaFloralFrontShadow_150",
+    "sha256": "8014fa158d70dac2714accfa061a94be9d21301c6b4cab8f3a8e3d7bae7f14b9",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JamieKay-July-2026-Collection-OrganicCottonLionelPlaysuit-MulberriesShadow_1500x.png?v=1781833501": {
+    "bytes": 2139853,
+    "file": "040b871749__JamieKay-July-2026-Collection-OrganicCottonLionelPlaysuit-MulberriesShadow_1500x",
+    "sha256": "39b551e50ab6b2ae871b0a41fcf40309f740c3de2c634ca853f453c2d6b787de",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JamieKay-July-2026-Collection-OrganicCottonMarietteDress-HuguetteGraphiteShadow_1500x.png?v=1781833559": {
+    "bytes": 1848846,
+    "file": "22a2900b95__JamieKay-July-2026-Collection-OrganicCottonMarietteDress-HuguetteGraphiteShadow_",
+    "sha256": "abe1fa6c897487e5e9ac13fbd7f162d24ff4a68d2fd34a945e89aefb8d04793c",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JamieKay-July-2026-Collection-OrganicCottonMarietteDress-VioletFloralShadow_1500x.png?v=1782679552": {
+    "bytes": 2429066,
+    "file": "606420eda3__JamieKay-July-2026-Collection-OrganicCottonMarietteDress-VioletFloralShadow_1500",
+    "sha256": "c818b63cf0fadce9118be810dca61de5b2245a5b332032fe560c81306be2397b",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JamieKay-July-2026-Collection-OrganicCottonMarietteSkirt-HuguetteGraphiteShadow_1500x.png?v=1781833680": {
+    "bytes": 1557755,
+    "file": "d1b3534e5a__JamieKay-July-2026-Collection-OrganicCottonMarietteSkirt-HuguetteGraphiteShadow_",
+    "sha256": "0bce01ef8f401984fb3d2fc144fd5e88131d29123e92e202582a4207308de169",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JamieKay-July-2026-Collection-OrganicCottonMarshallLongSleeveTop-MaritimeMerciShadow_1x1.png?v=1781833734": {
+    "bytes": 548,
+    "file": "54f52fa62d__JamieKay-July-2026-Collection-OrganicCottonMarshallLongSleeveTop-MaritimeMerciSh",
+    "sha256": "881e6d29f3cc7e4823e22783e3d8cb30396b25920cc3d7f1cbb83f31e0d24965",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JamieKay-July-2026-Collection-OrganicCottonMarshallLongSleeveTop-MaritimeMerciShadow_360x.png?v=1781833734": {
+    "bytes": 79507,
+    "file": "f8ea5ecb11__JamieKay-July-2026-Collection-OrganicCottonMarshallLongSleeveTop-MaritimeMerciSh",
+    "sha256": "523707435616ff7f79461c9f4398378003fe5dd2275490cd81d424cacab3d266",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JamieKay-July-2026-Collection-PimaCottonEdwardLongSleeveTop-PetiteStripeCloudMaritimeShadow_1x1.png?v=1781834139": {
+    "bytes": 548,
+    "file": "3f73031c93__JamieKay-July-2026-Collection-PimaCottonEdwardLongSleeveTop-PetiteStripeCloudMar",
+    "sha256": "bf306c7d98d68bed175be8899e2f8f6ff5560147c94ad576d25dc35854c55a42",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JamieKay-July-2026-Collection-PimaCottonEdwardLongSleeveTop-PetiteStripeCloudMaritimeShadow_360x.png?v=1781834139": {
+    "bytes": 123148,
+    "file": "c91135c675__JamieKay-July-2026-Collection-PimaCottonEdwardLongSleeveTop-PetiteStripeCloudMar",
+    "sha256": "51ab59fbdebbf1f278a0ccf2592f7d1687af04adbf9c5e1ebe64b289e9755d6f",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JamieKay-July-2026-Collection-PimaCottonEdwardShort-PetiteStripeCloudMaritimeFrontShadow_1x1.png?v=1781834091": {
+    "bytes": 548,
+    "file": "0c120d61e4__JamieKay-July-2026-Collection-PimaCottonEdwardShort-PetiteStripeCloudMaritimeFro",
+    "sha256": "e1ac15f3aaac485dce46efd44df669326294626df289b7b1c33af57c43f632bc",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JamieKay-July-2026-Collection-PimaCottonEdwardShort-PetiteStripeCloudMaritimeFrontShadow_360x.png?v=1781834091": {
+    "bytes": 132234,
+    "file": "b7bd8e09a7__JamieKay-July-2026-Collection-PimaCottonEdwardShort-PetiteStripeCloudMaritimeFro",
+    "sha256": "61a383da05d435a895a36f256f44829d1fce47b187f9d2b6558be7337b08b0f4",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JamieKay-July-2026-Collection-PimaCottonEdwardTee-PetiteStripeCloudMaritimeShadow_1500x.png?v=1781834005": {
+    "bytes": 2228614,
+    "file": "14a38823c4__JamieKay-July-2026-Collection-PimaCottonEdwardTee-PetiteStripeCloudMaritimeShado",
+    "sha256": "c5265bce2bd13a6e10c838c455ec01b1db9d902cf0b14f35c3f8d9d89a7df1ff",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JamieKay-July-2026-Collection-VirgilKnitVest-NavyShadow_1500x.png?v=1781834347": {
+    "bytes": 1522443,
+    "file": "b5aa52425e__JamieKay-July-2026-Collection-VirgilKnitVest-NavyShadow_1500x.png",
+    "sha256": "56bf537d7f26c22e49eaea0a142a7c022bbb82aeadd85780db6687d7eebbb8fb",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JamieKay-June-2026-Collection-OrganicCottonCarineTop-MollyLilacShadow_1500x.png?v=1780603570": {
+    "bytes": 1569882,
+    "file": "ebad662a8f__JamieKay-June-2026-Collection-OrganicCottonCarineTop-MollyLilacShadow_1500x.png",
+    "sha256": "2c94529c805ee73af141c84c3dc89eb398e989681fdec1a9e7366665f914465a",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JamieKay-June-2026-Collection-OrganicCottonCarolineDress-MollyLilacFrontShadow_1500x.png?v=1779653754": {
+    "bytes": 1836307,
+    "file": "8425059eff__JamieKay-June-2026-Collection-OrganicCottonCarolineDress-MollyLilacFrontShadow_1",
+    "sha256": "d392f1aa176efe4be9c96698b5ba48b216b78d500695f7894c41c8a9fabb8826",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JamieKay-June2026-ThisSpecialPlace-Campaign-160_1x1.jpg?v=1781069127": {
+    "bytes": 938,
+    "file": "cc80715f61__JamieKay-June2026-ThisSpecialPlace-Campaign-160_1x1.jpg",
+    "sha256": "be9555e77fe817f8b441101e17b50e453c576c585b6cd4fcf170378e1523632b",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JamieKay-June2026-ThisSpecialPlace-Campaign-160_360x.jpg?v=1781069127": {
+    "bytes": 54131,
+    "file": "a8185cdfd7__JamieKay-June2026-ThisSpecialPlace-Campaign-160_360x.jpg",
+    "sha256": "fa6d768dffffbec7cbd546572582d7b3a59df637b9a269fe2912753a7a3e2cb2",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JamieKay-March-2026-Collection-ClassicOverallDress-PetiteHeartRoseFront-Shadow_1500x.png?v=1767047354": {
+    "bytes": 2827744,
+    "file": "68ebe47e39__JamieKay-March-2026-Collection-ClassicOverallDress-PetiteHeartRoseFront-Shadow_1",
+    "sha256": "bf00a50948ffb6d5b5992a80648442789e74f47a3c70af10f372e0c8e5e6af08",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JamieKay-March-2026-Collection-OrganicCottonCecileDress-CinnamonGinghamFront-Shadow_1500x.png?v=1767129170": {
+    "bytes": 2922368,
+    "file": "e133ddda70__JamieKay-March-2026-Collection-OrganicCottonCecileDress-CinnamonGinghamFront-Sha",
+    "sha256": "7e4d335ae2956ae37709fc09367b48000132f19d192fa5577d9f432af11ea15c",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JamieKay-October-2025-AdalynDress-BlushedRoseFront_29a84d12-41bd-4062-a526-5c2e41d39e71_1500x.jpg?v=1758772423": {
+    "bytes": 45576,
+    "file": "079c988ae0__JamieKay-October-2025-AdalynDress-BlushedRoseFront_29a84d12-41bd-4062-a526-5c2e4",
+    "sha256": "9dc50c6edc61a35a53b3d35ff54212e023712c9f2a24ddca43c1cdd79d2dea41",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/JamieKay-October-2025-AnnaDress-ThelmaEgret_fb4e8659-4c97-4728-a914-90c9b21f983c_1500x.jpg?v=1758772616": {
+    "bytes": 80399,
+    "file": "feaba6ac16__JamieKay-October-2025-AnnaDress-ThelmaEgret_fb4e8659-4c97-4728-a914-90c9b21f983c",
+    "sha256": "5a9996ad0d93062763d20026bdb884d746c3ed6d7b7499b63d476a35c03361f2",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie_Kay-July-2026-Collection-Bear_Cardigan-Sweet_Mulberry_Shadow_b415a43c-84ea-41e6-910c-871b720f3469_1500x.png?v=1784088041": {
+    "bytes": 2517524,
+    "file": "da2a7ce3a0__Jamie_Kay-July-2026-Collection-Bear_Cardigan-Sweet_Mulberry_Shadow_b415a43c-84ea",
+    "sha256": "b9521b5cc9b58910319810ff0651c119ad0d7d97e70cb3956f08c421f6d1168f",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie_Kay-July-2026-Collection-Bear_Onepiece-Sweet_Mulberry_Shadow_f9253fdc-d7cd-43c4-8ec0-a9a8e8ef5d3d_1500x.png?v=1784087977": {
+    "bytes": 2963488,
+    "file": "7d30604155__Jamie_Kay-July-2026-Collection-Bear_Onepiece-Sweet_Mulberry_Shadow_f9253fdc-d7cd",
+    "sha256": "6077a656d9671f5c827ac9a5665ecef9e544f449a4406d5a556ee240c002b867",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie_Kay-July-2026-Collection-Ezekiel_Jacket-Mid_Indigo_Denim_Shadow_1500x.png?v=1784160817": {
+    "bytes": 1909472,
+    "file": "d284734007__Jamie_Kay-July-2026-Collection-Ezekiel_Jacket-Mid_Indigo_Denim_Shadow_1500x.png",
+    "sha256": "244baf9236f504ce38c57d4421c27c9e5ad0d3674d85012c4bbbb7a3ad57a219",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie_Kay-July-2026-Collection-Michaela_Knitted_Cardigan-Lily_Lavender_Shadow_dcb25ad0-faf9-4249-afad-257e8a19d378_1500x.png?v=1784159045": {
+    "bytes": 1969207,
+    "file": "74c3e9d0c9__Jamie_Kay-July-2026-Collection-Michaela_Knitted_Cardigan-Lily_Lavender_Shadow_dc",
+    "sha256": "1fe9bdbe466ae144c7417e8f72d37e9baed32d96b04c32a576386342b5f85673",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie_Kay-July-2026-Collection-Organic_Cotton_Beatrice_Playsuit-Luca_Floral_Front_Shadow_1500x.png?v=1782679191": {
+    "bytes": 3096944,
+    "file": "6996fc03df__Jamie_Kay-July-2026-Collection-Organic_Cotton_Beatrice_Playsuit-Luca_Floral_Fron",
+    "sha256": "474c69d110a595f2a08ed6b5b1fc2ac5c47831608a7649dcee7b968909765f6c",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie_Kay-July-2026-Collection-Organic_Cotton_Bentley_Playsuit-Tiny_Gingham_Maritime_Front_Shadow_e9326f8b-dbe8-4e54-b062-1c048d30bbb4_1500x.png?v=1784148069": {
+    "bytes": 2046530,
+    "file": "74ce7d1195__Jamie_Kay-July-2026-Collection-Organic_Cotton_Bentley_Playsuit-Tiny_Gingham_Mari",
+    "sha256": "4aef59d8682723e6e3a592dc4fd3e6a1af63ec96d0c3fe3a48f7b93b10b3947b",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie_Kay-July-2026-Collection-Organic_Cotton_Classic_Bloomer-Luca_Floral_Shadow_1500x.png?v=1782679409": {
+    "bytes": 1631669,
+    "file": "7a09e27e40__Jamie_Kay-July-2026-Collection-Organic_Cotton_Classic_Bloomer-Luca_Floral_Shadow",
+    "sha256": "237473a5947ad78624a0d3ad828a5d94256a9833265478439926d2081120c174",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie_Kay-July-2026-Collection-Organic_Cotton_Desiree_Bow-Luca_Floral_Shadow_1500x.png?v=1782679620": {
+    "bytes": 669899,
+    "file": "83043d7a7c__Jamie_Kay-July-2026-Collection-Organic_Cotton_Desiree_Bow-Luca_Floral_Shadow_150",
+    "sha256": "40f137b59a59afa75213c725efa46f8824a4f22588cb90786ed90e1d176d80eb",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie_Kay-July-2026-Collection-Organic_Cotton_Frill_Bloomer-Huguette_Graphite_Shadow_1500x.png?v=1782024163": {
+    "bytes": 1439882,
+    "file": "2b1f728925__Jamie_Kay-July-2026-Collection-Organic_Cotton_Frill_Bloomer-Huguette_Graphite_Sh",
+    "sha256": "e7b074da25f35c2290587a750b9cfb04db48ea9739ce197e9b383fcc4f895110",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie_Kay-July-2026-Collection-Organic_Cotton_Leonie_Top-Jade_Floral_Shadow_1500x.png?v=1782683503": {
+    "bytes": 1186707,
+    "file": "60685d4c59__Jamie_Kay-July-2026-Collection-Organic_Cotton_Leonie_Top-Jade_Floral_Shadow_1500",
+    "sha256": "24ee2fe6ac5e44192125b112286cba3e37c87edcfc4a231154c813847bd5c1dd",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie_Kay-July-2026-Collection-Organic_Cotton_Leonie_Top-Luca_Floral_Shadow_1500x.png?v=1782679506": {
+    "bytes": 2246478,
+    "file": "a35dd60502__Jamie_Kay-July-2026-Collection-Organic_Cotton_Leonie_Top-Luca_Floral_Shadow_1500",
+    "sha256": "7cf258850184149d09d2dcfea0863f80c87aacd1d53b5cc1e1f062ce3decd3dc",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie_Kay-July-2026-Collection-Sally_Knitted_Cardigan-Burgundy_Shadow_1500x.png?v=1784159442": {
+    "bytes": 1674177,
+    "file": "2354ab9983__Jamie_Kay-July-2026-Collection-Sally_Knitted_Cardigan-Burgundy_Shadow_1500x.png",
+    "sha256": "1b369f730a4a331c08fcd90389a78d6aaf7f90323f58f07d8b1d4133849a4f9b",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie_Kay-June-2026-Collection-Organic_Cotton_Beatrice_Top-Molly_Lilac_Shadow_1500x.png?v=1780279031": {
+    "bytes": 1568522,
+    "file": "c891ef93cd__Jamie_Kay-June-2026-Collection-Organic_Cotton_Beatrice_Top-Molly_Lilac_Shadow_15",
+    "sha256": "fa2d99014022420a3dd58fd940f059461f00b015d3bf60340de11a6510665340",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie_Kay-June-2026-Collection-Organic_Cotton_Bib-Fig_Floral_Shadow_1500x.png?v=1780949420": {
+    "bytes": 1858418,
+    "file": "b3a3c213a2__Jamie_Kay-June-2026-Collection-Organic_Cotton_Bib-Fig_Floral_Shadow_1500x.png",
+    "sha256": "4a7eff2146f4ac05a5e79bed40b780b7c4ee6b90de2a697abbcf0889bbc563c4",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie_Kay-June-2026-Collection-Organic_Cotton_Classic_Bloomer-Fig_Floral_Shadow_1500x.png?v=1780949132": {
+    "bytes": 1685837,
+    "file": "8f464819f5__Jamie_Kay-June-2026-Collection-Organic_Cotton_Classic_Bloomer-Fig_Floral_Shadow_",
+    "sha256": "f8bc366814c0eee6dffb9e24fc118480674678b814f2b15b888a840457926d30",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie_Kay-June-2026-Collection-Organic_Cotton_Clemence_Wrap_Top-Fig_Floral_Shadow_87beb4ea-40a1-4661-81d5-1b9d71c5f18d_1500x.png?v=1780949068": {
+    "bytes": 1978365,
+    "file": "ca7a9be4a5__Jamie_Kay-June-2026-Collection-Organic_Cotton_Clemence_Wrap_Top-Fig_Floral_Shado",
+    "sha256": "2df85d46240bd6079c6409c6bfe0a965be74f2e8b7a292ceecf6ebcea2ee9621",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie_Kay-June-2026-Collection-Organic_Cotton_Dominique_Pant-Fig_Floral_Shadow_1500x.png?v=1780948942": {
+    "bytes": 2862679,
+    "file": "141f1a1bc2__Jamie_Kay-June-2026-Collection-Organic_Cotton_Dominique_Pant-Fig_Floral_Shadow_1",
+    "sha256": "c8cb9f4f3bac145dad8b4feee6d08a301c4f6a9f3eeedb6dc636b136afedf215",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie_Kay-June-2026-Collection-Organic_Cotton_Everyday_Legging-Fig_Floral_Shadow_1500x.png?v=1780949291": {
+    "bytes": 2824323,
+    "file": "a574da0482__Jamie_Kay-June-2026-Collection-Organic_Cotton_Everyday_Legging-Fig_Floral_Shadow",
+    "sha256": "769f822202d866837f9e88fa5a0b0bf00c91d0b51c3aea2301f1329fc744ce5a",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie_Kay-June-2026-Collection-Organic_Cotton_Frankie_Dress-Fig_Floral_Shadow_1500x.png?v=1780949212": {
+    "bytes": 2407756,
+    "file": "d5bf736d49__Jamie_Kay-June-2026-Collection-Organic_Cotton_Frankie_Dress-Fig_Floral_Shadow_15",
+    "sha256": "6df4ec78473fcb927f1380538058c73d34ade55ec7ceaf6def4338dfa0fcc675",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie_Kay-June-2026-Collection-Organic_Cotton_Headband-Fig_Floral_Shadow_1500x.png?v=1780949172": {
+    "bytes": 916843,
+    "file": "1c3c0c39e2__Jamie_Kay-June-2026-Collection-Organic_Cotton_Headband-Fig_Floral_Shadow_1500x.p",
+    "sha256": "99984af1f8518d8d4ebc8cb3cd989208f4c047da1e8f708a9b772cfb2535645b",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie_Kay-June-2026-Collection-Organic_Cotton_Muslin_Beatrice_Playsuit-Fig_Front_Shadow_1500x.png?v=1780897526": {
+    "bytes": 2436627,
+    "file": "c6fcd93c72__Jamie_Kay-June-2026-Collection-Organic_Cotton_Muslin_Beatrice_Playsuit-Fig_Front",
+    "sha256": "eecb58778e0165c3bbe0c5d836ccba000182ccac0871c620cb95241d19c4a8d1",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie_Kay-June-2026-Collection-Organic_Cotton_Muslin_Lace_Dress-Fig_Front_Shadow_1500x.png?v=1780906416": {
+    "bytes": 1741028,
+    "file": "e416ec4f35__Jamie_Kay-June-2026-Collection-Organic_Cotton_Muslin_Lace_Dress-Fig_Front_Shadow",
+    "sha256": "8c6414faba6d640ac7a2311ffdd0e1d2739799de18e22189e14c2c4a2f7ffe37",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie_Kay_-_Premium_Childrens_Clothing.png?v=1657162442": {
+    "bytes": 29804,
+    "file": "07205dd6f4__Jamie_Kay_-_Premium_Childrens_Clothing.png",
+    "sha256": "5aa96d5be1a0f53eeba8687473777e8a8b39b0986ca8fb5298a89d0ecd152365",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie_Kay_July_2026_Luca_Collection_Fabric_Swatches_-_Maritime_Merci_Tee_1500x.jpg?v=1781844590": {
+    "bytes": 376227,
+    "file": "08fcf5cac9__Jamie_Kay_July_2026_Luca_Collection_Fabric_Swatches_-_Maritime_Merci_Tee_1500x.j",
+    "sha256": "a87981b491e18b3b59b406f0f2a9a558979966d437c99d2632078c67296fb9fe",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie_Kay_July_2026_Luca_Collection_Fabric_Swatches_-_Petite_Stripe_Cloud_Maritime_1500x.jpg?v=1781845100": {
+    "bytes": 418231,
+    "file": "ac68f6c6fa__Jamie_Kay_July_2026_Luca_Collection_Fabric_Swatches_-_Petite_Stripe_Cloud_Mariti",
+    "sha256": "d543a394ea28fac4ab01e4a94a721b025f59bd6a38237378a921af503c48a399",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie_Kay_Logo.png?v=1768945285&width=200": {
+    "bytes": 3238,
+    "file": "65ccaaef09__Jamie_Kay_Logo.png",
+    "sha256": "24368ac5822caa7e78b4fd5de95c1366e15efbb6c772ed05fca862714fc213a3",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie_Kay_Logo.png?v=1768945285&width=500": {
+    "bytes": 7750,
+    "file": "7d102dd4a2__Jamie_Kay_Logo.png",
+    "sha256": "669d7f3a785d30b82b8defbd2e1461760f592ca7384196bda46cfb6320e799df",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie_Kay_Logo_1500x.png?v=1768945285": {
+    "bytes": 27143,
+    "file": "6577c4e723__Jamie_Kay_Logo_1500x.png",
+    "sha256": "5ffb5e9571580c90e8088a0c36e434f6ea47911e0fad28170cad44d0f0a04160",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Jamie_Kay_Logo_360x.png?v=1768945285": {
+    "bytes": 5468,
+    "file": "4ba23add1e__Jamie_Kay_Logo_360x.png",
+    "sha256": "ad010a002ab93297b4bb64cb8fc7bfb12e93f10688e1c14c1356bccfb8f28182",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Juniper_Fields_Elements-02_1500x.png?v=1768515940": {
+    "bytes": 57823,
+    "file": "1fc02fe197__Juniper_Fields_Elements-02_1500x.png",
+    "sha256": "855da887512ea0e69917b96660e83bb3a15c3e6d46105289606cb0dc808cd3b0",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Juniper_Fields_Elements-02_1x1.png?v=1768515940": {
+    "bytes": 548,
+    "file": "8ceec3f15c__Juniper_Fields_Elements-02_1x1.png",
+    "sha256": "3bd6b3431cdae8d90014ca51a0b571799fcbc2f7a99fdc55a6d73bdfa41204ec",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Juniper_Fields_Elements-02_720x.png?v=1768515940": {
+    "bytes": 57823,
+    "file": "c08cd1d988__Juniper_Fields_Elements-02_720x.png",
+    "sha256": "855da887512ea0e69917b96660e83bb3a15c3e6d46105289606cb0dc808cd3b0",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Menu-Image---Girls_1x1.jpg?v=1747353905": {
+    "bytes": 939,
+    "file": "6dcae4210e__Menu-Image---Girls_1x1.jpg",
+    "sha256": "198b4f3a69c701c1cae7b4c92c900abf22fabddc3d975f8dd17088fe64b32a1a",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Menu-Image---Girls_720x.jpg?v=1747353905": {
+    "bytes": 130597,
+    "file": "859da07396__Menu-Image---Girls_720x.jpg",
+    "sha256": "a34521d97fff2e2f8c0ed2910efc840e542951086756c57f1208b9d0d3624340",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Menu-Image---Modal_1x1.jpg?v=1747354627": {
+    "bytes": 939,
+    "file": "e872537f24__Menu-Image---Modal_1x1.jpg",
+    "sha256": "2ff47250e720586aab592d6d0d022a28f994c9eb10c2d788ad97f49065ceae65",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Menu-Image---Modal_720x.jpg?v=1747354627": {
+    "bytes": 165664,
+    "file": "4c46000709__Menu-Image---Modal_720x.jpg",
+    "sha256": "6a346cee639ed2d91053de33c444042a34dd4a805890dfed89231018dcd0d548",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Menua-Image---Boys_1x1.jpg?v=1747354644": {
+    "bytes": 940,
+    "file": "b5446756a8__Menua-Image---Boys_1x1.jpg",
+    "sha256": "4c739f75eaf2ebecca7faeb3d923688eabe4dd9009bddeb4b158908c6e9a5160",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Menua-Image---Boys_720x.jpg?v=1747354644": {
+    "bytes": 99234,
+    "file": "608b2619a1__Menua-Image---Boys_720x.jpg",
+    "sha256": "5cfaacffca7d10e887cb170dad489ec6cb5cb68d7b8a690c12d502e9b08bbfc7",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Merino_Kids_Logo_228px.png?v=1761271933&width=200": {
+    "bytes": 5858,
+    "file": "440b497d92__Merino_Kids_Logo_228px.png",
+    "sha256": "270547883541df752944776c07b116dd180af88fc78f11603ff8800119ab404c",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Signature-Sale-Dresses.png?v=1783027664": {
+    "bytes": 742762,
+    "file": "1a96504d80__Signature-Sale-Dresses.png",
+    "sha256": "9cc9f4be8e1ae31348fc39b7ab217ebf9d1a662245e62e87e523aa8f582041b1",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Signature-Sale-Dresses_180x.png?v=1783027664": {
+    "bytes": 30944,
+    "file": "a63d7a1dad__Signature-Sale-Dresses_180x.png",
+    "sha256": "1e76a9a84be63adb5e456b42f82e2a32e4b5d7ea5759292a985947bd6fd70586",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Signature-Sale-Dresses_360x.png?v=1783027664": {
+    "bytes": 115486,
+    "file": "c9e3fb661e__Signature-Sale-Dresses_360x.png",
+    "sha256": "7d6a802dd34dfa7d33200bdba4ff50e451672045c4e1e999bd76fc1298fa3ecc",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Signature-Sale-Dresses_480x.png?v=1783027664": {
+    "bytes": 213611,
+    "file": "1399869c32__Signature-Sale-Dresses_480x.png",
+    "sha256": "bbb21873569e59661f35acc34294be1fd1f495de44a7639a86759804e79e6186",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Signature-Sale-Dresses_540x.png?v=1783027664": {
+    "bytes": 280389,
+    "file": "824d8046da__Signature-Sale-Dresses_540x.png",
+    "sha256": "da40eadc602e747a6288b16a7402dd750ccd373aa97bc9cd6482d44c3d6daee4",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Signature-Sale-Dresses_720x.png?v=1783027664": {
+    "bytes": 525755,
+    "file": "355d35e2df__Signature-Sale-Dresses_720x.png",
+    "sha256": "0faeeabc3cc98ad022ad503693d5deeaeb7bcc3c6075bdfaddc28b96edd9a48f",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Signature-Sale-Dresses_900x.png?v=1783027664": {
+    "bytes": 861008,
+    "file": "807731863f__Signature-Sale-Dresses_900x.png",
+    "sha256": "32a6879996c5a69fb5315c933d67121a1749d181bce4dbc5ff427ba6d27ed3a6",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Snuggle_Bunnies_Logo_PNG.png?v=1717584969&width=200": {
+    "bytes": 4577,
+    "file": "aa0026617c__Snuggle_Bunnies_Logo_PNG.png",
+    "sha256": "0203eaf361a0f75d4647ac720ca12b7d370925e2edcc161feac70612a362c44a",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/Snuggle_Bunnies_Mini_Logo.png?v=1749004940&width=200": {
+    "bytes": 4267,
+    "file": "50c4422209__Snuggle_Bunnies_Mini_Logo.png",
+    "sha256": "d88ecf5173f63a6cff1d1f07e028893657f260f263fd8a0442db6b7b5f8106c0",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/favicon_32x32.png?v=1656452795": {
+    "bytes": 1498,
+    "file": "db838a7bf8__favicon_32x32.png",
+    "sha256": "5bc3b4d2967b83c7b962871f9f458a61d880d565a51c4934b2015f9ed0a4b253",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/image_4_1x1.png?v=1783031708": {
+    "bytes": 547,
+    "file": "80e68f6f50__image_4_1x1.png",
+    "sha256": "7b5908e4a4e46568499ba07d3d7447790d74c0dc4a3d29a60b44a0a9af3c6c4d",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/files/image_4_720x.png?v=1783031708": {
+    "bytes": 1093270,
+    "file": "9d0e3a9802__image_4_720x.png",
+    "sha256": "0911e0a18de38a62d72d515a79b4bf94d5538603ccdebb15809767f396892e77",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/t/170/assets/blank.svg?v=8055057579596076041739416591": {
+    "bytes": 80184,
+    "file": "e96f5b2316__blank.svg",
+    "sha256": "0c9024b276ef55ac683238e702a91619e7a0a63544587d44167454dfc4f68b26",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/t/170/assets/cursor-zoom-2x.svg?v=150330213315242599881739416591": {
+    "bytes": 1525,
+    "file": "bd766a5d1b__cursor-zoom-2x.svg",
+    "sha256": "c3142bdf3eb2ab34add21e2bed220d84ecc052069e82ad46cff09b255f080c8b",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/t/170/assets/cursor-zoom.svg?v=149337251391987147571739416591": {
+    "bytes": 1554,
+    "file": "740acbf30e__cursor-zoom.svg",
+    "sha256": "a84b4c4e98f57f76d3ae4b2a7ad64993b16afc4612676fc9411db34d3b95c633",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/t/170/assets/custom.css?v=159503836227558626611782719853": {
+    "bytes": 21379,
+    "file": "f3289c5d6e__custom.css",
+    "sha256": "8c34ab2cae6d3f7b66dc6de636f92eb5041f328ce0b5824c584a2de1012cd6a2",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/t/170/assets/custom.js?v=52345921974394988141782720233": {
+    "bytes": 2708,
+    "file": "54cf09af12__custom.js",
+    "sha256": "c6d3be809b8732c7bd1a4e7549ea3d4f55d1640dbc12c1726151b520b6a1b0ae",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/t/170/assets/font-settings.css?v=167600522589579140081779668771": {
+    "bytes": 6879,
+    "file": "05dc871760__font-settings.css",
+    "sha256": "d73b3a976ac940cdc0b1724f267194234feaa02aa7e2b478aa9ead8f49bb7579",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/t/170/assets/global.autojs.js?v=82394828156166128071785284870": {
+    "bytes": 316780,
+    "file": "620dc0d6c3__global.autojs.js",
+    "sha256": "c146ab5170b356c551509dd0ac2d2f18ab2ab1ddf11b571567c200c6be160418",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/t/170/assets/global.autostyle.css?v=26942702788455869151783898777": {
+    "bytes": 486098,
+    "file": "04117cdfea__global.autostyle.css",
+    "sha256": "16944a99de37f16ebf511733b2af467c45af2506016febe5185eb2fd2fc16d0e",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/t/170/assets/homepage-multi-site.autostyle.css?v=49036742577670513471783898777": {
+    "bytes": 82973,
+    "file": "2c79b55d1e__homepage-multi-site.autostyle.css",
+    "sha256": "d2edc38cf1b6e5933fe5923cf22cc8aa5dcb4791a5583753fd34b9af51dd7b94",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/t/170/assets/ico-select.svg?v=161587956938089500361739416591": {
+    "bytes": 611,
+    "file": "0c419cb4db__ico-select.svg",
+    "sha256": "67311221c483d1bce3c31d06aa426343565fafe4dfea2867d43ed6a68e878ae8",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/t/170/assets/icon-caret.svg?v=41066445243216725011774490281": {
+    "bytes": 175,
+    "file": "84ce8a281c__icon-caret.svg",
+    "sha256": "4dc454ee0bebdbb63c939d888359d45fcc29ed289edebfb43ff39788b5ec6ade",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/t/170/assets/ie11.js?v=144489047535103983231739416591": {
+    "bytes": 8314,
+    "file": "a4e7796171__ie11.js",
+    "sha256": "f4cad82acdcb0301a8dba3df4620f37f3a96be289fd2aa2a5fd1f3a233845473",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/t/170/assets/infinite-scroll.pkgd.min.js?v=13815149076068874991739416591": {
+    "bytes": 22539,
+    "file": "0f7e15e4f8__infinite-scroll.pkgd.min.js",
+    "sha256": "7c9e9d369b235905c32e3ae399f4499cc30e60a1180be631d548ca2f98099ac1",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/t/170/assets/jquery-3.6.0.min.js?v=115860211936397945481739416591": {
+    "bytes": 89500,
+    "file": "b01279760f__jquery-3.6.0.min.js",
+    "sha256": "80f04717f32ea0320c5e8618fbacedd1fee3a8775ad8292140a6113551d4b5b0",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/t/170/assets/laybuy-helper.js?v=167604748853965106671739416591": {
+    "bytes": 42468,
+    "file": "03627b4b2b__laybuy-helper.js",
+    "sha256": "274067f2b6c4dcd1dc9ad511f4c8153fafba69f32ce0f255e7b5dfd8723e3917",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/t/170/assets/lazysizes.js?v=111431644619468174291739416591": {
+    "bytes": 28658,
+    "file": "7289136bed__lazysizes.js",
+    "sha256": "6ef0b26f16ecf59e8ec163a899d92edcbf22c89b22ffa793be88ac19dfca82a3",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/t/170/assets/select-arrow.png?v=120374": {
+    "error": "HTTP Error 404: Not Found",
+    "file": null,
+    "status": 404
+  },
+  "https://jamiekay.co.nz/cdn/shop/t/170/assets/spinner.gif?v=74017169589876499871739416591": {
+    "bytes": 39507,
+    "file": "6fff3a8d96__spinner.gif",
+    "sha256": "43bdd7b311c1bbf61b833bdece51e14b34aa392f5a93ed8845d6b30787045f74",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/t/170/assets/theme.js?v=162086783790988692101739416591": {
+    "bytes": 172503,
+    "file": "86d5827122__theme.js",
+    "sha256": "99a0b346f45f2034ea845c1791a95591bd241d2fe6526fe04059f81ac1f16c71",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shop/t/170/assets/vendor.js?v=174357195950707206411739416591": {
+    "bytes": 161152,
+    "file": "bd9d65ec0a__vendor.js",
+    "sha256": "fa1912caad349d402b67c281cdcffc8b2f791201212d4233824a97e4e12aad16",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shopifycloud/perf-kit/shopify-perf-kit-3.7.0.min.js": {
+    "bytes": 67660,
+    "file": "ed6f38af4d__shopify-perf-kit-3.7.0.min.js",
+    "sha256": "404fb615bf75c7e7cc72eb847b739af092572f69be35a51dc8b5286de0f8bc45",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shopifycloud/portable-wallets/latest/accelerated-checkout-backwards-compat.css": {
+    "bytes": 13851,
+    "file": "2137076332__accelerated-checkout-backwards-compat.css",
+    "sha256": "d069cde955914030ed97a20f60bf6802d3141b8881494652ab70dccee5385cd4",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shopifycloud/portable-wallets/latest/portable-wallets.en.js": {
+    "bytes": 400421,
+    "file": "cedd0bd4b3__portable-wallets.en.js",
+    "sha256": "e8e26d32743c4bd1fb0f89f8d8d437ae9d3858e4c968c4f4e7e221602cebaf6c",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shopifycloud/privacy-banner/storefront-banner.js": {
+    "bytes": 81100,
+    "file": "0759569798__storefront-banner.js",
+    "sha256": "243a10706ddf4bfcecc4181074572946470c730ed92bea8c0ae6f762302dde1b",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shopifycloud/shop-js/modules/v2/loader.init-shop-cart-sync.en.esm.js": {
+    "bytes": 884,
+    "file": "40c3cfc4ad__loader.init-shop-cart-sync.en.esm.js",
+    "sha256": "a7a5ba03b8a3f66c495cde3c614039cecf6e55279b2a511523d5b5a9bc69b238",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shopifycloud/storefront/assets/no-image-2048-a2addb12_480x.gif": {
+    "bytes": 4132,
+    "file": "15f2ca18c4__no-image-2048-a2addb12_480x.gif",
+    "sha256": "444d4e4cc36aa254fb2961eef572165fab8b4f4f9504046746242224e94912c8",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shopifycloud/storefront/assets/no-image-2048-a2addb12_720x.gif": {
+    "bytes": 6636,
+    "file": "b29ee862e3__no-image-2048-a2addb12_720x.gif",
+    "sha256": "4077d471474bed107e0aa2cb52d073e1770f111c2914b5676f39550fd23c32ad",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shopifycloud/storefront/assets/no-image-50-e6fb86f4_1x1.gif": {
+    "bytes": 134,
+    "file": "18683715c9__no-image-50-e6fb86f4_1x1.gif",
+    "sha256": "7816d4d6fd358e3cd1bafea16f5ca21049448678791422fac566acbc689c958c",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shopifycloud/storefront/assets/shop_events_listener-4e26a9ce.js": {
+    "bytes": 13482,
+    "file": "ebc42fccf1__shop_events_listener-4e26a9ce.js",
+    "sha256": "1d3ecda47a1526c73eb21d5909875b2d7008eede49702d4dabcece4cfe3f1f6f",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shopifycloud/storefront/assets/shopify_pay/storefront-bf1cdb70.js?v=20250812": {
+    "bytes": 81128,
+    "file": "b57bb780cc__storefront-bf1cdb70.js",
+    "sha256": "980855df0a0679fedd1d8a28c511f1233a808b2458a039f0a78a3646a5cd46e3",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shopifycloud/storefront/assets/storefront/autosizes-84416378.js": {
+    "bytes": 3327,
+    "file": "cbff1a4deb__autosizes-84416378.js",
+    "sha256": "fef8d37c118bfbaa23610974bab09b53324ebdd63052b942cff178b861610c72",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/cdn/shopifycloud/storefront/assets/storefront/load_feature-1bd60354.js": {
+    "bytes": 13938,
+    "file": "03f6792c6a__load_feature-1bd60354.js",
+    "sha256": "263a0fa7965f075b1202ce5241aa25d71d4682fbde33e060991cf20dec489c44",
+    "status": 200
+  },
+  "https://jamiekay.co.nz/checkouts/internal/preloads.js?locale=en-NZ&default_configuration_id=2168586349": {
+    "bytes": 10416,
+    "file": "f424bd5cc5__preloads.js",
+    "sha256": "50a2285cb245fda5815dac67c55060dfeab4f78bcb794b3ceb40bf91d0460d43",
+    "status": 200
+  },
+  "https://shop.app/checkouts/internal/preloads.js?locale=en-NZ&default_configuration_id=2168586349&shop_id=13744477": {
+    "bytes": 0,
+    "file": "1b3ceb62be__preloads.js",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "status": 200
+  },
+  "https://static.klaviyo.com/onsite/js/N6JGSE/klaviyo.js?company_id=N6JGSE": {
+    "bytes": 19265,
+    "file": "a0118bb106__klaviyo.js",
+    "sha256": "5febd983a94198b17664205c703f00850281debf20583c9f3394bfbe30e36b66",
+    "status": 200
+  },
+  "https://swymv3free-01.azureedge.net/code/swym-shopify.js": {
+    "bytes": 332084,
+    "file": "797b896153__swym-shopify.js",
+    "sha256": "473d6cda4b936a8dca83ef24d6a4892d5b837b24766e7834ba23cdb4f38ddbb0",
+    "status": 200
+  },
+  "https://www.googletagmanager.com/gtm.js?id=": {
+    "error": "HTTP Error 400: Bad Request",
+    "file": null,
+    "status": 400
+  },
+  "https://www.laybuy.com/assets/laybuy-logo-small.svg": {
+    "bytes": 635424,
+    "file": "82700317cc__laybuy-logo-small.svg",
+    "sha256": "8d0b52bd23cb05b729756bb2bf00542bf1568beb88a1b13653be19e33860c47d",
+    "status": 200
+  }
+}

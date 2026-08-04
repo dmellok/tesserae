@@ -1,0 +1,2 @@
+# Full image bytes (109 MB) are intentionally not committed; their sha256
+# hashes live in baseline/manifest.json, and they are re-fetched at diff time.

@@ -1,0 +1,3 @@
+# Preserve captured bytes exactly — no line-ending normalization on snapshot data.
+baseline/** -text
+tools/** text=auto

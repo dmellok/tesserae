@@ -1,0 +1,39 @@
+HTTP/1.1 200 Connection Established
+
+HTTP/2 103 
+link: <https://cdn.shopify.com>; rel=preconnect, <https://cdn.shopify.com>; crossorigin; rel=preconnect, <//jamiekay.co.nz/cdn/shop/t/170/assets/font-settings.css?v=167600522589579140081779668771>; as=style; rel=preload, <//jamiekay.co.nz/cdn/shop/t/170/assets/custom.css?v=159503836227558626611782719853>; as=style; rel=preload, <https://jamiekay.co.nz/cdn/shopifycloud/portable-wallets/latest/accelerated-checkout-backwards-compat.css>; as=style; crossorigin; rel=preload
+
+HTTP/2 200 
+date: Tue, 04 Aug 2026 20:51:45 GMT
+content-type: text/html; charset=utf-8
+x-dc: gcp-us-east1,gcp-us-east1,gcp-us-east1
+cf-cache-status: DYNAMIC
+set-cookie: localization=NZ; path=/; expires=Wed, 04 Aug 2027 20:51:45 GMT; secure; SameSite=None
+set-cookie: cart_currency=NZD; path=/; expires=Tue, 18 Aug 2026 20:51:45 GMT; secure; SameSite=None
+set-cookie: _shopify_y=dd1b03ad-90d2-4fd8-a511-51b00e2c8ed3; domain=jamiekay.co.nz; path=/; expires=Thu, 05 Aug 2027 02:51:45 GMT; SameSite=Lax
+set-cookie: _shopify_s=2032b811-f5db-4d0b-b618-84d769b62020; domain=jamiekay.co.nz; path=/; expires=Tue, 04 Aug 2026 21:21:45 GMT; SameSite=Lax
+set-cookie: _shopify_essential=:AZ_Oi-3gAAEAumG0SmoGOehOzhzpqcRtmRyLWQ_OBoH18Bg7o3q3oiegbmCUTSWCRR-PVIx5dPGZIfnUjUWLIQ0PHHDi90djYN2-pPxhu6QvizYghzvVNsWdm_RxpyIbRyIogUwr2TLDOnqAK7h8gvyBhhNWSosiVb1ACpH8CpnoxiRcYGZfQoqRahlnVJOeK1RTp5RkRPyC9-rO-N-LXRl6mjHxxXXdvHb67Fqk1ZkfB7kJP35DF3qjYhyiQ-l13LajAikJWSzsPgkmbXxpptdYiXLfPIcc3xwKL_9z4V1JfcdPd4OaG6o4_fWh25_BYTvvQSJT_8sAqSYYscshZoDdW7kMzhtg8KwM9aXDwUkC_Op9zSf41FEitd3yWJygeeL4X1bXzmyAi5qxbQsiFNoTILC0PjzC_QQ-KA2uneg1cLJU7DCSpUAZz00n40NdW59V2aiEDx4kEZ0oEAVwMUB4l5BoDlm4Aqzk41dnUXD5XBB_:; Max-Age=31536000; Path=/; HttpOnly; Secure; Priority=High; SameSite=None
+set-cookie: _shopify_analytics=:AZ_Oi_AYAAEAtewQh02xh2LDo9Av2tIJoUlwI7YpvKG_-6H7j5cGJGSrjO9JKJFFriO9XYEF87Xj67mAO_dpYem9C10SQk1yZejG:; Max-Age=31536000; Path=/; HttpOnly; Secure; Priority=High; SameSite=None
+set-cookie: _shopify_marketing=:AZ_Oi_AYAAEACahfh8rq3Yx-58REfVNBRZ1rfpFJm4Z31FdSSLcMITPjBF7s4qHwQVB5vTztamM31_fIXMLMcN7U:; Max-Age=31536000; Path=/; HttpOnly; Secure; Priority=High; SameSite=None
+link: <https://cdn.shopify.com>; rel="preconnect", <https://cdn.shopify.com>; rel="preconnect"; crossorigin, <//jamiekay.co.nz/cdn/shop/t/170/assets/font-settings.css?v=167600522589579140081779668771>; as="style"; rel="preload", <//jamiekay.co.nz/cdn/shop/t/170/assets/custom.css?v=159503836227558626611782719853>; as="style"; rel="preload", <https://jamiekay.co.nz/cdn/shopifycloud/portable-wallets/latest/accelerated-checkout-backwards-compat.css>; as="style"; rel="preload"; crossorigin
+report-to: {"group":"cf-nel","max_age":604800,"endpoints":[{"url":"https://a.nel.cloudflare.com/report/v4?s=bPgLX%2BFa8szJc8nVzjEunGe23V0LwNumA80kYPDZCeW2SjjUCe%2FNYMrFAfH0Fh076M3Rpy9qDfIwefXnZPVZ0fqvRT0AjzRlujPXqhFRS1OqkzvT7BLHfKuc24eEbhfL"}]}
+x-content-type-options: nosniff
+nel: {"report_to":"cf-nel","success_fraction":0.01,"max_age":604800}
+shopify-complexity-score: 581
+shopify-complexity-score-v2: 581
+content-security-policy: block-all-mixed-content; frame-ancestors *; upgrade-insecure-requests;
+strict-transport-security: max-age=7889238
+vary: Accept
+vary: accept-encoding
+alt-svc: h3=":443"; ma=86400
+content-language: en-NZ
+powered-by: Shopify
+server-timing: processing;dur=587;desc="gc:34", db;dur=116, render;dur=308, asn;desc="396982", edge;desc="IAD", country;desc="US", theme;desc="131728081005", pageType;desc="index", servedBy;desc="9ldm", requestID;desc="bbca1e9f-aab6-4d2b-bf46-a7defed7f629-1785876704", _y;desc="dd1b03ad-90d2-4fd8-a511-51b00e2c8ed3", _s;desc="2032b811-f5db-4d0b-b618-84d769b62020", _cmp;desc="3.AMPS_US_f_f_Xfl0C4iwSDu1T5UbUR70mQ", compressionLevel;desc="5", compressionTime;dur=51.576, earlyhints
+x-download-options: noopen
+x-permitted-cross-domain-policies: none
+server: cloudflare
+x-xss-protection: 1; mode=block
+x-request-id: bbca1e9f-aab6-4d2b-bf46-a7defed7f629-1785876704
+etag: W/"page_cache:13744477:IndexController:389be52986955ec48b933810397571e8"
+cf-ray: a260711c4a17e10e-IAD
+
