@@ -126,13 +126,12 @@
 {% for g in groups %}
 <section class="dk-group"{% if g.id %} id="display-{{ g.id }}"{% endif %}>
   <header class="dk-group-head">
-    <span class="dk-group-icon" aria-hidden="true"><i class="ph {% if g.id %}ph-monitor{% else %}ph-plugs{% endif %}"></i></span>
+    <span class="dk-group-icon" aria-hidden="true"><i class="ph ph-{{ g.icon }}"></i></span>
     <h2 class="dk-group-name">{{ g.name }}</h2>
     {% if g.showing %}
     <span class="dk-group-live"><span class="dk-live-dot" aria-hidden="true"></span>showing {{ g.showing }}</span>
     {% endif %}
   </header>
-  {% if g.cards %}
   <div class="dk-rows">
     {% for c in g.cards %}
     {# A row targeting several displays repeats per section; only its first
@@ -142,12 +141,6 @@
     {{ dk_row(c, first_here) }}
     {% endfor %}
   </div>
-  {% else %}
-  <p class="dk-group-empty">
-    Nothing lined up for this display yet.
-    <button type="button" class="dk-inline-link" data-open-timed-wizard>Set it up</button>
-  </p>
-  {% endif %}
 </section>
 {% endfor %}
 {% else %}
