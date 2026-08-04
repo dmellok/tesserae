@@ -6,6 +6,39 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.259.0], 2026-08-04
+
+### Changed
+
+- **Decks are now Lineups** (#167). The page is renamed and regrouped
+  per display: each display with something lined up gets its own section
+  with a live-status header, the device's configured icon, and device
+  chips on every row; displays with nothing lined up don't appear. Kind
+  labels are now Rotation and Schedule, enable and delete sit behind an
+  overflow menu, and the standalone new-deck, new-timed-send and
+  new-timer-cycle buttons are gone: the setup wizard, with deck
+  suggestions folded in as its intro screen, is the sole entry point.
+  The stored records, MCP tools, and REST envelope are unchanged.
+
+### Changed
+
+- **The display setup wizard is a three-step flow.** Behaviour, then
+  details (or pages), then a plain-language review, then a created
+  screen. It submits through the existing create endpoints in the
+  background so it can stay on the created screen, and the deck path
+  hands off to the deck editor with the new id. Step blocks now hide
+  properly per behaviour (previously every behaviour showed all of
+  step 2's fields).
+
+### Added
+
+- **4-level grayscale on the Xteink X3.** A new `xteink_x3_gray` device
+  kind matches CrossInk's default grayscale build: the same panel block
+  as `xteink_x3` with the renderer overridden to the 2-bpp
+  `esp32_gray2_bin` frame (gray_4 gamut), so an X3 running that build
+  resolves and pairs. Marked unverified until a frame renders on real
+  hardware.
+
 ### Changed
 
 - **The Decks page got its designed look.** Implemented from a design
