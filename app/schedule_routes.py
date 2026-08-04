@@ -24,6 +24,7 @@ from flask import (
     Flask,
     current_app,
     flash,
+    jsonify,
     redirect,
     request,
     url_for,
@@ -480,20 +481,38 @@ def _smart_sync_states(schedules: list[Schedule], pages: list[Any]) -> dict[str,
     return out
 
 
+def _json_error(msg: str) -> Response:
+    resp = jsonify({"ok": False, "error": msg})
+    resp.status_code = 400
+    return resp
+
+
 @bp.post("/new")
 def create() -> Response:
+    # The setup wizard submits with respond=json (fetch) so it can stay on
+    # its created screen instead of following the redirect.
+    wants_json = request.form.get("respond") == "json"
     try:
         schedule = _parse_form(request.form)
     except ValidationError as exc:
-        flash(f"Invalid schedule: {_first_error(exc)}", "error")
+        msg = f"Invalid schedule: {_first_error(exc)}"
+        if wants_json:
+            return _json_error(msg)
+        flash(msg, "error")
         return redirect(url_for("schedules.index"))
     if not _ID_RE.match(schedule.id):
-        flash(f"Bad id {schedule.id!r} (snake_case only).", "error")
+        msg = f"Bad id {schedule.id!r} (snake_case only)."
+        if wants_json:
+            return _json_error(msg)
+        flash(msg, "error")
         return redirect(url_for("schedules.index"))
     _store().upsert(schedule)
     flash(f"Schedule {schedule.name!r} saved.", "ok")
     # Land on the unified list with the new card highlighted (#167).
-    return redirect(url_for("decks.index", hl=schedule.id) + f"#udeck-{schedule.id}")
+    url = url_for("decks.index", hl=schedule.id) + f"#udeck-{schedule.id}"
+    if wants_json:
+        return jsonify({"ok": True, "id": schedule.id, "url": url})
+    return redirect(url)
 
 
 @bp.post("/<schedule_id>/update")

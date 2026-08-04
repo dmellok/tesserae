@@ -25,6 +25,7 @@ from flask import (
     Flask,
     current_app,
     flash,
+    jsonify,
     redirect,
     request,
     url_for,
@@ -363,20 +364,38 @@ def index() -> Response:
     return redirect(url_for("decks.index"))
 
 
+def _json_error(msg: str) -> Response:
+    resp = jsonify({"ok": False, "error": msg})
+    resp.status_code = 400
+    return resp
+
+
 @bp.post("/new")
 def create() -> Response:
+    # The setup wizard submits with respond=json (fetch) so it can stay on
+    # its created screen instead of following the redirect.
+    wants_json = request.form.get("respond") == "json"
     try:
         rotation = _parse_form(request.form)
     except ValidationError as exc:
-        flash(f"Invalid rotation: {_first_error(exc)}", "error")
+        msg = f"Invalid rotation: {_first_error(exc)}"
+        if wants_json:
+            return _json_error(msg)
+        flash(msg, "error")
         return redirect(url_for("rotations.index"))
     if not _ID_RE.match(rotation.id):
-        flash(f"Bad id {rotation.id!r} (snake_case only).", "error")
+        msg = f"Bad id {rotation.id!r} (snake_case only)."
+        if wants_json:
+            return _json_error(msg)
+        flash(msg, "error")
         return redirect(url_for("rotations.index"))
     _store().upsert(rotation)
     flash(f"Rotation {rotation.name!r} saved.", "ok")
     # Land on the unified list with the new card highlighted (#167).
-    return redirect(url_for("decks.index", hl=rotation.id) + f"#udeck-{rotation.id}")
+    url = url_for("decks.index", hl=rotation.id) + f"#udeck-{rotation.id}"
+    if wants_json:
+        return jsonify({"ok": True, "id": rotation.id, "url": url})
+    return redirect(url)
 
 
 @bp.post("/<rotation_id>/update")

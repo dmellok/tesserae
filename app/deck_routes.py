@@ -20,6 +20,7 @@ from flask import (
     Flask,
     current_app,
     flash,
+    jsonify,
     redirect,
     render_template,
     request,
@@ -472,22 +473,43 @@ def index() -> str:
     )
 
 
+def _json_error(msg: str) -> Response:
+    resp = jsonify({"ok": False, "error": msg})
+    resp.status_code = 400
+    return resp
+
+
 @bp.post("/new")
 def create() -> Response:
+    # The setup wizard submits with respond=json (fetch) so it can stay on
+    # its created screen and hand off to the editor with the new deck id.
+    wants_json = request.form.get("respond") == "json"
     try:
         deck = _parse_form(request.form)
     except (ValidationError, ValueError) as exc:
-        flash(
-            f"Invalid deck: {_first_error(exc) if isinstance(exc, ValidationError) else exc}",
-            "error",
-        )
+        msg = f"Invalid deck: {_first_error(exc) if isinstance(exc, ValidationError) else exc}"
+        if wants_json:
+            return _json_error(msg)
+        flash(msg, "error")
         return redirect(url_for("decks.index"))
     if not _ID_RE.match(deck.id):
-        flash(f"Bad id {deck.id!r} (snake_case only).", "error")
+        msg = f"Bad id {deck.id!r} (snake_case only)."
+        if wants_json:
+            return _json_error(msg)
+        flash(msg, "error")
         return redirect(url_for("decks.index"))
     _store().upsert(deck)
     _invalidate(deck)
     flash(f"Deck {deck.name!r} saved.", "ok")
+    if wants_json:
+        return jsonify(
+            {
+                "ok": True,
+                "id": deck.id,
+                "url": url_for("decks.index") + f"#deck-{deck.id}",
+                "editor_url": url_for("decks.editor", deck_id=deck.id),
+            }
+        )
     return redirect(url_for("decks.index") + f"#deck-{deck.id}")
 
 
