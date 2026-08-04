@@ -1,8 +1,12 @@
 """esp32_gray2_bin renderer.
 
 Composition PNG -> 4-level grayscale dither -> raw 2-bpp packed buffer
-for UC8179-class mono e-paper panels driven in their 4-gray waveform
-mode (the Seeed reTerminal E1001's 7.5" 800x480 EP75 in particular).
+for mono e-paper panels driven in their 4-gray waveform mode. Written
+against UC8179-class controllers (the Seeed reTerminal E1001's 7.5"
+800x480 EP75 in particular), but the buffer itself is
+controller-agnostic: it carries pixel levels only, and the client
+expands them into whatever plane sequence its controller wants (the
+Xteink X3's UC8253/UC8279d consume the same format).
 Published retained to ``tesserae/<device_id>/frame/bin`` so a
 freshly-woken client sees the current frame on first wake.
 
