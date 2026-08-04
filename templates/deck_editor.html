@@ -31,7 +31,8 @@
     </div>
 
     <div class="dxe-body">
-      {# ---- Left: flip order ---- #}
+      {# ---- Left: flip order + tuning ---- #}
+      <div class="dxe-main-col">
       <section class="dxe-card dxe-main">
         <div class="dxe-main-head">
           <h2 class="dxe-h2">Flip order</h2>
@@ -61,9 +62,45 @@
           <span class="dxe-adv-hint" id="dxe-adv-hint"></span>
         </div>
 
+        <div class="dxe-rail" id="dxe-rail"></div>
+        <div class="dxe-panel" id="dxe-panel" hidden></div>
+
+        {# No-JS source of truth for per-page data. JS hides this. #}
+        <fieldset class="dxe-fallback" id="dxe-fallback">
+          <legend>Deck pages</legend>
+          {% for p in page_meta %}
+          {% set idx = member_ids.index(p.id) if p.id in member_ids else none %}
+          <div class="dxe-fb-row" data-page="{{ p.id }}">
+            <label><input type="checkbox" name="member" value="{{ p.id }}"
+                     {% if p.id in member_ids %}checked{% endif %}> {{ p.name }}</label>
+            <input type="number" name="order[{{ p.id }}]" min="1" max="99"
+                   value="{{ (idx + 1) if idx is not none else loop.index }}" aria-label="Position">
+            <label><input type="radio" name="home" value="{{ p.id }}"
+                     {% if home_id == p.id %}checked{% endif %}> home</label>
+            <select name="override[{{ p.id }}]" aria-label="Refresh override">
+              {% set ov = override_map.get(p.id) %}
+              <option value="">deck default</option>
+              <option value="5" {% if ov == 5 %}selected{% endif %}>every 5 min</option>
+              <option value="30" {% if ov == 30 %}selected{% endif %}>every 30 min</option>
+              <option value="0" {% if ov == 0 %}selected{% endif %}>never</option>
+            </select>
+            <input type="number" name="dwell[{{ p.id }}]" min="1" max="10080"
+                   value="{{ dwell_map.get(p.id, '') }}" placeholder="dwell" aria-label="Dwell minutes">
+          </div>
+          {% endfor %}
+        </fieldset>
+      </section>
+
+      {# ---- Tuning card: timing + conditions folds, below the pages ---- #}
+      <section class="dxe-card dxe-tuning">
         {# Advanced timing (rotation parity): only meaningful when auto-advancing. #}
-        <details class="dxe-adv-more" id="dxe-adv-more">
-          <summary>Advanced timing</summary>
+        <details class="dxe-fold" id="dxe-adv-more">
+          <summary>
+            <i class="ph-bold ph-caret-right dxe-fold-caret" aria-hidden="true"></i>
+            <i class="ph-bold ph-clock-countdown" aria-hidden="true"></i>
+            <span>Advanced timing</span>
+            <span class="dxe-fold-hint">days · start/stop · priority · smart sync</span>
+          </summary>
           <div class="dxe-adv-grid">
             <div class="dxe-set">
               <span class="dxe-mono-label">DAYS</span>
@@ -125,8 +162,19 @@
            authored now that the cycle form is gone. Rendered for saved decks;
            a brand-new deck saves first, then conditions appear here. #}
         {% if deck and deck.pages %}
-        <details class="dxe-advanced">
-          <summary>Page conditions</summary>
+        {% set conditioned = deck.pages | selectattr('conditions') | list | length %}
+        <details class="dxe-fold" id="dxe-conditions"
+                 {% if request.args.get('open') == 'conditions' %}open{% endif %}>
+          <summary>
+            <i class="ph-bold ph-caret-right dxe-fold-caret" aria-hidden="true"></i>
+            <i class="ph-bold ph-funnel" aria-hidden="true"></i>
+            <span>Page conditions</span>
+            <span class="dxe-fold-hint">
+              {%- if conditioned -%}{{ conditioned }} of {{ deck.pages | length }} page{{ 's' if deck.pages | length != 1 }} conditioned
+              {%- else -%}none set
+              {%- endif -%}
+            </span>
+          </summary>
           <div class="dxe-advanced-body">
             <p class="dxe-help">Show a page only while its conditions pass. In
               scheduled mode the cycle skips a failing page; in priority mode
@@ -142,36 +190,12 @@
             {% endfor %}
           </div>
         </details>
+        {% else %}
+        <p class="dxe-help dxe-tuning-hint">Save the deck first, then page
+          conditions appear here.</p>
         {% endif %}
-
-        <div class="dxe-rail" id="dxe-rail"></div>
-        <div class="dxe-panel" id="dxe-panel" hidden></div>
-
-        {# No-JS source of truth for per-page data. JS hides this. #}
-        <fieldset class="dxe-fallback" id="dxe-fallback">
-          <legend>Deck pages</legend>
-          {% for p in page_meta %}
-          {% set idx = member_ids.index(p.id) if p.id in member_ids else none %}
-          <div class="dxe-fb-row" data-page="{{ p.id }}">
-            <label><input type="checkbox" name="member" value="{{ p.id }}"
-                     {% if p.id in member_ids %}checked{% endif %}> {{ p.name }}</label>
-            <input type="number" name="order[{{ p.id }}]" min="1" max="99"
-                   value="{{ (idx + 1) if idx is not none else loop.index }}" aria-label="Position">
-            <label><input type="radio" name="home" value="{{ p.id }}"
-                     {% if home_id == p.id %}checked{% endif %}> home</label>
-            <select name="override[{{ p.id }}]" aria-label="Refresh override">
-              {% set ov = override_map.get(p.id) %}
-              <option value="">deck default</option>
-              <option value="5" {% if ov == 5 %}selected{% endif %}>every 5 min</option>
-              <option value="30" {% if ov == 30 %}selected{% endif %}>every 30 min</option>
-              <option value="0" {% if ov == 0 %}selected{% endif %}>never</option>
-            </select>
-            <input type="number" name="dwell[{{ p.id }}]" min="1" max="10080"
-                   value="{{ dwell_map.get(p.id, '') }}" placeholder="dwell" aria-label="Dwell minutes">
-          </div>
-          {% endfor %}
-        </fieldset>
       </section>
+      </div>
 
       {# ---- Right rail ---- #}
       <aside class="dxe-rail-col">
@@ -239,7 +263,8 @@
         <button type="submit" class="dxe-btn-ghost dxe-btn-danger">Delete</button>
       </form>
       {% endif %}
-      <button type="button" class="dxe-btn-ghost" id="dxe-discard">Discard</button>
+      <button type="button" class="dxe-btn-ghost" id="dxe-discard"
+              data-lineups-url="{{ url_for('decks.index') }}">Discard</button>
       <button type="submit" class="dxe-btn-primary" form="deck-form">Save deck</button>
     </div>
   </div>

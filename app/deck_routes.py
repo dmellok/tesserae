@@ -983,7 +983,8 @@ def editor_save() -> Response:
                 _pages().save(page.model_copy(update={"device_ids": [display]}))
     _invalidate(deck)
     flash(f"Deck {deck.name!r} saved.", "ok")
-    return redirect(url_for("decks.editor", deck_id=deck.id))
+    # Every editor exit lands back on Lineups, highlighting the saved row.
+    return redirect(url_for("decks.index", hl=deck.id) + f"#udeck-{deck.id}")
 
 
 @bp.post("/<deck_id>/step")

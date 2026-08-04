@@ -408,9 +408,24 @@
   if (cadenceRange) cadenceRange.addEventListener("input", () => { syncCadence(cadenceRange); markDirty(); });
   if (cadenceNum) cadenceNum.addEventListener("input", () => { syncCadence(cadenceNum); markDirty(); });
   if (cadenceNum) syncCadence(cadenceNum);
+  // Discard = leave without saving; every bottom action lands on Lineups.
   const discard = el("dxe-discard");
-  if (discard) discard.addEventListener("click", () => window.location.reload());
+  if (discard) {
+    discard.addEventListener("click", () => {
+      window.location.assign(discard.dataset.lineupsUrl || "/decks");
+    });
+  }
   form.addEventListener("submit", () => (pagesField.value = orderedIds().join(",")));
+
+  // The wizard's "Create and open the editor" escape lands here with
+  // ?open=conditions; the fold is server-rendered open, bring it into view.
+  if (new URLSearchParams(window.location.search).get("open") === "conditions") {
+    const cond = el("dxe-conditions");
+    if (cond) {
+      cond.open = true;
+      cond.scrollIntoView({ block: "center" });
+    }
+  }
 
   render();
 })();

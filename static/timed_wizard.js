@@ -459,7 +459,7 @@
         if (state.openEditor && editorUrl) {
           state.handed = true;
           render(false);
-          window.location.assign(editorUrl);
+          window.location.assign(editorUrl + '?open=conditions');
           return;
         }
         state.step = 3;
