@@ -1,16 +1,33 @@
 #!/usr/bin/env python3
 """Resumable, throttled full-site crawler.
 
-Fetches every URL in urls.txt, stores gzipped HTML under pages/, and appends a
+Fetches every URL in urls.txt, stores raw HTML under pages_raw/, and appends a
 record to manifest.jsonl: {url, file, bytes, sha256, status}. Resumable: URLs
 already present in manifest.jsonl (status 200) are skipped. Backs off on rate
 limiting / connection resets so it stays under the proxy limiter.
+
+Set CB=1 in the environment on a re-crawl to cache-bust (see below), so a stale
+cached page cannot hide a real change.
 """
 import os, sys, json, time, hashlib, threading, urllib.request, urllib.error
 from concurrent.futures import ThreadPoolExecutor
 
 UA = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
                     "(KHTML, like Gecko) Chrome/120 Safari/537.36"}
+
+# Cache-busting: set CB=1 to defeat Shopify page_cache / any CDN edge cache on a
+# re-crawl, so a stale copy can't masquerade as "no change". Each request gets a
+# unique ?cb= param (fresh cache key) plus no-cache headers; the manifest is
+# still keyed by the CLEAN url so it compares against the baseline.
+CACHE_BUST = os.environ.get("CB") == "1"
+if CACHE_BUST:
+    UA = dict(UA, **{"Cache-Control": "no-cache", "Pragma": "no-cache"})
+
+def bust(url):
+    if not CACHE_BUST:
+        return url
+    token = os.urandom(8).hex()
+    return url + ("&" if "?" in url else "?") + "cb=" + token
 OUT = "pages_raw"
 MANIFEST = "manifest.jsonl"
 PROGRESS = "progress.txt"
@@ -47,7 +64,7 @@ def fetch(url):
     delay = 2.0
     for attempt in range(1, MAX_RETRIES + 1):
         try:
-            req = urllib.request.Request(url, headers=UA)
+            req = urllib.request.Request(bust(url), headers=UA)
             with urllib.request.urlopen(req, timeout=60) as r:
                 return r.read(), r.status
         except urllib.error.HTTPError as e:
