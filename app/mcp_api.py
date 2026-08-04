@@ -1129,6 +1129,7 @@ def _drift_conflict(page: Any) -> Response | None:
 
 def _save_mcp(page: Any) -> None:
     """Stamp the page as MCP-written and persist it."""
+    _pr._coerce_canvas_update_policy(page)
     _pr._stamp(page, "mcp")
     _pr._pages().save(page)
 

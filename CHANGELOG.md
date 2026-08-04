@@ -6,6 +6,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added
+
+- **Widgets can declare opt-in data-change updates.** A widget manifest may
+  expose strict `updates.on_change` source declarations, optionally narrowed
+  by a declared `selector_option`. Grid cells and Canvas widget elements now
+  persist an independent `update_on_change` policy (off by default), and their
+  editors surface the switch only for capable widgets. This stage defines the
+  placement contract only; data-change delivery remains separate.
+
 ## [0.259.0], 2026-08-04
 
 ### Changed

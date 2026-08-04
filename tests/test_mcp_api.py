@@ -448,6 +448,45 @@ def test_create_get_set_roundtrip(app: Flask) -> None:
     assert entry["created_by"] == "mcp" and entry["elements"] == 1
 
 
+def test_mcp_canvas_enforces_update_on_change_capability(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _enable(app)
+    weather = app.config["PLUGIN_REGISTRY"].get("weather_now")
+    assert weather is not None
+    monkeypatch.setitem(
+        weather.manifest,
+        "updates",
+        {"on_change": [{"source": "test.weather"}]},
+    )
+    client = app.test_client()
+    pid = _create_page(client)
+    resp = client.put(
+        f"/api/mcp/pages/{pid}/canvas",
+        json={
+            "els": [
+                {"id": "capable", "widget": "weather_now", "update_on_change": True},
+                {"id": "unsupported", "widget": "clock_analog", "update_on_change": True},
+            ]
+        },
+    )
+    assert resp.status_code == 200
+    doc = client.get(f"/api/mcp/pages/{pid}/canvas").get_json()
+    by_id = {element["id"]: element for element in doc["els"]}
+    assert by_id["capable"]["update_on_change"] is True
+    assert by_id["unsupported"]["update_on_change"] is False
+
+    # A partial MCP widget swap cannot carry the old widget's opt-in forward.
+    resp = client.patch(
+        f"/api/mcp/pages/{pid}/elements/capable",
+        json={"widget": "clock_analog"},
+    )
+    assert resp.status_code == 200
+    doc = client.get(f"/api/mcp/pages/{pid}/canvas").get_json()
+    swapped = next(element for element in doc["els"] if element["id"] == "capable")
+    assert swapped["update_on_change"] is False
+
+
 def test_code_element_sources_a_service(app: Flask) -> None:
     # End-to-end: a code element names a service (rest_service) as a source, and
     # the composer resolves it through the same path a widget uses, injecting the

@@ -147,6 +147,38 @@
         "needs_network": { "type": "boolean" }
       }
     },
+    "updates": {
+      "type": "object",
+      "description": "Declares data-change events this widget can subscribe to. The declaration only makes the per-placement opt-in available; it never refreshes a dashboard by itself.",
+      "required": ["on_change"],
+      "additionalProperties": false,
+      "properties": {
+        "on_change": {
+          "type": "array",
+          "description": "Data sources that may refresh an opted-in placement. selector_option optionally narrows an event to the placement's selected cell option value.",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "required": ["source"],
+            "additionalProperties": false,
+            "properties": {
+              "source": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_.-]*$",
+                "description": "Stable server data-change source id, for example personal_data.reminders."
+              },
+              "selector_option": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "description": "Optional cell_options name whose saved value narrows the dependency, for example list_id."
+              }
+            }
+          }
+        }
+      }
+    },
     "design": {
       "type": "object",
       "description": "Design-system intent. Default for every field is the strict, palette-safe behaviour; opt-in values signal a widget is using a richer surface and accepts the downstream trade-offs.",
@@ -194,6 +226,11 @@
       "description": "Placeable widgets must declare at least one size; non-placeable kinds (service, data, font, admin) may leave supports.sizes empty.",
       "if": { "properties": { "kind": { "const": "widget" } } },
       "then": { "properties": { "supports": { "properties": { "sizes": { "minItems": 1 } } } } }
+    },
+    {
+      "description": "Only placeable widgets may declare data-change update capabilities.",
+      "if": { "required": ["updates"] },
+      "then": { "properties": { "kind": { "const": "widget" } } }
     }
   ]
 }

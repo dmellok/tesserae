@@ -237,10 +237,22 @@ def test_fragments_of_declared_and_implicit_full() -> None:
 
 
 def test_catalog_entry_shape() -> None:
-    p = _FakePlugin("w", {"name": "W", "icon": "ph-x", "description": "d"})
+    p = _FakePlugin(
+        "w",
+        {
+            "name": "W",
+            "icon": "ph-x",
+            "description": "d",
+            "updates": {"on_change": [{"source": "personal_data.reminders"}]},
+        },
+    )
     entry = catalog_entry(p)  # type: ignore[arg-type]
     assert entry["key"] == "w" and entry["icon"] == "ph-x"
     assert [f["id"] for f in entry["fragments"]] == ["full"]
+    assert entry["updates_on_change"] is True
+
+    plain = catalog_entry(_FakePlugin("plain", {"name": "Plain"}))  # type: ignore[arg-type]
+    assert plain["updates_on_change"] is False
 
 
 def test_build_catalog_sorts_by_name() -> None:
@@ -268,6 +280,7 @@ def test_element_defaults_and_roundtrip(tmp_path: Path) -> None:
                 widget="weather_now",
                 fragment="temp",
                 options={"units": "metric"},
+                update_on_change=True,
                 x=8,
                 y=8,
                 w=160,
@@ -281,10 +294,12 @@ def test_element_defaults_and_roundtrip(tmp_path: Path) -> None:
     e = reloaded.els[0]
     assert e.widget == "weather_now" and e.fragment == "temp"
     assert e.options["units"] == "metric"
+    assert e.update_on_change is True
     assert e.dither is True and e.visible is True  # defaults
 
     blank = Element(id="e2")
     assert blank.widget == "" and blank.fragment == "full"  # unassigned box
+    assert blank.update_on_change is False
 
 
 def test_decoration_element_roundtrip(tmp_path: Path) -> None:
@@ -609,6 +624,56 @@ def test_save_and_doc_roundtrip(app: Flask, monkeypatch: pytest.MonkeyPatch) -> 
     assert resp.status_code == 200 and resp.get_json()["elements"] == 1
     doc = client.get(f"/pages/canvas/c/{cid}/doc.json").get_json()
     assert doc["name"] == "My Panel" and doc["els"][0]["widget"] == "weather_now"
+
+
+def test_save_coerces_update_on_change_to_manifest_capability(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The save endpoint, not only the editor UI, owns placement policy.
+
+    A capable widget keeps its opt-in. An unsupported widget and a decoration
+    cannot persist meaningless true bits, including after a widget swap that
+    sends the previous placement value back to the server.
+    """
+    monkeypatch.setenv("TESSERAE_EXPERIMENT_COMPOSER", "1")
+    weather = app.config["PLUGIN_REGISTRY"].get("weather_now")
+    assert weather is not None
+    monkeypatch.setitem(
+        weather.manifest,
+        "updates",
+        {"on_change": [{"source": "test.weather"}]},
+    )
+    client = app.test_client()
+    _sign_in(client)
+    cid = client.get("/pages/canvas/").location.rsplit("/", 1)[1]
+    resp = client.post(
+        f"/pages/canvas/c/{cid}/save",
+        json={
+            "els": [
+                {
+                    "id": "capable",
+                    "widget": "weather_now",
+                    "update_on_change": True,
+                },
+                {
+                    "id": "unsupported",
+                    "widget": "clock_analog",
+                    "update_on_change": True,
+                },
+                {
+                    "id": "decoration",
+                    "kind": "line",
+                    "update_on_change": True,
+                },
+            ]
+        },
+    )
+    assert resp.status_code == 200
+    doc = client.get(f"/pages/canvas/c/{cid}/doc.json").get_json()
+    by_id = {element["id"]: element for element in doc["els"]}
+    assert by_id["capable"]["update_on_change"] is True
+    assert by_id["unsupported"]["update_on_change"] is False
+    assert by_id["decoration"]["update_on_change"] is False
 
 
 def test_canvas_management(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
