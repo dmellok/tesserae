@@ -1,3 +1,5 @@
 # Preserve captured bytes exactly — no line-ending normalization on snapshot data.
 baseline/** -text
 tools/** text=auto
+crawl/*.tar.xz binary
+crawl/asset-index.json -text
