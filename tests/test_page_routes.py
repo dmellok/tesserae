@@ -13,7 +13,12 @@ from app.main import create_app
 from app.state.page_store import PageStore
 
 
-def _write_test_plugin(plugin_dir: Path, *, cell_options: list[dict[str, Any]]) -> None:
+def _write_test_plugin(
+    plugin_dir: Path,
+    *,
+    cell_options: list[dict[str, Any]],
+    updates: dict[str, Any] | None = None,
+) -> None:
     """Drop a minimal widget plugin at ``plugin_dir`` for editor tests
     that only need a valid plugin id + cell_option defaults."""
     plugin_dir.mkdir(parents=True)
@@ -25,6 +30,8 @@ def _write_test_plugin(plugin_dir: Path, *, cell_options: list[dict[str, Any]]) 
         "supports": {"sizes": ["sm", "md", "lg"]},
         "cell_options": cell_options,
     }
+    if updates is not None:
+        manifest["updates"] = updates
     (plugin_dir / "plugin.json").write_text(json.dumps(manifest))
     (plugin_dir / "client.js").write_text("export default function () {}\n")
 
@@ -43,6 +50,7 @@ def app(tmp_path: Path) -> Flask:
             {"name": "show_date", "type": "boolean", "label": "Show date", "default": True},
             {"name": "show_seconds", "type": "boolean", "label": "Show seconds", "default": False},
         ],
+        updates={"on_change": [{"source": "test.clock", "selector_option": "format"}]},
     )
     _write_test_plugin(plugins_dir / "widget_b", cell_options=[])
 
@@ -757,6 +765,66 @@ def test_change_plugin_resets_options(app: Flask, tmp_path: Path) -> None:
     assert cell.plugin == "widget_b"
     assert "show_seconds" not in cell.options
     assert "format" not in cell.options
+
+
+def test_update_on_change_is_opt_in_and_resets_on_widget_change(app: Flask, tmp_path: Path) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    pid = _new(client, name="Home", layout="1_cell")
+    cell_id = _store(tmp_path).get(pid).cells[0].id
+
+    # Assigning a capable widget retains the compatibility default: off.
+    client.post(f"/pages/{pid}/cells/{cell_id}", data={"plugin": "widget_a"})
+    assert _store(tmp_path).get(pid).cells[0].update_on_change is False
+
+    # The complete editor form can enable and explicitly disable the policy.
+    client.post(
+        f"/pages/{pid}/cells/{cell_id}",
+        data={
+            "plugin": "widget_a",
+            "update_on_change_present": "1",
+            "update_on_change": "1",
+        },
+    )
+    assert _store(tmp_path).get(pid).cells[0].update_on_change is True
+    client.post(
+        f"/pages/{pid}/cells/{cell_id}",
+        data={"plugin": "widget_a", "update_on_change_present": "1"},
+    )
+    assert _store(tmp_path).get(pid).cells[0].update_on_change is False
+
+    # Partial autosaves do not carry the checkbox marker and must preserve it.
+    client.post(
+        f"/pages/{pid}/cells/{cell_id}",
+        data={
+            "plugin": "widget_a",
+            "update_on_change_present": "1",
+            "update_on_change": "1",
+        },
+    )
+    client.post(f"/pages/{pid}/cells/{cell_id}", data={"plugin": "widget_a", "zoom": "1.2"})
+    assert _store(tmp_path).get(pid).cells[0].update_on_change is True
+
+    # A different widget owns a different dependency and always starts off.
+    client.post(f"/pages/{pid}/cells/{cell_id}", data={"plugin": "widget_b"})
+    assert _store(tmp_path).get(pid).cells[0].update_on_change is False
+
+
+def test_grid_editor_only_shows_update_switch_for_capable_widget(
+    app: Flask, tmp_path: Path
+) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    pid = _new(client, name="Home", layout="1_cell")
+    cell_id = _store(tmp_path).get(pid).cells[0].id
+
+    client.post(f"/pages/{pid}/cells/{cell_id}", data={"plugin": "widget_a"})
+    html = client.get(f"/pages/{pid}").get_data(as_text=True)
+    assert 'name="update_on_change"' in html
+
+    client.post(f"/pages/{pid}/cells/{cell_id}", data={"plugin": "widget_b"})
+    html = client.get(f"/pages/{pid}").get_data(as_text=True)
+    assert 'name="update_on_change"' not in html
 
 
 def test_update_cell_zoom_round_trips(app: Flask, tmp_path: Path) -> None:

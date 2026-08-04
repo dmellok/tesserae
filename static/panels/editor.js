@@ -202,7 +202,7 @@
   function makeElement(widget, fragment, x, y, w, h) {
     return {
       id: uid(), kind: "widget", widget: widget || "", fragment: fragment || "full",
-      options: {}, x: x, y: y, w: w, h: h, opacity: 100,
+      options: {}, update_on_change: false, x: x, y: y, w: w, h: h, opacity: 100,
       dither: true, visible: true, locked: false, group: null,
     };
   }
@@ -2522,6 +2522,7 @@
       var frs = fragmentsOf(e.widget);
       e.fragment = frs.length ? frs[0].id : "full";
       e.options = {};
+      e.update_on_change = false;
       scheduleSave(); paint();
     });
     wrow.appendChild(wsel); mount.appendChild(wrow);
@@ -2544,6 +2545,28 @@
       cfg.style.width = "100%"; cfg.style.justifyContent = "center";
       cfg.addEventListener("click", function () { openConfig(e.id); });
       cfgrow.appendChild(cfg); mount.appendChild(cfgrow);
+    }
+
+    // Host-owned placement policy. The widget only declares that it can
+    // consume change events; each element opts in independently and defaults
+    // off. Actual event delivery lands in a later server stage.
+    var selectedWidget = widgetFor(e.widget);
+    if (selectedWidget && selectedWidget.updates_on_change) {
+      mount.appendChild(el("div", "psec", '<i class="ph-bold ph-arrows-clockwise"></i>Updates'));
+      var urow = el("div", "prow");
+      urow.innerHTML = '<span class="plab">Data changes</span>';
+      var ubtn = el("button", "minibtn",
+        e.update_on_change
+          ? '<i class="ph-bold ph-check-square"></i> Refresh'
+          : '<i class="ph-bold ph-square"></i> Off');
+      ubtn.addEventListener("click", function () {
+        pushHistory();
+        e.update_on_change = !e.update_on_change;
+        scheduleSave(); paint();
+      });
+      urow.appendChild(ubtn); mount.appendChild(urow);
+      mount.appendChild(el("div", "note",
+        "Refreshes only displays already showing this dashboard. It never selects or advances a page."));
     }
 
     // Fragment parts (scale individual pieces of the render).

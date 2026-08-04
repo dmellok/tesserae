@@ -7,7 +7,7 @@ plus an implicit ``full`` fragment for whole-widget placement, so the editor
 palette can list a widget and expand it to its parts.
 
 The catalog entry the editor consumes is
-``{key, name, icon, desc, fragments:[{id,label,icon?,w,h}]}``.
+``{key, name, icon, desc, fragments:[{id,label,icon?,w,h}], updates_on_change}``.
 
 mypy --strict does not apply here; see pyproject.toml.
 """
@@ -74,6 +74,10 @@ def catalog_entry(plugin: Plugin) -> dict[str, Any]:
         "desc": str(plugin.manifest.get("description") or ""),
         "fragments": fragments_of(plugin),
         "sample": _preview_sample(plugin),
+        "updates_on_change": bool(
+            isinstance(plugin.manifest.get("updates"), dict)
+            and plugin.manifest["updates"].get("on_change")
+        ),
     }
 
 

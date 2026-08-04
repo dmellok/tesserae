@@ -1184,6 +1184,16 @@ def _apply_cell_form(cell: Cell, form: Any, panel: Any) -> Cell:
         options = _cell_options_from_form(plugin, form)
     else:
         options = {}
+    if plugin_changed:
+        # The opt-in belongs to the old widget dependency, not merely the box.
+        # A newly selected widget always starts at the contract default (off).
+        update_on_change = False
+    else:
+        update_on_change = _update_on_change_from_form(
+            form,
+            cell.update_on_change,
+            supported=bool(plugin and plugin.on_change_updates),
+        )
     return cell.model_copy(
         update={
             "plugin": new_plugin_id,
@@ -1195,12 +1205,28 @@ def _apply_cell_form(cell: Cell, form: Any, panel: Any) -> Cell:
             "style": (form.get("style") or None),
             "font": (form.get("font") or None),
             "options": options,
+            "update_on_change": update_on_change,
             "zoom": _coerce_float(form.get("zoom"), cell.zoom, lo=0.5, hi=3.0),
             "padding_override": _padding_override_from_form(form, cell.padding_override),
             "dither": _dither_override_from_form(form, cell.dither),
             **_touch_from_form(form, cell),
         }
     )
+
+
+def _update_on_change_from_form(form: Any, current: bool, *, supported: bool) -> bool:
+    """Parse the host-owned per-placement update policy.
+
+    The hidden ``update_on_change_present`` marker distinguishes a complete
+    widget form with an unchecked checkbox from partial autosave payloads that
+    do not carry this control. Widgets without a manifest declaration can never
+    retain or enable the policy.
+    """
+    if not supported:
+        return False
+    if "update_on_change_present" not in form:
+        return current
+    return form.get("update_on_change") in ("1", "true", "on")
 
 
 def _touch_from_form(form: Any, cell: Cell) -> dict[str, Any]:

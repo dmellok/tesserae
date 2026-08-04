@@ -237,10 +237,22 @@ def test_fragments_of_declared_and_implicit_full() -> None:
 
 
 def test_catalog_entry_shape() -> None:
-    p = _FakePlugin("w", {"name": "W", "icon": "ph-x", "description": "d"})
+    p = _FakePlugin(
+        "w",
+        {
+            "name": "W",
+            "icon": "ph-x",
+            "description": "d",
+            "updates": {"on_change": [{"source": "personal_data.reminders"}]},
+        },
+    )
     entry = catalog_entry(p)  # type: ignore[arg-type]
     assert entry["key"] == "w" and entry["icon"] == "ph-x"
     assert [f["id"] for f in entry["fragments"]] == ["full"]
+    assert entry["updates_on_change"] is True
+
+    plain = catalog_entry(_FakePlugin("plain", {"name": "Plain"}))  # type: ignore[arg-type]
+    assert plain["updates_on_change"] is False
 
 
 def test_build_catalog_sorts_by_name() -> None:
@@ -268,6 +280,7 @@ def test_element_defaults_and_roundtrip(tmp_path: Path) -> None:
                 widget="weather_now",
                 fragment="temp",
                 options={"units": "metric"},
+                update_on_change=True,
                 x=8,
                 y=8,
                 w=160,
@@ -281,10 +294,12 @@ def test_element_defaults_and_roundtrip(tmp_path: Path) -> None:
     e = reloaded.els[0]
     assert e.widget == "weather_now" and e.fragment == "temp"
     assert e.options["units"] == "metric"
+    assert e.update_on_change is True
     assert e.dither is True and e.visible is True  # defaults
 
     blank = Element(id="e2")
     assert blank.widget == "" and blank.fragment == "full"  # unassigned box
+    assert blank.update_on_change is False
 
 
 def test_decoration_element_roundtrip(tmp_path: Path) -> None:

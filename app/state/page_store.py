@@ -98,6 +98,11 @@ class Cell(BaseModel):
     style: str | None = None
     font: str | None = None
     options: dict[str, Any] = Field(default_factory=dict)
+    # Per-placement opt-in for manifest-declared ``updates.on_change`` events.
+    # False preserves every existing dashboard's pull/schedule-only behaviour;
+    # the event coordinator (a later stage) will also require the current
+    # plugin manifest to declare a matching source before acting on this bit.
+    update_on_change: bool = False
     # Per-cell content zoom. Inverse-sized at render time: the widget
     # paints into a 1/zoom virtual container that's transform-scaled back
     # up to the cell box, so text/icons grow without breaking layout. The

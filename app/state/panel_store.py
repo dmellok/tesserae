@@ -126,6 +126,10 @@ class Element(BaseModel):
     # Per-instance widget config, matching the widget's ``cell_options`` shape;
     # resolved via ``_resolved_options`` and handed to ``fetch()``.
     options: dict[str, Any] = Field(default_factory=dict)
+    # Per-placement opt-in for manifest-declared ``updates.on_change`` events.
+    # Kept on the element (not plugin settings) so two dashboards using the
+    # same widget can choose independently. False is the compatibility default.
+    update_on_change: bool = False
     # Decoration props (kind != "widget"; ignored for widgets). ``color`` is a
     # CSS colour or a Spectra token (e.g. "var(--accent-1)") so decorations can
     # follow the theme. ``fill`` false = outlined, ``stroke`` = outline/line

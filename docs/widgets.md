@@ -120,6 +120,27 @@ lowercase `[a-z0-9_]` is convention, not enforced. Name it `<family>_<role>`
   for `secret` reveals every sensitive value.
 * **`icon`**, Phosphor name used in the editor's widget picker.
 * **`render.needs_network`**, hint for the renderer (not enforced).
+* **`updates.on_change`**, optional data-change sources this widget knows how
+  to consume. Declaring one only exposes a host-owned, per-placement **Refresh
+  when this widget's data changes** switch; it does not enable refreshes by
+  default. `selector_option` may name one of the widget's `cell_options` to
+  narrow the dependency to that placement's selected value (for example one
+  published Reminders `list_id`). The selector must reference a declared
+  option. Grid cells and Canvas widget elements store their opt-ins
+  independently, so using the same widget on another dashboard is unaffected.
+
+  ```json
+  {
+    "cell_options": [
+      { "name": "list_id", "type": "select", "label": "Reminders list" }
+    ],
+    "updates": {
+      "on_change": [
+        { "source": "personal_data.reminders", "selector_option": "list_id" }
+      ]
+    }
+  }
+  ```
 
 Full schema: [`schema/plugin.schema.json`](https://github.com/dmellok/tesserae/blob/main/schema/plugin.schema.json).
 

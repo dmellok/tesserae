@@ -112,6 +112,29 @@ class Plugin:
                 return str(value)
         return "strict"
 
+    @property
+    def on_change_updates(self) -> list[dict[str, str]]:
+        """Validated ``updates.on_change`` declarations for this widget.
+
+        The manifest schema owns the public shape.  Keep this accessor
+        defensive because tests and internal callers can construct ``Plugin``
+        instances without going through discovery.
+        """
+        updates = self.manifest.get("updates")
+        raw = updates.get("on_change") if isinstance(updates, dict) else None
+        if not isinstance(raw, list):
+            return []
+        out: list[dict[str, str]] = []
+        for item in raw:
+            if not isinstance(item, dict) or not isinstance(item.get("source"), str):
+                continue
+            spec = {"source": str(item["source"])}
+            selector = item.get("selector_option")
+            if isinstance(selector, str) and selector:
+                spec["selector_option"] = selector
+            out.append(spec)
+        return out
+
     def cell_option_defaults(self) -> dict[str, Any]:
         defaults: dict[str, Any] = {}
         for opt in self.manifest.get("cell_options", []):
@@ -266,6 +289,35 @@ def _scan_plugin_dir(
             field_path = ".".join(str(p) for p in err.absolute_path) or "<root>"
             registry.errors.append(
                 LoaderError(plugin_id, child, f"manifest schema [{field_path}]: {err.message}")
+            )
+            continue
+
+        updates = manifest.get("updates")
+        raw_on_change = updates.get("on_change") if isinstance(updates, dict) else None
+        on_change = raw_on_change if isinstance(raw_on_change, list) else []
+        option_names = {
+            str(option.get("name"))
+            for option in manifest.get("cell_options", [])
+            if isinstance(option, dict) and option.get("name")
+        }
+        unknown_selector = next(
+            (
+                str(spec["selector_option"])
+                for spec in on_change
+                if isinstance(spec, dict)
+                and spec.get("selector_option")
+                and str(spec["selector_option"]) not in option_names
+            ),
+            None,
+        )
+        if unknown_selector is not None:
+            registry.errors.append(
+                LoaderError(
+                    plugin_id,
+                    child,
+                    "manifest updates.on_change selector_option "
+                    f"{unknown_selector!r} is not declared in cell_options",
+                )
             )
             continue
 

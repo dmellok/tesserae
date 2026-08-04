@@ -88,6 +88,76 @@ def test_invalid_manifest_is_rejected(tmp_path: Path, schema_path: Path) -> None
     assert any("manifest schema" in err.message for err in registry.errors)
 
 
+def test_on_change_manifest_is_discovered(tmp_path: Path, schema_path: Path) -> None:
+    plugins_dir = tmp_path / "plugins"
+    plugins_dir.mkdir()
+    _write_minimal_plugin(
+        plugins_dir,
+        "reminders",
+        {
+            "cell_options": [{"name": "list_id", "type": "string", "label": "Reminders list"}],
+            "updates": {
+                "on_change": [
+                    {
+                        "source": "personal_data.reminders",
+                        "selector_option": "list_id",
+                    }
+                ]
+            },
+        },
+    )
+    registry = plugin_loader.discover(
+        plugins_dir, schema_path=schema_path, data_root=tmp_path / "data"
+    )
+    assert registry.errors == []
+    assert registry.plugins["reminders"].on_change_updates == [
+        {"source": "personal_data.reminders", "selector_option": "list_id"}
+    ]
+
+
+def test_on_change_selector_must_name_cell_option(tmp_path: Path, schema_path: Path) -> None:
+    plugins_dir = tmp_path / "plugins"
+    plugins_dir.mkdir()
+    _write_minimal_plugin(
+        plugins_dir,
+        "broken_selector",
+        {
+            "updates": {
+                "on_change": [
+                    {
+                        "source": "personal_data.reminders",
+                        "selector_option": "missing",
+                    }
+                ]
+            }
+        },
+    )
+    registry = plugin_loader.discover(
+        plugins_dir, schema_path=schema_path, data_root=tmp_path / "data"
+    )
+    assert "broken_selector" not in registry.plugins
+    assert any("selector_option 'missing'" in err.message for err in registry.errors)
+
+
+def test_only_widgets_may_declare_on_change(tmp_path: Path, schema_path: Path) -> None:
+    plugins_dir = tmp_path / "plugins"
+    plugins_dir.mkdir()
+    _write_minimal_plugin(
+        plugins_dir,
+        "data_source",
+        {
+            "kind": "data",
+            "supports": {"sizes": []},
+            "updates": {"on_change": [{"source": "personal_data.reminders"}]},
+        },
+    )
+    registry = plugin_loader.discover(
+        plugins_dir, schema_path=schema_path, data_root=tmp_path / "data"
+    )
+    assert "data_source" not in registry.plugins
+    assert any("manifest schema" in err.message for err in registry.errors)
+
+
 def test_cell_option_defaults_merged() -> None:
     manifest = {
         "tesserae_compat": "1.x",
