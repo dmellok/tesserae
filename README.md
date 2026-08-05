@@ -107,10 +107,12 @@ streams them straight to the panel. Adding a new panel is a board header
 plus one driver. The network, power, and provisioning stack never
 changes.
 
-**Widgets are sandboxed.** Third-party widgets declare the network hosts
-they need in a `requires:` block in `plugin.json`, and the host enforces
-the allowlist at the socket layer. An undeclared connection raises
-`CapabilityDenied` instead of phoning home. The
+**Widget network egress is allowlisted.** Third-party widgets declare the
+network hosts they need in a `requires:` block in `plugin.json`, and the
+host enforces the allowlist at the socket layer. An undeclared connection
+raises `CapabilityDenied` instead of phoning home. That is the extent of
+the containment: widgets otherwise run in-process, and the trust model is
+PR review of the community catalog, not a sandbox. The
 [threat model](https://docs.tesserae.ink/dev/publishing-a-widget/) is
 documented honestly, including what it doesn't catch.
 
@@ -125,8 +127,11 @@ tarballs, sha256-verified, schema-validated, PR-reviewed:
 ## Supported hardware
 
 Tesserae renders to one of several panel families through drop-a-folder
-device plugins. The list below is the verified set; anything marked TBD
-is awaiting a real-hardware confirmation.
+device plugins. In the tables below, ✅ means the panel has been
+confirmed on real hardware (on my bench or via a community report);
+TBD means a client and hardware profile ship but nobody has confirmed a
+frame on the physical panel yet. The per-renderer bench matrix lives at
+[Screens & compatibility](https://docs.tesserae.ink/compatibility/).
 
 ### Seeed Studio
 
@@ -136,19 +141,20 @@ The reTerminal E-Series and XIAO ePaper family run the [Tesserae-native firmware
 
 | Model | Panel | Client | Status |
 |---|---|---|---|
-| [reTerminal E1001](https://www.seeedstudio.com/reTerminal-E1001-p-6534.html) | 7.5" mono, 800×480 | [tesserae-device-firmware](https://github.com/dmellok/tesserae-device-firmware) | ✅ |
+| [reTerminal E1001](https://www.seeedstudio.com/reTerminal-E1001-p-6534.html) | 7.5" mono, 800×480 | [tesserae-device-firmware](https://github.com/dmellok/tesserae-device-firmware) | TBD |
 | [reTerminal E1002](https://www.seeedstudio.com/reTerminal-E1002-p-6533.html) | 7.3" Spectra 6, 800×480 | [tesserae-device-firmware](https://github.com/dmellok/tesserae-device-firmware) | ✅ |
 | [reTerminal E1003](https://www.seeedstudio.com/reTerminal-E1003-p-6731.html) | 10.3" mono, 16-level grey, 1872×1404 | [tesserae-device-firmware](https://github.com/dmellok/tesserae-device-firmware) | ✅ |
 | [reTerminal E1004](https://www.seeedstudio.com/reTerminal-E1004-p-6692.html) | 13.3" Spectra 6, 1200×1600 | [tesserae-device-firmware](https://github.com/dmellok/tesserae-device-firmware) | ✅ |
-| [XIAO ePaper EE02](https://www.seeedstudio.com/XIAO-ePaper-DIY-Kit-EE02-for-13-3-Spectratm-6-E-Ink.html) | 13.3" Spectra 6, 1200×1600 | [tesserae-device-firmware](https://github.com/dmellok/tesserae-device-firmware) | ✅ |
-| [XIAO 7.5" ePaper Panel](https://www.seeedstudio.com/XIAO-7-5-ePaper-Panel-p-6416.html) | 7.5" mono, 800×480 | [tesserae-device-firmware](https://github.com/dmellok/tesserae-device-firmware) | ✅ |
-| [TRMNL 7.5" OG DIY Kit](https://www.seeedstudio.com/TRMNL-7-5-Inch-OG-DIY-Kit-p-6481.html) | 7.5" mono, 800×480 | TRMNL firmware | ✅ via BYOS |
+| [XIAO ePaper EE02](https://www.seeedstudio.com/XIAO-ePaper-DIY-Kit-EE02-for-13-3-Spectratm-6-E-Ink.html) | 13.3" Spectra 6, 1200×1600 | [tesserae-device-firmware](https://github.com/dmellok/tesserae-device-firmware) | TBD |
+| [XIAO 7.5" ePaper Panel](https://www.seeedstudio.com/XIAO-7-5-ePaper-Panel-p-6416.html) | 7.5" mono, 800×480 | [tesserae-device-firmware](https://github.com/dmellok/tesserae-device-firmware) | TBD |
+| [TRMNL 7.5" OG DIY Kit](https://www.seeedstudio.com/TRMNL-7-5-Inch-OG-DIY-Kit-p-6481.html) | 7.5" mono, 800×480 | TRMNL firmware | TBD via BYOS |
 
 ### Pimoroni Inky
 
 | Panel | Resolution | Client | Status |
 |---|---|---|---|
-| [Inky Impression 4"](https://shop.pimoroni.com/products/inky-impression) (6-colour Spectra 6) | 640×400 | [pi-png](https://github.com/dmellok/tesserae-device-pi-png) or [pi-bin](https://github.com/dmellok/tesserae-device-pi-bin) | TBD |
+| [Inky Impression 4"](https://shop.pimoroni.com/products/inky-impression) (6-colour Spectra 6) | 600×400 | [pi-png](https://github.com/dmellok/tesserae-device-pi-png) or [pi-bin](https://github.com/dmellok/tesserae-device-pi-bin) | TBD |
+| Inky Impression 4" (legacy 7-colour ACeP) | 640×400 | [pi-png](https://github.com/dmellok/tesserae-device-pi-png) or [pi-bin](https://github.com/dmellok/tesserae-device-pi-bin) | TBD |
 | [Inky Impression 5.7"](https://shop.pimoroni.com/products/inky-impression-5-7) (7-colour ACeP) | 600×448 | [pi-png](https://github.com/dmellok/tesserae-device-pi-png) or [pi-bin](https://github.com/dmellok/tesserae-device-pi-bin) | ✅ |
 | [Inky Impression 7.3"](https://shop.pimoroni.com/products/inky-impression?variant=55186435244411) (6-colour Spectra 6) | 800×480 | [pi-png](https://github.com/dmellok/tesserae-device-pi-png) or [pi-bin](https://github.com/dmellok/tesserae-device-pi-bin) | ✅ |
 | [Inky Impression 13.3"](https://shop.pimoroni.com/products/inky-impression?variant=55186435277179) (6-colour Spectra 6) | 1600×1200 | [pi-png](https://github.com/dmellok/tesserae-device-pi-png) or [pi-bin](https://github.com/dmellok/tesserae-device-pi-bin) | ✅ |
@@ -161,6 +167,20 @@ The reTerminal E-Series and XIAO ePaper family run the [Tesserae-native firmware
 | [Waveshare 13.3" Spectra 6 (ESP32-S3)](https://www.waveshare.com/esp32-s3-epaper-13.3e6.htm) | 1200×1600 | [esp32-bin](https://github.com/dmellok/tesserae-device-esp32-bin) | ✅ |
 | [Waveshare 7.3" PhotoPainter (ESP32-S3)](https://www.waveshare.com/esp32-s3-photopainter.htm) | 800×480 | [photopainter-7.3-bin](https://github.com/dmellok/tesserae-device-photopainter-7.3-bin) | ✅ |
 | [Waveshare 4.2" B/W (ESP32)](https://www.waveshare.com/4.2inch-e-paper-module.htm) | 400×300 | [esp32-bw](https://github.com/dmellok/tesserae-device-esp32-bw) | TBD |
+
+### Xteink (e-readers)
+
+Xteink's X-series e-readers run [CrossInk](https://github.com/uxjulia/CrossInk)
+firmware with Tesserae client support: the dashboard becomes the reader's
+sleep screen, painted on the sleep transition rather than on a timer.
+
+| Model | Panel | Client | Status |
+|---|---|---|---|
+| Xteink X3 (4-level grayscale) | 792×528, gray | CrossInk | ✅ |
+| Xteink X3 (mono) | 792×528, mono | CrossInk | TBD |
+| Xteink X4 | 800×480, mono | CrossInk | ✅ |
+| Xteink X4 (4-level grayscale) | 800×480, gray | CrossInk | ✅ |
+| Xteink X4 Pro | 800×480, mono | CrossInk | TBD |
 
 ### Community
 
@@ -177,7 +197,7 @@ works against the `trmnl_png` renderer.
 
 | Panel | Resolution | Client | Status |
 |---|---|---|---|
-| [TRMNL OG](https://shop.trmnl.com/products/trmnl) | 800×480 | TRMNL firmware | ✅ via BYOS |
+| [TRMNL OG](https://shop.trmnl.com/products/trmnl) | 800×480 | TRMNL firmware | TBD via BYOS |
 | [TRMNL X](https://shop.trmnl.com/products/trmnl-x) | 1872×1404 (10.3") | TRMNL firmware | TBD |
 | Amazon Kindle Paperwhite 2 (jailbroken) | 758×1024 | [KOReader trmnl-display plugin](https://github.com/koreader/koreader) | ✅ |
 
@@ -196,8 +216,9 @@ Full renderer / device-kind compatibility matrix:
 ## Status
 
 Pre-1.0 and moving fast. Every release is documented in the
-[CHANGELOG](CHANGELOG.md). CI runs pytest (1,200+ tests), ruff, and
-mypy --strict on every push.
+[CHANGELOG](CHANGELOG.md). CI runs pytest (2,400+ tests, 80% coverage
+gate), ruff, and mypy (strict on the render/push pipeline modules) on
+every push.
 
 Built with AI assistance (Claude Code). Architecture decisions, code
 review, hardware testing, and what ships vs. what doesn't are mine.

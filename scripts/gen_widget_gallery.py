@@ -2,7 +2,7 @@
 """Generate docs/widgets/gallery.md from the live plugin manifests.
 
 Reads every ``plugins/<id>/plugin.json`` with ``kind == "widget"``, pulls
-each widget's stability tier from the README's tier tables, groups the
+each widget's stability tier from ``docs/widgets/tiers.md``, groups the
 widgets by family (the ``<family>_<role>`` id prefix), and emits one
 Material "grid card" per widget linking its screenshot (captured
 separately by ``scripts/capture_widget_shots.py``).
@@ -18,7 +18,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 PLUGINS_DIR = REPO_ROOT / "plugins"
-README = REPO_ROOT / "README.md"
+TIERS_DOC = REPO_ROOT / "docs" / "widgets" / "tiers.md"
 SHOTS_REL = "../screenshots/widgets"  # relative to docs/widgets/gallery.md
 SHOTS_DIR = REPO_ROOT / "docs" / "screenshots" / "widgets"
 OUT = REPO_ROOT / "docs" / "widgets" / "gallery.md"
@@ -62,23 +62,18 @@ FAMILY_ORDER = [
 
 
 def _load_tiers() -> dict[str, str]:
-    """Map widget id -> tier label by parsing the README's
-    '## Widget stability tiers' section. Each '### <Tier>' subsection owns
-    every backtick-wrapped id that appears before the next heading."""
-    if not README.exists():
+    """Map widget id -> tier label by parsing ``docs/widgets/tiers.md``.
+    Each '## <Tier>' section owns every backtick-wrapped id that appears
+    before the next heading. Ids for marketplace widgets that aren't
+    bundled are harmless: the caller only looks up bundled ids."""
+    if not TIERS_DOC.exists():
         return {}
-    text = README.read_text(encoding="utf-8")
-    start = text.find("## Widget stability tiers")
-    if start == -1:
-        return {}
-    # Stop at the next top-level (## ) heading.
-    end = text.find("\n## ", start + 1)
-    section = text[start : end if end != -1 else len(text)]
+    text = TIERS_DOC.read_text(encoding="utf-8")
 
     tiers: dict[str, str] = {}
     current: str | None = None
-    for line in section.splitlines():
-        m = re.match(r"^###\s+(.*\S)", line)
+    for line in text.splitlines():
+        m = re.match(r"^##\s+(.*\S)", line)
         if m:
             heading = m.group(1).strip()
             current = heading if heading.lower() != "tier policy" else None

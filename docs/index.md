@@ -17,7 +17,7 @@ individual tile of a mosaic; the editor composes a dashboard out of cells.
     - **I want it running** → [Install Tesserae](install/server.md) (or via [Docker](install/docker.md) / as a [Home Assistant App](install/home-assistant.md))
     - **I have a panel to drive** → [Install a client](install/clients.md) then [Set up a device](install/devices.md)
     - **I want the ready-to-go hardware path** → the [Seeed reTerminal E-Series](hardware/seeed.md) (browser flash at [tesserae.ink/flash](https://tesserae.ink/flash), battery-powered, no assembly required)
-    - **What can it show?** → [Bundled widget gallery](widgets/gallery.md) (33 ship in the install) or the [community catalog](widgets/community.md) (more, one-click install)
+    - **What can it show?** → [Bundled widget gallery](widgets/gallery.md) (35 ship in the install) or the [community catalog](widgets/community.md) (more, one-click install)
     - **What hardware works?** → [Screens & compatibility](compatibility.md)
     - **I want to build a widget** → [Build a widget with AI](dev/writing-a-widget.md)
 
@@ -41,17 +41,17 @@ maintainer with a growing group of community contributors. The
 composer → renderers → transport → devices pipeline, scheduler, Home
 Assistant MQTT auto-discovery, webhook push, the Spectra theme system
 (browse / builder / image-to-palette extraction), font picker, and
-form-driven page editor are all shipping. Real-hardware coverage now
-sits at **14 verified panels across Seeed, Pimoroni, Waveshare, TRMNL,
-and Kindle**, driven by a client fleet that includes the
-Tesserae-native firmware for the Seeed reTerminal E-Series (browser
-flash, battery-powered), `esp32_bin` (13.3" Waveshare + 7.3"
-PhotoPainter), `pi_bin` and `pi_png` (Pi HAT panels including the Inky
-Impression family), `pico_bin` (battery-powered Pi Pico Plus 2W
-driving Inky-style Spectra 6), `trmnl_png` (TRMNL BYOS devices +
-jailbroken Kindle via KOReader), `circuitpython_png` (generic
-CircuitPython boards), and the community-firmware `picpak_client`
-(PicPak 4.2" BWRY). See
+form-driven page editor are all shipping. **Nine panels are confirmed
+on real hardware**: the Seeed reTerminal E1002, E1003, and E1004 on
+the Tesserae-native firmware (browser flash, battery-powered), the
+Waveshare 13.3" Spectra 6 and 7.3" PhotoPainter via `esp32_bin`, the
+Pimoroni Inky Impression via `pi_bin` / `pi_png`, the Xteink X3 and X4
+running CrossInk, and a jailbroken Kindle via KOReader on `trmnl_png`,
+plus the community-confirmed PicPak 4.2" BWRY on its author's
+firmware. Clients and hardware profiles ship for more SKUs (the
+remaining reTerminals and XIAO panels, TRMNL BYOS devices, Pi Pico
+Plus 2W via `pico_bin`, generic CircuitPython boards) that are
+awaiting a real-hardware report. See
 [what's tested](compatibility.md#whats-been-tested-on-real-hardware).
 Testers on other displays are welcome, as are contributors:
 [open an issue or PR](https://github.com/dmellok/tesserae).

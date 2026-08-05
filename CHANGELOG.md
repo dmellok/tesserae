@@ -4,20 +4,58 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
-## [Unreleased]
+## [0.264.1], 2026-08-05
+
+### Fixed
+
+- **Hardware claims reconciled with the bench matrix.** The README's
+  supported-hardware tables now use ✅ only for panels confirmed on real
+  hardware (the reTerminal E1001, both XIAO panels, and the TRMNL rows
+  move to TBD pending hardware reports), gain an Xteink X-series
+  section, and correct the Inky Impression 4" variants (600×400
+  Spectra 6 vs the legacy 640×400 7-colour ACeP). The reTerminal
+  E1002/E1003/E1004 manifests and the test matrix now record their
+  real-hardware confirmations, the E1003 including GT911 touch.
+- **The widget gallery shows real stability tiers again.** The gallery
+  generator reads tiers from `docs/widgets/tiers.md`; it was still
+  parsing a README section that moved there, so most cards rendered
+  "Tier: -".
+- **`app/online.py`'s docstring matches the code again**: online
+  features are opt-in and off by default (the stale docstring said the
+  opposite; the behaviour never changed).
+
+## [0.264.0], 2026-08-05
 
 ### Added
 
-- **Widgets can declare opt-in data-change updates.** A widget manifest may
-  expose strict `updates.on_change` source declarations, optionally narrowed
-  by a declared `selector_option`. Grid cells and Canvas widget elements now
-  persist an independent `update_on_change` policy (off by default), and their
-  editors surface the switch only for capable widgets. Accepted semantic data
-  changes are quietly debounced for 10 seconds, then active matching pages
-  refresh through the existing quiet-hours-aware push path while inactive Deck
-  pages are re-warmed without being promoted. TTL-only republishes do not
-  refresh, and personal-data PUT/DELETE responses remain independent from
-  background render or delivery outcomes.
+- **Pages can refresh when their data actually changes** (#188).
+  Accepted semantic data changes are quietly debounced for 10 seconds,
+  then active pages with the policy enabled refresh through the
+  existing quiet-hours-aware push path while inactive Deck pages are
+  re-warmed without being promoted. TTL-only republishes do not
+  refresh, and personal-data PUT/DELETE responses remain independent
+  from background render or delivery outcomes.
+
+### Changed
+
+- **Smart sync is a top-level switch on the deck card**, and the deck
+  editor's timing and conditions moved into a tuning card. Deck
+  conditions also surface on Lineups rows and in the setup wizard.
+
+### Docs
+
+- **Xteink X3 confirmed on real hardware** (#187).
+
+## [0.260.0], 2026-08-04
+
+### Added
+
+- **Widgets can declare opt-in data-change updates** (#185). A widget
+  manifest may expose strict `updates.on_change` source declarations,
+  optionally narrowed by a declared `selector_option`. Grid cells and
+  Canvas widget elements persist an independent `update_on_change`
+  policy (off by default), and their editors surface the switch only
+  for capable widgets.
 
 ## [0.259.0], 2026-08-04
 

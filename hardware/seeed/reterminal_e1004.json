@@ -18,5 +18,5 @@
   },
   "refresh_floor_s": 60,
   "image_format": "bin",
-  "notes_md": "Awaiting confirmed test on real hardware. If you flashed the reTerminal with TRMNL firmware instead of the tesserae-device-firmware build, use the (planned) `seeed_reterminal_e1004_trmnl` variant which routes through the TRMNL BYOS protocol + colour PNG renderer."
+  "notes_md": "Confirmed on real hardware running tesserae-device-firmware. If you flashed the reTerminal with TRMNL firmware instead of the tesserae-device-firmware build, use the (planned) `seeed_reterminal_e1004_trmnl` variant which routes through the TRMNL BYOS protocol + colour PNG renderer."
 }

@@ -3,8 +3,13 @@
   "renderers": {
     "esp32_bin": {
       "status": "Tested",
-      "hardware": "Waveshare 13.3\" Spectra 6 (ESP32-S3-WROOM-2) + Waveshare 7.3\" PhotoPainter (ESP32-S3)",
-      "notes": "Primary daily driver, battery-powered, deep-sleep. The 13.3\" client lives at tesserae-device-esp32-bin; the 7.3\" PhotoPainter client at tesserae-device-photopainter-7.3-bin. Both pair with the same renderer; the panel preset (waveshare_e6_13_3 vs waveshare_photopainter_7_3) selects the firmware-native row stride."
+      "hardware": "Waveshare 13.3\" Spectra 6 (ESP32-S3-WROOM-2) + Waveshare 7.3\" PhotoPainter (ESP32-S3) + Seeed reTerminal E1002 and E1004 (Spectra 6) via tesserae-device-firmware",
+      "notes": "Primary daily driver, battery-powered, deep-sleep. The 13.3\" client lives at tesserae-device-esp32-bin; the 7.3\" PhotoPainter client at tesserae-device-photopainter-7.3-bin. Both pair with the same renderer; the panel preset (waveshare_e6_13_3 vs waveshare_photopainter_7_3) selects the firmware-native row stride. The reTerminal Spectra 6 SKUs consume the same 4-bpp packed frames through tesserae-device-firmware."
+    },
+    "esp32_gray_bin": {
+      "status": "Tested",
+      "hardware": "Seeed reTerminal E1003 (10.3\" 1872x1404, 16-level grayscale) running tesserae-device-firmware",
+      "notes": "Confirmed end-to-end on the bench, including GT911 touch input round-tripping through the tap pipeline. The 4-bpp nibble-packed frame (1314144 bytes) is fetched over REST and painted with no on-device decode."
     },
     "pi_bin": {
       "status": "Tested",

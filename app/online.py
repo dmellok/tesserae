@@ -1,10 +1,11 @@
-"""Outbound calls to api.tesserae.ink, behind a single master opt-out.
+"""Outbound calls to api.tesserae.ink, behind a single master opt-in.
 
 Everything Tesserae sends to api.tesserae.ink (app + device-firmware update
 checks, the marketplace install count, the daily heartbeat, and the template
 marketplace calls) is gated by one setting, ``settings.app.online_features``.
-It is ON by default; turning it off means the app never contacts
-api.tesserae.ink.
+It is OFF by default (see :func:`online_enabled`): a fresh install never
+contacts api.tesserae.ink until the user opts in at the first-run wizard or
+in Settings.
 
 What is sent is documented on the privacy page: the install's random id (from
 ``data/core/install_id.json``), the widget/template id, and the running

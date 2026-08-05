@@ -2,7 +2,7 @@
 
 # Widget gallery
 
-The **33 widgets** that ship with Tesserae. Each is a drop-a-folder widget under `plugins/<id>/`; drop your own in and it shows up in the editor's picker. Want to build one? See [Build a widget with AI](../dev/writing-a-widget.md).
+The **35 widgets** that ship with Tesserae. Each is a drop-a-folder widget under `plugins/<id>/`; drop your own in and it shows up in the editor's picker. Want to build one? See [Build a widget with AI](../dev/writing-a-widget.md).
 
 !!! note "Stability tiers"
     **Stable** = backed by an official, documented API. **Best-effort** = undocumented but long-lived endpoint. **Fragile** = scraping or a soft policy, convenience only. **Local** = computed on the host, no upstream to break. See [Screens & compatibility](../compatibility.md) for the hardware side.
@@ -19,7 +19,7 @@ The **33 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     5-day forecast as a row of theme-aware cards: day name, condition icon, high / low temps, and rain probability. Data from Open-Meteo (no API key).
 
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
+    **Sizes:** `sm` `md` `lg` &middot; **Tier:** Stable
 
 -   **Weather, Hourly** &middot; `weather_hourly`
 
@@ -29,7 +29,7 @@ The **33 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     Hourly temperature line with a shaded area + condition-icon strip across the top. Defaults to the next 12 hours; configurable to 24 or 48. Data from Open-Meteo (no API key).
 
-    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** -
+    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** Stable
 
 -   **Weather, Now** &middot; `weather_now`
 
@@ -39,7 +39,7 @@ The **33 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     Current conditions plus feels-like, humidity, wind, UV and sun times. Data from Open-Meteo (no API key required).
 
-    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** -
+    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** Stable
 
 -   **Weather, Scenic** &middot; `weather_now_scenic`
 
@@ -75,7 +75,7 @@ The **33 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     Today's sunrise, sunset, golden hour, and day length for a chosen lat/lon. The hero shows a sun-arc visualisation with the current position marked. Data from Open-Meteo (no key).
 
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
+    **Sizes:** `sm` `md` `lg` &middot; **Tier:** Stable
 
 -   **Clock, Word** &middot; `clock_word`
 
@@ -101,7 +101,7 @@ The **33 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     Today's agenda Reads from feeds configured in Widgets → Calendar Feeds; each feed's colour drives the stripe / marker / fill colour.
 
-    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** -
+    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** Stable
 
 -   **Calendar, Month** &middot; `calendar_month`
 
@@ -111,7 +111,7 @@ The **33 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     Month-grid view Reads from feeds configured in Widgets → Calendar Feeds; each feed's colour drives the bar / dot / stripe colour.
 
-    **Sizes:** `md` `lg` &middot; **Tier:** -
+    **Sizes:** `md` `lg` &middot; **Tier:** Stable
 
 -   **Calendar, Week** &middot; `calendar_week`
 
@@ -121,7 +121,7 @@ The **33 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     Seven-day strip Each event's colour comes from its feed (Widgets → Calendar Feeds).
 
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
+    **Sizes:** `sm` `md` `lg` &middot; **Tier:** Stable
 
 </div>
 
@@ -137,7 +137,7 @@ The **33 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     Top / new / best / show / ask stories from Hacker News. Uses the free Firebase API (no auth, no key). Click-through opens the story; the lightbox doesn't apply.
 
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
+    **Sizes:** `sm` `md` `lg` &middot; **Tier:** Stable
 
 -   **News, Reddit** &middot; `news_reddit`
 
@@ -147,7 +147,7 @@ The **33 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     Top posts from a subreddit using the free .json endpoint (no API key, no OAuth). Pick the subreddit and time window per cell.
 
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
+    **Sizes:** `sm` `md` `lg` &middot; **Tier:** Fragile
 
 -   **News, RSS / Atom** &middot; `news_rss`
 
@@ -157,7 +157,7 @@ The **33 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     Latest N headlines from any RSS 2.0 or Atom 1.0 feed. Paste a feed URL; the widget parses both formats with the stdlib XML parser (no extra deps).
 
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
+    **Sizes:** `sm` `md` `lg` &middot; **Tier:** Stable
 
 -   **News, Wikipedia On This Day** &middot; `news_wikipedia_otd`
 
@@ -167,13 +167,23 @@ The **33 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     Wikipedia 'On this day', featured historical events for today's date. Uses the free Wikimedia REST API (no key).
 
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
+    **Sizes:** `sm` `md` `lg` &middot; **Tier:** Stable
 
 </div>
 
 ## Home Assistant
 
 <div class="grid cards" markdown>
+
+-   **Home Assistant, Automation History** &middot; `ha_automation_history`
+
+    ---
+
+    _Screenshot pending, run `python scripts/capture_widget_shots.py`._
+
+    Which Home Assistant automations fired, when, and how often. Ranks the most- vs least-fired automation this week, streams a most-recent-first trigger feed, tallies 1h / 24h / 7d trigger counts, and flags any tracked automation that hasn't fired within an expected cadence. Reads automation.* logbook history via the Home Assistant Core plugin.
+
+    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** -
 
 -   **Home Assistant, Batteries** &middot; `ha_battery`
 
@@ -309,7 +319,7 @@ The **33 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     NASA's Astronomy Picture of the Day, full bleed. Walks back day-by-day past video entries so the cell always shows an image. Uses DEMO_KEY by default; paste your own key at https://api.nasa.gov for a higher rate limit.
 
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
+    **Sizes:** `sm` `md` `lg` &middot; **Tier:** Stable
 
 -   **Picture, Gallery** &middot; `picture_gallery`
 
@@ -349,7 +359,7 @@ The **33 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     ![webpage](../screenshots/widgets/webpage.png)
 
-    Embed an external URL in a cell. The composer captures whatever the iframe renders, handy for status pages, public dashboards, or any site that doesn't deny embedding. Same headless-render path as the Send tab is used when the panel renders. Sites that set X-Frame-Options:DENY or strict CSP cannot be embedded.
+    Embed an external URL in a cell. The composer captures whatever the iframe renders, handy for status pages, public dashboards, or any site that doesn't deny embedding. Same headless-render path as the Send tab is used when the panel renders. Pages that fetch their data with JavaScript get a short settle delay after load so the content is captured, not a blank frame; raise it for slow pages. Sites that set X-Frame-Options:DENY or strict CSP cannot be embedded.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
 
@@ -384,6 +394,22 @@ The **33 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
     Battery level for every registered device that reports a battery_pct heartbeat (ESP32-S3, PhotoPainter, etc). Sorted lowest-first so the panel that needs charging surfaces to the top. Predicts days-to-empty from the last seven days of history, when available.
 
     **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** Local
+
+</div>
+
+## Tesserae
+
+<div class="grid cards" markdown>
+
+-   **Tesserae, Status Bar** &middot; `tesserae_status`
+
+    ---
+
+    _Screenshot pending, run `python scripts/capture_widget_shots.py`._
+
+    Dashboard status strip: identity on the left, ambient device telemetry on the right. Renders as a fixed-height bar (48 px) or a resizable block; each chip switches between icon+text, icon-only, or text-only. Temperature and humidity come from the target panel's status heartbeat. Auto-contrasts against a freeform background colour so it stays legible on 1-bit, 4-colour, and Spectra 6 panels. Update chips (app version, panel firmware) surface as a badge dot or accent text, never colour alone.
+
+    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** -
 
 </div>
 
