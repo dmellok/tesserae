@@ -10,6 +10,7 @@ from app.data_change_refresh import (
     DataChangeEvent,
     DataChangeRefreshCoordinator,
     matching_page_ids,
+    personal_data_delete_event,
     personal_data_update_event,
 )
 from app.plugin_loader import Plugin, PluginRegistry
@@ -123,6 +124,24 @@ def test_first_snapshot_is_source_wide_even_when_it_contains_no_lists() -> None:
     assert personal_data_update_event("reminders", None, current) == DataChangeEvent(
         source="personal_data.reminders"
     )
+
+
+def test_first_nonempty_snapshot_and_delete_are_narrowed_to_known_lists() -> None:
+    current = _snapshot(
+        generated="2026-08-05T12:00:00Z",
+        expires="2026-08-07T12:00:00Z",
+        lists=[
+            _list("food", "Groceries", "Milk"),
+            _list("work", "Tasks", "Review PR"),
+        ],
+    )
+    expected = DataChangeEvent(
+        source="personal_data.reminders",
+        selectors=frozenset({"food", "work"}),
+    )
+
+    assert personal_data_update_event("reminders", None, current) == expected
+    assert personal_data_delete_event("reminders", current) == expected
 
 
 def test_matching_pages_respects_placement_opt_in_and_selector(tmp_path: Path) -> None:

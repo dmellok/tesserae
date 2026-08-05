@@ -4,6 +4,17 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [Unreleased]
+
+### Fixed
+
+- **Personal-data snapshots are isolated per paired Companion installation.**
+  Two household phones can publish Apple Reminders without overwriting each
+  other, each phone sees only its own sync status, and disabling sync cannot
+  delete another phone's publication. Existing single-publisher data remains
+  readable and is replaced by the first authenticated publisher that next
+  syncs that source.
+
 ## [0.266.0], 2026-08-05
 
 ### Fixed

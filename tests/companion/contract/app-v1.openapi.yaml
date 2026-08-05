@@ -432,6 +432,10 @@ paths:
       tags: [Personal Data]
       operationId: getCompanionPersonalDataStatus
       summary: List snapshot freshness metadata without returning personal values
+      description: >-
+        Returns only sources published by this authenticated Companion
+        installation. Another paired installation's freshness metadata and
+        personal values are never exposed.
       responses:
         "200":
           description: Metadata for currently stored or expired snapshot sources
@@ -449,8 +453,13 @@ paths:
       operationId: putCompanionPersonalDataSnapshot
       summary: Replace the latest snapshot for one advertised personal-data source
       description: |
-        Snapshot validation, ordering, storage, latency, and response semantics
-        are independent from rendering. After a 200 response, the server may
+        The authenticated pairing determines a stable, server-derived publisher
+        identity; clients do not add publisher fields to the snapshot. Replacement
+        and generated_at ordering are scoped to that publisher and source, so two
+        paired Companion installations cannot overwrite one another.
+
+        Snapshot validation, storage, latency, and response semantics are
+        independent from rendering. After a 200 response, the server may
         asynchronously refresh already-active dashboards whose widget placements
         explicitly opted in to this source. Render or delivery failures never
         change the accepted PUT response and require no client retry.
@@ -478,8 +487,10 @@ paths:
       operationId: deleteCompanionPersonalDataSnapshot
       summary: Delete the latest snapshot when its source is disabled
       description: |
-        Deletion is authoritative and idempotent. Any eligible dashboard refresh
-        is fire-and-forget after the 204 response; no expiry timer is implied.
+        Deletion is authoritative and idempotent only for the authenticated
+        Companion installation's publication. It cannot delete another paired
+        installation's snapshot. Any eligible dashboard refresh is
+        fire-and-forget after the 204 response; no expiry timer is implied.
       responses:
         "204":
           description: Snapshot absent after the request
@@ -1255,6 +1266,9 @@ components:
         Incomplete items grouped by user-approved Apple Reminders lists. List
         identifiers are opaque Companion publication identifiers rather than
         EventKit calendar identifiers and must be unique within one snapshot;
+        they remain the widget selector across multiple paired publishers.
+        Widgets may distinguish duplicate list titles with the paired client's
+        display name, while publisher identity itself remains server-derived;
         duplicate ids are rejected as invalid_snapshot (400). At most 200 items
         may appear across all lists in one snapshot. Exceeding that aggregate
         cap is rejected as invalid_snapshot (400), never truncated by the
