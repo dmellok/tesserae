@@ -335,13 +335,16 @@ def _running_state_view(
     last_status = (status_row or {}).get("last_status")
     last_reason = (status_row or {}).get("last_reason")
     if last_status == "held":
+        # Two reasons land here: "no step's conditions are met" (all
+        # step conditions failed) and "all devices manually held"
+        # (button / touch page-away still active), so the tooltip just
+        # echoes the recorded reason.
+        reason = last_reason or "no step is eligible right now"
         return {
             "label": "held",
             "tone": "is-held",
             "icon": "funnel",
-            "tooltip": (
-                f"All step conditions failed: {last_reason or 'no step is eligible right now'}."
-            ),
+            "tooltip": f"{reason[:1].upper()}{reason[1:]}.",
         }
     if last_status == "failed":
         return {
@@ -492,12 +495,12 @@ def fire(rotation_id: str) -> Response:
             "warn",
         )
         return redirect(url_for("rotations.index"))
-    result = sched._fire_rotation(rotation, eligible, now)
+    result = sched._fire_rotation(rotation, eligible, now, bypass_holds=True)
     if result.status == "sent":
         flash(f"Fired rotation {rotation_id!r} (step {eligible}).", "ok")
     else:
         flash(
-            f"Fired rotation {rotation_id!r}: {result.status}, {result.error or ''}",
+            f"Fired rotation {rotation_id!r}: {_status_detail(result)}",
             "error",
         )
     return redirect(url_for("rotations.index"))
@@ -531,7 +534,7 @@ def play(rotation_id: str, step_index: int) -> Response:
             "warn",
         )
         return redirect(url_for("rotations.index"))
-    result = sched._fire_rotation(rotation, state.step_index, now)
+    result = sched._fire_rotation(rotation, state.step_index, now, bypass_holds=True)
     page_label = next(
         (p.name for p in _pages().list() if p.id == rotation.steps[state.step_index].page_id),
         rotation.steps[state.step_index].page_id,
@@ -545,10 +548,16 @@ def play(rotation_id: str, step_index: int) -> Response:
     else:
         flash(
             f"Couldn't play step {state.step_index + 1} on {rotation.name!r}: "
-            f"{result.status}, {result.error or ''}",
+            f"{_status_detail(result)}",
             "error",
         )
     return redirect(url_for("rotations.index"))
+
+
+def _status_detail(result: Any) -> str:
+    """``"failed, connection refused"`` with an error, bare ``"failed"``
+    without one (avoids the dangling-comma flash)."""
+    return f"{result.status}, {result.error}" if result.error else str(result.status)
 
 
 def _first_error(exc: ValidationError) -> str:

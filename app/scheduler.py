@@ -1512,6 +1512,31 @@ class Scheduler:
             and now < s.override_until
         }
 
+    def _clear_holds(self, rotation_id: str, held: set[str], page_id: str, step_index: int) -> None:
+        """Drop manual holds after a user-initiated fire that bypassed
+        them. Without this the rejoin pass would yank the panel off the
+        page the user just asked for once the hold lapses. Only holds
+        on devices bound to the fired page are cleared; a held device
+        the push didn't touch keeps its hold. No-op when the resolver
+        isn't wired (we can't tell which devices the push reached)."""
+        if self._rotation_state_store is None or self._device_ids_for_page is None:
+            return
+        bound = set(self._device_ids_for_page(page_id) or [])
+        try:
+            states = self._rotation_state_store.all()
+        except Exception:
+            logger.exception("clear holds: state store read failed")
+            return
+        for state in states.values():
+            if (
+                state.rotation_id == rotation_id
+                and state.device_id in held
+                and state.device_id in bound
+            ):
+                self._rotation_state_store.upsert(
+                    state.model_copy(update={"override_until": None, "step_index": step_index})
+                )
+
     def _fire_rotation(
         self,
         rotation: Rotation,
@@ -1519,6 +1544,7 @@ class Scheduler:
         now: datetime,
         *,
         respect_quiet_hours: bool = False,
+        bypass_holds: bool = False,
     ) -> PushResult:
         step = rotation.steps[step_index]
         logger.info(
@@ -1535,19 +1561,25 @@ class Scheduler:
         # 5 minutes. The rejoin pass brings held devices back once
         # their hold lapses. Only possible when both the state store
         # and the page->devices resolver are wired; otherwise the
-        # legacy fire-to-all behaviour stands.
+        # legacy fire-to-all behaviour stands. ``bypass_holds`` (the
+        # Play / Fire-now buttons) skips the exclusion entirely: an
+        # explicit user click supersedes a button/touch page-away.
         held = self._held_device_ids(rotation.id, now)
         device_filter: set[str] | None = None
-        if held and self._device_ids_for_page is not None:
+        if held and not bypass_holds and self._device_ids_for_page is not None:
             bound = set(self._device_ids_for_page(step.page_id) or [])
             targets = bound - held
             if bound and not targets:
                 # Every bound panel is mid-hold: nothing to paint now.
-                result = PushResult(status="quiet", page_id=step.page_id)
+                result = PushResult(
+                    status="held",
+                    page_id=step.page_id,
+                    error="all devices manually held",
+                )
                 with self._lock:
                     self._rotation_last_step[rotation.id] = step_index
                     self._rotation_last_pushed_at[rotation.id] = now.timestamp()
-                    self._rotation_last_status[rotation.id] = "quiet"
+                    self._rotation_last_status[rotation.id] = "held"
                     self._rotation_last_reason[rotation.id] = "all devices manually held"
                 return result
             if bound:
@@ -1565,6 +1597,8 @@ class Scheduler:
                 respect_quiet_hours=respect_quiet_hours,
                 source="rotation",
             )
+        if bypass_holds and held and result.status in ("sent", "no_change"):
+            self._clear_holds(rotation.id, held, step.page_id, step_index)
         # Same status semantics as _fire: a quiet result still counts
         # as "we tried" so the next tick doesn't re-attempt within the
         # quiet window. Failures don't bump so the next tick retries.

@@ -4,6 +4,19 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.266.0], 2026-08-05
+
+### Fixed
+
+- **Play and Fire-now push through a button/touch hold.** Clicking a
+  step used to fail with a bare "quiet" message when every panel bound
+  to the page was still inside a manual page-away hold, even with
+  quiet hours disabled. Explicit clicks now fire anyway and clear the
+  holds on the pushed panels (so the rejoin pass doesn't later yank
+  them off the page), while the timer-driven skip is reported as
+  `held` with the reason "all devices manually held" in the flash,
+  status pill, and events log.
+
 ## [0.265.1], 2026-08-05
 
 ### Fixed

@@ -749,7 +749,63 @@ def test_fire_skips_push_when_every_device_is_held(tmp_path: Path) -> None:
     rot = scheduler._rotation_store.all()[0]
     result = scheduler._fire_rotation(rot, 0, now)
     push_manager.push.assert_not_called()
-    assert result.status == "quiet"
+    assert result.status == "held"
+    assert result.error == "all devices manually held"
+
+
+def test_bypass_holds_pushes_to_held_devices_and_clears_hold(tmp_path: Path) -> None:
+    """The Play / Fire-now buttons are explicit user intent: they fire
+    through a button/touch hold instead of being blocked by it, and a
+    successful push drops the hold so the rejoin pass doesn't later
+    yank the panel off the page the user just asked for."""
+    scheduler, push_manager, state_store, State = _selffire_harness(
+        tmp_path,
+        dwells=[("home", 5)],
+        device_ids_for_page=lambda _pid: ["panel_a", "panel_b"],
+    )
+    now = datetime(2026, 6, 15, 0, 1, tzinfo=UTC)
+    state_store.upsert(
+        State(
+            device_id="panel_a",
+            rotation_id="r1",
+            step_index=2,
+            override_until=datetime(2026, 6, 15, 23, 0, tzinfo=UTC),
+        )
+    )
+    rot = scheduler._rotation_store.all()[0]
+    result = scheduler._fire_rotation(rot, 0, now, bypass_holds=True)
+    assert result.status == "sent"
+    # No device filter: held panels are included in the fire.
+    push_manager.push.assert_called_once()
+    assert "device_ids" not in push_manager.push.call_args.kwargs
+    # Hold cleared, state re-pointed at the played step.
+    assert state_store.get("panel_a").override_until is None
+    assert state_store.get("panel_a").step_index == 0
+
+
+def test_bypass_holds_keeps_hold_when_push_fails(tmp_path: Path) -> None:
+    scheduler, push_manager, state_store, State = _selffire_harness(
+        tmp_path,
+        dwells=[("home", 5)],
+        device_ids_for_page=lambda _pid: ["panel_a"],
+    )
+    push_manager.push.return_value = MagicMock(
+        status="failed", error="boom", duration_s=0.1, event_id=None
+    )
+    now = datetime(2026, 6, 15, 0, 1, tzinfo=UTC)
+    hold_until = datetime(2026, 6, 15, 23, 0, tzinfo=UTC)
+    state_store.upsert(
+        State(
+            device_id="panel_a",
+            rotation_id="r1",
+            step_index=0,
+            override_until=hold_until,
+        )
+    )
+    rot = scheduler._rotation_store.all()[0]
+    result = scheduler._fire_rotation(rot, 0, now, bypass_holds=True)
+    assert result.status == "failed"
+    assert state_store.get("panel_a").override_until == hold_until
 
 
 def test_store_strips_withdrawn_refresh_minutes_key(tmp_path: Path) -> None:
