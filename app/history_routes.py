@@ -97,9 +97,19 @@ def _preview_digest(ev: EventRow) -> str | None:
     return candidate if isinstance(candidate, str) and candidate else None
 
 
-def history_view(rows: list[EventRow]) -> list[dict[str, Any]]:
+def history_view(rows: list[EventRow], *, fold_presses: bool = False) -> list[dict[str, Any]]:
     """Shape raw event rows for the History page: page name instead of id,
-    humanised time, friendly device labels."""
+    humanised time, friendly device labels.
+
+    With ``fold_presses`` a press/touch row that carries the id of the
+    push row its action logged (``extra.push_event_id``, written by
+    ``ButtonService`` since the push completes before the press row) is
+    merged with that push row into one display row: the press row keeps
+    its identity (source chip, detail line) and borrows the push row's
+    thumbnail, duration, renderers, and resend target, and the standalone
+    push row is dropped. A press whose partner was deleted or fell
+    outside the fetched window renders unfolded, same as today.
+    """
     pages = _pages().list()
     page_names = {p.id: p.name for p in pages}
     devices = _devices()
@@ -114,21 +124,38 @@ def history_view(rows: list[EventRow]) -> list[dict[str, Any]]:
                     "name": dev.display_name,
                     "icon": dev.icon or "monitor",
                 }
+    # Press → push pairing for the fold. Only pairs where both rows are
+    # inside the fetched batch fold; ids are unique so a stale
+    # push_event_id (partner deleted) simply never matches.
+    folded: dict[int, EventRow] = {}
+    absorbed: set[int] = set()
+    if fold_presses:
+        by_id = {ev.id: ev for ev in rows}
+        for ev in rows:
+            pid = ev.extra.get("push_event_id")
+            if isinstance(pid, int) and pid != ev.id and pid in by_id:
+                folded[ev.id] = by_id[pid]
+                absorbed.add(pid)
     out: list[dict[str, Any]] = []
     for ev in rows:
-        # Button rows target a device (not a page), so resolve the
-        # target through device_meta first. Everything else goes
-        # through page_names as usual, and unknown targets fall
+        if ev.id in absorbed:
+            continue
+        push_ev = folded.get(ev.id)
+        # Press rows target a device (not a page), so resolve any target
+        # that is a known device id through device_meta first. Everything
+        # else goes through page_names as usual, and unknown targets fall
         # through to the raw value via the dict default. Same treatment
         # keeps the History view honest about "which device was
-        # this?", not just "which page did we send?".
-        if ev.source == "button" and ev.target in device_meta:
+        # this?", not just "which page did we send?". (Was previously
+        # gated on source == "button", which left deck/touch press rows
+        # showing the raw device id.)
+        if ev.target in device_meta:
             target = device_meta[ev.target]["name"]
         else:
             target = page_names.get(ev.target, ev.target)
         renderers = [
             {"label": _renderer_label(str(r.get("renderer_id", ""))), "error": r.get("error")}
-            for r in (ev.extra.get("renderers") or [])
+            for r in ((push_ev or ev).extra.get("renderers") or [])
         ]
         # Device chips: use only the ``device_ids`` snapshot the push
         # pipeline wrote to ``extra`` at push time. v0.69.17 (issue #52
@@ -141,23 +168,30 @@ def history_view(rows: list[EventRow]) -> list[dict[str, Any]]:
         # devices" isn't. Button rows always target a device directly,
         # so pull the target chip from ``ev.target`` in that case.
         device_ids = list(ev.extra.get("device_ids") or [])
-        if ev.source == "button" and not device_ids and ev.target in device_meta:
+        if not device_ids and ev.target in device_meta:
             device_ids = [ev.target]
         target_devices = [device_meta[did] for did in device_ids if did in device_meta]
-        # Button rows carry the pressed button, resolved action, and
+        # Press rows carry the pressed button, resolved action, and
         # resulting page in ``extra``. Fold those into a short detail
         # string the template renders below the main row so the "what
         # actually happened" is visible without opening the raw event
-        # (which the History page doesn't expose today).
-        button_detail = _button_detail(ev, page_names) if ev.source == "button" else None
-        preview_digest = _preview_digest(ev)
+        # (which the History page doesn't expose today). Rows without
+        # those keys (ordinary pushes) resolve to None and drop the line.
+        button_detail = _button_detail(ev, page_names)
+        preview_digest = _preview_digest(ev) or (_preview_digest(push_ev) if push_ev else None)
+        # A folded row resends and times as its push half; deletion
+        # removes both halves via ``ids``.
+        resend_ev = push_ev if push_ev is not None and push_ev.digest else ev
         out.append(
             {
                 "id": ev.id,
+                "ids": [ev.id] + ([push_ev.id] if push_ev is not None else []),
                 "status": ev.status,
+                "push_status": push_ev.status if push_ev is not None else None,
                 "digest": ev.digest,
                 "preview_digest": preview_digest,
-                "can_resend": bool(ev.digest),
+                "can_resend": bool(resend_ev.digest),
+                "resend_id": resend_ev.id,
                 "source": ev.source,
                 "target": target,
                 "target_devices": target_devices,
@@ -170,8 +204,8 @@ def history_view(rows: list[EventRow]) -> list[dict[str, Any]]:
                 "abs": datetime.fromtimestamp(ev.timestamp, tz=app_timezone()).strftime(
                     "%Y-%m-%d %H:%M:%S"
                 ),
-                "duration_s": ev.duration_s,
-                "error": ev.error,
+                "duration_s": ev.duration_s or (push_ev.duration_s if push_ev is not None else 0.0),
+                "error": ev.error or (push_ev.error if push_ev is not None else None),
                 "renderers": renderers,
                 "button_detail": button_detail,
             }
@@ -242,6 +276,14 @@ def index() -> str:
         "yes",
         "on",
     )
+    # Press rows fold into the push row they triggered by default; the
+    # toggle shows the raw two-row form for anyone auditing the log.
+    split_presses = (request.args.get("split_presses") or "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
     # v0.69.17 (issue #52 follow-up): opt-in sort by dashboard name so
     # a user drilling into "how did dashboard X fare over the last week"
     # can read consecutive rows without scanning back and forth. Default
@@ -257,7 +299,8 @@ def index() -> str:
             source=source,
             exclude_statuses=exclude_statuses,
             limit=100,
-        )
+        ),
+        fold_presses=not split_presses,
     )
     if sort_mode == "dashboard":
         # Stable-sort by the resolved target label (page name or
@@ -287,6 +330,7 @@ def index() -> str:
         chips=chips,
         active_source=source,
         include_skipped=include_skipped,
+        split_presses=split_presses,
         sort_mode=sort_mode,
     )
 

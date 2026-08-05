@@ -75,26 +75,40 @@
   {% endfor %}
   {# Skipped-pushes toggle preserves the existing behaviour, restyled. #}
   {% if include_skipped %}
-  <a href="{{ url_for('history.index', source=active_source, sort=(sort_mode if sort_mode != 'time' else None)) }}"
+  <a href="{{ url_for('history.index', source=active_source, split_presses=(1 if split_presses else None), sort=(sort_mode if sort_mode != 'time' else None)) }}"
      class="dx-filter-chip is-active" title="Hide skipped pushes (quiet hours, condition holds)">
     <i class="ph ph-eye" aria-hidden="true"></i><span>Skipped shown</span>
   </a>
   {% else %}
-  <a href="{{ url_for('history.index', source=active_source, include_skipped=1, sort=(sort_mode if sort_mode != 'time' else None)) }}"
+  <a href="{{ url_for('history.index', source=active_source, include_skipped=1, split_presses=(1 if split_presses else None), sort=(sort_mode if sort_mode != 'time' else None)) }}"
      class="dx-filter-chip" title="Show pushes skipped by quiet hours or condition holds">
     <i class="ph ph-eye-closed" aria-hidden="true"></i><span>Show skipped</span>
+  </a>
+  {% endif %}
+  {# Press-fold toggle: by default a button/touch press and the push it
+     triggered render as one merged row; splitting shows the raw
+     two-row log for auditing. #}
+  {% if split_presses %}
+  <a href="{{ url_for('history.index', source=active_source, include_skipped=(1 if include_skipped else None), sort=(sort_mode if sort_mode != 'time' else None)) }}"
+     class="dx-filter-chip is-active" title="Fold button presses into the push they triggered">
+    <i class="ph ph-arrows-in-line-vertical" aria-hidden="true"></i><span>Presses split</span>
+  </a>
+  {% else %}
+  <a href="{{ url_for('history.index', source=active_source, include_skipped=(1 if include_skipped else None), split_presses=1, sort=(sort_mode if sort_mode != 'time' else None)) }}"
+     class="dx-filter-chip" title="Show presses and the pushes they triggered as separate rows">
+    <i class="ph ph-arrows-out-line-vertical" aria-hidden="true"></i><span>Split presses</span>
   </a>
   {% endif %}
   {# v0.69.17: sort toggle. Default "Newest first" is chronological
      (rows already come back that way from the event log); "By
      dashboard" groups rows sharing a target so a per-dashboard read
      is one scroll rather than a needle-in-haystack scan. #}
-  <a href="{{ url_for('history.index', source=active_source, include_skipped=(1 if include_skipped else None)) }}"
+  <a href="{{ url_for('history.index', source=active_source, include_skipped=(1 if include_skipped else None), split_presses=(1 if split_presses else None)) }}"
      class="dx-filter-chip{% if sort_mode == 'time' %} is-active{% endif %}"
      title="Sort chronologically (newest first)">
     <i class="ph ph-clock-counter-clockwise" aria-hidden="true"></i><span>Newest first</span>
   </a>
-  <a href="{{ url_for('history.index', source=active_source, include_skipped=(1 if include_skipped else None), sort='dashboard') }}"
+  <a href="{{ url_for('history.index', source=active_source, include_skipped=(1 if include_skipped else None), split_presses=(1 if split_presses else None), sort='dashboard') }}"
      class="dx-filter-chip{% if sort_mode == 'dashboard' %} is-active{% endif %}"
      title="Group rows sharing a dashboard (or device, for button rows)">
     <i class="ph ph-squares-four" aria-hidden="true"></i><span>By dashboard</span>
@@ -138,10 +152,11 @@
   </div>
   {% else %}
   <ul class="dx-discovered-list">
+    {% set ok_statuses = ('sent', 'busy', 'quiet', 'no_change', 'dispatched', 'webhook_dispatched', 'fetched', 'noop', 'deduped', 'unmapped') %}
     {% for ev in history %}
-    {% set is_failed = ev.status not in ('sent', 'busy', 'quiet', 'no_change', 'dispatched', 'webhook_dispatched', 'fetched', 'noop', 'deduped', 'unmapped') %}
+    {% set is_failed = ev.status not in ok_statuses or (ev.push_status and ev.push_status not in ok_statuses) %}
     <li class="dx-inset-row dx-history-row{% if is_failed %} dx-history-row--failed{% endif %}">
-      <input type="checkbox" class="dx-history-select" value="{{ ev.id }}"
+      <input type="checkbox" class="dx-history-select" value="{{ ev.ids|join(',') }}"
              aria-label="Select entry #{{ ev.id }}" title="Select for bulk delete">
       {% if ev.preview_digest %}
       <a class="dx-history-thumb" href="{{ url_for('renders', filename=ev.preview_digest ~ '.png') }}" data-lightbox aria-label="Open render for push #{{ ev.id }}">
@@ -171,17 +186,28 @@
       </div>
       <div class="dx-history-end">
         {{ status_chip(ev.status) }}
+        {% if ev.push_status %}{{ status_chip(ev.push_status) }}{% endif %}
         <span class="dx-history-dur">{% if ev.duration_s %}{{ '%.1f'|format(ev.duration_s) }}s{% else %}—{% endif %}</span>
-        <form method="post" action="{{ url_for('send.resend', event_id=ev.id) }}" class="form form--inline">
+        <form method="post" action="{{ url_for('send.resend', event_id=ev.resend_id) }}" class="form form--inline">
           <button type="submit" class="dx-btn-ghost-sm dx-btn-icon-only" {% if not ev.can_resend %}disabled title="preview only; resend from the original push"{% else %}title="Resend this push"{% endif %}>
             <i class="ph ph-arrow-clockwise" aria-hidden="true"></i>
           </button>
         </form>
+        {# A folded row deletes both of its halves through the bulk endpoint. #}
+        {% if ev.ids|length > 1 %}
+        <form method="post" action="{{ url_for('send.bulk_delete') }}" class="form form--inline" onsubmit="return confirm('Delete this entry?');">
+          {% for rid in ev.ids %}<input type="hidden" name="event_ids" value="{{ rid }}">{% endfor %}
+          <button type="submit" class="dx-btn-ghost-sm dx-btn-icon-only" title="Delete entry">
+            <i class="ph ph-trash" aria-hidden="true"></i>
+          </button>
+        </form>
+        {% else %}
         <form method="post" action="{{ url_for('send.delete', event_id=ev.id) }}" class="form form--inline" onsubmit="return confirm('Delete this entry?');">
           <button type="submit" class="dx-btn-ghost-sm dx-btn-icon-only" title="Delete entry">
             <i class="ph ph-trash" aria-hidden="true"></i>
           </button>
         </form>
+        {% endif %}
       </div>
     </li>
     {% endfor %}
@@ -245,9 +271,13 @@
     form.addEventListener('submit', function () {
       form.querySelectorAll('input[name="event_ids"]').forEach(function (n) { n.remove(); });
       selected().forEach(function (b) {
-        const inp = document.createElement('input');
-        inp.type = 'hidden'; inp.name = 'event_ids'; inp.value = b.value;
-        form.appendChild(inp);
+        // Folded press+push rows carry both ids comma-joined; each id
+        // becomes its own event_ids field for the bulk endpoint.
+        b.value.split(',').forEach(function (id) {
+          const inp = document.createElement('input');
+          inp.type = 'hidden'; inp.name = 'event_ids'; inp.value = id;
+          form.appendChild(inp);
+        });
       });
     });
     clearBtn.addEventListener('click', function () {

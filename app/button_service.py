@@ -1766,7 +1766,11 @@ class ButtonService:
         ``extra`` so History can render the exact existing frame without
         changing that resend contract. ``origin`` becomes the row's source
         (``button`` / ``touch``); ``origin_extra`` carries the origin-specific
-        fields (button name vs stroke + gesture)."""
+        fields (button name vs stroke + gesture). ``push_event_id`` links the
+        press row to the push row its action logged (the push completes before
+        this row is written, so the id is already known); the History page
+        folds the pair into one display row. None when the press produced no
+        push (warm promote, dedup, unmapped, fetch, webhook)."""
         if self._event_log is None:
             return
         try:
@@ -1788,6 +1792,7 @@ class ButtonService:
                     "step_page_id": result.step_page_id,
                     "pushed_page_id": result.pushed_page_id,
                     "manual_override": result.manual_override,
+                    "push_event_id": getattr(result.push_result, "event_id", None),
                     **(
                         {"composition_digest": composition_digest}
                         if composition_digest is not None

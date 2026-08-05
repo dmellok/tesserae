@@ -78,7 +78,9 @@ class StubPushManager:
                 "source": source,
             }
         )
-        return PushResult(status="pushed", page_id=page_id)
+        # Stamp a predictable event-log id so tests can assert the press
+        # row's ``push_event_id`` link (first push -> 101, second -> 102...).
+        return PushResult(status="pushed", page_id=page_id, event_id=100 + len(self.calls))
 
 
 @pytest.fixture
@@ -813,6 +815,7 @@ def test_dispatched_press_emits_history_row(
     assert row.extra["rotation_id"] == "kitchen_rot"
     assert row.extra["step_index"] == 1
     assert row.extra["pushed_page_id"] == "afternoon"
+    assert row.extra["push_event_id"] == 101
 
 
 def test_deduped_press_emits_history_row(
