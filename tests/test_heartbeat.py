@@ -107,7 +107,8 @@ def test_build_payload_ignores_builtin_kinds(tmp_path: Path, test_install_uuid: 
     the operator's hardware, so counting the catalog kinds made every install
     report "10+". The count, transport, and kinds must key off instances."""
     devices = [
-        # 22 catalog kinds (kind_of None): 8 built-ins + 14 SKUs in the repo.
+        # Catalog kinds (kind_of None); the repo ships 33 (10 built-ins +
+        # 23 SKUs), the exact count here doesn't matter.
         *[_device(None, "mqtt") for _ in range(22)],
         # One real instance the operator actually configured.
         _device("pi_bin_client", "rest"),

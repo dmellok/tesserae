@@ -21,5 +21,5 @@
   },
   "refresh_floor_s": 60,
   "image_format": "bin",
-  "notes_md": "Awaiting confirmed test on real hardware. Frame is byte-identical to the seeed_reterminal_e1004 and waveshare_133e6 targets: 960000 bytes exactly (1200*1600/2), two pixels per byte with high nibble = LEFT (even column), low nibble = RIGHT (odd column), row-major, 600 bytes per row, top-left origin. Palette nibbles match the firmware's Spectra 6 constants byte-for-byte (black=0x0, white=0x1, yellow=0x2, red=0x3, blue=0x5, green=0x6; 0x4 and 0x7 reserved). Renderer keeps normal top-left orientation; if hardware testing surfaces a physical flip, the firmware rotates on-device rather than the server pre-rotating."
+  "notes_md": "Confirmed on real hardware running tesserae-device-firmware. Frame is byte-identical to the seeed_reterminal_e1004 and waveshare_133e6 targets: 960000 bytes exactly (1200*1600/2), two pixels per byte with high nibble = LEFT (even column), low nibble = RIGHT (odd column), row-major, 600 bytes per row, top-left origin. Palette nibbles match the firmware's Spectra 6 constants byte-for-byte (black=0x0, white=0x1, yellow=0x2, red=0x3, blue=0x5, green=0x6; 0x4 and 0x7 reserved). Renderer keeps normal top-left orientation; if hardware testing surfaces a physical flip, the firmware rotates on-device rather than the server pre-rotating."
 }

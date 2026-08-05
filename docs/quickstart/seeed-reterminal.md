@@ -8,7 +8,7 @@ The Seeed reTerminal E Series e-paper terminals: E1001 (7.5" mono), E1002 (7.3" 
     Stay on this page if you want to run TRMNL's firmware and use Tesserae as the BYOS server, or if the unified firmware doesn't yet cover your specific board revision.
 
 !!! note "Verified vs Pending"
-    The E1003 has been confirmed end-to-end on real hardware. The E1001, E1002, and E1004 use the same flashing flow; the TRMNL firmware port for E1004 is still in progress upstream.
+    All four E-Series boards are confirmed on real hardware running the native Tesserae firmware (the [unified Seeed guide](seeed-unified.md)). On this page's TRMNL BYOS path, the E1003 has been confirmed end-to-end; the E1001, E1002, and E1004 use the same flashing flow, and the TRMNL firmware port for the E1004 is still in progress upstream.
 
 ## 01 — Flash TRMNL firmware
 

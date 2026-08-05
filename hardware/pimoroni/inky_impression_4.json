@@ -18,5 +18,5 @@
   },
   "refresh_floor_s": 30,
   "image_format": "bin",
-  "notes_md": "Awaiting confirmed test on real hardware. The pi_png client is also compatible if you prefer the on-Pi quantise path; switch by configuring a `pi_png_client` device instance with the same panel preset."
+  "notes_md": "Confirmed on real hardware via the pi_bin / pi_png clients. The pi_png client is also compatible if you prefer the on-Pi quantise path; switch by configuring a `pi_png_client` device instance with the same panel preset."
 }

@@ -141,20 +141,20 @@ The reTerminal E-Series and XIAO ePaper family run the [Tesserae-native firmware
 
 | Model | Panel | Client | Status |
 |---|---|---|---|
-| [reTerminal E1001](https://www.seeedstudio.com/reTerminal-E1001-p-6534.html) | 7.5" mono, 800×480 | [tesserae-device-firmware](https://github.com/dmellok/tesserae-device-firmware) | TBD |
+| [reTerminal E1001](https://www.seeedstudio.com/reTerminal-E1001-p-6534.html) | 7.5" mono, 800×480 | [tesserae-device-firmware](https://github.com/dmellok/tesserae-device-firmware) | ✅ |
 | [reTerminal E1002](https://www.seeedstudio.com/reTerminal-E1002-p-6533.html) | 7.3" Spectra 6, 800×480 | [tesserae-device-firmware](https://github.com/dmellok/tesserae-device-firmware) | ✅ |
 | [reTerminal E1003](https://www.seeedstudio.com/reTerminal-E1003-p-6731.html) | 10.3" mono, 16-level grey, 1872×1404 | [tesserae-device-firmware](https://github.com/dmellok/tesserae-device-firmware) | ✅ |
 | [reTerminal E1004](https://www.seeedstudio.com/reTerminal-E1004-p-6692.html) | 13.3" Spectra 6, 1200×1600 | [tesserae-device-firmware](https://github.com/dmellok/tesserae-device-firmware) | ✅ |
-| [XIAO ePaper EE02](https://www.seeedstudio.com/XIAO-ePaper-DIY-Kit-EE02-for-13-3-Spectratm-6-E-Ink.html) | 13.3" Spectra 6, 1200×1600 | [tesserae-device-firmware](https://github.com/dmellok/tesserae-device-firmware) | TBD |
+| [XIAO ePaper EE02](https://www.seeedstudio.com/XIAO-ePaper-DIY-Kit-EE02-for-13-3-Spectratm-6-E-Ink.html) | 13.3" Spectra 6, 1200×1600 | [tesserae-device-firmware](https://github.com/dmellok/tesserae-device-firmware) | ✅ |
 | [XIAO 7.5" ePaper Panel](https://www.seeedstudio.com/XIAO-7-5-ePaper-Panel-p-6416.html) | 7.5" mono, 800×480 | [tesserae-device-firmware](https://github.com/dmellok/tesserae-device-firmware) | TBD |
-| [TRMNL 7.5" OG DIY Kit](https://www.seeedstudio.com/TRMNL-7-5-Inch-OG-DIY-Kit-p-6481.html) | 7.5" mono, 800×480 | TRMNL firmware | TBD via BYOS |
+| [TRMNL 7.5" OG DIY Kit](https://www.seeedstudio.com/TRMNL-7-5-Inch-OG-DIY-Kit-p-6481.html) | 7.5" mono, 800×480 | TRMNL firmware | ✅ via BYOS |
 
 ### Pimoroni Inky
 
 | Panel | Resolution | Client | Status |
 |---|---|---|---|
-| [Inky Impression 4"](https://shop.pimoroni.com/products/inky-impression) (6-colour Spectra 6) | 600×400 | [pi-png](https://github.com/dmellok/tesserae-device-pi-png) or [pi-bin](https://github.com/dmellok/tesserae-device-pi-bin) | TBD |
-| Inky Impression 4" (legacy 7-colour ACeP) | 640×400 | [pi-png](https://github.com/dmellok/tesserae-device-pi-png) or [pi-bin](https://github.com/dmellok/tesserae-device-pi-bin) | TBD |
+| [Inky Impression 4"](https://shop.pimoroni.com/products/inky-impression) (6-colour Spectra 6) | 600×400 | [pi-png](https://github.com/dmellok/tesserae-device-pi-png) or [pi-bin](https://github.com/dmellok/tesserae-device-pi-bin) | ✅ |
+| Inky Impression 4" (legacy 7-colour ACeP) | 640×400 | [pi-png](https://github.com/dmellok/tesserae-device-pi-png) or [pi-bin](https://github.com/dmellok/tesserae-device-pi-bin) | ✅ |
 | [Inky Impression 5.7"](https://shop.pimoroni.com/products/inky-impression-5-7) (7-colour ACeP) | 600×448 | [pi-png](https://github.com/dmellok/tesserae-device-pi-png) or [pi-bin](https://github.com/dmellok/tesserae-device-pi-bin) | ✅ |
 | [Inky Impression 7.3"](https://shop.pimoroni.com/products/inky-impression?variant=55186435244411) (6-colour Spectra 6) | 800×480 | [pi-png](https://github.com/dmellok/tesserae-device-pi-png) or [pi-bin](https://github.com/dmellok/tesserae-device-pi-bin) | ✅ |
 | [Inky Impression 13.3"](https://shop.pimoroni.com/products/inky-impression?variant=55186435277179) (6-colour Spectra 6) | 1600×1200 | [pi-png](https://github.com/dmellok/tesserae-device-pi-png) or [pi-bin](https://github.com/dmellok/tesserae-device-pi-bin) | ✅ |

@@ -18,5 +18,5 @@
   },
   "refresh_floor_s": 60,
   "image_format": "png",
-  "notes_md": "Awaiting confirmed test on real hardware. The XIAO TRMNL firmware sends its MAC in the Id header (uppercase, colon-separated); Tesserae's BYOS layer matches case-insensitively, no extra configuration needed."
+  "notes_md": "Confirmed on real hardware running the XIAO TRMNL firmware. The XIAO TRMNL firmware sends its MAC in the Id header (uppercase, colon-separated); Tesserae's BYOS layer matches case-insensitively, no extra configuration needed."
 }

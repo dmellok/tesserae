@@ -18,5 +18,5 @@
   },
   "refresh_floor_s": 60,
   "image_format": "bin",
-  "notes_md": "Awaiting confirmed test on real hardware. Wire format is exactly 48000 bytes (800*480/8), MSB=leftmost pixel, bit-set=white, bit-clear=black; no header, no padding, no checksum. Matches the firmware's raw-framebuffer expectation byte-for-byte. If you have an E1001 flashed with TRMNL BYOS firmware instead of the tesserae unified firmware, register against the trmnl_client kind directly; the trmnl_png renderer produces a 1-bit PNG at 800x480 that the TRMNL firmware paints via its native PNG decoder."
+  "notes_md": "Confirmed on real hardware running tesserae-device-firmware. Wire format is exactly 48000 bytes (800*480/8), MSB=leftmost pixel, bit-set=white, bit-clear=black; no header, no padding, no checksum. Matches the firmware's raw-framebuffer expectation byte-for-byte. If you have an E1001 flashed with TRMNL BYOS firmware instead of the tesserae unified firmware, register against the trmnl_client kind directly; the trmnl_png renderer produces a 1-bit PNG at 800x480 that the TRMNL firmware paints via its native PNG decoder."
 }

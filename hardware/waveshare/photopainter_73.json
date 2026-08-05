@@ -21,5 +21,5 @@
   },
   "refresh_floor_s": 60,
   "image_format": "bin",
-  "notes_md": "Awaiting confirmed test on real hardware. Palette nibbles align with the firmware's Spectra 6 constants byte-for-byte (black=0x0, white=0x1, yellow=0x2, red=0x3, blue=0x5, green=0x6; 0x4 and 0x7 reserved), and the buffer is byte-identical to the Seeed reTerminal E1002 output at 800x480: two pixels per byte, high nibble = LEFT (even column), low nibble = RIGHT (odd column), row-major, 400 bytes per row, top-left origin. Do not pre-rotate at render time even though the panel mounts 180 deg physically; the firmware rotates on-device."
+  "notes_md": "Confirmed on real hardware running tesserae-device-firmware. Palette nibbles align with the firmware's Spectra 6 constants byte-for-byte (black=0x0, white=0x1, yellow=0x2, red=0x3, blue=0x5, green=0x6; 0x4 and 0x7 reserved), and the buffer is byte-identical to the Seeed reTerminal E1002 output at 800x480: two pixels per byte, high nibble = LEFT (even column), low nibble = RIGHT (odd column), row-major, 400 bytes per row, top-left origin. Do not pre-rotate at render time even though the panel mounts 180 deg physically; the firmware rotates on-device."
 }

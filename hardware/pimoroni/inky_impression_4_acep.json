@@ -18,5 +18,5 @@
   },
   "refresh_floor_s": 30,
   "image_format": "bin",
-  "notes_md": "Awaiting confirmed test on real hardware. If you own the current 600x400 Spectra 6 variant, use `pimoroni_inky_4` instead; the two panels share the product name but not the panel dims or the ink chemistry, so picking the wrong kind will paint at the wrong resolution."
+  "notes_md": "Confirmed on real hardware via the pi_bin / pi_png clients. If you own the current 600x400 Spectra 6 variant, use `pimoroni_inky_4` instead; the two panels share the product name but not the panel dims or the ink chemistry, so picking the wrong kind will paint at the wrong resolution."
 }

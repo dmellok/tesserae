@@ -19,5 +19,5 @@
   },
   "refresh_floor_s": 60,
   "image_format": "bin",
-  "notes_md": "Awaiting confirmed test on real hardware. Wire format is exactly 96000 bytes (800*480/4), row-major from top-left, 4 pixels per byte MSB first (bits 7-6 = leftmost pixel), 2-bit value 0b00 = black, 0b11 = white, linear 4-level gray; no header, no padding, no checksum. Same physical unit as `seeed_reterminal_e1001`; pick this kind when the unit runs the grayscale firmware build. The server migrates a registered E1001 to this kind automatically when its firmware re-registers or re-discovers declaring it (same-protocol kind heal)."
+  "notes_md": "Confirmed on real hardware running the tesserae-device-firmware grayscale build. Wire format is exactly 96000 bytes (800*480/4), row-major from top-left, 4 pixels per byte MSB first (bits 7-6 = leftmost pixel), 2-bit value 0b00 = black, 0b11 = white, linear 4-level gray; no header, no padding, no checksum. Same physical unit as `seeed_reterminal_e1001`; pick this kind when the unit runs the grayscale firmware build. The server migrates a registered E1001 to this kind automatically when its firmware re-registers or re-discovers declaring it (same-protocol kind heal)."
 }

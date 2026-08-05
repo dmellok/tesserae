@@ -4,6 +4,20 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.265.1], 2026-08-05
+
+### Fixed
+
+- **Hardware verification records caught up with the bench.** The
+  reTerminal E1001 (mono and 4-level grayscale), XIAO 13.3" ePaper
+  EE02, TRMNL 7.5" OG DIY Kit, both Inky Impression 4" variants, the
+  Waveshare 13.3" Spectra 6, and the 7.3" PhotoPainter are now
+  recorded as confirmed on real hardware in their SKU manifests, the
+  test matrix, the README tables, and the quickstart banners. The
+  docs landing page counts thirteen confirmed panels (plus the
+  community-confirmed PicPak) and the architecture doc's stale
+  "58 widgets" claim is corrected to the actual 35.
+
 ## [0.265.0], 2026-08-05
 
 ### Added
