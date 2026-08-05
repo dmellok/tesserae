@@ -41,11 +41,11 @@ def app(tmp_path: Path) -> Flask:
     return a
 
 
-def _token(app: Flask) -> str:
+def _token(app: Flask, client: dict[str, str] | None = None) -> str:
     code = app.config["COMPANION_PAIRING_STORE"].issue(note="t").code
     resp = app.test_client().post(
         "/api/app/v1/pair",
-        data=json.dumps({"code": code, "client": _CLIENT}),
+        data=json.dumps({"code": code, "client": client or _CLIENT}),
         content_type="application/json",
     )
     return str(resp.get_json()["token"])
@@ -204,7 +204,10 @@ def test_personal_data_changes_emit_semantic_events_after_storage(app: Flask) ->
     initial = _multi_list_snapshot(now)
 
     assert _put_multi(app, token, initial).status_code == 200
-    assert capture.events == [DataChangeEvent("personal_data.reminders")]
+    initial_list_ids = frozenset(str(item["id"]) for item in initial["data"]["lists"])
+    assert capture.events == [
+        DataChangeEvent("personal_data.reminders", selectors=initial_list_ids)
+    ]
     assert app.config["PERSONAL_DATA_STORE"].get("reminders")["snapshot"] == initial
 
     # Republishing identical list contents only renews freshness/TTL.
@@ -228,7 +231,9 @@ def test_personal_data_changes_emit_semantic_events_after_storage(app: Flask) ->
     capture.events.clear()
     response = app.test_client().delete("/api/app/v1/personal-data/reminders", headers=_auth(token))
     assert response.status_code == 204
-    assert capture.events == [DataChangeEvent("personal_data.reminders")]
+    assert capture.events == [
+        DataChangeEvent("personal_data.reminders", selectors=initial_list_ids)
+    ]
 
     # Idempotent DELETE has no second event.
     capture.events.clear()
@@ -266,6 +271,91 @@ def test_empty_list_set_is_a_fresh_enabled_snapshot(app: Flask) -> None:
     )
     assert status.status_code == 200
     assert status.get_json()["sources"][0]["state"] == "fresh"
+
+
+def test_publishers_cannot_overwrite_or_delete_each_others_reminders(app: Flask) -> None:
+    client_a = {
+        **_CLIENT,
+        "name": "Alice iPhone",
+        "installation_id": "11111111-1111-4111-8111-111111111111",
+    }
+    client_b = {
+        **_CLIENT,
+        "name": "Bob iPhone",
+        "installation_id": "22222222-2222-4222-8222-222222222222",
+    }
+    token_a = _token(app, client_a)
+    token_b = _token(app, client_b)
+    now = datetime.now(UTC).replace(microsecond=0)
+    alice = _multi_list_snapshot(
+        now,
+        lists=[{"id": "alice-list", "title": "Groceries", "items": []}],
+    )
+    # Deliberately older than Alice: publisher-local ordering must still accept it.
+    bob = _multi_list_snapshot(
+        now - timedelta(minutes=5),
+        lists=[{"id": "bob-list", "title": "Groceries", "items": []}],
+    )
+
+    assert _put_multi(app, token_a, alice).status_code == 200
+    assert _put_multi(app, token_b, bob).status_code == 200
+
+    publications = app.config["PERSONAL_DATA_STORE"].publications("reminders")
+    assert [item["publisher_name"] for item in publications] == ["Alice iPhone", "Bob iPhone"]
+    assert {item["snapshot"]["data"]["lists"][0]["id"] for item in publications} == {
+        "alice-list",
+        "bob-list",
+    }
+
+    alice_status = app.test_client().get("/api/app/v1/personal-data/status", headers=_auth(token_a))
+    bob_status = app.test_client().get("/api/app/v1/personal-data/status", headers=_auth(token_b))
+    assert alice_status.get_json()["sources"][0]["generated_at"] == _iso(now)
+    assert bob_status.get_json()["sources"][0]["generated_at"] == _iso(now - timedelta(minutes=5))
+
+    assert (
+        app.test_client()
+        .delete("/api/app/v1/personal-data/reminders", headers=_auth(token_a))
+        .status_code
+        == 204
+    )
+    assert (
+        app.test_client()
+        .get("/api/app/v1/personal-data/status", headers=_auth(token_a))
+        .get_json()["sources"]
+        == []
+    )
+    assert [
+        source["source_id"]
+        for source in app.test_client()
+        .get("/api/app/v1/personal-data/status", headers=_auth(token_b))
+        .get_json()["sources"]
+    ] == ["reminders"]
+    remaining = app.config["PERSONAL_DATA_STORE"].publications("reminders")
+    assert [item["publisher_name"] for item in remaining] == ["Bob iPhone"]
+
+
+def test_repairing_the_same_installation_keeps_one_publisher(app: Flask) -> None:
+    first_token = _token(app)
+    second_token = _token(app)
+    now = datetime.now(UTC).replace(microsecond=0)
+    first = _multi_list_snapshot(
+        now,
+        lists=[{"id": "food", "title": "Groceries", "items": []}],
+    )
+    second = _multi_list_snapshot(
+        now + timedelta(minutes=1),
+        lists=[{"id": "food", "title": "Groceries", "items": []}],
+    )
+
+    assert _put_multi(app, first_token, first).status_code == 200
+    assert _put_multi(app, second_token, second).status_code == 200
+
+    publications = app.config["PERSONAL_DATA_STORE"].publications("reminders")
+    assert len(publications) == 1
+    assert publications[0]["snapshot"]["generated_at"] == _iso(now + timedelta(minutes=1))
+    for token in (first_token, second_token):
+        status = app.test_client().get("/api/app/v1/personal-data/status", headers=_auth(token))
+        assert status.get_json()["sources"][0]["generated_at"] == _iso(now + timedelta(minutes=1))
 
 
 def test_put_ordering(app: Flask) -> None:
@@ -390,11 +480,13 @@ def test_expiry_redacts_values_but_preserves_metadata_state(app: Flask) -> None:
     token = _token(app)
     now = datetime.now(UTC).replace(microsecond=0)
     store = app.config["PERSONAL_DATA_STORE"]
-    store.put(
-        "reminders",
-        snapshot=_multi_list_snapshot(now - timedelta(hours=49)),
-        generated_epoch=(now - timedelta(hours=49)).timestamp(),
-        expires_epoch=(now - timedelta(hours=1)).timestamp(),
+    assert (
+        _put_multi(
+            app,
+            token,
+            _multi_list_snapshot(now - timedelta(hours=49), ttl_hours=48),
+        ).status_code
+        == 200
     )
 
     response = app.test_client().get(

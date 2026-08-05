@@ -85,6 +85,10 @@ def personal_data_update_event(
     previous_data = _snapshot_data(previous)
     current_data = _snapshot_data(current)
     if previous_data is None:
+        if source_id == "reminders":
+            current_lists = _reminder_lists(current)
+            if current_lists:
+                return DataChangeEvent(source=source, selectors=frozenset(current_lists))
         return DataChangeEvent(source=source)
     if source_id == "reminders.fridge":
         previous_items = previous_data.get("items") if isinstance(previous_data, dict) else None
@@ -109,9 +113,16 @@ def personal_data_update_event(
     return DataChangeEvent(source=source, selectors=frozenset(changed))
 
 
-def personal_data_delete_event(source_id: str) -> DataChangeEvent:
-    """DELETE invalidates every placement for the removed source."""
-    return DataChangeEvent(source=f"personal_data.{source_id}")
+def personal_data_delete_event(
+    source_id: str, previous: dict[str, Any] | None = None
+) -> DataChangeEvent:
+    """DELETE invalidates only known selectors, else the complete source."""
+    source = f"personal_data.{source_id}"
+    if source_id == "reminders":
+        previous_lists = _reminder_lists(previous)
+        if previous_lists:
+            return DataChangeEvent(source=source, selectors=frozenset(previous_lists))
+    return DataChangeEvent(source=source)
 
 
 def _selector_values(raw: Any) -> set[str]:

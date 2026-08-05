@@ -25,6 +25,7 @@ mypy --strict applies to this module, see pyproject.toml.
 
 from __future__ import annotations
 
+import hashlib
 import json as _json
 import logging
 import re
@@ -211,6 +212,20 @@ def _events() -> EventLog:
 
 def _personal_data() -> PersonalDataSnapshotStore:
     return current_app.config["PERSONAL_DATA_STORE"]  # type: ignore[no-any-return]
+
+
+def _personal_data_publisher() -> tuple[str, str]:
+    """Stable, non-PII publisher identity derived from the paired app install."""
+    record = g.companion
+    client = record.client if isinstance(record.client, dict) else {}
+    installation_id = client.get("installation_id")
+    stable_input = (
+        installation_id
+        if isinstance(installation_id, str) and installation_id
+        else str(record.token_id)
+    )
+    digest = hashlib.sha256(f"companion-publisher:{stable_input}".encode()).hexdigest()[:24]
+    return f"companion_{digest}", record.name
 
 
 def _notify_data_change(event: DataChangeEvent | None) -> None:
@@ -656,7 +671,8 @@ def put_personal_data(source_id: str) -> Any:
     snapshot, gen, exp = result
     now = time.time()
     store = _personal_data()
-    existing = store.get(source_id)
+    publisher_id, publisher_name = _personal_data_publisher()
+    existing = store.get(source_id, publisher_id=publisher_id)
     if isinstance(existing, dict) and isinstance(existing.get("generated_epoch"), (int, float)):
         existing_gen = float(existing["generated_epoch"])
         if gen < existing_gen:
@@ -672,7 +688,14 @@ def put_personal_data(source_id: str) -> Any:
     if not isinstance(previous_snapshot, dict):
         previous_snapshot = None
     event = personal_data_update_event(source_id, previous_snapshot, snapshot)
-    store.put(source_id, snapshot=snapshot, generated_epoch=gen, expires_epoch=exp)
+    store.put(
+        source_id,
+        snapshot=snapshot,
+        generated_epoch=gen,
+        expires_epoch=exp,
+        publisher_id=publisher_id,
+        publisher_name=publisher_name,
+    )
     _notify_data_change(event)
     return jsonify(_source_status(source_id, gen, exp, now)), 200
 
@@ -683,9 +706,10 @@ def personal_data_status() -> Any:
     """Freshness metadata only, never the stored values."""
     now = time.time()
     store = _personal_data()
+    publisher_id, _publisher_name = _personal_data_publisher()
     store.purge_expired(now)
     sources = []
-    for source_id, rec in sorted(store.all().items()):
+    for source_id, rec in sorted(store.all(publisher_id=publisher_id).items()):
         gen, exp = rec.get("generated_epoch"), rec.get("expires_epoch")
         if isinstance(gen, (int, float)) and isinstance(exp, (int, float)):
             sources.append(_source_status(source_id, float(gen), float(exp), now))
@@ -696,8 +720,14 @@ def personal_data_status() -> Any:
 @_require_companion("personal_data:write")
 def delete_personal_data(source_id: str) -> Any:
     """Idempotently drop a source's snapshot (on disable)."""
-    if _personal_data().delete(source_id):
-        _notify_data_change(personal_data_delete_event(source_id))
+    store = _personal_data()
+    publisher_id, _publisher_name = _personal_data_publisher()
+    existing = store.get(source_id, publisher_id=publisher_id)
+    previous_snapshot = existing.get("snapshot") if isinstance(existing, dict) else None
+    if not isinstance(previous_snapshot, dict):
+        previous_snapshot = None
+    if store.delete(source_id, publisher_id=publisher_id):
+        _notify_data_change(personal_data_delete_event(source_id, previous_snapshot))
     return Response(status=204)
 
 
