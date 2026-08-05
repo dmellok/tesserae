@@ -92,6 +92,28 @@ def test_reminders_semantic_diff_returns_only_changed_list_ids() -> None:
     )
 
 
+def test_legacy_fridge_semantic_diff_ignores_item_order() -> None:
+    before = {
+        "data": {
+            "items": [
+                _list("food", "Groceries")["items"][0],
+                _list("work", "Work")["items"][0],
+            ]
+        }
+    }
+    after = {"data": {"items": list(reversed(before["data"]["items"]))}}
+
+    assert personal_data_update_event("reminders.fridge", before, after) is None
+
+    after["data"]["items"][0] = {
+        **after["data"]["items"][0],
+        "title": "Updated task",
+    }
+    assert personal_data_update_event("reminders.fridge", before, after) == DataChangeEvent(
+        source="personal_data.reminders.fridge"
+    )
+
+
 def test_first_snapshot_is_source_wide_even_when_it_contains_no_lists() -> None:
     current = _snapshot(
         generated="2026-08-05T00:00:00Z",
@@ -264,12 +286,14 @@ def test_coordinator_debounces_and_unions_selector_bursts(tmp_path: Path) -> Non
         page_store=store,
         plugin_registry=lambda: registry,
         refresh_pages=refresh,
-        debounce_seconds=0.05,
+        debounce_seconds=0.15,
     )
     coordinator.notify(DataChangeEvent("personal_data.reminders", selectors=frozenset({"food"})))
-    time.sleep(0.02)
+    time.sleep(0.10)
     coordinator.notify(DataChangeEvent("personal_data.reminders", selectors=frozenset({"work"})))
 
+    # A pure quiet-window debounce restarts on every event; it has no max cap.
+    assert not fired.wait(0.08)
     assert fired.wait(1.0)
     time.sleep(0.08)
     coordinator.stop()

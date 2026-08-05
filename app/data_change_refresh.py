@@ -77,14 +77,23 @@ def personal_data_update_event(
 
     Envelope timestamps and expiry are deliberately ignored. Reminders events
     identify only lists whose title or item set changed; list and item ordering
-    alone is not meaningful. The first usable snapshot is source-wide because
-    freshness/missing-source state can affect every configured placement.
+    alone is not meaningful. The deprecated fridge source likewise treats item
+    ordering as presentation-only. The first usable snapshot is source-wide
+    because freshness/missing-source state can affect every configured placement.
     """
     source = f"personal_data.{source_id}"
     previous_data = _snapshot_data(previous)
     current_data = _snapshot_data(current)
     if previous_data is None:
         return DataChangeEvent(source=source)
+    if source_id == "reminders.fridge":
+        previous_items = previous_data.get("items") if isinstance(previous_data, dict) else None
+        current_items = current_data.get("items") if isinstance(current_data, dict) else None
+        return (
+            None
+            if _canonical_items(previous_items) == _canonical_items(current_items)
+            else DataChangeEvent(source=source)
+        )
     if source_id != "reminders":
         return None if previous_data == current_data else DataChangeEvent(source=source)
 
@@ -214,6 +223,8 @@ class DataChangeRefreshCoordinator:
             generation = self._generation
             if self._timer is not None:
                 self._timer.cancel()
+            # Deliberately a pure quiet-window debounce in v1: there is no
+            # maximum-latency cap, so a sustained stream waits until it pauses.
             timer = threading.Timer(self._debounce_seconds, self._fire, args=(generation,))
             timer.daemon = True
             self._timer = timer
