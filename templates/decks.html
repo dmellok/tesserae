@@ -78,6 +78,10 @@
     </div>
   </div>
 
+  {% if c.warning %}
+  <p class="dk-warn"><i class="ph-fill ph-warning" aria-hidden="true"></i>{{ c.warning }}</p>
+  {% endif %}
+
   {% if c.kind == 'cycle' %}
   <div class="dk-body dk-body--cycle">
     {% for s in c.screens %}
@@ -125,6 +129,10 @@
 </article>
 {% endmacro %}
 
+{# Everything inside data-lineups-live is re-fetched and swapped in place by
+   the live-refresh loop below; keep interactive elements that hold JS
+   listeners (the wizard, the schedule forms) OUTSIDE it. #}
+<div data-lineups-live>
 {% if groups %}
 {% set seen = namespace(ids=[]) %}
 {% for g in groups %}
@@ -157,6 +165,7 @@
   </button>
 </div>
 {% endif %}
+</div>
 <script>
   (function () {
     // One-shot push animation when we just landed from an action (?hl=).
@@ -180,6 +189,65 @@
         if (!d.contains(e.target)) d.open = false;
       });
     });
+
+    // A thumbnail that isn't rendered yet comes back 202/empty and fires the
+    // img error handler; retry with backoff until the background render lands.
+    document.addEventListener('error', (e) => {
+      const img = e.target;
+      if (!(img instanceof HTMLImageElement) || !img.closest('.dk-screen-frame')) return;
+      const tries = Number(img.dataset.retries || 0);
+      if (tries >= 5) return;
+      img.dataset.retries = String(tries + 1);
+      setTimeout(() => {
+        const u = new URL(img.src, location.href);
+        u.searchParams.set('r', String(tries + 1));
+        img.src = u.toString();
+      }, 3000 * (tries + 1));
+    }, true);
+
+    // Live status: re-fetch the page and swap the Lineups region when the
+    // scheduler fires something (SSE, debounced) and on a slow fallback poll,
+    // so the playing badge, current step, next-advance time and thumbnails
+    // track reality without a manual reload. Swaps are skipped while the
+    // user is mid-interaction so nothing closes under the pointer.
+    const region = document.querySelector('[data-lineups-live]');
+    let refreshing = false;
+    const busy = () => {
+      const wizard = document.getElementById('timed-wizard');
+      return document.hidden
+        || (wizard && wizard.open)
+        || (region && region.querySelector('details.dk-more[open]'))
+        || (region && region.contains(document.activeElement)
+            && document.activeElement !== document.body);
+    };
+    const refresh = () => {
+      if (!region || refreshing || busy()) return;
+      refreshing = true;
+      fetch(location.pathname, { headers: { Accept: 'text/html' } })
+        .then((r) => (r.ok ? r.text() : Promise.reject(new Error('bad status'))))
+        .then((html) => {
+          const next = new DOMParser().parseFromString(html, 'text/html')
+            .querySelector('[data-lineups-live]');
+          if (!next || busy()) return;
+          // The empty state's wizard button carries a listener a swap would
+          // drop; if emptiness flipped, take the full reload instead.
+          const emptyNow = Boolean(region.querySelector('.dk-empty'));
+          const emptyNext = Boolean(next.querySelector('.dk-empty'));
+          if (emptyNow !== emptyNext) { location.reload(); return; }
+          region.replaceChildren(...next.childNodes);
+        })
+        .catch(() => {})
+        .finally(() => { refreshing = false; });
+    };
+    setInterval(refresh, 60000);
+    let sseTimer = null;
+    if (typeof EventSource === 'function') {
+      const es = new EventSource({{ url_for('events.stream')|tojson }});
+      es.addEventListener('log', () => {
+        clearTimeout(sseTimer);
+        sseTimer = setTimeout(refresh, 1500);
+      });
+    }
   })();
 </script>
 

@@ -137,6 +137,16 @@
         <p class="wizard-help" data-wizard-interval-hint></p>
       </div>
 
+      <div class="wizard-field" data-wizard-block="display" hidden>
+        <label class="wizard-label" for="wz-device">Display</label>
+        <select id="wz-device" data-wizard-device>
+          {% if devices|length > 1 %}<option value="">Choose a display…</option>{% endif %}
+          {% for d in devices %}<option value="{{ d.id }}">{{ d.display_name }}</option>{% endfor %}
+        </select>
+        <p class="wizard-help">The whole set plays on this display. Dashboards not yet
+          on any display are bound to it when you create.</p>
+      </div>
+
       <div class="wizard-field" data-wizard-block="multi" hidden>
         <div class="wizard-label-row">
           <label class="wizard-label" for="wz-query">Dashboards</label>
@@ -221,7 +231,7 @@
   </div>
 
   <script type="application/json" data-wizard-dashboards>
-    [{% for p in pages %}{"id": {{ p.id|tojson }}, "name": {{ p.name|tojson }}}{{ "," if not loop.last }}{% endfor %}]
+    [{% for p in pages %}{"id": {{ p.id|tojson }}, "name": {{ p.name|tojson }}, "devices": {{ p.device_ids|list|tojson }}}{{ "," if not loop.last }}{% endfor %}]
   </script>
 </dialog>
 <script src="{{ url_for('static', filename='timed_wizard.js') }}" defer></script>

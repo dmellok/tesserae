@@ -414,6 +414,21 @@
 }
 .dk-devchip i { font-size: 13px; }
 
+/* Delivery-gap notice: member dashboards bound to a different display. */
+.dk-warn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  padding: 6px 11px;
+  border-radius: 9px;
+  border: 1px solid color-mix(in oklab, var(--t-warn, #d97706) 40%, transparent);
+  background: color-mix(in oklab, var(--t-warn, #d97706) 12%, transparent);
+  color: var(--t-fg);
+  font-size: 12.5px;
+}
+.dk-warn i { color: var(--t-warn, #92400e); font-size: 15px; flex: none; }
+
 .dk-more { position: relative; display: inline-flex; }
 .dk-more > summary {
   list-style: none;

@@ -144,18 +144,18 @@ def _parse_form(form: Any, *, existing_id: str | None = None) -> Rotation:
     mode_raw = (form.get("mode") or "scheduled").strip()
     if mode_raw not in ("scheduled", "priority"):
         mode_raw = "scheduled"
+    getlist = form.getlist if hasattr(form, "getlist") else (lambda _k: [])
     payload: dict[str, Any] = {
         "id": rotation_id,
         "name": name,
         "enabled": form.get("enabled") in ("on", "true", "1"),
         "anchor": (form.get("anchor") or "00:00").strip(),
         "end_at": (form.get("end_at") or "").strip() or None,
-        "days_of_week": _parse_dow(
-            form.getlist("days_of_week") if hasattr(form, "getlist") else []
-        ),
-        # Rotation does NOT carry device bindings; each step's page
-        # already knows which devices it pushes to.
-        "device_ids": [],
+        "days_of_week": _parse_dow(getlist("days_of_week")),
+        # The wizard binds the rotation to its chosen display so the whole
+        # cycle plays there. Empty (the full form has no picker) falls
+        # through to each step page's own bindings.
+        "device_ids": [d.strip() for d in getlist("device_ids") if d and d.strip()],
         "priority": int(form.get("priority") or 0),
         "smart_sync": form.get("smart_sync") in ("on", "true", "1"),
         "smart_sync_lead_s": int(form.get("smart_sync_lead_s") or 10),
@@ -390,6 +390,16 @@ def create() -> Response:
         flash(msg, "error")
         return redirect(url_for("rotations.index"))
     _store().upsert(rotation)
+    # A picked dashboard that isn't on any display yet binds to the
+    # rotation's display, mirroring the deck editor's save behaviour, so a
+    # bound rotation can always render every step.
+    display = rotation.device_ids[0] if rotation.device_ids else None
+    if display:
+        pages = _pages()
+        for step_ in rotation.steps:
+            page = pages.get(step_.page_id)
+            if page is not None and not page.device_ids:
+                pages.save(page.model_copy(update={"device_ids": [display]}))
     flash(f"Rotation {rotation.name!r} saved.", "ok")
     # Land on the unified list with the new card highlighted (#167).
     url = url_for("decks.index", hl=rotation.id) + f"#udeck-{rotation.id}"

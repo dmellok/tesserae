@@ -23,8 +23,8 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-# (key, base_url, page_id, width, height, cache_path, pool)
-_Task = tuple[str, str, str, int, int, Path, Any]
+# (key, base_url, page_id, width, height, cache_path, pool, force)
+_Task = tuple[str, str, str, int, int, Path, Any, bool]
 
 
 class PreviewRenderQueue:
@@ -47,9 +47,12 @@ class PreviewRenderQueue:
         height: int,
         cache_path: Path,
         pool: Any,
+        force: bool = False,
     ) -> None:
         """Queue a preview render unless one with the same key is already
-        queued or in flight. Starts the worker thread lazily."""
+        queued or in flight. Starts the worker thread lazily. ``force``
+        re-renders even when a cached file exists (live-status thumbnails
+        refreshing a dashboard whose data moved under an unchanged token)."""
         with self._lock:
             if key in self._pending:
                 return
@@ -59,7 +62,7 @@ class PreviewRenderQueue:
                     target=self._run, name="tesserae-preview-render", daemon=True
                 )
                 self._thread.start()
-        self._q.put((key, base_url, page_id, width, height, cache_path, pool))
+        self._q.put((key, base_url, page_id, width, height, cache_path, pool, force))
 
     def join(self) -> None:
         """Block until every queued task has been processed."""
@@ -67,9 +70,9 @@ class PreviewRenderQueue:
 
     def _run(self) -> None:
         while True:
-            key, base_url, page_id, width, height, cache_path, pool = self._q.get()
+            key, base_url, page_id, width, height, cache_path, pool, force = self._q.get()
             try:
-                if not cache_path.exists():
+                if force or not cache_path.exists():
                     self._render(base_url, page_id, width, height, cache_path, pool)
             except Exception:
                 logger.debug("preview: background render failed for %s", page_id, exc_info=True)

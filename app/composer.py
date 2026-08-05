@@ -18,6 +18,7 @@ import base64
 import hashlib
 import json
 import logging
+import time
 from pathlib import Path
 from typing import Any, Final
 from urllib.parse import quote
@@ -1362,6 +1363,14 @@ def compose_preview(page_id: str) -> Response:
     falls back to a live iframe meanwhile. Rendering inline would pin a waitress
     worker for up to ~105s while the screenshot self-requests ``/compose``,
     which a burst of hovers could turn into thread starvation.
+
+    ``?refresh=<seconds>`` opts into content freshness for live-status
+    consumers (the Lineups screen cards): the token only tracks the page
+    DEFINITION, so a dashboard whose data moves (a clock, a feed) would
+    otherwise stay frozen at its first render forever. With the param, a
+    cached image older than the window is served as-is but queued for a
+    background re-render, and caching switches to revalidation (mtime-aware
+    ETag, no-cache) so the next poll picks the fresh image up.
     """
     preview_pages: dict[str, Page] = current_app.config.get("PREVIEW_CACHE", {}) or {}
     page = preview_pages.get(page_id) or current_app.config["PAGE_STORE"].get(page_id)
@@ -1374,6 +1383,7 @@ def compose_preview(page_id: str) -> Response:
 
     cache_dir = Path(current_app.config["DATA_ROOT"]) / "core" / "previews"
     cache_path = cache_dir / f"{page_id}__{token}.png"
+    refresh_after = request.args.get("refresh", type=int)
 
     if not cache_path.exists():
         from app import preview_cache
@@ -1394,14 +1404,34 @@ def compose_preview(page_id: str) -> Response:
         resp.headers["Cache-Control"] = "no-store"
         return resp
 
+    mtime = cache_path.stat().st_mtime
+    if refresh_after is not None and refresh_after > 0 and time.time() - mtime > refresh_after:
+        from app import preview_cache
+
+        preview_cache.submit(
+            key=f"{page_id}__{token}",
+            base_url=request.host_url.rstrip("/"),
+            page_id=page_id,
+            width=width,
+            height=height,
+            cache_path=cache_path,
+            pool=current_app.config.get("BROWSER_POOL"),
+            force=True,
+        )
+
     # Immutable per token: the URL changes when the dashboard changes, so the
     # browser can hold it for a day and a matching If-None-Match short-circuits.
-    if request.if_none_match and token in request.if_none_match:
+    # Freshness-opted requests revalidate instead, with the render time in the
+    # ETag so a background re-render shows up on the next request.
+    etag = token if refresh_after is None else f"{token}-{int(mtime)}"
+    if request.if_none_match and etag in request.if_none_match:
         resp = current_app.response_class(status=304)
     else:
         resp = current_app.response_class(cache_path.read_bytes(), mimetype="image/png")
-    resp.set_etag(token)
-    resp.headers["Cache-Control"] = "private, max-age=86400"
+    resp.set_etag(etag)
+    resp.headers["Cache-Control"] = (
+        "private, max-age=86400" if refresh_after is None else "private, no-cache"
+    )
     return resp
 
 

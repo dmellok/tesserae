@@ -296,3 +296,105 @@ def test_display_group_carries_live_status_and_device_chip(app: Flask) -> None:
     assert "dk-devchip" in body
     # The live screen card lights up on the playing row.
     assert "dk-screen is-live" in body
+
+
+def _register_display(app: Flask, client, device_id: str) -> None:
+    import json as _json
+
+    code = app.config["PAIRING_STORE"].issue(note="test").code
+    resp = client.post(
+        "/api/v1/device/register",
+        headers={"X-Pairing-Code": code, "Content-Type": "application/json"},
+        data=_json.dumps({"device_id": device_id, "kind": "esp32_client"}),
+    )
+    assert resp.status_code == 201
+
+
+def test_unbound_rotation_spanning_displays_warns(app: Flask) -> None:
+    """A rotation with no binding whose member dashboards live on different
+    displays sends each page to its own panel, so nothing visibly rotates;
+    the card says so instead of implying it plays on both."""
+    client = app.test_client()
+    _sign_in(client)
+    _register_display(app, client, "panel_a")
+    _register_display(app, client, "panel_b")
+    store = app.config["PAGE_STORE"]
+    store.save(store.get("kitchen").model_copy(update={"device_ids": ["panel_a"]}))
+    store.save(store.get("hall").model_copy(update={"device_ids": ["panel_b"]}))
+    app.config["ROTATION_STORE"].upsert(
+        Rotation(
+            id="split",
+            name="Split loop",
+            steps=[
+                RotationStep(page_id="kitchen", dwell_minutes=15),
+                RotationStep(page_id="hall", dwell_minutes=15),
+            ],
+        )
+    )
+    body = client.get("/decks").get_data(as_text=True)
+    assert "dk-warn" in body
+    assert "different displays" in body
+
+
+def test_bound_rotation_with_foreign_page_warns(app: Flask) -> None:
+    """A rotation bound to one display can't render a member dashboard bound
+    only to another (the push intersects bindings and fails); the card names
+    the stranded dashboard."""
+    client = app.test_client()
+    _sign_in(client)
+    _register_display(app, client, "panel_a")
+    _register_display(app, client, "panel_b")
+    store = app.config["PAGE_STORE"]
+    store.save(store.get("kitchen").model_copy(update={"device_ids": ["panel_a"]}))
+    store.save(store.get("hall").model_copy(update={"device_ids": ["panel_b"]}))
+    app.config["ROTATION_STORE"].upsert(
+        Rotation(
+            id="pinned",
+            name="Pinned loop",
+            device_ids=["panel_a"],
+            steps=[
+                RotationStep(page_id="kitchen", dwell_minutes=15),
+                RotationStep(page_id="hall", dwell_minutes=15),
+            ],
+        )
+    )
+    body = client.get("/decks").get_data(as_text=True)
+    assert "dk-warn" in body
+    assert "Hall" in body and "cannot show here" in body
+
+
+def test_single_display_setup_has_no_warning(app: Flask) -> None:
+    """The healthy shape stays quiet: everything on one display."""
+    client = app.test_client()
+    _sign_in(client)
+    _register_display(app, client, "panel_a")
+    store = app.config["PAGE_STORE"]
+    store.save(store.get("kitchen").model_copy(update={"device_ids": ["panel_a"]}))
+    store.save(store.get("hall").model_copy(update={"device_ids": ["panel_a"]}))
+    app.config["ROTATION_STORE"].upsert(
+        Rotation(
+            id="healthy",
+            name="Healthy loop",
+            device_ids=["panel_a"],
+            steps=[
+                RotationStep(page_id="kitchen", dwell_minutes=15),
+                RotationStep(page_id="hall", dwell_minutes=15),
+            ],
+        )
+    )
+    body = client.get("/decks").get_data(as_text=True)
+    assert "dk-warn" not in body
+
+
+def test_lineups_page_carries_live_refresh_hooks(app: Flask) -> None:
+    """The Lineups list self-updates: the swappable region, the SSE feed
+    subscription, the fallback poll, and the thumb retry handler all ship."""
+    _seed_all_shapes(app)
+    client = app.test_client()
+    _sign_in(client)
+    body = client.get("/decks").get_data(as_text=True)
+    assert "data-lineups-live" in body
+    assert "/events/stream" in body
+    assert "EventSource" in body
+    # Thumbnails opt into content freshness (see compose_preview ?refresh).
+    assert "refresh=300" in body

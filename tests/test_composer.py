@@ -208,6 +208,50 @@ def test_compose_preview_serves_existing_cache_without_render(
     assert resp.status_code == 200 and resp.mimetype == "image/png"
 
 
+def test_compose_preview_refresh_param_rerenders_stale(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """?refresh=<s> keeps live-status thumbnails honest: the token only tracks
+    the page definition, so a clock's preview would otherwise freeze at first
+    render. A cached image older than the window is served as-is but queued
+    for a forced re-render, with revalidation caching instead of max-age."""
+    import os
+
+    from app import preview_cache
+    from app.state.page_store import Page
+
+    app.config["PAGE_STORE"].save(Page(id="pg", name="Grid", layout_kind="grid"))
+    calls: list[int] = []
+    monkeypatch.setattr(
+        "app.renderer.render_to_png", lambda req, pool=None: calls.append(1) or _tiny_png()
+    )
+    client = app.test_client()
+    client.get("/compose/pg/preview.png")
+    preview_cache.join()
+    assert len(calls) == 1
+
+    # Fresh enough: served from cache, no re-render, but revalidation caching.
+    resp = client.get("/compose/pg/preview.png?refresh=300")
+    preview_cache.join()
+    assert resp.status_code == 200
+    assert resp.headers.get("Cache-Control") == "private, no-cache"
+    assert len(calls) == 1
+
+    # Age the cached file past the window: still served now, re-render queued.
+    cache_dir = app.config["DATA_ROOT"] / "core" / "previews"
+    cached = next(iter(cache_dir.glob("pg__*.png")))
+    old = cached.stat().st_mtime - 3600
+    os.utime(cached, (old, old))
+    resp = client.get("/compose/pg/preview.png?refresh=300")
+    preview_cache.join()
+    assert resp.status_code == 200
+    assert len(calls) == 2  # forced background re-render despite same token
+
+    # Without the param the old immutable behaviour is unchanged.
+    resp = client.get("/compose/pg/preview.png")
+    assert resp.headers.get("Cache-Control") == "private, max-age=86400"
+
+
 def test_canvas_page_renders_via_compose(app: Flask) -> None:
     """A dashboard with layout_kind='canvas' renders its freeform layout through
     the same /compose/<page_id> route grid pages use, so push / scheduler /

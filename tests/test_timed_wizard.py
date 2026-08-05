@@ -225,3 +225,71 @@ def test_wizard_json_errors_come_back_as_400(app: Flask) -> None:
     )
     assert resp.status_code == 400
     assert resp.get_json()["ok"] is False
+
+
+def _add_device(client, device_id: str, name: str) -> None:
+    resp = client.post(
+        "/settings/devices/add",
+        data={
+            "id": device_id,
+            "kind": "esp32_client",
+            "name": name,
+            "panel_w": "640",
+            "panel_h": "384",
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+
+
+def test_wizard_ships_display_picker_with_page_bindings(app: Flask) -> None:
+    """The multi-pick modes scope to one display: the details step carries a
+    display select and the dashboards JSON island carries each page's device
+    bindings so the picker can filter."""
+    client = app.test_client()
+    _sign_in(client)
+    _add_device(client, "esp32_a", "Kitchen panel")
+    store = app.config["PAGE_STORE"]
+    store.save(store.get("kitchen").model_copy(update={"device_ids": ["esp32_a"]}))
+
+    body = client.get("/decks").get_data(as_text=True)
+    assert "data-wizard-device" in body
+    assert 'data-wizard-block="display"' in body
+    assert '<option value="esp32_a">' in body
+    assert '"devices": ["esp32_a"]' in body  # kitchen's binding, for the filter
+    assert '"devices": []' in body  # hall is unbound
+
+
+def test_rotation_create_binds_display_and_unassigned_pages(app: Flask) -> None:
+    """The wizard posts its chosen display: the rotation stores the binding
+    (so the whole cycle plays on that panel) and picked dashboards that
+    weren't on any display yet are bound to it, mirroring the deck editor."""
+    client = app.test_client()
+    _sign_in(client)
+    _add_device(client, "esp32_a", "Kitchen panel")
+    store = app.config["PAGE_STORE"]
+    store.save(store.get("kitchen").model_copy(update={"device_ids": ["esp32_a"]}))
+
+    resp = client.post(
+        "/rotations/new",
+        data={
+            "respond": "json",
+            "name": "Kitchen loop",
+            "enabled": "on",
+            "anchor": "00:00",
+            "device_ids": "esp32_a",
+            "step_page_ids[]": ["kitchen", "hall"],
+            "step_dwell_minutes[]": ["5", "5"],
+            "step_conditions_json[]": ["", ""],
+        },
+    )
+    assert resp.status_code == 200
+    rotation_id = resp.get_json()["id"]
+    rotation = app.config["ROTATION_STORE"].get(rotation_id)
+    assert rotation.device_ids == ["esp32_a"]
+    deck = app.config["DECK_STORE"].get(rotation_id)
+    assert deck.device_ids == ["esp32_a"]
+    # hall had no display; creating the bound rotation adopted it.
+    assert store.get("hall").device_ids == ["esp32_a"]
+    # kitchen's existing binding is untouched.
+    assert store.get("kitchen").device_ids == ["esp32_a"]

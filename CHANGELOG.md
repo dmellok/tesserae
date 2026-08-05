@@ -4,6 +4,35 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.265.0], 2026-08-05
+
+### Added
+
+- **The setup wizard scopes rotations and decks to a display** (#167
+  feedback). The multi-pick steps gain a Display select; only
+  dashboards bound to that display (or not yet on any display) are
+  offered, the created rotation or deck is bound to it, and picked
+  dashboards without a display adopt it, so the whole set plays on one
+  panel. Rotations created through `/rotations/new` accept
+  `device_ids` accordingly.
+- **Lineups warns about delivery gaps.** A card whose dashboards are
+  bound to different displays (so no single panel plays the set), or
+  that is bound to a display some member dashboard can't render on,
+  now says so on the row instead of failing silently.
+
+### Fixed
+
+- **The Lineups page updates itself.** Playing badges, current step,
+  next-advance times, group headers and thumbnails now refresh when
+  the scheduler fires (via the events stream) and on a slow fallback
+  poll; previously everything was frozen at page load.
+- **Screen-card thumbnails no longer freeze at their first render.**
+  Preview images opt into a freshness window (`?refresh=<s>` on
+  `/compose/<id>/preview.png`): a stale cached image is served
+  immediately while a re-render is queued behind it, so dashboards
+  whose data moves (clocks, feeds) catch up. Thumbnails that aren't
+  rendered yet also retry with backoff instead of staying blank.
+
 ## [0.264.1], 2026-08-05
 
 ### Fixed

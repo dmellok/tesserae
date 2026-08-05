@@ -134,7 +134,11 @@ def _ago(epoch: Any, now_ts: float) -> str | None:
 
 
 def _page_thumbs(pages: list[Any]) -> dict[str, str]:
-    """Composer live-preview URL per dashboard (the design's screen cards)."""
+    """Composer live-preview URL per dashboard (the design's screen cards).
+
+    ``refresh=300`` keeps thumbnails honest for dashboards whose data moves
+    (clocks, feeds): the preview token only changes on edits, so without it a
+    screen card would show the first render forever."""
     from app.composer import page_preview_token, preview_dims
 
     devices_reg = current_app.config.get("DEVICE_REGISTRY")
@@ -145,7 +149,7 @@ def _page_thumbs(pages: list[Any]) -> dict[str, str]:
             token = page_preview_token(p, preview_dims(p, devices_reg, settings))
         except Exception:
             token = ""
-        out[p.id] = url_for("composer.compose_preview", page_id=p.id) + f"?v={token}"
+        out[p.id] = url_for("composer.compose_preview", page_id=p.id) + f"?v={token}&refresh=300"
     return out
 
 
@@ -220,6 +224,31 @@ def _design_cards(
                 seen.setdefault(did, None)
         return list(seen)
 
+    def binding_warning(explicit: list[str], page_ids: list[str]) -> str | None:
+        """Delivery gaps worth flagging on the card: an unbound multi-page
+        record whose members live on different displays sends each page to
+        its own panel, so no display plays the set as a unit; a bound record
+        can't render members that are bound to a different display."""
+        if not explicit:
+            if len(page_ids) > 1 and len(resolve_devices([], page_ids)) > 1:
+                return (
+                    "These dashboards are on different displays, so no single "
+                    "display plays the whole set. Edit it and pick one display."
+                )
+            return None
+        stranded = [
+            page_names.get(pid, pid)
+            for pid in page_ids
+            if page_devices.get(pid) and not (set(page_devices[pid]) & set(explicit))
+        ]
+        if stranded:
+            listed = ", ".join(stranded[:3]) + (" and more" if len(stranded) > 3 else "")
+            return (
+                f"{listed} belong{'s' if len(stranded) == 1 else ''} to a different "
+                "display and cannot show here. Rebind the dashboard or remove it."
+            )
+        return None
+
     def screen(
         pid: str,
         index: int | None = None,
@@ -250,6 +279,7 @@ def _design_cards(
                 "kind": "nav",
                 "id": deck.id,
                 "name": deck.name,
+                "warning": binding_warning(deck.device_ids, [dp.page_id for dp in deck.pages]),
                 "enabled": deck.enabled,
                 "playing": live_page is not None,
                 "badge": "By hand",
@@ -296,6 +326,7 @@ def _design_cards(
                 "kind": "cycle",
                 "id": r.id,
                 "name": r.name,
+                "warning": binding_warning(r.device_ids, [s.page_id for s in r.steps]),
                 "enabled": r.enabled,
                 "playing": playing,
                 "badge": "Playing · Rotation" if playing else "Rotation",
@@ -693,7 +724,8 @@ def editor(deck_id: str | None = None) -> str | Response:
             {
                 "id": p.id,
                 "name": p.name,
-                "thumb": url_for("composer.compose_preview", page_id=p.id) + f"?v={token}",
+                "thumb": url_for("composer.compose_preview", page_id=p.id)
+                + f"?v={token}&refresh=300",
                 # Device bindings, so the editor can filter the page library to the
                 # dashboards assigned to the chosen display. Empty = unassigned.
                 "devices": list(p.device_ids),

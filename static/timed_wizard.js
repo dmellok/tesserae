@@ -21,6 +21,25 @@
     return d ? d.name : '';
   };
 
+  // Display scoping for the multi-pick modes: a rotation or deck plays as a
+  // unit on ONE display, so only dashboards bound to the chosen display (or
+  // to none yet) are offered. Without this, picks bound to different
+  // displays each land on their own panel and nothing visibly rotates.
+  const deviceSel = $('[data-wizard-device]');
+  const deviceOptions = deviceSel
+    ? Array.from(deviceSel.options).filter((o) => o.value)
+    : [];
+  const deviceName = (id) => {
+    const o = deviceOptions.find((x) => x.value === id);
+    return o ? o.textContent.trim() : '';
+  };
+  const scoped = () => deviceOptions.length > 0
+    && (state.mode === 'cycle' || state.mode === 'deck');
+  const onDisplay = (d) => {
+    const bound = d.devices || [];
+    return bound.length === 0 || bound.includes(state.device);
+  };
+
   const URLS = {
     schedule: dialog.dataset.createScheduleUrl,
     rotation: dialog.dataset.createRotationUrl,
@@ -37,6 +56,7 @@
     step: hasSuggest ? -1 : 0, // -1 suggest · 0 behaviour · 1 details · 2 review · 3 created
     mode: null, // 'daily' | 'interval' | 'cycle' | 'deck'
     dash: DASHBOARDS.length ? DASHBOARDS[0].id : '',
+    device: deviceSel ? deviceSel.value : '', // multi-display installs start unpicked
     time: '07:00',
     interval: 15,
     picks: [], // ordered dashboard ids
@@ -130,7 +150,7 @@
     if (state.step === 1) {
       if (state.mode === 'daily') return Boolean(state.dash) && Boolean(state.time);
       if (state.mode === 'interval') return Boolean(state.dash) && Number(state.interval) >= 1;
-      return state.picks.length >= 2;
+      return (!scoped() || Boolean(state.device)) && state.picks.length >= 2;
     }
     return true;
   };
@@ -140,12 +160,27 @@
   // ----- step 2 dynamic lists --------------------------------------------
   const buildResults = () => {
     const q = state.query.trim().toLowerCase();
-    const matches = DASHBOARDS.filter((d) => !q || d.name.toLowerCase().includes(q));
+    const pool = scoped() && state.device ? DASHBOARDS.filter(onDisplay) : DASHBOARDS;
+    const matches = pool.filter((d) => !q || d.name.toLowerCase().includes(q));
     el.results.textContent = '';
     if (!DASHBOARDS.length) {
       const empty = document.createElement('p');
       empty.className = 'wizard-list-empty';
       empty.textContent = 'No dashboards yet. Create some first, then come back.';
+      el.results.append(empty);
+      return;
+    }
+    if (scoped() && !state.device) {
+      const empty = document.createElement('p');
+      empty.className = 'wizard-list-empty';
+      empty.textContent = 'Choose a display above to see its dashboards.';
+      el.results.append(empty);
+      return;
+    }
+    if (!matches.length && !q) {
+      const empty = document.createElement('p');
+      empty.className = 'wizard-list-empty';
+      empty.textContent = 'No dashboards on this display yet. Assign some to it, or pick another display.';
       el.results.append(empty);
       return;
     }
@@ -268,11 +303,13 @@
       rows.push(['When', 'Every ' + state.interval + ' minutes']);
     } else if (state.mode === 'cycle') {
       rows.push(['Behaviour', 'Timed rotation']);
+      if (state.device) rows.push(['Display', deviceName(state.device)]);
       rows.push(['Order', state.picks
         .map((id, i) => (i + 1) + '. ' + nameOf(id) + ' · ' + (state.mins[id] || 5) + ' min')
         .join('\n')]);
     } else {
       rows.push(['Behaviour', 'Manual deck']);
+      if (state.device) rows.push(['Display', deviceName(state.device)]);
       rows.push(['Pages', state.picks.map((id, i) => (i + 1) + '. ' + nameOf(id)).join('\n')]);
       rows.push(['Next', 'Wire the “go to page” actions in the deck editor']);
     }
@@ -378,6 +415,7 @@
         single: state.mode === 'daily' || state.mode === 'interval',
         time: state.mode === 'daily',
         interval: state.mode === 'interval',
+        display: scoped(),
         multi: state.mode === 'cycle' || state.mode === 'deck',
         durations: state.mode === 'cycle',
         deckinfo: state.mode === 'deck',
@@ -424,6 +462,7 @@
     if (state.mode === 'cycle') {
       url = URLS.rotation;
       body.set('anchor', '00:00');
+      if (state.device) body.append('device_ids', state.device);
       state.picks.forEach((id) => {
         body.append('step_page_ids[]', id);
         body.append('step_dwell_minutes[]', String(state.mins[id] || 5));
@@ -431,6 +470,7 @@
       });
     } else if (state.mode === 'deck') {
       url = URLS.deck;
+      if (state.device) body.append('device_ids', state.device);
       body.set('graph_json', JSON.stringify(state.picks.map((id) => ({ page_id: id }))));
     } else {
       url = URLS.schedule;
@@ -476,6 +516,7 @@
   // back in step with a fresh state object.
   const syncInputs = () => {
     if (el.dash && DASHBOARDS.length) el.dash.value = state.dash;
+    if (deviceSel) deviceSel.value = state.device;
     el.time.value = state.time;
     el.interval.value = String(state.interval);
     el.query.value = state.query;
@@ -520,6 +561,21 @@
   });
 
   el.dash.addEventListener('change', () => { state.dash = el.dash.value; });
+  if (deviceSel) {
+    deviceSel.addEventListener('change', () => {
+      state.device = deviceSel.value;
+      // Picks that don't belong to the newly chosen display drop out; their
+      // minutes are remembered in state.mins if they're re-added.
+      state.picks = state.picks.filter((id) => {
+        const d = DASHBOARDS.find((x) => x.id === id);
+        return Boolean(d) && onDisplay(d);
+      });
+      buildResults();
+      buildDurationRows();
+      updateHints();
+      el.forward.disabled = !valid();
+    });
+  }
   el.time.addEventListener('input', () => {
     state.time = el.time.value;
     el.forward.disabled = !valid();
