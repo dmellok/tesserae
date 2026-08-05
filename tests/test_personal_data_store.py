@@ -64,3 +64,27 @@ def test_delete_is_scoped_to_one_publisher(tmp_path: Path) -> None:
     assert store.get("reminders", publisher_id="companion_a") is None
     assert store.get("reminders", publisher_id="companion_b") is not None
     assert [item["publisher_name"] for item in store.publications("reminders")] == ["Bob"]
+
+
+def test_legacy_read_fallback_prefers_newest_generated_snapshot(tmp_path: Path) -> None:
+    store = PersonalDataSnapshotStore(tmp_path / "personal.json")
+    store.put(
+        "reminders",
+        snapshot=_snapshot("Semantically newest"),
+        generated_epoch=200.0,
+        expires_epoch=9_999_999_999.0,
+        publisher_id="companion_first",
+        publisher_name="First",
+    )
+    # Stored second, but generated earlier: delayed upload must not win the
+    # compatibility fallback used by widgets that predate publications().
+    store.put(
+        "reminders",
+        snapshot=_snapshot("Uploaded later"),
+        generated_epoch=100.0,
+        expires_epoch=9_999_999_999.0,
+        publisher_id="companion_second",
+        publisher_name="Second",
+    )
+
+    assert store.get("reminders")["snapshot"] == _snapshot("Semantically newest")

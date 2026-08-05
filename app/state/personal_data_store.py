@@ -44,9 +44,10 @@ _LEGACY_PUBLISHER_NAME = "Previously synced Companion"
 class PersonalDataSnapshotStore:
     """Thread-safe latest snapshot per publisher and source.
 
-    Calls that omit ``publisher_id`` retain the original single-publisher API:
-    writes target a legacy namespace and reads return the most recently stored
-    publication. New authenticated API paths always pass a publisher id.
+    Reads that omit ``publisher_id`` retain the original single-publisher API
+    by returning the publication with the newest generated timestamp. Writes
+    and deletes require an explicit publisher so no caller can accidentally
+    create new data in the migration-only legacy namespace.
     """
 
     def __init__(self, path: Path) -> None:
@@ -112,17 +113,19 @@ class PersonalDataSnapshotStore:
         # Backward-compatible read for existing widgets: return the newest
         # publisher's record. Multi-publisher-aware widgets use publications().
         newest: dict[str, Any] | None = None
-        newest_stored = float("-inf")
+        newest_generated = float("-inf")
         for publication in self.publications(source_id):
-            stored = publication.get("stored_at")
-            stored_value = float(stored) if isinstance(stored, (int, float)) else 0.0
-            if newest is None or stored_value > newest_stored:
+            generated = publication.get("generated_epoch")
+            generated_value = (
+                float(generated) if isinstance(generated, (int, float)) else float("-inf")
+            )
+            if newest is None or generated_value > newest_generated:
                 newest = {
                     key: value
                     for key, value in publication.items()
                     if not key.startswith("publisher_")
                 }
-                newest_stored = stored_value
+                newest_generated = generated_value
         return newest
 
     def all(self, *, publisher_id: str | None = None) -> dict[str, dict[str, Any]]:
@@ -185,7 +188,7 @@ class PersonalDataSnapshotStore:
         snapshot: dict[str, Any],
         generated_epoch: float,
         expires_epoch: float,
-        publisher_id: str = _LEGACY_PUBLISHER_ID,
+        publisher_id: str,
         publisher_name: str | None = None,
     ) -> None:
         """Replace the latest snapshot for one publisher and source."""
@@ -221,7 +224,7 @@ class PersonalDataSnapshotStore:
             }
             self._save(data)
 
-    def delete(self, source_id: str, *, publisher_id: str = _LEGACY_PUBLISHER_ID) -> bool:
+    def delete(self, source_id: str, *, publisher_id: str) -> bool:
         """Remove one publisher's source. Returns whether one existed."""
         with self._lock:
             data = self._load()

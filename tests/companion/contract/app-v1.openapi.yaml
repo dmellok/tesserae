@@ -433,9 +433,9 @@ paths:
       operationId: getCompanionPersonalDataStatus
       summary: List snapshot freshness metadata without returning personal values
       description: >-
-        Returns only sources published by this authenticated Companion
-        installation. Another paired installation's freshness metadata and
-        personal values are never exposed.
+        Returns only sources associated with the publisher identity bound to
+        this authenticated pairing. Installation descriptors supplied during
+        pairing are trusted within the Companion pairing boundary.
       responses:
         "200":
           description: Metadata for currently stored or expired snapshot sources
@@ -453,10 +453,12 @@ paths:
       operationId: putCompanionPersonalDataSnapshot
       summary: Replace the latest snapshot for one advertised personal-data source
       description: |
-        The authenticated pairing determines a stable, server-derived publisher
-        identity; clients do not add publisher fields to the snapshot. Replacement
-        and generated_at ordering are scoped to that publisher and source, so two
-        paired Companion installations cannot overwrite one another.
+        The authenticated pairing determines a stable publisher identity from
+        the installation descriptor accepted during pairing; clients do not add
+        publisher fields to the snapshot. Replacement and generated_at ordering
+        are scoped to that publisher and source, so independently identified
+        Companion installations do not replace one another. Installation
+        descriptors are trusted within the Companion pairing boundary.
 
         Snapshot validation, storage, latency, and response semantics are
         independent from rendering. After a 200 response, the server may
@@ -487,10 +489,12 @@ paths:
       operationId: deleteCompanionPersonalDataSnapshot
       summary: Delete the latest snapshot when its source is disabled
       description: |
-        Deletion is authoritative and idempotent only for the authenticated
-        Companion installation's publication. It cannot delete another paired
-        installation's snapshot. Any eligible dashboard refresh is
-        fire-and-forget after the 204 response; no expiry timer is implied.
+        Deletion is authoritative and idempotent for the publisher identity
+        bound to the authenticated pairing. Another independently identified
+        installation's snapshot is not addressable through this request.
+        Installation descriptors are trusted within the Companion pairing
+        boundary. Any eligible dashboard refresh is fire-and-forget after the
+        204 response; no expiry timer is implied.
       responses:
         "204":
           description: Snapshot absent after the request
