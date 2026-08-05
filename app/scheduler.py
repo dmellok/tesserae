@@ -842,6 +842,85 @@ class Scheduler:
                 result.status,
             )
 
+    def refresh_pages_for_data_change(
+        self, page_ids: set[str], now: datetime | None = None
+    ) -> None:
+        """Refresh changed pages without choosing or advancing active content.
+
+        Active pages reuse the normal page-refresh delivery path: resolve the
+        devices already showing each page, respect quiet hours, and let
+        PushManager's latest-wins/no-change handling apply. Affected inactive
+        Deck pages are only re-warmed for their bound devices, never promoted.
+        """
+        if self._page_store is None or not page_ids:
+            return
+        now = now or datetime.now(UTC)
+        try:
+            known_page_ids = {page.id for page in self._page_store.list()}
+        except Exception:
+            return
+        affected = page_ids & known_page_ids
+        if not affected:
+            return
+
+        showing = self._devices_showing_pages(now)
+        pusher = self._push_factory()
+        for page_id in sorted(affected):
+            devices = showing.get(page_id) or set()
+            if not devices:
+                continue
+            try:
+                result = pusher.push(
+                    page_id,
+                    device_ids=devices,
+                    respect_quiet_hours=True,
+                    source="data_change",
+                )
+            except Exception:
+                logger.exception("data-change page refresh failed page=%s", page_id)
+                continue
+            with self._lock:
+                self._page_last_refresh[page_id] = now.timestamp()
+            logger.info(
+                "data-change refresh: page=%s devices=%s (%s)",
+                page_id,
+                ",".join(sorted(devices)),
+                result.status,
+            )
+
+        if self._deck_store is None:
+            return
+        warm = getattr(pusher, "warm_deck_page", None)
+        if not callable(warm):
+            return
+        warm_targets: dict[tuple[str, str], set[str]] = {}
+        for deck in self._deck_store.all():
+            if not deck.enabled or not deck.device_ids:
+                continue
+            for deck_page in deck.pages:
+                page_id = deck_page.page_id
+                if page_id not in affected:
+                    continue
+                active_devices = showing.get(page_id) or set()
+                for device_id in deck.device_ids:
+                    if device_id not in active_devices:
+                        warm_targets.setdefault((page_id, device_id), set()).add(deck.id)
+        with self._deck_warm_lock:
+            for (page_id, device_id), deck_ids in sorted(warm_targets.items()):
+                try:
+                    warm(page_id, device_id)
+                except Exception:
+                    logger.exception(
+                        "data-change deck warm failed decks=%s page=%s device=%s",
+                        ",".join(sorted(deck_ids)),
+                        page_id,
+                        device_id,
+                    )
+                    continue
+                for deck_id in deck_ids:
+                    key = f"{deck_id}\x00{device_id}\x00{page_id}"
+                    self._deck_last_warm[key] = now.timestamp()
+
     def _maybe_return_decks_home(self, now: datetime) -> None:
         """Return idle deck panels to the home card (deck editor's
         "returns to home after N min" behaviour).

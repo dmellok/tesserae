@@ -51,6 +51,11 @@ from app.companion_history import (
     retained_resend_composition_for_row,
 )
 from app.companion_jobs import CompanionJobs, JobOutcome
+from app.data_change_refresh import (
+    DataChangeEvent,
+    personal_data_delete_event,
+    personal_data_update_event,
+)
 from app.device_loader import Device, DeviceRegistry
 from app.device_preview import retained_device_preview
 from app.net_guard import BlockedURLError, assert_public_url
@@ -206,6 +211,21 @@ def _events() -> EventLog:
 
 def _personal_data() -> PersonalDataSnapshotStore:
     return current_app.config["PERSONAL_DATA_STORE"]  # type: ignore[no-any-return]
+
+
+def _notify_data_change(event: DataChangeEvent | None) -> None:
+    """Enqueue a post-ingestion refresh without changing API semantics."""
+    if event is None:
+        return
+    coordinator = current_app.config.get("DATA_CHANGE_COORDINATOR")
+    if coordinator is None:
+        return
+    try:
+        coordinator.notify(event)
+    except Exception:
+        # Storage already succeeded. Refresh coordination is fire-and-forget
+        # and must never turn an accepted snapshot into a failed upload.
+        logger.exception("could not enqueue personal-data change event")
 
 
 # -- error envelope ------------------------------------------------------
@@ -431,8 +451,9 @@ def revoke_session() -> Any:
 # The phone stays the authority for Apple personal data. It publishes only an
 # explicitly enabled, minimal, expiring snapshot; the server keeps the latest
 # per source (no history), renders it in a widget, and deletes it on disable or
-# expiry. This is synchronous state, not a job: no render / publish / History
-# write happens here.
+# expiry. This is synchronous state, not a job: ingestion itself performs no
+# render / publish / History write. An accepted semantic change may enqueue a
+# detached refresh that runs only after the response path is complete.
 
 
 def _parse_iso(value: Any) -> float | None:
@@ -647,7 +668,12 @@ def put_personal_data(source_id: str) -> Any:
                 )
             # Identical retry: idempotent, don't rewrite.
             return jsonify(_source_status(source_id, gen, exp, now)), 200
+    previous_snapshot = existing.get("snapshot") if isinstance(existing, dict) else None
+    if not isinstance(previous_snapshot, dict):
+        previous_snapshot = None
+    event = personal_data_update_event(source_id, previous_snapshot, snapshot)
     store.put(source_id, snapshot=snapshot, generated_epoch=gen, expires_epoch=exp)
+    _notify_data_change(event)
     return jsonify(_source_status(source_id, gen, exp, now)), 200
 
 
@@ -670,7 +696,8 @@ def personal_data_status() -> Any:
 @_require_companion("personal_data:write")
 def delete_personal_data(source_id: str) -> Any:
     """Idempotently drop a source's snapshot (on disable)."""
-    _personal_data().delete(source_id)
+    if _personal_data().delete(source_id):
+        _notify_data_change(personal_data_delete_event(source_id))
     return Response(status=204)
 
 

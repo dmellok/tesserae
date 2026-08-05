@@ -139,6 +139,7 @@ ignore_missing_imports = true
 # Strict on the load-bearing contract modules. Everything else uses defaults.
 [[tool.mypy.overrides]]
 module = [
+    "app.data_change_refresh",
     "app.state.*",
     "app.push",
     "app.plugin_loader",

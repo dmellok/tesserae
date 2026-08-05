@@ -927,6 +927,14 @@ def create_app(
         condition_evaluator=condition_evaluator,
     )
     app.config["SCHEDULER"] = scheduler
+    from app.data_change_refresh import DataChangeRefreshCoordinator
+
+    data_change_coordinator = DataChangeRefreshCoordinator(
+        page_store=page_store,
+        plugin_registry=lambda: app.config["PLUGIN_REGISTRY"],
+        refresh_pages=scheduler.refresh_pages_for_data_change,
+    )
+    app.config["DATA_CHANGE_COORDINATOR"] = data_change_coordinator
     if not testing and not is_watcher:
         scheduler.start()
         from app import heartbeat
@@ -1033,6 +1041,7 @@ def create_app(
     import atexit
 
     atexit.register(companion_jobs.shutdown)
+    atexit.register(data_change_coordinator.stop)
     companion_api.register(app)
 
     if not testing:

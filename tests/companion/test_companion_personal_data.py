@@ -13,6 +13,7 @@ import jsonschema
 import pytest
 from flask import Flask
 
+from app.data_change_refresh import DataChangeEvent
 from app.main import REPO_ROOT, create_app
 
 from ._schema import schema_for
@@ -138,6 +139,19 @@ def _put_multi(app: Flask, token: str, snap: dict[str, Any]) -> Any:
     )
 
 
+class _ChangeCapture:
+    def __init__(self) -> None:
+        self.events: list[DataChangeEvent] = []
+
+    def notify(self, event: DataChangeEvent) -> None:
+        self.events.append(event)
+
+
+class _BrokenChangeCapture:
+    def notify(self, event: DataChangeEvent) -> None:
+        raise RuntimeError("coordinator unavailable")
+
+
 def test_capabilities_advertise_personal_data(app: Flask) -> None:
     body = app.test_client().get("/api/app/v1").get_json()
     jsonschema.validate(body, schema_for("Capabilities"), format_checker=_FMT)
@@ -180,6 +194,59 @@ def test_multi_list_put_then_status_round_trip(app: Flask) -> None:
     body = listing.get_json()
     jsonschema.validate(body, schema_for("PersonalDataStatusResponse"), format_checker=_FMT)
     assert [source["source_id"] for source in body["sources"]] == ["reminders"]
+
+
+def test_personal_data_changes_emit_semantic_events_after_storage(app: Flask) -> None:
+    token = _token(app)
+    capture = _ChangeCapture()
+    app.config["DATA_CHANGE_COORDINATOR"] = capture
+    now = datetime.now(UTC).replace(microsecond=0)
+    initial = _multi_list_snapshot(now)
+
+    assert _put_multi(app, token, initial).status_code == 200
+    assert capture.events == [DataChangeEvent("personal_data.reminders")]
+    assert app.config["PERSONAL_DATA_STORE"].get("reminders")["snapshot"] == initial
+
+    # Republishing identical list contents only renews freshness/TTL.
+    capture.events.clear()
+    renewed = _multi_list_snapshot(now + timedelta(seconds=1))
+    assert _put_multi(app, token, renewed).status_code == 200
+    assert capture.events == []
+
+    # A content edit narrows the event to the affected opaque list id.
+    changed_lists = json.loads(json.dumps(renewed["data"]["lists"]))
+    changed_lists[0]["items"][0]["title"] = "Oat milk"
+    changed = _multi_list_snapshot(now + timedelta(seconds=2), lists=changed_lists)
+    assert _put_multi(app, token, changed).status_code == 200
+    assert capture.events == [
+        DataChangeEvent(
+            "personal_data.reminders",
+            selectors=frozenset({changed_lists[0]["id"]}),
+        )
+    ]
+
+    capture.events.clear()
+    response = app.test_client().delete("/api/app/v1/personal-data/reminders", headers=_auth(token))
+    assert response.status_code == 204
+    assert capture.events == [DataChangeEvent("personal_data.reminders")]
+
+    # Idempotent DELETE has no second event.
+    capture.events.clear()
+    response = app.test_client().delete("/api/app/v1/personal-data/reminders", headers=_auth(token))
+    assert response.status_code == 204
+    assert capture.events == []
+
+
+def test_data_change_enqueue_failure_does_not_change_accepted_put(app: Flask) -> None:
+    token = _token(app)
+    app.config["DATA_CHANGE_COORDINATOR"] = _BrokenChangeCapture()
+    now = datetime.now(UTC).replace(microsecond=0)
+    snapshot = _multi_list_snapshot(now)
+
+    response = _put_multi(app, token, snapshot)
+
+    assert response.status_code == 200
+    assert app.config["PERSONAL_DATA_STORE"].get("reminders")["snapshot"] == snapshot
 
 
 def test_empty_list_set_is_a_fresh_enabled_snapshot(app: Flask) -> None:
