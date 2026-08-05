@@ -821,6 +821,11 @@ def test_grid_editor_only_shows_update_switch_for_capable_widget(
     client.post(f"/pages/{pid}/cells/{cell_id}", data={"plugin": "widget_a"})
     html = client.get(f"/pages/{pid}").get_data(as_text=True)
     assert 'name="update_on_change"' in html
+    options_start = html.index("<legend>Widget A options</legend>")
+    options_end = html.index("</fieldset>", options_start)
+    update_switch = html.index('name="update_on_change"')
+    assert options_start < update_switch < options_end
+    assert "<legend>Updates</legend>" not in html
 
     client.post(f"/pages/{pid}/cells/{cell_id}", data={"plugin": "widget_b"})
     html = client.get(f"/pages/{pid}").get_data(as_text=True)

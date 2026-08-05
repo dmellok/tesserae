@@ -124,6 +124,30 @@
   line-height: 1.5;
 }
 
+/* Host-owned placement controls that belong visually with a widget's own
+   options. The value still lives on the dashboard placement, not in the
+   plugin options payload. */
+.widget-option-section {
+  display: grid;
+  gap: var(--t-space-1);
+  margin-top: var(--t-space-4);
+  padding-top: var(--t-space-3);
+  border-top: 1px solid var(--t-border);
+}
+.widget-option-section--only {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+.widget-option-section > .field-label {
+  margin-bottom: var(--t-space-1);
+  font-size: var(--t-size-sm);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--t-fg-soft);
+}
+
 .actions {
   display: flex;
   gap: var(--t-space-2);

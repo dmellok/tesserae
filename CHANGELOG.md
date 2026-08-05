@@ -4,6 +4,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [Unreleased]
+
+### Fixed
+
+- **Refresh-on-change now appears with the Widget options it affects.**
+  Both Dashboard editors group the per-placement update policy inside the
+  selected Widget's options instead of presenting it like an unrelated or
+  dashboard-wide setting. Its scope and persistence are unchanged.
+
 ## [0.267.0], 2026-08-05
 
 ### Added

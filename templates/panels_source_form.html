@@ -4,14 +4,26 @@
    drawer. Reuses the grid editor's ``auto_field`` macro so a canvas data
    source is configured with the exact same controls as a grid cell. The
    drawer submits this form to ``panels.source_options``, which parses it back
-   into an options dict via the shared per-cell coercion. #}
-{% from "_components.html" import auto_field %}
+   into an options dict via the shared per-cell coercion. A direct widget
+   placement may also render the host-owned update policy here so it belongs
+   visually with these options without entering the plugin options payload. #}
+{% from "_components.html" import auto_field, switch %}
 {% if opts %}
   {% for opt in opts %}
     {% set field_id = 'src-' ~ sid ~ '-opt-' ~ opt.name %}
     {% set value = values.get(opt.name, opt.get('default', '')) %}
     {{ auto_field(field_id, 'opt_' ~ opt.name, opt, value) }}
   {% endfor %}
-{% else %}
+{% elif not show_update_on_change %}
   <p class="note" style="padding:8px 2px">This widget has no configurable options.</p>
+{% endif %}
+{% if show_update_on_change %}
+  <div class="widget-option-section{% if not opts %} widget-option-section--only{% endif %}">
+    <span class="field-label">Updates</span>
+    <input type="hidden" name="update_on_change_present" value="1">
+    {{ switch('src-' ~ sid ~ '-update-on-change', 'update_on_change',
+              "Refresh this dashboard when this widget's data changes",
+              checked=update_on_change) }}
+    <p class="field-help">Off by default. Only refreshes displays already showing this dashboard; it never selects or advances a dashboard.</p>
+  </div>
 {% endif %}

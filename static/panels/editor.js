@@ -2547,28 +2547,6 @@
       cfgrow.appendChild(cfg); mount.appendChild(cfgrow);
     }
 
-    // Host-owned placement policy. The widget only declares that it can
-    // consume change events; each element opts in independently and defaults
-    // off. Actual event delivery lands in a later server stage.
-    var selectedWidget = widgetFor(e.widget);
-    if (selectedWidget && selectedWidget.updates_on_change) {
-      mount.appendChild(el("div", "psec", '<i class="ph-bold ph-arrows-clockwise"></i>Updates'));
-      var urow = el("div", "prow");
-      urow.innerHTML = '<span class="plab">Data changes</span>';
-      var ubtn = el("button", "minibtn",
-        e.update_on_change
-          ? '<i class="ph-bold ph-check-square"></i> Refresh'
-          : '<i class="ph-bold ph-square"></i> Off');
-      ubtn.addEventListener("click", function () {
-        pushHistory();
-        e.update_on_change = !e.update_on_change;
-        scheduleSave(); paint();
-      });
-      urow.appendChild(ubtn); mount.appendChild(urow);
-      mount.appendChild(el("div", "note",
-        "Refreshes only displays already showing this dashboard. It never selects or advances a page."));
-    }
-
     // Fragment parts (scale individual pieces of the render).
     if (e.widget) partsSection(mount, e);
 
@@ -2750,7 +2728,13 @@
     fetch(S.cfg.sourceFormUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ key: key, sid: e.id, options: opts }),
+      body: JSON.stringify({
+        key: key,
+        sid: e.id,
+        options: opts,
+        placement: !hasSidx && isWidget(e),
+        update_on_change: !!e.update_on_change,
+      }),
     })
       .then(function (r) { return r.ok ? r.text() : Promise.reject(r.status); })
       .then(function (html) {
@@ -2796,12 +2780,19 @@
     });
     var sidx = body.dataset.sidx;
     var srcSel = (sidx !== "" && e.sources && e.sources[+sidx]) ? e.sources[+sidx] : null;
+    var updateMarker = body.querySelector('input[name="update_on_change_present"]');
+    var updateEnabled = !!body.querySelector('input[name="update_on_change"]:checked');
     form.append("key", srcSel ? srcSel.key : sourceOf(e));
     fetch(S.cfg.sourceOptionsUrl, { method: "POST", body: form })
       .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
       .then(function (j) {
         pushHistory();
-        if (srcSel) srcSel.options = j.options || {}; else e.options = j.options || {};
+        if (srcSel) {
+          srcSel.options = j.options || {};
+        } else {
+          e.options = j.options || {};
+          if (updateMarker) e.update_on_change = updateEnabled;
+        }
         scheduleSave(); closeConfig(); paint(); renderProps();
       })
       .catch(function () { var s = $("panels-status"); if (s) s.textContent = "config save failed"; });

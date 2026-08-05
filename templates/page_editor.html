@@ -168,19 +168,7 @@
        fields are absent, so the layout survives a cell-option save. #}
 
     {% set cell_opts = plugin_cell_options.get(plugin.id, []) %}
-    {% if plugin.on_change_updates %}
-    <fieldset class="form-group">
-      <legend>Updates</legend>
-      <input type="hidden" name="update_on_change_present" value="1">
-      <label class="switch dx-cell-tweak-switch">
-        <input type="checkbox" name="update_on_change" value="1"
-               {% if cell.update_on_change %}checked{% endif %}>
-        <span>Refresh when this widget's data changes</span>
-      </label>
-      <p class="field-help">Off by default. When enabled, a matching data-change event may refresh this dashboard only on displays already showing it; it never selects or advances a dashboard.</p>
-    </fieldset>
-    {% endif %}
-    {% if cell_opts %}
+    {% if cell_opts or plugin.on_change_updates %}
     <fieldset class="form-group">
       <legend>{{ plugin.name }} options</legend>
       {% for opt in cell_opts %}
@@ -188,6 +176,16 @@
         {% set value = cell.options.get(opt.name, opt.get('default', '')) %}
         {{ auto_field(field_id, 'opt_' ~ opt.name, opt, value) }}
       {% endfor %}
+      {% if plugin.on_change_updates %}
+      <div class="widget-option-section{% if not cell_opts %} widget-option-section--only{% endif %}">
+        <span class="field-label">Updates</span>
+        <input type="hidden" name="update_on_change_present" value="1">
+        {{ switch('cell-' ~ cell.id ~ '-update-on-change', 'update_on_change',
+                  "Refresh this dashboard when this widget's data changes",
+                  checked=cell.update_on_change) }}
+        <p class="field-help">Off by default. Only refreshes displays already showing this dashboard; it never selects or advances a dashboard.</p>
+      </div>
+      {% endif %}
     </fieldset>
     {% endif %}
 

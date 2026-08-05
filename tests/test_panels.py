@@ -788,6 +788,44 @@ def test_source_form_renders_widget_options(app: Flask, monkeypatch: pytest.Monk
     assert 'name="opt_units"' in resp.get_data(as_text=True)
 
 
+def test_source_form_groups_placement_updates_with_widget_options(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A capable widget's placement policy lives in its Configure drawer,
+    while data/code source configuration never receives the placement toggle."""
+    monkeypatch.setenv("TESSERAE_EXPERIMENT_COMPOSER", "1")
+    plugin = app.config["PLUGIN_REGISTRY"].get("weather_now")
+    assert plugin is not None
+    plugin.manifest["updates"] = {
+        "on_change": [{"source": "test.weather", "selector_option": "location"}]
+    }
+    client = app.test_client()
+    _sign_in(client)
+
+    resp = client.post(
+        "/pages/canvas/source-form",
+        json={
+            "key": "weather_now",
+            "sid": "e1",
+            "placement": True,
+            "update_on_change": True,
+        },
+    )
+    html = resp.get_data(as_text=True)
+    assert resp.status_code == 200
+    assert 'name="opt_units"' in html
+    assert 'name="update_on_change_present"' in html
+    assert 'name="update_on_change"' in html
+    update_input = html[html.index('name="update_on_change"') :].split(">", 1)[0]
+    assert "checked" in update_input
+
+    source_html = client.post(
+        "/pages/canvas/source-form",
+        json={"key": "weather_now", "sid": "e1", "placement": False},
+    ).get_data(as_text=True)
+    assert 'name="update_on_change"' not in source_html
+
+
 def test_widget_data_live_with_sample_fallback(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
     """The editor's live-data endpoint fetches real data; with no location
     configured, weather_now errors and falls back to its dev-gallery sample so

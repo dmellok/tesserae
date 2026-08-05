@@ -697,9 +697,11 @@ def _materialised_options(plugin: Any) -> list[dict[str, Any]]:
 @bp.post("/source-form")
 def source_form() -> Response:
     """Render a widget's ``cell_options`` as an HTML form fragment for the
-    source-config drawer. Body: ``{key, sid, options}``. Reuses the grid
-    editor's ``auto_field`` macros so the controls (location search, entity
-    overrides, selects) stay identical to per-cell config."""
+    source-config drawer. Body: ``{key, sid, options, placement?,
+    update_on_change?}``. Reuses the grid editor's ``auto_field`` macros so
+    the controls (location search, entity overrides, selects) stay identical
+    to per-cell config. A direct capable placement also gets the host-owned
+    update policy in this drawer; nested data sources do not."""
     _guard()
     body = request.get_json(silent=True) or {}
     key = body.get("key")
@@ -707,11 +709,14 @@ def source_form() -> Response:
     if plugin is None:
         abort(404)
     values = body.get("options")
+    show_update_on_change = body.get("placement") is True and bool(plugin.on_change_updates)
     html = render_template(
         "panels_source_form.html",
         opts=_materialised_options(plugin),
         values=values if isinstance(values, dict) else {},
         sid=str(body.get("sid") or "new"),
+        show_update_on_change=show_update_on_change,
+        update_on_change=show_update_on_change and body.get("update_on_change") is True,
     )
     return current_app.response_class(html, mimetype="text/html")
 
