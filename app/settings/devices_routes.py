@@ -721,13 +721,19 @@ def devices_register_discovered(discovered_id: str) -> Response:
     renderer_id_arg = device_service.renderer_id_for_format(
         renderers_registry, devices().get(kind_id), entry.wire_format
     )
+    # Display name: the form field wins when present (even cleared, the
+    # admin's empty submit means "no name"); a poster without the field
+    # (setup wizard JSON path) falls back to the announce's suggested
+    # ``name`` so a client that sent one on /discover isn't ignored
+    # (discussion #24).
+    name_arg = form.get("name") if "name" in form else (entry.name or "")
     result = device_service.create_instance(
         devices=devices(),
         renderers=renderers_registry,
         data_root=device_data_root(),
         instance_id=form.get("id") or default_id,
         kind_id=kind_id,
-        name=form.get("name") or "",
+        name=name_arg or "",
         panel_overrides=panel_overrides,
         access_token=discovered_token if isinstance(discovered_token, str) else None,
         mac=mac_arg,

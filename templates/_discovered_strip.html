@@ -30,6 +30,9 @@
   <div class="dx-discovered-actions">
     {% if d.kind %}
     <form method="post" action="{{ url_for('auth.devices_register_discovered', discovered_id=d.id) }}" class="form form--inline">
+      {# Prefilled from the announce's optional ``name`` (discussion #24);
+         the admin can edit or clear it before registering. #}
+      <input type="text" name="name" value="{{ d.name or '' }}" placeholder="Display name" class="dx-name-input" aria-label="Display name">
       {% if d.variants %}
       {# Sibling panels share a wire protocol but differ in gamut / dims
          (e.g. Inky 4" Spectra 6 600×400 vs legacy ACeP 640×400). The

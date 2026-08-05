@@ -86,6 +86,16 @@ class DiscoveredDevice:
         value = self.parsed.get("ip")
         return str(value) if isinstance(value, str) else None
 
+    @property
+    def name(self) -> str | None:
+        """Display name suggested by the announce (discussion #24).
+        Prefills the Register form's name field; the admin keeps the
+        final say there."""
+        value = self.parsed.get("name")
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+        return None
+
 
 # Default-config tokens shipped by various BYOS client firmwares. A
 # device polling with one of these is the official "I haven't been

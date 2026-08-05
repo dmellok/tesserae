@@ -4,7 +4,16 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
-## [Unreleased]
+## [0.267.0], 2026-08-05
+
+### Added
+
+- **`/discover` announces can suggest a display name** (discussion #24).
+  The Register card in Settings → Devices gains a Display name field
+  prefilled from the announce's optional `name`; the admin can edit or
+  clear it before registering, and later announces never rename an
+  already-registered device. The client protocol doc now spells out the
+  attribute's behaviour on both `/discover` and `/register`.
 
 ### Fixed
 

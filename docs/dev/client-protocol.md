@@ -116,10 +116,20 @@ server URL.
      "panel_w": 800,
      "panel_h": 480,
      "gamut": "mono",
+     "name": "Kitchen Display",
      "fw_version": "0.1.0",
      "mac": "AA:BB:CC:DD:EE:FF"
    }
    ```
+
+   `name` is optional on both `/discover` and `/register`: a suggested
+   human-readable display name for the device. On `/register` it's
+   applied directly to the new instance. On `/discover` it prefills
+   the Register card's "Display name" field in Settings → Devices, so
+   the admin sees the suggestion and can edit or clear it before
+   registering; the admin's choice always wins, and later announces
+   never rename an already-registered device. Omit it freely, the
+   device id is used as the display fallback.
 
    `gamut` is optional; when supplied, it's persisted onto the
    auto-provisioned instance's panel block so the generic

@@ -431,6 +431,7 @@ def format_discovered(items: list[DiscoveredDevice]) -> list[dict[str, Any]]:
             {
                 "id": d.id,
                 "kind": d.kind,
+                "name": d.name,
                 "panel_w": d.panel_w,
                 "panel_h": d.panel_h,
                 "gamut": d.gamut,

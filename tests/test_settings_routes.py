@@ -1102,6 +1102,55 @@ def test_register_discovered_variant_pick_overrides_heartbeat(app_with_gate: Fla
     assert (inst.panel["w"], inst.panel["h"]) == (640, 400)
 
 
+def test_register_discovered_uses_announced_name_when_form_omits_it(
+    app_with_gate: Flask,
+) -> None:
+    """Discussion #24: a ``name`` sent with /discover prefills the display
+    name. A poster without the field (setup wizard JSON path) falls back
+    to the announce's suggestion."""
+    client = app_with_gate.test_client()
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+    cache = app_with_gate.config["DISCOVERY_CACHE"]
+    cache.record(
+        "cp_kitchen",
+        b'{"kind":"esp32_client","name":"Kitchen Display"}',
+    )
+    resp = client.post("/settings/devices/discovery/cp_kitchen/register", follow_redirects=False)
+    assert resp.status_code == 302
+    inst = app_with_gate.config["DEVICE_REGISTRY"].get("cp_kitchen")
+    assert inst is not None
+    assert inst.display_name == "Kitchen Display"
+
+
+def test_register_discovered_form_name_wins_over_announce(app_with_gate: Flask) -> None:
+    """The admin's typed (or cleared) Display name field is authoritative
+    over the announce's suggestion."""
+    client = app_with_gate.test_client()
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+    cache = app_with_gate.config["DISCOVERY_CACHE"]
+    cache.record("cp_hall", b'{"kind":"esp32_client","name":"Hallway"}')
+    resp = client.post(
+        "/settings/devices/discovery/cp_hall/register",
+        data={"name": "Front hall panel"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    inst = app_with_gate.config["DEVICE_REGISTRY"].get("cp_hall")
+    assert inst is not None
+    assert inst.display_name == "Front hall panel"
+    # Cleared field means "no name": the id becomes the display fallback.
+    cache.record("cp_bare", b'{"kind":"esp32_client","name":"Ignored"}')
+    resp = client.post(
+        "/settings/devices/discovery/cp_bare/register",
+        data={"name": ""},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    inst = app_with_gate.config["DEVICE_REGISTRY"].get("cp_bare")
+    assert inst is not None
+    assert inst.display_name == "cp_bare"
+
+
 def test_variant_options_preselects_by_declared_gamut(app_with_gate: Flask) -> None:
     """The picker pre-selects the sibling whose panel matches a declared
     gamut, so one-click register is correct without touching the dropdown
