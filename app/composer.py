@@ -24,6 +24,7 @@ from typing import Any, Final
 from urllib.parse import quote
 
 from flask import Blueprint, Response, abort, current_app, render_template, request
+from werkzeug.wrappers import Response as WerkzeugResponse
 
 from app.bindings import apply_binding
 from app.panel import PANEL_PRESETS, resolve_panel_for_page
@@ -1311,7 +1312,7 @@ def compose(page_id: str) -> str:
 PREVIEW_MAX_DIM: Final = 800
 
 
-def _sent_composition_response(page_id: str) -> Response | None:
+def _sent_composition_response(page_id: str) -> WerkzeugResponse | None:
     """A downscale of the composition last pushed for ``page_id``, or ``None``
     when the dashboard has never been pushed (or its PNG has been culled).
 
@@ -1319,7 +1320,11 @@ def _sent_composition_response(page_id: str) -> Response | None:
     with the panel while the thumbnails did not: the pushed composition is the
     exact bytes Playwright captured for that push, whereas the preview cache
     re-renders the page definition and cannot reproduce a widget whose output
-    moves on its own."""
+    moves on its own.
+
+    Typed as a werkzeug ``Response`` rather than flask's because that is what
+    ``send_from_directory`` hands back; ``flask.Response`` is a subclass, so
+    the route's other returns still satisfy it."""
     from app.app_factory import _serve_render_thumbnail
 
     events = current_app.config.get("EVENT_LOG")
@@ -1404,7 +1409,7 @@ def page_preview_token(page: Page, dims: tuple[int, int]) -> str:
 
 
 @bp.get("/compose/<page_id>/preview.png")
-def compose_preview(page_id: str) -> Response:
+def compose_preview(page_id: str) -> WerkzeugResponse:
     """A cached PNG preview of a dashboard, for the dashboards-list hover.
 
     Rendered once per content version (the token) via the same headless path a
