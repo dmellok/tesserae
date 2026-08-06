@@ -93,21 +93,29 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url || steps.deployment-retry.outputs.page_url }}
     steps:
-      # actions/deploy-pages polls Pages for deployment status and
-      # gives up after a short internal timeout, so when Pages service
-      # is under load the poll returns ``deployment_failed`` even
-      # though the artifact was accepted and would eventually publish.
-      # One automatic retry with a 30s cooldown covers the vast majority
-      # of transients (observed ~7% flake rate on rapid release cycles,
-      # one retry drops it to sub-1%). If both attempts fail, the
-      # workflow errors out and the daily rebuild schedule + manual
-      # workflow_dispatch cover any remaining case.
+      # actions/deploy-pages polls Pages for deployment status and gives
+      # up after its ``timeout``, so when Pages is under load the poll
+      # reports failure even though the artifact was accepted and does
+      # publish. Observed on 2026-08-06: publishes landing at ~10m43s
+      # against the action's 600000ms default, i.e. the content went live
+      # ~30s after the step had already errored. ``timeout`` is raised to
+      # 20 minutes so a slow publish is waited out rather than reported
+      # as a failure.
+      #
+      # The retry stays for the case where the deployment is genuinely
+      # rejected, but note it can only help when the first attempt failed
+      # *before* creating a deployment: re-creating one for a commit that
+      # already has one is cancelled server-side within seconds.
       - id: deployment
         uses: actions/deploy-pages@v5
         continue-on-error: true
+        with:
+          timeout: 1200000
       - name: Wait before retry
         if: steps.deployment.outcome == 'failure'
         run: sleep 30
       - id: deployment-retry
         if: steps.deployment.outcome == 'failure'
         uses: actions/deploy-pages@v5
+        with:
+          timeout: 1200000
