@@ -302,7 +302,7 @@ APP_FIELDS: list[dict[str, Any]] = [
         "default": ("https://raw.githubusercontent.com/dmellok/tesserae-widgets/main/widgets.json"),
         "group": "marketplace",
         "help": (
-            "Where Settings → Plugins → Browse pulls the community widget "
+            "Where Settings → Widgets → Browse pulls the community widget "
             "catalog from. Defaults to the official catalog (audit-only, "
             "every entry PR-reviewed). Point at a fork to use your own "
             "catalog; leave blank to hide the Browse page entirely."

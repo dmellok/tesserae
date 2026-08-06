@@ -140,7 +140,7 @@ def fetch(
 
     if not core.is_configured():
         return {
-            "error": "Set your Home Assistant URL + token in Plugins → Home Assistant Core.",
+            "error": "Set your Home Assistant URL + token in Settings → Widgets → Home Assistant Core.",
             "title": title,
         }
 

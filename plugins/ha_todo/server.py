@@ -58,7 +58,7 @@ def fetch(
         return {"error": "Install the Home Assistant Core plugin to use this widget."}
     if not core.is_configured():
         return {
-            "error": "Home Assistant is not configured, set URL + token in Plugins → Home Assistant Core."
+            "error": "Home Assistant is not configured, set URL + token in Settings → Widgets → Home Assistant Core."
         }
 
     entity_id = (options.get("entity_id") or "").strip()

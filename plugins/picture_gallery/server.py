@@ -264,7 +264,7 @@ def fetch(
     if not images:
         return {
             "error": f"No images in '{folder_name or ROOT_FOLDER_VALUE}'. "
-            "Add some at Plugins → Gallery.",
+            "Add some at Settings → Widgets → Gallery.",
             "url": None,
         }
 

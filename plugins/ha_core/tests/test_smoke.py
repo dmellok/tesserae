@@ -26,7 +26,10 @@ def test_unconfigured_choices_guide_the_user(app: Flask) -> None:
         choices = core.entity_choices()
         assert len(choices) == 1
         assert choices[0]["value"] == ""
-        assert "Plugins" in choices[0]["label"]
+        # Points at where the setting actually lives: the Settings area is
+        # labelled Widgets, so "Plugins" would send people somewhere that
+        # isn't in the nav.
+        assert "Settings → Widgets" in choices[0]["label"]
 
 
 def test_entity_choices_lists_sorts_and_filters(app: Flask, monkeypatch) -> None:

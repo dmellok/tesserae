@@ -3,7 +3,7 @@
   "name": "Home Assistant (service)",
   "version": "0.1.0",
   "kind": "service",
-  "description": "Non-placeable data source that exposes the whole Home Assistant REST API to a code element, reusing the connection configured in Plugins → Home Assistant Core (base URL + token). Not shown in the canvas picker; source it from a code/data element by its key 'ha_service'. Probe with an empty scope to get a map of scopes (states, entity, history, services, config, raw). 'states' returns every entity; 'entity' one entity's full state; 'history' a series; 'raw' fetches any GET /api path you name.",
+  "description": "Non-placeable data source that exposes the whole Home Assistant REST API to a code element, reusing the connection configured in Settings → Widgets → Home Assistant Core (base URL + token). Not shown in the canvas picker; source it from a code/data element by its key 'ha_service'. Probe with an empty scope to get a map of scopes (states, entity, history, services, config, raw). 'states' returns every entity; 'entity' one entity's full state; 'history' a series; 'raw' fetches any GET /api path you name.",
   "icon": "ph-house-line",
   "supports": { "sizes": [] },
   "cell_options": [

@@ -1,7 +1,7 @@
 """Home Assistant service (kind: service).
 
 A non-placeable data source that exposes the Home Assistant REST API to a code
-element. It reuses the connection configured in Plugins → Home Assistant Core
+element. It reuses the connection configured in Settings → Widgets → Home Assistant Core
 (base URL + Long-Lived Access Token) via the plugin registry, so it shares one
 credential with the whole ha_* widget family and never stores its own.
 
@@ -37,7 +37,7 @@ def _discovery() -> dict[str, Any]:
     explore the API before choosing what to fetch."""
     return {
         "service": "home-assistant",
-        "auth": "shared (Plugins → Home Assistant Core: base URL + token)",
+        "auth": "shared (Settings → Widgets → Home Assistant Core: base URL + token)",
         "scopes": {
             "states": "Every entity state. Set options.domain (comma list, e.g. "
             "'light,sensor') to filter. Returns {entities: [...], count}.",
@@ -64,7 +64,9 @@ def fetch(
     if core is None:
         return {"error": "ha_core plugin not available"}
     if not core.is_configured():
-        return {"error": "Home Assistant is not configured (Plugins → Home Assistant Core)"}
+        return {
+            "error": "Home Assistant is not configured (Settings → Widgets → Home Assistant Core)"
+        }
 
     try:
         if scope == "states":

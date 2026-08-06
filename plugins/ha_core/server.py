@@ -6,7 +6,7 @@ registry and call ``get_state`` / ``get_states`` / ``history`` /
 policy. Tesserae renders headlessly on push/schedule, so a plain REST
 poll at render time fits, no WebSocket needed.
 
-Config lives in Settings → Plugins → Home Assistant Core: a base URL and
+Config lives in Settings → Widgets → Home Assistant Core: a base URL and
 a Long-Lived Access Token (HA → profile → Long-Lived Access Tokens).
 """
 
@@ -208,7 +208,9 @@ def entity_choices(domains: tuple[str, ...] | None = None) -> list[dict[str, str
     When HA isn't configured or is unreachable, returns a single guidance
     option instead of an empty dropdown so the editor explains itself."""
     if not is_configured():
-        return [{"value": "", "label": "Set HA URL + token in Plugins → Home Assistant Core"}]
+        return [
+            {"value": "", "label": "Set HA URL + token in Settings → Widgets → Home Assistant Core"}
+        ]
     try:
         states = get_states()
     except Exception:

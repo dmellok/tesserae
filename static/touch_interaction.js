@@ -146,7 +146,7 @@
       argHost.appendChild(extraTa); argHost.appendChild(hint);
       fetchJSON(urls.haActionsUrl, function (ha) {
         if (!ha || !ha.configured) {
-          hint.textContent = "Home Assistant isn't configured (Settings → Plugins → Home Assistant Core).";
+          hint.textContent = "Home Assistant isn't configured (Settings → Widgets → Home Assistant Core).";
           return;
         }
         slist.innerHTML = (ha.services || []).map(function (s) {

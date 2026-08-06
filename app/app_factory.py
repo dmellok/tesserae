@@ -711,7 +711,7 @@ def create_app(
     app.config["PLUGINS_DIR"] = plugins_dir
 
     # Audit-only community widget marketplace. Browse / install /
-    # uninstall via Settings → Plugins → Browse. Index URL is a
+    # uninstall via Settings → Widgets → Browse. Index URL is a
     # settings switch so a user can fork the catalog or empty the
     # field to disable Browse entirely. See app/marketplace.py for
     # the trust model + sequencing notes.

@@ -505,7 +505,7 @@ def _materialize_cell_options(plugins: list[Any]) -> dict[str, list[dict[str, An
                             "label": (
                                 f"Stored secret for {plugin_label} can't be "
                                 "decrypted, re-enter it under Settings → "
-                                f"Plugins → {plugin_label}"
+                                f"Widgets → {plugin_label}"
                             ),
                         }
                     ]

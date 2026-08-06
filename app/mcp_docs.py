@@ -133,7 +133,7 @@ TAP ACTIONS ("on_tap"/"on_swipe"/"on_slide" on ANY element -- make an existing e
     (split into the list HA wants). Sliders substitute the 0-100
     value into "{value}" (also "$value"), which becomes a number for fields like brightness_pct.
     Execution is SERVER-SIDE via the ha_core plugin's connection (base URL + long-lived token in
-    Settings -> Plugins -> Home Assistant Core), a POST to /api/services/<domain>/<service>. This is
+    Settings -> Widgets -> Home Assistant Core), a POST to /api/services/<domain>/<service>. This is
     NOT the read-only ha_service data source; you do NOT need a "callable" service source.
   On-device requirement: the target panel must be touch-capable (list_devices() shows "touch": true,
     e.g. the reTerminal E1003) AND running firmware that reports touch. On a display-only panel these
