@@ -1,9 +1,9 @@
 {
   "tesserae_compat": "1.x",
   "name": "Webpage",
-  "version": "0.1.1",
+  "version": "0.3.0",
   "kind": "widget",
-  "description": "Embed an external URL in a cell. The composer captures whatever the iframe renders, handy for status pages, public dashboards, or any site that doesn't deny embedding. Same headless-render path as the Send tab is used when the panel renders. Pages that fetch their data with JavaScript get a short settle delay after load so the content is captured, not a blank frame; raise it for slow pages. Sites that set X-Frame-Options:DENY or strict CSP cannot be embedded.",
+  "description": "Embed an external URL in a cell. The composer captures whatever the iframe renders, handy for status pages, public dashboards, or any site that doesn't deny embedding. A URL that points straight at an image (PNG, GIF, JPEG, WebP, SVG) is drawn as an image and scaled to the cell rather than embedded, so tall charts keep their bottom edge. Same headless-render path as the Send tab is used when the panel renders. Pages that fetch their data with JavaScript get a short settle delay after load so the content is captured, not a blank frame; raise it for slow pages. Sites that set X-Frame-Options:DENY or strict CSP cannot be embedded.",
   "icon": "ph-globe",
   "supports": { "sizes": ["sm", "md", "lg"] },
   "cell_options": [
@@ -11,7 +11,7 @@
       "name": "url",
       "type": "string",
       "label": "URL",
-      "help": "https://…, page to render inside the cell. Must support iframe embedding.",
+      "help": "https://…, page to render inside the cell. Pages must support iframe embedding; a direct image URL is drawn as an image instead.",
       "default": ""
     },
     {
@@ -19,12 +19,27 @@
       "type": "select",
       "label": "Scale",
       "default": "fit",
+      "help": "Applies to embedded pages. A direct image URL is framed by Image fit instead.",
       "choices": [
         { "value": "fit",  "label": "Fit to cell (no scroll)" },
         { "value": "100",  "label": "100% (native, may scroll)" },
         { "value": "75",   "label": "75%" },
         { "value": "50",   "label": "50%" },
         { "value": "25",   "label": "25%" }
+      ]
+    },
+    {
+      "name": "image_fit",
+      "type": "select",
+      "label": "Image fit",
+      "default": "fit",
+      "help": "How a direct image URL is framed in the cell. Ignored for pages.",
+      "choices": [
+        { "value": "fit",     "label": "Fit, letterbox (keep aspect)" },
+        { "value": "fill",    "label": "Fill, crop to cover" },
+        { "value": "stretch", "label": "Stretch, squash to exact dims" },
+        { "value": "center",  "label": "Center, no scaling" },
+        { "value": "blur",    "label": "Center + blurred background" }
       ]
     },
     {

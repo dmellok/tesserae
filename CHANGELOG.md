@@ -4,6 +4,18 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.269.0], 2026-08-06
+
+### Fixed
+
+- **The Webpage widget no longer crops direct image URLs.** A URL that
+  resolves to an image (PNG, GIF, JPEG, WebP, SVG) is now drawn as an image
+  and framed to the cell, so a chart taller than its cell keeps its bottom
+  edge instead of being clipped by the embedded viewport. Pages are
+  unaffected and still render through the iframe. A new Image fit option
+  offers the same five modes as the Send tab (fit, fill, stretch, center,
+  center with a blurred background); Scale continues to apply to pages.
+
 ## [0.267.0], 2026-08-05
 
 ### Added

@@ -3,7 +3,8 @@
 // pixels so a desktop layout fits in a small cell, and a fixed
 // ``viewport_w`` keeps responsive sites from collapsing to a mobile
 // breakpoint. The composer's headless render screenshots whatever
-// the iframe lands on.
+// the iframe lands on. A URL that resolves to an image takes a
+// separate <img> path instead, see ``probeImage``.
 
 function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({
@@ -18,6 +19,65 @@ function escapeHtml(s) {
 const IFRAME_HARD_CAP_MS = 12000;
 // Default settle window (seconds) after ``load`` when the cell doesn't set one.
 const DEFAULT_SETTLE_S = 2;
+// Cap on the "is this URL an image?" probe. Kept short because it is spent
+// before the iframe path even starts, and an HTML URL normally fails the
+// probe immediately (the decoder rejects the first bytes).
+const IMAGE_PROBE_CAP_MS = 6000;
+
+// A URL that resolves to an image is not a page. Chromium wraps a bare image
+// in its own image document rendered at the image's natural size, which the
+// iframe then clips to the cell rather than fitting, so an image taller than
+// the cell silently loses its bottom edge. Load it as an <img> instead and
+// let object-fit do the work. Probing by decode rather than by file extension
+// keeps image URLs served from an extension-less path on this path too.
+function probeImage(url) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    let settled = false;
+    const finish = (ok) => {
+      if (settled) return;
+      settled = true;
+      resolve(ok);
+    };
+    img.onload = () => finish(img.naturalWidth > 0 && img.naturalHeight > 0);
+    img.onerror = () => finish(false);
+    img.referrerPolicy = "no-referrer";
+    setTimeout(() => finish(false), IMAGE_PROBE_CAP_MS);
+    img.src = url;
+  });
+}
+
+// Same fit vocabulary the Send tab and the push pipeline use, so a URL framed
+// one way in Send frames the same way in a cell. "blur" is the odd one: it
+// contains the image over a cover-cropped, blurred copy of itself, matching
+// the backdrop the renderer produces (see .preview-bg in send.css).
+const IMAGE_OBJECT_FIT = {
+  fit: "contain",
+  fill: "cover",
+  stretch: "fill",
+  center: "none",
+  blur: "contain",
+};
+
+function imageMarkup(url, fitOpt) {
+  const mode = Object.hasOwn(IMAGE_OBJECT_FIT, fitOpt) ? fitOpt : "fit";
+  const src = escapeHtml(url);
+  const fg = `<img class="fg" src="${src}" alt="" referrerpolicy="no-referrer"
+       style="object-fit:${IMAGE_OBJECT_FIT[mode]}">`;
+  const bg = mode === "blur"
+    ? `<img class="bg" src="${src}" alt="" aria-hidden="true" referrerpolicy="no-referrer">`
+    : "";
+  return `
+    <style>
+      .shell { position:relative; width:100%; height:100%; overflow:hidden; background:#fff; }
+      .shell > img { position:absolute; inset:0; width:100%; height:100%; display:block; }
+      .shell > img.fg { z-index:1; }
+      /* Overscaled so the blur's soft edge never reveals the cell border. */
+      .shell > img.bg { z-index:0; object-fit:cover; transform:scale(1.08);
+                        filter:blur(18px) saturate(1.15); }
+    </style>
+    <div class="shell">${bg}${fg}</div>`;
+}
 
 export default async function render(shadow, ctx) {
   const opts = ctx?.cell?.options || {};
@@ -33,6 +93,22 @@ export default async function render(shadow, ctx) {
         <div class="w-title"><i class="ph-bold ph-globe" style="color:var(--text-muted)"></i><h3>Webpage</h3></div>
         <div class="w-body"><p class="u-muted">Set a URL in the cell options (must start with http/https).</p></div>
       </div>`;
+    return;
+  }
+
+  if (await probeImage(url)) {
+    shadow.innerHTML = `
+      ${css}
+      <div class="w is-bleed" data-widget="webpage">
+        ${imageMarkup(url, String(opts.image_fit || "fit"))}
+      </div>`;
+    // The probe warmed the cache, so these decodes are normally instant;
+    // awaiting them keeps the composer from screenshotting a half-painted cell.
+    await Promise.all(
+      [...shadow.querySelectorAll("img")].map((img) =>
+        img.decode ? img.decode().catch(() => {}) : Promise.resolve(),
+      ),
+    );
     return;
   }
 
