@@ -235,7 +235,11 @@
               of on the fixed cadence. Needs the device's sleep telemetry;
               without it the normal timing applies.</p>
           </div>
-          <div class="dxe-set">
+          {# Only meaningful when the deck waits for a person. An auto-advancing
+             deck reclaims its own panel at the next boundary, and a timeout
+             shorter than the advance interval parks it on home in between.
+             deck_editor.js hides and disables this for timer / both. #}
+          <div class="dxe-set" id="dxe-returnhome-wrap">
             <label class="dxe-mono-label" for="dxe-returnhome">RETURN HOME AFTER</label>
             <select name="timeout" id="dxe-returnhome">
               {% set to = deck.home_timeout_minutes if deck else 0 %}

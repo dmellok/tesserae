@@ -364,6 +364,14 @@
     // Smart sync only means something when a timer drives the deck.
     const smartWrap = el("dxe-smartsync-wrap");
     if (smartWrap) smartWrap.style.display = mode === "manual" ? "none" : "";
+    // Return-home is the inverse: it only means something when the deck waits
+    // for a person. Under a timer the deck reclaims its own panel at the next
+    // boundary, and a timeout shorter than the interval parks it on home in
+    // between, which reads as "it stopped cycling". Disabled as well as hidden
+    // so a stale value can't be submitted from a control nobody can see.
+    const returnWrap = el("dxe-returnhome-wrap");
+    if (returnWrap) returnWrap.style.display = mode === "manual" ? "" : "none";
+    if (returnSel) returnSel.disabled = mode !== "manual";
     if (advHint) {
       advHint.textContent =
         mode === "manual"

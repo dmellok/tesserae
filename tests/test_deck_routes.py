@@ -528,3 +528,54 @@ def test_editor_save_keeps_a_non_cycle_trigger(app: Flask) -> None:
     assert d.id == deck.id
     assert d.advance_trigger == "daily"
     assert d.advance_fires_at == "08:00"
+
+
+def test_editor_exposes_the_return_home_wrapper_for_the_mode_toggle(app: Flask) -> None:
+    """deck_editor.js hides return-home for timer / both by this id. If the id
+    moves, the control silently stays visible for modes it doesn't apply to."""
+    client = app.test_client()
+    _sign_in(client)
+    _save_both_deck(client)
+    deck_id = _decks(app)[0].id
+    body = client.get(f"/decks/{deck_id}/edit").get_data(as_text=True)
+    assert 'id="dxe-returnhome-wrap"' in body
+    assert 'id="dxe-returnhome"' in body
+
+
+def test_auto_advancing_save_without_a_timeout_stores_zero(app: Flask) -> None:
+    """The editor disables the return-home control for timer / both, so the
+    field isn't submitted. The server must read that as "off" rather than
+    carrying a stale timeout that would park the panel on home between
+    advances."""
+    client = app.test_client()
+    _sign_in(client)
+    client.post(
+        "/decks/editor-save",
+        data={
+            "name": "Loop",
+            "pages": "overview,calendar",
+            "advance": "manual",
+            "home": "overview",
+            "timeout": "5",
+        },
+        follow_redirects=True,
+    )
+    deck_id = _decks(app)[0].id
+    assert _decks(app)[0].home_timeout_minutes == 5
+
+    # Switch to an auto-advancing mode; the disabled control sends nothing.
+    client.post(
+        "/decks/editor-save",
+        data={
+            "deck_id": deck_id,
+            "name": "Loop",
+            "pages": "overview,calendar",
+            "advance": "both",
+            "advance_interval_minutes": "20",
+            "home": "overview",
+        },
+        follow_redirects=True,
+    )
+    d = _decks(app)[0]
+    assert d.advance == "both"
+    assert d.home_timeout_minutes == 0

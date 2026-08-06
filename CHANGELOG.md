@@ -4,6 +4,18 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.274.1], 2026-08-07
+
+### Fixed
+
+- **"Return home after" is offered only for lineups that wait for a person.**
+  An auto-advancing lineup reclaims its own panel at the next boundary, so a
+  return-home timeout shorter than the advance interval parked the panel on
+  the home page in between, which reads as the lineup having stopped cycling.
+  The control is now hidden, and disabled so nothing stale is submitted, when
+  the advance mode is Timer or Both. Existing lineups keep their stored value
+  until the next save through the editor.
+
 ## [0.274.0], 2026-08-07
 
 ### Fixed
