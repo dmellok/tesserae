@@ -11,6 +11,7 @@ from __future__ import annotations
 import importlib.util
 import urllib.error
 from pathlib import Path
+from typing import ClassVar
 from unittest.mock import MagicMock, patch
 from xml.etree import ElementTree as ET
 
@@ -43,6 +44,10 @@ _RSS = b"""<?xml version="1.0" encoding="UTF-8"?>
 
 
 class _FakeResp:
+    # ``headers`` mirrors a real urllib response: the fetcher reads
+    # Content-Type to tell a feed from a block page served with 200.
+    headers: ClassVar[dict[str, str]] = {"Content-Type": "application/rss+xml"}
+
     def read(self) -> bytes:
         return _RSS
 
@@ -202,3 +207,44 @@ def test_items_without_a_description_still_parse() -> None:
     _, items = srv._slim_rss(root, 5)
     assert [i["excerpt"] for i in items] == ["", ""]
     assert items[0]["title"] == "Premier article"
+
+
+# -- non-feed responses -----------------------------------------------------
+
+
+def test_html_block_page_reports_a_cause_not_a_parser_error() -> None:
+    """A feed that intermittently answers with a challenge or error page used
+    to surface the raw "not well-formed (invalid token): line 1, column 0",
+    which describes the symptom and gives the operator nothing to act on."""
+    with pytest.raises(srv.FeedNotXML) as excinfo:
+        srv._parse_feed(b"<!DOCTYPE html><html><body>Access denied</body></html>")
+    assert "web page instead of XML" in str(excinfo.value)
+
+
+def test_html_detected_by_content_type_too() -> None:
+    with pytest.raises(srv.FeedNotXML) as excinfo:
+        srv._parse_feed(b"nonsense that is not xml", "text/html; charset=utf-8")
+    assert "web page instead of XML" in str(excinfo.value)
+
+
+def test_empty_response_says_so() -> None:
+    with pytest.raises(srv.FeedNotXML) as excinfo:
+        srv._parse_feed(b"   \n ")
+    assert "empty response" in str(excinfo.value)
+
+
+def test_malformed_xml_still_reports_the_parser_detail() -> None:
+    with pytest.raises(srv.FeedNotXML) as excinfo:
+        srv._parse_feed(b"<rss><channel><title>Unclosed")
+    assert "isn't valid XML" in str(excinfo.value)
+
+
+def test_non_feed_body_surfaces_the_friendly_message_to_the_cell() -> None:
+    """The message the operator sees is the explanation, not "FeedNotXML: ..."."""
+
+    def _html(url: str) -> ET.Element:
+        raise srv.FeedNotXML("The feed returned an empty response.")
+
+    with patch.object(srv, "_fetch_via_urllib", _html):
+        result = srv._fetch_feed("https://example.com/rss", allow_pool=False)
+    assert result == "The feed returned an empty response."

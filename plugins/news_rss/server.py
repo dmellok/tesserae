@@ -177,10 +177,47 @@ def _slim_rss(rss: ET.Element, max_items: int) -> tuple[str, list[dict[str, Any]
     return feed_title, items
 
 
+class FeedNotXML(Exception):
+    """The response arrived but isn't a feed.
+
+    Worth its own type because the raw ``ParseError`` ("not well-formed
+    (invalid token): line 1, column 0") is what the operator sees in the
+    cell, and it describes the symptom rather than the cause. A feed that
+    intermittently fails this way is almost always answering with a block
+    page or an error page, which is actionable; a parser complaint isn't.
+    """
+
+
+_HTML_PAGE_MSG = (
+    "The feed returned a web page instead of XML, which usually means the site "
+    "served a block or error page for this request."
+)
+
+
+def _parse_feed(body: bytes, content_type: str = "") -> ET.Element:
+    looks_html = body[:400].lstrip().lower().startswith((b"<!doctype html", b"<html"))
+    try:
+        root = ET.fromstring(body)
+    except ET.ParseError as err:
+        if not body.strip():
+            raise FeedNotXML("The feed returned an empty response.") from err
+        if looks_html or "text/html" in content_type.lower():
+            raise FeedNotXML(_HTML_PAGE_MSG) from err
+        raise FeedNotXML(f"The feed isn't valid XML ({err}).") from err
+    # A block page can be perfectly well-formed and still not be a feed, so
+    # parsing cleanly isn't proof; the root element is.
+    tag = root.tag.rsplit("}", 1)[-1].lower()
+    if tag in {"html", "head", "body"}:
+        raise FeedNotXML(_HTML_PAGE_MSG)
+    return root
+
+
 def _fetch_via_urllib(url: str) -> ET.Element:
     req = urllib.request.Request(url, headers=URLLIB_HEADERS)
     with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT_S) as resp:
-        return ET.fromstring(resp.read())
+        body = resp.read()
+        content_type = resp.headers.get("Content-Type", "")
+    return _parse_feed(body, content_type)
 
 
 def _fetch_via_pool(url: str) -> ET.Element | None:
@@ -206,7 +243,10 @@ def _fetch_via_pool(url: str) -> ET.Element | None:
             accept=ACCEPT,
         )
     )
-    return ET.fromstring(body)
+    # Same treatment as the urllib path: Chromium clears more bot protection
+    # but can still land on a challenge page, and the raw parser error would
+    # be just as opaque.
+    return _parse_feed(body.encode("utf-8") if isinstance(body, str) else body)
 
 
 def _fetch_feed(url: str, *, allow_pool: bool) -> ET.Element | str:
@@ -221,6 +261,10 @@ def _fetch_feed(url: str, *, allow_pool: bool) -> ET.Element | str:
     composer's last-good fallback serves the prior payload."""
     try:
         return _fetch_via_urllib(url)
+    except FeedNotXML as err:
+        # Already phrased for the operator; don't bury it behind a type name.
+        urllib_error = str(err)
+        logger.debug("news_rss: urllib fetch returned a non-feed body (%s)", urllib_error)
     except Exception as err:
         urllib_error = f"{type(err).__name__}: {err}"
         logger.debug("news_rss: urllib fetch failed (%s)", urllib_error)

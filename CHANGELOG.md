@@ -4,6 +4,30 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.274.0], 2026-08-07
+
+### Fixed
+
+- **A lineup set to advance automatically no longer reverts to "By hand".**
+  Two separate faults produced that symptom. The management and graph forms
+  rebuilt the deck from only their own fields, so any save through them reset
+  every advance setting to its default, turning a timer or both deck back into
+  a manual one on disk. Those forms now overlay onto the stored deck, which
+  also means a field added later can't be silently dropped. Separately, the
+  Lineups card for a navigable deck was hardcoded to the "By hand" badge, so
+  even a correctly-saved both deck advertised itself as manual; it now shows
+  the cadence it runs on. Re-saving an interval or daily lineup through the
+  deck editor also no longer converts it to a cycle.
+- **Widget copy points at Settings → Widgets.** Error messages and help text
+  across the Home Assistant widgets, the gallery, the marketplace setting and
+  a touch hint still directed people to a "Plugins" section, which was renamed
+  to Widgets.
+- **A blocked RSS feed explains itself.** A feed answering with a challenge or
+  error page surfaced the raw parser complaint ("not well-formed (invalid
+  token): line 1, column 0"), and a block page that happened to be valid XML
+  slipped through to render as an empty widget. Both now report that the feed
+  returned a web page rather than XML.
+
 ## [0.273.0], 2026-08-07
 
 ### Added
