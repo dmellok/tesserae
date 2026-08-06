@@ -189,6 +189,25 @@ def _live_map() -> dict[str, tuple[str | None, str | None]]:
     return out
 
 
+def _nav_badge(deck: Deck) -> str:
+    """Card badge for a navigable deck.
+
+    ``manual`` only ever moves when someone taps it. ``both`` also runs on a
+    timer, so it needs the cadence on the card; saying "By hand" there implies
+    the deck is idle when it is not."""
+    if deck.advance == "manual":
+        return "By hand"
+    every = max(1, int(deck.advance_interval_minutes or 0))
+    return f"Every {every} min + tap"
+
+
+def _nav_meta(deck: Deck) -> str:
+    count = f"{len(deck.pages)} dashboard{'s' if len(deck.pages) != 1 else ''}"
+    if deck.advance == "manual":
+        return f"{count} · button, tap, swipe"
+    return f"{count} · auto-advance, button, tap, swipe"
+
+
 def _design_cards(
     *,
     nav_decks: list[Deck],
@@ -290,14 +309,15 @@ def _design_cards(
                 "warning": binding_warning(deck.device_ids, [dp.page_id for dp in deck.pages]),
                 "enabled": deck.enabled,
                 "playing": live_page is not None,
-                "badge": "By hand",
-                "badge_icon": "hand-tap",
+                # A "both" deck advances on a timer AND accepts taps, so
+                # labelling it "By hand" (as this card did unconditionally)
+                # reads as "nothing is going to happen on its own" and hides
+                # the cadence it is actually running on.
+                "badge": _nav_badge(deck),
+                "badge_icon": "hand-tap" if deck.advance == "manual" else "clock-clockwise",
                 "device_ids": deck_device_ids,
                 "device_names": [device_names.get(d, d) for d in deck_device_ids],
-                "meta": (
-                    f"{len(deck.pages)} dashboard{'s' if len(deck.pages) != 1 else ''}"
-                    " · button, tap, swipe"
-                ),
+                "meta": _nav_meta(deck),
                 "screens": [
                     screen(dp.page_id, None, dp.page_id == live_page, bool(dp.conditions))
                     for dp in deck.pages
@@ -600,6 +620,19 @@ def create() -> Response:
     return redirect(url_for("decks.index") + f"#deck-{deck.id}")
 
 
+def _merged_deck(existing: Deck, **changes: Any) -> Deck:
+    """``existing`` with ``changes`` overlaid, re-validated.
+
+    Forms here are partial: the management form has no advance controls, the
+    graph form has no name field. Rebuilding a ``Deck`` from only the posted
+    fields resets everything else to its model default, which is how a deck
+    set to advance automatically came back as "By hand". Dumping and overlaying
+    keeps unposted fields, and still runs validation (unlike ``model_copy``)."""
+    data = existing.model_dump()
+    data.update(changes)
+    return Deck.model_validate(data)
+
+
 def _apply_page_refresh(page: DeckPage, raw: str | None) -> DeckPage:
     """Apply a per-page refresh override from a form field. None (field absent)
     leaves the page unchanged; empty clears the override (inherit); a number
@@ -634,10 +667,14 @@ def update(deck_id: str) -> Response:
     pages = [_apply_page_refresh(p, form.get(f"page_refresh_{p.page_id}")) for p in existing.pages]
     try:
         refresh = int(form.get("refresh_interval_minutes") or existing.refresh_interval_minutes)
-        deck = Deck(
-            id=deck_id,
+        # Overlay onto the stored deck rather than rebuilding it: this form
+        # doesn't carry the advance settings, and constructing a fresh Deck
+        # silently reset them to the model defaults, turning a timer or both
+        # deck back into a manual one on any management save (#194 follow-up).
+        # Overlaying also means a field added later can't be dropped here.
+        deck = _merged_deck(
+            existing,
             name=(form.get("name") or existing.name).strip() or existing.name,
-            enabled=existing.enabled,
             device_ids=[d for d in form.getlist("device_ids") if d],
             pages=pages,
             entry_page_id=(form.get("entry_page_id") or "").strip() or None,
@@ -687,14 +724,13 @@ def edit_graph(deck_id: str) -> Response:
             raise ValueError("page graph must be a JSON array of pages")
         pages = [DeckPage.model_validate(p) for p in data]
         page_ids = {p.page_id for p in pages}
-        deck = Deck(
-            id=deck_id,
-            name=existing.name,
-            enabled=existing.enabled,
-            device_ids=existing.device_ids,
+        # Docstring says "the management fields are kept", which listing them
+        # by hand did not achieve: anything absent from the list (every advance
+        # setting) was reset to its default.
+        deck = _merged_deck(
+            existing,
             pages=pages,
             entry_page_id=existing.entry_page_id if existing.entry_page_id in page_ids else None,
-            refresh_interval_minutes=existing.refresh_interval_minutes,
         )
     except (ValidationError, ValueError, json.JSONDecodeError) as exc:
         return _edit_error(deck_id, exc)
@@ -985,28 +1021,32 @@ def editor_save() -> Response:
         "advance_min_hold_minutes", 0, 120, existing.advance_min_hold_minutes if existing else 5
     )
 
+    fields: dict[str, Any] = {
+        "id": deck_id,
+        "name": name,
+        "enabled": form.get("enabled") in ("on", "true", "1"),
+        "device_ids": [d for d in form.getlist("device_ids") if d],
+        "pages": pages,
+        "entry_page_id": entry,
+        "home_page_id": home,
+        "home_timeout_minutes": timeout,
+        "refresh_interval_minutes": cadence,
+        "advance": advance,
+        "advance_interval_minutes": adv_interval,
+        "advance_anchor": adv_anchor,
+        "advance_end_at": adv_end_at,
+        "advance_days_of_week": adv_dow,
+        "advance_priority": adv_priority,
+        "advance_smart_sync": adv_smart,
+        "advance_smart_sync_lead_s": adv_lead,
+        "advance_mode": adv_mode,
+        "advance_min_hold_minutes": adv_min_hold,
+    }
     try:
-        deck = Deck(
-            id=deck_id,
-            name=name,
-            enabled=form.get("enabled") in ("on", "true", "1"),
-            device_ids=[d for d in form.getlist("device_ids") if d],
-            pages=pages,
-            entry_page_id=entry,
-            home_page_id=home,
-            home_timeout_minutes=timeout,
-            refresh_interval_minutes=cadence,
-            advance=advance,
-            advance_interval_minutes=adv_interval,
-            advance_anchor=adv_anchor,
-            advance_end_at=adv_end_at,
-            advance_days_of_week=adv_dow,
-            advance_priority=adv_priority,
-            advance_smart_sync=adv_smart,
-            advance_smart_sync_lead_s=adv_lead,
-            advance_mode=adv_mode,
-            advance_min_hold_minutes=adv_min_hold,
-        )
+        # This form covers the cycle shape only, so an interval or daily deck
+        # opened here would lose its trigger, window and fallback if the model
+        # were rebuilt from these fields alone. Overlay when editing.
+        deck = _merged_deck(existing, **fields) if existing else Deck(**fields)
     except ValidationError as exc:
         flash(f"Invalid deck: {_first_error(exc)}", "error")
         return redirect(

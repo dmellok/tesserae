@@ -398,3 +398,39 @@ def test_lineups_page_carries_live_refresh_hooks(app: Flask) -> None:
     assert "EventSource" in body
     # Thumbnails opt into content freshness (see compose_preview ?refresh).
     assert "refresh=300" in body
+
+
+def test_both_advance_deck_is_not_labelled_by_hand(app: Flask) -> None:
+    """A "both" deck advances on a timer AND accepts taps. Its card used to be
+    hardcoded to "By hand", which reads as "nothing happens on its own" and
+    hides the cadence it is running on."""
+    from app.state.deck_model import Deck, DeckPage
+
+    app.config["DECK_STORE"].upsert(
+        Deck(
+            id="mixed",
+            name="Lounge mixed",
+            pages=[DeckPage(page_id="hall"), DeckPage(page_id="kitchen")],
+            advance="both",
+            advance_interval_minutes=20,
+        )
+    )
+    client = app.test_client()
+    _sign_in(client)
+    body = client.get("/decks").get_data(as_text=True)
+
+    assert "Lounge mixed" in body
+    assert "Every 20 min + tap" in body
+    assert "auto-advance, button, tap, swipe" in body
+
+
+def test_manual_deck_still_says_by_hand(app: Flask) -> None:
+    from app.state.deck_model import Deck, DeckPage
+
+    app.config["DECK_STORE"].upsert(
+        Deck(id="handy", name="Hall wayfinding", pages=[DeckPage(page_id="hall")])
+    )
+    client = app.test_client()
+    _sign_in(client)
+    body = client.get("/decks").get_data(as_text=True)
+    assert "By hand" in body

@@ -431,3 +431,100 @@ def test_editor_save_derives_links_from_page_actions(app: Flask) -> None:
     deck = _decks(app)[0]
     a = next(p for p in deck.pages if p.page_id == "a")
     assert any(link.target_page_id == "b" for link in a.links)
+
+
+# -- "both" advance: timer AND taps (issue report, 2026-08-07) -------------
+
+
+def _save_both_deck(client, name: str = "Mixed") -> None:
+    client.post(
+        "/decks/editor-save",
+        data={
+            "name": name,
+            "pages": "overview,calendar",
+            "advance": "both",
+            "advance_interval_minutes": "20",
+            "home": "overview",
+        },
+        follow_redirects=True,
+    )
+
+
+def test_editor_save_persists_both_advance(app: Flask) -> None:
+    """``both`` is a valid mode (auto-cycle AND accept taps) and must survive
+    the editor round trip like ``timer`` does."""
+    client = app.test_client()
+    _sign_in(client)
+    _save_both_deck(client)
+    d = _decks(app)[0]
+    assert d.advance == "both"
+    assert d.advance_interval_minutes == 20
+
+
+def test_management_update_keeps_the_advance_mode(app: Flask) -> None:
+    """The management form carries no advance controls. It used to rebuild the
+    deck from only its own fields, so saving a name change silently reset an
+    auto-advancing deck to manual, which is both "it stopped moving" and the
+    "By hand" label at once."""
+    client = app.test_client()
+    _sign_in(client)
+    _save_both_deck(client)
+    deck_id = _decks(app)[0].id
+
+    client.post(
+        f"/decks/{deck_id}/update",
+        data={"name": "Renamed", "refresh_interval_minutes": "10"},
+        follow_redirects=True,
+    )
+    d = _decks(app)[0]
+    assert d.name == "Renamed"
+    assert d.advance == "both"  # not reset to the model default
+    assert d.advance_interval_minutes == 20
+
+
+def test_graph_edit_keeps_the_advance_mode(app: Flask) -> None:
+    """Same reset via the advanced graph form, whose docstring already claimed
+    the management fields were kept."""
+    client = app.test_client()
+    _sign_in(client)
+    _save_both_deck(client)
+    deck_id = _decks(app)[0].id
+
+    client.post(
+        f"/decks/{deck_id}/graph",
+        data={"graph_json": '[{"page_id": "overview"}, {"page_id": "calendar"}]'},
+        follow_redirects=True,
+    )
+    d = _decks(app)[0]
+    assert d.advance == "both"
+    assert d.advance_interval_minutes == 20
+
+
+def test_editor_save_keeps_a_non_cycle_trigger(app: Flask) -> None:
+    """The deck editor only authors the cycle shape. Re-saving an interval or
+    daily deck through it must not silently convert it to a cycle."""
+    client = app.test_client()
+    _sign_in(client)
+    _save_both_deck(client)
+    store = app.config["DECK_STORE"]
+    deck = store.all()[0]
+    store.upsert(deck.model_copy(update={"advance_trigger": "daily", "advance_fires_at": "08:00"}))
+
+    client.post(
+        "/decks/editor-save",
+        data={
+            "deck_id": deck.id,
+            "name": "Mixed",
+            "pages": "overview,calendar",
+            "advance": "both",
+            "advance_interval_minutes": "20",
+        },
+        follow_redirects=True,
+    )
+    # Guard the premise: the save must have updated that deck, not created a
+    # second one, or the assertions below pass without testing anything.
+    assert len(store.all()) == 1
+    d = store.all()[0]
+    assert d.id == deck.id
+    assert d.advance_trigger == "daily"
+    assert d.advance_fires_at == "08:00"
