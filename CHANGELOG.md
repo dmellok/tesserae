@@ -4,6 +4,20 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.273.0], 2026-08-07
+
+### Added
+
+- **RSS headlines can show an article preview** (discussion #194). A new
+  Article preview option on the RSS widget prints one to three lines of each
+  item's summary under its headline; off by default, so existing dashboards
+  are unchanged. The summary comes from the feed itself (`description` on
+  RSS, `summary` falling back to `content` on Atom), so no extra requests are
+  made and no article pages are fetched. Markup is stripped and entities
+  decoded server-side, the text is capped so a full-text feed can't ship
+  whole articles into every render, and a feed whose description is a link
+  dump rather than prose shows no excerpt instead of a row of bare URLs.
+
 ## [0.272.2], 2026-08-07
 
 ### Fixed

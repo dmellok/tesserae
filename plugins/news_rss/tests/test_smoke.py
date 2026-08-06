@@ -125,3 +125,80 @@ def test_urllib_request_is_browser_shaped() -> None:
     ua = seen.get("User-agent", "")
     assert ua.startswith("Mozilla/5.0")
     assert "tesserae" not in ua.lower()
+
+
+# -- article preview excerpts (discussion #194) ---------------------------
+
+
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        # Plain text passes straight through.
+        ("An outage caused delays.", "An outage caused delays."),
+        # CDATA-wrapped markup: tags out, entities decoded.
+        (
+            "<p>Le gouvernement <b>f&eacute;d&eacute;ral</b> pr&eacute;cise.</p>",
+            "Le gouvernement fédéral précise.",
+        ),
+        # Markup that arrived escaped rather than CDATA-wrapped.
+        ("&lt;p&gt;Escaped markup&lt;/p&gt;", "Escaped markup"),
+        # Stripping an inline tag must not strand punctuation.
+        ('Read it at <a href="https://x.test">Ars</a>.', "Read it at Ars."),
+        # Nothing to show.
+        ("", ""),
+        ("   \n  ", ""),
+        # A bare tracking pixel leaves no prose.
+        ('<img src="https://t.test/p.gif" width="1" height="1">', ""),
+    ],
+)
+def test_clean_excerpt_shapes(raw: str, expected: str) -> None:
+    assert srv._clean_excerpt(raw) == expected
+
+
+def test_clean_excerpt_drops_link_dump_descriptions() -> None:
+    """Some feeds put navigation in the description rather than prose (Hacker
+    News ships "Article URL: ... Comments URL: ..."). Stripped of markup those
+    read as two bare URLs, which is worse on a panel than no excerpt at all."""
+    hn = (
+        '<p>Article URL: <a href="https://example.com/x">https://example.com/x</a></p>'
+        '<p>Comments URL: <a href="https://news.ycombinator.com/item?id=1">'
+        "https://news.ycombinator.com/item?id=1</a></p>"
+    )
+    assert srv._clean_excerpt(hn) == ""
+
+
+def test_clean_excerpt_caps_full_text_feeds() -> None:
+    """A full-text feed puts whole articles in the description. The panel shows
+    a couple of lines, so the rest is payload we never render."""
+    out = srv._clean_excerpt("mot " * 500)
+    assert len(out) <= srv.EXCERPT_MAX_CHARS + 1  # +1 for the ellipsis
+    assert out.endswith("…")
+
+
+def test_rss_and_atom_items_carry_excerpts() -> None:
+    """Both feed formats expose a preview: RSS from <description>, Atom from
+    <summary> falling back to <content>."""
+    rss = ET.fromstring(
+        b"""<rss version="2.0"><channel><title>F</title>
+        <item><title>T</title><link>https://e.test/a</link>
+        <description>&lt;p&gt;Une phrase de r\xc3\xa9sum\xc3\xa9.&lt;/p&gt;</description></item>
+        </channel></rss>"""
+    )
+    _, items = srv._slim_rss(rss, 5)
+    assert items[0]["excerpt"] == "Une phrase de résumé."
+
+    atom = ET.fromstring(
+        b"""<feed xmlns="http://www.w3.org/2005/Atom"><title>F</title>
+        <entry><title>T</title><link href="https://e.test/a"/>
+        <content>Contenu de repli.</content></entry></feed>"""
+    )
+    _, items = srv._slim_atom(atom, 5)
+    assert items[0]["excerpt"] == "Contenu de repli."
+
+
+def test_items_without_a_description_still_parse() -> None:
+    """The pre-existing fixture has no description elements at all."""
+    root = ET.fromstring(_RSS)
+    _, items = srv._slim_rss(root, 5)
+    assert [i["excerpt"] for i in items] == ["", ""]
+    assert items[0]["title"] == "Premier article"

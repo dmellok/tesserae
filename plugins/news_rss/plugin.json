@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "News, RSS / Atom",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "kind": "widget",
   "description": "Latest N headlines from any RSS 2.0 or Atom 1.0 feed. Paste a feed URL; the widget parses both formats with the stdlib XML parser (no extra deps).",
   "icon": "ph-rss",
@@ -30,6 +30,31 @@
       "type": "boolean",
       "label": "Show feed title in header",
       "default": true
+    },
+    {
+      "name": "excerpt_lines",
+      "type": "select",
+      "label": "Article preview",
+      "default": "0",
+      "help": "Lines of the article summary to show under each headline, when the feed provides one. Off keeps the headline-only list.",
+      "choices": [
+        {
+          "value": "0",
+          "label": "Off"
+        },
+        {
+          "value": "1",
+          "label": "1 line"
+        },
+        {
+          "value": "2",
+          "label": "2 lines"
+        },
+        {
+          "value": "3",
+          "label": "3 lines"
+        }
+      ]
     }
   ],
   "render": {

@@ -15,6 +15,7 @@ request can't fake regardless of User-Agent; Chromium's is genuine.
 from __future__ import annotations
 
 import contextlib
+import html
 import json
 import logging
 import re
@@ -56,6 +57,47 @@ URLLIB_HEADERS: dict[str, str] = {
 
 ATOM_NS = "{http://www.w3.org/2005/Atom}"
 
+# Cap the excerpt server-side. A full-text feed puts whole articles in
+# ``<description>``, and the panel only ever shows a couple of lines, so
+# shipping the rest just bloats every render's payload. Generous enough that
+# the client's line clamp, not this, decides where the text visually ends.
+EXCERPT_MAX_CHARS = 400
+_TAG_RE = re.compile(r"<[^>]+>")
+_WS_RE = re.compile(r"\s+")
+# Feeds whose description is a link dump rather than prose (Hacker News ships
+# "Article URL: … Comments URL: …"). Stripped of markup these read as two bare
+# URLs, which is worse on a panel than showing nothing.
+_URL_RE = re.compile(r"https?://\S+")
+_SPACED_PUNCT_RE = re.compile(r"\s+([,.;:!?…»])")
+
+
+def _clean_excerpt(raw: str) -> str:
+    """Plain-text preview from a feed's description/summary markup.
+
+    Feeds put anything in there: plain text, escaped HTML, CDATA-wrapped
+    markup, tracking pixels. Strip tags, decode entities, collapse
+    whitespace, and drop the result if what's left is mostly URL, so a
+    link-dump feed shows no excerpt rather than a wall of href."""
+    if not raw:
+        return ""
+    text = _TAG_RE.sub(" ", raw)
+    text = html.unescape(text)
+    # A second pass: entity-decoding can reveal markup that was escaped
+    # rather than CDATA-wrapped (&lt;p&gt;...).
+    text = _TAG_RE.sub(" ", text)
+    text = _WS_RE.sub(" ", text).strip()
+    # Tags become spaces, so an inline link before a full stop leaves
+    # "at Ars ." Pull punctuation back onto the word.
+    text = _SPACED_PUNCT_RE.sub(r"\1", text)
+    if not text:
+        return ""
+    without_urls = _URL_RE.sub("", text).strip()
+    if len(without_urls) < len(text) / 2:
+        return ""
+    if len(text) > EXCERPT_MAX_CHARS:
+        text = text[:EXCERPT_MAX_CHARS].rstrip() + "…"
+    return text
+
 
 def _parse_when(s: str) -> datetime | None:
     if not s:
@@ -93,11 +135,17 @@ def _slim_atom(feed: ET.Element, max_items: int) -> tuple[str, list[dict[str, An
         if link_el is not None:
             href = link_el.attrib.get("href") or ""
         when = _parse_when(published_el.text if published_el is not None else "")
+        summary_el = entry.find(f"{ATOM_NS}summary")
+        if summary_el is None:
+            summary_el = entry.find(f"{ATOM_NS}content")
         items.append(
             {
                 "title": (t.text or "").strip() if t is not None else "",
                 "url": href,
                 "published": when.isoformat() if when else "",
+                "excerpt": _clean_excerpt(
+                    "".join(summary_el.itertext()) if summary_el is not None else ""
+                ),
             }
         )
     return feed_title, items
@@ -115,11 +163,15 @@ def _slim_rss(rss: ET.Element, max_items: int) -> tuple[str, list[dict[str, Any]
         link_el = item.find("link")
         date_el = item.find("pubDate")
         when = _parse_when(date_el.text if date_el is not None else "")
+        desc_el = item.find("description")
         items.append(
             {
                 "title": (title_el.text or "").strip() if title_el is not None else "",
                 "url": (link_el.text or "").strip() if link_el is not None else "",
                 "published": when.isoformat() if when else "",
+                "excerpt": _clean_excerpt(
+                    "".join(desc_el.itertext()) if desc_el is not None else ""
+                ),
             }
         )
     return feed_title, items
