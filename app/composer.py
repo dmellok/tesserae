@@ -1311,6 +1311,60 @@ def compose(page_id: str) -> str:
 PREVIEW_MAX_DIM: Final = 800
 
 
+def _sent_composition_response(page_id: str) -> Response | None:
+    """A downscale of the composition last pushed for ``page_id``, or ``None``
+    when the dashboard has never been pushed (or its PNG has been culled).
+
+    Same source the History page reads, which is why History has always agreed
+    with the panel while the thumbnails did not: the pushed composition is the
+    exact bytes Playwright captured for that push, whereas the preview cache
+    re-renders the page definition and cannot reproduce a widget whose output
+    moves on its own."""
+    from app.app_factory import _serve_render_thumbnail
+
+    events = current_app.config.get("EVENT_LOG")
+    if events is None:
+        return None
+    try:
+        rows = events.list(type="push", target=page_id, statuses=("sent", "ok"), limit=1)
+    except Exception:  # pragma: no cover - never let a preview 500
+        logger.debug("preview: sent-frame lookup failed for %s", page_id, exc_info=True)
+        return None
+    if not rows:
+        return None
+    digest = rows[0].extra.get("composition_digest") or rows[0].digest
+    if not isinstance(digest, str) or not digest:
+        return None
+    renders_dir = Path(current_app.config["DATA_ROOT"]) / "core" / "renders"
+    resp = _serve_render_thumbnail(renders_dir, f"{digest}.png", PREVIEW_MAX_DIM)
+    if resp is None:
+        return None
+    # The composition is content-addressed and immutable, but which digest is
+    # current changes on every push, so revalidate rather than cache hard.
+    resp.headers["Cache-Control"] = "no-cache"
+    resp.headers["ETag"] = f'"{digest}"'
+    return resp
+
+
+def _preview_timezone_id() -> str | None:
+    """The render timezone for a preview, resolved on the request thread.
+
+    ``preview_cache`` renders on a bare daemon thread with no app context, so
+    it cannot reach the settings store; without this the browser falls back to
+    the container clock (UTC under Docker) and clock widgets in a thumbnail
+    disagree with the frame that was pushed."""
+    from app.push import resolve_render_timezone_id
+
+    store = current_app.config.get("SETTINGS_STORE")
+    if store is None:
+        return None
+    try:
+        return resolve_render_timezone_id(store)
+    except Exception:  # pragma: no cover - defensive, never block a preview
+        logger.debug("preview: could not resolve render timezone", exc_info=True)
+        return None
+
+
 def preview_dims(page: Page, devices: Any, settings_store: Any) -> tuple[int, int]:
     """The dims to render a dashboard's hover preview at: its panel (or an
     unbound canvas's authored size), scaled so the longest side is
@@ -1371,11 +1425,25 @@ def compose_preview(page_id: str) -> Response:
     cached image older than the window is served as-is but queued for a
     background re-render, and caching switches to revalidation (mtime-aware
     ETag, no-cache) so the next poll picks the fresh image up.
+
+    ``?sent=1`` serves the composition actually pushed for this dashboard
+    instead of any render, for surfaces that answer "what is on that screen"
+    (the Lineups cards). A re-render can never match a dashboard whose output
+    moves on its own - a fractal draws differently every time - so re-rendering
+    shows something the panel has never displayed. Falls back to the render
+    path when the dashboard has never been pushed. A dashboard edited since its
+    last push deliberately keeps showing the old frame: that IS what the panel
+    is displaying until the next push.
     """
     preview_pages: dict[str, Page] = current_app.config.get("PREVIEW_CACHE", {}) or {}
     page = preview_pages.get(page_id) or current_app.config["PAGE_STORE"].get(page_id)
     if page is None:
         abort(404)
+
+    if request.args.get("sent", type=int):
+        sent = _sent_composition_response(page_id)
+        if sent is not None:
+            return sent
     devices = current_app.config.get("DEVICE_REGISTRY")
     settings_store = current_app.config["SETTINGS_STORE"]
     width, height = preview_dims(page, devices, settings_store)
@@ -1396,6 +1464,7 @@ def compose_preview(page_id: str) -> Response:
             height=height,
             cache_path=cache_path,
             pool=current_app.config.get("BROWSER_POOL"),
+            timezone_id=_preview_timezone_id(),
         )
         # Not ready yet: tell the client to fall back to the iframe now, and
         # don't let the browser cache this so it re-fetches once the render
@@ -1417,6 +1486,7 @@ def compose_preview(page_id: str) -> Response:
             cache_path=cache_path,
             pool=current_app.config.get("BROWSER_POOL"),
             force=True,
+            timezone_id=_preview_timezone_id(),
         )
 
     # Immutable per token: the URL changes when the dashboard changes, so the
@@ -1492,6 +1562,7 @@ def compose_panel_preview(page_id: str) -> Response:
             height=height,
             cache_path=comp_path,
             pool=current_app.config.get("BROWSER_POOL"),
+            timezone_id=_preview_timezone_id(),
         )
         resp = current_app.response_class(status=202)
         resp.headers["Cache-Control"] = "no-store"

@@ -290,6 +290,8 @@ class EventLog:
         *,
         type: str | None = None,
         source: str | None = None,
+        target: str | None = None,
+        statuses: tuple[str, ...] | None = None,
         before_id: int | None = None,
         exclude_statuses: tuple[str, ...] | None = None,
         limit: int = 100,
@@ -303,6 +305,13 @@ class EventLog:
         if source is not None:
             clauses.append("source = ?")
             params.append(source)
+        if target is not None:
+            clauses.append("target = ?")
+            params.append(target)
+        if statuses:
+            placeholders = ",".join("?" * len(statuses))
+            clauses.append(f"status IN ({placeholders})")
+            params.extend(statuses)
         if before_id is not None:
             clauses.append("id < ?")
             params.append(before_id)

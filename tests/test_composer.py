@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 from flask import Flask
 from flask.testing import FlaskClient
@@ -178,6 +180,109 @@ def test_compose_preview_re_renders_after_edit(app: Flask, monkeypatch: pytest.M
     # Only the current version's file remains (stale one pruned).
     cache_dir = app.config["DATA_ROOT"] / "core" / "previews"
     assert len(list(cache_dir.glob("pg__*.png"))) == 1
+
+
+def test_compose_preview_renders_in_the_configured_timezone(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The preview render must carry the configured zone like a push does.
+
+    ``preview_cache`` renders on a daemon thread with no app context, so the
+    zone has to be resolved on the request thread and threaded through. Left
+    unset, Chromium uses the container clock (UTC under Docker) and a clock
+    widget in the thumbnail disagrees with the frame the panel was sent."""
+    from app import preview_cache
+    from app.state.page_store import Page
+
+    app.config["PAGE_STORE"].save(Page(id="pg_tz", name="Grid", layout_kind="grid"))
+    app.config["SETTINGS_STORE"].patch_section("app", {"timezone": "Australia/Melbourne"})
+    seen: list[Any] = []
+    monkeypatch.setattr(
+        "app.renderer.render_to_png", lambda req, pool=None: seen.append(req) or _tiny_png()
+    )
+
+    app.test_client().get("/compose/pg_tz/preview.png")
+    preview_cache.join()
+
+    assert len(seen) == 1
+    assert seen[0].timezone_id == "Australia/Melbourne"
+
+
+def _record_push(app: Flask, page_id: str, digest: str) -> None:
+    """A successful push of ``page_id`` whose composition PNG is on disk."""
+    renders = app.config["DATA_ROOT"] / "core" / "renders"
+    renders.mkdir(parents=True, exist_ok=True)
+    (renders / f"{digest}.png").write_bytes(_tiny_png())
+    app.config["EVENT_LOG"].record(
+        type="push",
+        source="page",
+        target=page_id,
+        status="sent",
+        digest=digest,
+        extra={"composition_digest": digest},
+    )
+
+
+def test_compose_preview_sent_serves_the_pushed_frame(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``?sent=1`` answers "what is on that screen" with the frame the panel
+    was actually given, not a re-render. A dashboard whose output moves on its
+    own (a fractal) can never be reproduced by re-rendering, so the card would
+    otherwise show something the panel has never displayed."""
+    from app.state.page_store import Page
+
+    app.config["PAGE_STORE"].save(Page(id="pg_sent", name="Grid", layout_kind="grid"))
+    _record_push(app, "pg_sent", "abc123")
+    calls: list[int] = []
+    monkeypatch.setattr(
+        "app.renderer.render_to_png", lambda req, pool=None: calls.append(1) or _tiny_png()
+    )
+
+    resp = app.test_client().get("/compose/pg_sent/preview.png?sent=1")
+    try:
+        assert resp.status_code == 200 and resp.mimetype == "image/png"
+        assert resp.headers.get("ETag") == '"abc123"'
+        assert resp.get_data()  # a real image, not an empty body
+        assert calls == []  # served from the pushed composition, never re-rendered
+    finally:
+        resp.close()  # send_from_directory holds the file open until consumed
+
+
+def test_compose_preview_sent_falls_back_when_never_pushed(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A dashboard with no push history has no frame to show, so ``sent=1``
+    falls through to the normal render path rather than 404ing the card."""
+    from app import preview_cache
+    from app.state.page_store import Page
+
+    app.config["PAGE_STORE"].save(Page(id="pg_never", name="Grid", layout_kind="grid"))
+    monkeypatch.setattr("app.renderer.render_to_png", lambda req, pool=None: _tiny_png())
+
+    resp = app.test_client().get("/compose/pg_never/preview.png?sent=1")
+    assert resp.status_code == 202  # enqueued a render, client falls back to the iframe
+    preview_cache.join()  # drain, so the shared queue doesn't dedupe a later key
+
+
+def test_compose_preview_without_sent_still_re_renders(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The dashboards list keeps definition-based rendering, so edits show up
+    while you work instead of being pinned to the last pushed frame."""
+    from app import preview_cache
+    from app.state.page_store import Page
+
+    app.config["PAGE_STORE"].save(Page(id="pg_rerender", name="Grid", layout_kind="grid"))
+    _record_push(app, "pg_rerender", "abc123")
+    calls: list[int] = []
+    monkeypatch.setattr(
+        "app.renderer.render_to_png", lambda req, pool=None: calls.append(1) or _tiny_png()
+    )
+
+    assert app.test_client().get("/compose/pg_rerender/preview.png").status_code == 202
+    preview_cache.join()
+    assert calls == [1]
 
 
 def test_compose_preview_unknown_page_404(client: FlaskClient) -> None:

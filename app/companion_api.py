@@ -1670,7 +1670,7 @@ def dashboard_preview(dashboard_id: str) -> Any:
     A faithful cached visual preview, invalidated by layout / config /
     target-dimension changes; it does not promise live widget data."""
     from app import preview_cache
-    from app.composer import page_preview_token, preview_dims
+    from app.composer import _preview_timezone_id, page_preview_token, preview_dims
 
     page = _pages().get(dashboard_id)
     if page is None:
@@ -1700,6 +1700,7 @@ def dashboard_preview(dashboard_id: str) -> Any:
             height=height,
             cache_path=cache_path,
             pool=current_app.config.get("BROWSER_POOL"),
+            timezone_id=_preview_timezone_id(),
         )
         resp = current_app.response_class(status=202)
         resp.headers["Retry-After"] = "2"

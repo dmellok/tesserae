@@ -4,6 +4,25 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.272.0], 2026-08-07
+
+### Fixed
+
+- **Lineups screen cards show the frame the panel was actually sent.** The
+  cards re-rendered the dashboard instead of reading what had been pushed, so
+  a dashboard whose output moves on its own (a fractal, a clock) showed
+  something the panel had never displayed. They now serve the pushed
+  composition, the same source the History page reads, falling back to a
+  render only for a dashboard that has never been pushed. A dashboard edited
+  since its last push keeps showing the old frame, which is what its screen
+  is still displaying.
+- **Preview thumbnails render in the configured timezone.** The preview
+  renderer runs off the request thread and never received the timezone a push
+  sets, so Chromium fell back to the container clock and clock widgets in a
+  thumbnail rendered in UTC. The zone is now resolved on the request thread
+  and passed through, covering the dashboards list, Lineups, the panel-view
+  preview and the Companion app's dashboard preview.
+
 ## [0.271.0], 2026-08-06
 
 ### Added

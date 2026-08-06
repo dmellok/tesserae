@@ -136,9 +136,15 @@ def _ago(epoch: Any, now_ts: float) -> str | None:
 def _page_thumbs(pages: list[Any]) -> dict[str, str]:
     """Composer live-preview URL per dashboard (the design's screen cards).
 
-    ``refresh=300`` keeps thumbnails honest for dashboards whose data moves
-    (clocks, feeds): the preview token only changes on edits, so without it a
-    screen card would show the first render forever."""
+    ``sent=1`` makes the card show the composition actually pushed for that
+    dashboard, which is what its screen is displaying. A re-render can't match
+    a dashboard whose output moves on its own (a fractal draws differently
+    every time), so re-rendering here shows something the panel never had.
+
+    ``refresh=300`` still covers the fallback path, for a dashboard that has
+    never been pushed and therefore has no frame to show: the preview token
+    only changes on edits, so without it such a card would show the first
+    render forever."""
     from app.composer import page_preview_token, preview_dims
 
     devices_reg = current_app.config.get("DEVICE_REGISTRY")
@@ -149,7 +155,9 @@ def _page_thumbs(pages: list[Any]) -> dict[str, str]:
             token = page_preview_token(p, preview_dims(p, devices_reg, settings))
         except Exception:
             token = ""
-        out[p.id] = url_for("composer.compose_preview", page_id=p.id) + f"?v={token}&refresh=300"
+        out[p.id] = (
+            url_for("composer.compose_preview", page_id=p.id) + f"?v={token}&refresh=300&sent=1"
+        )
     return out
 
 

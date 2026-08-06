@@ -23,8 +23,8 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-# (key, base_url, page_id, width, height, cache_path, pool, force)
-_Task = tuple[str, str, str, int, int, Path, Any, bool]
+# (key, base_url, page_id, width, height, cache_path, pool, force, timezone_id)
+_Task = tuple[str, str, str, int, int, Path, Any, bool, str | None]
 
 
 class PreviewRenderQueue:
@@ -48,11 +48,18 @@ class PreviewRenderQueue:
         cache_path: Path,
         pool: Any,
         force: bool = False,
+        timezone_id: str | None = None,
     ) -> None:
         """Queue a preview render unless one with the same key is already
         queued or in flight. Starts the worker thread lazily. ``force``
         re-renders even when a cached file exists (live-status thumbnails
-        refreshing a dashboard whose data moved under an unchanged token)."""
+        refreshing a dashboard whose data moved under an unchanged token).
+
+        ``timezone_id`` must be resolved by the caller, on the request
+        thread: this queue runs on a bare daemon thread with no Flask app
+        context, so it cannot read the settings store itself. Omitting it
+        leaves Chromium on the container clock, which is UTC under Docker,
+        and any clock widget in the preview renders in the wrong zone."""
         with self._lock:
             if key in self._pending:
                 return
@@ -62,7 +69,7 @@ class PreviewRenderQueue:
                     target=self._run, name="tesserae-preview-render", daemon=True
                 )
                 self._thread.start()
-        self._q.put((key, base_url, page_id, width, height, cache_path, pool, force))
+        self._q.put((key, base_url, page_id, width, height, cache_path, pool, force, timezone_id))
 
     def join(self) -> None:
         """Block until every queued task has been processed."""
@@ -70,10 +77,10 @@ class PreviewRenderQueue:
 
     def _run(self) -> None:
         while True:
-            key, base_url, page_id, width, height, cache_path, pool, force = self._q.get()
+            key, base_url, page_id, width, height, cache_path, pool, force, tz = self._q.get()
             try:
                 if force or not cache_path.exists():
-                    self._render(base_url, page_id, width, height, cache_path, pool)
+                    self._render(base_url, page_id, width, height, cache_path, pool, tz)
             except Exception:
                 logger.debug("preview: background render failed for %s", page_id, exc_info=True)
             finally:
@@ -82,12 +89,27 @@ class PreviewRenderQueue:
                 self._q.task_done()
 
     def _render(
-        self, base_url: str, page_id: str, width: int, height: int, cache_path: Path, pool: Any
+        self,
+        base_url: str,
+        page_id: str,
+        width: int,
+        height: int,
+        cache_path: Path,
+        pool: Any,
+        timezone_id: str | None = None,
     ) -> None:
         from app.renderer import RenderRequest, render_to_png, to_loopback_url
 
         url = to_loopback_url(f"{base_url}/compose/{page_id}?w={width}&h={height}")
-        png = render_to_png(RenderRequest(url=url, viewport_w=width, viewport_h=height), pool=pool)
+        png = render_to_png(
+            RenderRequest(
+                url=url,
+                viewport_w=width,
+                viewport_h=height,
+                timezone_id=timezone_id,
+            ),
+            pool=pool,
+        )
         cache_path.parent.mkdir(parents=True, exist_ok=True)
         # Drop older versions of this page so the cache doesn't grow per edit.
         for stale in cache_path.parent.glob(f"{page_id}__*.png"):
