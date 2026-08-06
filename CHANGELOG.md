@@ -4,6 +4,17 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.272.2], 2026-08-07
+
+### Fixed
+
+- **The Lineups editor's Save button is reachable on a phone** (#192). The
+  sticky action bar laid its status text and buttons out in a single
+  non-wrapping row, so on a narrow screen the buttons were pushed past the
+  right edge and Save could not be tapped at all; the longer the deck's page
+  chain, the further out they went. The bar now wraps, and the status gives
+  up space before the buttons do. Desktop layout is unchanged.
+
 ## [0.272.0], 2026-08-07
 
 ### Fixed

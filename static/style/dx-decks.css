@@ -334,9 +334,15 @@
 .dxe-fb-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 13px; }
 
 /* sticky action bar */
-.dxe-actionbar { position: sticky; bottom: 0; margin-top: 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; background: color-mix(in oklab, var(--t-bg) 86%, transparent); backdrop-filter: blur(8px); border-top: 1px solid var(--t-border); }
-.dxe-actionbar-status { font-size: 12.5px; color: var(--t-muted); }
-.dxe-actionbar-btns { display: flex; align-items: center; gap: 10px; }
+/* The status text grows with the deck's page chain, and the buttons can't
+   shrink below their labels, so without wrapping the group is pushed past the
+   right edge and Save becomes unreachable (issue #192, phone portrait). Wrap
+   rather than scroll: a sticky bar you have to scroll sideways is no better
+   than one you can't see. ``min-width: 0`` lets the status give up space
+   before that happens. */
+.dxe-actionbar { position: sticky; bottom: 0; margin-top: 20px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; background: color-mix(in oklab, var(--t-bg) 86%, transparent); backdrop-filter: blur(8px); border-top: 1px solid var(--t-border); }
+.dxe-actionbar-status { font-size: 12.5px; color: var(--t-muted); flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.dxe-actionbar-btns { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px; }
 .dxe-btn-ghost { background: var(--t-surface); border: 1px solid var(--t-border-strong); border-radius: 9px; padding: 9px 16px; font-size: 13px; font-weight: 500; color: var(--t-fg); cursor: pointer; }
 .dxe-btn-ghost:hover { border-color: var(--t-fg); }
 .dxe-btn-danger { color: var(--t-danger); }
