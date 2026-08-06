@@ -4,6 +4,18 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.270.0], 2026-08-06
+
+### Added
+
+- **Settings → Companion app is its own page** (#186). Issuing pairing codes,
+  watching pending codes, and disconnecting paired clients moved out of the
+  Devices page onto a dedicated tab, so the app surface has room to grow
+  without crowding the device list. The page also links the public TestFlight
+  beta, with a QR beside it so a phone can install without typing the URL.
+  The admin routes moved with it, from `/settings/devices/companion/*` to
+  `/settings/companion/*`.
+
 ## [0.269.0], 2026-08-06
 
 ### Fixed

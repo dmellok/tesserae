@@ -48,6 +48,7 @@ def register(app: Flask) -> None:
     # but listing them explicitly here makes the wiring discoverable.
     from . import (  # noqa: F401, imported for side effect (route registration)
         auth_routes,
+        companion_routes,
         devices_routes,
         diagnostics_routes,
         firmware_routes,

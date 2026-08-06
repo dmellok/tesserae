@@ -2797,6 +2797,33 @@
 
 .dx-pending-codes { margin-top: 14px; }
 
+/* Companion "Get the app" block: TestFlight QR beside the link + caveats.
+   The QR keeps a white quiet zone of its own, so it needs a light plate to
+   stay scannable against the dark theme's card background. */
+.companion-install {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.companion-qr {
+  flex: 0 0 auto;
+  display: block;
+  padding: 8px;
+  border-radius: 10px;
+  background: #fff;
+  line-height: 0;
+}
+.companion-qr img { display: block; width: 160px; height: 160px; }
+.companion-install-copy { flex: 1 1 260px; min-width: 0; }
+.companion-install-copy p { margin: 0 0 6px; }
+.companion-install-copy p:last-child { margin-bottom: 0; }
+
+@media (max-width: 560px) {
+  .companion-install { justify-content: center; }
+  .companion-install-copy { flex-basis: 100%; }
+}
+
 /* Add-device branch (REST or MQTT). Wrapping div so the existing
    .form's grid layout cascades cleanly. */
 .dx-add-branch { margin-top: 4px; }

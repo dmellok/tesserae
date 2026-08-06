@@ -1,0 +1,228 @@
+{# Settings -> Companion app (#186, discussion #147).
+
+   Issue a single-use pairing code the iOS app exchanges at
+   POST /api/app/v1/pair for a scoped, revocable per-client token, and
+   manage the clients already paired. A distinct credential purpose +
+   registry from firmware pairing, so a firmware code can't pair the app
+   and vice-versa.
+
+   Inputs:
+   - ``companion_pairing_codes`` — live pending companion codes
+   - ``companion_sessions`` — paired clients (public_dict from the store)
+   - ``companion_pairing_reveal`` — set once, right after a code is issued
+   - ``testflight_url`` — public beta link, also encoded in the QR
+#}
+{% extends "_base.html" %}
+{% from "_components.html" import settings_tabs, text_input with context %}
+{% block title %}Companion app, Tesserae{% endblock %}
+
+{% block main %}
+<header class="page-head">
+  <h1><i class="ph ph-device-mobile" aria-hidden="true"></i> Companion app</h1>
+  <p class="lede">
+    Pair the community-built iOS companion so it can list displays and dashboards
+    and send from your phone. Editing and administration stay here in the web UI.
+  </p>
+</header>
+
+{{ settings_tabs('companion') }}
+
+{# ---- Get the app --------------------------------------------------------- #}
+<section class="dx-section-card" id="companion-install">
+  <header class="dx-section-head">
+    <span class="dx-section-icon" aria-hidden="true"><i class="ph ph-apple-logo"></i></span>
+    <div class="dx-section-titleblock">
+      <h3 class="dx-section-title">Get the app</h3>
+      <p class="dx-section-desc">The app is in public beta on TestFlight. Scan the code with an iPhone, or open the link on the device you want to pair.</p>
+    </div>
+  </header>
+  <div class="dx-section-body">
+    <div class="companion-install">
+      <a class="companion-qr" href="{{ testflight_url }}" rel="noopener noreferrer" target="_blank">
+        <img src="{{ url_for('static', filename='brand/testflight-qr.svg') }}"
+             alt="QR code linking to the Tesserae companion app on TestFlight" width="160" height="160">
+      </a>
+      <div class="companion-install-copy">
+        <p>
+          <a href="{{ testflight_url }}" rel="noopener noreferrer" target="_blank">Join the TestFlight beta</a>
+        </p>
+        <p class="help">
+          Requires the TestFlight app from the App Store. Beta builds expire, so
+          you may need to update it from TestFlight now and then. Issue a pairing
+          code below once it's installed.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+{# ---- Pairing ------------------------------------------------------------- #}
+<section class="dx-section-card" id="companion-app">
+
+  <header class="dx-section-head">
+    <span class="dx-section-icon" aria-hidden="true"><i class="ph ph-device-mobile"></i></span>
+    <div class="dx-section-titleblock">
+      <h3 class="dx-section-title">Pair a phone</h3>
+      <p class="dx-section-desc">Each paired app gets its own token you can revoke here at any time.</p>
+    </div>
+  </header>
+
+  <div class="dx-section-body">
+
+    <div class="dx-hint-band">
+      <i class="ph ph-info" aria-hidden="true"></i>
+      <p>
+        Issue a code below, open the app, and enter it to pair. Codes are single-use and expire in 10 minutes.
+      </p>
+    </div>
+
+    {% if not companion_configured %}
+    <p class="muted">The companion API is not configured on this install.</p>
+    {% endif %}
+
+    <form method="post" action="{{ url_for('auth.companion_pair_issue') }}" class="form">
+      <div class="dx-pair-row">
+        <div class="dx-pair-input">
+          {{ text_input('companion-pair-note', 'note', 'Optional note', value='',
+                        placeholder="e.g. Charm's iPhone",
+                        help='Shown next to the code so you remember which phone it is for.') }}
+        </div>
+        <div class="dx-pair-action">
+          <button type="submit" class="dx-btn-primary"><i class="ph ph-plus" aria-hidden="true"></i><span>Issue pairing code</span></button>
+        </div>
+      </div>
+    </form>
+
+    {% if companion_pairing_codes %}
+    <div class="dx-pending-codes">
+      <div class="dx-discovered-sublabel">
+        <span>PENDING CODES</span>
+        <span class="dx-count-pill">{{ companion_pairing_codes|length }}</span>
+      </div>
+      <ul class="dx-discovered-list">
+        {% for p in companion_pairing_codes %}
+        <li class="dx-discovered-row">
+          <div class="dx-discovered-info">
+            <div class="dx-discovered-id"><code>{{ p.code }}</code></div>
+            <div class="dx-discovered-meta">
+              <span class="dx-meta-pair">
+                <span class="dx-meta-k">Expires in</span>
+                {% set m = (p.seconds_left // 60) %}{% set s = (p.seconds_left % 60) %}
+                <span class="dx-meta-v">{{ m }}m {{ '%02d' % s }}s</span>
+              </span>
+              <span class="dx-meta-pair"><span class="dx-meta-k">Note</span><span class="dx-meta-v">{{ p.note or '—' }}</span></span>
+            </div>
+          </div>
+          <div class="dx-discovered-actions">
+            <form method="post" action="{{ url_for('auth.companion_pair_revoke', code=p.code) }}" class="form form--inline"
+                  onsubmit="return confirm('Revoke code {{ p.code }}?');">
+              <button type="submit" class="dx-btn-ghost-sm"><i class="ph ph-trash" aria-hidden="true"></i><span>Revoke</span></button>
+            </form>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    {% if companion_sessions %}
+    <div class="dx-pending-codes">
+      <div class="dx-discovered-sublabel">
+        <span>PAIRED APPS</span>
+        <span class="dx-count-pill">{{ companion_sessions|length }}</span>
+      </div>
+      <ul class="dx-discovered-list">
+        {% for c in companion_sessions %}
+        <li class="dx-discovered-row">
+          <div class="dx-discovered-info">
+            <div class="dx-discovered-id">{{ c.name }}</div>
+            <div class="dx-discovered-meta">
+              <span class="dx-meta-pair"><span class="dx-meta-k">Last use</span><span class="dx-meta-v">{{ c.last_used_at or 'never' }}</span></span>
+              <span class="dx-meta-pair"><span class="dx-meta-k">Paired</span><span class="dx-meta-v">{{ c.created_at }}</span></span>
+            </div>
+          </div>
+          <div class="dx-discovered-actions">
+            <form method="post" action="{{ url_for('auth.companion_session_revoke', token_id=c.token_id) }}" class="form form--inline"
+                  onsubmit="return confirm('Disconnect {{ c.name }}?');">
+              <button type="submit" class="dx-btn-ghost-sm"><i class="ph ph-plug" aria-hidden="true"></i><span>Disconnect</span></button>
+            </form>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+  </div>
+</section>
+
+{# Pairing-code reveal modal. Pops once after ``auth.companion_pair_issue``
+   writes the code into ``session._companion_pairing_reveal``; same shell as
+   the REST reveal, different copy (the app exchanges the code for a token). #}
+{% if companion_pairing_reveal %}
+<div class="modal" data-modal role="dialog" aria-modal="true" aria-labelledby="companion-reveal-title">
+  <div class="modal-card">
+    <header class="modal-head">
+      <h2 id="companion-reveal-title"><i class="ph ph-device-mobile"></i> Companion pairing code</h2>
+      <button type="button" class="modal-close" data-modal-close aria-label="Close">
+        <i class="ph ph-x"></i>
+      </button>
+    </header>
+    <div class="modal-body">
+      <p class="lede">Enter this code in the companion app to pair it. The app exchanges it for its own revocable token; you can disconnect the app later from this page. Codes are single-use and expire in 10 minutes.</p>
+      <div class="token-row">
+        <input type="text" class="token-input" value="{{ companion_pairing_reveal.code }}" readonly data-modal-token aria-label="Companion pairing code">
+        <button type="button" class="button" data-modal-copy>
+          <i class="ph ph-copy"></i> Copy
+        </button>
+      </div>
+      {% if companion_pairing_reveal.note %}
+      <p class="field-help">Note: {{ companion_pairing_reveal.note }}</p>
+      {% endif %}
+      <p class="field-help">Server URL: <code>http://{{ request.host }}</code></p>
+    </div>
+    <footer class="modal-foot">
+      <button type="button" class="button ghost" data-modal-close>Done</button>
+    </footer>
+  </div>
+</div>
+<script>
+  (function () {
+    const modal = document.querySelector('[aria-labelledby="companion-reveal-title"]');
+    if (!modal) return;
+    const input = modal.querySelector('[data-modal-token]');
+    const copyBtn = modal.querySelector('[data-modal-copy]');
+    document.body.classList.add('modal-open');
+    function close() {
+      modal.remove();
+      if (!document.querySelector('.modal')) document.body.classList.remove('modal-open');
+    }
+    modal.addEventListener('click', (ev) => {
+      if (ev.target === modal || ev.target.closest('[data-modal-close]')) close();
+    });
+    document.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape' && document.body.contains(modal)) close();
+    });
+    if (copyBtn && input) {
+      copyBtn.addEventListener('click', async () => {
+        const value = input.value;
+        let ok = false;
+        try {
+          await navigator.clipboard.writeText(value);
+          ok = true;
+        } catch {
+          input.select();
+          input.setSelectionRange(0, value.length);
+          try { ok = document.execCommand('copy'); } catch { ok = false; }
+        }
+        const original = copyBtn.innerHTML;
+        copyBtn.innerHTML = ok
+          ? '<i class="ph ph-check"></i> Copied'
+          : '<i class="ph ph-warning"></i> Copy failed';
+        setTimeout(() => { copyBtn.innerHTML = original; }, 1800);
+      });
+    }
+  })();
+</script>
+{% endif %}
+{% endblock %}

@@ -79,9 +79,6 @@
 {% if active_area == 'devices' and device_kinds %}
 {% include '_add_device_card.html' %}
 {% endif %}
-{% if active_area == 'devices' %}
-{% include '_companion_pairing_card.html' %}
-{% endif %}
 
 {% for section in sections %}
 {% if section.kind == 'device' %}
@@ -1381,76 +1378,6 @@ docker compose up -d</code></pre>
 </script>
 {% endif %}
 
-{# Companion pairing-code reveal modal (discussion #147). Pops once after
-   ``auth.devices_companion_pair_issue`` writes the code into
-   ``session._companion_pairing_reveal``; same shell as the REST reveal,
-   different copy (the app exchanges the code for a token). #}
-{% if companion_pairing_reveal %}
-<div class="modal" data-modal role="dialog" aria-modal="true" aria-labelledby="companion-reveal-title">
-  <div class="modal-card">
-    <header class="modal-head">
-      <h2 id="companion-reveal-title"><i class="ph ph-device-mobile"></i> Companion pairing code</h2>
-      <button type="button" class="modal-close" data-modal-close aria-label="Close">
-        <i class="ph ph-x"></i>
-      </button>
-    </header>
-    <div class="modal-body">
-      <p class="lede">Enter this code in the companion app to pair it. The app exchanges it for its own revocable token; you can disconnect the app later from the Companion app card. Codes are single-use and expire in 10 minutes.</p>
-      <div class="token-row">
-        <input type="text" class="token-input" value="{{ companion_pairing_reveal.code }}" readonly data-modal-token aria-label="Companion pairing code">
-        <button type="button" class="button" data-modal-copy>
-          <i class="ph ph-copy"></i> Copy
-        </button>
-      </div>
-      {% if companion_pairing_reveal.note %}
-      <p class="field-help">Note: {{ companion_pairing_reveal.note }}</p>
-      {% endif %}
-      <p class="field-help">Server URL: <code>http://{{ request.host }}</code></p>
-    </div>
-    <footer class="modal-foot">
-      <button type="button" class="button ghost" data-modal-close>Done</button>
-    </footer>
-  </div>
-</div>
-<script>
-  (function () {
-    const modal = document.querySelector('[aria-labelledby="companion-reveal-title"]');
-    if (!modal) return;
-    const input = modal.querySelector('[data-modal-token]');
-    const copyBtn = modal.querySelector('[data-modal-copy]');
-    document.body.classList.add('modal-open');
-    function close() {
-      modal.remove();
-      if (!document.querySelector('.modal')) document.body.classList.remove('modal-open');
-    }
-    modal.addEventListener('click', (ev) => {
-      if (ev.target === modal || ev.target.closest('[data-modal-close]')) close();
-    });
-    document.addEventListener('keydown', (ev) => {
-      if (ev.key === 'Escape' && document.body.contains(modal)) close();
-    });
-    if (copyBtn && input) {
-      copyBtn.addEventListener('click', async () => {
-        const value = input.value;
-        let ok = false;
-        try {
-          await navigator.clipboard.writeText(value);
-          ok = true;
-        } catch {
-          input.select();
-          input.setSelectionRange(0, value.length);
-          try { ok = document.execCommand('copy'); } catch { ok = false; }
-        }
-        const original = copyBtn.innerHTML;
-        copyBtn.innerHTML = ok
-          ? '<i class="ph ph-check"></i> Copied'
-          : '<i class="ph ph-warning"></i> Copy failed';
-        setTimeout(() => { copyBtn.innerHTML = original; }, 1800);
-      });
-    }
-  })();
-</script>
-{% endif %}
 
 <script>
   // Built-in broker switch: show the embedded bind/port/auth fields and

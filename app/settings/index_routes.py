@@ -73,34 +73,6 @@ def _pending_pairings() -> list[dict[str, Any]]:
     ]
 
 
-def _pending_companion_pairings() -> list[dict[str, Any]]:
-    """Snapshot of live companion pairing codes for the Devices tab's
-    "Companion app" card. Separate store from the firmware pairing codes
-    (``COMPANION_PAIRING_STORE``) so the two purposes never mix. Defensive
-    against the store not being wired (test paths)."""
-    store = current_app.config.get("COMPANION_PAIRING_STORE")
-    if store is None:
-        return []
-    return [
-        {
-            "code": p.code,
-            "note": p.note,
-            "seconds_left": max(0, int(p.expires_at - time.time())),
-        }
-        for p in store.list_pending()
-    ]
-
-
-def _companion_sessions() -> list[dict[str, Any]]:
-    """Paired companion clients (name + last use) for the Devices tab, so
-    each can be revoked independently. Defensive against the store not
-    being wired."""
-    store = current_app.config.get("COMPANION_TOKENS")
-    if store is None:
-        return []
-    return [record.public_dict() for record in store.list_active()]
-
-
 @bp.get("/settings")
 def settings() -> Response:
     """Land on the Server sub-page by default."""
@@ -314,12 +286,6 @@ def settings_area(area: str) -> str | Response:
         # one).
         pairing_codes=_pending_pairings() if area == "devices" else [],
         pairing_reveal=session.pop("_rest_pairing_reveal", None),
-        # Companion API (/api/app/v1) pairing for the community iOS client.
-        # Separate credential purpose + registry from firmware pairing; only
-        # computed on the Devices tab.
-        companion_pairing_codes=_pending_companion_pairings() if area == "devices" else [],
-        companion_sessions=_companion_sessions() if area == "devices" else [],
-        companion_pairing_reveal=session.pop("_companion_pairing_reveal", None),
         # About tab: version. Community + sponsor links come from the
         # app-wide context processor (community_*_url) since the footer and
         # the onboarding wrap-up step share the same set. ``APP_VERSION`` is

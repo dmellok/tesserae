@@ -337,12 +337,12 @@ def _sign_in(client: Any) -> None:
 def test_admin_can_issue_a_companion_code_and_the_app_pairs_with_it(app: Flask) -> None:
     admin = app.test_client()
     _sign_in(admin)
-    # The Devices settings page renders the Companion app card.
-    page = admin.get("/settings/devices")
+    # The Companion app settings page renders the pairing controls.
+    page = admin.get("/settings/companion")
     assert page.status_code == 200
     assert b"Companion app" in page.get_data()
 
-    issue = admin.post("/settings/devices/companion/pair", data={"note": "phone"})
+    issue = admin.post("/settings/companion/pair", data={"note": "phone"})
     assert issue.status_code == 302
     pending = app.config["COMPANION_PAIRING_STORE"].list_pending()
     assert len(pending) == 1
@@ -355,7 +355,7 @@ def test_admin_can_issue_a_companion_code_and_the_app_pairs_with_it(app: Flask) 
 
     # Admin can disconnect that client; its bearer stops working.
     token = resp.get_json()["token"]
-    revoke = admin.post(f"/settings/devices/companion/session/{token_id}/revoke")
+    revoke = admin.post(f"/settings/companion/session/{token_id}/revoke")
     assert revoke.status_code == 302
     after = app.test_client().get(
         "/api/app/v1/devices", headers={"Authorization": f"Bearer {token}"}
