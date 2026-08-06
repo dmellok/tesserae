@@ -94,28 +94,27 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url || steps.deployment-retry.outputs.page_url }}
     steps:
       # actions/deploy-pages polls Pages for deployment status and gives
-      # up after its ``timeout``, so when Pages is under load the poll
-      # reports failure even though the artifact was accepted and does
-      # publish. Observed on 2026-08-06: publishes landing at ~10m43s
-      # against the action's 600000ms default, i.e. the content went live
-      # ~30s after the step had already errored. ``timeout`` is raised to
-      # 20 minutes so a slow publish is waited out rather than reported
-      # as a failure.
+      # up after 600000ms, which is also the maximum it accepts: passing
+      # a larger ``timeout`` is silently clamped back to 10 minutes, so
+      # there is no knob here for a slow publish.
       #
-      # The retry stays for the case where the deployment is genuinely
-      # rejected, but note it can only help when the first attempt failed
-      # *before* creating a deployment: re-creating one for a commit that
-      # already has one is cancelled server-side within seconds.
+      # When a publish overruns that window the step reports failure even
+      # though the artifact was accepted and does go live (observed
+      # 2026-08-06: content served ~30s after the step had errored). The
+      # trap is that the overrunning deployment stays "in progress" and
+      # every later run then fails at creation with HTTP 400, "due to in
+      # progress deployment. Please cancel <sha> first". The retry below
+      # cannot clear that, and neither can re-running the workflow: the
+      # stuck deployment has to be cancelled via
+      # POST /repos/{owner}/{repo}/pages/deployments/{sha}/cancel
+      # (or the Pages deployment activity log) before docs can publish
+      # again.
       - id: deployment
         uses: actions/deploy-pages@v5
         continue-on-error: true
-        with:
-          timeout: 1200000
       - name: Wait before retry
         if: steps.deployment.outcome == 'failure'
         run: sleep 30
       - id: deployment-retry
         if: steps.deployment.outcome == 'failure'
         uses: actions/deploy-pages@v5
-        with:
-          timeout: 1200000
