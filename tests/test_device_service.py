@@ -257,6 +257,48 @@ def test_update_instance_kind_heals_to_catalog_sibling(registries_with_catalog) 
     assert saved["kind"] == "seeed_reterminal_e1004"
 
 
+def test_e1001_gray_legacy_packs_identically_to_the_plain_gray_kind(
+    registries_with_catalog,
+) -> None:
+    """The two E1001 grayscale kinds exist to separate OTA lineages, not to
+    render differently. A canvas packed for one must be byte-identical to the
+    same canvas packed for the other, so an operator re-pointing a panel
+    between them never changes a pixel."""
+    import io
+
+    from PIL import Image
+
+    from app.panel import device_panel
+
+    devices, renderers, data_root = registries_with_catalog
+
+    def packed(instance_id: str, kind_id: str) -> bytes:
+        created = device_service.create_instance(
+            devices=devices,
+            renderers=renderers,
+            data_root=data_root,
+            instance_id=instance_id,
+            kind_id=kind_id,
+            name=instance_id,
+        )
+        assert created.ok, created.error
+        device = devices.get(instance_id)
+        assert device is not None and device.kind_of == kind_id
+        panel = device_panel(device)
+        assert panel is not None
+        clones = renderers.for_device(instance_id)
+        assert [c.id for c in clones] == [f"esp32_gray2_bin__{instance_id}"]
+        buf = io.BytesIO()
+        Image.linear_gradient("L").resize((800, 480)).convert("RGB").save(buf, "PNG")
+        return clones[0].transform(buf.getvalue(), panel=panel, settings={})
+
+    plain = packed("e1001_plain", "seeed_reterminal_e1001_gray")
+    legacy = packed("e1001_legacy", "seeed_reterminal_e1001_gray_legacy")
+
+    assert len(plain) == 800 * 480 // 4  # 2bpp -> 96000
+    assert legacy == plain
+
+
 def test_update_instance_kind_noop_cases(registries_with_catalog) -> None:
     # Same kind, empty, unknown, an instance id, and a cross-protocol
     # kind are all no-ops (changed=False), never an error or a move.

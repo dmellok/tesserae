@@ -498,6 +498,46 @@ def test_heal_between_catalog_siblings_keeps_device_identity(app: Flask) -> None
         assert devices.get(device_id).kind_of == first_kind
 
 
+def test_heal_tracks_the_declared_e1001_grayscale_variant(app: Flask) -> None:
+    """The E1001's two grayscale kinds are indistinguishable on the wire and
+    exist only to separate OTA lineages, so the lineage has to follow the
+    build actually flashed. Nothing the device sends identifies the glass;
+    the firmware's own declaration is the sole authority, and the heal must
+    honour it in both directions. Pinning that here because the alternative
+    (freezing the kind) silently offers a reflashed panel the other variant's
+    image, which leaves it unable to refresh until it is re-flashed by USB."""
+    client = app.test_client()
+    _sign_in(client)
+    devices = app.config["DEVICE_REGISTRY"]
+    device_id, mac = "study_e1001", "aa:bb:cc:dd:ee:13"
+
+    code = _issue_pairing(app)
+    first = client.post(
+        "/api/v1/device/register",
+        headers={"X-Pairing-Code": code, "Content-Type": "application/json"},
+        data=json.dumps(
+            {"device_id": device_id, "kind": "seeed_reterminal_e1001_gray", "mac": mac}
+        ),
+    )
+    assert first.status_code == 201
+    token = first.get_json()["device_token"]
+
+    for declared in (
+        "seeed_reterminal_e1001_gray_legacy",  # reflashed to the legacy build
+        "seeed_reterminal_e1001_gray",  # and back to the default build
+    ):
+        resp = client.post(
+            "/api/v1/device/discover",
+            headers={"Content-Type": "application/json"},
+            data=json.dumps({"device_id": device_id, "kind": declared, "mac": mac}),
+        )
+        assert resp.status_code == 200
+        healed = devices.get(device_id)
+        assert healed is not None and healed.kind_of == declared
+        # Same row, same credential: only the lineage moved.
+        assert healed.manifest.get("access_token") == token
+
+
 # -- auth --------------------------------------------------------------
 
 

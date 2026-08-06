@@ -236,6 +236,10 @@ def _derive_manifest(
         "protocol": entry.protocol,
         "file": str(entry.path),
         "vendor": entry.vendor,
+        # Whether a device's self-report may be resolved to this SKU
+        # automatically. Defaults on; see ``auto_select`` in the hardware
+        # schema for why a variant opts out.
+        "auto_select": entry.manifest.get("auto_select", True) is not False,
     }
 
     return manifest

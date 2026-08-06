@@ -73,6 +73,7 @@ The reTerminal E-Series and XIAO ePaper family run the [Tesserae-native firmware
 | [Seeed XIAO ePaper EE04 (7.5" mono)](https://www.seeedstudio.com/XIAO-ePaper-Display-Board-EE04-p-6560.html) | 800×480 | `mono` | `esp32_bw_client` (inherit) | `seeed_ee04_75` |
 | [Seeed reTerminal E1001](https://www.seeedstudio.com/reTerminal-E1001-p-6534.html) | 800×480 | `mono` | `esp32_bw_client` (inherit) | `seeed_reterminal_e1001` |
 | [Seeed reTerminal E1001 (4-level grayscale)](https://www.seeedstudio.com/reTerminal-E1001-p-6534.html) | 800×480 | `gray_4` | `esp32_bw_client` <br> `esp32_gray2_bin` | `seeed_reterminal_e1001_gray` |
+| [Seeed reTerminal E1001 (4-level grayscale, legacy glass)](https://www.seeedstudio.com/reTerminal-E1001-p-6534.html) | 800×480 | `gray_4` | `esp32_bw_client` <br> `esp32_gray2_bin` | `seeed_reterminal_e1001_gray_legacy` |
 | [Seeed reTerminal E1002](https://www.seeedstudio.com/reTerminal-E1002-p-6533.html) | 800×480 | `spectra_6` | `esp32_client` (inherit) | `seeed_reterminal_e1002` |
 | [Seeed reTerminal E1003](https://www.seeedstudio.com/reTerminal-E1003-p-6731.html) | 1872×1404 | `gray_16` | `esp32_client` <br> `esp32_gray_bin` | `seeed_reterminal_e1003` |
 | [Seeed reTerminal E1004](https://www.seeedstudio.com/reTerminal-E1004-p-6692.html) | 1200×1600 portrait | `spectra_6` | `esp32_client` (inherit) | `seeed_reterminal_e1004` |

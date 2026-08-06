@@ -90,6 +90,11 @@
       "type": "string",
       "description": "Free-form maintainer notes in markdown. Surfaced on the docs hardware page."
     },
+    "auto_select": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether a device's self-report may be resolved to this SKU automatically (relay pairing infers the most specific kind from the reported protocol + gamut). Set false for a variant that is indistinguishable on the wire from a sibling SKU and differs only in which firmware image was flashed: nothing the device sends can identify it, so guessing risks pinning the panel to the wrong OTA lineage. Such a kind is only ever set explicitly by the operator, or by the firmware declaring it at register / discover."
+    },
     "deprecated_aliases": {
       "type": "array",
       "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },

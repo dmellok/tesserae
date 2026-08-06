@@ -272,7 +272,17 @@ class RelayPairingPoller:
         (protocol, gamut) override (E1001-gray vs Xteink X4 gray), the one
         whose declared panel matches the reported geometry wins; a stable
         id sort settles anything left, since by then every candidate packs
-        the same bytes."""
+        the same bytes.
+
+        SKUs marked ``auto_select: false`` are never candidates. Those are
+        variants a device cannot identify itself as: same protocol, same
+        gamut, same geometry, same bytes as a sibling, differing only in
+        which firmware image was flashed (the E1001's two grayscale glass
+        variants). Inferring one would pin the panel to that variant's OTA
+        lineage on a coin flip, and being wrong there leaves a panel that
+        cannot refresh until it is re-flashed over USB. Excluding them
+        makes the non-legacy sibling the deterministic answer without
+        relying on where the id happens to sort."""
         from app.quantizer import canonicalise_gamut
 
         base = self._devices.get(protocol)
@@ -290,6 +300,8 @@ class RelayPairingPoller:
             # survive the manifest merge).
             catalog = manifest.get("_catalog_entry")
             if not isinstance(catalog, dict) or str(catalog.get("protocol") or "") != protocol:
+                continue
+            if catalog.get("auto_select") is False:
                 continue
             declared = str((manifest.get("panel") or {}).get("gamut") or "")
             if not declared or canonicalise_gamut(declared) != wanted:

@@ -464,6 +464,42 @@ def test_resolve_kind_breaks_gamut_ties_on_reported_geometry(
     assert poller._resolve_kind("", "esp32_bw_client", x4) == "xteink_x4_gray"
 
 
+def test_resolve_kind_never_infers_an_auto_select_false_variant(
+    registries: Any, tmp_path: Path
+) -> None:
+    """The E1001's two grayscale glass variants are identical on the wire:
+    same protocol, gamut, geometry and packed bytes, differing only in which
+    firmware image was flashed. A self-report therefore cannot distinguish
+    them, so resolution must land on the non-legacy sibling every time rather
+    than gambling on the panel's OTA lineage."""
+    devices, _, _ = registries
+    legacy = devices.get("seeed_reterminal_e1001_gray_legacy")
+    plain = devices.get("seeed_reterminal_e1001_gray")
+    assert legacy is not None and plain is not None
+    # Guard the premise: if these ever stop being indistinguishable, this
+    # test is no longer testing what it claims.
+    assert legacy.manifest["panel"] == plain.manifest["panel"]
+    assert legacy.manifest["renderers"] == plain.manifest["renderers"]
+    assert legacy.manifest["_catalog_entry"]["auto_select"] is False
+
+    poller = _poller(registries, tmp_path)
+    reported = {"model": "esp32_bw_client", "gamut": "gray_4", "panel_w": 800, "panel_h": 480}
+    assert poller._resolve_kind("", "esp32_bw_client", reported) == "seeed_reterminal_e1001_gray"
+
+
+def test_operator_can_still_pin_the_legacy_variant_explicitly(
+    registries: Any, tmp_path: Path
+) -> None:
+    """``auto_select: false`` only blocks *inference*. An operator naming the
+    kind on the pairing slot is an explicit choice and still wins."""
+    poller = _poller(registries, tmp_path)
+    reported = {"model": "esp32_bw_client", "gamut": "gray_4", "panel_w": 800, "panel_h": 480}
+    resolved = poller._resolve_kind(
+        "seeed_reterminal_e1001_gray_legacy", "esp32_bw_client", reported
+    )
+    assert resolved == "seeed_reterminal_e1001_gray_legacy"
+
+
 def test_gray_e1001_self_report_creates_a_device_that_packs_2bpp(
     registries: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -4,6 +4,25 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.271.0], 2026-08-06
+
+### Added
+
+- **`seeed_reterminal_e1001_gray_legacy` hardware kind.** The reTerminal
+  E1001 ships with two glass variants: one carries a built-in 4-gray
+  waveform, the other needs register LUTs uploaded instead. They need
+  different firmware images but are identical on the wire, down to the
+  96000-byte frame, so the new kind exists purely to give the second image
+  its own identity and OTA lineage. Rendering is unchanged.
+- **`auto_select` on hardware manifests.** A SKU can opt out of being
+  inferred from a device's self-report. Relay pairing resolves the most
+  specific catalog kind from the reported protocol + gamut, which is
+  ambiguous between the two E1001 grayscale variants because their reports
+  are identical; the legacy variant now sits out that resolution, so an
+  ambiguous report deterministically pairs as
+  `seeed_reterminal_e1001_gray`. The variant is only ever set by the
+  operator, or by the firmware declaring it at register / discover.
+
 ## [0.270.0], 2026-08-06
 
 ### Added
