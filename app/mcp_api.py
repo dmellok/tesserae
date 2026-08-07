@@ -1616,6 +1616,13 @@ _REPORT_JS: str = r"""() => {
       style: document.body.getAttribute('data-style') || '',
     },
     elements: els,
+    // Vendored bundles the code-element sandboxes inlined. Reported without
+    // ?debug=1 because the choice is INFERRED from the element's own code: an
+    // element can end up with a stylesheet nobody asked for, and that has to be
+    // visible without knowing to go looking for it.
+    injected_libs: (window.__tesseraeLibReport || []).filter(
+      (r) => (r.libs || []).length || r.autolibs === false,
+    ),
   };
 }"""
 
@@ -1640,7 +1647,9 @@ _DIAG_JS: str = r"""() => {
     libraries: {
       page: { chart_global: typeof window.Chart !== 'undefined' },
       elements: window.__tesseraeLibReport || [],
-      note: 'element libs inline before the ctx + user script in sandbox document order',
+      note: 'element libs inline before the ctx + user script in sandbox document order; '
+        + 'inferred:true means a token in the element code triggered it (see matched), '
+        + 'not that the element asked for it. Set the element autolibs:false for none.',
     },
   };
   // family -> src from reachable @font-face rules, so a failed face names its
@@ -1751,6 +1760,25 @@ _DIAG_JS: str = r"""() => {
     }
     return out;
   };
+  // Rules that went missing from the stylesheet a code element's sandbox
+  // actually composed, self-reported from inside the frame (an opaque origin
+  // nothing out here can read). This is the only view of the FINAL sheet:
+  // analyze() below re-parses authored CSS standing alone, so a rule that
+  // parses fine on its own but is consumed once composed shows up only here.
+  // ``sheet: 'library'`` means the auto-injected CSS is malformed: an injector
+  // bug, not an authoring one. Pushed first so the 50-cap can't bury them.
+  for (const rep of window.__tesseraeCssReport || []) {
+    for (const d of rep.dropped || []) {
+      diag.css.push({
+        el: rep.el,
+        selector: String(d.selector || '').slice(0, 120),
+        reason: d.sheet === 'library'
+          ? 'auto-injected library CSS lost this rule when the sandbox parsed it'
+          : 'authored rule missing from the composed sandbox stylesheet',
+        composed_counts: rep.counts || {},
+      });
+    }
+  }
   for (const n of document.querySelectorAll('.deco[data-el]')) {
     let el = null;
     try { el = JSON.parse(n.getAttribute('data-el') || '{}'); } catch (e) { continue; }
@@ -1808,7 +1836,8 @@ def build_render_report(
         renderer_diag = report.get("diagnostics") or {}
         report = report.get("result")
     if not isinstance(report, dict):
-        report = {"board": {}, "elements": []}
+        report = {"board": {}, "elements": [], "injected_libs": []}
+    report.setdefault("injected_libs", [])
     if debug:
         # Merge the renderer-side capture (console / errors / network /
         # settle) with the in-page report (fonts / css / libraries).
@@ -1886,11 +1915,20 @@ def render_report(page_id: str) -> Response:
     primitives and decorations report their text. Overflow is measured on the
     element box regardless.
 
+    ``injected_libs`` lists the vendored bundles each code element's sandbox
+    inlined (Chart.js, a Phosphor weight, a bundled font). The choice is
+    INFERRED from the element's own html/css/js, so each entry carries
+    ``inferred`` plus the ``matched`` token that triggered it: an element
+    carrying a stylesheet it never asked for is named here rather than left to
+    be deduced from the pixels. Set the element's ``autolibs: false`` to inject
+    nothing at all (it then reports ``autolibs: false`` with an empty list).
+
     Large boards: pass ``?fields=tap_invalid,tap_dangling`` (any of ``board`` /
     ``elements`` / ``tap_regions`` / ``tap_invalid`` / ``tap_dangling`` /
-    ``overlay_slots``) to trim the response, or ``?view=touch`` for the
-    touch-and-overlay wiring subset, so verifying interactions doesn't pull
-    the whole ``elements`` array. ``id`` + ``rev`` always ride along.
+    ``overlay_slots`` / ``injected_libs``) to trim the response, or
+    ``?view=touch`` for the touch-and-overlay wiring subset, so verifying
+    interactions doesn't pull the whole ``elements`` array. ``id`` + ``rev``
+    always ride along.
 
     ``?debug=1`` adds a ``diagnostics`` section that surfaces the failures a
     PNG hides: ``console`` (error/warn output from every frame, INCLUDING
@@ -1900,9 +1938,12 @@ def render_report(page_id: str) -> Response:
     (what gated the capture: goto / compose-signal / image-wait / font-wait
     outcome + elapsed ms per phase), ``fonts`` (every font face with
     loaded | pending-at-capture | failed | never-requested and its src),
-    ``css`` (authored element CSS the browser silently dropped, with selector
-    + declaration + reason), and ``libraries`` (which vendored bundles each
-    code element inlined). Diagnose from this instead of pixel-diffing.
+    ``css`` (CSS the browser silently dropped: invalid authored declarations,
+    plus any rule missing from the stylesheet a code element's sandbox actually
+    composed, which is where an authored rule eaten by injected library CSS
+    shows up), and ``libraries`` (the same inlining record as
+    ``injected_libs``, with per-element detail). Diagnose from this instead of
+    pixel-diffing.
 
     ``?fresh=1`` re-fetches widget data (bypasses the last-good fallback and
     widget-side caches via ``ctx["fresh"]``), so a mid-debug report can't be
@@ -1931,6 +1972,7 @@ def render_report(page_id: str) -> Response:
         "tap_dangling",
         "overlay_slots",
         "icon_invalid",
+        "injected_libs",
     }
     if debug:
         selectable.add("diagnostics")

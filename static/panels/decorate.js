@@ -167,13 +167,21 @@
   // on a headless compose render this runs before the page's load event, so the
   // library is ready by screenshot time. A lib is only inlined when the code
   // actually references it (``test`` against the element's html+css+js), so a
-  // lean element stays lean. URLs come from ``window.__TESSERAE_LIBS`` (set by
-  // the compose + editor templates). None of the minified sources contain a
-  // ``</script>`` sequence, so direct inlining is safe.
+  // lean element stays lean. That inference is a heuristic, so it is both
+  // reported (every entry in the element's lib report carries ``inferred`` and
+  // the ``matched`` token) and refusable: ``el.autolibs === false`` turns the
+  // whole thing off, libs and fonts alike, for an element that hand-authors its
+  // own markup and wants no ambient stylesheets. URLs come from
+  // ``window.__TESSERAE_LIBS`` (set by the compose + editor templates). None of
+  // the minified sources contain a ``</script>`` sequence, so direct inlining
+  // is safe.
   //
   //   name       -> label (debug only)
   //   files      -> keys into __TESSERAE_LIBS, inlined in order (deps first)
-  //   test       -> RegExp; inline this lib when it matches the code
+  //   test       -> RegExp, or a function returning the matched token (or null);
+  //                 inline this lib when it hits. The match text rides into the
+  //                 render report so an inferred injection can be traced back to
+  //                 what triggered it.
   //   kind       -> "js" (inline <script>) or "css" (inline <style>)
   //   init       -> optional JS run right after the lib loads (register/config)
   var SANDBOX_LIBS = [
@@ -191,13 +199,28 @@
     // Phosphor icons, all six weights. Each weight's self-contained CSS
     // (font embedded as a data: URL) is inlined only when its class appears,
     // so an element that uses one weight doesn't pay for the others.
-    { name: "ph-regular", files: ["phosphor_regular"], test: /\bph\b(?!-)/, kind: "css" },
+    // The regular weight is the BARE ``ph`` class, and the stylesheet only ever
+    // defines it paired with an icon class (``.ph.ph-heart``), so require BOTH
+    // halves to be present. Matching a lone "ph" token pulled the whole icon
+    // font into any element that merely mentioned ph in passing.
+    { name: "ph-regular", files: ["phosphor_regular"], kind: "css",
+      test: function (s) {
+        return /(^|[^\w-])ph(?![\w-])/.test(s) && /(^|[^\w-])ph-[a-z0-9]/.test(s) ? "ph" : null;
+      } },
     { name: "ph-thin", files: ["phosphor_thin"], test: /\bph-thin\b/, kind: "css" },
     { name: "ph-light", files: ["phosphor_light"], test: /\bph-light\b/, kind: "css" },
     { name: "ph-bold", files: ["phosphor"], test: /\bph-bold\b/, kind: "css" },
     { name: "ph-fill", files: ["phosphor_fill"], test: /\bph-fill\b/, kind: "css" },
     { name: "ph-duotone", files: ["phosphor_duotone"], test: /\bph-duotone\b/, kind: "css" },
   ];
+
+  // The token that made ``lib`` match, or null. Reported alongside the
+  // injection so an inferred match is traceable to the text that caused it.
+  function libMatch(lib, code) {
+    if (typeof lib.test === "function") return lib.test(code) || null;
+    var m = code.match(lib.test);
+    return m ? m[0] : null;
+  }
 
   var _libCache = {};
   function libSource(url) {
@@ -262,6 +285,83 @@
     "'style','class','hidden']});}catch(e){}" +
     "setTimeout(function(){try{mo.disconnect();}catch(e){}},2900);})();";
 
+  // Composed-stylesheet self-check. The sandbox is an opaque origin, so nothing
+  // outside it can read the stylesheet the browser actually parsed; the frame
+  // reports on itself instead. For each of its <style> blocks it diffs the
+  // authored text against the rules the parser kept and posts anything that
+  // vanished, so a dropped rule is NAMED in render_report's diagnostics rather
+  // than pixel-hunted. ``sheet: "library"`` findings mean the auto-injected CSS
+  // is malformed (an injector bug); ``"authored"`` means the element's own CSS
+  // is. Stringified with toString() instead of hand-written as a string literal
+  // so eslint and prettier still see real code.
+  // Block splitting is best-effort, like the render-report's own CSS analysis:
+  // a brace inside a quoted value can throw the depth count off.
+  function cssSelfCheck() {
+    try {
+      // The parser rewrites what it keeps (``:before`` comes back as
+      // ``::before``), so compare on a shape both spellings collapse to.
+      var norm = function (s) {
+        return String(s)
+          .replace(/\s+/g, "")
+          .replace(/['"]/g, "")
+          .replace(/::/g, ":")
+          .toLowerCase();
+      };
+      var preludes = function (text) {
+        var out = [];
+        var depth = 0;
+        var buf = "";
+        var clean = String(text || "").replace(/\/\*[\s\S]*?\*\//g, " ");
+        for (var i = 0; i < clean.length; i++) {
+          var ch = clean.charAt(i);
+          if (ch === "{") {
+            if (depth === 0 && buf.trim()) out.push(buf.trim());
+            depth++;
+            buf = "";
+          } else if (ch === "}") {
+            depth = depth > 0 ? depth - 1 : 0;
+            buf = "";
+          } else if (depth === 0) buf += ch;
+        }
+        return out;
+      };
+      var findings = [];
+      var counts = {};
+      var styles = document.querySelectorAll("style[data-tesserae-css], style[data-tesserae-lib]");
+      for (var s = 0; s < styles.length; s++) {
+        var st = styles[s];
+        var which = st.hasAttribute("data-tesserae-lib") ? "library" : "authored";
+        var rules = st.sheet ? st.sheet.cssRules : null;
+        if (!rules) continue;
+        var kept = {};
+        for (var r = 0; r < rules.length; r++) {
+          var text = String(rules[r].cssText || "");
+          var head = rules[r].selectorText || text.slice(0, text.indexOf("{"));
+          kept[norm(head)] = 1;
+        }
+        var authored = preludes(st.textContent);
+        counts[which] = { authored: authored.length, parsed: rules.length };
+        // Only diff rule by rule when the counts actually disagree. The
+        // selector match is approximate, and reporting a normalisation
+        // mismatch as a dropped rule would bury the real ones.
+        if (rules.length >= authored.length) continue;
+        for (var a = 0; a < authored.length; a++) {
+          if (kept[norm(authored[a])]) continue;
+          findings.push({
+            sheet: which,
+            selector: authored[a].replace(/\s+/g, " ").slice(0, 120),
+          });
+          if (findings.length >= 20) break;
+        }
+      }
+      parent.postMessage(
+        { type: "tesserae-css-report", counts: counts, dropped: findings },
+        "*",
+      );
+    } catch { /* diagnostics only: never break the render */ }
+  }
+  var CSS_CHECK_JS = "(" + cssSelfCheck.toString() + ")();";
+
   function renderCode(el, data) {
     var wrap = document.createElement("div");
     wrap.style.cssText = "position:relative;width:100%;height:100%";
@@ -285,31 +385,48 @@
     var ctxJson = JSON.stringify(ctx).replace(/</g, "\\u003c");
 
     // Per-element record of which vendored bundles were inlined (or matched
-    // but couldn't be), read by the render-report diagnostics so "why is my
-    // chart/icon missing" is answerable without pixel-diffing. Libs always
+    // but couldn't be), read by the render report so "why is my chart/icon
+    // missing", and "why did an icon font I never asked for turn up", are
+    // answerable without pixel-diffing. Every entry says whether it was
+    // ``inferred`` from the code and what token triggered it. Libs always
     // inline BEFORE the ctx + user script in srcdoc document order.
-    var libReport = { el: String(el.id || ""), libs: [] };
+    var autolibs = el.autolibs !== false;
+    var libReport = { el: String(el.id || ""), autolibs: autolibs, libs: [] };
     (window.__tesseraeLibReport = window.__tesseraeLibReport || []).push(libReport);
 
     // Inline only the vendored libs this element references.
     var probe = (el.html || "") + "\n" + (el.css || "") + "\n" + (el.js || "");
+    // Custom-property NAMES are the author's own vocabulary, never a library
+    // reference: a ``--ph`` or ``--chart-bg`` variable must not drag a bundle
+    // in. Strip the names before matching; var() USES survive as ``var( )``.
+    var probeLibs = probe.replace(/--[A-Za-z][\w-]*/g, " ");
     var urls = window.__TESSERAE_LIBS || {};
     var headCss = "";
     var libScripts = "";
     var needFont = false;
-    for (var i = 0; i < SANDBOX_LIBS.length; i++) {
+    for (var i = 0; autolibs && i < SANDBOX_LIBS.length; i++) {
       var lib = SANDBOX_LIBS[i];
-      if (!lib.test.test(probe)) continue;
+      var hit = libMatch(lib, probeLibs);
+      if (!hit) continue;
       var joined = "";
       for (var j = 0; j < lib.files.length; j++) {
         var s = libSource(urls[lib.files[j]]);
-        if (s) joined += s + "\n;\n";
+        // ";" separates concatenated JS statements. CSS has no such separator:
+        // a stray top-level ";" is a parse error that swallows the rule after
+        // it, which (headCss sitting ahead of the author's CSS) silently ate
+        // the element's first authored rule.
+        if (s) joined += s + (lib.kind === "css" ? "\n" : "\n;\n");
       }
       if (!joined) {
-        libReport.libs.push({ name: lib.name, injected: false, reason: "source fetch failed" });
+        libReport.libs.push({
+          name: lib.name, injected: false, inferred: true, matched: hit,
+          reason: "source fetch failed",
+        });
         continue;
       }
-      libReport.libs.push({ name: lib.name, injected: true, kind: lib.kind });
+      libReport.libs.push({
+        name: lib.name, injected: true, kind: lib.kind, inferred: true, matched: hit,
+      });
       if (lib.kind === "css") {
         headCss += joined;
         needFont = true; // fonts (phosphor) arrive as data: URLs
@@ -324,15 +441,17 @@
     // data: URL (the /fonts/face/<id>.css endpoint builds that). Only fonts the
     // code actually names are inlined, so a lean element stays lean.
     var fonts = window.__TESSERAE_FONTS || [];
-    for (var k = 0; k < fonts.length; k++) {
+    for (var k = 0; autolibs && k < fonts.length; k++) {
       var fnt = fonts[k];
       if (!fnt || !fnt.name || probe.indexOf(fnt.name) === -1) continue;
       var fcss = libSource(fnt.url);
       if (fcss) { headCss += fcss + "\n"; needFont = true; }
-      libReport.libs.push({
+      var fontEntry = {
         name: "font:" + fnt.name, injected: !!fcss, kind: "css",
-        reason: fcss ? undefined : "font css fetch failed",
-      });
+        inferred: true, matched: fnt.name,
+      };
+      if (!fcss) fontEntry.reason = "font css fetch failed";
+      libReport.libs.push(fontEntry);
     }
     // img-src allows the web so a code element can show remote artwork
     // (Spotify album covers, Unsplash photos, etc.), the same external images
@@ -364,11 +483,23 @@
       "console.error(t+' csp blocked '+ev.violatedDirective+': '+(ev.blockedURI||'inline'));});" +
       "})();</" + "script>";
 
+    // Three separate <style> blocks, never one concatenated string. A
+    // stylesheet's parse errors stop at its own element, so a malformed
+    // injection can no longer consume the author's rules: a stray token used to
+    // swallow whichever rule came next, and since headCss sat directly ahead of
+    // el.css that was ALWAYS the element's first authored rule (typically the
+    // :root block, taking every variable it declared with it). Author CSS still
+    // comes last in document order, so it keeps winning ties against the libs.
+    var styleBlocks =
+      "<style>" + reset + "</style>" +
+      (headCss ? "<style data-tesserae-lib>" + headCss + "</style>" : "") +
+      "<style data-tesserae-css>" + (el.css || "") + "</style>";
+
     f.srcdoc =
       "<!doctype html><html><head><meta charset='utf-8'>" +
       "<meta http-equiv='Content-Security-Policy' content=\"" + csp + "\">" +
       diagHooks +
-      "<style>" + reset + headCss + (el.css || "") + "</style></head><body>" +
+      styleBlocks + "</head><body>" +
       (el.html || "") +
       libScripts +
       "<script>window.ctx=" + ctxJson + ";</" + "script>" +
@@ -376,6 +507,7 @@
       "console.error(" + tag + "+' script threw: '+String(e&&e.stack||e));" +
       "document.body.innerHTML='<pre style=\"color:#900;font:12px monospace;white-space:pre-wrap\">'" +
       "+String(e&&e.message||e)+'</pre>';}</" + "script>" +
+      "<script>" + CSS_CHECK_JS + "</" + "script>" +
       "<script>" + TOUCH_COLLECT_JS + "</" + "script>" +
       "</body></html>";
 
@@ -394,7 +526,18 @@
     // Hard cap so a constantly-mutating sandbox can't stall the walk.
     setTimeout(settle, 3000);
     function onMsg(ev) {
-      if (ev.source !== f.contentWindow || !ev.data || ev.data.type !== "tesserae-touch-regions") return;
+      if (ev.source !== f.contentWindow || !ev.data) return;
+      // Stylesheet self-check (posted once, at parse time). Recorded against
+      // the element id here, since only the parent knows which frame is which.
+      if (ev.data.type === "tesserae-css-report") {
+        (window.__tesseraeCssReport = window.__tesseraeCssReport || []).push({
+          el: String(el.id || ""),
+          counts: ev.data.counts || {},
+          dropped: ev.data.dropped || [],
+        });
+        return;
+      }
+      if (ev.data.type !== "tesserae-touch-regions") return;
       if (settled) return;
       // Each message is the FULL current set; rebuild this iframe's mirrors
       // from it so a late (async) annotated node replaces the earlier (empty)

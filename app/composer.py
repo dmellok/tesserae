@@ -1057,6 +1057,10 @@ def _build_canvas_els(
                     "html": e.html,
                     "css": e.css,
                     "js": e.js,
+                    # Carried through so the sandbox can honour an opt-out of
+                    # library/font auto-injection (decorate.js infers what to
+                    # inline from the code itself; false means inline nothing).
+                    "autolibs": e.autolibs,
                     "opacity": e.opacity,
                     "rotate": e.rotate,
                     "x": e.x,

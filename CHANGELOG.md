@@ -4,6 +4,40 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.276.0], 2026-08-08
+
+### Fixed
+
+- **A canvas code element no longer picks up an icon stylesheet it never
+  referenced.** The sandbox inlines a vendored library when the element's own
+  html/css/js mentions it, and the Phosphor regular-weight test matched any bare
+  `ph` token, so a custom property named `--ph` pulled the whole icon font in.
+  The match now requires the class pair the stylesheet actually defines
+  (`class="ph ph-heart"`), and custom-property names are excluded from library
+  matching altogether.
+- **Injected library CSS can no longer consume an element's first authored
+  rule.** The vendored bundles were joined with a `;` separator, which is right
+  for JavaScript and a parse error at the top level of a stylesheet, and the
+  result was prepended to the element's own CSS inside a single `<style>`. The
+  stray token swallowed whichever rule followed, which was always the element's
+  first: typically a `:root` block, so every variable it declared resolved to
+  empty while the rest of the sheet applied normally. Injected CSS now carries
+  no separator and renders in its own `<style>` block, so a malformed injection
+  stops at its own stylesheet.
+
+### Added
+
+- **`render_report` names the libraries a code element was given.**
+  `injected_libs` rides along without `debug=1` and lists what each sandbox
+  inlined, each entry carrying `inferred` and the `matched` token behind the
+  choice, so a stylesheet nobody asked for is visible in the report.
+- **`autolibs: false` on a code element.** Opts out of auto-injection entirely,
+  vendored libraries and bundled fonts alike, for an element that hand-authors
+  its own markup and wants no ambient styling.
+- **`?debug=1` diagnostics cover the composed stylesheet.** Each code sandbox
+  self-reports any rule missing from the sheet it actually parsed, tagged
+  `authored` or `library`, so a dropped rule is named instead of pixel-hunted.
+
 ## [0.275.0], 2026-08-07
 
 ### Added

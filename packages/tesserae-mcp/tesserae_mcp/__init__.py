@@ -105,6 +105,11 @@ plus optional "opacity" (0-100) and "rotate" (degrees). By "kind":
                sandbox by family name, e.g. `font-family: "Fira Code"` or `"Press Start 2P"`. Only
                fonts your code actually names are inlined, so there's a broad programming + pixel set
                available at no cost until used.
+           Every one of those is chosen by matching your code, so render_report().injected_libs
+           reports what got inlined and the token that triggered it -- check it if an element
+           renders styled in a way you didn't author. To take no ambient CSS or JS at all (an
+           element that hand-authors its own SVG and styling), set "autolibs": false on it; nothing
+           is then injected, icon classes and bundled font names included.
            Chart.js example: put a <canvas id="c"> in "html", then in "js":
            "new Chart(document.getElementById('c'),{type:'line',data:{labels:[...],
            datasets:[{data: ctx.data.weather.hourly.map(h=>h.temp)}]}})".
@@ -739,10 +744,18 @@ def build_server() -> Any:
         isn't a real Phosphor name -- each with the element id and reason. Check it
         whenever you placed icons; fix with a slug from list_icons(q).
 
+        "injected_libs" (always on): the vendored bundles each code element's sandbox
+        inlined -- Chart.js, a Phosphor weight, a bundled font. The choice is INFERRED
+        from the element's own html/css/js, so each entry carries "inferred" and the
+        "matched" token behind it; an element that ended up carrying a stylesheet it
+        never asked for is named here instead of deduced from pixels. Set an element's
+        "autolibs": false to inject nothing at all.
+
         On a large board the full report can be big. Pass view="touch" for just the
         touch-wiring sections (tap_regions / tap_invalid / tap_dangling), or
         fields="tap_invalid,tap_dangling" (any of board / elements / tap_regions /
-        tap_invalid / tap_dangling) to trim it. id + rev always ride along.
+        tap_invalid / tap_dangling / injected_libs) to trim it. id + rev always ride
+        along.
 
         debug=True adds a "diagnostics" section -- reach for it whenever a render
         looks wrong and the cause isn't visible: "console" (error/warn output from
@@ -751,9 +764,10 @@ def build_server() -> Any:
         4xx/5xx requests -- a 404 font names its URL), "settle" (what gated the
         capture: goto / compose-signal / image-wait / font-wait outcome + ms),
         "fonts" (every face: loaded | pending-at-capture | failed | never-requested,
-        with src), "css" (authored element CSS the browser silently dropped:
-        selector + declaration + reason), "libraries" (which vendored bundles each
-        code element inlined). Diagnose from this instead of pixel-hunting.
+        with src), "css" (CSS the browser silently dropped: invalid authored
+        declarations, plus any rule missing from the stylesheet a code element's
+        sandbox actually composed), "libraries" (the same record as injected_libs,
+        with per-element detail). Diagnose from this instead of pixel-hunting.
 
         fresh=True re-fetches widget data (bypasses the last-good fallback and
         widget caches), so a stale cached result can't mislead a debugging pass."""

@@ -90,6 +90,11 @@ plus optional "opacity" (0-100) and "rotate" (degrees). By "kind":
                sandbox by family name, e.g. `font-family: "Fira Code"` or `"Press Start 2P"`. Only
                fonts your code actually names are inlined, so there's a broad programming + pixel set
                available at no cost until used.
+           Every one of those is chosen by matching your code, so render_report().injected_libs
+           reports what got inlined and the token that triggered it -- check it if an element
+           renders styled in a way you didn't author. To take no ambient CSS or JS at all (an
+           element that hand-authors its own SVG and styling), set "autolibs": false on it; nothing
+           is then injected, icon classes and bundled font names included.
            Chart.js example: put a <canvas id="c"> in "html", then in "js":
            "new Chart(document.getElementById('c'),{type:'line',data:{labels:[...],
            datasets:[{data: ctx.data.weather.hourly.map(h=>h.temp)}]}})".

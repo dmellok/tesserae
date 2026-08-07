@@ -180,6 +180,13 @@ class Element(BaseModel):
     # the widget data available as ``ctx.data[name]`` per source (and
     # ``ctx.options`` / ``ctx.w`` / ``ctx.h``). Empty for every other kind.
     js: str = ""
+    # Vendored-library auto-injection for kind == "code". The sandbox infers
+    # which bundles (Chart.js, Phosphor, a named font, …) to inline from the
+    # element's own html/css/js. Set false to inject NOTHING: an element that
+    # hand-authors its markup and styling gets no ambient stylesheets, and no
+    # heuristic can restyle what it draws. render_report's ``injected_libs``
+    # says what the inference chose and which token triggered it.
+    autolibs: bool = True
     # Named data sources for kind == "code": each ``{key, options, name}`` is a
     # widget whose fetched data lands at ``ctx.data[name]`` (name falls back to
     # key). Lets one code element combine data from several widgets. A legacy

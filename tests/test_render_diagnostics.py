@@ -1,8 +1,12 @@
-"""Acceptance tests for the render_report ``?debug=1`` diagnostics (live Chromium).
+"""Acceptance tests for render_report's failure reporting (live Chromium).
 
 The point of the diagnostics block is that silent failures stop needing pixel
 diffs: a throwing element script, a 404'ing font, and a browser-dropped CSS
 declaration must all be named explicitly by ONE ``render_report?debug=1`` call.
+The same bar applies to the code sandbox's library auto-injection, covered at
+the bottom of this module: it must not fire on a token that isn't a library
+reference, it must not corrupt the CSS the element authored, and whatever it
+does inject must be reported.
 These tests run the real pipeline (Flask served over loopback, headless
 Chromium navigating back into it) and are skipped when Playwright's Chromium
 isn't installed.
@@ -172,6 +176,155 @@ def test_debug_report_names_all_three_failures(live_server: str) -> None:
     fonts = diag.get("fonts") or []
     assert isinstance(fonts, list)
     assert not [f for f in fonts if f.get("status") == "pending-at-capture"]
+
+
+# -- code-sandbox library auto-injection ---------------------------------
+#
+# The sandbox picks vendored bundles by matching the element's own html/css/js.
+# A false positive is expensive: the element silently carries a stylesheet it
+# never asked for. Elements below read their own computed style back out
+# through console.warn, the one channel that crosses an opaque-origin frame,
+# and the assertions read it off diagnostics.console.
+
+_PROBE = (
+    "console.warn('[probe] k0='+getComputedStyle(document.documentElement)"
+    ".getPropertyValue('--k0').trim());"
+)
+
+
+def _probe_values(diag: dict[str, Any]) -> list[str]:
+    return [c.get("text", "") for c in diag.get("console") or [] if "[probe]" in c.get("text", "")]
+
+
+def _libs_for(report: dict[str, Any], el_id: str) -> dict[str, Any]:
+    entries = [e for e in report.get("injected_libs") or [] if e.get("el") == el_id]
+    return entries[0] if entries else {}
+
+
+def _page_with(base: str, els: list[dict[str, Any]]) -> str:
+    page = _api(base, "POST", "/pages", {"name": "Lib fixture", "w": 400, "h": 300})
+    pid = str(page["id"])
+    _api(base, "PUT", f"/pages/{pid}/canvas", {"w": 400, "h": 300, "els": els})
+    return pid
+
+
+def test_custom_property_does_not_inject_an_icon_font(live_server: str) -> None:
+    """A ``--ph`` variable is the author's own vocabulary, not a Phosphor icon
+    reference. Matching it pulled a whole icon stylesheet into an element that
+    never asked for one, with nothing but a lib-report line to show for it."""
+    pid = _page_with(
+        live_server,
+        [
+            {
+                "id": "vars",
+                "kind": "code",
+                "x": 0,
+                "y": 0,
+                "w": 300,
+                "h": 200,
+                "css": ":root{--k0:#000}\n#p{height:var(--ph);color:var(--k0)}",
+                "html": "<div id='p'>x</div>",
+                "js": "document.documentElement.style.setProperty('--ph','20px');" + _PROBE,
+            }
+        ],
+    )
+    report = _debug_report(live_server, pid)
+    injected = [lib.get("name") for lib in _libs_for(report, "vars").get("libs") or []]
+    assert not [n for n in injected if str(n).startswith("ph-")], (
+        f"a custom property pulled in an icon font: {injected}"
+    )
+    assert _probe_values(report["diagnostics"]) == ["[probe] k0=#000"]
+
+
+def test_icon_classes_still_inject_phosphor(live_server: str) -> None:
+    """The other half of the same fix: real ``class="ph ph-<name>"`` markup must
+    still get the regular weight inlined, and the element's own first CSS rule
+    must survive the injection sitting alongside it."""
+    pid = _page_with(
+        live_server,
+        [
+            {
+                "id": "icons",
+                "kind": "code",
+                "x": 0,
+                "y": 0,
+                "w": 300,
+                "h": 200,
+                "css": ":root{--k0:#000}\n#t{font-size:32px;color:var(--k0)}",
+                "html": "<div id='t'><i class='ph ph-heart'></i></div>",
+                "js": _PROBE
+                + "console.warn('[probe] icon='+getComputedStyle("
+                + "document.querySelector('i')).fontFamily);",
+            }
+        ],
+    )
+    report = _debug_report(live_server, pid)
+    entry = _libs_for(report, "icons")
+    ph = [lib for lib in entry.get("libs") or [] if lib.get("name") == "ph-regular"]
+    assert ph and ph[0].get("injected") is True, f"icon font not inlined: {entry}"
+    assert ph[0].get("inferred") is True and ph[0].get("matched")
+    probes = _probe_values(report["diagnostics"])
+    # The :root rule is the element's FIRST: injected CSS used to swallow it,
+    # emptying every variable it declared while the rest of the sheet applied.
+    assert "[probe] k0=#000" in probes
+    assert any("icon=Phosphor" in p for p in probes), probes
+    # And nothing was lost from either composed stylesheet.
+    assert not [c for c in report["diagnostics"].get("css") or [] if c.get("el") == "icons"]
+
+
+def test_autolibs_false_injects_nothing(live_server: str) -> None:
+    """The opt-out: an element that hand-authors its markup takes no ambient
+    stylesheet, however its code reads."""
+    pid = _page_with(
+        live_server,
+        [
+            {
+                "id": "bare",
+                "kind": "code",
+                "x": 0,
+                "y": 0,
+                "w": 300,
+                "h": 200,
+                "autolibs": False,
+                "css": "#t{font-family:'Inter'}",
+                "html": "<div id='t'><i class='ph ph-heart'></i></div>",
+                "js": "console.warn('[probe] icon='+getComputedStyle("
+                "document.querySelector('i')).fontFamily);",
+            }
+        ],
+    )
+    report = _debug_report(live_server, pid)
+    entry = _libs_for(report, "bare")
+    assert entry.get("autolibs") is False
+    assert not entry.get("libs"), f"autolibs:false still injected {entry}"
+    assert not any("icon=Phosphor" in p for p in _probe_values(report["diagnostics"]))
+
+
+def test_dropped_authored_rule_is_reported(live_server: str) -> None:
+    """A rule missing from the stylesheet the sandbox actually composed is named
+    in diagnostics.css. This is the signal that was absent while injected CSS
+    was eating authored rules."""
+    pid = _page_with(
+        live_server,
+        [
+            {
+                "id": "dropped",
+                "kind": "code",
+                "x": 0,
+                "y": 0,
+                "w": 300,
+                "h": 200,
+                "css": ":root{--k0:#000}\n#t @@ nonsense {color:red}\n#t{color:var(--k0)}",
+                "html": "<div id='t'>x</div>",
+                "js": _PROBE,
+            }
+        ],
+    )
+    report = _debug_report(live_server, pid)
+    css = [c for c in report["diagnostics"].get("css") or [] if c.get("el") == "dropped"]
+    assert any("nonsense" in c.get("selector", "") for c in css), css
+    # The valid rules around it still applied.
+    assert _probe_values(report["diagnostics"]) == ["[probe] k0=#000"]
 
 
 def test_debug_report_is_deterministic_across_runs(live_server: str) -> None:
