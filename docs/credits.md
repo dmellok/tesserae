@@ -36,6 +36,7 @@ live in `plugins/fonts_core/static/`.
 | [Outfit](https://fonts.google.com/specimen/Outfit) | Smith | OFL |
 | [Space Grotesk](https://fonts.google.com/specimen/Space+Grotesk) | Florian Karsten | OFL |
 | [Space Mono](https://fonts.google.com/specimen/Space+Mono) | Colophon Foundry | OFL |
+| [TRMNL12 / TRMNL16 / TRMNL21](https://trmnl.com/font-family) | [Heavyweight Digital Type Foundry](https://heavyweight-type.com) | OFL |
 
 ## Upstream protocols and reference clients
 

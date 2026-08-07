@@ -4,6 +4,21 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.275.0], 2026-08-07
+
+### Added
+
+- **Three pixel fonts: TRMNL12, TRMNL16 and TRMNL21.** Core fonts
+  (`fonts_core` 0.6.0) gains a three-family pixel set drawn by Heavyweight
+  Digital Type Foundry, Regular and Bold in each, bringing the bundled set to
+  39 families. Each family is drawn on a pixel grid at its named height, so set
+  it at 12px, 16px or 21px, or an integer multiple, to keep the strokes on
+  whole pixels; off-grid sizes resample and soften, which shows up badly once a
+  panel quantises to 1-bit. Available anywhere the other bundled fonts are,
+  including by family name inside a code element. Vendored as woff2 under the
+  SIL Open Font License 1.1, with the licence text alongside each family in
+  `plugins/fonts_core/static/`.
+
 ## [0.274.2], 2026-08-07
 
 ### Fixed
