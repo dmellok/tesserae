@@ -4,6 +4,17 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.274.2], 2026-08-07
+
+### Fixed
+
+- **The top navigation highlights the section you're in on every settings
+  page.** Firmware, Cloud relay and the new Companion app page aren't
+  `settings_area` routes, and the nav matched an explicit list of endpoints,
+  so on those three pages nothing was highlighted at all: the current section
+  rendered in ordinary body text rather than the accent. The nav now matches
+  the settings area by path, so a page added later can't drop out of it.
+
 ## [0.274.1], 2026-08-07
 
 ### Fixed

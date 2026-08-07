@@ -201,8 +201,13 @@
         </div>
       </details>
       {% endif %}
+      {# Match the whole settings area by path rather than listing endpoints:
+         the standalone pages (Firmware, Cloud relay, Companion app) are not
+         ``settings_area`` routes, so an endpoint list silently left the nav
+         with nothing highlighted on those pages, and a new one would keep
+         reintroducing it. #}
       <a href="{{ url_for('auth.settings') }}"
-         class="{% if request.endpoint in ('auth.settings', 'auth.settings_area') or request.blueprint == 'events' %}is-active{% endif %}">
+         class="{% if (request.blueprint == 'auth' and request.path.startswith('/settings')) or request.blueprint == 'events' %}is-active{% endif %}">
          <i class="ph ph-gear-six" aria-hidden="true"></i><span>Settings</span>
       </a>
       {% if update_status is defined and update_status.available %}

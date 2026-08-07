@@ -6,6 +6,7 @@ renderer manifests, and the form-driven update path."""
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -1327,3 +1328,41 @@ def test_devices_reveal_token_stashes_in_session_and_logs(app_with_gate: Flask) 
     # Full token appears in the page (modal). Just check a substring so
     # the test doesn't drift if the modal HTML wrapping changes.
     assert token in body
+
+
+# -- topnav highlighting ---------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/settings/server",
+        "/settings/devices",
+        "/settings/firmware",
+        "/settings/relay",
+        "/settings/companion",
+    ],
+)
+def test_settings_pages_highlight_the_settings_nav_item(app_with_gate: Flask, path: str) -> None:
+    """Every page in the settings area marks Settings as the current section.
+
+    The standalone pages (Firmware, Cloud relay, Companion app) aren't
+    ``settings_area`` routes, so an endpoint-list check left the whole nav
+    unhighlighted there: the current section rendered in ordinary body text
+    instead of the accent, with nothing to show where you were.
+    """
+    client = app_with_gate.test_client()
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+    body = client.get(path).get_data(as_text=True)
+    settings_link = re.search(r'<a href="/settings"[^>]*>', body)
+    assert settings_link is not None, "settings nav link missing"
+    assert "is-active" in settings_link.group(0), f"{path} left the nav unhighlighted"
+
+
+def test_non_settings_page_does_not_highlight_settings(app_with_gate: Flask) -> None:
+    client = app_with_gate.test_client()
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+    body = client.get("/send").get_data(as_text=True)
+    settings_link = re.search(r'<a href="/settings"[^>]*>', body)
+    assert settings_link is not None
+    assert "is-active" not in settings_link.group(0)
