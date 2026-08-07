@@ -109,6 +109,84 @@ def test_downsamples_and_clamps_hours(app: Flask, monkeypatch) -> None:
     assert len(vals) <= 80 and vals[0] == 0.0 and vals[-1] == 499.0
 
 
+def _stamped(values: list[float], start: str, step_minutes: int) -> list[dict[str, str]]:
+    """History samples with real UTC timestamps, ``step_minutes`` apart."""
+    from datetime import datetime, timedelta
+
+    t0 = datetime.fromisoformat(start)
+    return [
+        {
+            "state": str(v),
+            "last_changed": (t0 + timedelta(minutes=i * step_minutes)).isoformat(),
+        }
+        for i, v in enumerate(values)
+    ]
+
+
+def test_axis_labels_are_clock_times_within_a_day(app: Flask, monkeypatch) -> None:
+    """#196: the x-axis was labelled with sample ordinals (1, 10, 19, …),
+    which say nothing about when a reading was taken. A day-or-less window
+    labels in clock time, one label per plotted point."""
+    hist, core = _mods(app)
+    samples = _stamped([10.0, 11.0, 12.0, 13.0], "2026-08-07T06:00:00+00:00", 60)
+    with app.app_context():
+        app.config["SETTINGS_STORE"].patch_section("app", {"timezone": "UTC"})
+        monkeypatch.setattr(core, "get_states", lambda: _STATES)
+        monkeypatch.setattr(core, "history", lambda eid, hours=24: samples)
+        item = hist.fetch({"entities": "sensor.temp", "hours": 12}, {}, ctx={})["items"][0]
+
+    assert item["times"] == ["06:00", "07:00", "08:00", "09:00"]
+    assert len(item["times"]) == len(item["values"])
+
+
+def test_axis_labels_coarsen_with_the_window(app: Flask, monkeypatch) -> None:
+    """A multi-day window can't read as clock time alone: past three days
+    the axis carries the date instead."""
+    hist, core = _mods(app)
+    samples = _stamped([1.0, 2.0, 3.0], "2026-08-05T09:00:00+00:00", 60 * 24)
+    with app.app_context():
+        app.config["SETTINGS_STORE"].patch_section("app", {"timezone": "UTC"})
+        monkeypatch.setattr(core, "get_states", lambda: _STATES)
+        monkeypatch.setattr(core, "history", lambda eid, hours=24: samples)
+        item = hist.fetch({"entities": "sensor.temp", "window": "168"}, {}, ctx={})["items"][0]
+
+    assert item["times"] == ["5 Aug", "6 Aug", "7 Aug"]
+
+
+def test_axis_labels_stay_aligned_after_downsampling(app: Flask, monkeypatch) -> None:
+    """Downsampling picks indexes, so each surviving value keeps its own
+    timestamp: a label that described a discarded sample would be worse
+    than no label at all."""
+    hist, core = _mods(app)
+    samples = _stamped([float(i) for i in range(500)], "2026-08-07T00:00:00+00:00", 1)
+    with app.app_context():
+        app.config["SETTINGS_STORE"].patch_section("app", {"timezone": "UTC"})
+        monkeypatch.setattr(core, "get_states", lambda: _STATES)
+        monkeypatch.setattr(core, "history", lambda eid, hours=24: samples)
+        item = hist.fetch({"entities": "sensor.temp", "hours": 12}, {}, ctx={})["items"][0]
+
+    assert len(item["times"]) == len(item["values"]) <= 80
+    # Sample n was taken n minutes after midnight, so each kept value
+    # names the minute it was recorded.
+    for value, label in zip(item["values"], item["times"], strict=True):
+        minutes = int(value)
+        assert label == f"{minutes // 60:02d}:{minutes % 60:02d}"
+
+
+def test_axis_labels_absent_without_timestamps(app: Flask, monkeypatch) -> None:
+    """History with no usable timestamps reports no labels rather than
+    inventing them; the client falls back to ordinals."""
+    hist, core = _mods(app)
+    with app.app_context():
+        monkeypatch.setattr(core, "get_states", lambda: _STATES)
+        monkeypatch.setattr(
+            core, "history", lambda eid, hours=24: [{"state": str(v)} for v in (1, 2, 3)]
+        )
+        item = hist.fetch({"entities": "sensor.temp", "hours": 12}, {}, ctx={})["items"][0]
+
+    assert item["times"] == []
+
+
 def test_composer_mounts_widget(client: FlaskClient) -> None:
     resp = client.get("/_test/render?plugin=ha_history&size=md")
     assert resp.status_code == 200

@@ -444,13 +444,24 @@ export function lineChart(canvas, opts) {
           ticks: {
             color: t.textMuted,
             font: { family: t.fontFamily, weight: 700, size: 10 },
-            autoSkip: true, maxRotation: 0,
+            // autoSkip off: the callback below already decides which
+            // labels show, sized to the width on offer. Leaving it on
+            // meant two thinning passes fighting each other, and a wide
+            // label (a date) came out of both with two ticks left.
+            autoSkip: false, maxRotation: 0,
             callback(value, index) {
               const lbl = this.getLabelForValue(value);
               const total = opts.values.length;
               // Show roughly 6 labels evenly across the axis so a long
-              // series doesn't get one tick per point.
-              const stride = Math.max(1, Math.floor(total / 6));
+              // series doesn't get one tick per point, and fewer than
+              // that when the labels are wide (dates, weekday + clock)
+              // for the width on offer. Chart.js's own autoSkip measures
+              // only non-empty ticks, and every tick this callback hides
+              // is empty, so the spacing has to be decided here.
+              const area = (this.chart && this.chart.chartArea || {}).width || 0;
+              const approxPx = String(lbl).length * 6 + 12;
+              const fit = area > 0 ? Math.floor(area / approxPx) : 6;
+              const stride = Math.max(1, Math.ceil(total / Math.max(2, Math.min(6, fit))));
               return index % stride === 0 ? lbl : "";
             },
           },

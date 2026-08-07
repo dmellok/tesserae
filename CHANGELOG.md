@@ -4,6 +4,29 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.277.0], 2026-08-08
+
+### Fixed
+
+- **Toggling a dashboard's status bar keeps you in the editor** (#197). The
+  switch posts a native form (it restructures the layout, so the page has to
+  reload), and the redirect afterwards followed the `Referer` header. Behind a
+  proxy that strips it, Home Assistant's ingress among them, there was nothing
+  to follow and the browser landed on the dashboard list: the toggle had saved,
+  but the editing session looked thrown away. Every editor save route now
+  redirects to the dashboard it just changed.
+- **The history widget shows the Title you gave it** (#196). A single-entity
+  card printed the entity's friendly name in the heading and ignored the cell's
+  Title option; the option worked only when the card listed several entities. A
+  blank Title still falls back to the entity name.
+- **The history chart's x-axis carries times instead of sample numbers**
+  (#196). The axis was labelled with the ordinal of each plotted point (1, 10,
+  19, 26, …), which reads as data but says nothing about when a reading was
+  taken. It now labels in the app's timezone at a resolution the window can
+  carry: clock time within a day, weekday plus clock time up to three days, and
+  the date beyond that. Labels are spaced to the width available, so a wide date
+  label thins the axis rather than colliding.
+
 ## [0.276.0], 2026-08-08
 
 ### Fixed

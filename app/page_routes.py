@@ -291,11 +291,22 @@ def _cell_options_from_form(plugin: Plugin, form: Any) -> dict[str, Any]:
 
 def _flash_save(ok: bool, message: str) -> Response:
     """Return value for autosave endpoints: JSON for fetch callers, a
-    redirect for native form submits (e.g. JS-disabled fallback)."""
+    redirect for native form submits (e.g. the status bar toggle, which
+    posts natively because it restructures the layout).
+
+    Every caller is a ``/<page_id>/...`` route, so the redirect goes to
+    that page's editor rather than wherever ``Referer`` happens to point.
+    A missing Referer sent the browser to the dashboard LIST, which is
+    what a reverse proxy that strips the header (Home Assistant ingress)
+    produces: the toggle saved correctly and then threw the editor away.
+    """
     is_xhr = (request.headers.get("X-Requested-With") or "").lower() == "fetch"
     if is_xhr:
         return jsonify({"ok": ok, "message": message})
     flash(message, "ok" if ok else "error")
+    page_id = (request.view_args or {}).get("page_id")
+    if page_id:
+        return redirect(url_for("pages.edit", page_id=page_id))
     return redirect(request.referrer or url_for("pages.index"))
 
 

@@ -28,13 +28,16 @@ function escapeHtml(s) {
   }[c]));
 }
 
-function renderSingle(item, hours) {
+// ``title`` is the cell's own Title option; the server falls it back to
+// the entity's friendly name when the user left it blank, so this heading
+// honours a custom title instead of always printing the entity name.
+function renderSingle(item, hours, title) {
   const trendAccent = TREND_ACCENT[item.trend] || TREND_ACCENT.flat;
   const trendPh = TREND_ICON[item.trend] || TREND_ICON.flat;
   return `
     <div class="w-title">
       <i class="ph-bold ph-chart-line-up" style="color:${trendAccent}"></i>
-      <h3>${escapeHtml(item.name)}</h3>
+      <h3>${escapeHtml(title || item.name)}</h3>
       <span class="w-title-meta">${hours}H</span>
     </div>
     <div class="w-body" style="gap:var(--space-2)">
@@ -138,7 +141,7 @@ export default function render(shadow, ctx) {
       ? '<div class="w-body"><div style="flex:1 1 auto;min-height:0;position:relative"><canvas></canvas></div></div>'
       : '<div class="w-body"><p class="u-muted">No chart for this selection.</p></div>';
   } else {
-    body = single ? renderSingle(items[0], hours) : renderMulti(items, title, hours);
+    body = single ? renderSingle(items[0], hours, title) : renderMulti(items, title, hours);
   }
   shadow.innerHTML = `
     ${css}
@@ -192,9 +195,17 @@ export default function render(shadow, ctx) {
         color: t.accent1,
       } : null;
 
+      // Clock times / dates from the server (one per plotted point, in the
+      // app's timezone). Sample ordinals are the fallback for history with
+      // no usable timestamps; they say nothing about when, so they're the
+      // last resort rather than the default.
+      const axis = Array.isArray(item.times) && item.times.length === item.values.length
+        ? item.times
+        : item.values.map((_, i) => `${i + 1}`);
+
       lineChart(canvas, {
         tokens: t,
-        labels: item.values.map((_, i) => `${i + 1}`),
+        labels: axis,
         values: item.values,
         color: accent,
         markers,

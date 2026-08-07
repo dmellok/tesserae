@@ -60,12 +60,15 @@ def _fmt_num(value: float, fmt: str = "") -> str:
     return f"{round(value, 2):g}"
 
 
-def _downsample(values: list[float], cap: int = _MAX_POINTS) -> list[float]:
-    n = len(values)
+def _keep_indices(n: int, cap: int = _MAX_POINTS) -> list[int]:
+    """Which sample indexes survive downsampling to ``cap`` points, evenly
+    spread. Returned as indexes (not values) so the timestamps ride along
+    with the values they belong to: the x-axis labels have to describe the
+    points the chart actually plots."""
     if n <= cap:
-        return values
+        return list(range(n))
     step = (n - 1) / (cap - 1)
-    return [values[round(i * step)] for i in range(cap)]
+    return [round(i * step) for i in range(cap)]
 
 
 def _clamp_hours(raw: Any) -> int:
@@ -95,25 +98,64 @@ def _trend(values: list[float]) -> str:
     return "up" if delta > 0 else "down"
 
 
+def _parse_dt(raw: Any) -> Any:
+    """A HA history timestamp as an aware datetime, or None. HA sends UTC
+    ISO strings; a naive one is read as UTC rather than guessed at."""
+    from datetime import UTC, datetime
+
+    if not raw:
+        return None
+    try:
+        dt = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    return dt.replace(tzinfo=UTC) if dt.tzinfo is None else dt
+
+
+def _axis_labels(stamps: list[Any], hours: int) -> list[str]:
+    """One x-axis label per plotted sample, in the app's timezone, at a
+    resolution the window can carry: clock time within a day, weekday +
+    clock time up to three days, calendar date beyond that. The chart used
+    to label the axis with sample ordinals (1, 10, 19, …), which read as
+    data and told the viewer nothing about when anything happened.
+
+    All or nothing: one unparseable stamp returns [] and the client keeps
+    its ordinal fallback, rather than shipping an axis that's right for
+    part of the series and wrong for the rest.
+    """
+    from app.tz_resolve import app_timezone
+
+    zone = app_timezone()
+    out: list[str] = []
+    for raw in stamps:
+        dt = _parse_dt(raw)
+        if dt is None:
+            return []
+        local = dt.astimezone(zone)
+        if hours <= 24:
+            out.append(f"{local:%H:%M}")
+        elif hours <= 72:
+            out.append(f"{local:%a %H:%M}")
+        else:
+            # Day number formatted separately: "%-d" is not portable to
+            # Windows, and "%d" would zero-pad.
+            out.append(f"{local.day} {local:%b}")
+    return out
+
+
 def _hourly_profile(samples: list[dict[str, Any]]) -> list[float | None]:
     """Average value by hour-of-day across the entire window. Returns 24
     floats (or None for hours with no samples). Used by the client to
     overlay a "what does an average day at this hour look like?" ghost
     line on top of the live series. Worth computing only when the
     window is long enough to span multiple days (caller decides)."""
-    from datetime import datetime
-
     buckets: list[list[float]] = [[] for _ in range(24)]
     for s in samples:
         value = _to_float(s.get("state"))
         if value is None:
             continue
-        ts = s.get("last_changed") or s.get("last_updated")
-        if not ts:
-            continue
-        try:
-            dt = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
-        except (TypeError, ValueError):
+        dt = _parse_dt(s.get("last_changed") or s.get("last_updated"))
+        if dt is None:
             continue
         buckets[dt.hour].append(value)
     out: list[float | None] = []
@@ -150,7 +192,15 @@ def _series_for(
         current = _fmt_num(current_f, fmt) if current_f is not None else raw_state
 
     samples = core.history(eid, hours=hours)
-    values = [v for v in (_to_float(s.get("state")) for s in samples) if v is not None]
+    # Carry each sample's timestamp alongside its value so the chart can
+    # label its x-axis with real times.
+    pairs: list[tuple[Any, float]] = []
+    for s in samples:
+        value = _to_float(s.get("state"))
+        if value is None:
+            continue
+        pairs.append((s.get("last_changed") or s.get("last_updated"), value))
+    values = [v for _, v in pairs]
     if len(values) < 2:
         return {
             "name": name,
@@ -165,11 +215,13 @@ def _series_for(
     # three days, otherwise the per-hour averages are too noisy to
     # carry meaning.
     profile = _hourly_profile(samples) if hours >= 72 else []
-    values = _downsample(values)
+    keep = _keep_indices(len(pairs))
+    pairs = [pairs[i] for i in keep]
     # Round each sample to 2 decimals so the chart's tooltip / axis
     # labels stay clean (the chart itself just plots floats so the
     # rounding is purely cosmetic at the client layer).
-    values = [round(v, 2) for v in values]
+    values = [round(v, 2) for _, v in pairs]
+    times = _axis_labels([ts for ts, _ in pairs], hours)
     # Find the min/max INDEX so the client can mark them as dots on
     # the line. Use the downsampled series so indexes line up with
     # what the chart plots.
@@ -181,6 +233,9 @@ def _series_for(
         "unit": unit,
         "current": current or _fmt_num(values[-1], fmt),
         "values": values,
+        # One label per plotted point; empty when the history carried no
+        # usable timestamps, which the client reads as "no time axis".
+        "times": times,
         "min": _fmt_num(lo, fmt),
         "max": _fmt_num(hi, fmt),
         "min_idx": min_idx,

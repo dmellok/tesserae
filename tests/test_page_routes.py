@@ -571,6 +571,24 @@ def test_status_bar_toggle_hides_native_checkbox_behind_switch(app: Flask, tmp_p
     assert 'class="form form--inline dx-status-bar-switch field--switch"' in body
 
 
+def test_status_bar_toggle_returns_to_the_editor_without_a_referer(
+    app: Flask, tmp_path: Path
+) -> None:
+    """#197: the toggle posts natively, and the redirect used to follow
+    ``Referer``. Behind a proxy that strips it (HA ingress) that landed the
+    user on the dashboard LIST, so flipping the switch looked like it had
+    thrown the editing session away. The redirect names the page instead."""
+    client = app.test_client()
+    _sign_in(client)
+    pid = _new(client, name="Home", layout="1_cell")
+
+    resp = client.post(f"/pages/{pid}/status-bar/toggle", data={})
+
+    assert resp.status_code == 302
+    assert resp.headers["Location"].endswith(f"/pages/{pid}")
+    assert _store(tmp_path).get(pid).status_bar_enabled is True
+
+
 def test_status_bar_toggle_inserts_cell_and_rescales(app: Flask, tmp_path: Path) -> None:
     """Flipping the status-bar switch on prepends a tesserae_status cell
     at (0, 0, panel.w, 48) and shifts + rescales existing cells into

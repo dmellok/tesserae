@@ -221,6 +221,11 @@ def _ha_history() -> dict[str, Any]:
 
         return [round(base + amp * math.sin(phase + i / n * math.pi * 2), 2) for i in range(n)]
 
+    # Clock labels matching the curve length: the chart's x-axis plots
+    # these, so a sample without them would preview an axis the real
+    # widget no longer draws.
+    times = [f"{(i // 2) % 24:02d}:{(i % 2) * 30:02d}" for i in range(48)]
+
     return {
         "title": "History",
         "hours": 24,
@@ -230,6 +235,7 @@ def _ha_history() -> dict[str, Any]:
                 "unit": "°C",
                 "current": "20.5",
                 "values": _curve(20.4, 0.9, 0.4),
+                "times": times,
                 "min": "19.5",
                 "max": "21.3",
                 "trend": "up",
@@ -240,6 +246,7 @@ def _ha_history() -> dict[str, Any]:
                 "unit": "%",
                 "current": "48",
                 "values": _curve(48, 4.0, 1.8),
+                "times": times,
                 "min": "44",
                 "max": "52",
                 "trend": "flat",
