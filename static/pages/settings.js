@@ -437,7 +437,8 @@
       select.disabled = true;
     }
 
-    fetch('/settings/devices/ha-devices.json?integration=' + encodeURIComponent(integration))
+    fetch((window.TESSERAE_URL_PREFIX || '') +
+      '/settings/devices/ha-devices.json?integration=' + encodeURIComponent(integration))
       .then(function (r) { return r.json(); })
       .then(function (data) {
         const devices = (data && data.devices) || [];

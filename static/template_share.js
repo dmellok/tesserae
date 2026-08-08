@@ -10,6 +10,12 @@
 (function () {
   "use strict";
 
+  // Every URL here has to carry the app's script root: under the Home
+  // Assistant App the editor is served beneath /api/hassio_ingress/<token>/
+  // (same for any reverse proxy on a subpath), so a bare "/panels/..." leaves
+  // Tesserae entirely and the reply is never JSON.
+  var PREFIX = window.TESSERAE_URL_PREFIX || "";
+
   var btn = document.getElementById("panels-share");
   if (!btn) return;
   var host = document.querySelector("[data-canvas-id]");
@@ -32,6 +38,35 @@
 
   function close() {
     if (overlay) { overlay.remove(); overlay = null; }
+  }
+
+  // POST and parse JSON, keeping a transport failure distinct from a reply
+  // that isn't JSON at all: a login redirect after the session expired, a
+  // proxy error page, or the plain-text 404 the share routes return when the
+  // templates experiment is off. Rejects with a message worth showing.
+  function postJson(path, payload) {
+    var init = { method: "POST" };
+    if (payload !== undefined) {
+      init.headers = { "Content-Type": "application/json" };
+      init.body = JSON.stringify(payload);
+    }
+    return fetch(PREFIX + path, init).then(
+      function (resp) {
+        return resp.text().then(function (text) {
+          var body = null;
+          try { body = JSON.parse(text); } catch (err) { body = null; }
+          if (!body || typeof body !== "object") {
+            throw new Error(
+              "the server replied " + resp.status + " " + (resp.statusText || "") +
+              " instead of JSON" +
+              (resp.redirected ? " (redirected to " + resp.url + "; the session may have expired)" : "")
+            );
+          }
+          return { ok: resp.ok, body: body };
+        });
+      },
+      function () { throw new Error("couldn't reach the server"); }
+    );
   }
 
   function open(prep) {
@@ -94,7 +129,7 @@
 
     var img = el("img", { alt: "Preview" });
     img.style.cssText = "max-width:100%;border:1px solid var(--t-border,#ddd);border-radius:8px;margin:8px 0";
-    img.src = "/pages/canvas/c/" + canvasId + "/preview.png?t=" + Date.now();
+    img.src = PREFIX + "/pages/canvas/c/" + canvasId + "/preview.png?t=" + Date.now();
     card.appendChild(img);
 
     // Quality warnings from the headless render report.
@@ -182,16 +217,12 @@
           choices: spec.choices || [], targets: spec.targets,
         };
       });
-      fetch("/panels/c/" + canvasId + "/share/submit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: title.value,
-          description: desc.value,
-          tags: tags.value.split(",").map(function (t) { return t.trim(); }).filter(Boolean),
-          inputs: chosen,
-        }),
-      }).then(function (resp) { return resp.json().then(function (b) { return { ok: resp.ok, body: b }; }); })
+      postJson("/panels/c/" + canvasId + "/share/submit", {
+        title: title.value,
+        description: desc.value,
+        tags: tags.value.split(",").map(function (t) { return t.trim(); }).filter(Boolean),
+        inputs: chosen,
+      })
         .then(function (r) {
           if (!r.ok) {
             status.textContent = "Couldn't submit: " + (r.body.error || "unknown error");
@@ -203,8 +234,8 @@
           submit.remove();
           cancel.textContent = "Done";
         })
-        .catch(function () {
-          status.textContent = "Couldn't submit: network error";
+        .catch(function (err) {
+          status.textContent = "Couldn't submit: " + ((err && err.message) || "unknown error");
           submit.disabled = false;
         });
     });
@@ -216,12 +247,15 @@
 
   btn.addEventListener("click", function () {
     btn.classList.add("is-disabled");
-    fetch("/panels/c/" + canvasId + "/share/prepare", { method: "POST" })
-      .then(function (resp) { return resp.json(); })
-      .then(function (prep) { btn.classList.remove("is-disabled"); open(prep); })
-      .catch(function () {
+    postJson("/panels/c/" + canvasId + "/share/prepare")
+      .then(function (r) {
         btn.classList.remove("is-disabled");
-        alert("Couldn't prepare the share dialog; is the server reachable?");
+        if (!r.ok) throw new Error(r.body.error || "the server returned an error");
+        open(r.body);
+      })
+      .catch(function (err) {
+        btn.classList.remove("is-disabled");
+        alert("Couldn't prepare the share dialog: " + ((err && err.message) || "unknown error"));
       });
   });
 })();

@@ -4,6 +4,23 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.277.1], 2026-08-08
+
+### Fixed
+
+- **Sharing a community template works under Home Assistant ingress.** The
+  Share dialog, the community-templates catalog, and template install all
+  requested root-relative paths, so under ingress (or any reverse proxy on a
+  subpath) they left the app and hit the host root instead. The reply was never
+  JSON, and Share reported "Couldn't prepare the share dialog; is the server
+  reachable?" on a perfectly reachable server. All of these URLs now carry the
+  script root, as the rest of the UI already did.
+- **Share failures say what went wrong.** A non-JSON reply is now reported with
+  its status code, and a redirect to the login page is named as a likely
+  expired session, instead of both being labelled as an unreachable server.
+- The Home Assistant device picker in Settings also requested an unprefixed
+  path, so its device list stayed empty under ingress.
+
 ## [0.277.0], 2026-08-08
 
 ### Fixed

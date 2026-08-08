@@ -9,6 +9,12 @@
 (function () {
   "use strict";
 
+  // The app's script root, empty outside a subpath deployment. Under the Home
+  // Assistant App every one of these URLs sits beneath
+  // /api/hassio_ingress/<token>/, so a bare "/plugins/..." misses Tesserae.
+  // (``preview_url`` is already absolutised to the API host server-side.)
+  var PREFIX = window.TESSERAE_URL_PREFIX || "";
+
   var grid = document.getElementById("tpl-market-groups");
   if (!grid) return;
 
@@ -61,7 +67,7 @@
       });
       note.appendChild(el("div", { text: "Needs these marketplace items first:" }));
       missing.forEach(function (id) {
-        var link = el("a", { href: "/plugins/browse?q=" + encodeURIComponent(id), text: id, style: "margin-right:8px" });
+        var link = el("a", { href: PREFIX + "/plugins/browse?q=" + encodeURIComponent(id), text: id, style: "margin-right:8px" });
         note.appendChild(link);
       });
       card.appendChild(note);
@@ -87,7 +93,7 @@
     form.appendChild(slugField);
     card.appendChild(form);
 
-    fetch("/plugins/templates/" + encodeURIComponent(entry.slug) + "/inputs")
+    fetch(PREFIX + "/plugins/templates/" + encodeURIComponent(entry.slug) + "/inputs")
       .then(function (resp) {
         if (!resp.ok) throw new Error("inputs");
         return resp.text();
@@ -124,7 +130,7 @@
     go.addEventListener("click", function () {
       go.disabled = true;
       status.textContent = "Installing…";
-      fetch("/plugins/templates/install", { method: "POST", body: new FormData(form) })
+      fetch(PREFIX + "/plugins/templates/install", { method: "POST", body: new FormData(form) })
         .then(function (resp) { return resp.json().then(function (b) { return { ok: resp.ok, body: b }; }); })
         .then(function (r) {
           if (!r.ok) {
@@ -133,7 +139,8 @@
             return;
           }
           status.textContent = "Installed. Opening the editor…";
-          location.href = r.body.page_url || ("/pages/canvas/c/" + r.body.page_id);
+          // page_url comes from url_for() and already carries the script root.
+          location.href = r.body.page_url || (PREFIX + "/pages/canvas/c/" + r.body.page_id);
         })
         .catch(function () { status.textContent = "Install failed: network error"; go.disabled = false; });
     });
@@ -152,7 +159,7 @@
       if (reason === null) return;
       report.disabled = true;
       status.textContent = "Sending report…";
-      fetch("/plugins/templates/report", {
+      fetch(PREFIX + "/plugins/templates/report", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ slug: entry.slug, reason: reason }),
@@ -269,7 +276,7 @@
   }
 
   var config = readConfig();
-  fetch("/plugins/templates/index.json")
+  fetch(PREFIX + "/plugins/templates/index.json")
     .then(function (resp) { return resp.json().then(function (b) { return { ok: resp.ok, body: b }; }); })
     .then(function (r) {
       if (!r.ok) {

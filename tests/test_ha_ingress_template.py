@@ -64,6 +64,23 @@ def test_url_prefix_reflects_ingress_header(app: Flask) -> None:
     assert 'window.TESSERAE_URL_PREFIX = "/api/hassio_ingress/abc123";' in body
 
 
+def test_static_js_prefixes_root_relative_requests() -> None:
+    """A root-relative ``fetch("/...")`` in shipped JS leaves the app entirely
+    under HA Ingress (the request lands on the HA host root, which answers with
+    its own page, so the caller's ``resp.json()`` throws and the UI reports the
+    server as unreachable). Every request URL must carry
+    ``window.TESSERAE_URL_PREFIX``. Vendored libraries are exempt."""
+    offenders: list[str] = []
+    for path in sorted((REPO_ROOT / "static").rglob("*.js")):
+        if "vendor" in path.parts:
+            continue
+        for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            for call in ("fetch('/", 'fetch("/', "fetch(`/", "EventSource('/", 'EventSource("/'):
+                if call in line:
+                    offenders.append(f"{path.relative_to(REPO_ROOT)}:{lineno}: {line.strip()}")
+    assert not offenders, "root-relative request URLs break HA Ingress:\n" + "\n".join(offenders)
+
+
 def test_broker_settings_card_hides_embedded_fields_under_ha(app: Flask) -> None:
     """Under HA the bundled Mosquitto add-on already owns 1883; offering a
     second broker on the same host is a footgun. The Settings → MQTT
