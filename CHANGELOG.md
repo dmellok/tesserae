@@ -4,6 +4,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.278.2], 2026-08-08
+
+### Changed
+
+- **Click a canvas dashboard's name to rename it.** Rename already existed
+  behind the pencil in the switcher menu, but that menu is where you go to open
+  a *different* dashboard, so the name in the toolbar is what people reach for
+  first. It now opens the same rename prompt.
+
 ## [0.278.1], 2026-08-08
 
 ### Fixed

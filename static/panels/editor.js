@@ -3383,6 +3383,14 @@
     if (canvasBtn) canvasBtn.addEventListener("click", function (ev) {
       ev.stopPropagation(); toggleCanvasMenu(canvasBtn);
     });
+    // The title renames this dashboard. Rename also lives behind the pencil in
+    // the switcher menu, but that's where you look to open ANOTHER dashboard,
+    // so the name on screen is the thing people try first.
+    var titleEl = $("panels-title");
+    if (titleEl) titleEl.addEventListener("click", function (ev) {
+      ev.stopPropagation();
+      renameCanvas({ id: S.cfg.canvasId, name: (S.doc && S.doc.name) || "" });
+    });
     var psearch = $("panels-palette-search");
     if (psearch) psearch.addEventListener("input", function () {
       S.pq = psearch.value.trim().toLowerCase();
