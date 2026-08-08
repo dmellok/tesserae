@@ -4,6 +4,26 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.282.0], 2026-08-09
+
+### Added
+
+- **Palette calibration for 4-colour BWRY panels** (#201). `bwry_4` was the one
+  supported gamut with no palette-profile family, so the Calibration tab hid
+  itself on a PicPak and frames were always dithered against ideal sRGB
+  primaries the ink cannot reach: its yellow is a dark mustard, so error
+  diffusion spent yellow on highlights the panel never delivers. The gamut now
+  has a measured palette and two presets, **Nominal BWRY** (the default, which
+  renders identically to no profile, so nothing restyles itself) and **PicPak
+  Calibrated**. The palette editor drops the blue and green swatches for these
+  panels, and the palette-swatch test pattern stops painting two inks a BWRY
+  panel doesn't have. Calibration measured on a physical PicPak 4.2" panel by
+  [varanu5](https://github.com/varanu5); see NOTICES.md.
+- Switching on a PicPak's **Calibrated palette + tone mapping** toggle now
+  applies the measured palette. The toggle has been offered on these panels all
+  along and quietly did nothing, since there was no BWRY calibration data to
+  apply. It stays off by default.
+
 ## [0.281.0], 2026-08-09
 
 ### Fixed

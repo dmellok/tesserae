@@ -1538,9 +1538,7 @@ def test_compose_is_never_cacheable(app: Flask) -> None:
     _sign_in(client)
     pid = _new(client, name="Home", layout="2x2_grid")
     for query in ("?preview=1", "?for_push=1", ""):
-        resp = client.get(
-            f"/compose/{pid}{query}", environ_overrides={"REMOTE_ADDR": "10.0.0.5"}
-        )
+        resp = client.get(f"/compose/{pid}{query}", environ_overrides={"REMOTE_ADDR": "10.0.0.5"})
         assert resp.status_code == 200, query
         assert "no-store" in resp.headers.get("Cache-Control", ""), query
 

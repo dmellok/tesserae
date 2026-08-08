@@ -498,15 +498,18 @@ def _palette_profile_slug_for(device: Device) -> str:
     store.
 
     Self-heals for panels whose gamut has a matching profile family
-    (spectra6 / inky_7colour): when the stored slug is empty OR points
-    at a profile that no longer resolves, backfill the family's
+    (spectra6 / inky_7colour / bwry_4): when the stored slug is empty OR
+    points at a profile that no longer resolves, backfill the family's
     default bundled slug and persist it. This keeps the Calibration
     tab's tone / palette section rendered across saves that would
     otherwise leave the slug in a broken state (issue #52 follow-up,
     the "section vanishes after saving a slider" symptom).
 
-    Devices whose gamut has no matching family (mono, bwry_4, rgb24,
-    rgb16) still return "" so the section stays hidden as intended.
+    Devices whose gamut has no matching family (mono, rgb24, rgb16)
+    still return "" so the section stays hidden as intended. ``bwry_4``
+    joined the families with profiles in v0.282.0, and self-heals to its
+    NOMINAL preset, which renders identically to no profile at all, so
+    unlocking the tab doesn't restyle a PicPak that already looks right.
     """
     raw = settings_store().get_for_runtime(
         "devices",

@@ -97,6 +97,36 @@ def test_uncalibrated_bwry_is_unchanged(monkeypatch):
     assert before == after
 
 
+def test_calibrated_toggle_without_a_profile_now_reaches_the_measured_palette(monkeypatch):
+    """The one case where registering ``bwry_4`` in ``_CALIBRATED_PALETTES``
+    deliberately CHANGES an existing panel.
+
+    ``pack_to_panel_bin`` treats ``calibrated=True`` plus a gamut present in the
+    map as reason enough to swap the palette and compress the source range, with
+    no profile involved. That path was unreachable for BWRY, so a PicPak owner
+    who switched the per-device "Calibrated palette + tone mapping" toggle on got
+    nothing: it silently fell through to the nominal primaries. Now it does what
+    the toggle's own help text has always promised.
+
+    Opt-in (the toggle defaults off) and intended, but pinned here because it is
+    the one behaviour this family's arrival does not leave untouched, and because
+    the profile-default reasoning (nominal first, so nothing restyles itself)
+    covers the profile path only, not this one."""
+    img = _photo()
+    with_map = pack_to_panel_bin(img, width=40, height=30, gamut="bwry_4", calibrated=True)
+
+    patched = dict(_CALIBRATED_PALETTES)
+    patched.pop("bwry_4")
+    monkeypatch.setattr("app.quantizer._CALIBRATED_PALETTES", patched)
+    without_map = pack_to_panel_bin(img, width=40, height=30, gamut="bwry_4", calibrated=True)
+
+    assert with_map != without_map, "the toggle should now reach the measured palette"
+    # And the pre-change path is still exactly the nominal one, i.e. what a
+    # PicPak with the toggle on has been rendering until now.
+    nominal = pack_to_panel_bin(img, width=40, height=30, gamut="bwry_4", calibrated=False)
+    assert without_map == nominal
+
+
 # -- bundled profile family ---------------------------------------------
 
 
