@@ -205,34 +205,157 @@
       outline: 3px solid var(--editor-accent, #0d8c7e);
       outline-offset: -3px;
     }
+    /* Drag a cell onto another to swap the two widgets (discussion #198).
+       The shim layer is already the topmost interactive thing over each cell,
+       so it doubles as the drag surface. */
+    .cell-click-shim.is-draggable { cursor: grab; }
+    .cell-click-shim.is-dragging {
+      cursor: grabbing;
+      background: rgba(13, 140, 126, 0.28);
+      outline: 2px dashed var(--editor-accent, #0d8c7e);
+      outline-offset: -2px;
+    }
+    .cell-click-shim.is-swap-target {
+      background: rgba(13, 140, 126, 0.2);
+      outline: 3px solid var(--editor-accent, #0d8c7e);
+      outline-offset: -3px;
+    }
+    /* Follows the pointer while dragging so it's obvious something is moving
+       and what will happen on release. */
+    .swap-ghost {
+      position: absolute;
+      z-index: 10;
+      pointer-events: none;
+      background: rgba(20, 16, 12, 0.85);
+      color: #fff;
+      font: 600 11px/1 system-ui, sans-serif;
+      padding: 5px 9px;
+      border-radius: 4px;
+      white-space: nowrap;
+      transform: translate(8px, 8px);
+    }
   </style>
   <div class="preview-tags">
     {% for cell in page.cells %}
     <div class="cell-tag" style="left: {{ cell.x + 6 }}px; top: {{ cell.y + 6 }}px;">
       {{ loop.index }}{% if cell.size_label %} · {{ cell.size_label }}{% endif %} · {{ cell.plugin or 'unassigned' }}
     </div>
-    <button class="cell-click-shim"
+    {# The auto-managed status bar is pinned; the server refuses to swap it, so
+       it never becomes a drag source or a drop target. #}
+    <button class="cell-click-shim{% if cell.id != page.status_bar_cell_id %} is-draggable{% endif %}"
             type="button"
             data-cell-id="{{ cell.id }}"
             data-cell-index="{{ loop.index }}"
+            data-plugin="{{ cell.plugin or 'unassigned' }}"
+            {% if cell.id != page.status_bar_cell_id %}data-swappable="1"{% endif %}
             style="left: {{ cell.x }}px; top: {{ cell.y }}px; width: {{ cell.w }}px; height: {{ cell.h }}px;"
-            aria-label="Edit cell {{ loop.index }}"></button>
+            aria-label="Edit cell {{ loop.index }}, or drag onto another cell to swap them"></button>
     {% endfor %}
   </div>
   <script>
-    // Notify the editor (parent window) when a cell is clicked.
-    document.querySelectorAll('.cell-click-shim').forEach((btn) => {
-      btn.addEventListener('click', (ev) => {
-        ev.preventDefault();
-        try {
-          window.parent.postMessage({
-            type: 'tesserae-cell-clicked',
-            cellId: btn.dataset.cellId,
-            cellIndex: Number(btn.dataset.cellIndex),
-          }, location.origin);
-        } catch (e) { /* no parent */ }
+    // Drag one cell onto another to swap the two widgets (discussion #198).
+    // Pointer events, not HTML5 drag-and-drop: a native drag doesn't cross the
+    // iframe boundary reliably, and this layer lives inside the preview frame.
+    // Coordinates here are panel pixels already, the iframe's transform: scale
+    // is applied by the parent, so no scale math is needed for hit-testing.
+    (() => {
+      const DRAG_THRESHOLD_PX = 6;
+      const shims = () => Array.from(document.querySelectorAll('.cell-click-shim'));
+      let drag = null; // {id, plugin, startX, startY, moved, ghost}
+      // A completed drag still emits a click on the capture element. Set on
+      // release and cleared once that click has been dispatched, so a drag
+      // never doubles as "select this cell".
+      let justDragged = false;
+
+      function targetUnder(x, y) {
+        // The ghost is pointer-events:none, so the top hit is a shim or a cell.
+        const el = document.elementFromPoint(x, y);
+        const shim = el && el.closest ? el.closest('.cell-click-shim') : null;
+        if (!shim || !shim.dataset.swappable) return null;
+        return shim.dataset.cellId === drag.id ? null : shim;
+      }
+      function clearTargets() {
+        shims().forEach((s) => s.classList.remove('is-swap-target'));
+      }
+      function endDrag() {
+        if (drag && drag.ghost) drag.ghost.remove();
+        shims().forEach((s) => s.classList.remove('is-dragging'));
+        clearTargets();
+        drag = null;
+      }
+
+      shims().forEach((shim) => {
+        if (!shim.dataset.swappable) return;
+        shim.addEventListener('pointerdown', (ev) => {
+          if (ev.button !== 0) return;
+          shim.setPointerCapture(ev.pointerId);
+          drag = {
+            id: shim.dataset.cellId,
+            plugin: shim.dataset.plugin || 'widget',
+            startX: ev.clientX,
+            startY: ev.clientY,
+            moved: false,
+            ghost: null,
+          };
+        });
+        shim.addEventListener('pointermove', (ev) => {
+          if (!drag || drag.id !== shim.dataset.cellId) return;
+          const dx = ev.clientX - drag.startX;
+          const dy = ev.clientY - drag.startY;
+          if (!drag.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
+          if (!drag.moved) {
+            drag.moved = true;
+            shim.classList.add('is-dragging');
+            drag.ghost = document.createElement('div');
+            drag.ghost.className = 'swap-ghost';
+            drag.ghost.textContent = 'Swap ' + drag.plugin + ' with…';
+            document.body.appendChild(drag.ghost);
+          }
+          drag.ghost.style.left = ev.clientX + 'px';
+          drag.ghost.style.top = ev.clientY + 'px';
+          clearTargets();
+          const over = targetUnder(ev.clientX, ev.clientY);
+          if (over) over.classList.add('is-swap-target');
+        });
+        shim.addEventListener('pointerup', (ev) => {
+          if (!drag || drag.id !== shim.dataset.cellId) return;
+          const dropped = drag.moved ? targetUnder(ev.clientX, ev.clientY) : null;
+          const from = drag.id;
+          if (drag.moved) {
+            justDragged = true;
+            setTimeout(() => { justDragged = false; }, 0);
+          }
+          endDrag();
+          if (!dropped) return; // a click, or released over nothing swappable
+          // The parent owns the commit: it has to flush unsaved cell forms
+          // before the swap or typed-but-unsaved edits are lost on reload.
+          try {
+            window.parent.postMessage({
+              type: 'tesserae-cell-swap',
+              from: from,
+              to: dropped.dataset.cellId,
+            }, location.origin);
+          } catch (e) { /* no parent */ }
+        });
+        shim.addEventListener('pointercancel', endDrag);
       });
-    });
+
+      // Notify the editor (parent window) when a cell is clicked. Suppressed
+      // after a drag so releasing on another cell doesn't also select this one.
+      shims().forEach((btn) => {
+        btn.addEventListener('click', (ev) => {
+          ev.preventDefault();
+          if (justDragged) return;
+          try {
+            window.parent.postMessage({
+              type: 'tesserae-cell-clicked',
+              cellId: btn.dataset.cellId,
+              cellIndex: Number(btn.dataset.cellIndex),
+            }, location.origin);
+          } catch (e) { /* no parent */ }
+        });
+      });
+    })();
     // Parent can post back which cell is currently focused; we mirror
     // the focused outline so the user knows which preview cell matches
     // their selected editor card.

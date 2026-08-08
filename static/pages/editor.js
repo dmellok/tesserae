@@ -668,11 +668,40 @@
     });
   }
 
-  // Drag a cell card's handle onto another card to swap the two widgets
-  // (discussion #198). Only the contents move; both boxes stay where they are,
-  // which is what "put cell 4 next to cell 1" actually means when cells carry
-  // absolute geometry. Unsaved edits on every card are persisted first, same as
+  // Swap two cells' widgets (discussion #198). Only the contents move; both
+  // boxes stay where they are, which is what "put cell 4 next to cell 1" means
+  // when cells carry absolute geometry. Two entry points land here: dragging a
+  // cell onto another IN THE LIVE PREVIEW (the preview iframe posts
+  // 'tesserae-cell-swap'; the commit has to happen out here because the iframe
+  // can't see the editor's unsaved forms), and dragging a cell card's handle in
+  // the form column. Unsaved edits on every card are persisted first, same as
   // the layout-preset path, because the swap reloads the editor.
+  async function swapCells(from, target) {
+    if (!from || !target || from === target) return;
+    const source = document.querySelector(`.cell-card[data-cell-id="${from}"]`);
+    if (!source || !source.dataset.swapUrl) return; // status bar / unknown cell
+    setStatus("saving");
+    try {
+      for (const f of forms()) await submit(f);
+      const resp = await fetch(source.dataset.swapUrl, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", "X-Requested-With": "fetch" },
+        body: JSON.stringify({ target: target }),
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json().catch(() => ({ ok: true }));
+      if (data.ok === false) throw new Error(data.message || "swap failed");
+      setDirty(false); // clean before reload so beforeunload stays quiet (#115)
+      location.reload();
+    } catch (err) {
+      setStatus("error");
+      console.error("[editor] cell swap failed:", err);
+    }
+  }
+
+  // Drag a cell card's handle onto another card: the same swap, driven from the
+  // form column for anyone who'd rather not drag on a scaled-down preview.
   function watchCellDrag() {
     let sourceId = null;
 
@@ -719,32 +748,12 @@
         card.classList.add("is-drop-target");
       });
       card.addEventListener("dragleave", () => card.classList.remove("is-drop-target"));
-      card.addEventListener("drop", async (ev) => {
+      card.addEventListener("drop", (ev) => {
         ev.preventDefault();
         const target = card.dataset.cellId;
         const from = sourceId;
         clearDropTargets();
-        if (!from || from === target) return;
-        const url = document.querySelector(`.cell-card[data-cell-id="${from}"]`);
-        if (!url || !url.dataset.swapUrl) return;
-        setStatus("saving");
-        try {
-          for (const f of forms()) await submit(f);
-          const resp = await fetch(url.dataset.swapUrl, {
-            method: "POST",
-            credentials: "same-origin",
-            headers: { "Content-Type": "application/json", "X-Requested-With": "fetch" },
-            body: JSON.stringify({ target: target }),
-          });
-          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-          const data = await resp.json().catch(() => ({ ok: true }));
-          if (data.ok === false) throw new Error(data.message || "swap failed");
-          setDirty(false); // clean before reload so beforeunload stays quiet (#115)
-          location.reload();
-        } catch (err) {
-          setStatus("error");
-          console.error("[editor] cell swap failed:", err);
-        }
+        swapCells(from, target);
       });
     });
   }
@@ -897,7 +906,12 @@
   window.addEventListener("message", (ev) => {
     if (ev.origin !== location.origin) return;
     const d = ev.data;
-    if (!d || d.type !== "tesserae-cell-clicked" || !d.cellId) return;
+    if (!d) return;
+    if (d.type === "tesserae-cell-swap" && d.from && d.to) {
+      swapCells(d.from, d.to);
+      return;
+    }
+    if (d.type !== "tesserae-cell-clicked" || !d.cellId) return;
     focusCellCard(d.cellId);
   });
 

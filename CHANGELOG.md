@@ -4,6 +4,19 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.279.1], 2026-08-08
+
+### Changed
+
+- **Rearrange widgets by dragging them on the live preview.** Swapping cells
+  shipped in 0.279.0 as a drag handle on the editor's form cards, which is not
+  where anyone looks to move something around a dashboard. The preview itself is
+  now the drag surface: press a cell, a label follows the pointer, the cell
+  underneath outlines, and releasing swaps the two widgets. The card handles
+  remain as a second route in for narrow screens where the preview is scaled
+  well down. None of this reaches a device render, it lives in the preview-only
+  overlay.
+
 ## [0.279.0], 2026-08-08
 
 ### Added

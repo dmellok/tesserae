@@ -917,6 +917,51 @@ def test_compose_preview_overlay_present(app: Flask) -> None:
     assert b"cell-click-shim" in resp.data
 
 
+def test_compose_preview_cells_are_drag_swappable(app: Flask, tmp_path: Path) -> None:
+    """The preview overlay is the drag surface for reordering widgets
+    (discussion #198): every non-status-bar cell is marked swappable and the
+    drag script posts 'tesserae-cell-swap' up to the editor."""
+    client = app.test_client()
+    _sign_in(client)
+    pid = _new(client, name="Home", layout="2x2_grid")
+    body = client.get(
+        f"/compose/{pid}?preview=1", environ_overrides={"REMOTE_ADDR": "10.0.0.5"}
+    ).get_data(as_text=True)
+    assert body.count('data-swappable="1"') == 4
+    assert body.count("is-draggable") >= 4
+    assert "tesserae-cell-swap" in body
+
+
+def test_compose_preview_excludes_the_status_bar_from_dragging(app: Flask) -> None:
+    """The status bar is pinned and the server refuses to swap it, so it is
+    neither a drag source nor a drop target."""
+    client = app.test_client()
+    _sign_in(client)
+    pid = _new(client, name="Home", layout="2x2_grid")
+    client.post(f"/pages/{pid}/status-bar/toggle", data={})
+    body = client.get(
+        f"/compose/{pid}?preview=1", environ_overrides={"REMOTE_ADDR": "10.0.0.5"}
+    ).get_data(as_text=True)
+    # Five cells now, but the bar isn't one of the swappable ones.
+    assert body.count("cell-click-shim") >= 5
+    assert body.count('data-swappable="1"') == 4
+
+
+def test_push_render_carries_no_drag_code(app: Flask) -> None:
+    """The drag layer is editor-only. A push render must not ship it: it would
+    be dead weight in every frame and the headless renderer would screenshot
+    the outlines."""
+    client = app.test_client()
+    _sign_in(client)
+    pid = _new(client, name="Home", layout="2x2_grid")
+    body = client.get(
+        f"/compose/{pid}?for_push=1", environ_overrides={"REMOTE_ADDR": "10.0.0.5"}
+    ).get_data(as_text=True)
+    assert "tesserae-cell-swap" not in body
+    assert "data-swappable" not in body
+    assert "swap-ghost" not in body
+
+
 def test_compose_without_preview_has_no_overlay(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
