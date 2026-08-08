@@ -619,12 +619,37 @@
   // Layout picker, apply server-side (it reshapes cells), then reload
   // the page so the cell list reflects the new layout. The iframe
   // refreshes naturally on reload.
+  // Applying a preset with fewer slots than the page has cells drops the
+  // surplus cells and everything configured on them, silently: the server
+  // pairs slot i with cell i and discards the tail. The markup has carried a
+  // ``data-confirm-if-cells`` flag since the feature shipped with nothing
+  // reading it, so the warning never appeared. Name the widgets about to go.
+  function confirmLayoutLoss(form) {
+    const slots = Number(form.dataset.slots || 0);
+    if (!form.hasAttribute("data-confirm-if-cells") || !slots) return true;
+    // The status bar is re-anchored separately by the server, so it doesn't
+    // occupy one of the preset's slots and can never be the cell that's cut.
+    const cells = Array.from(document.querySelectorAll(".cell-card:not([data-status-bar])"));
+    const losing = cells.slice(slots).map((card) => {
+      const select = card.querySelector("select[name='plugin']");
+      return select && select.value ? select.value : "";
+    }).filter(Boolean);
+    if (!losing.length) return true;
+    return window.confirm(
+      `This layout has ${slots} cell${slots === 1 ? "" : "s"}, so ` +
+      `${losing.length} widget${losing.length === 1 ? "" : "s"} won't fit and will be ` +
+      `removed along with their settings:\n\n${losing.join("\n")}\n\n` +
+      "Move them into the cells you're keeping first if you want to keep them."
+    );
+  }
+
   function watchLayoutForms() {
     document.querySelectorAll(".layout-form").forEach((form) => {
       if (form.dataset.layoutBound) return;
       form.dataset.layoutBound = "1";
       form.addEventListener("submit", async (ev) => {
         ev.preventDefault();
+        if (!confirmLayoutLoss(form)) return;
         setStatus("saving");
         try {
           // Persist every cell form first — picking a layout preset
@@ -638,6 +663,87 @@
         } catch (err) {
           setStatus("error");
           console.error("[editor] layout swap failed:", err);
+        }
+      });
+    });
+  }
+
+  // Drag a cell card's handle onto another card to swap the two widgets
+  // (discussion #198). Only the contents move; both boxes stay where they are,
+  // which is what "put cell 4 next to cell 1" actually means when cells carry
+  // absolute geometry. Unsaved edits on every card are persisted first, same as
+  // the layout-preset path, because the swap reloads the editor.
+  function watchCellDrag() {
+    let sourceId = null;
+
+    function cardFor(node) {
+      return node && node.closest ? node.closest(".cell-card") : null;
+    }
+    function clearDropTargets() {
+      document.querySelectorAll(".cell-card.is-drop-target").forEach((c) => {
+        c.classList.remove("is-drop-target");
+      });
+    }
+
+    document.querySelectorAll(".cell-card .cell-drag").forEach((handle) => {
+      if (handle.dataset.dragBound) return;
+      handle.dataset.dragBound = "1";
+      handle.addEventListener("dragstart", (ev) => {
+        const card = cardFor(handle);
+        if (!card) return;
+        sourceId = card.dataset.cellId;
+        card.classList.add("is-dragging");
+        // Firefox ignores a drag that sets no data.
+        if (ev.dataTransfer) {
+          ev.dataTransfer.effectAllowed = "move";
+          ev.dataTransfer.setData("text/plain", sourceId);
+        }
+      });
+      handle.addEventListener("dragend", () => {
+        sourceId = null;
+        document.querySelectorAll(".cell-card.is-dragging").forEach((c) => {
+          c.classList.remove("is-dragging");
+        });
+        clearDropTargets();
+      });
+    });
+
+    document.querySelectorAll(".cell-card[data-swap-url]").forEach((card) => {
+      if (card.dataset.dropBound) return;
+      card.dataset.dropBound = "1";
+      card.addEventListener("dragover", (ev) => {
+        // A card with no swap URL is the status bar; it never accepts a drop.
+        if (!sourceId || sourceId === card.dataset.cellId) return;
+        ev.preventDefault();
+        if (ev.dataTransfer) ev.dataTransfer.dropEffect = "move";
+        card.classList.add("is-drop-target");
+      });
+      card.addEventListener("dragleave", () => card.classList.remove("is-drop-target"));
+      card.addEventListener("drop", async (ev) => {
+        ev.preventDefault();
+        const target = card.dataset.cellId;
+        const from = sourceId;
+        clearDropTargets();
+        if (!from || from === target) return;
+        const url = document.querySelector(`.cell-card[data-cell-id="${from}"]`);
+        if (!url || !url.dataset.swapUrl) return;
+        setStatus("saving");
+        try {
+          for (const f of forms()) await submit(f);
+          const resp = await fetch(url.dataset.swapUrl, {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json", "X-Requested-With": "fetch" },
+            body: JSON.stringify({ target: target }),
+          });
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          const data = await resp.json().catch(() => ({ ok: true }));
+          if (data.ok === false) throw new Error(data.message || "swap failed");
+          setDirty(false); // clean before reload so beforeunload stays quiet (#115)
+          location.reload();
+        } catch (err) {
+          setStatus("error");
+          console.error("[editor] cell swap failed:", err);
         }
       });
     });
@@ -810,6 +916,7 @@
   });
   watchForms();
   watchLayoutForms();
+  watchCellDrag();
   watchMultiSelect();
   wireTouchEditors();
   // ``setDirty(false)`` here (not just ``setStatus("saved")``) so the

@@ -1407,3 +1407,77 @@ def test_dashboards_list_shows_freeform_badge_and_choice(app: Flask) -> None:
     body = client.get("/pages").get_data(as_text=True)
     assert "Corner" in body and "Freeform" in body
     assert 'name="layout_kind"' in body  # create form offers Grid / Freeform
+
+
+def test_swap_cells_exchanges_contents_not_boxes(app: Flask, tmp_path: Path) -> None:
+    """Dragging one cell card onto another swaps the widgets while both
+    boxes stay put (discussion #198). Geometry and cell ids belong to the
+    slot, so list order, the status-bar index and preset detection are all
+    unaffected by a move."""
+    _set_panel(app, 800, 600)
+    client = app.test_client()
+    _sign_in(client)
+    pid = _new(client, name="Home", layout="2x2_grid")
+    page = _store(tmp_path).get(pid)
+    first, last = page.cells[0], page.cells[3]
+    ids_before = [c.id for c in page.cells]
+    # Assign, then configure: a plugin change resets options to the new
+    # widget's defaults, so the option has to land on a second post.
+    client.post(f"/pages/{pid}/cells/{first.id}", data={"plugin": "widget_a"})
+    client.post(
+        f"/pages/{pid}/cells/{first.id}",
+        data={"plugin": "widget_a", "opt_format": "12h"},
+    )
+    client.post(f"/pages/{pid}/cells/{last.id}", data={"plugin": "widget_b"})
+
+    resp = client.post(
+        f"/pages/{pid}/cells/{first.id}/swap",
+        json={"target": last.id},
+        headers={"X-Requested-With": "fetch"},
+    )
+    assert resp.status_code == 200
+    assert resp.get_json()["ok"] is True
+
+    page = _store(tmp_path).get(pid)
+    assert [c.id for c in page.cells] == ids_before  # ids + list order untouched
+    assert page.cells[0].plugin == "widget_b"
+    assert page.cells[3].plugin == "widget_a"
+    # The widget's own settings travel with it.
+    assert page.cells[3].options.get("format") == "12h"
+    # Boxes never move.
+    assert (page.cells[0].x, page.cells[0].y) == (0, 0)
+    assert (page.cells[3].x, page.cells[3].y) == (400, 300)
+
+
+def test_swap_cells_refuses_the_status_bar(app: Flask, tmp_path: Path) -> None:
+    """``status_bar_cell_id`` names one specific cell; swapping its contents
+    would leave the page claiming a status bar that renders something else."""
+    _set_panel(app, 800, 600)
+    client = app.test_client()
+    _sign_in(client)
+    pid = _new(client, name="Home", layout="2x2_grid")
+    client.post(f"/pages/{pid}/status-bar/toggle", data={})
+    page = _store(tmp_path).get(pid)
+    assert page.status_bar_cell_id == page.cells[0].id
+
+    resp = client.post(
+        f"/pages/{pid}/cells/{page.cells[0].id}/swap",
+        json={"target": page.cells[1].id},
+        headers={"X-Requested-With": "fetch"},
+    )
+    assert resp.get_json()["ok"] is False
+    assert "status bar" in resp.get_json()["message"].lower()
+
+
+def test_swap_cells_rejects_an_unknown_target(app: Flask, tmp_path: Path) -> None:
+    _set_panel(app, 800, 600)
+    client = app.test_client()
+    _sign_in(client)
+    pid = _new(client, name="Home", layout="2x2_grid")
+    cell_id = _store(tmp_path).get(pid).cells[0].id
+    resp = client.post(
+        f"/pages/{pid}/cells/{cell_id}/swap",
+        json={"target": "nope"},
+        headers={"X-Requested-With": "fetch"},
+    )
+    assert resp.get_json()["ok"] is False

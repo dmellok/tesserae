@@ -8,9 +8,17 @@
 
 {% macro cell_form(cell, idx) %}
 {% set plugin = (plugins | selectattr('id', 'equalto', cell.plugin) | list | first) if cell.plugin else None %}
-<section class="dx-section-card cell-card" id="cell-{{ cell.id }}" data-cell-id="{{ cell.id }}">
+{# The auto-managed status bar is pinned to the top slot: ``status_bar_cell_id``
+   names that specific cell, so it can't take part in a swap. #}
+{% set is_status_bar = page.status_bar_cell_id and cell.id == page.status_bar_cell_id %}
+<section class="dx-section-card cell-card" id="cell-{{ cell.id }}" data-cell-id="{{ cell.id }}"
+         {% if is_status_bar %}data-status-bar="1"{% else %}data-swap-url="{{ url_for('pages.swap_cells', page_id=page.id, cell_id=cell.id) }}"{% endif %}>
   <header class="card-head cell-card-head">
     <h2>
+      {% if not is_status_bar %}
+      <span class="cell-drag" draggable="true" title="Drag onto another cell to swap the two widgets"
+            aria-label="Move this widget to another cell"><i class="ph-bold ph-dots-six-vertical"></i></span>
+      {% endif %}
       <span>Cell {{ idx }}</span>
       <span class="muted">·</span>
       <span class="cell-card-plugin">{{ cell.plugin or 'unassigned' }}</span>
@@ -478,7 +486,10 @@
 
       <div class="layout-grid">
         {% for layout in layouts %}
-        <form method="post" action="{{ url_for('pages.apply_layout', page_id=page.id) }}" class="layout-form" data-confirm-if-cells>
+        {# ``data-slots`` lets the editor warn before a preset with fewer slots
+           than the page has cells drops the surplus (and its options). #}
+        <form method="post" action="{{ url_for('pages.apply_layout', page_id=page.id) }}" class="layout-form"
+              data-confirm-if-cells data-slots="{{ layout.cells|length }}">
           <input type="hidden" name="layout" value="{{ layout.slug }}">
           <button type="submit" class="layout-card {% if active_layout == layout.slug %}is-active{% endif %}" aria-label="Apply {{ layout.name }}">
             <span class="layout-thumb">

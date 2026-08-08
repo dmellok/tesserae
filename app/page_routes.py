@@ -31,7 +31,7 @@ import logging
 import re
 import time
 import uuid
-from typing import Any
+from typing import Any, Final
 
 from flask import (
     Blueprint,
@@ -1452,6 +1452,63 @@ def update_cell(page_id: str, cell_id: str) -> Response:
     current_app.config.get("PREVIEW_CACHE", {}).pop(page_id, None)
     msg = "Plugin changed, options reset." if plugin_changed and plugin else "Cell saved."
     return _flash_save(True, msg)
+
+
+# Everything that makes a cell "this widget" as opposed to "this box". Swapped
+# as a unit so a move carries the widget's whole configuration, not just its id.
+# Geometry (x/y/w/h) and the cell id itself are deliberately absent: they belong
+# to the slot, and keeping them put means list order, the status-bar index and
+# preset detection (all of which key off position) are untouched by a move.
+_CELL_CONTENT_FIELDS: Final = (
+    "plugin",
+    "options",
+    "theme",
+    "style",
+    "font",
+    "zoom",
+    "padding_override",
+    "dither",
+    "on_tap",
+    "on_swipe",
+    "on_slide",
+    "update_on_change",
+)
+
+
+@bp.post("/<page_id>/cells/<cell_id>/swap")
+def swap_cells(page_id: str, cell_id: str) -> Response:
+    """Exchange two cells' contents, leaving both boxes where they are.
+
+    This is "move a widget to another slot" (discussion #198). Dragging one
+    cell card onto another in the editor lands here. The auto-managed status
+    bar is refused: ``status_bar_cell_id`` names a specific cell, so swapping
+    its contents would leave the page claiming a status bar that renders
+    something else.
+    """
+    page = _store().get(page_id)
+    if page is None:
+        abort(404)
+    body = request.get_json(silent=True) or {}
+    target_id = str(body.get("target") or "").strip()
+    source = next((c for c in page.cells if c.id == cell_id), None)
+    target = next((c for c in page.cells if c.id == target_id), None)
+    if source is None or target is None:
+        return _flash_save(False, "No such cell.")
+    if source.id == target.id:
+        return _flash_save(True, "Nothing to move.")
+    if page.status_bar_cell_id in (source.id, target.id):
+        return _flash_save(False, "The status bar can't be moved.")
+
+    source_content = {f: getattr(source, f) for f in _CELL_CONTENT_FIELDS}
+    target_content = {f: getattr(target, f) for f in _CELL_CONTENT_FIELDS}
+    swapped = {
+        source.id: source.model_copy(update=target_content),
+        target.id: target.model_copy(update=source_content),
+    }
+    new_cells = [swapped.get(c.id, c) for c in page.cells]
+    _store().save(page.model_copy(update={"cells": new_cells}))
+    current_app.config.get("PREVIEW_CACHE", {}).pop(page_id, None)
+    return _flash_save(True, "Cells swapped.")
 
 
 @bp.post("/<page_id>/cells/<cell_id>/delete")

@@ -4,6 +4,27 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.279.0], 2026-08-08
+
+### Added
+
+- **Drag a cell onto another to swap the two widgets** (discussion #198).
+  Grid cells carry absolute geometry, so a widget was welded to whatever box it
+  was first assigned to: rearranging a dashboard meant re-picking every widget
+  and re-entering its settings. Each cell card now has a drag handle in its
+  header; drop it on another card and the two widgets trade places, settings
+  and touch actions included, while both boxes stay exactly where they are. The
+  auto-managed status bar is pinned and doesn't take part.
+
+### Fixed
+
+- **Switching to a layout with fewer cells warns before dropping widgets.**
+  Applying a smaller preset pairs each of its slots with a cell in order and
+  discards the surplus, taking their settings with them. The editor markup had
+  carried a flag for this warning since the feature shipped, with nothing
+  reading it, so the confirmation never appeared. It now names the widgets that
+  won't fit before anything is written.
+
 ## [0.278.2], 2026-08-08
 
 ### Changed

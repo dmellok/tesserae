@@ -878,6 +878,26 @@
   color: var(--t-fg-soft);
 }
 
+/* Drag a cell's handle onto another cell to swap the two widgets
+   (discussion #198). The handle is the only draggable part of the card so
+   selecting text in the option fields still works. */
+.cell-drag {
+  cursor: grab;
+  color: var(--t-fg-soft);
+  margin-right: var(--t-space-1);
+  touch-action: none;
+}
+.cell-drag:hover {
+  color: var(--t-fg);
+}
+.cell-card.is-dragging {
+  opacity: 0.5;
+}
+.cell-card.is-drop-target {
+  outline: 3px dashed var(--t-accent);
+  outline-offset: 2px;
+}
+
 /* ----- Layout editor (interactive grid) --------------------------- */
 
 .layout-editor {
