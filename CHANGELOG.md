@@ -4,6 +4,23 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.278.1], 2026-08-08
+
+### Fixed
+
+- **Renders started from the UI show the dashboard, not the setup page, under
+  Home Assistant.** Inside HA's Ingress tab every in-app URL carries HA's
+  `/api/hassio_ingress/<token>` prefix, and any render the browser asked for
+  passed that prefix through to the headless renderer. The renderer fetches
+  over loopback, which skips HA's proxy, so Tesserae saw the prefix as part of
+  the path: it matched no route, the loopback bypass that lets the renderer
+  read `/compose/` never applied, and what got screenshotted was the password
+  setup screen. A canvas Send, the panel preview, the render report, the touch
+  monitor and the template share preview were all affected; scheduled and
+  device-driven pushes were not, since they build their URLs from `base_url`
+  rather than the request. Templates already submitted with a setup-screen
+  preview need resubmitting from an updated install.
+
 ## [0.278.0], 2026-08-08
 
 ### Fixed

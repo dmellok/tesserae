@@ -65,6 +65,28 @@ def _chromium_launch_kwargs() -> dict[str, Any]:
     return {"executable_path": path} if path else {}
 
 
+def _strip_script_root(path: str) -> str:
+    """Drop the app's SCRIPT_NAME prefix from a request-derived path.
+
+    Under Home Assistant Ingress every in-app URL carries HA's
+    ``/api/hassio_ingress/<token>`` prefix, because that's what the browser
+    asked for. A loopback fetch bypasses HA's proxy, so Tesserae receives that
+    prefix as part of the path: it matches no route, and the auth gate's
+    ``/compose/`` loopback bypass never applies, so the renderer screenshots
+    the setup / login page instead of the dashboard. Outside a request context
+    (the scheduler's own pushes build URLs from ``base_url``) and outside
+    Ingress, ``script_root`` is empty and this is a no-op.
+    """
+    from flask import has_request_context, request
+
+    if not has_request_context():
+        return path
+    root = request.script_root or ""
+    if root and path.startswith(root):
+        return path[len(root) :] or "/"
+    return path
+
+
 def to_loopback_url(url: str) -> str:
     """Rewrite the host portion of ``url`` to ``127.0.0.1`` while preserving
     the port + path + query.
@@ -84,6 +106,7 @@ def to_loopback_url(url: str) -> str:
     public render links). This helper is for the in-process renderer only.
     """
     parts = urlsplit(url)
+    path = _strip_script_root(parts.path)
     # Prefer the actual bind port the server is listening on internally,
     # since under HA the URL's port is the *host* mapping (e.g. 8766 for
     # edge) and nothing is listening on it inside the container, the
@@ -99,7 +122,7 @@ def to_loopback_url(url: str) -> str:
         netloc = f"127.0.0.1:{bind_port}"
     elif parts.port:
         netloc = f"127.0.0.1:{parts.port}"
-    return urlunsplit((parts.scheme, netloc, parts.path, parts.query, parts.fragment))
+    return urlunsplit((parts.scheme, netloc, path, parts.query, parts.fragment))
 
 
 @dataclass(frozen=True)

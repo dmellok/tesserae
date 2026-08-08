@@ -41,3 +41,36 @@ def test_falls_back_to_url_port_without_bind_env(monkeypatch: pytest.MonkeyPatch
     assert to_loopback_url("http://tess.example:5050/compose/abc") == (
         "http://127.0.0.1:5050/compose/abc"
     )
+
+
+def test_ingress_prefix_stripped(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Under HA Ingress every in-app path carries HA's
+    ``/api/hassio_ingress/<token>`` prefix. Loopback skips HA's proxy, so the
+    prefix has to come off: with it the path matches no route, the auth gate's
+    ``/compose/`` loopback bypass doesn't apply, and the renderer screenshots
+    the setup page instead of the dashboard (a canvas Send, the panel preview
+    and the template share preview all did exactly that)."""
+    from flask import Flask
+
+    monkeypatch.delenv("TESSERAE_BIND_PORT", raising=False)
+    app = Flask(__name__)
+    env = {"SCRIPT_NAME": "/api/hassio_ingress/tok3n"}
+    with app.test_request_context("/compose/abc", environ_overrides=env, base_url="http://ha:8123"):
+        assert (
+            to_loopback_url("http://ha:8123/api/hassio_ingress/tok3n/compose/abc?w=800")
+            == "http://127.0.0.1:8123/compose/abc?w=800"
+        )
+
+
+def test_path_untouched_without_ingress(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A path that merely starts with the same characters as no script root
+    is left alone, and so is every non-Ingress install."""
+    from flask import Flask
+
+    monkeypatch.delenv("TESSERAE_BIND_PORT", raising=False)
+    app = Flask(__name__)
+    with app.test_request_context("/compose/abc", base_url="http://tess.example:8765"):
+        assert (
+            to_loopback_url("http://tess.example:8765/compose/abc")
+            == "http://127.0.0.1:8765/compose/abc"
+        )
