@@ -694,20 +694,22 @@ def test_device_card_exposes_picture_quality(app_with_gate: Flask) -> None:
     assert 'name="pi_bin__pi_lab:contrast"' in body
 
 
-def test_calibration_tone_dither_survives_bwry_gamut(app_with_gate: Flask) -> None:
+def test_calibration_tone_dither_survives_familyless_gamut(app_with_gate: Flask) -> None:
     """Issue #52 follow-up (r/eink launch feedback, bablokb): the
     renderer picture-quality block (Contrast / Saturation / Dither)
     used to be nested inside the palette-recalibration ``{% if %}``
     guard. Panels whose gamut has no matching palette family
-    (bwry_4 / mono / rgb24 / rgb16) get ``palette_apply_endpoint =
-    None``, so a save that resolved gamut to bwry_4 silently dropped
-    the whole picture-quality block along with the palette one. The
-    block is now guarded independently so the tone & dither sliders
-    remain visible on non-Spectra-6 panels."""
+    (mono / rgb24 / rgb16) get ``palette_apply_endpoint = None``, so
+    such a save silently dropped the whole picture-quality block along
+    with the palette one. The block is now guarded independently so the
+    tone & dither sliders remain visible on non-Spectra-6 panels.
+
+    Used ``bwry_4`` as the familyless example until that gamut gained
+    its own bundled profile family; ``mono`` carries the case now."""
     client = app_with_gate.test_client()
     client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
     client.post("/settings/devices/add", data={"id": "kitchen_pi", "kind": "pi_bin_client"})
-    # Save with bwry_4 gamut (Inky4 legacy path).
+    # Save with a gamut that has no bundled palette family.
     client.post(
         "/settings/devices/kitchen_pi/save",
         data={
@@ -716,14 +718,14 @@ def test_calibration_tone_dither_survives_bwry_gamut(app_with_gate: Flask) -> No
             "panel_w": "640",
             "panel_h": "400",
             "panel_orientation": "landscape",
-            "panel_gamut": "bwry_4",
+            "panel_gamut": "mono",
             "quiet_hours_enabled": "0",
             "pi_bin__kitchen_pi:saturation": "1.5",
         },
     )
     body = client.get("/settings/devices").get_data(as_text=True)
-    # Palette recalibration block correctly hidden for a bwry_4 gamut
-    # (no matching palette family).
+    # Palette recalibration block correctly hidden for a familyless
+    # gamut (no matching palette family).
     assert "Palette recalibration" not in body
     # But the tone & dither picture-quality block MUST still render.
     assert "Pi BIN client — tone" in body

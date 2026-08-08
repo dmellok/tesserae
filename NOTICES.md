@@ -48,3 +48,21 @@ the calibration data. The presets live in
 [`app/palette_profiles/bundled.py`](app/palette_profiles/bundled.py);
 user-authored profiles are saved to
 `data/palette_profiles/<slug>.json` and follow the same schema.
+
+## varanu5 — PicPak 4.2" BWRY calibration
+
+The 4-colour BWRY calibrated palette (in
+[app/quantizer.py](app/quantizer.py) as `BWRY_4_CALIBRATED_PALETTE`, and
+shipped as the `picpak-bwry-calibrated` preset in
+[`app/palette_profiles/bundled.py`](app/palette_profiles/bundled.py)) was
+measured against a physical PicPak 4.2" black/white/red/yellow panel by
+[varanu5](https://github.com/varanu5), author of the PicPak community
+firmware. epdoptimize carries no BWRY profile, so these values are an
+independent contribution rather than a port.
+
+The preset carries `based_on` and `attribution` fields that surface as a
+"via varanu5" chip on the picker card, the same way the
+paperlesspaper-derived presets do.
+
+* Upstream: https://github.com/varanu5
+* PicPak firmware: https://github.com/varanu5/picpak-tesserae-client

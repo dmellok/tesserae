@@ -417,6 +417,10 @@ def _build_app_field_groups() -> list[dict[str, Any]]:
 
 _TEST_PATTERN_GAMUT_LABELS: dict[str, tuple[str, ...]] = {
     "waveshare_e6": ("black", "white", "yellow", "red", "blue", "green"),
+    # BWRY has no blue or green ink. Without this entry the lookup below
+    # falls back to the E6 row and the solid-fill picker offers a PicPak
+    # two colours it physically cannot paint.
+    "bwry_4": ("black", "white", "yellow", "red"),
     "inky_7colour": (
         "black",
         "white",
@@ -437,6 +441,11 @@ _TEST_PATTERN_GAMUT_HEXES: dict[str, tuple[str, ...]] = {
         "#0000ff",
         "#00ff00",
     ),
+    # Nominal (not measured) primaries: this picker drives a solid-fill
+    # test pattern, whose point is to send the panel a pure palette index
+    # and see what the ink actually does. Feeding it measured values
+    # would beg the question.
+    "bwry_4": ("#000000", "#ffffff", "#ffff00", "#ff0000"),
     "inky_7colour": (
         "#000000",
         "#ffffff",
@@ -543,11 +552,11 @@ def _palette_family_for(device: Device) -> str:
 
     Maps panel gamut to the bundled profile family: ``waveshare_e6`` /
     ``spectra_6`` → ``spectra6``, ``inky_7colour`` / ``acep_7colour``
-    → ``inky_7colour``. Panels without a matching profile family
-    (mono, ``bwry_4``, ``rgb24``, ``rgb16``, unknown gamut) return
-    empty so the section builder can null out every palette endpoint
-    for them; the whole Calibration-tab palette + tone editor then
-    hides on the template side.
+    → ``inky_7colour``, ``bwry_4`` → ``bwry_4``. Panels without a
+    matching profile family (mono, ``rgb24``, ``rgb16``, unknown gamut)
+    return empty so the section builder can null out every palette
+    endpoint for them; the whole Calibration-tab palette + tone editor
+    then hides on the template side.
 
     Empty gamut is treated as ``spectra6`` (legacy default for the
     fleet majority) so devices that haven't declared a gamut yet
@@ -559,9 +568,11 @@ def _palette_family_for(device: Device) -> str:
         return "inky_7colour"
     if gamut in ("waveshare_e6", "spectra_6", ""):
         return "spectra6"
-    # mono, bwry_4, rgb24, rgb16, unknown: no bundled profile family
-    # applies, hide the picker rather than showing incompatible
-    # Spectra 6 profiles as the pre-v0.69.11 default did.
+    if gamut == "bwry_4":
+        return "bwry_4"
+    # mono, rgb24, rgb16, unknown: no bundled profile family applies,
+    # hide the picker rather than showing incompatible Spectra 6
+    # profiles as the pre-v0.69.11 default did.
     return ""
 
 
@@ -585,9 +596,22 @@ def _palette_profile_colors_for(device: Device) -> list[dict[str, str]] | None:
         {"name": "white", "label": "White", "hex": profile.palette.white},
         {"name": "yellow", "label": "Yellow", "hex": profile.palette.yellow},
         {"name": "red", "label": "Red", "hex": profile.palette.red},
-        {"name": "blue", "label": "Blue", "hex": profile.palette.blue},
-        {"name": "green", "label": "Green", "hex": profile.palette.green},
     ]
+    # A 4-ink BWRY panel stops here. ``PaletteColors`` keeps six slots so
+    # the stored schema is identical for every family, but the quantizer
+    # slices a profile palette to the gamut's length, so blue / green are
+    # discarded before dithering. Offering them would be two swatches
+    # that silently do nothing.
+    #
+    # Scoped to bwry_4 on purpose. Trimming by the gamut's palette length
+    # generalises better, but it is not behaviour-neutral for the other
+    # families (a spectra6 profile carrying an orange would lose it), and
+    # this change is meant to touch PicPak only. Every other gamut takes
+    # the original path below unchanged.
+    if _palette_family_for(device) == "bwry_4":
+        return out
+    out.append({"name": "blue", "label": "Blue", "hex": profile.palette.blue})
+    out.append({"name": "green", "label": "Green", "hex": profile.palette.green})
     if profile.palette.orange:
         out.append({"name": "orange", "label": "Orange", "hex": profile.palette.orange})
     return out
