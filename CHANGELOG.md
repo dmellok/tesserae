@@ -4,6 +4,24 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.278.0], 2026-08-08
+
+### Fixed
+
+- **A rotation advances on the anchor grid the card predicts** (#167). The
+  minimum-hold guard, which exists to stop a flapping condition flipping a
+  panel back and forth, was also gating advances that the clock had triggered,
+  and a held advance then fired the instant the hold lapsed. That off-grid fire
+  became the reference for the next hold, so with the default 5-minute hold and
+  a 5-minute dwell a single off-grid advance (a restart, an enable, a manual
+  play) re-paced the rotation permanently: it kept the right interval but ran
+  minutes behind the times the Lineups card showed under "next advance", and it
+  never recovered. A clock-driven advance is now held against the dwell
+  window's start rather than the moment of the last push, so a held advance
+  resumes on a later boundary and the rotation stays in phase with its anchor.
+  A condition changing the step inside one window is still held from the last
+  push, so an urgent step takes over as soon as the hold lapses.
+
 ## [0.277.1], 2026-08-08
 
 ### Fixed

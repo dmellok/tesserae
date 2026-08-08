@@ -1068,12 +1068,19 @@ class Scheduler:
                 # (keep-fresh), matching a single-step rotation.
                 if last_at is not None and last_at >= state.step_started_at.timestamp():
                     continue
-            elif (
-                rot.min_hold_minutes > 0
-                and last_at is not None
-                and now.timestamp() - last_at < rot.min_hold_minutes * 60
-            ):
-                continue  # min-hold anti-flap
+            elif rot.min_hold_minutes > 0 and last_at is not None:
+                # Same split as the find pass: a boundary-crossing advance
+                # is gated from the window start (so a held one resumes on
+                # a later boundary, never mid-window, which would re-anchor
+                # this panel's cadence off the grid); a within-window one is
+                # a condition flap and is gated from now.
+                held_from = (
+                    state.step_started_at.timestamp()
+                    if last_at < state.step_started_at.timestamp()
+                    else now.timestamp()
+                )
+                if held_from < last_at + rot.min_hold_minutes * 60:
+                    continue  # min-hold anti-flap
             if rot.smart_sync and self._smart_sync_should_wait(target, rot.smart_sync_lead_s, now):
                 continue
             pusher = self._push_factory()
@@ -1302,10 +1309,32 @@ class Scheduler:
                 # ``last_pushed_at`` is updated by ``_fire_rotation`` on
                 # every successful fire. Manual "play step now" already
                 # writes to the override and bypasses the find/fire path.
+                #
+                # Two shapes of transition, gated differently.
+                #
+                # A dwell boundary has been crossed since the last fire:
+                # the clock moved us, so the hold is measured from the
+                # window's START. A held advance then resumes on a later
+                # boundary rather than the instant the hold lapses.
+                # Resuming mid-window re-anchored the gate to that
+                # off-grid moment, and with a min-hold at or above the
+                # dwell (the 5/5 default pairing) it stayed there: one
+                # off-grid fire (a restart, an enable, a manual play)
+                # re-paced the rotation for good, so it ran permanently
+                # out of phase with the anchor the UI predicts its next
+                # advance from (#167).
+                #
+                # No boundary crossed: a condition changed the picked
+                # step inside one window, which is the flap this gate was
+                # written for. Measured from now, so a step that becomes
+                # eligible takes over as soon as the hold lapses.
                 min_hold_s = rotation.min_hold_minutes * 60
                 if min_hold_s > 0 and last_pushed_at is not None:
-                    elapsed = now.timestamp() - last_pushed_at
-                    if elapsed < min_hold_s:
+                    crossed_boundary = last_pushed_at < state.step_started_at.timestamp()
+                    held_until = (
+                        state.step_started_at.timestamp() if crossed_boundary else now.timestamp()
+                    )
+                    if held_until < last_pushed_at + min_hold_s:
                         continue
             # Smart-sync: same wake-aware gate that schedules use.
             # Hold the transition until a bound device is close to

@@ -4,7 +4,7 @@ filter, clears state on disable)."""
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import MagicMock
 from zoneinfo import ZoneInfo
@@ -696,15 +696,43 @@ def test_single_step_rotation_refires_every_dwell_window(tmp_path: Path) -> None
 
 
 def test_multi_step_transitions_still_respect_min_hold(tmp_path: Path) -> None:
-    """Index CHANGES keep the flap guard: a transition inside the
-    min-hold window stays gated."""
+    """Index changes WITHIN one dwell window keep the flap guard: that's
+    a condition oscillating, which is what min-hold exists for."""
     scheduler, _push_manager, _s, _S = _selffire_harness(tmp_path, dwells=[("a", 2), ("b", 2)])
-    t0 = datetime(2026, 6, 15, 0, 1, tzinfo=UTC)  # step 0
-    due = scheduler.find_due_rotations(t0)
-    scheduler._fire_rotation(*due[0], t0)
+    # Fire step 1 at 00:01, inside step 0's window [00:00, 00:02).
+    scheduler._fire_rotation(
+        scheduler._rotation_store.all()[0], 1, datetime(2026, 6, 15, 0, 1, tzinfo=UTC)
+    )
+    # Still inside that window, the computed step is 0 again: an index
+    # change with no boundary crossed, so min_hold (5m default) gates it.
+    assert scheduler.find_due_rotations(datetime(2026, 6, 15, 0, 1, 30, tzinfo=UTC)) == []
 
-    # 00:03 -> computed step 1, but min_hold (5m default) gates it.
-    assert scheduler.find_due_rotations(datetime(2026, 6, 15, 0, 3, tzinfo=UTC)) == []
+
+def test_min_hold_resumes_on_a_boundary_not_mid_window(tmp_path: Path) -> None:
+    """A held transition must resume on the next dwell boundary that
+    clears the hold. It used to fire the moment the hold lapsed, which
+    re-anchored the gate to that off-grid moment; with the 5/5 default
+    pairing of dwell and min-hold, one off-grid fire (restart / enable /
+    manual play) re-paced the rotation permanently and it ran out of
+    phase with the anchor the Lineups card predicts from (#167)."""
+    scheduler, _push_manager, _s, _S = _selffire_harness(tmp_path, dwells=[("a", 5), ("b", 5)])
+    # Off-grid first fire, as a restart at 12:23 would produce.
+    scheduler._fire_rotation(
+        scheduler._rotation_store.all()[0], 0, datetime(2026, 6, 15, 12, 23, tzinfo=UTC)
+    )
+    fires = []
+    now = datetime(2026, 6, 15, 12, 23, 30, tzinfo=UTC)
+    end = datetime(2026, 6, 15, 12, 46, tzinfo=UTC)
+    while now < end:
+        for rot, idx in scheduler.find_due_rotations(now):
+            fires.append(now.strftime("%H:%M"))
+            scheduler._fire_rotation(rot, idx, now)
+        now += timedelta(seconds=30)
+    # 12:25 is only 2 minutes after the off-grid fire, so the hold skips
+    # it; from the first boundary that clears the hold the rotation is
+    # back on the anchor grid and stays there. Before the fix this ran
+    # 12:28 / 12:33 / 12:38, permanently 2 minutes behind the card.
+    assert fires == ["12:30", "12:35", "12:40", "12:45"]
 
 
 def test_fire_excludes_manually_held_devices(tmp_path: Path) -> None:
