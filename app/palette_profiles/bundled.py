@@ -258,10 +258,10 @@ BUNDLED_PROFILES: tuple[PaletteProfile, ...] = (
         # the card renders it without a link. ``attribution`` exists to point
         # at an upstream project the data was ported from, which does not
         # apply here.
-        based_on="varanu5 · PicPak 4.2\" BWRY panel calibration",
+        based_on='varanu5 · PicPak 4.2" BWRY panel calibration',
         notes=(
             "The colours this panel actually prints, measured from a real PicPak "
-            "4.2\" by varanu5. The default profile aims for perfect ink the screen "
+            '4.2" by varanu5. The default profile aims for perfect ink the screen '
             "can't make (its yellow is closer to mustard than lemon), which can "
             "leave photos looking muddy. Panels vary a little, so copy this "
             "profile and adjust the colours if yours looks off."

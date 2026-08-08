@@ -270,18 +270,14 @@ def _text_scene(bg, fg):
 
 def _red_fraction(img, palette):
     """Share of pixels painted with the red ink (palette index 3)."""
-    payload = pack_to_panel_bin(
-        img, width=200, height=60, gamut="bwry_4", palette_override=palette
-    )
+    payload = pack_to_panel_bin(img, width=200, height=60, gamut="bwry_4", palette_override=palette)
     idx = []
     for byte in payload:
         idx += [(byte >> 6) & 3, (byte >> 4) & 3, (byte >> 2) & 3, byte & 3]
     return sum(1 for i in idx if i == 3) / len(idx)
 
 
-@pytest.mark.parametrize(
-    ("bg", "fg"), [((0, 0, 0), (255, 255, 255)), ((255, 255, 255), (0, 0, 0))]
-)
+@pytest.mark.parametrize(("bg", "fg"), [((0, 0, 0), (255, 255, 255)), ((255, 255, 255), (0, 0, 0))])
 def test_nominal_leaves_neutral_text_free_of_red(bg, fg):
     """Documents the trade between the two shipped profiles rather than
     asserting one is correct. Nominal keeps neutral text clean; the
