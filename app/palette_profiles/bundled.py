@@ -1,17 +1,27 @@
 """Read-only palette presets shipped in the source tree.
 
-Six Spectra 6 profiles + one seven-colour Inky ACeP profile + one
-nominal (uncalibrated identity) fallback. Every measured profile is
-attributed to its upstream source; the palette hex values for the
-paperlesspaper-attributed profiles are the Apache-2.0 palette data
-from `paperlesspaper/epdoptimize
+Grouped by panel family: Spectra 6, seven-colour Inky ACeP, and 4-colour
+BWRY, each with at least one measured profile plus a nominal
+(uncalibrated identity) fallback. Every profile derived from someone
+else's work is attributed to its upstream source; the palette hex values
+for the paperlesspaper-attributed profiles are the Apache-2.0 palette
+data from `paperlesspaper/epdoptimize
 <https://github.com/paperlesspaper/epdoptimize/blob/main/src/dither/data/default-palettes.json>`_.
+The BWRY values were calibrated against a physical PicPak 4.2" panel by
+`varanu5 <https://github.com/varanu5>`_.
 
 Contributors ordered so the picker's default is Tesserae's tuned
 profile (currently equivalent to paperlesspaper's ``spectra6``), then
 the community-measured alternatives in rough popularity order, then
 Nominal at the bottom as the "start over" option. The order the
 picker renders in comes from :func:`list_bundled`.
+
+**BWRY deliberately inverts that**: its nominal profile is listed first
+and is the family default, so unlocking the Calibration tab for PicPak
+panels does not silently restyle frames that already look right. The
+measured presets are one click away. If BWRY should follow the same
+convention as the other families, reorder here and change
+:func:`default_slug_for`.
 
 Attribution surfaces:
 
@@ -44,17 +54,24 @@ def _profile(
     based_on: str | None = None,
     attribution: str | None = None,
     notes: str = "",
+    dither: DitherSettings | None = None,
 ) -> PaletteProfile:
     """Bundled-profile constructor with the defaults every preset uses:
     tone / dither / edges at their neutral values. Fine-tuning is what
-    user profiles are for."""
+    user profiles are for.
+
+    ``dither`` overrides those neutral defaults. The BWRY presets use it
+    to pin ``serpentine=False``, matching what the renderer does when no
+    profile is applied -- ``DitherSettings`` defaults it to True, so
+    without the pin merely having a profile applied would change output.
+    Omitting the argument keeps every pre-existing preset unchanged."""
     return PaletteProfile(
         slug=slug,
         name=name,
         family=family,
         palette=palette,
         tone=ToneSettings(),
-        dither=DitherSettings(),
+        dither=dither if dither is not None else DitherSettings(),
         edges=EdgeSettings(),
         bundled=True,
         based_on=based_on,
@@ -193,6 +210,87 @@ BUNDLED_PROFILES: tuple[PaletteProfile, ...] = (
         ),
         notes="Ideal-primary sRGB values for the 7-colour ACeP palette.",
     ),
+    # --- bwry_4 (PicPak 4.2" black/white/red/yellow) ---------------------
+    # Only the first four slots are used: the quantizer slices a profile
+    # palette to the gamut's length, and BWRY's canonical order (black,
+    # white, yellow, red) is exactly the first four of the shared slot
+    # order, so no remapping is needed. ``blue`` / ``green`` keep their
+    # dataclass defaults and are sliced off before dithering.
+    #
+    # The nominal profile is FIRST and is the family default, so a PicPak
+    # keeps rendering against the ideal primaries unless the user opts
+    # into a measured one. Its dither block pins the renderer's
+    # no-profile defaults (serpentine off, RGB matching) rather than
+    # ``DitherSettings``' own defaults, which differ -- otherwise merely
+    # having a profile applied would change output.
+    _profile(
+        slug="nominal-bwry",
+        name="Nominal BWRY",
+        family="bwry_4",
+        palette=PaletteColors(
+            black="#000000",
+            white="#FFFFFF",
+            yellow="#FFFF00",
+            red="#FF0000",
+        ),
+        dither=DitherSettings(serpentine=False, color_match="rgb"),
+        notes=(
+            "Standard colours, what Tesserae has always used for this panel. "
+            "Kept as the default so existing screens don't suddenly change "
+            "appearance. Try PicPak Calibrated if photos look muddy."
+        ),
+    ),
+    _profile(
+        slug="picpak-bwry-calibrated",
+        name="PicPak Calibrated",
+        family="bwry_4",
+        palette=PaletteColors(
+            black="#242522",
+            white="#ECE9DF",
+            yellow="#DEB428",
+            red="#BC4248",
+        ),
+        # Same dither block as the nominal profile: switching to this
+        # preset must change the palette and nothing else, so the A/B
+        # isolates one variable.
+        dither=DitherSettings(serpentine=False, color_match="rgb"),
+        # ``based_on`` only, no ``attribution``: the credit line is enough and
+        # the card renders it without a link. ``attribution`` exists to point
+        # at an upstream project the data was ported from, which does not
+        # apply here.
+        based_on="varanu5 · PicPak 4.2\" BWRY panel calibration",
+        notes=(
+            "The colours this panel actually prints, measured from a real PicPak "
+            "4.2\" by varanu5. The default profile aims for perfect ink the screen "
+            "can't make (its yellow is closer to mustard than lemon), which can "
+            "leave photos looking muddy. Panels vary a little, so copy this "
+            "profile and adjust the colours if yours looks off."
+        ),
+    ),
+    # Known characteristic of the measured palette, recorded here rather
+    # than worked around: the real red ink is desaturated enough to sit
+    # geometrically next to neutral mid-grey, so grey levels ~80-160 snap
+    # to red under every matching mode. Antialiased text edges live in
+    # that band, so white-on-black and black-on-white text picks up a
+    # small amount of red speckle (~0.4% of pixels on a text-heavy
+    # frame). A preset with a de-neutralised red (#D4242A) removed it
+    # completely but was dropped as unwanted; Nominal remains the clean
+    # choice for text-heavy dashboards.
+    #
+    # NO LAB / chroma-aware preset here, deliberately. ``color_match="lab"``
+    # silently disables dithering. ``_error_diffusion`` builds buf_l / buf_a
+    # / buf_b_lab once from the ORIGINAL image and never writes diffused
+    # error back into them (only buf_r/g/b get the error), yet the LAB
+    # branch makes its nearest-palette decision from those stale buffers.
+    # Every pixel is therefore judged against its pristine value: plain
+    # nearest-colour quantisation, posterised, no dither texture.
+    #
+    # Pre-existing and NOT BWRY-specific. ``_error_diffusion`` never sees a
+    # gamut, and atkinson / jarvis / stucki all call it (floyd-steinberg
+    # detours into it too when LAB is selected), so this hits every
+    # gamut x every error-diffusion dither x both lab and chroma-aware --
+    # measured as 12/12 combinations collapsing a flat patch to one ink
+    # where RGB uses 4 to 7. Ship no preset that steers users onto it.
 )
 
 
@@ -210,6 +308,11 @@ def default_slug_for(family: str) -> str:
     requested family so an unknown gamut still resolves to something."""
     if family == "inky_7colour":
         return "paperlesspaper-inky7"
+    if family == "bwry_4":
+        # Nominal, not measured: unlocking the Calibration tab must not
+        # silently change how existing PicPak panels render. Measured is
+        # one click away in the picker.
+        return "nominal-bwry"
     return "paperlesspaper-spectra6"
 
 

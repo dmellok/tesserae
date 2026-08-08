@@ -417,9 +417,13 @@ def test_slug_self_heal_on_empty_slug_for_supported_family(app: Flask, tmp_path:
 
 
 def test_slug_self_heal_leaves_unsupported_gamut_alone(app: Flask, tmp_path: Path) -> None:
-    """Panels whose gamut has no matching profile family (mono / bwry_4
-    / rgb24 / rgb16) should still hide the palette section, not get
-    forced onto a Spectra 6 profile."""
+    """Panels whose gamut has no matching profile family (mono / rgb24
+    / rgb16) should still hide the palette section, not get forced onto
+    a Spectra 6 profile.
+
+    Used ``bwry_4`` as the example until that gamut gained its own
+    bundled family; ``mono`` is now the stand-in, which is what this
+    test's own "force gamut to mono" comment always intended."""
     from app.settings.index_routes import _palette_profile_slug_for, _palette_profile_tone_for
 
     client = app.test_client()
@@ -442,7 +446,7 @@ def test_slug_self_heal_leaves_unsupported_gamut_alone(app: Flask, tmp_path: Pat
         w=device.panel["w"],
         h=device.panel["h"],
         orientation=device.panel.get("orientation", "landscape"),
-        gamut="bwry_4",
+        gamut="mono",
     )
     with app.test_request_context():
         device = app.config["DEVICE_REGISTRY"].get(dev)

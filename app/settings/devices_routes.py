@@ -1677,7 +1677,15 @@ def devices_test_pattern_preview(instance_id: str) -> Response:
         if len(raw) == 7 and raw.startswith("#"):
             with contextlib.suppress(ValueError):
                 swatches.append((int(raw[1:3], 16), int(raw[3:5], 16), int(raw[5:7], 16)))
-    if len(swatches) >= 6:
+    # How many swatches constitute a complete palette for this panel.
+    # BWRY posts four (it has no blue / green ink); EVERY other gamut
+    # keeps the original constant 6, deliberately. Deriving this from
+    # the gamut's palette length reads better but is not behaviour-
+    # neutral: it moves inky_7colour to 7 and the profile-less gamuts
+    # (bwr_3 / mono / gray_4) to 3 / 2 / 4, and this change is scoped to
+    # PicPak only. Leave the rest exactly as they were.
+    required_swatches = 4 if str(params["gamut"]) == "bwry_4" else 6
+    if len(swatches) >= required_swatches:
         palette_override = tuple(swatches)
 
     custom_path = _custom_image_path_for(instance_id)

@@ -205,6 +205,27 @@ INKY_7COLOUR_CALIBRATED_PALETTE: tuple[tuple[int, int, int], ...] = (
     (0xF3, 0xCF, 0x11),  # 5 yellow
     (0xB8, 0x5E, 0x1C),  # 6 orange  (brick)
 )
+# 4-colour BWRY (PicPak class). Calibrated against a physical PicPak 4.2"
+# panel by varanu5 <https://github.com/varanu5>, rather than ported from
+# epdoptimize, which carries no BWRY profile. Panel batches drift, so the
+# Calibration tab lets anyone fork these and adjust.
+#
+# The nominal palette these replace is the *ideal* sRGB primaries, and
+# the gap is what makes uncalibrated BWRY output look muddy. Yellow is
+# the worst case: dithering against (255, 255, 0) treats it as a bright
+# highlight, but the ink lays down a dark mustard, so error diffusion
+# picks yellow for highlights it cannot deliver. The reproducible range
+# is also roughly [36, 236], not [0, 255], so an uncalibrated dither
+# over-drives contrast against endpoints the panel never reaches.
+#
+# Order matches BWRY_4_PALETTE (black, white, yellow, red) so the same
+# identity nibble LUT applies and the on-wire bytes are unchanged.
+BWRY_4_CALIBRATED_PALETTE: tuple[tuple[int, int, int], ...] = (
+    (0x24, 0x25, 0x22),  # 0 black   warm near-black, never a true 0
+    (0xEC, 0xE9, 0xDF),  # 1 white   slightly cream paper
+    (0xDE, 0xB4, 0x28),  # 2 yellow  mustard, not lemon
+    (0xBC, 0x42, 0x48),  # 3 red     dusty brick
+)
 
 
 # Panel colour gamuts the .bin packer can target, keyed by the value
@@ -295,6 +316,7 @@ def canonicalise_gamut(declared: str) -> str:
 _CALIBRATED_PALETTES: dict[str, tuple[tuple[int, int, int], ...]] = {
     "waveshare_e6": WAVESHARE_E6_CALIBRATED_PALETTE,
     "inky_7colour": INKY_7COLOUR_CALIBRATED_PALETTE,
+    "bwry_4": BWRY_4_CALIBRATED_PALETTE,
 }
 
 

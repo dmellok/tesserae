@@ -22,6 +22,8 @@ from typing import Any
 from PIL import Image, ImageDraw, ImageFont
 
 from app.quantizer import (
+    BWRY_4_CALIBRATED_PALETTE,
+    BWRY_4_PALETTE,
     INKY_7COLOUR_CALIBRATED_PALETTE,
     INKY_7COLOUR_PALETTE,
     WAVESHARE_E6_CALIBRATED_PALETTE,
@@ -37,6 +39,13 @@ _COLOUR_LABELS_E6: tuple[str, ...] = (
     "red",
     "blue",
     "green",
+)
+# 4-ink BWRY. Order matches BWRY_4_PALETTE.
+_COLOUR_LABELS_BWRY: tuple[str, ...] = (
+    "black",
+    "white",
+    "yellow",
+    "red",
 )
 _COLOUR_LABELS_INKY7: tuple[str, ...] = (
     "black",
@@ -58,6 +67,18 @@ def _palette_for(gamut: str, calibrated: bool) -> tuple[tuple[RGB, ...], tuple[s
     if gamut == "inky_7colour":
         pal = INKY_7COLOUR_CALIBRATED_PALETTE if calibrated else INKY_7COLOUR_PALETTE
         return pal, _COLOUR_LABELS_INKY7
+    if gamut == "bwry_4":
+        # Without this the E6 fallback below hands a 4-ink BWRY panel a
+        # six-colour deck, and three things go wrong at once: the swatch
+        # pattern paints blue and green blocks the panel cannot
+        # reproduce; a 4-entry profile palette is silently discarded by
+        # the ``len(palette_override) >= len(palette)`` guard in
+        # :func:`build_pattern`, so the user's chosen profile never
+        # reaches the pattern; and error diffusion carries the
+        # out-of-gamut columns' residue sideways into neighbouring
+        # swatches, speckling them.
+        pal = BWRY_4_CALIBRATED_PALETTE if calibrated else BWRY_4_PALETTE
+        return pal, _COLOUR_LABELS_BWRY
     pal = WAVESHARE_E6_CALIBRATED_PALETTE if calibrated else WAVESHARE_E6_PALETTE
     return pal, _COLOUR_LABELS_E6
 
