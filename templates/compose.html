@@ -208,7 +208,17 @@
     /* Drag a cell onto another to swap the two widgets (discussion #198).
        The shim layer is already the topmost interactive thing over each cell,
        so it doubles as the drag surface. */
-    .cell-click-shim.is-draggable { cursor: grab; }
+    /* ``touch-action: none`` is what makes this work with a finger: without it
+       the browser claims the gesture for scrolling and the pointermove events
+       never arrive, so a drag does nothing on a tablet or in the Home
+       Assistant companion app. ``user-select`` stops the drag selecting the
+       widget text underneath. */
+    .cell-click-shim.is-draggable {
+      cursor: grab;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+    }
     .cell-click-shim.is-dragging {
       cursor: grabbing;
       background: rgba(13, 140, 126, 0.28);

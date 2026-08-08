@@ -23,7 +23,15 @@ from pathlib import Path
 from typing import Any, Final
 from urllib.parse import quote
 
-from flask import Blueprint, Response, abort, current_app, render_template, request
+from flask import (
+    Blueprint,
+    Response,
+    abort,
+    current_app,
+    make_response,
+    render_template,
+    request,
+)
 from werkzeug.wrappers import Response as WerkzeugResponse
 
 from app.bindings import apply_binding
@@ -1237,8 +1245,25 @@ def _preview_target_device(page: Page, devices: Any) -> str:
     return ""
 
 
+def _uncacheable(html: str) -> Response:
+    """Wrap a composition in a response no cache may keep.
+
+    A composition is live widget data plus per-request state, so reusing one is
+    never right. It went out with no cache directives at all, which leaves an
+    intermediary free to cache it heuristically: behind a caching reverse proxy
+    the editor's preview can be served a composition rendered by an older
+    Tesserae, so anything added to this template (the drag-to-swap overlay, say)
+    simply isn't there, with nothing in the console to explain it. The push
+    renderer fetches over loopback where this costs nothing.
+    """
+    resp = make_response(html)
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    resp.headers["Pragma"] = "no-cache"
+    return resp
+
+
 @bp.get("/compose/<page_id>")
-def compose(page_id: str) -> str:
+def compose(page_id: str) -> Response:
     preview_cache: dict[str, Page] = current_app.config.get("PREVIEW_CACHE", {})
     page = preview_cache.get(page_id)
     if page is None:
@@ -1291,22 +1316,26 @@ def compose(page_id: str) -> str:
             target_w, target_h = page.canvas.w, page.canvas.h
         else:
             target_w, target_h = panel_w, panel_h
-        return _render_canvas(
-            page.canvas,
-            target_w=target_w,
-            target_h=target_h,
-            target_device_id=target_device_id,
-            fresh=fresh,
+        return _uncacheable(
+            _render_canvas(
+                page.canvas,
+                target_w=target_w,
+                target_h=target_h,
+                target_device_id=target_device_id,
+                fresh=fresh,
+            )
         )
 
     page_dict["panel"] = {"w": panel_w, "h": panel_h}
     if target_device_id:
         page_dict["target_device_id"] = target_device_id
-    return render_template(
-        "compose.html",
-        page=_hydrate_page(page_dict, preview=not for_push, fresh=fresh),
-        for_push=for_push,
-        preview_mode=preview_mode,
+    return _uncacheable(
+        render_template(
+            "compose.html",
+            page=_hydrate_page(page_dict, preview=not for_push, fresh=fresh),
+            for_push=for_push,
+            preview_mode=preview_mode,
+        )
     )
 
 

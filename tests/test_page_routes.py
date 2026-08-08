@@ -1526,3 +1526,30 @@ def test_swap_cells_rejects_an_unknown_target(app: Flask, tmp_path: Path) -> Non
         headers={"X-Requested-With": "fetch"},
     )
     assert resp.get_json()["ok"] is False
+
+
+def test_compose_is_never_cacheable(app: Flask) -> None:
+    """A composition is live widget data; caching one is always wrong. It used
+    to go out with no cache directives at all, which lets an intermediary cache
+    it heuristically: behind a caching reverse proxy the editor's preview can be
+    served a composition rendered by an older Tesserae, missing whatever the
+    template gained since."""
+    client = app.test_client()
+    _sign_in(client)
+    pid = _new(client, name="Home", layout="2x2_grid")
+    for query in ("?preview=1", "?for_push=1", ""):
+        resp = client.get(
+            f"/compose/{pid}{query}", environ_overrides={"REMOTE_ADDR": "10.0.0.5"}
+        )
+        assert resp.status_code == 200, query
+        assert "no-store" in resp.headers.get("Cache-Control", ""), query
+
+
+def test_editor_preview_iframe_carries_a_version_buster(app: Flask) -> None:
+    """An upgrade must not be able to reuse a composition cached from the
+    previous version, so the initial iframe src is version-stamped."""
+    client = app.test_client()
+    _sign_in(client)
+    pid = _new(client, name="Home", layout="2x2_grid")
+    body = client.get(f"/pages/{pid}").get_data(as_text=True)
+    assert f"v={app.config['APP_VERSION']}" in body

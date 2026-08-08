@@ -298,7 +298,10 @@
         <div class="preview-throbber" data-preview-throbber hidden aria-hidden="true">
           <i class="ph ph-circle-notch"></i>
         </div>
-        <iframe src="{{ url_for('composer.compose', page_id=page.id) }}?preview=1&amp;w={{ g.w }}&amp;h={{ g.h }}"
+        {# ``v`` is a cache-buster, not read by the route: an upgrade must never
+           be able to reuse a composition an intermediary cached from the
+           previous version. Later reloads add their own ``_t``. #}
+        <iframe src="{{ url_for('composer.compose', page_id=page.id) }}?preview=1&amp;w={{ g.w }}&amp;h={{ g.h }}&amp;v={{ config.APP_VERSION }}"
                 style="width: {{ g.w }}px; height: {{ g.h }}px;"
                 loading="lazy" sandbox="allow-scripts allow-same-origin"
                 data-preview-iframe></iframe>

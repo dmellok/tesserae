@@ -4,6 +4,22 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.281.0], 2026-08-09
+
+### Fixed
+
+- **A dashboard preview is never served from a cache.** Compositions went out
+  with no cache directives at all, which leaves an intermediary free to cache
+  them heuristically. Behind a caching reverse proxy the editor's preview could
+  therefore be a composition rendered by an older Tesserae, so anything the
+  template had gained since (the drag-to-swap overlay) simply wasn't there, with
+  nothing in the browser console to explain it. Compositions now go out
+  `no-store`, and the editor's preview frame is version-stamped so an upgrade
+  can't reuse a copy cached from the version before it.
+- **Dragging a widget on the preview works with a finger.** The drag surface had
+  no `touch-action`, so on a touchscreen the browser claimed the gesture for
+  scrolling and no drag ever started.
+
 ## [0.280.0], 2026-08-08
 
 ### Fixed
