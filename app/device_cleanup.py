@@ -53,6 +53,10 @@ class OrphanSummary:
     setting_keys_devices: int = 0
     setting_keys_renderers: int = 0
     has_calibration_image: bool = False
+    # Whether the push manager still held a frame for this id. Renders are
+    # content-addressed, so a surviving pointer means a re-registered device is
+    # served the pre-wipe frame rather than a 204 (issue #199).
+    has_latest_render: bool = False
 
     @property
     def total(self) -> int:
@@ -65,6 +69,7 @@ class OrphanSummary:
             + self.setting_keys_devices
             + self.setting_keys_renderers
             + (1 if self.has_calibration_image else 0)
+            + (1 if self.has_latest_render else 0)
         )
 
 
@@ -210,11 +215,17 @@ def wipe_orphan_state(
     event_log: EventLog,
     settings_store: SettingsStore,
     data_root: Path,
+    push_manager: Any | None = None,
 ) -> OrphanSummary:
     """Remove per-device leftovers idempotently and return a summary of
     what was actually deleted. Safe to call after
     :func:`app.device_service.delete_instance`; caller is responsible
-    for rebuilding the transport / renderer registry."""
+    for rebuilding the transport / renderer registry.
+
+    ``push_manager`` is the live :class:`app.push.PushManager`. Passing it drops
+    the device's frame pointers, without which a device re-registered under the
+    same id is served the frame from before the wipe (issue #199). Optional so
+    a caller with no manager wired (tests, CLI) still works."""
     pages = _pages_for_device(page_store, device_id)
     removed_events = _delete_events_for_device(event_log, device_id, pages)
     for pid in pages:
@@ -225,6 +236,10 @@ def wipe_orphan_state(
     if path.exists():
         path.unlink()
         calibration_removed = True
+    render_forgotten = False
+    forget = getattr(push_manager, "forget_device", None)
+    if callable(forget):
+        render_forgotten = bool(forget(device_id))
     return OrphanSummary(
         device_id=device_id,
         page_ids=pages,
@@ -232,4 +247,5 @@ def wipe_orphan_state(
         setting_keys_devices=devices_removed,
         setting_keys_renderers=renderers_removed,
         has_calibration_image=calibration_removed,
+        has_latest_render=render_forgotten,
     )

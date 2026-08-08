@@ -655,6 +655,30 @@ class PushManager:
         frame the renderer just wrote, not a stale guess."""
         return self._latest_renders.get(device_id)
 
+    def forget_device(self, device_id: str) -> bool:
+        """Drop every per-device frame slot this manager holds.
+
+        Called when a device is deleted with the wipe option (issue #199).
+        Without it the persisted latest-render entry outlives the device, and
+        because renders are content-addressed the artifact is still on disk, so
+        registering the same device id again gets served the frame from before
+        the wipe instead of a 204. Returns whether anything was held.
+
+        The warmed deck / album caches and the patch document go too: they are
+        keyed by device id and would otherwise be promoted into the live slot by
+        the first navigation after a re-register. Artifact files are left to the
+        render prune, which is content-addressed and shared across devices.
+        """
+        with self._lock:
+            had = self._latest_renders.pop(device_id, None) is not None
+            self._previous_renders.pop(device_id, None)
+            self._deck_renders.pop(device_id, None)
+            self._album_renders.pop(device_id, None)
+            self._patch_docs.pop(device_id, None)
+            if had:
+                self._save_latest_renders()
+        return had
+
     def last_served_render_for(self, device_id: str) -> dict[str, Any] | None:
         """The full frame most recently handed to a REST device.
 

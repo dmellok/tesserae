@@ -159,3 +159,33 @@ def test_clear_deck_cache(wired) -> None:
     assert not manager.has_warm_deck_page("panel", "p_b")
     manager.clear_deck_cache("panel")
     assert not manager.has_warm_deck_page("panel", "p_a")
+
+
+def test_forget_device_clears_the_live_and_warmed_frames(wired) -> None:
+    """Deleting a device with the wipe option must leave no frame behind, or a
+    device registered again under the same id is served the pre-wipe frame
+    (issue #199). Warmed deck frames go too: the first navigation after a
+    re-register would otherwise promote one into the live slot."""
+    manager = wired
+    with patch("app.push.capture_composed", return_value=(_png((255, 0, 0)), [])):
+        manager.push("p_a", device_ids={"panel"})
+    with patch("app.push.capture_composed", return_value=(_png((0, 0, 255)), [])):
+        assert manager.warm_deck_page("p_b", "panel") is True
+    assert manager.latest_render_for("panel") is not None
+
+    assert manager.forget_device("panel") is True
+    assert manager.latest_render_for("panel") is None
+    assert manager.has_warm_deck_page("panel", "p_b") is False
+    # Idempotent: nothing held the second time.
+    assert manager.forget_device("panel") is False
+
+
+def test_forget_device_survives_a_restart(wired, tmp_path) -> None:
+    """The latest-render map is persisted, so forgetting has to write through;
+    otherwise the pointer comes back with the next process."""
+    manager = wired
+    with patch("app.push.capture_composed", return_value=(_png((255, 0, 0)), [])):
+        manager.push("p_a", device_ids={"panel"})
+    manager.forget_device("panel")
+    reloaded = manager._load_latest_renders()
+    assert "panel" not in reloaded

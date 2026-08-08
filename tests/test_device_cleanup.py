@@ -210,3 +210,45 @@ def test_marker_deleted_at_is_close_to_now(tmp_path: Path) -> None:
     entry = m.get("esp32_lab")
     assert entry is not None
     assert before <= float(entry["deleted_at"]) <= after
+
+
+def test_wipe_forgets_the_devices_last_frame(tmp_path: Path) -> None:
+    """Renders are content-addressed, so a surviving latest-render pointer means
+    a device re-registered under the same id is handed the frame from before the
+    wipe instead of a 204 (issue #199)."""
+    ps, el, ss = _make_stores(tmp_path)
+
+    class FakePush:
+        def __init__(self) -> None:
+            self.frames = {"esp32_lab": {"digest": "abc123"}, "other": {"digest": "def456"}}
+
+        def forget_device(self, device_id: str) -> bool:
+            return self.frames.pop(device_id, None) is not None
+
+    push = FakePush()
+    wiped = device_cleanup.wipe_orphan_state(
+        device_id="esp32_lab",
+        page_store=ps,
+        event_log=el,
+        settings_store=ss,
+        data_root=tmp_path,
+        push_manager=push,
+    )
+    assert wiped.has_latest_render is True
+    assert "esp32_lab" not in push.frames
+    assert "other" in push.frames  # other devices untouched
+
+
+def test_wipe_without_a_push_manager_still_works(tmp_path: Path) -> None:
+    """The parameter is optional; a caller with nothing wired must not blow up."""
+    ps, el, ss = _make_stores(tmp_path)
+    ps.save(_make_page("bound", device_ids=["esp32_lab"]))
+    wiped = device_cleanup.wipe_orphan_state(
+        device_id="esp32_lab",
+        page_store=ps,
+        event_log=el,
+        settings_store=ss,
+        data_root=tmp_path,
+    )
+    assert wiped.has_latest_render is False
+    assert wiped.page_ids == ["bound"]

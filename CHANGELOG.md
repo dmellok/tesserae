@@ -4,6 +4,31 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.280.0], 2026-08-08
+
+### Fixed
+
+- **A portrait panel's width and height stay where you put them** (#200). A
+  client reports its panel dimensions but never an orientation, so a display
+  taller than it is wide was stored with portrait dimensions and its device
+  kind's landscape orientation. Nothing read the contradiction until the next
+  save of that card, which resolved it by rewriting the dimensions to match the
+  orientation: 1200×1920 became 1920×1200 after editing something unrelated like
+  the sleep interval, and typing the dimensions back swapped them again. The
+  orientation is now derived from the reported dimensions at registration, and a
+  save prefers whichever of the two the user actually changed, so a stored
+  mismatch is repaired on the orientation side instead. Moving the rotation
+  dropdown still drives the dimensions as before, and the 180° half of a
+  rotation is preserved either way.
+- **Deleting a device with the wipe option no longer leaves its last frame
+  behind** (#199). The wipe cleared dashboards, history, per-device settings and
+  the calibration image, but not the pointer to the frame most recently rendered
+  for that device. Renders are content-addressed, so the artifact was still on
+  disk too: registering the same device id again was handed the dashboard from
+  before the wipe rather than the 204 that means "nothing here yet". The wipe now
+  drops that pointer along with any pre-warmed deck or album frames for the
+  device.
+
 ## [0.279.1], 2026-08-08
 
 ### Changed

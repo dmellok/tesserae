@@ -152,6 +152,7 @@ def devices_add() -> Response:
                 event_log=current_app.config["EVENT_LOG"],
                 settings_store=settings_store(),
                 data_root=Path(current_app.config["DATA_ROOT"]),
+                push_manager=current_app.config.get("PUSH_MANAGER"),
             )
             markers.clear(target_id)
     result = device_service.create_instance(
@@ -622,6 +623,19 @@ def devices_register_discovered(discovered_id: str) -> Response:
 
             panel_overrides["gamut"] = canonicalise_gamut(entry.gamut)
 
+    # Firmware reports dims but never an orientation, so a client that paints a
+    # tall panel used to land with portrait dims and the kind's landscape
+    # orientation. Nothing reads that contradiction until the first save of the
+    # panel form, which resolves it by rewriting the dims to match the
+    # orientation: the user's 1200x1920 silently became 1920x1200 (issue #200).
+    # Derive the aspect from what the client reported so the stored panel is
+    # self-consistent from the moment it's created.
+    reported_orientation: str | None = None
+    if panel_overrides.get("w") and panel_overrides.get("h"):
+        reported_orientation = (
+            "portrait" if int(panel_overrides["h"]) > int(panel_overrides["w"]) else "landscape"
+        )
+
     # TRMNL discoveries carry the original access_token in the cache
     # entry's parsed payload so create_instance can preserve it, the
     # user already has it pasted into their client config, and the
@@ -671,6 +685,7 @@ def devices_register_discovered(discovered_id: str) -> Response:
             event_log=current_app.config["EVENT_LOG"],
             settings_store=settings_store(),
             data_root=Path(current_app.config["DATA_ROOT"]),
+            push_manager=current_app.config.get("PUSH_MANAGER"),
         )
     markers.clear(target_id)
     # Wire format the client asked for (png / bmp). A memory-constrained
@@ -695,6 +710,7 @@ def devices_register_discovered(discovered_id: str) -> Response:
         kind_id=kind_id,
         name=name_arg or "",
         panel_overrides=panel_overrides,
+        orientation=reported_orientation,
         access_token=discovered_token if isinstance(discovered_token, str) else None,
         mac=mac_arg,
         transport=transport_arg,
@@ -1096,6 +1112,30 @@ def devices_update_combined(instance_id: str) -> Response:
                 underscan = max(0, int(underscan_raw))
             except ValueError:
                 underscan = 0
+        # ``update_instance_panel`` normalises dims to match the orientation,
+        # which is right when the rotation dropdown is what moved (its JS swaps
+        # the dim fields live, and a hand-crafted POST should still land
+        # consistent). It's wrong when the dims are what moved: typing tall dims
+        # under an untouched landscape dropdown got them swapped straight back,
+        # so a portrait panel could not be entered at all (issue #200). Decide
+        # which side to trust by comparing against what's stored.
+        submitted_orientation = (form.get("panel_orientation") or "").strip().lower()
+        stored = devices_registry.get(instance_id)
+        stored_panel = dict(getattr(stored, "panel", None) or {}) if stored else {}
+        stored_orientation = str(stored_panel.get("orientation") or "").lower()
+        orientation_arg = submitted_orientation or "landscape"
+        if new_w and new_h and submitted_orientation in ("", stored_orientation):
+            # The rotation didn't move, so the dims are the authority. This also
+            # repairs a panel that was already stored inconsistent (firmware
+            # reports dims but no orientation, so a tall panel used to land with
+            # a landscape orientation) instead of swapping the dims on every
+            # unrelated save. Keeps the ``_flipped`` half the user has set;
+            # only landscape-vs-portrait follows the dims.
+            flipped = submitted_orientation.endswith("_flipped") or stored_orientation.endswith(
+                "_flipped"
+            )
+            aspect = "portrait" if new_h > new_w else "landscape"
+            orientation_arg = f"{aspect}_flipped" if flipped else aspect
         panel_result = device_service.update_instance_panel(
             devices=devices_registry,
             renderers=renderers(),
@@ -1103,7 +1143,7 @@ def devices_update_combined(instance_id: str) -> Response:
             instance_id=instance_id,
             w=new_w,
             h=new_h,
-            orientation=form.get("panel_orientation") or "landscape",
+            orientation=orientation_arg,
             gamut=form.get("panel_gamut"),
             underscan=underscan,
             icon=form.get("device_icon"),
@@ -1283,6 +1323,7 @@ def devices_delete(instance_id: str) -> Response:
             event_log=current_app.config["EVENT_LOG"],
             settings_store=settings_store(),
             data_root=Path(current_app.config["DATA_ROOT"]),
+            push_manager=current_app.config.get("PUSH_MANAGER"),
         )
         # Also clear any pending marker for this id; the state is
         # already gone, so a later re-register has nothing to compare
