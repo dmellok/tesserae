@@ -4,7 +4,7 @@
 // test_scale_sliders_clamp_to_bounds before the clamp moved from
 // server.py to client.js.
 import assert from "node:assert/strict";
-import { clampScale, readOptions, computeRange, styleLabel } from "../client.js";
+import { clampScale, clampToDay, computeRange, pctSpan, readOptions, styleLabel } from "../client.js";
 
 assert.equal(clampScale(undefined, 1.0, 0.7, 1.5), 1.0, "missing falls back to default");
 assert.equal(clampScale(null, 1.0, 0.7, 1.5), 1.0, "null falls back to default");
@@ -39,6 +39,30 @@ assert.deepEqual(
 );
 assert.deepEqual(computeRange([], 20, 21), { start: 20, end: 21 }, "inverted-looking override kept as given");
 assert.deepEqual(computeRange([], 20, 20), { start: 20, end: 21 }, "equal start/end widened by 1h to stay renderable");
+
+// clampToDay: calendar_core includes a multi-day event in "today"'s list
+// whenever it overlaps today, even on a day that isn't its start/end —
+// each such day must clamp to *that* day, not redraw at the event's
+// original start hour.
+const trip = { start: "2026-08-09T16:00:00", end: "2026-08-11T10:00:00" };
+assert.deepEqual(clampToDay(trip, "2026-08-09"), { s: 16, e: 24 }, "start day keeps the real start hour, runs to midnight");
+assert.deepEqual(clampToDay(trip, "2026-08-10"), { s: 0, e: 24 }, "a pass-through day runs the full 24h, not the start hour");
+assert.deepEqual(clampToDay(trip, "2026-08-11"), { s: 0, e: 10 }, "end day starts at midnight, keeps the real end hour");
+assert.deepEqual(
+  clampToDay({ start: "2026-08-09T16:00:00", end: "2026-08-09T17:00:00" }, "2026-08-09"),
+  { s: 16, e: 17 },
+  "single-day event is unaffected"
+);
+
+// pctSpan: a block's [s,e) hour span must clamp to the visible lane
+// without ever exceeding 100% height, even when day_start_hour/
+// day_end_hour narrows the range well below a pass-through day's full
+// 0-24h span (regression: height used to be derived from the
+// *unclamped* span, so it could exceed 100% and spill past the lane's
+// bottom edge).
+assert.deepEqual(pctSpan(9, 17, 8, 10), { top: 10, height: 80 }, "fully inside the range renders normally");
+assert.deepEqual(pctSpan(0, 24, 8, 4), { top: 0, height: 100 }, "a full 0-24h pass-through day clamps to exactly the lane, not beyond");
+assert.deepEqual(pctSpan(20, 24, 8, 4), { top: 100, height: 2 }, "a span entirely after the visible range clamps to the bottom edge, not off it");
 
 // date_label_style: full / short / minimal (1-2 chars, disambiguated).
 const DOW_MINIMAL = { Tuesday: "Tu", Thursday: "Th" };

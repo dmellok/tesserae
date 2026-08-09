@@ -67,6 +67,95 @@ function fmtHm(iso) {
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
+// A timed (non-all-day) event's end can land on a different local
+// calendar day than its start (an overnight event, or a genuinely
+// multi-day timed block like a trip). Subtracting raw hour-of-day
+// across two different dates is meaningless — it previously produced
+// negative/near-zero heights and corrupted computeRange's auto-fit
+// window for the whole visible week. Treat "ends on a later day" as
+// "runs to the bottom of this day" instead. Used for the week-wide
+// auto-fit range only, where a coarse "runs to midnight" is enough —
+// see clampToDay for the per-day-copy rendering split.
+function eventEndHour(ev, s) {
+  const e = parseTime(ev.end);
+  if (e == null) return s != null ? s + 1 : null;
+  if (s == null) return e;
+  const sameDay = new Date(ev.start).toDateString() === new Date(ev.end).toDateString();
+  return sameDay ? e : 24;
+}
+
+function localDateKey(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// The server repeats a multi-day timed event's original start/end on
+// every covered day's bucket (so each day's own copy carries the true
+// event times for the tooltip). Rendering a middle/end-day copy at the
+// *original* start hour is wrong — e.g. a Sun 16:00 → Fri 10:00 trip
+// would redraw a 16:00-start block on Wednesday too. Clamp per day:
+// only the actual start day keeps the real start hour (else 00:00),
+// and only the actual end day keeps the real end hour (else 24:00).
+export function clampToDay(ev, dayDate) {
+  const s = parseTime(ev.start);
+  if (s == null) return null;
+  const startKey = localDateKey(new Date(ev.start));
+  const endDate = ev.end ? new Date(ev.end) : null;
+  const endKey = endDate ? localDateKey(endDate) : startKey;
+  const isStartDay = !dayDate || dayDate === startKey;
+  const isEndDay = !dayDate || dayDate === endKey;
+  const top = isStartDay ? s : 0;
+  let bottom = isEndDay ? (endDate ? parseTime(ev.end) : top + 1) : 24;
+  if (bottom == null || bottom <= top) bottom = Math.min(24, top + 1);
+  return { s: top, e: bottom };
+}
+
+// Converts an [s, e) hour-space block into a top/height percentage pair
+// against the visible [rangeStart, rangeStart + spanHours] lane, clamping
+// each edge independently into [0,100] *before* deriving height. A
+// pass-through day of a multi-day event spans the full 0-24h logical day
+// (clampToDay), which routinely runs past a narrowed
+// day_start_hour/day_end_hour window — deriving height from the unclamped
+// span first would let it exceed 100% and, since nothing upstream clips
+// overflow, spill the block out past the lane's bottom edge instead of
+// stopping at it.
+export function pctSpan(s, e, rangeStart, spanHours) {
+  const rawTop = ((s - rangeStart) / spanHours) * 100;
+  const rawBottom = ((e - rangeStart) / spanHours) * 100;
+  const top = Math.max(0, Math.min(rawTop, 100));
+  const bottom = Math.max(0, Math.min(rawBottom, 100));
+  return { top, height: Math.max(2, bottom - top) };
+}
+
+// Groups an all-day event's per-day copies (identical start/end/summary
+// on each, per the server-side spread) back into a single {ev, first,
+// last} bar spanning the day-column indices it covers.
+function collectAllDayBars(days) {
+  const byKey = new Map();
+  days.forEach((d, i) => {
+    (d.events || []).filter((e) => e.all_day).forEach((ev) => {
+      const key = `${ev.start}|${ev.end}|${ev.summary}`;
+      const bar = byKey.get(key);
+      if (bar) bar.last = i;
+      else byKey.set(key, { ev, first: i, last: i });
+    });
+  });
+  return [...byKey.values()];
+}
+
+// Greedy interval-packing so overlapping bars stack into separate lanes
+// instead of colliding when two all-day events cover the same day(s).
+function packAllDayLanes(bars) {
+  const laneEnds = [];
+  return bars
+    .sort((a, b) => a.first - b.first)
+    .map((bar) => {
+      let lane = laneEnds.findIndex((end) => end < bar.first);
+      if (lane === -1) { lane = laneEnds.length; laneEnds.push(bar.last); }
+      else laneEnds[lane] = bar.last;
+      return { ...bar, lane };
+    });
+}
+
 // day_start_hour / day_end_hour cell options override either edge
 // (-1 = keep auto-fitting that edge); set both to 0/24 to always show
 // the whole day regardless of events.
@@ -77,7 +166,7 @@ export function computeRange(days, startOverride = -1, endOverride = -1) {
       if (ev.all_day) continue;
       const s = parseTime(ev.start);
       if (s != null) { lo = Math.min(lo, s); has = true; }
-      const e = parseTime(ev.end) ?? (s != null ? s + 1 : null);
+      const e = eventEndHour(ev, s);
       if (e != null) { hi = Math.max(hi, e); has = true; }
     }
   }
@@ -163,39 +252,37 @@ export default function render(shadow, ctx) {
   const showNow = nowH >= range.start && nowH <= range.end;
   const nowPct = showNow ? ((nowH - range.start) / span) * 100 : 0;
 
-  // ponytail: all-day events render as same-day pills per column; a
-  // multi-day event shows once per day it overlaps (server already
-  // expands it into every covered day's bucket) rather than as a
-  // single strip spanning columns. Add column-spanning rendering if
-  // that turns out to matter in practice.
-  const alldayRow = days.map((d) => {
-    const allDayEvents = (d.events || []).filter((e) => e.all_day);
-    if (!allDayEvents.length) return `<div class="tt-allday"></div>`;
-    const pills = allDayEvents.map((ev) => {
-      const colour = ev.colour || "var(--accent-4)";
-      const tint = `color-mix(in oklab, ${colour} 28%, var(--surface))`;
-      return `<span class="tt-allday-pill" style="border-left-color:${colour};--tt-bg:${tint}">${escapeHtml(ev.summary || "")}</span>`;
-    }).join("");
-    return `<div class="tt-allday">${pills}</div>`;
-  }).join("");
-  const hasAllDay = days.some((d) => (d.events || []).some((e) => e.all_day));
+  // The server spreads a multi-day all-day event across every covered
+  // day's bucket (same start/end/summary on each copy) so today's view
+  // always includes it. Group those copies back into one bar spanning
+  // the covered day columns instead of repeating the label per day.
+  const allDayBars = packAllDayLanes(collectAllDayBars(days));
+  // grid-column:2/-1 (day columns only, no hour-gutter track) + a plain
+  // repeat(N,1fr) here is deliberate: this wrapper is a *nested* grid,
+  // sized independently of the outer .tt.is-week grid. An "auto" gutter
+  // column here has no content to size itself against and collapses to
+  // 0, which widened every day column and shifted every pill left of
+  // its real day. Dropping the gutter track and starting at the outer
+  // grid's day-column 2 makes this grid's tracks land on the exact same
+  // pixels as the header/lane day columns above and below it.
+  const alldayRow = allDayBars.length
+    ? `<div class="tt-allday-row" style="grid-column:2/-1;display:grid;grid-template-columns:repeat(${days.length}, 1fr);gap:var(--space-1)">${allDayBars.map((bar) => {
+        const colour = bar.ev.colour || "var(--accent-4)";
+        const tint = `color-mix(in oklab, ${colour} 28%, var(--surface))`;
+        return `<span class="tt-allday-pill" style="grid-column:${bar.first + 1} / span ${bar.last - bar.first + 1};grid-row:${bar.lane + 1};border-left-color:${colour};--tt-bg:${tint}">${escapeHtml(bar.ev.summary || "")}</span>`;
+      }).join("")}</div>`
+    : "";
+  const hasAllDay = allDayBars.length > 0;
 
   const lanes = days.map((d) => {
     const isWeekend = d.weekday === 5 || d.weekday === 6;
     const isToday = !!d.is_today;
     const events = (d.events || []).filter((e) => !e.all_day);
     const blocks = events.map((ev) => {
-      const s = parseTime(ev.start);
-      if (s == null) return "";
-      const e = parseTime(ev.end) ?? s + 1;
-      const rawTop = ((s - range.start) / span) * 100;
-      const rawHeight = Math.max(2, ((e - s) / span) * 100);
-      // Clamp the event's top so a row sitting at the very end of the
-      // range (e.g. an event at 24:00) doesn't overflow below the
-      // lane. Cap at (100 - height) so the block always ends inside
-      // the lane's bottom edge.
-      const top = Math.max(0, Math.min(rawTop, 100 - rawHeight));
-      const height = rawHeight;
+      const clamped = clampToDay(ev, d.date);
+      if (clamped == null) return "";
+      const { s, e } = clamped;
+      const { top, height } = pctSpan(s, e, range.start, span);
       const colour = ev.colour || "var(--accent-4)";
       const tint = `color-mix(in oklab, ${colour} 28%, var(--surface))`;
       const time = `${fmtHm(ev.start)}${ev.end ? `–${fmtHm(ev.end)}` : ""}`;
@@ -363,7 +450,7 @@ export default function render(shadow, ctx) {
           <div class="tt is-week" style="flex:1 1 auto;min-height:0;grid-template-rows:${hasAllDay ? "auto auto 1fr" : "auto 1fr"}">
             <div></div>
             ${heads}
-            ${hasAllDay ? `<div></div>${alldayRow}` : ""}
+            ${alldayRow}
             <div class="tt-hours">${hourLabels(range)}</div>
             ${lanes}
           </div>

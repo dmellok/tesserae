@@ -10,8 +10,8 @@ from flask import current_app
 
 from app.calendar_time import (
     all_day_event_date_keys,
-    event_local_date_key,
     local_midnight_utc,
+    timed_event_date_keys,
 )
 from app.tz_resolve import app_timezone
 
@@ -64,15 +64,18 @@ def fetch(
     except Exception as err:
         return {"error": f"{type(err).__name__}: {err}", "days": []}
 
-    # Bucket timed events by their local start date. All-day event DTEND
-    # values are exclusive, so expand them across each covered visible date
-    # (same split as calendar_month) rather than only their start day.
+    # Expand every event across each visible day it covers: all-day DTEND
+    # values are exclusive so they're spread across each covered date (same
+    # split as calendar_month), and a timed event's [start, end) span can
+    # itself cross midnight or run several days (an overnight block, a
+    # multi-day trip) — bucketing it only on its start day would make it
+    # vanish from every day after that.
     buckets: dict[str, list[dict[str, Any]]] = {}
     for ev in events:
         if ev.get("all_day"):
             day_keys = all_day_event_date_keys(ev, start_date, end_date)
         else:
-            day_keys = [event_local_date_key(ev, zone)]
+            day_keys = timed_event_date_keys(ev, zone, start_date, end_date)
         for day_key in day_keys:
             buckets.setdefault(day_key, []).append(ev)
 

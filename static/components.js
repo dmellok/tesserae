@@ -6,13 +6,11 @@
 (function () {
   function attachSliders(root) {
     root.querySelectorAll('input[type="range"]:not([data-bound])').forEach((slider) => {
-      const output = root.querySelector(`output[for="${slider.id}"]`);
-      const suffix = slider.dataset.outputSuffix || "";
-      const sync = () => {
-        if (output) output.value = slider.value + suffix;
-        // Paint the filled portion of the track in the accent colour
-        // (WebKit can't draw progress natively; Firefox uses
-        // ::-moz-range-progress for the same effect.)
+      const number = root.querySelector(`input[data-slider-number-for="${slider.id}"]`);
+      // Paint the filled portion of the track in the accent colour
+      // (WebKit can't draw progress natively; Firefox uses
+      // ::-moz-range-progress for the same effect.)
+      const paintFill = () => {
         const min = parseFloat(slider.min || "0");
         const max = parseFloat(slider.max || "100");
         const val = parseFloat(slider.value || "0");
@@ -20,9 +18,22 @@
         const pct = span > 0 ? ((val - min) / span) * 100 : 0;
         slider.style.setProperty("--slider-fill", pct + "%");
       };
-      slider.addEventListener("input", sync);
-      slider.addEventListener("change", sync);
-      sync();
+      const syncFromSlider = () => {
+        if (number) number.value = slider.value;
+        paintFill();
+      };
+      const syncFromNumber = () => {
+        if (!number || number.value === "") return;
+        slider.value = number.value;
+        paintFill();
+      };
+      slider.addEventListener("input", syncFromSlider);
+      slider.addEventListener("change", syncFromSlider);
+      if (number) {
+        number.addEventListener("input", syncFromNumber);
+        number.addEventListener("change", syncFromNumber);
+      }
+      syncFromSlider();
       slider.dataset.bound = "1";
     });
   }

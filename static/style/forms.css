@@ -1454,14 +1454,28 @@ code {
   gap: var(--t-space-2);
 }
 
-.slider-value {
+.slider-value-wrap {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--t-space-1);
+}
+
+input.slider-value {
   font-variant-numeric: tabular-nums;
   font-size: var(--t-size-sm);
   font-weight: 600;
   color: var(--t-fg-soft);
   background: var(--t-surface-soft);
   padding: 2px var(--t-space-2);
+  border: 1px solid var(--t-border);
   border-radius: var(--t-radius-pill);
+  width: 4.5em;
+  text-align: right;
+}
+
+.slider-unit {
+  font-size: var(--t-size-sm);
+  color: var(--t-fg-soft);
 }
 
 input[type="range"].slider {
