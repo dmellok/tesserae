@@ -91,14 +91,31 @@
         <form method="post" action="{{ url_for('pages.update', page_id=page.id) }}"
               class="dx-updates-ctl" title="How often this page's content re-renders while it's on a panel. Delivery respects quiet hours; battery panels pick changes up at their next wake.">
           <span class="dx-meta-k">Updates</span>
-          <select name="refresh_minutes" onchange="this.form.submit()">
+          {# The presets cover the common cadences; "custom" reveals a minutes
+             box for anything else, which matters when a dashboard has to line
+             up with a battery panel's own wake interval (a 20 or 45 minute
+             sleep has no preset, and a mismatch means the panel silently skips
+             renders). A stored value outside this list selects "custom" so it
+             renders as itself rather than falling back to the first option. #}
+          {% set refresh_presets = [0, 1, 5, 15, 30, 60, 1440] %}
+          {% set is_custom = page.refresh_minutes not in refresh_presets %}
+          <select name="refresh_minutes" data-updates-preset aria-label="How often this dashboard re-renders">
             <option value="0" {% if page.refresh_minutes == 0 %}selected{% endif %}>only when pushed</option>
             <option value="1" {% if page.refresh_minutes == 1 %}selected{% endif %}>every minute</option>
             <option value="5" {% if page.refresh_minutes == 5 %}selected{% endif %}>every 5 min</option>
             <option value="15" {% if page.refresh_minutes == 15 %}selected{% endif %}>every 15 min</option>
+            <option value="30" {% if page.refresh_minutes == 30 %}selected{% endif %}>every 30 min</option>
             <option value="60" {% if page.refresh_minutes == 60 %}selected{% endif %}>hourly</option>
             <option value="1440" {% if page.refresh_minutes == 1440 %}selected{% endif %}>daily</option>
+            <option value="custom" {% if is_custom %}selected{% endif %}>custom…</option>
           </select>
+          <input type="number" name="refresh_minutes_custom" min="0" max="1440" step="1"
+                 value="{{ page.refresh_minutes }}" data-updates-custom
+                 aria-label="Update frequency in minutes"
+                 {% if not is_custom %}hidden{% endif %}>
+          <span class="dx-updates-unit" data-updates-unit {% if not is_custom %}hidden{% endif %}>min</span>
+          <button type="submit" class="ghost dx-updates-set" data-updates-set
+                  {% if not is_custom %}hidden{% endif %}>Set</button>
           <noscript><button type="submit" class="ghost">Set</button></noscript>
         </form>
         <div class="dx-discovered-actions">
@@ -197,6 +214,26 @@
     const sync = () => { btn.disabled = !input.value.trim(); };
     input.addEventListener('input', sync);
     sync();
+  })();
+
+  // Updates control: a preset submits straight away, "custom" reveals a
+  // minutes box instead so the value isn't posted until it's been typed.
+  // Without JS the select still posts a preset (and "custom" resolves to the
+  // stored value server-side), which is the pre-custom behaviour.
+  (function () {
+    document.querySelectorAll('[data-updates-preset]').forEach(function (sel) {
+      const form = sel.form;
+      if (!form) return;
+      const box = form.querySelector('[data-updates-custom]');
+      const unit = form.querySelector('[data-updates-unit]');
+      const set = form.querySelector('[data-updates-set]');
+      sel.addEventListener('change', function () {
+        const custom = sel.value === 'custom';
+        [box, unit, set].forEach(function (el) { if (el) el.hidden = !custom; });
+        if (custom) { if (box) { box.focus(); box.select(); } return; }
+        form.submit();
+      });
+    });
   })();
 
   // Hover preview. One shared popover holding a cached PNG screenshot of the

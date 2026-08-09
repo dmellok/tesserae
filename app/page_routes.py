@@ -965,9 +965,16 @@ def update(page_id: str) -> Response:
     if "font" in form:
         updates["font"] = form.get("font") or None
     if "refresh_minutes" in form:
-        updates["refresh_minutes"] = _coerce_int(
-            form.get("refresh_minutes"), page.refresh_minutes, lo=0, hi=1440
-        )
+        # The Updates dropdown posts a preset, or the literal "custom" when the
+        # user wants a cadence the presets don't cover (matching a battery
+        # panel's own wake interval, typically). The minutes box carries the
+        # value in that case; a non-numeric or empty one falls through to the
+        # stored value, so a stray "custom" submit is a no-op rather than a
+        # reset to zero.
+        raw = form.get("refresh_minutes")
+        if raw == "custom":
+            raw = form.get("refresh_minutes_custom")
+        updates["refresh_minutes"] = _coerce_int(raw, page.refresh_minutes, lo=0, hi=1440)
     if "gap" in form:
         updates["gap"] = _coerce_int(form.get("gap"), page.gap, lo=0)
     if "corner_radius" in form:

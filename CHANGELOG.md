@@ -4,6 +4,24 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.284.0], 2026-08-10
+
+### Added
+
+- **Any update cadence for a dashboard.** The Updates control gains a 30 minute
+  preset and a **custom…** option with a minutes box, so a dashboard can be set
+  to any interval up to a day. Matching a battery panel's own wake interval
+  matters: a panel sleeping 30 minutes against a dashboard refreshing every 15
+  only ever downloads the newest render, so a sequential gallery appears to skip
+  every second picture.
+
+### Fixed
+
+- **A cadence outside the preset list renders as itself.** `refresh_minutes`
+  always accepted anything up to a day, but a value the dropdown didn't offer
+  had no matching option and the list drew it as "only when pushed", so opening
+  the dropdown and picking anything silently rewrote it.
+
 ## [0.283.0], 2026-08-09
 
 ### Added

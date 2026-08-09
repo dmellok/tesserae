@@ -353,6 +353,12 @@
 .dx-updates-ctl { display: flex; align-items: center; gap: 6px; margin-left: 10px; flex: none; }
 .dx-updates-ctl select { font-size: 12px; padding: 2px 6px; border-radius: var(--t-radius-sm); border: 1px solid var(--t-border); background: var(--t-bg); color: var(--t-fg-soft); }
 .dx-updates-ctl select:has(option:checked:not([value="0"])) { border-color: var(--t-accent); color: var(--t-fg); }
+/* Custom cadence: a minutes box next to the preset select. Sized for four
+   digits (1440 is the ceiling) so it doesn't crowd the card's action row. */
+.dx-updates-ctl input[type="number"] { width: 62px; font-size: 12px; padding: 2px 6px; border-radius: var(--t-radius-sm); border: 1px solid var(--t-accent); background: var(--t-bg); color: var(--t-fg); }
+.dx-updates-ctl .dx-updates-unit { font-size: 12px; color: var(--t-fg-soft); }
+.dx-updates-ctl .dx-updates-set { font-size: 12px; padding: 2px 8px; }
+.dx-updates-ctl [hidden] { display: none; }
 
 /* -- Lineups page: per-display sections, entry rows --------------------- */
 .dk-group { margin-bottom: 26px; }

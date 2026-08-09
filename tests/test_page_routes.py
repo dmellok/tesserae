@@ -1551,3 +1551,64 @@ def test_editor_preview_iframe_carries_a_version_buster(app: Flask) -> None:
     pid = _new(client, name="Home", layout="2x2_grid")
     body = client.get(f"/pages/{pid}").get_data(as_text=True)
     assert f"v={app.config['APP_VERSION']}" in body
+
+
+# -- Updates cadence control -----------------------------------------
+
+
+def test_preset_cadence_saves_as_itself(app: Flask, tmp_path: Path) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    pid = _new(client, name="Home", layout="1_cell")
+    client.post(f"/pages/{pid}", data={"refresh_minutes": "30"})
+    assert _store(tmp_path).get(pid).refresh_minutes == 30
+
+
+def test_custom_cadence_comes_from_the_minutes_box(app: Flask, tmp_path: Path) -> None:
+    """A cadence the presets don't cover (matching a battery panel's own
+    wake interval) posts the sentinel plus a minutes value."""
+    client = app.test_client()
+    _sign_in(client)
+    pid = _new(client, name="Home", layout="1_cell")
+    client.post(
+        f"/pages/{pid}",
+        data={"refresh_minutes": "custom", "refresh_minutes_custom": "45"},
+    )
+    assert _store(tmp_path).get(pid).refresh_minutes == 45
+
+
+def test_custom_cadence_without_a_value_keeps_the_stored_one(app: Flask, tmp_path: Path) -> None:
+    """The sentinel on its own must not read as zero, which would quietly
+    turn a refreshing dashboard into a push-only one."""
+    client = app.test_client()
+    _sign_in(client)
+    pid = _new(client, name="Home", layout="1_cell")
+    client.post(f"/pages/{pid}", data={"refresh_minutes": "15"})
+    client.post(f"/pages/{pid}", data={"refresh_minutes": "custom", "refresh_minutes_custom": ""})
+    assert _store(tmp_path).get(pid).refresh_minutes == 15
+
+
+def test_custom_cadence_is_clamped_to_a_day(app: Flask, tmp_path: Path) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    pid = _new(client, name="Home", layout="1_cell")
+    client.post(
+        f"/pages/{pid}",
+        data={"refresh_minutes": "custom", "refresh_minutes_custom": "99999"},
+    )
+    assert _store(tmp_path).get(pid).refresh_minutes == 1440
+
+
+def test_a_non_preset_cadence_renders_as_custom_in_the_list(app: Flask, tmp_path: Path) -> None:
+    """Before the custom box existed, a value set outside the dropdown had
+    no matching option and the list rendered it as "only when pushed"."""
+    client = app.test_client()
+    _sign_in(client)
+    pid = _new(client, name="Home", layout="1_cell")
+    client.post(
+        f"/pages/{pid}",
+        data={"refresh_minutes": "custom", "refresh_minutes_custom": "45"},
+    )
+    body = client.get("/pages").get_data(as_text=True)
+    assert '<option value="custom" selected>custom…</option>' in body
+    assert 'value="45"' in body
