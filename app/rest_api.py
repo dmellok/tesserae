@@ -49,7 +49,12 @@ from werkzeug.wrappers import Response
 
 from app.button_service import ButtonService, TouchStroke
 from app.device_loader import Device, DeviceRegistry
-from app.device_service import create_instance, generate_access_token
+from app.device_service import (
+    create_instance,
+    generate_access_token,
+    panel_geometry_from_report,
+    parse_rotation,
+)
 from app.render_signing import sign_render_query
 from app.renderer_loader import RendererRegistry
 from app.state.event_log import EventLog
@@ -910,6 +915,17 @@ def get_frame(device_id: str) -> Response:
         "render_id": latest["digest"],
         "renderer_id": latest.get("renderer_id", ""),
     }
+    # Devices whose manifest declares a framebuffer (a client that sent a
+    # ``rotation`` at registration, or a hardware manifest with a
+    # ``native_w``/``native_h`` block) get those dims echoed back
+    # alongside the composer-orientation ones, so the client can
+    # sanity-check the image it's about to paint without having to know
+    # which way the dashboard is turned (issue #200). Absent for panels
+    # with no declared stride, and additive either way: a client that
+    # doesn't read the keys is unaffected.
+    if panel.get("native_w") and panel.get("native_h"):
+        payload["native_w"] = int(panel["native_w"])
+        payload["native_h"] = int(panel["native_h"])
     # Merge the renderer's MQTT-frozen payload (rotate / scale / bg /
     # saturation for pi_png, palette_signature for the .bin renderers,
     # etc.) so REST clients get the same fields their MQTT-subscribed
@@ -2374,7 +2390,12 @@ def _discover() -> Response:
 
     Body shape:
         {"device_id": "...", "kind": "...", "panel_w": int,
-         "panel_h": int, "fw_version": "...", "mac": "..." }
+         "panel_h": int, "rotation": int, "fw_version": "...",
+         "mac": "..." }
+
+    ``rotation`` is optional; see
+    :func:`app.device_service.panel_geometry_from_report` for what
+    declaring it changes.
 
     Rate-limited per client IP using the same limiter as ``/register``.
     Successful claims do NOT release the bucket (a misconfigured
@@ -2529,8 +2550,16 @@ def _register() -> Response:
         h = int(body.get("panel_h") or 0)
     except (TypeError, ValueError):
         w = h = 0
+    # Optional ``rotation`` (0 / 90 / 180 / 270, issue #200): declares that
+    # panel_w / panel_h are the client's framebuffer and names the turn
+    # from that buffer to the dashboard canvas. Absent, the dims are the
+    # canvas and only the aspect is inferred, which is what every client
+    # written before the field existed means.
+    geometry, reported_orientation = panel_geometry_from_report(
+        w=w, h=h, rotation=parse_rotation(body.get("rotation"))
+    )
     if w > 0 and h > 0:
-        panel_overrides = {"w": w, "h": h}
+        panel_overrides = {"w": w, "h": h, **geometry}
     declared_gamut = body.get("gamut")
     if isinstance(declared_gamut, str) and declared_gamut.strip():
         from app.quantizer import canonicalise_gamut
@@ -2609,6 +2638,7 @@ def _register() -> Response:
         kind_id=kind_id,
         name=str(body.get("name") or "").strip(),
         panel_overrides=panel_overrides,
+        orientation=reported_orientation,
         access_token=None,  # let create_instance mint one
         mac=incoming_mac,
         renderer_id=renderer_id_arg,

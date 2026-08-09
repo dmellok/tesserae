@@ -11,7 +11,9 @@ their heartbeat JSON (see `PROMPTS/updates/*_discovery.md`):
 * ``kind``, the Tesserae device kind id (``pi_bin_client`` /
   ``pi_png_client`` / ``esp32_client`` / ``pico_bin_client``). Tells
   the UI which kind to pre-select in the Add-device form.
-* ``panel_w`` / ``panel_h``, pixel dims the client expects to paint.
+* ``panel_w`` / ``panel_h``, pixel dims the client expects to paint,
+  and an optional ``rotation`` (0 / 90 / 180 / 270) saying how those
+  dims sit relative to the dashboard canvas.
 * ``fw_version``, ``ip`` (optional), diagnostic context, surfaced in
   the discovered-device row.
 
@@ -34,6 +36,7 @@ from typing import Any
 # Shared with the device-instance lifecycle so a discovered id always
 # passes the same validation as a hand-entered one.
 from app.device_service import DEVICE_ID_RE as _DEVICE_ID_RE
+from app.device_service import parse_rotation
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +59,16 @@ class DiscoveredDevice:
     @property
     def panel_h(self) -> int | None:
         return _maybe_int(self.parsed.get("panel_h"))
+
+    @property
+    def rotation(self) -> int | None:
+        """Declared rotation from the /discover payload (issue #200),
+        one of 0 / 90 / 180 / 270. Declaring it means ``panel_w`` /
+        ``panel_h`` describe the client's framebuffer rather than the
+        dashboard canvas; ``None`` (undeclared or off-quadrant) keeps
+        the older reading. Resolved at register time by
+        :func:`app.device_service.panel_geometry_from_report`."""
+        return parse_rotation(self.parsed.get("rotation"))
 
     @property
     def gamut(self) -> str | None:

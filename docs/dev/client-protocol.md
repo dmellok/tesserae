@@ -115,6 +115,7 @@ server URL.
      "kind": "circuitpython_generic",
      "panel_w": 800,
      "panel_h": 480,
+     "rotation": 0,
      "gamut": "mono",
      "name": "Kitchen Display",
      "fw_version": "0.1.0",
@@ -130,6 +131,31 @@ server URL.
    registering; the admin's choice always wins, and later announces
    never rename an already-registered device. Omit it freely, the
    device id is used as the display fallback.
+
+   `rotation` is optional, one of `0`, `90`, `180`, `270`, and it
+   changes how `panel_w` / `panel_h` are read (issue #200).
+
+   Send it and you're saying: **`panel_w` / `panel_h` are my
+   framebuffer, and `rotation` is the turn from that buffer to the
+   dashboard.** `0` means the dashboard is composed at the dims you
+   reported. `90` and `270` compose it transposed, so a client
+   reporting `1200 x 1920` gets a `1920 x 1200` dashboard rotated back
+   onto its `1200 x 1920` buffer before the image is written. `180`
+   keeps the dims and turns the image half a turn for an upside-down
+   mount. Either way the file you download is shaped like the panel you
+   declared, and the server also echoes `native_w` / `native_h` back in
+   the `/frame` envelope so you can assert on it.
+
+   Omit it and the older reading applies: `panel_w` / `panel_h` are the
+   dashboard canvas itself, and the server only infers the aspect from
+   them (taller than wide registers as portrait). That's what every
+   client written before this field existed means, so nothing changes
+   for firmware that doesn't send it, including a client doing its own
+   rotation after download.
+
+   The value is a registration-time fact. Remount the panel and change
+   it with the Rotation dropdown in Settings → Devices, or re-register;
+   `/status` doesn't accept it.
 
    `gamut` is optional; when supplied, it's persisted onto the
    auto-provisioned instance's panel block so the generic
@@ -255,6 +281,7 @@ click.
      "kind": "circuitpython_generic",
      "panel_w": 800,
      "panel_h": 480,
+     "rotation": 0,
      "gamut": "mono",
      "name": "Kitchen Display",
      "fw_version": "0.1.0",
@@ -263,8 +290,8 @@ click.
 
    `gamut` follows the same rules as on `/discover` (v0.69.1). Both
    paths write the canonicalised value onto the auto-provisioned
-   instance's panel block. `format` (`png` / `bmp`) is honoured here
-   too, same rules as on `/discover`.
+   instance's panel block. `format` (`png` / `bmp`) and `rotation` are
+   honoured here too, same rules as on `/discover`.
    ```
 3. Server validates, creates the instance, returns a token:
    ```json
@@ -382,6 +409,8 @@ Headers: `ETag: "<digest>"`, `Content-Location: <absolute URL of the frame>`, `C
 | `format` | string | yes | file extension | `"bin"`, `"png"`, etc. Tells the client which decoder to use. Matches the topic suffix on the MQTT side (`frame/<format>`). |
 | `panel_w` | int | yes | device manifest | Panel width in pixels (composer orientation; usually landscape for `.bin` clients, can be portrait for `.png`). Sanity-check this matches your display before painting. |
 | `panel_h` | int | yes | device manifest | Panel height in pixels, same caveats as `panel_w`. |
+| `native_w` | int | no | device manifest | Framebuffer width in pixels, present when the device declared one (a `rotation` at registration, or a hardware manifest's `native_w` / `native_h` block). This is the shape the downloaded file actually has, so it's the one to assert against your display buffer. |
+| `native_h` | int | no | device manifest | Framebuffer height in pixels, same rules as `native_w`. |
 | `render_id` | string | yes | SHA-256 truncated to 16 hex chars | Content-addressed digest of the artefact. Stable across identical renders, so two consecutive `/frame` calls returning the same digest mean nothing changed. Use as the value for `If-None-Match` on your next request. Also serves as the `ETag` header. |
 | `renderer_id` | string | yes | `<renderer_kind>__<device_id>` | Which renderer produced this frame. Useful for log lines; not needed for paint. |
 | `rotate` | int (0–3) | **PNG only** | per-device setting | Number of 90° clockwise quarter-turns the client should apply *after* decoding the PNG. Already-baked into `.bin` output server-side, so it's not sent for bin. |

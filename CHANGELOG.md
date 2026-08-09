@@ -4,6 +4,35 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.283.0], 2026-08-09
+
+### Added
+
+- **Clients can declare their panel rotation at registration** (#200). `rotation`
+  (0 / 90 / 180 / 270) is now accepted on `/api/v1/device/discover` and
+  `/api/v1/device/register`. Sending it means `panel_w` / `panel_h` describe the
+  client's framebuffer and the rotation is the turn from that buffer to the
+  dashboard canvas, so a panel that autodetects as 1200x1920 can drive a
+  1920x1200 dashboard and still receive a 1200x1920 image. The buffer is stored
+  as the panel's native dims and echoed back as `native_w` / `native_h` in the
+  `/frame` envelope. Omitting the field keeps the previous reading, where the
+  reported dims are the canvas itself.
+- **The CircuitPython renderers rotate onto a declared framebuffer.**
+  `circuitpython_png` and `circuitpython_bmp` emitted at composition dims, which
+  left a rotated dashboard un-paintable on a client whose buffer is fixed the
+  other way. They now turn the composition onto the buffer before quantising,
+  the way the `.bin` renderers do. Only devices that declared a buffer are
+  affected; where the native dims were inferred from the preset table, output
+  keeps its existing shape.
+
+### Fixed
+
+- **A portrait client self-registering over REST no longer lands inconsistent.**
+  The orientation fix in v0.280.0 covered the admin Register button but not
+  `/api/v1/device/register` or the setup wizard's one-click register, so devices
+  paired through those paths still stored portrait dims against a landscape
+  orientation and had them swapped on the next save (#200).
+
 ## [0.282.0], 2026-08-09
 
 ### Added

@@ -441,6 +441,14 @@ def register_discovered(discovered_id: str) -> Response:
             from app.quantizer import canonicalise_gamut
 
             overrides["gamut"] = canonicalise_gamut(entry.gamut)
+    # Same geometry resolution as the Settings → Devices register button
+    # (issue #200): keep the announce's dims and derive an orientation that
+    # agrees with them, rather than letting the kind's default orientation
+    # rewrite them on the next save.
+    geometry, reported_orientation = device_service.panel_geometry_from_report(
+        w=overrides.get("w"), h=overrides.get("h"), rotation=entry.rotation
+    )
+    overrides.update(geometry)
     renderers = _renderers()
     kind = _devices().get(kind_id)
     renderer_id = device_service.renderer_id_for_format(renderers, kind, entry.wire_format)
@@ -451,6 +459,7 @@ def register_discovered(discovered_id: str) -> Response:
         instance_id=discovered_id,
         kind_id=kind_id,
         panel_overrides=overrides,
+        orientation=reported_orientation,
         renderer_id=renderer_id,
     )
     if not result.ok or result.device is None:

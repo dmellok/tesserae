@@ -47,9 +47,24 @@ from app.quantizer import circuitpython_indexed_image
 from app.state.page_store import Panel
 
 
+def _declared_native_size(panel: Panel) -> tuple[int, int] | None:
+    """The client's framebuffer dims, but only when the device declared
+    them (a manifest ``native_w``/``native_h`` block, or a ``rotation``
+    sent at registration).
+
+    Preset-inferred native dims are deliberately ignored here: a device
+    already painting composition-shaped frames correctly, with the
+    rotation handled on-device, would otherwise start receiving them
+    turned 90° after an upgrade (issue #200)."""
+    if panel.native_declared and panel.native_w is not None and panel.native_h is not None:
+        return (panel.native_w, panel.native_h)
+    return None
+
+
 def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> bytes:
     """Fit, contrast-adjust, quantize, and save the composition as an
-    uncompressed indexed BMP at the panel's exact dims.
+    uncompressed indexed BMP at the panel's exact dims, or at the
+    client's declared framebuffer dims when it sent a ``rotation``.
 
     Shares the pixel pipeline (fit, contrast, palette-quantise) with
     ``circuitpython_png`` via
@@ -70,6 +85,7 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
         flip=panel.flip,
         underscan=panel.underscan,
         settings=settings,
+        native_size=_declared_native_size(panel),
     )
     return pack_indexed_bmp(img)
 

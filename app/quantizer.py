@@ -939,6 +939,7 @@ def circuitpython_indexed_image(
     flip: bool = False,
     underscan: int = 0,
     settings: dict[str, object] | None = None,
+    native_size: tuple[int, int] | None = None,
 ) -> Image.Image:
     """Fit, contrast-adjust, and quantise a composition PNG for a
     CircuitPython client, returning the ready-to-save Pillow image.
@@ -947,6 +948,14 @@ def circuitpython_indexed_image(
     caller that saves it as PNG or uncompressed BMP produces an indexed
     file ``adafruit_imageload`` mounts natively. ``rgb24`` / ``rgb16``
     gamuts return an ``"RGB"`` image instead (full-colour passthrough).
+
+    ``width`` / ``height`` are the composition dims. ``native_size`` is
+    the client's framebuffer when the device declared one (issue #200):
+    a composition in the other aspect is turned 90° CW onto it, the way
+    the .bin renderers land a portrait dashboard on a landscape-native
+    panel, so the file always arrives shaped like the buffer the client
+    reported. Without it the output keeps the composition's shape, which
+    is what every client that predates the ``rotation`` field expects.
 
     The device paints what arrives: no on-device quantise, no dither, no
     nibble unpack. This is the shared pixel pipeline behind both the
@@ -963,9 +972,25 @@ def circuitpython_indexed_image(
     if img.size != (width, height):
         # Composer pre-sizes pages to ``panel.w x panel.h`` so this is
         # usually a no-op. It only does real work on Send-page image
-        # pushes where the input PNG isn't panel-sized.
+        # pushes where the input PNG isn't panel-sized. Fitting to the
+        # composition dims before any rotation keeps an arbitrary
+        # uploaded photo's aspect handling identical to the .bin path.
         fit = str(settings.get("image_fit") or "fit")
         img = fit_to_panel(img, target_w=width, target_h=height, scale=fit, bg="white")
+
+    if native_size is not None:
+        native_w, native_h = native_size
+        if (native_w > native_h) != (width > height):
+            # Composition aspect differs from the framebuffer: rotate so
+            # the canvas's left edge lands on the panel's top edge. PIL
+            # ``rotate`` is counter-clockwise, so -90 gives CW.
+            img = img.rotate(-90, expand=True)
+        if img.size != (native_w, native_h):
+            # Bounded fallback for a client whose declared buffer isn't
+            # the exact composition pair (mismatched dims, not just a
+            # swapped aspect).
+            fit = str(settings.get("image_fit") or "fit")
+            img = fit_to_panel(img, target_w=native_w, target_h=native_h, scale=fit, bg="white")
 
     if underscan:
         # Per-device underscan: inset rendered content so it clears a

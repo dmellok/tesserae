@@ -15,7 +15,7 @@ broker (**Settings → Server → MQTT broker**), and you've
         **Settings → Server**, and that the client's `device_id` and broker
         credentials match.
 
-3. **Calibrate orientation.** Hit **Calibrate** to push a numbered test card to the panel, then tell Tesserae which number landed in the top-left corner; it sets the rotation that makes your dashboard read upright. The **Rotation** dropdown (0 / 90 / 180 / 270°) is there for manual tweaks.
+3. **Calibrate orientation.** Hit **Calibrate** to push a numbered test card to the panel, then tell Tesserae which number landed in the top-left corner; it sets the rotation that makes your dashboard read upright. The **Rotation** dropdown (0 / 90 / 180 / 270°) is there for manual tweaks. A client can also declare its rotation when it registers, which additionally tells Tesserae that the dims it reported are its framebuffer rather than the dashboard canvas (see [the client protocol](../dev/client-protocol.md)); the dropdown edits that afterwards either way.
 4. **Bind a dashboard.** Open the page editor and set the page's **panel** block to match the device's panel size, then pick a layout preset and assign a widget per cell (see [Compose a dashboard](#compose-a-dashboard) below). Send the page to push it to the device.
 
 ## Register a TRMNL / KOReader client (HTTP-pull)

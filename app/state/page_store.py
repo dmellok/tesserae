@@ -67,6 +67,16 @@ class Panel(BaseModel):
     # not a per-page choice.
     native_w: int | None = Field(default=None, gt=0)
     native_h: int | None = Field(default=None, gt=0)
+    # True when the native dims came from the device itself (a manifest
+    # block, or a client declaring ``rotation`` at registration) rather
+    # than from the dims-matching preset fallback in ``device_panel``.
+    # The .bin renderers pack at native dims either way, but a renderer
+    # whose output shape used to follow the composition (the
+    # CircuitPython pair) can only start rotating onto the buffer when
+    # the device actually vouched for it; a guess from the preset table
+    # would silently reshape frames for panels already painting
+    # correctly (issue #200).
+    native_declared: bool = False
 
 
 class Cell(BaseModel):

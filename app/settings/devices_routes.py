@@ -623,18 +623,19 @@ def devices_register_discovered(discovered_id: str) -> Response:
 
             panel_overrides["gamut"] = canonicalise_gamut(entry.gamut)
 
-    # Firmware reports dims but never an orientation, so a client that paints a
-    # tall panel used to land with portrait dims and the kind's landscape
-    # orientation. Nothing reads that contradiction until the first save of the
-    # panel form, which resolves it by rewriting the dims to match the
-    # orientation: the user's 1200x1920 silently became 1920x1200 (issue #200).
-    # Derive the aspect from what the client reported so the stored panel is
-    # self-consistent from the moment it's created.
-    reported_orientation: str | None = None
-    if panel_overrides.get("w") and panel_overrides.get("h"):
-        reported_orientation = (
-            "portrait" if int(panel_overrides["h"]) > int(panel_overrides["w"]) else "landscape"
-        )
+    # A client that paints a tall panel used to land with portrait dims and the
+    # kind's landscape orientation. Nothing reads that contradiction until the
+    # first save of the panel form, which resolves it by rewriting the dims to
+    # match the orientation: the user's 1200x1920 silently became 1920x1200
+    # (issue #200). Resolve the announce's geometry up front so the stored panel
+    # is self-consistent from the moment it's created, honouring a declared
+    # ``rotation`` when the client sent one.
+    geometry, reported_orientation = device_service.panel_geometry_from_report(
+        w=panel_overrides.get("w"),
+        h=panel_overrides.get("h"),
+        rotation=entry.rotation,
+    )
+    panel_overrides.update(geometry)
 
     # TRMNL discoveries carry the original access_token in the cache
     # entry's parsed payload so create_instance can preserve it, the

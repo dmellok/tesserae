@@ -237,6 +237,63 @@ def renderer_id_for_format(
     return None
 
 
+VALID_ROTATIONS: tuple[int, ...] = (0, 90, 180, 270)
+
+
+def parse_rotation(value: Any) -> int | None:
+    """Coerce a client-reported ``rotation`` to one of 0 / 90 / 180 / 270.
+
+    ``None`` means "the client didn't declare one", which is a different
+    state from ``0`` and keeps the caller on the derive-from-dims path.
+    Off-quadrant, non-numeric and boolean values are treated as
+    undeclared rather than rejected: a firmware sending nonsense should
+    land the same way one sending nothing does, not fail to pair."""
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        rotation = int(value)
+    except (TypeError, ValueError):
+        return None
+    rotation %= 360
+    return rotation if rotation in VALID_ROTATIONS else None
+
+
+def panel_geometry_from_report(
+    *, w: int | None, h: int | None, rotation: int | None
+) -> tuple[dict[str, int], str | None]:
+    """Map a client's reported panel geometry onto panel overrides and a
+    composition orientation.
+
+    Two contracts meet here, and ``rotation`` is what tells them apart
+    (issue #200).
+
+    Without a ``rotation``, the reported dims *are* the composition
+    canvas, which is all any client could express before the field
+    existed. The only thing to infer is the aspect, so a client painting
+    a tall panel stops landing with portrait dims and the kind's
+    landscape orientation, a contradiction that the next save of the
+    panel form used to resolve by rewriting the dims.
+
+    With a ``rotation``, the reported dims are the client's
+    *framebuffer* and the rotation is the turn from that buffer to the
+    canvas: 0 leaves them equal, 90 / 270 transpose, 180 keeps the dims
+    and flips. The buffer is recorded as ``native_w / native_h`` so a
+    renderer can rotate the finished composition back onto it, and the
+    client always receives an image shaped like the panel it declared.
+
+    Returns the extra panel overrides plus the orientation to stamp;
+    ``_apply_orientation`` does the w/h swap from there."""
+    if not w or not h or w <= 0 or h <= 0:
+        return ({}, None)
+    if rotation is None:
+        return ({}, "portrait" if h > w else "landscape")
+    transposed = rotation in (90, 270)
+    canvas_landscape = (w >= h) != transposed
+    aspect = "landscape" if canvas_landscape else "portrait"
+    flipped = rotation in (180, 270)
+    return ({"native_w": w, "native_h": h}, f"{aspect}_flipped" if flipped else aspect)
+
+
 def _drop_clones(renderers: RendererRegistry, instance_id: str) -> None:
     """Remove any renderer clones whose resolved device is this instance.
 
