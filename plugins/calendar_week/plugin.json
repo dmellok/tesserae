@@ -14,6 +14,23 @@
   },
   "cell_options": [
     {
+      "name": "feeds_filter",
+      "type": "string",
+      "label": "Feed IDs (comma-separated; blank = all enabled)",
+      "default": ""
+    },
+    {
+      "name": "range_mode",
+      "type": "select",
+      "label": "7-day window",
+      "default": "calendar_week",
+      "choices": [
+        {"value": "calendar_week", "label": "Current calendar week (fixed start day)"},
+        {"value": "rolling_7", "label": "Next 7 days (rolling from today)"}
+      ],
+      "help": "Calendar week always starts on 'Week starts on' below, so it jumps back once today isn't that day. Rolling always starts today."
+    },
+    {
       "name": "week_start",
       "type": "select",
       "label": "Week starts on",
@@ -21,13 +38,8 @@
       "choices": [
         {"value": "sunday", "label": "Sunday"},
         {"value": "monday", "label": "Monday"}
-      ]
-    },
-    {
-      "name": "feeds_filter",
-      "type": "string",
-      "label": "Feed IDs (comma-separated; blank = all enabled)",
-      "default": ""
+      ],
+      "help": "Only used when '7-day window' above is set to Current calendar week."
     },
     {
       "name": "day_start_hour",

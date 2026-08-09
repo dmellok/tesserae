@@ -51,6 +51,13 @@
       "default": true
     },
     {
+      "name": "show_location",
+      "type": "boolean",
+      "label": "Show event locations",
+      "default": false,
+      "help": "Text-display mode only: appends '· location' after each event title. Off by default since month cells are the tightest on space of any calendar widget."
+    },
+    {
       "name": "date_label_style",
       "type": "select",
       "label": "Weekday label style",
@@ -60,13 +67,6 @@
         {"value": "short", "label": "Short (Mon, Tue)"},
         {"value": "minimal", "label": "Minimal (M, Tu)"}
       ]
-    },
-    {
-      "name": "show_location",
-      "type": "boolean",
-      "label": "Show event locations",
-      "default": false,
-      "help": "Text-display mode only: appends '· location' after each event title. Off by default since month cells are the tightest on space of any calendar widget."
     },
     {
       "name": "title_scale",
@@ -107,7 +107,7 @@
       "label": "Cell spacing",
       "default": 0.0,
       "min": 0.0,
-      "max": 1.5,
+      "max": 3.0,
       "step": 0.05,
       "unit": "em",
       "help": "Extra padding added inside each day cell, on top of the default. 0 = default."

@@ -1,8 +1,21 @@
-// calendar_month, Spectra month-grid. Same per-text-type sizing/spacing/
-// label controls as the other calendar_* widgets: dashboard title scale, day
-// header (mc-num) scale, event title scale, event block spacing, a
-// show_location toggle (appends location in text-display mode; absent
-// from the bundled widget), and date_label_style (short/minimal weekday
+// calendar_month, Spectra month-grid. Each day cell carries:
+//
+//   - A heat tint on the cell background scaled by event count, so a
+//     glance over the grid reveals which days are stacked vs quiet.
+//   - Up to 4 feed-colour micro-strips at the bottom of the cell -
+//     one per unique feed that has events that day, so it reads
+//     "this day has work + personal + bills" without spelling it out.
+//   - A +N chip when the day's event count exceeds what the visible
+//     strips / text rows could show.
+//
+// Today's cell keeps the filled accent-1 block behind the day number;
+// out-of-month days fade via the existing is-out class.
+//
+// Same per-text-type sizing/spacing/label controls as the other
+// calendar_* widgets: dashboard title scale, day header (mc-num)
+// scale, event title scale, event block spacing, a show_location
+// toggle (appends location in text-display mode; absent from the
+// bundled widget), and date_label_style (short/minimal weekday
 // abbreviations). No hourly timeline here, so there's no day start/end
 // hour option — every other widget's configurability that applies to a
 // grid-of-days layout is carried over.
@@ -35,7 +48,11 @@ export function clampScale(raw, def, lo, hi) {
   return Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : def;
 }
 
-// Dedupe feed colours preserving first-seen order.
+// Dedupe feed colours preserving first-seen order. The cell shows
+// one strip per unique colour rather than one per event, so a day
+// with three "work" meetings doesn't paint three identical blue
+// strips, it paints one wide blue strip alongside whatever other
+// feeds the day touches.
 function uniqueColours(events) {
   const seen = new Set();
   const out = [];
@@ -50,7 +67,9 @@ function uniqueColours(events) {
 }
 
 // Heat-tint background, scales the cell's background from surface
-// (0 events) up to a `color-mix` overlay of accent-4 at increasing alpha.
+// (0 events) up to a `color-mix` overlay of accent-4 (teal) at
+// increasing alpha. Capped at 5+ events so a single day with 20
+// meetings doesn't drown out the rest of the grid's distinctions.
 function heatBackground(count) {
   if (count <= 0) return "";
   const intensity = Math.min(1, count / 5);
@@ -63,6 +82,9 @@ export default function render(shadow, ctx) {
   const opts = ctx?.cell?.options || {};
   const display = opts.event_display === "text" ? "text" : "bars";
   const maxPerDay = Math.max(1, Number(opts.max_events_per_day) || 3);
+  // Heat-tint on by default; cell option flips it off for users who
+  // want the month-grid to read as a uniform field of cells instead
+  // of "busy days darker".
   const heatmap = opts.heatmap !== false;
   const showLocations = opts.show_location === true;
   const labelStyle = ["short", "minimal", "full"].includes(opts.date_label_style) ? opts.date_label_style : "short";
@@ -103,6 +125,9 @@ export default function render(shadow, ctx) {
 
     let body = "";
     if (display === "text") {
+      // Original "title text with feed colour bar" rendering kept
+      // intact so existing dashboards with that cell option stay
+      // visually consistent.
       const visible = events.slice(0, maxPerDay);
       const remainder = Math.max(0, count - maxPerDay);
       body = `
@@ -114,6 +139,10 @@ export default function render(shadow, ctx) {
         }).join("")}
         ${remainder > 0 ? `<span class="mc-more">+${remainder}</span>` : ""}`;
     } else {
+      // bars mode (default), strips per unique feed-colour. Cap at
+      // 4 strips so a day with 7 distinct feeds doesn't paint a
+      // rainbow stack that pushes the day number out of frame; the
+      // rest are summarised by the +N chip.
       const colours = uniqueColours(events);
       const visibleColours = colours.slice(0, 4);
       const overflow = colours.length - visibleColours.length;
@@ -135,6 +164,9 @@ export default function render(shadow, ctx) {
       </div>`;
   }).join("");
 
+  // Inline layout for the visual-pass additions (heat tints handled
+  // via inline style above; strips + chip styling below). Strip
+  // height bumps at LG so the row reads cleanly on a wide cell.
   const layout = `
     .mc-strips {
       display: flex;

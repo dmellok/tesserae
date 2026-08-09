@@ -1,18 +1,23 @@
-// calendar_week, Spectra timetable, seven columns. Same per-text-type
-// sizing/spacing/label controls as calendar_day / calendar_three /
-// calendar_schedule:
-// event title/location scale, event row spacing, header/axis label
-// scale, dashboard title scale, configurable day_start_hour/day_end_hour
-// (or "always show the whole day"), a show_location toggle + rendering
-// (absent from the bundled widget), and date_label_style (short/minimal
-// weekday+month abbreviations).
+// calendar_week, Spectra timetable, seven columns. Display header
+// shows the date range ("JUN 1 → 7 · 2026"), columns show DOW + day
+// number with today picked out via an inverse accent-1 chip and
+// weekend columns tinted to read distinct from weekdays. Each
+// column head also carries a small event-count chip so a glance
+// answers "which day is the busiest?" without scrolling the lane.
+//
+// Same per-text-type sizing/spacing/label controls as calendar_day /
+// calendar_three / calendar_schedule: event title/location scale,
+// event row spacing, header/axis label scale, dashboard title scale,
+// configurable day_start_hour/day_end_hour (or "always show the whole
+// day"), a show_location toggle + rendering (absent from the bundled
+// widget), and date_label_style (short/minimal weekday+month
+// abbreviations).
 
 const MONTH_SHORT = [
   "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
   "JUL", "AUG", "SEP", "OCT", "NOV", "DEC",
 ];
 const DOW = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
-const DOW_SUN = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 
 // date_label_style cell option: "short" (default, current 3-letter
 // behaviour), "minimal" (1-2 chars, just enough to stay unambiguous), or
@@ -44,7 +49,10 @@ export function clampScale(raw, def, lo, hi) {
 
 // Parse the ISO timestamp through Date so the resulting hour is in
 // the renderer's LOCAL timezone, not whatever offset is baked into
-// the ISO string.
+// the ISO string. calendar_core's server normalises everything to
+// UTC ISO; the previous string-slicing path was treating "14:00
+// Melbourne → 04:00 UTC" as "render at hour 4", landing every event
+// 10 hours from its true local time.
 function parseTime(iso) {
   if (typeof iso !== "string") return null;
   const d = new Date(iso);
@@ -103,11 +111,6 @@ function fmtRange(startIso, endIso, labelStyle) {
   return `${startBit} → ${endBit} · ${year}`;
 }
 
-// Which column indices are weekend days, given the chosen week start.
-function weekendIndices(weekStart) {
-  return weekStart === "sunday" ? new Set([0, 6]) : new Set([5, 6]);
-}
-
 export default function render(shadow, ctx) {
   const data = ctx?.data ?? {};
   const opts = ctx?.cell?.options || {};
@@ -137,14 +140,12 @@ export default function render(shadow, ctx) {
   const days = Array.isArray(data.days) ? data.days.slice(0, 7) : [];
   const range = computeRange(days, startHour, endHour);
   const span = Math.max(1, range.end - range.start);
-  const dowNames = (data.week_start === "sunday") ? DOW_SUN : DOW;
   const rangeMeta = fmtRange(data.start, data.end, labelStyle);
-  const weekendCols = weekendIndices(data.week_start || "monday");
 
-  const heads = days.map((d, i) => {
-    const name = styleShortLabel(dowNames[i] || "", labelStyle, DOW_MINIMAL, DOW_FULL);
+  const heads = days.map((d) => {
+    const name = styleShortLabel(DOW[d.weekday] || "", labelStyle, DOW_MINIMAL, DOW_FULL);
     const isToday = !!d.is_today;
-    const isWeekend = weekendCols.has(i);
+    const isWeekend = d.weekday === 5 || d.weekday === 6;
     const count = Array.isArray(d.events) ? d.events.length : 0;
     const classes = ["tt-col-head"];
     if (isToday) classes.push("is-today");
@@ -162,8 +163,25 @@ export default function render(shadow, ctx) {
   const showNow = nowH >= range.start && nowH <= range.end;
   const nowPct = showNow ? ((nowH - range.start) / span) * 100 : 0;
 
-  const lanes = days.map((d, i) => {
-    const isWeekend = weekendCols.has(i);
+  // ponytail: all-day events render as same-day pills per column; a
+  // multi-day event shows once per day it overlaps (server already
+  // expands it into every covered day's bucket) rather than as a
+  // single strip spanning columns. Add column-spanning rendering if
+  // that turns out to matter in practice.
+  const alldayRow = days.map((d) => {
+    const allDayEvents = (d.events || []).filter((e) => e.all_day);
+    if (!allDayEvents.length) return `<div class="tt-allday"></div>`;
+    const pills = allDayEvents.map((ev) => {
+      const colour = ev.colour || "var(--accent-4)";
+      const tint = `color-mix(in oklab, ${colour} 28%, var(--surface))`;
+      return `<span class="tt-allday-pill" style="border-left-color:${colour};--tt-bg:${tint}">${escapeHtml(ev.summary || "")}</span>`;
+    }).join("");
+    return `<div class="tt-allday">${pills}</div>`;
+  }).join("");
+  const hasAllDay = days.some((d) => (d.events || []).some((e) => e.all_day));
+
+  const lanes = days.map((d) => {
+    const isWeekend = d.weekday === 5 || d.weekday === 6;
     const isToday = !!d.is_today;
     const events = (d.events || []).filter((e) => !e.all_day);
     const blocks = events.map((ev) => {
@@ -172,11 +190,20 @@ export default function render(shadow, ctx) {
       const e = parseTime(ev.end) ?? s + 1;
       const rawTop = ((s - range.start) / span) * 100;
       const rawHeight = Math.max(2, ((e - s) / span) * 100);
+      // Clamp the event's top so a row sitting at the very end of the
+      // range (e.g. an event at 24:00) doesn't overflow below the
+      // lane. Cap at (100 - height) so the block always ends inside
+      // the lane's bottom edge.
       const top = Math.max(0, Math.min(rawTop, 100 - rawHeight));
       const height = rawHeight;
       const colour = ev.colour || "var(--accent-4)";
       const tint = `color-mix(in oklab, ${colour} 28%, var(--surface))`;
       const time = `${fmtHm(ev.start)}${ev.end ? `–${fmtHm(ev.end)}` : ""}`;
+      // Mark very short blocks so the CSS can hide the text entirely
+      // (an illegible string of letter-tops is worse than a clean bar
+      //, the title attr still carries the summary for any browser
+      // that surfaces tooltips). Threshold is generous because the
+      // lane's height varies; 4% of a typical 12-hour span ~= 24-30 px.
       const isTiny = height < 4;
       const location = ev.location || "";
       const showLocation = showLocations && location && height > 8;
@@ -333,9 +360,10 @@ export default function render(shadow, ctx) {
           <div class="cal-head-rule"></div>
         </div>
         <div class="tt-body" style="--tt-hours:${span};flex:1 1 auto;min-height:0;display:flex;flex-direction:column">
-          <div class="tt is-week" style="flex:1 1 auto;min-height:0;grid-template-rows:auto 1fr">
+          <div class="tt is-week" style="flex:1 1 auto;min-height:0;grid-template-rows:${hasAllDay ? "auto auto 1fr" : "auto 1fr"}">
             <div></div>
             ${heads}
+            ${hasAllDay ? `<div></div>${alldayRow}` : ""}
             <div class="tt-hours">${hourLabels(range)}</div>
             ${lanes}
           </div>

@@ -424,6 +424,19 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   already-registered device. The client protocol doc now spells out the
   attribute's behaviour on both `/discover` and `/register`.
 
+### Added
+
+- **Configurable text sizing for calendar_day, calendar_week, and
+  calendar_month.** Per-text-type scale sliders (title, header, axis
+  label, event title/location/time, 0.01–10.0×), a `date_label_style`
+  choice with a full-word option, and a `show_location` toggle for
+  the widgets that lacked one. calendar_day also gets configurable
+  `day_start_hour`/`day_end_hour` and a `show_density` toggle;
+  calendar_week gets a `range_mode` option so its 7-day window can
+  either stay anchored to the chosen week-start day or roll from
+  today (`rolling_7`), and correctly labels/shades each day by its
+  actual weekday rather than its column position in either mode.
+
 ### Fixed
 
 - **Personal-data snapshots are isolated per paired Companion installation.**

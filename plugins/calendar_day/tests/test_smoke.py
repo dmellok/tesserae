@@ -1,7 +1,6 @@
-"""Smoke tests for the calendar_day (custom) widget.
+"""Smoke tests for the calendar_day widget.
 
-Mirrors the calendar_schedule community widget's test setup: stub
-``current_app`` + the calendar_core plugin so the tests exercise
+Stubs ``current_app`` + the calendar_core plugin so the tests exercise
 fetch()'s own logic (event slimming and cap) without reaching real ICS
 feeds or the Tesserae core.
 
@@ -89,3 +88,10 @@ def test_max_events_truncates() -> None:
     with patch.object(server, "current_app", app):
         out = server.fetch(options={"max_events": 2}, settings={}, ctx={})
     assert out["count"] == 2
+
+
+if __name__ == "__main__":
+    test_missing_calendar_core_surfaces_error()
+    test_fetch_slims_events()
+    test_max_events_truncates()
+    print("test_smoke.py: all assertions passed")

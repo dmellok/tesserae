@@ -8,7 +8,11 @@ from typing import Any
 
 from flask import current_app
 
-from app.calendar_time import event_local_date_key, local_midnight_utc
+from app.calendar_time import (
+    all_day_event_date_keys,
+    event_local_date_key,
+    local_midnight_utc,
+)
 from app.tz_resolve import app_timezone
 
 
@@ -31,10 +35,19 @@ def fetch(
     zone = app_timezone()
     today = datetime.now(zone).date()
     week_start = options.get("week_start", "monday")
-    first_weekday = 6 if week_start == "sunday" else 0
-    # Start the week on the chosen weekday at-or-before today.
-    offset = (today.weekday() - first_weekday) % 7
-    start_date = today - timedelta(days=offset)
+    # range_mode: "calendar_week" (default) anchors the 7-day window to the
+    # chosen week_start, same as before; "rolling_7" ignores week_start and
+    # always starts today, so the widget shows "today + the next 6 days"
+    # instead of jumping back to Sunday/Monday once today isn't the first
+    # day of the calendar week.
+    range_mode = options.get("range_mode", "calendar_week")
+    if range_mode == "rolling_7":
+        start_date = today
+    else:
+        first_weekday = 6 if week_start == "sunday" else 0
+        # Start the week on the chosen weekday at-or-before today.
+        offset = (today.weekday() - first_weekday) % 7
+        start_date = today - timedelta(days=offset)
     end_date = start_date + timedelta(days=7)
 
     start_dt = local_midnight_utc(start_date, zone)
@@ -51,10 +64,17 @@ def fetch(
     except Exception as err:
         return {"error": f"{type(err).__name__}: {err}", "days": []}
 
+    # Bucket timed events by their local start date. All-day event DTEND
+    # values are exclusive, so expand them across each covered visible date
+    # (same split as calendar_month) rather than only their start day.
     buckets: dict[str, list[dict[str, Any]]] = {}
     for ev in events:
-        day_key = event_local_date_key(ev, zone)
-        buckets.setdefault(day_key, []).append(ev)
+        if ev.get("all_day"):
+            day_keys = all_day_event_date_keys(ev, start_date, end_date)
+        else:
+            day_keys = [event_local_date_key(ev, zone)]
+        for day_key in day_keys:
+            buckets.setdefault(day_key, []).append(ev)
 
     days = []
     cur = start_date
