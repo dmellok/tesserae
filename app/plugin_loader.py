@@ -51,11 +51,56 @@ _ALLOWED_ASSET_PREFIXES: tuple[str, ...] = ("static/", "files/")
 _COMPAT_RE = re.compile(r"^(\d+)\.(x|\d+)")
 
 
+# A folder skipped because an earlier scan root already claimed its id.
+# Shared with the Widgets page, which offers to delete the shadowed copy,
+# and matched exactly there so nothing else can be routed into a delete.
+DUPLICATE_ID_MESSAGE = "duplicate plugin id"
+
+# Scan roots under the data root that Tesserae itself writes, and can
+# therefore offer to clean up. Bundled plugins ship with the image and are
+# never removable from the UI.
+REMOVABLE_ROOTS: tuple[str, ...] = ("authored", "marketplace")
+
+
 @dataclass(frozen=True)
 class LoaderError:
     plugin_id: str
     path: Path
     message: str
+
+
+def shadowed_origin(path: Path, data_root: Path) -> str | None:
+    """Which managed scan root ``path`` is a direct child of, if any.
+
+    ``None`` for a bundled plugin, or for anything outside the data root,
+    which is what keeps the Widgets page's delete action away from folders
+    that ship with the image."""
+    for name in REMOVABLE_ROOTS:
+        try:
+            if path.resolve().parent == (data_root / name).resolve():
+                return name
+        except OSError:
+            continue
+    return None
+
+
+def _describe_error(err: LoaderError, registry: PluginRegistry, data_root: Path) -> dict[str, Any]:
+    """A loader error plus what the Widgets page needs to act on it.
+
+    A duplicate id is the one error a user can resolve without editing
+    files: some other folder already claimed the id, this copy never
+    loads, and deleting it is the whole fix. Anything else stays
+    informational."""
+    active = registry.plugins.get(err.plugin_id)
+    origin = shadowed_origin(err.path, data_root) if err.message == DUPLICATE_ID_MESSAGE else None
+    return {
+        "plugin_id": err.plugin_id,
+        "path": str(err.path),
+        "message": err.message,
+        "origin": origin,
+        "active_path": str(active.path) if active is not None else None,
+        "removable": origin is not None and active is not None,
+    }
 
 
 @dataclass(frozen=True)
@@ -322,7 +367,7 @@ def _scan_plugin_dir(
             continue
 
         if plugin_id in registry.plugins:
-            registry.errors.append(LoaderError(plugin_id, child, "duplicate plugin id"))
+            registry.errors.append(LoaderError(plugin_id, child, DUPLICATE_ID_MESSAGE))
             continue
 
         server_path = child / "server.py"
@@ -391,10 +436,11 @@ def register_routes(app: Flask, registry: PluginRegistry) -> None:
     def plugins_index() -> str:
         """Top-level page listing every loaded plugin + loader errors."""
         reg = _live_registry()
+        data_root = Path(current_app.config["DATA_ROOT"])
         return render_template(
             "plugins_index.html",
             plugins=sorted(reg.plugins.values(), key=lambda p: (p.kind, p.name.lower())),
-            errors=reg.errors,
+            errors=[_describe_error(err, reg, data_root) for err in reg.errors],
         )
 
     @bp.get("/<plugin_id>/<path:asset>")

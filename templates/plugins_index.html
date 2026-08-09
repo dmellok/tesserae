@@ -25,7 +25,7 @@
 
 {% if errors %}
 {% call section_card(icon='warning-octagon', title='Loader errors',
-                     description='These widgets failed to load and were skipped. Fix the manifest or remove the folder, then restart.',
+                     description='These widgets failed to load and were skipped. Fix the manifest or remove the folder, then restart. A duplicate id can be cleared from here.',
                      extra_class='dx-section-card--danger') %}
   <ul class="dx-discovered-list">
     {% for err in errors %}
@@ -36,7 +36,26 @@
           <span class="dx-meta-pair"><span class="dx-meta-k">Path</span><code>{{ err.path }}</code></span>
           <span class="dx-meta-pair"><span class="dx-meta-k">Message</span><span class="dx-meta-v">{{ err.message }}</span></span>
         </div>
+        {% if err.active_path %}
+        {# Which copy actually loaded. Without this the duplicate reads as
+           "the widget is broken" rather than "this spare folder is idle". #}
+        <div class="dx-discovered-meta">
+          <span class="dx-meta-pair"><span class="dx-meta-k">In use</span><code>{{ err.active_path }}</code></span>
+        </div>
+        {% endif %}
       </div>
+      {% if err.removable %}
+      <div class="dx-discovered-actions">
+        <form method="post" action="{{ url_for('marketplace.remove_shadowed') }}" class="form form--inline"
+              onsubmit="return confirm('Delete {{ err.path }}?\n\nThis copy is shadowed by the one already in use, so nothing on your dashboards changes.');">
+          <input type="hidden" name="plugin_id" value="{{ err.plugin_id }}">
+          <input type="hidden" name="path" value="{{ err.path }}">
+          <button type="submit" class="ghost">
+            <i class="ph ph-trash" aria-hidden="true"></i><span>Remove this copy</span>
+          </button>
+        </form>
+      </div>
+      {% endif %}
     </li>
     {% endfor %}
   </ul>

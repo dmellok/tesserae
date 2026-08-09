@@ -4,6 +4,20 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.285.0], 2026-08-10
+
+### Added
+
+- **Clear a duplicate widget from the Widgets page.** Plugins load from three
+  roots (bundled, then `data/authored/`, then `data/marketplace/`) and the first
+  to claim an id wins, so a widget pushed from Studio shadows a marketplace
+  install of the same id and the loser sits on disk erroring forever. The Loader
+  errors card now names the copy that is actually in use and offers to delete the
+  shadowed one, which previously needed shell access. The registry re-scans in
+  place, so no restart. Bundled copies are never removable, and a folder that is
+  one of several in a catalog bundle points at Browse instead of being removed on
+  its own.
+
 ## [0.284.0], 2026-08-10
 
 ### Added

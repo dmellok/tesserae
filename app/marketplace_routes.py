@@ -25,6 +25,8 @@ mutation as "restart to pick it up".
 from __future__ import annotations
 
 import logging
+import shutil
+from pathlib import Path
 from typing import Any
 
 from flask import (
@@ -40,6 +42,7 @@ from flask import (
 )
 from werkzeug.wrappers import Response
 
+from app import authored_widgets, plugin_loader
 from app.marketplace import (
     CatalogEntry,
     IndexUnavailable,
@@ -452,6 +455,99 @@ def uninstall() -> Response:
     )
     flash(msg, "ok")
     return redirect(url_for("marketplace.browse"))
+
+
+@bp.post("/errors/remove")
+def remove_shadowed() -> Response:
+    """Delete a plugin folder the loader skipped as a duplicate id.
+
+    Widgets pushed from Tesserae Studio land in ``data/authored/`` and
+    marketplace installs in ``data/marketplace/``, and the first scan root
+    to claim an id wins (bundled, then authored, then marketplace). The
+    losing folder sits on disk forever, doing nothing but filling the
+    Widgets page with errors, and until now the only way out was a shell.
+
+    Deleting is safe here precisely because the folder never loaded: it
+    contributed no widget, no blueprint, no data. The gate is that the
+    live registry must still be reporting this exact (id, path) pair as a
+    duplicate, so a hand-crafted POST can't point this at anything else.
+    """
+    plugin_id = (request.form.get("plugin_id") or "").strip()
+    raw_path = (request.form.get("path") or "").strip()
+    registry = current_app.config.get("PLUGIN_REGISTRY")
+    matched = next(
+        (
+            err
+            for err in (getattr(registry, "errors", None) or [])
+            if err.plugin_id == plugin_id
+            and str(err.path) == raw_path
+            and err.message == plugin_loader.DUPLICATE_ID_MESSAGE
+        ),
+        None,
+    )
+    if matched is None:
+        flash("That folder isn't a duplicate the loader reported; nothing removed.", "error")
+        return redirect(url_for("plugins.plugins_index"))
+
+    data_root = Path(current_app.config["DATA_ROOT"])
+    origin = plugin_loader.shadowed_origin(matched.path, data_root)
+    if origin is None:
+        flash("Only widgets under the data directory can be removed here.", "error")
+        return redirect(url_for("plugins.plugins_index"))
+
+    removed: bool
+    if origin == "authored":
+        removed = authored_widgets.uninstall(plugin_id, data_root=data_root)
+    else:
+        outcome = _remove_marketplace_folder(plugin_id, matched.path)
+        if outcome is None:
+            return redirect(url_for("plugins.plugins_index"))
+        removed = outcome
+
+    if not removed:
+        flash(f"Could not remove {matched.path}.", "error")
+        return redirect(url_for("plugins.plugins_index"))
+
+    # A shadowed folder never loaded, so dropping it can't leave a stale
+    # blueprint behind and an in-process re-scan is enough to clear the
+    # error. No restart banner for this one.
+    rediscover = current_app.config.get("REDISCOVER_PLUGINS")
+    if callable(rediscover):
+        current_app.config["PLUGIN_REGISTRY"] = rediscover()
+    flash(f"Removed the shadowed copy of {plugin_id!r} from {origin}.", "ok")
+    return redirect(url_for("plugins.plugins_index"))
+
+
+def _remove_marketplace_folder(plugin_id: str, path: Path) -> bool | None:
+    """Remove a shadowed folder under ``data/marketplace/``.
+
+    Routed through ``Marketplace.uninstall`` when the folder is the whole
+    of a catalog install, so the record in ``marketplace.json`` goes with
+    it and Browse stops claiming the entry is installed. A folder that is
+    one of several in a bundle is left alone: removing a bundle piecemeal
+    would break the siblings that are loading fine. Returns ``None`` when
+    the caller should stop (already flashed)."""
+    mkt = current_app.config.get("MARKETPLACE")
+    if isinstance(mkt, Marketplace):
+        for catalog_id, record in mkt.installed().items():
+            if record.kind == "theme" or plugin_id not in record.folders:
+                continue
+            if len(record.folders) > 1:
+                flash(
+                    f"{plugin_id!r} is part of the {catalog_id!r} bundle. Uninstall the "
+                    "whole entry from Browse instead, so its other widgets go with it.",
+                    "error",
+                )
+                return None
+            return bool(mkt.uninstall(catalog_id))
+    # Untracked folder (hand-dropped, or a record that has since been
+    # lost). Nothing to unwind in marketplace state, so remove it directly.
+    try:
+        shutil.rmtree(path)
+    except OSError:
+        logger.exception("marketplace: could not remove shadowed folder %s", path)
+        return False
+    return True
 
 
 @bp.post("/browse/restart")

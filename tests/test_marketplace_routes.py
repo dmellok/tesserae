@@ -20,7 +20,9 @@ restart.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -242,3 +244,179 @@ def test_restart_pending_flag_surfaces_in_topbar(app: Flask) -> None:
     # Also visible on a non-settings page, proving it's truly site-wide.
     resp = client.get("/events", follow_redirects=True)
     assert b"Restart required" in resp.data
+
+
+# -- shadowed duplicate cleanup (Widgets page) ------------------------
+#
+# Scan order is bundled -> data/authored -> data/marketplace, first id wins.
+# A widget pushed from Studio therefore shadows a marketplace install of the
+# same id, and either can be shadowed by a bundled one. The loser sits on
+# disk doing nothing but filling the Widgets page with errors.
+
+# Ships in plugins/, so a copy under the data root always loses to it.
+BUNDLED_ID = "ha_automation_history"
+
+
+def _copy_widget(tmp_path: Path, root: str, plugin_id: str) -> Path:
+    folder = tmp_path / root / plugin_id
+    folder.mkdir(parents=True)
+    (folder / "plugin.json").write_text(
+        json.dumps(
+            {
+                "tesserae_compat": "1.x",
+                "name": "Shadowed copy",
+                "version": "0.0.1",
+                "kind": "widget",
+                "supports": {"sizes": ["sm", "md", "lg"]},
+            }
+        ),
+        encoding="utf-8",
+    )
+    (folder / "client.js").write_text("export default function () {}\n", encoding="utf-8")
+    return folder
+
+
+def _reload(app: Flask) -> None:
+    app.config["PLUGIN_REGISTRY"] = app.config["REDISCOVER_PLUGINS"]()
+
+
+def _errors_for(app: Flask, plugin_id: str) -> list[Any]:
+    return [e for e in app.config["PLUGIN_REGISTRY"].errors if e.plugin_id == plugin_id]
+
+
+def _remove(client: Any, plugin_id: str, path: Path) -> Any:
+    return client.post(
+        "/plugins/errors/remove",
+        data={"plugin_id": plugin_id, "path": str(path)},
+        follow_redirects=True,
+    )
+
+
+@pytest.mark.parametrize("root", ["authored", "marketplace"])
+def test_a_copy_shadowed_by_the_bundled_widget_can_be_removed(
+    app: Flask, tmp_path: Path, root: str
+) -> None:
+    folder = _copy_widget(tmp_path, root, BUNDLED_ID)
+    _reload(app)
+    assert _errors_for(app, BUNDLED_ID), "expected a duplicate id error"
+    client = app.test_client()
+    _sign_in(client)
+    assert _remove(client, BUNDLED_ID, folder).status_code == 200
+    assert not folder.exists()
+    assert not _errors_for(app, BUNDLED_ID)
+    # The bundled copy is untouched and still the one in use.
+    assert app.config["PLUGIN_REGISTRY"].plugins[BUNDLED_ID].path != folder
+
+
+def test_a_studio_push_shadowing_a_marketplace_install_can_be_cleaned_up(
+    app: Flask, tmp_path: Path
+) -> None:
+    """The reported case: Studio pushes a widget to data/authored, which
+    then wins over the marketplace install of the same id and leaves it
+    erroring forever."""
+    authored = _copy_widget(tmp_path, "authored", "studio_widget")
+    installed = _copy_widget(tmp_path, "marketplace", "studio_widget")
+    _reload(app)
+    errors = _errors_for(app, "studio_widget")
+    assert [str(e.path) for e in errors] == [str(installed)], "marketplace copy should lose"
+    client = app.test_client()
+    _sign_in(client)
+    _remove(client, "studio_widget", installed)
+    assert not installed.exists()
+    assert authored.exists()
+    assert app.config["PLUGIN_REGISTRY"].plugins["studio_widget"].path == authored
+
+
+def test_a_path_the_loader_never_flagged_is_refused(app: Flask, tmp_path: Path) -> None:
+    """The gate that stops a hand-crafted POST pointing this at any folder
+    on disk."""
+    victim = tmp_path / "authored" / "not_a_duplicate"
+    victim.mkdir(parents=True)
+    (victim / "keep.txt").write_text("x", encoding="utf-8")
+    _reload(app)
+    client = app.test_client()
+    _sign_in(client)
+    _remove(client, "not_a_duplicate", victim)
+    assert victim.exists()
+
+
+def test_the_bundled_copy_is_never_removable(app: Flask, tmp_path: Path) -> None:
+    """Bundled plugins ship with the image; only folders under the data
+    root are ours to delete."""
+    folder = _copy_widget(tmp_path, "authored", BUNDLED_ID)
+    _reload(app)
+    bundled = app.config["PLUGIN_REGISTRY"].plugins[BUNDLED_ID].path
+    client = app.test_client()
+    _sign_in(client)
+    _remove(client, BUNDLED_ID, bundled)
+    assert bundled.exists()
+    assert folder.exists()
+
+
+def test_a_bundle_member_points_at_browse_instead(app: Flask, tmp_path: Path) -> None:
+    """Removing one folder of a multi-folder catalog install would break
+    the siblings that load fine, so it's refused."""
+    from app.marketplace import InstalledRecord
+
+    folder = _copy_widget(tmp_path, "marketplace", BUNDLED_ID)
+    _reload(app)
+    mkt = app.config["MARKETPLACE"]
+    mkt._write_state(
+        {
+            "some_bundle": InstalledRecord(
+                catalog_id="some_bundle",
+                folders=[BUNDLED_ID, "sibling_widget"],
+                version="1.0.0",
+                sha256="0" * 64,
+                source=None,
+                installed_at="2026-01-01T00:00:00Z",
+            )
+        }
+    )
+    client = app.test_client()
+    _sign_in(client)
+    resp = _remove(client, BUNDLED_ID, folder)
+    assert folder.exists()
+    assert "bundle" in resp.get_data(as_text=True)
+
+
+def test_removing_a_tracked_single_widget_drops_its_marketplace_record(
+    app: Flask, tmp_path: Path
+) -> None:
+    """Otherwise Browse keeps claiming the entry is installed after the
+    folder is gone."""
+    from app.marketplace import InstalledRecord
+
+    folder = _copy_widget(tmp_path, "marketplace", BUNDLED_ID)
+    _reload(app)
+    mkt = app.config["MARKETPLACE"]
+    mkt._write_state(
+        {
+            BUNDLED_ID: InstalledRecord(
+                catalog_id=BUNDLED_ID,
+                folders=[BUNDLED_ID],
+                version="1.0.0",
+                sha256="0" * 64,
+                source=None,
+                installed_at="2026-01-01T00:00:00Z",
+            )
+        }
+    )
+    client = app.test_client()
+    _sign_in(client)
+    _remove(client, BUNDLED_ID, folder)
+    assert not folder.exists()
+    assert BUNDLED_ID not in mkt.installed()
+
+
+def test_the_widgets_page_offers_removal_and_names_the_live_copy(
+    app: Flask, tmp_path: Path
+) -> None:
+    folder = _copy_widget(tmp_path, "marketplace", BUNDLED_ID)
+    _reload(app)
+    client = app.test_client()
+    _sign_in(client)
+    body = client.get("/plugins/").get_data(as_text=True)
+    assert "Remove this copy" in body
+    assert str(folder) in body
+    assert str(app.config["PLUGIN_REGISTRY"].plugins[BUNDLED_ID].path) in body
