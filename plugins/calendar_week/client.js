@@ -1,9 +1,11 @@
-// calendar_week, Spectra timetable, seven columns. Display header
-// shows the date range ("JUN 1 → 7 · 2026"), columns show DOW + day
-// number with today picked out via an inverse accent-1 chip and
-// weekend columns tinted to read distinct from weekdays. Each
-// column head also carries a small event-count chip so a glance
-// answers "which day is the busiest?" without scrolling the lane.
+// calendar_week, Spectra timetable, seven columns. Same per-text-type
+// sizing/spacing/label controls as calendar_day / calendar_three /
+// calendar_schedule:
+// event title/location scale, event row spacing, header/axis label
+// scale, dashboard title scale, configurable day_start_hour/day_end_hour
+// (or "always show the whole day"), a show_location toggle + rendering
+// (absent from the bundled widget), and date_label_style (short/minimal
+// weekday+month abbreviations).
 
 const MONTH_SHORT = [
   "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
@@ -12,18 +14,37 @@ const MONTH_SHORT = [
 const DOW = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 const DOW_SUN = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 
+// date_label_style cell option: "short" (default, current 3-letter
+// behaviour), "minimal" (1-2 chars, just enough to stay unambiguous), or
+// "full" (the whole word, derived from the short code since that's all
+// this widget stores).
+const DOW_MINIMAL = { SUN: "SU", MON: "M", TUE: "TU", WED: "W", THU: "TH", FRI: "F", SAT: "SA" };
+const MONTH_MINIMAL = { JAN: "JA", FEB: "F", MAR: "MR", APR: "AP", MAY: "MY", JUN: "JN", JUL: "JL", AUG: "AU", SEP: "S", OCT: "O", NOV: "N", DEC: "D" };
+const DOW_FULL = { SUN: "Sunday", MON: "Monday", TUE: "Tuesday", WED: "Wednesday", THU: "Thursday", FRI: "Friday", SAT: "Saturday" };
+const MONTH_FULL = { JAN: "January", FEB: "February", MAR: "March", APR: "April", MAY: "May", JUN: "June", JUL: "July", AUG: "August", SEP: "September", OCT: "October", NOV: "November", DEC: "December" };
+
+export function styleShortLabel(label, style, minimalMap, fullMap) {
+  if (style === "minimal") return minimalMap[label] || label.slice(0, 2);
+  if (style === "full") return (fullMap && fullMap[label]) || label;
+  return label;
+}
+
 function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
   }[c]));
 }
 
+// Clamps a cell-option slider value, defaulting on missing/non-numeric
+// input. Same shape as the other calendar_* widgets' clampScale.
+export function clampScale(raw, def, lo, hi) {
+  const v = raw === null || raw === undefined || raw === "" ? def : Number(raw);
+  return Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : def;
+}
+
 // Parse the ISO timestamp through Date so the resulting hour is in
 // the renderer's LOCAL timezone, not whatever offset is baked into
-// the ISO string. calendar_core's server normalises everything to
-// UTC ISO; the previous string-slicing path was treating "14:00
-// Melbourne → 04:00 UTC" as "render at hour 4", landing every event
-// 10 hours from its true local time.
+// the ISO string.
 function parseTime(iso) {
   if (typeof iso !== "string") return null;
   const d = new Date(iso);
@@ -38,7 +59,10 @@ function fmtHm(iso) {
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
-function computeRange(days) {
+// day_start_hour / day_end_hour cell options override either edge
+// (-1 = keep auto-fitting that edge); set both to 0/24 to always show
+// the whole day regardless of events.
+export function computeRange(days, startOverride = -1, endOverride = -1) {
   let lo = 24, hi = 0, has = false;
   for (const d of days) {
     for (const ev of d.events || []) {
@@ -49,11 +73,13 @@ function computeRange(days) {
       if (e != null) { hi = Math.max(hi, e); has = true; }
     }
   }
-  if (!has) return { start: 8, end: 18 };
-  return {
-    start: Math.max(0, Math.floor(lo) - 1),
-    end: Math.min(24, Math.ceil(hi) + 1),
-  };
+  const range = has
+    ? { start: Math.max(0, Math.floor(lo) - 1), end: Math.min(24, Math.ceil(hi) + 1) }
+    : { start: 8, end: 18 };
+  if (startOverride >= 0) range.start = Math.min(24, startOverride);
+  if (endOverride >= 0) range.end = Math.min(24, endOverride);
+  if (range.end <= range.start) range.end = Math.min(24, range.start + 1);
+  return range;
 }
 
 function hourLabels(range) {
@@ -65,22 +91,19 @@ function hourLabels(range) {
   return out.join("");
 }
 
-function fmtRange(startIso, endIso) {
+function fmtRange(startIso, endIso, labelStyle) {
   if (!startIso || !endIso) return "";
   const [sy, sm, sd] = startIso.split("-").map(Number);
   const [ey, em, ed] = endIso.split("-").map(Number);
-  const startBit = `${MONTH_SHORT[sm - 1] || ""} ${sd}`;
-  const endBit = (sm === em)
-    ? `${ed}`
-    : `${MONTH_SHORT[em - 1] || ""} ${ed}`;
+  const startMonth = styleShortLabel(MONTH_SHORT[sm - 1] || "", labelStyle, MONTH_MINIMAL, MONTH_FULL);
+  const endMonth = styleShortLabel(MONTH_SHORT[em - 1] || "", labelStyle, MONTH_MINIMAL, MONTH_FULL);
+  const startBit = `${startMonth} ${sd}`;
+  const endBit = (sm === em) ? `${ed}` : `${endMonth} ${ed}`;
   const year = sy === ey ? `${sy}` : `${sy}/${ey}`;
   return `${startBit} → ${endBit} · ${year}`;
 }
 
 // Which column indices are weekend days, given the chosen week start.
-// Server passes week_start as "monday" (default) or "sunday".
-// Monday-first weeks: Saturday is idx 5, Sunday idx 6.
-// Sunday-first weeks: Sunday is idx 0, Saturday idx 6.
 function weekendIndices(weekStart) {
   return weekStart === "sunday" ? new Set([0, 6]) : new Set([5, 6]);
 }
@@ -89,6 +112,17 @@ export default function render(shadow, ctx) {
   const data = ctx?.data ?? {};
   const opts = ctx?.cell?.options || {};
   const hideLabels = opts.hide_labels === true;
+  const titleScale = clampScale(opts.event_title_scale, 1.0, 0.01, 10.0);
+  const locScale = clampScale(opts.event_location_scale, 1.0, 0.01, 10.0);
+  const rowPad = clampScale(opts.event_row_padding_em, 0.0, 0.0, 3.0);
+  const headerScale = clampScale(opts.header_scale, 1.0, 0.01, 10.0);
+  const axisScale = clampScale(opts.axis_label_scale, 1.0, 0.01, 10.0);
+  const dashTitleScale = clampScale(opts.title_scale, 1.0, 0.01, 10.0);
+  const showLocations = opts.show_location === true;
+  const labelStyle = ["short", "minimal", "full"].includes(opts.date_label_style) ? opts.date_label_style : "short";
+  const startHour = clampScale(opts.day_start_hour, -1, -1, 24);
+  const endHour = clampScale(opts.day_end_hour, -1, -1, 24);
+  const styleAttr = `--tt-title-scale:${titleScale};--tt-loc-scale:${locScale};--tt-row-pad:${rowPad}em;--tt-header-scale:${headerScale};--tt-axis-scale:${axisScale};--tt-dash-title-scale:${dashTitleScale};`;
   const css = `<link rel="stylesheet" href="/static/style/spectra-widgets.css">`;
 
   if (data.error) {
@@ -101,14 +135,14 @@ export default function render(shadow, ctx) {
   }
 
   const days = Array.isArray(data.days) ? data.days.slice(0, 7) : [];
-  const range = computeRange(days);
+  const range = computeRange(days, startHour, endHour);
   const span = Math.max(1, range.end - range.start);
   const dowNames = (data.week_start === "sunday") ? DOW_SUN : DOW;
-  const rangeMeta = fmtRange(data.start, data.end);
+  const rangeMeta = fmtRange(data.start, data.end, labelStyle);
   const weekendCols = weekendIndices(data.week_start || "monday");
 
   const heads = days.map((d, i) => {
-    const name = dowNames[i] || "";
+    const name = styleShortLabel(dowNames[i] || "", labelStyle, DOW_MINIMAL, DOW_FULL);
     const isToday = !!d.is_today;
     const isWeekend = weekendCols.has(i);
     const count = Array.isArray(d.events) ? d.events.length : 0;
@@ -138,24 +172,18 @@ export default function render(shadow, ctx) {
       const e = parseTime(ev.end) ?? s + 1;
       const rawTop = ((s - range.start) / span) * 100;
       const rawHeight = Math.max(2, ((e - s) / span) * 100);
-      // Clamp the event's top so a row sitting at the very end of the
-      // range (e.g. an event at 24:00) doesn't overflow below the
-      // lane. Cap at (100 - height) so the block always ends inside
-      // the lane's bottom edge.
       const top = Math.max(0, Math.min(rawTop, 100 - rawHeight));
       const height = rawHeight;
       const colour = ev.colour || "var(--accent-4)";
       const tint = `color-mix(in oklab, ${colour} 28%, var(--surface))`;
       const time = `${fmtHm(ev.start)}${ev.end ? `–${fmtHm(ev.end)}` : ""}`;
-      // Mark very short blocks so the CSS can hide the text entirely
-      // (an illegible string of letter-tops is worse than a clean bar
-      //, the title attr still carries the summary for any browser
-      // that surfaces tooltips). Threshold is generous because the
-      // lane's height varies; 4% of a typical 12-hour span ~= 24-30 px.
       const isTiny = height < 4;
+      const location = ev.location || "";
+      const showLocation = showLocations && location && height > 8;
       return `
-        <div class="tt-event ${isTiny ? "is-tiny" : ""}" style="top:${top.toFixed(2)}%;height:${height.toFixed(2)}%;border-left-color:${colour};--tt-bg:${tint}" title="${escapeHtml(time)} ${escapeHtml(ev.summary || "")}">
+        <div class="tt-event ${isTiny ? "is-tiny" : ""}" style="top:${top.toFixed(2)}%;height:${height.toFixed(2)}%;border-left-color:${colour};--tt-bg:${tint}" title="${escapeHtml(time)} ${escapeHtml(ev.summary || "")}${location ? ` · ${escapeHtml(location)}` : ""}">
           <span class="tt-name">${escapeHtml(ev.summary || "")}</span>
+          ${showLocation ? `<span class="tt-loc"><i class="ph-bold ph-map-pin"></i>${escapeHtml(location)}</span>` : ""}
         </div>`;
     }).join("");
     const nowLine = (showNow && d.is_today)
@@ -168,13 +196,7 @@ export default function render(shadow, ctx) {
   }).join("");
 
   const layout = `
-    /* Today marker, inverse-coloured chip instead of just an accent
-       shift on the day number, so a quick scan locks on the current
-       day. The DOW label drops to on-accent over a tinted backdrop,
-       the day number becomes a filled circle. */
-    .tt-col-head.is-today {
-      color: var(--accent-1);
-    }
+    .tt-col-head.is-today { color: var(--accent-1); }
     .tt-col-head.is-today .tt-col-day {
       background: var(--accent-1);
       color: var(--on-accent);
@@ -185,11 +207,6 @@ export default function render(shadow, ctx) {
       border-radius: 999px;
       font-weight: var(--fw-black);
     }
-
-    /* Weekend tint, soft sunken background on column heads + lanes
-       to set Sat/Sun off from weekdays without yelling. Inset
-       background instead of border so the existing grid gutters
-       stay clean. */
     .tt-col-head.is-weekend {
       background: color-mix(in oklab, var(--text-primary) 4%, transparent);
     }
@@ -206,10 +223,6 @@ export default function render(shadow, ctx) {
       ),
       color-mix(in oklab, var(--text-primary) 3%, transparent);
     }
-
-    /* Per-column event-count chip, small numeric badge under the
-       day number. Hidden when count = 0 (handled in JS so the badge
-       only renders when there are events). */
     .tt-col-head {
       display: flex;
       flex-direction: column;
@@ -218,7 +231,7 @@ export default function render(shadow, ctx) {
       padding-bottom: var(--space-1);
     }
     .tt-col-dow {
-      font-size: var(--fs-caption);
+      font-size: calc(var(--fs-caption) * var(--tt-header-scale, 1));
       font-weight: var(--fw-black);
       letter-spacing: var(--ls-label);
       text-transform: var(--label-transform, uppercase);
@@ -226,7 +239,7 @@ export default function render(shadow, ctx) {
     }
     .tt-col-head.is-today .tt-col-dow { color: var(--accent-1); }
     .tt-col-day {
-      font-size: var(--fs-body);
+      font-size: calc(var(--fs-body) * var(--tt-header-scale, 1));
       font-weight: var(--fw-bold);
       color: var(--text-primary);
       line-height: 1.1;
@@ -247,39 +260,20 @@ export default function render(shadow, ctx) {
       background: color-mix(in oklab, var(--accent-1) 20%, var(--surface));
       color: var(--accent-1);
     }
-
-    /* xs / sm: drop the count chips to free space for the day-num
-       circles. */
     @container (max-width: 360px) {
       .tt-col-count { display: none; }
     }
-
-    /* Event blocks, week view squeezes events into narrow columns,
-       so the title needs a tighter line-height + minimal top
-       padding to keep all the letters visible inside the block.
-       The base .tt-event styles in spectra-widgets.css set
-       line-height: 1.1 plus var(--space-1) vertical padding, which
-       combined with the small font-size we want here pushed the
-       descender row past the overflow boundary, letters were
-       clipping at the bottom.
-
-       Title wraps for taller events via line-clamp (up to 3 lines),
-       so a 90-min meeting can spell out "Architecture review" rather
-       than truncating to "Archit...". Short events still single-line
-       ellipsis since they don't have the height to wrap. */
+    /* event_row_padding_em adds on top of the fixed 2px base, so 0
+       (default) reproduces the previous fixed spacing. */
     .tt-event {
-      padding-top: 2px;
-      padding-bottom: 2px;
+      padding-top: calc(2px + var(--tt-row-pad, 0em));
+      padding-bottom: calc(2px + var(--tt-row-pad, 0em));
       gap: 0;
     }
     .tt-event .tt-name {
-      font-size: calc(var(--fs-caption) * 0.88);
+      font-size: calc(var(--fs-caption) * 0.88 * var(--tt-title-scale, 1));
       line-height: 1.05;
       font-weight: var(--fw-black);
-      /* Multi-line wrap with line-clamp so taller events use their
-         vertical room. White-space: normal lets the browser break on
-         word boundaries; -webkit-line-clamp caps at 3 lines and the
-         remaining lines truncate with ellipsis. */
       display: -webkit-box;
       -webkit-line-clamp: 3;
       line-clamp: 3;
@@ -289,30 +283,47 @@ export default function render(shadow, ctx) {
       word-break: break-word;
       hyphens: auto;
     }
-    /* Tiny event blocks (under ~4% of lane height) drop the text
-       and just paint as a coloured bar. An illegible string of
-       letter-tops reads worse than a clean coloured strip; the
-       title attribute still carries the summary for any browser
-       that surfaces tooltips. */
     .tt-event.is-tiny .tt-name { display: none; }
     .tt-event.is-tiny { padding-top: 0; padding-bottom: 0; }
 
-    /* hide_labels cell option, when on, every event block paints as
-       its colour bar only (same treatment as is-tiny). Reads as a
-       glance-friendly heatmap of feed colours when the dashboard
-       cares about "what kind of day is this" more than "what's the
-       title of each meeting". */
+    /* Location row, off by default (show_location cell option). */
+    .tt-event .tt-loc {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.2em;
+      font-size: calc(var(--fs-caption) * 0.75 * var(--tt-loc-scale, 1));
+      font-weight: var(--fw-bold);
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
+    }
+    .tt-event .tt-loc .ph-bold { font-size: 0.9em; flex: 0 0 auto; }
+
     [data-hide-labels="true"] .tt-event .tt-name { display: none; }
+    [data-hide-labels="true"] .tt-event .tt-loc { display: none; }
     [data-hide-labels="true"] .tt-event {
       padding-top: 0;
       padding-bottom: 0;
     }
+
+    /* spectra-widgets.css's shared .tt-allday-pill has a fixed
+       font-size; scope the title-scale override here. */
+    .tt-allday-pill { font-size: calc(var(--fs-caption) * var(--tt-title-scale, 1)); }
+
+    /* header_scale: the day column headers.
+       axis_label_scale: the hour gutter labels.
+       title_scale: the "THIS WEEK" dashboard title. */
+    .tt-hours { font-size: calc(var(--fs-caption) * var(--tt-axis-scale, 1)); }
+    .cal-head-title { font-size: calc(1em * var(--tt-dash-title-scale, 1)); }
+    .cal-head-meta { font-size: calc(1em * var(--tt-dash-title-scale, 1)); }
   `;
 
   shadow.innerHTML = `
     ${css}
     <style>${layout}</style>
-    <div class="w" data-widget="calendar_week" data-hide-labels="${hideLabels}">
+    <div class="w" data-widget="calendar_week" data-hide-labels="${hideLabels}" style="${styleAttr}">
       <div class="w-body" style="gap:var(--space-3)">
         <div class="cal-head">
           <div class="cal-head-row">

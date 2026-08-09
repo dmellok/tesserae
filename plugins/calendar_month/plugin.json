@@ -1,9 +1,9 @@
 {
   "tesserae_compat": "1.x",
   "name": "Calendar, Month",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "kind": "widget",
-  "description": "Month-grid view Reads from feeds configured in Widgets \u2192 Calendar Feeds; each feed's colour drives the bar / dot / stripe colour.",
+  "description": "Month-grid view with tunable dashboard title/day-number/event text sizing, cell spacing, and a location toggle for text-display mode. Each feed's colour drives the bar / dot / stripe colour.",
   "icon": "ph-calendar",
   "supports": {
     "sizes": [
@@ -18,15 +18,15 @@
       "label": "Week starts on",
       "default": "monday",
       "choices": [
-        {
-          "value": "sunday",
-          "label": "Sunday"
-        },
-        {
-          "value": "monday",
-          "label": "Monday"
-        }
+        {"value": "sunday", "label": "Sunday"},
+        {"value": "monday", "label": "Monday"}
       ]
+    },
+    {
+      "name": "feeds_filter",
+      "type": "string",
+      "label": "Feed IDs (comma-separated; blank = all enabled)",
+      "default": ""
     },
     {
       "name": "max_events_per_day",
@@ -40,14 +40,8 @@
       "label": "Event style",
       "default": "bars",
       "choices": [
-        {
-          "value": "bars",
-          "label": "Coloured bars"
-        },
-        {
-          "value": "text",
-          "label": "Title text with feed colour bar"
-        }
+        {"value": "bars", "label": "Coloured bars"},
+        {"value": "text", "label": "Title text with feed colour bar"}
       ]
     },
     {
@@ -57,10 +51,66 @@
       "default": true
     },
     {
-      "name": "feeds_filter",
-      "type": "string",
-      "label": "Feed IDs (comma-separated; blank = all enabled)",
-      "default": ""
+      "name": "date_label_style",
+      "type": "select",
+      "label": "Weekday label style",
+      "default": "short",
+      "choices": [
+        {"value": "full", "label": "Full word (Monday, Tuesday)"},
+        {"value": "short", "label": "Short (Mon, Tue)"},
+        {"value": "minimal", "label": "Minimal (M, Tu)"}
+      ]
+    },
+    {
+      "name": "show_location",
+      "type": "boolean",
+      "label": "Show event locations",
+      "default": false,
+      "help": "Text-display mode only: appends '· location' after each event title. Off by default since month cells are the tightest on space of any calendar widget."
+    },
+    {
+      "name": "title_scale",
+      "type": "slider",
+      "label": "Dashboard title size",
+      "default": 1.0,
+      "min": 0.01,
+      "max": 10.0,
+      "step": 0.05,
+      "unit": "×",
+      "help": "Multiplier on the 'MONTH YYYY' header row at the top of the widget."
+    },
+    {
+      "name": "header_scale",
+      "type": "slider",
+      "label": "Day number size",
+      "default": 1.0,
+      "min": 0.01,
+      "max": 10.0,
+      "step": 0.05,
+      "unit": "×",
+      "help": "Multiplier on each cell's day-number badge."
+    },
+    {
+      "name": "event_title_scale",
+      "type": "slider",
+      "label": "Event text size",
+      "default": 1.0,
+      "min": 0.01,
+      "max": 10.0,
+      "step": 0.05,
+      "unit": "×",
+      "help": "Multiplier on event text in text-display mode (and the '+N' overflow chip)."
+    },
+    {
+      "name": "event_row_padding_em",
+      "type": "slider",
+      "label": "Cell spacing",
+      "default": 0.0,
+      "min": 0.0,
+      "max": 1.5,
+      "step": 0.05,
+      "unit": "em",
+      "help": "Extra padding added inside each day cell, on top of the default. 0 = default."
     }
   ],
   "render": {
@@ -70,26 +120,10 @@
   "data_schema": {
     "color": "#4F6F36",
     "fields": [
-      {
-        "name": "month",
-        "type": "num",
-        "label": "Month"
-      },
-      {
-        "name": "year",
-        "type": "num",
-        "label": "Year"
-      },
-      {
-        "name": "month_name",
-        "type": "str",
-        "label": "Month name"
-      },
-      {
-        "name": "days",
-        "type": "arr",
-        "label": "Days"
-      }
+      {"name": "month", "type": "num", "label": "Month"},
+      {"name": "year", "type": "num", "label": "Year"},
+      {"name": "month_name", "type": "str", "label": "Month name"},
+      {"name": "days", "type": "arr", "label": "Days"}
     ],
     "sample": {
       "month": 7,
@@ -101,7 +135,9 @@
           "day": 10,
           "in_month": true,
           "is_today": true,
-          "events": [],
+          "events": [
+            {"summary": "Standup", "location": "Zoom", "colour": "#4F6F36"}
+          ],
           "total": 2,
           "extra": 0
         },

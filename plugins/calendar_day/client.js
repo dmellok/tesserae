@@ -22,10 +22,40 @@ const WEEKDAY_FULL = [
   "Friday", "Saturday", "Sunday",
 ];
 
+// date_label_style cell option: "full" (default, current behaviour),
+// "short" (3-letter), or "minimal" (1-2 chars, just enough to stay
+// unambiguous across the 7 weekdays / 12 months).
+const DOW_MINIMAL = { Monday: "M", Tuesday: "Tu", Wednesday: "W", Thursday: "Th", Friday: "F", Saturday: "Sa", Sunday: "Su" };
+const MONTH_MINIMAL = { January: "Ja", February: "F", March: "Mr", April: "Ap", May: "My", June: "Jn", July: "Jl", August: "Au", September: "S", October: "O", November: "N", December: "D" };
+
+export function styleLabel(full, style, minimalMap) {
+  if (style === "minimal") return (minimalMap[full] || full.slice(0, 2)).toUpperCase();
+  if (style === "short") return full.slice(0, 3).toUpperCase();
+  return full.toUpperCase();
+}
+
 function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
   }[c]));
+}
+
+// Clamps a cell-option slider value, defaulting on missing/non-numeric
+// input. Ported from server.py's _coerce_scale — server.py used to clamp
+// event_title_scale / event_time_scale before sending them down; now the
+// raw slider value comes straight through in ctx.cell.options and this
+// does the clamping client-side instead.
+export function clampScale(raw, def, lo, hi) {
+  const v = raw === null || raw === undefined || raw === "" ? def : Number(raw);
+  return Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : def;
+}
+
+// Cell options live at ctx.cell.options (see docs/widgets.md's ctx shape),
+// not top-level ctx.options. Named + exported so a regression back to the
+// wrong path is a one-line, testable fact instead of silently no-op-ing
+// every slider (the bug this shipped with for a while).
+export function readOptions(ctx) {
+  return ctx?.cell?.options ?? {};
 }
 
 // Parse the ISO timestamp through Date so the hour is in the
@@ -51,19 +81,31 @@ function fmtHm(iso) {
 // Auto-fit the hour axis to the actual events with one hour of padding
 // each side. Default to a 9 → 18 business window when there are no
 // timed events. Clamped to [0, 24].
-function computeRange(timed) {
-  if (!timed.length) return { start: 9, end: 18 };
-  let lo = 24, hi = 0;
-  for (const ev of timed) {
-    const s = parseTime(ev.start);
-    if (s != null) lo = Math.min(lo, s);
-    const e = parseTime(ev.end) ?? (s != null ? s + 1 : null);
-    if (e != null) hi = Math.max(hi, e);
+//
+// day_start_hour / day_end_hour cell options override either edge
+// (-1 = keep auto-fitting that edge); set both to 0/24 to always show
+// the whole day regardless of events.
+export function computeRange(timed, startOverride = -1, endOverride = -1) {
+  let range;
+  if (!timed.length) {
+    range = { start: 9, end: 18 };
+  } else {
+    let lo = 24, hi = 0;
+    for (const ev of timed) {
+      const s = parseTime(ev.start);
+      if (s != null) lo = Math.min(lo, s);
+      const e = parseTime(ev.end) ?? (s != null ? s + 1 : null);
+      if (e != null) hi = Math.max(hi, e);
+    }
+    range = {
+      start: Math.max(0, Math.floor(lo) - 1),
+      end: Math.min(24, Math.ceil(hi) + 1),
+    };
   }
-  return {
-    start: Math.max(0, Math.floor(lo) - 1),
-    end: Math.min(24, Math.ceil(hi) + 1),
-  };
+  if (startOverride >= 0) range.start = Math.min(24, startOverride);
+  if (endOverride >= 0) range.end = Math.min(24, endOverride);
+  if (range.end <= range.start) range.end = Math.min(24, range.start + 1);
+  return range;
 }
 
 // Time-of-day icon for canonical solar transitions. Returns an icon
@@ -149,19 +191,25 @@ export default function render(shadow, ctx) {
     return;
   }
 
+  const options = readOptions(ctx);
+  const labelStyle = ["full", "short", "minimal"].includes(options.date_label_style) ? options.date_label_style : "full";
+
   const isoDate = data.date || new Date().toISOString().slice(0, 10);
   const [y, m, d] = isoDate.split("-").map(Number);
   const localDate = new Date(y, m - 1, d);
   const dayNum = String(d);
-  const monthName = (MONTH_FULL[m - 1] || "").toUpperCase();
-  const weekday = WEEKDAY_FULL[(localDate.getDay() + 6) % 7].toUpperCase();
+  const monthName = styleLabel(MONTH_FULL[m - 1] || "", labelStyle, MONTH_MINIMAL);
+  const weekday = styleLabel(WEEKDAY_FULL[(localDate.getDay() + 6) % 7], labelStyle, DOW_MINIMAL);
 
   const events = Array.isArray(data.events) ? data.events : [];
   const allDay = events.filter((e) => e.all_day);
   const timed = events.filter((e) => !e.all_day);
 
-  const range = computeRange(timed);
+  const startHour = clampScale(options.day_start_hour, -1, -1, 24);
+  const endHour = clampScale(options.day_end_hour, -1, -1, 24);
+  const range = computeRange(timed, startHour, endHour);
   const span = Math.max(1, range.end - range.start);
+  const showLocations = options.show_location !== false;
 
   const eventBlocks = timed.map((ev) => {
     const s = parseTime(ev.start);
@@ -174,7 +222,7 @@ export default function render(shadow, ctx) {
     const time = `${fmtHm(ev.start)}${ev.end ? `–${fmtHm(ev.end)}` : ""}`;
     const showSub = height > 5;
     const location = ev.location || "";
-    const showLocation = location && height > 8;
+    const showLocation = showLocations && location && height > 8;
     return `
       <div class="tt-event" style="top:${top.toFixed(2)}%;height:${height.toFixed(2)}%;border-left-color:${colour};--tt-bg:${tint}" title="${escapeHtml(time)} ${escapeHtml(ev.summary || "")}${location ? ` · ${escapeHtml(location)}` : ""}">
         <span class="tt-name">${escapeHtml(ev.summary || "")}</span>
@@ -204,7 +252,16 @@ export default function render(shadow, ctx) {
     ? `<div class="tt-now" style="top:${nowPct.toFixed(2)}%"></div>`
     : "";
 
-  const density = timed.length ? densityStrip(range, timed) : "";
+  const showDensity = options.show_density !== false;
+  const density = (showDensity && timed.length) ? densityStrip(range, timed) : "";
+
+  const titleScale = clampScale(options.event_title_scale, 1.0, 0.01, 10.0);
+  const timeScale = clampScale(options.event_time_scale, 1.0, 0.01, 10.0);
+  const locScale = clampScale(options.event_location_scale, 1.0, 0.01, 10.0);
+  const rowPad = clampScale(options.event_row_padding_em, 0.0, 0.0, 3.0);
+  const headerScale = clampScale(options.header_scale, 1.0, 0.01, 10.0);
+  const axisScale = clampScale(options.axis_label_scale, 1.0, 0.01, 10.0);
+  const styleAttr = `--tt-title-scale:${titleScale};--tt-time-scale:${timeScale};--tt-loc-scale:${locScale};--tt-row-pad:${rowPad}em;--tt-header-scale:${headerScale};--tt-axis-scale:${axisScale};`;
 
   // Inline layout for the visual-pass additions (density strip, sun-
   // cycle icons in the hour gutter, location pin row inside events).
@@ -250,7 +307,7 @@ export default function render(shadow, ctx) {
       display: inline-flex;
       align-items: center;
       gap: 0.25em;
-      font-size: var(--fs-caption);
+      font-size: calc(var(--fs-caption) * var(--tt-loc-scale, 1));
       font-weight: var(--fw-bold);
       color: var(--text-muted);
       letter-spacing: var(--ls-label);
@@ -271,12 +328,34 @@ export default function render(shadow, ctx) {
       .tt-density { display: none; }
       .tt-event .tt-loc { display: none; }
     }
+
+    /* User-tunable event text sizing (event_title_scale /
+       event_time_scale / event_location_scale cell options),
+       multiplies the base spectra-widgets.css font-size so 1.0
+       matches the previous fixed size exactly. */
+    .tt-event .tt-name { font-size: calc(var(--fs-body) * var(--tt-title-scale, 1)); }
+    .tt-event .tt-sub { font-size: calc(var(--fs-caption) * var(--tt-time-scale, 1)); }
+    /* spectra-widgets.css's shared .tt-allday-pill has a fixed font-size
+       that event_title_scale never reached; scope the override here so
+       all-day events resize with the same slider as timed events. */
+    .tt-allday-pill { font-size: calc(var(--fs-caption) * var(--tt-title-scale, 1)); }
+    /* event_row_padding_em adds on top of the shared spectra-widgets.css
+       padding, so 0 (default) reproduces the previous fixed spacing. */
+    .tt-event { padding: calc(var(--space-1) + var(--tt-row-pad, 0em)) var(--space-2); }
+
+    /* header_scale: the "WEEKDAY 12" / "MONTH YYYY" head row.
+       axis_label_scale: the 08:00/10:00.../sun-icon hour gutter labels.
+       Both override shared spectra-widgets.css fixed sizes, scoped to
+       this widget instance only. */
+    .cal-head-title { font-size: calc(1em * var(--tt-header-scale, 1)); }
+    .cal-head-meta { font-size: calc(1em * var(--tt-header-scale, 1)); }
+    .tt-hours { font-size: calc(var(--fs-caption) * var(--tt-axis-scale, 1)); }
   `;
 
   shadow.innerHTML = `
     ${css}
     <style>${layout}</style>
-    <div class="w" data-widget="calendar_day">
+    <div class="w" data-widget="calendar_day" style="${styleAttr}">
       <div class="w-body" style="gap:var(--space-3)">
         <div class="cal-head">
           <div class="cal-head-row">

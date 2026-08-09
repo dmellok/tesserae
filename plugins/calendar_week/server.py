@@ -78,6 +78,7 @@ def fetch(
                         "end": e.get("end"),
                         "all_day": e.get("all_day", False),
                         "colour": e.get("feed_colour"),
+                        "location": e.get("location") or "",
                     }
                     for e in all_evs
                 ],
