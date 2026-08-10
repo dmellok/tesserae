@@ -16,10 +16,10 @@ Design constraints, deliberately distinct from firmware device tokens
   plaintext. The plaintext is returned exactly once, at pairing time, and
   is unrecoverable afterwards (the app keeps it in the Keychain). A leaked
   ``companion_tokens.json`` yields no usable credentials.
-* **Scoped.** Each record carries an explicit ``scopes`` list. The first
-  release grants a single fixed Companion role (all four scopes), but the
-  field is persisted so scopes can be narrowed later without a storage
-  migration or a breaking change.
+* **Scoped.** Each record carries an explicit ``scopes`` list. Pairing
+  grants one fixed Companion role; anything beyond it is an optional scope
+  the operator grants per client from Settings, which takes effect on the
+  next request without re-pairing (the bearer doesn't change).
 * **Independently revocable.** Every client shows up in the admin UI by
   name + last use and can be revoked on its own. Revocation is a tombstone
   (``revoked_at`` set) rather than a delete so an audit trail survives.
@@ -65,6 +65,18 @@ COMPANION_SCOPES: tuple[str, ...] = (
     "lineups:read",
     "lineups:control",
 )
+
+# Scopes an operator can grant to an existing pairing from Settings, on top
+# of the set above. Each one is here because it shouldn't arrive by default:
+# rewriting household scheduling is a different ask from pushing a picture,
+# and a client paired months ago shouldn't silently acquire it because the
+# server upgraded (#207).
+OPTIONAL_SCOPES: tuple[str, ...] = ("lineups:write",)
+
+# Every scope this server recognises. A record carrying anything else was
+# either hand-edited or written by a newer build; it's dropped on load
+# rather than kept, so a typo can't sit in the file looking like a grant.
+KNOWN_SCOPES: frozenset[str] = frozenset(COMPANION_SCOPES) | frozenset(OPTIONAL_SCOPES)
 
 # How stale ``last_used_at`` may get before a fresh authenticated request
 # rewrites it. The admin UI only needs "last use" at minute granularity;
@@ -137,7 +149,10 @@ class CompanionToken:
             token_hash = str(raw["token_hash"])
         except (KeyError, TypeError):
             return None
-        scopes = [str(s) for s in raw.get("scopes", []) if isinstance(s, str)]
+        # Drop anything this build doesn't recognise. A scope check is a
+        # membership test, so an unknown string sat in the file looking like
+        # a grant while granting nothing; better it never loads.
+        scopes = [str(s) for s in raw.get("scopes", []) if isinstance(s, str) and s in KNOWN_SCOPES]
         client = raw.get("client")
         return cls(
             token_id=token_id,
@@ -234,6 +249,31 @@ class CompanionTokenStore:
                     self._flush()
                     return True
         return False
+
+    def set_optional_scope(self, token_id: str, scope: str, *, granted: bool) -> bool:
+        """Grant or withdraw one optional scope on a live pairing.
+
+        Takes effect on the client's next request; the bearer is unchanged,
+        so the operator can hand an app a new ability without making the
+        user re-pair, and take it back the same way. Only scopes in
+        ``OPTIONAL_SCOPES`` move: the pairing set isn't editable here,
+        because withdrawing it would leave a working app failing in ways
+        the operator didn't intend. Returns whether anything changed."""
+        if scope not in OPTIONAL_SCOPES:
+            return False
+        with self._lock:
+            record = self._tokens.get(token_id)
+            if record is None or record.revoked:
+                return False
+            has = scope in record.scopes
+            if has == granted:
+                return False
+            if granted:
+                record.scopes.append(scope)
+            else:
+                record.scopes.remove(scope)
+            self._flush()
+            return True
 
     def list_active(self) -> list[CompanionToken]:
         """Live (non-revoked) credentials, newest first. Backs the admin

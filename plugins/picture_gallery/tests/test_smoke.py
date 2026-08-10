@@ -124,3 +124,42 @@ def test_serve_image_and_thumbnail(app: Flask, client: FlaskClient) -> None:
         assert thumb.get_data()
     finally:
         thumb.close()
+
+
+# -- sequential cursor (#209) -------------------------------------------
+
+
+def _sequential(server, plugin, *, preview: bool) -> str:
+    ctx = {"data_dir": str(plugin.data_dir)}
+    if preview:
+        ctx["preview"] = True
+    out = server.fetch({"folder": "", "mode": "sequential"}, {}, ctx=ctx)
+    return str(out["filename"])
+
+
+def test_a_panel_render_walks_the_album(app: Flask) -> None:
+    server = _load_server()
+    plugin = app.config["PLUGIN_REGISTRY"].get("picture_gallery")
+    for name in ("a.jpg", "b.jpg", "c.jpg"):
+        _seed_image(plugin.data_dir, name)
+    seen = [_sequential(server, plugin, preview=False) for _ in range(3)]
+    assert sorted(seen) == ["a.jpg", "b.jpg", "c.jpg"], "each paint takes the next photo"
+
+
+def test_a_preview_does_not_consume_a_photo(app: Flask) -> None:
+    """Opening the editor, hovering a dashboard card, or probing the widget
+    all call fetch(). Each one used to advance the album, so the panel then
+    skipped whatever the preview ate."""
+    server = _load_server()
+    plugin = app.config["PLUGIN_REGISTRY"].get("picture_gallery")
+    for name in ("a.jpg", "b.jpg", "c.jpg"):
+        _seed_image(plugin.data_dir, name)
+
+    first_paint = _sequential(server, plugin, preview=False)
+    previews = [_sequential(server, plugin, preview=True) for _ in range(4)]
+    next_paint = _sequential(server, plugin, preview=False)
+
+    # A preview shows what the panel will paint next, and stays there.
+    assert len(set(previews)) == 1
+    assert previews[0] != first_paint
+    assert next_paint == previews[0], "the panel gets the photo the preview promised"

@@ -287,9 +287,18 @@ def fetch(
         except (FileNotFoundError, ValueError):
             current = -1
         next_idx = (current + 1) % len(images)
-        with contextlib.suppress(OSError):
-            idx_file.write_text(str(next_idx), encoding="utf-8")
-        chosen = images[next_idx]
+        # Only a render headed for a panel moves the album on. Opening the
+        # editor, hovering a card on the dashboards list, or probing the
+        # widget all call fetch() too, and each one used to consume a photo
+        # the panel then never showed (#209). A preview shows what the panel
+        # will paint next, which is the same image the position already
+        # points at.
+        if ctx.get("preview"):
+            chosen = images[next_idx]
+        else:
+            with contextlib.suppress(OSError):
+                idx_file.write_text(str(next_idx), encoding="utf-8")
+            chosen = images[next_idx]
     else:
         chosen = random.choice(images)
 

@@ -140,6 +140,25 @@
               <span class="dx-meta-pair"><span class="dx-meta-k">Last use</span><span class="dx-meta-v">{{ c.last_used_at or 'never' }}</span></span>
               <span class="dx-meta-pair"><span class="dx-meta-k">Paired</span><span class="dx-meta-v">{{ c.created_at }}</span></span>
             </div>
+            {# What this app can already do, then the extras that are the
+               operator's call. Phrased as abilities rather than scope
+               strings: the decision is "may this app rewrite my schedules",
+               not "does it hold lineups:write". #}
+            {% if c.abilities %}
+            <p class="field-help companion-abilities">Can: {{ c.abilities|join(', ')|lower }}.</p>
+            {% endif %}
+            {% for opt in c.optional %}
+            <form method="post" action="{{ url_for('auth.companion_session_scope', token_id=c.token_id) }}"
+                  class="form form--inline companion-scope-toggle"
+                  {% if not opt.granted %}onsubmit="return confirm('Let {{ c.name }} create and edit Lineups? It will be able to change what your displays show and when.');"{% endif %}>
+              <input type="hidden" name="scope" value="{{ opt.scope }}">
+              <input type="hidden" name="granted" value="{{ '0' if opt.granted else '1' }}">
+              <button type="submit" class="dx-btn-ghost-sm">
+                <i class="ph {{ 'ph-check-square' if opt.granted else 'ph-square' }}" aria-hidden="true"></i>
+                <span>{{ opt.label }}</span>
+              </button>
+            </form>
+            {% endfor %}
           </div>
           <div class="dx-discovered-actions">
             <form method="post" action="{{ url_for('auth.companion_session_revoke', token_id=c.token_id) }}" class="form form--inline"

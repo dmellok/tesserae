@@ -899,7 +899,13 @@ def _crop_layout(e: Any) -> dict[str, float] | None:
 
 
 def _build_canvas_els(
-    els: list[Any], cw: int, ch: int, *, target_device_id: str = "", fresh: bool = False
+    els: list[Any],
+    cw: int,
+    ch: int,
+    *,
+    target_device_id: str = "",
+    fresh: bool = False,
+    preview: bool = True,
 ) -> list[dict[str, Any]]:
     """Shape a canvas's elements for ``panels_compose.html``: decorations pass
     their raw props (drawn client-side), widget elements get resolved options +
@@ -912,7 +918,13 @@ def _build_canvas_els(
     because :func:`_render_canvas` fetches server-side here.
 
     ``fresh`` (from ``?fresh=1``) skips the last-good fallback and sets
-    ``ctx["fresh"]`` on each widget fetch, mirroring the grid path."""
+    ``ctx["fresh"]`` on each widget fetch, mirroring the grid path.
+
+    ``preview`` says whether this render is headed for a panel, and reaches
+    each widget as ``ctx["preview"]``. Defaults to True so a caller that
+    doesn't know (the standalone canvas route) is treated as a look, not a
+    paint: a widget that advances state per render should move for the panel,
+    not for someone opening the editor (#209)."""
     from app.widget_samples import get_sample
 
     # Dedupe fetches across elements that resolve to the same widget +
@@ -934,7 +946,7 @@ def _build_canvas_els(
                 opts,
                 cw,
                 ch,
-                preview=False,
+                preview=preview,
                 cell_w=cell_w,
                 cell_h=cell_h,
                 fresh=fresh,
@@ -1144,6 +1156,7 @@ def _render_canvas(
     target_h: int,
     target_device_id: str = "",
     fresh: bool = False,
+    preview: bool = True,
 ) -> str:
     """Render a canvas layout (authored at ``layout.w x layout.h``) scaled to fit
     a ``target_w x target_h`` panel, aspect preserved and centred. When the
@@ -1163,7 +1176,9 @@ def _render_canvas(
     font = _resolve_font(layout.font or None, registry)
     return render_template(
         "panels_compose.html",
-        els=_build_canvas_els(layout.els, cw, ch, target_device_id=target_device_id, fresh=fresh),
+        els=_build_canvas_els(
+            layout.els, cw, ch, target_device_id=target_device_id, fresh=fresh, preview=preview
+        ),
         cw=cw,
         ch=ch,
         w=target_w,
@@ -1323,6 +1338,7 @@ def compose(page_id: str) -> Response:
                 target_h=target_h,
                 target_device_id=target_device_id,
                 fresh=fresh,
+                preview=not for_push,
             )
         )
 

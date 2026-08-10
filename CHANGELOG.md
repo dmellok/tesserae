@@ -4,6 +4,27 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.288.0], 2026-08-10
+
+### Added
+
+- **Per-client permissions for the companion app** (#207). Settings → Companion
+  lists what each paired app can do and offers the abilities that shouldn't
+  arrive by default. Today that's creating and editing Lineups: granting it is
+  a decision per client, takes effect on the next request, and can be withdrawn
+  the same way, all without the user re-pairing since the token doesn't change.
+
+### Fixed
+
+- **A gallery preview no longer eats a photo** (#209). The sequential cursor
+  advanced on every render, and opening the dashboard editor, hovering a card
+  on the dashboards list, and probing the widget are all renders. Each one
+  consumed an image the panel then skipped. Only a render headed for a panel
+  moves the album on now; a preview shows the photo the panel will paint next.
+- **A stored permission the server doesn't recognise is dropped on load**
+  rather than kept. A scope check is a membership test, so a typo sat in the
+  credential file looking like a grant while granting nothing.
+
 ## [0.287.0], 2026-08-10
 
 ### Added

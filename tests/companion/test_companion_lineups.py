@@ -343,3 +343,75 @@ def test_an_advanced_lineup_is_still_controllable(app: Flask) -> None:
     assert resp.status_code == 200
     assert resp.get_json()["lineup"]["native_editable"] is False
     assert app.config["DECK_STORE"].get("morning").enabled is False
+
+
+# -- optional scopes (#207) ---------------------------------------------
+
+
+def _sign_in(client: Any) -> None:
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+
+
+def test_authoring_is_not_granted_at_pairing(app: Flask) -> None:
+    """The whole point of #207: a pairing hands over what an app needs to be
+    an app, and rewriting household scheduling isn't in that set."""
+    _token(app)
+    record = app.config["COMPANION_TOKENS"].list_active()[0]
+    assert "lineups:control" in record.scopes
+    assert "lineups:write" not in record.scopes
+
+
+def test_an_operator_can_grant_and_withdraw_authoring(app: Flask) -> None:
+    _token(app)
+    token_id = app.config["COMPANION_TOKENS"].list_active()[0].token_id
+    client = app.test_client()
+    _sign_in(client)
+    for granted, expected in (("1", True), ("0", False)):
+        resp = client.post(
+            f"/settings/companion/session/{token_id}/scope",
+            data={"scope": "lineups:write", "granted": granted},
+            follow_redirects=True,
+        )
+        assert resp.status_code == 200
+        record = app.config["COMPANION_TOKENS"].list_active()[0]
+        assert ("lineups:write" in record.scopes) is expected
+
+
+def test_a_granted_scope_survives_without_re_pairing(app: Flask) -> None:
+    """The bearer is untouched, so the app keeps working across the change."""
+    token = _token(app)
+    store = app.config["COMPANION_TOKENS"]
+    token_id = store.list_active()[0].token_id
+    assert store.set_optional_scope(token_id, "lineups:write", granted=True)
+    assert store.lookup(token) is not None
+    assert "lineups:write" in store.lookup(token).scopes
+
+
+def test_a_scope_outside_the_optional_set_is_refused(app: Flask) -> None:
+    """Only the optional scopes move here. Withdrawing a pairing scope would
+    leave a working app failing in ways the operator didn't intend."""
+    _token(app)
+    store = app.config["COMPANION_TOKENS"]
+    token_id = store.list_active()[0].token_id
+    assert store.set_optional_scope(token_id, "push:write", granted=False) is False
+    assert store.set_optional_scope(token_id, "made:up", granted=True) is False
+    assert "push:write" in store.list_active()[0].scopes
+
+
+def test_an_unknown_stored_scope_is_dropped_on_load(app: Flask, tmp_path: Path) -> None:
+    """A typo in the file used to sit there looking like a grant while
+    granting nothing, since the check is a membership test."""
+    import json as _json
+
+    from app.state.companion_token_store import CompanionTokenStore
+
+    _token(app)
+    path = tmp_path / "core" / "companion_tokens.json"
+    raw = _json.loads(path.read_text(encoding="utf-8"))
+    key = "tokens" if isinstance(raw, dict) and "tokens" in raw else None
+    records = raw[key] if key else raw
+    records[0]["scopes"].append("lineups:wrtie")
+    path.write_text(_json.dumps(raw), encoding="utf-8")
+    reloaded = CompanionTokenStore(path).list_active()[0]
+    assert "lineups:wrtie" not in reloaded.scopes
+    assert "push:write" in reloaded.scopes
