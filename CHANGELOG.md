@@ -4,6 +4,26 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.289.0], 2026-08-10
+
+### Changed
+
+- **One write path for creating a Lineup** (#204). The setup wizard's four
+  buttons posted to three different routes backed by three different stores, so
+  what a record ended up being depended on which button made it. All four now
+  post the same shape to one create, which maps the authoring intent onto the
+  unified model. The scheduler already ran decks natively, so nothing about how
+  a Lineup fires changes; the per-store forms behind the Rotations and
+  Schedules pages are untouched, and existing records are unaffected.
+
+  A dashboard picked in the wizard that isn't on any display yet now binds to
+  the Lineup's display for every intent, which the cycle and by-hand paths
+  already did. Without it a freshly-created Lineup can have steps that never
+  render.
+
+  This is what native authoring in the companion app was waiting on (#206):
+  there is now somewhere for `POST /lineups` to land.
+
 ## [0.288.0], 2026-08-10
 
 ### Added

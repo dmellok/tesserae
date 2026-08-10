@@ -30,6 +30,7 @@ from pydantic import ValidationError
 from werkzeug.wrappers import Response
 
 from app.deck_suggest import graph_for_pages, suggest_decks
+from app.lineup_authoring import build_lineup
 from app.state.deck_model import Deck, DeckPage
 from app.state.deck_store import DeckStore
 from app.state.page_store import PageStore
@@ -618,6 +619,67 @@ def create() -> Response:
             }
         )
     return redirect(url_for("decks.index") + f"#deck-{deck.id}")
+
+
+@bp.post("/new/lineup")
+def create_lineup() -> Response:
+    """Create a Lineup from an authoring intent, the one write path (#204).
+
+    The setup wizard used to post its four buttons to three different
+    routes backed by three different stores, so what a record ended up
+    being depended on which button made it. All four land here now and
+    become a Deck, which the scheduler already runs natively.
+
+    JSON-only (the wizard fetches); the classic per-store forms are
+    untouched for the Rotations / Schedules pages that still use them.
+    """
+    form = request.form
+    intent = (form.get("intent") or "").strip().lower()
+    name = (form.get("name") or "").strip()
+    device_ids = [d for d in form.getlist("device_ids") if d]
+    page_ids = [p for p in form.getlist("page_ids") if p]
+    dwell: dict[str, int] = {}
+    for page_id, raw in zip(page_ids, form.getlist("dwell_minutes"), strict=False):
+        with contextlib.suppress(TypeError, ValueError):
+            dwell[page_id] = int(raw)
+    try:
+        interval = int(form.get("interval_minutes") or 30)
+    except (TypeError, ValueError):
+        interval = 30
+    try:
+        deck = build_lineup(
+            intent=intent,
+            lineup_id=_unique_id(_slug_from(name)),
+            name=name or "Lineup",
+            page_ids=page_ids,
+            device_ids=device_ids,
+            dwell_minutes=dwell,
+            interval_minutes=interval,
+            fires_at=(form.get("fires_at") or "").strip() or None,
+            anchor=(form.get("anchor") or "00:00").strip() or "00:00",
+        )
+    except (ValidationError, ValueError) as exc:
+        msg = _first_error(exc) if isinstance(exc, ValidationError) else str(exc)
+        return _json_error(f"Invalid lineup: {msg}")
+    _store().upsert(deck)
+    _invalidate(deck)
+    # A dashboard picked here that isn't on any display yet binds to this
+    # Lineup's display, so a freshly-created Lineup can actually render every
+    # step. Same rule the deck editor's save has always applied.
+    display = deck.device_ids[0] if deck.device_ids else None
+    if display:
+        pages = _pages()
+        for page in (pages.get(p.page_id) for p in deck.pages):
+            if page is not None and not page.device_ids:
+                pages.save(page.model_copy(update={"device_ids": [display]}))
+    return jsonify(
+        {
+            "ok": True,
+            "id": deck.id,
+            "url": url_for("decks.index", hl=deck.id) + f"#udeck-{deck.id}",
+            "editor_url": url_for("decks.editor", deck_id=deck.id),
+        }
+    )
 
 
 def _merged_deck(existing: Deck, **changes: Any) -> Deck:

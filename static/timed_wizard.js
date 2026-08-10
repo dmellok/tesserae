@@ -41,6 +41,9 @@
   };
 
   const URLS = {
+    // One create for all four intents (#204). The per-store URLs are still
+    // read by the "advanced" hand-off links, not by this wizard's submit.
+    lineup: dialog.dataset.createLineupUrl,
     schedule: dialog.dataset.createScheduleUrl,
     rotation: dialog.dataset.createRotationUrl,
     deck: dialog.dataset.createDeckUrl,
@@ -458,24 +461,20 @@
     body.set('respond', 'json');
     body.set('name', state.name.trim() || autoName());
     body.set('enabled', 'on');
-    let url;
-    if (state.mode === 'cycle') {
-      url = URLS.rotation;
-      body.set('anchor', '00:00');
-      if (state.device) body.append('device_ids', state.device);
+    // Every intent posts the same shape to the same place; the server maps
+    // it onto the unified model (#204). 'deck' is the wizard's older name
+    // for the by-hand intent.
+    const url = URLS.lineup;
+    body.set('intent', state.mode === 'deck' ? 'manual' : state.mode);
+    if (state.device) body.append('device_ids', state.device);
+    if (state.mode === 'cycle' || state.mode === 'deck') {
       state.picks.forEach((id) => {
-        body.append('step_page_ids[]', id);
-        body.append('step_dwell_minutes[]', String(state.mins[id] || 5));
-        body.append('step_conditions_json[]', '');
+        body.append('page_ids', id);
+        body.append('dwell_minutes', String(state.mins[id] || 5));
       });
-    } else if (state.mode === 'deck') {
-      url = URLS.deck;
-      if (state.device) body.append('device_ids', state.device);
-      body.set('graph_json', JSON.stringify(state.picks.map((id) => ({ page_id: id }))));
+      if (state.mode === 'cycle') body.set('anchor', '00:00');
     } else {
-      url = URLS.schedule;
-      body.set('page_id', state.dash);
-      body.set('type', state.mode);
+      body.append('page_ids', state.dash);
       if (state.mode === 'daily') body.set('fires_at', state.time);
       else body.set('interval_minutes', String(state.interval));
     }
