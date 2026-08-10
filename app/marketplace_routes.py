@@ -246,6 +246,11 @@ def _entries_payload(
                 "name": entry.name,
                 "description": entry.description,
                 "icon": entry.icon or "ph-puzzle-piece",
+                "icon_url": (
+                    f"{screenshots_base}/icons/{entry.icon_asset}"
+                    if (entry.icon_asset and screenshots_base)
+                    else None
+                ),
                 "author_name": entry.author_name,
                 "author_github": entry.author_github,
                 "tags": entry.tags,

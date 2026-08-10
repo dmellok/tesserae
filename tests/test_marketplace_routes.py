@@ -20,6 +20,7 @@ restart.
 
 from __future__ import annotations
 
+import dataclasses
 import json
 from pathlib import Path
 from typing import Any
@@ -420,3 +421,37 @@ def test_the_widgets_page_offers_removal_and_names_the_live_copy(
     assert "Remove this copy" in body
     assert str(folder) in body
     assert str(app.config["PLUGIN_REGISTRY"].plugins[BUNDLED_ID].path) in body
+
+
+# -- image icons on the Browse card ------------------------------------
+
+
+def _browse_with(app: Flask, entry: Any) -> str:
+    mkt = MagicMock(spec=Marketplace)
+    mkt.index_url.return_value = "https://catalog.invalid/widgets.json"
+    mkt.fetch_index.return_value = [entry]
+    mkt.cached_index.return_value = [entry]
+    mkt.installed.return_value = {}
+    mkt.screenshots_base.return_value = "https://catalog.invalid"
+    mkt.plugins_dir.return_value = None
+    app.config["MARKETPLACE"] = mkt
+    client = app.test_client()
+    _sign_in(client)
+    return client.get("/plugins/browse").get_data(as_text=True)
+
+
+def test_an_entry_with_its_own_mark_renders_the_image(app: Flask) -> None:
+    entry = dataclasses.replace(
+        _fake_entry("picture_immich"), icon="ph-images-square", icon_asset="immich.svg"
+    )
+    body = _browse_with(app, entry)
+    assert "https://catalog.invalid/icons/immich.svg" in body
+
+
+def test_without_a_mark_the_card_keeps_the_glyph(app: Flask) -> None:
+    """The fallback that keeps an offline or air-gapped install looking
+    the same as it always did."""
+    entry = dataclasses.replace(_fake_entry("picture_immich"), icon="ph-images-square")
+    body = _browse_with(app, entry)
+    assert "catalog.invalid/icons/" not in body
+    assert "ph-images-square" in body

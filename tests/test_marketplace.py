@@ -1398,3 +1398,76 @@ def test_uninstall_theme_pack_removes_every_subfolder(
     assert not (marketplace._themes_dir / "pastel-rose").exists()
     assert not (marketplace._themes_dir / "pastel-mint").exists()
     assert "pastels" not in marketplace.installed()
+
+
+# -- image icons -------------------------------------------------------
+
+
+def _entry_with(**extra: object) -> dict[str, object]:
+    base: dict[str, object] = {
+        "id": "sample",
+        "name": "Sample",
+        "description": "A sample widget for tests.",
+        "author": {"name": "Test Author"},
+        "tags": ["utility"],
+        "kind": "widget",
+        "tesserae_compat": "1.x",
+        "screenshot_sizes": ["lg"],
+        "release": {
+            "version": "0.0.1",
+            "tarball_url": "https://example.invalid/sample.tar.gz",
+            "sha256": "a" * 64,
+        },
+    }
+    base.update(extra)
+    return base
+
+
+def test_icon_asset_parses_through(marketplace: Marketplace, url_fixture: dict[str, bytes]) -> None:
+    """An entry wrapping a recognisable service can ship its own mark
+    instead of a Phosphor glyph."""
+    url_fixture["https://example.invalid/widgets.json"] = _make_index(
+        [_entry_with(icon="ph-images-square", icon_asset="immich.svg")]
+    )
+    entry = marketplace.fetch_index()[0]
+    assert entry.icon_asset == "immich.svg"
+    # The glyph stays as the fallback for an unreachable catalog.
+    assert entry.icon == "ph-images-square"
+
+
+def test_icon_asset_defaults_to_none(
+    marketplace: Marketplace, url_fixture: dict[str, bytes]
+) -> None:
+    url_fixture["https://example.invalid/widgets.json"] = _make_index([_entry_with()])
+    assert marketplace.fetch_index()[0].icon_asset is None
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "https://evil.invalid/beacon.png",
+        "//evil.invalid/beacon.png",
+        "../../../etc/passwd",
+        "icons/../secret.png",
+        "sub/dir/logo.png",
+        "logo.jpg",
+        "logo",
+        "logo.png.exe",
+        "",
+        123,
+        None,
+    ],
+)
+def test_a_url_or_path_shaped_icon_asset_is_dropped(
+    marketplace: Marketplace, url_fixture: dict[str, bytes], value: object
+) -> None:
+    """The value arrives from a remote index. Anything URL-shaped would
+    let a catalog point every Browse page's <img> at a host of its
+    choosing; a path segment would escape the icons directory. Both fall
+    back to the glyph rather than failing the parse."""
+    url_fixture["https://example.invalid/widgets.json"] = _make_index(
+        [_entry_with(icon_asset=value)]
+    )
+    entries = marketplace.fetch_index()
+    assert len(entries) == 1, "a bad icon must not drop the entry"
+    assert entries[0].icon_asset is None

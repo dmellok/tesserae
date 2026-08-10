@@ -34,6 +34,7 @@ import dataclasses
 import hashlib
 import json
 import logging
+import re
 import shutil
 import tarfile
 import tempfile
@@ -131,6 +132,14 @@ class CatalogEntry:
     # the widget repo has zero stars; positive int means real signal.
     # The Browse template hides the chip when this is None or 0.
     stars: int | None = None
+    # Optional image icon, a filename the catalog ships under
+    # ``icons/``. For entries wrapping a recognisable third-party
+    # service, the project's own mark reads faster than any glyph the
+    # Phosphor set can offer. ``icon`` stays the fallback, so an
+    # unreachable catalog (or an install that never fetches it) still
+    # renders something. Declared last because dataclass defaults have
+    # to follow non-default fields; it belongs next to ``icon``.
+    icon_asset: str | None = None
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> CatalogEntry:
@@ -155,6 +164,7 @@ class CatalogEntry:
             release_tarball_url=str(release["tarball_url"]),
             release_sha256=str(release["sha256"]).lower(),
             source=(str(raw["source"]) if raw.get("source") else None),
+            icon_asset=_clean_icon_asset(raw.get("icon_asset")),
         )
 
 
@@ -234,6 +244,26 @@ class IndexSnapshot:
 
 def _utcnow_iso() -> str:
     return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+# An ``icon_asset`` is a bare filename, resolved under the catalog's
+# ``icons/`` directory. Deliberately not a URL: the value arrives from a
+# remote index, and anything URL-shaped would let a catalog point an
+# <img> at a host of its choosing, turning every Browse page load into a
+# beacon. A path segment would escape the directory just as usefully.
+_ICON_ASSET_RE = re.compile(r"^[a-z0-9][a-z0-9_-]*\.(?:png|svg)$")
+
+
+def _clean_icon_asset(raw: Any) -> str | None:
+    """Accept a plain ``<name>.png`` / ``<name>.svg`` filename, else None.
+
+    Falling back to None rather than raising keeps one malformed entry
+    from failing the whole catalog parse; the widget just renders with
+    its Phosphor glyph."""
+    if not isinstance(raw, str):
+        return None
+    value = raw.strip().lower()
+    return value if _ICON_ASSET_RE.match(value) else None
 
 
 def _screenshots_base(index_url: str) -> str:

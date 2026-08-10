@@ -4,6 +4,20 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.286.0], 2026-08-10
+
+### Added
+
+- **Catalog entries can carry their own icon.** A widget fronting a service with
+  a recognisable mark (Immich, a photo host, a transit agency) can ship that
+  mark in the catalog and have the Browse card render it in place of a Phosphor
+  glyph, which no glyph set can match for recognisability. The entry names a
+  bare filename resolved under the catalog's `icons/` directory, never a URL, so
+  a catalog can't aim every Browse page's `<img>` at a host of its choosing; an
+  invalid value falls back to the glyph rather than failing the catalog parse.
+  The glyph stays the fallback for an install that can't reach the catalog, or
+  an image that fails to load.
+
 ## [0.285.0], 2026-08-10
 
 ### Added

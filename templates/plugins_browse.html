@@ -187,13 +187,28 @@
     </div>
     {% else %}
     <div class="marketplace-thumb marketplace-thumb--placeholder">
+      {# An entry wrapping a recognisable service can ship its own mark;
+         the glyph stays the fallback so a catalog that never loads (or an
+         image that 404s) still draws something. #}
+      {% if e.icon_url %}
+      <img class="marketplace-thumb-logo" src="{{ e.icon_url }}" alt="" loading="lazy"
+           onerror="this.remove()">
+      {% else %}
       <i class="ph-duotone ph-{{ e.icon.removeprefix('ph-') }}" aria-hidden="true"></i>
+      {% endif %}
     </div>
     {% endif %}
     <div class="marketplace-body">
       <header class="marketplace-card-head">
         <h3>
-          <span class="icon-box"><i class="ph ph-{{ e.icon.removeprefix('ph-') }}" aria-hidden="true"></i></span>
+          <span class="icon-box">
+            {% if e.icon_url %}
+            <img class="marketplace-icon-logo" src="{{ e.icon_url }}" alt="" loading="lazy"
+                 onerror="this.remove()">
+            {% else %}
+            <i class="ph ph-{{ e.icon.removeprefix('ph-') }}" aria-hidden="true"></i>
+            {% endif %}
+          </span>
           <span>{{ e.name }}</span>
           {% if e.official %}
           <span class="pill is-accent" title="Reviewed + maintained by the catalog owner">
@@ -408,6 +423,22 @@
   .marketplace-thumb--placeholder > i {
     font-size: 3rem;
     color: var(--t-muted);
+  }
+  /* A project's own mark standing in for the glyph. Overrides the
+     screenshot rule above (which stretches to fill a 3:2 card): a logo
+     has a shape worth keeping, so contain it and let it sit at glyph
+     scale rather than spanning the whole thumbnail. */
+  .marketplace-thumb--placeholder > img.marketplace-thumb-logo {
+    width: auto;
+    max-width: 55%;
+    height: 42%;
+    object-fit: contain;
+  }
+  .icon-box > img.marketplace-icon-logo {
+    display: block;
+    width: 1em;
+    height: 1em;
+    object-fit: contain;
   }
   /* Carousel: CSS scroll-snap handles touch swipe + keyboard
      left/right when the track is focused, for free. JS only wires
