@@ -46,15 +46,24 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-# All four scopes the OpenAPI contract defines. The first release hands a
-# companion client the full set (a single "Companion" role); the field is
-# stored per-token so we can issue narrower sets later.
+# The scopes a pairing grants. One "Companion" role today, issued whole;
+# the field is stored per-token so narrower sets can be issued later.
+#
+# A token paired before a scope existed simply doesn't carry it, and the
+# routes guarding that scope refuse it. That's survivable while every new
+# scope is something the app couldn't call anyway, and it's why authoring
+# (``lineups:write``) is NOT here: granting the ability to rewrite
+# household scheduling to every previously-paired client is the one case
+# where silence is the wrong default, so it lands as an explicit per-token
+# grant instead (#207).
 COMPANION_SCOPES: tuple[str, ...] = (
     "devices:read",
     "dashboards:read",
     "push:write",
     "media:write",
     "personal_data:write",
+    "lineups:read",
+    "lineups:control",
 )
 
 # How stale ``last_used_at`` may get before a fresh authenticated request

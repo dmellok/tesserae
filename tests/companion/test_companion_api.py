@@ -128,6 +128,8 @@ def test_capabilities_probe_is_unauthenticated_and_valid(app: Flask) -> None:
         "history",
         "image_framing",
         "personal_data_reminders",
+        "lineups",
+        "lineup_control",
     }
     assert body["personal_data"]["sources"] == ["reminders", "reminders.fridge"]
     assert "webpage_push" not in body["features"]
@@ -154,6 +156,10 @@ def test_pair_exchanges_code_for_scoped_token(app: Flask) -> None:
         "push:write",
         "media:write",
         "personal_data:write",
+        # Read + control for Lineups ride along with the pairing role;
+        # authoring (lineups:write) deliberately does not, see #207.
+        "lineups:read",
+        "lineups:control",
     }
     assert body["instance"]["server_version"] == app.config["APP_VERSION"]
 

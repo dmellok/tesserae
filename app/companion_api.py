@@ -52,6 +52,7 @@ from app.companion_history import (
     retained_resend_composition_for_row,
 )
 from app.companion_jobs import CompanionJobs, JobOutcome
+from app.companion_lineups import lineup_dict
 from app.data_change_refresh import (
     DataChangeEvent,
     personal_data_delete_event,
@@ -130,6 +131,11 @@ FEATURES = (
     "history",
     "image_framing",
     "personal_data_reminders",
+    # Read + control for Lineups (#205). Authoring is a separate capability
+    # so a client can offer the controls without implying it can edit, which
+    # it can't until the write path behind #204 exists.
+    "lineups",
+    "lineup_control",
 )
 
 _PAIRING_CODE_RE = re.compile(r"^[0-9]{6,12}$")
@@ -884,6 +890,184 @@ def list_dashboards() -> Any:
             }
         )
     return jsonify({"dashboards": out})
+
+
+# -- lineups -------------------------------------------------------------
+
+
+def _decks() -> Any:
+    return current_app.config.get("DECK_STORE")
+
+
+def _deck_nav() -> Any:
+    return current_app.config.get("DECK_NAV_STORE")
+
+
+def _lineup_views() -> list[dict[str, Any]]:
+    """Every Lineup, in the shape the app renders.
+
+    Page names are resolved here rather than by the client so a Lineup
+    listing a since-deleted dashboard reports it as missing instead of
+    showing a bare id."""
+    store = _decks()
+    if store is None:
+        return []
+    page_names = {p.id: (p.name or p.id) for p in _pages().list()}
+    nav = _deck_nav()
+    out: list[dict[str, Any]] = []
+    for deck in store.all():
+        current: dict[str, str] = {}
+        if nav is not None:
+            for device_id in deck.device_ids:
+                page_id = nav.current_page(device_id, deck.id)
+                if page_id:
+                    current[device_id] = page_id
+        out.append(lineup_dict(deck, page_names=page_names, current_pages=current))
+    return out
+
+
+@bp.get("/lineups")
+@_require_companion("lineups:read")
+def list_lineups() -> Any:
+    return jsonify({"lineups": _lineup_views()})
+
+
+@bp.get("/lineups/<lineup_id>")
+@_require_companion("lineups:read")
+def get_lineup(lineup_id: str) -> Any:
+    for view in _lineup_views():
+        if view["id"] == lineup_id:
+            return jsonify({"lineup": view})
+    return _error("not_found", "No lineup with that id.", 404)
+
+
+# Actions that only change stored state, versus those that repaint a panel.
+# The split decides the response: a config flip answers with the updated
+# record, a repaint goes through the job pipeline like every other write.
+_LINEUP_CONFIG_ACTIONS = ("enable", "disable")
+_LINEUP_PAINT_ACTIONS = ("next", "previous", "play")
+
+
+@bp.post("/lineups/<lineup_id>/actions")
+@_require_companion("lineups:control")
+def lineup_action(lineup_id: str) -> Any:
+    """Enable / disable a Lineup, or move a display through it.
+
+    Control only: nothing here edits the Lineup's definition, so an
+    advanced record the app refuses to edit is still fully operable.
+    """
+    store = _decks()
+    deck = store.get(lineup_id) if store is not None else None
+    if deck is None:
+        return _error("not_found", "No lineup with that id.", 404)
+
+    body = request.get_json(silent=True)
+    action = str(body.get("action") or "").strip().lower() if isinstance(body, dict) else ""
+    if action not in _LINEUP_CONFIG_ACTIONS + _LINEUP_PAINT_ACTIONS:
+        return _error(
+            "invalid_request",
+            "action must be one of: "
+            + ", ".join(_LINEUP_CONFIG_ACTIONS + _LINEUP_PAINT_ACTIONS)
+            + ".",
+            400,
+        )
+
+    if action in _LINEUP_CONFIG_ACTIONS:
+        # No panel is touched, so no job and no idempotency key: the flip is
+        # idempotent by construction (enable twice is enabled).
+        store.upsert(deck.model_copy(update={"enabled": action == "enable"}))
+        for view in _lineup_views():
+            if view["id"] == lineup_id:
+                return jsonify({"lineup": view})
+        return _error("not_found", "No lineup with that id.", 404)
+
+    key, err = _require_idempotency_key()
+    if err is not None:
+        return err
+    assert key is not None
+    raw = request.get_data(cache=True)
+    if not isinstance(body, dict) or not isinstance(body.get("override_quiet_hours"), bool):
+        return _error("invalid_request", "override_quiet_hours (boolean) is required.", 400)
+    override = bool(body["override_quiet_hours"])
+
+    targets = _valid_target_ids(body.get("device_ids")) if "device_ids" in body else None
+    if "device_ids" in body and targets is None:
+        return _error("invalid_target", "One or more target displays are unknown.", 400)
+    if targets is None:
+        targets = list(dict.fromkeys(deck.device_ids))
+    # A Lineup bound to nothing has no panel to move.
+    targets = [d for d in targets if d in deck.device_ids]
+    if not targets:
+        return _error("invalid_target", "The lineup has no bound displays.", 400)
+
+    page_ids = deck.page_ids
+    nav = _deck_nav()
+
+    def _target_page(device_id: str) -> str:
+        """Where this device lands. ``play`` is explicit; the steps walk from
+        wherever the device actually is, so two panels on one Lineup step
+        independently rather than being yanked to a shared index."""
+        if action == "play":
+            return str(body.get("page_id") or "")
+        current = nav.current_page(device_id, deck.id) if nav is not None else None
+        try:
+            index = page_ids.index(current) if current else 0
+        except ValueError:
+            index = 0
+        step = 1 if action == "next" else -1
+        return str(page_ids[(index + step) % len(page_ids)])
+
+    if action == "play":
+        requested = str(body.get("page_id") or "")
+        if requested not in page_ids:
+            return _error("invalid_request", "page_id must be a dashboard in the lineup.", 400)
+
+    deck_id = deck.id
+    resolved_targets = list(targets)
+
+    def _work() -> JobOutcome:
+        active, _quiet = _partition_quiet(resolved_targets, override=override)
+        if not active:
+            return JobOutcome.quiet(resolved_targets, "all_targets_in_quiet_hours")
+        manager = _push_manager()
+        if manager is None:
+            return JobOutcome.failed("temporarily_unavailable", "The push pipeline is offline.")
+        painted: list[str] = []
+        event_ids: list[str] = []
+        for device_id in active:
+            target_page = _target_page(device_id)
+            promoter = getattr(manager, "promote_deck_page", None)
+            if callable(promoter) and promoter(device_id, target_page):
+                painted.append(device_id)
+            else:
+                result = manager.push(
+                    target_page,
+                    device_ids={device_id},
+                    respect_quiet_hours=False,
+                    source="companion",
+                    bypass_coalesce=True,
+                )
+                if result.status not in _PUBLISHED_STATUSES:
+                    continue
+                painted.append(device_id)
+                event_ids.extend(_history_event_ids(result) or ())
+            if nav is not None:
+                nav.set(device_id, deck_id, target_page)
+        if not painted:
+            return JobOutcome.failed("render_failed", "No display took the frame.")
+        return JobOutcome.published(painted, history_event_ids=event_ids)
+
+    return _reserve_and_run(
+        # Reuses the dashboard_push job kind: it is a dashboard being pushed
+        # to a display, and the closed enum in the published contract is
+        # charmmmz's to widen if the app wants to tell them apart.
+        kind="dashboard_push",
+        key=key,
+        payload=raw,
+        target_ids=resolved_targets,
+        label=deck.name or deck.id,
+        work=_work,
+    )
 
 
 # -- write routes: shared plumbing ---------------------------------------

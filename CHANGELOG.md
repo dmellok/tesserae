@@ -4,6 +4,38 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.287.0], 2026-08-10
+
+### Added
+
+- **Companion API: Lineups read + control** (#205). `GET /api/app/v1/lineups`
+  and `/lineups/{id}` report each Lineup with its dashboards, which display is
+  on which page, and whether the app may edit it;
+  `POST /lineups/{id}/actions` enables, disables, steps a display forward or
+  back, or plays a chosen dashboard. Steps read each display's own position, so
+  two panels on one Lineup move independently rather than being pulled to a
+  shared index. Repaints go through the existing job pipeline with an
+  `Idempotency-Key`; enable and disable answer immediately, since they touch no
+  panel.
+
+  Editability is decided by the server, not the client: a Lineup using
+  conditions, a fallback dashboard, priority mode, smart sync, day or
+  time-of-day windows, or a home card reports `native_editable: false` with the
+  reason, and stays fully readable and controllable. That keeps a partial
+  client update from flattening fields it never knew about. Authoring itself
+  waits on #204.
+
+  Pairing now grants `lineups:read` and `lineups:control`. Authoring
+  (`lineups:write`) deliberately does not ride along, see #207.
+
+### Fixed
+
+- **The client protocol no longer claims re-registering changes a declared
+  rotation** (#208). It doesn't: `/register` for an existing device id, and
+  `/discover` matching a known MAC, both return the existing device without
+  rebuilding its panel. The Rotation dropdown owns the value after the instance
+  exists, and the page now says so.
+
 ## [0.286.2], 2026-08-10
 
 ### Fixed

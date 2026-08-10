@@ -656,6 +656,12 @@ components:
               - webpage_push
               - image_framing
               - personal_data_reminders
+              # Server-side errata, pending re-vendor: Tesserae advertises
+              # these from v0.287.0 (issue #205). Read + control for Lineups;
+              # the paths themselves are not described here yet, they land
+              # with the Companion contract PR discussed in #203.
+              - lineups
+              - lineup_control
         personal_data:
           $ref: "#/components/schemas/PersonalDataCapabilities"
         limits:
@@ -775,7 +781,19 @@ components:
           uniqueItems: true
           items:
             type: string
-            enum: [devices:read, dashboards:read, push:write, media:write, personal_data:write]
+            # lineups:read / lineups:control are server-side errata pending
+            # re-vendor, issued from v0.287.0 (issue #205). Authoring
+            # (lineups:write) is deliberately not granted at pairing, see #207.
+            enum:
+              [
+                devices:read,
+                dashboards:read,
+                push:write,
+                media:write,
+                personal_data:write,
+                lineups:read,
+                lineups:control,
+              ]
         created_at:
           type: string
           format: date-time

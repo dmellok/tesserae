@@ -153,9 +153,19 @@ server URL.
    for firmware that doesn't send it, including a client doing its own
    rotation after download.
 
-   The value is a registration-time fact. Remount the panel and change
-   it with the Rotation dropdown in Settings → Devices, or re-register;
-   `/status` doesn't accept it.
+   The value is read once, when the device instance is created. After
+   that the panel belongs to the operator: remount it and change the
+   **Rotation** dropdown in Settings → Devices. Re-sending a different
+   `rotation` does nothing on its own, because a `/register` for an
+   existing device id (and a `/discover` that matches a known MAC)
+   returns the existing device untouched rather than rebuilding its
+   panel. `/status` doesn't accept the field at all. To have a client
+   redeclare its geometry from scratch, delete the device and pair it
+   again.
+
+   The dropdown's degrees are measured the same way this field is, as
+   the turn from your framebuffer, so a client that declared `0` reads
+   back as 0° even on a portrait-native panel.
 
    `gamut` is optional; when supplied, it's persisted onto the
    auto-provisioned instance's panel block so the generic
