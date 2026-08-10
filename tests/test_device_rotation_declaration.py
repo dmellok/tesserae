@@ -263,3 +263,53 @@ def test_rotation_carries_the_content_not_just_the_frame(renderer) -> None:
     assert img.size == (480, 800)
     assert img.getpixel((470, 10)) < 128, "marker should have landed top-right"
     assert img.getpixel((10, 10)) > 128, "top-left should be blank after the turn"
+
+
+# -- the Rotation dropdown --------------------------------------------
+
+
+def test_a_portrait_native_panel_reads_zero_degrees(app: Flask) -> None:
+    """The client declared rotation 0 and its buffer is taller than it is
+    wide, so the card has to agree: labelling that 90 degrees told the
+    operator their client asked for something it hadn't, and correcting it
+    to 0 transposed the dimensions (issue #200)."""
+    from app.settings.index_routes import _rotation_options
+
+    options = _rotation_options({"w": 720, "h": 1280, "native_w": 720, "native_h": 1280})
+    assert options[0] == {"value": "portrait", "label": "0°"}
+    assert options[1] == {"value": "landscape", "label": "90°"}
+    assert options[2] == {"value": "portrait_flipped", "label": "180°"}
+    assert options[3] == {"value": "landscape_flipped", "label": "270°"}
+
+
+@pytest.mark.parametrize(
+    "panel",
+    [
+        {"w": 800, "h": 480, "native_w": 800, "native_h": 480},
+        {"w": 800, "h": 480},  # no declared buffer
+        None,
+        {"w": 800, "h": 480, "native_w": "junk", "native_h": None},
+    ],
+)
+def test_everything_else_keeps_the_landscape_relative_labels(panel: object) -> None:
+    from app.settings.index_routes import _rotation_options
+
+    options = _rotation_options(panel)  # type: ignore[arg-type]
+    assert [o["value"] for o in options] == [
+        "landscape",
+        "portrait",
+        "landscape_flipped",
+        "portrait_flipped",
+    ]
+    assert [o["label"] for o in options] == ["0°", "90°", "180°", "270°"]
+
+
+def test_the_card_renders_the_declared_rotation(app: Flask) -> None:
+    """End to end: a client registering a portrait buffer at rotation 0
+    lands on a card whose Rotation control shows 0°, not 90°."""
+    client = app.test_client()
+    _sign_in(client)
+    assert _register(client, app, device_id="pi_touch_ui", rotation=0).status_code == 201
+    body = client.get("/settings/devices").get_data(as_text=True)
+    # The selected option is the one carrying the stored orientation.
+    assert '<option value="portrait" selected>0°</option>' in body

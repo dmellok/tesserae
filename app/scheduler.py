@@ -1094,7 +1094,31 @@ class Scheduler:
                     target, device_ids={device_id}, respect_quiet_hours=True, source="deck"
                 )
                 if result.status == "failed":
-                    continue  # retry next tick; don't record the transition
+                    # Retry next tick; don't record the transition. Surface
+                    # it though: a page that fails every time its window
+                    # comes round leaves the panel holding the previous one,
+                    # which reads as "the deck skips that dashboard" rather
+                    # than "that dashboard won't render" (#167).
+                    logger.warning(
+                        "deck timer advance failed: device=%s deck=%s -> %s (%s)",
+                        device_id,
+                        deck.id,
+                        target,
+                        result.error or "push failed",
+                    )
+                    if self._event_log is not None:
+                        self._event_log.record(
+                            type="deck",
+                            source="deck",
+                            target=deck.id,
+                            status="failed",
+                            extra={
+                                "timer_advance_device": device_id,
+                                "page_id": target,
+                                "error": result.error or "push failed",
+                            },
+                        )
+                    continue
             self._deck_nav_store.set(device_id, deck.id, target)
             fired_any = True
             with self._lock:

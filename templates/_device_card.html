@@ -542,12 +542,13 @@
         <div class="dx-panel-orientation">
           <hr class="dx-divider">
           <p class="device-subhead">Panel &amp; orientation</p>
+          {# Degrees are the turn from the panel's own framebuffer, so a
+             portrait-native panel reads 0° when it paints its buffer as-is.
+             Built server-side because it depends on the device's declared
+             native dims (issue #200). #}
           {{ select_field(section.id ~ '-orientation', 'panel_orientation', 'Rotation',
               value=section.panel.get('orientation', 'landscape'),
-              options=[{'value':'landscape','label':'0°'},
-                       {'value':'portrait','label':'90°'},
-                       {'value':'landscape_flipped','label':'180°'},
-                       {'value':'portrait_flipped','label':'270°'}],
+              options=section.panel_rotation_options,
               help='Clockwise turn to match the mount.',
               form=_combined_form_id) }}
           <div class="dx-field-grid">

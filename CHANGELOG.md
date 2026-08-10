@@ -4,6 +4,26 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.286.2], 2026-08-10
+
+### Fixed
+
+- **A device's Rotation control reads in the client's own terms** (#200). The
+  dropdown labelled its degrees relative to landscape, so a client declaring a
+  720x1280 framebuffer at `rotation: 0` (paint my buffer as-is) read back as
+  90°, and correcting it to 0° transposed the dimensions, which then derived
+  90° again on the next save. The degrees are now the turn from the panel's own
+  framebuffer, so the card agrees with what the client declared. Panels whose
+  framebuffer is landscape, or that never declared one, are unaffected.
+
+### Changed
+
+- **A deck advance that can't paint says so** (#167). When a page failed to
+  push, the advance was skipped silently and the panel kept showing the
+  previous page, so a dashboard that consistently fails to render looks like a
+  deck skipping it rather than a page that won't paint. The failure now records
+  a deck event and a log line naming the page and the error.
+
 ## [0.286.1], 2026-08-10
 
 ### Changed

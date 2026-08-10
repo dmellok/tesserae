@@ -964,6 +964,9 @@ def _build_sections() -> list[dict[str, Any]]:
                 # Panel edit (orientation + dims) is only offered on
                 # instances, kinds aren't shown here at all.
                 "panel": device.panel if is_instance else None,
+                "panel_rotation_options": (
+                    _rotation_options(device.panel) if is_instance else None
+                ),
                 "panel_endpoint": (
                     url_for("auth.devices_update_panel", instance_id=device.id)
                     if is_instance
@@ -1357,6 +1360,38 @@ _OPENDISPLAY_INTEGRATION = {
     "label": "OpenDisplay integration for Home Assistant",
     "url": "https://opendisplay.org/",
 }
+
+
+def _rotation_options(panel: dict[str, Any] | None) -> list[dict[str, str]]:
+    """Rotation choices for a device card: orientation value + degrees label.
+
+    The degrees are the turn from the panel's own framebuffer, not from
+    landscape. Those agree for the landscape-native panels that make up
+    most of the hardware list, so this changes nothing for them.
+
+    They part company on a portrait-native panel. A client reporting
+    720x1280 with ``rotation: 0`` is saying "compose at my buffer, no
+    turn", which is stored as the portrait orientation; labelling that
+    90 degrees told the operator their client had asked for something it
+    hadn't, and correcting it to 0 then transposed the dimensions. The
+    label now matches what the client declared (issue #200)."""
+    portrait_native = False
+    if panel:
+        try:
+            portrait_native = int(panel["native_h"]) > int(panel["native_w"])
+        except (KeyError, TypeError, ValueError):
+            portrait_native = False
+    # Index i is the orientation reached by turning i quarter-turns from
+    # the framebuffer: 90 and 270 transpose it, 180 and 270 flip it.
+    order = (
+        ("portrait", "landscape", "portrait_flipped", "landscape_flipped")
+        if portrait_native
+        else ("landscape", "portrait", "landscape_flipped", "portrait_flipped")
+    )
+    return [
+        {"value": value, "label": f"{degrees}°"}
+        for value, degrees in zip(order, (0, 90, 180, 270), strict=True)
+    ]
 
 
 def _opendisplay_setup(device: Device) -> dict[str, Any] | None:
