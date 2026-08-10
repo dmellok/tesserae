@@ -248,3 +248,55 @@ def test_non_feed_body_surfaces_the_friendly_message_to_the_cell() -> None:
     with patch.object(srv, "_fetch_via_urllib", _html):
         result = srv._fetch_feed("https://example.com/rss", allow_pool=False)
     assert result == "The feed returned an empty response."
+
+
+# -- compressed responses (#212) -----------------------------------------
+
+
+class _GzipResp:
+    """A CDN that gzips regardless of what the request asked for.
+
+    urllib does not transparently decompress, so before the fix the XML
+    parser was handed gzip bytes and blamed the feed: "not well-formed
+    (invalid token): line 1, column 0". The reporter's feed only rendered
+    when a preview happened to warm the cache through the Chromium
+    fallback, which decompresses natively.
+    """
+
+    headers: ClassVar[dict[str, str]] = {
+        "Content-Type": "application/rss+xml",
+        "Content-Encoding": "gzip",
+    }
+
+    def read(self) -> bytes:
+        import gzip
+
+        return gzip.compress(_RSS)
+
+    def __enter__(self) -> _GzipResp:
+        return self
+
+    def __exit__(self, *a: object) -> bool:
+        return False
+
+
+def test_a_gzipped_feed_parses() -> None:
+    with patch.object(srv.urllib.request, "urlopen", lambda *a, **k: _GzipResp()):
+        root = srv._fetch_via_urllib("https://example.com/rss")
+    assert root.tag == "rss"
+    _title, items = srv._slim_rss(root, 2)
+    assert [i["title"] for i in items] == ["Premier article", "Deuxieme article"]
+
+
+def test_the_request_asks_for_no_compression() -> None:
+    """Decoding is the safety net; not being sent compression in the first
+    place is the fix. A server that honours this hands back plain XML."""
+    seen: dict[str, str] = {}
+
+    def _capture(req: object, timeout: int = 0) -> _FakeResp:
+        seen.update(dict(getattr(req, "headers", {})))
+        return _FakeResp()
+
+    with patch.object(srv.urllib.request, "urlopen", _capture):
+        srv._fetch_via_urllib("https://example.com/rss")
+    assert seen.get("Accept-encoding") == "identity"

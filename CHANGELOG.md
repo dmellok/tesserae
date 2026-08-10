@@ -4,6 +4,32 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.290.0], 2026-08-11
+
+### Fixed
+
+- **A compressed RSS feed no longer reports itself as broken XML** (#212).
+  urllib doesn't transparently decompress, and a CDN that gzips regardless of
+  what was asked for handed the parser a binary blob, which it reported as "not
+  well-formed (invalid token): line 1, column 0". That reads like a broken feed
+  rather than a compressed one, so the widget blamed the wrong thing. The
+  request now asks for no compression and decodes anyway if the server ignores
+  that.
+
+  It presented as intermittent because the editor preview falls back to a
+  Chromium fetch, which decompresses natively, and its result is cached for ten
+  minutes. A dashboard therefore rendered correctly right after anyone opened
+  the editor, and showed the error once the cache expired. The same fallback
+  explains the `TimeoutError: widget data fetch exceeded the page-render
+  budget` on the panel preview: it was firing a whole browser fetch on every
+  preview because the plain fetch looked like a failure.
+
+- **The shared plugin HTTP helpers decode compressed responses too.**
+  `fetch_text` and `fetch_json` had the same gap, so any widget on a
+  CDN-fronted API could receive an undecodable body. The decoder is now one
+  implementation in `app.plugin_http`, which `calendar_core` (where this class
+  of bug was first fixed, #168) now shares instead of keeping its own copy.
+
 ## [0.289.2], 2026-08-10
 
 ### Fixed

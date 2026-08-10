@@ -47,6 +47,8 @@ from flask import (
 )
 from werkzeug.wrappers import Response
 
+from app.plugin_http import decode_content_encoding
+
 _log = logging.getLogger(__name__)
 
 CACHE_TTL_S = 15 * 60
@@ -163,7 +165,7 @@ def _http_get(url: str, auth: dict[str, str] | None) -> bytes | None:
         )
         with opener.open(req, timeout=HTTP_TIMEOUT_S) as resp:
             blob: bytes = resp.read()
-            blob = _decode_content_encoding(blob, str(resp.headers.get("Content-Encoding", "")))
+            blob = decode_content_encoding(blob, str(resp.headers.get("Content-Encoding", "")))
         return blob
     except Exception:
         return None
@@ -515,32 +517,6 @@ def _prop_find(props: list[Any], tag: str) -> Any:
     return None
 
 
-def _decode_content_encoding(body: bytes, content_encoding: str) -> bytes:
-    """Decode a ``Content-Encoding`` the response carried anyway.
-
-    urllib never sends ``Accept-Encoding``, and RFC 7231 lets a server treat
-    an absent header as "any coding acceptable", so a Nextcloud behind a
-    compressing proxy / CDN can hand back gzip or deflate that urllib does
-    *not* transparently decompress, i.e. an unparseable binary blob. We ask
-    for ``identity`` up front; this is the belt-and-suspenders decode for a
-    server that ignores that. gzip and deflate are stdlib; anything else
-    (e.g. brotli) is left untouched and surfaces in the diagnostic log."""
-    enc = content_encoding.lower().strip()
-    if enc in ("gzip", "x-gzip"):
-        import gzip
-
-        with contextlib.suppress(Exception):
-            return gzip.decompress(body)
-    elif enc == "deflate":
-        import zlib
-
-        # deflate is ambiguous in the wild: zlib-wrapped or raw. Try both.
-        for wbits in (zlib.MAX_WBITS, -zlib.MAX_WBITS):
-            with contextlib.suppress(Exception):
-                return zlib.decompress(body, wbits)
-    return body
-
-
 def _propfind(
     url: str, auth: dict[str, str] | None, depth: str
 ) -> tuple[Any, dict[str, Any] | None]:
@@ -588,7 +564,7 @@ def _propfind(
     # Decode a compressed body the server sent despite our identity request
     # (a proxy / CDN in front of Nextcloud is the usual cause), otherwise the
     # parser just sees a binary blob (#168).
-    body = _decode_content_encoding(body, content_encoding)
+    body = decode_content_encoding(body, content_encoding)
     # Some servers (misconfigured PHP / Nextcloud output buffering, an app
     # that emits a stray newline before the response) prepend a BOM or
     # whitespace ahead of the ``<?xml`` declaration. A browser or curl

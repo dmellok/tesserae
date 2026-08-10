@@ -29,6 +29,8 @@ from xml.etree import ElementTree as ET
 
 from flask import current_app
 
+from app.plugin_http import decode_content_encoding
+
 logger = logging.getLogger(__name__)
 
 CACHE_TTL_S = 600
@@ -53,6 +55,11 @@ URLLIB_HEADERS: dict[str, str] = {
     "Sec-Fetch-Mode": "navigate",
     "Sec-Fetch-Site": "none",
     "Sec-Fetch-User": "?1",
+    # Ask for no compression. urllib doesn't transparently decompress, and a
+    # server that gzips anyway hands the XML parser a binary blob, which it
+    # reports as "not well-formed (invalid token): line 1, column 0" (#212).
+    # _fetch_via_urllib decodes defensively for servers that ignore this.
+    "Accept-Encoding": "identity",
 }
 
 ATOM_NS = "{http://www.w3.org/2005/Atom}"
@@ -217,6 +224,11 @@ def _fetch_via_urllib(url: str) -> ET.Element:
     with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT_S) as resp:
         body = resp.read()
         content_type = resp.headers.get("Content-Type", "")
+        content_encoding = str(resp.headers.get("Content-Encoding", ""))
+    # Some CDNs compress regardless of what we asked for. Decoding here is
+    # what separates "this feed is compressed" from "this feed is broken":
+    # the parser can't tell the difference and blames the feed (#212).
+    body = decode_content_encoding(body, content_encoding)
     return _parse_feed(body, content_type)
 
 
