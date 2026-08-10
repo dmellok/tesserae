@@ -448,6 +448,27 @@ def test_an_entry_with_its_own_mark_renders_the_image(app: Flask) -> None:
     assert "https://catalog.invalid/icons/immich.svg" in body
 
 
+def test_the_mark_stands_in_for_the_card_screenshot(app: Flask) -> None:
+    """A widget rendering the user's own library screenshots as one
+    arbitrary photo, which says nothing about what it is. Where a mark
+    exists it takes the card image, not just the small icon slot."""
+    entry = dataclasses.replace(
+        _fake_entry("picture_immich"),
+        icon="ph-images-square",
+        icon_asset="immich.svg",
+        screenshot_sizes=["lg"],
+    )
+    body = _browse_with(app, entry)
+    assert "https://catalog.invalid/icons/immich.svg" in body
+    assert "/screenshots/picture_immich/lg.png" not in body
+
+
+def test_without_a_mark_the_screenshot_still_leads(app: Flask) -> None:
+    entry = dataclasses.replace(_fake_entry("weather"), screenshot_sizes=["lg"])
+    body = _browse_with(app, entry)
+    assert "/screenshots/weather/lg.png" in body
+
+
 def test_without_a_mark_the_card_keeps_the_glyph(app: Flask) -> None:
     """The fallback that keeps an offline or air-gapped install looking
     the same as it always did."""

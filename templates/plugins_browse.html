@@ -152,7 +152,17 @@
      filter is a plain ``indexOf`` against a lower-cased string. #}
   {% set _hay = (e.id ~ ' ' ~ e.name ~ ' ' ~ e.description ~ ' ' ~ (e.author_name or '') ~ ' ' ~ (e.tags|join(' '))) | lower %}
   <article class="dx-section-card marketplace-card" data-search-haystack="{{ _hay }}">
-    {% if e.screenshot_urls and e.screenshot_urls|length > 1 %}
+    {# A mark, when the entry ships one, stands in for the card image
+       entirely. For a widget that renders whatever the user's own library
+       holds, a screenshot is one arbitrary photo and says nothing about
+       what the widget is; the service's logo is the thing a person scans
+       the grid for. Entries without a mark keep the screenshot. #}
+    {% if e.icon_url %}
+    <div class="marketplace-thumb marketplace-thumb--logo">
+      <img class="marketplace-thumb-logo" src="{{ e.icon_url }}"
+           alt="{{ e.name }}" loading="lazy" onerror="this.remove()">
+    </div>
+    {% elif e.screenshot_urls and e.screenshot_urls|length > 1 %}
     <div class="marketplace-thumb marketplace-thumb-carousel"
          role="region" aria-label="screenshots for {{ e.name }}"
          data-carousel data-slide-count="{{ e.screenshot_urls|length }}">
@@ -187,15 +197,7 @@
     </div>
     {% else %}
     <div class="marketplace-thumb marketplace-thumb--placeholder">
-      {# An entry wrapping a recognisable service can ship its own mark;
-         the glyph stays the fallback so a catalog that never loads (or an
-         image that 404s) still draws something. #}
-      {% if e.icon_url %}
-      <img class="marketplace-thumb-logo" src="{{ e.icon_url }}" alt="" loading="lazy"
-           onerror="this.remove()">
-      {% else %}
       <i class="ph-duotone ph-{{ e.icon.removeprefix('ph-') }}" aria-hidden="true"></i>
-      {% endif %}
     </div>
     {% endif %}
     <div class="marketplace-body">
@@ -424,14 +426,17 @@
     font-size: 3rem;
     color: var(--t-muted);
   }
-  /* A project's own mark standing in for the glyph. Overrides the
+  /* A project's own mark standing in for the card image. Overrides the
      screenshot rule above (which stretches to fill a 3:2 card): a logo
-     has a shape worth keeping, so contain it and let it sit at glyph
-     scale rather than spanning the whole thumbnail. */
-  .marketplace-thumb--placeholder > img.marketplace-thumb-logo {
+     has a shape worth keeping, so contain it and let it sit centred at
+     badge scale rather than spanning the whole thumbnail. */
+  .marketplace-thumb--logo {
+    background: var(--t-surface-sunk);
+  }
+  .marketplace-thumb--logo > img.marketplace-thumb-logo {
     width: auto;
-    max-width: 55%;
-    height: 42%;
+    max-width: 45%;
+    height: 52%;
     object-fit: contain;
   }
   .icon-box > img.marketplace-icon-logo {

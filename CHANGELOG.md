@@ -4,6 +4,16 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.286.1], 2026-08-10
+
+### Changed
+
+- **A catalog entry's own mark now replaces its card screenshot**, rather than
+  only standing in where no screenshot exists. A widget that renders whatever
+  the user's own library holds screenshots as one arbitrary photo, which says
+  nothing about what the widget is; the service's logo is the thing people scan
+  the grid for. Entries without a mark are unchanged.
+
 ## [0.286.0], 2026-08-10
 
 ### Added
