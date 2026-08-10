@@ -152,3 +152,56 @@ def test_deck_to_rotation_rejects_overlong_cycle() -> None:
         ]
     )
     assert _deck_to_rotation(big) is None
+
+
+def test_a_five_minute_cycle_alternates_under_the_default_min_hold(wiring) -> None:
+    """Two dashboards, five-minute dwell, defaults otherwise (#167).
+
+    ``advance_min_hold_minutes`` defaults to 5, so this is the dwell and the
+    hold set to the same value, which is what anyone who leaves the defaults
+    alone gets. The gate used to measure from the moment of the last fire,
+    and a fire lands a few seconds into its window (the tick that noticed the
+    boundary), so the next boundary fell just inside the hold. Every other
+    window was swallowed, and with two pages the swallowed window is always
+    the same one: the panel sat on a single dashboard while still firing on
+    the grid, at twice the interval.
+
+    Ticks here deliberately land a few seconds late, because ticking exactly
+    on the boundary is what hid this.
+    """
+    scheduler, push, store, _nav = wiring
+    store.upsert(
+        _deck(
+            advance_interval_minutes=5,
+            pages=[DeckPage(page_id="a"), DeckPage(page_id="b")],
+        )
+    )
+    painted: list[str] = []
+    for window in range(6):
+        # +7s: a real tick notices the boundary shortly after it passes.
+        moment = datetime(2026, 6, 15, 0, 0, tzinfo=UTC).replace(minute=(window * 5) % 60, second=7)
+        scheduler._tick_once(moment)
+        if push.push.call_args is not None:
+            painted.append(push.push.call_args[0][0])
+        push.push.reset_mock()
+    assert painted == ["a", "b", "a", "b", "a", "b"]
+
+
+def test_a_hold_longer_than_the_dwell_still_slows_the_cycle(wiring) -> None:
+    """The other half of the same gate: a hold above the dwell is someone
+    deliberately keeping each dashboard up longer than the cycle says, and
+    that has to keep working."""
+    scheduler, push, store, _nav = wiring
+    store.upsert(_deck(advance_interval_minutes=30, advance_min_hold_minutes=60))
+    fired_at: list[str] = []
+    for window in range(5):
+        moment = datetime(2026, 6, 15, 0, 0, tzinfo=UTC).replace(
+            hour=(window * 30) // 60, minute=(window * 30) % 60, second=7
+        )
+        scheduler._tick_once(moment)
+        if push.push.call_args is not None:
+            fired_at.append(moment.strftime("%H:%M"))
+        push.push.reset_mock()
+    # Every other 30-minute window is held, so the panel repaints hourly,
+    # which is what asking for a 60-minute hold means.
+    assert fired_at == ["00:00", "01:00", "02:00"]

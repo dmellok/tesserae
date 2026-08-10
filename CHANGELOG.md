@@ -4,6 +4,23 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.289.2], 2026-08-10
+
+### Fixed
+
+- **A Lineup with the default hold no longer sticks on one dashboard** (#167).
+  The minimum-hold guard measured from the moment of the last paint, and a
+  paint lands a few seconds into its window (the tick that noticed the
+  boundary), so the next boundary fell just inside the hold whenever the hold
+  equalled the dwell. `advance_min_hold_minutes` defaults to 5, so a five
+  minute cycle, the obvious thing to build, swallowed every other window; with
+  two dashboards the swallowed window is always the same one, and the panel sat
+  on a single dashboard indefinitely while still firing on the grid at twice
+  the interval. The hold is now measured window to window for a scheduled
+  advance, so a hold equal to the dwell swallows nothing while a hold longer
+  than the dwell still slows the cycle as intended. A condition changing the
+  step inside one window is unchanged, still held from the last paint.
+
 ## [0.289.1], 2026-08-10
 
 ### Changed

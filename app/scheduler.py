@@ -331,6 +331,10 @@ class Scheduler:
         self._deck_last_advance: dict[str, str] = {}
         # Same key -> POSIX timestamp of that last advance, for the min-hold gate.
         self._deck_last_advance_at: dict[str, float] = {}
+        # The dwell window a fire belonged to, which is what the min-hold
+        # gate measures from for scheduled advances. See the gate for why
+        # the fire's own timestamp is the wrong base there (#167).
+        self._deck_last_advance_window: dict[str, float] = {}
         # (#167 decommission: interval / daily trigger decks ride the
         # schedule engine's _last_fired / _first_seen maps via
         # _timed_records, so they share the cooldown and backfill state
@@ -367,6 +371,7 @@ class Scheduler:
         # rotation. Updated on every successful (sent / quiet / held)
         # fire.
         self._rotation_last_pushed_at: dict[str, float] = {}
+        self._rotation_last_window_start: dict[str, float] = {}
         # v0.48 running-state pills. Tracks the most recent PushStatus
         # the scheduler observed for each schedule / rotation, plus a
         # human-readable reason string (e.g. "conditions not met") so
@@ -1007,6 +1012,18 @@ class Scheduler:
             or self._deck_nav_store is None
         ):
             self._fire_rotation(rotation, step_index, now, respect_quiet_hours=True)
+            # Record which window that fire belonged to. ``_fire_rotation``
+            # only stamps the moment, which is right for the off-grid callers
+            # (Play, a restart) where the paint is the reference. Here the
+            # clock chose it, so the min-hold gate measures from the window
+            # and a tick landing seconds late can't swallow the next one
+            # (#167).
+            scheduled_state = self.compute_step_state(rotation, now)
+            if scheduled_state is not None:
+                with self._lock:
+                    self._rotation_last_window_start[rotation.id] = (
+                        scheduled_state.step_started_at.timestamp()
+                    )
             return
         state = self.compute_step_state(rotation, now)
         if state is None:
@@ -1020,6 +1037,7 @@ class Scheduler:
             # find pass stays one code path for every cycle record.
             self._rotation_last_step[rotation.id] = step_index
             self._rotation_last_pushed_at[rotation.id] = now.timestamp()
+            self._rotation_last_window_start[rotation.id] = state.step_started_at.timestamp()
             if fired:
                 self._rotation_last_status[rotation.id] = "sent"
                 self._rotation_last_reason[rotation.id] = None
@@ -1070,16 +1088,17 @@ class Scheduler:
                     continue
             elif rot.min_hold_minutes > 0 and last_at is not None:
                 # Same split as the find pass: a boundary-crossing advance
-                # is gated from the window start (so a held one resumes on
-                # a later boundary, never mid-window, which would re-anchor
-                # this panel's cadence off the grid); a within-window one is
-                # a condition flap and is gated from now.
-                held_from = (
-                    state.step_started_at.timestamp()
-                    if last_at < state.step_started_at.timestamp()
-                    else now.timestamp()
-                )
-                if held_from < last_at + rot.min_hold_minutes * 60:
+                # is held window-to-window (so a hold longer than the dwell
+                # still slows the cycle, while one equal to it swallows
+                # nothing), a within-window change is a condition flap and
+                # is held from the last paint (#167).
+                min_hold_s = rot.min_hold_minutes * 60
+                window_start = state.step_started_at.timestamp()
+                if last_at < window_start:
+                    base = self._deck_last_advance_window.get(key, last_at)
+                    if window_start < base + min_hold_s:
+                        continue  # min-hold anti-flap
+                elif now.timestamp() < last_at + min_hold_s:
                     continue  # min-hold anti-flap
             if rot.smart_sync and self._smart_sync_should_wait(target, rot.smart_sync_lead_s, now):
                 continue
@@ -1124,6 +1143,7 @@ class Scheduler:
             with self._lock:
                 self._deck_last_advance[key] = target
                 self._deck_last_advance_at[key] = now.timestamp()
+                self._deck_last_advance_window[key] = state.step_started_at.timestamp()
             logger.info(
                 "deck timer advance: device=%s deck=%s -> %s (%s)",
                 device_id,
@@ -1245,6 +1265,9 @@ class Scheduler:
             # user intent always reaches the panel, same convention
             # as quiet hours and conditional schedules' ``bypass``.
             self._rotation_last_pushed_at.pop(rotation.id, None)
+            # Drop the window basis too, or the gate would measure the next
+            # advance from a window this manual play just superseded.
+            self._rotation_last_window_start.pop(rotation.id, None)
         return self.compute_step_state(rotation, now)
 
     def clear_anchor_override(self, rotation_id: str) -> None:
@@ -1337,16 +1360,24 @@ class Scheduler:
                 # Two shapes of transition, gated differently.
                 #
                 # A dwell boundary has been crossed since the last fire:
-                # the clock moved us, so the hold is measured from the
-                # window's START. A held advance then resumes on a later
-                # boundary rather than the instant the hold lapses.
-                # Resuming mid-window re-anchored the gate to that
-                # off-grid moment, and with a min-hold at or above the
-                # dwell (the 5/5 default pairing) it stayed there: one
-                # off-grid fire (a restart, an enable, a manual play)
-                # re-paced the rotation for good, so it ran permanently
-                # out of phase with the anchor the UI predicts its next
-                # advance from (#167).
+                # the clock moved us, so the hold spans WINDOW to WINDOW,
+                # not fire to fire. A hold longer than the dwell still
+                # slows the cycle (30-minute steps under a 60-minute hold
+                # advance every other window, which is the point of the
+                # setting); a hold equal to the dwell no longer swallows
+                # anything.
+                #
+                # Measuring from the fire itself is what broke: a fire
+                # lands a few seconds INTO its window (the tick that
+                # noticed the boundary), so the next boundary sat just
+                # inside ``last_pushed_at + min_hold`` whenever the hold
+                # equalled the dwell, and the default pairing is 5 and 5.
+                # Every other window was swallowed, and on a two-page
+                # cycle the swallowed window is always the same page: the
+                # panel sat on one dashboard for good while still firing
+                # on the grid, at twice the interval (#167). The test
+                # covering this fired on exact boundaries with no offset,
+                # so it never saw it.
                 #
                 # No boundary crossed: a condition changed the picked
                 # step inside one window, which is the flap this gate was
@@ -1355,10 +1386,11 @@ class Scheduler:
                 min_hold_s = rotation.min_hold_minutes * 60
                 if min_hold_s > 0 and last_pushed_at is not None:
                     crossed_boundary = last_pushed_at < state.step_started_at.timestamp()
-                    held_until = (
-                        state.step_started_at.timestamp() if crossed_boundary else now.timestamp()
-                    )
-                    if held_until < last_pushed_at + min_hold_s:
+                    if crossed_boundary:
+                        base = self._rotation_last_window_start.get(rotation.id, last_pushed_at)
+                        if state.step_started_at.timestamp() < base + min_hold_s:
+                            continue
+                    elif now.timestamp() < last_pushed_at + min_hold_s:
                         continue
             # Smart-sync: same wake-aware gate that schedules use.
             # Hold the transition until a bound device is close to
