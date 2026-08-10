@@ -6,13 +6,11 @@
 (function () {
   function attachSliders(root) {
     root.querySelectorAll('input[type="range"]:not([data-bound])').forEach((slider) => {
-      const output = root.querySelector(`output[for="${slider.id}"]`);
-      const suffix = slider.dataset.outputSuffix || "";
-      const sync = () => {
-        if (output) output.value = slider.value + suffix;
-        // Paint the filled portion of the track in the accent colour
-        // (WebKit can't draw progress natively; Firefox uses
-        // ::-moz-range-progress for the same effect.)
+      const number = root.querySelector(`input[data-slider-number-for="${slider.id}"]`);
+      // Paint the filled portion of the track in the accent colour
+      // (WebKit can't draw progress natively; Firefox uses
+      // ::-moz-range-progress for the same effect.)
+      const paintFill = () => {
         const min = parseFloat(slider.min || "0");
         const max = parseFloat(slider.max || "100");
         const val = parseFloat(slider.value || "0");
@@ -20,9 +18,32 @@
         const pct = span > 0 ? ((val - min) / span) * 100 : 0;
         slider.style.setProperty("--slider-fill", pct + "%");
       };
-      slider.addEventListener("input", sync);
-      slider.addEventListener("change", sync);
-      sync();
+      const syncFromSlider = () => {
+        if (number) number.value = slider.value;
+        paintFill();
+      };
+      const syncFromNumber = () => {
+        if (!number || number.value === "") return;
+        slider.value = number.value;
+        paintFill();
+      };
+      // The range input is the one that carries the field's name, and it
+      // silently clamps anything outside min/max. Typing 9 into a 0.7-1.5
+      // box would leave 9 on screen while 1.5 got submitted, so on commit
+      // the box is rewritten with the value that will actually be saved.
+      const clampNumber = () => {
+        if (!number || number.value === "") return;
+        syncFromNumber();
+        number.value = slider.value;
+      };
+      slider.addEventListener("input", syncFromSlider);
+      slider.addEventListener("change", syncFromSlider);
+      if (number) {
+        number.addEventListener("input", syncFromNumber);
+        number.addEventListener("change", clampNumber);
+        number.addEventListener("blur", clampNumber);
+      }
+      syncFromSlider();
       slider.dataset.bound = "1";
     });
   }

@@ -281,11 +281,28 @@ def _expand_events_cached(
     # Slice the warm-cached list to the widget's specific window.
     start_iso = start.astimezone(UTC).isoformat()
     end_iso = end.astimezone(UTC).isoformat()
-    return [
-        e
-        for e in events
-        if (e.get("end") or e.get("start", "")) >= start_iso and (e.get("start") or "") < end_iso
-    ]
+    # All-day events store bare "YYYY-MM-DD" dates (no timezone), which
+    # can't compare correctly against the full UTC datetime bounds above:
+    # a bare date string sorts as "less than" any same-day timestamp
+    # string, so once the UTC calendar day rolls past local midnight
+    # (e.g. any evening in a negative-UTC-offset timezone), today's
+    # all-day event silently drops out. Widen by a day on each side for
+    # all-day events instead — every widget already re-filters all-day
+    # events against the real local date downstream, so over-inclusion
+    # here is harmless.
+    all_day_start = (start - timedelta(days=1)).date().isoformat()
+    all_day_end = (end + timedelta(days=1)).date().isoformat()
+
+    def _in_window(e: dict[str, Any]) -> bool:
+        if e.get("all_day"):
+            return (e.get("end") or e.get("start", "")) >= all_day_start and (
+                e.get("start") or ""
+            ) < all_day_end
+        return (e.get("end") or e.get("start", "")) >= start_iso and (
+            e.get("start") or ""
+        ) < end_iso
+
+    return [e for e in events if _in_window(e)]
 
 
 # Public API for the calendar_* widgets uses the cached path. Direct

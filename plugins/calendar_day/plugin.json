@@ -1,9 +1,9 @@
 {
   "tesserae_compat": "1.x",
   "name": "Calendar, Day",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "kind": "widget",
-  "description": "Today's agenda Reads from feeds configured in Widgets \u2192 Calendar Feeds; each feed's colour drives the stripe / marker / fill colour.",
+  "description": "Today's agenda with tunable event text sizing, a configurable visible-hour range, and a location toggle. Reads from feeds configured in Widgets \u2192 Calendar Feeds; each feed's colour drives the stripe / marker / fill colour.",
   "icon": "ph-calendar-check",
   "supports": {
     "sizes": [
@@ -31,6 +31,118 @@
       "type": "string",
       "label": "Feed IDs (comma-separated; blank = all enabled)",
       "default": ""
+    },
+    {
+      "name": "day_start_hour",
+      "type": "slider",
+      "label": "Day starts at",
+      "default": -1,
+      "min": -1,
+      "max": 24,
+      "step": 1,
+      "unit": "h",
+      "help": "Hour the visible timetable starts (0-24). -1 = auto-fit to events. Set to 0 (with Day ends at = 24) to always show the whole day."
+    },
+    {
+      "name": "day_end_hour",
+      "type": "slider",
+      "label": "Day ends at",
+      "default": -1,
+      "min": -1,
+      "max": 24,
+      "step": 1,
+      "unit": "h",
+      "help": "Hour the visible timetable ends (0-24). -1 = auto-fit to events. Set to 24 (with Day starts at = 0) to always show the whole day."
+    },
+    {
+      "name": "show_location",
+      "type": "boolean",
+      "label": "Show event locations",
+      "default": true
+    },
+    {
+      "name": "show_density",
+      "type": "boolean",
+      "label": "Show event-density strip",
+      "default": true,
+      "help": "The heatmap strip above the timetable showing which hours are busiest. Off removes it entirely."
+    },
+    {
+      "name": "date_label_style",
+      "type": "select",
+      "label": "Weekday / month label style",
+      "default": "full",
+      "choices": [
+        {"value": "full", "label": "Full word (Monday, January)"},
+        {"value": "short", "label": "Short (MON, JAN)"},
+        {"value": "minimal", "label": "Minimal (M, JA)"}
+      ]
+    },
+    {
+      "name": "header_scale",
+      "type": "slider",
+      "label": "Header size (weekday / date)",
+      "default": 1.0,
+      "min": 0.01,
+      "max": 10.0,
+      "step": 0.05,
+      "unit": "×",
+      "help": "Multiplier on the top weekday/day-number/month-year header text."
+    },
+    {
+      "name": "axis_label_scale",
+      "type": "slider",
+      "label": "Time axis label size",
+      "default": 1.0,
+      "min": 0.01,
+      "max": 10.0,
+      "step": 0.05,
+      "unit": "×",
+      "help": "Multiplier on the hour-gutter time labels (08:00, 10:00, ...)."
+    },
+    {
+      "name": "event_title_scale",
+      "type": "slider",
+      "label": "Event title size",
+      "default": 1.0,
+      "min": 0.01,
+      "max": 10.0,
+      "step": 0.05,
+      "unit": "×",
+      "help": "Multiplier on the event title font size. 1.0 = default."
+    },
+    {
+      "name": "event_time_scale",
+      "type": "slider",
+      "label": "Event time size",
+      "default": 1.0,
+      "min": 0.01,
+      "max": 10.0,
+      "step": 0.05,
+      "unit": "×",
+      "help": "Multiplier on the event time-range font size."
+    },
+    {
+      "name": "event_location_scale",
+      "type": "slider",
+      "label": "Event location size",
+      "default": 1.0,
+      "min": 0.01,
+      "max": 10.0,
+      "step": 0.05,
+      "unit": "×",
+      "help": "Multiplier on the location text font size."
+    },
+    {
+      "name": "event_row_padding_em",
+      "type": "slider",
+      "label": "Event block spacing",
+      "default": 0.0,
+      "min": 0.0,
+      "max": 3.0,
+      "step": 0.05,
+      "unit": "em",
+      "help": "Extra padding added inside each event block, on top of the default. 0 = default."
     }
   ],
   "render": {

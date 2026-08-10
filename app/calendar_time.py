@@ -11,6 +11,18 @@ def local_midnight_utc(day: date, zone: tzinfo) -> datetime:
     return datetime.combine(day, time.min, tzinfo=zone).astimezone(UTC)
 
 
+def _local_datetime(raw: str, zone: tzinfo) -> datetime | None:
+    if not raw:
+        return None
+    try:
+        parsed = datetime.fromisoformat(raw)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(zone)
+
+
 def event_local_date_key(event: dict[str, Any], zone: tzinfo) -> str:
     """Bucket a calendar event by the date a user sees in ``zone``."""
     start = str(event.get("start") or "")
@@ -18,13 +30,42 @@ def event_local_date_key(event: dict[str, Any], zone: tzinfo) -> str:
         return ""
     if event.get("all_day") or "T" not in start:
         return start.split("T")[0]
-    try:
-        parsed = datetime.fromisoformat(start)
-    except ValueError:
-        return start.split("T")[0]
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=UTC)
-    return parsed.astimezone(zone).date().isoformat()
+    local = _local_datetime(start, zone)
+    return local.date().isoformat() if local else start.split("T")[0]
+
+
+def timed_event_date_keys(
+    event: dict[str, Any], zone: tzinfo, window_start: date, window_end: date
+) -> list[str]:
+    """Return local date keys a timed (non-all-day) event's [start, end)
+    span occupies inside ``[window_start, window_end)``.
+
+    A multi-day timed event (an overnight block, or a genuinely
+    multi-day timed span) must appear in every day's bucket it runs
+    through, not just the day it starts — otherwise it silently
+    vanishes from every day after the first.
+    """
+    start_raw = str(event.get("start") or "")
+    start_local = _local_datetime(start_raw, zone)
+    if start_local is None:
+        return [start_raw.split("T")[0]] if start_raw else []
+    end_local = _local_datetime(str(event.get("end") or ""), zone) or start_local
+
+    start_date = start_local.date()
+    end_date = end_local.date()
+    # End is exclusive: an event ending exactly at local midnight doesn't
+    # spill into that next day (same convention as all-day DTEND).
+    if end_date > start_date and end_local.time() == time.min:
+        end_date -= timedelta(days=1)
+    end_date = max(start_date, end_date)
+
+    cur = max(start_date, window_start)
+    stop = min(end_date + timedelta(days=1), window_end)
+    keys: list[str] = []
+    while cur < stop:
+        keys.append(cur.isoformat())
+        cur += timedelta(days=1)
+    return keys
 
 
 def _all_day_bounds(event: dict[str, Any]) -> tuple[date, date] | None:

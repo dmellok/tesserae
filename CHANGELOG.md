@@ -59,6 +59,16 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   always accepted anything up to a day, but a value the dropdown didn't offer
   had no matching option and the list drew it as "only when pushed", so opening
   the dropdown and picking anything silently rewrote it.
+- **All-day events no longer disappear from calendar_day/week/month/schedule
+  in the evening.** Every calendar widget's shared event-fetching layer
+  compared an all-day event's date against the requested time window as if
+  both were full timestamps; once the UTC calendar day rolled past local
+  midnight — any evening in a timezone behind UTC, such as US timezones —
+  today's all-day events silently dropped out of the response.
+- **calendar_day's all-day events span the full width of the event column.**
+  They were laid out in a wrapping flex row, so each pill was only as wide as
+  its own title and stopped short of the column's right edge, reading as a
+  small tag instead of a bar covering the day it applies to.
 
 ## [0.283.0], 2026-08-09
 
@@ -462,8 +472,32 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   already-registered device. The client protocol doc now spells out the
   attribute's behaviour on both `/discover` and `/register`.
 
+### Added
+
+- **Configurable text sizing for calendar_day, calendar_week, and
+  calendar_month.** Per-text-type scale sliders (title, header, axis
+  label, event title/location/time, 0.01–10.0×), a `date_label_style`
+  choice with a full-word option, and a `show_location` toggle for
+  the widgets that lacked one. calendar_day also gets configurable
+  `day_start_hour`/`day_end_hour` and a `show_density` toggle;
+  calendar_week gets a `range_mode` option so its 7-day window can
+  either stay anchored to the chosen week-start day or roll from
+  today (`rolling_7`), and correctly labels/shades each day by its
+  actual weekday rather than its column position in either mode.
+
 ### Fixed
 
+- **Multi-day events now display correctly in calendar_day and
+  calendar_week.** A multi-day all-day event (e.g. a 3-day conference)
+  previously appeared only on its first day, or as a separately-labeled
+  pill repeated on each day instead of one bar spanning them. A
+  multi-day *timed* event (an overnight block, a multi-day trip) is a
+  more common case and had it worse: it vanished entirely after its
+  first day, could render at the wrong time or run past midnight on
+  later days, and could overflow the visible timetable when
+  `day_start_hour`/`day_end_hour` narrowed it. All-day pills in both
+  widgets could also draw shifted left of their true day column. Every
+  day an event covers now renders correctly clamped to that day.
 - **Personal-data snapshots are isolated per paired Companion installation.**
   Independently identified household phones can publish Apple Reminders
   without replacing each other, each phone sees only its own sync status, and

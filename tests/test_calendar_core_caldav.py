@@ -113,6 +113,27 @@ def test_parse_todos_tolerates_garbage(cc: Any) -> None:
     assert cc._parse_todos(b"not a calendar") == []
 
 
+# -- _expand_events_cached window slicing --------------------------------
+
+
+def test_expand_events_cached_keeps_all_day_event_past_utc_midnight(cc: Any) -> None:
+    """A negative-UTC-offset evening (e.g. ~7pm US Eastern) pushes the UTC
+    calendar day one ahead of the local one. The warm-cache window slice
+    used to compare an all-day event's bare "YYYY-MM-DD" date string
+    against the query window's full UTC datetime string, which silently
+    dropped today's all-day event once that UTC rollover happened."""
+    from datetime import UTC, datetime, timedelta
+
+    cc._EXPANSION_CACHE["feed1"] = (
+        1.0,
+        [{"summary": "Conference", "start": "2026-08-10", "end": "2026-08-11", "all_day": True}],
+    )
+    start = datetime(2026, 8, 11, 1, 0, tzinfo=UTC)  # 8/10 20:00 America/New_York
+    end = start + timedelta(hours=24)
+    out = cc._expand_events_cached("feed1", 1.0, b"", start, end)
+    assert [e["summary"] for e in out] == ["Conference"]
+
+
 # -- load_todos (feeds.json + auth-aware fetch) --------------------------
 
 
