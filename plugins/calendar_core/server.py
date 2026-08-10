@@ -298,7 +298,9 @@ def _expand_events_cached(
             return (e.get("end") or e.get("start", "")) >= all_day_start and (
                 e.get("start") or ""
             ) < all_day_end
-        return (e.get("end") or e.get("start", "")) >= start_iso and (e.get("start") or "") < end_iso
+        return (e.get("end") or e.get("start", "")) >= start_iso and (
+            e.get("start") or ""
+        ) < end_iso
 
     return [e for e in events if _in_window(e)]
 

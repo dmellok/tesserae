@@ -7,14 +7,24 @@ without reaching real ICS feeds.
 
 from __future__ import annotations
 
+import importlib.util
 import sys
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-import server
+# Load under a plugin-specific module name rather than a bare ``import
+# server``. Every calendar_* widget has a server.py, so the plain name
+# resolves to whichever plugin's test imported first and the rest silently
+# assert against a sibling widget's fetch().
+_spec = importlib.util.spec_from_file_location(
+    "calendar_week_server", Path(__file__).resolve().parent.parent / "server.py"
+)
+assert _spec is not None and _spec.loader is not None
+server = importlib.util.module_from_spec(_spec)
+sys.modules[_spec.name] = server
+_spec.loader.exec_module(server)
 
 
 def _stub_app(events: list[dict[str, Any]] | None = None) -> MagicMock:
@@ -28,9 +38,19 @@ def _stub_app(events: list[dict[str, Any]] | None = None) -> MagicMock:
     return app
 
 
+def _utc_zone() -> Any:
+    """Pin the widget's timezone for the duration of a test.
+
+    ``app_timezone()`` falls back to the host's zone, so a test that
+    writes event times and window offsets in the same breath only agrees
+    with itself where that zone is UTC. Pinning keeps these deterministic
+    on a developer's machine and on CI alike."""
+    return patch.object(server, "app_timezone", lambda: UTC)
+
+
 def test_rolling_7_always_starts_today() -> None:
     app = _stub_app()
-    with patch.object(server, "current_app", app):
+    with patch.object(server, "current_app", app), _utc_zone():
         out = server.fetch(options={"range_mode": "rolling_7"}, settings={}, ctx={})
     today = datetime.now(UTC).date()
     assert out["start"] == today.isoformat()
@@ -40,7 +60,7 @@ def test_rolling_7_always_starts_today() -> None:
 
 def test_calendar_week_default_unchanged() -> None:
     app = _stub_app()
-    with patch.object(server, "current_app", app):
+    with patch.object(server, "current_app", app), _utc_zone():
         out = server.fetch(options={}, settings={}, ctx={})
     today = datetime.now(UTC).date()
     start = datetime.strptime(out["start"], "%Y-%m-%d").date()
@@ -50,7 +70,7 @@ def test_calendar_week_default_unchanged() -> None:
 
 def test_multi_day_all_day_event_appears_on_every_covered_day() -> None:
     app = _stub_app()
-    with patch.object(server, "current_app", app):
+    with patch.object(server, "current_app", app), _utc_zone():
         first = server.fetch(options={"range_mode": "rolling_7"}, settings={}, ctx={})
     start = datetime.strptime(first["start"], "%Y-%m-%d").date()
     # 3-day conference starting on the window's first day.
@@ -64,7 +84,7 @@ def test_multi_day_all_day_event_appears_on_every_covered_day() -> None:
         }
     ]
     app = _stub_app(events)
-    with patch.object(server, "current_app", app):
+    with patch.object(server, "current_app", app), _utc_zone():
         out = server.fetch(options={"range_mode": "rolling_7"}, settings={}, ctx={})
     covered = out["days"][:3]
     for day in covered:
@@ -78,21 +98,21 @@ def test_multi_day_timed_event_appears_on_every_covered_day() -> None:
     # to be bucketed only on its start day and silently vanish from every
     # day after that, unlike all-day events.
     app = _stub_app()
-    with patch.object(server, "current_app", app):
+    with patch.object(server, "current_app", app), _utc_zone():
         first = server.fetch(options={"range_mode": "rolling_7"}, settings={}, ctx={})
     start = datetime.strptime(first["start"], "%Y-%m-%d").date()
     # A 4-calendar-day trip: starts 16:00 on day 0, ends 10:00 on day 3.
     events = [
         {
             "summary": "Trip",
-            "start": f"{start.isoformat()}T16:00:00",
-            "end": f"{(start + timedelta(days=3)).isoformat()}T10:00:00",
+            "start": f"{start.isoformat()}T16:00:00+00:00",
+            "end": f"{(start + timedelta(days=3)).isoformat()}T10:00:00+00:00",
             "all_day": False,
             "feed_colour": "#3366CC",
         }
     ]
     app = _stub_app(events)
-    with patch.object(server, "current_app", app):
+    with patch.object(server, "current_app", app), _utc_zone():
         out = server.fetch(options={"range_mode": "rolling_7"}, settings={}, ctx={})
     covered = out["days"][:4]
     for day in covered:

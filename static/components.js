@@ -27,11 +27,21 @@
         slider.value = number.value;
         paintFill();
       };
+      // The range input is the one that carries the field's name, and it
+      // silently clamps anything outside min/max. Typing 9 into a 0.7-1.5
+      // box would leave 9 on screen while 1.5 got submitted, so on commit
+      // the box is rewritten with the value that will actually be saved.
+      const clampNumber = () => {
+        if (!number || number.value === "") return;
+        syncFromNumber();
+        number.value = slider.value;
+      };
       slider.addEventListener("input", syncFromSlider);
       slider.addEventListener("change", syncFromSlider);
       if (number) {
         number.addEventListener("input", syncFromNumber);
-        number.addEventListener("change", syncFromNumber);
+        number.addEventListener("change", clampNumber);
+        number.addEventListener("blur", clampNumber);
       }
       syncFromSlider();
       slider.dataset.bound = "1";

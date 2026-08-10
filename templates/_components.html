@@ -105,8 +105,12 @@ macro here instead.
   <div class="slider-header">
     <label for="{{ field_id }}">{{ label }}{{ info_pop(help) }}</label>
     <span class="slider-value-wrap">
+      {# Display + direct entry only; the range input below carries the
+         field's name, so this one is deliberately unnamed and never
+         reaches the form data. aria-label because the visible <label>
+         points at the range. #}
       <input type="number" class="slider-value" id="{{ field_id }}-number"
-             data-slider-number-for="{{ field_id }}"
+             data-slider-number-for="{{ field_id }}" aria-label="{{ label }}"
              value="{{ value }}" min="{{ min }}" max="{{ max }}" step="{{ step }}">
       {%- if unit %}<span class="slider-unit">{{ unit }}</span>{% endif %}
     </span>
