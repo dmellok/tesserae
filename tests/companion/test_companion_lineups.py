@@ -415,3 +415,112 @@ def test_an_unknown_stored_scope_is_dropped_on_load(app: Flask, tmp_path: Path) 
     reloaded = CompanionTokenStore(path).list_active()[0]
     assert "lineups:wrtie" not in reloaded.scopes
     assert "push:write" in reloaded.scopes
+
+
+# -- the full read shape (#203) -----------------------------------------
+
+
+def test_an_advanced_lineup_is_described_completely(app: Flask) -> None:
+    """The app may not edit these, but it has to be able to show them.
+
+    Reporting only the fields a client understands is what lets a partial
+    update flatten the rest, so the projection carries everything a Lineup
+    can hold and the client treats absent as unknown rather than as a safe
+    default.
+    """
+    from app.state.conditions import Condition
+    from app.state.deck_model import DeckLink, DeckPage
+
+    device = _seed_device(app)
+    _seed_pages(app, [device], ("pantry", "weather"))
+    _seed_lineup(
+        app,
+        device_ids=[device],
+        pages=[
+            DeckPage(
+                page_id="pantry",
+                refresh_interval_minutes=45,
+                links=[DeckLink(target_page_id="weather", button="right")],
+                conditions=[
+                    Condition(
+                        source_kind="time_window",
+                        operator="in",
+                        value={
+                            "start_local": "08:00",
+                            "end_local": "18:00",
+                            "days_of_week": [0, 1, 2, 3, 4],
+                        },
+                    )
+                ],
+            ),
+            DeckPage(page_id="weather"),
+        ],
+        entry_page_id="pantry",
+        home_page_id="weather",
+        home_timeout_minutes=30,
+        refresh_interval_minutes=20,
+        advance_end_at="22:00",
+        advance_days_of_week=[0, 1, 2, 3, 4],
+        advance_priority=3,
+        advance_smart_sync=True,
+        advance_smart_sync_lead_s=45,
+        advance_mode="priority",
+        advance_min_hold_minutes=9,
+        advance_window_start="08:00",
+        advance_window_end="18:00",
+        advance_fallback_page_id="weather",
+    )
+    token = _token(app)
+    body = app.test_client().get("/api/app/v1/lineups/morning", headers=_auth(token)).get_json()
+    lineup = body["lineup"]
+
+    assert lineup["entry_page_id"] == "pantry"
+    assert lineup["home_page_id"] == "weather"
+    assert lineup["home_timeout_minutes"] == 30
+    assert lineup["refresh_interval_minutes"] == 20
+    assert lineup["end_at"] == "22:00"
+    assert lineup["days_of_week"] == [0, 1, 2, 3, 4]
+    assert lineup["priority"] == 3
+    assert lineup["smart_sync"] is True
+    assert lineup["smart_sync_lead_seconds"] == 45
+    assert lineup["mode"] == "priority"
+    assert lineup["min_hold_minutes"] == 9
+    assert lineup["window_start"] == "08:00"
+    assert lineup["window_end"] == "18:00"
+    assert lineup["fallback_page_id"] == "weather"
+    assert lineup["native_editable"] is False
+
+    pantry = lineup["dashboards"][0]
+    # The raw override sits next to the effective dwell, so "inherits" is
+    # distinguishable from "set to the same number".
+    assert pantry["refresh_interval_minutes"] == 45
+    assert lineup["dashboards"][1]["refresh_interval_minutes"] is None
+    assert pantry["links"] == [{"target_page_id": "weather", "button": "right"}]
+    assert pantry["conditions"]
+    assert pantry["conditions"][0]["source_kind"] == "time_window"
+
+
+def test_which_store_a_record_came_from_stays_private(app: Flask) -> None:
+    device = _seed_device(app)
+    _seed_pages(app, [device], ("pantry", "weather"))
+    _seed_lineup(app, device_ids=[device], legacy_kind="rotation")
+    token = _token(app)
+    body = app.test_client().get("/api/app/v1/lineups/morning", headers=_auth(token)).get_json()
+    assert "legacy_kind" not in body["lineup"]
+
+
+def test_a_step_reports_its_own_job_kind(app: Flask) -> None:
+    """So an activity view can say "moved a Lineup" rather than showing it
+    as an ordinary dashboard push (#203)."""
+    device = _seed_device(app)
+    _seed_pages(app, [device], ("pantry", "weather"))
+    _seed_lineup(app, device_ids=[device])
+    token = _token(app)
+    resp = app.test_client().post(
+        "/api/app/v1/lineups/morning/actions",
+        headers=_auth(token, "idem-kind-0000000000"),
+        data=json.dumps({"action": "next", "override_quiet_hours": False}),
+        content_type="application/json",
+    )
+    assert resp.status_code == 202
+    assert resp.get_json()["job"]["kind"] == "lineup_action"

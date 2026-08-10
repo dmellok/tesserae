@@ -1058,10 +1058,10 @@ def lineup_action(lineup_id: str) -> Any:
         return JobOutcome.published(painted, history_event_ids=event_ids)
 
     return _reserve_and_run(
-        # Reuses the dashboard_push job kind: it is a dashboard being pushed
-        # to a display, and the closed enum in the published contract is
-        # charmmmz's to widen if the app wants to tell them apart.
-        kind="dashboard_push",
+        # Its own kind so a client's activity view can identify explicit
+        # Lineup control instead of presenting it as an ordinary dashboard
+        # push. The History source stays "companion" (#203).
+        kind="lineup_action",
         key=key,
         payload=raw,
         target_ids=resolved_targets,

@@ -4,6 +4,25 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.291.0], 2026-08-11
+
+### Added
+
+- **Lineups read carries everything an advanced Lineup holds** (#203). The
+  projection gained the fields a Lineup can use but the four authoring intents
+  can't express: entry and home page, home timeout, refresh cadence, end time,
+  days of week, priority, smart sync and its lead, mode, minimum hold, the
+  time-of-day window, and the fallback dashboard, plus each dashboard's raw
+  refresh override, links and conditions. A client that must not edit such a
+  record can now describe it completely, which is what stops a partial update
+  flattening the parts it never knew about. Which legacy store a record was
+  migrated from stays private.
+
+- **Lineup step and play report their own job kind.** `next`, `previous` and
+  `play` return `kind: lineup_action` rather than riding on `dashboard_push`, so
+  a client's activity view can name explicit Lineup control instead of
+  presenting it as an ordinary push. The History source stays `companion`.
+
 ## [0.290.0], 2026-08-11
 
 ### Fixed

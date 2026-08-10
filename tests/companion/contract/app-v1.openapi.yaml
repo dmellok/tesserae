@@ -1187,6 +1187,8 @@ components:
             - image_url_push
             - webpage_push
             - history_resend
+            # Lineup step / play, from v0.291.0 (#203).
+            - lineup_action
         status:
           description: Execution lifecycle only; quiet is a successful result
           type: string

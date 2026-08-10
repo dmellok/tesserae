@@ -101,6 +101,12 @@ def lineup_dict(
                 # A page can be listed in a Lineup and since deleted; the app
                 # needs to render the row without pretending it's playable.
                 "missing": page.page_id not in page_names,
+                # The raw override next to the effective value above, so a
+                # client can tell "inherits the Lineup's cadence" from "set to
+                # the same number".
+                "refresh_interval_minutes": page.refresh_interval_minutes,
+                "links": [link.model_dump(exclude_none=True) for link in page.links],
+                "conditions": [c.model_dump(exclude_none=True) for c in page.conditions],
             }
             for page in deck.pages
         ],
@@ -118,7 +124,27 @@ def lineup_dict(
         "interval_minutes": (deck.advance_interval_minutes if deck.advance != "manual" else None),
         "fires_at": deck.advance_fires_at,
         "anchor": deck.advance_anchor if deck.advance != "manual" else None,
+        # Everything an advanced Lineup can carry, so a client that must not
+        # edit one can still describe it completely (#203). Absent-means-
+        # unknown is the contract the app relies on: reporting only the
+        # fields it understands would let a partial update flatten the rest.
+        "entry_page_id": deck.entry_page_id,
+        "home_page_id": deck.home_page_id,
+        "home_timeout_minutes": deck.home_timeout_minutes,
+        "refresh_interval_minutes": deck.refresh_interval_minutes,
+        "end_at": deck.advance_end_at,
+        "days_of_week": list(deck.advance_days_of_week),
+        "priority": deck.advance_priority,
+        "smart_sync": deck.advance_smart_sync,
+        "smart_sync_lead_seconds": deck.advance_smart_sync_lead_s,
+        "mode": deck.advance_mode,
+        "min_hold_minutes": deck.advance_min_hold_minutes,
+        "window_start": deck.advance_window_start,
+        "window_end": deck.advance_window_end,
+        "fallback_page_id": deck.advance_fallback_page_id,
         "native_editable": reason is None,
         "requires_web_reason": reason,
         "web_url": f"/decks/{deck.id}",
+        # ``legacy_kind`` is deliberately absent: which store a record was
+        # migrated from is ours, not something a client should branch on.
     }

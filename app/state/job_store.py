@@ -36,7 +36,15 @@ from pathlib import Path
 from typing import Any, Literal
 
 JobKind = Literal[
-    "dashboard_push", "image_push", "image_url_push", "webpage_push", "history_resend"
+    "dashboard_push",
+    "image_push",
+    "image_url_push",
+    "webpage_push",
+    "history_resend",
+    # Stepping or playing a Lineup. Distinct from dashboard_push so a client's
+    # activity view can say "moved a Lineup" rather than presenting it as an
+    # ordinary push; the History source stays "companion" either way (#203).
+    "lineup_action",
 ]
 JobStatus = Literal["accepted", "running", "succeeded", "failed"]
 ResultStatus = Literal["published", "quiet"]
