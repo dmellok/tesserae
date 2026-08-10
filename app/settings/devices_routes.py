@@ -810,7 +810,7 @@ def devices_update_panel(instance_id: str) -> Response:
         new_w = int(form.get("panel_w") or 0)
         new_h = int(form.get("panel_h") or 0)
     except ValueError:
-        flash("Panel width and height must be whole numbers.", "error")
+        flash("Logical panel width and height must be whole numbers.", "error")
         return redirect(
             url_for("auth.settings_area", area="devices", opened=instance_id, _anchor=anchor)
         )
@@ -1104,7 +1104,7 @@ def devices_update_combined(instance_id: str) -> Response:
             new_w = int(form.get("panel_w") or 0)
             new_h = int(form.get("panel_h") or 0)
         except ValueError:
-            flash("Panel width and height must be whole numbers.", "error")
+            flash("Logical panel width and height must be whole numbers.", "error")
             return redirect_to
         underscan_raw = form.get("panel_underscan")
         underscan: int | None = None

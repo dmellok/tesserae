@@ -318,9 +318,10 @@
                    {'value':'portrait_flipped','label':'270°'}],
           help='Clockwise turn to match the mount. 0° = native (wide); 90°/270° render tall; 180° is upside-down. The preview stays upright.') }}
       <div class="field-grid">
-        {{ number_input(section.id ~ '-panel-w', 'panel_w', 'Panel width (px)', value=section.panel.w, min=1, step=1) }}
-        {{ number_input(section.id ~ '-panel-h', 'panel_h', 'Panel height (px)', value=section.panel.h, min=1, step=1) }}
+        {{ number_input(section.id ~ '-panel-w', 'panel_w', 'Logical panel width (px)', value=section.panel.w, min=1, step=1) }}
+        {{ number_input(section.id ~ '-panel-h', 'panel_h', 'Logical panel height (px)', value=section.panel.h, min=1, step=1) }}
       </div>
+      <p class="field-help">Composition orientation, the canvas dashboards are rendered at. Not the physical size the device reports.</p>
       {% set us_max = [section.panel.w, section.panel.h]|min // 4 %}
       {{ slider(section.id ~ '-panel-underscan', 'panel_underscan', 'Underscan', value=section.panel.get('underscan', 0), min=0, max=us_max, step=1, unit='px',
           help='Inset content by this many pixels on every edge so it clears a mat or bezel covering the screen edge. 0 = full bleed.') }}

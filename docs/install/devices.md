@@ -32,10 +32,14 @@ Two paths, depending on the client:
 
 ## Per-device settings
 
-Each registered device carries its own panel block, width, height, orientation,
-colour gamut, and underscan (inset content to clear a physical mat/bezel) -
-plus picture-quality controls (dither algorithm, saturation, contrast) that tune
-the output for the specific panel. These live on the device, not on the
+Each registered device carries its own panel block: logical width and height,
+orientation, colour gamut, and underscan (inset content to clear a physical
+mat/bezel) - plus picture-quality controls (dither algorithm, saturation,
+contrast) that tune the output for the specific panel. The width and height are
+**logical**: the composition orientation dashboards are rendered at, not the
+physical size the device reports. A panel that reports 1200×1920 can carry a
+1920×1200 logical size, and the renderer turns the finished dashboard back onto
+the device's own framebuffer. These live on the device, not on the
 renderer, so two panels driven by the same renderer can differ. For TRMNL /
 1-bit panels the dither dropdown carries the full set: Floyd-Steinberg,
 Atkinson, Jarvis-Judice-Ninke, Stucki, Bayer 8×8, halftone, crosshatch, or none.

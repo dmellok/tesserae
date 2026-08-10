@@ -595,7 +595,7 @@ def update_instance_panel(
     if device is None or device.kind_of is None:
         return InstanceResult(None, f"Unknown device {instance_id!r}.")
     if w < 1 or h < 1:
-        return InstanceResult(None, "Panel width and height must be at least 1px.")
+        return InstanceResult(None, "Logical panel width and height must be at least 1px.")
     o = orientation.strip().lower()
     if o not in ("landscape", "landscape_flipped", "portrait", "portrait_flipped"):
         o = "landscape"

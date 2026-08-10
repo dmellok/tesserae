@@ -153,9 +153,10 @@
         {{ select_field('add-device-preset', 'panel_preset', 'Panel size', value='', options=panel_preset_choices,
                         help='Pick a common panel, or Custom to set width / height by hand.') }}
         <div class="add-device-custom-fields">
-          {{ number_input('add-device-w', 'panel_w', 'Panel width (px)', value='', min=1, step=1) }}
-          {{ number_input('add-device-h', 'panel_h', 'Panel height (px)', value='', min=1, step=1) }}
+          {{ number_input('add-device-w', 'panel_w', 'Logical panel width (px)', value='', min=1, step=1) }}
+          {{ number_input('add-device-h', 'panel_h', 'Logical panel height (px)', value='', min=1, step=1) }}
         </div>
+        <p class="field-help">Composition orientation, the canvas dashboards are rendered at. Not the physical size the device reports.</p>
         {{ select_field('add-device-orientation', 'panel_orientation', 'Rotation', value='landscape',
                         options=[{'value':'landscape','label':'0°'},
                                  {'value':'portrait','label':'90°'},
@@ -213,9 +214,10 @@
                       help='Lowercase, no spaces. Names the frame file Tesserae writes for this tag.') }}
         {{ text_input('add-od-name', 'name', 'Display name', value='', placeholder='Kitchen tag') }}
         <div class="add-device-custom-fields add-device-custom-fields--static">
-          {{ number_input('add-od-w', 'panel_w', 'Panel width (px)', value='800', min=1, step=1) }}
-          {{ number_input('add-od-h', 'panel_h', 'Panel height (px)', value='480', min=1, step=1) }}
+          {{ number_input('add-od-w', 'panel_w', 'Logical panel width (px)', value='800', min=1, step=1) }}
+          {{ number_input('add-od-h', 'panel_h', 'Logical panel height (px)', value='480', min=1, step=1) }}
         </div>
+        <p class="field-help">Composition orientation, the canvas dashboards are rendered at. Not the physical size the device reports.</p>
         {{ select_field('add-od-orientation', 'panel_orientation', 'Rotation', value='landscape',
                         options=[{'value':'landscape','label':'0°'},
                                  {'value':'portrait','label':'90°'},

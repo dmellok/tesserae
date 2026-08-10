@@ -417,8 +417,8 @@ Headers: `ETag: "<digest>"`, `Content-Location: <absolute URL of the frame>`, `C
 |---|---|---|---|---|
 | `url` | string | yes | rendered artefact path | Absolute URL of the frame to download. Same-origin as the server (request scheme + host), no auth required to fetch. Filename is `<render_id>.<format>`. |
 | `format` | string | yes | file extension | `"bin"`, `"png"`, etc. Tells the client which decoder to use. Matches the topic suffix on the MQTT side (`frame/<format>`). |
-| `panel_w` | int | yes | device manifest | Panel width in pixels (composer orientation; usually landscape for `.bin` clients, can be portrait for `.png`). Sanity-check this matches your display before painting. |
-| `panel_h` | int | yes | device manifest | Panel height in pixels, same caveats as `panel_w`. |
+| `panel_w` | int | yes | device manifest | Logical panel width in pixels: the composition orientation the dashboard is rendered at, which is what Settings calls the logical panel width. Usually landscape for `.bin` clients, can be portrait for `.png`. Not necessarily your framebuffer; see `native_w` below. |
+| `panel_h` | int | yes | device manifest | Logical panel height in pixels, same caveats as `panel_w`. |
 | `native_w` | int | no | device manifest | Framebuffer width in pixels, present when the device declared one (a `rotation` at registration, or a hardware manifest's `native_w` / `native_h` block). This is the shape the downloaded file actually has, so it's the one to assert against your display buffer. |
 | `native_h` | int | no | device manifest | Framebuffer height in pixels, same rules as `native_w`. |
 | `render_id` | string | yes | SHA-256 truncated to 16 hex chars | Content-addressed digest of the artefact. Stable across identical renders, so two consecutive `/frame` calls returning the same digest mean nothing changed. Use as the value for `If-None-Match` on your next request. Also serves as the `ETag` header. |

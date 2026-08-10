@@ -552,9 +552,10 @@
               help='Clockwise turn to match the mount.',
               form=_combined_form_id) }}
           <div class="dx-field-grid">
-            {{ number_input(section.id ~ '-panel-w', 'panel_w', 'Panel width (px)', value=section.panel.w, min=1, step=1, form=_combined_form_id) }}
-            {{ number_input(section.id ~ '-panel-h', 'panel_h', 'Panel height (px)', value=section.panel.h, min=1, step=1, form=_combined_form_id) }}
+            {{ number_input(section.id ~ '-panel-w', 'panel_w', 'Logical panel width (px)', value=section.panel.w, min=1, step=1, form=_combined_form_id) }}
+            {{ number_input(section.id ~ '-panel-h', 'panel_h', 'Logical panel height (px)', value=section.panel.h, min=1, step=1, form=_combined_form_id) }}
           </div>
+          <p class="field-help">Composition orientation, the canvas dashboards are rendered at. Not the physical size the device reports.</p>
           {% if section.status.reported_panel_hint %}
           <p class="dx-hint">
             <i class="ph ph-info" aria-hidden="true"></i>

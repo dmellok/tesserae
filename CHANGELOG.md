@@ -4,6 +4,20 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.289.1], 2026-08-10
+
+### Changed
+
+- **Panel dimension fields are labelled "Logical panel width / height"**, with a
+  line under them saying they're the composition orientation dashboards render
+  at, not the physical size the device reports. The old label read as the
+  hardware's own dimensions, which is exactly what they aren't on any device
+  whose mounted orientation differs from its framebuffer: a CircuitPython board
+  with a built-in display assumes a standard orientation, and the operator may
+  want another. Renamed across the device card, add-device, onboarding, the
+  app-level panel block, and the relay pairing form, along with the matching
+  validation messages, so the wording can't drift between them.
+
 ## [0.289.0], 2026-08-10
 
 ### Changed

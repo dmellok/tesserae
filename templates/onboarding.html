@@ -249,9 +249,10 @@
         {{ select_field('dev-preset', 'panel_preset', 'Panel size', value='', options=panel_preset_choices,
                         help='Pick the panel you actually have. Custom lets you set width / height by hand.') }}
         <div class="wizard-add-device-custom">
-          {{ number_input('dev-w', 'panel_w', 'Panel width (px)', value='', min=1, step=1) }}
-          {{ number_input('dev-h', 'panel_h', 'Panel height (px)', value='', min=1, step=1) }}
+          {{ number_input('dev-w', 'panel_w', 'Logical panel width (px)', value='', min=1, step=1) }}
+          {{ number_input('dev-h', 'panel_h', 'Logical panel height (px)', value='', min=1, step=1) }}
         </div>
+        <p class="field-help">Composition orientation, the canvas dashboards are rendered at. Not the physical size the device reports.</p>
         {{ select_field('dev-orientation', 'panel_orientation', 'Rotation', value='landscape',
                         options=[{'value':'landscape','label':'0°'},
                                  {'value':'portrait','label':'90°'},

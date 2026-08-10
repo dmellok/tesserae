@@ -90,7 +90,7 @@ def relay_add_panel() -> Response:
         if request.form.get("panel_w") and request.form.get("panel_h"):
             panel = {"w": int(request.form["panel_w"]), "h": int(request.form["panel_h"])}
     except ValueError:
-        flash("Panel width/height must be numbers.", "error")
+        flash("Logical panel width/height must be numbers.", "error")
         return redirect(url_for("auth.relay_index"))
     if not device_id:
         flash("Pick a device id for the remote panel.", "error")
