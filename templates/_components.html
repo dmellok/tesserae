@@ -139,19 +139,25 @@ macro here instead.
     ``group`` are wrapped in a single <optgroup> labelled with the group
     name, so callers can keep the picker single-element while users see
     related themes / fonts / etc. clustered. -#}
+{#- Match on the rendered string, not the Python value: an option list can
+    carry ints (sleep intervals, thresholds) while the saved value arrives
+    from a form as a string. A bare ``==`` calls those unequal, which both
+    leaves the real choice unselected and adds an "Unavailable" duplicate of
+    it below. ``none`` normalises to '' so it lines up with ``blank_label``. -#}
+{% set value_key = '' if value is none else value|string %}
 {% set selected = namespace(found=false) %}
 {% for opt in options %}
   {% if opt is mapping %}{% set option_value = opt.value %}
   {% else %}{% set option_value = opt[0] %}{% endif %}
-  {% if value == option_value %}{% set selected.found = true %}{% endif %}
+  {% if value_key == option_value|string %}{% set selected.found = true %}{% endif %}
 {% endfor %}
-{% set has_value = value is not none and value != '' %}
+{% set has_value = value_key != '' %}
 <div class="field">
   <label for="{{ field_id }}">{{ label }}{{ info_pop(help) }}</label>
   <select id="{{ field_id }}" name="{{ name }}"
           {% if form %}form="{{ form }}"{% endif %}>
     {% if blank_label is not none %}
-    <option value="" {% if not value %}selected{% endif %}>{{ blank_label }}</option>
+    <option value="" {% if not has_value %}selected{% endif %}>{{ blank_label }}</option>
     {% endif %}
     {#- Browsers visually select the first option when no option matches the
         control's saved value. That makes an unset dynamic picker look
@@ -160,7 +166,7 @@ macro here instead.
         remains visibly unset, while a removed value stays visible until the
         user deliberately replaces it. -#}
     {% if not selected.found and (has_value or blank_label is none) %}
-    <option value="{{ value|default('', true) }}" selected data-unmatched-option>{% if has_value %}Unavailable: {{ value }}{% else %}(not set){% endif %}</option>
+    <option value="{{ value_key }}" selected data-unmatched-option>{% if has_value %}Unavailable: {{ value_key }}{% else %}(not set){% endif %}</option>
     {% endif %}
     {% set ns = namespace(group='') %}
     {% for opt in options %}
@@ -171,7 +177,7 @@ macro here instead.
         {% if g %}<optgroup label="{{ g }}">{% endif %}
         {% set ns.group = g %}
       {% endif %}
-      <option value="{{ v }}" {% if value == v %}selected{% endif %}>{{ l }}</option>
+      <option value="{{ v }}" {% if value_key == v|string %}selected{% endif %}>{{ l }}</option>
     {% endfor %}
     {% if ns.group %}</optgroup>{% endif %}
   </select>

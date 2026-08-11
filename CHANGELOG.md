@@ -13,6 +13,9 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   and other runtime-backed selects now show the actual unset or removed value
   until it is deliberately replaced, instead of letting the browser display
   and later submit the first available option.
+- **A select whose saved value and choices disagree only on type** (a stored
+  `"300"` against a numeric `300` choice) now matches that choice instead of
+  rendering it twice, once as unavailable.
 
 ## [0.292.1], 2026-08-11
 

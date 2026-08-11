@@ -1193,6 +1193,72 @@ def test_select_with_removed_value_preserves_and_labels_it(app: Flask) -> None:
     assert '<option value="sensor.current" selected' not in html
 
 
+def _render_select(app: Flask, **kwargs: object) -> str:
+    with app.app_context():
+        tmpl = app.jinja_env.from_string(
+            "{% from '_components.html' import select_field %}"
+            "{{ select_field('f', 'n', 'L', value=value, options=options,"
+            " blank_label=blank) }}"
+        )
+        return tmpl.render({"blank": None, **kwargs})
+
+
+def test_select_matches_choice_of_a_different_type(app: Flask) -> None:
+    """A value stored as a string still selects its numeric choice, rather
+    than rendering an 'Unavailable' duplicate of an option that's right
+    there in the list (kind defaults hold integer sleep intervals)."""
+    html = _render_select(
+        app,
+        value="300",
+        options=[{"value": 60, "label": "1 minute"}, {"value": 300, "label": "5 minutes"}],
+    )
+
+    assert "data-unmatched-option" not in html
+    assert '<option value="300" selected>5 minutes</option>' in html
+
+
+def test_select_with_blank_label_marks_only_the_unmatched_option(app: Flask) -> None:
+    """A picker that offers its own blank choice must not end up with two
+    selected options when the saved value is missing from the list; browsers
+    honour the last one, which would silently move the value."""
+    html = _render_select(
+        app,
+        value="sensor.removed",
+        options=[{"value": "sensor.current", "label": "Current"}],
+        blank="(default)",
+    )
+
+    assert html.count("selected") == 1
+    assert '<option value="" >(default)</option>' in html
+    assert (
+        '<option value="sensor.removed" selected data-unmatched-option>'
+        "Unavailable: sensor.removed</option>"
+    ) in html
+
+
+def test_select_with_blank_label_keeps_blank_selected_when_unset(app: Flask) -> None:
+    """The caller's own blank option still covers the empty case, so no
+    synthetic '(not set)' entry is added alongside it."""
+    html = _render_select(
+        app,
+        value="",
+        options=[{"value": "a", "label": "A"}],
+        blank="(default)",
+    )
+
+    assert "data-unmatched-option" not in html
+    assert '<option value="" selected>(default)</option>' in html
+
+
+def test_select_accepts_tuple_options(app: Flask) -> None:
+    """The (value, label) tuple form takes the same unmatched treatment as
+    the dict form."""
+    html = _render_select(app, value="zz", options=[("a", "A"), ("b", "B")])
+
+    assert ('<option value="zz" selected data-unmatched-option>Unavailable: zz</option>') in html
+    assert html.count("selected") == 1
+
+
 # -- _ensure_cells_fit_panel ------------------------------------------------
 
 
