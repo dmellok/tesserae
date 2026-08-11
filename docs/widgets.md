@@ -9,6 +9,18 @@ streamed over MQTT.
 If you're designing a widget, this is the only doc you need. Everything
 below is enforced by code; values come straight from the source.
 
+> **New widgets ship through the catalog, not this repo.** The widgets in
+> `plugins/` are the bundled set and stay where they are, but a new one
+> belongs in [tesserae-widgets](https://github.com/dmellok/tesserae-widgets):
+> publish it to a repo of your own, tag a release, and open a PR adding its
+> `widgets.json` entry, and users install it from Settings → Widgets → Browse.
+> The contract on this page is identical either way; the loader walks the
+> bundled directory and the marketplace install directory and merges them, so
+> `server.py`, `blueprint()` admin pages and `fetch()` all behave the same.
+> Occasionally something generic enough gets adopted into the bundled set, but
+> the catalog is the default answer. See that repo's CONTRIBUTING for the
+> submission flow.
+
 ---
 
 ## Cell sizes (test-render fixtures)
