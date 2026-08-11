@@ -4,6 +4,34 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [Unreleased]
+
+### Added
+
+- **GTFS / GTFS-RT departure board.** A new `gtfs` widget shows approaching
+  vehicles at a stop, from any agency's static GTFS zip plus optional
+  realtime feeds: live times, delays against the timetable, cancellations,
+  service alerts, and track numbers where the feed publishes them. Presets
+  cover the NYC Subway (one per realtime line group) and BART; anything else
+  takes URLs. A stop finder at `/plugins/gtfs/` searches a feed for the
+  `stop_id` a cell needs and reports which routes call there and what each
+  `direction_id` means in headsign terms, since GTFS never says. Two stops
+  can share one board — the office lobby case, a subway entrance and the
+  station round the block — and a large cell can split into two columns by
+  direction. Realtime protobuf is decoded directly, including the NYCT
+  extension, so no protobuf dependency is added.
+- **`fill_from` on a cell option.** An option can declare that another owns
+  its value; the editor fills the field from a map and locks it. The `gtfs`
+  presets use it so picking a feed fills its three URLs. See
+  [docs/widgets.md](docs/widgets.md).
+
+### Fixed
+
+- **The widget preview resolves dynamic dropdowns.** `/_test/preview` read
+  `cell_options` straight from the manifest, so any option using
+  `choices_from` rendered as an empty `<select>` — for every widget, not just
+  new ones. It now materialises choices the way the page editor does.
+
 ## [0.292.3], 2026-08-12
 
 ### Fixed

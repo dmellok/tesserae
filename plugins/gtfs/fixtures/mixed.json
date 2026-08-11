@@ -1,0 +1,11 @@
+{
+  "stop": "Canal St",
+  "arrivals": [
+    {"in": 1,  "route": "C", "headsign": "Euclid Av",                    "delay": 0,  "live": true,  "color": "#0039A6", "text_color": "#FFFFFF"},
+    {"in": 4,  "route": "A", "headsign": "Inwood-207 St",                "delay": 3,  "live": true,  "color": "#0039A6", "text_color": "#FFFFFF"},
+    {"in": 7,  "route": "E", "headsign": "World Trade Center",           "delay": -2, "live": true,  "color": "#0039A6", "text_color": "#FFFFFF"},
+    {"in": 11, "route": "C", "headsign": "168 St",                       "delay": 9,  "live": true,  "color": "#0039A6", "text_color": "#FFFFFF"},
+    {"in": 15, "route": "A", "headsign": "Far Rockaway-Mott Av",         "delay": 0,  "live": false, "color": "#0039A6", "text_color": "#FFFFFF"},
+    {"in": 19, "route": "E", "headsign": "Jamaica Center-Parsons/Archer","delay": 1,  "live": true,  "color": "#0039A6", "text_color": "#FFFFFF"}
+  ]
+}

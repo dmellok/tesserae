@@ -1,0 +1,12 @@
+{
+  "stop": "Canal St",
+  "note": "C trains cancelled",
+  "arrivals": [
+    {"in": 2,  "route": "C", "headsign": "Euclid Av",           "canceled": true, "color": "#0039A6", "text_color": "#FFFFFF"},
+    {"in": 5,  "route": "A", "headsign": "Inwood-207 St",       "delay": 2,       "color": "#0039A6", "text_color": "#FFFFFF"},
+    {"in": 9,  "route": "C", "headsign": "168 St",              "canceled": true, "color": "#0039A6", "text_color": "#FFFFFF"},
+    {"in": 13, "route": "E", "headsign": "World Trade Center",  "delay": 0,       "color": "#0039A6", "text_color": "#FFFFFF"},
+    {"in": 18, "route": "A", "headsign": "Far Rockaway-Mott Av","delay": 7,       "color": "#0039A6", "text_color": "#FFFFFF"},
+    {"in": 24, "route": "E", "headsign": "Jamaica Center",      "delay": 0,       "color": "#0039A6", "text_color": "#FFFFFF"}
+  ]
+}

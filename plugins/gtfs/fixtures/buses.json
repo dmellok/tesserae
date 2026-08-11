@@ -1,0 +1,11 @@
+{
+  "stop": "Canal St / Broadway",
+  "arrivals": [
+    {"in": 1,  "route": "M20", "headsign": "Lincoln Center",  "delay": 4,  "live": true,  "mode": "bus"},
+    {"in": 6,  "route": "M55", "headsign": "South Ferry",     "delay": 0,  "live": true,  "mode": "bus"},
+    {"in": 12, "route": "M20", "headsign": "Battery Park City","delay": 12, "live": true,  "mode": "bus"},
+    {"in": 18, "route": "M9",  "headsign": "Kips Bay",        "delay": -1, "live": true,  "mode": "bus"},
+    {"in": 25, "route": "M55", "headsign": "Midtown",         "delay": 0,  "live": false, "mode": "bus"},
+    {"in": 33, "route": "M20", "headsign": "Lincoln Center",  "delay": 0,  "live": false, "mode": "bus"}
+  ]
+}
