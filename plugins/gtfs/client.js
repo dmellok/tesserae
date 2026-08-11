@@ -144,7 +144,12 @@ const STYLE = `
   .gt-live { color: var(--accent-4); font-size: 0.7em; }
   .gt-stops { font-weight: var(--fw-bold); color: var(--text-secondary); white-space: nowrap; }
   .gt-origin {
-    flex: 0 0 auto;
+    /* Shrinks (and ellipses) before the delay chip does: a truncated
+       station name still reads, half a "+4" doesn't. */
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
     padding: 0 0.35em;
     background: var(--surface-sunken);
     color: var(--text-secondary);
@@ -216,6 +221,7 @@ const STYLE = `
     text-overflow: ellipsis;
   }
   .gt-delay {
+    flex: 0 0 auto;
     white-space: nowrap;
     font-weight: var(--fw-bold);
     text-transform: var(--label-transform, uppercase);
