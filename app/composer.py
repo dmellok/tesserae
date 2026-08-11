@@ -2031,7 +2031,14 @@ def test_widget_preview() -> str:
     # , same schema the page editor reads. Defaults override URL-supplied
     # values only when the URL omits a field, so reloading the page with
     # an explicit blank still wins over the manifest default.
-    schema = list(plugin.manifest.get("cell_options") or [])
+    #
+    # Materialised through the page editor's helper so ``choices_from``
+    # options (the plugin resolves those at edit time) arrive with concrete
+    # choices. Reading the raw manifest here rendered every dynamic dropdown
+    # in this preview empty, for every widget that uses one.
+    from app.page_routes import _materialize_cell_options
+
+    schema = list(_materialize_cell_options([plugin]).get(plugin.id) or [])
     supplied_opts: dict[str, Any] = parsed["cell_options"]
     form_values: dict[str, Any] = {}
     for spec in schema:
