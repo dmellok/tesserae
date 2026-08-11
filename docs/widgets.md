@@ -236,17 +236,18 @@ and renders it read-only (still submitted, so the value survives a save).
   "label": "Realtime URL",
   "fill_from": {
     "option": "preset",
-    "map": { "acme_north": "https://feeds.example.org/north" }
+    "map": { "mta_ace": "https://api-endpoint.mta.info/..." }
   }
 }
 ```
 
-The pattern suits "pick a preset and the URLs follow": a cell can't end up
-pairing one provider's endpoint with another's. Resolution is server-side,
-so the fields update when the page reloads after a save, not the instant
-the select changes. A widget whose behaviour depends on the filled value
-should re-derive it from the controlling option in `fetch()` rather than
-trusting what a single save persisted.
+The `gtfs` widget uses this for its feed presets: pick "NYC Subway (A/C/E)"
+and the three URL fields below fill in and lock, so a cell can't end up
+pairing one agency's timetable with another's realtime feed. Resolution is
+server-side, so the fields update when the page reloads after a save, not
+the instant the select changes. A widget whose behaviour depends on the
+filled value should re-derive it from the controlling option in `fetch()`,
+the way `gtfs` does, rather than trusting what a single save persisted.
 
 ### Companion `_core` plugins
 
@@ -1021,7 +1022,8 @@ the conventions land in practice.
 
 * `.stat-body`, [`plugins/weather_now`](https://github.com/dmellok/tesserae/tree/main/plugins/weather_now),
   [`plugins/ha_battery`](https://github.com/dmellok/tesserae/tree/main/plugins/ha_battery)
-* `.list-body`, [`plugins/news_hacker_news`](https://github.com/dmellok/tesserae/tree/main/plugins/news_hacker_news),
+* `.list-body`, [`plugins/gtfs`](https://github.com/dmellok/tesserae/tree/main/plugins/gtfs),
+  [`plugins/news_hacker_news`](https://github.com/dmellok/tesserae/tree/main/plugins/news_hacker_news),
   [`plugins/ha_entities`](https://github.com/dmellok/tesserae/tree/main/plugins/ha_entities),
   [`plugins/todo`](https://github.com/dmellok/tesserae/tree/main/plugins/todo)
 * `.chart-body`, [`plugins/weather_hourly`](https://github.com/dmellok/tesserae/tree/main/plugins/weather_hourly),

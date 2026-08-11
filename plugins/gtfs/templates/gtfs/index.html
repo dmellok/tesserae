@@ -1,0 +1,115 @@
+{% extends "_base.html" %}
+{% from "_components.html" import card_head, button, empty_state %}
+{% block title %}GTFS Stop Finder, Tesserae{% endblock %}
+
+{% block main %}
+<div class="page-head">
+  <h1><i class="ph-bold ph-bus" aria-hidden="true"></i> GTFS Stop Finder</h1>
+  <p class="page-blurb">Look up the <code>stop_id</code> a GTFS cell needs, without downloading and grepping the feed yourself. Search by stop name or ID, then inspect a stop to see which routes call there and what each direction actually means.</p>
+</div>
+
+<section class="card">
+  {{ card_head('Search a feed', icon_name='magnifying-glass', level=2) }}
+  <form method="get" action="{{ url_for('gtfs_admin.index') }}" class="form">
+    <div class="field">
+      <label for="feed-url">GTFS feed URL</label>
+      <input type="url" id="feed-url" name="feed_url" required
+             placeholder="https://rrgtfsfeeds.s3.amazonaws.com/gtfs_subway.zip"
+             value="{{ feed_url }}">
+      <p class="field-help">The same zip URL you'll put in the cell. Cached for 12 hours after the first download, so searching is instant afterwards.</p>
+    </div>
+    <div class="field">
+      <label for="feed-q">Stop name or ID</label>
+      <input type="text" id="feed-q" name="q" value="{{ query }}" placeholder="Canal St">
+      <p class="field-help">Substring match, case-insensitive. Leave blank to list everything (first {{ 60 }} shown).</p>
+    </div>
+    <div class="actions">{{ button('Search', icon='magnifying-glass') }}</div>
+  </form>
+
+  {% if presets %}
+  <p class="field-help">Presets:
+    {% for url, name in presets %}<a href="{{ url_for('gtfs_admin.index', feed_url=url, q=query) }}">{{ name }}</a>{{ ' · ' if not loop.last }}{% endfor %}
+    — the cell editor has the same list, split by realtime line group.</p>
+  {% endif %}
+
+  {% if error %}
+  <p class="field-help" role="alert"><i class="ph-bold ph-warning-circle" aria-hidden="true"></i> {{ error }}</p>
+  {% endif %}
+</section>
+
+{% if detail %}
+<section class="card">
+  {{ card_head(detail.stop_name or detail.stop_id, icon_name='map-pin', level=2) }}
+  <p class="lede">
+    <code>{{ detail.stop_id }}</code> covers {{ detail.stop_ids|length }} platform{{ '' if detail.stop_ids|length == 1 else 's' }}
+    ({{ detail.stop_ids|join(', ') }}) · {{ detail.trips }} trips · timezone {{ detail.tz }}
+  </p>
+
+  <h3>Routes calling here</h3>
+  <p>
+    {% for r in detail.routes %}
+      <span class="pill" style="min-width:2.4em;justify-content:center;{% if r.color %}background:{{ r.color }};color:{{ r.text_color }}{% endif %}">{{ r.name }}</span>
+    {% else %}
+      <span class="field-help">None found.</span>
+    {% endfor %}
+  </p>
+
+  <h3>Directions</h3>
+  <table class="table">
+    <thead>
+      <tr><th><code>direction</code> option</th><th>Goes to</th><th>Routes</th><th>Platforms</th></tr>
+    </thead>
+    <tbody>
+      {% for d in detail.directions %}
+      <tr>
+        <td><code>{{ d.direction }}</code></td>
+        <td>{{ d.headsigns|join(', ') or '—' }}</td>
+        <td>{{ d.routes|join(', ') }}</td>
+        <td>{{ d.platforms|join(', ') }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="field-help">GTFS doesn't say what <code>direction_id</code> 0 and 1 mean — each agency picks. Match the headsigns above to the way you travel, then set the cell's Direction option. Or set the cell's Stop ID to a single platform instead.</p>
+</section>
+{% endif %}
+
+{% if stops %}
+<section class="card">
+  {{ card_head('%d matching stop%s' % (stops|length, '' if stops|length == 1 else 's'), icon_name='list', level=2) }}
+  <table class="table">
+    <thead>
+      <tr><th>Stop ID</th><th>Name</th><th>Parent station</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for s in stops %}
+      <tr>
+        <td><code>{{ s.stop_id }}</code></td>
+        <td>{{ s.stop_name }}</td>
+        <td>{% if s.parent_station %}<code>{{ s.parent_station }}</code>{% else %}—{% endif %}</td>
+        <td>
+          <a href="{{ url_for('gtfs_admin.index', feed_url=feed_url, q=query, inspect=s.stop_id) }}">Inspect</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if truncated %}
+  <p class="field-help">{{ truncated }} more match — narrow the search.</p>
+  {% endif %}
+  <p class="field-help">Use a parent station ID to get every platform on one board, or a single platform ID (often the parent plus a direction suffix) to get one direction only.</p>
+</section>
+{% elif feed_url and not detail and not error %}
+<section class="card">
+  {{ empty_state('magnifying-glass', 'No stops matched', 'Try a shorter search, or leave the box blank to list the first stops in the feed.') }}
+</section>
+{% endif %}
+
+<section class="card">
+  {{ card_head('No feed handy?', icon_name='flask', level=2) }}
+  <p class="lede">Set a cell's GTFS feed URL to one of these to paint a canned board with no network at all — useful for checking how delays, cancellations and empty stops look on your panel.</p>
+  <p>
+    {% for f in fixtures %}<code>demo:{{ f }}</code>{{ ' · ' if not loop.last }}{% endfor %}
+  </p>
+</section>
+{% endblock %}

@@ -852,7 +852,54 @@ def _weather_now() -> dict[str, Any]:
     }
 
 
+def _gtfs() -> dict[str, Any]:
+    # Canal St (A/C/E), the stop the widget was developed against. Route
+    # colours are the MTA's own (data identity, not a design choice).
+    def _a(
+        minutes: int,
+        route: str,
+        headsign: str,
+        time: str,
+        live: bool,
+        delay: int = 0,
+        stop: str = "Canal St",
+    ) -> dict[str, Any]:
+        return {
+            "trip_id": f"sample-{route}-{minutes}",
+            "stop_id": "A34N",
+            "stop_name": stop,
+            "direction": "0" if minutes % 2 else "1",
+            "minutes": minutes,
+            "time": time,
+            "delay": delay,
+            "route": route,
+            "headsign": headsign,
+            "mode": "subway",
+            "color": "#0039A6",
+            "text_color": "#FFFFFF",
+            "live": live,
+        }
+
+    return {
+        "stop": "Canal St",
+        "label": "Canal St",
+        "now": "13:26",
+        "live": True,
+        "feed_age_s": 35,
+        "note": "",
+        "arrivals": [
+            _a(1, "C", "Euclid Av", "13:27", True),
+            _a(4, "A", "Inwood-207 St", "13:30", True, delay=3),
+            _a(7, "E", "World Trade Center", "13:33", True, delay=-2),
+            _a(11, "C", "168 St", "13:37", True, delay=9),
+            _a(15, "A", "Far Rockaway-Mott Av", "13:41", False),
+            _a(19, "E", "Jamaica Center-Parsons/Archer", "13:45", True, delay=1),
+        ],
+    }
+
+
 SAMPLES: dict[str, Any] = {
+    "gtfs": _gtfs,
     "weather_now": _weather_now,
     "calendar_schedule": _calendar_schedule,
     "devref_egress": _devref_egress,
