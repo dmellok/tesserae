@@ -4,6 +4,30 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.292.3], 2026-08-12
+
+### Fixed
+
+- **Saving a device no longer drops the MQTT session.** Adding a device,
+  saving its card, editing a panel, and applying a calibration profile all
+  rebuild the transport, and none of them change how Tesserae reaches the
+  broker. Each one disconnected and redialled anyway, leaving a disconnect /
+  reconnect cycle in the broker's log that reads as a connection fault while
+  you are debugging one, and putting in-flight QoS 1 messages at risk. The
+  rebuild now keeps a live session whose resolved broker settings are
+  unchanged, and re-registers its callbacks rather than stacking a second set
+  per rebuild. A genuine broker change still redials.
+- **The log no longer announces a connection the broker refused.** "MQTT
+  connected" was written as soon as the socket opened, before the broker had
+  answered, and the CONNACK return code was discarded. A rejected login read
+  as a successful connect followed by a mysterious disconnect. The line now
+  comes from the broker's acceptance and carries the client id; a refusal
+  logs an error naming the broker and client id.
+- **The MQTT DISCONNECT packet is now actually sent.** Teardown stopped the
+  network loop before asking the client to disconnect, so the packet that
+  loop was responsible for writing never went out and the broker held the
+  session open until keepalive expired.
+
 ## [0.292.2], 2026-08-11
 
 ### Fixed

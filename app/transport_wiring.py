@@ -164,6 +164,31 @@ def _resolve_client_id(configured: Any, *, dev: bool, data_root: Path | None = N
     return f"{base}-dev" if dev else base
 
 
+def _broker_config(
+    broker_raw: dict[str, Any],
+    *,
+    host: str,
+    embedded_port: int,
+    username: str | None,
+    password: str | None,
+    dev: bool,
+    data_root: Path | None,
+) -> BrokerConfig:
+    """Resolve the broker settings into a :class:`BrokerConfig`.
+
+    Shared by the rebuild path's "has anything actually changed?" check
+    and its construction of a new transport, so the two can't drift and
+    leave the check comparing against a config we'd never build."""
+    return BrokerConfig(
+        host=host,
+        port=int(broker_raw.get("port") or embedded_port or 1883),
+        username=username,
+        password=password,
+        keepalive=int(broker_raw.get("keepalive") or 60),
+        client_id=_resolve_client_id(broker_raw.get("client_id"), dev=dev, data_root=data_root),
+    )
+
+
 # -- status merge -------------------------------------------------------
 
 
@@ -581,19 +606,14 @@ def _rebuild_transport(
     testing: bool,
     dev: bool = False,
 ) -> None:
-    """Tear down any existing transport, construct a fresh one from current
-    broker settings, rewire the PushManager, and re-subscribe every loaded
-    device's status topic. Safe to call repeatedly.
+    """Rewire the PushManager and re-subscribe every loaded device's status
+    topic against a transport built from current broker settings. Safe to
+    call repeatedly, and most callers (device saves, panel edits) change
+    nothing about the broker: those keep the live session rather than
+    redialling it, see the reuse check below.
 
     During testing the transport is constructed with a no-op fake client
     factory so test code can drive the system without a broker."""
-    old_transport: MqttTransport | None = app.config.get("MQTT_TRANSPORT")
-    if old_transport is not None:
-        try:
-            old_transport.disconnect()
-        except Exception:
-            logger.exception("disconnecting old transport")
-
     broker_raw = settings.get_section("broker")
     host = str(broker_raw.get("host") or "")
 
@@ -619,88 +639,134 @@ def _rebuild_transport(
     embedded_bind = str(broker_raw.get("embedded_bind") or "127.0.0.1").strip() or "127.0.0.1"
     embedded_user = (str(broker_raw.get("embedded_username") or "")).strip()
     embedded_pass = str(broker_raw.get("embedded_password_secret") or "")
-    old_embedded: EmbeddedBroker | None = app.config.get("EMBEDDED_BROKER")
-    if old_embedded is not None:
-        try:
-            old_embedded.stop()
-        except Exception:
-            logger.exception("stopping old embedded broker")
-        app.config.pop("EMBEDDED_BROKER", None)
-    embedded_self_connect = False
-    if embedded_enabled and not testing:
-        # renders_dir lives at data_root/core/renders, so its parent is
-        # the right home for the broker's password file.
-        passwd_path = renders_dir.parent / ".amqtt-passwd"
-        embedded = EmbeddedBroker(
-            bind=embedded_bind,
-            port=embedded_port,
-            username=embedded_user or None,
-            password=embedded_pass or None,
-            passwd_path=passwd_path,
-        )
-        try:
-            embedded.start()
-            app.config["EMBEDDED_BROKER"] = embedded
-            if not host:
-                # The broker runs on this machine, so the transport always
-                # connects over localhost. 0.0.0.0 means "bind all
-                # interfaces" (so LAN clients can reach it), it isn't a
-                # connectable address, so map it to loopback here too.
-                host = (
-                    embedded_bind
-                    if embedded_bind not in ("127.0.0.1", "localhost", "0.0.0.0")
-                    else "127.0.0.1"
-                )
-                embedded_self_connect = True
-        except Exception:
-            logger.exception(
-                "embedded broker failed to start on %s:%s; transport will stay offline",
-                embedded_bind,
-                embedded_port,
-            )
 
-    factory = _noop_client_factory if testing else None
-    # When the transport is hitting our own embedded broker and the
-    # operator set creds for it, reuse those creds, no need to set
-    # them in two places.
-    transport_user = broker_raw.get("username") or None
-    transport_pass = broker_raw.get("password_secret") or None
-    if embedded_self_connect and embedded_user and not transport_user:
-        transport_user = embedded_user
-        transport_pass = embedded_pass or None
-    # v0.71.x (issue #81): keep ``host`` empty when the operator hasn't
-    # configured a broker. The previous fallback to ``"localhost"`` made
-    # ``BrokerConfig.host`` truthy on REST-only installs, which broke
-    # ``MqttTransport.publish``'s ``if not self._config.host`` no-op
-    # (issue #67). Result: user-initiated gallery / dashboard pushes on
-    # a broker-less fleet raised ``RuntimeError("transport not connected")``
-    # deep inside ``_fan_out``, ``_latest_renders`` never updated, and
-    # the REST client kept getting 304 on ``/frame`` against a stale
-    # digest. Passing an empty string is safe: ``transport.connect()``
-    # below only fires when ``host`` was originally truthy, and paho
-    # is never asked to dial an empty string.
-    config = BrokerConfig(
-        host=host,
-        port=int(broker_raw.get("port") or embedded_port or 1883),
-        username=transport_user,
-        password=transport_pass,
-        keepalive=int(broker_raw.get("keepalive") or 60),
-        client_id=_resolve_client_id(
-            broker_raw.get("client_id"),
+    # Almost nothing that calls this actually changes how we talk to the
+    # broker: adding a device, saving its card, applying a calibration
+    # profile all land here. Redialling on each one shows up in the
+    # broker's log as a disconnect / reconnect cycle (which reads as a
+    # connection fault when you're debugging one), republishes the whole
+    # HA discovery set, and puts in-flight QoS 1 messages at risk, all to
+    # arrive at the settings we already had.
+    #
+    # So when the resolved config matches the live session's, keep the
+    # session and only rewire the parts above it. The embedded broker
+    # opts out: it's stopped and restarted below, which would strand a
+    # reused transport on a dead socket, and it's off on every install
+    # where this churn is felt (HA hides it entirely).
+    old_transport: MqttTransport | None = app.config.get("MQTT_TRANSPORT")
+    unchanged = (
+        old_transport is not None
+        and not embedded_enabled
+        and app.config.get("EMBEDDED_BROKER") is None
+        and old_transport.config
+        == _broker_config(
+            broker_raw,
+            host=host,
+            embedded_port=embedded_port,
+            username=broker_raw.get("username") or None,
+            password=broker_raw.get("password_secret") or None,
             dev=dev,
-            # ``data_root`` here is the same ``data_root`` create_app
-            # passed in via ``app.config["DATA_ROOT"]``. We use it to
-            # persist the random suffix that breaks broker-side client
-            # id collisions when two installs share a broker.
             data_root=app.config.get("DATA_ROOT"),
-        ),
+        )
+        # A transport that never got off the ground is worth rebuilding;
+        # a hostless one has nothing to redial.
+        and (not host or old_transport.connected)
     )
-    transport = MqttTransport(config, client_factory=factory)
-    if host:
-        try:
-            transport.connect()
-        except Exception:
-            logger.exception("MQTT connect failed (host=%s); leaving transport offline", host)
+
+    transport: MqttTransport
+    if unchanged and old_transport is not None:
+        logger.debug("broker settings unchanged; keeping the live MQTT session")
+        transport = old_transport
+        # Callbacks are re-registered below against the fresh PushManager
+        # and status cache. Without this the previous ones survive and
+        # every heartbeat dispatches twice, once per rebuild.
+        transport.reset_subscriptions()
+    else:
+        if old_transport is not None:
+            try:
+                old_transport.disconnect()
+            except Exception:
+                logger.exception("disconnecting old transport")
+        old_embedded: EmbeddedBroker | None = app.config.get("EMBEDDED_BROKER")
+        if old_embedded is not None:
+            try:
+                old_embedded.stop()
+            except Exception:
+                logger.exception("stopping old embedded broker")
+            app.config.pop("EMBEDDED_BROKER", None)
+        embedded_self_connect = False
+        if embedded_enabled and not testing:
+            # renders_dir lives at data_root/core/renders, so its parent is
+            # the right home for the broker's password file.
+            passwd_path = renders_dir.parent / ".amqtt-passwd"
+            embedded = EmbeddedBroker(
+                bind=embedded_bind,
+                port=embedded_port,
+                username=embedded_user or None,
+                password=embedded_pass or None,
+                passwd_path=passwd_path,
+            )
+            try:
+                embedded.start()
+                app.config["EMBEDDED_BROKER"] = embedded
+                if not host:
+                    # The broker runs on this machine, so the transport always
+                    # connects over localhost. 0.0.0.0 means "bind all
+                    # interfaces" (so LAN clients can reach it), it isn't a
+                    # connectable address, so map it to loopback here too.
+                    host = (
+                        embedded_bind
+                        if embedded_bind not in ("127.0.0.1", "localhost", "0.0.0.0")
+                        else "127.0.0.1"
+                    )
+                    embedded_self_connect = True
+            except Exception:
+                logger.exception(
+                    "embedded broker failed to start on %s:%s; transport will stay offline",
+                    embedded_bind,
+                    embedded_port,
+                )
+
+        factory = _noop_client_factory if testing else None
+        # When the transport is hitting our own embedded broker and the
+        # operator set creds for it, reuse those creds, no need to set
+        # them in two places.
+        transport_user = broker_raw.get("username") or None
+        transport_pass = broker_raw.get("password_secret") or None
+        if embedded_self_connect and embedded_user and not transport_user:
+            transport_user = embedded_user
+            transport_pass = embedded_pass or None
+        # v0.71.x (issue #81): keep ``host`` empty when the operator hasn't
+        # configured a broker. The previous fallback to ``"localhost"`` made
+        # ``BrokerConfig.host`` truthy on REST-only installs, which broke
+        # ``MqttTransport.publish``'s ``if not self._config.host`` no-op
+        # (issue #67). Result: user-initiated gallery / dashboard pushes on
+        # a broker-less fleet raised ``RuntimeError("transport not connected")``
+        # deep inside ``_fan_out``, ``_latest_renders`` never updated, and
+        # the REST client kept getting 304 on ``/frame`` against a stale
+        # digest. Passing an empty string is safe: ``transport.connect()``
+        # below only fires when ``host`` was originally truthy, and paho
+        # is never asked to dial an empty string.
+        #
+        # ``data_root`` is the same one create_app passed in via
+        # ``app.config["DATA_ROOT"]``; it persists the random client-id
+        # suffix that breaks broker-side collisions when two installs
+        # share a broker.
+        config = _broker_config(
+            broker_raw,
+            host=host,
+            embedded_port=embedded_port,
+            username=transport_user,
+            password=transport_pass,
+            dev=dev,
+            data_root=app.config.get("DATA_ROOT"),
+        )
+        transport = MqttTransport(config, client_factory=factory)
+        if host:
+            try:
+                transport.connect()
+            except Exception:
+                logger.exception("MQTT connect failed (host=%s); leaving transport offline", host)
 
     # Wire status subscriptions for every user-registered instance only;
     # built-in kinds are templates with no physical device behind them.

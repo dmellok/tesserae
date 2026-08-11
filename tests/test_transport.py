@@ -223,3 +223,56 @@ def test_topic_matcher_basics() -> None:
     assert m("tesserae/pi/frame/png")
     assert m("tesserae/pi/anything/at/all")
     assert not m("tesserae/esp32/status")
+
+
+def test_connect_logs_only_after_the_broker_accepts(fakes, caplog) -> None:
+    """``connect()`` returning means the socket opened, nothing more. A
+    log line claiming otherwise sent a real MQTT diagnosis down the wrong
+    path: the broker was refusing the login while we printed a connect."""
+    holder, factory = fakes
+    t = MqttTransport(BrokerConfig(host="b"), client_factory=factory)
+    caplog.set_level("INFO", logger="app.transport")
+    t.connect()
+    assert not [r for r in caplog.records if "MQTT connected" in r.message]
+    t._on_connect(holder["client"], None, None, 0)  # type: ignore[arg-type]
+    assert [r for r in caplog.records if "MQTT connected" in r.message]
+
+
+def test_refused_connection_logs_an_error_and_skips_resubscribe(fakes, caplog) -> None:
+    """A non-zero CONNACK is the only place a bad password shows up."""
+    holder, factory = fakes
+    t = MqttTransport(BrokerConfig(host="b"), client_factory=factory)
+    t.connect()
+    t.subscribe("tesserae/pi/#", lambda _t, _p: None)
+    holder["client"].subscribed.clear()
+    caplog.set_level("ERROR", logger="app.transport")
+    t._on_connect(holder["client"], None, None, 5)  # type: ignore[arg-type]
+    assert [r for r in caplog.records if "connection refused" in r.message]
+    assert holder["client"].subscribed == []
+
+
+def test_disconnect_sends_the_packet_before_stopping_the_loop(fakes) -> None:
+    """The network loop is what writes DISCONNECT. Stopping it first
+    leaves the broker holding the session until keepalive expires."""
+    holder, factory = fakes
+    calls: list[str] = []
+    t = MqttTransport(BrokerConfig(host="b"), client_factory=factory)
+    t.connect()
+    client = holder["client"]
+    client.disconnect = lambda: calls.append("disconnect") or 0  # type: ignore[assignment,method-assign]
+    client.loop_stop = lambda: calls.append("loop_stop") or 0  # type: ignore[assignment,method-assign]
+    t.disconnect()
+    assert calls == ["disconnect", "loop_stop"]
+
+
+def test_reset_subscriptions_clears_callbacks_but_keeps_the_session(fakes) -> None:
+    holder, factory = fakes
+    seen: list[str] = []
+    t = MqttTransport(BrokerConfig(host="b"), client_factory=factory)
+    t.connect()
+    t.subscribe("tesserae/pi/status", lambda topic, _p: seen.append(topic))
+    t.reset_subscriptions()
+    assert t.topic_subscriptions == []
+    assert t.connected
+    holder["client"].deliver("tesserae/pi/status", b"x")
+    assert seen == []

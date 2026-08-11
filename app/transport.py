@@ -125,6 +125,12 @@ class MqttTransport:
         return self._connected
 
     @property
+    def config(self) -> BrokerConfig:
+        """The broker settings this transport was built from. Compared by
+        the rebuild path to decide whether a live session can be kept."""
+        return self._config
+
+    @property
     def client_id(self) -> str:
         """The resolved MQTT client id in use (host-based default / -dev
         suffix already applied). Surfaced so the settings UI can show what
@@ -138,19 +144,33 @@ class MqttTransport:
 
     def connect(self) -> None:
         """Open the broker connection and start the network loop in a
-        background thread. Idempotent, calling twice is a no-op."""
+        background thread. Idempotent, calling twice is a no-op.
+
+        Returning from here only means the socket opened and CONNECT went
+        out; the broker's verdict arrives later on the loop thread. The
+        "MQTT connected" line is logged from :meth:`_on_connect` once the
+        broker has actually accepted us, so a rejected login can't read as
+        a successful connection in the log."""
         if self._connected:
             return
+        logger.debug(
+            "MQTT connecting to %s:%d as %s",
+            self._config.host,
+            self._config.port,
+            self._config.client_id,
+        )
         self._client.connect(self._config.host, self._config.port, self._config.keepalive)
         self._client.loop_start()
         self._connected = True
-        logger.info("MQTT connected: %s:%d", self._config.host, self._config.port)
 
     def disconnect(self) -> None:
         if not self._connected:
             return
-        self._client.loop_stop()
+        # DISCONNECT first, loop_stop second: the network loop is what puts
+        # the packet on the wire, so stopping it first leaves the broker
+        # holding the session until keepalive expires.
         self._client.disconnect()
+        self._client.loop_stop()
         self._connected = False
         logger.info("MQTT disconnected")
 
@@ -207,12 +227,43 @@ class MqttTransport:
         with self._lock:
             self._subscriptions = [s for s in self._subscriptions if s.callback is not callback]
 
+    def reset_subscriptions(self) -> None:
+        """Drop every registered callback, keeping the live session.
+
+        Used by the rebuild path when it reuses a connected transport: the
+        callers re-register a fresh callback per device, and without this
+        the old closures (bound to the replaced PushManager and status
+        cache) would stay behind and double-dispatch every heartbeat.
+        Broker-side subscriptions are left alone; ``subscribe`` re-issues
+        them, and a topic no longer claimed by any callback falls through
+        to the discovery listener, which is where an unregistered device
+        belongs anyway."""
+        with self._lock:
+            self._subscriptions = []
+
     # -- paho callbacks (kept tiny, real work happens in dispatch) --------
 
     def _on_connect(
         self, client: Any, userdata: Any, flags: Any, rc: Any, properties: Any = None
     ) -> None:
-        logger.debug("MQTT on_connect rc=%s", rc)
+        # This is the broker's verdict, not connect()'s return. A refusal
+        # (bad credentials, banned client id) says so here and nowhere
+        # else, so it's logged at error rather than swallowed.
+        if _rc_is_failure(rc):
+            logger.error(
+                "MQTT connection refused by %s:%d as %s: %s",
+                self._config.host,
+                self._config.port,
+                self._config.client_id,
+                rc,
+            )
+            return
+        logger.info(
+            "MQTT connected: %s:%d as %s",
+            self._config.host,
+            self._config.port,
+            self._config.client_id,
+        )
         # Replay every registered subscription so a reconnect doesn't drop
         # them. paho will not re-subscribe on its own.
         with self._lock:
@@ -225,6 +276,11 @@ class MqttTransport:
         # reason code says WHY, notably "Session taken over", which means
         # another client connected with this same client_id (give each
         # instance a unique 'MQTT client id' in Settings → Broker).
+        #
+        # Reason codes are an MQTT 5 feature. We speak 3.1.1, where the
+        # broker just closes the socket, so every unexpected drop reports
+        # the generic "Unspecified error" no matter the cause. Diagnose
+        # those from the broker's own log, not this line.
         reason = kwargs.get("reason_code")
         if reason is None and len(args) >= 2:
             reason = args[1]
@@ -247,6 +303,22 @@ class MqttTransport:
                 # A subscriber raising must not kill dispatch for other
                 # subscribers, log loudly and continue.
                 logger.exception("MQTT subscriber for %r raised on topic %r", sub.topic, topic)
+
+
+def _rc_is_failure(rc: Any) -> bool:
+    """True when a CONNACK return code means the broker refused us.
+
+    paho v2 hands us a ``ReasonCode`` object, older shims and our own
+    tests pass a bare int. Anything unrecognisable counts as success, so
+    a shape we didn't anticipate can't suppress the subscription replay
+    that follows a real connect."""
+    is_failure = getattr(rc, "is_failure", None)
+    if isinstance(is_failure, bool):
+        return is_failure
+    try:
+        return int(rc) != 0
+    except (TypeError, ValueError):
+        return False
 
 
 def _paho_client_factory(client_id: str) -> _MqttClientLike:

@@ -323,6 +323,35 @@ def test_instance_status_subscriptions_replayed_on_broker_rebuild(app: Flask) ->
     assert "tesserae/esp32/status" not in new_transport.topic_subscriptions
 
 
+def test_broker_rebuild_keeps_the_live_session_when_nothing_changed(app: Flask) -> None:
+    """Adding a device, saving a card, applying a profile: they all rebuild
+    the transport, and none of them change how we reach the broker. Dropping
+    the session each time shows up in the broker log as a disconnect /
+    reconnect cycle that reads as a fault. Keep the session, and re-register
+    the callbacks exactly once rather than stacking a set per rebuild."""
+    client = app.test_client()
+    _sign_in(client)
+    _add_instance(client, id="esp32_lab", kind="esp32_client")
+    first = app.config["MQTT_TRANSPORT"]
+    app.config["REBUILD_TRANSPORT"]()
+    app.config["REBUILD_TRANSPORT"]()
+    assert app.config["MQTT_TRANSPORT"] is first
+    topics = first.topic_subscriptions
+    assert topics.count("tesserae/esp32_lab/status") == 1
+    assert topics.count("tesserae/+/status") == 1
+
+
+def test_broker_rebuild_replaces_the_transport_when_settings_change(app: Flask) -> None:
+    """The other half of the deal: a real broker change still redials."""
+    client = app.test_client()
+    _sign_in(client)
+    first = app.config["MQTT_TRANSPORT"]
+    app.config["SETTINGS_STORE"].patch_section("broker", {"client_id": "tesserae-renamed"})
+    app.config["REBUILD_TRANSPORT"]()
+    assert app.config["MQTT_TRANSPORT"] is not first
+    assert app.config["MQTT_TRANSPORT"].client_id == "tesserae-renamed"
+
+
 def test_trmnl_api_setup_auto_provisions_native_device_by_mac(app: Flask) -> None:
     """0.44.1: full Terminus BYOS contract. When a native TRMNL
     device (any client that sends its MAC in the ``Id`` header) hits
