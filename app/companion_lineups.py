@@ -78,6 +78,7 @@ def lineup_dict(
     *,
     page_names: dict[str, str],
     current_pages: dict[str, str],
+    web_url: str,
     next_advance_epoch: int | None = None,
 ) -> dict[str, Any]:
     """One Lineup as the app sees it.
@@ -85,6 +86,12 @@ def lineup_dict(
     ``current_pages`` maps device id to the page that device is showing, so
     a Lineup bound to several displays can report each one rather than a
     single fictional "current" page.
+
+    ``web_url`` is required rather than built here: this module has no app
+    context, and the first version of it hardcoded a path that was never a
+    route, so every "open in Tesserae" link the app advertised was a 404
+    (#203). The caller resolves it with ``url_for`` so it can't drift from
+    the routing table again.
     """
     reason = _web_only_reason(deck)
     return {
@@ -144,7 +151,7 @@ def lineup_dict(
         "fallback_page_id": deck.advance_fallback_page_id,
         "native_editable": reason is None,
         "requires_web_reason": reason,
-        "web_url": f"/decks/{deck.id}",
+        "web_url": web_url,
         # ``legacy_kind`` is deliberately absent: which store a record was
         # migrated from is ours, not something a client should branch on.
     }

@@ -922,7 +922,17 @@ def _lineup_views() -> list[dict[str, Any]]:
                 page_id = nav.current_page(device_id, deck.id)
                 if page_id:
                     current[device_id] = page_id
-        out.append(lineup_dict(deck, page_names=page_names, current_pages=current))
+        out.append(
+            lineup_dict(
+                deck,
+                page_names=page_names,
+                current_pages=current,
+                # Resolved from the routing table, not spelled out: the
+                # editor is the only GET a deck id has, and a literal path
+                # here was a 404 for four releases (#203).
+                web_url=url_for("decks.editor", deck_id=deck.id),
+            )
+        )
     return out
 
 

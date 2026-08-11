@@ -524,3 +524,30 @@ def test_a_step_reports_its_own_job_kind(app: Flask) -> None:
     )
     assert resp.status_code == 202
     assert resp.get_json()["job"]["kind"] == "lineup_action"
+
+
+def test_the_advertised_link_opens_the_editor(app: Flask) -> None:
+    """ "Open in Tesserae" has to land somewhere. The first version of this
+    projection spelled the path out as ``/decks/{id}``, which was never a
+    route: the only GET a deck id has is the editor, so every link the app
+    advertised 404'd from v0.287.0 to v0.291.0 (#203)."""
+    device = _seed_device(app)
+    _seed_pages(app, [device], ("pantry", "weather"))
+    _seed_lineup(app, device_ids=[device])
+    token = _token(app)
+    client = app.test_client()
+    _sign_in(client)
+
+    body = client.get("/api/app/v1/lineups/morning", headers=_auth(token)).get_json()
+    web_url = body["lineup"]["web_url"]
+    assert web_url == "/decks/morning/edit"
+
+    # Resolved from the routing table rather than restated, so a future
+    # rename of the editor route fails here instead of shipping a dead link.
+    with app.test_request_context():
+        from flask import url_for
+
+        assert web_url == url_for("decks.editor", deck_id="morning")
+
+    # And it actually resolves.
+    assert client.get(web_url).status_code == 200

@@ -4,6 +4,17 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.291.1], 2026-08-11
+
+### Fixed
+
+- **A Lineup's "open in Tesserae" link pointed at a page that doesn't exist**
+  (#203). The Companion projection spelled the path out as `/decks/{id}`, which
+  was never a route: the only GET a deck id has is its editor at
+  `/decks/{id}/edit`. Every such link the app advertised since v0.287.0 was a
+  404. The URL is resolved from the routing table now, and asserted against it,
+  so a future rename fails a test rather than shipping a dead link.
+
 ## [0.291.0], 2026-08-11
 
 ### Added
