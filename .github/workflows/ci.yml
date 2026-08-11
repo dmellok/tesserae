@@ -55,9 +55,37 @@ jobs:
       - name: pytest
         # -n auto fans the suite across the runner's vCPUs (pytest-xdist).
         # The suite is parallel-safe (tmp_path isolation, no shared ports).
-        # --cov gates on app/ line coverage; the floor sits just under the
-        # current ~82% so a genuine regression fails the build while normal
-        # churn doesn't. Raise the floor as coverage climbs.
+        # Coverage deliberately does NOT run here, see the `coverage` job.
+        run: pytest -n auto -q
+
+  coverage:
+    name: coverage
+    runs-on: ubuntu-latest
+    # Split out from `pytest` and pinned to 3.13 for one reason: speed.
+    # coverage.py's default C tracer costs ~2.5x on this suite, which is what
+    # made the blocking check a ~50 minute job. COVERAGE_CORE=sysmon puts it on
+    # sys.monitoring (3.12+), which is close to free: measured locally at 8:29
+    # (C tracer) vs 3:23-4:29 (sysmon), against a 3:24 no-coverage baseline.
+    # `pytest` above keeps 3.11, the shipped runtime, so correctness is still
+    # gated where it ships; only the coverage floor is measured on a newer
+    # interpreter, at 83.69% when this split landed. Both jobs run in parallel,
+    # so a green PR is gated by the slower of the two rather than by their sum.
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: Install dev deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      - name: pytest --cov
+        # The floor sits just under the current ~82% so a genuine regression
+        # fails the build while normal churn doesn't. Raise it as coverage
+        # climbs.
+        env:
+          COVERAGE_CORE: sysmon
         run: pytest -n auto -q --cov=app --cov-report=term-missing --cov-fail-under=80
 
   pytest-forward:
