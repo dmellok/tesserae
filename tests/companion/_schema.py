@@ -2,10 +2,14 @@
 vendored OpenAPI 0.5.2 contract.
 
 The spec + fixtures under ``contract/`` are a verbatim copy of
-``charmmmz/tesserae-companion-ios`` ``Contracts/``. Keeping them in-tree
-lets the server suite prove its live responses match the same shapes the
-iOS client decodes, and flags drift the moment the vendored copy is
-refreshed.
+``charmmmz/tesserae-companion-ios`` ``Contracts/``, and stay that way:
+values Tesserae serves ahead of the published contract live in
+``contract_errata.py`` and are layered on here at load. Keeping the vendored
+copy pristine means refreshing it is a copy rather than a merge.
+
+Keeping them in-tree lets the server suite prove its live responses match
+the same shapes the iOS client decodes, and flags drift the moment the
+vendored copy is refreshed.
 
 The ``$ref``/``nullable``/``allOf`` resolution mirrors the client repo's
 ``test_contract.py`` so both sides interpret the OpenAPI dialect
@@ -19,9 +23,13 @@ from typing import Any
 
 import yaml
 
+from .contract_errata import apply as _apply_errata
+
 CONTRACT_DIR = Path(__file__).parent / "contract"
 FIXTURES_DIR = CONTRACT_DIR / "Fixtures"
-SPEC: dict[str, Any] = yaml.safe_load((CONTRACT_DIR / "app-v1.openapi.yaml").read_text())
+SPEC: dict[str, Any] = _apply_errata(
+    yaml.safe_load((CONTRACT_DIR / "app-v1.openapi.yaml").read_text())
+)
 
 
 def _pointer(ref: str) -> Any:

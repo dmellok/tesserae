@@ -656,13 +656,6 @@ components:
               - webpage_push
               - image_framing
               - personal_data_reminders
-              # Server-side errata, pending re-vendor: Tesserae advertises
-              # these from v0.287.0 (issue #205). Read + control for Lineups;
-              # the paths themselves are not described here yet, they land
-              # with the Companion contract PR discussed in #203.
-              - lineups
-              - lineup_control
-              - lineup_authoring
         personal_data:
           $ref: "#/components/schemas/PersonalDataCapabilities"
         limits:
@@ -782,19 +775,7 @@ components:
           uniqueItems: true
           items:
             type: string
-            # lineups:read / lineups:control are server-side errata pending
-            # re-vendor, issued from v0.287.0 (issue #205). Authoring
-            # (lineups:write) is deliberately not granted at pairing, see #207.
-            enum:
-              [
-                devices:read,
-                dashboards:read,
-                push:write,
-                media:write,
-                personal_data:write,
-                lineups:read,
-                lineups:control,
-              ]
+            enum: [devices:read, dashboards:read, push:write, media:write, personal_data:write]
         created_at:
           type: string
           format: date-time
@@ -1188,8 +1169,6 @@ components:
             - image_url_push
             - webpage_push
             - history_resend
-            # Lineup step / play, from v0.291.0 (#203).
-            - lineup_action
         status:
           description: Execution lifecycle only; quiet is a successful result
           type: string
@@ -1439,11 +1418,6 @@ components:
                 - invalid_target
                 - unsupported_image
                 - image_too_large
-                # Vendored errata (not yet in charmmmz/tesserae-companion-ios#5):
-                # the 0.6 fixture server returns this code for bad framing but
-                # the published enum missed it. Flagged upstream; drop this
-                # comment when the refreshed contract lands.
-                - invalid_framing
                 - invalid_snapshot
                 - unsupported_personal_data_source
                 - snapshot_out_of_order
@@ -1452,13 +1426,6 @@ components:
                 - idempotency_conflict
                 - not_resendable
                 - temporarily_unavailable
-                # Stale If-Match on a Lineup edit, from v0.292.0 (#206).
-                # Server-side errata pending re-vendor.
-                - precondition_failed
-                # A valid credential that lacks a scope, from v0.292.0. Was
-                # 401/unauthorized, which told a client to re-pair when the
-                # remedy is an operator toggle in Settings (#207).
-                - forbidden
             message:
               type: string
             request_id:

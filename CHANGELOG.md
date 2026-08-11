@@ -4,6 +4,20 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.292.1], 2026-08-11
+
+### Changed
+
+- **The vendored Companion contract is verbatim again.** Six values Tesserae
+  serves ahead of the published contract had been edited straight into the
+  copy, which turned refreshing it from a copy into a merge (an overwrite would
+  have dropped them silently) and left the deviations as comments only findable
+  by whoever read that region. They now live in one `contract_errata.py`, each
+  with the version that started serving it and why, layered over the spec at
+  load. A test asserts every entry is still missing from the vendored file, so
+  the first refresh that includes one fails and names the entry to delete
+  rather than letting the list rot.
+
 ## [0.292.0], 2026-08-11
 
 ### Added
