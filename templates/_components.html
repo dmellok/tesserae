@@ -139,12 +139,28 @@ macro here instead.
     ``group`` are wrapped in a single <optgroup> labelled with the group
     name, so callers can keep the picker single-element while users see
     related themes / fonts / etc. clustered. -#}
+{% set selected = namespace(found=false) %}
+{% for opt in options %}
+  {% if opt is mapping %}{% set option_value = opt.value %}
+  {% else %}{% set option_value = opt[0] %}{% endif %}
+  {% if value == option_value %}{% set selected.found = true %}{% endif %}
+{% endfor %}
+{% set has_value = value is not none and value != '' %}
 <div class="field">
   <label for="{{ field_id }}">{{ label }}{{ info_pop(help) }}</label>
   <select id="{{ field_id }}" name="{{ name }}"
           {% if form %}form="{{ form }}"{% endif %}>
     {% if blank_label is not none %}
     <option value="" {% if not value %}selected{% endif %}>{{ blank_label }}</option>
+    {% endif %}
+    {#- Browsers visually select the first option when no option matches the
+        control's saved value. That makes an unset dynamic picker look
+        configured, and a later unrelated save silently submits the first
+        choice. Keep the actual value as an explicit option instead: blank
+        remains visibly unset, while a removed value stays visible until the
+        user deliberately replaces it. -#}
+    {% if not selected.found and (has_value or blank_label is none) %}
+    <option value="{{ value|default('', true) }}" selected data-unmatched-option>{% if has_value %}Unavailable: {{ value }}{% else %}(not set){% endif %}</option>
     {% endif %}
     {% set ns = namespace(group='') %}
     {% for opt in options %}

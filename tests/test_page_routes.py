@@ -53,6 +53,18 @@ def app(tmp_path: Path) -> Flask:
         updates={"on_change": [{"source": "test.clock", "selector_option": "format"}]},
     )
     _write_test_plugin(plugins_dir / "widget_b", cell_options=[])
+    _write_test_plugin(
+        plugins_dir / "widget_c",
+        cell_options=[
+            {
+                "name": "folder",
+                "type": "select",
+                "label": "Folder",
+                "default": "",
+                "choices": [{"value": "family", "label": "family (5)"}],
+            }
+        ],
+    )
 
     a = create_app(
         testing=False,
@@ -1135,6 +1147,50 @@ def test_multiselect_tolerates_bare_string_and_missing_value(app: Flask) -> None
     ]
     assert _multiselect_checkbox_order(app, "light.b", options) == ["light.b", "light.a"]
     assert _multiselect_checkbox_order(app, None, options) == ["light.a", "light.b"]
+
+
+def test_select_with_unmatched_value_does_not_visually_choose_first_option(
+    app: Flask, tmp_path: Path
+) -> None:
+    """An empty dynamic option must stay visibly empty instead of looking
+    like the browser's first available choice is already saved.
+
+    This is the Gallery failure mode: a newly selected widget stores
+    ``folder=""`` (root), while the editor used to display ``family`` because
+    it was the first runtime choice. The preview still rendered root, and the
+    next unrelated save silently changed the folder to family.
+    """
+    client = app.test_client()
+    _sign_in(client)
+    pid = _new(client, name="Gallery", layout="1_cell")
+    cell_id = _store(tmp_path).get(pid).cells[0].id
+    client.post(f"/pages/{pid}/cells/{cell_id}", data={"plugin": "widget_c"})
+
+    body = client.get(f"/pages/{pid}").get_data(as_text=True)
+
+    assert '<option value="" selected data-unmatched-option>(not set)</option>' in body
+    assert '<option value="family" selected' not in body
+    assert '<option value="family" >family (5)</option>' in body
+
+
+def test_select_with_removed_value_preserves_and_labels_it(app: Flask) -> None:
+    """A choice that disappeared from a dynamic source remains the selected
+    submitted value until the user deliberately picks a replacement."""
+    with app.app_context():
+        tmpl = app.jinja_env.from_string(
+            "{% from '_components.html' import select_field %}"
+            "{{ select_field('f', 'entity', 'Entity', value=value, options=options) }}"
+        )
+        html = tmpl.render(
+            value="sensor.removed",
+            options=[{"value": "sensor.current", "label": "Current"}],
+        )
+
+    assert (
+        '<option value="sensor.removed" selected data-unmatched-option>'
+        "Unavailable: sensor.removed</option>"
+    ) in html
+    assert '<option value="sensor.current" selected' not in html
 
 
 # -- _ensure_cells_fit_panel ------------------------------------------------
