@@ -357,12 +357,18 @@
             <input id="opt-{{ name }}" type="number" step="any" data-opt-input value="{{ val if val is not none else '' }}">
           </div>
         {% else %}
+          {#- ``fill_from``: another option owns this field's value (a feed
+             preset supplying URLs, say). Same resolution the page editor
+             does, so the preview shows what a real cell would use. -#}
+          {% set fill = spec.fill_from %}
+          {% set filled = fill.get('map', {}).get(form_values.get(fill.get('option'))) if fill else none %}
           <div class="field" data-opt-field data-opt-name="{{ name }}" data-opt-type="string">
             <label for="opt-{{ name }}">{{ label }}</label>
             <input id="opt-{{ name }}"
                    type="{% if spec.secret %}password{% else %}text{% endif %}"
                    data-opt-input
-                   value="{{ val if val is not none else '' }}">
+                   {% if filled is not none %}readonly{% endif %}
+                   value="{{ filled if filled is not none else (val if val is not none else '') }}">
             {% if spec.secret %}<span class="hint">Stored as plain text in the URL while previewing, paste a throwaway key.</span>{% endif %}
           </div>
         {% endif %}
