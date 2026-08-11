@@ -4,7 +4,13 @@
   "title": "Tesserae plugin manifest",
   "description": "Shape of plugin.json. See docs/contracts/plugins.md for the prose contract.",
   "type": "object",
-  "required": ["tesserae_compat", "name", "version", "kind", "supports"],
+  "required": [
+    "tesserae_compat",
+    "name",
+    "version",
+    "kind",
+    "supports"
+  ],
   "properties": {
     "tesserae_compat": {
       "type": "string",
@@ -20,7 +26,13 @@
       "pattern": "^\\d+\\.\\d+\\.\\d+(?:[-+].*)?$"
     },
     "kind": {
-      "enum": ["widget", "font", "admin", "data", "service"]
+      "enum": [
+        "widget",
+        "font",
+        "admin",
+        "data",
+        "service"
+      ]
     },
     "description": {
       "type": "string"
@@ -32,16 +44,27 @@
     },
     "supports": {
       "type": "object",
-      "required": ["sizes"],
+      "required": [
+        "sizes"
+      ],
       "properties": {
         "sizes": {
           "type": "array",
-          "items": { "enum": ["xs", "sm", "md", "lg"] },
+          "items": {
+            "enum": [
+              "xs",
+              "sm",
+              "md",
+              "lg"
+            ]
+          },
           "uniqueItems": true
         },
         "panels": {
           "type": "array",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         }
       }
     },
@@ -50,17 +73,33 @@
       "description": "Named, independently-placeable pieces of the widget for the Panels canvas editor. render() paints just one when it receives ctx.fragment; a widget with no fragments (or ctx.fragment absent) renders the whole widget. Declaring fragments lets a user drop, say, just the temperature or the sun-times of a weather widget onto the canvas. See docs/dev/writing-a-widget.md.",
       "items": {
         "type": "object",
-        "required": ["id", "label"],
+        "required": [
+          "id",
+          "label"
+        ],
         "properties": {
           "id": {
             "type": "string",
             "pattern": "^[a-z][a-z0-9_]*$",
             "description": "Fragment id passed to render() as ctx.fragment. 'full' is reserved for the whole widget."
           },
-          "label": { "type": "string" },
-          "icon": { "type": "string", "pattern": "^ph-[a-z0-9-]+$" },
-          "w": { "type": "integer", "minimum": 1, "description": "Default placement width in px." },
-          "h": { "type": "integer", "minimum": 1, "description": "Default placement height in px." }
+          "label": {
+            "type": "string"
+          },
+          "icon": {
+            "type": "string",
+            "pattern": "^ph-[a-z0-9-]+$"
+          },
+          "w": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Default placement width in px."
+          },
+          "h": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Default placement height in px."
+          }
         }
       }
     },
@@ -68,25 +107,77 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["name", "type", "label"],
+        "required": [
+          "name",
+          "type",
+          "label"
+        ],
         "properties": {
-          "name": { "type": "string" },
-          "type": { "enum": ["string", "textarea", "variables_textarea", "entity_overrides", "location_search", "number", "slider", "select", "multiselect", "boolean", "color"] },
-          "label": { "type": "string" },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "string",
+              "textarea",
+              "variables_textarea",
+              "entity_overrides",
+              "location_search",
+              "number",
+              "slider",
+              "select",
+              "multiselect",
+              "boolean",
+              "color"
+            ]
+          },
+          "label": {
+            "type": "string"
+          },
           "default": {},
-          "secret": { "type": "boolean" },
+          "secret": {
+            "type": "boolean"
+          },
           "choices": {
             "type": "array",
             "items": {
               "type": "object",
-              "required": ["value", "label"],
+              "required": [
+                "value",
+                "label"
+              ],
               "properties": {
                 "value": {},
-                "label": { "type": "string" }
+                "label": {
+                  "type": "string"
+                }
               }
             }
           },
-          "choices_from": { "type": "string" }
+          "choices_from": {
+            "type": "string"
+          },
+          "fill_from": {
+            "type": "object",
+            "description": "Another option owns this field's value; the editor fills it and locks it. See docs/widgets.md.",
+            "required": [
+              "option",
+              "map"
+            ],
+            "properties": {
+              "option": {
+                "type": "string",
+                "description": "Name of the controlling cell option."
+              },
+              "map": {
+                "type": "object",
+                "description": "Controlling value -> value for this field."
+              }
+            }
+          },
+          "help": {
+            "type": "string"
+          }
         }
       }
     },
@@ -94,11 +185,21 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["name", "type", "label"],
+        "required": [
+          "name",
+          "type",
+          "label"
+        ],
         "properties": {
-          "name": { "type": "string" },
-          "type": { "type": "string" },
-          "label": { "type": "string" },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
           "secret": {
             "type": "boolean",
             "description": "When true, this field is saved to settings.json as '<name>_secret' so disk-grepping reveals which values are sensitive."
@@ -110,7 +211,9 @@
     "data_schema": {
       "type": "object",
       "description": "Declares the widget's fetch() data shape so the Panels canvas editor can offer its fields as bindable data sources. Optional: a widget without this block still renders normally but has no bindable fields in the composer. See docs/dev/writing-a-widget.md.",
-      "required": ["fields"],
+      "required": [
+        "fields"
+      ],
       "properties": {
         "color": {
           "type": "string",
@@ -121,15 +224,31 @@
           "description": "The bindable fields, one per top-level fetch() result key worth exposing.",
           "items": {
             "type": "object",
-            "required": ["name", "type"],
+            "required": [
+              "name",
+              "type"
+            ],
             "properties": {
-              "name": { "type": "string", "description": "The fetch() result key." },
+              "name": {
+                "type": "string",
+                "description": "The fetch() result key."
+              },
               "type": {
-                "enum": ["num", "str", "arr"],
+                "enum": [
+                  "num",
+                  "str",
+                  "arr"
+                ],
                 "description": "num (number), str (text/state), or arr (list, e.g. a series or item list)."
               },
-              "label": { "type": "string", "description": "Human-friendly field name shown in the bind list." },
-              "unit": { "type": "string", "description": "Optional unit hint (e.g. 'deg', '%', 's')." }
+              "label": {
+                "type": "string",
+                "description": "Human-friendly field name shown in the bind list."
+              },
+              "unit": {
+                "type": "string",
+                "description": "Optional unit hint (e.g. 'deg', '%', 's')."
+              }
             }
           }
         },
@@ -142,15 +261,27 @@
     "render": {
       "type": "object",
       "properties": {
-        "dither": { "enum": ["none", "floyd-steinberg", "ordered"] },
-        "full_bleed": { "type": "boolean" },
-        "needs_network": { "type": "boolean" }
+        "dither": {
+          "enum": [
+            "none",
+            "floyd-steinberg",
+            "ordered"
+          ]
+        },
+        "full_bleed": {
+          "type": "boolean"
+        },
+        "needs_network": {
+          "type": "boolean"
+        }
       }
     },
     "updates": {
       "type": "object",
       "description": "Declares data-change events this widget can subscribe to. The declaration only makes the per-placement opt-in available; it never refreshes a dashboard by itself.",
-      "required": ["on_change"],
+      "required": [
+        "on_change"
+      ],
       "additionalProperties": false,
       "properties": {
         "on_change": {
@@ -160,7 +291,9 @@
           "uniqueItems": true,
           "items": {
             "type": "object",
-            "required": ["source"],
+            "required": [
+              "source"
+            ],
             "additionalProperties": false,
             "properties": {
               "source": {
@@ -184,7 +317,10 @@
       "description": "Design-system intent. Default for every field is the strict, palette-safe behaviour; opt-in values signal a widget is using a richer surface and accepts the downstream trade-offs.",
       "properties": {
         "palette": {
-          "enum": ["strict", "extended"],
+          "enum": [
+            "strict",
+            "extended"
+          ],
           "default": "strict",
           "description": "`strict` (default): the widget only uses Spectra colour tokens (`--w-orange`, `--w-blue`, etc.), so the rendered output lands cleanly on every supported panel without dithering. `extended`: the widget uses arbitrary CSS colours and relies on the renderer's Floyd-Steinberg pass to approximate them on the panel palette. Good for scenic/decorative widgets (gradients, soft scenery); read worse on BW panels than strict widgets. Catalog reviewers should see this flag and treat extended widgets as taking on the dither-tradeoff responsibility."
         }
@@ -203,19 +339,44 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["id", "name", "weights", "files"],
+        "required": [
+          "id",
+          "name",
+          "weights",
+          "files"
+        ],
         "properties": {
-          "id": { "type": "string", "pattern": "^[a-z][a-z0-9_-]*$" },
-          "name": { "type": "string", "minLength": 1 },
-          "category": { "enum": ["sans", "serif", "mono", "display", "handwriting"] },
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_-]*$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "category": {
+            "enum": [
+              "sans",
+              "serif",
+              "mono",
+              "display",
+              "handwriting"
+            ]
+          },
           "weights": {
             "type": "array",
-            "items": { "type": "integer", "minimum": 100, "maximum": 900 },
+            "items": {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 900
+            },
             "minItems": 1
           },
           "files": {
             "type": "object",
-            "additionalProperties": { "type": "string" }
+            "additionalProperties": {
+              "type": "string"
+            }
           }
         }
       }
@@ -224,13 +385,39 @@
   "allOf": [
     {
       "description": "Placeable widgets must declare at least one size; non-placeable kinds (service, data, font, admin) may leave supports.sizes empty.",
-      "if": { "properties": { "kind": { "const": "widget" } } },
-      "then": { "properties": { "supports": { "properties": { "sizes": { "minItems": 1 } } } } }
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "widget"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "supports": {
+            "properties": {
+              "sizes": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      }
     },
     {
       "description": "Only placeable widgets may declare data-change update capabilities.",
-      "if": { "required": ["updates"] },
-      "then": { "properties": { "kind": { "const": "widget" } } }
+      "if": {
+        "required": [
+          "updates"
+        ]
+      },
+      "then": {
+        "properties": {
+          "kind": {
+            "const": "widget"
+          }
+        }
+      }
     }
   ]
 }

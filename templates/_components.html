@@ -50,7 +50,7 @@ macro here instead.
     would close the outer form early. Explicit ``form`` attribute
     keeps every input in the right form regardless of DOM nesting. -#}
 
-{%- macro text_input(field_id, name, label, value='', placeholder='', required=False, help=None, autofocus=False, autocomplete=None, type='text', form=None) -%}
+{%- macro text_input(field_id, name, label, value='', placeholder='', required=False, help=None, autofocus=False, autocomplete=None, type='text', form=None, readonly=False) -%}
 <div class="field">
   <label for="{{ field_id }}">{{ label }}{{ info_pop(help) }}</label>
   <input type="{{ type }}" id="{{ field_id }}" name="{{ name }}"
@@ -59,6 +59,7 @@ macro here instead.
          {% if placeholder %}placeholder="{{ placeholder }}"{% endif %}
          {% if autocomplete %}autocomplete="{{ autocomplete }}"{% endif %}
          {% if required %}required{% endif %}
+         {% if readonly %}readonly{% endif %}
          {% if autofocus %}autofocus{% endif %}>
 </div>
 {%- endmacro -%}
@@ -514,7 +515,11 @@ macro here instead.
 </div>
 {%- endmacro -%}
 
-{%- macro auto_field(field_id, name, spec, value, help=None, form=None) -%}
+{#- ``readonly``: render the control uneditable but still submitted. Used
+   when another option owns this field's value (e.g. a feed preset that
+   supplies the URLs below it), so the value stays visible and stays in the
+   POST instead of silently reverting. -#}
+{%- macro auto_field(field_id, name, spec, value, help=None, form=None, readonly=False) -%}
   {% set ftype = spec.get('type', 'string') %}
   {% set label = spec.get('label', name) %}
   {% set help_text = help if help is not none else spec.get('help') %}
@@ -569,7 +574,7 @@ macro here instead.
                   placeholder=spec.get('placeholder', ''),
                   type='password' if spec.get('secret') else 'text',
                   autocomplete='new-password' if spec.get('secret') else None,
-                  help=help_text, form=form) }}
+                  help=help_text, form=form, readonly=readonly) }}
   {% endif %}
 {%- endmacro -%}
 
