@@ -4,6 +4,16 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [Unreleased]
+
+### Fixed
+
+- **Dynamic widget pickers no longer look configured when their saved value is
+  empty or unavailable.** Gallery folders, Home Assistant entities, Todo lists,
+  and other runtime-backed selects now show the actual unset or removed value
+  until it is deliberately replaced, instead of letting the browser display
+  and later submit the first available option.
+
 ## [0.292.0], 2026-08-11
 
 ### Added
