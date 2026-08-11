@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from app.plugin_loader import Plugin, PluginRegistry
+from app.scheduled_refresh import scheduled_placements
 from app.scheduler import Scheduler
 from app.state.deck_model import Deck, DeckPage
 from app.state.deck_nav_store import DeckNavStore
@@ -29,6 +30,7 @@ class FakePush:
     # device_id -> latest render record (as the real PushManager stores it).
     latest: dict[str, dict] = field(default_factory=dict)
     status: str = "sent"
+    quiet_devices: set[str] = field(default_factory=set)
 
     def push(self, page_id: str, *, device_ids=None, respect_quiet_hours=False, source="page"):
         self.pushes.append((page_id, frozenset(device_ids or ()), respect_quiet_hours, source))
@@ -43,6 +45,9 @@ class FakePush:
 
     def latest_render_for(self, device_id: str):
         return self.latest.get(device_id)
+
+    def device_in_quiet_hours(self, device_id: str) -> bool:
+        return device_id in self.quiet_devices
 
     def warm_deck_page(self, page_id: str, device_id: str) -> bool:
         self.warms.append((page_id, device_id))
@@ -93,6 +98,21 @@ def _scheduled_cell(cell_id: str, *, at: str | None = None) -> Cell:
         w=100,
         h=100,
     )
+
+
+def test_scheduled_resolver_ignores_stale_unsupported_placement(tmp_path: Path) -> None:
+    page = Page(
+        id="reminders",
+        name="Reminders",
+        cells=[_scheduled_cell("a")],
+    )
+    registry = _scheduled_registry(tmp_path)
+    assert [record.page_id for record in scheduled_placements([page], registry)] == ["reminders"]
+
+    plugin = registry.get("daily")
+    assert plugin is not None
+    plugin.manifest["updates"] = {"on_change": [{"source": "test.daily"}]}
+    assert scheduled_placements([page], registry) == []
 
 
 def test_lone_single_bound_page_refreshes_on_cadence(tmp_path: Path) -> None:
@@ -256,6 +276,19 @@ def test_data_change_warms_shared_deck_page_once_per_device(tmp_path: Path) -> N
     }
 
 
+def test_data_change_attempt_preserves_page_cadence_timestamp(tmp_path: Path) -> None:
+    ps = _pages(tmp_path, Page(id="active", name="Active", device_ids=["panel"]))
+    pusher = FakePush(status="failed")
+    sched = _sched(tmp_path, ps, pusher)
+
+    sched.refresh_pages_for_update({"active"}, source="data_change", now=T0)
+    assert sched._page_last_refresh["active"] == T0.timestamp()
+
+    sched.refresh_pages_for_update({"active"}, source="data_change", now=T0 + timedelta(seconds=30))
+
+    assert len(pusher.pushes) == 2
+
+
 def test_widget_daily_boundary_refreshes_once_and_coalesces_placements(
     tmp_path: Path,
 ) -> None:
@@ -322,6 +355,52 @@ def test_widget_schedule_retries_after_quiet_result(tmp_path: Path) -> None:
     sched._maybe_refresh_scheduled_widgets(boundary + timedelta(hours=7))
 
     assert [push[3] for push in pusher.pushes] == ["widget_schedule", "widget_schedule"]
+
+
+def test_widget_schedule_waits_through_quiet_without_push_events(tmp_path: Path) -> None:
+    page = Page(
+        id="reminders",
+        name="Reminders",
+        device_ids=["panel"],
+        cells=[_scheduled_cell("a")],
+    )
+    ps = _pages(tmp_path, page)
+    pusher = FakePush(quiet_devices={"panel"})
+    registry = _scheduled_registry(tmp_path)
+    sched = _sched(tmp_path, ps, pusher, plugin_registry=lambda: registry)
+
+    sched._maybe_refresh_scheduled_widgets(datetime(2026, 6, 15, 23, 59, tzinfo=UTC))
+    boundary = datetime(2026, 6, 16, 0, 0, tzinfo=UTC)
+    sched._maybe_refresh_scheduled_widgets(boundary)
+    sched._maybe_refresh_scheduled_widgets(boundary + timedelta(seconds=30))
+    assert pusher.pushes == []
+
+    pusher.quiet_devices.clear()
+    sched._maybe_refresh_scheduled_widgets(boundary + timedelta(seconds=60))
+    assert len(pusher.pushes) == 1
+
+
+def test_widget_schedule_backs_off_after_delivery_failure(tmp_path: Path) -> None:
+    page = Page(
+        id="reminders",
+        name="Reminders",
+        device_ids=["panel"],
+        cells=[_scheduled_cell("a")],
+    )
+    ps = _pages(tmp_path, page)
+    pusher = FakePush(status="failed")
+    registry = _scheduled_registry(tmp_path)
+    sched = _sched(tmp_path, ps, pusher, plugin_registry=lambda: registry)
+
+    sched._maybe_refresh_scheduled_widgets(datetime(2026, 6, 15, 23, 59, tzinfo=UTC))
+    boundary = datetime(2026, 6, 16, 0, 0, tzinfo=UTC)
+    sched._maybe_refresh_scheduled_widgets(boundary)
+    sched._maybe_refresh_scheduled_widgets(boundary + timedelta(seconds=30))
+    assert len(pusher.pushes) == 1
+
+    pusher.status = "sent"
+    sched._maybe_refresh_scheduled_widgets(boundary + timedelta(minutes=5, seconds=1))
+    assert len(pusher.pushes) == 2
 
 
 def test_widget_schedule_warms_inactive_lineup_page_without_promoting(

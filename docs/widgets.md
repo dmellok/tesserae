@@ -149,6 +149,9 @@ lowercase `[a-z0-9_]` is convention, not enforced. Name it `<family>_<role>`
   progressive Custom time control and is not persisted until the user chooses
   it. Scheduled refreshes update displays already showing the dashboard and
   silently re-warm inactive Lineup pages; they never select or advance one.
+  The due/satisfied bookkeeping is in memory, matching Tesserae Schedules: a
+  server restart after today's target can defer that placement until its next
+  local-day target rather than backfilling immediately.
 
   ```json
   {

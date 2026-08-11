@@ -49,6 +49,8 @@ from app.state.schedule_model import Schedule
 
 logger = logging.getLogger(__name__)
 
+UPDATE_REFRESH_FAILURE_BACKOFF_SECONDS = 5 * 60
+
 
 class ScheduleSource(Protocol):
     """What the scheduler needs from a schedule store: the file-backed
@@ -106,6 +108,35 @@ def _matches_window(schedule: Schedule, now: datetime, tz: tzinfo | None) -> boo
 def _parse_hhmm(value: str) -> time:
     h, m = value.split(":")
     return time(int(h), int(m))
+
+
+def _daily_is_due(
+    now: datetime,
+    tz: tzinfo | None,
+    fires_at: time,
+    *,
+    first_seen: float | None,
+    last_fired: float | None,
+) -> bool:
+    """Shared once-per-local-day gate for Schedules and widget placements."""
+    local_now = _local(now, tz)
+    target_local = local_now.replace(
+        hour=fires_at.hour,
+        minute=fires_at.minute,
+        second=0,
+        microsecond=0,
+    )
+    target = target_local.astimezone(UTC)
+    if now < target:
+        return False
+    # Suppress backfill when a schedule was first observed only after today's
+    # target. This state is intentionally session-local, matching Schedules.
+    if first_seen is None or first_seen > target.timestamp():
+        return False
+    if last_fired is None:
+        return True
+    last_dt = datetime.fromtimestamp(last_fired, tz=UTC)
+    return _local(last_dt, tz).date() != local_now.date()
 
 
 def compute_current_step(
@@ -329,6 +360,10 @@ class Scheduler:
         # observation window and cannot inherit today's prior completion.
         self._widget_schedule_first_seen: dict[str, float] = {}
         self._widget_schedule_last_fired: dict[str, float] = {}
+        # (source, page_id) -> next retry timestamp after an actual delivery
+        # failure. Quiet pages are preflighted without creating Events rows and
+        # stay eligible every tick, so they fire immediately when quiet ends.
+        self._page_update_retry_after: dict[tuple[str, str], float] = {}
         # deck_id -> last warm POSIX timestamp, so a deck's pages are re-warmed
         # (in the background, silently) at its refresh cadence. The lock keeps
         # warm passes from stacking when one runs longer than a tick.
@@ -542,31 +577,17 @@ class Scheduler:
                     continue
                 if not _matches_dow(s, now, tz):
                     continue
-                # Target time is today (wall-clock in the configured tz) at
-                # fires_at's HH:MM.
-                local_now = _local(now, tz)
-                target_local = local_now.replace(
-                    hour=s.fires_at.hour,
-                    minute=s.fires_at.minute,
-                    second=0,
-                    microsecond=0,
-                )
-                target = target_local.astimezone(UTC)
-                if now < target:
-                    continue
                 with self._lock:
                     first_seen = self._first_seen.get(s.id)
                     last = self._last_fired.get(s.id)
-                # Backfill guard: if we weren't watching the schedule at
-                # the moment today's target would have fired, skip, the
-                # user enabled it after the time had passed.
-                if first_seen is None or first_seen > target.timestamp():
-                    continue
-                if last is not None:
-                    last_dt = datetime.fromtimestamp(last, tz=UTC)
-                    if _local(last_dt, tz).date() == local_now.date():
-                        continue  # already fired today (local terms)
-                candidates.append(s)
+                if _daily_is_due(
+                    now,
+                    tz,
+                    s.fires_at.time(),
+                    first_seen=first_seen,
+                    last_fired=last,
+                ):
+                    candidates.append(s)
         candidates.sort(key=lambda s: (-s.priority, s.id))
         return candidates
 
@@ -866,6 +887,8 @@ class Scheduler:
         *,
         source: str,
         now: datetime | None = None,
+        failure_backoff_seconds: int = 0,
+        defer_during_quiet: bool = False,
     ) -> set[str]:
         """Refresh invalidated pages without choosing or advancing content.
 
@@ -877,6 +900,8 @@ class Scheduler:
         The returned page ids completed every applicable live push and deck
         warm. A page blocked by quiet hours is deliberately absent so a daily
         placement schedule remains due and retries after quiet hours end.
+        Scheduled callers can request a failure backoff and quiet preflight;
+        one-shot data-change callers keep their established delivery behavior.
         """
         if self._page_store is None or not page_ids:
             return set()
@@ -892,9 +917,33 @@ class Scheduler:
         showing = self._devices_showing_pages(now)
         pusher = self._push_factory()
         completed = set(affected)
+        deferred: set[str] = set()
         for page_id in sorted(affected):
             devices = showing.get(page_id) or set()
             if not devices:
+                continue
+            retry_key = (source, page_id)
+            if failure_backoff_seconds > 0:
+                with self._lock:
+                    retry_after = self._page_update_retry_after.get(retry_key, 0.0)
+                if now.timestamp() < retry_after:
+                    completed.discard(page_id)
+                    deferred.add(page_id)
+                    continue
+
+            # Avoid calling PushManager while every live target is quiet. Its
+            # normal quiet path writes an Events row, so a 30-second scheduler
+            # tick would otherwise flood History all night. This cheap preflight
+            # remains eligible every tick and therefore fires immediately when
+            # the quiet window ends.
+            quiet_check = getattr(pusher, "device_in_quiet_hours", None)
+            if (
+                defer_during_quiet
+                and callable(quiet_check)
+                and all(quiet_check(device_id) for device_id in devices)
+            ):
+                completed.discard(page_id)
+                deferred.add(page_id)
                 continue
             try:
                 result = pusher.push(
@@ -905,13 +954,29 @@ class Scheduler:
                 )
             except Exception:
                 completed.discard(page_id)
+                deferred.add(page_id)
+                if failure_backoff_seconds > 0:
+                    with self._lock:
+                        self._page_update_retry_after[retry_key] = (
+                            now.timestamp() + failure_backoff_seconds
+                        )
                 logger.exception("%s page refresh failed page=%s", source, page_id)
                 continue
+            # Preserve the established data-change/page-cadence interaction:
+            # any push attempt that returned a result resets the cadence clock.
+            with self._lock:
+                self._page_last_refresh[page_id] = now.timestamp()
             if result.status in ("sent", "no_change"):
                 with self._lock:
-                    self._page_last_refresh[page_id] = now.timestamp()
+                    self._page_update_retry_after.pop(retry_key, None)
             else:
                 completed.discard(page_id)
+                deferred.add(page_id)
+                if result.status != "quiet" and failure_backoff_seconds > 0:
+                    with self._lock:
+                        self._page_update_retry_after[retry_key] = (
+                            now.timestamp() + failure_backoff_seconds
+                        )
             logger.info(
                 "%s refresh: page=%s devices=%s (%s)",
                 source,
@@ -939,10 +1004,18 @@ class Scheduler:
                         warm_targets.setdefault((page_id, device_id), set()).add(deck.id)
         with self._deck_warm_lock:
             for (page_id, device_id), deck_ids in sorted(warm_targets.items()):
+                if page_id in deferred:
+                    continue
+                retry_key = (source, page_id)
                 try:
                     warmed = warm(page_id, device_id)
                 except Exception:
                     completed.discard(page_id)
+                    if failure_backoff_seconds > 0:
+                        with self._lock:
+                            self._page_update_retry_after[retry_key] = (
+                                now.timestamp() + failure_backoff_seconds
+                            )
                     logger.exception(
                         "%s deck warm failed decks=%s page=%s device=%s",
                         source,
@@ -953,10 +1026,18 @@ class Scheduler:
                     continue
                 if warmed is False:
                     completed.discard(page_id)
+                    if failure_backoff_seconds > 0:
+                        with self._lock:
+                            self._page_update_retry_after[retry_key] = (
+                                now.timestamp() + failure_backoff_seconds
+                            )
                     continue
                 for deck_id in deck_ids:
                     key = f"{deck_id}\x00{device_id}\x00{page_id}"
                     self._deck_last_warm[key] = now.timestamp()
+        with self._lock:
+            for page_id in completed:
+                self._page_update_retry_after.pop((source, page_id), None)
         return completed
 
     def _widget_schedule_records(self) -> list[ScheduledPlacement]:
@@ -983,32 +1064,30 @@ class Scheduler:
                 self._widget_schedule_first_seen.setdefault(key, now_ts)
 
         tz = self._tz_provider()
-        local_now = _local(now, tz)
         due_by_page: dict[str, list[ScheduledPlacement]] = {}
         for record in records:
             at = record.schedule.at
-            hour, minute = map(int, at.split(":")) if at is not None else (0, 0)
-            target_local = local_now.replace(hour=hour, minute=minute, second=0, microsecond=0)
-            target = target_local.astimezone(UTC)
-            if now < target:
-                continue
+            fires_at = _parse_hhmm(at) if at is not None else time(0, 0)
             with self._lock:
                 first_seen = self._widget_schedule_first_seen.get(record.key)
                 last = self._widget_schedule_last_fired.get(record.key)
-            # Match daily Schedule semantics: enabling after today's target
-            # does not immediately repaint to backfill a missed time.
-            if first_seen is None or first_seen > target.timestamp():
-                continue
-            if last is not None:
-                last_dt = datetime.fromtimestamp(last, tz=UTC)
-                if _local(last_dt, tz).date() == local_now.date():
-                    continue
-            due_by_page.setdefault(record.page_id, []).append(record)
+            if _daily_is_due(
+                now,
+                tz,
+                fires_at,
+                first_seen=first_seen,
+                last_fired=last,
+            ):
+                due_by_page.setdefault(record.page_id, []).append(record)
 
         if not due_by_page:
             return
         completed = self.refresh_pages_for_update(
-            set(due_by_page), source="widget_schedule", now=now
+            set(due_by_page),
+            source="widget_schedule",
+            now=now,
+            failure_backoff_seconds=UPDATE_REFRESH_FAILURE_BACKOFF_SECONDS,
+            defer_during_quiet=True,
         )
         with self._lock:
             for page_id in completed:
