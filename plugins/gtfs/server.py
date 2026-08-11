@@ -1368,13 +1368,26 @@ def _rows(zf: zipfile.ZipFile, names: dict[str, str], member: str) -> Iterator[d
 # ----------------------------------------------------------------------
 
 
-# Only http(s) reaches the network. Every URL here — feed, TripUpdates,
-# alerts, and the admin page's ``feed_url`` query arg — is user-supplied, and
-# urllib's default opener also speaks file:// and ftp://, so a pasted
+# Only http(s) reaches the network. Every URL here (feed, TripUpdates, alerts,
+# and the admin page's ``feed_url`` query arg) is user-supplied, and urllib's
+# default opener also speaks file://, ftp:// and data://, so a pasted
 # "file:///etc/passwd" would otherwise be read and parsed server-side.
-# Registering only the HTTP handlers refuses those at the transport layer
-# rather than relying on the scheme check alone.
-_OPENER = urllib.request.build_opener(urllib.request.HTTPHandler, urllib.request.HTTPSHandler)
+#
+# ``build_opener`` does NOT give you an http-only opener: it installs the
+# default handler set and only substitutes the classes you pass, so FileHandler
+# and FTPHandler survive. The scheme check in ``_download`` covers a pasted
+# URL, but not a redirect: CPython's HTTPRedirectHandler permits redirects to
+# ftp://, so a feed host answering 302 could otherwise pull one. Dropping the
+# schemes from the dispatch table refuses them at the transport layer, in the
+# redirect case too, and UnknownHandler turns the attempt into a URLError.
+def _http_only_opener() -> urllib.request.OpenerDirector:
+    opener = urllib.request.build_opener(urllib.request.HTTPHandler, urllib.request.HTTPSHandler)
+    for scheme in ("file", "ftp", "data"):
+        opener.handle_open.pop(scheme, None)
+    return opener
+
+
+_OPENER = _http_only_opener()
 
 
 def _download(url: str, timeout: float) -> bytes:
