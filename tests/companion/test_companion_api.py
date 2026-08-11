@@ -130,6 +130,7 @@ def test_capabilities_probe_is_unauthenticated_and_valid(app: Flask) -> None:
         "personal_data_reminders",
         "lineups",
         "lineup_control",
+        "lineup_authoring",
     }
     assert body["personal_data"]["sources"] == ["reminders", "reminders.fridge"]
     assert "webpage_push" not in body["features"]

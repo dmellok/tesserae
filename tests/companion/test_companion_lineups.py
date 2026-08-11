@@ -551,3 +551,193 @@ def test_the_advertised_link_opens_the_editor(app: Flask) -> None:
 
     # And it actually resolves.
     assert client.get(web_url).status_code == 200
+
+
+# -- authoring (#206) ----------------------------------------------------
+
+
+def _grant_write(app: Flask) -> None:
+    store = app.config["COMPANION_TOKENS"]
+    store.set_optional_scope(store.list_active()[0].token_id, "lineups:write", granted=True)
+
+
+def _create(app: Flask, token: str, **body: Any) -> Any:
+    return app.test_client().post(
+        "/api/app/v1/lineups",
+        headers=_auth(token),
+        data=json.dumps(body),
+        content_type="application/json",
+    )
+
+
+def test_authoring_needs_the_write_scope(app: Flask) -> None:
+    """It isn't granted at pairing, so an app that hasn't been given it
+    can read and control but not create (#207)."""
+    _seed_pages(app, [], ("pantry",))
+    token = _token(app)
+    resp = _create(app, token, intent="interval", name="Fresh", page_ids=["pantry"])
+    # 403, not 401: the credential is fine, and re-pairing wouldn't grant it.
+    assert resp.status_code == 403
+    assert resp.get_json()["error"]["code"] == "forbidden"
+
+
+@pytest.mark.parametrize(
+    ("body", "expected_trigger"),
+    [
+        ({"intent": "daily", "page_ids": ["pantry"], "fires_at": "07:30"}, "daily"),
+        ({"intent": "interval", "page_ids": ["pantry"], "interval_minutes": 45}, "interval"),
+        ({"intent": "cycle", "page_ids": ["pantry", "weather"]}, "cycle"),
+    ],
+)
+def test_each_intent_creates_a_lineup(
+    app: Flask, body: dict[str, Any], expected_trigger: str
+) -> None:
+    device = _seed_device(app)
+    _seed_pages(app, [device], ("pantry", "weather"))
+    token = _token(app)
+    _grant_write(app)
+    resp = _create(app, token, name="Made", **body)
+    assert resp.status_code == 201, resp.get_data(as_text=True)
+    assert resp.headers.get("ETag")
+    lineup = resp.get_json()["lineup"]
+    assert lineup["trigger"] == expected_trigger
+    # Anything the app authors is by definition something it can edit again.
+    assert lineup["native_editable"] is True
+
+
+def test_creating_against_a_missing_dashboard_is_refused(app: Flask) -> None:
+    """Otherwise the Lineup exists with a step that can never render."""
+    _seed_pages(app, [], ("pantry",))
+    token = _token(app)
+    _grant_write(app)
+    resp = _create(app, token, intent="cycle", name="Bad", page_ids=["pantry", "ghost"])
+    assert resp.status_code == 404
+
+
+def test_binding_unassigned_dashboards_is_opt_in(app: Flask) -> None:
+    device = _seed_device(app)
+    _seed_pages(app, [], ("pantry",))
+    token = _token(app)
+    _grant_write(app)
+
+    _create(app, token, intent="interval", name="Nobind", page_ids=["pantry"], device_ids=[device])
+    assert app.config["PAGE_STORE"].get("pantry").device_ids == []
+
+    _create(
+        app,
+        token,
+        intent="interval",
+        name="Bind",
+        page_ids=["pantry"],
+        device_ids=[device],
+        bind_unassigned_dashboards=True,
+    )
+    assert app.config["PAGE_STORE"].get("pantry").device_ids == [device]
+
+
+def _etag(app: Flask, token: str, lineup_id: str = "morning") -> str:
+    resp = app.test_client().get(f"/api/app/v1/lineups/{lineup_id}", headers=_auth(token))
+    return str(resp.headers["ETag"]).strip('"')
+
+
+def _patch(app: Flask, token: str, etag: str | None, **body: Any) -> Any:
+    headers = _auth(token)
+    if etag is not None:
+        headers["If-Match"] = etag
+    return app.test_client().patch(
+        "/api/app/v1/lineups/morning",
+        headers=headers,
+        data=json.dumps(body),
+        content_type="application/json",
+    )
+
+
+def test_a_patch_leaves_untouched_fields_alone(app: Flask) -> None:
+    """The contract that matters: a client editing the name must not flatten
+    the twenty other fields a Lineup can hold (#203)."""
+    device = _seed_device(app)
+    _seed_pages(app, [device], ("pantry", "weather"))
+    _seed_lineup(app, device_ids=[device], home_timeout_minutes=0, advance_interval_minutes=7)
+    token = _token(app)
+    _grant_write(app)
+    resp = _patch(app, token, _etag(app, token), name="Renamed")
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    stored = app.config["DECK_STORE"].get("morning")
+    assert stored.name == "Renamed"
+    assert stored.advance_interval_minutes == 7
+    assert [p.page_id for p in stored.pages] == ["pantry", "weather"]
+    assert stored.advance_anchor == "00:00"
+
+
+def test_a_stale_etag_is_refused(app: Flask) -> None:
+    """The web editor is very likely the other writer."""
+    device = _seed_device(app)
+    _seed_pages(app, [device], ("pantry", "weather"))
+    _seed_lineup(app, device_ids=[device])
+    token = _token(app)
+    _grant_write(app)
+    stale = _etag(app, token)
+    # Someone edits it elsewhere.
+    deck = app.config["DECK_STORE"].get("morning")
+    app.config["DECK_STORE"].upsert(deck.model_copy(update={"name": "Changed in the web"}))
+
+    resp = _patch(app, token, stale, name="From the app")
+    assert resp.status_code == 412
+    assert resp.get_json()["error"]["code"] == "precondition_failed"
+    assert app.config["DECK_STORE"].get("morning").name == "Changed in the web"
+
+
+def test_a_patch_without_if_match_is_refused(app: Flask) -> None:
+    device = _seed_device(app)
+    _seed_pages(app, [device], ("pantry", "weather"))
+    _seed_lineup(app, device_ids=[device])
+    token = _token(app)
+    _grant_write(app)
+    assert _patch(app, token, None, name="No token").status_code == 400
+
+
+def test_an_advanced_lineup_refuses_the_edit_and_says_why(app: Flask) -> None:
+    device = _seed_device(app)
+    _seed_pages(app, [device], ("pantry", "weather"))
+    _seed_lineup(app, device_ids=[device], advance_smart_sync=True)
+    token = _token(app)
+    _grant_write(app)
+    resp = _patch(app, token, _etag(app, token), name="Nope")
+    assert resp.status_code == 400
+    assert "smart sync" in resp.get_json()["error"]["message"]
+    assert app.config["DECK_STORE"].get("morning").name == "Morning"
+
+
+def test_a_field_the_app_may_not_set_is_refused_not_ignored(app: Flask) -> None:
+    """Silently dropping it would let the app believe it wrote something."""
+    device = _seed_device(app)
+    _seed_pages(app, [device], ("pantry", "weather"))
+    _seed_lineup(app, device_ids=[device])
+    token = _token(app)
+    _grant_write(app)
+    resp = _patch(app, token, _etag(app, token), advance_fallback_page_id="weather")
+    assert resp.status_code == 400
+    assert "advance_fallback_page_id" in resp.get_json()["error"]["message"]
+
+
+def test_reordering_keeps_what_each_dashboard_carried(app: Flask) -> None:
+    from app.state.deck_model import DeckLink, DeckPage
+
+    device = _seed_device(app)
+    _seed_pages(app, [device], ("pantry", "weather"))
+    _seed_lineup(
+        app,
+        device_ids=[device],
+        pages=[
+            DeckPage(page_id="pantry", links=[DeckLink(target_page_id="weather", button="right")]),
+            DeckPage(page_id="weather"),
+        ],
+    )
+    token = _token(app)
+    _grant_write(app)
+    resp = _patch(app, token, _etag(app, token), page_ids=["weather", "pantry"])
+    assert resp.status_code == 200
+    stored = app.config["DECK_STORE"].get("morning")
+    assert [p.page_id for p in stored.pages] == ["weather", "pantry"]
+    # The link the reordered page carried survives the edit.
+    assert stored.pages[1].links[0].target_page_id == "weather"

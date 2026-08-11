@@ -4,6 +4,35 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.292.0], 2026-08-11
+
+### Added
+
+- **Companion API: Lineups authoring** (#206). `POST /api/app/v1/lineups`
+  creates one from the same four intents the setup wizard offers, through the
+  same builder, so a Lineup made from the app and one made from the web are the
+  same record made the same way. `PATCH /lineups/{id}` edits one, gated on the
+  `lineups:write` permission an operator grants per client.
+
+  Three refusals carry the design. A Lineup using anything outside the four
+  intents is web-only, because a partial write from a client that can't see
+  those fields would flatten them. A field the app may not set is rejected
+  rather than ignored, so a client can't believe it wrote something it didn't.
+  And an edit must present the `ETag` from the copy it read: the web editor is
+  very likely the other writer, and a stale write is refused with `412` rather
+  than applied. Every field a request doesn't mention keeps its stored value.
+
+  Binding an unassigned dashboard to the Lineup's display is opt-in via
+  `bind_unassigned_dashboards`, so a dashboard already on another display is
+  never quietly moved.
+
+### Changed
+
+- **A valid credential that lacks a permission now answers `403`, not `401`**
+  (#207). 401 tells a client its credential is dead and to pair again, but an
+  optional permission is an operator toggle in Settings, so re-pairing lands in
+  exactly the same place. A missing or revoked credential is still `401`.
+
 ## [0.291.1], 2026-08-11
 
 ### Fixed

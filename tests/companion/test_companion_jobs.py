@@ -257,8 +257,10 @@ def test_dashboard_push_requires_push_scope(app: Flask) -> None:
         content_type="application/json",
         headers=_auth(token, "idem-scope-00001"),
     )
-    assert resp.status_code == 401
-    assert resp.get_json()["error"]["code"] == "unauthorized"
+    # 403 since v0.292.0: the credential is valid, it just lacks the
+    # scope, and re-pairing is not the remedy (#207).
+    assert resp.status_code == 403
+    assert resp.get_json()["error"]["code"] == "forbidden"
 
 
 # -- quiet hours ---------------------------------------------------------
@@ -542,7 +544,9 @@ def test_image_url_push_requires_push_scope(app: Flask) -> None:
         content_type="application/json",
         headers=_auth(token, "idem-noscope-00001"),
     )
-    assert resp.status_code == 401
+    # 403 since v0.292.0: the credential is valid, it just lacks the
+    # scope, and re-pairing is not the remedy (#207).
+    assert resp.status_code == 403
 
 
 def test_image_url_push_idempotent_replay_returns_same_job(app: Flask) -> None:

@@ -662,6 +662,7 @@ components:
               # with the Companion contract PR discussed in #203.
               - lineups
               - lineup_control
+              - lineup_authoring
         personal_data:
           $ref: "#/components/schemas/PersonalDataCapabilities"
         limits:
@@ -1451,6 +1452,13 @@ components:
                 - idempotency_conflict
                 - not_resendable
                 - temporarily_unavailable
+                # Stale If-Match on a Lineup edit, from v0.292.0 (#206).
+                # Server-side errata pending re-vendor.
+                - precondition_failed
+                # A valid credential that lacks a scope, from v0.292.0. Was
+                # 401/unauthorized, which told a client to re-pair when the
+                # remedy is an operator toggle in Settings (#207).
+                - forbidden
             message:
               type: string
             request_id:

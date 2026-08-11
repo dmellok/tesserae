@@ -325,11 +325,14 @@ def test_device_preview_requires_devices_read_scope(app: Flask) -> None:
     token = _token(app)
     app.config["COMPANION_TOKENS"].list_active()[0].scopes = ["dashboards:read"]
     resp = app.test_client().get(f"/api/app/v1/devices/{device}/preview", headers=_auth(token))
-    assert resp.status_code == 401
+    # 403 since v0.292.0: the credential is valid, it just lacks the
+    # scope, and re-pairing is not the remedy (#207).
+    assert resp.status_code == 403
 
 
 def test_device_preview_requires_auth(app: Flask) -> None:
     resp = app.test_client().get("/api/app/v1/devices/kitchen/preview")
+    # No credential at all is still 401; only a scope miss became 403.
     assert resp.status_code == 401
 
 
@@ -406,7 +409,9 @@ def test_dashboard_preview_requires_dashboards_read_scope(app: Flask) -> None:
     token = _token(app)
     app.config["COMPANION_TOKENS"].list_active()[0].scopes = ["devices:read"]
     resp = app.test_client().get("/api/app/v1/dashboards/pantry/preview", headers=_auth(token))
-    assert resp.status_code == 401
+    # 403 since v0.292.0: the credential is valid, it just lacks the
+    # scope, and re-pairing is not the remedy (#207).
+    assert resp.status_code == 403
 
 
 # -- capability advertisement --------------------------------------------

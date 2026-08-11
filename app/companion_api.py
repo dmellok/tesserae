@@ -40,6 +40,7 @@ from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from flask import Blueprint, Flask, current_app, g, jsonify, request, url_for
+from pydantic import ValidationError
 from werkzeug.wrappers import Response
 
 from app.companion_history import (
@@ -52,7 +53,12 @@ from app.companion_history import (
     retained_resend_composition_for_row,
 )
 from app.companion_jobs import CompanionJobs, JobOutcome
-from app.companion_lineups import lineup_dict
+from app.companion_lineups import (
+    _web_only_reason,
+    apply_patch,
+    lineup_dict,
+    lineup_etag,
+)
 from app.data_change_refresh import (
     DataChangeEvent,
     personal_data_delete_event,
@@ -60,6 +66,7 @@ from app.data_change_refresh import (
 )
 from app.device_loader import Device, DeviceRegistry
 from app.device_preview import retained_device_preview
+from app.lineup_authoring import build_lineup
 from app.net_guard import BlockedURLError, assert_public_url
 from app.panel import device_panel, resolve_settings_panel
 from app.quiet_hours import device_is_quiet
@@ -136,6 +143,7 @@ FEATURES = (
     # it can't until the write path behind #204 exists.
     "lineups",
     "lineup_control",
+    "lineup_authoring",
 )
 
 _PAIRING_CODE_RE = re.compile(r"^[0-9]{6,12}$")
@@ -292,7 +300,16 @@ def _require_companion(*scopes: str) -> Callable[[Callable[..., Any]], Callable[
                 return _error("unauthorized", "Missing, invalid, or revoked credential.", 401)
             missing = [s for s in scopes if s not in record.scopes]
             if missing:
-                return _error("unauthorized", "Credential lacks the required scope.", 401)
+                # 403, not 401: the credential is valid and re-pairing won't
+                # help. An optional scope is an operator toggle in Settings,
+                # so answering 401 sends a client off to re-pair and land in
+                # exactly the same place (#207).
+                return _error(
+                    "forbidden",
+                    "This app hasn't been given permission for that. "
+                    "Grant it in Settings, Companion.",
+                    403,
+                )
             g.companion = record
             return fn(*args, **kwargs)
 
@@ -912,28 +929,7 @@ def _lineup_views() -> list[dict[str, Any]]:
     store = _decks()
     if store is None:
         return []
-    page_names = {p.id: (p.name or p.id) for p in _pages().list()}
-    nav = _deck_nav()
-    out: list[dict[str, Any]] = []
-    for deck in store.all():
-        current: dict[str, str] = {}
-        if nav is not None:
-            for device_id in deck.device_ids:
-                page_id = nav.current_page(device_id, deck.id)
-                if page_id:
-                    current[device_id] = page_id
-        out.append(
-            lineup_dict(
-                deck,
-                page_names=page_names,
-                current_pages=current,
-                # Resolved from the routing table, not spelled out: the
-                # editor is the only GET a deck id has, and a literal path
-                # here was a 404 for four releases (#203).
-                web_url=url_for("decks.editor", deck_id=deck.id),
-            )
-        )
-    return out
+    return [_lineup_view(deck) for deck in store.all()]
 
 
 @bp.get("/lineups")
@@ -942,13 +938,162 @@ def list_lineups() -> Any:
     return jsonify({"lineups": _lineup_views()})
 
 
+def _lineup_view(deck: Any) -> dict[str, Any]:
+    """One Lineup's projection, for the routes that already hold the record."""
+    page_names = {p.id: (p.name or p.id) for p in _pages().list()}
+    nav = _deck_nav()
+    current: dict[str, str] = {}
+    if nav is not None:
+        for device_id in deck.device_ids:
+            page_id = nav.current_page(device_id, deck.id)
+            if page_id:
+                current[device_id] = page_id
+    return lineup_dict(
+        deck,
+        page_names=page_names,
+        current_pages=current,
+        web_url=url_for("decks.editor", deck_id=deck.id),
+    )
+
+
+def _lineup_response(deck: Any, status: int = 200) -> Any:
+    """A Lineup plus its version tag. The ETag is what a later PATCH sends
+    back as ``If-Match``, so every response that hands out a record also
+    hands out the token needed to edit it safely."""
+    resp = jsonify({"lineup": _lineup_view(deck)})
+    resp.status_code = status
+    resp.headers["ETag"] = f'"{lineup_etag(deck)}"'
+    return resp
+
+
 @bp.get("/lineups/<lineup_id>")
 @_require_companion("lineups:read")
 def get_lineup(lineup_id: str) -> Any:
-    for view in _lineup_views():
-        if view["id"] == lineup_id:
-            return jsonify({"lineup": view})
-    return _error("not_found", "No lineup with that id.", 404)
+    store = _decks()
+    deck = store.get(lineup_id) if store is not None else None
+    if deck is None:
+        return _error("not_found", "No lineup with that id.", 404)
+    return _lineup_response(deck)
+
+
+@bp.post("/lineups")
+@_require_companion("lineups:write")
+def create_lineup() -> Any:
+    """Author a Lineup from one of the four intents.
+
+    Goes through the same builder the web wizard uses (#204), so a Lineup
+    made from the app and one made from the web are the same record made
+    the same way, and neither carries fields the other can't represent.
+    """
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return _error("invalid_request", "A JSON object body is required.", 400)
+    store = _decks()
+    if store is None:
+        return _error("temporarily_unavailable", "Lineups are not available.", 503)
+
+    name = str(body.get("name") or "").strip()
+    page_ids = [str(p) for p in (body.get("page_ids") or []) if p]
+    device_ids = _valid_target_ids(body.get("device_ids")) if "device_ids" in body else []
+    if device_ids is None:
+        return _error("invalid_target", "One or more target displays are unknown.", 400)
+    # A dashboard that doesn't exist would create a Lineup whose steps can
+    # never render, so it's refused here rather than surfacing later as a
+    # missing row on a card.
+    known = {p.id for p in _pages().list()}
+    unknown = [p for p in page_ids if p not in known]
+    if unknown:
+        return _error("not_found", f"No dashboard with id {unknown[0]!r}.", 404)
+
+    try:
+        deck = build_lineup(
+            intent=str(body.get("intent") or "").strip().lower(),
+            lineup_id=_unique_lineup_id(store, name),
+            name=name or "Lineup",
+            page_ids=page_ids,
+            device_ids=device_ids,
+            dwell_minutes={str(k): int(v) for k, v in (body.get("dwell_minutes") or {}).items()},
+            interval_minutes=int(body.get("interval_minutes") or 30),
+            fires_at=str(body.get("fires_at") or "") or None,
+            anchor=str(body.get("anchor") or "00:00") or "00:00",
+        )
+    except (ValidationError, ValueError, TypeError) as err:
+        return _error("invalid_request", f"Invalid lineup: {err}", 400)
+
+    store.upsert(deck)
+    # Binding an unassigned dashboard is the server's job, and opt-in: the
+    # app asks for it rather than the server deciding, so a dashboard that
+    # lives on another display is never quietly moved (#203).
+    if body.get("bind_unassigned_dashboards") and deck.device_ids:
+        display = deck.device_ids[0]
+        pages = _pages()
+        for page in (pages.get(p.page_id) for p in deck.pages):
+            if page is not None and not page.device_ids:
+                pages.save(page.model_copy(update={"device_ids": [display]}))
+    return _lineup_response(deck, 201)
+
+
+@bp.patch("/lineups/<lineup_id>")
+@_require_companion("lineups:write")
+def update_lineup(lineup_id: str) -> Any:
+    """Edit a Lineup the app can represent completely.
+
+    Two refusals matter more than the edit itself. A record using anything
+    outside the four intents is web-only, because a partial write from a
+    client that can't see those fields would flatten them. And a stale
+    ``If-Match`` is rejected rather than applied, because the web editor is
+    very likely the other writer.
+    """
+    store = _decks()
+    deck = store.get(lineup_id) if store is not None else None
+    if deck is None:
+        return _error("not_found", "No lineup with that id.", 404)
+
+    reason = _web_only_reason(deck)
+    if reason is not None:
+        return _error(
+            "invalid_request",
+            f"This lineup {reason} and can only be edited in the web editor.",
+            400,
+        )
+
+    presented = (request.headers.get("If-Match") or "").strip().strip('"')
+    if not presented:
+        return _error("invalid_request", "If-Match is required to edit a lineup.", 400)
+    if presented != lineup_etag(deck):
+        return _error(
+            "precondition_failed",
+            "The lineup changed since you loaded it; re-read it and try again.",
+            412,
+        )
+
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return _error("invalid_request", "A JSON object body is required.", 400)
+    if "device_ids" in body and _valid_target_ids(body.get("device_ids")) is None:
+        return _error("invalid_target", "One or more target displays are unknown.", 400)
+    try:
+        updated = apply_patch(deck, body)
+    except (ValidationError, ValueError, TypeError) as err:
+        return _error("invalid_request", f"Invalid lineup: {err}", 400)
+
+    store.upsert(updated)
+    return _lineup_response(updated)
+
+
+def _unique_lineup_id(store: Any, name: str) -> str:
+    """Slug the name, then suffix until it's free. Mirrors the web wizard so
+    an id looks the same whichever surface made it."""
+    import re as _re
+
+    base = _re.sub(r"[^a-z0-9]+", "_", name.strip().lower()).strip("_") or "lineup"
+    taken = {d.id for d in store.all()}
+    if base not in taken:
+        return base
+    i = 2
+    while f"{base}_{i}" in taken:
+        i += 1
+    return f"{base}_{i}"
 
 
 # Actions that only change stored state, versus those that repaint a panel.

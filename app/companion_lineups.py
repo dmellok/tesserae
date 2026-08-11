@@ -19,9 +19,11 @@ mypy --strict applies to this module, see pyproject.toml.
 
 from __future__ import annotations
 
+import hashlib
+import json
 from typing import Any
 
-from app.state.deck_model import Deck
+from app.state.deck_model import Deck, DeckPage
 
 # The four authoring intents the setup wizard offers, which are also the
 # only ones a native client can round-trip. Mapped from the internal
@@ -71,6 +73,94 @@ def _web_only_reason(deck: Deck) -> str | None:
     if any(page.refresh_interval_minutes for page in deck.pages):
         return "has a per-dashboard refresh override"
     return None
+
+
+def lineup_etag(deck: Deck) -> str:
+    """A version tag for one Lineup, for optimistic concurrency.
+
+    Hashes the stored record, so any edit from any surface changes it. The
+    app sends it back as ``If-Match`` and a stale one is refused rather
+    than applied: two people editing the same Lineup is ordinary in a
+    household, and the web editor is the other one (#206)."""
+    payload = json.dumps(deck.model_dump(mode="json"), sort_keys=True, default=str)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+
+
+# Fields a native client may set. Anything outside this list is either
+# derived (``intent``), internal (``legacy_kind``), or beyond the four
+# authoring intents, and is refused rather than silently dropped so a
+# client can't believe it wrote something it didn't.
+PATCHABLE = frozenset(
+    {
+        "name",
+        "enabled",
+        "device_ids",
+        "page_ids",
+        "dwell_minutes",
+        "interval_minutes",
+        "fires_at",
+        "anchor",
+    }
+)
+
+
+def apply_patch(deck: Deck, body: dict[str, Any]) -> Deck:
+    """A partial edit laid over the stored record. Raises ValueError.
+
+    Every field the body doesn't mention keeps its stored value. That's the
+    whole contract: a client that understands six fields must not flatten
+    the twenty a Lineup can hold, and the only way to guarantee that is to
+    start from what's stored rather than rebuild from the request (#203).
+    """
+    unknown = sorted(set(body) - PATCHABLE)
+    if unknown:
+        raise ValueError(f"cannot edit {', '.join(unknown)} from the app")
+
+    changes: dict[str, Any] = {}
+    if "name" in body:
+        name = str(body["name"] or "").strip()
+        if not name:
+            raise ValueError("name cannot be empty")
+        changes["name"] = name
+    if "enabled" in body:
+        changes["enabled"] = bool(body["enabled"])
+    if "device_ids" in body:
+        changes["device_ids"] = [str(d) for d in body["device_ids"] or []]
+    if "interval_minutes" in body:
+        changes["advance_interval_minutes"] = max(1, int(body["interval_minutes"]))
+    if "fires_at" in body:
+        changes["advance_fires_at"] = str(body["fires_at"] or "") or None
+    if "anchor" in body:
+        changes["advance_anchor"] = str(body["anchor"] or "00:00") or "00:00"
+
+    # Reordering or re-picking the dashboards rebuilds the page list, but
+    # each page keeps whatever else it carried (links, conditions, its own
+    # refresh override) when it survives the edit.
+    if "page_ids" in body:
+        page_ids = [str(p) for p in body["page_ids"] or [] if p]
+        if not page_ids:
+            raise ValueError("a lineup needs at least one dashboard")
+        dwell = {str(k): int(v) for k, v in (body.get("dwell_minutes") or {}).items()}
+        existing = {page.page_id: page for page in deck.pages}
+        rebuilt = []
+        for page_id in page_ids:
+            page = existing.get(page_id)
+            if page is None:
+                page = DeckPage(page_id=page_id)
+            if page_id in dwell:
+                page = page.model_copy(update={"dwell_minutes": dwell[page_id] or None})
+            rebuilt.append(page)
+        changes["pages"] = rebuilt
+    elif "dwell_minutes" in body:
+        dwell = {str(k): int(v) for k, v in (body.get("dwell_minutes") or {}).items()}
+        changes["pages"] = [
+            page.model_copy(update={"dwell_minutes": dwell[page.page_id] or None})
+            if page.page_id in dwell
+            else page
+            for page in deck.pages
+        ]
+
+    return deck.model_copy(update=changes)
 
 
 def lineup_dict(
