@@ -176,9 +176,10 @@
        fields are absent, so the layout survives a cell-option save. #}
 
     {% set cell_opts = plugin_cell_options.get(plugin.id, []) %}
-    {% if plugin.on_change_updates %}
+    {% if plugin.on_change_updates or plugin.on_schedule_updates %}
     <fieldset class="form-group">
       <legend>Updates</legend>
+      {% if plugin.on_change_updates %}
       <input type="hidden" name="update_on_change_present" value="1">
       <label class="switch dx-cell-tweak-switch">
         <input type="checkbox" name="update_on_change" value="1"
@@ -186,6 +187,37 @@
         <span>Refresh when this widget's data changes</span>
       </label>
       <p class="field-help">Off by default. When enabled, a matching data-change event may refresh this dashboard only on displays already showing it; it never selects or advances a dashboard.</p>
+      {% endif %}
+      {% if plugin.on_schedule_updates %}
+      {% set schedule_spec = plugin.on_schedule_updates[0] %}
+      {% set schedule_at = cell.update_schedule.at if cell.update_schedule else none %}
+      <input type="hidden" name="update_schedule_present" value="1">
+      <label class="switch dx-cell-tweak-switch">
+        <input type="checkbox" name="update_schedule_enabled" value="1"
+               {% if cell.update_schedule %}checked{% endif %}>
+        <span>Refresh daily</span>
+      </label>
+      <p class="field-help">Off by default. Without a custom time, refreshes after the local day changes. It updates this widget's dashboard without selecting or advancing it.</p>
+      <details class="advanced-options" {% if schedule_at %}open{% endif %}>
+        <summary>Custom refresh time</summary>
+        <label class="radio-row">
+          <input type="radio" name="update_schedule_timing" value="boundary"
+                 {% if not schedule_at %}checked{% endif %}>
+          <span>At the local day boundary</span>
+        </label>
+        <label class="radio-row">
+          <input type="radio" name="update_schedule_timing" value="custom"
+                 {% if schedule_at %}checked{% endif %}>
+          <span>At a specific time</span>
+        </label>
+        <label>
+          Time
+          <input type="time" name="update_schedule_at"
+                 value="{{ schedule_at or schedule_spec.get('suggested_at', '07:00') }}">
+        </label>
+        <p class="field-help">The suggested time is only a prefill. It is saved only when “At a specific time” is selected.</p>
+      </details>
+      {% endif %}
     </fieldset>
     {% endif %}
     {% if cell_opts %}

@@ -50,7 +50,10 @@ def app(tmp_path: Path) -> Flask:
             {"name": "show_date", "type": "boolean", "label": "Show date", "default": True},
             {"name": "show_seconds", "type": "boolean", "label": "Show seconds", "default": False},
         ],
-        updates={"on_change": [{"source": "test.clock", "selector_option": "format"}]},
+        updates={
+            "on_change": [{"source": "test.clock", "selector_option": "format"}],
+            "on_schedule": [{"kind": "daily", "suggested_at": "07:00"}],
+        },
     )
     _write_test_plugin(plugins_dir / "widget_b", cell_options=[])
     _write_test_plugin(
@@ -855,6 +858,82 @@ def test_grid_editor_only_shows_update_switch_for_capable_widget(
     client.post(f"/pages/{pid}/cells/{cell_id}", data={"plugin": "widget_b"})
     html = client.get(f"/pages/{pid}").get_data(as_text=True)
     assert 'name="update_on_change"' not in html
+
+
+def test_update_schedule_defaults_to_boundary_and_preserves_partial_posts(
+    app: Flask, tmp_path: Path
+) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    pid = _new(client, name="Home", layout="1_cell")
+    cell_id = _store(tmp_path).get(pid).cells[0].id
+    client.post(f"/pages/{pid}/cells/{cell_id}", data={"plugin": "widget_a"})
+
+    client.post(
+        f"/pages/{pid}/cells/{cell_id}",
+        data={
+            "plugin": "widget_a",
+            "update_schedule_present": "1",
+            "update_schedule_enabled": "1",
+            "update_schedule_timing": "boundary",
+            "update_schedule_at": "07:00",
+        },
+    )
+    schedule = _store(tmp_path).get(pid).cells[0].update_schedule
+    assert schedule is not None and schedule.at is None
+
+    client.post(f"/pages/{pid}/cells/{cell_id}", data={"plugin": "widget_a", "zoom": "1.2"})
+    schedule = _store(tmp_path).get(pid).cells[0].update_schedule
+    assert schedule is not None and schedule.at is None
+
+    client.post(
+        f"/pages/{pid}/cells/{cell_id}",
+        data={
+            "plugin": "widget_a",
+            "update_schedule_present": "1",
+            "update_schedule_enabled": "1",
+            "update_schedule_timing": "custom",
+            "update_schedule_at": "08:30",
+        },
+    )
+    schedule = _store(tmp_path).get(pid).cells[0].update_schedule
+    assert schedule is not None and schedule.at == "08:30"
+
+    # Clearing a custom time falls back to the day boundary without rejecting
+    # the rest of the cell form.
+    client.post(
+        f"/pages/{pid}/cells/{cell_id}",
+        data={
+            "plugin": "widget_a",
+            "zoom": "1.4",
+            "update_schedule_present": "1",
+            "update_schedule_enabled": "1",
+            "update_schedule_timing": "custom",
+            "update_schedule_at": "",
+        },
+    )
+    cell = _store(tmp_path).get(pid).cells[0]
+    assert cell.zoom == 1.4
+    assert cell.update_schedule is not None and cell.update_schedule.at is None
+
+    client.post(f"/pages/{pid}/cells/{cell_id}", data={"plugin": "widget_b"})
+    assert _store(tmp_path).get(pid).cells[0].update_schedule is None
+
+
+def test_grid_editor_only_shows_schedule_for_capable_widget(app: Flask, tmp_path: Path) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    pid = _new(client, name="Home", layout="1_cell")
+    cell_id = _store(tmp_path).get(pid).cells[0].id
+
+    client.post(f"/pages/{pid}/cells/{cell_id}", data={"plugin": "widget_a"})
+    html = client.get(f"/pages/{pid}").get_data(as_text=True)
+    assert 'name="update_schedule_enabled"' in html
+    assert 'value="07:00"' in html
+
+    client.post(f"/pages/{pid}/cells/{cell_id}", data={"plugin": "widget_b"})
+    html = client.get(f"/pages/{pid}").get_data(as_text=True)
+    assert 'name="update_schedule_enabled"' not in html
 
 
 def test_update_cell_zoom_round_trips(app: Flask, tmp_path: Path) -> None:

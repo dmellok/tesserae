@@ -205,6 +205,16 @@ class _FakePlugin:
     def name(self) -> str:
         return str(self.manifest["name"])
 
+    @property
+    def on_schedule_updates(self) -> list[dict[str, str]]:
+        updates = self.manifest.get("updates")
+        raw = updates.get("on_schedule") if isinstance(updates, dict) else None
+        if not isinstance(raw, list):
+            return []
+        return [
+            dict(spec) for spec in raw if isinstance(spec, dict) and spec.get("kind") == "daily"
+        ]
+
 
 class _FakeRegistry:
     def __init__(self, plugins: list[_FakePlugin]) -> None:
@@ -243,16 +253,24 @@ def test_catalog_entry_shape() -> None:
             "name": "W",
             "icon": "ph-x",
             "description": "d",
-            "updates": {"on_change": [{"source": "personal_data.reminders"}]},
+            "updates": {
+                "on_change": [{"source": "personal_data.reminders"}],
+                "on_schedule": [
+                    {"kind": "daily", "suggested_at": "07:00"},
+                    {"kind": "weekly"},
+                ],
+            },
         },
     )
     entry = catalog_entry(p)  # type: ignore[arg-type]
     assert entry["key"] == "w" and entry["icon"] == "ph-x"
     assert [f["id"] for f in entry["fragments"]] == ["full"]
     assert entry["updates_on_change"] is True
+    assert entry["updates_on_schedule"] == [{"kind": "daily", "suggested_at": "07:00"}]
 
     plain = catalog_entry(_FakePlugin("plain", {"name": "Plain"}))  # type: ignore[arg-type]
     assert plain["updates_on_change"] is False
+    assert plain["updates_on_schedule"] == []
 
 
 def test_build_catalog_sorts_by_name() -> None:
@@ -626,7 +644,7 @@ def test_save_and_doc_roundtrip(app: Flask, monkeypatch: pytest.MonkeyPatch) -> 
     assert doc["name"] == "My Panel" and doc["els"][0]["widget"] == "weather_now"
 
 
-def test_save_coerces_update_on_change_to_manifest_capability(
+def test_save_coerces_update_policies_to_manifest_capabilities(
     app: Flask, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """The save endpoint, not only the editor UI, owns placement policy.
@@ -641,7 +659,10 @@ def test_save_coerces_update_on_change_to_manifest_capability(
     monkeypatch.setitem(
         weather.manifest,
         "updates",
-        {"on_change": [{"source": "test.weather"}]},
+        {
+            "on_change": [{"source": "test.weather"}],
+            "on_schedule": [{"kind": "daily", "suggested_at": "07:00"}],
+        },
     )
     client = app.test_client()
     _sign_in(client)
@@ -654,16 +675,19 @@ def test_save_coerces_update_on_change_to_manifest_capability(
                     "id": "capable",
                     "widget": "weather_now",
                     "update_on_change": True,
+                    "update_schedule": {"kind": "daily"},
                 },
                 {
                     "id": "unsupported",
                     "widget": "clock_analog",
                     "update_on_change": True,
+                    "update_schedule": {"kind": "daily", "at": "08:30"},
                 },
                 {
                     "id": "decoration",
                     "kind": "line",
                     "update_on_change": True,
+                    "update_schedule": {"kind": "daily"},
                 },
             ]
         },
@@ -672,8 +696,11 @@ def test_save_coerces_update_on_change_to_manifest_capability(
     doc = client.get(f"/pages/canvas/c/{cid}/doc.json").get_json()
     by_id = {element["id"]: element for element in doc["els"]}
     assert by_id["capable"]["update_on_change"] is True
+    assert by_id["capable"]["update_schedule"] == {"kind": "daily", "at": None}
     assert by_id["unsupported"]["update_on_change"] is False
+    assert by_id["unsupported"]["update_schedule"] is None
     assert by_id["decoration"]["update_on_change"] is False
+    assert by_id["decoration"]["update_schedule"] is None
 
 
 def test_canvas_management(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
