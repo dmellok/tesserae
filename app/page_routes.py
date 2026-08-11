@@ -1271,7 +1271,10 @@ def _update_schedule_from_form(form: Any, current: Any, *, supported: bool) -> A
         return None
     if form.get("update_schedule_timing") != "custom":
         return WidgetUpdateSchedule(kind="daily")
-    return WidgetUpdateSchedule(kind="daily", at=(form.get("update_schedule_at") or ""))
+    custom_at = str(form.get("update_schedule_at") or "").strip()
+    if not custom_at:
+        return WidgetUpdateSchedule(kind="daily")
+    return WidgetUpdateSchedule(kind="daily", at=custom_at)
 
 
 def _touch_from_form(form: Any, cell: Cell) -> dict[str, Any]:

@@ -205,6 +205,16 @@ class _FakePlugin:
     def name(self) -> str:
         return str(self.manifest["name"])
 
+    @property
+    def on_schedule_updates(self) -> list[dict[str, str]]:
+        updates = self.manifest.get("updates")
+        raw = updates.get("on_schedule") if isinstance(updates, dict) else None
+        if not isinstance(raw, list):
+            return []
+        return [
+            dict(spec) for spec in raw if isinstance(spec, dict) and spec.get("kind") == "daily"
+        ]
+
 
 class _FakeRegistry:
     def __init__(self, plugins: list[_FakePlugin]) -> None:
@@ -245,7 +255,10 @@ def test_catalog_entry_shape() -> None:
             "description": "d",
             "updates": {
                 "on_change": [{"source": "personal_data.reminders"}],
-                "on_schedule": [{"kind": "daily", "suggested_at": "07:00"}],
+                "on_schedule": [
+                    {"kind": "daily", "suggested_at": "07:00"},
+                    {"kind": "weekly"},
+                ],
             },
         },
     )

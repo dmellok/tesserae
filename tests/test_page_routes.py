@@ -899,6 +899,23 @@ def test_update_schedule_defaults_to_boundary_and_preserves_partial_posts(
     schedule = _store(tmp_path).get(pid).cells[0].update_schedule
     assert schedule is not None and schedule.at == "08:30"
 
+    # Clearing a custom time falls back to the day boundary without rejecting
+    # the rest of the cell form.
+    client.post(
+        f"/pages/{pid}/cells/{cell_id}",
+        data={
+            "plugin": "widget_a",
+            "zoom": "1.4",
+            "update_schedule_present": "1",
+            "update_schedule_enabled": "1",
+            "update_schedule_timing": "custom",
+            "update_schedule_at": "",
+        },
+    )
+    cell = _store(tmp_path).get(pid).cells[0]
+    assert cell.zoom == 1.4
+    assert cell.update_schedule is not None and cell.update_schedule.at is None
+
     client.post(f"/pages/{pid}/cells/{cell_id}", data={"plugin": "widget_b"})
     assert _store(tmp_path).get(pid).cells[0].update_schedule is None
 

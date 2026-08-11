@@ -81,11 +81,7 @@ def catalog_entry(plugin: Plugin) -> dict[str, Any]:
             isinstance(plugin.manifest.get("updates"), dict)
             and plugin.manifest["updates"].get("on_change")
         ),
-        "updates_on_schedule": (
-            plugin.manifest["updates"].get("on_schedule", [])
-            if isinstance(plugin.manifest.get("updates"), dict)
-            else []
-        ),
+        "updates_on_schedule": [dict(spec) for spec in plugin.on_schedule_updates],
     }
 
 

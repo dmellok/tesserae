@@ -2600,20 +2600,29 @@
         timeInput.type = "time";
         timeInput.value = e.update_schedule.at || scheduleSpec.suggested_at || "07:00";
         timeRow.appendChild(timeInput); timeDetails.appendChild(timeRow);
-        var useTime = el("button", "minibtn",
-          e.update_schedule.at ? "Use day boundary" : "Use this time");
+        var timeActions = el("div", "prow");
+        var useTime = el("button", "minibtn", "Use this time");
         useTime.type = "button";
         useTime.addEventListener("click", function () {
           if (!e.update_schedule) return;
+          if (!timeInput.value || timeInput.value === e.update_schedule.at) return;
           pushHistory();
-          if (e.update_schedule.at) {
-            e.update_schedule = {kind: "daily"};
-          } else if (timeInput.value) {
-            e.update_schedule = {kind: "daily", at: timeInput.value};
-          }
+          e.update_schedule = {kind: "daily", at: timeInput.value};
           scheduleSave(); paint();
         });
-        timeDetails.appendChild(useTime);
+        timeActions.appendChild(useTime);
+        if (e.update_schedule.at) {
+          var useBoundary = el("button", "minibtn", "Use day boundary");
+          useBoundary.type = "button";
+          useBoundary.addEventListener("click", function () {
+            if (!e.update_schedule) return;
+            pushHistory();
+            e.update_schedule = {kind: "daily"};
+            scheduleSave(); paint();
+          });
+          timeActions.appendChild(useBoundary);
+        }
+        timeDetails.appendChild(timeActions);
         timeDetails.appendChild(el("div", "note",
           "The suggested time is only a prefill; click Use this time to save it."));
         mount.appendChild(timeDetails);
