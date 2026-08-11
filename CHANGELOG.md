@@ -4,6 +4,19 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.294.1], 2026-08-12
+
+### Fixed
+
+- **A plugin's admin page no longer answers unauthenticated requests.**
+  `/plugins/<id>/` matched the rule that exempts plugin *assets*
+  (`/plugins/<id>/client.js`) from the auth gate, because its trailing slash
+  left a non-empty first segment, which was all the check tested for. Every
+  plugin admin page was therefore reachable without a session from loopback,
+  contrary to the comment on the rule, which reserves the exemption for the
+  assets the in-process renderer fetches while composing. Both segments must
+  now be non-empty; renderer asset fetches are unaffected.
+
 ## [0.294.0], 2026-08-12
 
 ### Added
