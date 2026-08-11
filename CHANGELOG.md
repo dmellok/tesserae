@@ -4,6 +4,24 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.293.1], 2026-08-12
+
+### Added
+
+- **A cell option can be filled and locked by another option, `fill_from`.**
+  An option names the option that owns its value plus a value map; the editor
+  fills the field from the controlling option's current value and renders it
+  read-only, so it stays visible and stays in the POST. Suits presets that
+  supply a set of endpoints together, where mixing one preset's value with
+  another's is never valid.
+
+### Fixed
+
+- **`choices_from` dropdowns are no longer empty in the widget preview.** The
+  preview read the raw manifest, so every dynamically-populated dropdown
+  rendered with no choices for every widget that uses one. It now materialises
+  options through the same helper the page editor uses.
+
 ## [0.293.0], 2026-08-12
 
 ### Added

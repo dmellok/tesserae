@@ -223,10 +223,16 @@
     {% if cell_opts %}
     <fieldset class="form-group">
       <legend>{{ plugin.name }} options</legend>
+      {#- ``fill_from`` lets one option own another's value: the owning
+         option's current value is looked up in the map, and a hit fills the
+         dependent field and locks it (still submitted, just not editable).
+         Widgets use it for "pick a preset and the URLs follow". -#}
       {% for opt in cell_opts %}
         {% set field_id = 'cell-' ~ cell.id ~ '-opt-' ~ opt.name %}
-        {% set value = cell.options.get(opt.name, opt.get('default', '')) %}
-        {{ auto_field(field_id, 'opt_' ~ opt.name, opt, value) }}
+        {% set fill = opt.get('fill_from') %}
+        {% set filled = fill.get('map', {}).get(cell.options.get(fill.get('option'))) if fill else none %}
+        {% set value = filled if filled is not none else cell.options.get(opt.name, opt.get('default', '')) %}
+        {{ auto_field(field_id, 'opt_' ~ opt.name, opt, value, readonly=filled is not none) }}
       {% endfor %}
     </fieldset>
     {% endif %}

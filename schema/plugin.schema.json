@@ -86,7 +86,17 @@
               }
             }
           },
-          "choices_from": { "type": "string" }
+          "choices_from": { "type": "string" },
+          "fill_from": {
+            "type": "object",
+            "description": "Another option owns this field's value; the editor fills it and locks it. Resolved server-side, so the field updates on reload after a save rather than the instant the controlling option changes. See docs/widgets.md.",
+            "required": ["option", "map"],
+            "properties": {
+              "option": { "type": "string", "description": "Name of the controlling cell option." },
+              "map": { "type": "object", "description": "Controlling value -> value for this field." }
+            }
+          },
+          "help": { "type": "string" }
         }
       }
     },

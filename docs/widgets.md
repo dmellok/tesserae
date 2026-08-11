@@ -114,6 +114,12 @@ lowercase `[a-z0-9_]` is convention, not enforced. Name it `<family>_<role>`
   cross-widget shape selection. If a widget needs a genuine layout
   shape choice (e.g. `stack` vs `side`), name the option `layout` and
   use shape-describing values.
+* **Careful with an option named `label`.** The host promotes the app-level
+  Settings location into every widget's options and fills a blank `label`
+  with the place name (see `_resolved_options` in `app/composer.py`). That's
+  the intent for weather-style widgets; for anything else it means a cell
+  titled "Melbourne" for no reason. Name the option something else
+  (`title`) if it isn't a place.
 * **`settings`**, plugin-wide knobs (one set across all cells using
   this widget). Surfaces in `/settings/plugins/<id>`. `secret: true`
   stores under `<name>_secret` in `settings.json` so an on-disk grep
@@ -216,6 +222,31 @@ catalog, `glances_status` → `glances_core` if you install the
 monitoring bundle). The Dev Reference Bundle
 (`devref_card` → `devref_core`) is a worked example you can
 install from the catalog and read end-to-end.
+
+### Fields another option fills, `fill_from`
+
+An option can declare that another option owns its value. The editor looks
+the controlling option's current value up in a map; a hit fills the field
+and renders it read-only (still submitted, so the value survives a save).
+
+```jsonc
+{
+  "name": "rt_url",
+  "type": "string",
+  "label": "Realtime URL",
+  "fill_from": {
+    "option": "preset",
+    "map": { "acme_north": "https://feeds.example.org/north" }
+  }
+}
+```
+
+The pattern suits "pick a preset and the URLs follow": a cell can't end up
+pairing one provider's endpoint with another's. Resolution is server-side,
+so the fields update when the page reloads after a save, not the instant
+the select changes. A widget whose behaviour depends on the filled value
+should re-derive it from the controlling option in `fetch()` rather than
+trusting what a single save persisted.
 
 ### Companion `_core` plugins
 
