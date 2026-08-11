@@ -1206,11 +1206,17 @@ def _apply_cell_form(cell: Cell, form: Any, panel: Any) -> Cell:
         # The opt-in belongs to the old widget dependency, not merely the box.
         # A newly selected widget always starts at the contract default (off).
         update_on_change = False
+        update_schedule = None
     else:
         update_on_change = _update_on_change_from_form(
             form,
             cell.update_on_change,
             supported=bool(plugin and plugin.on_change_updates),
+        )
+        update_schedule = _update_schedule_from_form(
+            form,
+            cell.update_schedule,
+            supported=bool(plugin and plugin.on_schedule_updates),
         )
     return cell.model_copy(
         update={
@@ -1224,6 +1230,7 @@ def _apply_cell_form(cell: Cell, form: Any, panel: Any) -> Cell:
             "font": (form.get("font") or None),
             "options": options,
             "update_on_change": update_on_change,
+            "update_schedule": update_schedule,
             "zoom": _coerce_float(form.get("zoom"), cell.zoom, lo=0.5, hi=3.0),
             "padding_override": _padding_override_from_form(form, cell.padding_override),
             "dither": _dither_override_from_form(form, cell.dither),
@@ -1245,6 +1252,26 @@ def _update_on_change_from_form(form: Any, current: bool, *, supported: bool) ->
     if "update_on_change_present" not in form:
         return current
     return form.get("update_on_change") in ("1", "true", "on")
+
+
+def _update_schedule_from_form(form: Any, current: Any, *, supported: bool) -> Any:
+    """Parse the daily schedule without clearing it on partial form posts.
+
+    The presence marker follows the on-change control's round-trip contract.
+    Enabling the default stores no ``at`` value (local day boundary). A time is
+    persisted only when the user explicitly selects the custom-time mode.
+    """
+    from app.state.widget_update_schedule import WidgetUpdateSchedule
+
+    if not supported:
+        return None
+    if "update_schedule_present" not in form:
+        return current
+    if form.get("update_schedule_enabled") not in ("1", "true", "on"):
+        return None
+    if form.get("update_schedule_timing") != "custom":
+        return WidgetUpdateSchedule(kind="daily")
+    return WidgetUpdateSchedule(kind="daily", at=(form.get("update_schedule_at") or ""))
 
 
 def _touch_from_form(form: Any, cell: Cell) -> dict[str, Any]:
@@ -1479,6 +1506,7 @@ _CELL_CONTENT_FIELDS: Final = (
     "on_swipe",
     "on_slide",
     "update_on_change",
+    "update_schedule",
 )
 
 

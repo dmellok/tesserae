@@ -202,7 +202,8 @@
   function makeElement(widget, fragment, x, y, w, h) {
     return {
       id: uid(), kind: "widget", widget: widget || "", fragment: fragment || "full",
-      options: {}, update_on_change: false, x: x, y: y, w: w, h: h, opacity: 100,
+      options: {}, update_on_change: false, update_schedule: null,
+      x: x, y: y, w: w, h: h, opacity: 100,
       dither: true, visible: true, locked: false, group: null,
     };
   }
@@ -2523,6 +2524,7 @@
       e.fragment = frs.length ? frs[0].id : "full";
       e.options = {};
       e.update_on_change = false;
+      e.update_schedule = null;
       scheduleSave(); paint();
     });
     wrow.appendChild(wsel); mount.appendChild(wrow);
@@ -2547,12 +2549,15 @@
       cfgrow.appendChild(cfg); mount.appendChild(cfgrow);
     }
 
-    // Host-owned placement policy. The widget only declares that it can
-    // consume change events; each element opts in independently and defaults
-    // off. Actual event delivery lands in a later server stage.
+    // Host-owned placement update policies. Widgets declare which triggers
+    // they support; each element opts in independently and defaults off.
     var selectedWidget = widgetFor(e.widget);
-    if (selectedWidget && selectedWidget.updates_on_change) {
+    var scheduledSpecs = selectedWidget && Array.isArray(selectedWidget.updates_on_schedule)
+      ? selectedWidget.updates_on_schedule : [];
+    if (selectedWidget && (selectedWidget.updates_on_change || scheduledSpecs.length)) {
       mount.appendChild(el("div", "psec", '<i class="ph-bold ph-arrows-clockwise"></i>Updates'));
+    }
+    if (selectedWidget && selectedWidget.updates_on_change) {
       var urow = el("div", "prow");
       urow.innerHTML = '<span class="plab">Data changes</span>';
       var ubtn = el("button", "minibtn",
@@ -2567,6 +2572,52 @@
       urow.appendChild(ubtn); mount.appendChild(urow);
       mount.appendChild(el("div", "note",
         "Refreshes only displays already showing this dashboard. It never selects or advances a page."));
+    }
+    if (scheduledSpecs.some(function (spec) { return spec && spec.kind === "daily"; })) {
+      var scheduleSpec = scheduledSpecs.find(function (spec) { return spec && spec.kind === "daily"; }) || {};
+      var srow = el("div", "prow");
+      srow.innerHTML = '<span class="plab">Daily</span>';
+      var sbtn = el("button", "minibtn",
+        e.update_schedule
+          ? '<i class="ph-bold ph-check-square"></i> Refresh'
+          : '<i class="ph-bold ph-square"></i> Off');
+      sbtn.addEventListener("click", function () {
+        pushHistory();
+        e.update_schedule = e.update_schedule ? null : {kind: "daily"};
+        scheduleSave(); paint();
+      });
+      srow.appendChild(sbtn); mount.appendChild(srow);
+      mount.appendChild(el("div", "note",
+        "Uses the local day boundary by default. It refreshes or warms this dashboard without selecting it."));
+
+      if (e.update_schedule) {
+        var timeDetails = el("details", "pdetails");
+        if (e.update_schedule.at) timeDetails.open = true;
+        timeDetails.appendChild(el("summary", "", "Custom time"));
+        var timeRow = el("div", "prow");
+        timeRow.innerHTML = '<span class="plab">Time</span>';
+        var timeInput = el("input", "psel");
+        timeInput.type = "time";
+        timeInput.value = e.update_schedule.at || scheduleSpec.suggested_at || "07:00";
+        timeRow.appendChild(timeInput); timeDetails.appendChild(timeRow);
+        var useTime = el("button", "minibtn",
+          e.update_schedule.at ? "Use day boundary" : "Use this time");
+        useTime.type = "button";
+        useTime.addEventListener("click", function () {
+          if (!e.update_schedule) return;
+          pushHistory();
+          if (e.update_schedule.at) {
+            e.update_schedule = {kind: "daily"};
+          } else if (timeInput.value) {
+            e.update_schedule = {kind: "daily", at: timeInput.value};
+          }
+          scheduleSave(); paint();
+        });
+        timeDetails.appendChild(useTime);
+        timeDetails.appendChild(el("div", "note",
+          "The suggested time is only a prefill; click Use this time to save it."));
+        mount.appendChild(timeDetails);
+      }
     }
 
     // Fragment parts (scale individual pieces of the render).

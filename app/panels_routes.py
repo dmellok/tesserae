@@ -124,12 +124,21 @@ def _coerce_canvas_update_policy(page: Page) -> Page:
         plugin = (
             registry.get(element.widget) if element.kind == "widget" and element.widget else None
         )
-        supported = bool(plugin and plugin.on_change_updates)
-        coerced.append(
-            element
-            if supported or not element.update_on_change
-            else element.model_copy(update={"update_on_change": False})
+        on_change_supported = bool(plugin and plugin.on_change_updates)
+        schedule_supported = bool(
+            plugin
+            and element.update_schedule is not None
+            and any(
+                spec.get("kind") == element.update_schedule.kind
+                for spec in plugin.on_schedule_updates
+            )
         )
+        updates: dict[str, Any] = {}
+        if element.update_on_change and not on_change_supported:
+            updates["update_on_change"] = False
+        if element.update_schedule is not None and not schedule_supported:
+            updates["update_schedule"] = None
+        coerced.append(element.model_copy(update=updates) if updates else element)
     page.canvas.els = coerced
     return page
 
