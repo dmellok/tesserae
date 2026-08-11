@@ -20,6 +20,7 @@ from typing import Any
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.state.panel_store import CanvasLayout, CanvasStore
+from app.state.widget_update_schedule import WidgetUpdateSchedule
 
 logger = logging.getLogger(__name__)
 
@@ -113,6 +114,10 @@ class Cell(BaseModel):
     # the event coordinator (a later stage) will also require the current
     # plugin manifest to declare a matching source before acting on this bit.
     update_on_change: bool = False
+    # Optional host-owned daily refresh for time-dependent widget output.
+    # None is the compatibility default. The current plugin manifest must
+    # declare the matching ``updates.on_schedule`` kind before it can run.
+    update_schedule: WidgetUpdateSchedule | None = None
     # Per-cell content zoom. Inverse-sized at render time: the widget
     # paints into a 1/zoom virtual container that's transform-scaled back
     # up to the cell box, so text/icons grow without breaking layout. The

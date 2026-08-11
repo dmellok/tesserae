@@ -149,8 +149,11 @@
     },
     "updates": {
       "type": "object",
-      "description": "Declares data-change events this widget can subscribe to. The declaration only makes the per-placement opt-in available; it never refreshes a dashboard by itself.",
-      "required": ["on_change"],
+      "description": "Declares host-owned update triggers this widget supports. A declaration only makes the matching per-placement opt-in available; it never refreshes a dashboard by itself.",
+      "anyOf": [
+        { "required": ["on_change"] },
+        { "required": ["on_schedule"] }
+      ],
       "additionalProperties": false,
       "properties": {
         "on_change": {
@@ -173,6 +176,25 @@
                 "minLength": 1,
                 "maxLength": 128,
                 "description": "Optional cell_options name whose saved value narrows the dependency, for example list_id."
+              }
+            }
+          }
+        },
+        "on_schedule": {
+          "type": "array",
+          "description": "Scheduled refresh kinds supported by this widget. suggested_at only prefills the optional custom-time control; omitting a placement time means the local day boundary.",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "required": ["kind"],
+            "additionalProperties": false,
+            "properties": {
+              "kind": { "const": "daily" },
+              "suggested_at": {
+                "type": "string",
+                "pattern": "^(?:[01][0-9]|2[0-3]):[0-5][0-9]$",
+                "description": "Optional HH:MM prefill for a user-selected custom time."
               }
             }
           }
@@ -228,7 +250,7 @@
       "then": { "properties": { "supports": { "properties": { "sizes": { "minItems": 1 } } } } }
     },
     {
-      "description": "Only placeable widgets may declare data-change update capabilities.",
+      "description": "Only placeable widgets may declare update capabilities.",
       "if": { "required": ["updates"] },
       "then": { "properties": { "kind": { "const": "widget" } } }
     }

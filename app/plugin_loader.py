@@ -180,6 +180,24 @@ class Plugin:
             out.append(spec)
         return out
 
+    @property
+    def on_schedule_updates(self) -> list[dict[str, str]]:
+        """Validated ``updates.on_schedule`` declarations for this widget."""
+        updates = self.manifest.get("updates")
+        raw = updates.get("on_schedule") if isinstance(updates, dict) else None
+        if not isinstance(raw, list):
+            return []
+        out: list[dict[str, str]] = []
+        for item in raw:
+            if not isinstance(item, dict) or item.get("kind") != "daily":
+                continue
+            spec = {"kind": "daily"}
+            suggested_at = item.get("suggested_at")
+            if isinstance(suggested_at, str):
+                spec["suggested_at"] = suggested_at
+            out.append(spec)
+        return out
+
     def cell_option_defaults(self) -> dict[str, Any]:
         defaults: dict[str, Any] = {}
         for opt in self.manifest.get("cell_options", []):
