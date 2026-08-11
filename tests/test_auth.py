@@ -90,3 +90,21 @@ def test_cli_reset_clears_password(tmp_path: Path, monkeypatch) -> None:
 
     fresh = SettingsStore(settings_path)
     assert not auth.password_is_set(fresh)
+
+
+def test_plugin_assets_bypass_the_gate_but_admin_pages_do_not() -> None:
+    """The loopback exemption exists so the in-process renderer can pull a
+    widget's ``client.js`` and static assets while composing. It is not meant
+    to cover a plugin's admin page: those list loader errors and plugin
+    contents, and some (gtfs's stop finder) turn a query argument into an
+    outbound HTTP request. A trailing slash used to satisfy the old
+    "has a second segment" test, so every one of them was reachable without
+    a session from loopback."""
+    assert auth._path_is_loopback_only("/plugins/gtfs/client.js") is True
+    assert auth._path_is_loopback_only("/plugins/weather_now/client.css") is True
+    assert auth._path_is_loopback_only("/plugins/f1_next_race/static/circuits/monza.svg") is True
+
+    assert auth._path_is_loopback_only("/plugins/") is False
+    assert auth._path_is_loopback_only("/plugins/gtfs") is False
+    assert auth._path_is_loopback_only("/plugins/gtfs/") is False
+    assert auth._path_is_loopback_only("/plugins/calendar_core/") is False

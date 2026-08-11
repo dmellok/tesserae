@@ -256,12 +256,16 @@ def _path_is_open(path: str) -> bool:
 def _path_is_loopback_only(path: str) -> bool:
     if any(path.startswith(p) for p in _LOOPBACK_PATHS):
         return True
-    # /plugins/<id>/<asset> bypasses for the renderer; bare /plugins/
-    # (admin index) does not. Require at least two more segments after
-    # the prefix so the index is still gated.
+    # /plugins/<id>/<asset> bypasses for the renderer; bare /plugins/ (the
+    # index) and /plugins/<id>/ (a plugin's own admin page) do not. Both
+    # segments must be non-empty: a trailing slash used to satisfy the
+    # "has a second segment" test, which let every plugin admin page —
+    # including ones that fetch arbitrary URLs on request, like gtfs's stop
+    # finder — answer unauthenticated requests from loopback.
     if path.startswith(_PLUGIN_ASSET_PREFIX):
         tail = path[len(_PLUGIN_ASSET_PREFIX) :]
-        return "/" in tail and tail.split("/", 1)[0] != ""
+        plugin_id, _, asset = tail.partition("/")
+        return bool(plugin_id) and bool(asset)
     return False
 
 
