@@ -8,14 +8,16 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from app.plugin_loader import Plugin, PluginRegistry
 from app.scheduler import Scheduler
 from app.state.deck_model import Deck, DeckPage
 from app.state.deck_nav_store import DeckNavStore
 from app.state.deck_store import DeckStore
-from app.state.page_store import Page, PageStore
+from app.state.page_store import Cell, Page, PageStore
 from app.state.rotation_model import Rotation, RotationStep
 from app.state.rotation_store import RotationStore
 from app.state.schedule_store import ScheduleStore
+from app.state.widget_update_schedule import WidgetUpdateSchedule
 
 T0 = datetime(2026, 6, 15, 12, 0, tzinfo=UTC)
 
@@ -26,12 +28,13 @@ class FakePush:
     warms: list[tuple[str, str]] = field(default_factory=list)
     # device_id -> latest render record (as the real PushManager stores it).
     latest: dict[str, dict] = field(default_factory=dict)
+    status: str = "sent"
 
     def push(self, page_id: str, *, device_ids=None, respect_quiet_hours=False, source="page"):
         self.pushes.append((page_id, frozenset(device_ids or ()), respect_quiet_hours, source))
 
         class R:
-            status = "sent"
+            status = self.status
             error = None
             duration_s = 0.0
             event_id = None
@@ -58,9 +61,37 @@ def _sched(tmp_path: Path, page_store: PageStore, pusher: FakePush, **kw: Any) -
         store=ScheduleStore(tmp_path / "s.json"),
         push_manager=lambda: pusher,  # type: ignore[arg-type,return-value]
         page_store=page_store,
+        plugin_registry=kw.pop("plugin_registry", None),
         timezone_provider=lambda: UTC,
         device_ids_for_page=kw.pop("device_ids_for_page", None),
         **kw,
+    )
+
+
+def _scheduled_registry(tmp_path: Path) -> PluginRegistry:
+    plugin = Plugin(
+        id="daily",
+        path=tmp_path / "daily",
+        manifest={
+            "name": "Daily",
+            "kind": "widget",
+            "supports": {"sizes": ["md"]},
+            "updates": {"on_schedule": [{"kind": "daily", "suggested_at": "07:00"}]},
+        },
+        data_dir=tmp_path / "data" / "daily",
+    )
+    return PluginRegistry(plugins={"daily": plugin})
+
+
+def _scheduled_cell(cell_id: str, *, at: str | None = None) -> Cell:
+    return Cell(
+        id=cell_id,
+        plugin="daily",
+        update_schedule=WidgetUpdateSchedule(kind="daily", at=at),
+        x=0,
+        y=0,
+        w=100,
+        h=100,
     )
 
 
@@ -191,7 +222,7 @@ def test_data_change_refreshes_active_page_and_only_warms_inactive_deck_page(
     pusher = FakePush()
     sched = _sched(tmp_path, ps, pusher, deck_store=decks, deck_nav_store=nav)
 
-    sched.refresh_pages_for_data_change({"active", "inactive"}, now=T0)
+    sched.refresh_pages_for_update({"active", "inactive"}, source="data_change", now=T0)
 
     assert pusher.pushes == [("active", frozenset({"panel"}), True, "data_change")]
     assert pusher.warms == [("inactive", "panel")]
@@ -216,10 +247,120 @@ def test_data_change_warms_shared_deck_page_once_per_device(tmp_path: Path) -> N
     pusher = FakePush()
     sched = _sched(tmp_path, ps, pusher, deck_store=decks)
 
-    sched.refresh_pages_for_data_change({"shared"}, now=T0)
+    sched.refresh_pages_for_update({"shared"}, source="data_change", now=T0)
 
     assert pusher.pushes == []
     assert pusher.warms == [("shared", "panel")]
     assert sched._deck_last_warm == {
         f"{deck_id}\x00panel\x00shared": T0.timestamp() for deck_id in ("morning", "evening")
     }
+
+
+def test_widget_daily_boundary_refreshes_once_and_coalesces_placements(
+    tmp_path: Path,
+) -> None:
+    page = Page(
+        id="reminders",
+        name="Reminders",
+        device_ids=["panel"],
+        cells=[_scheduled_cell("a"), _scheduled_cell("b")],
+    )
+    ps = _pages(tmp_path, page)
+    pusher = FakePush()
+    registry = _scheduled_registry(tmp_path)
+    sched = _sched(tmp_path, ps, pusher, plugin_registry=lambda: registry)
+
+    before = datetime(2026, 6, 15, 23, 59, tzinfo=UTC)
+    sched._maybe_refresh_scheduled_widgets(before)
+    assert pusher.pushes == []
+
+    boundary = datetime(2026, 6, 16, 0, 0, tzinfo=UTC)
+    sched._maybe_refresh_scheduled_widgets(boundary)
+    sched._maybe_refresh_scheduled_widgets(boundary + timedelta(minutes=1))
+
+    assert pusher.pushes == [("reminders", frozenset({"panel"}), True, "widget_schedule")]
+
+
+def test_widget_custom_time_does_not_backfill_when_enabled_after_target(
+    tmp_path: Path,
+) -> None:
+    page = Page(
+        id="reminders",
+        name="Reminders",
+        device_ids=["panel"],
+        cells=[_scheduled_cell("a", at="07:00")],
+    )
+    ps = _pages(tmp_path, page)
+    pusher = FakePush()
+    registry = _scheduled_registry(tmp_path)
+    sched = _sched(tmp_path, ps, pusher, plugin_registry=lambda: registry)
+
+    enabled_late = datetime(2026, 6, 15, 11, 0, tzinfo=UTC)
+    sched._maybe_refresh_scheduled_widgets(enabled_late)
+    assert pusher.pushes == []
+
+    sched._maybe_refresh_scheduled_widgets(datetime(2026, 6, 16, 7, 0, tzinfo=UTC))
+    assert len(pusher.pushes) == 1
+
+
+def test_widget_schedule_retries_after_quiet_result(tmp_path: Path) -> None:
+    page = Page(
+        id="reminders",
+        name="Reminders",
+        device_ids=["panel"],
+        cells=[_scheduled_cell("a")],
+    )
+    ps = _pages(tmp_path, page)
+    pusher = FakePush(status="quiet")
+    registry = _scheduled_registry(tmp_path)
+    sched = _sched(tmp_path, ps, pusher, plugin_registry=lambda: registry)
+
+    sched._maybe_refresh_scheduled_widgets(datetime(2026, 6, 15, 23, 59, tzinfo=UTC))
+    boundary = datetime(2026, 6, 16, 0, 0, tzinfo=UTC)
+    sched._maybe_refresh_scheduled_widgets(boundary)
+    pusher.status = "sent"
+    sched._maybe_refresh_scheduled_widgets(boundary + timedelta(hours=7))
+
+    assert [push[3] for push in pusher.pushes] == ["widget_schedule", "widget_schedule"]
+
+
+def test_widget_schedule_warms_inactive_lineup_page_without_promoting(
+    tmp_path: Path,
+) -> None:
+    ps = _pages(
+        tmp_path,
+        Page(id="active", name="Active", device_ids=["panel"]),
+        Page(
+            id="reminders",
+            name="Reminders",
+            device_ids=["panel"],
+            cells=[_scheduled_cell("a")],
+        ),
+    )
+    decks = DeckStore(tmp_path / "decks.json")
+    decks.upsert(
+        Deck(
+            id="kitchen",
+            name="Kitchen",
+            device_ids=["panel"],
+            pages=[DeckPage(page_id="active"), DeckPage(page_id="reminders")],
+        )
+    )
+    nav = DeckNavStore(tmp_path / "nav.json")
+    nav.set("panel", "kitchen", "active")
+    pusher = FakePush()
+    registry = _scheduled_registry(tmp_path)
+    sched = _sched(
+        tmp_path,
+        ps,
+        pusher,
+        plugin_registry=lambda: registry,
+        deck_store=decks,
+        deck_nav_store=nav,
+    )
+
+    sched._maybe_refresh_scheduled_widgets(datetime(2026, 6, 15, 23, 59, tzinfo=UTC))
+    sched._maybe_refresh_scheduled_widgets(datetime(2026, 6, 16, 0, 0, tzinfo=UTC))
+
+    assert pusher.pushes == []
+    assert pusher.warms == [("reminders", "panel")]

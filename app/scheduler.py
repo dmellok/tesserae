@@ -36,7 +36,9 @@ from typing import Any, Protocol
 
 from pydantic import ValidationError
 
+from app.plugin_loader import PluginRegistry
 from app.push import PushManager, PushResult
+from app.scheduled_refresh import ScheduledPlacement, scheduled_placements
 from app.scheduler_conditions import ConditionEvaluator
 from app.state.deck_migration import deck_to_schedule
 from app.state.deck_model import Deck
@@ -285,6 +287,7 @@ class Scheduler:
         deck_store: DeckStore | None = None,
         deck_nav_store: Any = None,
         page_store: Any = None,
+        plugin_registry: Callable[[], PluginRegistry] | None = None,
         # Conditional schedules + rotation steps (v0.48). Optional; None
         # means every condition resolves to True (legacy behaviour) so
         # existing tests don't need updating. Production wires a real
@@ -317,9 +320,15 @@ class Scheduler:
         self._deck_store = deck_store
         self._deck_nav_store = deck_nav_store
         self._page_store = page_store
+        self._plugin_registry = plugin_registry
         # Page content-refresh bookkeeping: page_id -> POSIX timestamp of
         # the last refresh attempt that reached devices (discussion #140).
         self._page_last_refresh: dict[str, float] = {}
+        # Placement schedule key -> first observed / last satisfied timestamps.
+        # Keys include the configured time, so editing a schedule starts a new
+        # observation window and cannot inherit today's prior completion.
+        self._widget_schedule_first_seen: dict[str, float] = {}
+        self._widget_schedule_last_fired: dict[str, float] = {}
         # deck_id -> last warm POSIX timestamp, so a deck's pages are re-warmed
         # (in the background, silently) at its refresh cadence. The lock keeps
         # warm passes from stacking when one runs longer than a tick.
@@ -584,6 +593,10 @@ class Scheduler:
         # currently showing the page. Runs before the fire pass so a due
         # record's frame still lands last on the panel.
         self._maybe_refresh_pages(now)
+        # Placement-level daily refreshes are independent of page cadence and
+        # data-change events. Resolve all due widgets first so placements on the
+        # same page coalesce into one render/delivery pass.
+        self._maybe_refresh_scheduled_widgets(now)
         # Unified timed-content pass (#167 Phase 1): rotations, timer
         # decks, and schedules are collected together and fired in ONE
         # ascending sort. E-ink shows the most recent frame, so firing
@@ -847,29 +860,38 @@ class Scheduler:
                 result.status,
             )
 
-    def refresh_pages_for_data_change(
-        self, page_ids: set[str], now: datetime | None = None
-    ) -> None:
-        """Refresh changed pages without choosing or advancing active content.
+    def refresh_pages_for_update(
+        self,
+        page_ids: set[str],
+        *,
+        source: str,
+        now: datetime | None = None,
+    ) -> set[str]:
+        """Refresh invalidated pages without choosing or advancing content.
 
         Active pages reuse the normal page-refresh delivery path: resolve the
         devices already showing each page, respect quiet hours, and let
         PushManager's latest-wins/no-change handling apply. Affected inactive
         Deck pages are only re-warmed for their bound devices, never promoted.
+
+        The returned page ids completed every applicable live push and deck
+        warm. A page blocked by quiet hours is deliberately absent so a daily
+        placement schedule remains due and retries after quiet hours end.
         """
         if self._page_store is None or not page_ids:
-            return
+            return set()
         now = now or datetime.now(UTC)
         try:
             known_page_ids = {page.id for page in self._page_store.list()}
         except Exception:
-            return
+            return set()
         affected = page_ids & known_page_ids
         if not affected:
-            return
+            return set()
 
         showing = self._devices_showing_pages(now)
         pusher = self._push_factory()
+        completed = set(affected)
         for page_id in sorted(affected):
             devices = showing.get(page_id) or set()
             if not devices:
@@ -879,25 +901,30 @@ class Scheduler:
                     page_id,
                     device_ids=devices,
                     respect_quiet_hours=True,
-                    source="data_change",
+                    source=source,
                 )
             except Exception:
-                logger.exception("data-change page refresh failed page=%s", page_id)
+                completed.discard(page_id)
+                logger.exception("%s page refresh failed page=%s", source, page_id)
                 continue
-            with self._lock:
-                self._page_last_refresh[page_id] = now.timestamp()
+            if result.status in ("sent", "no_change"):
+                with self._lock:
+                    self._page_last_refresh[page_id] = now.timestamp()
+            else:
+                completed.discard(page_id)
             logger.info(
-                "data-change refresh: page=%s devices=%s (%s)",
+                "%s refresh: page=%s devices=%s (%s)",
+                source,
                 page_id,
                 ",".join(sorted(devices)),
                 result.status,
             )
 
         if self._deck_store is None:
-            return
+            return completed
         warm = getattr(pusher, "warm_deck_page", None)
         if not callable(warm):
-            return
+            return completed
         warm_targets: dict[tuple[str, str], set[str]] = {}
         for deck in self._deck_store.all():
             if not deck.enabled or not deck.device_ids:
@@ -913,18 +940,80 @@ class Scheduler:
         with self._deck_warm_lock:
             for (page_id, device_id), deck_ids in sorted(warm_targets.items()):
                 try:
-                    warm(page_id, device_id)
+                    warmed = warm(page_id, device_id)
                 except Exception:
+                    completed.discard(page_id)
                     logger.exception(
-                        "data-change deck warm failed decks=%s page=%s device=%s",
+                        "%s deck warm failed decks=%s page=%s device=%s",
+                        source,
                         ",".join(sorted(deck_ids)),
                         page_id,
                         device_id,
                     )
                     continue
+                if warmed is False:
+                    completed.discard(page_id)
+                    continue
                 for deck_id in deck_ids:
                     key = f"{deck_id}\x00{device_id}\x00{page_id}"
                     self._deck_last_warm[key] = now.timestamp()
+        return completed
+
+    def _widget_schedule_records(self) -> list[ScheduledPlacement]:
+        """Load currently supported placement schedules defensively."""
+        if self._page_store is None or self._plugin_registry is None:
+            return []
+        try:
+            return scheduled_placements(self._page_store.list(), self._plugin_registry())
+        except Exception:
+            logger.exception("widget schedule resolution failed")
+            return []
+
+    def _maybe_refresh_scheduled_widgets(self, now: datetime) -> None:
+        """Run due daily placement refreshes with Schedule-style gating."""
+        records = self._widget_schedule_records()
+        active_keys = {record.key for record in records}
+        now_ts = now.timestamp()
+        with self._lock:
+            for key in list(self._widget_schedule_first_seen):
+                if key not in active_keys:
+                    self._widget_schedule_first_seen.pop(key, None)
+                    self._widget_schedule_last_fired.pop(key, None)
+            for key in active_keys:
+                self._widget_schedule_first_seen.setdefault(key, now_ts)
+
+        tz = self._tz_provider()
+        local_now = _local(now, tz)
+        due_by_page: dict[str, list[ScheduledPlacement]] = {}
+        for record in records:
+            at = record.schedule.at
+            hour, minute = map(int, at.split(":")) if at is not None else (0, 0)
+            target_local = local_now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+            target = target_local.astimezone(UTC)
+            if now < target:
+                continue
+            with self._lock:
+                first_seen = self._widget_schedule_first_seen.get(record.key)
+                last = self._widget_schedule_last_fired.get(record.key)
+            # Match daily Schedule semantics: enabling after today's target
+            # does not immediately repaint to backfill a missed time.
+            if first_seen is None or first_seen > target.timestamp():
+                continue
+            if last is not None:
+                last_dt = datetime.fromtimestamp(last, tz=UTC)
+                if _local(last_dt, tz).date() == local_now.date():
+                    continue
+            due_by_page.setdefault(record.page_id, []).append(record)
+
+        if not due_by_page:
+            return
+        completed = self.refresh_pages_for_update(
+            set(due_by_page), source="widget_schedule", now=now
+        )
+        with self._lock:
+            for page_id in completed:
+                for record in due_by_page[page_id]:
+                    self._widget_schedule_last_fired[record.key] = now_ts
 
     def _maybe_return_decks_home(self, now: datetime) -> None:
         """Return idle deck panels to the home card (deck editor's

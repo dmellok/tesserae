@@ -4,6 +4,17 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.293.0], 2026-08-12
+
+### Added
+
+- **Placement-level daily widget refreshes.** Widgets may declare
+  `updates.on_schedule` so each Grid cell or Canvas element can independently
+  refresh at the server's local day boundary or an explicitly selected time.
+  Due refreshes coalesce per dashboard, respect quiet hours, update only
+  displays already showing the dashboard, and silently re-warm inactive Lineup
+  pages without selecting or advancing them. The feature is off by default.
+
 ## [0.292.3], 2026-08-12
 
 ### Fixed

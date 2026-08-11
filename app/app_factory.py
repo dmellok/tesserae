@@ -918,6 +918,7 @@ def create_app(
         deck_store=deck_store,
         deck_nav_store=deck_nav_store,
         page_store=page_store,
+        plugin_registry=lambda: app.config["PLUGIN_REGISTRY"],
         push_manager=lambda: app.config["PUSH_MANAGER"],
         event_log=event_log,
         timezone_provider=_resolve_timezone,
@@ -929,10 +930,13 @@ def create_app(
     app.config["SCHEDULER"] = scheduler
     from app.data_change_refresh import DataChangeRefreshCoordinator
 
+    def _refresh_data_change_pages(page_ids: set[str]) -> None:
+        scheduler.refresh_pages_for_update(page_ids, source="data_change")
+
     data_change_coordinator = DataChangeRefreshCoordinator(
         page_store=page_store,
         plugin_registry=lambda: app.config["PLUGIN_REGISTRY"],
-        refresh_pages=scheduler.refresh_pages_for_data_change,
+        refresh_pages=_refresh_data_change_pages,
     )
     app.config["DATA_CHANGE_COORDINATOR"] = data_change_coordinator
     if not testing and not is_watcher:

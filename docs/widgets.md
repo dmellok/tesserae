@@ -141,6 +141,24 @@ lowercase `[a-z0-9_]` is convention, not enforced. Name it `<family>_<role>`
     }
   }
   ```
+* **`updates.on_schedule`**, optional host-owned scheduled refresh kinds for
+  time-dependent output. The first contract supports `{"kind":"daily"}`.
+  Each Grid or Canvas placement remains off by default; when enabled without a
+  custom time it becomes due at the server's local day boundary. A manifest may
+  include `suggested_at` in `HH:MM` form, but that value only prefills the
+  progressive Custom time control and is not persisted until the user chooses
+  it. Scheduled refreshes update displays already showing the dashboard and
+  silently re-warm inactive Lineup pages; they never select or advance one.
+
+  ```json
+  {
+    "updates": {
+      "on_schedule": [
+        { "kind": "daily", "suggested_at": "07:00" }
+      ]
+    }
+  }
+  ```
 
 Full schema: [`schema/plugin.schema.json`](https://github.com/dmellok/tesserae/blob/main/schema/plugin.schema.json).
 

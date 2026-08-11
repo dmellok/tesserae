@@ -27,6 +27,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field, model_validator
 
+from app.state.widget_update_schedule import WidgetUpdateSchedule
+
 
 class PartScale(BaseModel):
     """A CSS-selector-scoped transform inside a widget fragment: scale the
@@ -130,6 +132,9 @@ class Element(BaseModel):
     # Kept on the element (not plugin settings) so two dashboards using the
     # same widget can choose independently. False is the compatibility default.
     update_on_change: bool = False
+    # Optional host-owned refresh trigger for this widget placement. Static
+    # elements cannot retain it; route-level capability guards enforce that.
+    update_schedule: WidgetUpdateSchedule | None = None
     # Decoration props (kind != "widget"; ignored for widgets). ``color`` is a
     # CSS colour or a Spectra token (e.g. "var(--accent-1)") so decorations can
     # follow the theme. ``fill`` false = outlined, ``stroke`` = outline/line

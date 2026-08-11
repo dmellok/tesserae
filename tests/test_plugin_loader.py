@@ -115,6 +115,42 @@ def test_on_change_manifest_is_discovered(tmp_path: Path, schema_path: Path) -> 
     ]
 
 
+def test_on_schedule_only_manifest_is_discovered(tmp_path: Path, schema_path: Path) -> None:
+    plugins_dir = tmp_path / "plugins"
+    plugins_dir.mkdir()
+    _write_minimal_plugin(
+        plugins_dir,
+        "daily_widget",
+        {"updates": {"on_schedule": [{"kind": "daily", "suggested_at": "07:00"}]}},
+    )
+
+    registry = plugin_loader.discover(
+        plugins_dir, schema_path=schema_path, data_root=tmp_path / "data"
+    )
+
+    assert registry.errors == []
+    assert registry.plugins["daily_widget"].on_schedule_updates == [
+        {"kind": "daily", "suggested_at": "07:00"}
+    ]
+
+
+def test_on_schedule_rejects_invalid_suggested_time(tmp_path: Path, schema_path: Path) -> None:
+    plugins_dir = tmp_path / "plugins"
+    plugins_dir.mkdir()
+    _write_minimal_plugin(
+        plugins_dir,
+        "bad_daily_widget",
+        {"updates": {"on_schedule": [{"kind": "daily", "suggested_at": "7am"}]}},
+    )
+
+    registry = plugin_loader.discover(
+        plugins_dir, schema_path=schema_path, data_root=tmp_path / "data"
+    )
+
+    assert "bad_daily_widget" not in registry.plugins
+    assert any("manifest schema" in error.message for error in registry.errors)
+
+
 def test_on_change_selector_must_name_cell_option(tmp_path: Path, schema_path: Path) -> None:
     plugins_dir = tmp_path / "plugins"
     plugins_dir.mkdir()
