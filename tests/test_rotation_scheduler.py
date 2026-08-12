@@ -256,6 +256,27 @@ def test_quiet_result_still_bumps_last_step(wiring) -> None:
     assert push.push.call_count == 1
 
 
+def test_no_change_result_still_bumps_last_step(wiring) -> None:
+    """A no_change push counts as 'we tried' too: the panel already shows
+    this step's frame, so the work is done.
+
+    Without this, the step never recorded itself as last fired, so every
+    tick inside its dwell re-fired it and paid a full render only to
+    rediscover the same digest. A rotation whose content is stable
+    (a single-step 'keep this fresh' cycle is the common case) therefore
+    re-rendered on every tick instead of once per dwell.
+    """
+    scheduler, push, store = wiring
+    push.push.return_value = MagicMock(
+        status="no_change", error=None, duration_s=0.0, event_id="evt"
+    )
+    store.upsert(_rot(steps=_steps(("a", 30), ("b", 30))))
+    scheduler._tick_once(datetime(2026, 6, 15, 0, 0, tzinfo=UTC))
+    scheduler._tick_once(datetime(2026, 6, 15, 0, 5, tzinfo=UTC))
+    scheduler._tick_once(datetime(2026, 6, 15, 0, 20, tzinfo=UTC))
+    assert push.push.call_count == 1
+
+
 # -- Manual play step / anchor override --------------------------------
 
 

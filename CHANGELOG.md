@@ -4,6 +4,27 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.294.3], 2026-08-12
+
+### Fixed
+
+- **An unchanged panel is no longer reported as a failed one.** Playing a
+  Lineup step whose frame the panel already shows flashed "Couldn't play step
+  N: no_change, one or more panels failed to render/publish". Nothing had
+  failed: `no_change` means the rendered frame matched the panel's current
+  digest, so the publish was correctly skipped, which on e-ink is the point.
+  The multi-panel aggregate attached the render/publish error to every status
+  that wasn't `sent`, and the Play button branched on `sent` alone. Fixed in
+  both places, plus the Fire now, schedule fire, and onboarding push routes,
+  which shared the check.
+- **A rotation step no longer re-renders on every tick.** Only `sent` and
+  `quiet` recorded a step as fired, so a step whose content was stable never
+  recorded itself: each tick inside its dwell re-fired it and paid a full
+  render to rediscover the same digest, rather than rendering once per dwell.
+  Most visible on a single-step "keep this page fresh" rotation, where every
+  tick re-rendered. `no_change` now counts as fired, matching the hold-clearing
+  check directly above it.
+
 ## [0.294.1], 2026-08-12
 
 ### Fixed

@@ -2033,7 +2033,13 @@ class PushManager:
             composition_digest=digest,
             duration_s=time.monotonic() - started,
             renderers=all_renderers,
-            error=None if status == "sent" else "one or more panels failed to render/publish",
+            # Only a genuine failure carries the error. ``status`` here is one
+            # of sent / no_change / failed per the aggregation above, and
+            # no_change is a success: every panel already shows this frame, so
+            # there was nothing to publish. Attaching the render/publish error
+            # to it made callers that branch on the error string report an
+            # unchanged panel as a failed one.
+            error=("one or more panels failed to render/publish" if status == "failed" else None),
             event_id=event_ids[0] if len(event_ids) == 1 else None,
             event_ids=event_ids,
         )

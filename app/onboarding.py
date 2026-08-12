@@ -486,6 +486,8 @@ def push_starter(page_id: str) -> Response:
     result = _push().push(page_id)
     if result.status == "sent":
         flash("Pushed, your panel should paint shortly.", "ok")
+    elif result.status == "no_change":
+        flash("Your panel is already showing this dashboard, nothing to repaint.", "ok")
     else:
         flash(f"Push {result.status}: {result.error or '(no detail)'}", "error")
     return redirect(url_for("onboarding.step", step="dashboard"))

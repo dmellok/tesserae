@@ -293,6 +293,59 @@ def test_manual_fire_button_respects_conditions(app: Flask, tmp_path: Path) -> N
     )
 
 
+def test_play_step_reports_no_change_as_success(app: Flask, tmp_path: Path) -> None:
+    """Playing a step whose frame the panel already shows is a success.
+
+    The user's bug: "Couldn't play step 4 on 'E1001 5-min cycle':
+    no_change, one or more panels failed to render/publish". Nothing had
+    failed. ``no_change`` means the rendered frame matched the panel's
+    current digest, so PushManager correctly skipped the publish, and on
+    e-ink skipping a needless full repaint is the whole point. Two bugs
+    stacked: the aggregate attached the render/publish error to any status
+    that wasn't ``sent``, and this route branched on ``== "sent"``.
+    """
+    from app.scheduler import Scheduler as _Scheduler
+    from app.state.page_store import Page, PageStore
+
+    pages = PageStore(tmp_path / "core" / "pages.json")
+    pages.save(Page(id="home", name="Home"))
+
+    store = app.config["ROTATION_STORE"]
+    store.upsert(
+        Rotation(
+            id="cycle",
+            name="E1001 5-min cycle",
+            anchor="00:00",
+            steps=[RotationStep(page_id="home", dwell_minutes=5) for _ in range(4)],
+        )
+    )
+
+    class _StubPM:
+        def push(self, page_id: str, **kwargs):
+            class _R:
+                status = "no_change"
+                error = None  # fixed: was the render/publish string
+
+            return _R()
+
+    app.config["SCHEDULER"] = _Scheduler(
+        store=store,  # type: ignore[arg-type]
+        push_manager=lambda: _StubPM(),
+        rotation_store=store,
+    )
+
+    client = app.test_client()
+    _sign_in(client)
+    resp = client.post("/rotations/cycle/play/3", follow_redirects=True)
+    body = resp.get_data(as_text=True)
+    assert resp.status_code == 200
+    assert "Couldn&#39;t play step" not in body and "Couldn't play step" not in body, (
+        "an unchanged panel was reported as a failure"
+    )
+    assert "failed to render/publish" not in body
+    assert "already showing it" in body
+
+
 def test_projection_covers_full_window_for_short_dwells(app: Flask) -> None:
     """Regression for the projection-bar gap: the old hard-coded 200
     iter cap meant short-dwell rotations only filled ~70% of the 24h

@@ -1855,7 +1855,11 @@ class Scheduler:
         # Same status semantics as _fire: a quiet result still counts
         # as "we tried" so the next tick doesn't re-attempt within the
         # quiet window. Failures don't bump so the next tick retries.
-        if result.status in ("sent", "quiet"):
+        # no_change counts too: the panel already shows this step's frame,
+        # so the work is done. Leaving it out meant a step whose content is
+        # stable never recorded itself, so every tick re-fired it and paid a
+        # full render to rediscover the same digest, instead of once per dwell.
+        if result.status in ("sent", "quiet", "no_change"):
             with self._lock:
                 self._rotation_last_step[rotation.id] = step_index
                 # v0.48: arm the minimum-hold gate so a flapping

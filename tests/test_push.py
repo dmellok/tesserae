@@ -208,6 +208,11 @@ def test_push_skips_publish_when_composition_matches_last_served(
 
     assert second.status == "no_change"
     assert all(r.unchanged and r.error is None for r in second.renderers)
+    # no_change is a success, so it carries no error. The aggregate used to
+    # attach "one or more panels failed to render/publish" to anything that
+    # wasn't "sent", which made callers that branch on the error string report
+    # an unchanged panel as a failed one (the rotation Play button did).
+    assert second.error is None
     # No additional publish for the same digest.
     assert len(mqtt_client.published) == publishes_after_first
 

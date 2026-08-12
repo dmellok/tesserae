@@ -496,8 +496,9 @@ def fire(rotation_id: str) -> Response:
         )
         return redirect(url_for("rotations.index"))
     result = sched._fire_rotation(rotation, eligible, now, bypass_holds=True)
-    if result.status == "sent":
-        flash(f"Fired rotation {rotation_id!r} (step {eligible}).", "ok")
+    if result.status in ("sent", "no_change"):
+        detail = " (already showing it)" if result.status == "no_change" else ""
+        flash(f"Fired rotation {rotation_id!r} (step {eligible}){detail}.", "ok")
     else:
         flash(
             f"Fired rotation {rotation_id!r}: {_status_detail(result)}",
@@ -539,10 +540,15 @@ def play(rotation_id: str, step_index: int) -> Response:
         (p.name for p in _pages().list() if p.id == rotation.steps[state.step_index].page_id),
         rotation.steps[state.step_index].page_id,
     )
-    if result.status == "sent":
+    if result.status in ("sent", "no_change"):
+        # no_change is a success: the panel already shows this step's frame, so
+        # there was nothing to repaint. Saying so beats both a bogus error and
+        # a bare "playing", which would leave the user watching for a refresh
+        # that correctly never comes.
+        detail = " (already showing it, nothing to repaint)" if result.status == "no_change" else ""
         flash(
             f"Playing step {state.step_index + 1} ({page_label}) on rotation "
-            f"{rotation.name!r}; cycle continues from here.",
+            f"{rotation.name!r}{detail}; cycle continues from here.",
             "ok",
         )
     else:

@@ -560,8 +560,9 @@ def fire(schedule_id: str) -> Response:
     result = _scheduler().fire_now(schedule_id)
     if result is None:
         flash(f"No schedule with id {schedule_id!r}.", "error")
-    elif result.status == "sent":
-        flash(f"Fired {schedule_id!r}.", "ok")
+    elif result.status in ("sent", "no_change"):
+        detail = " (already showing it)" if result.status == "no_change" else ""
+        flash(f"Fired {schedule_id!r}{detail}.", "ok")
     else:
         flash(f"Fired {schedule_id!r}: {result.status}, {result.error or ''}", "error")
     return redirect(url_for("schedules.index"))
