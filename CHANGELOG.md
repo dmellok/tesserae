@@ -4,6 +4,33 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.295.0], 2026-08-13
+
+### Fixed
+
+- **A daily or interval Lineup can be played from the Companion API.** Records
+  that came from the schedule store carry no display of their own and fire at
+  whatever displays their dashboards are bound to, but the action endpoint
+  resolved targets from the Lineup's own binding, so `play`, `next` and
+  `previous` answered `invalid_target` for every one of them from v0.287.0.
+  Targets are now resolved the way the engine resolves them, and the same
+  resolved set is reported as `resolved_device_ids` on the projection so a
+  client targets and labels from the server's answer rather than deriving it.
+  An explicit `device_ids` subset is bounded by the resolved set.
+- **Adding an unknown dashboard to a Lineup by `PATCH` is refused.** Creation
+  already answered 404 for a dashboard id that doesn't exist; an edit built a
+  step pointing at nothing. Only ids being added are checked, so a member
+  dashboard deleted since the Lineup was built can still be edited out.
+
+### Added
+
+- **`GET /api/app/v1/session`** returns the token id, the scopes the presented
+  credential carries now, and the Settings page where they're granted. An
+  optional scope can be granted or withdrawn long after pairing, and the
+  pairing response was the only place a client saw its scope list, so it had
+  no way to tell an ungranted permission from a granted one until a write
+  answered 403. Advertised as the `session_read` capability.
+
 ## [0.294.3], 2026-08-12
 
 ### Fixed

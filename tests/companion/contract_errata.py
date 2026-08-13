@@ -92,6 +92,18 @@ ERRATA: tuple[Erratum, ...] = (
             "operator toggle (#207)."
         ),
     ),
+    Erratum(
+        pointer="components/schemas/Capabilities/properties/features/items/enum",
+        values=("session_read",),
+        since="v0.295.0",
+        why=(
+            "GET /api/app/v1/session, so a client can read the scopes its "
+            "credential carries now rather than the ones pairing issued: an "
+            "optional scope granted or withdrawn after pairing is invisible "
+            "otherwise. Requested in discussion #203; the feature name is "
+            "ours and the client is free to rename it in its contract PR."
+        ),
+    ),
 )
 
 

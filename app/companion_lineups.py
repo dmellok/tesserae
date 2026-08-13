@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from app.state.deck_model import Deck, DeckPage
@@ -73,6 +74,30 @@ def _web_only_reason(deck: Deck) -> str | None:
     if any(page.refresh_interval_minutes for page in deck.pages):
         return "has a per-dashboard refresh override"
     return None
+
+
+def resolved_device_ids(deck: Deck, page_devices: Mapping[str, Sequence[str]]) -> list[str]:
+    """Which displays this Lineup actually paints.
+
+    Usually the authored binding. Schedule-style records (daily, interval)
+    are the exception: they came from a store where a schedule carried a
+    page and no display at all, so ``device_ids`` is empty and the engine
+    fires them at whatever displays their member dashboards are bound to.
+
+    Reading the authored list alone therefore makes a daily Lineup look
+    unplayable when it isn't. The client is told the resolved set rather
+    than deriving it from the dashboard bindings itself, and the action
+    endpoint paints the same set, so what the app offers and what the
+    server will do can't disagree (#203).
+    """
+    if deck.device_ids:
+        return list(dict.fromkeys(deck.device_ids))
+    out: list[str] = []
+    for page in deck.pages:
+        for device_id in page_devices.get(page.page_id, ()):
+            if device_id not in out:
+                out.append(device_id)
+    return out
 
 
 def lineup_etag(deck: Deck) -> str:
@@ -167,6 +192,7 @@ def lineup_dict(
     deck: Deck,
     *,
     page_names: dict[str, str],
+    page_devices: Mapping[str, Sequence[str]],
     current_pages: dict[str, str],
     web_url: str,
     next_advance_epoch: int | None = None,
@@ -176,6 +202,10 @@ def lineup_dict(
     ``current_pages`` maps device id to the page that device is showing, so
     a Lineup bound to several displays can report each one rather than a
     single fictional "current" page.
+
+    ``page_devices`` maps dashboard id to the displays it is bound to, which
+    is what ``resolved_device_ids`` needs for a Lineup that carries no
+    binding of its own.
 
     ``web_url`` is required rather than built here: this module has no app
     context, and the first version of it hardcoded a path that was never a
@@ -190,6 +220,11 @@ def lineup_dict(
         "enabled": deck.enabled,
         "intent": lineup_intent(deck),
         "device_ids": list(deck.device_ids),
+        # The authored binding above, the displays it actually paints here.
+        # They differ only for schedule-style records, which bind nothing and
+        # fire at their dashboards' own displays; the app targets and labels
+        # from this one rather than working it out (#203).
+        "resolved_device_ids": resolved_device_ids(deck, page_devices),
         "dashboards": [
             {
                 "page_id": page.page_id,

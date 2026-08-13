@@ -313,6 +313,88 @@ def test_an_unbound_lineup_has_nothing_to_move(app: Flask) -> None:
     assert resp.get_json()["error"]["code"] == "invalid_target"
 
 
+# -- schedule-style Lineups bind nothing ---------------------------------
+#
+# A daily or interval Lineup came from the schedule store, where a record
+# carried a page and no display at all. It still fires, at whatever displays
+# its dashboards are bound to. Resolving those server-side is what stops the
+# app either refusing to offer the control or inferring the target itself
+# (#203).
+
+
+def _seed_daily(app: Flask, device: str) -> None:
+    _seed_pages(app, [device], ("pantry", "weather"))
+    _seed_lineup(
+        app,
+        device_ids=[],
+        advance="timer",
+        advance_trigger="daily",
+        advance_fires_at="07:30",
+        legacy_kind="schedule",
+    )
+
+
+def test_a_daily_lineup_resolves_its_displays_from_its_dashboards(app: Flask) -> None:
+    device = _seed_device(app)
+    _seed_daily(app, device)
+    token = _token(app)
+    body = app.test_client().get("/api/app/v1/lineups/morning", headers=_auth(token)).get_json()
+    lineup = body["lineup"]
+    assert lineup["intent"] == "daily"
+    # The authored binding stays empty; what it paints is reported alongside.
+    assert lineup["device_ids"] == []
+    assert lineup["resolved_device_ids"] == [device]
+
+
+def test_an_authored_binding_is_reported_as_is(app: Flask) -> None:
+    """Resolution only fills a gap. A Lineup that names its displays keeps
+    them, even if a member dashboard lives somewhere else as well."""
+    device = _seed_device(app)
+    _seed_device(app, "study")
+    _seed_pages(app, [device, "study"], ("pantry", "weather"))
+    _seed_lineup(app, device_ids=[device])
+    token = _token(app)
+    body = app.test_client().get("/api/app/v1/lineups/morning", headers=_auth(token)).get_json()
+    assert body["lineup"]["resolved_device_ids"] == [device]
+
+
+def test_playing_a_daily_lineup_paints_the_dashboards_display(app: Flask) -> None:
+    """From v0.287.0 this answered invalid_target for every daily Lineup:
+    the action endpoint filtered targets against an authored binding that
+    is empty by construction (#203)."""
+    device = _seed_device(app)
+    _seed_daily(app, device)
+    token = _token(app)
+    resp = app.test_client().post(
+        "/api/app/v1/lineups/morning/actions",
+        headers=_auth(token, "idem-daily-play-0000"),
+        data=json.dumps({"action": "play", "page_id": "weather", "override_quiet_hours": False}),
+        content_type="application/json",
+    )
+    assert resp.status_code == 202, resp.get_data(as_text=True)
+    job = _poll(app, token, resp.get_json()["job"]["id"])
+    assert job["status"] == "succeeded"
+    assert [c["page_id"] for c in app.config["PUSH_MANAGER"].push_calls] == ["weather"]
+    assert app.config["DECK_NAV_STORE"].current_page(device, "morning") == "weather"
+
+
+def test_a_target_outside_the_resolved_displays_is_refused(app: Flask) -> None:
+    """The subset a client may name is bounded by what the Lineup reaches,
+    so the resolved set is a target list, not a suggestion."""
+    device = _seed_device(app)
+    other = _seed_device(app, "study")
+    _seed_daily(app, device)
+    token = _token(app)
+    resp = app.test_client().post(
+        "/api/app/v1/lineups/morning/actions",
+        headers=_auth(token, "idem-daily-other-000"),
+        data=json.dumps({"action": "next", "device_ids": [other], "override_quiet_hours": False}),
+        content_type="application/json",
+    )
+    assert resp.status_code == 400
+    assert resp.get_json()["error"]["code"] == "invalid_target"
+
+
 def test_an_unknown_action_is_refused(app: Flask) -> None:
     device = _seed_device(app)
     _seed_pages(app, [device], ("pantry", "weather"))
@@ -718,6 +800,39 @@ def test_a_field_the_app_may_not_set_is_refused_not_ignored(app: Flask) -> None:
     resp = _patch(app, token, _etag(app, token), advance_fallback_page_id="weather")
     assert resp.status_code == 400
     assert "advance_fallback_page_id" in resp.get_json()["error"]["message"]
+
+
+def test_adding_a_missing_dashboard_by_patch_is_refused(app: Flask) -> None:
+    """Same refusal as create. A step pointing at nothing can never render,
+    whether it arrived when the Lineup was made or when it was edited, and
+    a dashboard can be deleted between the app reading the picker and the
+    user saving (#203)."""
+    device = _seed_device(app)
+    _seed_pages(app, [device], ("pantry", "weather"))
+    _seed_lineup(app, device_ids=[device])
+    token = _token(app)
+    _grant_write(app)
+    resp = _patch(app, token, _etag(app, token), page_ids=["pantry", "ghost"])
+    assert resp.status_code == 404
+    assert resp.get_json()["error"]["code"] == "not_found"
+    assert [p.page_id for p in app.config["DECK_STORE"].get("morning").pages] == [
+        "pantry",
+        "weather",
+    ]
+
+
+def test_an_already_deleted_member_can_still_be_edited_out(app: Flask) -> None:
+    """Only ids being added are checked. A member dashboard deleted since
+    the Lineup was built already reports as missing, and refusing the edit
+    would leave the app unable to remove it."""
+    device = _seed_device(app)
+    _seed_pages(app, [device], ("pantry",))  # 'weather' never existed
+    _seed_lineup(app, device_ids=[device])
+    token = _token(app)
+    _grant_write(app)
+    resp = _patch(app, token, _etag(app, token), page_ids=["pantry"])
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    assert [p.page_id for p in app.config["DECK_STORE"].get("morning").pages] == ["pantry"]
 
 
 def test_reordering_keeps_what_each_dashboard_carried(app: Flask) -> None:

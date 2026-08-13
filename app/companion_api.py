@@ -32,7 +32,7 @@ import re
 import secrets
 import time
 import urllib.parse
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from datetime import UTC, date, datetime
 from functools import wraps
 from pathlib import Path
@@ -58,6 +58,7 @@ from app.companion_lineups import (
     apply_patch,
     lineup_dict,
     lineup_etag,
+    resolved_device_ids,
 )
 from app.data_change_refresh import (
     DataChangeEvent,
@@ -144,6 +145,10 @@ FEATURES = (
     "lineups",
     "lineup_control",
     "lineup_authoring",
+    # ``GET /session``: the client can read the scopes its credential
+    # carries now rather than the ones it was issued, which is the only way
+    # to know an operator has granted or withdrawn an optional one (#203).
+    "session_read",
 )
 
 _PAIRING_CODE_RE = re.compile(r"^[0-9]{6,12}$")
@@ -472,6 +477,32 @@ def pair() -> Any:
         "instance": _instance(),
     }
     return jsonify(payload), 201
+
+
+@bp.get("/session")
+@_require_companion()
+def read_session() -> Any:
+    """What this credential currently carries.
+
+    An optional scope can be granted or withdrawn from Settings long after
+    pairing, and the pairing response is the only place a client ever saw
+    its scope list, so the copy it persisted goes stale the moment an
+    operator flips a toggle. Without this the app can't tell "authoring
+    isn't granted" from "authoring is granted" until a save answers 403,
+    which is the wrong moment to find out (#203).
+
+    ``settings_url`` is where the operator does the granting, resolved from
+    the routing table rather than spelled out, since a hardcoded path is
+    how the Lineup web link shipped as a 404 for five releases.
+    """
+    record = g.companion
+    return jsonify(
+        {
+            "token_id": record.token_id,
+            "scopes": list(record.scopes),
+            "settings_url": url_for("auth.companion_index"),
+        }
+    )
 
 
 @bp.delete("/session")
@@ -938,19 +969,49 @@ def list_lineups() -> Any:
     return jsonify({"lineups": _lineup_views()})
 
 
+def _unknown_page_id(page_ids: Iterable[str]) -> str | None:
+    """The first dashboard id that doesn't exist, or None.
+
+    A step pointing at nothing can never render, so both authoring routes
+    refuse it up front rather than letting it surface later as a missing
+    row on a card (#203)."""
+    known = {p.id for p in _pages().list()}
+    for page_id in page_ids:
+        if page_id not in known:
+            return page_id
+    return None
+
+
+def _page_devices() -> dict[str, list[str]]:
+    """Dashboard id -> the displays it's bound to. What a Lineup with no
+    binding of its own is resolved against."""
+    return {p.id: list(dict.fromkeys(p.device_ids)) for p in _pages().list()}
+
+
+def _lineup_targets(deck: Any) -> list[str]:
+    """The displays an action on this Lineup may touch."""
+    return resolved_device_ids(deck, _page_devices())
+
+
 def _lineup_view(deck: Any) -> dict[str, Any]:
     """One Lineup's projection, for the routes that already hold the record."""
-    page_names = {p.id: (p.name or p.id) for p in _pages().list()}
+    pages = _pages().list()
+    page_names = {p.id: (p.name or p.id) for p in pages}
+    page_devices = {p.id: list(dict.fromkeys(p.device_ids)) for p in pages}
     nav = _deck_nav()
     current: dict[str, str] = {}
     if nav is not None:
-        for device_id in deck.device_ids:
+        # Over the resolved displays, not the authored ones: a schedule-style
+        # Lineup binds nothing, and reporting no current dashboard for it
+        # would be a gap the app can't fill from anywhere else.
+        for device_id in resolved_device_ids(deck, page_devices):
             page_id = nav.current_page(device_id, deck.id)
             if page_id:
                 current[device_id] = page_id
     return lineup_dict(
         deck,
         page_names=page_names,
+        page_devices=page_devices,
         current_pages=current,
         web_url=url_for("decks.editor", deck_id=deck.id),
     )
@@ -997,13 +1058,9 @@ def create_lineup() -> Any:
     device_ids = _valid_target_ids(body.get("device_ids")) if "device_ids" in body else []
     if device_ids is None:
         return _error("invalid_target", "One or more target displays are unknown.", 400)
-    # A dashboard that doesn't exist would create a Lineup whose steps can
-    # never render, so it's refused here rather than surfacing later as a
-    # missing row on a card.
-    known = {p.id for p in _pages().list()}
-    unknown = [p for p in page_ids if p not in known]
-    if unknown:
-        return _error("not_found", f"No dashboard with id {unknown[0]!r}.", 404)
+    missing = _unknown_page_id(page_ids)
+    if missing is not None:
+        return _error("not_found", f"No dashboard with id {missing!r}.", 404)
 
     try:
         deck = build_lineup(
@@ -1072,6 +1129,16 @@ def update_lineup(lineup_id: str) -> Any:
         return _error("invalid_request", "A JSON object body is required.", 400)
     if "device_ids" in body and _valid_target_ids(body.get("device_ids")) is None:
         return _error("invalid_target", "One or more target displays are unknown.", 400)
+    # Same refusal as create, and for the same reason. Only ids being added
+    # are checked: a member dashboard deleted since the Lineup was built
+    # already reports as ``missing``, and refusing the edit would leave the
+    # app unable to remove it (#203).
+    if "page_ids" in body and isinstance(body.get("page_ids"), list):
+        members = {page.page_id for page in deck.pages}
+        added = [str(p) for p in body["page_ids"] if p and str(p) not in members]
+        missing = _unknown_page_id(added)
+        if missing is not None:
+            return _error("not_found", f"No dashboard with id {missing!r}.", 404)
     try:
         updated = apply_patch(deck, body)
     except (ValidationError, ValueError, TypeError) as err:
@@ -1145,13 +1212,18 @@ def lineup_action(lineup_id: str) -> Any:
         return _error("invalid_request", "override_quiet_hours (boolean) is required.", 400)
     override = bool(body["override_quiet_hours"])
 
+    # Resolved rather than authored. A daily or interval Lineup carries no
+    # display of its own and fires at whatever its dashboards are bound to,
+    # so filtering against ``deck.device_ids`` made every one of them
+    # unplayable from the app while the engine ran them fine (#203).
+    bound = _lineup_targets(deck)
     targets = _valid_target_ids(body.get("device_ids")) if "device_ids" in body else None
     if "device_ids" in body and targets is None:
         return _error("invalid_target", "One or more target displays are unknown.", 400)
     if targets is None:
-        targets = list(dict.fromkeys(deck.device_ids))
-    # A Lineup bound to nothing has no panel to move.
-    targets = [d for d in targets if d in deck.device_ids]
+        targets = list(bound)
+    # A Lineup that reaches no display, however it's bound, has no panel to move.
+    targets = [d for d in targets if d in bound]
     if not targets:
         return _error("invalid_target", "The lineup has no bound displays.", 400)
 

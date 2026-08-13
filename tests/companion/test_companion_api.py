@@ -131,6 +131,7 @@ def test_capabilities_probe_is_unauthenticated_and_valid(app: Flask) -> None:
         "lineups",
         "lineup_control",
         "lineup_authoring",
+        "session_read",
     }
     assert body["personal_data"]["sources"] == ["reminders", "reminders.fridge"]
     assert "webpage_push" not in body["features"]
@@ -319,6 +320,37 @@ def test_read_models_require_a_token(app: Flask, path: str) -> None:
     resp = app.test_client().get(path)
     assert resp.status_code == 401
     _validate(resp.get_json(), "ErrorResponse")
+    assert resp.get_json()["error"]["code"] == "unauthorized"
+
+
+def test_session_reports_the_scopes_the_credential_carries_now(app: Flask) -> None:
+    """Not the ones pairing issued. An operator can grant or withdraw an
+    optional scope at any time, and the app's persisted copy from pairing
+    goes stale the moment they do (#203)."""
+    token = _token(app)
+    client = app.test_client()
+    auth = {"Authorization": f"Bearer {token}"}
+
+    body = client.get("/api/app/v1/session", headers=auth).get_json()
+    assert body["token_id"] == app.config["COMPANION_TOKENS"].list_active()[0].token_id
+    assert "lineups:read" in body["scopes"]
+    assert "lineups:write" not in body["scopes"]
+    # Where the operator does the granting, resolved from the routing table.
+    assert body["settings_url"] == "/settings/companion"
+    with app.test_request_context():
+        from flask import url_for
+
+        assert body["settings_url"] == url_for("auth.companion_index")
+
+    store = app.config["COMPANION_TOKENS"]
+    store.set_optional_scope(body["token_id"], "lineups:write", granted=True)
+    after = client.get("/api/app/v1/session", headers=auth).get_json()
+    assert "lineups:write" in after["scopes"]
+
+
+def test_session_read_needs_a_credential(app: Flask) -> None:
+    resp = app.test_client().get("/api/app/v1/session")
+    assert resp.status_code == 401
     assert resp.get_json()["error"]["code"] == "unauthorized"
 
 
