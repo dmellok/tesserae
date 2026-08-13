@@ -39,15 +39,31 @@ jobs:
           set -euo pipefail
           tag="${GITHUB_REF_NAME}"
           version="${tag#v}"
-          # Extract the section for this version from CHANGELOG.md.
-          # Matches "## [<version>]," picks everything until the next
-          # "## [" or end of file. Falls back to a short auto-generated
-          # body when the CHANGELOG has no entry for this version.
-          awk -v ver="[$version]" '
+          # Extract this release's notes from CHANGELOG.md: everything from
+          # the tag's own section down to (but excluding) the previous
+          # release tag's section, so the body covers the whole span the
+          # release actually ships rather than the last version bump alone.
+          # Every version bump writes its own "## [x.y.z]" section, so a
+          # release cut after 50 of them used to publish one bullet and drop
+          # the rest.
+          #
+          # The tag's own header is skipped (the Release title already names
+          # it); intermediate headers are kept so the body reads as a list of
+          # versions. With no earlier tag to stop at (first release, or a tag
+          # that sorts oddly) it falls back to the single-section behaviour.
+          prev=$(git tag --list 'v*' --sort=-v:refname \
+                 | awk -v t="$tag" 'f { print; exit } $0 == t { f=1 }')
+          prev_marker=""
+          if [ -n "$prev" ]; then prev_marker="[${prev#v}]"; fi
+          awk -v ver="[$version]" -v prev="$prev_marker" '
             BEGIN { capture=0 }
             /^## \[/{
-              if (capture) exit
-              if (index($0, ver) > 0) { capture=1; next }
+              if (capture) {
+                if (prev == "" || index($0, prev) > 0) exit
+                print; next
+              }
+              if (index($0, ver) > 0) { capture=1 }
+              next
             }
             capture { print }
           ' CHANGELOG.md > release_body.md

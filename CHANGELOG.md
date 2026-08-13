@@ -4,6 +4,19 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.296.1], 2026-08-13
+
+### Fixed
+
+- **Release notes cover the whole span a release ships.** Every version bump
+  writes its own CHANGELOG section, and the release workflow extracted only
+  the section matching the tag, stopping at the next `## [`. A release cut
+  after fifty bumps therefore published the last bump's entry and dropped
+  everything else, which is what v0.296.0 did on first publish. The workflow
+  now reads down to the previous release tag's section, keeping the
+  intermediate version headers, and falls back to the single-section
+  behaviour when there's no earlier tag to stop at.
+
 ## [0.296.0], 2026-08-13
 
 First stable release since 0.259.0. Home Assistant users on the stable add-on
