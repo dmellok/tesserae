@@ -184,7 +184,7 @@ verifies:
    - Screenshot shows what users would actually see?
 
 9. Once merged, the theme shows up in everyone's
-   **Settings → Widgets → Browse community widgets** on the next
+   **Settings → Widgets → Browse catalog** on the next
    catalog refresh.
 
 ## Updates

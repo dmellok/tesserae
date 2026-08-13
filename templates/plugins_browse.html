@@ -1,46 +1,56 @@
 {% extends "_base.html" %}
-{% from "_components.html" import card_head, info_pop %}
-{% block title %}Browse community widgets, Tesserae{% endblock %}
+{% from "_components.html" import card_head %}
+{% block title %}Browse catalog, Tesserae{% endblock %}
 {% block page_class %}page-wide{% endblock %}
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='style/dx-catalog.css') }}">
+{% endblock %}
 {% block main %}
-<header class="page-head">
-  <h1>
-    <a href="{{ url_for('plugins.plugins_index') }}" class="ghost-link" style="margin-right: 0.5rem;">
-      <i class="ph ph-arrow-left" aria-hidden="true"></i>
-    </a>
-    <i class="ph ph-storefront"></i> Browse community widgets
-  </h1>
-  <p class="lede">
-    A catalog of community-contributed widgets, audit-reviewed before they
-    land here. Pick the ones you want; once you're done, click
-    <strong>Restart required</strong> in the top bar to load them.
-  </p>
+{# ---------------------------------------------------------------------
+   Browse catalog. One page over three item types: widgets and themes
+   from the static index on GitHub (server-rendered payload below) and
+   community templates from api.tesserae.ink (fetched client-side).
+
+   The shell here is static: header, filter rail chrome, toolbar, sheet
+   frame. Everything data-driven — type counts, category chips, rows,
+   groups, the sheet body — is rendered by catalog_browse.js off the
+   ``catalog-data`` payload. The search input is server markup that JS
+   never re-renders, so focus and caret survive every keystroke.
+
+   Without JS the <noscript> list at the bottom still lists entries and
+   its install / uninstall forms still post.
+   --------------------------------------------------------------------- #}
+<header class="cat-head">
+  <a class="cat-back" href="{{ url_for('plugins.plugins_index') }}" aria-label="Back to widgets">
+    <i class="ph ph-arrow-left" aria-hidden="true"></i>
+  </a>
+  <div class="cat-head-text">
+    <h1>Browse catalog</h1>
+    <p class="cat-lede">
+      Community-contributed widgets, themes, and full dashboard templates;
+      all audit-reviewed before they land here. Select what you want, then
+      load it from <strong>Restart required</strong> in the top bar.
+    </p>
+  </div>
 </header>
 
 {% if restart_pending %}
-<section class="card" data-restart-banner>
-  <header class="card-head">
-    <div class="card-head-row">
-      <h2>
-        <span class="icon-box"><i class="ph ph-arrow-clockwise" aria-hidden="true"></i></span>
-        <span>Restart required</span>
-      </h2>
-      <div class="card-head-action">
-        <form method="post" action="{{ url_for('marketplace.restart') }}" class="inline"
-              onsubmit="return confirm('Restart Tesserae now? In-flight requests will drop.');">
-          <button type="submit" class="dx-btn-primary">
-            <i class="ph ph-arrow-clockwise" aria-hidden="true"></i><span>Restart now</span>
-          </button>
-        </form>
-      </div>
-    </div>
-  </header>
-  <p class="field-help">
-    One or more marketplace changes since the last restart. The newly
-    installed widgets won't appear in the editor (and uninstalled ones
-    won't disappear from existing pages) until Tesserae re-loads its
-    plugin registry.
-  </p>
+<section class="cat-notice cat-notice--restart" data-restart-banner>
+  <div>
+    <strong><i class="ph ph-arrow-clockwise" aria-hidden="true"></i> Restart required</strong>
+    <p>
+      One or more catalog changes since the last restart. Newly installed
+      widgets won't appear in the editor (and uninstalled ones won't
+      disappear from existing pages) until Tesserae re-loads its plugin
+      registry.
+    </p>
+  </div>
+  <form method="post" action="{{ url_for('marketplace.restart') }}" class="inline"
+        data-restart-form data-restart-label="Restarting Tesserae">
+    <button type="submit" class="dx-btn-primary">
+      <i class="ph ph-arrow-clockwise" aria-hidden="true"></i><span>Restart now</span>
+    </button>
+  </form>
 </section>
 {% endif %}
 
@@ -58,645 +68,134 @@
 {% else %}
 
 {% if error %}
-<section class="dx-section-card">
-  {{ card_head('Couldn’t refresh the catalog', icon_name='warning') }}
-  <p class="field-help">{{ error }}{% if stale %} Showing the last successfully cached entries.{% endif %}</p>
-</section>
-{% endif %}
-
-{% if entries or tags or kinds or active_query %}
-<section class="dx-section-card">
-  <header class="card-head">
-    <div class="card-head-row">
-      <h2>
-        <span class="icon-box"><i class="ph ph-funnel-simple" aria-hidden="true"></i></span>
-        <span>Filter</span>
-        <span class="muted">({{ entries|length }} shown)</span>
-      </h2>
-      <div class="card-head-action">
-        <a class="ghost-link" href="{{ url_for('marketplace.browse', refresh=1) }}">
-          <i class="ph ph-arrows-clockwise" aria-hidden="true"></i><span>Refresh catalog</span>
-        </a>
-      </div>
-    </div>
-  </header>
-  {# Free-text catalog search. Client-side DOM filter so typing
-     never triggers a page navigation — the input keeps focus +
-     caret position naturally. The form still submits on Enter so
-     the result URL stays shareable (?q=... is honoured server-side
-     by ``_filter_entries``). When JS is disabled the form-submit
-     path still works. #}
-  <form method="get" action="{{ url_for('marketplace.browse') }}" class="dx-marketplace-search" data-mkt-search-form>
-    <i class="ph ph-magnifying-glass" aria-hidden="true"></i>
-    <input type="search" name="q" value="{{ active_query or '' }}"
-           class="dx-input" placeholder="Search the catalog…"
-           autocomplete="off" data-mkt-search>
-    {% if active_tag %}<input type="hidden" name="tag" value="{{ active_tag }}">{% endif %}
-    {% if active_kind %}<input type="hidden" name="kind" value="{{ active_kind }}">{% endif %}
-    <button type="button" class="dx-btn-ghost-sm" data-mkt-search-clear
-            aria-label="Clear search" hidden>
-      <i class="ph ph-x" aria-hidden="true"></i>
-    </button>
-  </form>
-  {% if kinds and kinds|length > 1 %}
-  <div class="dx-mkt-chips dx-mkt-chips--kinds" role="tablist" aria-label="Filter by type">
-    <a href="{{ url_for('marketplace.browse', tag=active_tag, q=active_query) }}"
-       class="dx-mkt-chip {% if not active_kind %}is-active{% endif %}"
-       role="tab" aria-selected="{{ 'true' if not active_kind else 'false' }}">
-      <span>All</span><span class="dx-mkt-chip-count">{{ kinds|sum(attribute='count') }}</span>
-    </a>
-    {% for k in kinds %}
-    <a href="{{ url_for('marketplace.browse', tag=active_tag, kind=k.key, q=active_query) }}"
-       class="dx-mkt-chip {% if active_kind == k.key %}is-active{% endif %}"
-       role="tab" aria-selected="{{ 'true' if active_kind == k.key else 'false' }}">
-      {% if k.key == 'widget' %}<i class="ph ph-puzzle-piece" aria-hidden="true"></i>
-      {% elif k.key == 'theme' %}<i class="ph ph-paint-brush" aria-hidden="true"></i>
-      {% elif k.key == 'font' %}<i class="ph ph-text-aa" aria-hidden="true"></i>
-      {% endif %}
-      <span>{{ k.label }}</span><span class="dx-mkt-chip-count">{{ k.count }}</span>
-    </a>
-    {% endfor %}
-  </div>
-  {% endif %}
-  {% if tags %}
-  <div class="dx-mkt-chips">
-    <a href="{{ url_for('marketplace.browse', kind=active_kind, q=active_query) }}"
-       class="dx-mkt-chip {% if not active_tag %}is-active{% endif %}">All</a>
-    {% for tag in tags %}
-    <a href="{{ url_for('marketplace.browse', tag=tag, kind=active_kind, q=active_query) }}"
-       class="dx-mkt-chip {% if active_tag == tag %}is-active{% endif %}">{{ tag }}</a>
-    {% endfor %}
-  </div>
-  {% endif %}
-</section>
-{% endif %}
-
-{% if templates_enabled %}
-{# Community dashboard templates live on their own page (grouped by
-   resolution > device); this is just the doorway from the widget Browse.
-
-   The card renders on the experiment flag alone. When the master online
-   switch is off it stays visible and says why, rather than disappearing:
-   the widgets above come from a static index on GitHub and keep working
-   without that switch, so a vanishing templates section read as a bug
-   with nothing on the page connecting the two (#224). #}
-<section class="dx-section-card" style="margin:16px 0;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+<section class="cat-notice">
   <div>
-    <strong><i class="ph ph-layout" aria-hidden="true"></i> Community templates</strong>
-    <div class="field-help" style="margin:2px 0 0">Complete dashboards shared by other users,
-      reviewed before publishing and grouped by the panels they fit.</div>
-    {% if not templates_online %}
-    <div class="field-help" style="margin:4px 0 0">
-      <i class="ph ph-wifi-slash" aria-hidden="true"></i>
-      These are served from api.tesserae.ink, so they need Online features
-      switched on. The widgets above come from GitHub and work either way.
-    </div>
-    {% endif %}
+    <strong><i class="ph ph-warning" aria-hidden="true"></i> Couldn’t refresh the catalog</strong>
+    <p>{{ error }}{% if stale %} Showing the last successfully cached entries.{% endif %}</p>
   </div>
-  {% if templates_online %}
-  <a class="dx-btn-sm" href="{{ url_for('template_market.page') }}">Browse templates
-    <i class="ph ph-arrow-right" aria-hidden="true"></i></a>
-  {% else %}
-  <a class="dx-btn-sm" href="{{ url_for('auth.settings_area', area='system') }}#online-features">Enable online features
-    <i class="ph ph-arrow-right" aria-hidden="true"></i></a>
-  {% endif %}
 </section>
 {% endif %}
 
-{% if entries %}
-<div class="marketplace-grid">
-  {% for e in entries %}
-  {# Concatenate the searchable fields once per card so the JS
-     filter is a plain ``indexOf`` against a lower-cased string. #}
-  {% set _hay = (e.id ~ ' ' ~ e.name ~ ' ' ~ e.description ~ ' ' ~ (e.author_name or '') ~ ' ' ~ (e.tags|join(' '))) | lower %}
-  <article class="dx-section-card marketplace-card" data-search-haystack="{{ _hay }}">
-    {# A mark, when the entry ships one, stands in for the card image
-       entirely. For a widget that renders whatever the user's own library
-       holds, a screenshot is one arbitrary photo and says nothing about
-       what the widget is; the service's logo is the thing a person scans
-       the grid for. Entries without a mark keep the screenshot. #}
-    {% if e.icon_url %}
-    <div class="marketplace-thumb marketplace-thumb--logo">
-      <img class="marketplace-thumb-logo" src="{{ e.icon_url }}"
-           alt="{{ e.name }}" loading="lazy" onerror="this.remove()">
+<script type="application/json" id="catalog-data">{{ catalog_payload | tojson }}</script>
+
+<div class="cat-body"
+     data-catalog
+     data-install-url="{{ url_for('marketplace.install') }}"
+     data-uninstall-url="{{ url_for('marketplace.uninstall') }}"
+     data-refresh-url="{{ url_for('marketplace.browse', refresh=1) }}"
+     data-templates-url="{{ url_for('template_market.index') if templates_enabled else '' }}"
+     data-online-settings-url="{{ url_for('auth.settings_area', area='system') }}#online-features">
+
+  <aside class="cat-rail" aria-label="Filters">
+    <div class="cat-rail-section">
+      <div class="cat-rail-label" id="cat-type-label">Type</div>
+      <div class="cat-types" role="group" aria-labelledby="cat-type-label" data-cat-types></div>
     </div>
-    {% elif e.screenshot_urls and e.screenshot_urls|length > 1 %}
-    <div class="marketplace-thumb marketplace-thumb-carousel"
-         role="region" aria-label="screenshots for {{ e.name }}"
-         data-carousel data-slide-count="{{ e.screenshot_urls|length }}">
-      <div class="marketplace-thumb-track" data-carousel-track tabindex="0">
-        {% for url in e.screenshot_urls %}
-        <img src="{{ url }}"
-             alt="{{ e.name }} screenshot {{ loop.index }} of {{ e.screenshot_urls|length }}"
-             {% if not loop.first %}loading="lazy" decoding="async"{% endif %}
-             class="marketplace-thumb-slide">
-        {% endfor %}
-      </div>
-      <button type="button" class="marketplace-thumb-arrow is-prev"
-              aria-label="Previous screenshot" data-carousel-prev tabindex="-1">
-        <i class="ph ph-caret-left" aria-hidden="true"></i>
-      </button>
-      <button type="button" class="marketplace-thumb-arrow is-next"
-              aria-label="Next screenshot" data-carousel-next tabindex="-1">
-        <i class="ph ph-caret-right" aria-hidden="true"></i>
-      </button>
-      <div class="marketplace-thumb-dots" data-carousel-dots>
-        {% for url in e.screenshot_urls %}
-        <button type="button" class="marketplace-thumb-dot"
-                aria-label="Screenshot {{ loop.index }} of {{ e.screenshot_urls|length }}"
-                {% if loop.first %}aria-current="true"{% endif %}
-                data-carousel-dot data-slide-index="{{ loop.index0 }}"></button>
-        {% endfor %}
+
+    <div class="cat-rail-section">
+      <div class="cat-rail-label" id="cat-status-label">Status</div>
+      <div class="cat-seg" role="group" aria-labelledby="cat-status-label" data-cat-status>
+        <button type="button" class="cat-seg-btn is-active" data-status="All" aria-pressed="true">All</button>
+        <button type="button" class="cat-seg-btn" data-status="Installed" aria-pressed="false">Installed</button>
+        <button type="button" class="cat-seg-btn" data-status="Available" aria-pressed="false">Available</button>
       </div>
     </div>
-    {% elif e.screenshot_url %}
-    <div class="marketplace-thumb">
-      <img src="{{ e.screenshot_url }}" alt="{{ e.name }} screenshot" loading="lazy">
-    </div>
-    {% else %}
-    <div class="marketplace-thumb marketplace-thumb--placeholder">
-      <i class="ph-duotone ph-{{ e.icon.removeprefix('ph-') }}" aria-hidden="true"></i>
-    </div>
-    {% endif %}
-    <div class="marketplace-body">
-      <header class="marketplace-card-head">
-        <h3>
-          <span class="icon-box">
-            {% if e.icon_url %}
-            <img class="marketplace-icon-logo" src="{{ e.icon_url }}" alt="" loading="lazy"
-                 onerror="this.remove()">
-            {% else %}
-            <i class="ph ph-{{ e.icon.removeprefix('ph-') }}" aria-hidden="true"></i>
-            {% endif %}
-          </span>
-          <span>{{ e.name }}</span>
-          {% if e.official %}
-          <span class="pill is-accent" title="Reviewed + maintained by the catalog owner">
-            <i class="ph-fill ph-shield-check" aria-hidden="true"></i> verified
-          </span>
-          {% endif %}
-        </h3>
-        <p class="marketplace-meta">
-          <code class="muted">v{{ e.version }}</code>
-          {% if e.author_name %}
-          <span class="muted">·</span>
-          <span class="muted">by
-            {% if e.author_github %}
-            <a href="https://github.com/{{ e.author_github }}" target="_blank" rel="noopener">{{ e.author_name }}</a>
-            {% else %}
-            {{ e.author_name }}
-            {% endif %}
-          </span>
-          {% endif %}
-          {% if e.stars %}
-          <span class="muted">·</span>
-          <span class="muted marketplace-stars" title="GitHub stars on the widget's source repo; refreshed hourly by the catalog.">
-            <i class="ph ph-star" aria-hidden="true"></i> {{ e.stars }}
-          </span>
-          {% endif %}
-          {% if e.installs %}
-          <span class="muted">·</span>
-          <span class="muted marketplace-installs" title="Anonymous count of installs that use this widget, reported by opted-in Tesserae installs.">
-            <i class="ph ph-download-simple" aria-hidden="true"></i> {{ '{:,}'.format(e.installs) }}
-          </span>
-          {% endif %}
-          {% if e.installed_from_disk %}
-          <span class="muted">·</span>
-          <span class="pill is-warn" title="Plugin folders are present on disk but weren't installed via the marketplace, typically from a Tesserae upgrade where the widget moved from the bundle to the catalog.">
-            <i class="ph ph-floppy-disk" aria-hidden="true"></i> from a previous install
-          </span>
-          {% elif e.installed and not e.update_available %}
-          <span class="muted">·</span>
-          <span class="pill is-ok"><i class="ph ph-check-circle" aria-hidden="true"></i> installed</span>
-          {% elif e.update_available %}
-          <span class="muted">·</span>
-          <span class="pill is-warn">
-            <i class="ph ph-arrow-up-circle" aria-hidden="true"></i>
-            installed v{{ e.installed_version }} — update available
-          </span>
-          {% endif %}
-        </p>
-      </header>
 
-      <p class="marketplace-desc">{{ e.description }}</p>
-
-      {% if e.is_bundle %}
-      {# Cap the visible folder chips at 3 with a "+N more" tail so a
-         bundle with many folders (afl × 5, ai × 4, etc.) doesn't push
-         the card noticeably taller than its neighbours in the grid.
-         Folder names are informational; the full list is one click
-         away via the source link. #}
-      <p class="marketplace-bundle">
-        <i class="ph ph-stack" aria-hidden="true"></i>
-        <span>Bundle, installs {{ e.folders|length }} plugin folder{{ '' if e.folders|length == 1 else 's' }}:</span>
-        {% for f in e.folders[:3] %}<code>{{ f }}</code>{% if not loop.last %} {% endif %}{% endfor %}
-        {% if e.folders|length > 3 %}<span class="marketplace-bundle-more" title="{{ e.folders[3:]|join(', ') }}">+{{ e.folders|length - 3 }} more</span>{% endif %}
-      </p>
-      {% endif %}
-
-      {% if e.tags %}
-      <div class="marketplace-tags">
-        {% for tag in e.tags %}
-        <a class="pill" href="{{ url_for('marketplace.browse', tag=tag, kind=active_kind) }}">{{ tag }}</a>
-        {% endfor %}
+    <div class="cat-rail-section">
+      <div class="cat-rail-label-row">
+        <div class="cat-rail-label" id="cat-cat-label">Category</div>
+        <button type="button" class="cat-clear" data-cat-clear hidden>clear</button>
       </div>
-      {% endif %}
+      <div class="cat-chips" role="group" aria-labelledby="cat-cat-label" data-cat-chips></div>
+    </div>
 
-      {# Install / Update / Uninstall just set the restart-pending
-         flag on the server and redirect back here with a flash. The
-         topbar "Restart required" button (rendered from _base.html
-         when ``marketplace_restart_pending`` is set) opens the spinner
-         modal + restart. This lets users queue several installs and
-         restart once. #}
-      <footer class="marketplace-actions">
+    <div class="cat-rail-section cat-rail-section--fit" data-cat-fit-section hidden>
+      <label class="cat-check">
+        <input type="checkbox" data-cat-fits>
+        <span>Fits my panels only</span>
+      </label>
+      <div class="cat-mono cat-rail-res" data-cat-my-res></div>
+    </div>
+  </aside>
+
+  <div class="cat-main">
+    <div class="cat-toolbar">
+      <i class="ph ph-magnifying-glass cat-toolbar-icon" aria-hidden="true"></i>
+      {# A real form so Enter is a no-op that doesn't navigate, and the
+         browser offers its own clear affordance on the search input. #}
+      <form class="cat-search" role="search" data-cat-search-form>
+        <label class="sr-only" for="cat-search">Search the catalog</label>
+        <input type="search" id="cat-search" name="q" data-cat-search autocomplete="off"
+               spellcheck="false" placeholder="Search widgets, themes, templates…"
+               value="{{ active_query or '' }}">
+      </form>
+      <div class="cat-toolbar-divider" aria-hidden="true"></div>
+      <span class="cat-mono cat-count" data-cat-count aria-live="polite"></span>
+      <details class="cat-sort" data-cat-sort>
+        <summary>
+          <i class="ph ph-arrows-down-up" aria-hidden="true"></i>
+          <span data-cat-sort-label>Most installed</span>
+        </summary>
+        <div class="cat-sort-menu" role="menu">
+          <button type="button" role="menuitemradio" aria-checked="true" data-sort="installs">Most installed</button>
+          <button type="button" role="menuitemradio" aria-checked="false" data-sort="name">Name A–Z</button>
+          <button type="button" role="menuitemradio" aria-checked="false" data-sort="recent">Recently added</button>
+        </div>
+      </details>
+      <a class="cat-refresh" href="{{ url_for('marketplace.browse', refresh=1) }}"
+         title="Re-fetch the catalog index now">
+        <i class="ph ph-arrows-clockwise" aria-hidden="true"></i>
+        <span class="sr-only">Refresh catalog</span>
+      </a>
+    </div>
+
+    <div class="cat-results" data-cat-results aria-live="polite" aria-busy="true">
+      <div class="cat-loading">Loading catalog…</div>
+    </div>
+  </div>
+</div>
+
+{# Detail sheet. Rendered empty and filled by JS; kept in the document so
+   the markup (and its labelled regions) is one place, not a string in a
+   script. #}
+<div class="cat-sheet-root" data-cat-sheet hidden>
+  <div class="cat-scrim" data-cat-sheet-close></div>
+  <aside class="cat-sheet" role="dialog" aria-modal="true" aria-labelledby="cat-sheet-title"
+         tabindex="-1" data-cat-sheet-panel></aside>
+</div>
+
+<noscript>
+  <section class="dx-section-card" style="margin-top:16px">
+    <p class="field-help">
+      Filtering, sorting and the detail sheet need JavaScript. The full
+      catalog is listed below and installs still work.
+    </p>
+    <ul class="cat-noscript">
+      {% for e in entries %}
+      <li>
+        <strong>{{ e.name }}</strong> <code>v{{ e.version }}</code>
+        {% if e.author_name %}<span class="muted">by {{ e.author_name }}</span>{% endif %}
+        <p>{{ e.description }}</p>
         {% if not e.installed %}
         <form method="post" action="{{ url_for('marketplace.install') }}" class="inline">
           <input type="hidden" name="catalog_id" value="{{ e.id }}">
-          <button type="submit" class="dx-btn-primary">
-            <i class="ph ph-download-simple" aria-hidden="true"></i><span>Install</span>
-          </button>
+          <button type="submit" class="dx-btn-primary">Install</button>
         </form>
         {% else %}
-        {% if e.update_available %}
-        <form method="post" action="{{ url_for('marketplace.install') }}" class="inline">
+        <form method="post" action="{{ url_for('marketplace.uninstall') }}" class="inline">
           <input type="hidden" name="catalog_id" value="{{ e.id }}">
-          <button type="submit" class="dx-btn-primary">
-            <i class="ph ph-arrow-up-circle" aria-hidden="true"></i><span>Update to v{{ e.version }}</span>
-          </button>
+          <button type="submit" class="ghost danger">Uninstall</button>
         </form>
         {% endif %}
-        <form method="post" action="{{ url_for('marketplace.uninstall') }}" class="inline"
-              onsubmit="return confirm('Uninstall {{ e.name }}? (Data dir is kept; tick the box below first to delete that too.)');">
-          <input type="hidden" name="catalog_id" value="{{ e.id }}">
-          <label class="inline-check muted" title="Also delete plugin data dir(s)">
-            <input type="checkbox" name="delete_data" value="1">
-            <span>+ data</span>
-          </label>
-          <button type="submit" class="ghost danger">
-            <i class="ph ph-trash" aria-hidden="true"></i><span>Uninstall</span>
-          </button>
-        </form>
-        {% endif %}
-        {% if e.source %}
-        <a class="ghost-link" href="{{ e.source }}" target="_blank" rel="noopener">
-          <i class="ph ph-github-logo" aria-hidden="true"></i><span>Source</span>
-        </a>
-        {% endif %}
-      </footer>
-    </div>
-  </article>
-  {% endfor %}
-</div>
-{% else %}
-<section class="dx-section-card">
-  {{ card_head('Nothing to show', icon_name='package') }}
-  <p class="field-help">
-    {% if active_query %}
-    Nothing matched <code>{{ active_query }}</code>. Try
-    <a href="{{ url_for('marketplace.browse', tag=active_tag, kind=active_kind) }}">clearing the search</a>.
-    {% elif active_kind and active_tag %}
-    No entries matched <code>{{ active_kind }}</code> + <code>{{ active_tag }}</code>. Try
-    <a href="{{ url_for('marketplace.browse') }}">All</a>.
-    {% elif active_kind %}
-    No entries of type <code>{{ active_kind }}</code> in the catalog yet. Try
-    <a href="{{ url_for('marketplace.browse') }}">All</a>.
-    {% elif active_tag %}
-    No entries matched the <code>{{ active_tag }}</code> filter. Try
-    <a href="{{ url_for('marketplace.browse') }}">All</a>.
-    {% elif stale %}
-    The catalog couldn’t be refreshed and there’s no cached snapshot
-    available. Check your network or the catalog URL.
-    {% else %}
-    The catalog at <code>{{ index_url }}</code> is empty.
-    {% endif %}
-  </p>
-</section>
-{% endif %}
+        {% if e.source %}<a href="{{ e.source }}" target="_blank" rel="noopener">Source</a>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+</noscript>
 
 {% endif %} {# index_url not empty #}
 
-<style>
-  .filter-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem;
-    margin-top: 0.5rem;
-  }
-  .filter-chips--kinds {
-    padding-bottom: 0.6rem;
-    margin-bottom: 0.4rem;
-    border-bottom: 1px solid var(--t-border, rgba(128, 128, 128, 0.2));
-  }
-  .filter-chips--kinds .pill {
-    font-weight: 600;
-  }
-  .filter-chips--kinds .pill i {
-    margin-right: 0.25rem;
-  }
-  .marketplace-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    /* Equal-height rows so a card with a longer description or an
-       extra chip row doesn't make itself visibly taller than its
-       neighbours. The tallest natural card in each row sets the
-       row height; shorter cards stretch to match, and their
-       ``.marketplace-actions`` (which already has ``margin-top:
-       auto``) floats to the bottom of the grown card. Same pattern
-       most modern app-store catalogs use. */
-    grid-auto-rows: 1fr;
-    gap: 1rem;
-    margin-top: 1rem;
-  }
-  .marketplace-card {
-    display: flex;
-    flex-direction: column;
-    padding: 0;
-    overflow: hidden;
-  }
-  .marketplace-thumb {
-    /* 3:2 matches the lg widget cell (1200×800), so a tightly-
-       cropped screenshot of an lg render fills the card without
-       letterboxing. Contributor convention is "screenshot the
-       widget at lg without surrounding chrome"; if a source PNG
-       comes in wider or taller than 3:2, object-fit: cover crops
-       symmetrically from the centre. */
-    aspect-ratio: 3 / 2;
-    background: var(--t-surface-sunk);
-    border-bottom: 1px solid var(--t-border);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-  }
-  .marketplace-thumb > img {
-    width: 100%;
-    height: 100%;
-    /* Stretch to fill the frame regardless of source aspect ratio.
-       Catalog screenshots come in at varying shapes (different
-       contributors, different Playwright configs); fill guarantees
-       the card surface is always covered, accepting minor
-       distortion as the cost. Cards are thumbnails; the
-       contributor's source URL link is one click away if a user
-       wants to see the widget at its true ratio. */
-    object-fit: fill;
-  }
-  .marketplace-thumb--placeholder > i {
-    font-size: 3rem;
-    color: var(--t-muted);
-  }
-  /* A project's own mark standing in for the card image. Overrides the
-     screenshot rule above (which stretches to fill a 3:2 card): a logo
-     has a shape worth keeping, so contain it and let it sit centred at
-     badge scale rather than spanning the whole thumbnail. */
-  .marketplace-thumb--logo {
-    background: var(--t-surface-sunk);
-  }
-  .marketplace-thumb--logo > img.marketplace-thumb-logo {
-    width: auto;
-    max-width: 45%;
-    height: 52%;
-    object-fit: contain;
-  }
-  .icon-box > img.marketplace-icon-logo {
-    display: block;
-    width: 1em;
-    height: 1em;
-    object-fit: contain;
-  }
-  /* Carousel: CSS scroll-snap handles touch swipe + keyboard
-     left/right when the track is focused, for free. JS only wires
-     the explicit prev/next arrow buttons and dot clicks. Arrows
-     and dots fade in on hover/focus so a card at rest stays clean. */
-  .marketplace-thumb-carousel {
-    position: relative;
-    padding: 0;
-  }
-  .marketplace-thumb-track {
-    display: flex;
-    width: 100%;
-    height: 100%;
-    overflow-x: auto;
-    overflow-y: hidden;
-    scroll-snap-type: x mandatory;
-    scrollbar-width: none;  /* Firefox: hide scrollbar */
-    -ms-overflow-style: none;
-    outline: none;
-  }
-  .marketplace-thumb-track::-webkit-scrollbar { display: none; }
-  .marketplace-thumb-track:focus-visible {
-    /* Surface keyboard focus on the scrollable region so users
-       know arrow keys will page. Inset so it doesn't clip the
-       card's border-radius. */
-    box-shadow: inset 0 0 0 2px var(--t-accent, currentColor);
-  }
-  .marketplace-thumb-slide {
-    flex: 0 0 100%;
-    width: 100%;
-    height: 100%;
-    object-fit: fill;
-    scroll-snap-align: center;
-    scroll-snap-stop: always;
-  }
-  .marketplace-thumb-arrow {
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 1.9rem;
-    height: 1.9rem;
-    padding: 0;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(0, 0, 0, 0.55);
-    color: #fff;
-    border: 0;
-    border-radius: 50%;
-    cursor: pointer;
-    opacity: 0;
-    transition: opacity 120ms ease-out;
-  }
-  .marketplace-thumb-arrow.is-prev { left: 0.5rem; }
-  .marketplace-thumb-arrow.is-next { right: 0.5rem; }
-  .marketplace-thumb-arrow:hover,
-  .marketplace-thumb-arrow:focus-visible {
-    background: rgba(0, 0, 0, 0.78);
-    outline: none;
-  }
-  .marketplace-thumb-arrow > i { font-size: 1.1rem; }
-  .marketplace-thumb-dots {
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0.45rem;
-    display: flex;
-    justify-content: center;
-    gap: 0.3rem;
-    pointer-events: none;
-  }
-  .marketplace-thumb-dot {
-    pointer-events: auto;
-    width: 0.5rem;
-    height: 0.5rem;
-    padding: 0;
-    border: 1px solid rgba(255, 255, 255, 0.9);
-    background: rgba(255, 255, 255, 0.4);
-    border-radius: 50%;
-    cursor: pointer;
-    transition: background 120ms ease-out, transform 120ms ease-out;
-  }
-  .marketplace-thumb-dot[aria-current="true"] {
-    background: #fff;
-    transform: scale(1.25);
-  }
-  .marketplace-thumb-dot:focus-visible {
-    outline: 2px solid var(--t-accent, #fff);
-    outline-offset: 2px;
-  }
-  /* Reveal arrows on hover/focus-within so the card looks clean
-     at rest but exposes navigation on intent. */
-  .marketplace-thumb-carousel:hover .marketplace-thumb-arrow,
-  .marketplace-thumb-carousel:focus-within .marketplace-thumb-arrow {
-    opacity: 1;
-  }
-  @media (prefers-reduced-motion: reduce) {
-    /* Disable smooth-scroll fallback; the JS reads this media
-       query too and uses behavior: 'instant' for arrow/dot
-       jumps, matching the user's stated motion preference. */
-    .marketplace-thumb-track { scroll-behavior: auto; }
-  }
-  .marketplace-body {
-    padding: 0.9rem 1rem 1rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.6rem;
-    flex: 1;
-  }
-  .marketplace-card-head h3 {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    flex-wrap: wrap;
-    margin: 0;
-    font-size: 1rem;
-  }
-  .marketplace-meta {
-    margin: 0.2rem 0 0;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.3rem;
-    align-items: center;
-    font-size: 0.85rem;
-  }
-  .marketplace-desc {
-    margin: 0;
-    color: var(--t-fg-soft);
-    font-size: 0.92rem;
-    line-height: 1.4;
-  }
-  .marketplace-tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.3rem;
-  }
-  .marketplace-bundle {
-    margin: 0;
-    font-size: 0.82rem;
-    color: var(--t-fg-soft);
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.35rem;
-  }
-  .marketplace-bundle code {
-    background: var(--t-surface-sunk);
-    border: 1px solid var(--t-border);
-    border-radius: 4px;
-    padding: 0.1rem 0.4rem;
-    font-size: 0.78rem;
-  }
-  .marketplace-bundle-more {
-    /* Tail chip for the "+N more" hidden folders. Muted, no border,
-       picks up a tooltip with the full overflow on hover so power
-       users can still see the truncated names without clicking
-       through to the source. */
-    color: var(--t-muted);
-    font-size: 0.78rem;
-    font-style: italic;
-    cursor: help;
-  }
-  .marketplace-actions {
-    margin-top: auto;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    align-items: center;
-    padding-top: 0.4rem;
-    border-top: 1px solid var(--t-border);
-  }
-  .inline-check {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-    font-size: 0.85rem;
-    margin-right: 0.4rem;
-  }
-</style>
-<script src="{{ url_for('static', filename='plugins_browse_carousel.js') }}" defer></script>
-<script>
-  // Client-side catalog search. Filters the marketplace grid by
-  // showing/hiding article cards in the DOM as the user types, so
-  // focus + caret are never disturbed. The hit set is built off
-  // each card's data-search-haystack (id + name + author + tags +
-  // description, lower-cased server-side). Submitting the form
-  // (Enter or the Clear button) does a full GET so the URL / share
-  // state stays in sync; ``?q=`` is honoured server-side.
-  (function () {
-    const form = document.querySelector('[data-mkt-search-form]');
-    const input = document.querySelector('[data-mkt-search]');
-    const clearBtn = document.querySelector('[data-mkt-search-clear]');
-    const grid = document.querySelector('.marketplace-grid');
-    if (!input) return;
-    const cards = grid ? Array.from(grid.querySelectorAll('[data-search-haystack]')) : [];
-
-    function apply(query) {
-      const q = (query || '').trim().toLowerCase();
-      let visible = 0;
-      cards.forEach(function (card) {
-        if (!q) {
-          card.hidden = false;
-          visible++;
-          return;
-        }
-        const hay = card.dataset.searchHaystack || '';
-        const match = hay.indexOf(q) !== -1;
-        card.hidden = !match;
-        if (match) visible++;
-      });
-      if (clearBtn) clearBtn.hidden = !q;
-      // Toggle an "empty after filter" message under the grid.
-      let emptyEl = document.querySelector('[data-mkt-search-empty]');
-      if (q && visible === 0 && grid && !emptyEl) {
-        emptyEl = document.createElement('p');
-        emptyEl.setAttribute('data-mkt-search-empty', '');
-        emptyEl.className = 'dx-empty-help';
-        emptyEl.style.cssText = 'margin-top: 14px; text-align: center;';
-        emptyEl.textContent = 'No entries match that search.';
-        grid.parentNode.insertBefore(emptyEl, grid.nextSibling);
-      }
-      if ((!q || visible > 0) && emptyEl) emptyEl.remove();
-    }
-
-    input.addEventListener('input', function () { apply(input.value); });
-    if (clearBtn) {
-      clearBtn.addEventListener('click', function () {
-        input.value = '';
-        apply('');
-        input.focus();
-      });
-    }
-    // Initial pass in case the input already has a value (e.g. URL ?q=).
-    apply(input.value);
-    // Form submit (Enter) still goes server-side so the URL updates.
-  })();
-</script>
+<script src="{{ url_for('static', filename='template_install_modal.js') }}" defer></script>
+<script src="{{ url_for('static', filename='catalog_browse.js') }}" defer></script>
 {% endblock %}

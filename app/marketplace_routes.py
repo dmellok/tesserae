@@ -1,4 +1,4 @@
-"""Routes for the community widget marketplace (Settings → Widgets → Browse).
+"""Routes for the community catalog (Settings → Widgets → Browse catalog).
 
 Three POST endpoints plus the Browse page render, all mounted under
 ``/plugins/`` to live alongside the existing plugin admin routes. The
@@ -35,6 +35,7 @@ from flask import (
     abort,
     current_app,
     flash,
+    jsonify,
     redirect,
     render_template,
     request,
@@ -218,6 +219,19 @@ def _entries_payload(
                 f"{screenshots_base}/screenshots/{entry.id}/extra-{n}.png"
                 for n in range(1, entry.extra_screenshot_count + 1)
             )
+        icon_url = (
+            f"{screenshots_base}/icons/{entry.icon_asset}"
+            if (entry.icon_asset and screenshots_base)
+            else None
+        )
+        # A mark stands in for the preview entirely, not just the small
+        # icon slot: for a widget that renders whatever the user's own
+        # library holds, one screenshot is an arbitrary photo and says
+        # nothing about what the widget is. Dropped here rather than in
+        # the view so the client model never has to re-decide it.
+        if icon_url:
+            primary_url = None
+            screenshot_urls = []
         if record is not None:
             folders = list(record.folders)
         elif entry.folders:
@@ -246,11 +260,7 @@ def _entries_payload(
                 "name": entry.name,
                 "description": entry.description,
                 "icon": entry.icon or "ph-puzzle-piece",
-                "icon_url": (
-                    f"{screenshots_base}/icons/{entry.icon_asset}"
-                    if (entry.icon_asset and screenshots_base)
-                    else None
-                ),
+                "icon_url": icon_url,
                 "author_name": entry.author_name,
                 "author_github": entry.author_github,
                 "tags": entry.tags,
@@ -310,22 +320,54 @@ def _collect_kinds(entries: list[CatalogEntry]) -> list[dict[str, Any]]:
     return ordered
 
 
+def _panel_fit() -> dict[str, Any]:
+    """What the rail's "Fits my panels only" filter needs: the resolutions
+    the user actually has registered, plus the known device names at each
+    resolution so a template group can say what it fits. Shared with the
+    template catalog (same helpers the standalone templates page used)."""
+    from app import template_market
+
+    devices = current_app.config.get("DEVICE_REGISTRY")
+    return {
+        "my_resolutions": template_market.registered_device_resolutions(devices),
+        "resolution_devices": template_market.resolution_device_labels(),
+    }
+
+
 @bp.get("/browse")
 def browse() -> str:
-    """Render the Browse page. Failures to fetch the index don't
-    blank the page, fall back to the cached snapshot when possible
-    and surface a muted "Couldn't refresh" line."""
+    """Render the Browse catalog page.
+
+    The page is one catalog over three item types: widgets and themes come
+    from the static index on GitHub (rendered here), templates from
+    api.tesserae.ink (fetched by the client from
+    ``/plugins/templates/index.json``, which needs the online switch).
+
+    Filtering, sorting, grouping and the detail sheet all run client-side
+    off ``catalog_payload``, so typing never navigates. ``?q=`` / ``?tag=``
+    / ``?kind=`` / ``?type=`` still work: they seed the client's initial
+    filter state, and the ``<noscript>`` list below is filtered server-side
+    by the same values so a JS-less browser can still install.
+
+    Failures to fetch the index don't blank the page: fall back to the
+    cached snapshot when possible and surface a muted "Couldn't refresh"
+    line."""
     mkt = _marketplace()
+    initial = {
+        "type": request.args.get("type") or "All",
+        "tag": request.args.get("tag") or None,
+        "kind": request.args.get("kind") or None,
+        "q": (request.args.get("q") or "").strip(),
+        "status": request.args.get("status") or "All",
+    }
     if not mkt.index_url():
         return render_template(
             "plugins_browse.html",
             entries=[],
-            tags=[],
-            kinds=[],
+            catalog_payload={"items": [], "initial": initial},
             active_tag=None,
             active_kind=None,
             active_query=None,
-            installed_count=0,
             index_url="",
             stale=False,
             error=None,
@@ -345,27 +387,42 @@ def browse() -> str:
         if cached is not None:
             entries = cached
             stale = True
-    active_tag = request.args.get("tag") or None
-    active_kind = request.args.get("kind") or None
-    active_query = (request.args.get("q") or "").strip() or None
-    # Kinds are derived from the full cached index (or the live one if
-    # no cache), so toggling a kind chip doesn't make the other chips
-    # disappear. Same logic as tags.
-    full_index = mkt.cached_index() or entries
-    entries = _filter_entries(entries, tag=active_tag, kind=active_kind, query=active_query)
+    active_tag = initial["tag"]
+    active_kind = initial["kind"]
+    active_query = initial["q"] or None
     installed = mkt.installed()
     install_counts = _install_counts()
+    payload_items = _entries_payload(
+        entries, installed, mkt.screenshots_base(), mkt.plugins_dir(), install_counts
+    )
+    # The client gets the whole index and narrows it live; the noscript
+    # list gets the server-filtered slice so deep links still land
+    # somewhere sensible without JS.
+    fallback = _entries_payload(
+        _filter_entries(entries, tag=active_tag, kind=active_kind, query=active_query),
+        installed,
+        mkt.screenshots_base(),
+        mkt.plugins_dir(),
+        install_counts,
+    )
+    catalog_payload: dict[str, Any] = {
+        "items": payload_items,
+        "categories": _collect_tags(entries),
+        "kinds": _collect_kinds(entries),
+        "initial": initial,
+        "templates_enabled": _templates_enabled(),
+        "templates_online": _templates_online(),
+        "stale": stale,
+        "index_url": mkt.index_url(),
+        **_panel_fit(),
+    }
     return render_template(
         "plugins_browse.html",
-        entries=_entries_payload(
-            entries, installed, mkt.screenshots_base(), mkt.plugins_dir(), install_counts
-        ),
-        tags=_collect_tags(full_index),
-        kinds=_collect_kinds(full_index),
+        entries=fallback,
+        catalog_payload=catalog_payload,
         active_tag=active_tag,
         active_kind=active_kind,
         active_query=active_query,
-        installed_count=len(installed),
         index_url=mkt.index_url(),
         stale=stale,
         error=error,
@@ -396,8 +453,30 @@ def _templates_online() -> bool:
     return online.online_enabled(current_app.config.get("SETTINGS_STORE"))
 
 
+def _wants_json() -> bool:
+    """True when the caller is the Browse catalog's fetch(), not a form post.
+
+    The catalog page installs in place (the row keeps its filters, sort
+    position and scroll), so it needs the outcome back as data rather than
+    a redirect + flash. Anything else, including a ``<noscript>`` form
+    post, keeps the redirect path untouched."""
+    return request.headers.get("X-Requested-With") == "tesserae-fetch"
+
+
+def _outcome(ok: bool, message: str, *, status: int = 400, **extra: Any) -> Response:
+    """Flash + redirect for form posts, JSON for the catalog page."""
+    if _wants_json():
+        resp = jsonify(
+            {"ok": ok, "message": message, "restart_pending": _restart_pending(), **extra}
+        )
+        resp.status_code = 200 if ok else status
+        return resp
+    flash(message, "ok" if ok else "error")
+    return redirect(url_for("marketplace.browse"))
+
+
 @bp.post("/browse/install")
-def install() -> Response:
+def install() -> Response | tuple[Response, int]:
     """Install one catalog entry by id. The form sends only the id;
     we re-fetch the index here so a stale browser tab can't smuggle
     in a different tarball URL or sha256 than the catalog actually
@@ -405,35 +484,35 @@ def install() -> Response:
     mkt = _marketplace()
     catalog_id = (request.form.get("catalog_id") or "").strip()
     if not catalog_id:
-        flash("Missing catalog id.", "error")
-        return redirect(url_for("marketplace.browse"))
+        return _outcome(False, "Missing catalog id.", status=400)
     try:
         entries = mkt.fetch_index(force=True)
     except IndexUnavailable as err:
-        flash(f"Couldn't refresh the catalog: {err}", "error")
-        return redirect(url_for("marketplace.browse"))
+        return _outcome(False, f"Couldn't refresh the catalog: {err}", status=502)
     entry = next((e for e in entries if e.id == catalog_id), None)
     if entry is None:
-        flash(f"Catalog entry {catalog_id!r} not found (try refreshing).", "error")
-        return redirect(url_for("marketplace.browse"))
+        return _outcome(
+            False, f"Catalog entry {catalog_id!r} not found (try refreshing).", status=404
+        )
     try:
         result = mkt.install(entry)
     except (InstallRefused, TarballRejected) as err:
-        flash(f"Install failed: {err}", "error")
-        return redirect(url_for("marketplace.browse"))
+        return _outcome(False, f"Install failed: {err}", status=400)
     except Exception:
         logger.exception("marketplace: unexpected install failure for %s", catalog_id)
-        flash("Install failed with an unexpected error (see server log).", "error")
-        return redirect(url_for("marketplace.browse"))
+        return _outcome(
+            False, "Install failed with an unexpected error (see server log).", status=500
+        )
     _mark_restart_pending()
     _report_install(entry)
-    flash(
+    return _outcome(
+        True,
         f"Installed {entry.name} v{result.version}. Click "
         '"Restart required" in the top bar when you\'re done installing '
         "to load it (you can queue more installs first).",
-        "ok",
+        installed=True,
+        version=result.version,
     )
-    return redirect(url_for("marketplace.browse"))
 
 
 @bp.post("/browse/uninstall")
@@ -447,22 +526,22 @@ def uninstall() -> Response:
     mkt = _marketplace()
     catalog_id = (request.form.get("catalog_id") or "").strip()
     if not catalog_id:
-        flash("Missing catalog id.", "error")
-        return redirect(url_for("marketplace.browse"))
+        return _outcome(False, "Missing catalog id.")
     delete_data = request.form.get("delete_data") == "1"
     try:
         removed = mkt.uninstall(catalog_id, delete_data=delete_data)
     except Exception:
         logger.exception("marketplace: unexpected uninstall failure for %s", catalog_id)
-        flash("Uninstall failed with an unexpected error (see server log).", "error")
-        return redirect(url_for("marketplace.browse"))
+        return _outcome(
+            False, "Uninstall failed with an unexpected error (see server log).", status=500
+        )
     if not removed:
-        flash(
+        return _outcome(
+            False,
             f"{catalog_id!r} isn't tracked by the marketplace, refusing to "
             "remove a bundled or hand-installed plugin.",
-            "error",
+            status=409,
         )
-        return redirect(url_for("marketplace.browse"))
     _mark_restart_pending()
     msg = f"Uninstalled {catalog_id}."
     if delete_data:
@@ -471,8 +550,7 @@ def uninstall() -> Response:
         ' Click "Restart required" in the top bar when you\'re done'
         " to drop it from the running registry."
     )
-    flash(msg, "ok")
-    return redirect(url_for("marketplace.browse"))
+    return _outcome(True, msg, installed=False)
 
 
 @bp.post("/errors/remove")

@@ -250,31 +250,39 @@ def test_missing_requirements_helper() -> None:
     assert missing_requirements(template, records, registry) == ["nope"]
 
 
-# -- templates page (resolution > device grouping) ------------------------
+# -- templates in the merged catalog (resolution > device grouping) --------
 
 
-def test_templates_page_renders_with_grouping_data(
+def test_old_templates_page_redirects_into_the_catalog(
     app: Flask, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """Templates are one type in the one catalog now; the standalone page's
+    URL stays valid and lands on the Templates view."""
     _enable(app, monkeypatch)
-    resp = app.test_client().get("/plugins/templates/")
-    assert resp.status_code == 200
-    body = resp.get_data(as_text=True)
-    assert "tpl-market-data" in body and "resolution_devices" in body
+    resp = app.test_client().get("/plugins/templates/", follow_redirects=False)
+    assert resp.status_code == 302
+    assert resp.headers["Location"].endswith("/plugins/browse?type=Templates")
+
+
+def test_catalog_carries_the_grouping_data(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The resolution > device labels the template groups are built from
+    ship with the catalog page, alongside the user's own resolutions."""
+    _enable(app, monkeypatch)
+    body = app.test_client().get("/plugins/browse").get_data(as_text=True)
+    assert "resolution_devices" in body and "my_resolutions" in body
     assert "800x480" in body  # preset resolutions serialized for grouping
-    assert "template_browse.js" in body
 
 
-def test_templates_page_offline_shows_notice_not_403(
+def test_data_endpoints_stay_strict_when_offline(
     app: Flask, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """The catalog page explains the offline state client-side; the data +
+    install endpoints hard-fail so nothing silently no-ops."""
     monkeypatch.setenv("TESSERAE_EXPERIMENT_TEMPLATES", "1")
     app.config["SETTINGS_STORE"].patch_section("app", {"online_features": False})
-    resp = app.test_client().get("/plugins/templates/")
-    assert resp.status_code == 200
-    assert "Online features are disabled" in resp.get_data(as_text=True)
-    # Data + install endpoints stay strict.
     assert app.test_client().get("/plugins/templates/index.json").status_code == 403
+    body = app.test_client().get("/plugins/browse").get_data(as_text=True)
+    assert '"templates_online": false' in body
 
 
 def test_templates_page_404_when_experiment_off(app: Flask) -> None:
@@ -514,39 +522,36 @@ def test_install_accepts_the_rendered_form(app: Flask, monkeypatch: pytest.Monke
     assert page.canvas.els[0].options["location"] == "Melbourne"
 
 
-# -- Browse doorway + Settings hint (#224) ---------------------------------
+# -- Templates as a catalog type + Settings hint (#224) --------------------
 
 
-def test_browse_doorway_hidden_when_experiment_off(app: Flask) -> None:
-    """No opt-in, no section. Unchanged behaviour."""
+def test_templates_type_absent_when_experiment_off(app: Flask) -> None:
+    """No opt-in, no Templates row in the rail, and no fetch of the hosted
+    catalog. Unchanged behaviour, expressed through the payload flag the
+    client reads."""
     body = app.test_client().get("/plugins/browse").get_data(as_text=True)
-    assert "Community templates" not in body
+    assert '"templates_enabled": false' in body
 
 
-def test_browse_doorway_links_to_templates_when_online(
-    app: Flask, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_templates_type_offered_when_online(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
     _enable(app, monkeypatch)
     body = app.test_client().get("/plugins/browse").get_data(as_text=True)
-    assert "Community templates" in body
-    assert "Browse templates" in body
-    assert "Enable online features" not in body
+    assert '"templates_enabled": true' in body
+    assert '"templates_online": true' in body
 
 
-def test_browse_doorway_explains_itself_when_offline(
+def test_templates_type_explains_itself_when_offline(
     app: Flask, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The section used to vanish, which read as a bug: the widget grid above
-    it comes from a static index on GitHub and keeps working without the
-    online switch, so nothing on the page connected the two (#224)."""
+    """The section used to vanish, which read as a bug: widgets come from a
+    static index on GitHub and keep working without the online switch, so
+    nothing on the page connected the two (#224). The Templates type stays
+    selectable and says why it's empty instead."""
     monkeypatch.setenv("TESSERAE_EXPERIMENT_TEMPLATES", "1")
     app.config["SETTINGS_STORE"].patch_section("app", {"online_features": False})
     body = app.test_client().get("/plugins/browse").get_data(as_text=True)
-    assert "Community templates" in body
-    assert "need Online features" in body
-    # And it points at the switch rather than leaving the user to find it.
-    assert "Enable online features" in body
-    assert "#online-features" in body
+    assert '"templates_enabled": true' in body
+    assert '"templates_online": false' in body
     assert "Browse templates" not in body
 
 

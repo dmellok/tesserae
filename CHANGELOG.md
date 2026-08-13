@@ -4,6 +4,22 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.297.0], 2026-08-14
+
+### Changed
+
+- **Browse community widgets and Community templates are one Browse catalog
+  page.** Widgets, themes and templates now share a single list of dense rows
+  with a persistent filter rail (type with live counts, status, category,
+  panel fit), a ranked search, a sort menu, and a detail sheet holding the
+  long description, the plugin folders and the install detail that used to
+  make every card tall. Selecting Templates switches the list into the
+  resolution-grouped sections the standalone templates page was built around;
+  `/plugins/templates/` redirects into it. Install and uninstall post in
+  place, so the list keeps its filters, sort position and scroll, and the
+  topbar "Restart required" button lights up as soon as the first change
+  lands.
+
 ## [0.296.1], 2026-08-13
 
 ### Fixed

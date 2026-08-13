@@ -252,7 +252,7 @@ For your own widgets, third-party APIs, niche use cases — anything
 you want users to opt into per install rather than shipping to
 everyone. Your widget lives in its own GitHub repo and ships via a
 PR to the catalog index; users find it on Settings → Widgets →
-Browse community widgets.
+Browse catalog.
 
 See **[Publish a widget through the catalog](publishing-a-widget.md)**
 for the full flow: pinned-release tarballs, sha256 verification, the

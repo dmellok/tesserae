@@ -17,11 +17,9 @@
 // gets the UX automatically.
 (function () {
   const STAGES = [
-    { at: 0,    text: "Working…" },
+    { at: 0, text: "Working…" },
     { at: 4000, text: "Almost there…" },
   ];
-  const forms = document.querySelectorAll("[data-restart-form]");
-  if (!forms.length) return;
   const modal = document.querySelector("[data-restart-modal]");
   const titleEl = document.querySelector("[data-restart-modal-title]");
   const stageEl = document.querySelector("[data-restart-modal-stage]");
@@ -103,7 +101,13 @@
     });
   }
 
-  forms.forEach((form) => {
+  function bind(form) {
+    // Idempotent: bindAll() runs again whenever a page injects a form
+    // after load (the catalog lights up the topbar "Restart required"
+    // button as soon as the first install lands), and re-binding the
+    // same form would fire the submit handler twice.
+    if (form.dataset.restartBound === "1") return;
+    form.dataset.restartBound = "1";
     form.addEventListener("submit", (ev) => {
       const confirmText = form.dataset.restartConfirm;
       if (confirmText && !confirm(confirmText)) {
@@ -153,9 +157,18 @@
           showError(
             "Couldn't confirm the server came back. " +
               "It may have restarted anyway, reload the page manually to check. " +
-              "(" + (err && err.message ? err.message : "timed out") + ")"
+              "(" +
+              (err && err.message ? err.message : "timed out") +
+              ")"
           );
         });
     });
-  });
+  }
+
+  function bindAll() {
+    document.querySelectorAll("[data-restart-form]").forEach(bind);
+  }
+
+  window.tesseraeBindRestartForms = bindAll;
+  bindAll();
 })();

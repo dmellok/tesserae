@@ -3,7 +3,7 @@
 # Community widgets gallery
 
 Widgets that don't ship in Tesserae's default install but are one click
-away via **Settings → Widgets → Browse community widgets**. The
+away via **Settings → Widgets → Browse catalog**. The
 catalog is curated, every entry is reviewed before it lands.
 
 If your dashboard is missing a widget that used to be in the bundle
@@ -11,7 +11,7 @@ If your dashboard is missing a widget that used to be in the bundle
 
 ## How install works
 
-1. Open **Settings → Widgets → Browse community widgets** in Tesserae.
+1. Open **Settings → Widgets → Browse catalog** in Tesserae.
 2. Click **Install** on the entry you want. Tesserae downloads the
    release tarball, verifies its sha256 against the catalog, and
    drops the widget folders into `plugins/`.

@@ -5,17 +5,26 @@ the master online-features switch. The browser never talks to
 api.tesserae.ink directly: the catalog is proxied (consistent with how widget
 install counts are fetched) and installs re-fetch the doc server-side.
 
-``GET /plugins/templates/`` is the dedicated Browse page: templates grouped
-by resolution, each group labelled with the known devices at those dims, and
-the user's own device resolutions pinned first.
+``GET /plugins/templates/`` is a redirect into the merged Browse catalog;
+templates are one type there, and selecting them switches the list into the
+resolution-grouped sections the standalone page used to own.
 """
 
 from __future__ import annotations
 
-import json
 from typing import Any
 
-from flask import Blueprint, Response, current_app, jsonify, render_template, request, url_for
+from flask import (
+    Blueprint,
+    Response,
+    current_app,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
+from werkzeug.wrappers import Response as WerkzeugResponse
 
 from app import experiments, online, template_market
 
@@ -37,18 +46,15 @@ def _gate() -> Response | tuple[Response, int] | None:
 
 
 @bp.get("/")
-def page() -> str:
-    """The Templates page: client-rendered groups (resolution > devices) fed
-    by ``/plugins/templates/index.json``; server supplies the device-name map
-    and which resolutions the user actually owns."""
-    settings = current_app.config.get("SETTINGS_STORE")
-    devices = current_app.config.get("DEVICE_REGISTRY")
-    return render_template(
-        "templates_browse.html",
-        online_enabled=online.online_enabled(settings),
-        resolution_devices_json=json.dumps(template_market.resolution_device_labels()),
-        my_resolutions_json=json.dumps(template_market.registered_device_resolutions(devices)),
-    )
+def page() -> WerkzeugResponse:
+    """Kept as a redirect into the merged catalog.
+
+    Templates used to have their own page, reached from a teaser strip on
+    the widget Browse. They're one type in the one catalog now (Browse
+    catalog → Templates, which switches the list into the same
+    resolution-grouped sections this page was built around), so old links
+    and bookmarks land there instead of on a second, emptier gallery."""
+    return redirect(url_for("marketplace.browse", type="Templates"))
 
 
 def _installed_records() -> dict[str, Any]:

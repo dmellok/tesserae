@@ -106,8 +106,10 @@ def test_install_marks_restart_pending_but_does_not_restart(app: Flask) -> None:
 
 
 def test_browse_shows_install_counts(app: Flask, monkeypatch: object) -> None:
-    """The Browse page renders the per-widget install count fetched from
-    api.tesserae.ink, keyed by catalog id, on each card."""
+    """The Browse page hands the per-widget install count fetched from
+    api.tesserae.ink to the catalog client, keyed by catalog id. The row
+    formats it (thousands separator, download glyph); the payload carries
+    the raw number."""
     client = app.test_client()
     _sign_in(client)
     app.config["SETTINGS_STORE"].patch_section("app", {"online_features": True})
@@ -127,7 +129,72 @@ def test_browse_shows_install_counts(app: Flask, monkeypatch: object) -> None:
         online, "widget_install_counts", lambda: {"spotify": 1234}
     )
     body = client.get("/plugins/browse").get_data(as_text=True)
-    assert "1,234" in body  # the count is rendered on the card
+    assert '"installs": 1234' in body
+
+
+def test_catalog_page_install_answers_in_json(app: Flask) -> None:
+    """The Browse catalog installs in place: the row keeps its filters,
+    sort position and scroll, so the outcome has to come back as data.
+    Marked by the fetch header; a plain form post still redirects."""
+    client = app.test_client()
+    _sign_in(client)
+    _inject_mocks(app)
+    resp = client.post(
+        "/plugins/browse/install",
+        data={"catalog_id": "sample"},
+        headers={"X-Requested-With": "tesserae-fetch"},
+    )
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["ok"] is True
+    assert body["installed"] is True
+    assert body["version"] == "1.0.0"
+    assert body["restart_pending"] is True
+    assert "Restart required" in body["message"]
+
+
+def test_catalog_page_surfaces_a_refused_install_as_json(app: Flask) -> None:
+    """A refusal has to reach the row's button, not a flash the page
+    never reloads to show."""
+    client = app.test_client()
+    _sign_in(client)
+    mkt, _ = _inject_mocks(app)
+    mkt.fetch_index.return_value = []
+    resp = client.post(
+        "/plugins/browse/install",
+        data={"catalog_id": "sample"},
+        headers={"X-Requested-With": "tesserae-fetch"},
+    )
+    assert resp.status_code == 404
+    assert resp.get_json()["ok"] is False
+    assert app.config.get("MARKETPLACE_RESTART_PENDING") is not True
+
+
+def test_catalog_page_uninstall_answers_in_json(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    _inject_mocks(app)
+    resp = client.post(
+        "/plugins/browse/uninstall",
+        data={"catalog_id": "sample", "delete_data": "1"},
+        headers={"X-Requested-With": "tesserae-fetch"},
+    )
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["ok"] is True and body["installed"] is False
+    assert "data dir" in body["message"]
+
+
+def test_a_form_post_still_redirects(app: Flask) -> None:
+    """The <noscript> path is untouched: flash + redirect, as before."""
+    client = app.test_client()
+    _sign_in(client)
+    _inject_mocks(app)
+    resp = client.post(
+        "/plugins/browse/install", data={"catalog_id": "sample"}, follow_redirects=False
+    )
+    assert resp.status_code == 302
+    assert "/plugins/browse" in resp.headers["Location"]
 
 
 def test_install_reports_and_logs_telemetry(
