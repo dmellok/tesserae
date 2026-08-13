@@ -73,6 +73,12 @@ CATALOG: tuple[dict[str, str], ...] = (
 )
 
 
+# Flags whose feature is hosted on api.tesserae.ink, so switching them on does
+# nothing until the master online-features opt-in is also on. The Settings row
+# says so rather than leaving the toggle a silent no-op (#224).
+REQUIRES_ONLINE: frozenset[str] = frozenset({"templates"})
+
+
 def _env_flag(name: str) -> bool | None:
     """The env override for ``name``, or None when the var is unset."""
     raw = os.environ.get(f"TESSERAE_EXPERIMENT_{name.upper()}")

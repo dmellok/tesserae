@@ -133,15 +133,33 @@
 
 {% if templates_enabled %}
 {# Community dashboard templates live on their own page (grouped by
-   resolution > device); this is just the doorway from the widget Browse. #}
+   resolution > device); this is just the doorway from the widget Browse.
+
+   The card renders on the experiment flag alone. When the master online
+   switch is off it stays visible and says why, rather than disappearing:
+   the widgets above come from a static index on GitHub and keep working
+   without that switch, so a vanishing templates section read as a bug
+   with nothing on the page connecting the two (#224). #}
 <section class="dx-section-card" style="margin:16px 0;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
   <div>
     <strong><i class="ph ph-layout" aria-hidden="true"></i> Community templates</strong>
     <div class="field-help" style="margin:2px 0 0">Complete dashboards shared by other users,
       reviewed before publishing and grouped by the panels they fit.</div>
+    {% if not templates_online %}
+    <div class="field-help" style="margin:4px 0 0">
+      <i class="ph ph-wifi-slash" aria-hidden="true"></i>
+      These are served from api.tesserae.ink, so they need Online features
+      switched on. The widgets above come from GitHub and work either way.
+    </div>
+    {% endif %}
   </div>
+  {% if templates_online %}
   <a class="dx-btn-sm" href="{{ url_for('template_market.page') }}">Browse templates
     <i class="ph ph-arrow-right" aria-hidden="true"></i></a>
+  {% else %}
+  <a class="dx-btn-sm" href="{{ url_for('auth.settings_area', area='system') }}#online-features">Enable online features
+    <i class="ph ph-arrow-right" aria-hidden="true"></i></a>
+  {% endif %}
 </section>
 {% endif %}
 

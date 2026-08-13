@@ -986,7 +986,17 @@ docker compose up -d</code></pre>
         <strong>{{ exp.label }}</strong>
         {% if exp.enabled %}<span class="pill is-ok">on</span>{% else %}<span class="pill">off</span>{% endif %}
         {% if exp.env_forced %}<span class="pill">forced by env</span>{% endif %}
+        {% if exp.needs_online %}<span class="pill is-warn">needs online features</span>{% endif %}
         <div class="field-help" style="margin:2px 0 0">{{ exp.description }}</div>
+        {% if exp.needs_online %}
+        {# The feature is hosted, so the flag alone does nothing. Say so here
+           rather than letting the toggle look broken (#224). #}
+        <div class="field-help" style="margin:4px 0 0">
+          <i class="ph ph-warning-circle" aria-hidden="true"></i>
+          This one is served from api.tesserae.ink, so it stays inert until
+          <a href="#online-features">Online features</a> is on.
+        </div>
+        {% endif %}
       </div>
       <form method="post" action="{{ url_for('auth.system_experiments_toggle') }}" class="form" style="margin:0;flex:none">
         <input type="hidden" name="name" value="{{ exp.name }}">
@@ -1161,7 +1171,7 @@ docker compose up -d</code></pre>
    api.tesserae.ink call: app + device-firmware update checks and the
    anonymous marketplace install count. Off means the app never contacts
    api.tesserae.ink. #}
-{% call section_card(icon='cloud-arrow-down', title='Online features',
+{% call section_card(id='online-features', icon='cloud-arrow-down', title='Online features',
                      description="When on, Tesserae contacts api.tesserae.ink to check for app and device-firmware updates, to report an anonymous install count for the widgets you add from the marketplace, and to send a once-a-day heartbeat with low-cardinality facts about this install (version, OS family, CPU arch, Python minor, deployment kind, transport, a bucketed device count, and the device kinds you run). Each request may include your install's random ID and version. A coarse country is derived from your IP for aggregate geography and the IP is then discarded. No account, no personal data, no exact device counts, and no IP addresses or browser details are stored. Off by default (you're asked once at first-run setup); turn it off here and Tesserae never contacts api.tesserae.ink.") %}
   <div class="section-body">
     <form method="post" action="{{ url_for('auth.settings_online_features_toggle') }}"

@@ -4,6 +4,34 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.296.0], 2026-08-13
+
+First stable release since 0.259.0. Home Assistant users on the stable add-on
+channel should take this one: 0.277.1 fixed the community-template catalog,
+the Share dialog, template install and the Home Assistant device picker under
+ingress, all of which requested root-relative paths and so left the app for
+the host root. Also here since 0.259.0: the Companion API grew Lineups
+authoring, read and control with per-client permissions and a session
+endpoint; dashboards gained data-change refreshes, placement-level refresh
+cadences, and cell options that fill from another option; a GTFS departure
+board, three TRMNL pixel fonts and BWRY palette calibration landed; and
+CircuitPython clients can declare their panel rotation at registration. The
+per-version sections below carry the detail.
+
+### Fixed
+
+- **Switching on the Template marketplace experiment while online features are
+  off no longer changes nothing without saying why.** The community-templates
+  section on Browse was gated on the experiment *and* the master online
+  switch, so an install that enabled the experiment alone saw the page it
+  already had, with nothing anywhere to explain the omission. Community
+  widgets are served from a static index on GitHub and stay browsable with the
+  online switch off, which made the missing templates section read as a bug
+  rather than a setting. The section now renders on the experiment alone and,
+  when the online switch is off, says the templates come from api.tesserae.ink
+  and links straight to the switch. The Settings row for the flag carries the
+  same note.
+
 ## [0.295.0], 2026-08-13
 
 ### Fixed

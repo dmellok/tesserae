@@ -142,11 +142,16 @@ def settings_area(area: str) -> str | Response:
     system_mcp_reveal_token = session.pop("_mcp_token_reveal", "") if area == "system" else ""
     # Experiments card: one row per catalogued flag, with the resolved state
     # and whether an env var pins it (row renders read-only then).
+    # ``needs_online`` marks a row whose feature is hosted on api.tesserae.ink
+    # and is therefore inert while the master online switch is off. Enabling
+    # such a flag used to change nothing with no explanation anywhere (#224).
+    _online_on = _firmware_check_enabled()
     system_experiments = [
         {
             **entry,
             "enabled": _experiments.is_enabled(entry["name"]),
             "env_forced": _experiments.env_override(entry["name"]) is not None,
+            "needs_online": entry["name"] in _experiments.REQUIRES_ONLINE and not _online_on,
         }
         for entry in _experiments.CATALOG
     ]

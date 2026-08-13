@@ -331,6 +331,7 @@ def browse() -> str:
             error=None,
             restart_pending=_restart_pending(),
             templates_enabled=_templates_enabled(),
+            templates_online=_templates_online(),
         )
     error: str | None = None
     stale = False
@@ -370,17 +371,29 @@ def browse() -> str:
         error=error,
         restart_pending=_restart_pending(),
         templates_enabled=_templates_enabled(),
+        templates_online=_templates_online(),
     )
 
 
 def _templates_enabled() -> bool:
-    """Whether the community-templates section shows on Browse: the experiment
-    flag AND the master online switch (the section is pure hosted content)."""
-    from app import experiments, online
+    """Whether the community-templates section shows on Browse at all: the
+    experiment flag alone. An install that never opted into the experiment
+    sees nothing, same as before."""
+    from app import experiments
 
-    return experiments.is_enabled("templates") and online.online_enabled(
-        current_app.config.get("SETTINGS_STORE")
-    )
+    return experiments.is_enabled("templates")
+
+
+def _templates_online() -> bool:
+    """Whether that section can actually reach its catalog. The templates
+    live on api.tesserae.ink, so they need the master online switch too.
+    Kept separate from :func:`_templates_enabled` so the section can explain
+    itself when the switch is off instead of silently vanishing (#224):
+    widgets come from a static index on GitHub and stay browsable either way,
+    which made the disappearance look arbitrary."""
+    from app import online
+
+    return online.online_enabled(current_app.config.get("SETTINGS_STORE"))
 
 
 @bp.post("/browse/install")
