@@ -39,6 +39,7 @@ from app.panel import PANEL_PRESETS, resolve_panel_for_page
 from app.plugin_http import fetch_json
 from app.plugin_loader import Font, PluginRegistry
 from app.state.page_store import Page, PageStore
+from app.touch_spec import PRIMITIVE_KINDS
 
 logger = logging.getLogger(__name__)
 
@@ -1094,30 +1095,46 @@ def _build_canvas_els(
             _stamp_touch(els_out[-1], e)
             continue
         if e.kind and e.kind != "widget":
-            els_out.append(
-                {
-                    "id": e.id,
-                    "kind": e.kind,
-                    "color": e.color,
-                    "fill": e.fill,
-                    "stroke": e.stroke,
-                    "radius": e.radius,
-                    "icon": e.icon,
-                    "weight": e.weight,
-                    "text": e.text,
-                    "align": e.align,
-                    "size": e.size,
-                    "html": e.html,
-                    "css": e.css,
-                    "opacity": e.opacity,
-                    "rotate": e.rotate,
-                    "x": e.x,
-                    "y": e.y,
-                    "w": e.w,
-                    "h": e.h,
-                    "data_source": "static",
-                }
-            )
+            deco: dict[str, Any] = {
+                "id": e.id,
+                "kind": e.kind,
+                "color": e.color,
+                "fill": e.fill,
+                "stroke": e.stroke,
+                "radius": e.radius,
+                "icon": e.icon,
+                "weight": e.weight,
+                "text": e.text,
+                "align": e.align,
+                "size": e.size,
+                "html": e.html,
+                "css": e.css,
+                "opacity": e.opacity,
+                "rotate": e.rotate,
+                "x": e.x,
+                "y": e.y,
+                "w": e.w,
+                "h": e.h,
+                "data_source": "static",
+            }
+            if e.kind in PRIMITIVE_KINDS:
+                # A touch-v3 primitive carries its own content: the caption, the
+                # switch position, the value the slider / stepper sits at. The
+                # firmware reads these from the wire spec, but the renderer needs
+                # them too now that it draws the control for panels that don't
+                # (#228), and they're inert on the kinds that ignore them.
+                deco.update(
+                    {
+                        "label": e.label,
+                        "state": e.state,
+                        "axis": e.axis,
+                        "value_min": e.value_min,
+                        "value_max": e.value_max,
+                        "value_step": e.value_step,
+                        "value_now": e.value_now,
+                    }
+                )
+            els_out.append(deco)
             _apply_binds(e, els_out[-1])
             _stamp_touch(els_out[-1], e)
             continue
@@ -1149,6 +1166,27 @@ def _build_canvas_els(
     return els_out
 
 
+def device_draws_touch_primitives(device_id: str) -> bool:
+    """Whether the panel receiving this render draws touch-v3 primitives itself.
+
+    True only for a device advertising protocol v2 (device-owned touch), the
+    same capability :mod:`app.push` gates frame patches on. Those panels hit-test
+    and draw button / switch / slider / stepper locally, so the composition
+    leaves their rects blank; everywhere else nothing would ever fill that rect,
+    so the renderer paints the control (#228). An unknown device, a device that
+    has never advertised ``proto``, or no device at all all answer False: the
+    honest default is to paint, since an unwanted control is visible and a
+    missing one is not.
+    """
+    if not device_id:
+        return False
+    status_cache = current_app.config.get("DEVICE_STATUS") or {}
+    status = status_cache.get(device_id) if isinstance(status_cache, dict) else None
+    proto = status.get("proto") if isinstance(status, dict) else None
+    v = proto.get("v") if isinstance(proto, dict) else None
+    return isinstance(v, int) and not isinstance(v, bool) and v >= 2
+
+
 def _render_canvas(
     layout: Any,
     *,
@@ -1164,7 +1202,12 @@ def _render_canvas(
 
     ``target_device_id`` names which bound device this render is for, so
     per-device widgets (``tesserae_status``) resolve to that device's telemetry.
-    ``fresh`` bypasses widget-data caches (see :func:`_build_canvas_els`)."""
+    ``fresh`` bypasses widget-data caches (see :func:`_build_canvas_els`).
+
+    Touch-v3 primitives are left blank only when this render is a frame for a
+    panel that draws them itself: ``preview`` renders (the editor iframe, hover
+    thumbnails, the MCP render loop) always paint the control, since a preview
+    is a look at the design rather than the bytes a panel receives."""
     cw = max(1, int(layout.w))
     ch = max(1, int(layout.h))
     scale = min(target_w / cw, target_h / ch)
@@ -1194,6 +1237,7 @@ def _render_canvas(
         bg_fit=layout.bg_fit or "cover",
         font_face_css=_font_face_css(registry.fonts),
         code_fonts=[{"id": f.id, "name": f.name} for f in registry.fonts.values()],
+        device_draws_touch=not preview and device_draws_touch_primitives(target_device_id),
     )
 
 

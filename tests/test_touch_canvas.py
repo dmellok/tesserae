@@ -6,6 +6,8 @@ markup the extractor reads."""
 
 from __future__ import annotations
 
+import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -208,3 +210,161 @@ def test_ha_actions_json_unconfigured(app: Flask) -> None:
     body = resp.get_json()
     assert body["configured"] is False
     assert body["services"] == [] and body["entities"] == []
+
+
+def _bind_device(app: Flask, cid: str, device_id: str, *, proto_v: int | None) -> None:
+    """Create a device, bind it to the canvas page, and give it a status entry
+    with (or without) the protocol-v2 handshake."""
+    from app.device_service import create_instance
+
+    result = create_instance(
+        devices=app.config["DEVICE_REGISTRY"],
+        renderers=app.config["RENDERER_REGISTRY"],
+        data_root=app.config["DEVICE_DATA_ROOT"],
+        instance_id=device_id,
+        kind_id="esp32_client",
+    )
+    assert result.ok
+    store = app.config["PAGE_STORE"]
+    page = store.get(cid)
+    assert page is not None
+    page.device_ids = [device_id]
+    store.save(page)
+    app.config["DEVICE_STATUS"][device_id] = {"proto": {"v": proto_v}} if proto_v else {}
+
+
+def _canvas_with_button(client: Any) -> str:
+    cid = _new_canvas(client)
+    resp = client.post(
+        f"/pages/canvas/c/{cid}/save",
+        json={
+            "els": [
+                {
+                    "id": "b1",
+                    "kind": "button",
+                    "x": 40,
+                    "y": 40,
+                    "w": 200,
+                    "h": 90,
+                    "label": "Movie",
+                    "on_tap": "page:scenes",
+                }
+            ]
+        },
+    )
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    return cid
+
+
+def test_compose_paints_touch_primitives_when_no_device_draws_them(app: Flask) -> None:
+    """The default: nothing on the other end owns those pixels, so the server
+    paints the control rather than shipping an invisible hole (#228)."""
+    client = app.test_client()
+    _sign_in(client)
+    cid = _canvas_with_button(client)
+    body = client.get(f"/compose/{cid}?for_push=1").get_data(as_text=True)
+    assert "window.__TESSERAE_DEVICE_DRAWS_TOUCH = false;" in body
+
+
+def test_compose_reserves_touch_primitives_for_a_protocol_v2_panel(app: Flask) -> None:
+    """A panel that draws its own controls still gets the blank reserve: the
+    firmware contract is unchanged for the devices it was written for."""
+    client = app.test_client()
+    _sign_in(client)
+    cid = _canvas_with_button(client)
+    _bind_device(app, cid, "e1003", proto_v=2)
+    body = client.get(f"/compose/{cid}?for_push=1&device_id=e1003").get_data(as_text=True)
+    assert "window.__TESSERAE_DEVICE_DRAWS_TOUCH = true;" in body
+
+
+def test_compose_paints_touch_primitives_for_a_display_only_panel(app: Flask) -> None:
+    """Bound, but never advertised protocol v2: nothing will draw the control
+    on-device, so the composition carries it."""
+    client = app.test_client()
+    _sign_in(client)
+    cid = _canvas_with_button(client)
+    _bind_device(app, cid, "plain", proto_v=None)
+    body = client.get(f"/compose/{cid}?for_push=1&device_id=plain").get_data(as_text=True)
+    assert "window.__TESSERAE_DEVICE_DRAWS_TOUCH = false;" in body
+
+
+def test_preview_paints_touch_primitives_even_for_a_protocol_v2_panel(app: Flask) -> None:
+    """A preview is a look at the design, not the bytes a panel receives, so it
+    shows the control whatever the target does with it."""
+    client = app.test_client()
+    _sign_in(client)
+    cid = _canvas_with_button(client)
+    _bind_device(app, cid, "e1003", proto_v=2)
+    body = client.get(f"/compose/{cid}?device_id=e1003").get_data(as_text=True)
+    assert "window.__TESSERAE_DEVICE_DRAWS_TOUCH = false;" in body
+
+
+def test_device_draws_touch_primitives_needs_a_real_v2_handshake(app: Flask) -> None:
+    """The capability check itself: no device, an unknown device, a missing or
+    junk ``proto`` all answer False, since painting a control nobody asked for
+    is visible and a missing one is not."""
+    from app.composer import device_draws_touch_primitives
+
+    with app.test_request_context("/"):
+        app.config["DEVICE_STATUS"].update(
+            {
+                "no_proto": {},
+                "v1": {"proto": {"v": 1}},
+                "junk": {"proto": {"v": True}},
+                "v3": {"proto": {"v": 3}},
+            }
+        )
+        assert device_draws_touch_primitives("") is False
+        assert device_draws_touch_primitives("never_seen") is False
+        assert device_draws_touch_primitives("no_proto") is False
+        assert device_draws_touch_primitives("v1") is False
+        assert device_draws_touch_primitives("junk") is False
+        # Forward-compatible: a later protocol still owns its own pixels.
+        assert device_draws_touch_primitives("v3") is True
+
+
+def test_compose_carries_primitive_content_for_the_painter(app: Flask) -> None:
+    """A primitive's caption, switch position and slider / stepper value reach
+    the compose payload. The renderer draws the control from these now, so a
+    prop the decoration shaping doesn't forward renders as an empty control
+    (#228): the reserve rect never needed them, the painted one does."""
+    client = app.test_client()
+    _sign_in(client)
+    cid = _new_canvas(client)
+    resp = client.post(
+        f"/pages/canvas/c/{cid}/save",
+        json={
+            "els": [
+                {
+                    "id": "sw1",
+                    "kind": "switch",
+                    "x": 0,
+                    "y": 0,
+                    "w": 220,
+                    "h": 80,
+                    "label": "Desk",
+                    "state": "on",
+                    "value_key": "ha:light.desk",
+                },
+                {
+                    "id": "sl1",
+                    "kind": "slider",
+                    "x": 0,
+                    "y": 100,
+                    "w": 300,
+                    "h": 64,
+                    "axis": "x",
+                    "value_min": 0,
+                    "value_max": 100,
+                    "value_now": 65,
+                },
+            ]
+        },
+    )
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    body = client.get(f"/compose/{cid}").get_data(as_text=True)
+    payloads = [json.loads(m) for m in re.findall(r"data-el='([^']+)'", body)]
+    by_id = {p["id"]: p for p in payloads}
+    assert by_id["sw1"]["label"] == "Desk" and by_id["sw1"]["state"] == "on"
+    assert by_id["sl1"]["value_now"] == 65 and by_id["sl1"]["axis"] == "x"
+    assert by_id["sl1"]["value_max"] == 100

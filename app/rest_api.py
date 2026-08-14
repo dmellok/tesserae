@@ -61,6 +61,7 @@ from app.renderer_loader import RendererRegistry
 from app.state.event_log import EventLog
 from app.state.pairing_store import PairingStore
 from app.state.settings_store import SettingsStore
+from app.touch_spec import PRIMITIVE_KINDS
 
 logger = logging.getLogger(__name__)
 
@@ -1783,9 +1784,6 @@ def get_touch_atlas(device_id: str, digest: str) -> Response:
     )
 
 
-_TOUCH_PRIMITIVE_KINDS = frozenset({"button", "switch", "slider", "stepper"})
-
-
 def _entity_from_value_key(value_key: str) -> str:
     """The HA entity id in a ``ha:<entity>[:<attr>]`` binding, or ""."""
     if not value_key.startswith("ha:"):
@@ -1850,11 +1848,7 @@ def post_interact(device_id: str) -> Response:
     canvas = _canvas_for_page(page_id)
     els = canvas.els if canvas is not None else []
     el = next(
-        (
-            e
-            for e in els
-            if getattr(e, "id", "") == primitive_id and e.kind in _TOUCH_PRIMITIVE_KINDS
-        ),
+        (e for e in els if getattr(e, "id", "") == primitive_id and e.kind in PRIMITIVE_KINDS),
         None,
     )
     if el is None:

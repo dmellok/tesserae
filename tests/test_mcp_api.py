@@ -1312,7 +1312,15 @@ def test_render_report_view_touch_trims_to_touch_fields(
     client = app.test_client()
     pid = _create_page(client)
     body = client.get(f"/api/mcp/pages/{pid}/render_report?view=touch").get_json()
-    assert set(body) == {"id", "rev", "tap_regions", "tap_invalid", "tap_dangling", "overlay_slots"}
+    assert set(body) == {
+        "id",
+        "rev",
+        "tap_regions",
+        "tap_invalid",
+        "tap_dangling",
+        "overlay_slots",
+        "touch_primitives",
+    }
     assert "elements" not in body and "board" not in body
 
 
@@ -1672,3 +1680,51 @@ def test_icons_respects_limit(app: Flask) -> None:
     # Out-of-range / garbage limits fall back rather than error.
     assert app.test_client().get("/api/mcp/icons?limit=99999").status_code == 200
     assert app.test_client().get("/api/mcp/icons?limit=abc").status_code == 200
+
+
+def test_render_report_lists_touch_primitives_and_who_draws_them(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Every primitive on the canvas is reported with the bound devices whose
+    firmware draws it on-device. The report's own render paints all of them, so
+    without this an agent can't tell a reserved rect from a broken one (#228)."""
+    _enable(app)
+    monkeypatch.setattr(
+        "app.renderer.inspect_composed",
+        lambda req, pool=None: {"board": {}, "elements": [], "interactive": None},
+    )
+    client = app.test_client()
+    pid = _create_page(client)
+    for body in (
+        {"kind": "button", "x": 10, "y": 10, "w": 200, "h": 90, "label": "Movie"},
+        {"kind": "slider", "x": 10, "y": 120, "w": 300, "h": 64, "axis": "x"},
+        {"kind": "rect", "x": 10, "y": 200, "w": 50, "h": 50},
+    ):
+        assert client.post(f"/api/mcp/pages/{pid}/elements", json=body).status_code == 200
+
+    report = client.get(f"/api/mcp/pages/{pid}/render_report").get_json()
+    kinds = [p["kind"] for p in report["touch_primitives"]]
+    assert kinds == ["button", "slider"]  # the rect is not a primitive
+    assert report["touch_primitives"][0]["w"] == 200
+    # Unbound page: nothing else will draw them, so the server paints them.
+    assert all(p["device_drawn"] == [] for p in report["touch_primitives"])
+
+    from app.device_service import create_instance
+
+    assert create_instance(
+        devices=app.config["DEVICE_REGISTRY"],
+        renderers=app.config["RENDERER_REGISTRY"],
+        data_root=app.config["DEVICE_DATA_ROOT"],
+        instance_id="e1003",
+        kind_id="esp32_client",
+    ).ok
+    store = app.config["PAGE_STORE"]
+    page = store.get(pid)
+    assert page is not None
+    page.device_ids = ["e1003", "plain"]
+    store.save(page)
+    app.config["DEVICE_STATUS"]["e1003"] = {"proto": {"v": 2}}
+
+    report = client.get(f"/api/mcp/pages/{pid}/render_report").get_json()
+    # Only the protocol-v2 panel draws its own; "plain" gets a painted control.
+    assert all(p["device_drawn"] == ["e1003"] for p in report["touch_primitives"])

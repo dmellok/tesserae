@@ -37,6 +37,7 @@ from app.auth import _is_loopback
 from app.panels_schema import build_catalog
 from app.state.panel_store import CanvasLayout, CanvasPage
 from app.state.settings_store import SettingsStore
+from app.touch_spec import PRIMITIVE_KINDS
 from app.webhook_routes import _presented_token, generate_token
 
 bp = Blueprint("mcp_api", __name__, url_prefix="/api/mcp")
@@ -1790,6 +1791,40 @@ _DIAG_JS: str = r"""() => {
 }"""
 
 
+def _touch_primitives(page: Any) -> list[dict[str, Any]]:
+    """The touch-v3 primitives placed on ``page``, each with the bound devices
+    that will draw it themselves.
+
+    A primitive with a non-empty ``device_drawn`` renders as a BLANK rect in the
+    frame those panels receive: their firmware owns those pixels and draws the
+    control locally. An empty list means the server paints the control into the
+    composition, which is what a display-only panel, a preview, and this report's
+    own render all show. Without this an agent reading a render of a panel that
+    draws its own controls sees an empty box and can't tell "reserved" from
+    "broken" (#228)."""
+    from app.composer import device_draws_touch_primitives
+
+    canvas = getattr(page, "canvas", None)
+    if canvas is None:
+        return []
+    drawn_by_device = sorted(
+        d for d in (getattr(page, "device_ids", None) or []) if device_draws_touch_primitives(d)
+    )
+    return [
+        {
+            "id": el.id,
+            "kind": el.kind,
+            "x": el.x,
+            "y": el.y,
+            "w": el.w,
+            "h": el.h,
+            "device_drawn": drawn_by_device,
+        }
+        for el in canvas.els
+        if el.kind in PRIMITIVE_KINDS
+    ]
+
+
 def build_render_report(
     page_id: str, page: Any, *, host_url: str, debug: bool = False, fresh: bool = False
 ) -> dict[str, Any]:
@@ -1862,6 +1897,11 @@ def build_render_report(
     # always on, mirroring tap_invalid: a blank icon box is named here instead
     # of being pixel-hunted.
     report["icon_invalid"] = _invalid_icons(page.canvas)
+    # Touch-v3 primitives + which bound panels draw them on-device. This render
+    # (like any preview) paints every control, so without the list an agent
+    # can't tell that the SAME element arrives blank on a panel that draws its
+    # own.
+    report["touch_primitives"] = _touch_primitives(page)
     # Regions whose declared action wouldn't dispatch (issue #49). Empty
     # tap_invalid means every region will actually fire; a non-empty list
     # is the honest signal that a dashboard looks wired but is dead, e.g.
@@ -1899,6 +1939,12 @@ def render_report(page_id: str) -> Response:
     weight), ``icon``-transform bind tables, and a heuristic scan of
     code/html/svg markup for ``ph-<name>`` classes that aren't real Phosphor
     names. Fix with a slug from ``GET /icons?q=``.
+
+    ``touch_primitives`` lists the button / switch / slider / stepper elements
+    with the bound devices whose firmware draws them on-device
+    (``device_drawn``). This report's render, like every preview, paints all of
+    them; a primitive with a non-empty ``device_drawn`` is the one case where
+    the frame that panel receives carries a blank rect instead.
 
     ``overlay_slots`` (hybrid render mode) lists the ``data-overlay-key``
     annotations that actually extracted (box + key + font bucket): the
@@ -1972,6 +2018,7 @@ def render_report(page_id: str) -> Response:
         "tap_dangling",
         "overlay_slots",
         "icon_invalid",
+        "touch_primitives",
         "injected_libs",
     }
     if debug:
@@ -1980,7 +2027,7 @@ def render_report(page_id: str) -> Response:
     raw_fields = (request.args.get("fields") or "").strip()
     wanted: set[str] | None = None
     if view == "touch":
-        wanted = {"tap_regions", "tap_invalid", "tap_dangling", "overlay_slots"}
+        wanted = {"tap_regions", "tap_invalid", "tap_dangling", "overlay_slots", "touch_primitives"}
     elif raw_fields:
         wanted = {f.strip() for f in raw_fields.split(",") if f.strip() in selectable}
     if wanted is not None and debug:

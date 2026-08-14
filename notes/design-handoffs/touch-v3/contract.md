@@ -16,6 +16,10 @@ Companion artifacts in this directory:
 
 - Server renders the dashboard **image** with touch-control rects left **blank**,
   and emits a declarative **touch spec** describing the controls.
+  The blank rect applies to **panels advertising protocol v2**, the ones that
+  draw their own controls. Every other target (a display-only panel, a preview,
+  an unbound page) gets a server-painted control instead, since nothing else
+  would ever fill that rect (#228). Firmware behaviour is unchanged either way.
 - Firmware **draws the controls** into the blank rects (from `primitives.json`),
   owns hit-testing, gives **instant local partial-refresh feedback**, then
   reports a **semantic event**.

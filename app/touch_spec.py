@@ -61,7 +61,10 @@ def wire_transform(panel: dict[str, Any], canvas_w: int, canvas_h: int) -> WireF
 ATLAS_LABEL = "l20"
 ATLAS_VALUE = "v28"
 
-_PRIMITIVE_KINDS = frozenset({"button", "switch", "slider", "stepper"})
+# The four typed touch controls. Public: the REST spec endpoint and the render
+# report both ask "is this element a primitive", and a third private copy of the
+# set is one more place for the answer to drift.
+PRIMITIVE_KINDS = frozenset({"button", "switch", "slider", "stepper"})
 
 
 def classify_action(spec: str | dict[str, Any] | None) -> tuple[int, str]:
@@ -101,7 +104,7 @@ def _text_ref(
 
 
 def _primitive_for(el: Element, wire: WireFn | None) -> dict[str, Any] | None:
-    if el.kind not in _PRIMITIVE_KINDS:
+    if el.kind not in PRIMITIVE_KINDS:
         return None
     if el.x < 0 or el.y < 0:
         return None  # a touch control must sit fully on-panel

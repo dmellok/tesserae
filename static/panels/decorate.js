@@ -42,6 +42,92 @@
     return _walk(next, parts, i + 1);
   }
 
+  var PRIMITIVE_KINDS = { button: 1, switch: 1, slider: 1, stepper: 1 };
+
+  // Touch-v3 primitive chrome, drawn to primitives.json geometry so it reads
+  // like the on-device control. Shared with the editor (which always draws it,
+  // being a look at the design rather than a frame) so preview and composition
+  // can't drift. Keep the geometry in sync with primitives.json.
+  function renderPrimitive(e) {
+    var ink = "var(--text-primary, #1B1A16)";
+    var paper = "var(--bg, #FFFFFF)";
+    var soft = "var(--surface-sunken, #E7E4DC)";
+    // The box is opaque whichever way it's drawn: the reserve covers what sits
+    // behind it, and so must the painted control, or the two disagree about
+    // what a primitive placed over other elements looks like.
+    var wrap = document.createElement("div");
+    var base = "position:relative;box-sizing:border-box;width:100%;height:100%;overflow:hidden;" +
+      "background:" + paper + ";color:" + ink + ";font-family:var(--font-family, inherit)";
+    function span(text, css) {
+      var s = document.createElement("span");
+      s.textContent = text;
+      if (css) s.style.cssText = css;
+      return s;
+    }
+
+    if (e.kind === "button") {
+      wrap.style.cssText = base + ";border:2px solid " + ink + ";border-radius:12px;" +
+        "display:flex;align-items:center;justify-content:center;gap:8px;font-weight:700";
+      if (e.icon) {
+        var weight = e.weight || "bold";
+        if (!/^(thin|light|regular|bold|fill|duotone)$/.test(weight)) weight = "bold";
+        var ic = document.createElement("i");
+        ic.className = (weight === "regular" ? "ph" : "ph-" + weight) +
+          " ph-" + String(e.icon).replace(/^ph-/, "");
+        ic.style.fontSize = "22px";
+        wrap.appendChild(ic);
+      }
+      if (e.label) wrap.appendChild(span(e.label));
+      return wrap;
+    }
+
+    if (e.kind === "switch") {
+      wrap.style.cssText = base;
+      var on = e.state === "on";
+      var track = document.createElement("div");
+      track.style.cssText = "position:absolute;right:4px;top:50%;transform:translateY(-50%);width:64px;" +
+        "height:36px;border:2px solid " + ink + ";border-radius:999px;background:" + (on ? soft : paper);
+      var thumb = document.createElement("div");
+      thumb.style.cssText = "position:absolute;top:50%;transform:translateY(-50%);width:26px;height:26px;" +
+        "border-radius:50%;background:" + ink + ";" + (on ? "right:5px" : "left:5px");
+      track.appendChild(thumb);
+      wrap.appendChild(track);
+      if (e.label) wrap.appendChild(span(e.label,
+        "position:absolute;left:4px;top:50%;transform:translateY(-50%);font-weight:700"));
+      return wrap;
+    }
+
+    if (e.kind === "slider") {
+      wrap.style.cssText = base;
+      var range = Math.max(1, Number(e.value_max) - Number(e.value_min));
+      var t = Math.max(0, Math.min(1, (Number(e.value_now) - Number(e.value_min)) / range || 0));
+      var trk = document.createElement("div");
+      trk.style.cssText = "position:absolute;left:20px;right:20px;top:50%;transform:translateY(-50%);" +
+        "height:8px;border-radius:4px;background:" + soft;
+      var fill = document.createElement("div");
+      fill.style.cssText = "position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:" + ink +
+        ";width:" + (t * 100) + "%";
+      trk.appendChild(fill);
+      var th = document.createElement("div");
+      th.style.cssText = "position:absolute;top:50%;transform:translate(-50%,-50%);width:32px;height:32px;" +
+        "border:2px solid " + ink + ";border-radius:50%;background:" + paper +
+        ";left:calc(20px + " + t + " * (100% - 40px))";
+      wrap.appendChild(trk);
+      wrap.appendChild(th);
+      return wrap;
+    }
+
+    // stepper: [ - | value | + ]
+    wrap.style.cssText = base + ";border:2px solid " + ink + ";border-radius:12px;" +
+      "display:flex;align-items:stretch";
+    var cell = "flex:1;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:22px";
+    wrap.appendChild(span("−", cell + ";border-right:2px solid " + soft));
+    wrap.appendChild(span(String(e.value_now == null ? 0 : e.value_now),
+      cell + ";border-right:2px solid " + soft));
+    wrap.appendChild(span("+", cell));
+    return wrap;
+  }
+
   function render(el, data) {
     var kind = el.kind || "rect";
     var color = el.color || "var(--text-primary, #1B1A16)";
@@ -53,14 +139,19 @@
       hs.style.cssText = "width:100%;height:100%";
       return hs;
     }
-    if (kind === "button" || kind === "switch" || kind === "slider" || kind === "stepper") {
-      // Touch-v3 primitives (device-owned touch): the FIRMWARE draws the control
-      // on top of the served image, so the render reserves a blank rect filled
-      // with the canvas background, covering anything behind it. The editor draws
-      // its own chrome affordance separately, like the hotspot.
-      var rsv = document.createElement("div");
-      rsv.style.cssText = "width:100%;height:100%;background:var(--bg, #FFFFFF)";
-      return rsv;
+    if (PRIMITIVE_KINDS[kind]) {
+      // Touch-v3 primitives. Who paints the control depends on who owns the
+      // pixels: a panel whose firmware draws it (protocol v2, flagged by the
+      // compose page) gets a blank rect filled with the canvas background,
+      // covering anything behind it, and draws its own control on top. Anywhere
+      // else (a display-only panel, a preview, no device at all) nothing would
+      // ever fill that rect, so the server paints the control itself (#228).
+      if (window.__TESSERAE_DEVICE_DRAWS_TOUCH) {
+        var rsv = document.createElement("div");
+        rsv.style.cssText = "width:100%;height:100%;background:var(--bg, #FFFFFF)";
+        return rsv;
+      }
+      return renderPrimitive(el);
     }
     if (kind === "html") return renderHtml(el, false);
     if (kind === "svg") return renderHtml(el, true);
@@ -748,5 +839,5 @@
     return wrap;
   }
 
-  window.PanelsDecorate = { render: render, resolvePath: resolvePath };
+  window.PanelsDecorate = { render: render, resolvePath: resolvePath, primitive: renderPrimitive };
 })();

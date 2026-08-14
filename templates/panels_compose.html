@@ -116,7 +116,11 @@
     phosphor_fill: "{{ url_for('static', filename='vendor/phosphor/phosphor-fill.css') }}",
     phosphor_duotone: "{{ url_for('static', filename='vendor/phosphor/phosphor-duotone.css') }}"
   };
-  window.__TESSERAE_FONTS = [{% for f in code_fonts or [] %}{ "name": {{ f.name|tojson }}, "url": "{{ url_for('composer.font_face_datauri', font_id=f.id) }}" }{{ "," if not loop.last }}{% endfor %}];</script>
+  window.__TESSERAE_FONTS = [{% for f in code_fonts or [] %}{ "name": {{ f.name|tojson }}, "url": "{{ url_for('composer.font_face_datauri', font_id=f.id) }}" }{{ "," if not loop.last }}{% endfor %}];
+  // True only when this frame is bound for a panel whose firmware draws
+  // touch-v3 controls itself: decorate.js then leaves their rects blank for the
+  // device to fill. False everywhere else, so the control is painted (#228).
+  window.__TESSERAE_DEVICE_DRAWS_TOUCH = {{ 'true' if device_draws_touch else 'false' }};</script>
   <script src="{{ url_for('static', filename='panels/decorate.js') }}"></script>
   <script>
     // Draw decorations, data primitives (with their fetched data) and custom

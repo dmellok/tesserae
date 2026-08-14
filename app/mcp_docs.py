@@ -145,16 +145,20 @@ TAP ACTIONS ("on_tap"/"on_swipe"/"on_slide" on ANY element -- make an existing e
     fields render but never fire.
 
 TOUCH PRIMITIVES (button / switch / slider / stepper -- the DEFAULT for interactive controls):
-  Typed controls the FIRMWARE draws + owns (the render reserves a blank rect); it hit-tests locally
-  and reports the action. Reach for these whenever the user asks for a button/switch/slider/stepper:
+  Typed controls a touch panel's firmware draws + owns: it hit-tests locally and reports the action,
+  and the render reserves a blank rect for it. On every other target -- a display-only panel, a
+  preview, an unbound page -- the server paints the control instead, so it is always visible
+  somewhere. Reach for these whenever the user asks for a button/switch/slider/stepper:
     {"kind":"button",  <box>, "label":"Movie", "icon":"<phosphor>"?, "on_tap":<action spec>} -- fires on_tap.
     {"kind":"switch",  <box>, "label":"Desk", "value_key":"ha:<entity>", "state":"on"|"off"?} -- taps
       toggle the bound entity and reflect its live state (no on_tap; the toggle is derived).
     {"kind":"slider",  <box>, "axis":"x"|"y", "value_key":"ha:<entity>[:<attr>]",
       "value_min":0, "value_max":100, "value_step":5} -- drag sets the bound value.
     {"kind":"stepper", <box>, "value_key":"ha:<entity>", "value_min":0, "value_max":30, "value_step":1}.
-  On-device: shown on touch panels running the touch-v3 firmware; a display-only panel renders the
-  reserved (blank) rect but no control. The action spec forms (HA object, etc.) match TAP ACTIONS above.
+  On-device: a touch panel running the touch-v3 firmware draws the control itself (and only there is
+  the rect blank in the frame); anywhere else the composition carries a painted control that simply
+  never fires. render_report().touch_primitives lists each one with the bound devices that draw it
+  on-device. The action spec forms (HA object, etc.) match TAP ACTIONS above.
   Code element named actions: give a "code" element "actions":{"<name>":<spec>, ...} and reference
     them from its markup as data-on-tap="@name" (also data-on-swipe / data-on-slide), in static HTML
     or JS-built DOM. Structured (HA) specs stay in validated config; the markup holds a plain @name.

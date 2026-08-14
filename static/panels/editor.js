@@ -725,81 +725,6 @@
     return k === "button" || k === "switch" || k === "slider" || k === "stepper";
   }
 
-  // Editor-only preview of a touch-v3 primitive, matching primitives.json
-  // geometry so it reads like the on-device control. The real render leaves the
-  // rect blank (the firmware draws it); this chrome is editor-only. Keep the
-  // geometry in sync with primitives.json.
-  function primitiveChrome(e) {
-    var ink = "var(--text-primary, #1B1A16)";
-    var paper = "var(--bg, #FFFFFF)";
-    var soft = "var(--surface-sunken, #E7E4DC)";
-    var wrap = el("div", "el-prim");
-    wrap.style.cssText = "position:absolute;inset:0;pointer-events:none;color:" + ink +
-      ";font-family:var(--font-family, inherit)";
-    function span(text, css) {
-      var s = document.createElement("span");
-      s.textContent = text;
-      if (css) s.style.cssText = css;
-      return s;
-    }
-
-    if (e.kind === "button") {
-      wrap.style.cssText += ";border:2px solid " + ink + ";border-radius:12px;background:" + paper +
-        ";display:flex;align-items:center;justify-content:center;gap:8px;font-weight:700;overflow:hidden";
-      if (e.icon) {
-        var wcls = e.weight === "regular" ? "ph" : "ph-" + (e.weight || "bold");
-        var ic = el("i", wcls + " ph-" + String(e.icon).replace(/^ph-/, ""));
-        ic.style.fontSize = "22px";
-        wrap.appendChild(ic);
-      }
-      if (e.label) wrap.appendChild(span(e.label));
-      return wrap;
-    }
-
-    if (e.kind === "switch") {
-      var on = e.state === "on";
-      var track = el("div");
-      track.style.cssText = "position:absolute;right:4px;top:50%;transform:translateY(-50%);width:64px;" +
-        "height:36px;border:2px solid " + ink + ";border-radius:999px;background:" + (on ? soft : paper);
-      var thumb = el("div");
-      thumb.style.cssText = "position:absolute;top:50%;transform:translateY(-50%);width:26px;height:26px;" +
-        "border-radius:50%;background:" + ink + ";" + (on ? "right:5px" : "left:5px");
-      track.appendChild(thumb);
-      wrap.appendChild(track);
-      if (e.label) wrap.appendChild(span(e.label,
-        "position:absolute;left:4px;top:50%;transform:translateY(-50%);font-weight:700"));
-      return wrap;
-    }
-
-    if (e.kind === "slider") {
-      var span01 = Math.max(1, Number(e.value_max) - Number(e.value_min));
-      var t = Math.max(0, Math.min(1, (Number(e.value_now) - Number(e.value_min)) / span01 || 0));
-      var trk = el("div");
-      trk.style.cssText = "position:absolute;left:20px;right:20px;top:50%;transform:translateY(-50%);" +
-        "height:8px;border-radius:4px;background:" + soft;
-      var fill = el("div");
-      fill.style.cssText = "position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:" + ink +
-        ";width:" + (t * 100) + "%";
-      trk.appendChild(fill);
-      var th = el("div");
-      th.style.cssText = "position:absolute;top:50%;transform:translate(-50%,-50%);width:32px;height:32px;" +
-        "border:2px solid " + ink + ";border-radius:50%;background:" + paper +
-        ";left:calc(20px + " + t + " * (100% - 40px))";
-      wrap.appendChild(trk);
-      wrap.appendChild(th);
-      return wrap;
-    }
-
-    // stepper: [ - | value | + ]
-    wrap.style.cssText += ";border:2px solid " + ink + ";border-radius:12px;display:flex;" +
-      "align-items:stretch;overflow:hidden;background:" + paper;
-    var cell = "flex:1;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:22px";
-    wrap.appendChild(span("−", cell + ";border-right:2px solid " + soft));
-    wrap.appendChild(span(String(e.value_now == null ? 0 : e.value_now), cell + ";border-right:2px solid " + soft));
-    wrap.appendChild(span("+", cell));
-    return wrap;
-  }
-
   function elNode(e) {
     var node = el("div", "el" + (isSel(e.id) ? " psel" : "") +
       (isWidget(e) && !e.widget ? " el-empty" : ""));
@@ -826,9 +751,10 @@
         // Editor-only affordance: the hotspot paints nothing in the real
         // render, so show a dashed outline + hand glyph here.
         node.appendChild(el("div", "el-hotspot", '<i class="ph-bold ph-hand-tap"></i>'));
-      } else if (isPrimitive(e.kind)) {
-        node.appendChild(primitiveChrome(e));
       }
+      // Touch-v3 primitives need nothing extra: decorate.js draws their chrome,
+      // and the editor never sets __TESSERAE_DEVICE_DRAWS_TOUCH, so the preview
+      // shows the control even when the target panel's firmware will draw it.
     } else {
       // Reuse the cached widget host when nothing that affects the render
       // changed; otherwise mount fresh. The host is pointer-transparent so

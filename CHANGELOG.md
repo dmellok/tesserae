@@ -4,6 +4,22 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.301.0], 2026-08-14
+
+### Fixed
+
+- **Touch controls are drawn in the render unless the panel draws them
+  itself** (#228). The button, switch, slider and stepper elements reserved a
+  blank rect in every composition, because a touch panel's firmware draws the
+  control into that rect itself. On every other target, a display-only panel, a
+  preview, a dashboard with no device bound, nothing ever filled it, so a
+  control placed in the editor rendered as an invisible hole. The reserve is
+  now kept only for panels advertising protocol v2; everywhere else the server
+  paints the control. The editor and the renderer share one painter, so the
+  preview and the composition can't drift, and `render_report` gained
+  `touch_primitives`, naming the bound devices that draw each control
+  on-device.
+
 ## [0.300.4], 2026-08-14
 
 ### Changed
