@@ -25,6 +25,14 @@ def _make_page(page_id: str, *, device_ids: list[str]) -> Page:
     )
 
 
+class _FakeRegistry:
+    """Minimal stand-in for DeviceRegistry: cleanup only ever asks whether an
+    id resolves to a device."""
+
+    def __init__(self, *live_ids: str) -> None:
+        self.devices = {did: object() for did in live_ids}
+
+
 def test_list_orphan_state_counts_bound_pages(tmp_path: Path) -> None:
     ps, el, ss = _make_stores(tmp_path)
     ps.save(_make_page("bound1", device_ids=["esp32_lab"]))
@@ -37,8 +45,66 @@ def test_list_orphan_state_counts_bound_pages(tmp_path: Path) -> None:
         event_log=el,
         settings_store=ss,
         data_root=tmp_path,
+        devices=_FakeRegistry("esp32_lab", "other"),
     )
     assert sorted(summary.page_ids) == ["bound1", "bound2"]
+    # "shared" survives the wipe, but the device comes off its binding.
+    assert summary.unbound_page_ids == ["shared"]
+
+
+def test_page_shared_with_a_DELETED_device_is_this_devices_to_wipe(tmp_path: Path) -> None:
+    """Issue #229: deleting a device leaves its id on any dashboard it shared,
+    so the next device's delete saw a two-id binding and treated the dashboard
+    as shared forever. Only LIVE co-owners protect a page."""
+    ps, el, ss = _make_stores(tmp_path)
+    ps.save(_make_page("shared", device_ids=["deleted_a", "esp32_lab"]))
+    ps.save(_make_page("really_shared", device_ids=["live_b", "esp32_lab"]))
+    summary = device_cleanup.list_orphan_state(
+        device_id="esp32_lab",
+        page_store=ps,
+        event_log=el,
+        settings_store=ss,
+        data_root=tmp_path,
+        devices=_FakeRegistry("esp32_lab", "live_b"),  # deleted_a is gone
+    )
+    assert summary.page_ids == ["shared"]
+    assert summary.unbound_page_ids == ["really_shared"]
+
+
+def test_no_registry_falls_back_to_exclusive_bindings(tmp_path: Path) -> None:
+    """A caller with no registry (CLI, older call sites) keeps the conservative
+    rule: only pages bound to this device alone count as its own."""
+    ps, el, ss = _make_stores(tmp_path)
+    ps.save(_make_page("alone", device_ids=["esp32_lab"]))
+    ps.save(_make_page("shared", device_ids=["esp32_lab", "other"]))
+    summary = device_cleanup.list_orphan_state(
+        device_id="esp32_lab",
+        page_store=ps,
+        event_log=el,
+        settings_store=ss,
+        data_root=tmp_path,
+    )
+    assert summary.page_ids == ["alone"]
+
+
+def test_wipe_unbinds_the_device_from_pages_it_does_not_own(tmp_path: Path) -> None:
+    """A dashboard a live device still shows is kept, but stops naming the
+    device that just went (#229), so the dashboards list stops counting it."""
+    ps, el, ss = _make_stores(tmp_path)
+    ps.save(_make_page("shared", device_ids=["esp32_lab", "live_b"]))
+    ps.save(_make_page("owned", device_ids=["esp32_lab"]))
+    summary = device_cleanup.wipe_orphan_state(
+        device_id="esp32_lab",
+        page_store=ps,
+        event_log=el,
+        settings_store=ss,
+        data_root=tmp_path,
+        devices=_FakeRegistry("live_b"),  # esp32_lab already out of the registry
+    )
+    assert summary.page_ids == ["owned"] and ps.get("owned") is None
+    assert summary.unbound_page_ids == ["shared"]
+    kept = ps.get("shared")
+    assert kept is not None and kept.device_ids == ["live_b"]
 
 
 def test_list_orphan_state_counts_events_for_bound_pages(tmp_path: Path) -> None:

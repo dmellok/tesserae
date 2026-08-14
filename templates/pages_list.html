@@ -132,7 +132,10 @@
                pushes to every device the dashboard is linked to. Count
                the linked devices in the title so the fan-out is
                visible before the click. #}
-            {% set _link_count = page.device_ids|length %}
+            {# Count LIVE bindings, not raw ids: a deleted device leaves its id
+               on any dashboard it shared, and counting those read "Push to 2"
+               on a row the same page showed as unbound (#229). #}
+            {% set _link_count = (page_devices.get(page.id) or [])|length %}
             <button type="submit" class="dx-btn-ghost-sm dx-btn-push"
                     title="Push this dashboard to {% if _link_count == 0 %}no linked devices (attach a device on the dashboard first){% elif _link_count == 1 %}its 1 linked device{% else %}all {{ _link_count }} linked devices{% endif %}">
               <i class="ph ph-paper-plane-tilt" aria-hidden="true"></i>

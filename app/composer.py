@@ -1630,12 +1630,15 @@ def compose_panel_preview(page_id: str) -> Response:
     token = page_preview_token(page, (width, height))
 
     # An explicit ?gamut wins (the editor passes the preview group's gamut);
-    # else resolve it from ?device or the page's first bound device.
+    # else resolve it from ?device or the page's first bound device. "First
+    # LIVE binding", not first id: a deleted device can leave its id at the head
+    # of the list, and taking it blind resolved to nothing and dropped Panel
+    # view to the default gamut while a real bound device sat behind it (#229).
     gamut = (request.args.get("gamut") or "").strip()
     if not gamut:
         device_id = (request.args.get("device") or "").strip()
-        if not device_id and page.device_ids:
-            device_id = page.device_ids[0]
+        if not device_id:
+            device_id = _preview_target_device(page, devices)
         if device_id and devices is not None:
             dev = devices.get(device_id)
             panel = device_panel(dev) if dev is not None else None

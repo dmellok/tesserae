@@ -4,6 +4,23 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.301.1], 2026-08-15
+
+### Fixed
+
+- **Deleting a device no longer strands the dashboards it shared** (#229).
+  A deleted device's id stayed on every dashboard it was bound to alongside
+  another device, and the delete flow decided what a device owned by counting
+  ids rather than live devices. A dashboard bound to two panels therefore kept
+  a dead id after the first was deleted, which made it look permanently shared:
+  deleting the second panel never offered to remove it, and no later delete
+  could either. Ownership is now judged on devices that still exist, so the last
+  real device to go takes the dashboard with it and dashboards already carrying
+  a dead id heal on the next delete. Wiping a device now also drops it from
+  dashboards it shared, and the Dashboards list counts live bindings, so a row
+  can no longer read "unbound" and "Push to 2" at once. Panel view resolves its
+  gamut from the first live binding for the same reason.
+
 ## [0.301.0], 2026-08-14
 
 ### Fixed

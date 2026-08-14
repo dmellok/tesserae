@@ -478,12 +478,16 @@ def _orphan_state_counts_for(device: Device) -> dict[str, Any]:
         event_log=current_app.config["EVENT_LOG"],
         settings_store=settings_store(),
         data_root=Path(current_app.config["DATA_ROOT"]),
+        devices=current_app.config.get("DEVICE_REGISTRY"),
     )
     return {
         "page_count": len(summary.page_ids),
         "event_count": summary.event_count,
         "settings_count": summary.setting_keys_devices + summary.setting_keys_renderers,
         "has_calibration_image": summary.has_calibration_image,
+        # Pages kept for a live co-owner, with this device dropped from their
+        # binding. Counted separately so the modal doesn't imply they're deleted.
+        "unbound_page_count": len(summary.unbound_page_ids),
         "total": summary.total,
     }
 

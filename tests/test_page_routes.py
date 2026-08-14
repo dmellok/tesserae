@@ -1813,3 +1813,19 @@ def test_a_non_preset_cadence_renders_as_custom_in_the_list(app: Flask, tmp_path
     body = client.get("/pages").get_data(as_text=True)
     assert '<option value="custom" selected>custom…</option>' in body
     assert 'value="45"' in body
+
+
+def test_push_button_counts_only_live_bindings(app: Flask) -> None:
+    """Issue #229: a deleted device leaves its id on any dashboard it shared,
+    and the Push button counted raw ids, so the same row could read "unbound"
+    (grouping resolves against the registry) and "Push to 2" at once."""
+    from app.state.page_store import Page
+
+    client = app.test_client()
+    _sign_in(client)
+    app.config["PAGE_STORE"].save(
+        Page(id="orphaned", name="Orphaned", device_ids=["gone_a", "gone_b"], cells=[])
+    )
+    body = client.get("/pages").get_data(as_text=True)
+    assert "Push to 2" not in body
+    assert "no linked devices" in body

@@ -2664,6 +2664,7 @@ def _register() -> Response:
             event_log=current_app.config["EVENT_LOG"],
             settings_store=_settings(),
             data_root=_data_root(),
+            devices=_devices(),
         )
     markers.clear(device_id)
 

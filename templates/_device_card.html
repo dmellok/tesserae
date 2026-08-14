@@ -1200,6 +1200,9 @@
                 {% if section.orphan_state.event_count %}{% set _ = parts.append(section.orphan_state.event_count ~ ' history row' ~ ('s' if section.orphan_state.event_count != 1 else '')) %}{% endif %}
                 {% if section.orphan_state.settings_count %}{% set _ = parts.append('per-device settings') %}{% endif %}
                 {% if section.orphan_state.has_calibration_image %}{% set _ = parts.append('uploaded calibration image') %}{% endif %}
+                {# Kept, not deleted: another live device still shows them, so
+                   the wipe only drops this device from their binding (#229). #}
+                {% if section.orphan_state.unbound_page_count %}{% set _ = parts.append('this device off ' ~ section.orphan_state.unbound_page_count ~ ' shared dashboard' ~ ('s' if section.orphan_state.unbound_page_count != 1 else '')) %}{% endif %}
                 {{ parts | join(', ') }}.
               </span>
             </label>

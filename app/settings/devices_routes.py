@@ -153,6 +153,7 @@ def devices_add() -> Response:
                 settings_store=settings_store(),
                 data_root=Path(current_app.config["DATA_ROOT"]),
                 push_manager=current_app.config.get("PUSH_MANAGER"),
+                devices=devices(),
             )
             markers.clear(target_id)
     result = device_service.create_instance(
@@ -690,6 +691,7 @@ def devices_register_discovered(discovered_id: str) -> Response:
             settings_store=settings_store(),
             data_root=Path(current_app.config["DATA_ROOT"]),
             push_manager=current_app.config.get("PUSH_MANAGER"),
+            devices=devices(),
         )
     markers.clear(target_id)
     # Wire format the client asked for (png / bmp). A memory-constrained
@@ -1328,6 +1330,7 @@ def devices_delete(instance_id: str) -> Response:
             settings_store=settings_store(),
             data_root=Path(current_app.config["DATA_ROOT"]),
             push_manager=current_app.config.get("PUSH_MANAGER"),
+            devices=devices(),
         )
         # Also clear any pending marker for this id; the state is
         # already gone, so a later re-register has nothing to compare

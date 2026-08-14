@@ -657,3 +657,61 @@ def test_trmnl_api_display_auto_provisions_when_only_a_mac_arrives(app: Flask) -
     devs = app.config["DEVICE_REGISTRY"]
     matches = [d for d in devs.all() if d.manifest.get("mac") == "BB:CC:DD:EE:FF:00"]
     assert len(matches) == 1
+
+
+def test_deleting_shared_dashboard_devices_in_sequence(app: Flask) -> None:
+    """Issue #229, the reporter's exact sequence: a dashboard bound to A and B,
+    then both devices deleted with wipe ticked.
+
+    Deleting A keeps the dashboard (B still shows it) but drops A from the
+    binding; deleting B then recognises the dashboard as B's own and removes it.
+    Before the fix the stale A id made the binding look shared forever, so the
+    dashboard survived both deletes and the list kept counting two links."""
+    from app.state.page_store import Cell, Page
+
+    client = app.test_client()
+    _sign_in(client)
+    _add_instance(client, id="panel_a", kind="esp32_client", name="Panel A")
+    _add_instance(client, id="panel_b", kind="esp32_client", name="Panel B")
+    page_store = app.config["PAGE_STORE"]
+    page_store.save(
+        Page(
+            id="shared",
+            name="Shared",
+            device_ids=["panel_a", "panel_b"],
+            cells=[Cell(id="c1", plugin=None, x=0, y=0, w=100, h=100)],
+        )
+    )
+
+    client.post("/settings/devices/panel_a/delete", data={"wipe_orphan": "1"})
+    kept = page_store.get("shared")
+    assert kept is not None, "still bound to a live device, must not be deleted"
+    assert kept.device_ids == ["panel_b"], "the deleted device must come off the binding"
+
+    client.post("/settings/devices/panel_b/delete", data={"wipe_orphan": "1"})
+    assert page_store.get("shared") is None
+
+
+def test_deleting_a_device_without_wiping_keeps_the_binding(app: Flask) -> None:
+    """The keep-state path is unchanged: an unticked wipe leaves the dashboard
+    and its binding alone, so re-registering the same physical device (matched
+    by MAC) still gets its dashboards back."""
+    from app.state.page_store import Cell, Page
+
+    client = app.test_client()
+    _sign_in(client)
+    _add_instance(client, id="panel_a", kind="esp32_client", name="Panel A")
+    _add_instance(client, id="panel_b", kind="esp32_client", name="Panel B")
+    page_store = app.config["PAGE_STORE"]
+    page_store.save(
+        Page(
+            id="shared",
+            name="Shared",
+            device_ids=["panel_a", "panel_b"],
+            cells=[Cell(id="c1", plugin=None, x=0, y=0, w=100, h=100)],
+        )
+    )
+
+    client.post("/settings/devices/panel_a/delete", data={})
+    kept = page_store.get("shared")
+    assert kept is not None and kept.device_ids == ["panel_a", "panel_b"]

@@ -57,6 +57,10 @@ class OrphanSummary:
     # content-addressed, so a surviving pointer means a re-registered device is
     # served the pre-wipe frame rather than a 204 (issue #199).
     has_latest_render: bool = False
+    # Pages that SURVIVED the wipe but had the device id dropped from their
+    # binding, because another live device still shows them (issue #229). Not
+    # deleted, just unbound from this id.
+    unbound_page_ids: list[str] = field(default_factory=list)
 
     @property
     def total(self) -> int:
@@ -65,6 +69,7 @@ class OrphanSummary:
         the delete is already clean, no need to prompt)."""
         return (
             len(self.page_ids)
+            + len(self.unbound_page_ids)
             + self.event_count
             + self.setting_keys_devices
             + self.setting_keys_renderers
@@ -73,16 +78,67 @@ class OrphanSummary:
         )
 
 
-def _pages_for_device(page_store: PageStore, device_id: str) -> list[str]:
-    """Page ids whose device_ids binding names the target device.
-    Pages bound to multiple devices are only listed if the target is
-    the *only* device on the binding, otherwise wiping the page would
-    unbind an unrelated device that still exists."""
+def _is_live(devices: Any | None, device_id: str) -> bool:
+    """Whether ``device_id`` still resolves to a registered device. A missing
+    registry answers False for everything, which keeps the caller conservative:
+    bindings are then judged on presence alone."""
+    if devices is None:
+        return False
+    return getattr(devices, "devices", {}).get(device_id) is not None
+
+
+def _pages_for_device(
+    page_store: PageStore, device_id: str, devices: Any | None = None
+) -> list[str]:
+    """Page ids the target device exclusively owns: it is on the binding and no
+    OTHER device on that binding is still registered.
+
+    The test is deliberately about LIVE co-bindings, not binding length (issue
+    #229). Deleting a device leaves its id behind on any page it shared, so a
+    length test read ``["deleted_a", "b"]`` as "shared, leave it alone" and never
+    offered the page again once b was deleted too. Counting only live co-owners
+    means the last real device to go takes the page with it, and a page already
+    carrying a dead id self-heals on the next delete.
+
+    Deliberately tolerant about the target itself: the delete route wipes AFTER
+    dropping the device from the registry, so the target is usually gone by the
+    time this runs. Only the OTHER ids are resolved.
+
+    With no registry there is no way to tell a live co-owner from a dead one, so
+    the rule falls back to the conservative one it replaced: ANY other id on the
+    binding protects the page. Deleting a page a live device still shows is the
+    one outcome worth ruling out, so the ambiguous case keeps it."""
     out: list[str] = []
     for page in page_store.list():
-        if device_id in page.device_ids and len(page.device_ids) == 1:
-            out.append(page.id)
+        if device_id not in page.device_ids:
+            continue
+        others = [d for d in page.device_ids if d != device_id]
+        if others and (devices is None or any(_is_live(devices, o) for o in others)):
+            continue
+        out.append(page.id)
     return out
+
+
+def _unbind_device_from_pages(
+    page_store: PageStore, device_id: str, *, skip: list[str]
+) -> list[str]:
+    """Drop ``device_id`` from every surviving page that still names it,
+    returning the page ids changed. ``skip`` names the pages the caller is
+    deleting outright, so a page isn't rewritten on its way out.
+
+    Only ever called from the wipe path. A wipe says "this id is a clean slate",
+    and a dashboard still listing a device that no longer exists contradicts
+    that: it inflates the dashboards list's link count and, left alone, would
+    keep the page from ever being recognised as another device's to delete."""
+    changed: list[str] = []
+    skipped = set(skip)
+    for page in page_store.list():
+        if page.id in skipped or device_id not in page.device_ids:
+            continue
+        page.device_ids = [d for d in page.device_ids if d != device_id]
+        page_store.save(page)
+        changed.append(page.id)
+    return changed
 
 
 def _event_count_for_device(event_log: EventLog, device_id: str, page_ids: list[str]) -> int:
@@ -192,12 +248,23 @@ def list_orphan_state(
     event_log: EventLog,
     settings_store: SettingsStore,
     data_root: Path,
+    devices: Any | None = None,
 ) -> OrphanSummary:
-    """Snapshot the state a device_id currently owns."""
-    pages = _pages_for_device(page_store, device_id)
+    """Snapshot the state a device_id currently owns.
+
+    ``devices`` is the live :class:`app.device_loader.DeviceRegistry`. Passing it
+    lets a page co-bound to an already-deleted device count as this device's to
+    delete (issue #229); without it the summary falls back to counting only
+    pages bound to this device alone."""
+    pages = _pages_for_device(page_store, device_id, devices)
     events = _event_count_for_device(event_log, device_id, pages)
     devices_keys, renderers_keys = _count_settings_for_device(settings_store, device_id)
     calibration = _calibration_image_path(data_root, device_id).exists()
+    unbound = [
+        page.id
+        for page in page_store.list()
+        if page.id not in pages and device_id in page.device_ids
+    ]
     return OrphanSummary(
         device_id=device_id,
         page_ids=pages,
@@ -205,6 +272,7 @@ def list_orphan_state(
         setting_keys_devices=devices_keys,
         setting_keys_renderers=renderers_keys,
         has_calibration_image=calibration,
+        unbound_page_ids=unbound,
     )
 
 
@@ -216,6 +284,7 @@ def wipe_orphan_state(
     settings_store: SettingsStore,
     data_root: Path,
     push_manager: Any | None = None,
+    devices: Any | None = None,
 ) -> OrphanSummary:
     """Remove per-device leftovers idempotently and return a summary of
     what was actually deleted. Safe to call after
@@ -225,11 +294,18 @@ def wipe_orphan_state(
     ``push_manager`` is the live :class:`app.push.PushManager`. Passing it drops
     the device's frame pointers, without which a device re-registered under the
     same id is served the frame from before the wipe (issue #199). Optional so
-    a caller with no manager wired (tests, CLI) still works."""
-    pages = _pages_for_device(page_store, device_id)
+    a caller with no manager wired (tests, CLI) still works.
+
+    ``devices`` is the live :class:`app.device_loader.DeviceRegistry`, used to
+    tell a page this device exclusively owns from one another LIVE device still
+    shows (issue #229). Pages kept for a live co-owner have this device's id
+    dropped from their binding rather than being left pointing at a device that
+    no longer exists."""
+    pages = _pages_for_device(page_store, device_id, devices)
     removed_events = _delete_events_for_device(event_log, device_id, pages)
     for pid in pages:
         page_store.delete(pid)
+    unbound = _unbind_device_from_pages(page_store, device_id, skip=pages)
     devices_removed, renderers_removed = _wipe_settings_for_device(settings_store, device_id)
     calibration_removed = False
     path = _calibration_image_path(data_root, device_id)
@@ -248,4 +324,5 @@ def wipe_orphan_state(
         setting_keys_renderers=renderers_removed,
         has_calibration_image=calibration_removed,
         has_latest_render=render_forgotten,
+        unbound_page_ids=unbound,
     )
