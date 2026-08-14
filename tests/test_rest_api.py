@@ -2044,3 +2044,42 @@ def test_counter_restart_without_repair_still_dispatches(app: Flask) -> None:
     # stays, and the dedup outcome leaves state untouched.
     assert post_button(1).status_code == 200
     assert store.get("desk_e1003").last_button_event_id == 1
+
+
+def test_discover_says_the_body_is_not_json(app: Flask) -> None:
+    """A client formatting a Python repr instead of serialising JSON
+    (single quotes, bare ``None``) sends something Flask can't parse. The
+    empty-dict fallback used to surface that as "device_id is required",
+    which sends the client author looking for a field they did send
+    (issue #226)."""
+    client = app.test_client()
+    resp = client.post(
+        "/api/v1/device/discover",
+        headers={"Content-Type": "application/json"},
+        data="{'device_id': 'pico_repr', 'kind': 'pico_bin_client', 'mac': None}",
+    )
+    assert resp.status_code == 400
+    assert "valid JSON" in resp.get_json()["error"]
+
+
+def test_register_says_the_body_is_not_json(app: Flask) -> None:
+    """Same message on the pairing-code path."""
+    client = app.test_client()
+    _sign_in(client)
+    code = _issue_pairing(app)
+    resp = client.post(
+        "/api/v1/device/register",
+        headers={"X-Pairing-Code": code, "Content-Type": "application/json"},
+        data="{'device_id': 'pico_repr'}",
+    )
+    assert resp.status_code == 400
+    assert "valid JSON" in resp.get_json()["error"]
+
+
+def test_empty_body_still_names_the_missing_field(app: Flask) -> None:
+    """No body at all is a different mistake from a malformed one, and
+    keeps the field-level message."""
+    client = app.test_client()
+    resp = client.post("/api/v1/device/discover", headers={"Content-Type": "application/json"})
+    assert resp.status_code == 400
+    assert "device_id" in resp.get_json()["error"]

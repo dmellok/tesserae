@@ -2420,7 +2420,15 @@ def _discover() -> Response:
             resp.headers["Retry-After"] = str(decision.retry_after_s)
             return resp
 
-    body = request.get_json(silent=True) or {}
+    # A body that doesn't parse used to fall through to an empty dict and
+    # surface as "device_id is required", which sends a client author
+    # hunting for a field they did send. Name the real problem: the most
+    # common cause is a client formatting a Python repr (single quotes,
+    # bare None) instead of serialising JSON (issue #226).
+    parsed_body = request.get_json(silent=True)
+    if parsed_body is None and request.get_data():
+        return _error(400, "body is not valid JSON")
+    body = parsed_body or {}
     if not isinstance(body, dict):
         return _error(400, "body must be a JSON object")
     device_id = _canonical_id(body.get("device_id"))
@@ -2542,7 +2550,12 @@ def _register() -> Response:
     if not code:
         return _error(400, "missing X-Pairing-Code header")
 
-    body = request.get_json(silent=True) or {}
+    # Same reasoning as /discover: an unparseable body says so rather
+    # than blaming the first field it can't find (issue #226).
+    parsed_body = request.get_json(silent=True)
+    if parsed_body is None and request.get_data():
+        return _error(400, "body is not valid JSON")
+    body = parsed_body or {}
     if not isinstance(body, dict):
         return _error(400, "body must be a JSON object")
 

@@ -4,6 +4,17 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.300.2], 2026-08-14
+
+### Fixed
+
+- **A body that isn't JSON says so.** `/api/v1/device/discover` and
+  `/register` fell back to an empty object when the body failed to parse, so
+  the rejection blamed the first field they couldn't find (`device_id is
+  required`) rather than the parse. A client that formats a Python repr
+  (single quotes, bare `None`) instead of serialising JSON now gets `body is
+  not valid JSON`. An empty body still names the missing field.
+
 ## [0.300.1], 2026-08-14
 
 ### Fixed
