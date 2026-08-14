@@ -55,6 +55,7 @@ ROOT_FOLDER_VALUE = "_root"
 META_FILE = ".folders.json"
 THUMB_DIR = ".thumb_cache"
 THUMB_SIZE = (320, 240)
+RENDITION_DIR = ".render_cache"
 ORIENT_CACHE_FILE = ".orientation_cache.json"
 SQUARE_TOLERANCE = 0.05
 
@@ -168,6 +169,49 @@ def _ensure_thumbnail(source: Path, dest: Path) -> Path | None:
                 img = img.convert("RGB")
             tmp = dest.with_suffix(dest.suffix + ".tmp")
             img.save(tmp, format="JPEG", quality=78, optimize=True)
+            os.replace(tmp, dest)
+        return dest
+    except (OSError, Image.UnidentifiedImageError, ValueError):
+        return None
+
+
+# ----- full-size renditions -------------------------------------------
+#
+# A PNG copy of an image whose stored format a consumer can't take. The
+# Gallery accepts BMP and GIF (pre-dithered artwork arrives as BMP, see
+# #117) and the Web UI serves them as-is, but the Companion contract's
+# media types don't cover either. Rather than hide those files from the
+# app, it gets a rendition: same pixels, a format everything reads, and
+# the stored file untouched.
+#
+# Cached beside the thumbnails and keyed the same way (folder + filename
+# + mtime), so re-saving an image busts it automatically.
+
+
+def _rendition_path(data_dir: Path, folder_name: str, filename: str, source: Path) -> Path:
+    try:
+        mtime = int(source.stat().st_mtime)
+    except OSError:
+        mtime = 0
+    safe = re.sub(r"[^a-zA-Z0-9._-]", "_", filename)
+    return data_dir / RENDITION_DIR / f"{folder_name}__{safe}__{mtime}.png"
+
+
+def _ensure_rendition(source: Path, dest: Path) -> Path | None:
+    if dest.exists():
+        return dest
+    try:
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        with Image.open(source) as img:
+            # First frame only for an animated GIF: the contract has no
+            # notion of an animation, and a still is what a panel renders.
+            oriented = ImageOps.exif_transpose(img) or img
+            if oriented.mode in ("P", "PA"):
+                oriented = oriented.convert("RGBA" if "transparency" in oriented.info else "RGB")
+            elif oriented.mode not in ("RGB", "RGBA", "L", "LA"):
+                oriented = oriented.convert("RGB")
+            tmp = dest.with_suffix(dest.suffix + ".tmp")
+            oriented.save(tmp, format="PNG", optimize=True)
             os.replace(tmp, dest)
         return dest
     except (OSError, Image.UnidentifiedImageError, ValueError):
@@ -450,6 +494,18 @@ def thumbnail_path(folder: str, filename: str) -> Path | None:
     if source is None:
         return None
     return _ensure_thumbnail(source, _thumb_path(_data_dir(), folder, filename, source))
+
+
+def rendition_path(folder: str, filename: str) -> Path | None:
+    """Cached full-size PNG copy of one image, generating it on first
+    ask. None when the image is unreadable.
+
+    For consumers that can't take the stored format. The stored file is
+    never touched, so the Web UI keeps serving the original."""
+    source = resolve_image_path(folder, filename)
+    if source is None:
+        return None
+    return _ensure_rendition(source, _rendition_path(_data_dir(), folder, filename, source))
 
 
 def allowed_suffixes() -> frozenset[str]:

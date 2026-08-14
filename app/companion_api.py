@@ -2329,21 +2329,27 @@ def gallery_image_thumbnail(image_id: str) -> Any:
 @bp.get("/gallery/images/<image_id>/content")
 @_require_companion("gallery:read")
 def gallery_image_content(image_id: str) -> Any:
-    """The stored image. A client passes these bytes into ``POST /images``
-    to send it, so Gallery adds no second delivery path and Send stays
-    independent of whether the target caches frames."""
+    """The image, in a format the contract defines. A client passes these
+    bytes into ``POST /images`` to send it, so Gallery adds no second
+    delivery path and Send stays independent of whether the target caches
+    frames.
+
+    Usually the stored file. For a stored format the contract's media
+    types don't cover (BMP, GIF) it's a cached PNG rendition of the same
+    pixels; the stored file is never rewritten."""
     ref, err = _gallery_image_or_404(image_id)
     if err is not None:
         return err
     assert ref is not None
     folder, filename = ref
-    view = companion_gallery.image_view(folder, filename)
-    gallery = companion_gallery.gallery_module()
-    path = gallery.resolve_image_path(folder, filename)
-    if view is None or path is None:
+    served = companion_gallery.served_image(folder, filename)
+    if served is None:
         return _error("not_found", "No Gallery image with that id.", 404)
     return _gallery_binary(
-        path, str(view["content_type"]), str(view["etag"]), filename=str(view["name"])
+        served.path,
+        served.content_type,
+        companion_gallery.etag_for(served.path),
+        filename=served.name,
     )
 
 

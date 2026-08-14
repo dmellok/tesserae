@@ -189,21 +189,82 @@ def test_content_and_thumbnail_revalidate_with_an_etag(app: Flask, auth: dict[st
     assert len(thumb.get_data()) > 0
 
 
-def test_unrepresentable_formats_are_left_out_rather_than_mislabelled(
-    app: Flask, auth: dict[str, str]
+@pytest.mark.parametrize(
+    ("stored", "fmt"),
+    [("dithered.bmp", "BMP"), ("old.gif", "GIF")],
+)
+def test_a_format_the_contract_lacks_is_served_as_a_png_rendition(
+    app: Flask, auth: dict[str, str], stored: str, fmt: str
 ) -> None:
-    """The plugin has always accepted GIF and BMP through the Web UI. The
-    contract's Gallery media types don't cover them, so they're skipped
-    here instead of being served under a type the client can't decode."""
+    """The Gallery accepts BMP and GIF and the Web UI serves them
+    unchanged, but the contract's media types cover neither. Hiding them
+    would make a folder of pre-dithered BMPs read as empty over the API
+    (#117), so they're converted on read instead."""
     _seed_image(app, "family", "one.jpg")
-    _seed_image(app, "family", "old.gif", fmt="GIF")
+    source = _seed_image(app, "family", stored, fmt=fmt, size=(70, 50))
+    folder_id = companion_gallery.folder_id("family")
+
+    body = (
+        app.test_client().get(f"/api/app/v1/gallery/folders/{folder_id}", headers=auth).get_json()
+    )
+    _validate(body, "GalleryFolderResponse")
+    assert body["folder"]["image_count"] == 2
+
+    rendered = next(i for i in body["images"] if i["name"] != "one.jpg")
+    # The extension follows the bytes, so a client that saves the download
+    # doesn't end up with a .bmp full of PNG.
+    assert rendered["name"] == f"{Path(stored).stem}.png"
+    assert rendered["content_type"] == "image/png"
+    assert (rendered["width"], rendered["height"]) == (70, 50)
+
+    content = app.test_client().get(rendered["content_url"], headers=auth)
+    assert content.status_code == 200
+    assert content.mimetype == "image/png"
+    with Image.open(io.BytesIO(content.get_data())) as decoded:
+        assert decoded.format == "PNG"
+        assert decoded.size == (70, 50)
+    # Advertised size and validator describe what was actually served.
+    assert rendered["bytes"] == len(content.get_data())
+    assert content.headers["ETag"] == rendered["etag"]
+
+    # The stored file is never rewritten; the Web UI still serves it as-is.
+    assert source.read_bytes()[:2] != b"\x89P"
+    with Image.open(source) as original:
+        assert original.format == fmt
+
+
+def test_a_rendition_is_cached_rather_than_rebuilt(app: Flask, auth: dict[str, str]) -> None:
+    _seed_image(app, "family", "dithered.bmp", fmt="BMP")
+    image_id = companion_gallery.image_id("family", "dithered.bmp")
+    client = app.test_client()
+
+    first = client.get(f"/api/app/v1/gallery/images/{image_id}/content", headers=auth)
+    assert first.status_code == 200
+    cache = list((_gallery_dir(app) / ".render_cache").glob("*.png"))
+    assert len(cache) == 1
+    stamped = cache[0].stat().st_mtime_ns
+
+    second = client.get(f"/api/app/v1/gallery/images/{image_id}/content", headers=auth)
+    assert second.headers["ETag"] == first.headers["ETag"]
+    assert cache[0].stat().st_mtime_ns == stamped
+
+    revalidated = client.get(
+        f"/api/app/v1/gallery/images/{image_id}/content",
+        headers={**auth, "If-None-Match": first.headers["ETag"]},
+    )
+    assert revalidated.status_code == 304
+
+
+def test_an_unreadable_file_is_left_out_of_the_listing(app: Flask, auth: dict[str, str]) -> None:
+    """A truncated or corrupt file shouldn't fail the whole folder."""
+    _seed_image(app, "family", "one.jpg")
+    (_gallery_dir(app) / "family" / "broken.bmp").write_bytes(b"BM not really a bitmap")
     folder_id = companion_gallery.folder_id("family")
     body = (
         app.test_client().get(f"/api/app/v1/gallery/folders/{folder_id}", headers=auth).get_json()
     )
     _validate(body, "GalleryFolderResponse")
     assert [i["name"] for i in body["images"]] == ["one.jpg"]
-    # The count agrees with the list rather than with the directory.
     assert body["folder"]["image_count"] == 1
 
 

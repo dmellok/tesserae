@@ -4,6 +4,18 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.300.3], 2026-08-14
+
+### Fixed
+
+- **BMP and GIF images are visible over the Companion API (#117).** The
+  Gallery accepts both and the Web UI serves them unchanged, but the client
+  contract's media types cover neither, so a folder of pre-dithered BMPs read
+  as empty from the phone. Those images are now served as a full-size PNG
+  rendition, generated on first request and cached beside the thumbnails. The
+  stored file is never rewritten, and the reported filename, size and cache
+  validator describe what is actually served.
+
 ## [0.300.2], 2026-08-14
 
 ### Fixed

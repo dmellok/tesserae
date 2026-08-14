@@ -25,10 +25,11 @@ profile is re-attached deliberately. The client sends a photo; what
 lands is the server's file.
 
 Content types: the contract's Gallery enum covers JPEG, PNG, HEIC/HEIF
-and WebP. The plugin has always also accepted GIF and BMP through the
-Web UI, and those stay readable and usable there; they're left out of
-the Companion listing rather than served under a media type the contract
-doesn't define. See ``notes/companion-gallery.md``.
+and WebP. The plugin also accepts GIF and BMP, which it has served
+through the Web UI since it was ported, so this surface serves those as
+a cached PNG rendition rather than either hiding them or labelling them
+with a media type the client can't decode. See
+``notes/companion-gallery.md``.
 
 mypy --strict applies, see pyproject.toml.
 """
@@ -68,15 +69,20 @@ GALLERY_IMAGE_CONTENT_TYPES: tuple[str, ...] = (
     "image/webp",
 )
 
-# Stored suffix -> the media type we report for it. Only types the
-# contract's Gallery enum defines; a folder's other readable files (GIF,
-# BMP) are skipped rather than mislabelled.
-_SUFFIX_CONTENT_TYPES: dict[str, str] = {
+# Stored suffix -> the media type served straight from the stored file.
+_NATIVE_CONTENT_TYPES: dict[str, str] = {
     ".jpg": "image/jpeg",
     ".jpeg": "image/jpeg",
     ".png": "image/png",
     ".webp": "image/webp",
 }
+
+# Stored suffixes the Gallery reads but the contract's media types don't
+# cover. Served as a cached PNG rendition rather than hidden: the Web UI
+# has always accepted both, and a folder of pre-dithered BMPs reading as
+# empty over the API would be a worse answer than a converted copy.
+_RENDITION_SUFFIXES: frozenset[str] = frozenset({".bmp", ".gif"})
+_RENDITION_CONTENT_TYPE = "image/png"
 
 # Decoded format -> (stored suffix, media type). HEIC/HEIF is transcoded
 # to JPEG on the way in: nothing else in Tesserae reads HEIF, so leaving
@@ -187,12 +193,60 @@ def image_from_id(value: str) -> tuple[str, str] | None:
 
 
 def _listable(gallery: Any, folder: str) -> list[str]:
-    """A folder's filenames the Companion contract can represent."""
+    """A folder's filenames this surface can serve, natively or as a
+    rendition. Everything the plugin will read, in other words."""
     return [
         name
         for name in gallery.list_folder_files(folder)
-        if Path(name).suffix.lower() in _SUFFIX_CONTENT_TYPES
+        if Path(name).suffix.lower() in _NATIVE_CONTENT_TYPES
+        or Path(name).suffix.lower() in _RENDITION_SUFFIXES
     ]
+
+
+@dataclass(frozen=True)
+class ServedImage:
+    """The bytes this surface hands back for one stored image.
+
+    ``path`` is the stored file for a format the contract defines, and a
+    cached PNG rendition of it otherwise. ``name`` follows: a client that
+    saves what it downloaded ends up with a file whose extension matches
+    its contents."""
+
+    path: Path
+    content_type: str
+    name: str
+    is_rendition: bool
+
+
+def served_image(folder: str, filename: str) -> ServedImage | None:
+    """What to serve for one stored image, or None when it can't be read.
+
+    BMP and GIF are the case this exists for. The Gallery has accepted
+    both since it was ported (#117: pre-dithered artwork arrives as BMP)
+    and the Web UI serves them unchanged, but the Companion contract's
+    media types cover neither. Skipping them would make a folder of
+    pre-dithered BMPs read as empty over the API, so they're rendered to
+    PNG on first ask instead, cached beside the thumbnails, with the
+    stored file untouched."""
+    gallery = gallery_module()
+    source = gallery.resolve_image_path(folder, filename)
+    if source is None:
+        return None
+    suffix = source.suffix.lower()
+    native = _NATIVE_CONTENT_TYPES.get(suffix)
+    if native is not None:
+        return ServedImage(path=source, content_type=native, name=filename, is_rendition=False)
+    if suffix not in _RENDITION_SUFFIXES:
+        return None
+    rendition = gallery.rendition_path(folder, filename)
+    if rendition is None:
+        return None
+    return ServedImage(
+        path=Path(rendition),
+        content_type=_RENDITION_CONTENT_TYPE,
+        name=f"{Path(filename).stem}.png",
+        is_rendition=True,
+    )
 
 
 def etag_for(path: Path) -> str:
@@ -218,36 +272,36 @@ def _created_at(path: Path) -> str | None:
 
 def image_view(folder: str, filename: str) -> dict[str, Any] | None:
     """One image as the contract's ``GalleryImage``, or None when it has
-    gone missing or can't be decoded for its dimensions."""
-    gallery = gallery_module()
-    path = gallery.resolve_image_path(folder, filename)
-    if path is None:
-        return None
-    content_type = _SUFFIX_CONTENT_TYPES.get(path.suffix.lower())
-    if content_type is None:
+    gone missing or can't be decoded for its dimensions.
+
+    Every field describes what a client will actually receive, so for a
+    rendition the type, size and validator are the rendition's, not the
+    stored file's. ``created_at`` stays the stored file's, since that is
+    when the photo entered the Gallery; a cache rebuild is not a new
+    import."""
+    served = served_image(folder, filename)
+    if served is None:
         return None
     try:
-        with Image.open(path) as img:
+        with Image.open(served.path) as img:
             width, height = ImageOps.exif_transpose(img).size
+        size_bytes = served.path.stat().st_size
     except (OSError, ValueError, Image.DecompressionBombError):
         return None
-    try:
-        size_bytes = path.stat().st_size
-    except OSError:
-        return None
+    source = gallery_module().resolve_image_path(folder, filename)
     ident = image_id(folder, filename)
     return {
         "id": ident,
         "folder_id": folder_id(folder),
-        "name": filename,
-        "content_type": content_type,
+        "name": served.name,
+        "content_type": served.content_type,
         "bytes": max(int(size_bytes), 1),
         "width": int(width),
         "height": int(height),
-        "etag": etag_for(path),
+        "etag": etag_for(served.path),
         "thumbnail_url": url_for("companion_api.gallery_image_thumbnail", image_id=ident),
         "content_url": url_for("companion_api.gallery_image_content", image_id=ident),
-        "created_at": _created_at(path),
+        "created_at": _created_at(source if source is not None else served.path),
     }
 
 
@@ -282,9 +336,19 @@ def list_folders() -> list[dict[str, Any]]:
 
 
 def folder_detail(folder: str) -> dict[str, Any]:
+    """One folder and its images.
+
+    The count is corrected here to the images actually returned. The
+    listing endpoint takes it from the directory, because opening every
+    image in every folder to answer would be a slow list, so a file that
+    turns out to be truncated or corrupt is counted there and dropped
+    here. Opening the folder is what resolves the difference."""
     gallery = gallery_module()
-    images = [image_view(folder, name) for name in _listable(gallery, folder)]
-    return {"folder": folder_view(folder), "images": [i for i in images if i is not None]}
+    views = [image_view(folder, name) for name in _listable(gallery, folder)]
+    images = [view for view in views if view is not None]
+    view = folder_view(folder)
+    view["image_count"] = len(images)
+    return {"folder": view, "images": images}
 
 
 # -- upload --------------------------------------------------------------
