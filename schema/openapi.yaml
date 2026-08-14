@@ -1156,8 +1156,11 @@ components:
             the MAC is bound to the instance the admin creates from
             the Discovered strip so the next poll claims the token.
             An announce without one is rejected with `400`, since
-            nothing would ever match it (issue #226). A client with
-            no MAC to report pairs via `/api/v1/device/register`.
+            nothing would ever match it (issue #226), and so is a
+            placeholder (`null`, `"None"`, `00:00:00:00:00:00`,
+            `ff:ff:ff:ff:ff:ff`): two devices sending the same one
+            would claim each other's token. A client with no MAC to
+            report pairs via `/api/v1/device/register`.
           example: "AA:BB:CC:DD:EE:FF"
 
     DiscoverClaimed:

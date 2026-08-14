@@ -54,6 +54,7 @@ from app.device_service import (
     generate_access_token,
     panel_geometry_from_report,
     parse_rotation,
+    usable_mac,
 )
 from app.render_signing import sign_render_query
 from app.renderer_loader import RendererRegistry
@@ -2347,17 +2348,24 @@ def _claim_device_by_mac(mac: str) -> Device | None:
     without needing a pairing code.
 
     Case-insensitive compare; spec-MAC formats (with or without colons,
-    upper or lower case) normalise to lower-no-separators."""
-    target = mac.strip().lower().replace(":", "").replace("-", "")
+    upper or lower case) normalise to lower-no-separators.
+
+    Instances carrying a placeholder MAC are skipped rather than matched.
+    Installs that paired before v0.300.1 may have ``"None"`` or an
+    all-zero MAC persisted from a client that formatted its null into the
+    body; matching one would hand the announcing device someone else's
+    token, so they're treated as MAC-less here (issue #226). No migration
+    needed: the stored value stays put and simply stops being claimable."""
+    target = (usable_mac(mac) or "").lower().replace(":", "").replace("-", "")
     if not target:
         return None
     for dev in _devices().all():
         if dev.kind_of is None:
             continue
-        stored = dev.manifest.get("mac")
-        if not isinstance(stored, str) or not stored:
+        stored = usable_mac(dev.manifest.get("mac"))
+        if not stored:
             continue
-        normalised = stored.strip().lower().replace(":", "").replace("-", "")
+        normalised = stored.lower().replace(":", "").replace("-", "")
         if normalised == target:
             return dev
     return None
@@ -2418,7 +2426,7 @@ def _discover() -> Response:
     device_id = _canonical_id(body.get("device_id"))
     if not device_id:
         return _error(400, "device_id is required")
-    mac = str(body.get("mac") or "").strip()
+    mac = usable_mac(body.get("mac"))
     if not mac:
         # The whole flow keys off the MAC: the announce lands in the
         # Discovered strip, the admin clicks Register, and the NEXT
@@ -2429,11 +2437,18 @@ def _discover() -> Response:
         # Reject it up front instead of accepting a pairing that can
         # never complete; a client that genuinely has no MAC to report
         # pairs via ``/register`` with a 6-digit code.
+        #
+        # A placeholder counts as absent, see :func:`usable_mac`. Taking
+        # ``"None"`` at face value is the worse failure of the two: two
+        # clients sending the same placeholder collide on one instance
+        # and the second is handed the first one's access token.
         return _error(
             400,
             "mac is required: /discover hands back the device token by matching "
-            "this MAC against a registered device. Send the client's MAC, or pair "
-            "with a 6-digit code via /api/v1/device/register instead.",
+            "this MAC against a registered device. Send the client's real MAC "
+            '(a placeholder such as null, "None" or 00:00:00:00:00:00 is '
+            "rejected, since two devices sharing one would claim each other's "
+            "token), or pair with a 6-digit code via /api/v1/device/register.",
         )
 
     # MAC-match claim: if admin already registered a device whose
@@ -2627,7 +2642,11 @@ def _register() -> Response:
     # the id and auto-wipe the leftovers before create_instance runs
     # so the new device starts pristine. Matching MACs keep state
     # (same physical device came back).
-    incoming_mac = str(body.get("mac") or "").strip() or None
+    # Placeholders are dropped rather than persisted: a stored ``"None"``
+    # would become claimable by any other client sending the same string
+    # on /discover (issue #226). Pairing still succeeds, the device just
+    # has no MAC to auto-claim with later, which is the honest state.
+    incoming_mac = usable_mac(body.get("mac"))
     markers = _deleted_device_markers()
     if markers.mac_differs(device_id, incoming_mac):
         from app import device_cleanup as _cleanup

@@ -129,6 +129,15 @@ server URL.
    polling forever on `registered: false` (issue #226). A client that
    has no MAC to report pairs with a 6-digit code instead (path B).
 
+   Send the real MAC, not a stand-in. `null`, `"None"` (a client's own
+   null formatted into the body), `00:00:00:00:00:00` and
+   `ff:ff:ff:ff:ff:ff` are all rejected the same way an absent MAC is,
+   because two devices sending the same placeholder would resolve to
+   one instance and the second would be handed the first one's token.
+   The same rule applies to the `mac` on `/register`: a placeholder is
+   dropped rather than stored, so pairing succeeds but that device
+   can't auto-claim later.
+
    `name` is optional on both `/discover` and `/register`: a suggested
    human-readable display name for the device. On `/register` it's
    applied directly to the new instance. On `/discover` it prefills

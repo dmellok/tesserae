@@ -4,6 +4,22 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.300.1], 2026-08-14
+
+### Fixed
+
+- **A placeholder MAC can no longer claim another device's token (#226).**
+  `/discover` matches the announced MAC against registered instances, and it
+  took any non-empty string at face value. A client that formatted its own
+  null into the body sent `"None"`, so two such clients resolved to one
+  instance and the second was handed the first one's access token; an
+  all-zero or broadcast MAC from a radio that wasn't up yet did the same.
+  `null`, `"None"`, `00:00:00:00:00:00`, `ff:ff:ff:ff:ff:ff` and similar
+  stand-ins now read as no MAC at all: `/discover` rejects them with `400`,
+  `/register` pairs but stores no MAC, and an instance that already carries
+  one from an earlier install stops being claimable. No migration; the
+  stored value stays where it is and simply stops matching.
+
 ## [0.300.0], 2026-08-14
 
 ### Added

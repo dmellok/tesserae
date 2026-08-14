@@ -258,6 +258,52 @@ def parse_rotation(value: Any) -> int | None:
     return rotation if rotation in VALID_ROTATIONS else None
 
 
+# Values that reach the server in the ``mac`` slot but carry no device
+# identity. Mostly a client's null formatted into the body as a string
+# (``f'"mac": "{mac}"'`` with ``mac = None`` yields ``"None"``), plus the
+# all-zero / broadcast MACs a driver reports before the radio is up.
+# Compared after separators and case are normalised away.
+_MAC_SENTINELS: frozenset[str] = frozenset(
+    {
+        "none",
+        "null",
+        "nil",
+        "nan",
+        "na",
+        "undefined",
+        "unknown",
+        "unset",
+        "000000000000",
+        "ffffffffffff",
+    }
+)
+
+
+def usable_mac(value: Any) -> str | None:
+    """The announced MAC, or ``None`` when it can't identify a device.
+
+    ``/discover`` hands a firmware its access token by matching this
+    value against a registered instance, which makes a placeholder worse
+    than nothing: two clients that both send ``"None"`` or an all-zero
+    MAC collide on one instance, and the second one is handed the first
+    one's token. So a sentinel is treated exactly like an absent MAC
+    (issue #226), both when deciding whether an announce can claim and
+    when persisting a MAC onto a new instance.
+
+    The caller's spelling is preserved on the way out (colons, case) so
+    the value shown on the device card matches what the client sent;
+    only the comparison is normalised."""
+    if not isinstance(value, str):
+        return None
+    text = value.strip()
+    if not text:
+        return None
+    normalised = re.sub(r"[^a-z0-9]", "", text.lower())
+    if not normalised or normalised in _MAC_SENTINELS:
+        return None
+    return text
+
+
 def panel_geometry_from_report(
     *, w: int | None, h: int | None, rotation: int | None
 ) -> tuple[dict[str, int], str | None]:

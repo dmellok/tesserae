@@ -671,7 +671,10 @@ def devices_register_discovered(discovered_id: str) -> Response:
     # pipeline skips MQTT publish.
     is_rest_discovery = entry.parsed.get("transport") == "rest"
     transport_arg = "rest" if is_rest_discovery else None
-    mac_arg = str(entry.parsed.get("mac") or "").strip() or None if is_rest_discovery else None
+    # ``usable_mac`` drops placeholders ("None", all-zero, ...) so one
+    # never lands on an instance where a second client sending the same
+    # string could claim its token (issue #226).
+    mac_arg = device_service.usable_mac(entry.parsed.get("mac")) if is_rest_discovery else None
     # v0.69.2 (issue #48): if the id has orphan state from a previous
     # deletion AND the incoming MAC differs from what was stored, wipe
     # the leftovers so the new device starts pristine. Matching MACs

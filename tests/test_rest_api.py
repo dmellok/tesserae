@@ -1568,16 +1568,80 @@ def test_discover_rejects_missing_mac(app: Flask) -> None:
     assert app.config["DISCOVERY_CACHE"].get("no_mac_pico") is None
 
 
-def test_discover_rejects_blank_mac(app: Flask) -> None:
-    """``mac: null`` / ``mac: ""`` are the same as omitting it."""
+def test_discover_rejects_blank_or_placeholder_mac(app: Flask) -> None:
+    """``mac: null`` and the placeholders that reach the wire as strings
+    are all treated as "no MAC". A client formatting its own null into
+    the body sends ``"None"``; a driver polled before the radio is up
+    reports the all-zero or broadcast MAC. Taking any of them at face
+    value is worse than rejecting: see the collision test below."""
     client = app.test_client()
-    for value in (None, "", "   "):
+    for value in (
+        None,
+        "",
+        "   ",
+        "None",
+        "none",
+        "null",
+        "n/a",
+        "undefined",
+        "00:00:00:00:00:00",
+        "FF-FF-FF-FF-FF-FF",
+    ):
         resp = client.post(
             "/api/v1/device/discover",
             headers={"Content-Type": "application/json"},
             data=json.dumps({"device_id": "blank_mac_pico", "mac": value}),
         )
-        assert resp.status_code == 400
+        assert resp.status_code == 400, f"{value!r} should not pair"
+        assert app.config["DISCOVERY_CACHE"].get("blank_mac_pico") is None
+
+
+def test_discover_never_claims_a_token_via_a_placeholder_mac(app: Flask) -> None:
+    """Two clients sending the same placeholder are not the same device.
+    Before #226 the second one matched the first one's instance and was
+    handed its access token, so a placeholder has to stay unclaimable
+    even when an older install already persisted one (no migration: the
+    stored value simply stops matching)."""
+    from app import device_service
+
+    result = device_service.create_instance(
+        devices=app.config["DEVICE_REGISTRY"],
+        renderers=app.config["RENDERER_REGISTRY"],
+        data_root=app.config["DEVICE_DATA_ROOT"],
+        instance_id="legacy_panel",
+        kind_id="pico_bin_client",
+        mac="None",  # what a pre-fix install persisted
+        transport="rest",
+    )
+    assert result.device is not None
+    victim_token = result.device.manifest["access_token"]
+
+    client = app.test_client()
+    resp = client.post(
+        "/api/v1/device/discover",
+        headers={"Content-Type": "application/json"},
+        data=json.dumps({"device_id": "other_panel", "kind": "pico_bin_client", "mac": "None"}),
+    )
+    assert resp.status_code == 400
+    assert victim_token not in resp.get_data(as_text=True)
+
+
+def test_register_does_not_persist_a_placeholder_mac(app: Flask) -> None:
+    """The pairing-code path stores whatever MAC it's given. A stored
+    placeholder would be claimable by any client sending the same string
+    on /discover, so it's dropped: pairing still succeeds, the device
+    just has no MAC to auto-claim with (issue #226)."""
+    client = app.test_client()
+    _sign_in(client)
+    code = _issue_pairing(app)
+    resp = client.post(
+        "/api/v1/device/register",
+        headers={"X-Pairing-Code": code, "Content-Type": "application/json"},
+        data=json.dumps({"device_id": "coded_pico", "kind": "pico_bin_client", "mac": "None"}),
+    )
+    assert resp.status_code == 201
+    stored = app.config["DEVICE_REGISTRY"].get("coded_pico").manifest.get("mac")
+    assert not stored, f"placeholder MAC persisted as {stored!r}"
 
 
 def test_discover_endpoint_rate_limited(app: Flask) -> None:

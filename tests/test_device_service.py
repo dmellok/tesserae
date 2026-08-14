@@ -750,3 +750,35 @@ def test_relocate_orphan_instance_files_does_not_clobber_existing(tmp_path: Path
     # Stray untouched; the fresh copy in data/devices/ is preserved.
     assert (data_root / "dupe_pico.json").exists()
     assert '"fresh": true' in (device_data_root / "dupe_pico.json").read_text(encoding="utf-8")
+
+
+def test_usable_mac_drops_placeholders_but_keeps_spelling() -> None:
+    """The claim path matches on this value, so anything that can't
+    identify a device has to read as absent (issue #226). Real MACs come
+    back exactly as the client spelled them, since the device card shows
+    the stored string."""
+    from app.device_service import usable_mac
+
+    for placeholder in (
+        None,
+        123,
+        "",
+        "  ",
+        "None",
+        "NONE",
+        "null",
+        "nil",
+        "n/a",
+        "unknown",
+        "undefined",
+        "00:00:00:00:00:00",
+        "000000000000",
+        "ff:ff:ff:ff:ff:ff",
+    ):
+        assert usable_mac(placeholder) is None, f"{placeholder!r} should read as absent"
+
+    assert usable_mac("AA:BB:CC:DD:EE:FF") == "AA:BB:CC:DD:EE:FF"
+    assert usable_mac("  aabbccddeeff  ") == "aabbccddeeff"
+    # Not every client sends a spec-shaped MAC; a stable unique id still
+    # pairs, so shape is not policed beyond the placeholder check.
+    assert usable_mac("aa-bb-cc-00-00-01") == "aa-bb-cc-00-00-01"
