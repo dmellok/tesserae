@@ -1046,6 +1046,30 @@ def test_debug_mask_secrets_hides_access_token_and_secret_keys() -> None:
     assert masked["panel"] == {"w": 800, "h": 480}
 
 
+def test_device_card_shows_device_id_and_mac(app_with_gate: Flask) -> None:
+    """Issue #226: /discover hands a firmware its token by matching the
+    stored MAC, so the card has to show the device id and that MAC, and
+    say so when a REST device has none (auto-claim can never fire)."""
+    client = app_with_gate.test_client()
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+    cache = app_with_gate.config["DISCOVERY_CACHE"]
+    cache.record(
+        "pico_garage",
+        b'{"kind":"pico_bin_client","transport":"rest","mac":"AA:BB:CC:DD:EE:FF"}',
+    )
+    client.post("/settings/devices/discovery/pico_garage/register", follow_redirects=False)
+    body = client.get("/settings/devices").get_data(as_text=True)
+    assert "Device id" in body
+    assert "AA:BB:CC:DD:EE:FF" in body
+
+    # A REST device registered by hand has no MAC to match on: say it
+    # rather than silently omitting the row.
+    client.post("/settings/devices/add", data={"id": "pico_shed", "kind": "pico_bin_client"})
+    client.post("/settings/devices/pico_shed/set-transport", data={"transport": "rest"})
+    body = client.get("/settings/devices").get_data(as_text=True)
+    assert "not recorded" in body
+
+
 def test_discovered_json_lists_only_unregistered(app_with_gate: Flask) -> None:
     client = app_with_gate.test_client()
     client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})

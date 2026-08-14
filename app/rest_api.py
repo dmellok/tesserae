@@ -2393,6 +2393,9 @@ def _discover() -> Response:
          "panel_h": int, "rotation": int, "fw_version": "...",
          "mac": "..." }
 
+    ``device_id`` and ``mac`` are required (the MAC is what the claim
+    path matches on); everything else is optional.
+
     ``rotation`` is optional; see
     :func:`app.device_service.panel_geometry_from_report` for what
     declaring it changes.
@@ -2416,37 +2419,52 @@ def _discover() -> Response:
     if not device_id:
         return _error(400, "device_id is required")
     mac = str(body.get("mac") or "").strip()
+    if not mac:
+        # The whole flow keys off the MAC: the announce lands in the
+        # Discovered strip, the admin clicks Register, and the NEXT
+        # discover POST matches the stored MAC and receives the token.
+        # A MAC-less announce has nothing to match on later, so it used
+        # to register cleanly in the UI and then poll forever on
+        # ``registered: false`` with no way to tell why (issue #226).
+        # Reject it up front instead of accepting a pairing that can
+        # never complete; a client that genuinely has no MAC to report
+        # pairs via ``/register`` with a 6-digit code.
+        return _error(
+            400,
+            "mac is required: /discover hands back the device token by matching "
+            "this MAC against a registered device. Send the client's MAC, or pair "
+            "with a 6-digit code via /api/v1/device/register instead.",
+        )
 
     # MAC-match claim: if admin already registered a device whose
     # manifest carries this MAC, hand back the token + config so the
     # firmware can stop polling discover and start its real wake loop.
-    if mac:
-        claimed = _claim_device_by_mac(mac)
-        if claimed is not None:
-            token = claimed.manifest.get("access_token")
-            if isinstance(token, str) and token:
-                # Honour a re-declared kind + wire format on reconnect,
-                # same as /register. A re-flashed device whose NVS was
-                # wiped lands here (MAC match), so this is the path that
-                # heals a stale generic kind after a board-build upgrade.
-                # Both reload the instance, so re-fetch it.
-                _maybe_heal_kind(claimed.id, body)
-                _maybe_switch_wire_format(claimed.id, body)
-                # Wiped NVS also means a restarted wake-event counter:
-                # forget the dedup high-water mark or every future
-                # button/touch reads as a duplicate.
-                _reset_event_counter(claimed.id)
-                current = _devices().get(claimed.id) or claimed
-                return jsonify(
-                    {
-                        "status": 200,
-                        "registered": True,
-                        "device_token": token,
-                        "device_id": current.id,
-                        "config": _current_config(current),
-                        "server_time": int(time.time()),
-                    }
-                )
+    claimed = _claim_device_by_mac(mac)
+    if claimed is not None:
+        token = claimed.manifest.get("access_token")
+        if isinstance(token, str) and token:
+            # Honour a re-declared kind + wire format on reconnect,
+            # same as /register. A re-flashed device whose NVS was
+            # wiped lands here (MAC match), so this is the path that
+            # heals a stale generic kind after a board-build upgrade.
+            # Both reload the instance, so re-fetch it.
+            _maybe_heal_kind(claimed.id, body)
+            _maybe_switch_wire_format(claimed.id, body)
+            # Wiped NVS also means a restarted wake-event counter:
+            # forget the dedup high-water mark or every future
+            # button/touch reads as a duplicate.
+            _reset_event_counter(claimed.id)
+            current = _devices().get(claimed.id) or claimed
+            return jsonify(
+                {
+                    "status": 200,
+                    "registered": True,
+                    "device_token": token,
+                    "device_id": current.id,
+                    "config": _current_config(current),
+                    "server_time": int(time.time()),
+                }
+            )
 
     # Not yet registered: add to the Discovered strip so admin can
     # one-click register. The transport hint lives in the body so the

@@ -123,6 +123,12 @@ server URL.
    }
    ```
 
+   `device_id` and `mac` are required here. The MAC is what step 4
+   matches on to hand the token back, so an announce without one is
+   rejected with `400` instead of landing in the Discovered strip and
+   polling forever on `registered: false` (issue #226). A client that
+   has no MAC to report pairs with a 6-digit code instead (path B).
+
    `name` is optional on both `/discover` and `/register`: a suggested
    human-readable display name for the device. On `/register` it's
    applied directly to the new instance. On `/discover` it prefills

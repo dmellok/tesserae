@@ -250,6 +250,11 @@ paths:
           the next discover poll after admin clicks Register returns
           the token.
 
+        `mac` is required. It is the only thing the claim path
+        matches on, so an announce without one is rejected with
+        `400` rather than accepted into a pairing that could never
+        complete.
+
         Rate-limited per source IP (10 failed attempts / 60s,
         `X-Forwarded-For` honoured behind a reverse proxy).
       operationId: postDeviceDiscover
@@ -1127,7 +1132,7 @@ components:
 
     DiscoverRequest:
       type: object
-      required: [device_id]
+      required: [device_id, mac]
       properties:
         device_id:
           type: string
@@ -1145,9 +1150,15 @@ components:
         mac:
           type: string
           description: |
-            MAC address. When supplied, enables the MAC-match
-            auto-claim path: if an existing device instance has the
-            same MAC, its access token is returned immediately.
+            MAC address. Required: it is what the auto-claim path
+            matches on. If an existing device instance has the same
+            MAC, its access token is returned immediately; otherwise
+            the MAC is bound to the instance the admin creates from
+            the Discovered strip so the next poll claims the token.
+            An announce without one is rejected with `400`, since
+            nothing would ever match it (issue #226). A client with
+            no MAC to report pairs via `/api/v1/device/register`.
+          example: "AA:BB:CC:DD:EE:FF"
 
     DiscoverClaimed:
       type: object

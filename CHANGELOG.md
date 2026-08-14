@@ -4,6 +4,24 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.299.0], 2026-08-14
+
+### Fixed
+
+- **`/api/v1/device/discover` rejects an announce with no MAC (#226).** The
+  claim path matches the firmware's MAC against a registered instance, so a
+  MAC-less announce landed in the Discovered strip, registered cleanly, and
+  then polled forever on `registered: false` with nothing in the response
+  saying why. It now returns `400` naming the missing field and pointing at
+  the pairing-code path for clients that have no MAC to report.
+
+### Changed
+
+- **Device cards show the device id and the MAC.** Connection details carry
+  both, and a REST device with no stored MAC says so rather than omitting the
+  row, so a stuck pairing or a pair of clients announcing the same MAC is
+  visible from the card.
+
 ## [0.298.0], 2026-08-14
 
 ### Changed

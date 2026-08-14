@@ -1551,19 +1551,33 @@ def test_discover_returns_token_when_mac_matches_registered_instance(app: Flask)
     assert "config" in body
 
 
-def test_discover_does_not_claim_when_mac_missing(app: Flask) -> None:
-    """A discover POST without a MAC can't match-by-MAC; falls through
-    to the standard cache-and-tell-firmware-to-retry path even if an
-    instance exists with that device id."""
+def test_discover_rejects_missing_mac(app: Flask) -> None:
+    """A discover POST without a MAC has nothing for the claim path to
+    match on later: the announce would land in the Discovered strip,
+    register cleanly, and then poll forever on ``registered: false``
+    (issue #226). Reject it with a reason instead, and keep it out of
+    the cache so no admin registers a pairing that can't complete."""
     client = app.test_client()
     resp = client.post(
         "/api/v1/device/discover",
         headers={"Content-Type": "application/json"},
         data=json.dumps({"device_id": "no_mac_pico", "kind": "pico_bin_client"}),
     )
-    assert resp.status_code == 200
-    body = resp.get_json()
-    assert body["registered"] is False
+    assert resp.status_code == 400
+    assert "mac" in resp.get_json()["error"].lower()
+    assert app.config["DISCOVERY_CACHE"].get("no_mac_pico") is None
+
+
+def test_discover_rejects_blank_mac(app: Flask) -> None:
+    """``mac: null`` / ``mac: ""`` are the same as omitting it."""
+    client = app.test_client()
+    for value in (None, "", "   "):
+        resp = client.post(
+            "/api/v1/device/discover",
+            headers={"Content-Type": "application/json"},
+            data=json.dumps({"device_id": "blank_mac_pico", "mac": value}),
+        )
+        assert resp.status_code == 400
 
 
 def test_discover_endpoint_rate_limited(app: Flask) -> None:
@@ -1573,7 +1587,9 @@ def test_discover_endpoint_rate_limited(app: Flask) -> None:
 
     app.config["REGISTER_RATE_LIMITER"] = RateLimiter(max_attempts=2, window_s=60)
     client = app.test_client()
-    body = json.dumps({"device_id": "spam_pico", "kind": "pico_bin_client"})
+    body = json.dumps(
+        {"device_id": "spam_pico", "kind": "pico_bin_client", "mac": "aa:bb:cc:00:00:01"}
+    )
     for _ in range(2):
         resp = client.post(
             "/api/v1/device/discover",

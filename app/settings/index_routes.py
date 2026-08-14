@@ -1457,10 +1457,25 @@ def _device_connection_details(device: Device, is_instance: bool) -> list[dict[s
     next to the masked value (issue #20). Branches by transport so
     REST devices don't show dormant MQTT topic rows (issue #21)."""
     rows: list[dict[str, Any]] = [
-        {"label": "Renderer", "value": ", ".join(device.renderer_ids), "monospace": True}
+        {"label": "Device id", "value": device.id, "monospace": True},
+        {"label": "Renderer", "value": ", ".join(device.renderer_ids), "monospace": True},
     ]
     if is_instance:
         rows.append({"label": "Instance of", "value": str(device.kind_of), "monospace": True})
+    # MAC is what /discover matches on to hand a firmware its token back,
+    # so surfacing it (and its absence) makes a stuck pairing or a pair of
+    # devices sharing a MAC diagnosable from the card (issue #226).
+    stored_mac = device.manifest.get("mac")
+    if isinstance(stored_mac, str) and stored_mac.strip():
+        rows.append({"label": "MAC", "value": stored_mac.strip(), "monospace": True})
+    elif device.transport == "rest":
+        rows.append(
+            {
+                "label": "MAC",
+                "value": "not recorded (this device can't auto-claim via /discover)",
+                "monospace": False,
+            }
+        )
     access_token = device.manifest.get("access_token")
     if device.transport == "relay":
         # Remote panel: it never reaches this server directly, so a local
