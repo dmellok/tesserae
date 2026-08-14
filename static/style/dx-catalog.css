@@ -448,10 +448,10 @@
 }
 .cat-row {
   display: grid;
-  grid-template-columns: 104px minmax(0, 1fr) auto;
-  gap: 16px;
+  grid-template-columns: 152px minmax(0, 1fr) auto;
+  gap: 18px;
   align-items: center;
-  padding: 11px 16px;
+  padding: 14px 16px;
   background: var(--t-surface);
   cursor: pointer;
   transition: background var(--t-trans-fast);
@@ -476,13 +476,19 @@
   align-items: center;
   justify-content: center;
 }
+/* 8:5, close enough to the 3:2 the catalog's lg screenshots are shot at
+   that a cover crop takes a couple of pixels off the sides. */
 .cat-thumb--row {
-  width: 104px;
-  height: 65px;
+  width: 152px;
+  height: 95px;
 }
 .cat-thumb--sheet {
-  height: 210px;
+  height: 264px;
   border-radius: 10px;
+}
+/* The sheet preview opens the lightbox, so say so on hover. */
+.cat-thumb--sheet.is-zoomable {
+  cursor: zoom-in;
 }
 .cat-thumb img {
   width: 100%;
@@ -552,13 +558,17 @@
 }
 /* Single line, truncated. The full text is one click away in the
    sheet, which is what keeps the row dense. */
+/* Two lines, clamped. The taller row has the space for it, and one line
+   cut most descriptions mid-sentence; the untruncated text is still in
+   the sheet. */
 .cat-row-desc {
   font-size: 12.5px;
   color: var(--t-fg-soft);
   line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .cat-row-meta {
   display: flex;
@@ -871,6 +881,88 @@
   line-height: 1.5;
 }
 
+/* -- lightbox ---------------------------------------------------- */
+
+/* Above the sheet (700) so a preview opened from the sheet covers it,
+   and Esc closes this first. */
+.cat-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 800;
+  background: rgb(12 12 11 / 82%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  cursor: zoom-out;
+  animation: cat-lightbox-in 140ms var(--t-ease-snappy);
+}
+@keyframes cat-lightbox-in {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cat-lightbox {
+    animation: none;
+  }
+}
+.cat-lightbox img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 24px 80px rgb(0 0 0 / 45%);
+}
+.cat-lightbox-close,
+.cat-lightbox-nav {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 12%);
+  color: #fff;
+  cursor: pointer;
+  transition: background var(--t-trans-fast);
+}
+.cat-lightbox-close:hover,
+.cat-lightbox-nav:hover {
+  background: rgb(255 255 255 / 24%);
+}
+.cat-lightbox-close {
+  top: 16px;
+  right: 16px;
+  width: 36px;
+  height: 36px;
+  font-size: 16px;
+}
+.cat-lightbox-nav {
+  top: 50%;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 40px;
+  font-size: 18px;
+}
+.cat-lightbox-nav.is-prev {
+  left: 16px;
+}
+.cat-lightbox-nav.is-next {
+  right: 16px;
+}
+.cat-lightbox-caption {
+  position: absolute;
+  bottom: 18px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  color: rgb(255 255 255 / 78%);
+  font-family: var(--t-font-mono);
+  font-size: 11.5px;
+}
+
 /* -- template install modal ------------------------------------- */
 
 .tpl-modal-scrim {
@@ -992,12 +1084,12 @@
 }
 @media (width <= 640px) {
   .cat-row {
-    grid-template-columns: 76px minmax(0, 1fr);
+    grid-template-columns: 104px minmax(0, 1fr);
     row-gap: 10px;
   }
   .cat-thumb--row {
-    width: 76px;
-    height: 48px;
+    width: 104px;
+    height: 65px;
   }
   .cat-row-actions {
     grid-column: 1 / -1;

@@ -438,6 +438,16 @@
      shots live here instead of being dropped. */
   function sheetPreview(item) {
     var frame = previewFrame(item, "sheet");
+    // The row thumbnails are small by design; the sheet is where a
+    // preview is worth looking at, so clicking it opens the shot at
+    // full size rather than at whatever the sheet's width allows.
+    var shots = item.iconUrl ? [] : item.previews;
+    if (shots.length) {
+      frame.classList.add("is-zoomable");
+      frame.addEventListener("click", function () {
+        openLightbox(item, shots, sheetShotIndex);
+      });
+    }
     if (item.previews.length < 2) return frame;
     var wrap = el("div", { class: "cat-sheet-gallery" }, [frame]);
     var strip = el("div", { class: "cat-sheet-strip" });
@@ -446,7 +456,7 @@
         "button",
         {
           type: "button",
-          class: "cat-sheet-strip-btn" + (idx === 0 ? " is-active" : ""),
+          class: "cat-sheet-strip-btn" + (idx === sheetShotIndex ? " is-active" : ""),
           "aria-label": "Screenshot " + (idx + 1) + " of " + item.previews.length,
         },
         [el("img", { src: src, alt: "", loading: "lazy" })]
@@ -454,6 +464,7 @@
       thumb.addEventListener("click", function () {
         var img = frame.querySelector("img");
         if (img) img.src = src;
+        sheetShotIndex = idx;
         Array.prototype.forEach.call(strip.children, function (b) {
           b.classList.toggle("is-active", b === thumb);
         });
@@ -462,6 +473,78 @@
     });
     wrap.appendChild(strip);
     return wrap;
+  }
+
+  // -- lightbox ----------------------------------------------------------
+
+  // Which shot the sheet is currently showing, so the lightbox opens on
+  // the one you clicked rather than always on the first.
+  var sheetShotIndex = 0;
+  var lightbox = null;
+
+  function openLightbox(item, shots, startIndex) {
+    closeLightbox();
+    var idx = Math.min(Math.max(startIndex || 0, 0), shots.length - 1);
+    var overlay = el("div", { class: "cat-lightbox" });
+    var img = el("img", { src: shots[idx], alt: item.name + " preview" });
+    overlay.appendChild(img);
+
+    var caption = el("div", { class: "cat-lightbox-caption" });
+    function paint() {
+      img.src = shots[idx];
+      caption.textContent =
+        shots.length > 1 ? item.name + "  ·  " + (idx + 1) + " / " + shots.length : item.name;
+    }
+    function step(delta) {
+      idx = (idx + delta + shots.length) % shots.length;
+      paint();
+    }
+    if (shots.length > 1) {
+      [
+        ["is-prev", "ph-caret-left", -1, "Previous screenshot"],
+        ["is-next", "ph-caret-right", 1, "Next screenshot"],
+      ].forEach(function (spec) {
+        var btn = el(
+          "button",
+          { type: "button", class: "cat-lightbox-nav " + spec[0], "aria-label": spec[3] },
+          [icon(spec[1])]
+        );
+        btn.addEventListener("click", function (ev) {
+          ev.stopPropagation();
+          step(spec[2]);
+        });
+        overlay.appendChild(btn);
+      });
+    }
+    var close = el(
+      "button",
+      { type: "button", class: "cat-lightbox-close", "aria-label": "Close preview" },
+      [icon("ph-x")]
+    );
+    close.addEventListener("click", closeLightbox);
+    overlay.appendChild(close);
+    overlay.appendChild(caption);
+    paint();
+
+    // Click anywhere outside the image closes; the image itself doesn't,
+    // so dragging or right-clicking to save it stays possible.
+    overlay.addEventListener("click", function (ev) {
+      if (ev.target === overlay) closeLightbox();
+    });
+    img.addEventListener("click", function (ev) {
+      ev.stopPropagation();
+    });
+
+    lightbox = { el: overlay, step: step };
+    document.body.appendChild(overlay);
+    close.focus();
+  }
+
+  function closeLightbox() {
+    if (!lightbox) return;
+    lightbox.el.remove();
+    lightbox = null;
+    if (sheetPanel && state.selectedId) sheetPanel.focus();
   }
 
   function actionLabel(item) {
@@ -804,6 +887,7 @@
   function openSheet(id) {
     lastFocus = document.activeElement;
     state.selectedId = id;
+    sheetShotIndex = 0;
     renderSheet();
     sheetRoot.hidden = false;
     // Next frame so the transition has a "closed" state to run from.
@@ -815,6 +899,7 @@
 
   function closeSheet() {
     if (!state.selectedId) return;
+    closeLightbox();
     state.selectedId = null;
     sheetRoot.classList.remove("is-open");
     sheetRoot.hidden = true;
@@ -1251,6 +1336,19 @@
   });
 
   document.addEventListener("keydown", function (ev) {
+    // The lightbox is the topmost layer, so it takes Escape and the
+    // arrows before the sheet sees them.
+    if (lightbox) {
+      if (ev.key === "Escape") {
+        ev.stopPropagation();
+        closeLightbox();
+      } else if (ev.key === "ArrowLeft") {
+        lightbox.step(-1);
+      } else if (ev.key === "ArrowRight") {
+        lightbox.step(1);
+      }
+      return;
+    }
     if (ev.key === "Escape") {
       if (state.selectedId) {
         closeSheet();

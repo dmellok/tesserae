@@ -4,6 +4,17 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.298.0], 2026-08-14
+
+### Changed
+
+- **Browse catalog rows carry a larger preview.** The row thumbnail goes from
+  104x65 to 152x95 and the description runs to two clamped lines, so a
+  screenshot is legible in the list rather than only in the sheet. The sheet's
+  own preview grows to 264px and now opens in a lightbox on click, with the
+  thumbnail strip choosing which shot opens, arrow keys stepping through an
+  entry's screenshots, and Escape closing the lightbox before the sheet.
+
 ## [0.297.0], 2026-08-14
 
 ### Changed
