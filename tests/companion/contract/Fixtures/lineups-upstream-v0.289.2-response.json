@@ -1,0 +1,37 @@
+{
+  "lineups": [
+    {
+      "id": "morning",
+      "name": "Morning",
+      "enabled": true,
+      "intent": "cycle",
+      "device_ids": ["picpak-kitchen"],
+      "dashboards": [
+        {
+          "page_id": "pantry",
+          "name": "Pantry",
+          "dwell_minutes": 30,
+          "missing": false
+        },
+        {
+          "page_id": "weather",
+          "name": "Weather",
+          "dwell_minutes": 30,
+          "missing": false
+        }
+      ],
+      "current": [
+        {"device_id": "picpak-kitchen", "page_id": "pantry"}
+      ],
+      "next_advance_epoch": null,
+      "advance": "timer",
+      "trigger": "cycle",
+      "interval_minutes": 30,
+      "fires_at": null,
+      "anchor": "00:00",
+      "native_editable": true,
+      "requires_web_reason": null,
+      "web_url": "/decks/morning"
+    }
+  ]
+}

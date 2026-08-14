@@ -1,0 +1,22 @@
+{
+  "token": "tc_live_fixture_secret_returned_once",
+  "token_id": "ct_01JGALLERY",
+  "scopes": [
+    "devices:read",
+    "dashboards:read",
+    "push:write",
+    "media:write",
+    "gallery:read",
+    "gallery:write",
+    "lineups:read",
+    "lineups:control"
+  ],
+  "created_at": "2026-08-14T08:00:00Z",
+  "instance": {
+    "id": "inst_01JABCDEF",
+    "name": "Home",
+    "server_version": "0.0.0+gallery-contract",
+    "timezone": "Asia/Shanghai",
+    "web_url": "/"
+  }
+}

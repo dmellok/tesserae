@@ -1,0 +1,6 @@
+{
+  "action": "play",
+  "page_id": "pantry",
+  "device_ids": ["picpak-kitchen"],
+  "override_quiet_hours": false
+}

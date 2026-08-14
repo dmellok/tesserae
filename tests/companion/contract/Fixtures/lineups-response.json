@@ -1,0 +1,156 @@
+{
+  "lineups": [
+    {
+      "id": "kitchen-deck",
+      "name": "Kitchen deck",
+      "enabled": true,
+      "intent": "manual",
+      "device_ids": ["picpak-kitchen"],
+      "resolved_device_ids": ["picpak-kitchen"],
+      "dashboards": [
+        {
+          "page_id": "pantry",
+          "name": "Pantry",
+          "dwell_minutes": 30,
+          "missing": false,
+          "refresh_interval_minutes": null,
+          "links": [
+            {"target_page_id": "morning", "button": "right", "zone": null},
+            {
+              "target_page_id": "photo-frame",
+              "button": null,
+              "zone": {"x": 0.5, "y": 0, "w": 0.5, "h": 1}
+            }
+          ],
+          "conditions": []
+        },
+        {
+          "page_id": "morning",
+          "name": "Morning",
+          "dwell_minutes": 30,
+          "missing": false,
+          "refresh_interval_minutes": null,
+          "links": [
+            {"target_page_id": "pantry", "button": "left", "zone": null}
+          ],
+          "conditions": []
+        },
+        {
+          "page_id": "photo-frame",
+          "name": "Photo Frame",
+          "dwell_minutes": 30,
+          "missing": false,
+          "refresh_interval_minutes": null,
+          "links": [
+            {"target_page_id": "pantry", "button": "left", "zone": null}
+          ],
+          "conditions": []
+        }
+      ],
+      "current": [
+        {"device_id": "picpak-kitchen", "page_id": "pantry"}
+      ],
+      "next_advance_epoch": null,
+      "advance": "manual",
+      "trigger": null,
+      "interval_minutes": null,
+      "fires_at": null,
+      "anchor": null,
+      "entry_page_id": "pantry",
+      "home_page_id": null,
+      "home_timeout_minutes": 0,
+      "refresh_interval_minutes": 15,
+      "end_at": null,
+      "days_of_week": [0, 1, 2, 3, 4, 5, 6],
+      "priority": 0,
+      "smart_sync": false,
+      "smart_sync_lead_seconds": 10,
+      "mode": "scheduled",
+      "min_hold_minutes": 5,
+      "window_start": null,
+      "window_end": null,
+      "fallback_page_id": null,
+      "native_editable": true,
+      "requires_web_reason": null,
+      "web_url": "/decks/kitchen-deck/edit"
+    },
+    {
+      "id": "whole-home-cycle",
+      "name": "Conditional whole-home cycle",
+      "enabled": true,
+      "intent": "cycle",
+      "device_ids": ["picpak-kitchen", "e1004-desk"],
+      "resolved_device_ids": ["picpak-kitchen", "e1004-desk"],
+      "dashboards": [
+        {
+          "page_id": "morning",
+          "name": "Morning",
+          "dwell_minutes": 8,
+          "missing": false,
+          "refresh_interval_minutes": 10,
+          "links": [],
+          "conditions": [
+            {
+              "source_kind": "ha_entity",
+              "source_id": "binary_sensor.someone_home",
+              "operator": "==",
+              "value": "on"
+            },
+            {
+              "source_kind": "time_window",
+              "source_id": "",
+              "operator": "in",
+              "value": {
+                "start_local": "06:00",
+                "end_local": "23:00",
+                "days_of_week": [0, 1, 2, 3, 4]
+              }
+            },
+            {
+              "source_kind": "sun",
+              "source_id": "",
+              "operator": "after_sunset",
+              "value": {"offset_minutes": -30}
+            }
+          ]
+        },
+        {
+          "page_id": "photo-frame",
+          "name": "Photo Frame",
+          "dwell_minutes": 22,
+          "missing": false,
+          "refresh_interval_minutes": 120,
+          "links": [],
+          "conditions": []
+        }
+      ],
+      "current": [
+        {"device_id": "picpak-kitchen", "page_id": "photo-frame"},
+        {"device_id": "e1004-desk", "page_id": "morning"}
+      ],
+      "next_advance_epoch": 1786350120,
+      "advance": "both",
+      "trigger": "cycle",
+      "interval_minutes": 30,
+      "fires_at": null,
+      "anchor": "06:30",
+      "entry_page_id": null,
+      "home_page_id": null,
+      "home_timeout_minutes": 0,
+      "refresh_interval_minutes": 30,
+      "end_at": "23:00",
+      "days_of_week": [0, 1, 2, 3, 4],
+      "priority": 20,
+      "smart_sync": true,
+      "smart_sync_lead_seconds": 25,
+      "mode": "priority",
+      "min_hold_minutes": 12,
+      "window_start": "06:00",
+      "window_end": "23:30",
+      "fallback_page_id": "pantry",
+      "native_editable": false,
+      "requires_web_reason": "has conditions on one or more dashboards",
+      "web_url": "/decks/whole-home-cycle/edit"
+    }
+  ]
+}

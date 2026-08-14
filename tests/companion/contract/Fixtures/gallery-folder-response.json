@@ -1,0 +1,64 @@
+{
+  "folder": {
+    "id": "folder_family",
+    "name": "family",
+    "kind": "internal",
+    "writable": true,
+    "image_count": 4,
+    "cover_thumbnail_url": "/api/app/v1/gallery/images/image_family_01/thumbnail"
+  },
+  "images": [
+    {
+      "id": "image_family_01",
+      "folder_id": "folder_family",
+      "name": "family-portrait.png",
+      "content_type": "image/png",
+      "bytes": 245760,
+      "width": 1200,
+      "height": 1600,
+      "etag": "\"gallery-image-family-01\"",
+      "thumbnail_url": "/api/app/v1/gallery/images/image_family_01/thumbnail",
+      "content_url": "/api/app/v1/gallery/images/image_family_01/content",
+      "created_at": "2026-08-14T08:15:00Z"
+    },
+    {
+      "id": "image_family_02",
+      "folder_id": "folder_family",
+      "name": "picnic.jpg",
+      "content_type": "image/jpeg",
+      "bytes": 184320,
+      "width": 1600,
+      "height": 1200,
+      "etag": "\"gallery-image-family-02\"",
+      "thumbnail_url": "/api/app/v1/gallery/images/image_family_02/thumbnail",
+      "content_url": "/api/app/v1/gallery/images/image_family_02/content",
+      "created_at": "2026-08-14T08:16:00Z"
+    },
+    {
+      "id": "image_family_03",
+      "folder_id": "folder_family",
+      "name": "birthday.gif",
+      "content_type": "image/gif",
+      "bytes": 98304,
+      "width": 640,
+      "height": 480,
+      "etag": "\"gallery-image-family-03\"",
+      "thumbnail_url": "/api/app/v1/gallery/images/image_family_03/thumbnail",
+      "content_url": "/api/app/v1/gallery/images/image_family_03/content",
+      "created_at": "2026-08-14T08:17:00Z"
+    },
+    {
+      "id": "image_family_04",
+      "folder_id": "folder_family",
+      "name": "scan.bmp",
+      "content_type": "image/bmp",
+      "bytes": 921600,
+      "width": 640,
+      "height": 480,
+      "etag": "\"gallery-image-family-04\"",
+      "thumbnail_url": "/api/app/v1/gallery/images/image_family_04/thumbnail",
+      "content_url": "/api/app/v1/gallery/images/image_family_04/content",
+      "created_at": null
+    }
+  ]
+}

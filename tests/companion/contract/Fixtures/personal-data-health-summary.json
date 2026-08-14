@@ -1,0 +1,150 @@
+{
+  "version": "personal_data_bridge_v1",
+  "source_id": "health.summary",
+  "generated_at": "2026-08-14T12:30:00Z",
+  "expires_at": "2026-08-16T12:30:00Z",
+  "data": {
+    "time_zone": "Asia/Shanghai",
+    "window_start_date": "2026-08-08",
+    "window_end_date": "2026-08-14",
+    "activity": {
+      "days": [
+        {
+          "date": "2026-08-08",
+          "steps": 7184,
+          "walking_running_distance_meters": 5230.8,
+          "move_mode": "active_energy",
+          "active_energy_kcal": 401.7,
+          "active_energy_goal_kcal": 600.0,
+          "move_minutes": null,
+          "move_goal_minutes": null,
+          "exercise_minutes": 27,
+          "exercise_goal_minutes": 30,
+          "stand_hours": 9,
+          "stand_goal_hours": 12
+        },
+        {
+          "date": "2026-08-09",
+          "steps": 9630,
+          "walking_running_distance_meters": 7012.2,
+          "move_mode": "active_energy",
+          "active_energy_kcal": 511.6,
+          "active_energy_goal_kcal": 600.0,
+          "move_minutes": null,
+          "move_goal_minutes": null,
+          "exercise_minutes": 38,
+          "exercise_goal_minutes": 30,
+          "stand_hours": 11,
+          "stand_goal_hours": 12
+        },
+        {
+          "date": "2026-08-10",
+          "steps": 6042,
+          "walking_running_distance_meters": 4421.9,
+          "move_mode": "active_energy",
+          "active_energy_kcal": 366.8,
+          "active_energy_goal_kcal": 600.0,
+          "move_minutes": null,
+          "move_goal_minutes": null,
+          "exercise_minutes": 21,
+          "exercise_goal_minutes": 30,
+          "stand_hours": 8,
+          "stand_goal_hours": 12
+        },
+        {
+          "date": "2026-08-11",
+          "steps": 11240,
+          "walking_running_distance_meters": 8320.5,
+          "move_mode": "active_energy",
+          "active_energy_kcal": 623.0,
+          "active_energy_goal_kcal": 600.0,
+          "move_minutes": null,
+          "move_goal_minutes": null,
+          "exercise_minutes": 51,
+          "exercise_goal_minutes": 30,
+          "stand_hours": 13,
+          "stand_goal_hours": 12
+        },
+        {
+          "date": "2026-08-12",
+          "steps": 7789,
+          "walking_running_distance_meters": 5662.7,
+          "move_mode": "active_energy",
+          "active_energy_kcal": 422.4,
+          "active_energy_goal_kcal": 600.0,
+          "move_minutes": null,
+          "move_goal_minutes": null,
+          "exercise_minutes": 29,
+          "exercise_goal_minutes": 30,
+          "stand_hours": 10,
+          "stand_goal_hours": 12
+        },
+        {
+          "date": "2026-08-13",
+          "steps": 8954,
+          "walking_running_distance_meters": 6503.1,
+          "move_mode": "active_energy",
+          "active_energy_kcal": 477.9,
+          "active_energy_goal_kcal": 600.0,
+          "move_minutes": null,
+          "move_goal_minutes": null,
+          "exercise_minutes": 35,
+          "exercise_goal_minutes": 30,
+          "stand_hours": 11,
+          "stand_goal_hours": 12
+        },
+        {
+          "date": "2026-08-14",
+          "steps": 8421,
+          "walking_running_distance_meters": 6110.4,
+          "move_mode": "active_energy",
+          "active_energy_kcal": 436.2,
+          "active_energy_goal_kcal": 600.0,
+          "move_minutes": null,
+          "move_goal_minutes": null,
+          "exercise_minutes": 32,
+          "exercise_goal_minutes": 30,
+          "stand_hours": 10,
+          "stand_goal_hours": 12
+        }
+      ]
+    },
+    "sleep": {
+      "nights": [
+        {
+          "wake_date": "2026-08-14",
+          "start_at": "2026-08-13T15:18:00Z",
+          "end_at": "2026-08-13T23:06:00Z",
+          "in_bed_minutes": 468,
+          "asleep_minutes": 432,
+          "awake_minutes": 24,
+          "core_minutes": 251,
+          "deep_minutes": 61,
+          "rem_minutes": 98,
+          "unspecified_minutes": 22
+        }
+      ]
+    },
+    "workouts": {
+      "items": [
+        {
+          "id": "0e6a6183c76c0ee93a41d163",
+          "activity_type": "running",
+          "start_at": "2026-08-14T10:02:00Z",
+          "end_at": "2026-08-14T10:46:13Z",
+          "duration_seconds": 2531,
+          "active_energy_kcal": 386.7,
+          "walking_running_distance_meters": 6231.5,
+          "cycling_distance_meters": null,
+          "swimming_distance_meters": null,
+          "wheelchair_distance_meters": null,
+          "flights_climbed": null,
+          "swimming_stroke_count": null,
+          "segments": [],
+          "segments_truncated": false
+        }
+      ],
+      "items_truncated": false
+    }
+  }
+}

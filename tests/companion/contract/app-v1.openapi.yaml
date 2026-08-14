@@ -1,16 +1,20 @@
 openapi: 3.0.3
 info:
   title: Tesserae Companion API
-  version: 0.7.0
+  version: 0.12.0
   description: >-
     Companion API contract for community-built clients. Previews, History,
     resend, remote-image push, webpage push, and server-advertised image fit
     modes are optional additive extensions over the five-feature compatibility
-    floor. Image framing is an accepted additive extension for server-resolved
-    drag and pinch composition across mixed target geometries. New Reminders
-    clients require `reminders` in `personal_data.sources`; they do not infer
-    generic support from the legacy feature flag or fall back to
-    `reminders.fridge`.
+    floor. Image framing and the privacy-preserving personal-data snapshot
+    bridge are independently capability-gated additive extensions. New
+    Reminders clients require `reminders` in `personal_data.sources`; they do
+    not infer generic support from the legacy feature flag or fall back to
+    `reminders.fridge`. Apple Health clients require both the separate
+    `personal_data_health` feature and `health.summary` source advertisement.
+    Native Gallery browsing, internal-folder creation, and one-image-at-a-time
+    upload are gated independently from image push and from future destructive
+    Gallery management or Offline Album authoring.
 servers:
   - url: /
 tags:
@@ -19,9 +23,12 @@ tags:
   - name: Displays
   - name: Dashboards
   - name: Images
+  - name: Gallery
   - name: Webpages
   - name: Jobs
+  - name: Lineups
   - name: History
+  - name: Personal Data
 paths:
   /api/app/v1:
     get:
@@ -60,6 +67,23 @@ paths:
         "409":
           $ref: "#/components/responses/Conflict"
   /api/app/v1/session:
+    get:
+      tags: [Pairing]
+      operationId: getCompanionSessionAuthorization
+      summary: Read the presented credential's current optional permissions
+      description: >-
+        Returns current scopes after an operator changes an optional grant in
+        Tesserae Settings. Advertised by the session_read capability. Clients
+        may fall back to save-time 403 handling on older authoring servers.
+      responses:
+        "200":
+          description: Current credential identity and scopes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompanionSessionAuthorization"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
     delete:
       tags: [Pairing]
       operationId: revokeCompanionSession
@@ -69,6 +93,75 @@ paths:
           description: Credential revoked
         "401":
           $ref: "#/components/responses/Unauthorized"
+  /api/app/v1/personal-data/status:
+    get:
+      tags: [Personal Data]
+      operationId: getCompanionPersonalDataStatus
+      summary: List snapshot freshness metadata without returning personal values
+      description: >-
+        Returns only source identifiers and timestamps. Snapshot payload values
+        are intentionally unavailable through the Companion read surface.
+      responses:
+        "200":
+          description: Metadata for currently stored or expired snapshot sources
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PersonalDataStatusResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /api/app/v1/personal-data/{source_id}:
+    parameters:
+      - $ref: "#/components/parameters/PersonalDataSourceID"
+    put:
+      tags: [Personal Data]
+      operationId: putCompanionPersonalDataSnapshot
+      summary: Replace the latest snapshot for one advertised personal-data source
+      description: >-
+        Validates and atomically replaces the source's latest snapshot. This
+        synchronous storage operation does not render a dashboard, publish to a
+        display, create a Job, or write History. A retry with the same generated
+        timestamp and payload is idempotent; an older snapshot or conflicting
+        payload at the same timestamp is refused so delayed background work
+        cannot replace newer data.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PersonalDataSnapshot"
+      responses:
+        "200":
+          description: Snapshot accepted as the source's latest value
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PersonalDataSourceStatus"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+    delete:
+      tags: [Personal Data]
+      operationId: deleteCompanionPersonalDataSnapshot
+      summary: Delete the latest snapshot when its source is disabled
+      description: >-
+        Idempotently removes the raw snapshot immediately. Previously rendered
+        compositions remain governed by the existing render-cache and History
+        policy and are not personal-data snapshot records.
+      responses:
+        "204":
+          description: Snapshot absent after the request
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
   /api/app/v1/devices:
     get:
       tags: [Displays]
@@ -83,6 +176,8 @@ paths:
                 $ref: "#/components/schemas/DevicesResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
   /api/app/v1/devices/{device_id}/preview:
     parameters:
       - $ref: "#/components/parameters/DeviceID"
@@ -124,6 +219,8 @@ paths:
               $ref: "#/components/headers/ETag"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
   /api/app/v1/dashboards:
@@ -140,6 +237,8 @@ paths:
                 $ref: "#/components/schemas/DashboardsResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
   /api/app/v1/dashboards/{dashboard_id}/preview:
     parameters:
       - $ref: "#/components/parameters/DashboardID"
@@ -183,6 +282,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
   /api/app/v1/dashboards/{dashboard_id}/push:
@@ -207,6 +308,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
@@ -241,6 +344,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "409":
           $ref: "#/components/responses/Conflict"
         "413":
@@ -255,6 +360,220 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /api/app/v1/gallery/folders:
+    get:
+      tags: [Gallery]
+      operationId: listCompanionGalleryFolders
+      summary: List Gallery folders without exposing host filesystem paths
+      description: >-
+        Requires gallery:read and the gallery feature. Internal and external
+        folders share the same read model; writable is computed by the server.
+      responses:
+        "200":
+          description: Gallery folder summaries in server-defined display order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GalleryFoldersResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [Gallery]
+      operationId: createCompanionGalleryFolder
+      summary: Create one writable internal Gallery folder
+      description: >-
+        Requires gallery:write and the gallery feature. The server validates
+        and normalizes the requested display name, creates only an internal
+        folder, and returns its opaque stable identifier. Companion cannot link
+        an external host path through this surface.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GalleryFolderCreateRequest"
+      responses:
+        "201":
+          description: Internal folder created with an empty image list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GalleryFolderResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /api/app/v1/gallery/folders/{folder_id}:
+    parameters:
+      - $ref: "#/components/parameters/GalleryFolderID"
+    get:
+      tags: [Gallery]
+      operationId: getCompanionGalleryFolder
+      summary: Read one Gallery folder and its images
+      description: >-
+        Requires gallery:read and the gallery feature. Image order is the
+        server's canonical folder order; no host filesystem path is returned.
+      responses:
+        "200":
+          description: Folder metadata and image resources
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GalleryFolderResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /api/app/v1/gallery/folders/{folder_id}/images:
+    parameters:
+      - $ref: "#/components/parameters/GalleryFolderID"
+    post:
+      tags: [Gallery]
+      operationId: uploadCompanionGalleryImage
+      summary: Upload one still image into a writable Gallery folder
+      description: >-
+        Requires gallery:write and the gallery feature. Each request contains
+        exactly one image and has its own Idempotency-Key; the client owns its
+        upload queue, concurrency, progress, and retry policy. The server
+        decodes and validates the image, removes all location metadata, bakes
+        orientation into the stored pixels, preserves the ICC colour profile,
+        transcodes HEIC and HEIF sources to JPEG, chooses the stored filename
+        and identifiers, and atomically publishes the image to the folder.
+        External folders return a resource conflict.
+        This synchronous storage write creates neither a Job nor History.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [image]
+              properties:
+                image:
+                  type: string
+                  format: binary
+      responses:
+        "201":
+          description: >-
+            Image stored. Repeating the same request with the same key returns
+            this original response rather than creating a duplicate.
+          headers:
+            Location:
+              description: Relative authenticated content URL for the image
+              schema:
+                type: string
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GalleryImageResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "413":
+          description: Encoded or decoded image exceeds Gallery limits
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "415":
+          description: Unsupported or undecodable still-image media type
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/app/v1/gallery/images/{image_id}/thumbnail:
+    parameters:
+      - $ref: "#/components/parameters/GalleryImageID"
+    get:
+      tags: [Gallery]
+      operationId: getCompanionGalleryImageThumbnail
+      summary: Read a cached Gallery thumbnail
+      description: Requires gallery:read and the gallery feature.
+      parameters:
+        - $ref: "#/components/parameters/IfNoneMatch"
+      responses:
+        "200":
+          description: Server-generated thumbnail
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            image/*:
+              schema:
+                type: string
+                format: binary
+        "304":
+          description: The cached thumbnail is still current
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /api/app/v1/gallery/images/{image_id}/content:
+    parameters:
+      - $ref: "#/components/parameters/GalleryImageID"
+    get:
+      tags: [Gallery]
+      operationId: getCompanionGalleryImageContent
+      summary: Read one normalized Gallery image
+      description: >-
+        Requires gallery:read and the gallery feature. The response is the
+        server-owned stored image, not an arbitrary host filesystem path. A
+        client may pass these bytes into the existing POST /api/app/v1/images
+        Send flow; Gallery does not introduce a second delivery action or make
+        Send depend on frame_cache support.
+      parameters:
+        - $ref: "#/components/parameters/IfNoneMatch"
+      responses:
+        "200":
+          description: Stored image content
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+            Content-Disposition:
+              description: Safe display filename selected by the server
+              schema:
+                type: string
+          content:
+            image/*:
+              schema:
+                type: string
+                format: binary
+        "304":
+          description: The stored image is still current
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /api/app/v1/image-urls:
     post:
       tags: [Images]
@@ -281,6 +600,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "409":
           $ref: "#/components/responses/Conflict"
   /api/app/v1/webpages:
@@ -312,6 +633,163 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /api/app/v1/lineups:
+    get:
+      tags: [Lineups]
+      operationId: listCompanionLineups
+      summary: Read all Lineups without hiding advanced server-owned fields
+      description: >-
+        Requires lineups:read. The resource noun is Lineup even though the
+        server's unified internal model is Deck. native_editable is advisory
+        and server-computed; false never permits the client to discard fields.
+      responses:
+        "200":
+          description: Complete Lineup definitions and lightweight runtime state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LineupsResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [Lineups]
+      operationId: createCompanionLineup
+      summary: Create a native-editable Lineup from one of four intents
+      description: >-
+        Requires the optional lineups:write scope. Uses the same server-owned
+        builder as Tesserae Web; saving the definition does not refresh a
+        display. Binding an unassigned Dashboard is explicit and opt-in.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LineupCreateRequest"
+      responses:
+        "201":
+          description: Created Lineup and its edit validator
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LineupResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /api/app/v1/lineups/{lineup_id}:
+    parameters:
+      - $ref: "#/components/parameters/LineupID"
+    get:
+      tags: [Lineups]
+      operationId: getCompanionLineup
+      summary: Read one complete Lineup
+      responses:
+        "200":
+          description: Complete Lineup definition and runtime state
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LineupResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Lineups]
+      operationId: updateCompanionLineup
+      summary: Partially edit a native-editable Lineup
+      description: >-
+        Requires lineups:write and the ETag returned by GET. Omitted fields
+        retain their server values. A stale validator returns 412 instead of
+        overwriting a concurrent web or app edit, and advanced Lineups remain
+        web-only.
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LineupPatchRequest"
+      responses:
+        "200":
+          description: Updated Lineup and its new edit validator
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LineupResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "412":
+          description: If-Match no longer identifies the stored Lineup version
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/app/v1/lineups/{lineup_id}/actions:
+    parameters:
+      - $ref: "#/components/parameters/LineupID"
+    post:
+      tags: [Lineups]
+      operationId: controlCompanionLineup
+      summary: Change Lineup state or repaint one or more bound displays
+      description: >-
+        Requires lineups:control. enable and disable are idempotent stored-state
+        flips and return the updated Lineup synchronously. next, previous, and
+        play repaint displays through Jobs, quiet-hours policy, idempotency, and
+        canonical History. None of these actions edits the Lineup definition.
+      parameters:
+        - $ref: "#/components/parameters/ConditionalIdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LineupActionRequest"
+      responses:
+        "200":
+          description: Updated Lineup after enable or disable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LineupResponse"
+        "202":
+          $ref: "#/components/responses/JobAccepted"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
   /api/app/v1/jobs/{job_id}:
@@ -336,6 +814,8 @@ paths:
                 $ref: "#/components/schemas/JobResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
   /api/app/v1/history:
@@ -370,6 +850,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
   /api/app/v1/history/{history_id}/preview:
     parameters:
       - $ref: "#/components/parameters/HistoryID"
@@ -399,6 +881,8 @@ paths:
               $ref: "#/components/headers/ETag"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
   /api/app/v1/history/{history_id}/resend:
@@ -423,83 +907,12 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
-  /api/app/v1/personal-data/status:
-    get:
-      tags: [Personal Data]
-      operationId: getCompanionPersonalDataStatus
-      summary: List snapshot freshness metadata without returning personal values
-      description: >-
-        Returns only sources associated with the publisher identity bound to
-        this authenticated pairing. Installation descriptors supplied during
-        pairing are trusted within the Companion pairing boundary.
-      responses:
-        "200":
-          description: Metadata for currently stored or expired snapshot sources
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PersonalDataStatusResponse"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-  /api/app/v1/personal-data/{source_id}:
-    parameters:
-      - $ref: "#/components/parameters/PersonalDataSourceID"
-    put:
-      tags: [Personal Data]
-      operationId: putCompanionPersonalDataSnapshot
-      summary: Replace the latest snapshot for one advertised personal-data source
-      description: |
-        The authenticated pairing determines a stable publisher identity from
-        the installation descriptor accepted during pairing; clients do not add
-        publisher fields to the snapshot. Replacement and generated_at ordering
-        are scoped to that publisher and source, so independently identified
-        Companion installations do not replace one another. Installation
-        descriptors are trusted within the Companion pairing boundary.
-
-        Snapshot validation, storage, latency, and response semantics are
-        independent from rendering. After a 200 response, the server may
-        asynchronously refresh already-active dashboards whose widget placements
-        explicitly opted in to this source. Render or delivery failures never
-        change the accepted PUT response and require no client retry.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/PersonalDataSnapshot"
-      responses:
-        "200":
-          description: Snapshot accepted as the source's latest value
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PersonalDataSourceStatus"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "409":
-          $ref: "#/components/responses/Conflict"
-    delete:
-      tags: [Personal Data]
-      operationId: deleteCompanionPersonalDataSnapshot
-      summary: Delete the latest snapshot when its source is disabled
-      description: |
-        Deletion is authoritative and idempotent for the publisher identity
-        bound to the authenticated pairing. Another independently identified
-        installation's snapshot is not addressable through this request.
-        Installation descriptors are trusted within the Companion pairing
-        boundary. Any eligible dashboard refresh is fire-and-forget after the
-        204 response; no expiry timer is implied.
-      responses:
-        "204":
-          description: Snapshot absent after the request
-        "401":
-          $ref: "#/components/responses/Unauthorized"
 components:
   securitySchemes:
     CompanionBearer:
@@ -519,6 +932,24 @@ components:
       required: true
       schema:
         type: string
+    GalleryFolderID:
+      in: path
+      name: folder_id
+      required: true
+      description: Opaque Gallery folder identifier, never a host path
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 256
+    GalleryImageID:
+      in: path
+      name: image_id
+      required: true
+      description: Opaque Gallery image identifier, never a filename or host path
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 512
     JobID:
       in: path
       name: job_id
@@ -531,14 +962,39 @@ components:
       required: true
       schema:
         type: string
+    LineupID:
+      in: path
+      name: lineup_id
+      required: true
+      schema:
+        type: string
+    PersonalDataSourceID:
+      in: path
+      name: source_id
+      required: true
+      description: Strict source id advertised in personal_data.sources
+      schema:
+        $ref: "#/components/schemas/PersonalDataSourceID"
     IdempotencyKey:
       in: header
       name: Idempotency-Key
       required: true
       description: >-
         Opaque client-generated key. Reusing a key with the same credential,
-        method, path, and payload returns the original job; changing the payload
-        returns idempotency_conflict.
+        method, path, and payload returns the original response; changing the
+        payload returns idempotency_conflict.
+      schema:
+        type: string
+        minLength: 16
+        maxLength: 128
+    ConditionalIdempotencyKey:
+      in: header
+      name: Idempotency-Key
+      required: false
+      description: >-
+        Required for next, previous, and play, which create asynchronous Jobs.
+        Omit for enable and disable, whose state flips are idempotent by
+        construction and return synchronously.
       schema:
         type: string
         minLength: 16
@@ -550,16 +1006,16 @@ components:
       description: ETag from a previously returned preview
       schema:
         type: string
-    PersonalDataSourceID:
-      in: path
-      name: source_id
+    IfMatch:
+      in: header
+      name: If-Match
       required: true
-      description: Source advertised by the corresponding capability flag
+      description: ETag returned when the Lineup was read
       schema:
-        $ref: "#/components/schemas/PersonalDataSourceID"
+        type: string
   headers:
     ETag:
-      description: Content-addressed preview validator
+      description: Content-addressed resource validator
       schema:
         type: string
   responses:
@@ -591,6 +1047,12 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
+    Forbidden:
+      description: Valid Companion credential missing a required scope
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
     NotFound:
       description: Resource not found or not visible to this client
       content:
@@ -598,7 +1060,7 @@ components:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
     Conflict:
-      description: Pairing code or idempotency-key conflict
+      description: Pairing code, idempotency-key, or resource-state conflict
       content:
         application/json:
           schema:
@@ -655,7 +1117,13 @@ components:
               - image_url_push
               - webpage_push
               - image_framing
+              - gallery
               - personal_data_reminders
+              - personal_data_health
+              - lineups
+              - lineup_control
+              - lineup_authoring
+              - session_read
         personal_data:
           $ref: "#/components/schemas/PersonalDataCapabilities"
         limits:
@@ -706,16 +1174,47 @@ components:
             an editor range.
           type: number
           minimum: 1
+        gallery_upload_bytes:
+          description: >-
+            Maximum encoded bytes in one Gallery image request. Required when
+            gallery is advertised; each request contains exactly one image.
+          type: integer
+          minimum: 1
+        gallery_image_content_types:
+          description: >-
+            Still-image media types accepted by Gallery upload. Required when
+            gallery is advertised and independent from POST /images limits.
+            These are source types, not a promise that the same media type is
+            stored or returned after server normalization.
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/GalleryUploadContentType"
+        gallery_upload_batch_size:
+          description: >-
+            Advisory maximum number of Photos selections the client should add
+            to one managed upload batch. It is not an HTTP request cardinality;
+            every request still contains exactly one image. Required when
+            gallery is advertised.
+          type: integer
+          minimum: 1
+        personal_data_stale_after_seconds:
+          description: >-
+            Age at which an accepted personal-data snapshot becomes stale.
+            Required whenever any personal-data capability is advertised.
+          type: integer
+          minimum: 60
+        personal_data_max_ttl_seconds:
+          description: >-
+            Maximum allowed difference between generated_at and expires_at.
+            Required whenever any personal-data capability is advertised.
+          type: integer
+          minimum: 60
         job_retention_seconds:
           type: integer
           minimum: 60
         idempotency_retention_seconds:
-          type: integer
-          minimum: 60
-        personal_data_stale_after_seconds:
-          type: integer
-          minimum: 60
-        personal_data_max_ttl_seconds:
           type: integer
           minimum: 60
     PersonalDataCapabilities:
@@ -775,12 +1274,47 @@ components:
           uniqueItems: true
           items:
             type: string
-            enum: [devices:read, dashboards:read, push:write, media:write, personal_data:write]
+            enum:
+              - devices:read
+              - dashboards:read
+              - push:write
+              - media:write
+              - gallery:read
+              - gallery:write
+              - personal_data:write
+              - lineups:read
+              - lineups:control
         created_at:
           type: string
           format: date-time
         instance:
           $ref: "#/components/schemas/Instance"
+    CompanionSessionAuthorization:
+      type: object
+      additionalProperties: false
+      required: [token_id, scopes, settings_url]
+      properties:
+        token_id:
+          type: string
+        scopes:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            enum:
+              - devices:read
+              - dashboards:read
+              - push:write
+              - media:write
+              - gallery:read
+              - gallery:write
+              - personal_data:write
+              - lineups:read
+              - lineups:control
+              - lineups:write
+        settings_url:
+          description: Relative URL for this token's Companion permission settings
+          type: string
     Instance:
       type: object
       additionalProperties: false
@@ -796,6 +1330,691 @@ components:
           type: string
         web_url:
           type: string
+    PersonalDataSourceID:
+      type: string
+      enum:
+        - reminders
+        - reminders.fridge
+        - health.summary
+    PersonalDataSnapshot:
+      description: >-
+        Versioned, expiring snapshot envelope. Each source is a strict schema;
+        this is not an arbitrary JSON storage endpoint.
+      oneOf:
+        - $ref: "#/components/schemas/RemindersSnapshot"
+        - $ref: "#/components/schemas/RemindersFridgeSnapshot"
+        - $ref: "#/components/schemas/HealthSummarySnapshot"
+      discriminator:
+        propertyName: source_id
+        mapping:
+          reminders: "#/components/schemas/RemindersSnapshot"
+          reminders.fridge: "#/components/schemas/RemindersFridgeSnapshot"
+          health.summary: "#/components/schemas/HealthSummarySnapshot"
+    RemindersSnapshot:
+      type: object
+      additionalProperties: false
+      required: [version, source_id, generated_at, expires_at, data]
+      properties:
+        version:
+          type: string
+          enum: [personal_data_bridge_v1]
+        source_id:
+          type: string
+          enum: [reminders]
+        generated_at:
+          type: string
+          format: date-time
+        expires_at:
+          description: Required deletion deadline for raw snapshot values
+          type: string
+          format: date-time
+        data:
+          $ref: "#/components/schemas/RemindersData"
+    RemindersData:
+      description: >-
+        Incomplete items grouped by user-approved Apple Reminders lists. List
+        identifiers are opaque, app-generated publication identifiers rather
+        than EventKit calendar identifiers and must be unique within one
+        snapshot; duplicate ids are rejected as invalid_snapshot (400). At
+        most 200 items may appear across all lists in one snapshot. Exceeding
+        that aggregate cap is rejected as invalid_snapshot (400), never
+        truncated by the server. An empty lists array means no lists are
+        currently published; the source remains fresh and widgets show their
+        selected-list-unavailable state. DELETE is reserved for disabling the
+        source.
+      type: object
+      additionalProperties: false
+      required: [lists]
+      properties:
+        lists:
+          description: >-
+            Complete atomic set of currently published lists. An empty array is
+            a valid enabled snapshot, not a request to delete the source.
+          type: array
+          maxItems: 20
+          items:
+            $ref: "#/components/schemas/ReminderListSnapshot"
+    ReminderListSnapshot:
+      type: object
+      additionalProperties: false
+      required: [id, title, items]
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 256
+        title:
+          type: string
+          minLength: 1
+          maxLength: 256
+        items:
+          type: array
+          maxItems: 200
+          items:
+            $ref: "#/components/schemas/ReminderSnapshotItem"
+    RemindersFridgeSnapshot:
+      deprecated: true
+      description: >-
+        Deprecated one-list compatibility source retained for the already
+        published reminders_fridge widget. New clients and widgets should use
+        grouped reminders rather than implement this fallback.
+      type: object
+      additionalProperties: false
+      required: [version, source_id, generated_at, expires_at, data]
+      properties:
+        version:
+          type: string
+          enum: [personal_data_bridge_v1]
+        source_id:
+          type: string
+          enum: [reminders.fridge]
+        generated_at:
+          description: Time at which the iPhone generated this complete snapshot
+          type: string
+          format: date-time
+        expires_at:
+          description: >-
+            Required deletion deadline for raw snapshot values. It must be later
+            than generated_at and conform to the server retention policy.
+          type: string
+          format: date-time
+        data:
+          $ref: "#/components/schemas/RemindersFridgeData"
+    RemindersFridgeData:
+      description: >-
+        Incomplete items selected from one user-approved Reminders list. Notes,
+        URLs, alarms, locations, and unrelated lists are never included.
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          maxItems: 200
+          items:
+            $ref: "#/components/schemas/ReminderSnapshotItem"
+    ReminderSnapshotItem:
+      type: object
+      additionalProperties: false
+      required: [id, title, due_date, priority, completed]
+      properties:
+        id:
+          description: Opaque reminder identifier used only inside this snapshot
+          type: string
+          minLength: 1
+          maxLength: 256
+        title:
+          type: string
+          minLength: 1
+          maxLength: 512
+        due_date:
+          description: Local calendar date selected in Reminders, or null
+          type: string
+          format: date
+          nullable: true
+        priority:
+          description: Normalized priority rather than EventKit's numeric value
+          type: string
+          enum: [none, low, medium, high]
+        completed:
+          description: Defense-in-depth marker; the first source contains only incomplete items
+          type: boolean
+          enum: [false]
+    HealthSummarySnapshot:
+      description: >-
+        Latest-only Apple Health summary for the active instance's seven most
+        recent calendar dates. The iPhone performs selection, aggregation, and
+        redaction before upload; this schema never accepts raw HealthKit
+        samples, source identities, routes, heart rate, or free-form metadata.
+      type: object
+      additionalProperties: false
+      required: [version, source_id, generated_at, expires_at, data]
+      properties:
+        version:
+          type: string
+          enum: [personal_data_bridge_v1]
+        source_id:
+          type: string
+          enum: [health.summary]
+        generated_at:
+          type: string
+          format: date-time
+        expires_at:
+          description: >-
+            Required deletion deadline. The server's advertised maximum remains
+            48 hours even though the content covers seven calendar dates.
+          type: string
+          format: date-time
+        data:
+          $ref: "#/components/schemas/HealthSummaryData"
+    HealthSummaryData:
+      description: >-
+        Atomic optional sections selected for this Tesserae instance. All three
+        section keys are explicit and nullable; at least one is non-null. Null
+        does not disclose a specific HealthKit denial because Apple does not
+        reveal individual read authorization decisions to apps. When a selected
+        section is readable but contains no records, its object remains present
+        with an empty array or explicit nullable values.
+      type: object
+      additionalProperties: false
+      required:
+        - time_zone
+        - window_start_date
+        - window_end_date
+        - activity
+        - sleep
+        - workouts
+      anyOf:
+        - properties:
+            activity:
+              type: object
+        - properties:
+            sleep:
+              type: object
+        - properties:
+            workouts:
+              type: object
+      properties:
+        time_zone:
+          description: IANA time zone of the active Tesserae instance
+          type: string
+          minLength: 1
+          maxLength: 64
+          pattern: "^[A-Za-z0-9._+-]+(?:/[A-Za-z0-9._+-]+)*$"
+        window_start_date:
+          type: string
+          format: date
+        window_end_date:
+          type: string
+          format: date
+        activity:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/HealthActivityData"
+        sleep:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/HealthSleepData"
+        workouts:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/HealthWorkoutsData"
+    HealthActivityData:
+      type: object
+      additionalProperties: false
+      required: [days]
+      properties:
+        days:
+          description: Exactly one ascending record for each date in the window
+          type: array
+          minItems: 7
+          maxItems: 7
+          items:
+            $ref: "#/components/schemas/HealthActivityDay"
+    HealthActivityDay:
+      type: object
+      additionalProperties: false
+      required:
+        - date
+        - steps
+        - walking_running_distance_meters
+        - move_mode
+        - active_energy_kcal
+        - active_energy_goal_kcal
+        - move_minutes
+        - move_goal_minutes
+        - exercise_minutes
+        - exercise_goal_minutes
+        - stand_hours
+        - stand_goal_hours
+      properties:
+        date:
+          type: string
+          format: date
+        steps:
+          type: integer
+          minimum: 0
+          maximum: 1000000
+          nullable: true
+        walking_running_distance_meters:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1000000
+          nullable: true
+        move_mode:
+          type: string
+          enum: [active_energy, move_time]
+          nullable: true
+        active_energy_kcal:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 100000
+          nullable: true
+        active_energy_goal_kcal:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 100000
+          nullable: true
+        move_minutes:
+          type: integer
+          minimum: 0
+          maximum: 1440
+          nullable: true
+        move_goal_minutes:
+          type: integer
+          minimum: 0
+          maximum: 1440
+          nullable: true
+        exercise_minutes:
+          type: integer
+          minimum: 0
+          maximum: 1440
+          nullable: true
+        exercise_goal_minutes:
+          type: integer
+          minimum: 0
+          maximum: 1440
+          nullable: true
+        stand_hours:
+          type: integer
+          minimum: 0
+          maximum: 24
+          nullable: true
+        stand_goal_hours:
+          type: integer
+          minimum: 0
+          maximum: 24
+          nullable: true
+    HealthSleepData:
+      type: object
+      additionalProperties: false
+      required: [nights]
+      properties:
+        nights:
+          description: At most one primary sleep episode per ascending wake date
+          type: array
+          maxItems: 7
+          items:
+            $ref: "#/components/schemas/HealthSleepNight"
+    HealthSleepNight:
+      type: object
+      additionalProperties: false
+      required:
+        - wake_date
+        - start_at
+        - end_at
+        - in_bed_minutes
+        - asleep_minutes
+        - awake_minutes
+        - core_minutes
+        - deep_minutes
+        - rem_minutes
+        - unspecified_minutes
+      properties:
+        wake_date:
+          description: Calendar date containing end_at in data.time_zone
+          type: string
+          format: date
+        start_at:
+          type: string
+          format: date-time
+        end_at:
+          type: string
+          format: date-time
+        in_bed_minutes:
+          type: integer
+          minimum: 0
+          maximum: 1440
+          nullable: true
+        asleep_minutes:
+          type: integer
+          minimum: 0
+          maximum: 1440
+          nullable: true
+        awake_minutes:
+          type: integer
+          minimum: 0
+          maximum: 1440
+          nullable: true
+        core_minutes:
+          type: integer
+          minimum: 0
+          maximum: 1440
+          nullable: true
+        deep_minutes:
+          type: integer
+          minimum: 0
+          maximum: 1440
+          nullable: true
+        rem_minutes:
+          type: integer
+          minimum: 0
+          maximum: 1440
+          nullable: true
+        unspecified_minutes:
+          type: integer
+          minimum: 0
+          maximum: 1440
+          nullable: true
+    HealthWorkoutsData:
+      type: object
+      additionalProperties: false
+      required: [items, items_truncated]
+      properties:
+        items:
+          description: Up to 100 workouts sorted by start_at ascending
+          type: array
+          maxItems: 100
+          items:
+            $ref: "#/components/schemas/HealthWorkout"
+        items_truncated:
+          type: boolean
+    HealthWorkout:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - activity_type
+        - start_at
+        - end_at
+        - duration_seconds
+        - active_energy_kcal
+        - walking_running_distance_meters
+        - cycling_distance_meters
+        - swimming_distance_meters
+        - wheelchair_distance_meters
+        - flights_climbed
+        - swimming_stroke_count
+        - segments
+        - segments_truncated
+      properties:
+        id:
+          description: >-
+            Stable per-instance publication id for the same workout across
+            snapshots; never a HealthKit UUID and not correlatable across
+            Tesserae instances.
+          type: string
+          pattern: "^[0-9a-f]{24}$"
+        activity_type:
+          $ref: "#/components/schemas/HealthWorkoutActivityType"
+        start_at:
+          type: string
+          format: date-time
+        end_at:
+          type: string
+          format: date-time
+        duration_seconds:
+          type: integer
+          minimum: 0
+          maximum: 604800
+        active_energy_kcal:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 100000
+          nullable: true
+        walking_running_distance_meters:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 10000000
+          nullable: true
+        cycling_distance_meters:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 10000000
+          nullable: true
+        swimming_distance_meters:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 10000000
+          nullable: true
+        wheelchair_distance_meters:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 10000000
+          nullable: true
+        flights_climbed:
+          type: integer
+          minimum: 0
+          maximum: 10000000
+          nullable: true
+        swimming_stroke_count:
+          type: integer
+          minimum: 0
+          maximum: 10000000
+          nullable: true
+        segments:
+          type: array
+          maxItems: 64
+          items:
+            $ref: "#/components/schemas/HealthWorkoutSegment"
+        segments_truncated:
+          type: boolean
+    HealthWorkoutSegment:
+      type: object
+      additionalProperties: false
+      required:
+        - ordinal
+        - activity_type
+        - start_at
+        - end_at
+        - duration_seconds
+        - active_energy_kcal
+        - walking_running_distance_meters
+        - cycling_distance_meters
+        - swimming_distance_meters
+        - wheelchair_distance_meters
+        - flights_climbed
+        - swimming_stroke_count
+      properties:
+        ordinal:
+          type: integer
+          minimum: 0
+          maximum: 63
+        activity_type:
+          $ref: "#/components/schemas/HealthWorkoutActivityType"
+        start_at:
+          type: string
+          format: date-time
+        end_at:
+          type: string
+          format: date-time
+        duration_seconds:
+          type: integer
+          minimum: 0
+          maximum: 604800
+        active_energy_kcal:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 100000
+          nullable: true
+        walking_running_distance_meters:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 10000000
+          nullable: true
+        cycling_distance_meters:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 10000000
+          nullable: true
+        swimming_distance_meters:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 10000000
+          nullable: true
+        wheelchair_distance_meters:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 10000000
+          nullable: true
+        flights_climbed:
+          type: integer
+          minimum: 0
+          maximum: 10000000
+          nullable: true
+        swimming_stroke_count:
+          type: integer
+          minimum: 0
+          maximum: 10000000
+          nullable: true
+    HealthWorkoutActivityType:
+      description: >-
+        Stable lowercase activity slug. Future HealthKit values map to other
+        until this enum is extended.
+      type: string
+      enum:
+        - american_football
+        - archery
+        - australian_football
+        - badminton
+        - barre
+        - baseball
+        - basketball
+        - bowling
+        - boxing
+        - cardio_dance
+        - climbing
+        - cooldown
+        - core_training
+        - cricket
+        - cross_country_skiing
+        - cross_training
+        - curling
+        - cycling
+        - dance
+        - dance_inspired_training
+        - disc_sports
+        - downhill_skiing
+        - elliptical
+        - equestrian_sports
+        - fencing
+        - fishing
+        - fitness_gaming
+        - flexibility
+        - functional_strength_training
+        - golf
+        - gymnastics
+        - hand_cycling
+        - handball
+        - high_intensity_interval_training
+        - hiking
+        - hockey
+        - hunting
+        - jump_rope
+        - kickboxing
+        - lacrosse
+        - martial_arts
+        - mind_and_body
+        - mixed_cardio
+        - mixed_metabolic_cardio_training
+        - other
+        - paddle_sports
+        - pickleball
+        - pilates
+        - play
+        - preparation_and_recovery
+        - racquetball
+        - rowing
+        - rugby
+        - running
+        - sailing
+        - skating_sports
+        - snow_sports
+        - snowboarding
+        - soccer
+        - social_dance
+        - softball
+        - squash
+        - stair_climbing
+        - stairs
+        - step_training
+        - surfing_sports
+        - swim_bike_run
+        - swimming
+        - table_tennis
+        - tai_chi
+        - tennis
+        - track_and_field
+        - traditional_strength_training
+        - transition
+        - underwater_diving
+        - volleyball
+        - walking
+        - water_fitness
+        - water_polo
+        - water_sports
+        - wheelchair_run_pace
+        - wheelchair_walk_pace
+        - wrestling
+        - yoga
+    PersonalDataFreshness:
+      type: string
+      enum: [fresh, stale, expired]
+    PersonalDataSourceStatus:
+      description: Metadata only; raw snapshot values are never returned here
+      type: object
+      additionalProperties: false
+      required: [source_id, state, generated_at, stale_at, expires_at]
+      properties:
+        source_id:
+          $ref: "#/components/schemas/PersonalDataSourceID"
+        state:
+          $ref: "#/components/schemas/PersonalDataFreshness"
+        generated_at:
+          type: string
+          format: date-time
+        stale_at:
+          description: >-
+            Server-computed generated_at plus the advertised stale interval.
+            State is stale at or after this time and before expires_at.
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+    PersonalDataStatusResponse:
+      type: object
+      additionalProperties: false
+      required: [sources]
+      properties:
+        sources:
+          type: array
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/PersonalDataSourceStatus"
     DevicesResponse:
       type: object
       additionalProperties: false
@@ -817,13 +2036,10 @@ components:
         kind:
           type: string
         icon:
-          type: string
-          minLength: 1
           description: >-
-            Bare Phosphor icon slug (no ph- prefix), the same device identity
-            Tesserae's device pickers and Settings cards use. Inherited from
-            the device kind until the user overrides it per instance; always
-            resolved server-side.
+            Bare Phosphor icon name resolved from the device kind or its
+            per-instance override.
+          type: string
         panel:
           $ref: "#/components/schemas/Panel"
         freshness:
@@ -844,6 +2060,15 @@ components:
         firmware_version:
           type: string
           nullable: true
+        capability_support:
+          description: >-
+            Server-computed support states keyed by protocol capability rather
+            than device model. A server advertising gallery includes a
+            frame_cache entry so Gallery and future Album surfaces can present
+            supported, unsupported, and unknown targets consistently. Clients
+            must not infer support from an SD-card model list.
+          allOf:
+            - $ref: "#/components/schemas/DeviceCapabilitySupportMap"
         has_pending_render:
           type: boolean
           description: >-
@@ -871,6 +2096,39 @@ components:
         preview_url:
           type: string
           description: Authenticated Companion path for this exact revision.
+    DeviceCapabilitySupportMap:
+      type: object
+      minProperties: 1
+      additionalProperties:
+        $ref: "#/components/schemas/DeviceCapabilitySupport"
+    DeviceCapabilitySupport:
+      type: object
+      additionalProperties: false
+      required: [state]
+      properties:
+        state:
+          description: >-
+            supported only when the latest usable device report advertises the
+            capability; unsupported when a usable report explicitly lacks it;
+            unknown when the server has no usable current report.
+          type: string
+          enum: [supported, unsupported, unknown]
+        reason_code:
+          description: >-
+            Optional stable machine-readable explanation. Clients localize
+            known values and use a generic explanation for unknown future
+            values. Initial values are not_advertised, no_usable_heartbeat,
+            and stale_heartbeat. A stale heartbeat produces unknown with a
+            non-null observed_at; its age threshold follows the device's poll
+            cadence rather than a client-defined fixed interval.
+          type: string
+          minLength: 1
+          maxLength: 80
+        observed_at:
+          description: Time of the device report used for this computed state
+          type: string
+          format: date-time
+          nullable: true
     Panel:
       type: object
       additionalProperties: false
@@ -939,6 +2197,174 @@ components:
         override_quiet_hours:
           type: boolean
           default: false
+    GalleryFoldersResponse:
+      type: object
+      additionalProperties: false
+      required: [folders]
+      properties:
+        folders:
+          type: array
+          items:
+            $ref: "#/components/schemas/GalleryFolder"
+    GalleryFolderResponse:
+      type: object
+      additionalProperties: false
+      required: [folder, images]
+      properties:
+        folder:
+          $ref: "#/components/schemas/GalleryFolder"
+        images:
+          description: Images in the server's canonical folder order
+          type: array
+          items:
+            $ref: "#/components/schemas/GalleryImage"
+    GalleryFolderCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name:
+          description: >-
+            User-entered folder name. The server validates and normalizes it
+            into the Gallery's storage name; the returned GalleryFolder.name
+            is authoritative and can differ from this request. The client
+            never constructs an id or path from either value.
+          type: string
+          minLength: 1
+          maxLength: 80
+    GalleryFolder:
+      type: object
+      additionalProperties: false
+      required: [id, name, kind, writable, image_count, cover_thumbnail_url]
+      properties:
+        id:
+          description: Opaque stable folder identifier, never a host path
+          type: string
+          minLength: 1
+          maxLength: 256
+        name:
+          description: >-
+            Authoritative server name also shown by Tesserae Web. For a newly
+            created internal folder this is its normalized storage name; for
+            example, Summer 2026! can return summer-2026. Special server-owned
+            folders may use their canonical label. The value is not a host
+            path.
+          type: string
+          minLength: 1
+          maxLength: 80
+        kind:
+          type: string
+          enum: [internal, external]
+        writable:
+          description: >-
+            Server-computed write eligibility. External folders are false in
+            contract 0.12.0; future policy must not be inferred from kind alone.
+          type: boolean
+        image_count:
+          type: integer
+          minimum: 0
+        cover_thumbnail_url:
+          description: Relative authenticated thumbnail URL, or null when empty
+          type: string
+          nullable: true
+    GalleryImageResponse:
+      type: object
+      additionalProperties: false
+      required: [image]
+      properties:
+        image:
+          $ref: "#/components/schemas/GalleryImage"
+    GalleryImage:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - folder_id
+        - name
+        - content_type
+        - bytes
+        - width
+        - height
+        - etag
+        - thumbnail_url
+        - content_url
+      properties:
+        id:
+          description: Opaque stable image identifier, never a filename or path
+          type: string
+          minLength: 1
+          maxLength: 512
+        folder_id:
+          type: string
+          minLength: 1
+          maxLength: 256
+        name:
+          description: Safe server-selected display filename; not resource identity
+          type: string
+          minLength: 1
+          maxLength: 255
+        content_type:
+          description: >-
+            Media type of the server-owned stored image. It can differ from
+            the accepted upload type; HEIC and HEIF uploads are normalized to
+            JPEG before they enter the Gallery.
+          allOf:
+            - $ref: "#/components/schemas/GalleryStoredContentType"
+        bytes:
+          type: integer
+          minimum: 1
+        width:
+          description: Pixel width after the server bakes source orientation
+          type: integer
+          minimum: 1
+        height:
+          description: Pixel height after the server bakes source orientation
+          type: integer
+          minimum: 1
+        etag:
+          description: Validator for both content and derived thumbnail caching
+          type: string
+          minLength: 1
+        thumbnail_url:
+          type: string
+        content_url:
+          type: string
+        created_at:
+          description: Server import time when available
+          type: string
+          format: date-time
+          nullable: true
+    GalleryUploadContentType:
+      description: Source media type accepted by Gallery upload
+      type: string
+      enum:
+        - image/jpeg
+        - image/png
+        - image/heic
+        - image/heif
+        - image/webp
+    GalleryImageContentType:
+      description: >-
+        Deprecated 0.11 combined name retained for generated-client source
+        compatibility. New clients use GalleryUploadContentType for accepted
+        sources and GalleryStoredContentType for returned resources.
+      deprecated: true
+      type: string
+      enum:
+        - image/jpeg
+        - image/png
+        - image/heic
+        - image/heif
+        - image/webp
+    GalleryStoredContentType:
+      description: Media type that an existing normalized Gallery file can expose
+      type: string
+      enum:
+        - image/jpeg
+        - image/png
+        - image/webp
+        - image/gif
+        - image/bmp
     ImagePushRequest:
       type: object
       additionalProperties: false
@@ -1063,6 +2489,402 @@ components:
     ImageFitMode:
       type: string
       enum: [fit, fill, blur, stretch, center]
+    LineupsResponse:
+      type: object
+      additionalProperties: false
+      required: [lineups]
+      properties:
+        lineups:
+          type: array
+          items:
+            $ref: "#/components/schemas/Lineup"
+    LineupResponse:
+      type: object
+      additionalProperties: false
+      required: [lineup]
+      properties:
+        lineup:
+          $ref: "#/components/schemas/Lineup"
+    LineupCreateRequest:
+      description: >-
+        Intent selects the server-owned native builder. Daily and interval use
+        exactly one page; cycle and manual accept an ordered list. The server
+        validates all referenced Dashboard and Display identifiers.
+      type: object
+      additionalProperties: false
+      required: [intent, name, page_ids]
+      properties:
+        intent:
+          type: string
+          enum: [daily, interval, cycle, manual]
+        name:
+          type: string
+          minLength: 1
+        page_ids:
+          type: array
+          minItems: 1
+          items:
+            type: string
+        device_ids:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+        dwell_minutes:
+          type: object
+          additionalProperties:
+            type: integer
+            minimum: 1
+            maximum: 10080
+        interval_minutes:
+          type: integer
+          minimum: 1
+          maximum: 10080
+        fires_at:
+          $ref: "#/components/schemas/LocalTime"
+        anchor:
+          $ref: "#/components/schemas/LocalTime"
+        bind_unassigned_dashboards:
+          description: >-
+            When true, assign selected Dashboards with no existing binding to
+            the first selected Display. Never moves a Dashboard already bound
+            elsewhere.
+          type: boolean
+          default: false
+    LineupPatchRequest:
+      description: >-
+        Partial native edit. Omitted fields retain their stored values; intent
+        and advanced fields are deliberately not writable through this route.
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name:
+          type: string
+          minLength: 1
+        enabled:
+          type: boolean
+        device_ids:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+        page_ids:
+          type: array
+          minItems: 1
+          items:
+            type: string
+        dwell_minutes:
+          type: object
+          additionalProperties:
+            type: integer
+            minimum: 1
+            maximum: 10080
+        interval_minutes:
+          type: integer
+          minimum: 1
+          maximum: 10080
+        fires_at:
+          $ref: "#/components/schemas/LocalTime"
+        anchor:
+          $ref: "#/components/schemas/LocalTime"
+    Lineup:
+      description: >-
+        Public read projection of the server's unified Deck model. Fields through
+        anchor match the v0.289.2 implementation. The remaining scheduling and
+        navigation fields are additive 0.8 contract requirements so an advanced
+        Lineup remains fully describable when native_editable is false. The
+        internal legacy_kind migration marker is intentionally not public.
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - enabled
+        - intent
+        - device_ids
+        - resolved_device_ids
+        - dashboards
+        - current
+        - next_advance_epoch
+        - advance
+        - trigger
+        - interval_minutes
+        - fires_at
+        - anchor
+        - entry_page_id
+        - home_page_id
+        - home_timeout_minutes
+        - refresh_interval_minutes
+        - end_at
+        - days_of_week
+        - priority
+        - smart_sync
+        - smart_sync_lead_seconds
+        - mode
+        - min_hold_minutes
+        - window_start
+        - window_end
+        - fallback_page_id
+        - native_editable
+        - requires_web_reason
+        - web_url
+      properties:
+        id:
+          type: string
+          pattern: "^[a-z0-9_][a-z0-9_-]*$"
+        name:
+          type: string
+          minLength: 1
+        enabled:
+          type: boolean
+        intent:
+          description: >-
+            Server-computed mapping to the four user-facing wizard intents, or
+            null when the stored trigger cannot be represented by one of them.
+          type: string
+          enum: [daily, interval, cycle, manual]
+          nullable: true
+        device_ids:
+          description: Explicit displays authored on this Lineup; may be empty
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+        resolved_device_ids:
+          description: >-
+            Server-computed displays an action may touch. Uses device_ids when
+            present, otherwise the union of member Dashboard bindings.
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+        dashboards:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/LineupDashboard"
+        current:
+          description: Per-display navigation state; bound displays may differ
+          type: array
+          items:
+            $ref: "#/components/schemas/LineupCurrent"
+        next_advance_epoch:
+          description: Next scheduled advance as Unix epoch seconds, when known
+          type: integer
+          format: int64
+          nullable: true
+        advance:
+          type: string
+          enum: [manual, timer, both]
+        trigger:
+          type: string
+          enum: [cycle, interval, daily]
+          nullable: true
+        interval_minutes:
+          type: integer
+          minimum: 1
+          maximum: 10080
+          nullable: true
+        fires_at:
+          allOf:
+            - $ref: "#/components/schemas/LocalTime"
+          nullable: true
+        anchor:
+          allOf:
+            - $ref: "#/components/schemas/LocalTime"
+          nullable: true
+        entry_page_id:
+          type: string
+          nullable: true
+        home_page_id:
+          type: string
+          nullable: true
+        home_timeout_minutes:
+          type: integer
+          minimum: 0
+          maximum: 120
+        refresh_interval_minutes:
+          type: integer
+          minimum: 0
+          maximum: 1440
+        end_at:
+          allOf:
+            - $ref: "#/components/schemas/LocalTime"
+          nullable: true
+        days_of_week:
+          type: array
+          uniqueItems: true
+          items:
+            type: integer
+            minimum: 0
+            maximum: 6
+        priority:
+          type: integer
+        smart_sync:
+          type: boolean
+        smart_sync_lead_seconds:
+          type: integer
+          minimum: 0
+          maximum: 600
+        mode:
+          type: string
+          enum: [scheduled, priority]
+        min_hold_minutes:
+          type: integer
+          minimum: 0
+          maximum: 120
+        window_start:
+          allOf:
+            - $ref: "#/components/schemas/LocalTime"
+          nullable: true
+        window_end:
+          allOf:
+            - $ref: "#/components/schemas/LocalTime"
+          nullable: true
+        fallback_page_id:
+          type: string
+          nullable: true
+        native_editable:
+          description: Server-computed; false makes the definition read/control-only
+          type: boolean
+        requires_web_reason:
+          description: Human-readable reason native editing is unavailable
+          type: string
+          nullable: true
+        web_url:
+          description: Relative URL for editing this Lineup in Tesserae Web
+          type: string
+    LocalTime:
+      type: string
+      pattern: "^([01]\\d|2[0-3]):[0-5]\\d$"
+    LineupDashboard:
+      type: object
+      additionalProperties: false
+      required:
+        - page_id
+        - name
+        - dwell_minutes
+        - missing
+        - refresh_interval_minutes
+        - links
+        - conditions
+      properties:
+        page_id:
+          type: string
+          minLength: 1
+        name:
+          type: string
+          minLength: 1
+        dwell_minutes:
+          description: Effective dwell after applying the Lineup default
+          type: integer
+          minimum: 1
+          maximum: 10080
+        missing:
+          description: True when the referenced Dashboard has been deleted
+          type: boolean
+        refresh_interval_minutes:
+          description: Raw per-Dashboard override; null inherits the Lineup default
+          type: integer
+          minimum: 0
+          maximum: 1440
+          nullable: true
+        links:
+          type: array
+          items:
+            $ref: "#/components/schemas/LineupLink"
+        conditions:
+          type: array
+          items:
+            $ref: "#/components/schemas/LineupCondition"
+    LineupCurrent:
+      type: object
+      additionalProperties: false
+      required: [device_id, page_id]
+      properties:
+        device_id:
+          type: string
+        page_id:
+          type: string
+    LineupLink:
+      description: Exactly one of button or zone is non-null
+      type: object
+      additionalProperties: false
+      required: [target_page_id, button, zone]
+      properties:
+        target_page_id:
+          type: string
+          minLength: 1
+        button:
+          type: string
+          nullable: true
+        zone:
+          allOf:
+            - $ref: "#/components/schemas/LineupZone"
+          nullable: true
+    LineupZone:
+      type: object
+      additionalProperties: false
+      required: [x, y, w, h]
+      properties:
+        x: {type: number, minimum: 0, maximum: 1}
+        y: {type: number, minimum: 0, maximum: 1}
+        w: {type: number, minimum: 0.000001, maximum: 1}
+        h: {type: number, minimum: 0.000001, maximum: 1}
+    LineupCondition:
+      description: >-
+        One upstream condition tuple. value remains structurally open because
+        its shape is selected by source_kind and operator; clients must preserve
+        unknown additive condition forms when rendering a read-only summary.
+      type: object
+      additionalProperties: false
+      required: [source_kind, source_id, operator, value]
+      properties:
+        source_kind:
+          type: string
+          enum: [ha_entity, time_window, sun]
+        source_id:
+          type: string
+        operator:
+          type: string
+        value:
+          nullable: true
+    LineupActionRequest:
+      description: >-
+        State actions return 200 with the updated Lineup. Paint actions return
+        202 with a Job; play requires page_id from this Lineup, while next and
+        previous omit page_id. device_ids, when present, must be bound to it.
+      oneOf:
+        - $ref: "#/components/schemas/LineupStateActionRequest"
+        - $ref: "#/components/schemas/LineupPaintActionRequest"
+    LineupStateActionRequest:
+      type: object
+      additionalProperties: false
+      required: [action]
+      properties:
+        action:
+          type: string
+          enum: [enable, disable]
+    LineupPaintActionRequest:
+      type: object
+      additionalProperties: false
+      required: [action, override_quiet_hours]
+      properties:
+        action:
+          type: string
+          enum: [next, previous, play]
+        page_id:
+          type: string
+        device_ids:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+        override_quiet_hours:
+          type: boolean
+          default: false
     HistoryResponse:
       type: object
       additionalProperties: false
@@ -1169,6 +2991,7 @@ components:
             - image_url_push
             - webpage_push
             - history_resend
+            - lineup_action
         status:
           description: Execution lifecycle only; quiet is a successful result
           type: string
@@ -1232,171 +3055,6 @@ components:
           type: string
         message:
           type: string
-    PersonalDataSourceID:
-      type: string
-      enum:
-        - reminders
-        - reminders.fridge
-    PersonalDataSnapshot:
-      oneOf:
-        - $ref: "#/components/schemas/RemindersSnapshot"
-        - $ref: "#/components/schemas/RemindersFridgeSnapshot"
-      discriminator:
-        propertyName: source_id
-        mapping:
-          reminders: "#/components/schemas/RemindersSnapshot"
-          reminders.fridge: "#/components/schemas/RemindersFridgeSnapshot"
-    RemindersSnapshot:
-      type: object
-      additionalProperties: false
-      required: [version, source_id, generated_at, expires_at, data]
-      properties:
-        version:
-          type: string
-          enum: [personal_data_bridge_v1]
-        source_id:
-          type: string
-          enum: [reminders]
-        generated_at:
-          type: string
-          format: date-time
-        expires_at:
-          type: string
-          format: date-time
-        data:
-          $ref: "#/components/schemas/RemindersData"
-    RemindersData:
-      description: >-
-        Incomplete items grouped by user-approved Apple Reminders lists. List
-        identifiers are opaque Companion publication identifiers rather than
-        EventKit calendar identifiers and must be unique within one snapshot;
-        they remain the widget selector across multiple paired publishers.
-        Widgets may distinguish duplicate list titles with the paired client's
-        display name, while publisher identity itself remains server-derived;
-        duplicate ids are rejected as invalid_snapshot (400). At most 200 items
-        may appear across all lists in one snapshot. Exceeding that aggregate
-        cap is rejected as invalid_snapshot (400), never truncated by the
-        server. An empty lists array means no lists are currently published;
-        the source remains fresh and widgets show their selected-list-
-        unavailable state. DELETE is reserved for disabling the source.
-      type: object
-      additionalProperties: false
-      required: [lists]
-      properties:
-        lists:
-          description: >-
-            Complete atomic set of currently published lists. An empty array is
-            a valid enabled snapshot, not a request to delete the source.
-          type: array
-          maxItems: 20
-          items:
-            $ref: "#/components/schemas/ReminderListSnapshot"
-    ReminderListSnapshot:
-      type: object
-      additionalProperties: false
-      required: [id, title, items]
-      properties:
-        id:
-          type: string
-          minLength: 1
-          maxLength: 256
-        title:
-          type: string
-          minLength: 1
-          maxLength: 256
-        items:
-          type: array
-          maxItems: 200
-          items:
-            $ref: "#/components/schemas/ReminderSnapshotItem"
-    RemindersFridgeSnapshot:
-      description: >-
-        Deprecated one-list compatibility source retained for the already
-        published reminders_fridge widget. New clients and widgets should use
-        the grouped reminders source rather than implement this fallback.
-      deprecated: true
-      type: object
-      additionalProperties: false
-      required: [version, source_id, generated_at, expires_at, data]
-      properties:
-        version:
-          type: string
-          enum: [personal_data_bridge_v1]
-        source_id:
-          type: string
-          enum: [reminders.fridge]
-        generated_at:
-          type: string
-          format: date-time
-        expires_at:
-          type: string
-          format: date-time
-        data:
-          $ref: "#/components/schemas/RemindersFridgeData"
-    RemindersFridgeData:
-      type: object
-      additionalProperties: false
-      required: [items]
-      properties:
-        items:
-          type: array
-          maxItems: 200
-          items:
-            $ref: "#/components/schemas/ReminderSnapshotItem"
-    ReminderSnapshotItem:
-      type: object
-      additionalProperties: false
-      required: [id, title, due_date, priority, completed]
-      properties:
-        id:
-          type: string
-          minLength: 1
-          maxLength: 256
-        title:
-          type: string
-          minLength: 1
-          maxLength: 512
-        due_date:
-          type: string
-          format: date
-          nullable: true
-        priority:
-          type: string
-          enum: [none, low, medium, high]
-        completed:
-          type: boolean
-          enum: [false]
-    PersonalDataFreshness:
-      type: string
-      enum: [fresh, stale, expired]
-    PersonalDataSourceStatus:
-      type: object
-      additionalProperties: false
-      required: [source_id, state, generated_at, stale_at, expires_at]
-      properties:
-        source_id:
-          $ref: "#/components/schemas/PersonalDataSourceID"
-        state:
-          $ref: "#/components/schemas/PersonalDataFreshness"
-        generated_at:
-          type: string
-          format: date-time
-        stale_at:
-          type: string
-          format: date-time
-        expires_at:
-          type: string
-          format: date-time
-    PersonalDataStatusResponse:
-      type: object
-      additionalProperties: false
-      required: [sources]
-      properties:
-        sources:
-          type: array
-          uniqueItems: true
-          items:
-            $ref: "#/components/schemas/PersonalDataSourceStatus"
     ErrorResponse:
       type: object
       additionalProperties: false
@@ -1412,20 +3070,24 @@ components:
               enum:
                 - invalid_request
                 - unauthorized
+                - forbidden
                 - not_found
                 - pairing_expired
                 - pairing_code_used
                 - invalid_target
-                - unsupported_image
-                - image_too_large
+                - invalid_framing
                 - invalid_snapshot
                 - unsupported_personal_data_source
                 - snapshot_out_of_order
                 - snapshot_conflict
+                - unsupported_image
+                - image_too_large
                 - url_blocked
                 - idempotency_conflict
+                - resource_conflict
                 - not_resendable
                 - temporarily_unavailable
+                - precondition_failed
             message:
               type: string
             request_id:

@@ -1,0 +1,13 @@
+{
+  "job": {
+    "id": "job_01JLINEUPACTION",
+    "kind": "lineup_action",
+    "status": "succeeded",
+    "label": "Kitchen deck",
+    "target_device_ids": ["picpak-kitchen"],
+    "created_at": "2026-08-10T08:02:00Z",
+    "updated_at": "2026-08-10T08:02:01Z",
+    "result": {"status": "published", "reason": "play", "device_ids": ["picpak-kitchen"], "history_event_ids": ["history_lineup_0001"]},
+    "error": null
+  }
+}

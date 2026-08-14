@@ -1,0 +1,7 @@
+{
+  "name": "Morning rotation",
+  "page_ids": ["weather", "room-overview"],
+  "dwell_minutes": {
+    "weather": 20
+  }
+}

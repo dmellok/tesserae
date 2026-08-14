@@ -1,0 +1,19 @@
+{
+  "token": "tc_live_fixture_secret_returned_once",
+  "token_id": "ct_01JPERSONALDATA",
+  "scopes": [
+    "devices:read",
+    "dashboards:read",
+    "push:write",
+    "media:write",
+    "personal_data:write"
+  ],
+  "created_at": "2026-08-02T08:00:00Z",
+  "instance": {
+    "id": "inst_01JPERSONALDATA",
+    "name": "Home",
+    "server_version": "0.226.0+personal-data-fixture",
+    "timezone": "Asia/Shanghai",
+    "web_url": "/"
+  }
+}

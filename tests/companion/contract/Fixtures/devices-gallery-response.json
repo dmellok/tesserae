@@ -1,0 +1,103 @@
+{
+  "devices": [
+    {
+      "id": "picpak-kitchen",
+      "name": "Kitchen PicPak",
+      "kind": "picpak_4_2",
+      "icon": "device-tablet",
+      "panel": {
+        "width": 400,
+        "height": 300,
+        "gamut": "bwry_4",
+        "orientation": "landscape"
+      },
+      "freshness": "fresh",
+      "last_seen_at": "2026-08-14T07:58:30Z",
+      "battery_percent": 86,
+      "rssi_dbm": -54,
+      "firmware_version": "0.8.0",
+      "capability_support": {
+        "frame_cache": {
+          "state": "unsupported",
+          "reason_code": "not_advertised",
+          "observed_at": "2026-08-14T07:58:30Z"
+        }
+      },
+      "has_pending_render": false
+    },
+    {
+      "id": "e1004-desk",
+      "name": "Desk",
+      "kind": "seeed_reterminal_e1004",
+      "icon": "device-tablet",
+      "panel": {
+        "width": 1200,
+        "height": 1600,
+        "gamut": "spectra_6",
+        "orientation": "portrait"
+      },
+      "freshness": "fresh",
+      "last_seen_at": "2026-08-14T07:57:00Z",
+      "battery_percent": 74,
+      "rssi_dbm": -48,
+      "firmware_version": "0.0.82",
+      "capability_support": {
+        "frame_cache": {
+          "state": "supported",
+          "observed_at": "2026-08-14T07:57:00Z"
+        }
+      },
+      "has_pending_render": false
+    },
+    {
+      "id": "e1003-bedroom",
+      "name": "Bedroom",
+      "kind": "seeed_reterminal_e1003",
+      "icon": "device-tablet",
+      "panel": {
+        "width": 1872,
+        "height": 1404,
+        "gamut": "gray_16",
+        "orientation": "landscape"
+      },
+      "freshness": "unknown",
+      "last_seen_at": null,
+      "battery_percent": null,
+      "rssi_dbm": null,
+      "firmware_version": null,
+      "capability_support": {
+        "frame_cache": {
+          "state": "unknown",
+          "reason_code": "no_usable_heartbeat",
+          "observed_at": null
+        }
+      },
+      "has_pending_render": false
+    },
+    {
+      "id": "e1004-hallway",
+      "name": "Hallway",
+      "kind": "seeed_reterminal_e1004",
+      "icon": "device-tablet",
+      "panel": {
+        "width": 1200,
+        "height": 1600,
+        "gamut": "spectra_6",
+        "orientation": "portrait"
+      },
+      "freshness": "stale",
+      "last_seen_at": "2026-08-13T20:00:00Z",
+      "battery_percent": 61,
+      "rssi_dbm": -67,
+      "firmware_version": "0.0.82",
+      "capability_support": {
+        "frame_cache": {
+          "state": "unknown",
+          "reason_code": "stale_heartbeat",
+          "observed_at": "2026-08-13T20:00:00Z"
+        }
+      },
+      "has_pending_render": false
+    }
+  ]
+}

@@ -4,6 +4,18 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.300.4], 2026-08-14
+
+### Changed
+
+- **Companion responses are validated against contract 0.12.** The vendored
+  copy of the app contract was several versions behind, so Lineups, the
+  session endpoint and the whole Gallery surface were checked against local
+  transcriptions of shapes rather than the published ones. The refreshed copy
+  carries every value we had been serving ahead of it, so the local errata
+  list is now empty, and the Gallery, Lineup, session and capability-support
+  fixtures are exercised directly.
+
 ## [0.300.3], 2026-08-14
 
 ### Fixed

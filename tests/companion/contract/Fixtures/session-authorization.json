@@ -1,0 +1,11 @@
+{
+  "token_id": "ct_lineup_authoring",
+  "scopes": [
+    "devices:read",
+    "dashboards:read",
+    "lineups:read",
+    "lineups:control",
+    "lineups:write"
+  ],
+  "settings_url": "/settings/companion"
+}

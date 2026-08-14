@@ -1,0 +1,25 @@
+{
+  "folder": {
+    "id": "folder_nas_archive",
+    "name": "nas-archive",
+    "kind": "external",
+    "writable": false,
+    "image_count": 1,
+    "cover_thumbnail_url": "/api/app/v1/gallery/images/image_archive_01/thumbnail"
+  },
+  "images": [
+    {
+      "id": "image_archive_01",
+      "folder_id": "folder_nas_archive",
+      "name": "holiday.png",
+      "content_type": "image/png",
+      "bytes": 327680,
+      "width": 1600,
+      "height": 1200,
+      "etag": "\"gallery-image-archive-01\"",
+      "thumbnail_url": "/api/app/v1/gallery/images/image_archive_01/thumbnail",
+      "content_url": "/api/app/v1/gallery/images/image_archive_01/content",
+      "created_at": null
+    }
+  ]
+}

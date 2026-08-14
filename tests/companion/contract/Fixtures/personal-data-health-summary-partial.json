@@ -1,0 +1,16 @@
+{
+  "version": "personal_data_bridge_v1",
+  "source_id": "health.summary",
+  "generated_at": "2026-08-14T12:30:00Z",
+  "expires_at": "2026-08-16T12:30:00Z",
+  "data": {
+    "time_zone": "Asia/Shanghai",
+    "window_start_date": "2026-08-08",
+    "window_end_date": "2026-08-14",
+    "activity": null,
+    "sleep": {
+      "nights": []
+    },
+    "workouts": null
+  }
+}

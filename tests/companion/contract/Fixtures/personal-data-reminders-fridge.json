@@ -5,9 +5,27 @@
   "expires_at": "2026-08-04T08:00:00Z",
   "data": {
     "items": [
-      { "id": "reminder-yogurt", "title": "Yogurt", "due_date": "2026-08-02", "priority": "high", "completed": false },
-      { "id": "reminder-spinach", "title": "Spinach", "due_date": "2026-08-04", "priority": "none", "completed": false },
-      { "id": "reminder-leftovers", "title": "Leftovers", "due_date": null, "priority": "none", "completed": false }
+      {
+        "id": "reminder-yogurt",
+        "title": "Yogurt",
+        "due_date": "2026-08-02",
+        "priority": "high",
+        "completed": false
+      },
+      {
+        "id": "reminder-spinach",
+        "title": "Spinach",
+        "due_date": "2026-08-04",
+        "priority": "none",
+        "completed": false
+      },
+      {
+        "id": "reminder-leftovers",
+        "title": "Leftovers",
+        "due_date": null,
+        "priority": "none",
+        "completed": false
+      }
     ]
   }
 }

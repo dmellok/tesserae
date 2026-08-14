@@ -41,6 +41,31 @@ CASES = {
     "history-response.json": "HistoryResponse",
     "history-link-response.json": "HistoryResponse",
     "history-resend-request.json": "HistoryResendRequest",
+    "session-authorization.json": "CompanionSessionAuthorization",
+    "capabilities-lineups.json": "Capabilities",
+    "capabilities-lineup-authoring.json": "Capabilities",
+    "capabilities-gallery.json": "Capabilities",
+    "pair-response-lineups.json": "PairingResponse",
+    "pair-response-gallery.json": "PairingResponse",
+    "pair-response-personal-data.json": "PairingResponse",
+    "devices-gallery-response.json": "DevicesResponse",
+    "gallery-folders-response.json": "GalleryFoldersResponse",
+    "gallery-folder-response.json": "GalleryFolderResponse",
+    "gallery-external-folder-response.json": "GalleryFolderResponse",
+    "gallery-folder-create-request.json": "GalleryFolderCreateRequest",
+    "gallery-image-upload-response.json": "GalleryImageResponse",
+    "lineups-response.json": "LineupsResponse",
+    "lineup-response.json": "LineupResponse",
+    "lineup-daily-resolved-response.json": "LineupResponse",
+    "lineup-create-request.json": "LineupCreateRequest",
+    "lineup-patch-request.json": "LineupPatchRequest",
+    "lineup-action-request.json": "LineupActionRequest",
+    "lineup-state-action-request.json": "LineupActionRequest",
+    "personal-data-health-summary.json": "PersonalDataSnapshot",
+    "personal-data-health-summary-partial.json": "PersonalDataSnapshot",
+    "personal-data-health-summary-put-response.json": "PersonalDataSourceStatus",
+    "job-lineup-action.json": "JobResponse",
+    "error-forbidden.json": "ErrorResponse",
     "job-accepted.json": "JobResponse",
     "job-published.json": "JobResponse",
     "job-quiet.json": "JobResponse",
@@ -55,7 +80,7 @@ CASES = {
 
 def test_openapi_shape_and_operation_ids_are_stable() -> None:
     assert SPEC["openapi"] == "3.0.3"
-    assert SPEC["info"]["version"] == "0.7.0"
+    assert SPEC["info"]["version"] == "0.12.0"
     assert set(SPEC["paths"]) == {
         "/api/app/v1",
         "/api/app/v1/pair",
@@ -64,6 +89,14 @@ def test_openapi_shape_and_operation_ids_are_stable() -> None:
         "/api/app/v1/personal-data/{source_id}",
         "/api/app/v1/devices",
         "/api/app/v1/devices/{device_id}/preview",
+        "/api/app/v1/gallery/folders",
+        "/api/app/v1/gallery/folders/{folder_id}",
+        "/api/app/v1/gallery/folders/{folder_id}/images",
+        "/api/app/v1/gallery/images/{image_id}/content",
+        "/api/app/v1/gallery/images/{image_id}/thumbnail",
+        "/api/app/v1/lineups",
+        "/api/app/v1/lineups/{lineup_id}",
+        "/api/app/v1/lineups/{lineup_id}/actions",
         "/api/app/v1/dashboards",
         "/api/app/v1/dashboards/{dashboard_id}/preview",
         "/api/app/v1/dashboards/{dashboard_id}/push",
@@ -131,16 +164,19 @@ def test_preview_endpoints_are_read_only_and_conditional() -> None:
     assert set(device) == {"parameters", "get"}
     assert set(dashboard) == {"parameters", "get"}
     assert set(history) == {"parameters", "get"}
-    assert set(device["get"]["responses"]) == {"200", "304", "401", "404"}
+    # 403 is a valid credential without the scope, distinct from the 401 that
+    # sends a client off to re-pair when the remedy is an operator toggle.
+    assert set(device["get"]["responses"]) == {"200", "304", "401", "403", "404"}
     assert set(dashboard["get"]["responses"]) == {
         "200",
         "202",
         "304",
         "400",
         "401",
+        "403",
         "404",
     }
-    assert set(history["get"]["responses"]) == {"200", "304", "401", "404"}
+    assert set(history["get"]["responses"]) == {"200", "304", "401", "403", "404"}
     features = SPEC["components"]["schemas"]["Capabilities"]["properties"]["features"]["items"][
         "enum"
     ]
@@ -199,6 +235,7 @@ def test_personal_data_capabilities_advertise_source_ids_directly() -> None:
     assert capabilities["personal_data"]["sources"] == [
         "reminders",
         "reminders.fridge",
+        "health.summary",
     ]
     assert "personal_data_reminders" in capabilities["features"]
     assert "personal_data_reminders_multi_list" not in capabilities["features"]
@@ -272,6 +309,22 @@ def test_image_framing_fixture_matches_the_server_resolver() -> None:
         assert resolved[key] == pytest.approx(expected)
     assert resolve(raw)["x"] != pytest.approx(resolved["x"])
 
+    # A focus point close enough to an edge that the crop would run off it
+    # resolves to the same window as one clamped to the edge, rather than
+    # being rejected or letting the crop leave the image.
+    clamp = fixture["clamp_case"]
+    clamped = resolve_framing_crop(
+        source_w=normalized["width"],
+        source_h=normalized["height"],
+        target_w=target["width"],
+        target_h=target["height"],
+        focus_x=clamp["framing"]["focus_x"],
+        focus_y=clamp["framing"]["focus_y"],
+        zoom=clamp["framing"]["zoom"],
+    )
+    for key, expected in clamp["expected_crop"].items():
+        assert clamped[{"width": "w", "height": "h"}.get(key, key)] == pytest.approx(expected)
+
 
 def test_history_contract_keeps_composition_preview_and_resend_correlatable() -> None:
     history = json.loads((FIXTURES_DIR / "history-response.json").read_text())
@@ -288,3 +341,57 @@ def test_history_contract_keeps_composition_preview_and_resend_correlatable() ->
         "responses"
     ]["200"]["description"]
     assert "not a device-final preview" in preview_description
+
+
+def test_capability_support_reason_codes_are_the_ones_the_server_emits() -> None:
+    """The contract names its reason codes in prose rather than an enum, so
+    nothing else would catch us renaming one out from under the client."""
+    from app.device_capability import (
+        REASON_NO_HEARTBEAT,
+        REASON_NOT_ADVERTISED,
+        REASON_STALE_HEARTBEAT,
+    )
+
+    ours = {REASON_NOT_ADVERTISED, REASON_NO_HEARTBEAT, REASON_STALE_HEARTBEAT}
+    described = SPEC["components"]["schemas"]["DeviceCapabilitySupport"]["properties"][
+        "reason_code"
+    ]["description"]
+    for code in ours:
+        assert code in described
+
+    devices = json.loads((FIXTURES_DIR / "devices-gallery-response.json").read_text())["devices"]
+    support = {
+        device["capability_support"]["frame_cache"]["reason_code"]: device["capability_support"][
+            "frame_cache"
+        ]
+        for device in devices
+        if "reason_code" in device["capability_support"]["frame_cache"]
+    }
+    assert set(support) == ours
+
+    # A stale beat is evidence that went out of date, not a display that
+    # answered no, so it reads unknown and keeps the time it was observed.
+    assert support[REASON_STALE_HEARTBEAT]["state"] == "unknown"
+    assert support[REASON_STALE_HEARTBEAT]["observed_at"] is not None
+    assert support[REASON_NO_HEARTBEAT]["state"] == "unknown"
+    assert support[REASON_NO_HEARTBEAT]["observed_at"] is None
+    assert support[REASON_NOT_ADVERTISED]["state"] == "unsupported"
+
+
+def test_gallery_upload_and_stored_media_types_are_separate() -> None:
+    """0.12 split the two: HEIC is a legal upload and can never be a stored
+    file, and GIF/BMP are readable but not offered as upload sources."""
+    from app.companion_gallery import (
+        _NATIVE_CONTENT_TYPES,
+        _RENDITION_CONTENT_TYPE,
+        GALLERY_IMAGE_CONTENT_TYPES,
+    )
+
+    schemas = SPEC["components"]["schemas"]
+    accepted = schemas["GalleryUploadContentType"]["enum"]
+    stored = schemas["GalleryStoredContentType"]["enum"]
+
+    assert list(GALLERY_IMAGE_CONTENT_TYPES) == accepted
+    assert "image/heic" not in stored
+    for served in {*_NATIVE_CONTENT_TYPES.values(), _RENDITION_CONTENT_TYPE}:
+        assert served in stored

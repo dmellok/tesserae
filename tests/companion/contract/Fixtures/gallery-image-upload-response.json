@@ -1,0 +1,15 @@
+{
+  "image": {
+    "id": "image_upload_0001",
+    "folder_id": "folder_family",
+    "name": "beach.jpg",
+    "content_type": "image/jpeg",
+    "bytes": 196608,
+    "width": 1600,
+    "height": 1200,
+    "etag": "\"gallery-image-upload-0001\"",
+    "thumbnail_url": "/api/app/v1/gallery/images/image_upload_0001/thumbnail",
+    "content_url": "/api/app/v1/gallery/images/image_upload_0001/content",
+    "created_at": "2026-08-14T08:30:00Z"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "forbidden",
+    "message": "This app hasn't been given permission for that. Grant it in Settings, Companion.",
+    "request_id": "req_forbidden_01"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "product": "tesserae",
+  "server_version": "0.295.0",
+  "api": {"name": "companion", "version": 1},
+  "pairing": {"supported": true, "code_length": 6, "ttl_seconds": 600},
+  "features": [
+    "devices", "dashboards", "dashboard_push", "image_push", "jobs",
+    "previews", "history", "lineups", "lineup_control",
+    "lineup_authoring", "session_read"
+  ],
+  "limits": {
+    "image_upload_bytes": 26214400,
+    "image_max_edge": 8192,
+    "image_content_types": ["image/jpeg", "image/png", "image/heic", "image/heif", "image/webp"],
+    "image_fit_modes": ["fit", "fill", "blur", "stretch", "center"],
+    "image_framing_max_zoom": 4,
+    "job_retention_seconds": 86400,
+    "idempotency_retention_seconds": 86400
+  },
+  "web_url": "/"
+}

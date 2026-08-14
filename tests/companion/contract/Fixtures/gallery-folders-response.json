@@ -1,0 +1,28 @@
+{
+  "folders": [
+    {
+      "id": "folder_family",
+      "name": "family",
+      "kind": "internal",
+      "writable": true,
+      "image_count": 4,
+      "cover_thumbnail_url": "/api/app/v1/gallery/images/image_family_01/thumbnail"
+    },
+    {
+      "id": "folder_nas_archive",
+      "name": "nas-archive",
+      "kind": "external",
+      "writable": false,
+      "image_count": 1,
+      "cover_thumbnail_url": "/api/app/v1/gallery/images/image_archive_01/thumbnail"
+    },
+    {
+      "id": "folder_empty",
+      "name": "empty",
+      "kind": "internal",
+      "writable": true,
+      "image_count": 0,
+      "cover_thumbnail_url": null
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "intent": "cycle",
+  "name": "Morning cycle",
+  "page_ids": ["room-overview", "weather"],
+  "device_ids": ["picpak-living-room"],
+  "dwell_minutes": {
+    "room-overview": 15,
+    "weather": 30
+  },
+  "interval_minutes": 30,
+  "anchor": "06:00",
+  "bind_unassigned_dashboards": true
+}
