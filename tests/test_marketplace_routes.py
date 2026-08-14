@@ -543,3 +543,27 @@ def test_without_a_mark_the_card_keeps_the_glyph(app: Flask) -> None:
     body = _browse_with(app, entry)
     assert "catalog.invalid/icons/" not in body
     assert "ph-images-square" in body
+
+
+def test_browse_offers_a_row_density_control(app: Flask) -> None:
+    """The catalog toolbar carries the Cozy / Compact control, with Cozy
+    pre-selected in the server markup so the page has a sane density before
+    catalog_browse.js reads the stored preference."""
+    client = app.test_client()
+    _sign_in(client)
+    mkt = MagicMock(spec=Marketplace)
+    entry = _fake_entry()
+    mkt.index_url.return_value = "https://catalog.invalid/widgets.json"
+    mkt.fetch_index.return_value = [entry]
+    mkt.cached_index.return_value = [entry]
+    mkt.installed.return_value = {}
+    mkt.screenshots_base.return_value = ""
+    mkt.plugins_dir.return_value = None
+    app.config["MARKETPLACE"] = mkt
+
+    body = client.get("/plugins/browse").get_data(as_text=True)
+    assert "data-cat-density" in body
+    assert 'data-density="cozy"' in body and 'data-density="compact"' in body
+    # Cozy is the default, and it is the one marked active before any JS runs.
+    cozy = body.index('data-density="cozy"')
+    assert 'class="cat-seg-btn is-active"' in body[cozy - 60 : cozy]

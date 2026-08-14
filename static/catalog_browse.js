@@ -34,7 +34,30 @@
     { key: "recent", label: "Recently added" },
   ];
 
+  // Row roominess, persisted per browser. Not a server setting: it's a
+  // per-screen preference (a laptop wants Compact where a desktop doesn't),
+  // and nothing else needs to know about it.
+  var DENSITY_KEY = "tesserae.catalog.density";
+
+  function readDensity() {
+    try {
+      var saved = window.localStorage.getItem(DENSITY_KEY);
+      return saved === "compact" || saved === "cozy" ? saved : "cozy";
+    } catch {
+      return "cozy"; // private mode / storage disabled
+    }
+  }
+
+  function writeDensity(value) {
+    try {
+      window.localStorage.setItem(DENSITY_KEY, value);
+    } catch {
+      /* preference just doesn't persist */
+    }
+  }
+
   var state = {
+    density: readDensity(),
     type: payload.initial && payload.initial.type ? payload.initial.type : "All",
     status: payload.initial && payload.initial.status ? payload.initial.status : "All",
     cat: (payload.initial && payload.initial.tag) || "All",
@@ -71,6 +94,7 @@
   var elCount = root.querySelector("[data-cat-count]");
   var elSort = root.querySelector("[data-cat-sort]");
   var elSortLabel = root.querySelector("[data-cat-sort-label]");
+  var elDensity = root.querySelector("[data-cat-density]");
   var elResults = root.querySelector("[data-cat-results]");
   var sheetRoot = document.querySelector("[data-cat-sheet]");
   var sheetPanel = sheetRoot ? sheetRoot.querySelector("[data-cat-sheet-panel]") : null;
@@ -662,7 +686,21 @@
       tabindex: "0",
       "aria-label": item.name + ", open details",
     });
-    row.appendChild(previewFrame(item, "row"));
+    // The thumbnail enlarges in place rather than opening the sheet: at a
+    // glance "what does this look like" is the question a screenshot answers,
+    // and routing it through the sheet made you close two things to get back.
+    // stopPropagation keeps the row's own click (open sheet) out of it.
+    var thumb = previewFrame(item, "row");
+    var rowShots = item.iconUrl ? [] : item.previews;
+    if (rowShots.length) {
+      thumb.classList.add("is-zoomable");
+      thumb.setAttribute("title", "Click to enlarge");
+      thumb.addEventListener("click", function (ev) {
+        ev.stopPropagation();
+        openLightbox(item, rowShots, 0);
+      });
+    }
+    row.appendChild(thumb);
 
     var text = el("div", { class: "cat-row-text" });
     var line1 = el("div", { class: "cat-row-title" });
@@ -1316,6 +1354,29 @@
     state.fitsOnly = elFits.checked;
     render();
   });
+
+  // Density is CSS-only: the attribute on the root switches the row metrics,
+  // so switching costs no re-render and can't disturb the list or the sheet.
+  function applyDensity() {
+    root.setAttribute("data-density", state.density);
+    if (!elDensity) return;
+    Array.prototype.forEach.call(elDensity.querySelectorAll("[data-density]"), function (b) {
+      var on = b.getAttribute("data-density") === state.density;
+      b.classList.toggle("is-active", on);
+      b.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+  }
+
+  if (elDensity) {
+    elDensity.addEventListener("click", function (ev) {
+      var btn = ev.target.closest("[data-density]");
+      if (!btn) return;
+      state.density = btn.getAttribute("data-density");
+      writeDensity(state.density);
+      applyDensity();
+    });
+  }
+  applyDensity();
 
   elSort.addEventListener("click", function (ev) {
     var btn = ev.target.closest("[data-sort]");

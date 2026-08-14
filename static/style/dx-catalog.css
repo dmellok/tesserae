@@ -446,12 +446,44 @@
   border-radius: 12px;
   overflow: hidden;
 }
+/* -- row density --------------------------------------------------
+   Every metric a row's roominess depends on lives here as a custom
+   property, so the Cozy / Compact control is one attribute flip on the
+   catalog root and no JS re-render. Cozy is the default: the screenshot
+   is what people are shopping for, and the old 152px thumb was too small
+   to judge a dashboard widget by. Compact keeps the previous scanning
+   density with a slightly larger preview.
+   Declared on [data-catalog] rather than :root so nothing else on the
+   page inherits catalog metrics. */
+[data-catalog] {
+  --cat-row-pad-y: 18px;
+  --cat-row-pad-x: 20px;
+  --cat-row-gap: 22px;
+  --cat-thumb-w: 300px;
+  --cat-thumb-h: 180px;
+  --cat-row-name: 17px;
+  --cat-row-desc: 14px;
+  --cat-row-desc-lines: 3;
+  --cat-thumb-glyph: 40px;
+}
+[data-catalog][data-density="compact"] {
+  --cat-row-pad-y: 14px;
+  --cat-row-pad-x: 16px;
+  --cat-row-gap: 18px;
+  --cat-thumb-w: 208px;
+  --cat-thumb-h: 125px;
+  --cat-row-name: 15px;
+  --cat-row-desc: 13px;
+  --cat-row-desc-lines: 2;
+  --cat-thumb-glyph: 30px;
+}
+
 .cat-row {
   display: grid;
-  grid-template-columns: 152px minmax(0, 1fr) auto;
-  gap: 18px;
+  grid-template-columns: var(--cat-thumb-w) minmax(0, 1fr) auto;
+  gap: var(--cat-row-gap);
   align-items: center;
-  padding: 14px 16px;
+  padding: var(--cat-row-pad-y) var(--cat-row-pad-x);
   background: var(--t-surface);
   cursor: pointer;
   transition: background var(--t-trans-fast);
@@ -479,8 +511,15 @@
 /* 8:5, close enough to the 3:2 the catalog's lg screenshots are shot at
    that a cover crop takes a couple of pixels off the sides. */
 .cat-thumb--row {
-  width: 152px;
-  height: 95px;
+  width: var(--cat-thumb-w);
+  height: var(--cat-thumb-h);
+}
+/* Enlarging a row's shot is the thumbnail's own click, not the row's. */
+.cat-thumb--row.is-zoomable {
+  cursor: zoom-in;
+}
+.cat-thumb--row.is-zoomable:hover {
+  border-color: var(--t-accent);
 }
 .cat-thumb--sheet {
   height: 264px;
@@ -507,7 +546,7 @@
   color: var(--t-muted);
 }
 .cat-thumb--row.is-glyph .ph {
-  font-size: 26px;
+  font-size: var(--cat-thumb-glyph);
 }
 .cat-thumb--sheet.is-glyph .ph {
   font-size: 54px;
@@ -526,7 +565,7 @@
   flex-wrap: wrap;
 }
 .cat-row-name {
-  font-size: 14.5px;
+  font-size: var(--cat-row-name);
   font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--t-fg);
@@ -562,11 +601,11 @@
    cut most descriptions mid-sentence; the untruncated text is still in
    the sheet. */
 .cat-row-desc {
-  font-size: 12.5px;
+  font-size: var(--cat-row-desc);
   color: var(--t-fg-soft);
-  line-height: 1.45;
+  line-height: 1.5;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: var(--cat-row-desc-lines);
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -1083,13 +1122,20 @@
   }
 }
 @media (width <= 640px) {
-  .cat-row {
-    grid-template-columns: 104px minmax(0, 1fr);
-    row-gap: 10px;
+  /* Phone width: density stops applying. Neither setting's thumbnail fits
+     beside the text here, so both collapse to the same stacked layout. */
+  [data-catalog],
+  [data-catalog][data-density="compact"] {
+    --cat-thumb-w: 104px;
+    --cat-thumb-h: 65px;
+    --cat-row-desc-lines: 2;
+    --cat-row-name: 15px;
+    --cat-row-desc: 13px;
+    --cat-thumb-glyph: 26px;
   }
-  .cat-thumb--row {
-    width: 104px;
-    height: 65px;
+  .cat-row {
+    grid-template-columns: var(--cat-thumb-w) minmax(0, 1fr);
+    row-gap: 10px;
   }
   .cat-row-actions {
     grid-column: 1 / -1;

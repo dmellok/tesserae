@@ -4,6 +4,18 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.302.0], 2026-08-15
+
+### Changed
+
+- **Browse catalog rows lead with the screenshot.** Rows are roomier by
+  default: a 300×180 preview instead of 152×95, a larger title, and three lines
+  of description rather than two. A **Cozy / Compact** control in the toolbar
+  switches back to a scanning density, and the choice is remembered per browser.
+- **A row's screenshot enlarges in place.** Clicking a row thumbnail opens the
+  full-size preview directly, the same lightbox the detail sheet uses, instead
+  of only being reachable by opening the sheet first.
+
 ## [0.301.1], 2026-08-15
 
 ### Fixed

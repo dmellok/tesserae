@@ -131,6 +131,14 @@
       </form>
       <div class="cat-toolbar-divider" aria-hidden="true"></div>
       <span class="cat-mono cat-count" data-cat-count aria-live="polite"></span>
+      {# Row roominess. Cozy leads because the screenshot is the thing being
+         shopped for and a 152px thumb showed too little of it; Compact is for
+         scanning a long catalog by name. Persisted per browser, so the choice
+         survives a reload. #}
+      <div class="cat-seg cat-seg--density" role="group" aria-label="Row density" data-cat-density>
+        <button type="button" class="cat-seg-btn is-active" data-density="cozy" aria-pressed="true">Cozy</button>
+        <button type="button" class="cat-seg-btn" data-density="compact" aria-pressed="false">Compact</button>
+      </div>
       <details class="cat-sort" data-cat-sort>
         <summary>
           <i class="ph ph-arrows-down-up" aria-hidden="true"></i>
