@@ -18,7 +18,7 @@ import jsonschema
 import pytest
 from flask import Flask
 
-from app import companion_api
+from app import companion_api, companion_gallery
 from app.main import REPO_ROOT, create_app
 from app.state.page_store import Page
 
@@ -132,12 +132,23 @@ def test_capabilities_probe_is_unauthenticated_and_valid(app: Flask) -> None:
         "lineup_control",
         "lineup_authoring",
         "session_read",
+        # The photo library is a plugin; the test app registers it.
+        "gallery",
     }
     assert body["personal_data"]["sources"] == ["reminders", "reminders.fridge"]
     assert "webpage_push" not in body["features"]
     assert body["limits"]["image_fit_modes"] == list(companion_api.IMAGE_FIT_MODES)
     # Contract 0.6: the zoom bound is mandatory alongside image_framing.
     assert body["limits"]["image_framing_max_zoom"] == companion_api.IMAGE_FRAMING_MAX_ZOOM
+    # Contract 0.11: all three Gallery bounds are mandatory alongside the
+    # capability, so a client never hard-codes an upload ceiling.
+    assert body["limits"]["gallery_upload_bytes"] == companion_gallery.GALLERY_UPLOAD_BYTES
+    assert body["limits"]["gallery_image_content_types"] == list(
+        companion_gallery.GALLERY_IMAGE_CONTENT_TYPES
+    )
+    assert (
+        body["limits"]["gallery_upload_batch_size"] == companion_gallery.GALLERY_UPLOAD_BATCH_SIZE
+    )
     # No household content leaks from the unauthenticated probe.
     assert "devices" not in body and "dashboards" not in body
 
@@ -162,6 +173,10 @@ def test_pair_exchanges_code_for_scoped_token(app: Flask) -> None:
         # authoring (lineups:write) deliberately does not, see #207.
         "lineups:read",
         "lineups:control",
+        # Browsing and adding to the photo Gallery rides along too; the
+        # destructive second slice will not, see #225.
+        "gallery:read",
+        "gallery:write",
     }
     assert body["instance"]["server_version"] == app.config["APP_VERSION"]
 

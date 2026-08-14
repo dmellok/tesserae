@@ -4,6 +4,36 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.300.0], 2026-08-14
+
+### Added
+
+- **Companion API can browse and add to the photo Gallery (#225).** Six
+  routes under `/api/app/v1/gallery/` list folders, create an internal
+  folder, read a folder's images, upload one image, and serve a thumbnail or
+  the stored content. Folders and images are addressed by opaque server-minted
+  ids rather than filenames or host paths, external folders are read-only, and
+  `gallery:read` + `gallery:write` ride along with the pairing role.
+  Uploads are normalised on the way in: all EXIF is dropped (location
+  included), source orientation is baked into the pixels, and the ICC profile
+  is preserved. Sending a Gallery photo still goes through the existing
+  `POST /images` flow, so there is one send path rather than two.
+- **Displays report which protocol capabilities they support.** Each device in
+  the Companion API's list carries a `capability_support` map with a
+  `supported` / `unsupported` / `unknown` state per capability, computed from
+  the display's own heartbeats. A display that has not checked in recently
+  enough to tell reads `unknown` rather than being reported as incapable.
+
+### Fixed
+
+- **The offline photo album form no longer offers displays that can't play
+  one.** It listed every registered display whose kind resolved, so an album
+  could be bound to a panel with no frame cache, save cleanly, and then never
+  receive anything. Displays that reported no frame cache are now disabled
+  with the reason shown, ones that have not checked in yet are marked as
+  unconfirmed but still bindable, and a submitted target that reported no
+  frame cache is dropped rather than saved.
+
 ## [0.299.0], 2026-08-14
 
 ### Fixed

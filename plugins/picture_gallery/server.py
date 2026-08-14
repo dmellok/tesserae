@@ -359,19 +359,138 @@ def list_folder_files(folder: str) -> list[str]:
     return [p.name for p in _list_images(_folder_path(folder, data_dir))]
 
 
+# ----- storage adapter (public, for the Companion API) ----------------
+#
+# The Companion Gallery surface (#225) reads and writes the same storage
+# the admin pages do, but must not call the admin routes: those are
+# browser forms with redirects, flash messages, and filename identity,
+# and they change shape as the plugin does. These functions are the
+# contract between the plugin's storage and anything outside it.
+
+
+def folder_names() -> list[str]:
+    """Every addressable folder, root first then internal + external by
+    name. Root is the plugin's own data_dir, always present."""
+    return [ROOT_FOLDER_VALUE, *_all_folder_names(_data_dir())]
+
+
+def folder_exists(folder: str) -> bool:
+    # An empty name is not root. ``_folder_path`` treats the two the same
+    # for the render path's convenience, which would let an outside caller
+    # address root by a second name it never minted.
+    if not folder:
+        return False
+    if folder == ROOT_FOLDER_VALUE:
+        return True
+    path = _folder_path(folder, _data_dir())
+    return path is not None and path.is_dir()
+
+
+def folder_is_external(folder: str) -> bool:
+    """External folders point at an arbitrary host directory. Read-only:
+    the plugin serves from them but never writes, so an upload can't
+    scribble on somebody's actual photo library."""
+    return _is_external(folder, _data_dir())
+
+
+def folder_label(folder: str) -> str:
+    if folder == ROOT_FOLDER_VALUE:
+        return "(root)"
+    meta = _load_meta(_data_dir()).get(folder, {})
+    label = meta.get("label")
+    return str(label) if isinstance(label, str) and label.strip() else folder
+
+
+def normalize_folder_name(raw: str) -> str | None:
+    """Fold a user-supplied display name into a storage folder name, or
+    None when nothing usable survives.
+
+    Folder names are the on-disk directory names, so the plugin's own
+    regex is the authority: lowercase, digits, ``-`` and ``_``, starting
+    on an alphanumeric. Normalising here rather than rejecting means a
+    phone keyboard's "Summer 2026" lands as ``summer-2026`` instead of a
+    validation error the operator has to guess their way out of."""
+    folded = re.sub(r"[^a-z0-9_-]+", "-", raw.strip().lower()).strip("-_")
+    folded = re.sub(r"-{2,}", "-", folded)[:64].strip("-_")
+    return folded if folded and _FOLDER_NAME_RE.match(folded) else None
+
+
+def create_internal_folder(folder: str) -> bool:
+    """Create an internal folder. False when it already exists (internal
+    or external) or the name isn't a legal folder name. Never links an
+    external path: that stays an admin-only action, since it hands the
+    plugin a host directory to read."""
+    if not _FOLDER_NAME_RE.match(folder):
+        return False
+    data_dir = _data_dir()
+    meta = _load_meta(data_dir)
+    if folder in meta or (data_dir / folder).exists():
+        return False
+    (data_dir / folder).mkdir(parents=True)
+    meta[folder] = {"label": folder, "external_path": None}
+    _save_meta(data_dir, meta)
+    return True
+
+
+def image_target_dir(folder: str) -> Path | None:
+    """Writable directory for a folder, or None when it doesn't exist or
+    doesn't accept writes."""
+    if folder_is_external(folder):
+        return None
+    target = _folder_path(folder, _data_dir())
+    if target is None or not target.is_dir():
+        return None
+    return target
+
+
+def thumbnail_path(folder: str, filename: str) -> Path | None:
+    """Cached JPEG thumbnail for one image, generating it on first ask.
+    None when the image is unreadable."""
+    source = resolve_image_path(folder, filename)
+    if source is None:
+        return None
+    return _ensure_thumbnail(source, _thumb_path(_data_dir(), folder, filename, source))
+
+
+def allowed_suffixes() -> frozenset[str]:
+    return ALLOWED_SUFFIXES
+
+
 # ----- offline album authoring (#177) ---------------------------------
 
 
-def _bindable_devices() -> list[dict[str, str]]:
-    """Device instances an offline album can be bound to (id + label)."""
+def _bindable_devices() -> list[dict[str, Any]]:
+    """Device instances an offline album can be bound to, each carrying
+    the computed frame-cache support state that decides whether it can
+    actually play one.
+
+    Every registered instance is listed rather than filtered: a target
+    that has simply not checked in yet is not the same as one that
+    reported no storage, and hiding either leaves an operator wondering
+    where their display went. Only ``unsupported`` is refused, since
+    that's the one state we have evidence for; ``unknown`` stays
+    selectable with a caveat, so a display that happens to be asleep
+    during setup can still be bound (#225)."""
     reg = current_app.config.get("DEVICE_REGISTRY")
     if reg is None:
         return []
-    out: list[dict[str, str]] = []
+    from app.device_capability import FRAME_CACHE, capability_support, support_note
+
+    status_cache = current_app.config.get("DEVICE_STATUS") or {}
+    out: list[dict[str, Any]] = []
     for dev in sorted(reg.devices.values(), key=lambda d: d.name.lower()):
         if dev.kind_of is None:
             continue
-        out.append({"id": dev.id, "label": dev.display_name})
+        support = capability_support(dev, status_cache.get(dev.id), FRAME_CACHE)
+        out.append(
+            {
+                "id": dev.id,
+                "label": dev.display_name,
+                "state": support["state"],
+                "selectable": support["state"] != "unsupported",
+                "note": support_note(support),
+            }
+        )
     return out
 
 
@@ -625,7 +744,14 @@ def blueprint() -> Blueprint:
 
         default_name = "Root album" if folder == ROOT_FOLDER_VALUE else folder
         name = (request.form.get("name") or "").strip() or default_name
-        device_ids = [d for d in request.form.getlist("device_ids") if d]
+        # A submitted target the form disabled (an open tab from before the
+        # display last reported, a hand-crafted POST) is dropped rather than
+        # saved: binding an album a device can never receive looks like it
+        # worked and then silently does nothing (#225).
+        selectable = {d["id"] for d in _bindable_devices() if d["selectable"]}
+        submitted = [d for d in request.form.getlist("device_ids") if d]
+        device_ids = [d for d in submitted if d in selectable]
+        refused = len(submitted) - len(device_ids)
         fit = request.form.get("fit") or "fill"
         mode = request.form.get("mode") or "sequential"
         repeat = request.form.get("repeat") or "loop"
@@ -667,6 +793,12 @@ def blueprint() -> Blueprint:
             f"Saved album '{name}', bound to {count} device{'' if count == 1 else 's'}.",
             "ok",
         )
+        if refused:
+            flash(
+                f"Skipped {refused} display{'' if refused == 1 else 's'} that reported "
+                "no frame cache; an offline album can't play there.",
+                "warn",
+            )
         return redirect(url_for("picture_gallery_admin.show_folder", folder=folder))
 
     return bp

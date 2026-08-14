@@ -43,6 +43,7 @@ from flask import Blueprint, Flask, current_app, g, jsonify, request, url_for
 from pydantic import ValidationError
 from werkzeug.wrappers import Response
 
+from app import companion_gallery
 from app.companion_history import (
     DEFAULT_HISTORY_LIMIT,
     MAX_HISTORY_LIMIT,
@@ -65,6 +66,7 @@ from app.data_change_refresh import (
     personal_data_delete_event,
     personal_data_update_event,
 )
+from app.device_capability import capability_support_map, heartbeat_freshness
 from app.device_loader import Device, DeviceRegistry
 from app.device_preview import retained_device_preview
 from app.lineup_authoring import build_lineup
@@ -154,6 +156,7 @@ FEATURES = (
 _PAIRING_CODE_RE = re.compile(r"^[0-9]{6,12}$")
 _IMAGE_CONTENT_TYPES = frozenset(IMAGE_CONTENT_TYPES)
 _IMAGE_FIT_MODES = frozenset(IMAGE_FIT_MODES)
+_GALLERY_CONTENT_TYPES = frozenset(companion_gallery.GALLERY_IMAGE_CONTENT_TYPES)
 
 
 # -- CORS ----------------------------------------------------------------
@@ -374,7 +377,26 @@ def _features() -> list[str]:
         # webpage_push to screenshot an arbitrary URL server-side.
         feats.append("previews")
         feats.append("webpage_push")
+    if companion_gallery.gallery_available():
+        # The photo library is a plugin, and a plugin can be uninstalled.
+        # Advertising Gallery on an instance without it would leave the
+        # client offering a browse tab that 404s on every folder (#225).
+        feats.append("gallery")
     return feats
+
+
+def _gallery_limits() -> dict[str, Any]:
+    """Gallery's own upload bounds, required whenever the capability is
+    advertised and deliberately separate from the ``POST /images`` ones:
+    a photo entering the library and a photo being sent to a panel are
+    different actions with different ceilings."""
+    if not companion_gallery.gallery_available():
+        return {}
+    return {
+        "gallery_upload_bytes": companion_gallery.GALLERY_UPLOAD_BYTES,
+        "gallery_image_content_types": list(companion_gallery.GALLERY_IMAGE_CONTENT_TYPES),
+        "gallery_upload_batch_size": companion_gallery.GALLERY_UPLOAD_BATCH_SIZE,
+    }
 
 
 def _capabilities() -> dict[str, Any]:
@@ -408,6 +430,7 @@ def _capabilities() -> dict[str, Any]:
             # (contract 0.7): the client reads freshness/TTL bounds, not guesses.
             "personal_data_stale_after_seconds": PERSONAL_DATA_STALE_SECONDS,
             "personal_data_max_ttl_seconds": PERSONAL_DATA_MAX_TTL_SECONDS,
+            **_gallery_limits(),
         },
         "web_url": _web_url(),
     }
@@ -792,26 +815,6 @@ def _orientation(width: int, height: int) -> str:
     return "portrait" if height > width else "landscape"
 
 
-def _freshness_threshold_s(device: Device) -> float:
-    """How long since last heartbeat before a device reads as ``stale``.
-
-    E-ink clients sleep for long stretches by design, so the threshold
-    tracks the device's own poll cadence: a few wake cycles of silence,
-    with a floor so a chatty device isn't marked stale on a single skipped
-    beat."""
-    section = _settings().get_section("devices") or {}
-    stored = section.get(device.id) if isinstance(section, dict) else None
-    interval = 60
-    if isinstance(stored, dict) and isinstance(stored.get("sleep_interval_s"), int):
-        interval = int(stored["sleep_interval_s"])
-    else:
-        schema = device.config_schema or {}
-        spec = schema.get("sleep_interval_s") if isinstance(schema, dict) else None
-        if isinstance(spec, dict) and isinstance(spec.get("default"), int):
-            interval = int(spec["default"])
-    return max(interval * 3, 300)
-
-
 def _nullable_int(value: Any, *, lo: int | None = None, hi: int | None = None) -> int | None:
     if isinstance(value, bool):  # bool is an int subclass; never a metric
         return None
@@ -832,16 +835,7 @@ def _device_view(
 ) -> dict[str, Any]:
     panel = device_panel(device) or resolve_settings_panel(_settings())
     parsed = status.get("parsed", {}) if isinstance(status, dict) else {}
-    received_at = status.get("received_at") if isinstance(status, dict) else None
-
-    last_seen_at: str | None = None
-    freshness = "unknown"
-    if isinstance(received_at, (int, float)):
-        last_seen_at = datetime.fromtimestamp(float(received_at), UTC).strftime(
-            "%Y-%m-%dT%H:%M:%SZ"
-        )
-        age = time.time() - float(received_at)
-        freshness = "fresh" if age <= _freshness_threshold_s(device) else "stale"
+    freshness, last_seen_at = heartbeat_freshness(device, status)
 
     fw = parsed.get("fw_version") if isinstance(parsed, dict) else None
     has_pending_render = False
@@ -897,6 +891,11 @@ def _device_view(
         ),
         "rssi_dbm": _nullable_int(parsed.get("rssi") if isinstance(parsed, dict) else None),
         "firmware_version": (str(fw) if isinstance(fw, (str, int, float)) else None),
+        # Support keyed by protocol capability, not by model: a client must
+        # never carry its own list of which panels have an SD card, and a
+        # target it can't tell apart from an eligible one is a target the
+        # operator will bind and then wonder about (#225).
+        "capability_support": capability_support_map(device, status),
         "has_pending_render": has_pending_render,
     }
     if pending_render is not None:
@@ -2125,6 +2124,227 @@ def dashboard_preview(dashboard_id: str) -> Any:
     resp.set_etag(token)
     resp.headers["Cache-Control"] = "private, max-age=86400"
     return resp
+
+
+# -- gallery -------------------------------------------------------------
+#
+# Browse, create, upload, Send (#225). Deliberately the whole of the first
+# slice: delete, rename and move are the operations where a mobile mis-tap
+# is unrecoverable, and they arrive behind their own operator-granted scope
+# rather than riding in on the pairing role.
+#
+# Sending a Gallery photo is not a new action here. A client reads
+# ``content_url`` and posts those bytes to ``POST /images`` like any other
+# photo, so Send keeps one code path and Gallery never becomes a second
+# delivery mechanism with its own quiet-hours and framing behaviour.
+
+
+class _PublishFailed(RuntimeError):
+    """Storage refused an upload after the request validated."""
+
+
+def _gallery_folder_or_404(folder_id: str) -> tuple[str | None, tuple[Response, int] | None]:
+    try:
+        folder = companion_gallery.folder_from_id(folder_id)
+    except companion_gallery.GalleryUnavailable:
+        return None, _error("not_found", "The photo Gallery isn't available.", 404)
+    if folder is None:
+        return None, _error("not_found", "No Gallery folder with that id.", 404)
+    return folder, None
+
+
+def _gallery_image_or_404(
+    image_id: str,
+) -> tuple[tuple[str, str] | None, tuple[Response, int] | None]:
+    try:
+        ref = companion_gallery.image_from_id(image_id)
+    except companion_gallery.GalleryUnavailable:
+        return None, _error("not_found", "The photo Gallery isn't available.", 404)
+    if ref is None:
+        return None, _error("not_found", "No Gallery image with that id.", 404)
+    return ref, None
+
+
+@bp.get("/gallery/folders")
+@_require_companion("gallery:read")
+def gallery_folders() -> Any:
+    try:
+        return jsonify({"folders": companion_gallery.list_folders()})
+    except companion_gallery.GalleryUnavailable:
+        return _error("not_found", "The photo Gallery isn't available.", 404)
+
+
+@bp.post("/gallery/folders")
+@_require_companion("gallery:write")
+def create_gallery_folder() -> Any:
+    """Create one internal folder.
+
+    Only internal: linking an external folder hands the plugin a host
+    directory to read from, which is an admin decision made in front of a
+    filesystem picker, not something a paired phone should be able to do."""
+    body = request.get_json(silent=True)
+    raw_name = body.get("name") if isinstance(body, dict) else None
+    if not isinstance(raw_name, str) or not (1 <= len(raw_name.strip()) <= 80):
+        return _error("invalid_request", "A folder name of 1-80 characters is required.", 400)
+    try:
+        gallery = companion_gallery.gallery_module()
+        folder = gallery.normalize_folder_name(raw_name)
+        if folder is None:
+            return _error(
+                "invalid_request",
+                "That name has no letters or digits Tesserae can make a folder from.",
+                400,
+            )
+        if not gallery.create_internal_folder(folder):
+            return _error("resource_conflict", "A folder with that name already exists.", 409)
+        return jsonify(companion_gallery.folder_detail(folder)), 201
+    except companion_gallery.GalleryUnavailable:
+        return _error("not_found", "The photo Gallery isn't available.", 404)
+    except OSError:
+        return _error("temporarily_unavailable", "The folder could not be created.", 503)
+
+
+@bp.get("/gallery/folders/<folder_id>")
+@_require_companion("gallery:read")
+def gallery_folder(folder_id: str) -> Any:
+    folder, err = _gallery_folder_or_404(folder_id)
+    if err is not None:
+        return err
+    assert folder is not None
+    return jsonify(companion_gallery.folder_detail(folder))
+
+
+@bp.post("/gallery/folders/<folder_id>/images")
+@_require_companion("gallery:write")
+def upload_gallery_image(folder_id: str) -> Any:
+    """Store one photo in a writable folder.
+
+    One image per request, not a batch: per-file progress and retry come
+    for free, a photo that fails doesn't complicate the nine that
+    succeeded, and there's no partial-batch result object to specify or
+    version. The client owns its queue and concurrency; the advertised
+    batch size is advice about how many to line up, not a request shape.
+
+    A synchronous storage write, so no Job and no History entry: nothing
+    was sent to a display, and an upload that shows up in the activity
+    feed as a push is a lie about what happened."""
+    key, err = _require_idempotency_key()
+    if err is not None:
+        return err
+    assert key is not None
+
+    folder, err = _gallery_folder_or_404(folder_id)
+    if err is not None:
+        return err
+    assert folder is not None
+
+    gallery = companion_gallery.gallery_module()
+    if gallery.folder_is_external(folder):
+        return _error(
+            "resource_conflict",
+            "This folder is linked from elsewhere on the host and is read-only.",
+            409,
+        )
+
+    upload = request.files.get("image")
+    if upload is None:
+        return _error("invalid_request", "A multipart 'image' part is required.", 400)
+    if (upload.mimetype or "").lower() not in _GALLERY_CONTENT_TYPES:
+        return _error("unsupported_image", "Unsupported still-image media type.", 415)
+    blob = upload.read()
+    if not blob:
+        return _error("invalid_request", "The 'image' part is empty.", 400)
+
+    normalized = companion_gallery.normalize_upload(blob)
+    if isinstance(normalized, str):
+        status = 413 if normalized == "image_too_large" else 415
+        message = (
+            "The image exceeds the Gallery size limit."
+            if status == 413
+            else "The image could not be decoded."
+        )
+        return _error(normalized, message, status)
+
+    filename = companion_gallery.stored_filename(upload.filename, normalized)
+
+    def _publish() -> str:
+        if not companion_gallery.publish_image(folder, filename, normalized):
+            raise _PublishFailed(filename)
+        return companion_gallery.image_id(folder, filename)
+
+    try:
+        resolved, _created, conflict = _idempotency().reserve(
+            token_id=g.companion.token_id,
+            key=key,
+            fingerprint=_idempotency_fingerprint(
+                "POST", f"/gallery/folders/{folder_id}/images", normalized.data
+            ),
+            make_job=_publish,
+        )
+    except _PublishFailed:
+        return _error("temporarily_unavailable", "The image could not be stored.", 503)
+    if conflict:
+        return _error(
+            "idempotency_conflict", "That Idempotency-Key was used for a different image.", 409
+        )
+
+    view = companion_gallery.image_view(folder, filename)
+    if view is None:
+        return _error("temporarily_unavailable", "The stored image could not be read back.", 503)
+    response = jsonify({"image": view})
+    response.status_code = 201
+    response.headers["Location"] = view["content_url"]
+    response.headers["ETag"] = view["etag"]
+    logger.info("companion gallery upload: %s -> %s (%s)", resolved, filename, folder)
+    return response
+
+
+def _gallery_binary(path: Path, mimetype: str, etag: str, *, filename: str | None) -> Any:
+    if request.if_none_match and etag.strip('"') in request.if_none_match:
+        resp = current_app.response_class(status=304)
+    else:
+        resp = current_app.response_class(path.read_bytes(), mimetype=mimetype)
+        if filename is not None:
+            resp.headers["Content-Disposition"] = f'inline; filename="{filename}"'
+    resp.set_etag(etag.strip('"'))
+    resp.headers["Cache-Control"] = "private, max-age=86400"
+    return resp
+
+
+@bp.get("/gallery/images/<image_id>/thumbnail")
+@_require_companion("gallery:read")
+def gallery_image_thumbnail(image_id: str) -> Any:
+    ref, err = _gallery_image_or_404(image_id)
+    if err is not None:
+        return err
+    assert ref is not None
+    folder, filename = ref
+    gallery = companion_gallery.gallery_module()
+    thumb = gallery.thumbnail_path(folder, filename)
+    if thumb is None:
+        return _error("not_found", "No thumbnail could be made for that image.", 404)
+    return _gallery_binary(thumb, "image/jpeg", companion_gallery.etag_for(thumb), filename=None)
+
+
+@bp.get("/gallery/images/<image_id>/content")
+@_require_companion("gallery:read")
+def gallery_image_content(image_id: str) -> Any:
+    """The stored image. A client passes these bytes into ``POST /images``
+    to send it, so Gallery adds no second delivery path and Send stays
+    independent of whether the target caches frames."""
+    ref, err = _gallery_image_or_404(image_id)
+    if err is not None:
+        return err
+    assert ref is not None
+    folder, filename = ref
+    view = companion_gallery.image_view(folder, filename)
+    gallery = companion_gallery.gallery_module()
+    path = gallery.resolve_image_path(folder, filename)
+    if view is None or path is None:
+        return _error("not_found", "No Gallery image with that id.", 404)
+    return _gallery_binary(
+        path, str(view["content_type"]), str(view["etag"]), filename=str(view["name"])
+    )
 
 
 def register(app: Flask) -> None:

@@ -78,14 +78,17 @@
       {% if devices %}
       <div class="pg-dev-list">
         {% for dev in devices %}
-        <label class="pg-dev">
+        <label class="pg-dev pg-dev--{{ dev.state }}" {% if dev.note %}title="{{ dev.note }}"{% endif %}>
           <input type="checkbox" name="device_ids" value="{{ dev.id }}"
-                 {{ 'checked' if album and dev.id in album.device_ids else '' }}>
+                 {{ 'disabled' if not dev.selectable else '' }}
+                 {{ 'checked' if dev.selectable and album and dev.id in album.device_ids else '' }}>
           <span>{{ dev.label }}</span>
+          {% if dev.state == 'unsupported' %}<span class="pg-dev-tag">no frame cache</span>
+          {% elif dev.state == 'unknown' %}<span class="pg-dev-tag pg-dev-tag--soft">not reported yet</span>{% endif %}
         </label>
         {% endfor %}
       </div>
-      <p class="pg-hint">One album plays per device (slice 1). Leave all unchecked to save the album without binding it yet.</p>
+      <p class="pg-hint">One album plays per device (slice 1). Leave all unchecked to save the album without binding it yet. A display is offered once it reports a frame cache; one that hasn't checked in yet can still be bound, but won't play until it does.</p>
       {% else %}
       <p class="pg-hint">No devices registered yet. Add one under Settings → Devices, then bind it here.</p>
       {% endif %}
@@ -219,6 +222,21 @@
     cursor: pointer;
   }
   .pg-dev input { margin: 0; }
+  .pg-dev--unsupported {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+  .pg-dev-tag {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: var(--t-fg-soft);
+    border: 1px solid var(--t-border);
+    border-radius: 999px;
+    padding: 1px 7px;
+  }
+  .pg-dev-tag--soft { font-weight: 500; text-transform: none; letter-spacing: 0; }
   .pg-album-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));

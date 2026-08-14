@@ -46,6 +46,8 @@ SCOPE_LABELS: dict[str, str] = {
     "lineups:read": "See your Lineups",
     "lineups:control": "Start, stop, and step Lineups",
     "lineups:write": "Create and edit Lineups",
+    "gallery:read": "Browse your photo Gallery",
+    "gallery:write": "Add photos to your Gallery",
 }
 
 

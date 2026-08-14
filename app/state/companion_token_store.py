@@ -64,6 +64,13 @@ COMPANION_SCOPES: tuple[str, ...] = (
     "personal_data:write",
     "lineups:read",
     "lineups:control",
+    # Browsing the photo Gallery and adding to it (#225). Both ride along
+    # with the pairing role: putting a photo into the library is the same
+    # class of action as ``media:write``, which paired clients already
+    # have. Deleting and reorganising is not, and lands as its own scope
+    # when those routes exist.
+    "gallery:read",
+    "gallery:write",
 )
 
 # Scopes an operator can grant to an existing pairing from Settings, on top

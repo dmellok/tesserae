@@ -17,7 +17,15 @@ from typing import Any
 import pytest
 import yaml
 
-from .contract_errata import ERRATA, Erratum, apply, missing_values
+from .contract_errata import (
+    ERRATA,
+    SCHEMA_ERRATA,
+    Erratum,
+    SchemaErratum,
+    apply,
+    missing_keys,
+    missing_values,
+)
 
 _RAW: dict[str, Any] = yaml.safe_load(
     (Path(__file__).parent / "contract" / "app-v1.openapi.yaml").read_text(encoding="utf-8")
@@ -68,6 +76,43 @@ def test_applying_errata_is_idempotent() -> None:
 def test_every_erratum_says_why_and_since() -> None:
     """The list doubles as what to send the contract's owner, so an entry
     without a reason or a version isn't much use to them."""
-    for erratum in ERRATA:
+    for erratum in (*ERRATA, *SCHEMA_ERRATA):
         assert erratum.since.startswith("v"), erratum.pointer
         assert len(erratum.why) > 40, f"{erratum.pointer} needs a real reason"
+
+
+@pytest.mark.parametrize(
+    "erratum", SCHEMA_ERRATA, ids=lambda e: f"{e.pointer}:{','.join(sorted(e.patch))}"
+)
+def test_each_schema_erratum_is_still_needed(erratum: SchemaErratum) -> None:
+    """Same self-cleaning rule for the whole-key additions.
+
+    A re-vendor that brings a Gallery schema in should delete the entry
+    rather than leave a transcription shadowing the published one."""
+    still_missing = missing_keys(_RAW, erratum)
+    assert set(still_missing) == set(erratum.patch), (
+        f"The vendored contract now carries "
+        f"{sorted(set(erratum.patch) - set(still_missing))} at {erratum.pointer}. "
+        f"Delete those from SCHEMA_ERRATA in contract_errata.py."
+    )
+
+
+def test_schema_errata_never_overwrite_the_published_shape() -> None:
+    """Applying twice, and applying over a contract that caught up, must
+    leave the vendored definition in place: an erratum adds what is
+    missing, it does not get to redefine what was published."""
+    caught_up = yaml.safe_load(yaml.safe_dump(_RAW))
+    marker = {"type": "string", "description": "published"}
+    for erratum in SCHEMA_ERRATA:
+        node: Any = caught_up
+        for part in erratum.pointer.split("/"):
+            node = node[part]
+        for key in erratum.patch:
+            node[key] = marker
+    applied = apply(caught_up)
+    for erratum in SCHEMA_ERRATA:
+        node = applied
+        for part in erratum.pointer.split("/"):
+            node = node[part]
+        for key in erratum.patch:
+            assert node[key] == marker, f"{key} at {erratum.pointer} was overwritten"

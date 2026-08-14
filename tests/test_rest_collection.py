@@ -372,6 +372,59 @@ def test_use_as_album_creates_and_binds(app: Flask) -> None:
     assert album.playback.repeat == "reshuffle"
 
 
+def test_album_targets_are_offered_by_advertised_capability(app: Flask) -> None:
+    """The form lists every registered display but marks what each one
+    actually reported, so a panel with no frame cache can't be picked and
+    one that simply hasn't checked in isn't presented as confirmed (#225).
+    """
+    client = app.test_client()
+    with_cache = _register_esp32(app, client, "frame01")
+    no_cache = _register_esp32(app, client, "frame02")
+    _register_esp32(app, client, "frame03")  # never reports
+
+    client.post("/api/v1/device/frame01/status", headers=_auth(with_cache), data=json.dumps(CAP))
+    client.post("/api/v1/device/frame02/status", headers=_auth(no_cache), data=json.dumps({}))
+
+    module = app.config["PLUGIN_REGISTRY"].get("picture_gallery").server_module
+    with app.test_request_context("/plugins/picture_gallery"):
+        by_id = {d["id"]: d for d in module._bindable_devices()}
+
+    assert by_id["frame01"]["state"] == "supported"
+    assert by_id["frame01"]["selectable"] is True
+    assert by_id["frame01"]["note"] == ""
+
+    assert by_id["frame02"]["state"] == "unsupported"
+    assert by_id["frame02"]["selectable"] is False
+    assert by_id["frame02"]["note"]
+
+    # Never heard from: still bindable, because refusing it would make a
+    # sleeping display impossible to set up, but not shown as confirmed.
+    assert by_id["frame03"]["state"] == "unknown"
+    assert by_id["frame03"]["selectable"] is True
+    assert by_id["frame03"]["note"]
+
+
+def test_use_as_album_drops_a_target_that_reported_no_frame_cache(app: Flask) -> None:
+    """Saving from a stale tab (or a hand-made POST) must not bind a
+    display that can never receive the collection: it looks like it
+    worked and then silently never plays."""
+    client = app.test_client()
+    with_cache = _register_esp32(app, client, "frame01")
+    no_cache = _register_esp32(app, client, "frame02")
+    client.post("/api/v1/device/frame01/status", headers=_auth(with_cache), data=json.dumps(CAP))
+    client.post("/api/v1/device/frame02/status", headers=_auth(no_cache), data=json.dumps({}))
+    _seed_folder(app, "holidays", ["a.jpg"])
+
+    client.post(
+        "/plugins/picture_gallery/folders/holidays/use-as-album",
+        data={"name": "Beach trip", "device_ids": ["frame01", "frame02"]},
+        follow_redirects=False,
+    )
+    album = app.config["ALBUM_STORE"].get("holidays")
+    assert album is not None
+    assert album.device_ids == ["frame01"]
+
+
 def test_use_as_album_rejects_empty_folder(app: Flask) -> None:
     client = app.test_client()
     _register_esp32(app, client, "frame01")
