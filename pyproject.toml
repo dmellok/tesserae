@@ -131,7 +131,12 @@ indent-style = "space"
 
 # ---------- mypy ----------
 [tool.mypy]
-python_version = "3.11"
+# No python_version pin: mypy follows the interpreter it runs under. CI runs it
+# on 3.11, so the requires-python floor is still what gates a merge. Pinning
+# 3.11 here instead broke every local run on a newer interpreter, because the
+# numpy that resolves for 3.12+ ships stubs written in 3.12+ syntax (PEP 695
+# `type` aliases) that a 3.11 target refuses to parse, and mypy aborts before it
+# reaches app/ at all. Ruff still targets py311 statically (target-version).
 warn_unused_ignores = true
 warn_redundant_casts = true
 ignore_missing_imports = true
