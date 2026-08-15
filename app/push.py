@@ -2614,6 +2614,7 @@ class PushManager:
                 extras["_profile_edges"] = {
                     "smoothing_radius": profile.edges.smoothing_radius,
                     "preserve_line_art": profile.edges.preserve_line_art,
+                    "protect_native_colours": profile.edges.protect_native_colours,
                 }
                 settings = {**settings, **extras}
         return settings

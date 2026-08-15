@@ -669,6 +669,7 @@ def _palette_profile_tone_for(device: Device) -> dict[str, Any]:
         "diffusion_strength": profile.dither.diffusion_strength,
         "smoothing_radius": profile.edges.smoothing_radius,
         "preserve_line_art": profile.edges.preserve_line_art,
+        "protect_native_colours": profile.edges.protect_native_colours,
         "lab_compress_min": profile.tone.lab_compress_min,
         "lab_compress_max": profile.tone.lab_compress_max,
         "color_match": profile.dither.color_match,

@@ -4,6 +4,26 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.306.0], 2026-08-16
+
+### Added
+
+- **Flat backgrounds can keep the panel's own colours instead of
+  dithering (#227).** A pixel that already sits on one of the panel's
+  colours generates no dither error of its own, but it still receives its
+  neighbours', so a background beside saturated content gets pushed off
+  its colour and speckles. The palette profile's edge section gains
+  "Protect the panel's own colours", a tolerance in sRGB distance: above
+  0, those pixels keep their colour, and on the error-diffusion dithers
+  they stop passing error onward so a protected region can't collect
+  error on one side and dump it out the other. The mask is built on the
+  tone-mapped source, since exposure, the S-curve and the calibrated
+  pre-pass all move the pixels it means to protect. Wired for the colour
+  packers and for black-and-white panels, left out of the greyscale ramp
+  where nearly every pixel is close to some level and the same guard
+  would flatten photographs. Off by default, and off renders exactly as
+  before.
+
 ## [0.305.0], 2026-08-16
 
 ### Fixed

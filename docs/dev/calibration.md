@@ -47,7 +47,10 @@ means no override (the built-in `_CALIBRATED_PALETTES` in
     "algorithm": "floyd-steinberg", "serpentine": true,
     "color_match": "rgb", "diffusion_strength": 100
   },
-  "edges": {"preserve_line_art": false, "smoothing_radius": 0}
+  "edges": {
+    "preserve_line_art": false, "smoothing_radius": 0,
+    "protect_native_colours": 0
+  }
 }
 ```
 
@@ -110,6 +113,33 @@ Experimental edge handling, wired for `esp32_bin` / `pi_bin` /
   full error-diffusion dither. Cost is one extra
   `Image.quantize(dither=NONE)` pass plus a mask copy; near-zero on
   all-photo sources.
+
+## What v0.306.0 adds
+
+- **`protect_native_colours` (0-48)** — tolerance, as Euclidean
+  distance in sRGB, for holding pixels that already sit on one of the
+  panel's own colours. A pixel that matches a palette entry generates
+  no error of its own but still receives its neighbours', so a flat
+  background beside saturated content gets pushed off its colour and
+  speckles. Above 0, those pixels keep their colour: they take the
+  same nearest-neighbour override `preserve_line_art` uses, and on the
+  error-diffusion dithers they also stop passing error onward, so a
+  protected region can't collect error from one side and dump it out
+  the other.
+
+  The mask is computed on the tone-mapped source, after exposure, the
+  S-curve, LAB compression and the calibrated pre-pass have moved the
+  pixels, since a mask built on the original would miss what it means
+  to protect. The bundled light themes paint a warm paper background
+  rather than pure white, so a tolerance around 16-24 is what catches
+  them; 0 (off) renders byte-for-byte as before.
+
+  Wired for `esp32_bin` / `pi_bin` / `pico_bin` and, unusually for an
+  edge knob, `esp32_bw_bin`: black and white is the gamut where a
+  background has least to gain from diffusion. Deliberately not wired
+  for the greyscale packers, where the 16-level ramp puts nearly every
+  pixel close to some entry and the same guard would flatten
+  photographs instead of cleaning backgrounds.
 
 ## What still isn't wired (later phases)
 

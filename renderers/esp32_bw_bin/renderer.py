@@ -104,12 +104,18 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
             flip=bool(panel.flip),
             underscan=int(panel.underscan or 0),
         )
+    # Palette-profile edge knobs. Only the native-colour guard applies on a
+    # 2-colour panel: smoothing and line-art preservation are colour-packer
+    # concerns, and a missing profile leaves this at 0 (off), so a device
+    # without one renders byte-identical to before.
+    edges = settings.get("_profile_edges") or {}
     return pack_to_panel_bin_1bpp(
         img,
         width=native_w,
         height=native_h,
         dither=_setting(settings, "dither"),
         contrast=float(_setting(settings, "contrast")),
+        protect_native_colours=int(edges.get("protect_native_colours", 0)),
         region_nearest_mask=mask_img,
     )
 

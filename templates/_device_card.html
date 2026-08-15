@@ -1042,6 +1042,20 @@
                 {{ switch(section.id ~ '-preserve-line-art', 'preserve_line_art',
                           'Preserve line-art edges (nearest-neighbour on detected text / rules)',
                           checked=section.palette_profile_tone.preserve_line_art) }}
+                <label class="dx-tone-slider">
+                  <span class="dx-tone-label">Protect the panel's own colours</span>
+                  <input type="range" name="protect_native_colours" min="0" max="48" step="4"
+                         value="{{ section.palette_profile_tone.protect_native_colours }}"
+                         data-tone-input>
+                  <output class="dx-tone-value" data-tone-value>{{ section.palette_profile_tone.protect_native_colours }}</output>
+                </label>
+                <p class="field-help" style="margin: 4px 0 0;">
+                  Keeps pixels that already sit on one of the panel's colours
+                  off the dither, so flat white and black backgrounds stop
+                  picking up speckle from their neighbours. 0 is off. Raise it
+                  if a background is nearly-but-not-exactly a panel colour;
+                  too high starts flattening pale parts of photos.
+                </p>
               </div>
             </details>
 

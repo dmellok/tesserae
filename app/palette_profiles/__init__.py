@@ -31,6 +31,7 @@ from __future__ import annotations
 from app.palette_profiles.bundled import BUNDLED_PROFILES, bundled_profile, list_bundled
 from app.palette_profiles.resolver import resolve_device_palette
 from app.palette_profiles.schema import (
+    MAX_NATIVE_TOLERANCE,
     DitherSettings,
     EdgeSettings,
     PaletteColors,
@@ -42,6 +43,7 @@ from app.palette_profiles.store import PaletteProfileStore, slugify
 
 __all__ = [
     "BUNDLED_PROFILES",
+    "MAX_NATIVE_TOLERANCE",
     "DitherSettings",
     "EdgeSettings",
     "PaletteColors",

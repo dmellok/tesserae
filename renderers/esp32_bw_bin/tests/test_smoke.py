@@ -116,3 +116,27 @@ def test_leftmost_pixel_is_msb(panel) -> None:
 def test_payload_url_uses_bin_extension(panel) -> None:
     out = renderer.payload("deadbeef", "http://example.local:8000/", settings={})
     assert out == {"url": "http://example.local:8000/renders/deadbeef.bin"}
+
+
+def test_profile_native_colour_guard_reaches_the_packer(panel) -> None:
+    """The renderer reads the palette profile's edge block. Without the
+    passthrough the guard would look enabled in Settings and do nothing
+    on a mono panel (discussion #227)."""
+    img = Image.new("RGB", (PANEL_W, PANEL_H), color=(248, 246, 242))
+    for y in range(PANEL_H):
+        for x in range(PANEL_W // 2):
+            img.putpixel((x, y), (128, 128, 128))
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    png = buf.getvalue()
+
+    plain = renderer.transform(png, panel=panel, settings={})
+    guarded = renderer.transform(
+        png, panel=panel, settings={"_profile_edges": {"protect_native_colours": 24}}
+    )
+    assert plain != guarded
+    # A profile that leaves the guard off must not move any bytes.
+    off = renderer.transform(
+        png, panel=panel, settings={"_profile_edges": {"protect_native_colours": 0}}
+    )
+    assert off == plain

@@ -110,6 +110,9 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
         preserve_line_art=bool(
             (settings.get("_profile_edges") or {}).get("preserve_line_art", False)
         ),
+        protect_native_colours=int(
+            (settings.get("_profile_edges") or {}).get("protect_native_colours", 0)
+        ),
         lab_compress_min=int((settings.get("_profile_tone") or {}).get("lab_compress_min", 0)),
         lab_compress_max=int((settings.get("_profile_tone") or {}).get("lab_compress_max", 100)),
         color_match=str((settings.get("_profile_dither") or {}).get("color_match", "rgb")),

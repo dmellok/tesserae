@@ -85,6 +85,13 @@ class DitherSettings:
     diffusion_strength: int = 100
 
 
+# Upper bound for ``protect_native_colours``, as Euclidean distance in
+# sRGB. Past this a "close enough to white" test starts catching the pale
+# end of photographs, which is a flattened sky rather than a clean
+# background, so the form can't offer a value that reads as a bug.
+MAX_NATIVE_TOLERANCE = 48
+
+
 @dataclass(frozen=True)
 class EdgeSettings:
     """Edge-handling knobs (experimental, phase 3). Stored on every
@@ -93,6 +100,11 @@ class EdgeSettings:
 
     preserve_line_art: bool = False
     smoothing_radius: int = 0
+    # Tolerance for the native-colour guard (discussion #227). 0 is off.
+    # Pixels already within this distance of one of the panel's own
+    # colours keep that colour instead of collecting their neighbours'
+    # diffused error, which is what speckles flat backgrounds.
+    protect_native_colours: int = 0
 
 
 @dataclass(frozen=True)
@@ -195,6 +207,9 @@ def _edges_from_dict(raw: dict[str, Any]) -> EdgeSettings:
     return EdgeSettings(
         preserve_line_art=bool(raw.get("preserve_line_art", False)),
         smoothing_radius=max(0, min(3, int(raw.get("smoothing_radius", 0) or 0))),
+        protect_native_colours=max(
+            0, min(MAX_NATIVE_TOLERANCE, int(raw.get("protect_native_colours", 0) or 0))
+        ),
     )
 
 

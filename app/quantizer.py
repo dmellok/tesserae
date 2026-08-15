@@ -1085,6 +1085,43 @@ def _nearest_palette_indices(pixels: np.ndarray, palette: np.ndarray) -> np.ndar
     return reshaped
 
 
+def _native_colour_mask(
+    rgb: Image.Image, palette: tuple[tuple[int, int, int], ...], tolerance: int
+) -> np.ndarray:
+    """1D boolean mask (length H*W) marking pixels that already sit on one
+    of the panel's own colours, within ``tolerance`` (Euclidean distance in
+    sRGB, so 0 means an exact match and ~16 covers a JPEG-softened white).
+
+    Error diffusion doesn't leave those pixels alone. A pixel that lands
+    exactly on a palette entry generates no error of its own, but it still
+    receives its neighbours', so a white background beside anything
+    saturated gets pushed off white and quantises to something else. That's
+    the speckle on flat backgrounds, and it's worst at the ends of the
+    range where there's no headroom to absorb the error (discussion #227).
+
+    Computed on the tone-mapped image the dither actually sees, not the
+    original: exposure, the S-curve, the LAB compression and the calibrated
+    pre-pass all move pixels, and the calibrated path deliberately pulls
+    pure white down to the panel's real paper colour. A mask built before
+    any of that would miss the pixels it means to protect.
+
+    One squared-distance pass per palette entry rather than a single
+    broadcast against all of them: at panel size the broadcast allocates a
+    (H*W, N, 3) intermediate, and the gamuts here have at most seven
+    entries to walk."""
+    arr = np.asarray(rgb.convert("RGB"), dtype=np.float32)
+    limit = float(max(0, tolerance)) ** 2
+    best: np.ndarray | None = None
+    for entry in palette:
+        delta = arr - np.array(entry, dtype=np.float32)
+        d2 = np.einsum("hwc,hwc->hw", delta, delta)
+        best = d2 if best is None else np.minimum(best, d2)
+    if best is None:  # empty palette; nothing to protect
+        return np.zeros(arr.shape[0] * arr.shape[1], dtype=bool)
+    flat: np.ndarray = (best <= limit).ravel()
+    return flat
+
+
 def _error_diffusion(
     rgb: Image.Image,
     palette: np.ndarray,
@@ -1093,6 +1130,7 @@ def _error_diffusion(
     serpentine: bool = False,
     strength: float = 1.0,
     color_match: str = "rgb",
+    hold: np.ndarray | None = None,
 ) -> bytes:
     """Generic error-diffusion dither.
 
@@ -1120,7 +1158,14 @@ def _error_diffusion(
     over lightness by weighting the a*/b* difference 2x. The source
     LAB values are pre-computed once (source-with-accumulated-error is
     approximated by the initial LAB coordinates; small errors don't
-    shift LAB space enough to matter for practical dashboards)."""
+    shift LAB space enough to matter for practical dashboards).
+
+    ``hold`` (flat bool array, length H*W) marks pixels that propagate no
+    error onward. Their own output still goes through the normal match
+    here and is corrected afterwards by :func:`_apply_nearest_override`,
+    which owns the same mask; what this does is stop a protected region
+    acting as a reservoir that collects error from one side and dumps it
+    out the other, which would leave a dirty seam just past the boundary."""
     import array as _array
 
     strength = max(0.0, float(strength))
@@ -1167,6 +1212,9 @@ def _error_diffusion(
     w_frac = [w[2] for w in weights]
     w_dx_rl = [-dx for dx in w_dx_lr]
     n_weights = len(weights)
+    # Same array.array treatment as the colour buffers: a numpy bool
+    # indexed per pixel in the hot loop costs more than the branch saves.
+    hold_flags = _array.array("B", hold.astype(np.uint8).tobytes()) if hold is not None else None
 
     for y in range(H):
         row_base = y * W
@@ -1218,6 +1266,8 @@ def _error_diffusion(
                         best_d = d
                         best_i = i
             out[idx] = best_i
+            if hold_flags is not None and hold_flags[idx]:
+                continue
             er = (r - pr[best_i]) * strength
             eg = (g - pg[best_i]) * strength
             eb = (b - pb[best_i]) * strength
@@ -1356,6 +1406,7 @@ def pack_to_panel_bin(
     diffusion_strength: int = 100,
     smoothing_radius: int = 0,
     preserve_line_art: bool = False,
+    protect_native_colours: int = 0,
     lab_compress_min: int = 0,
     lab_compress_max: int = 100,
     color_match: str = "rgb",
@@ -1417,6 +1468,15 @@ def pack_to_panel_bin(
       colour quantise instead of the frame dither, so flat-colour UI cells
       stay clean while photo cells keep diffusing. ``None`` reproduces the
       pre-#86 single-strategy behaviour byte-for-byte.
+    * ``protect_native_colours`` (discussion #227), tolerance in sRGB
+      distance. Above 0, pixels already sitting on one of the panel's own
+      colours keep that colour instead of collecting their neighbours'
+      diffused error, which is what speckles flat white and black
+      backgrounds. 0 (the default) is byte-for-byte the previous
+      behaviour. Only offered on the sparse gamuts: on the 16-level
+      greyscale ramp nearly every pixel is close to some entry, so the
+      same guard would flatten photographs rather than clean up
+      backgrounds.
     """
     if gamut in _NATIVE_2BPP_GAMUTS:
         if width % 4:
@@ -1489,6 +1549,15 @@ def pack_to_panel_bin(
         rgb = ImageEnhance.Contrast(rgb).enhance(contrast)
 
     strength_scale = max(0.0, min(200, int(diffusion_strength))) / 100.0
+    # Built once, before the dither runs, from the fully tone-mapped source:
+    # the error-diffusion paths take it as ``hold`` so a protected region
+    # doesn't pass error through itself, and every path (Pillow's FS
+    # included) takes it again below as a nearest-colour override.
+    native_mask = (
+        _native_colour_mask(rgb, palette, protect_native_colours)
+        if protect_native_colours > 0
+        else None
+    )
     # Pillow's built-in Floyd-Steinberg only knows RGB nearest. When
     # the profile asks for LAB / chroma-aware match on FS, we detour
     # through the numpy error-diffusion path with the FS weights so
@@ -1507,6 +1576,7 @@ def pack_to_panel_bin(
             serpentine=serpentine,
             strength=strength_scale,
             color_match=color_match,
+            hold=native_mask,
         )
     elif dither == "jarvis":
         raw = _error_diffusion(
@@ -1516,6 +1586,7 @@ def pack_to_panel_bin(
             serpentine=serpentine,
             strength=strength_scale,
             color_match=color_match,
+            hold=native_mask,
         )
     elif dither == "stucki":
         raw = _error_diffusion(
@@ -1525,6 +1596,7 @@ def pack_to_panel_bin(
             serpentine=serpentine,
             strength=strength_scale,
             color_match=color_match,
+            hold=native_mask,
         )
     elif dither == "floyd-steinberg":  # numpy-FS LAB detour
         raw = _error_diffusion(
@@ -1534,6 +1606,7 @@ def pack_to_panel_bin(
             serpentine=serpentine,
             strength=strength_scale,
             color_match=color_match,
+            hold=native_mask,
         )
     elif dither == "bayer-8x8":
         raw = _dither_ordered(rgb, pal_arr, _BAYER_8X8)
@@ -1556,11 +1629,19 @@ def pack_to_panel_bin(
     #    diffuse. Composition-mode agnostic (grid today, canvas later): the
     #    packer only sees a mask, never a cell.
     #
-    # Both select from the SAME nearest quantise of the SAME tone-mapped
+    #  * ``protect_native_colours`` (discussion #227): pixels already on one
+    #    of the panel's own colours, so a flat white or black background
+    #    keeps its colour instead of quantising to whatever its neighbours'
+    #    diffused error pushed it towards.
+    #
+    # All three select from the SAME nearest quantise of the SAME tone-mapped
     # ``rgb`` the dither ran on, unioned and applied in one pass (see
     # :func:`_apply_nearest_override`), so an all-photo dashboard with no
     # hints pays nothing.
     line_mask = _line_art_mask(rgb) if preserve_line_art else None
+    extra_mask = line_mask
+    if native_mask is not None:
+        extra_mask = native_mask if extra_mask is None else (extra_mask | native_mask)
     raw = _apply_nearest_override(
         raw,
         rgb,
@@ -1568,7 +1649,7 @@ def pack_to_panel_bin(
         width=width,
         height=height,
         region_nearest_mask=region_nearest_mask,
-        extra_mask=line_mask,
+        extra_mask=extra_mask,
     )
 
     # palette index -> firmware/library nibble via bytes.translate (C-speed).
@@ -1622,6 +1703,7 @@ def pack_to_panel_bin_1bpp(
     height: int,
     dither: DitherMode = "floyd-steinberg",
     contrast: float = 1.0,
+    protect_native_colours: int = 0,
     region_nearest_mask: Image.Image | None = None,
 ) -> bytes:
     """Quantise to mono B/W and pack to the firmware's 1-bpp wire format.
@@ -1650,6 +1732,11 @@ def pack_to_panel_bin_1bpp(
     packer because that's the single most useful tuning lever on a
     photo / text mixed dashboard: bump > 1 to deepen black-or-white
     decisions on photos, drop < 1 to soften text-heavy frames.
+
+    ``protect_native_colours`` behaves as it does on the colour packer
+    (discussion #227). This is the panel class it matters most on: with
+    only black and white to spend, a background that is already one of
+    them has nothing to gain from diffusion and everything to lose.
     """
     if width % 8:
         raise ValueError(f"panel width must be a multiple of 8 (8 pixels per byte), got {width}")
@@ -1663,6 +1750,12 @@ def pack_to_panel_bin_1bpp(
     if contrast != 1.0:
         rgb = ImageEnhance.Contrast(rgb).enhance(contrast)
 
+    native_mask = (
+        _native_colour_mask(rgb, palette, protect_native_colours)
+        if protect_native_colours > 0
+        else None
+    )
+
     # Same dither branch as pack_to_panel_bin, just against the 2-colour
     # mono palette. Every mode produces palette indices (0=black, 1=white)
     # at the end of this block.
@@ -1671,11 +1764,11 @@ def pack_to_panel_bin_1bpp(
         indexed = rgb.quantize(palette=pal_img, dither=_PIL_DITHER_MAP[dither])
         raw = indexed.tobytes()
     elif dither == "atkinson":
-        raw = _error_diffusion(rgb, pal_arr, _ATKINSON_WEIGHTS)
+        raw = _error_diffusion(rgb, pal_arr, _ATKINSON_WEIGHTS, hold=native_mask)
     elif dither == "jarvis":
-        raw = _error_diffusion(rgb, pal_arr, _JJN_WEIGHTS)
+        raw = _error_diffusion(rgb, pal_arr, _JJN_WEIGHTS, hold=native_mask)
     elif dither == "stucki":
-        raw = _error_diffusion(rgb, pal_arr, _STUCKI_WEIGHTS)
+        raw = _error_diffusion(rgb, pal_arr, _STUCKI_WEIGHTS, hold=native_mask)
     elif dither == "bayer-8x8":
         raw = _dither_ordered(rgb, pal_arr, _BAYER_8X8)
     elif dither == "halftone":
@@ -1687,7 +1780,9 @@ def pack_to_panel_bin_1bpp(
 
     # Per-cell dither map (issue #86): snap flat-UI regions to nearest mono
     # instead of dithering them. On a 2-colour panel this is the difference
-    # between crisp black text and a stippled grey approximation.
+    # between crisp black text and a stippled grey approximation. Unioned
+    # with the native-colour guard (#227) the same way the colour packer
+    # does it, so the two features compose instead of racing.
     raw = _apply_nearest_override(
         raw,
         rgb,
@@ -1695,6 +1790,7 @@ def pack_to_panel_bin_1bpp(
         width=width,
         height=height,
         region_nearest_mask=region_nearest_mask,
+        extra_mask=native_mask,
     )
 
     # Palette indices: 0 = black, 1 = white. Bit-set must be white,

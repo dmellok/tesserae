@@ -147,7 +147,12 @@ def devices_palette_update_tone(instance_id: str) -> Response:
     on first tweak; subsequent tweaks update the fork in place. User
     profiles are edited directly. The renderer picks up the new values
     on the next push (no restart needed)."""
-    from app.palette_profiles.schema import DitherSettings, EdgeSettings, ToneSettings
+    from app.palette_profiles.schema import (
+        MAX_NATIVE_TOLERANCE,
+        DitherSettings,
+        EdgeSettings,
+        ToneSettings,
+    )
 
     device = devices().get(instance_id)
     if device is None:
@@ -190,6 +195,9 @@ def devices_palette_update_tone(instance_id: str) -> Response:
     new_edges = EdgeSettings(
         preserve_line_art=bool(request.form.get("preserve_line_art")),
         smoothing_radius=max(0, min(3, _as_int("smoothing_radius", 0))),
+        protect_native_colours=max(
+            0, min(MAX_NATIVE_TOLERANCE, _as_int("protect_native_colours", 0))
+        ),
     )
     store = _profile_store()
     if base.bundled:
