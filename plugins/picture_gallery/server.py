@@ -832,7 +832,25 @@ def blueprint() -> Blueprint:
         except ValidationError:
             flash("Could not save the album: invalid playback settings.", "warn")
             return redirect(url_for("picture_gallery_admin.show_folder", folder=folder))
-        store.upsert(album)
+        # A display plays one cached collection at a time. Taking it off
+        # whatever it's showing is a decision, so the form says which album
+        # has it and lets the operator resubmit with "take over" rather than
+        # quietly winning (discussion #230).
+        from app.state.album_store import AlbumConflict
+
+        try:
+            store.upsert(album, replace=bool(request.form.get("replace_conflicts")))
+        except AlbumConflict as conflict:
+            names = {a.id: a.name for a in store.all()}
+            listed = ", ".join(
+                f"{did} is playing '{names.get(aid, aid)}'"
+                for did, aid in sorted(conflict.claims.items())
+            )
+            flash(
+                f"Not saved: {listed}. Tick 'Take over' to move those displays to this album.",
+                "warn",
+            )
+            return redirect(url_for("picture_gallery_admin.show_folder", folder=folder))
 
         # Drop cached frames for every affected device (newly bound, still
         # bound, or just unbound) so the next manifest fetch re-renders with the

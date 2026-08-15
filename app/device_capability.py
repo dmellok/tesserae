@@ -107,6 +107,30 @@ def heartbeat_freshness(device: Device, status: dict[str, Any] | None) -> tuple[
     return state, _iso(received_at)
 
 
+# Fields worth passing through from a capability's advertisement, per
+# capability. "Supported" on its own doesn't tell an operator whether a
+# 200-photo album fits, and the numbers that answer that are already in the
+# heartbeat: re-deriving them client-side from a model name is exactly what
+# the support map exists to stop (discussion #230).
+_DETAIL_FIELDS: dict[str, tuple[str, ...]] = {
+    FRAME_CACHE: ("capacity_bytes", "max_frames"),
+}
+
+
+def _detail_for(capability: str, advertised: Any) -> dict[str, int]:
+    """The advertised numbers this capability publishes, validated. Empty when
+    the device reported none of them (older firmware advertises ``frame_cache``
+    without a ``max_frames``)."""
+    if not isinstance(advertised, dict):
+        return {}
+    out: dict[str, int] = {}
+    for key in _DETAIL_FIELDS.get(capability, ()):
+        value = advertised.get(key)
+        if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+            out[key] = value
+    return out
+
+
 def capability_support(
     device: Device, status: dict[str, Any] | None, capability: str
 ) -> dict[str, Any]:
@@ -131,7 +155,11 @@ def capability_support(
         }
     advertised = status.get(capability) if isinstance(status, dict) else None
     if advertised:
-        return {"state": "supported", "observed_at": last_seen_at}
+        support: dict[str, Any] = {"state": "supported", "observed_at": last_seen_at}
+        detail = _detail_for(capability, advertised)
+        if detail:
+            support["detail"] = detail
+        return support
     return {
         "state": "unsupported",
         "reason_code": REASON_NOT_ADVERTISED,

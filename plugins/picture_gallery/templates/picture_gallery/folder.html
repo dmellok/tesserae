@@ -89,6 +89,10 @@
         {% endfor %}
       </div>
       <p class="pg-hint">One album plays per device (slice 1). Leave all unchecked to save the album without binding it yet. A display is offered once it reports a frame cache; one that hasn't checked in yet can still be bound, but won't play until it does.</p>
+      <label class="pg-dev" style="margin-top: 6px;">
+        <input type="checkbox" name="replace_conflicts" value="1">
+        <span>Take over displays already playing another album</span>
+      </label>
       {% else %}
       <p class="pg-hint">No devices registered yet. Add one under Settings → Devices, then bind it here.</p>
       {% endif %}

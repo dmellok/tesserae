@@ -135,3 +135,56 @@ def test_freshness_and_support_agree(app: Flask) -> None:
         assert heartbeat_freshness(device, None) == ("unknown", None)
         mapped = capability_support_map(device, {"received_at": now})
     assert set(mapped) == {FRAME_CACHE}
+
+
+def test_supported_carries_what_the_device_said_it_can_hold(app: Flask) -> None:
+    """ "Supported" alone doesn't tell an operator whether a 200-photo album
+    fits. The numbers that answer that are already in the heartbeat, so they
+    ride along rather than being re-derived from a model name (#230)."""
+    with app.app_context():
+        device = _device(app)
+        support = capability_support(
+            device,
+            {
+                "received_at": time.time(),
+                "frame_cache": {"schema": 1, "capacity_bytes": 67_108_864, "max_frames": 32},
+            },
+            FRAME_CACHE,
+        )
+    assert support["state"] == "supported"
+    assert support["detail"] == {"capacity_bytes": 67_108_864, "max_frames": 32}
+
+
+def test_detail_omits_what_the_device_did_not_report(app: Flask) -> None:
+    """Older firmware advertises frame_cache without max_frames, and a
+    fabricated default would read as a promise the device never made."""
+    with app.app_context():
+        device = _device(app)
+        support = capability_support(
+            device,
+            {"received_at": time.time(), "frame_cache": {"schema": 1, "capacity_bytes": 1024}},
+            FRAME_CACHE,
+        )
+    assert support["detail"] == {"capacity_bytes": 1024}
+
+    with app.app_context():
+        junk = capability_support(
+            device,
+            {
+                "received_at": time.time(),
+                "frame_cache": {"schema": 1, "capacity_bytes": "lots", "max_frames": True},
+            },
+            FRAME_CACHE,
+        )
+    # Neither a string nor a bool is a byte count; both are dropped rather
+    # than coerced into a number the client would act on.
+    assert "detail" not in junk
+
+
+def test_only_a_supported_state_carries_detail(app: Flask) -> None:
+    with app.app_context():
+        device = _device(app)
+        unsupported = capability_support(device, {"received_at": time.time()}, FRAME_CACHE)
+        unknown = capability_support(device, None, FRAME_CACHE)
+    assert "detail" not in unsupported
+    assert "detail" not in unknown

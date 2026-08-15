@@ -4,6 +4,21 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.303.0], 2026-08-15
+
+### Changed
+
+- **A display plays one offline album at a time, and says so.** Binding a
+  display that already plays another album used to save cleanly and then
+  resolve to whichever album was found first, so the other silently never
+  synced. The album form now refuses the save, names the album holding each
+  display, and offers a "take over" tick to move them deliberately. A
+  displaced album keeps its remaining displays rather than being deleted.
+- **A display that reports a frame cache says how much it holds.** Its
+  advertised capacity and frame cap now ride along with the capability state
+  in the Companion API, so a client can tell whether a folder fits without
+  guessing from the model name. Absent when the display didn't report them.
+
 ## [0.302.2], 2026-08-15
 
 ### Fixed

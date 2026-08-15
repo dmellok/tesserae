@@ -464,3 +464,53 @@ def test_collection_end_to_end_renders_real_images(app: Flask) -> None:
         assert resp.status_code == 200
         assert len(resp.data) == frame["bytes"]
         resp.close()
+
+
+def test_use_as_album_refuses_a_display_already_playing_another_album(app: Flask) -> None:
+    """A display plays one collection at a time, so the form says which album
+    has it rather than quietly winning (discussion #230)."""
+    client = app.test_client()
+    token = _register_esp32(app, client, "frame01")
+    client.post("/api/v1/device/frame01/status", headers=_auth(token), data=json.dumps(CAP))
+    _seed_folder(app, "holidays", ["a.jpg"])
+    _seed_folder(app, "pets", ["b.jpg"])
+
+    client.post(
+        "/plugins/picture_gallery/folders/holidays/use-as-album",
+        data={"name": "Holidays", "device_ids": ["frame01"]},
+        follow_redirects=False,
+    )
+    resp = client.post(
+        "/plugins/picture_gallery/folders/pets/use-as-album",
+        data={"name": "Pets", "device_ids": ["frame01"]},
+        follow_redirects=True,
+    )
+    body = resp.get_data(as_text=True)
+    assert "Holidays" in body and "Take over" in body
+    # Not saved, and the display still plays what it was playing.
+    assert app.config["ALBUM_STORE"].get("pets") is None
+    assert [a.id for a in app.config["ALBUM_STORE"].for_device("frame01")] == ["holidays"]
+
+
+def test_use_as_album_takes_over_when_asked(app: Flask) -> None:
+    client = app.test_client()
+    token = _register_esp32(app, client, "frame01")
+    client.post("/api/v1/device/frame01/status", headers=_auth(token), data=json.dumps(CAP))
+    _seed_folder(app, "holidays", ["a.jpg"])
+    _seed_folder(app, "pets", ["b.jpg"])
+
+    client.post(
+        "/plugins/picture_gallery/folders/holidays/use-as-album",
+        data={"name": "Holidays", "device_ids": ["frame01"]},
+        follow_redirects=False,
+    )
+    client.post(
+        "/plugins/picture_gallery/folders/pets/use-as-album",
+        data={"name": "Pets", "device_ids": ["frame01"], "replace_conflicts": "1"},
+        follow_redirects=False,
+    )
+    store = app.config["ALBUM_STORE"]
+    assert [a.id for a in store.for_device("frame01")] == ["pets"]
+    # The displaced album is unbound, not deleted.
+    assert store.get("holidays") is not None
+    assert store.get("holidays").device_ids == []
