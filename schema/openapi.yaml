@@ -23,7 +23,7 @@ openapi: 3.0.3
 
 info:
   title: Tesserae REST API
-  version: 0.71.1
+  version: 0.72.0
   description: |
     _Self-hosted e-ink dashboard server, device + automation HTTP API._
 
@@ -39,9 +39,10 @@ info:
        auth bootstrapped through pairing codes or MAC-based discover.
     2. **TRMNL-compatible BYOS** (`/api/display`, `/api/setup`,
        `/api/log*`) for the Terminus / TRMNL native firmware family.
-    3. **Webhook push** (`/api/v1/push`) for automations
-       (Home Assistant beyond MQTT, n8n, cron + curl, phone shortcuts)
-       that trigger a render + publish of a saved page.
+    3. **Webhook push** (`/api/v1/push`, `/api/v1/push/image`) for
+       automations (Home Assistant beyond MQTT, n8n, cron + curl, phone
+       shortcuts) that trigger a render + publish of a saved page, or
+       send a single image straight to named displays.
     4. **Static render artifacts** (`/renders/*`, `/preview/*.png`,
        `/mirror/<id>`) that clients fetch after being told their URL
        through one of the above.
@@ -81,8 +82,8 @@ tags:
   - name: webhook
     description: |
       External automation hook. One global token, generated under
-      Settings → Server → App, fires a render + publish for a saved
-      page.
+      Settings → System → Webhook, fires a render + publish for a saved
+      page, or sends a single image to named displays.
   - name: frames
     description: |
       Static-artifact routes. Devices fetch the binary frame produced
@@ -469,7 +470,7 @@ paths:
       summary: Trigger a render + publish for a saved page.
       description: |
         External automation hook. Authenticated by the global
-        webhook token from Settings → Server → App (sent as either
+        webhook token from Settings → System → Webhook (sent as either
         `Authorization: Bearer …` or `X-Tesserae-Token: …`).
 
         `device_ids` is optional. When omitted, the push fans out to
@@ -541,6 +542,123 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/WebhookPushResponse'
+
+  /api/v1/push/image:
+    post:
+      tags: [webhook]
+      summary: Push a single image straight to one or more displays.
+      description: |
+        For when there is no saved dashboard behind the frame: a photo, a
+        chart another tool generated, an already-rendered image. Same
+        global webhook token as `POST /api/v1/push`.
+
+        Unlike `/api/v1/push`, `device_ids` is **required**: a dashboard
+        knows which displays it belongs to, a loose image does not, and
+        defaulting to every registered panel is the wrong way to find out.
+        Send it comma-separated or as a repeated field.
+
+        The image is fitted and dithered to each target's panel exactly as
+        the Send page does. Accepted types: JPEG, PNG, HEIC, HEIF, WebP,
+        up to 25 MiB encoded and 8192 px on the longest edge.
+
+        Per-device quiet hours are respected unless `override_quiet_hours`
+        is set. The response lists each display under `sent`, `quiet`, or
+        `failed`, so a partial result is readable without inferring it
+        from a count.
+
+        Status code map:
+
+        | `status`  | HTTP | Meaning                                  |
+        | --------- | ---- | ---------------------------------------- |
+        | `sent`    | 200  | at least one display took the frame      |
+        | `quiet`   | 202  | every target is inside its quiet hours   |
+        | `failed`  | 500  | at least one display failed              |
+      operationId: postWebhookPushImage
+      security:
+        - WebhookBearer: []
+        - WebhookToken: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [image, device_ids]
+              properties:
+                image:
+                  type: string
+                  format: binary
+                  description: The image file.
+                device_ids:
+                  type: string
+                  description: >-
+                    Target display ids, comma-separated or repeated.
+                  example: pi_kitchen,pi_bedroom
+                fit:
+                  type: string
+                  enum: [fit, fill, blur, stretch, center]
+                  description: >-
+                    How to place a non-panel-sized image. Defaults to the
+                    renderer's own default when omitted.
+                label:
+                  type: string
+                  description: History label for the push.
+                  default: Webhook image
+                override_quiet_hours:
+                  type: boolean
+                  default: false
+                  description: >-
+                    Send even to displays currently inside their quiet
+                    hours. Off by default; set it for images that are worth
+                    a refresh at 3am (a doorbell snapshot, an alarm frame)
+                    rather than for ambient content.
+      responses:
+        '200':
+          description: The image was published to at least one display.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookImagePushResponse'
+        '202':
+          description: Every target display is in quiet hours; nothing was sent.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookImagePushResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: One or more display ids are unknown.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookImagePushResponse'
+        '413':
+          description: The image exceeds the size or edge-length limit.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookImagePushResponse'
+        '415':
+          description: Unsupported or undecodable image type.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookImagePushResponse'
+        '500':
+          description: One or more displays failed to take the frame.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookImagePushResponse'
+        '503':
+          description: Webhook token not generated yet.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookImagePushResponse'
 
   # ------------------------------------------------------------------
   # Frame artifacts
@@ -719,7 +837,7 @@ components:
       type: http
       scheme: bearer
       description: |
-        Global webhook token from Settings → Server → App.
+        Global webhook token from Settings → System → Webhook.
         Single token shared by all webhook callers (HA, n8n, cron, …).
     WebhookToken:
       type: apiKey
@@ -1401,3 +1519,35 @@ components:
           type: string
           nullable: true
           description: Failure detail when `status` is `failed` / `bad_request` / `not_found`.
+
+    WebhookImagePushResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [sent, quiet, failed, unauthorized, bad_request, not_found, disabled]
+        sent:
+          type: array
+          description: Displays that took the frame.
+          items:
+            type: string
+        quiet:
+          type: array
+          description: Displays skipped because they are inside their quiet hours.
+          items:
+            type: string
+        failed:
+          type: array
+          description: Displays that could not be reached, with the reason for each.
+          items:
+            type: object
+            properties:
+              device_id:
+                type: string
+              error:
+                type: string
+        error:
+          type: string
+          nullable: true
+          description: Failure detail when the request itself was rejected.

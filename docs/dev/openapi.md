@@ -21,10 +21,36 @@ versionable.
 | --- | --- | --- |
 | **Native device API** | `/api/v1/device/{frame,status,log,discover,register}` | Battery + always-on panels that prefer HTTP polling over MQTT. Per-device bearer-token auth, bootstrapped by pairing code or MAC-based discovery. The companion to MQTT, same envelope shape on both transports. |
 | **TRMNL-compatible BYOS** | `/api/display`, `/api/setup`, `/api/log`, `/api/log/level` | Stock TRMNL / Terminus firmware. Point a TRMNL device at a Tesserae host and it self-provisions on first boot. |
-| **Webhook push** | `/api/v1/push` | External automation (Home Assistant beyond MQTT, n8n, Stream Deck, GitHub Actions, cron + curl). One global token; per-device quiet hours are honoured. |
+| **Webhook push** | `/api/v1/push`, `/api/v1/push/image` | External automation (Home Assistant beyond MQTT, n8n, Stream Deck, GitHub Actions, cron + curl). One global token; per-device quiet hours are honoured. `/push` renders a saved dashboard; `/push/image` sends a single image straight to named displays, for when there's no dashboard behind the frame. |
 | **Render artifacts** | `/renders/{filename}`, `/preview/{id}.png`, `/mirror/{id}` | The binary frames clients fetch after being told their URL through one of the above. The `/mirror/<id>` endpoint serves a browser-friendly HTML auto-refresh page so an old iPad or Kindle browser can stand in as a panel. |
 
 Plus `/healthz` for liveness probes.
+
+### Pushing one image from a script
+
+The shortest useful call, once you've generated a webhook token under
+**Settings → System → Webhook**:
+
+```sh
+curl -sS -X POST http://tesserae.local:8765/api/v1/push/image \
+  -H "Authorization: Bearer $TESSERAE_TOKEN" \
+  -F image=@photo.jpg \
+  -F device_ids=hallway \
+  -F fit=fill
+```
+
+```json
+{"status": "sent", "sent": ["hallway"], "quiet": [], "failed": []}
+```
+
+`device_ids` is required and takes a comma-separated list or a repeated
+field. Quiet hours are honoured, so a display inside its window comes
+back under `quiet` with a 202 rather than being reported as sent. Add
+`-F override_quiet_hours=true` when the image is worth waking a panel
+for anyway. Running
+under the Home Assistant App, call the instance directly on its port
+rather than through the ingress URL, which is session-authenticated for
+the browser.
 
 ## What's deliberately not in the spec
 
@@ -123,7 +149,7 @@ Each operation tags which ones it accepts.
 | `PairingCode` | `X-Pairing-Code: <6-digit-code>` | `/api/v1/device/register` only. Single-use, 15-minute TTL. |
 | `TrmnlAccessToken` | `access-token: <token>` | TRMNL BYOS endpoints. Legacy header name; the bearer header is also accepted. |
 | `TrmnlAuthBearer` | `Authorization: Bearer <token>` | TRMNL BYOS endpoints. |
-| `WebhookBearer` | `Authorization: Bearer <token>` | `/api/v1/push`. Global token, generated under Settings -> Server -> App. |
+| `WebhookBearer` | `Authorization: Bearer <token>` | `/api/v1/push`. Global token, generated under Settings -> System -> Webhook. |
 | `WebhookToken` | `X-Tesserae-Token: <token>` | Same global webhook token, alternate header for tools that can't customise `Authorization`. |
 
 ### Bootstrap flow for a native REST client
@@ -153,7 +179,7 @@ admin click required. This path is the exception, not the default.
 ## Worked example: trigger a webhook push from cron
 
 ```sh
-TOKEN="..."  # from Settings -> Server -> App
+TOKEN="..."  # from Settings -> System -> Webhook
 curl -X POST https://tesserae.local:8765/api/v1/push \
      -H "Authorization: Bearer $TOKEN" \
      -H "Content-Type: application/json" \

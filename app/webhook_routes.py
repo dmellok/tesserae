@@ -1,9 +1,16 @@
-"""Webhook push endpoint.
+"""Webhook push endpoints.
 
-A single ``POST /api/v1/push`` endpoint that lets external automations
-(Home Assistant beyond the existing MQTT discovery, n8n, GitHub
-Actions, Stream Deck, cron + curl, your phone's Shortcuts app, …)
-trigger a render-and-push of a saved dashboard.
+Two endpoints that let external automations (Home Assistant beyond the
+existing MQTT discovery, n8n, GitHub Actions, Stream Deck, cron + curl,
+your phone's Shortcuts app, …) put something on a panel:
+
+* ``POST /api/v1/push`` renders and publishes a saved dashboard.
+* ``POST /api/v1/push/image`` sends one image straight to named displays,
+  for when there is no dashboard behind it: a photo, a chart another tool
+  generated, an already-rendered frame. Added because the only scriptable
+  image push was the Companion API, which is a paired-client contract and
+  isn't in the public spec, so the obvious place to look didn't have it
+  (discussion #231).
 
 Auth model: one global token, stored in ``settings.app.webhook_token``
 (masked in the Settings UI like other ``_secret`` values). The caller
@@ -33,12 +40,23 @@ from __future__ import annotations
 
 import logging
 import secrets
+from datetime import UTC, datetime
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from flask import Blueprint, Flask, current_app, jsonify, request
 from werkzeug.wrappers import Response
 
+from app.image_upload import (
+    IMAGE_CONTENT_TYPES,
+    IMAGE_FIT_MODES,
+    IMAGE_MAX_EDGE,
+    IMAGE_UPLOAD_BYTES,
+    TOO_LARGE,
+    validate_image,
+)
 from app.push import PushManager
+from app.quiet_hours import device_is_quiet
 from app.state.settings_store import SettingsStore
 
 logger = logging.getLogger(__name__)
@@ -61,8 +79,8 @@ def _push_manager() -> PushManager:
 
 
 def generate_token() -> str:
-    """Build a fresh URL-safe token. Used by the Settings → Server →
-    App "Generate webhook token" action and by tests."""
+    """Build a fresh URL-safe token. Used by the Settings → System →
+    Webhook "Generate webhook token" action and by tests."""
     return secrets.token_hex(TOKEN_BYTES)
 
 
@@ -84,6 +102,29 @@ def _presented_token(req: Any) -> str | None:
         return auth[7:].strip() or None
     direct = (req.headers.get("X-Tesserae-Token") or "").strip()
     return direct or None
+
+
+# Form encoders have no boolean type, so a flag arrives as whatever the
+# caller's tooling produced. Accept the spellings people actually send and
+# treat everything else, including the empty string, as off.
+_TRUTHY = frozenset({"1", "true", "yes", "on"})
+
+
+def _truthy(raw: str | None) -> bool:
+    return (raw or "").strip().lower() in _TRUTHY
+
+
+def _timezone(settings: SettingsStore) -> Any:
+    """The configured display timezone, or None to follow the host. Quiet
+    hours are wall-clock windows, so they need the same zone the scheduler
+    and the Settings UI use."""
+    raw = str((settings.get_section("app") or {}).get("timezone") or "system").strip()
+    if not raw or raw.lower() == "system":
+        return None
+    try:
+        return ZoneInfo(raw)
+    except ZoneInfoNotFoundError:
+        return None
 
 
 def _body() -> dict[str, Any]:
@@ -154,6 +195,160 @@ def push() -> tuple[Response, int] | Response:
         "error": result.error,
     }
     return jsonify(payload), http_status
+
+
+@bp.post("/push/image")
+def push_image() -> tuple[Response, int] | Response:
+    """Push a single image straight to one or more displays.
+
+    The sibling of ``POST /push`` for the case where there is no saved
+    dashboard: a photo, a chart something else generated, a pre-rendered
+    frame. Same global token, same quiet-hours policy, so a script that
+    already talks to ``/push`` needs no new credential (discussion #231).
+
+    ``multipart/form-data``:
+
+        image                  the file (JPEG / PNG / HEIC / HEIF / WebP)
+        device_ids             comma-separated, or repeated; REQUIRED
+        fit                    fit | fill | blur | stretch | center (optional)
+        label                  History label, default "Webhook image"
+        override_quiet_hours   send anyway during quiet hours (optional)
+
+    ``device_ids`` is required here, unlike ``/push``. A dashboard knows
+    which displays it belongs to; a loose image does not, and defaulting
+    to "every panel in the house" is the wrong way to find that out.
+
+    ``override_quiet_hours`` exists because not every image is ambient.
+    A doorbell snapshot or an alarm frame is worth a refresh at 3am, and
+    without an opt-out the only way to get one was to turn quiet hours
+    off for the display and remember to turn them back on. Off by
+    default: the caller has to say that this particular image matters
+    more than the household's sleep.
+    """
+    settings = _settings()
+    stored = _stored_token(settings)
+    if not stored:
+        return jsonify({"status": "disabled", "error": "webhook token not generated"}), 503
+    presented = _presented_token(request)
+    if not presented or not secrets.compare_digest(presented, stored):
+        return jsonify({"status": "unauthorized"}), 401
+
+    upload = request.files.get("image")
+    if upload is None:
+        return (
+            jsonify({"status": "bad_request", "error": "an 'image' file part is required"}),
+            400,
+        )
+    image_bytes = upload.read()
+    problem = validate_image(image_bytes, upload.mimetype)
+    if problem == TOO_LARGE:
+        return (
+            jsonify(
+                {
+                    "status": "bad_request",
+                    "error": (
+                        f"image exceeds the limits ({IMAGE_UPLOAD_BYTES} bytes encoded, "
+                        f"{IMAGE_MAX_EDGE}px longest edge)"
+                    ),
+                }
+            ),
+            413,
+        )
+    if problem is not None:
+        return (
+            jsonify(
+                {
+                    "status": "bad_request",
+                    "error": (
+                        "unsupported or undecodable image; accepted types: "
+                        + ", ".join(IMAGE_CONTENT_TYPES)
+                    ),
+                }
+            ),
+            415,
+        )
+
+    raw_devices = request.form.getlist("device_ids") or []
+    if len(raw_devices) == 1:
+        raw_devices = [d.strip() for d in raw_devices[0].split(",")]
+    device_ids = [d.strip() for d in raw_devices if d.strip()]
+    if not device_ids:
+        return (
+            jsonify({"status": "bad_request", "error": "device_ids is required"}),
+            400,
+        )
+    registry = current_app.config.get("DEVICE_REGISTRY")
+    unknown = [
+        d
+        for d in device_ids
+        if registry is None or getattr(registry.get(d), "kind_of", None) is None
+    ]
+    if unknown:
+        return (
+            jsonify(
+                {
+                    "status": "not_found",
+                    "error": f"unknown display(s): {', '.join(sorted(unknown))}",
+                }
+            ),
+            404,
+        )
+
+    fit = (request.form.get("fit") or "").strip().lower() or None
+    if fit is not None and fit not in IMAGE_FIT_MODES:
+        return (
+            jsonify(
+                {
+                    "status": "bad_request",
+                    "error": f"fit must be one of {', '.join(IMAGE_FIT_MODES)}",
+                }
+            ),
+            400,
+        )
+    label = (request.form.get("label") or "").strip() or "Webhook image"
+    override = _truthy(request.form.get("override_quiet_hours"))
+
+    # Quiet hours are honoured per display, matching /push: a webhook call
+    # is automation rather than someone standing at the panel. Displays that
+    # are quiet are reported back so the caller can tell "skipped" from
+    # "failed" rather than inferring it from a count.
+    manager = _push_manager()
+    app_settings = settings.get_section("app") or {}
+    now = datetime.now(UTC)
+    tz = _timezone(settings)
+    sent: list[str] = []
+    quiet: list[str] = []
+    failed: list[dict[str, str]] = []
+    for device_id in device_ids:
+        device = registry.get(device_id) if registry is not None else None
+        if not override and device is not None and device_is_quiet(app_settings, device, now, tz):
+            quiet.append(device_id)
+            continue
+        result = manager.push_image(
+            image_bytes,
+            source_label=label,
+            device_id=device_id,
+            fit=fit,
+            source="webhook",
+        )
+        if result.status in ("sent", "no_change"):
+            sent.append(device_id)
+        else:
+            failed.append({"device_id": device_id, "error": result.error or result.status})
+
+    if failed:
+        http_status = 500
+        status = "failed"
+    elif sent:
+        http_status = 200
+        status = "sent"
+    else:
+        http_status = 202
+        status = "quiet"
+    return (
+        jsonify({"status": status, "sent": sent, "quiet": quiet, "failed": failed}),
+        http_status,
+    )
 
 
 def register(app: Flask) -> None:

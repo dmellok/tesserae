@@ -69,6 +69,15 @@ from app.data_change_refresh import (
 from app.device_capability import capability_support_map, heartbeat_freshness
 from app.device_loader import Device, DeviceRegistry
 from app.device_preview import retained_device_preview
+from app.image_upload import (
+    IMAGE_CONTENT_TYPES,
+    IMAGE_FIT_MODES,
+    IMAGE_MAX_EDGE,
+    IMAGE_UPLOAD_BYTES,
+)
+from app.image_upload import (
+    decode_edge as _decode_edge,
+)
 from app.lineup_authoring import build_lineup
 from app.net_guard import BlockedURLError, assert_public_url
 from app.panel import device_panel, resolve_settings_panel
@@ -85,17 +94,6 @@ from app.state.settings_store import SettingsStore
 
 logger = logging.getLogger(__name__)
 
-# Register the HEIF/HEIC opener so Pillow can decode iPhone photos both for
-# our edge/size validation and downstream in the renderer. pillow-heif is a
-# hard dependency (pyproject.toml); guard the import only so a broken wheel
-# degrades to "HEIC unsupported" rather than failing app import.
-try:
-    import pillow_heif
-
-    pillow_heif.register_heif_opener()
-except Exception:
-    logger.warning("pillow-heif unavailable; HEIC/HEIF companion uploads will not decode")
-
 bp = Blueprint("companion_api", __name__, url_prefix="/api/app/v1")
 
 # -- limits advertised by the capability probe ---------------------------
@@ -104,10 +102,6 @@ bp = Blueprint("companion_api", __name__, url_prefix="/api/app/v1")
 # tuning these needs no app release. The byte / edge caps are the ones the
 # owner settled on (~25 MB, 8K max edge); job + idempotency retention are
 # 24 h. These constants are reused by Phase 2's upload + job enforcement.
-IMAGE_UPLOAD_BYTES = 26_214_400  # 25 MiB
-IMAGE_MAX_EDGE = 8192
-IMAGE_CONTENT_TYPES = ("image/jpeg", "image/png", "image/heic", "image/heif", "image/webp")
-IMAGE_FIT_MODES = ("fit", "fill", "blur", "stretch", "center")
 # Contract 0.6 ``image_framing``: mandatory editor bound whenever the
 # capability is advertised, so clients never hard-code a zoom range. An
 # editor bound rather than a quality promise: the resolved crop is always
@@ -1484,19 +1478,6 @@ def push_dashboard(dashboard_id: str) -> Any:
 
 
 # -- image push ----------------------------------------------------------
-
-
-def _decode_edge(image_bytes: bytes) -> int | None:
-    """Longest edge of the decoded image, or None if it can't be decoded."""
-    from io import BytesIO
-
-    try:
-        from PIL import Image
-
-        with Image.open(BytesIO(image_bytes)) as img:
-            return max(int(img.width), int(img.height))
-    except Exception:
-        return None
 
 
 def _valid_framing(

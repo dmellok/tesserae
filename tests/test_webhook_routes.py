@@ -255,3 +255,246 @@ def test_set_endpoint_clear_wipes_the_token(app: Flask) -> None:
     assert resp.status_code == 302
     stored = app.config["SETTINGS_STORE"].get_section("app").get("webhook_token_secret")
     assert not stored
+
+
+# -- single-image push (discussion #231) ---------------------------------
+#
+# The sibling of /push for the case with no saved dashboard behind the
+# frame. Same token, same quiet-hours policy; device_ids is required
+# because a loose image has no bindings to fall back on.
+
+
+def _png(size: tuple[int, int] = (400, 300)) -> bytes:
+    import io
+
+    from PIL import Image
+
+    buf = io.BytesIO()
+    Image.new("RGB", size, (30, 90, 160)).save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def _register(app: Flask, device_id: str) -> None:
+    import json
+
+    client = app.test_client()
+    code = app.config["PAIRING_STORE"].issue(note="t").code
+    resp = client.post(
+        "/api/v1/device/register",
+        headers={"X-Pairing-Code": code, "Content-Type": "application/json"},
+        data=json.dumps({"device_id": device_id, "kind": "esp32_client"}),
+    )
+    assert resp.status_code == 201, resp.get_data(as_text=True)
+
+
+def _post_image(app: Flask, **fields: object) -> object:
+    import io
+
+    data: dict[str, object] = {"image": (io.BytesIO(_png()), "photo.png", "image/png")}
+    data.update(fields)
+    return app.test_client().post(
+        "/api/v1/push/image",
+        headers={"Authorization": "Bearer real-token"},
+        data=data,
+        content_type="multipart/form-data",
+    )
+
+
+def test_image_push_sends_to_named_displays(app: Flask) -> None:
+    _set_token(app, "real-token")
+    _register(app, "kitchen")
+    _register(app, "hallway")
+    calls: list[dict[str, object]] = []
+
+    def fake_push_image(image_bytes: bytes, **kw: object) -> PushResult:
+        calls.append({"bytes": len(image_bytes), **kw})
+        return PushResult(status="sent", page_id="", error=None)
+
+    app.config["PUSH_MANAGER"].push_image = fake_push_image  # type: ignore[method-assign]
+
+    resp = _post_image(app, device_ids="kitchen,hallway", fit="fill", label="Doorbell")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["status"] == "sent"
+    assert body["sent"] == ["kitchen", "hallway"]
+    assert body["quiet"] == [] and body["failed"] == []
+    # Each display gets its own push so the frame is fitted to its panel.
+    assert [c["device_id"] for c in calls] == ["kitchen", "hallway"]
+    assert {c["fit"] for c in calls} == {"fill"}
+    assert {c["source_label"] for c in calls} == {"Doorbell"}
+
+
+def test_image_push_accepts_repeated_device_fields(app: Flask) -> None:
+    """Comma-separated or repeated: form encoders disagree, the endpoint
+    shouldn't care."""
+    _set_token(app, "real-token")
+    _register(app, "kitchen")
+    _register(app, "hallway")
+    app.config["PUSH_MANAGER"].push_image = lambda b, **kw: PushResult(  # type: ignore[method-assign]
+        status="sent", page_id="", error=None
+    )
+    resp = _post_image(app, device_ids=["kitchen", "hallway"])
+    assert resp.status_code == 200
+    assert resp.get_json()["sent"] == ["kitchen", "hallway"]
+
+
+def test_image_push_requires_a_target(app: Flask) -> None:
+    """A dashboard knows its displays; a loose image does not. Silence
+    here would mean fanning a photo out to every panel in the house."""
+    _set_token(app, "real-token")
+    _register(app, "kitchen")
+    resp = _post_image(app)
+    assert resp.status_code == 400
+    assert "device_ids" in resp.get_json()["error"]
+
+
+def test_image_push_rejects_an_unknown_display(app: Flask) -> None:
+    _set_token(app, "real-token")
+    _register(app, "kitchen")
+    resp = _post_image(app, device_ids="kitchen,ghost")
+    assert resp.status_code == 404
+    assert "ghost" in resp.get_json()["error"]
+
+
+def test_image_push_needs_the_token(app: Flask) -> None:
+    _set_token(app, "real-token")
+    _register(app, "kitchen")
+    import io
+
+    resp = app.test_client().post(
+        "/api/v1/push/image",
+        headers={"Authorization": "Bearer wrong"},
+        data={"image": (io.BytesIO(_png()), "p.png", "image/png"), "device_ids": "kitchen"},
+        content_type="multipart/form-data",
+    )
+    assert resp.status_code == 401
+
+
+def test_image_push_rejects_a_file_that_is_not_an_image(app: Flask) -> None:
+    """Declaring an accepted media type doesn't make the bytes decodable."""
+    _set_token(app, "real-token")
+    _register(app, "kitchen")
+    import io
+
+    resp = app.test_client().post(
+        "/api/v1/push/image",
+        headers={"Authorization": "Bearer real-token"},
+        data={
+            "image": (io.BytesIO(b"definitely not a png"), "p.png", "image/png"),
+            "device_ids": "kitchen",
+        },
+        content_type="multipart/form-data",
+    )
+    assert resp.status_code == 415
+
+    wrong_type = app.test_client().post(
+        "/api/v1/push/image",
+        headers={"Authorization": "Bearer real-token"},
+        data={"image": (io.BytesIO(b"hello"), "p.txt", "text/plain"), "device_ids": "kitchen"},
+        content_type="multipart/form-data",
+    )
+    assert wrong_type.status_code == 415
+
+
+def test_image_push_validates_the_fit_mode(app: Flask) -> None:
+    _set_token(app, "real-token")
+    _register(app, "kitchen")
+    resp = _post_image(app, device_ids="kitchen", fit="squish")
+    assert resp.status_code == 400
+    assert "fit" in resp.get_json()["error"]
+
+
+def test_image_push_holds_a_quiet_display_and_says_so(app: Flask) -> None:
+    """202 rather than 200, and the display is named under `quiet`, so a
+    script can tell a skip from a failure without counting."""
+    _set_token(app, "real-token")
+    _register(app, "kitchen")
+    # patch, not update: update_section replaces the whole app section and
+    # would drop the webhook token set above.
+    app.config["SETTINGS_STORE"].patch_section(
+        "app",
+        {"quiet_hours_enabled": True, "quiet_hours_start": "00:00", "quiet_hours_end": "23:59"},
+    )
+    pushed: list[str] = []
+    app.config["PUSH_MANAGER"].push_image = lambda b, **kw: (  # type: ignore[method-assign]
+        pushed.append(str(kw["device_id"])),
+        PushResult(status="sent", page_id="", error=None),
+    )[1]
+
+    resp = _post_image(app, device_ids="kitchen")
+    assert resp.status_code == 202
+    body = resp.get_json()
+    assert body["status"] == "quiet" and body["quiet"] == ["kitchen"]
+    assert pushed == []
+
+
+def test_image_push_reports_a_partial_failure(app: Flask) -> None:
+    _set_token(app, "real-token")
+    _register(app, "kitchen")
+    _register(app, "hallway")
+
+    def flaky(image_bytes: bytes, **kw: object) -> PushResult:
+        if kw["device_id"] == "hallway":
+            return PushResult(status="failed", page_id="", error="renderer offline")
+        return PushResult(status="sent", page_id="", error=None)
+
+    app.config["PUSH_MANAGER"].push_image = flaky  # type: ignore[method-assign]
+    resp = _post_image(app, device_ids="kitchen,hallway")
+    assert resp.status_code == 500
+    body = resp.get_json()
+    assert body["sent"] == ["kitchen"]
+    assert body["failed"] == [{"device_id": "hallway", "error": "renderer offline"}]
+
+
+def test_image_push_is_disabled_without_a_token(app: Flask) -> None:
+    resp = _post_image(app, device_ids="kitchen")
+    assert resp.status_code == 503
+    assert resp.get_json()["status"] == "disabled"
+
+
+def test_image_push_can_override_quiet_hours(app: Flask) -> None:
+    """Not every image is ambient. A doorbell snapshot is worth a refresh
+    at 3am, and the alternative was turning quiet hours off for the
+    display and remembering to turn them back on."""
+    _set_token(app, "real-token")
+    _register(app, "kitchen")
+    app.config["SETTINGS_STORE"].patch_section(
+        "app",
+        {"quiet_hours_enabled": True, "quiet_hours_start": "00:00", "quiet_hours_end": "23:59"},
+    )
+    pushed: list[str] = []
+    app.config["PUSH_MANAGER"].push_image = lambda b, **kw: (  # type: ignore[method-assign]
+        pushed.append(str(kw["device_id"])),
+        PushResult(status="sent", page_id="", error=None),
+    )[1]
+
+    resp = _post_image(app, device_ids="kitchen", override_quiet_hours="true")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["status"] == "sent" and body["sent"] == ["kitchen"]
+    assert body["quiet"] == []
+    assert pushed == ["kitchen"]
+
+
+def test_quiet_hours_override_reads_the_spellings_form_encoders_send(app: Flask) -> None:
+    """Forms have no boolean type, so the flag arrives as whatever the
+    caller's tooling produced. Anything unrecognised stays off, because
+    the safe default for "wake the bedroom panel" is no."""
+    _set_token(app, "real-token")
+    _register(app, "kitchen")
+    app.config["SETTINGS_STORE"].patch_section(
+        "app",
+        {"quiet_hours_enabled": True, "quiet_hours_start": "00:00", "quiet_hours_end": "23:59"},
+    )
+    app.config["PUSH_MANAGER"].push_image = lambda b, **kw: PushResult(  # type: ignore[method-assign]
+        status="sent", page_id="", error=None
+    )
+
+    for raw in ("1", "true", "TRUE", "yes", "on"):
+        assert (
+            _post_image(app, device_ids="kitchen", override_quiet_hours=raw).status_code == 200
+        ), raw
+    for raw in ("0", "false", "no", "", "maybe"):
+        assert (
+            _post_image(app, device_ids="kitchen", override_quiet_hours=raw).status_code == 202
+        ), raw

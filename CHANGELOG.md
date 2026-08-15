@@ -4,6 +4,28 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.304.0], 2026-08-16
+
+### Added
+
+- **Push a single image from a script (#231).** `POST /api/v1/push/image`
+  sends one image straight to named displays, using the same webhook token
+  as `POST /api/v1/push`. Until now the only scriptable image push was the
+  Companion API, which is a paired-client contract and isn't in the public
+  OpenAPI spec, so the obvious place to look didn't have it. Multipart
+  upload, required `device_ids`, optional `fit` and History `label`,
+  per-device quiet hours honoured (with an `override_quiet_hours` opt-out for
+  images that are worth waking a panel for), and a response that names each
+  display under `sent`, `quiet` or `failed` rather than leaving a partial
+  result to be inferred from a count. Documented in the spec and in the
+  OpenAPI guide with a curl recipe.
+
+### Fixed
+
+- **The webhook token's location in the docs was wrong.** The API spec and the
+  OpenAPI guide sent people to Settings → Server → App; the token has always
+  lived under Settings → System → Webhook.
+
 ## [0.303.0], 2026-08-15
 
 ### Changed

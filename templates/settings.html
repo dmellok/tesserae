@@ -871,7 +871,7 @@ docker compose up -d</code></pre>
   </section>
 
   <section class="dx-section-card">
-    {{ card_head('Webhook', icon_name='webhooks-logo', blurb='POST a JSON body to /api/v1/push from anything that can fire HTTP, Home Assistant scripts, n8n, GitHub Actions, cron + curl, Shortcuts. The token is the bearer key.') }}
+    {{ card_head('Webhook', icon_name='webhooks-logo', blurb='POST to /api/v1/push to send a saved dashboard, or /api/v1/push/image to send a single picture, from anything that can fire HTTP: Home Assistant scripts, n8n, GitHub Actions, cron + curl, Shortcuts. The token is the bearer key.') }}
 
     <p>
       Status: {% if system_webhook_token_set %}
