@@ -950,3 +950,28 @@ def test_compose_page_wires_sandbox_libs(app: Flask) -> None:
     html = client.get("/compose/cc1").get_data(as_text=True)
     assert "__TESSERAE_LIBS" in html
     assert "vendor/chartjs/chart.umd.min.js" in html and "vendor/phosphor/phosphor-bold.css" in html
+
+
+def test_send_collapses_a_repeated_device(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A binding is a set of devices. A repeat used to persist, which then
+    double-listed the dashboard on the Dashboards page and pushed the same
+    frame to the same panel twice (#229)."""
+    monkeypatch.setattr("app.renderer.render_to_png", lambda request, pool=None: b"PNGBYTES")
+    pushed: list[str] = []
+    monkeypatch.setattr(
+        app.config["PUSH_MANAGER"],
+        "push_image",
+        lambda png, **kw: (
+            pushed.append(kw["device_id"]),
+            SimpleNamespace(status="sent", error=None),
+        )[1],
+    )
+    client = app.test_client()
+    _sign_in(client)
+    cid = client.get("/pages/canvas/").location.rsplit("/", 1)[1]
+    resp = client.post(
+        f"/pages/canvas/c/{cid}/send", json={"device_ids": ["dev_a", "dev_a", "dev_b"]}
+    )
+    assert resp.status_code == 200
+    assert pushed == ["dev_a", "dev_b"]
+    assert app.config["PAGE_STORE"].get(cid).device_ids == ["dev_a", "dev_b"]

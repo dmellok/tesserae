@@ -1203,6 +1203,10 @@
                 {# Kept, not deleted: another live device still shows them, so
                    the wipe only drops this device from their binding (#229). #}
                 {% if section.orphan_state.unbound_page_count %}{% set _ = parts.append('this device off ' ~ section.orphan_state.unbound_page_count ~ ' shared dashboard' ~ ('s' if section.orphan_state.unbound_page_count != 1 else '')) %}{% endif %}
+                {# Same again for History: a push delivered to this device AND
+                   another is kept for the other one, with this device dropped
+                   from the row's chips rather than the row deleted (#229). #}
+                {% if section.orphan_state.relabelled_event_count %}{% set _ = parts.append('this device off ' ~ section.orphan_state.relabelled_event_count ~ ' shared history row' ~ ('s' if section.orphan_state.relabelled_event_count != 1 else '')) %}{% endif %}
                 {{ parts | join(', ') }}.
               </span>
             </label>

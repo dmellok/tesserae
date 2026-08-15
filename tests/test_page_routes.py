@@ -1829,3 +1829,33 @@ def test_push_button_counts_only_live_bindings(app: Flask) -> None:
     body = client.get("/pages").get_data(as_text=True)
     assert "Push to 2" not in body
     assert "no linked devices" in body
+
+
+# -- a binding is a set of devices (issue #229) ---------------------------
+
+
+def test_page_model_collapses_a_repeated_binding() -> None:
+    """A repeated id used to double-list the dashboard under that device
+    and inflate its "Push to N linked devices" count. Collapsing on load
+    means an existing pages.json heals rather than needing a migration."""
+    from app.state.page_store import Page
+
+    page = Page(id="d", name="D", device_ids=["kitchen", "kitchen", "studio"], cells=[])
+    assert page.device_ids == ["kitchen", "studio"]
+
+    # Order is first-seen, so the page's primary device doesn't move.
+    assert Page(id="d", name="D", device_ids=["b", "a", "b"], cells=[]).device_ids == ["b", "a"]
+
+
+def test_group_pages_lists_a_repeated_binding_once() -> None:
+    """Belt and braces for a binding assigned in-process, after the model
+    validator has run."""
+    from app.page_routes import _group_pages_for_index
+
+    kitchen = _StubDevice("kitchen", display_name="Kitchen Panel")
+    registry = _StubRegistry([kitchen])
+    page = _page("d", "Family agenda", ["kitchen"])
+    page.device_ids = ["kitchen", "kitchen"]  # assignment skips validation
+    groups = _group_pages_for_index([page], registry)
+    assert [d.id for d, _ in groups] == ["kitchen"]
+    assert [p.id for p in groups[0][1]] == ["d"]

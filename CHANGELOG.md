@@ -4,6 +4,24 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.302.2], 2026-08-15
+
+### Fixed
+
+- **Deleting a device takes its own History, not the dashboard's (#229).** A
+  push records the dashboard it came from and the displays it reached; the
+  wipe only looked at the dashboard. Deleting one display off a shared
+  dashboard left its pushes behind, and deleting the last display then removed
+  every row for that dashboard, including the first display's. Rows delivered
+  only to the deleted display are now removed with it, rows shared with
+  another display survive with the dead one dropped from their delivery chips,
+  and the delete dialog counts the two separately.
+- **A dashboard bound to the same display twice is listed once (#229).** A
+  repeated id in a dashboard's binding listed it twice under that display on
+  the Dashboards page, read as "Push to 2 linked displays", and pushed the
+  same frame to the same panel twice. Bindings now collapse repeats when a
+  dashboard is loaded or saved, so existing dashboards heal on their own.
+
 ## [0.302.1], 2026-08-15
 
 ### Fixed

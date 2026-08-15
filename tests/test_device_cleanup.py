@@ -318,3 +318,155 @@ def test_wipe_without_a_push_manager_still_works(tmp_path: Path) -> None:
     )
     assert wiped.has_latest_render is False
     assert wiped.page_ids == ["bound"]
+
+
+# -- history is per device, not per dashboard (issue #229) -----------------
+#
+# A push row names its dashboard in ``target`` and the devices it was
+# actually delivered to in ``extra.device_ids``. Scoping the wipe on
+# ``target`` alone got both halves wrong on a shared dashboard: deleting the
+# first device left its solo pushes behind, and deleting the second took the
+# whole dashboard's history, the first device's rows included.
+
+
+def _push(el: EventLog, page: str, *device_ids: str) -> int:
+    return el.record(
+        type="push",
+        source="page",
+        target=page,
+        status="sent",
+        extra={"device_ids": list(device_ids)},
+    )
+
+
+def _targets(el: EventLog) -> list[list[str]]:
+    return [r.extra.get("device_ids", []) for r in el.list(limit=50) if r.type == "push"]
+
+
+def test_deleting_a_device_takes_only_its_own_history(tmp_path: Path) -> None:
+    ps, el, ss = _make_stores(tmp_path)
+    ps.save(_make_page("shared", device_ids=["panel_a", "panel_b"]))
+    for _ in range(3):
+        _push(el, "shared", "panel_a")  # pushed before panel_b existed
+    _push(el, "shared", "panel_a", "panel_b")
+
+    summary = device_cleanup.wipe_orphan_state(
+        device_id="panel_a",
+        page_store=ps,
+        event_log=el,
+        settings_store=ss,
+        data_root=tmp_path,
+        devices=_FakeRegistry("panel_b"),
+    )
+
+    # The three solo pushes go with the device; the shared one stays for
+    # panel_b, with the dead id off its delivery chips.
+    assert summary.event_count == 3
+    assert summary.relabelled_event_count == 1
+    assert _targets(el) == [["panel_b"]]
+    assert ps.get("shared") is not None
+
+
+def test_deleting_the_last_device_does_not_resurrect_the_first_devices_rows(
+    tmp_path: Path,
+) -> None:
+    """The other half of #229: once panel_a's rows are gone, deleting
+    panel_b takes the dashboard and the one row that is left, and there is
+    nothing of panel_a's for the page-scoped delete to sweep up."""
+    ps, el, ss = _make_stores(tmp_path)
+    ps.save(_make_page("shared", device_ids=["panel_a", "panel_b"]))
+    _push(el, "shared", "panel_a")
+    _push(el, "shared", "panel_a", "panel_b")
+    _push(el, "shared", "panel_b")
+
+    device_cleanup.wipe_orphan_state(
+        device_id="panel_a",
+        page_store=ps,
+        event_log=el,
+        settings_store=ss,
+        data_root=tmp_path,
+        devices=_FakeRegistry("panel_b"),
+    )
+    assert _targets(el) == [["panel_b"], ["panel_b"]]
+
+    summary = device_cleanup.wipe_orphan_state(
+        device_id="panel_b",
+        page_store=ps,
+        event_log=el,
+        settings_store=ss,
+        data_root=tmp_path,
+        devices=_FakeRegistry(),
+    )
+    assert summary.page_ids == ["shared"]
+    assert summary.event_count == 2
+    assert _targets(el) == []
+    assert ps.get("shared") is None
+
+
+def test_the_preview_counts_match_what_the_wipe_does(tmp_path: Path) -> None:
+    """The delete modal promises what the wipe delivers, and separates
+    "deleted" from "this device taken off a shared row"."""
+    ps, el, ss = _make_stores(tmp_path)
+    ps.save(_make_page("shared", device_ids=["panel_a", "panel_b"]))
+    _push(el, "shared", "panel_a")
+    _push(el, "shared", "panel_a", "panel_b")
+
+    preview = device_cleanup.list_orphan_state(
+        device_id="panel_a",
+        page_store=ps,
+        event_log=el,
+        settings_store=ss,
+        data_root=tmp_path,
+        devices=_FakeRegistry("panel_a", "panel_b"),
+    )
+    wiped = device_cleanup.wipe_orphan_state(
+        device_id="panel_a",
+        page_store=ps,
+        event_log=el,
+        settings_store=ss,
+        data_root=tmp_path,
+        devices=_FakeRegistry("panel_b"),
+    )
+    assert (preview.event_count, preview.relabelled_event_count) == (1, 1)
+    assert (wiped.event_count, wiped.relabelled_event_count) == (1, 1)
+
+
+def test_a_row_without_a_delivery_snapshot_is_left_to_the_page_rule(tmp_path: Path) -> None:
+    """Rows written before pushes recorded their targets carry no
+    ``device_ids``. There is no way to attribute those to one device, so
+    they survive until the dashboard itself goes."""
+    ps, el, ss = _make_stores(tmp_path)
+    ps.save(_make_page("shared", device_ids=["panel_a", "panel_b"]))
+    el.record(type="push", source="page", target="shared", status="sent")
+
+    summary = device_cleanup.wipe_orphan_state(
+        device_id="panel_a",
+        page_store=ps,
+        event_log=el,
+        settings_store=ss,
+        data_root=tmp_path,
+        devices=_FakeRegistry("panel_b"),
+    )
+    assert summary.event_count == 0
+    assert len([r for r in el.list(limit=10) if r.type == "push"]) == 1
+
+
+def test_a_device_id_that_prefixes_another_keeps_its_neighbours_history(
+    tmp_path: Path,
+) -> None:
+    """The candidate query matches on the quoted id, so wiping ``panel``
+    doesn't reach ``panel_2``'s rows."""
+    ps, el, ss = _make_stores(tmp_path)
+    ps.save(_make_page("shared", device_ids=["panel", "panel_2"]))
+    _push(el, "shared", "panel")
+    _push(el, "shared", "panel_2")
+
+    device_cleanup.wipe_orphan_state(
+        device_id="panel",
+        page_store=ps,
+        event_log=el,
+        settings_store=ss,
+        data_root=tmp_path,
+        devices=_FakeRegistry("panel_2"),
+    )
+    assert _targets(el) == [["panel_2"]]

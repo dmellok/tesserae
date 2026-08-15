@@ -741,7 +741,12 @@ def _group_pages_for_index(pages: list[Page], devices: Any) -> list[tuple[Any, l
     for page in pages:
         matched: list[Any] = []
         if devices is not None:
-            for did in page.device_ids:
+            # Deduped: a binding is a set of devices even though it's
+            # stored as a list, and a repeated id listed the dashboard
+            # twice under the same section head (#229). The Page model
+            # collapses repeats on load, so this only catches a binding
+            # assigned in-process since.
+            for did in dict.fromkeys(page.device_ids):
                 candidate = devices.devices.get(did)
                 if candidate is not None:
                     matched.append(candidate)
@@ -803,7 +808,7 @@ def index() -> str:
         if devices is None:
             return []
         names: list[str] = []
-        for did in page.device_ids:
+        for did in dict.fromkeys(page.device_ids):
             device = devices.devices.get(did)
             if device is not None:
                 names.append(device.display_name)

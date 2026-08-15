@@ -259,6 +259,21 @@ class Page(BaseModel):
             data.pop("device_id", None)
         return data
 
+    @field_validator("device_ids", mode="before")
+    @classmethod
+    def _dedupe_device_ids(cls, value: Any) -> Any:
+        """Collapse repeats, keeping first-seen order.
+
+        A binding is a set of devices, but it's stored as a list and not
+        every write path checked. A repeated id used to double-list the
+        dashboard under that device, inflate its "Push to N linked
+        devices" count, and push to the same panel twice (#229). Fixing
+        it here means existing pages.json heals on load, rather than
+        needing every reader to defend itself."""
+        if isinstance(value, list):
+            return list(dict.fromkeys(v for v in value if isinstance(v, str) and v))
+        return value
+
     @field_validator("icon", mode="before")
     @classmethod
     def _strip_icon_prefix(cls, value: Any) -> Any:

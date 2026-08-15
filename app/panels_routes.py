@@ -572,7 +572,13 @@ def send(canvas_id: str) -> Response:
     body = request.get_json(silent=True) or {}
     picked = body.get("device_ids")
     if isinstance(picked, list):
-        page.device_ids = [str(x) for x in picked if isinstance(x, str) and x]
+        # Deduped: a binding is a set of devices. Persisting the posted
+        # list verbatim let a repeat through, which double-listed the
+        # dashboard under that device and pushed to the same panel twice
+        # (#229). Unknown ids are deliberately still accepted here, unlike
+        # the dashboard editor's binding: this route is a push target list,
+        # and a canvas bound before its device registers should still send.
+        page.device_ids = list(dict.fromkeys(str(x) for x in picked if isinstance(x, str) and x))
         _pages().save(page)
     if not page.device_ids:
         return _error(400, "no device selected")

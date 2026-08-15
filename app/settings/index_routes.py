@@ -488,6 +488,10 @@ def _orphan_state_counts_for(device: Device) -> dict[str, Any]:
         # Pages kept for a live co-owner, with this device dropped from their
         # binding. Counted separately so the modal doesn't imply they're deleted.
         "unbound_page_count": len(summary.unbound_page_ids),
+        # History rows kept because they also went to another device, with this
+        # one dropped from their delivery chips. Counted separately for the same
+        # reason: they aren't being deleted (#229).
+        "relabelled_event_count": summary.relabelled_event_count,
         "total": summary.total,
     }
 

@@ -33,6 +33,7 @@ mypy --strict applies to this module, see pyproject.toml.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -61,6 +62,9 @@ class OrphanSummary:
     # binding, because another live device still shows them (issue #229). Not
     # deleted, just unbound from this id.
     unbound_page_ids: list[str] = field(default_factory=list)
+    # History rows that SURVIVED because they were also delivered to another
+    # device, with this id dropped from their delivery snapshot (issue #229).
+    relabelled_event_count: int = 0
 
     @property
     def total(self) -> int:
@@ -71,6 +75,7 @@ class OrphanSummary:
             len(self.page_ids)
             + len(self.unbound_page_ids)
             + self.event_count
+            + self.relabelled_event_count
             + self.setting_keys_devices
             + self.setting_keys_renderers
             + (1 if self.has_calibration_image else 0)
@@ -141,50 +146,137 @@ def _unbind_device_from_pages(
     return changed
 
 
+def _candidate_event_rows(conn: Any, device_id: str, page_ids: list[str]) -> list[tuple[Any, ...]]:
+    """``(id, target, extra_json)`` for every row that might belong to
+    this device: a push at one of its exclusively-bound pages, a row
+    whose target carries the id (test patterns, button events), or a row
+    whose payload mentions the id at all.
+
+    The last clause is a coarse text match, deliberately. It only has to
+    be a superset; :func:`_partition_event_rows` parses each candidate
+    and decides. The quotes matter: ``"kitchen"`` does not match
+    ``"kitchen-2"``, so a device whose id prefixes another's doesn't drag
+    its neighbour's rows in."""
+    params: list[Any] = []
+    clauses: list[str] = []
+    if page_ids:
+        placeholders = ",".join(["?"] * len(page_ids))
+        clauses.append(f"target IN ({placeholders})")
+        params.extend(page_ids)
+    if device_id:
+        clauses.append("target LIKE ?")
+        params.append(f"%:{device_id}")
+        clauses.append("extra_json LIKE ?")
+        params.append(f'%"{device_id}"%')
+    if not clauses:
+        return []
+    sql = "SELECT id, target, extra_json FROM events WHERE " + " OR ".join(clauses)
+    return list(conn.execute(sql, params).fetchall())
+
+
+def _row_device_ids(extra_json: Any) -> list[str] | None:
+    """The devices a push row was actually delivered to, or None when the
+    row doesn't record them (rows written before the snapshot existed,
+    and every non-push type)."""
+    if not isinstance(extra_json, str) or not extra_json:
+        return None
+    try:
+        extra = json.loads(extra_json)
+    except (ValueError, TypeError):
+        return None
+    if not isinstance(extra, dict):
+        return None
+    raw = extra.get("device_ids")
+    if not isinstance(raw, list):
+        return None
+    return [d for d in raw if isinstance(d, str) and d]
+
+
+def _partition_event_rows(
+    rows: list[tuple[Any, ...]], device_id: str, page_ids: list[str]
+) -> tuple[list[int], list[tuple[int, str]]]:
+    """Split candidate rows into ``(delete_ids, relabel)``.
+
+    A push row names its page in ``target`` and the devices it was
+    delivered to in ``extra.device_ids``. Scoping the wipe on ``target``
+    alone can only ever be page-shaped, which got both halves wrong on a
+    dashboard shared between two panels (#229): deleting the first device
+    left its solo pushes behind, and deleting the second took the whole
+    dashboard's history including the first device's rows.
+
+    So the device's own rows are found by payload:
+
+    * every row for a page being deleted goes, whatever it names, because
+      the dashboard itself is going;
+    * a row delivered only to this device goes;
+    * a row delivered to this device *and* others stays, with the id
+      dropped from its snapshot, so History keeps the entry for the
+      devices that still exist and stops chipping it with a dead one;
+    * a row that records no devices is left to the page rule alone.
+    """
+    page_set = set(page_ids)
+    delete_ids: list[int] = []
+    relabel: list[tuple[int, str]] = []
+    for row_id, target, extra_json in rows:
+        if target in page_set:
+            delete_ids.append(int(row_id))
+            continue
+        if isinstance(target, str) and device_id and target.endswith(f":{device_id}"):
+            delete_ids.append(int(row_id))
+            continue
+        devices_on_row = _row_device_ids(extra_json)
+        if not devices_on_row or device_id not in devices_on_row:
+            continue
+        remaining = [d for d in devices_on_row if d != device_id]
+        if not remaining:
+            delete_ids.append(int(row_id))
+            continue
+        extra = json.loads(extra_json)
+        extra["device_ids"] = remaining
+        relabel.append((int(row_id), json.dumps(extra, default=str)))
+    return delete_ids, relabel
+
+
 def _event_count_for_device(event_log: EventLog, device_id: str, page_ids: list[str]) -> int:
-    """Count of event rows the wipe would delete: pushes targeting one
-    of the device's exclusively-bound pages, plus rows whose target
-    was labelled with the device id (test patterns, button events)."""
+    """Count of event rows the wipe would delete. Relabelled rows are not
+    counted here: they survive, and telling the operator a shared push is
+    about to be deleted when it isn't would be the wrong warning."""
     if not page_ids and not device_id:
         return 0
     with event_log._lock, event_log._conn() as conn:
-        params: list[Any] = []
-        clauses: list[str] = []
-        if page_ids:
-            placeholders = ",".join(["?"] * len(page_ids))
-            clauses.append(f"target IN ({placeholders})")
-            params.extend(page_ids)
-        if device_id:
-            clauses.append("target LIKE ?")
-            params.append(f"%:{device_id}")
-        if not clauses:
-            return 0
-        sql = "SELECT COUNT(*) FROM events WHERE " + " OR ".join(clauses)
-        row = conn.execute(sql, params).fetchone()
-    return int(row[0]) if row else 0
+        rows = _candidate_event_rows(conn, device_id, page_ids)
+    deleted, _relabel = _partition_event_rows(rows, device_id, page_ids)
+    return len(deleted)
 
 
-def _delete_events_for_device(event_log: EventLog, device_id: str, page_ids: list[str]) -> int:
-    """Deletion counterpart of :func:`_event_count_for_device`. Returns
-    the row count actually removed."""
+def _relabel_count_for_device(event_log: EventLog, device_id: str, page_ids: list[str]) -> int:
+    """How many surviving rows would have this device dropped from their
+    delivery snapshot."""
     if not page_ids and not device_id:
         return 0
     with event_log._lock, event_log._conn() as conn:
-        params: list[Any] = []
-        clauses: list[str] = []
-        if page_ids:
-            placeholders = ",".join(["?"] * len(page_ids))
-            clauses.append(f"target IN ({placeholders})")
-            params.extend(page_ids)
-        if device_id:
-            clauses.append("target LIKE ?")
-            params.append(f"%:{device_id}")
-        if not clauses:
-            return 0
-        sql = "DELETE FROM events WHERE " + " OR ".join(clauses)
-        cur = conn.execute(sql, params)
+        rows = _candidate_event_rows(conn, device_id, page_ids)
+    _deleted, relabel = _partition_event_rows(rows, device_id, page_ids)
+    return len(relabel)
+
+
+def _delete_events_for_device(
+    event_log: EventLog, device_id: str, page_ids: list[str]
+) -> tuple[int, int]:
+    """Apply :func:`_partition_event_rows`. Returns
+    ``(rows_deleted, rows_relabelled)``."""
+    if not page_ids and not device_id:
+        return 0, 0
+    with event_log._lock, event_log._conn() as conn:
+        rows = _candidate_event_rows(conn, device_id, page_ids)
+        delete_ids, relabel = _partition_event_rows(rows, device_id, page_ids)
+        if delete_ids:
+            placeholders = ",".join(["?"] * len(delete_ids))
+            conn.execute(f"DELETE FROM events WHERE id IN ({placeholders})", delete_ids)
+        for row_id, extra_json in relabel:
+            conn.execute("UPDATE events SET extra_json = ? WHERE id = ?", (extra_json, row_id))
         conn.commit()
-        return int(cur.rowcount)
+    return len(delete_ids), len(relabel)
 
 
 def _renderer_clone_prefix(device_id: str) -> str:
@@ -258,6 +350,7 @@ def list_orphan_state(
     pages bound to this device alone."""
     pages = _pages_for_device(page_store, device_id, devices)
     events = _event_count_for_device(event_log, device_id, pages)
+    relabelled = _relabel_count_for_device(event_log, device_id, pages)
     devices_keys, renderers_keys = _count_settings_for_device(settings_store, device_id)
     calibration = _calibration_image_path(data_root, device_id).exists()
     unbound = [
@@ -269,6 +362,7 @@ def list_orphan_state(
         device_id=device_id,
         page_ids=pages,
         event_count=events,
+        relabelled_event_count=relabelled,
         setting_keys_devices=devices_keys,
         setting_keys_renderers=renderers_keys,
         has_calibration_image=calibration,
@@ -302,7 +396,7 @@ def wipe_orphan_state(
     dropped from their binding rather than being left pointing at a device that
     no longer exists."""
     pages = _pages_for_device(page_store, device_id, devices)
-    removed_events = _delete_events_for_device(event_log, device_id, pages)
+    removed_events, relabelled_events = _delete_events_for_device(event_log, device_id, pages)
     for pid in pages:
         page_store.delete(pid)
     unbound = _unbind_device_from_pages(page_store, device_id, skip=pages)
@@ -320,6 +414,7 @@ def wipe_orphan_state(
         device_id=device_id,
         page_ids=pages,
         event_count=removed_events,
+        relabelled_event_count=relabelled_events,
         setting_keys_devices=devices_removed,
         setting_keys_renderers=renderers_removed,
         has_calibration_image=calibration_removed,
