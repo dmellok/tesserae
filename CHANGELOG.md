@@ -4,6 +4,18 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.302.1], 2026-08-15
+
+### Fixed
+
+- **Community templates, install and uninstall work again under the Home
+  Assistant App.** The merged Browse catalog (0.297.0) prefixed its request
+  URLs with the ingress path a second time, because the ones it reads from the
+  page already carry it. Home Assistant answered the doubled path with a 404,
+  which the page reported as "Template catalog unreachable right now"; install
+  and uninstall failed the same way. Requests now go through one idempotent
+  prefix helper, and a test pins both halves of the contract.
+
 ## [0.302.0], 2026-08-15
 
 ### Changed

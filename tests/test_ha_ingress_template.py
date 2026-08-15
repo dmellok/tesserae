@@ -136,3 +136,72 @@ def test_transport_rebuild_logs_when_ignoring_embedded_under_ha(
     a.config["REBUILD_TRANSPORT"]()
     assert any("HA add-on detected" in r.message for r in caplog.records)
     assert a.config.get("EMBEDDED_BROKER") is None
+
+
+def test_catalog_data_urls_already_carry_the_ingress_prefix(app: Flask) -> None:
+    """``url_for`` output includes SCRIPT_NAME, which the ingress middleware
+    sets from ``X-Ingress-Path``. The catalog hands those URLs to its client in
+    data-* attributes, so they arrive prefixed and must NOT be prefixed again:
+    doing so requested /api/hassio_ingress/<token>/api/hassio_ingress/<token>/…
+    and Home Assistant answered 404, which the page reported as the catalog
+    being unreachable."""
+    from unittest.mock import MagicMock
+
+    from app.marketplace import CatalogEntry, Marketplace
+
+    client = app.test_client()
+    _sign_in(client)
+    app.config["SETTINGS_STORE"].patch_section("app", {"online_features": True})
+    app.config["SETTINGS_STORE"].patch_section("experiments", {"templates": True})
+    entry = CatalogEntry(
+        id="sample",
+        name="Sample",
+        description="",
+        icon=None,
+        author_name="a",
+        author_github=None,
+        tags=[],
+        kind="widget",
+        tesserae_compat="0.x",
+        official=False,
+        screenshot_sizes=[],
+        extra_screenshot_count=0,
+        folders=None,
+        release_version="1.0.0",
+        release_tarball_url="https://x.invalid/s.tgz",
+        release_sha256="0" * 64,
+        source=None,
+    )
+    mkt = MagicMock(spec=Marketplace)
+    mkt.index_url.return_value = "https://catalog.invalid/widgets.json"
+    mkt.fetch_index.return_value = [entry]
+    mkt.cached_index.return_value = [entry]
+    mkt.installed.return_value = {}
+    mkt.screenshots_base.return_value = ""
+    mkt.plugins_dir.return_value = None
+    app.config["MARKETPLACE"] = mkt
+
+    prefix = "/api/hassio_ingress/abc123"
+    body = client.get("/plugins/browse", headers={"X-Ingress-Path": prefix}).get_data(as_text=True)
+    for attr in ("data-templates-url", "data-install-url", "data-uninstall-url"):
+        marker = attr + '="'
+        start = body.index(marker) + len(marker)
+        url = body[start : body.index('"', start)]
+        assert url.startswith(prefix + "/"), f"{attr} = {url}"
+
+
+def test_catalog_client_prefixes_urls_idempotently() -> None:
+    """The catalog's request URLs come from two places: literals in the script,
+    which need the prefix, and data-* attributes, which already have it. It has
+    had this wrong in both directions, so every request goes through the
+    idempotent ``withPrefix`` helper rather than bare concatenation."""
+    source = (REPO_ROOT / "static" / "catalog_browse.js").read_text(encoding="utf-8")
+    assert "function withPrefix(" in source
+    offenders = []
+    for lineno, line in enumerate(source.splitlines(), 1):
+        code = line.strip()
+        if code.startswith("//") or code.startswith("*"):
+            continue
+        if "fetch(" in code and "withPrefix(" not in code:
+            offenders.append(f"catalog_browse.js:{lineno}: {code}")
+    assert not offenders, "catalog request not routed through withPrefix:\n" + "\n".join(offenders)

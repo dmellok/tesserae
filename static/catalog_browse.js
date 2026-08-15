@@ -23,6 +23,19 @@
   // Assistant App every URL sits beneath /api/hassio_ingress/<token>/.
   var PREFIX = window.TESSERAE_URL_PREFIX || "";
 
+  // Prefix a path, unless it already carries the prefix. Two kinds of URL
+  // reach fetch() from here: literals written in this file, which need the
+  // prefix, and ones handed over in data-* attributes, which came from
+  // ``url_for`` and already have it because the ingress middleware puts the
+  // public path in SCRIPT_NAME. Prefixing the second kind produced
+  // /api/hassio_ingress/<token>/api/hassio_ingress/<token>/... and a 404 from
+  // Home Assistant, which the catalog reported as an unreachable server. The
+  // idempotent form means neither caller has to remember which kind it holds.
+  function withPrefix(url) {
+    if (!PREFIX || !url || url.indexOf(PREFIX + "/") === 0) return url;
+    return PREFIX + url;
+  }
+
   var payload = readPayload();
   var CATS = payload.categories || [];
   var MY_RES = payload.my_resolutions || [];
@@ -1008,7 +1021,10 @@
       note.appendChild(el("div", { text: "Needs these catalog items installed first:" }));
       var links = el("div", { class: "cat-sheet-note-links" });
       item.missing.forEach(function (id) {
-        var a = el("a", { href: PREFIX + "/plugins/browse?q=" + encodeURIComponent(id), text: id });
+        var a = el("a", {
+          href: withPrefix("/plugins/browse?q=" + encodeURIComponent(id)),
+          text: id,
+        });
         links.appendChild(a);
       });
       note.appendChild(links);
@@ -1095,7 +1111,7 @@
   // -- mutations ---------------------------------------------------------
 
   function post(url, body) {
-    return fetch(PREFIX + url, {
+    return fetch(withPrefix(url), {
       method: "POST",
       headers: { "X-Requested-With": "tesserae-fetch" },
       body: body,
@@ -1195,7 +1211,7 @@
       "form",
       {
         method: "post",
-        action: PREFIX + "/plugins/browse/restart",
+        action: withPrefix("/plugins/browse/restart"),
         class: "inline topbar-restart-form",
         "data-restart-form": "",
         "data-restart-label": "Restarting Tesserae",
@@ -1287,7 +1303,7 @@
       templatesError = null;
       return;
     }
-    fetch(PREFIX + url, { headers: { "X-Requested-With": "tesserae-fetch" } })
+    fetch(withPrefix(url), { headers: { "X-Requested-With": "tesserae-fetch" } })
       .then(function (resp) {
         return resp.json().then(function (body) {
           return { ok: resp.ok, body: body };
