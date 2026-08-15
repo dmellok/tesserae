@@ -818,13 +818,28 @@ def blueprint() -> Blueprint:
         interval_s = max(60, min(interval_min * 60, 86_400))
 
         prev = store.get(folder)
+        # A save replaces the whole record, so fields this form doesn't edit
+        # are carried across rather than left to fall back to the model
+        # defaults. An album can also be authored elsewhere (MCP, and the
+        # Companion API once it lands), and those surfaces can set an explicit
+        # frame order, disable an album, or pick an interval that isn't a whole
+        # number of minutes. Renaming a folder's album here shouldn't silently
+        # drop any of that.
+        order = list(prev.order) if prev is not None else []
+        enabled = prev.enabled if prev is not None else True
+        # The field can only show whole minutes, so an unchanged one means "as
+        # it was", not "round it to what I can see".
+        if prev is not None and interval_min == prev.playback.interval_s // 60:
+            interval_s = prev.playback.interval_s
         try:
             album = Album.model_validate(
                 {
                     "id": folder,
                     "name": name,
+                    "enabled": enabled,
                     "device_ids": device_ids,
                     "source_folder": folder,
+                    "order": order,
                     "fit": fit,
                     "playback": {"mode": mode, "interval_s": interval_s, "repeat": repeat},
                 }
@@ -871,6 +886,14 @@ def blueprint() -> Blueprint:
             flash(
                 f"Skipped {refused} display{'' if refused == 1 else 's'} that reported "
                 "no frame cache; an offline album can't play there.",
+                "warn",
+            )
+        if not enabled:
+            # Nothing here can disable an album, so this one was turned off
+            # elsewhere. Saying so beats a success message about displays it
+            # isn't playing on.
+            flash(
+                "This album is disabled, so it isn't playing on the displays it's bound to.",
                 "warn",
             )
         return redirect(url_for("picture_gallery_admin.show_folder", folder=folder))

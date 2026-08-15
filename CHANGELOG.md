@@ -4,6 +4,20 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.305.0], 2026-08-16
+
+### Fixed
+
+- **Saving an album from the Gallery kept only what that form can edit.** The
+  album form builds a whole record from its own fields, so an explicit frame
+  order, a disabled album, or an interval that isn't a round number of minutes
+  was dropped the next time someone renamed the album or changed its displays.
+  All three come from surfaces the form knows nothing about (the MCP tools
+  today, the Companion API next), and none of them are the form's to discard.
+  A save now carries them across, leaves the interval alone unless the minutes
+  field actually changed, and says an album is disabled instead of reporting a
+  success about displays it isn't playing on.
+
 ## [0.304.0], 2026-08-16
 
 ### Added

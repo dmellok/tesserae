@@ -425,6 +425,62 @@ def test_use_as_album_drops_a_target_that_reported_no_frame_cache(app: Flask) ->
     assert album.device_ids == ["frame01"]
 
 
+def test_use_as_album_keeps_what_the_form_cannot_edit(app: Flask) -> None:
+    """The form saves a whole record, so an explicit frame order, a disabled
+    album, and an interval that isn't a round number of minutes all survive a
+    save from here: those come from surfaces this form knows nothing about."""
+    client = app.test_client()
+    token = _register_esp32(app, client, "frame01")
+    client.post("/api/v1/device/frame01/status", headers=_auth(token), data=json.dumps(CAP))
+    _seed_folder(app, "holidays", ["a.jpg", "b.jpg"])
+    store = app.config["ALBUM_STORE"]
+    store.upsert(
+        Album.model_validate(
+            {
+                "id": "holidays",
+                "name": "Holidays",
+                "enabled": False,
+                "device_ids": ["frame01"],
+                "source_folder": "holidays",
+                "order": ["b.jpg", "a.jpg"],
+                "fit": "fill",
+                "playback": {"mode": "sequential", "interval_s": 90, "repeat": "loop"},
+            }
+        )
+    )
+
+    client.post(
+        "/plugins/picture_gallery/folders/holidays/use-as-album",
+        data={
+            "name": "Beach trip",
+            "device_ids": ["frame01"],
+            "fit": "fit",
+            "mode": "sequential",
+            "interval_min": "1",  # what 90s renders as; unchanged
+            "repeat": "loop",
+        },
+        follow_redirects=False,
+    )
+    album = store.get("holidays")
+    assert album is not None
+    assert album.name == "Beach trip"  # the edit lands
+    assert album.fit == "fit"
+    assert album.order == ["b.jpg", "a.jpg"]
+    assert album.enabled is False
+    assert album.playback.interval_s == 90
+
+    # A real change to the minutes field still takes effect.
+    client.post(
+        "/plugins/picture_gallery/folders/holidays/use-as-album",
+        data={"name": "Beach trip", "device_ids": ["frame01"], "interval_min": "20"},
+        follow_redirects=False,
+    )
+    reloaded = store.get("holidays")
+    assert reloaded is not None
+    assert reloaded.playback.interval_s == 20 * 60
+    assert reloaded.order == ["b.jpg", "a.jpg"]
+
+
 def test_use_as_album_rejects_empty_folder(app: Flask) -> None:
     client = app.test_client()
     _register_esp32(app, client, "frame01")
