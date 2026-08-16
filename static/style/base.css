@@ -99,6 +99,15 @@
   --t-border:        var(--t-200);
   --t-border-strong: var(--t-300);
 
+  /* Categorical chart series (v0.307). Three hues plus a neutral for
+     "other", validated for colour-blind separation against the light and
+     dark chart surfaces, and kept clear of the status colours below so a
+     series can never read as "this one is failing". */
+  --t-chart-1: #2a78d6;
+  --t-chart-2: #eb6834;
+  --t-chart-3: #0d8c7e;
+  --t-chart-other: #8d8c86;
+
   --t-danger:    #dc2626;
   --t-danger-bg: #fef2f2;
   --t-warn:      #d97706;
@@ -225,6 +234,12 @@
   --t-accent-soft:   color-mix(in oklab, #2dd4bf 18%, #181b21);
   --t-accent-fg:     #04241f;
   --t-accent-ink:    #99f6e4;
+
+  /* Same three hues, stepped for the dark surface rather than flipped. */
+  --t-chart-1: #3987e5;
+  --t-chart-2: #d95926;
+  --t-chart-3: #16a394;
+  --t-chart-other: #7b8290;
 
   --t-danger:    #f87171;
   --t-danger-bg: color-mix(in oklab, #f87171 18%, #181b21);

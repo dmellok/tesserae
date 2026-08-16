@@ -192,6 +192,25 @@ and is only surfaced inside the admin UI (Settings → Devices, the
 battery indicator, smart-sync scheduling). It is never transmitted
 off the box.
 
+## Local stats (stays on the server)
+
+The **Stats** page counts what your install does: pushes per day and what
+asked for them, frames painted per display, how often each panel checks
+in, how long a render takes, and how many of each other event the server
+logged. It exists because the event log is capped and rolls over, so
+anything spanning months has to be aggregated as it happens.
+
+Those counters live in `data/core/stats.db` on your server. Nothing reads
+them except the Stats page and your own export button, and there is no
+client or upload path that could send them anywhere. Every row is a date,
+a metric name, a dimension, and an integer: no URLs, no dashboard titles,
+no push contents, and no clock times finer than the day. Dimensions are
+ids you already have (a device id, an event type), and names are resolved
+for display rather than written to the file.
+
+The page carries the controls to match: export the whole store as JSON,
+pause collection, or delete every counter.
+
 ## Docs site analytics
 
 Aggregate analytics on the documentation site

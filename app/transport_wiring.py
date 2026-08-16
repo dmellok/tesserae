@@ -441,6 +441,12 @@ def record_status_heartbeat(
     # ``battery_mv`` via the LiPo curve) is visible. Firmwares that
     # publish only voltage land as ``parsed["battery_pct"] = None``
     # and the derivation runs during the merge above.
+    # Wake count for /stats. Bumped here rather than from the event log
+    # because a steady heartbeat deliberately isn't logged, so counting
+    # log rows would only see the beats where something changed.
+    stats_recorder = app.config.get("STATS_RECORDER")
+    if stats_recorder is not None and "error" not in parsed:
+        stats_recorder.record_wake(device.id)
     battery_history = app.config.get("BATTERY_HISTORY")
     if (
         battery_history is not None

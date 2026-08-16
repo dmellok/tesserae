@@ -1,0 +1,246 @@
+{% extends "_base.html" %}
+{% from "_components.html" import section_card, button %}
+{% block title %}Stats, Tesserae{% endblock %}
+
+{% block main %}
+<header class="page-head">
+  <h1><i class="ph ph-chart-bar"></i> Stats</h1>
+  <p class="lede">
+    What this install has actually done. Counted here, stored here, sent nowhere.
+  </p>
+</header>
+
+{% if not available %}
+<div class="dx-empty">
+  <div class="dx-empty-icon"><i class="ph ph-chart-bar" aria-hidden="true"></i></div>
+  <p class="dx-empty-title">Stats aren't wired up</p>
+  <p class="dx-empty-help">This build has no stats store configured, so there's nothing to show.</p>
+</div>
+{% else %}
+
+<nav class="dx-filter-strip" role="tablist" aria-label="Stats window">
+  {% for w in window_options %}
+  <a href="{{ url_for('stats.index', window=w) }}" role="tab"
+     class="dx-filter-chip{% if w == window %} is-active{% endif %}"
+     title="Show the last {{ w }} days">
+    <i class="ph ph-clock" aria-hidden="true"></i><span>{{ w }}d</span>
+  </a>
+  {% endfor %}
+  <span class="dx-filter-note">
+    {% if paused %}
+    <i class="ph ph-pause-circle" aria-hidden="true"></i> Collection paused
+    {% else %}
+    Collecting since {{ since }}
+    {% endif %}
+  </span>
+</nav>
+
+<div class="dx-stat-tiles">
+  {% for tile in tiles %}
+  <article class="dx-stat-tile">
+    <p class="dx-stat-label">{{ tile.label }}</p>
+    <p class="dx-stat-value">
+      {{ "{:,}".format(tile.value) }}{% if tile.unit %}<span class="dx-stat-unit">{{ tile.unit }}</span>{% endif %}
+    </p>
+    <p class="dx-stat-note">{{ tile.note }}</p>
+  </article>
+  {% endfor %}
+</div>
+
+{% call section_card(icon='chart-bar', title='Pushes per day',
+                     description='Every push this install made, grouped by what asked for it.') %}
+  {% if pushes.total == 0 %}
+  <div class="dx-empty">
+    <div class="dx-empty-icon"><i class="ph ph-wind" aria-hidden="true"></i></div>
+    <p class="dx-empty-title">Nothing counted yet</p>
+    <p class="dx-empty-help">Counting started on {{ since }}. Send a dashboard to a display and it lands here.</p>
+  </div>
+  {% else %}
+  <ul class="dx-chart-legend">
+    {% for s in pushes.series %}
+    <li><span class="dx-legend-swatch" data-series="{{ s.label }}"></span>{{ s.label }}</li>
+    {% endfor %}
+  </ul>
+  <div class="dx-chart-frame">
+    <canvas id="pushes-chart" height="220" role="img"
+            aria-label="Daily pushes over the last {{ window }} days, grouped by source"></canvas>
+  </div>
+  {# Series data rides in a JSON script block rather than a data-
+     attribute: tojson is escaped for script context, and its inner
+     double quotes would end a quoted attribute early. #}
+  <script id="pushes-data" type="application/json">{{ {"days": pushes.days, "series": pushes.series} | tojson }}</script>
+  <details class="dx-chart-table">
+    <summary>Show as a table</summary>
+    <table class="dx-table">
+      <thead>
+        <tr><th scope="col">Day</th>{% for s in pushes.series %}<th scope="col">{{ s.label }}</th>{% endfor %}</tr>
+      </thead>
+      <tbody>
+        {% for day in pushes.days %}
+        {% set outer = loop.index0 %}
+        <tr>
+          <th scope="row">{{ day }}</th>
+          {% for s in pushes.series %}<td>{{ s.values[outer] }}</td>{% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </details>
+  {% endif %}
+{% endcall %}
+
+<div class="dx-stats-columns">
+  {% call section_card(icon='monitor', title='Displays',
+                       description='Frames painted per display over the window, and how often each one checked in.') %}
+    {% if not devices %}
+    <p class="dx-muted-note">No frames counted in this window.</p>
+    {% else %}
+    {% set busiest = devices[0].frames or 1 %}
+    <ul class="dx-bar-list">
+      {% for d in devices %}
+      <li>
+        <div class="dx-bar-row">
+          <span class="dx-bar-label">
+            {{ d.name }}
+            {% if not d.known %}<span class="dx-bar-tag" title="Not a registered display any more">gone</span>{% endif %}
+          </span>
+          <span class="dx-bar-value">{{ "{:,}".format(d.frames) }}</span>
+        </div>
+        <div class="dx-bar-track">
+          <span class="dx-bar-fill" style="width: {{ (d.frames * 100 / busiest) | round(1) }}%"></span>
+        </div>
+        {% if d.wakes %}<p class="dx-bar-sub">{{ "{:,}".format(d.wakes) }} check-ins</p>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  {% endcall %}
+
+  {% call section_card(icon='list-checks', title='Outcomes',
+                       description='What happened to each push, and what else the server logged.') %}
+    {% if not outcomes %}
+    <p class="dx-muted-note">No pushes counted in this window.</p>
+    {% else %}
+    <table class="dx-table">
+      <thead><tr><th scope="col">Outcome</th><th scope="col">Count</th><th scope="col">Share</th></tr></thead>
+      <tbody>
+        {% for row in outcomes %}
+        <tr>
+          <th scope="row">{{ row.label }}</th>
+          <td>{{ "{:,}".format(row.value) }}</td>
+          <td class="dx-share">{{ row.share }}%</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+    {% if activity %}
+    <h4 class="dx-subhead">Other activity</h4>
+    <ul class="dx-chip-list">
+      {% for kind, count in activity %}
+      <li><span class="dx-chip-key">{{ kind }}</span><span class="dx-chip-value">{{ "{:,}".format(count) }}</span></li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  {% endcall %}
+</div>
+
+{% call section_card(icon='stack', title='This install',
+                     description='Counted right now, not stored day by day.') %}
+  <ul class="dx-fleet-list">
+    {% for item in fleet %}
+    <li><span class="dx-fleet-value">{{ item.value }}</span><span class="dx-fleet-label">{{ item.label }}</span></li>
+    {% endfor %}
+  </ul>
+{% endcall %}
+
+{% call section_card(icon='lock-key', title='Where this data lives',
+                     description='Nothing on this page is transmitted anywhere. There is no client and no upload path.') %}
+  <p class="dx-privacy-line">
+    Counters are written to <code>{{ db_path }}</code> inside your data directory. Every row is a
+    date, a metric, a dimension, and a number: no URLs, no dashboard titles, no message contents,
+    and no clock times finer than the day.
+  </p>
+  <h4 class="dx-subhead">What's recorded</h4>
+  <ul class="dx-metric-list">
+    {% for name, description in metrics %}
+    <li><code>{{ name }}</code><span>{{ description }}</span></li>
+    {% endfor %}
+  </ul>
+  <div class="dx-privacy-actions">
+    <a class="button ghost" href="{{ url_for('stats.export') }}">
+      <i class="ph ph-download-simple" aria-hidden="true"></i> Export as JSON
+    </a>
+    <form method="post" action="{{ url_for('stats.pause') }}">
+      {{ button('Resume collecting' if paused else 'Pause collecting', variant='ghost', icon='pause') }}
+    </form>
+    <form method="post" action="{{ url_for('stats.delete') }}"
+          onsubmit="return confirm('Delete every counter? The page starts from zero.');">
+      {{ button('Delete all stats', variant='ghost danger', icon='trash') }}
+    </form>
+  </div>
+{% endcall %}
+
+<script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
+<script src="{{ url_for('static', filename='admin-chart.js') }}"></script>
+<script>
+  (function () {
+    var canvas = document.getElementById("pushes-chart");
+    var payload = document.getElementById("pushes-data");
+    if (!canvas || !payload || typeof Chart === "undefined" || !window.TesseraeCharts) return;
+    var helpers = window.TesseraeCharts;
+    var days, series;
+    try {
+      var parsed = JSON.parse(payload.textContent);
+      days = parsed.days;
+      series = parsed.series;
+    } catch (e) { return; }
+    if (!days || !series || !days.length || !series.length) return;
+
+    /* Swatches read their colour from the same lookup the bars do, so the
+       legend can never drift from the chart. */
+    document.querySelectorAll(".dx-legend-swatch").forEach(function (node) {
+      node.style.background = helpers.seriesColor(node.dataset.series);
+    });
+
+    var surface = helpers.token("--t-surface", "#ffffff");
+    var last = series.length - 1;
+    var datasets = series.map(function (s, i) {
+      return {
+        label: s.label,
+        data: s.values,
+        backgroundColor: helpers.seriesColor(s.label),
+        /* A 2px surface-coloured edge keeps stacked segments from
+           bleeding into each other; only the top of the stack gets the
+           rounded cap so a bar still reads as one column. */
+        borderColor: surface,
+        borderWidth: { top: 2, right: 0, bottom: 0, left: 0 },
+        borderRadius: i === last ? 4 : 0,
+        borderSkipped: false,
+        maxBarThickness: 26,
+      };
+    });
+
+    var options = helpers.baseOptions();
+    options.plugins.tooltip.callbacks = {
+      title: function (items) {
+        var d = new Date(items[0].label + "T00:00:00");
+        return isNaN(d) ? items[0].label
+          : d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+      },
+    };
+    options.scales.x.ticks.callback = function (value, index) {
+      var raw = days[index] || "";
+      var d = new Date(raw + "T00:00:00");
+      return isNaN(d) ? raw : d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    };
+
+    new Chart(canvas.getContext("2d"), {
+      type: "bar",
+      data: { labels: days, datasets: datasets },
+      options: options,
+    });
+  })();
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,347 @@
+/* /stats — local activity dashboard.
+ *
+ * Same card + token vocabulary as the other dx- admin sheets; the only
+ * new pieces are the stat tiles, the CSS bar list (used instead of a
+ * second canvas, so the per-display numbers are real text that reads in
+ * a screen reader and copies out of the page), and the chart legend.
+ */
+
+.dx-stat-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin: 0 0 20px;
+}
+
+.dx-stat-tile {
+  background: var(--t-surface);
+  border: 1px solid var(--t-border);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+
+.dx-stat-label {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--t-muted);
+}
+
+.dx-stat-value {
+  margin: 6px 0 2px;
+  font-size: 1.75rem;
+  font-weight: 650;
+  line-height: 1.1;
+  color: var(--t-fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.dx-stat-unit {
+  margin-left: 3px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--t-muted);
+}
+
+.dx-stat-note {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--t-muted);
+}
+
+.dx-filter-note {
+  margin-left: auto;
+  align-self: center;
+  font-size: 0.82rem;
+  color: var(--t-muted);
+}
+
+/* Chart -------------------------------------------------------------- */
+
+.dx-chart-frame {
+  position: relative;
+  height: 240px;
+}
+
+.dx-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+  font-size: 0.85rem;
+  /* Labels wear text tokens, never the series colour; the swatch beside
+     them carries the identity. */
+  color: var(--t-fg-soft);
+}
+
+.dx-chart-legend li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.dx-legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: var(--t-chart-other);
+}
+
+.dx-chart-table {
+  margin-top: 14px;
+  font-size: 0.85rem;
+}
+
+.dx-chart-table summary {
+  cursor: pointer;
+  color: var(--t-muted);
+}
+
+.dx-chart-table[open] summary {
+  margin-bottom: 10px;
+}
+
+.dx-chart-table .dx-table {
+  display: block;
+  max-height: 260px;
+  overflow: auto;
+}
+
+/* Two-column body ---------------------------------------------------- */
+
+.dx-stats-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+/* Bar list ----------------------------------------------------------- */
+
+.dx-bar-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.dx-bar-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.dx-bar-label {
+  font-size: 0.92rem;
+  color: var(--t-fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dx-bar-tag {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--t-pill-neutral-bg, var(--t-surface-sunk));
+  color: var(--t-muted);
+  font-size: 0.72rem;
+}
+
+.dx-bar-value {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--t-fg);
+}
+
+.dx-bar-track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--t-surface-sunk);
+  overflow: hidden;
+}
+
+.dx-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--t-chart-1);
+}
+
+.dx-bar-sub {
+  margin: 5px 0 0;
+  font-size: 0.8rem;
+  color: var(--t-muted);
+}
+
+/* Tables and chips --------------------------------------------------- */
+
+.dx-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.dx-table th,
+.dx-table td {
+  padding: 7px 10px 7px 0;
+  text-align: left;
+  border-bottom: 1px solid var(--t-border);
+}
+
+.dx-table thead th {
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--t-muted);
+  font-weight: 600;
+}
+
+.dx-table tbody th {
+  font-weight: 500;
+  color: var(--t-fg);
+}
+
+.dx-table td {
+  font-variant-numeric: tabular-nums;
+  color: var(--t-fg-soft);
+}
+
+.dx-share {
+  color: var(--t-muted);
+}
+
+.dx-subhead {
+  margin: 18px 0 8px;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--t-muted);
+}
+
+.dx-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dx-chip-list li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--t-border);
+  border-radius: 999px;
+  font-size: 0.84rem;
+}
+
+.dx-chip-key {
+  color: var(--t-fg-soft);
+}
+
+.dx-chip-value {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--t-fg);
+}
+
+.dx-muted-note {
+  margin: 0;
+  color: var(--t-muted);
+  font-size: 0.9rem;
+}
+
+/* Fleet + privacy ---------------------------------------------------- */
+
+.dx-fleet-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dx-fleet-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--t-surface-sunk);
+}
+
+.dx-fleet-value {
+  font-size: 1.3rem;
+  font-weight: 650;
+  color: var(--t-fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.dx-fleet-label {
+  font-size: 0.8rem;
+  color: var(--t-muted);
+}
+
+.dx-privacy-line {
+  margin: 0;
+  color: var(--t-fg-soft);
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
+.dx-metric-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 0.88rem;
+}
+
+.dx-metric-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.dx-metric-list code {
+  color: var(--t-fg);
+  background: var(--t-surface-sunk);
+  border-radius: 5px;
+  padding: 1px 6px;
+}
+
+.dx-metric-list span {
+  color: var(--t-muted);
+}
+
+.dx-privacy-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.dx-privacy-actions form {
+  margin: 0;
+}
+
+@media (max-width: 640px) {
+  .dx-chart-frame {
+    height: 200px;
+  }
+}

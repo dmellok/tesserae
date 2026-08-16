@@ -4,6 +4,22 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.307.0], 2026-08-16
+
+### Added
+
+- **A Stats page, counted and kept on your own server.** The event log is
+  capped and rolls over within days, so until now nothing could answer how
+  much work an install actually does. `/stats` now shows pushes per day
+  grouped by what asked for them, frames painted per display, check-ins,
+  render times, outcomes, and a snapshot of what the install is made of.
+  Counters are aggregated as events happen into `data/core/stats.db`: one
+  row per date, metric, and dimension, with no URLs, dashboard titles,
+  push contents, or clock times finer than the day. Nothing reads that
+  file except the page and the export button, and the page carries the
+  controls to prove it: export the whole store as JSON, pause collecting,
+  or delete every counter. Documented under Privacy.
+
 ## [0.306.0], 2026-08-16
 
 ### Added

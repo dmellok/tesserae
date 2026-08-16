@@ -105,6 +105,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='style/dx-marketplace.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='style/dx-history.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='style/dx-events.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style/dx-stats.css') }}">
   {# Mobile responsive pass — loads last so its @media rules win
      against any per-page sheet's narrow-viewport breakpoints. #}
   <link rel="stylesheet" href="{{ url_for('static', filename='style/dx-responsive.css') }}">
@@ -141,6 +142,12 @@
       <a href="{{ url_for('history.index') }}"
          class="{% if request.blueprint == 'history' %}is-active{% endif %}">
          <i class="ph ph-clock-counter-clockwise" aria-hidden="true"></i><span>History</span>
+      </a>
+      {# Stats sits beside History on purpose: same subject, one is the
+         individual rows and the other is what they add up to. #}
+      <a href="{{ url_for('stats.index') }}"
+         class="{% if request.blueprint == 'stats' %}is-active{% endif %}">
+         <i class="ph ph-chart-bar" aria-hidden="true"></i><span>Stats</span>
       </a>
       <a href="{{ url_for('themes.index') }}"
          class="{% if request.blueprint == 'themes' %}is-active{% endif %}">

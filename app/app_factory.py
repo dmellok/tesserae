@@ -47,6 +47,7 @@ from app import (
     schedule_routes,
     send_routes,
     settings_routes,
+    stats_routes,
     themes_routes,
     touch_monitor_routes,
     trmnl_api,
@@ -668,6 +669,19 @@ def create_app(
     app.config["USER_THEMES_STORE"] = user_themes_store
     app.config["COMMUNITY_THEMES_STORE"] = community_themes_store
     app.config["EVENT_LOG"] = event_log
+    # Local-only daily counters behind /stats. The event log is capped,
+    # so anything spanning months has to be aggregated as it happens;
+    # the recorder listens to the log rather than instrumenting the push
+    # path, so every event type is counted from one place. Nothing here
+    # leaves the instance (app/state/stats_store.py).
+    from app.state.stats_store import StatsStore
+    from app.stats_recorder import StatsRecorder
+
+    stats_store = StatsStore(data_root / "core" / "stats.db")
+    stats_recorder = StatsRecorder(stats_store)
+    event_log.add_listener(stats_recorder.on_event)
+    app.config["STATS_STORE"] = stats_store
+    app.config["STATS_RECORDER"] = stats_recorder
     # Smart-sync per-device telemetry (issue #10). Persisted under
     # data/core/device_telemetry.json. Step 1 only tracks heartbeats +
     # computes predictions; the scheduler hook that acts on them is
@@ -978,6 +992,7 @@ def create_app(
     send_routes.register(app)
     history_routes.register(app)
     device_battery_routes.register(app)
+    stats_routes.register(app)
     events_routes.register(app)
     touch_monitor_routes.register(app)
     page_routes.register(app)
