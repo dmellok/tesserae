@@ -18,6 +18,10 @@
 </div>
 {% else %}
 
+{# One vertical rhythm for the page: the stack owns the spacing and the
+   children's own margins are reset, so tiles, cards, and the two-column
+   grid can't each contribute a different gap. #}
+<div class="dx-stats-stack">
 <nav class="dx-filter-strip" role="tablist" aria-label="Stats window">
   {% for w in window_options %}
   <a href="{{ url_for('stats.index', window=w) }}" role="tab"
@@ -210,6 +214,7 @@
     </form>
   </div>
 {% endcall %}
+</div>
 
 <script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
 <script src="{{ url_for('static', filename='admin-chart.js') }}"></script>

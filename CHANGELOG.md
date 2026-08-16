@@ -4,6 +4,19 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.308.1], 2026-08-16
+
+### Fixed
+
+- **Uneven gaps between the cards on the Stats page.** Three different
+  things were spacing the page: the tiles and sponsor card carried their
+  own bottom margins, adjacent section cards get 16px from a global rule,
+  and that rule stops applying the moment a wrapper (the two-column grid)
+  sits between two cards, which left some seams at zero. The page now
+  stacks with a single 16px flex gap and resets the parts that were
+  contributing their own, including the adjacent-card rule that outranks a
+  plain reset.
+
 ## [0.308.0], 2026-08-16
 
 ### Added

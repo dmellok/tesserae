@@ -6,11 +6,34 @@
  * a screen reader and copies out of the page), and the chart legend.
  */
 
+/* Page rhythm. The section cards are spaced by
+   `.dx-section-card + .dx-section-card` elsewhere, which stops working the
+   moment a wrapper (the two-column grid) sits between two of them, and the
+   tiles and sponsor card each carried their own bottom margin on top of
+   that. One flex gap owns every vertical gap on the page instead, matching
+   the 16px the rest of the admin UI uses. */
+.dx-stats-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--t-space-4);
+}
+
+.dx-stats-stack > * {
+  margin: 0;
+}
+
+/* settings.css spaces adjacent cards with `.dx-section-card +
+   .dx-section-card`, which is two classes and so outranks the reset
+   above; left alone it adds its 16px on top of the flex gap and the last
+   two cards drift to 32px. */
+.dx-stats-stack > .dx-section-card + .dx-section-card {
+  margin-top: 0;
+}
+
 .dx-stat-tiles {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 12px;
-  margin: 0 0 20px;
 }
 
 .dx-stat-tile {
@@ -357,7 +380,6 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin: 0 0 20px;
   padding: 16px 18px;
   border: 1px solid var(--t-accent-soft);
   border-left: 3px solid var(--t-accent);
