@@ -4,6 +4,21 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.309.1], 2026-08-16
+
+### Fixed
+
+- **Portrait pictures arrived sideways on mono and greyscale ESP32
+  panels.** `esp32_bw_bin`, `esp32_gray_bin` and `esp32_gray2_bin` decided
+  the quarter turn by comparing the *source image's* aspect with the
+  firmware's row stride, so any picture taller than it is wide was turned
+  90° on a landscape panel, whether or not the panel wanted a turn. A turn
+  belongs to the panel: the upload is now fitted to the display's
+  composition first, and rotated only when the composition and the
+  hardware stride actually disagree, which is what `esp32_bin` and the
+  CircuitPython path already did. Dashboards were unaffected, they arrive
+  composition-sized.
+
 ## [0.309.0], 2026-08-16
 
 ### Fixed

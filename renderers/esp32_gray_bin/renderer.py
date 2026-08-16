@@ -74,19 +74,34 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
     if regions:
         mask_img = rasterize_region_mask(regions, img.width, img.height)
     native_w, native_h = _firmware_native_dims(panel)
+    fit = str(settings.get("image_fit") or "fit")
+
+    # A Send-page / webhook upload is arbitrary source media, not a
+    # pre-composed panel frame. Fit it into the display's *composition*
+    # dimensions before considering the firmware-native row stride.
+    #
+    # Comparing the raw image's aspect to the firmware aspect here turned
+    # every portrait photo sent to a landscape panel 90° CW: the source
+    # says which way the picture is, not which way the panel is (esp32_bin
+    # carried the same bug in the other direction, discussion #231).
+    if img.size != (panel.w, panel.h):
+        img = fit_to_panel(img, target_w=panel.w, target_h=panel.h, scale=fit, bg="white")
+
     firmware_landscape = native_w > native_h
-    img_landscape = img.size[0] > img.size[1]
-    orientation_mismatch = firmware_landscape != img_landscape
+    composition_landscape = panel.w > panel.h
+    orientation_mismatch = firmware_landscape != composition_landscape
     if orientation_mismatch:
-        # Orientation mismatch: rotate 90 deg CW so the input's left
-        # edge lands at the panel's top edge (same convention as
-        # esp32_bin / esp32_bw_bin).
+        # The composition orientation differs from the hardware row
+        # stride: rotate 90 deg CW so its left edge lands at the panel's
+        # top edge (same convention as esp32_bin / esp32_bw_bin).
         img = img.rotate(-90, expand=True)
     if panel.flip:
         # Upside-down physical mount; turn 180 deg so it reads upright.
         img = img.rotate(180, expand=True)
     if img.size != (native_w, native_h):
-        fit = str(settings.get("image_fit") or "fit")
+        # Normally the composition dims equal the native dims (or the
+        # exact swapped pair after rotation). Bounded fallback for
+        # custom / legacy manifests whose declared sizes differ.
         img = fit_to_panel(img, target_w=native_w, target_h=native_h, scale=fit, bg="white")
     if panel.underscan:
         img = underscan_image(img, underscan=panel.underscan)
