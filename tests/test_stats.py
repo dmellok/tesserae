@@ -248,3 +248,114 @@ def test_chart_payload_is_parseable_json_in_the_page(app: Flask) -> None:
     assert len(payload["days"]) == 7
     assert {s["label"] for s in payload["series"]} == {"scheduled", "integrations", "by hand"}
     assert all(len(s["values"]) == 7 for s in payload["series"])
+
+
+# -- sponsor prompt ---------------------------------------------------
+
+
+class _Settings:
+    """Minimal stand-in for the settings store's section API."""
+
+    def __init__(self) -> None:
+        self.data: dict[str, dict[str, object]] = {}
+
+    def get_section(self, section: str) -> dict[str, object]:
+        return dict(self.data.get(section, {}))
+
+    def patch_section(self, section: str, values: dict[str, object]) -> None:
+        self.data.setdefault(section, {}).update(values)
+
+
+def _minted(days_ago: int) -> str:
+    from datetime import UTC, datetime, timedelta
+
+    return (datetime.now(UTC) - timedelta(days=days_ago)).isoformat()
+
+
+def test_sponsor_prompt_stays_quiet_below_both_milestones(store: StatsStore) -> None:
+    from app import sponsor_prompt
+
+    store.bump(FRAMES_BY_DEVICE, "frame01", 500)
+    assert (
+        sponsor_prompt.state(settings=_Settings(), stats=store, install_created_at=_minted(30))
+        is None
+    )
+
+
+def test_sponsor_prompt_fires_on_frames_and_on_age(store: StatsStore) -> None:
+    from app import sponsor_prompt
+
+    store.bump(FRAMES_BY_DEVICE, "frame01", 10_000)
+    by_frames = sponsor_prompt.state(
+        settings=_Settings(), stats=store, install_created_at=_minted(30)
+    )
+    assert by_frames is not None
+    assert by_frames["reason"] == "frames"
+    assert by_frames["frames"] == 10_000
+
+    quiet = StatsStore(store._path.with_name("other.db"))
+    by_age = sponsor_prompt.state(
+        settings=_Settings(), stats=quiet, install_created_at=_minted(400)
+    )
+    assert by_age is not None
+    assert by_age["reason"] == "years"
+    assert by_age["years"] == 1
+
+
+def test_sponsor_prompt_dismissal_is_permanent(store: StatsStore) -> None:
+    from app import sponsor_prompt
+
+    settings = _Settings()
+    store.bump(FRAMES_BY_DEVICE, "frame01", 20_000)
+    assert sponsor_prompt.state(settings=settings, stats=store, install_created_at=_minted(500))
+
+    sponsor_prompt.dismiss(settings)
+    assert (
+        sponsor_prompt.state(settings=settings, stats=store, install_created_at=_minted(500))
+        is None
+    )
+
+
+def test_dismissal_survives_deleting_the_stats(app: Flask) -> None:
+    """The dismissal flag lives in settings, not the stats store: using
+    the privacy control must not bring the ask back."""
+    from app import sponsor_prompt
+
+    client = app.test_client()
+    store = app.config["STATS_STORE"]
+    store.bump(FRAMES_BY_DEVICE, "frame01", 12_000)
+
+    client.post("/stats/sponsor/dismiss")
+    client.post("/stats/delete")
+    store.bump(FRAMES_BY_DEVICE, "frame01", 12_000)
+
+    assert (
+        sponsor_prompt.state(
+            settings=app.config["SETTINGS_STORE"],
+            stats=store,
+            install_created_at=_minted(900),
+        )
+        is None
+    )
+    # The footer carries a permanent sponsor link, so the card is
+    # identified by its own container rather than by the word.
+    assert "dx-sponsor-card" not in client.get("/stats/").get_data(as_text=True)
+
+
+def test_sponsor_card_appears_on_the_page_once_earned(app: Flask) -> None:
+    client = app.test_client()
+    app.config["STATS_STORE"].bump(FRAMES_BY_DEVICE, "frame01", 10_000)
+    body = client.get("/stats/").get_data(as_text=True)
+    assert "dx-sponsor-card" in body
+    assert "10,000 frames" in body
+
+    client.post("/stats/sponsor/dismiss")
+    assert "dx-sponsor-card" not in client.get("/stats/").get_data(as_text=True)
+
+
+def test_install_age_handles_a_missing_or_broken_timestamp() -> None:
+    from app import sponsor_prompt
+
+    assert sponsor_prompt.install_age_days("") == 0
+    assert sponsor_prompt.install_age_days("not a date") == 0
+    assert sponsor_prompt.install_age_days(_minted(10)) == 10

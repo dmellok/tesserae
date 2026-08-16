@@ -345,3 +345,51 @@
     height: 200px;
   }
 }
+
+/* Sponsor card ------------------------------------------------------- */
+
+/* Deliberately quieter than a section card: a tinted panel, no shadow,
+   no icon badge. It appears once after a milestone and never blocks
+   anything, so it should read as a note rather than a dialog. */
+.dx-sponsor-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 0 20px;
+  padding: 16px 18px;
+  border: 1px solid var(--t-accent-soft);
+  border-left: 3px solid var(--t-accent);
+  border-radius: 12px;
+  background: var(--t-accent-tint);
+}
+
+.dx-sponsor-body {
+  flex: 1 1 320px;
+}
+
+.dx-sponsor-title {
+  margin: 0 0 6px;
+  font-size: 1.05rem;
+  font-weight: 650;
+  color: var(--t-fg);
+}
+
+.dx-sponsor-text {
+  margin: 0;
+  max-width: 62ch;
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: var(--t-fg-soft);
+}
+
+.dx-sponsor-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dx-sponsor-actions form {
+  margin: 0;
+}

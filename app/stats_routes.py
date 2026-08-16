@@ -17,6 +17,7 @@ the page.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from flask import (
@@ -32,6 +33,7 @@ from flask import (
     url_for,
 )
 
+from app import sponsor_prompt
 from app.state.stats_store import (
     ACTIVITY_BY_TYPE,
     DEVICE_WAKES,
@@ -185,6 +187,26 @@ def _fleet() -> list[dict[str, Any]]:
     ]
 
 
+def _sponsor_state(store: StatsStore) -> dict[str, Any] | None:
+    """The sponsor card, when a milestone has actually been reached.
+
+    Lives on this page on purpose: the operator opened it to look at what
+    the install has done for them, which is the only context where the
+    ask isn't an interruption."""
+    from app import install_id as install_id_module
+
+    settings = current_app.config.get("SETTINGS_STORE")
+    if settings is None:
+        return None
+    data_root = current_app.config.get("DATA_ROOT")
+    meta = install_id_module.read_metadata(Path(data_root)) if data_root else None
+    return sponsor_prompt.state(
+        settings=settings,
+        stats=store,
+        install_created_at=(meta or {}).get("created_at", ""),
+    )
+
+
 @bp.get("/")
 def index() -> str:
     store = _store()
@@ -240,6 +262,7 @@ def index() -> str:
         fleet=_fleet(),
         metrics=METRICS,
         db_path="data/core/stats.db",
+        sponsor=_sponsor_state(store),
     )
 
 
@@ -268,6 +291,17 @@ def pause() -> Any:
             else "Stats collection resumed.",
             "ok",
         )
+    return redirect(url_for("stats.index"))
+
+
+@bp.post("/sponsor/dismiss")
+def dismiss_sponsor() -> Any:
+    """Permanent and silent. No "remind me later": the footer keeps a
+    plain sponsor link, so dismissing hides the interruption rather than
+    the door."""
+    settings = current_app.config.get("SETTINGS_STORE")
+    if settings is not None:
+        sponsor_prompt.dismiss(settings)
     return redirect(url_for("stats.index"))
 
 

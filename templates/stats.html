@@ -47,6 +47,36 @@
   {% endfor %}
 </div>
 
+{% if sponsor %}
+{# Shown once, after a milestone the install actually reached, and only
+   here: this is the page someone opens to look at what they got out of
+   Tesserae. Dismissal is permanent; the footer link stays either way. #}
+<aside class="dx-sponsor-card">
+  <div class="dx-sponsor-body">
+    <h2 class="dx-sponsor-title">
+      {% if sponsor.reason == 'years' %}
+      This install has been running for {{ sponsor.years }} year{{ '' if sponsor.years == 1 else 's' }}.
+      {% else %}
+      This install has painted {{ "{:,}".format(sponsor.frames) }} frames.
+      {% endif %}
+    </h2>
+    <p class="dx-sponsor-text">
+      Tesserae is free, self-hosted, and built in someone's spare time. If it's
+      earned a place on your wall, sponsorship is what keeps it growing. If not,
+      that's genuinely fine: nothing here is gated, and this card won't come back.
+    </p>
+  </div>
+  <div class="dx-sponsor-actions">
+    <a class="button primary" href="{{ community_sponsor_url }}" target="_blank" rel="noreferrer noopener">
+      <i class="ph ph-heart" aria-hidden="true"></i> Sponsor Tesserae
+    </a>
+    <form method="post" action="{{ url_for('stats.dismiss_sponsor') }}">
+      {{ button('Dismiss', variant='ghost') }}
+    </form>
+  </div>
+</aside>
+{% endif %}
+
 {% call section_card(icon='chart-bar', title='Pushes per day',
                      description='Every push this install made, grouped by what asked for it.') %}
   {% if pushes.total == 0 %}

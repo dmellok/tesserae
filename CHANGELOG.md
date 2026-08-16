@@ -4,6 +4,21 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.308.0], 2026-08-16
+
+### Added
+
+- **One sponsorship ask, on the Stats page, after a milestone.** A card
+  appears once an install has been running a year or has painted 10,000
+  frames, on the page someone opened to look at what Tesserae has done for
+  them. Fleet size is deliberately not a trigger: panel count can't tell a
+  hobbyist with secondhand hardware from a business. Dismissal is
+  permanent and silent, with no "remind me later", and the flag lives in
+  settings rather than the stats store so deleting the counters can't
+  bring the card back. Nothing is gated, delayed, or degraded either way,
+  the footer sponsor link is unchanged, and none of this is ever rendered
+  to a panel.
+
 ## [0.307.0], 2026-08-16
 
 ### Added
