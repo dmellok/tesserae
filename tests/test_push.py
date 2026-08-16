@@ -489,6 +489,109 @@ def test_push_image_bypass_coalesce_always_fires(tmp_path: Path, composition_png
     assert r2.status == "sent"
 
 
+# -- orientation on ingest (discussion #231) -----------------------------
+
+
+def _recording_renderer(tmp_path: Path, seen: list[bytes]) -> Renderer:
+    """A renderer that records the bytes the pipeline hands it, so a test
+    can assert what every renderer downstream would see."""
+    renderer = _make_renderer(tmp_path, "esp32_bin", "bin", retain=False)
+
+    def transform(png_bytes, *, panel, settings):
+        seen.append(png_bytes)
+        return png_bytes
+
+    renderer.module.transform = transform  # type: ignore[attr-defined]
+    return renderer
+
+
+def _exif_portrait_jpeg() -> bytes:
+    """A landscape pixel buffer carrying EXIF orientation 6, which is what
+    a phone writes for a photo shot in portrait: the viewer turns it, the
+    pixels are never rotated."""
+    img = Image.new("RGB", (600, 400), (20, 120, 90))
+    exif = img.getexif()
+    exif[274] = 6
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", exif=exif.tobytes())
+    return buf.getvalue()
+
+
+def test_push_image_applies_exif_orientation_before_the_renderers(
+    tmp_path: Path, composition_png: bytes
+) -> None:
+    """A phone photo reaches every renderer upright.
+
+    ``fit_to_panel`` transposes, but the renderers that fit client-side
+    (pi_png hands the panel the image plus a ``scale``) never call it, so
+    the orientation tag was dropped on re-encode and the panel painted the
+    photo on its side. Settling it on ingest covers both kinds."""
+    seen: list[bytes] = []
+    manager, _, _ = _wired(tmp_path, composition_png, [_recording_renderer(tmp_path, seen)])
+
+    result = manager.push_image(_exif_portrait_jpeg(), source_label="photo.jpg", device_id="esp32")
+
+    assert result.status == "sent"
+    assert seen, "renderer should have been handed the image"
+    with Image.open(io.BytesIO(seen[0])) as got:
+        assert got.size == (400, 600), "expected the EXIF turn to be baked into the pixels"
+
+
+def test_push_image_auto_rotate_turns_to_match_the_panel(
+    tmp_path: Path, composition_png: bytes
+) -> None:
+    """``rotate="auto"`` turns a portrait image a quarter for a landscape
+    panel (the test settings panel is 1600×1200), so it fills rather than
+    landing as a letterboxed strip."""
+    seen: list[bytes] = []
+    manager, _, _ = _wired(tmp_path, composition_png, [_recording_renderer(tmp_path, seen)])
+    buf = io.BytesIO()
+    Image.new("RGB", (400, 600), (200, 40, 40)).save(buf, format="PNG")
+
+    result = manager.push_image(
+        buf.getvalue(), source_label="poster.png", device_id="esp32", rotate="auto"
+    )
+
+    assert result.status == "sent"
+    with Image.open(io.BytesIO(seen[0])) as got:
+        assert got.size == (600, 400)
+
+
+def test_push_image_keeps_orientation_when_rotate_is_unset(
+    tmp_path: Path, composition_png: bytes
+) -> None:
+    """The default leaves the image alone: an image carrying text is worse
+    turned than letterboxed, and the server can't tell one from the other.
+    Untouched bytes also mean no decode + re-encode on the way through."""
+    seen: list[bytes] = []
+    manager, _, _ = _wired(tmp_path, composition_png, [_recording_renderer(tmp_path, seen)])
+    buf = io.BytesIO()
+    Image.new("RGB", (400, 600), (200, 40, 40)).save(buf, format="PNG")
+    original = buf.getvalue()
+
+    manager.push_image(original, source_label="poster.png", device_id="esp32")
+
+    assert seen[0] == original
+
+
+def test_push_image_explicit_rotate_turns_clockwise(tmp_path: Path, composition_png: bytes) -> None:
+    """90 puts the image's left edge along the panel's top, i.e. clockwise,
+    matching the ``rotate`` field the Pi client payload has always used."""
+    seen: list[bytes] = []
+    manager, _, _ = _wired(tmp_path, composition_png, [_recording_renderer(tmp_path, seen)])
+    src = Image.new("RGB", (40, 20), (255, 255, 255))
+    src.putpixel((0, 0), (255, 0, 0))  # top-left marker
+    buf = io.BytesIO()
+    src.save(buf, format="PNG")
+
+    manager.push_image(buf.getvalue(), source_label="marker.png", device_id="esp32", rotate="90")
+
+    with Image.open(io.BytesIO(seen[0])) as got:
+        assert got.size == (20, 40)
+        # Clockwise: the top-left marker lands top-right.
+        assert got.convert("RGB").getpixel((19, 0)) == (255, 0, 0)
+
+
 def test_supersede_records_event_log_row(tmp_path: Path, composition_png: bytes) -> None:
     """Superseded pushes still write an event row so History can chip
     them, mirroring the old ``busy`` semantics on the observability

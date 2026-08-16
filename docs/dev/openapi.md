@@ -47,7 +47,19 @@ curl -sS -X POST http://tesserae.local:8765/api/v1/push/image \
 field. Quiet hours are honoured, so a display inside its window comes
 back under `quiet` with a 202 rather than being reported as sent. Add
 `-F override_quiet_hours=true` when the image is worth waking a panel
-for anyway. Running
+for anyway.
+
+EXIF orientation is applied, so a phone photo lands the way its camera
+roll shows it. When the image and the panel still disagree about which
+way is up, `-F rotate=auto` turns a portrait image a quarter to fill a
+landscape panel (and the reverse); `-F rotate=90|180|270` turns it
+clockwise by that much regardless. Left out, the orientation is kept as
+shot, which is what an image carrying text wants. A panel that is
+*mounted* the other way around is a display setting rather than a
+per-image one: set its **Rotation** under Settings → Devices and
+dashboards land the right way up too.
+
+Running
 under the Home Assistant App, call the instance directly on its port
 rather than through the ingress URL, which is session-authenticated for
 the browser.

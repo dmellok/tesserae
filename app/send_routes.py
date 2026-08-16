@@ -38,6 +38,7 @@ from flask import (
 from werkzeug.wrappers import Response
 
 from app.device_loader import DeviceRegistry
+from app.image_upload import IMAGE_ROTATE_MODES
 from app.net_guard import BlockedURLError, assert_operator_url
 from app.panel import device_panel, resolve_settings_panel
 from app.push import PushManager, PushResult
@@ -269,6 +270,14 @@ def _form_fit() -> str | None:
     return raw if raw in _FIT_MODES else None
 
 
+def _form_rotate() -> str | None:
+    """Chosen turn, or None (keep the image's own orientation) when unset
+    or not a recognised mode. Same vocabulary the webhook image push
+    takes, so the page and a script describe a turn the same way."""
+    raw = (request.form.get("rotate") or "").strip().lower()
+    return raw if raw in IMAGE_ROTATE_MODES and raw != "0" else None
+
+
 def _gallery_module() -> Any:
     reg = current_app.config.get("PLUGIN_REGISTRY")
     plugin = reg.get("picture_gallery") if reg is not None else None
@@ -318,13 +327,16 @@ def send_file() -> Response:
         return redirect(url_for("send.index", tab="file"))
     filename = upload.filename
     fit = _form_fit()
+    rotate = _form_rotate()
     targets = _require_target_devices("file")
     if isinstance(targets, Response):
         return targets
     _push_to_targets(
         f"File {filename!r}",
         targets,
-        lambda tid: _push().push_image(image_bytes, source_label=filename, device_id=tid, fit=fit),
+        lambda tid: _push().push_image(
+            image_bytes, source_label=filename, device_id=tid, fit=fit, rotate=rotate
+        ),
     )
     return redirect(url_for("history.index"))
 
@@ -408,13 +420,14 @@ def send_url() -> Response:
         flash("Paste an image URL first.", "error")
         return redirect(url_for("send.index", tab="url"))
     fit = _form_fit()
+    rotate = _form_rotate()
     targets = _require_target_devices("url")
     if isinstance(targets, Response):
         return targets
     _push_to_targets(
         f"URL {url}",
         targets,
-        lambda tid: _push().push_url_image(url, device_id=tid, fit=fit),
+        lambda tid: _push().push_url_image(url, device_id=tid, fit=fit, rotate=rotate),
     )
     return redirect(url_for("history.index"))
 
@@ -467,6 +480,7 @@ def send_gallery() -> Response:
         flash(f"Could not read {filename}: {err}", "error")
         return redirect(url_for("send.index", tab="gallery", g_folder=folder, g_file=filename))
     fit = _form_fit()
+    rotate = _form_rotate()
     label = f"gallery:{folder}/{filename}"
     targets = _require_target_devices("gallery")
     if isinstance(targets, Response):
@@ -474,7 +488,9 @@ def send_gallery() -> Response:
     _push_to_targets(
         f"Gallery {filename!r}",
         targets,
-        lambda tid: _push().push_image(image_bytes, source_label=label, device_id=tid, fit=fit),
+        lambda tid: _push().push_image(
+            image_bytes, source_label=label, device_id=tid, fit=fit, rotate=rotate
+        ),
     )
     return redirect(url_for("history.index"))
 

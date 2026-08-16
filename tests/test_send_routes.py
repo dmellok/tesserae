@@ -144,7 +144,7 @@ def test_url_invokes_push_url_image(app: Flask) -> None:
         follow_redirects=False,
     )
     pm.push_url_image.assert_called_once_with(
-        "https://example.com/img.png", device_id=dev, fit=None
+        "https://example.com/img.png", device_id=dev, fit=None, rotate=None
     )
 
 
@@ -198,7 +198,7 @@ def test_send_with_device_id_routes_to_that_device(app: Flask) -> None:
         follow_redirects=False,
     )
     pm.push_url_image.assert_called_once_with(
-        "https://example.com/img.png", device_id="esp32_lab", fit=None
+        "https://example.com/img.png", device_id="esp32_lab", fit=None, rotate=None
     )
 
 
@@ -373,8 +373,33 @@ def test_fit_threaded_through_url(app: Flask) -> None:
         data={"url": "https://example.com/i.png", "fit": "blur", "device_id": dev},
     )
     pm.push_url_image.assert_called_once_with(
-        "https://example.com/i.png", device_id=dev, fit="blur"
+        "https://example.com/i.png", device_id=dev, fit="blur", rotate=None
     )
+
+
+def test_rotate_threaded_through_url(app: Flask) -> None:
+    """The Send page's turn picker takes the same vocabulary as the
+    webhook image push, and "none" (the default) reaches the push as
+    ``None`` rather than a no-op turn the pipeline has to decode for."""
+    client = app.test_client()
+    _sign_in(client)
+    dev = _register_device(client)
+    pm = MagicMock()
+    pm.push_url_image.return_value = PushResult(status="sent", page_id="x")
+    app.config["PUSH_MANAGER"] = pm
+    client.post(
+        "/send/url",
+        data={"url": "https://example.com/i.png", "rotate": "auto", "device_id": dev},
+    )
+    pm.push_url_image.assert_called_once_with(
+        "https://example.com/i.png", device_id=dev, fit=None, rotate="auto"
+    )
+    pm.push_url_image.reset_mock()
+    client.post(
+        "/send/url",
+        data={"url": "https://example.com/i.png", "rotate": "0", "device_id": dev},
+    )
+    assert pm.push_url_image.call_args.kwargs["rotate"] is None
 
 
 def test_invalid_fit_falls_back_to_none(app: Flask) -> None:
@@ -388,7 +413,9 @@ def test_invalid_fit_falls_back_to_none(app: Flask) -> None:
         "/send/url",
         data={"url": "https://example.com/i.png", "fit": "bogus", "device_id": dev},
     )
-    pm.push_url_image.assert_called_once_with("https://example.com/i.png", device_id=dev, fit=None)
+    pm.push_url_image.assert_called_once_with(
+        "https://example.com/i.png", device_id=dev, fit=None, rotate=None
+    )
 
 
 def test_gallery_query_shows_section(app: Flask, tmp_path: Path, monkeypatch) -> None:

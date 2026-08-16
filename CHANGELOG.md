@@ -4,6 +4,31 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.309.0], 2026-08-16
+
+### Fixed
+
+- **Phone photos landed on their side on Pi panels.** A camera stores a
+  landscape pixel buffer plus an EXIF orientation tag rather than rotating
+  the pixels. The `.bin` renderers apply that tag inside their own fit,
+  but `pi_png` fits client-side and never called it, so the tag was
+  dropped on re-encode and the panel painted the photo turned a quarter.
+  Orientation is now settled once when the image is taken in, so every
+  renderer sees upright pixels and the History thumbnail matches what the
+  panel paints.
+
+### Added
+
+- **A rotation control for pushed images**, on the Send page and as
+  `rotate` on `POST /api/v1/push/image`. `auto` turns the image a quarter
+  when its aspect is the opposite of the panel's, so a portrait photo
+  fills a landscape panel instead of arriving as a letterboxed strip;
+  `90` / `180` / `270` turn it clockwise regardless. Unset keeps the
+  orientation as shot, since an image carrying text is worse rotated than
+  letterboxed and nothing here can tell the two apart. A panel that is
+  mounted the other way around still wants the display's own Rotation
+  setting, which dashboards follow too.
+
 ## [0.308.1], 2026-08-16
 
 ### Fixed

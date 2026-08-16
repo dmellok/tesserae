@@ -1934,7 +1934,7 @@ wheels = [
 
 [[package]]
 name = "tesserae"
-version = "0.308.1"
+version = "0.309.0"
 source = { editable = "." }
 dependencies = [
     { name = "amqtt" },

@@ -559,7 +559,10 @@ paths:
 
         The image is fitted and dithered to each target's panel exactly as
         the Send page does. Accepted types: JPEG, PNG, HEIC, HEIF, WebP,
-        up to 25 MiB encoded and 8192 px on the longest edge.
+        up to 25 MiB encoded and 8192 px on the longest edge. EXIF
+        orientation is applied, so a phone photo arrives the way its
+        camera roll shows it; `rotate` turns it further when the image and
+        the panel disagree about which way is up.
 
         Per-device quiet hours are respected unless `override_quiet_hours`
         is set. The response lists each display under `sent`, `quiet`, or
@@ -600,6 +603,18 @@ paths:
                   description: >-
                     How to place a non-panel-sized image. Defaults to the
                     renderer's own default when omitted.
+                rotate:
+                  type: string
+                  enum: [auto, "0", "90", "180", "270"]
+                  description: >-
+                    Turn the image clockwise before fitting it, for when
+                    the image's orientation and the panel's disagree.
+                    `auto` turns a quarter only when their aspects are
+                    opposite, so a portrait photo fills a landscape panel
+                    instead of landing as a letterboxed strip. Omitted,
+                    the image keeps the orientation it was shot in, which
+                    is what an image carrying text wants. EXIF orientation
+                    is applied either way.
                 label:
                   type: string
                   description: History label for the push.

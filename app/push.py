@@ -53,6 +53,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from app.device_loader import DeviceRegistry
 from app.device_preview import retained_device_preview, write_device_preview
 from app.dither_regions import has_nearest_region, regions_from_page
+from app.image_upload import orient_for_panel
 from app.net_guard import (
     BlockedURLError,
     assert_operator_url,
@@ -1454,6 +1455,7 @@ class PushManager:
         source_label: str,
         device_id: str | None = None,
         fit: str | None = None,
+        rotate: str | None = None,
         bypass_coalesce: bool = True,
         force_publish: bool = True,
         source: str = "file",
@@ -1472,6 +1474,12 @@ class PushManager:
         tags the History row: the Companion link-send routes fetch / render
         once and fan the resulting bytes out through here with ``"url"`` /
         ``"webpage"`` so History keeps the real origin (default ``"file"``).
+
+        ``rotate`` (optional): ``auto`` / ``90`` / ``180`` / ``270``, a
+        clockwise turn applied after EXIF normalization and before the fit,
+        for when the image's orientation and the panel's disagree. ``auto``
+        turns a quarter only when their aspects are opposite. Omitted (the
+        default) the image keeps the orientation it was shot in.
 
         ``framing`` (optional, Companion 0.6 ``image_framing``): validated
         ``{focus_x, focus_y, zoom}`` intent, resolved against this push's
@@ -1499,6 +1507,7 @@ class PushManager:
                     source=source,
                     device_id=device_id,
                     fit=fit,
+                    rotate=rotate,
                     force_publish=force_publish,
                     framing=framing,
                 )
@@ -1513,6 +1522,7 @@ class PushManager:
         *,
         device_id: str | None = None,
         fit: str | None = None,
+        rotate: str | None = None,
         bypass_coalesce: bool = True,
         allow_local: bool = True,
     ) -> PushResult:
@@ -1543,7 +1553,12 @@ class PushManager:
                     result = self._log_failure(source="url", target=url, error=f"fetch: {err}")
                 else:
                     result = self._push_bytes_locked(
-                        image_bytes, url, source="url", device_id=device_id, fit=fit
+                        image_bytes,
+                        url,
+                        source="url",
+                        device_id=device_id,
+                        fit=fit,
+                        rotate=rotate,
                     )
             finally:
                 self._lock.release()
@@ -2053,6 +2068,7 @@ class PushManager:
         started: float | None = None,
         device_id: str | None = None,
         fit: str | None = None,
+        rotate: str | None = None,
         force_publish: bool = False,
         force_client_refetch: bool = False,
         framing: dict[str, float] | None = None,
@@ -2060,6 +2076,17 @@ class PushManager:
         """Shared tail end of push_image / push_webpage / republish."""
         started = started if started is not None else time.monotonic()
         panel_dims = self._panel_dims_for_send(device_id)
+        # Orientation is settled once, here, so every renderer downstream
+        # sees upright pixels: the .bin renderers EXIF-transpose inside
+        # their own fit, but pi_png fits client-side and never does, which
+        # landed phone photos on their side (discussion #231). No-op for a
+        # composition PNG with no orientation tag and no requested turn.
+        image_bytes = orient_for_panel(
+            image_bytes,
+            rotate=rotate,
+            target_w=int(panel_dims.get("w") or 0),
+            target_h=int(panel_dims.get("h") or 0),
+        )
         if framing is not None:
             image_bytes = _apply_framing(image_bytes, panel_dims, framing)
         return self._fan_out(

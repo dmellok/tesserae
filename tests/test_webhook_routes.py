@@ -404,6 +404,31 @@ def test_image_push_validates_the_fit_mode(app: Flask) -> None:
     assert "fit" in resp.get_json()["error"]
 
 
+def test_image_push_passes_the_requested_turn_through(app: Flask) -> None:
+    """``rotate`` reaches the push, for when the image and the panel
+    disagree about which way is up (a portrait photo on a landscape
+    panel). Unset means "keep the orientation it was shot in"."""
+    _set_token(app, "real-token")
+    _register(app, "kitchen")
+    calls: list[dict[str, object]] = []
+    app.config["PUSH_MANAGER"].push_image = lambda b, **kw: (  # type: ignore[method-assign]
+        calls.append(kw),
+        PushResult(status="sent", page_id="", error=None),
+    )[1]
+
+    assert _post_image(app, device_ids="kitchen", rotate="auto").status_code == 200
+    assert _post_image(app, device_ids="kitchen").status_code == 200
+    assert [c["rotate"] for c in calls] == ["auto", None]
+
+
+def test_image_push_validates_the_rotate_mode(app: Flask) -> None:
+    _set_token(app, "real-token")
+    _register(app, "kitchen")
+    resp = _post_image(app, device_ids="kitchen", rotate="45")
+    assert resp.status_code == 400
+    assert "rotate" in resp.get_json()["error"]
+
+
 def test_image_push_holds_a_quiet_display_and_says_so(app: Flask) -> None:
     """202 rather than 200, and the display is named under `quiet`, so a
     script can tell a skip from a failure without counting."""

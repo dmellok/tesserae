@@ -100,8 +100,12 @@
 {% endmacro %}
 
 {# Image fit mode, how a non-panel-sized image maps onto the panel.
-   Shared by File / URL / Webpage / Gallery. #}
-{% macro fit_picker(field_id) %}
+   Shared by File / URL / Webpage / Gallery.
+
+   ``rotate`` adds the turn picker alongside it, for the sources that
+   carry their own orientation (a photo). A webpage capture is rendered
+   at the viewport it was given, so there's nothing to turn there. #}
+{% macro fit_picker(field_id, rotate=true) %}
 {% set _selected_fit = form_values.get('fit', 'fit') %}
 <div class="field">
   <label for="{{ field_id }}">Image fit{{ info_pop("How the image maps onto the panel when it isn't already panel-sized.") }}</label>
@@ -113,6 +117,19 @@
     <option value="blur"    {% if _selected_fit == 'blur' %}selected{% endif %}>Center + blurred background</option>
   </select>
 </div>
+{% if rotate %}
+{% set _selected_rotate = form_values.get('rotate', '0') %}
+<div class="field">
+  <label for="{{ field_id }}-rotate">Image rotation{{ info_pop("Turns this image before it's fitted, for when the photo and the panel disagree about which way is up. Auto turns a portrait photo a quarter to fill a landscape panel, and the reverse. A panel that's mounted the other way around wants the display's own Rotation setting instead, so dashboards land right too.") }}</label>
+  <select id="{{ field_id }}-rotate" name="rotate">
+    <option value="0"    {% if _selected_rotate == '0' %}selected{% endif %}>None, keep the image's orientation</option>
+    <option value="auto" {% if _selected_rotate == 'auto' %}selected{% endif %}>Auto, turn to match the panel</option>
+    <option value="90"   {% if _selected_rotate == '90' %}selected{% endif %}>90° clockwise</option>
+    <option value="180"  {% if _selected_rotate == '180' %}selected{% endif %}>180°</option>
+    <option value="270"  {% if _selected_rotate == '270' %}selected{% endif %}>270° clockwise</option>
+  </select>
+</div>
+{% endif %}
 {% endmacro %}
 
 {% block main %}
@@ -281,7 +298,7 @@
         </div>
       </div>
       {{ device_picker('webpage-device') }}
-      {{ fit_picker('webpage-fit') }}
+      {{ fit_picker('webpage-fit', rotate=false) }}
       <div class="actions">
         <button type="submit" class="dx-btn-primary" data-requires-device-pick>
           <i class="ph ph-browser" aria-hidden="true"></i><span>Render &amp; push</span>

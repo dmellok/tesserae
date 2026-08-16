@@ -51,6 +51,7 @@ from app.image_upload import (
     IMAGE_CONTENT_TYPES,
     IMAGE_FIT_MODES,
     IMAGE_MAX_EDGE,
+    IMAGE_ROTATE_MODES,
     IMAGE_UPLOAD_BYTES,
     TOO_LARGE,
     validate_image,
@@ -211,6 +212,7 @@ def push_image() -> tuple[Response, int] | Response:
         image                  the file (JPEG / PNG / HEIC / HEIF / WebP)
         device_ids             comma-separated, or repeated; REQUIRED
         fit                    fit | fill | blur | stretch | center (optional)
+        rotate                 auto | 90 | 180 | 270, clockwise (optional)
         label                  History label, default "Webhook image"
         override_quiet_hours   send anyway during quiet hours (optional)
 
@@ -224,6 +226,12 @@ def push_image() -> tuple[Response, int] | Response:
     off for the display and remember to turn them back on. Off by
     default: the caller has to say that this particular image matters
     more than the household's sleep.
+
+    ``rotate`` covers the case where the image and the panel disagree
+    about which way is up: ``auto`` turns a portrait image a quarter to
+    fill a landscape panel (and the reverse), the explicit angles turn it
+    clockwise by that much regardless. Unset leaves the orientation alone,
+    which is what an image carrying text wants.
     """
     settings = _settings()
     stored = _stored_token(settings)
@@ -305,6 +313,17 @@ def push_image() -> tuple[Response, int] | Response:
             ),
             400,
         )
+    rotate = (request.form.get("rotate") or "").strip().lower() or None
+    if rotate is not None and rotate not in IMAGE_ROTATE_MODES:
+        return (
+            jsonify(
+                {
+                    "status": "bad_request",
+                    "error": f"rotate must be one of {', '.join(IMAGE_ROTATE_MODES)}",
+                }
+            ),
+            400,
+        )
     label = (request.form.get("label") or "").strip() or "Webhook image"
     override = _truthy(request.form.get("override_quiet_hours"))
 
@@ -329,6 +348,7 @@ def push_image() -> tuple[Response, int] | Response:
             source_label=label,
             device_id=device_id,
             fit=fit,
+            rotate=rotate,
             source="webhook",
         )
         if result.status in ("sent", "no_change"):
