@@ -38,6 +38,7 @@ FAMILIES: dict[str, str] = {
     "spotify": "Spotify",
     "picture": "Pictures",
     "public": "Transit",
+    "gtfs": "Transit (GTFS)",
     "todo": "Productivity",
     "webpage": "Web",
 }
@@ -56,6 +57,7 @@ FAMILY_ORDER = [
     "spotify",
     "picture",
     "public",
+    "gtfs",
     "todo",
     "webpage",
 ]
@@ -151,6 +153,14 @@ def render() -> str:
         "drop-a-folder widget under `plugins/<id>/`; drop your own in and it "
         "shows up in the editor's picker. Want to build one? See "
         "[Build a widget with AI](../dev/writing-a-widget.md)."
+    )
+    lines.append("")
+    lines.append(
+        '!!! tip "Looking for more widgets?"\n'
+        "    Browse the full community catalog at "
+        "[tesserae.ink/catalog](https://tesserae.ink/catalog/): widgets, themes, "
+        "and dashboard templates, all installable from "
+        "**Settings → Widgets → Browse catalog** inside the app."
     )
     lines.append("")
     lines.append(

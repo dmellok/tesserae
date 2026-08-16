@@ -73,11 +73,6 @@ jobs:
         run: |
           python scripts/gen_widget_gallery.py
           python scripts/gen_compatibility.py
-          # Community gallery pulls the catalog's widgets.json from
-          # GitHub. Tolerate a transient fetch failure here so a flaky
-          # raw.githubusercontent.com doesn't fail the whole docs
-          # build; the previously-committed copy stays in tree.
-          python scripts/gen_community_gallery.py || echo "::warning::community gallery generation skipped (catalog fetch failed)"
       - name: Build site (strict)
         run: mkdocs build --strict
       - uses: actions/configure-pages@v6

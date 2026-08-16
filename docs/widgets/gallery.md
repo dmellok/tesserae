@@ -2,7 +2,10 @@
 
 # Widget gallery
 
-The **35 widgets** that ship with Tesserae. Each is a drop-a-folder widget under `plugins/<id>/`; drop your own in and it shows up in the editor's picker. Want to build one? See [Build a widget with AI](../dev/writing-a-widget.md).
+The **36 widgets** that ship with Tesserae. Each is a drop-a-folder widget under `plugins/<id>/`; drop your own in and it shows up in the editor's picker. Want to build one? See [Build a widget with AI](../dev/writing-a-widget.md).
+
+!!! tip "Looking for more widgets?"
+    Browse the full community catalog at [tesserae.ink/catalog](https://tesserae.ink/catalog/): widgets, themes, and dashboard templates, all installable from **Settings → Widgets → Browse catalog** inside the app.
 
 !!! note "Stability tiers"
     **Stable** = backed by an official, documented API. **Best-effort** = undocumented but long-lived endpoint. **Fragile** = scraping or a soft policy, convenience only. **Local** = computed on the host, no upstream to break. See [Screens & compatibility](../compatibility.md) for the hardware side.
@@ -99,7 +102,7 @@ The **35 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     ![calendar_day](../screenshots/widgets/calendar_day.png)
 
-    Today's agenda Reads from feeds configured in Widgets → Calendar Feeds; each feed's colour drives the stripe / marker / fill colour.
+    Today's agenda with tunable event text sizing, a configurable visible-hour range, and a location toggle. Reads from feeds configured in Widgets → Calendar Feeds; each feed's colour drives the stripe / marker / fill colour.
 
     **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** Stable
 
@@ -109,7 +112,7 @@ The **35 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     ![calendar_month](../screenshots/widgets/calendar_month.png)
 
-    Month-grid view Reads from feeds configured in Widgets → Calendar Feeds; each feed's colour drives the bar / dot / stripe colour.
+    Month-grid view with tunable dashboard title/day-number/event text sizing, cell spacing, and a location toggle for text-display mode. Each feed's colour drives the bar / dot / stripe colour.
 
     **Sizes:** `md` `lg` &middot; **Tier:** Stable
 
@@ -119,7 +122,7 @@ The **35 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     ![calendar_week](../screenshots/widgets/calendar_week.png)
 
-    Seven-day strip Each event's colour comes from its feed (Widgets → Calendar Feeds).
+    Seven-day strip timetable with tunable event text sizing/spacing, configurable visible hour range, and a location toggle. Each event's colour comes from its feed (Widgets → Calendar Feeds).
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** Stable
 
@@ -333,6 +336,22 @@ The **35 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
 </div>
 
+## Transit (GTFS)
+
+<div class="grid cards" markdown>
+
+-   **GTFS / GTFS-RT** &middot; `gtfs`
+
+    ---
+
+    _Screenshot pending, run `python scripts/capture_widget_shots.py`._
+
+    Approaching vehicles at a stop (or two), from any GTFS feed. Presets for the NYC Subway and BART, live times and delays from GTFS-RT, service alerts, and an optional split-by-direction board.
+
+    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** -
+
+</div>
+
 ## Productivity
 
 <div class="grid cards" markdown>
@@ -359,7 +378,7 @@ The **35 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     ![webpage](../screenshots/widgets/webpage.png)
 
-    Embed an external URL in a cell. The composer captures whatever the iframe renders, handy for status pages, public dashboards, or any site that doesn't deny embedding. Same headless-render path as the Send tab is used when the panel renders. Pages that fetch their data with JavaScript get a short settle delay after load so the content is captured, not a blank frame; raise it for slow pages. Sites that set X-Frame-Options:DENY or strict CSP cannot be embedded.
+    Embed an external URL in a cell. The composer captures whatever the iframe renders, handy for status pages, public dashboards, or any site that doesn't deny embedding. A URL that points straight at an image (PNG, GIF, JPEG, WebP, SVG) is drawn as an image and scaled to the cell rather than embedded, so tall charts keep their bottom edge. Same headless-render path as the Send tab is used when the panel renders. Pages that fetch their data with JavaScript get a short settle delay after load so the content is captured, not a blank frame; raise it for slow pages. Sites that set X-Frame-Options:DENY or strict CSP cannot be embedded.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
 

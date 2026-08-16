@@ -46,4 +46,4 @@ The standard TRMNL OG manages multi-month battery life on its default 60-minute 
 
 - [Bind a second TRMNL device](../install/devices.md#multiple-panels) and target a different dashboard per device.
 - [Build a widget](../dev/writing-a-widget.md) tuned for the 1-bit aesthetic.
-- [Browse community widgets](../widgets/community.md): many are tuned for the TRMNL OG specifically.
+- [Browse community widgets](https://tesserae.ink/catalog/): many are tuned for the TRMNL OG specifically.

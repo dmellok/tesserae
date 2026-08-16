@@ -2,7 +2,7 @@
 
 Screenshots of the Tesserae admin UI in action: composing dashboards, integrating with Home Assistant, and how a single widget handles being dropped into different cell sizes.
 
-For panels in domestic context, see the [README](https://github.com/dmellok/tesserae/blob/main/README.md#tesserae) hero image. For the per-widget grid, see the [bundled widget gallery](widgets/gallery.md) or the [community catalog](widgets/community.md).
+For panels in domestic context, see the [README](https://github.com/dmellok/tesserae/blob/main/README.md#tesserae) hero image. For the per-widget grid, see the [bundled widget gallery](widgets/gallery.md) or the [community catalog](https://tesserae.ink/catalog/).
 
 ## Inside Home Assistant
 

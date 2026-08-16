@@ -45,7 +45,7 @@ Jailbroken Kindles can act as a Tesserae panel via the KOReader plugin path.
 Every guide ends at the same point: a panel painting a single dashboard. From there:
 
 - [Set up a schedule](../install/devices.md): rotate dashboards, refresh on a cadence, use smart sync to render just before each wake on battery panels.
-- [Browse the widget catalog](../widgets/community.md): one-click install of community widgets for Spotify, GitHub, OctoPrint, F1, and more.
+- [Browse the widget catalog](https://tesserae.ink/catalog/): one-click install of community widgets for Spotify, GitHub, OctoPrint, F1, and more.
 - [Build your own widget](../dev/writing-a-widget.md): the drop-a-folder plugin path.
 
 ## Don't see your hardware?

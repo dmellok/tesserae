@@ -41,5 +41,5 @@ Closed-case battery life with a daily cadence is several months on the integrate
 
 ## Next steps
 
-- [Picture widgets](../widgets/community.md): the catalog has Immich, Unsplash, and Paperlesspaper Art widgets that fit the PhotoPainter form factor.
+- [Picture widgets](https://tesserae.ink/catalog/): the catalog has Immich, Unsplash, and Paperlesspaper Art widgets that fit the PhotoPainter form factor.
 - [Quiet hours](../install/devices.md#per-device-settings) overnight.

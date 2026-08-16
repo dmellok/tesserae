@@ -44,4 +44,4 @@ A well-tuned Kindle Tesserae setup runs for weeks between charges, depending on 
 ## Next steps
 
 - [Quiet hours](../install/devices.md#per-device-settings) to skip overnight wakes if you're not on a daily cadence.
-- [Browse community widgets](../widgets/community.md). The Kindle's tall portrait aspect suits the calendar and news widgets particularly well.
+- [Browse community widgets](https://tesserae.ink/catalog/). The Kindle's tall portrait aspect suits the calendar and news widgets particularly well.

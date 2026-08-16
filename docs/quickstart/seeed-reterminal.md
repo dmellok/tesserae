@@ -65,5 +65,5 @@ The reTerminal polls Tesserae's BYOS endpoint on its own cadence (≥60 seconds;
 ## Next steps
 
 - [Build a widget tuned for greyscale](../dev/writing-a-widget.md) for the E1003's 16-level palette.
-- [Browse community widgets](../widgets/community.md).
+- [Browse community widgets](https://tesserae.ink/catalog/).
 - [Per-device settings](../install/devices.md#per-device-settings) for the wake interval and quiet hours.

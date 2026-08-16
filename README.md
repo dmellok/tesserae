@@ -28,7 +28,7 @@ features).
 **📖 [Full documentation](https://docs.tesserae.ink/):**
 install guides, [hardware quickstarts](https://docs.tesserae.ink/quickstart/),
 [widget gallery](https://docs.tesserae.ink/widgets/gallery/),
-[community catalog](https://docs.tesserae.ink/widgets/community/),
+[community catalog](https://tesserae.ink/catalog/),
 [architecture deep dive](https://docs.tesserae.ink/dev/architecture/),
 [how to build a widget](https://docs.tesserae.ink/dev/writing-a-widget/),
 [how to add hardware support](https://docs.tesserae.ink/dev/adding-hardware/).

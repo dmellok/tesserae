@@ -17,7 +17,7 @@ individual tile of a mosaic; the editor composes a dashboard out of cells.
     - **I want it running** → [Install Tesserae](install/server.md) (or via [Docker](install/docker.md) / as a [Home Assistant App](install/home-assistant.md))
     - **I have a panel to drive** → [Install a client](install/clients.md) then [Set up a device](install/devices.md)
     - **I want the ready-to-go hardware path** → the [Seeed reTerminal E-Series](hardware/seeed.md) (browser flash at [tesserae.ink/flash](https://tesserae.ink/flash), battery-powered, no assembly required)
-    - **What can it show?** → [Bundled widget gallery](widgets/gallery.md) (35 ship in the install) or the [community catalog](widgets/community.md) (18 bundles, one-click install)
+    - **What can it show?** → [Bundled widget gallery](widgets/gallery.md) (36 ship in the install) or the [community catalog](https://tesserae.ink/catalog/) (widgets, themes and templates, one-click install)
     - **What hardware works?** → [Screens & compatibility](compatibility.md)
     - **I want to build a widget** → [Build a widget with AI](dev/writing-a-widget.md)
 

@@ -44,4 +44,4 @@ The 7.5" mono panel paints quickly; cadence can be reasonably aggressive without
 ## Next steps
 
 - [Per-device settings](../install/devices.md#per-device-settings) for the wake interval and quiet hours.
-- [Browse community widgets](../widgets/community.md) tuned for the 800×480 1-bit canvas.
+- [Browse community widgets](https://tesserae.ink/catalog/) tuned for the 800×480 1-bit canvas.

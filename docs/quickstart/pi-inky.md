@@ -61,5 +61,5 @@ Pimoroni Inky panels are line-powered, so cadence is your choice. The constraint
 ## Next steps
 
 - [Pair multiple Pis](../install/devices.md#multiple-panels) to drive several panels from one server.
-- [Browse the widget catalog](../widgets/community.md) for one-click community widgets.
+- [Browse the widget catalog](https://tesserae.ink/catalog/) for one-click community widgets.
 - [Add a rotation](../install/devices.md#next-steps) to cycle through dashboards across the day.

@@ -116,6 +116,6 @@ For battery-powered Pi setups (rare but possible), **smart sync** keeps the pane
 
 ## Next steps
 
-- [Compose a multi-cell dashboard](../widgets/community.md): browse the community widget catalog for one-click installs.
+- [Compose a multi-cell dashboard](https://tesserae.ink/catalog/): browse the community widget catalog for one-click installs.
 - [Schedule rotations](../install/devices.md#next-steps) to cycle through several dashboards across the day.
 - [Add another Pi or panel](../install/devices.md#multiple-panels): re-run this cloud-init on another SD card with a different `instance-id` in meta-data.
