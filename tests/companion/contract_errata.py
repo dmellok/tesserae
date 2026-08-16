@@ -71,32 +71,11 @@ class SchemaErratum:
 # own shapes rather than our copies of them.
 ERRATA: tuple[Erratum, ...] = ()
 
-SCHEMA_ERRATA: tuple[SchemaErratum, ...] = (
-    SchemaErratum(
-        pointer="components/schemas/DeviceCapabilitySupport/properties",
-        patch={
-            "detail": {
-                "description": (
-                    "Capability-specific numbers the device advertised, present only "
-                    "on supported. Keys depend on the capability; frame_cache "
-                    "publishes capacity_bytes and max_frames when the device reports "
-                    "them. Clients ignore keys they don't know."
-                ),
-                "type": "object",
-                "additionalProperties": {"type": "integer", "minimum": 0},
-            }
-        },
-        since="v0.303.0",
-        why=(
-            "A supported target that can't say how much it holds pushes the "
-            "client back to guessing from a model name, which is the thing "
-            "capability_support exists to stop. The device already reports "
-            "both numbers and the server already reads them when sizing a "
-            "manifest. Offered in discussion #230 for the Offline Album "
-            "preflight; needs a home in contract 0.13."
-        ),
-    ),
-)
+# Emptied at the contract 0.13 re-vendor
+# (charmmmz/tesserae-companion-ios@f37ccd1): DeviceCapabilitySupport.detail,
+# offered in discussion #230 so an Offline Album preflight could say what a
+# target actually holds, is published upstream field for field.
+SCHEMA_ERRATA: tuple[SchemaErratum, ...] = ()
 
 
 def _resolve(spec: dict[str, Any], pointer: str) -> Any:

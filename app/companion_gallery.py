@@ -133,12 +133,15 @@ def gallery_available() -> bool:
 # -- opaque identifiers --------------------------------------------------
 
 
-def _encode(prefix: str, raw: str) -> str:
+def encode_opaque(prefix: str, raw: str) -> str:
+    """Mint one opaque id. Public because the Offline Album adapter mints its
+    own ids over the same scheme, and two encoders that have to agree are
+    better as one function than as a copied five lines."""
     packed = base64.urlsafe_b64encode(raw.encode("utf-8")).decode("ascii")
     return prefix + packed.rstrip("=")
 
 
-def _decode(prefix: str, value: str) -> str | None:
+def decode_opaque(prefix: str, value: str) -> str | None:
     if not value.startswith(prefix):
         return None
     body = value[len(prefix) :]
@@ -150,14 +153,14 @@ def _decode(prefix: str, value: str) -> str | None:
 
 
 def folder_id(folder: str) -> str:
-    return _encode(_FOLDER_PREFIX, folder)
+    return encode_opaque(_FOLDER_PREFIX, folder)
 
 
 def folder_from_id(value: str) -> str | None:
     """The plugin folder name an id refers to, or None. Re-validated
     against the plugin rather than trusted: a decoded id is client input,
     not a capability."""
-    name = _decode(_FOLDER_PREFIX, value)
+    name = decode_opaque(_FOLDER_PREFIX, value)
     if name is None:
         return None
     try:
@@ -168,18 +171,34 @@ def folder_from_id(value: str) -> str | None:
 
 
 def image_id(folder: str, filename: str) -> str:
-    return _encode(_IMAGE_PREFIX, f"{folder}\n{filename}")
+    return encode_opaque(_IMAGE_PREFIX, f"{folder}\n{filename}")
 
 
-def image_from_id(value: str) -> tuple[str, str] | None:
-    """``(folder, filename)`` for an image id, or None when it doesn't
-    decode or doesn't resolve to a readable image."""
-    raw = _decode(_IMAGE_PREFIX, value)
+def image_ref_from_id(value: str) -> tuple[str, str] | None:
+    """``(folder, filename)`` an image id names, without checking that the
+    image still exists.
+
+    Separate from :func:`image_from_id` because the Offline Album order has
+    to tell "this id belongs to a different folder", which is the client
+    sending something it never should have, apart from "this image was
+    deleted while the form was open", which is ordinary and gets dropped
+    (discussion #230)."""
+    raw = decode_opaque(_IMAGE_PREFIX, value)
     if raw is None or "\n" not in raw:
         return None
     folder, filename = raw.split("\n", 1)
     if not folder or not filename:
         return None
+    return folder, filename
+
+
+def image_from_id(value: str) -> tuple[str, str] | None:
+    """``(folder, filename)`` for an image id, or None when it doesn't
+    decode or doesn't resolve to a readable image."""
+    ref = image_ref_from_id(value)
+    if ref is None:
+        return None
+    folder, filename = ref
     try:
         gallery = gallery_module()
     except GalleryUnavailable:

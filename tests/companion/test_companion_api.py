@@ -134,6 +134,9 @@ def test_capabilities_probe_is_unauthenticated_and_valid(app: Flask) -> None:
         "session_read",
         # The photo library is a plugin; the test app registers it.
         "gallery",
+        # Needs the same plugin plus the album store, so it rides with it here
+        # and is advertised separately (#230).
+        "offline_albums",
     }
     assert body["personal_data"]["sources"] == ["reminders", "reminders.fridge"]
     assert "webpage_push" not in body["features"]

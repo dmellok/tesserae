@@ -1,0 +1,13 @@
+{
+  "error": {
+    "code": "offline_album_conflict",
+    "message": "One or more displays are already playing another Offline Album.",
+    "request_id": "req_offline_album_conflict",
+    "claims": {
+      "e1004-desk": {
+        "album_id": "oa_7f92a4",
+        "name": "Holidays"
+      }
+    }
+  }
+}

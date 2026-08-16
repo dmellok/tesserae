@@ -1,0 +1,47 @@
+{
+  "album": {
+    "id": "oa_4c6d9e",
+    "folder_id": "folder_family",
+    "name": "Family",
+    "enabled": true,
+    "device_ids": ["e1004-desk"],
+    "order": ["image_family_02", "image_family_01"],
+    "fit": "fill",
+    "playback": {
+      "mode": "shuffle",
+      "interval_s": 1800,
+      "repeat": "reshuffle"
+    }
+  },
+  "targets": [
+    {
+      "device_id": "e1004-desk",
+      "support": {
+        "state": "supported",
+        "observed_at": "2026-08-15T09:58:00Z",
+        "detail": {
+          "capacity_bytes": 67108864,
+          "max_frames": 32
+        }
+      },
+      "plan": {
+        "total_frames": 4,
+        "cacheable_frames": 4,
+        "accuracy": "exact",
+        "fully_offline": true,
+        "storage": {
+          "bytes": 3072000,
+          "accuracy": "exact"
+        }
+      },
+      "desired_version": "d34db33fd34db33f",
+      "observed": {
+        "state": "playing",
+        "cached": 4,
+        "total": 4,
+        "version": "d34db33fd34db33f",
+        "observed_at": "2026-08-15T10:00:00Z"
+      }
+    }
+  ]
+}

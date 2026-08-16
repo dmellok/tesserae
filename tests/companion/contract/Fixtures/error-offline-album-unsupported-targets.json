@@ -1,0 +1,8 @@
+{
+  "error": {
+    "code": "offline_album_unsupported_targets",
+    "message": "One or more displays no longer support Offline Albums.",
+    "request_id": "req_offline_album_unsupported",
+    "device_ids": ["picpak-kitchen"]
+  }
+}

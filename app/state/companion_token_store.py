@@ -78,7 +78,11 @@ COMPANION_SCOPES: tuple[str, ...] = (
 # rewriting household scheduling is a different ask from pushing a picture,
 # and a client paired months ago shouldn't silently acquire it because the
 # server upgraded (#207).
-OPTIONAL_SCOPES: tuple[str, ...] = ("lineups:write",)
+# ``offline_albums:write`` is here for the same reason: it changes what a
+# physical display does on its own, with the radio off, for hours at a
+# time, which is a stronger action than putting a photo in a library and a
+# different one from pushing a frame (#230).
+OPTIONAL_SCOPES: tuple[str, ...] = ("lineups:write", "offline_albums:write")
 
 # Every scope this server recognises. A record carrying anything else was
 # either hand-edited or written by a newer build; it's dropped on load

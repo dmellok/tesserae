@@ -1,0 +1,34 @@
+{
+  "folder_id": "folder_family",
+  "targets": [
+    {
+      "device_id": "e1004-desk",
+      "support": {
+        "state": "supported",
+        "observed_at": "2026-08-15T09:58:00Z",
+        "detail": {
+          "capacity_bytes": 67108864,
+          "max_frames": 32
+        }
+      },
+      "conflict": {
+        "album_id": "oa_7f92a4",
+        "name": "Holidays"
+      },
+      "plan": {
+        "total_frames": 4,
+        "cacheable_frames": 4,
+        "accuracy": "exact",
+        "fully_offline": true
+      }
+    },
+    {
+      "device_id": "e1004-hallway",
+      "support": {
+        "state": "unknown",
+        "reason_code": "stale_heartbeat",
+        "observed_at": "2026-08-14T20:00:00Z"
+      }
+    }
+  ]
+}

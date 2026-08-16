@@ -186,6 +186,14 @@ module; the shared cache ignores it.
 - `repeat`: `loop` replays in order, `reshuffle` draws a new bag, `once` holds
   the last frame.
 
+Albums are authored from the Picture Gallery admin pages, from MCP, and over the
+Companion API at `/api/app/v1/gallery/folders/{folder_id}/offline-album` behind
+the operator-granted `offline_albums:write` scope. All three write the same
+records and are held to the same rules: one enabled album per display, with a
+take-over that has to be asked for rather than being a consequence of saving, and
+a display whose current report explicitly lacks `frame_cache` refused while one
+that simply hasn't checked in stays bindable.
+
 ### Deck (`kind: "deck"`, future)
 
 The Deck link graph (button/zone/swipe → target) moves into

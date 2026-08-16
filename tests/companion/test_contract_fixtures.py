@@ -64,6 +64,16 @@ CASES = {
     "personal-data-health-summary.json": "PersonalDataSnapshot",
     "personal-data-health-summary-partial.json": "PersonalDataSnapshot",
     "personal-data-health-summary-put-response.json": "PersonalDataSourceStatus",
+    "capabilities-offline-albums.json": "Capabilities",
+    "devices-offline-albums-response.json": "DevicesResponse",
+    "session-authorization-offline-albums.json": "CompanionSessionAuthorization",
+    "offline-album-draft.json": "OfflineAlbumDraft",
+    "offline-album-put-request.json": "OfflineAlbumWriteRequest",
+    "offline-album-response.json": "OfflineAlbumResponse",
+    "offline-album-response-partial-observation.json": "OfflineAlbumResponse",
+    "offline-album-preflight-response.json": "OfflineAlbumPreflightResponse",
+    "error-offline-album-conflict.json": "ErrorResponse",
+    "error-offline-album-unsupported-targets.json": "ErrorResponse",
     "job-lineup-action.json": "JobResponse",
     "error-forbidden.json": "ErrorResponse",
     "job-accepted.json": "JobResponse",
@@ -80,7 +90,7 @@ CASES = {
 
 def test_openapi_shape_and_operation_ids_are_stable() -> None:
     assert SPEC["openapi"] == "3.0.3"
-    assert SPEC["info"]["version"] == "0.12.0"
+    assert SPEC["info"]["version"] == "0.13.0"
     assert set(SPEC["paths"]) == {
         "/api/app/v1",
         "/api/app/v1/pair",
@@ -92,6 +102,8 @@ def test_openapi_shape_and_operation_ids_are_stable() -> None:
         "/api/app/v1/gallery/folders",
         "/api/app/v1/gallery/folders/{folder_id}",
         "/api/app/v1/gallery/folders/{folder_id}/images",
+        "/api/app/v1/gallery/folders/{folder_id}/offline-album",
+        "/api/app/v1/gallery/folders/{folder_id}/offline-album/preflight",
         "/api/app/v1/gallery/images/{image_id}/content",
         "/api/app/v1/gallery/images/{image_id}/thumbnail",
         "/api/app/v1/lineups",

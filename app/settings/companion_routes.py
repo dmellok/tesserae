@@ -48,6 +48,7 @@ SCOPE_LABELS: dict[str, str] = {
     "lineups:write": "Create and edit Lineups",
     "gallery:read": "Browse your photo Gallery",
     "gallery:write": "Add photos to your Gallery",
+    "offline_albums:write": "Set up offline photo albums on a display",
 }
 
 

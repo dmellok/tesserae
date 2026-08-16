@@ -1,0 +1,12 @@
+{
+  "name": "Family",
+  "enabled": true,
+  "device_ids": ["e1004-desk", "e1004-hallway"],
+  "order": ["image_family_02", "image_family_01"],
+  "fit": "fill",
+  "playback": {
+    "mode": "shuffle",
+    "interval_s": 1800,
+    "repeat": "reshuffle"
+  }
+}

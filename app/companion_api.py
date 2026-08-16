@@ -43,7 +43,7 @@ from flask import Blueprint, Flask, current_app, g, jsonify, request, url_for
 from pydantic import ValidationError
 from werkzeug.wrappers import Response
 
-from app import companion_gallery
+from app import companion_albums, companion_gallery
 from app.companion_history import (
     DEFAULT_HISTORY_LIMIT,
     MAX_HISTORY_LIMIT,
@@ -262,18 +262,22 @@ def _notify_data_change(event: DataChangeEvent | None) -> None:
 # -- error envelope ------------------------------------------------------
 
 
-def _error(code: str, message: str, status: int) -> tuple[Response, int]:
+def _error(code: str, message: str, status: int, **extras: Any) -> tuple[Response, int]:
     """Build the contract ``ErrorResponse`` envelope. ``request_id`` is
     always attached so a failed companion call is traceable from the app
-    without leaking anything sensitive."""
-    payload = {
-        "error": {
-            "code": code,
-            "message": message,
-            "request_id": f"req_{secrets.token_hex(8)}",
-        }
+    without leaking anything sensitive.
+
+    ``extras`` carries the few codes that need more than a message to be
+    actionable: ``claims`` names the album holding each contested display,
+    ``device_ids`` lists the targets that became unsupported. Both are
+    defined in the contract for those codes and absent everywhere else."""
+    error: dict[str, Any] = {
+        "code": code,
+        "message": message,
+        "request_id": f"req_{secrets.token_hex(8)}",
     }
-    return jsonify(payload), status
+    error.update(extras)
+    return jsonify({"error": error}), status
 
 
 # -- auth ----------------------------------------------------------------
@@ -376,6 +380,12 @@ def _features() -> list[str]:
         # Advertising Gallery on an instance without it would leave the
         # client offering a browse tab that 404s on every folder (#225).
         feats.append("gallery")
+    if companion_albums.albums_available():
+        # Offline Album authoring needs both halves: the Gallery plugin for
+        # the source photos and the album store for the producer. Advertised
+        # separately from ``gallery`` because browsing a library and making a
+        # display play one on its own are different things to offer (#230).
+        feats.append("offline_albums")
     return feats
 
 
@@ -2332,6 +2342,236 @@ def gallery_image_content(image_id: str) -> Any:
         companion_gallery.etag_for(served.path),
         filename=served.name,
     )
+
+
+# -- offline albums ------------------------------------------------------
+#
+# Authoring the Offline Album producer over the Companion API (#230). One
+# album per Gallery folder, so the resource is a nested singleton rather
+# than a collection: albums are keyed by folder in the store, and a
+# top-level route would advertise a many-per-folder world that doesn't
+# exist.
+#
+# The Web form in the Picture Gallery plugin does the same job, and the
+# two are held to the same rules deliberately: only ``unsupported``
+# targets are refused, an ``unknown`` one stays selectable so a display
+# asleep during setup can still be bound, taking a display off another
+# album is an explicit act rather than a consequence of saving, and every
+# affected display has its warmed frames dropped so the next manifest
+# re-renders.
+
+
+def _albums_or_404() -> tuple[Response, int] | None:
+    """Refuse the whole surface when either half is missing."""
+    if not companion_albums.albums_available():
+        return _error("not_found", "Offline Albums aren't available.", 404)
+    return None
+
+
+def _album_response(album: Any, folder: str, status: int = 200) -> Any:
+    """An album plus its version tag. Every response that hands out the
+    record hands out the validator needed to edit it safely."""
+    resp = jsonify(companion_albums.album_response(album, folder))
+    resp.status_code = status
+    resp.headers["ETag"] = f'"{companion_albums.album_etag(album)}"'
+    return resp
+
+
+def _album_draft(
+    body: Any, folder: str, *, stored_id: str
+) -> tuple[Any | None, tuple[Response, int] | None]:
+    """Validate an ``OfflineAlbumDraft`` into an unsaved :class:`Album`.
+
+    The folder identity comes from the path, never the body, so a client
+    cannot author an album against a folder it didn't address."""
+    from app.state.album_model import Album
+
+    if not isinstance(body, dict):
+        return None, _error("invalid_request", "A JSON object body is required.", 400)
+    order = body.get("order")
+    if not isinstance(order, list) or not all(isinstance(v, str) for v in order):
+        return None, _error("invalid_request", "order must be a list of image ids.", 400)
+    try:
+        filenames = companion_albums.order_to_filenames(folder, order)
+    except companion_albums.OrderRejected as exc:
+        return None, _error("invalid_request", str(exc), 400)
+    except companion_gallery.GalleryUnavailable:
+        return None, _error("not_found", "The photo Gallery isn't available.", 404)
+    device_ids = body.get("device_ids")
+    if not isinstance(device_ids, list) or not all(isinstance(v, str) for v in device_ids):
+        return None, _error("invalid_request", "device_ids must be a list of display ids.", 400)
+    try:
+        album = Album.model_validate(
+            {
+                "id": stored_id,
+                "name": body.get("name"),
+                "enabled": body.get("enabled"),
+                "device_ids": device_ids,
+                "source_folder": folder,
+                "order": filenames,
+                "fit": body.get("fit"),
+                "playback": body.get("playback"),
+            }
+        )
+    except ValidationError as exc:
+        return None, _error(
+            "invalid_request", f"Invalid album: {exc.error_count()} problem(s).", 400
+        )
+    return album, None
+
+
+def _album_targets_or_error(album: Any) -> tuple[Response, int] | None:
+    """Refuse a write naming a display that can't play an album.
+
+    Unregistered ids are ``invalid_target``; a display whose latest report
+    explicitly lacks the frame cache is ``offline_album_unsupported_targets``
+    with the ids named, so a form that passed preflight and then went stale
+    gets a reason rather than an opaque 400. ``unknown`` is allowed
+    through: a sleeping display is not evidence of anything."""
+    unknown_ids: list[str] = []
+    unsupported: list[str] = []
+    for device_id in album.device_ids:
+        support = companion_albums.support_for(device_id)
+        if support is None:
+            unknown_ids.append(device_id)
+        elif support.get("state") == "unsupported":
+            unsupported.append(device_id)
+    if unknown_ids:
+        return _error("invalid_target", "One or more target displays are unknown.", 400)
+    if unsupported:
+        return _error(
+            "offline_album_unsupported_targets",
+            "One or more displays no longer support Offline Albums.",
+            400,
+            device_ids=unsupported,
+        )
+    return None
+
+
+@bp.get("/gallery/folders/<folder_id>/offline-album")
+@_require_companion("gallery:read", "devices:read")
+def get_offline_album(folder_id: str) -> Any:
+    err = _albums_or_404()
+    if err is not None:
+        return err
+    folder, err = _gallery_folder_or_404(folder_id)
+    if err is not None:
+        return err
+    assert folder is not None
+    album = companion_albums.stored_album(folder)
+    if album is None:
+        return _error("not_found", "This folder has no Offline Album.", 404)
+    return _album_response(album, folder)
+
+
+@bp.put("/gallery/folders/<folder_id>/offline-album")
+@_require_companion("offline_albums:write")
+def put_offline_album(folder_id: str) -> Any:
+    """Create or completely replace one folder's album.
+
+    ``If-Match`` is required to replace an existing album and its absence
+    means "create": two surfaces edit these records, and a phone that
+    prepared its form before the Web form saved should be refused rather
+    than silently overwrite what it never saw."""
+    from app.state.album_store import AlbumConflict
+
+    err = _albums_or_404()
+    if err is not None:
+        return err
+    folder, err = _gallery_folder_or_404(folder_id)
+    if err is not None:
+        return err
+    assert folder is not None
+
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict) or not isinstance(body.get("album"), dict):
+        return _error("invalid_request", "An album object is required.", 400)
+
+    store = current_app.config["ALBUM_STORE"]
+    existing = companion_albums.stored_album(folder)
+    presented = (request.headers.get("If-Match") or "").strip().strip('"')
+    if not presented:
+        if existing is not None:
+            return _error(
+                "precondition_failed",
+                "This folder already has an Offline Album; send If-Match to replace it.",
+                412,
+            )
+    elif existing is None:
+        return _error("precondition_failed", "This folder's Offline Album no longer exists.", 412)
+    elif presented != companion_albums.album_etag(existing):
+        return _error("precondition_failed", "The Offline Album changed since it was read.", 412)
+
+    album, err = _album_draft(body["album"], folder, stored_id=companion_albums.stored_id(folder))
+    if err is not None:
+        return err
+    assert album is not None
+    err = _album_targets_or_error(album)
+    if err is not None:
+        return err
+
+    try:
+        store.upsert(album, replace=bool(body.get("replace_conflicts")))
+    except AlbumConflict as conflict:
+        return _error(
+            "offline_album_conflict",
+            "One or more displays are already playing another Offline Album.",
+            409,
+            claims=companion_albums.resolve_claims(conflict.claims),
+        )
+
+    previous = set(existing.device_ids) if existing is not None else set()
+    companion_albums.clear_warmed_frames(previous | set(album.device_ids))
+    logger.info(
+        "companion offline album saved: %s -> %d display(s)", album.id, len(album.device_ids)
+    )
+    return _album_response(album, folder, 200 if existing is not None else 201)
+
+
+@bp.delete("/gallery/folders/<folder_id>/offline-album")
+@_require_companion("offline_albums:write")
+def delete_offline_album(folder_id: str) -> Any:
+    """Remove the producer and its bindings. Source photos are untouched:
+    this unbinds a folder from a display, it doesn't delete a library.
+
+    204 whenever the folder ends up without an album, including when it
+    never had one, so a retried delete doesn't read as a missing folder."""
+    err = _albums_or_404()
+    if err is not None:
+        return err
+    folder, err = _gallery_folder_or_404(folder_id)
+    if err is not None:
+        return err
+    assert folder is not None
+    existing = companion_albums.stored_album(folder)
+    if existing is None:
+        return Response(status=204)
+    current_app.config["ALBUM_STORE"].delete(existing.id)
+    companion_albums.clear_warmed_frames(set(existing.device_ids))
+    return Response(status=204)
+
+
+@bp.post("/gallery/folders/<folder_id>/offline-album/preflight")
+@_require_companion("offline_albums:write")
+def preflight_offline_album(folder_id: str) -> Any:
+    """Plan a draft against each target without saving or warming.
+
+    Behind the write scope because it exists to serve an authoring form,
+    and a saved album's plan is readable through GET anyway."""
+    err = _albums_or_404()
+    if err is not None:
+        return err
+    folder, err = _gallery_folder_or_404(folder_id)
+    if err is not None:
+        return err
+    assert folder is not None
+    album, err = _album_draft(
+        request.get_json(silent=True), folder, stored_id=companion_albums.stored_id(folder)
+    )
+    if err is not None:
+        return err
+    assert album is not None
+    return jsonify(companion_albums.preflight_response(album, folder))
 
 
 def register(app: Flask) -> None:

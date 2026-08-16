@@ -1,0 +1,10 @@
+{
+  "token_id": "ct_offline_album_authoring",
+  "scopes": [
+    "devices:read",
+    "gallery:read",
+    "gallery:write",
+    "offline_albums:write"
+  ],
+  "settings_url": "/settings/companion"
+}
