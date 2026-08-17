@@ -4,6 +4,17 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.315.1], 2026-08-18
+
+### Fixed
+
+- **Agents are told about a dashboard's settings surface.** The MCP handshake
+  instructions now cover declaring `inputs` and that `patch_canvas` accepts them
+  on their own, so the one-call path for declaring settings after the elements
+  are placed is discoverable. The bridge serves per-tool descriptions from its
+  own package, so this had to reach agents through the server-fetched
+  instructions rather than a tool description.
+
 ## [0.315.0], 2026-08-18
 
 ### Added

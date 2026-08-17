@@ -254,6 +254,17 @@ EDITING WITHOUT RESENDING EVERYTHING:
   append_code(page_id, element_id, field, text) appends to its html/css/js and saves each time, so
   an open editor re-renders after each chunk -- stream a code element in line by line for a live
   build instead of one big post at the end (add the empty code element first, then append).
+  patch_canvas also takes "inputs" (the dashboard's config surface, see the doc shape), so once
+  the elements are placed you declare what the finished dashboard asks its operator in one more
+  call without resending the layout.
+
+BEFORE YOU CALL IT DONE, DECLARE THE SETTINGS:
+  A dashboard usually has a few values whose owner will want to change them later -- an API
+  endpoint, a postcode, an entity id, a city. Left as raw element options, changing one means
+  opening the composer and finding the right drawer. Declare those as "inputs" (see the doc shape)
+  and Tesserae serves the dashboard its own settings page, linked from the Dashboards list, and
+  asks the same questions if it is ever shared to the catalog. Declare the values an operator
+  would plausibly retune; leave the ones that are structural to the design alone.
 
 AVOID CLOBBERING A CONCURRENT EDIT:
   get_canvas() returns a "rev". Pass it as base_rev to a write; if the page changed since (someone
