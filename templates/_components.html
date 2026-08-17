@@ -369,15 +369,25 @@ macro here instead.
     </div>
     <div class="multiselect-list" data-ms-list>
       {% for opt in real %}
-      <label class="multiselect-opt" data-ms-text="{{ opt.label | lower }}">
-        <input type="checkbox" name="{{ name }}" value="{{ opt.value }}"
-               {% if opt.value | string in sel_str %}checked{% endif %}>
-        <span class="multiselect-tick" aria-hidden="true"><i class="ph ph-check"></i></span>
-        <span class="multiselect-label">{{ opt.label }}</span>
-      </label>
+      <div class="multiselect-opt" data-ms-text="{{ opt.label | lower }}">
+        <label class="multiselect-choice" for="{{ field_id }}-{{ loop.index0 }}">
+          <input type="checkbox" id="{{ field_id }}-{{ loop.index0 }}"
+                 name="{{ name }}" value="{{ opt.value }}"
+                 {% if opt.value | string in sel_str %}checked{% endif %}>
+          <span class="multiselect-tick" aria-hidden="true"><i class="ph ph-check"></i></span>
+          <span class="multiselect-label">{{ opt.label }}</span>
+        </label>
+        <button class="multiselect-drag" type="button" draggable="true" data-ms-drag
+                aria-label="Reorder {{ opt.label }}"
+                aria-keyshortcuts="ArrowUp ArrowDown Home End"
+                title="Drag to reorder; use arrow keys for precise movement">
+          <i class="ph ph-dots-six-vertical" aria-hidden="true"></i>
+        </button>
+      </div>
       {% endfor %}
       <p class="multiselect-empty" data-ms-empty hidden>No matches.</p>
     </div>
+    <span class="sr-only" data-ms-order-status aria-live="polite"></span>
     {% else %}
     <p class="multiselect-hint">{{ (options[0].label if options else None) or 'No options available.' }}</p>
     {% endif %}

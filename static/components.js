@@ -193,8 +193,88 @@
       ms.dataset.msBound = "1";
       const filter = ms.querySelector("[data-ms-filter]");
       const opts = Array.from(ms.querySelectorAll(".multiselect-opt"));
+      const list = ms.querySelector("[data-ms-list]");
       const emptyEl = ms.querySelector("[data-ms-empty]");
       const countEl = ms.querySelector("[data-ms-count]");
+      const orderStatus = ms.querySelector("[data-ms-order-status]");
+      let dragged = null;
+      let dragStartOrder = [];
+      let pointerDrag = null;
+
+      const inputFor = (row) => row && row.querySelector('input[type="checkbox"]');
+      const rows = () => list ? Array.from(list.querySelectorAll(".multiselect-opt")) : [];
+      const selectedRows = () => rows().filter((row) => inputFor(row)?.checked);
+      const selectedValues = () => selectedRows().map((row) => inputFor(row).value);
+      const sameOrder = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
+
+      function firstUnchecked() {
+        return rows().find((row) => !inputFor(row)?.checked) || emptyEl || null;
+      }
+
+      function announce(row) {
+        if (!orderStatus || !row) return;
+        const selected = selectedRows();
+        const position = selected.indexOf(row) + 1;
+        const label = row.querySelector(".multiselect-label")?.textContent.trim() || "Item";
+        orderStatus.textContent = `${label}, priority ${position} of ${selected.length}`;
+      }
+
+      function emitOrderChange(row) {
+        if (list) list.dispatchEvent(new Event("input", { bubbles: true }));
+        announce(row);
+      }
+
+      function partitionSelection() {
+        if (!list) return;
+        const ordered = rows();
+        const checked = ordered.filter((row) => inputFor(row)?.checked);
+        const unchecked = ordered.filter((row) => !inputFor(row)?.checked);
+        [...checked, ...unchecked].forEach((row) => list.insertBefore(row, emptyEl || null));
+      }
+
+      function beginDrag(row) {
+        if (!row || !inputFor(row)?.checked || (filter && filter.value.trim())) return false;
+        dragged = row;
+        dragStartOrder = selectedValues();
+        row.classList.add("is-dragging");
+        return true;
+      }
+
+      function reorderAt(clientY) {
+        if (!dragged || !list) return;
+        const peers = selectedRows().filter((row) => row !== dragged);
+        const before = peers.find((row) => {
+          const rect = row.getBoundingClientRect();
+          return clientY < rect.top + rect.height / 2;
+        });
+        list.insertBefore(dragged, before || firstUnchecked());
+      }
+
+      function finishDrag() {
+        if (!dragged) return;
+        const row = dragged;
+        row.classList.remove("is-dragging");
+        dragged = null;
+        if (!sameOrder(dragStartOrder, selectedValues())) emitOrderChange(row);
+        dragStartOrder = [];
+      }
+
+      function moveWithKeyboard(row, key) {
+        const selected = selectedRows();
+        const current = selected.indexOf(row);
+        if (current < 0 || selected.length < 2) return;
+        let target = current;
+        if (key === "ArrowUp") target -= 1;
+        else if (key === "ArrowDown") target += 1;
+        else if (key === "Home") target = 0;
+        else if (key === "End") target = selected.length - 1;
+        target = Math.max(0, Math.min(selected.length - 1, target));
+        if (target === current) return;
+        const reordered = selected.filter((item) => item !== row);
+        reordered.splice(target, 0, row);
+        reordered.forEach((item) => list.insertBefore(item, firstUnchecked()));
+        emitOrderChange(row);
+      }
 
       function updateCount() {
         if (!countEl) return;
@@ -209,6 +289,7 @@
           o.hidden = !match;
           if (match) shown += 1;
         });
+        ms.classList.toggle("is-filtering", Boolean(q));
         if (emptyEl) emptyEl.hidden = shown > 0;
       }
       if (filter) {
@@ -219,7 +300,78 @@
         );
         filter.addEventListener("input", applyFilter);
       }
-      ms.addEventListener("change", updateCount);
+      if (list) {
+        list.addEventListener("dragover", (ev) => {
+          if (!dragged) return;
+          ev.preventDefault();
+          if (ev.dataTransfer) ev.dataTransfer.dropEffect = "move";
+          reorderAt(ev.clientY);
+        });
+        list.addEventListener("drop", (ev) => {
+          if (!dragged) return;
+          ev.preventDefault();
+          reorderAt(ev.clientY);
+          finishDrag();
+        });
+
+        opts.forEach((row) => {
+          const handle = row.querySelector("[data-ms-drag]");
+          if (!handle) return;
+          handle.addEventListener("click", (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+          });
+          handle.addEventListener("dragstart", (ev) => {
+            if (pointerDrag || !beginDrag(row)) {
+              ev.preventDefault();
+              return;
+            }
+            if (ev.dataTransfer) {
+              ev.dataTransfer.effectAllowed = "move";
+              ev.dataTransfer.setData("text/plain", inputFor(row).value);
+            }
+          });
+          handle.addEventListener("dragend", finishDrag);
+          handle.addEventListener("keydown", (ev) => {
+            if (!["ArrowUp", "ArrowDown", "Home", "End"].includes(ev.key)) return;
+            ev.preventDefault();
+            moveWithKeyboard(row, ev.key);
+          });
+
+          // Native HTML drag handles mouse input. Pointer events cover touch
+          // and pen input, where HTML drag-and-drop is not consistently
+          // available across mobile browsers.
+          handle.addEventListener("pointerdown", (ev) => {
+            if (ev.pointerType === "mouse" || !inputFor(row)?.checked) return;
+            if (filter && filter.value.trim()) return;
+            pointerDrag = { id: ev.pointerId, row, startY: ev.clientY, moved: false };
+            handle.setPointerCapture?.(ev.pointerId);
+          });
+          handle.addEventListener("pointermove", (ev) => {
+            if (!pointerDrag || pointerDrag.id !== ev.pointerId) return;
+            if (!pointerDrag.moved && Math.abs(ev.clientY - pointerDrag.startY) < 5) return;
+            if (!pointerDrag.moved) {
+              pointerDrag.moved = beginDrag(pointerDrag.row);
+              if (!pointerDrag.moved) return;
+            }
+            ev.preventDefault();
+            reorderAt(ev.clientY);
+          });
+          const endPointerDrag = (ev) => {
+            if (!pointerDrag || pointerDrag.id !== ev.pointerId) return;
+            if (pointerDrag.moved) finishDrag();
+            handle.releasePointerCapture?.(ev.pointerId);
+            pointerDrag = null;
+          };
+          handle.addEventListener("pointerup", endPointerDrag);
+          handle.addEventListener("pointercancel", endPointerDrag);
+        });
+      }
+
+      ms.addEventListener("change", (ev) => {
+        if (ev.target.matches?.('input[type="checkbox"]')) partitionSelection();
+        updateCount();
+      });
       updateCount();
     });
   }

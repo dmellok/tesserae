@@ -1184,17 +1184,21 @@ def test_multiselect_cell_option_coercion() -> None:
     assert _coerce_cell_option(field, "", {"opt_entities": ""}) == []
 
 
-def _multiselect_checkbox_order(app: Flask, value: Any, options: list[dict[str, str]]) -> list[str]:
-    """Render the ``multiselect_field`` macro and pull the checkbox
-    values back out in DOM order (which is the order they'd submit in)."""
-    import re
-
+def _render_multiselect(app: Flask, value: Any, options: list[dict[str, str]]) -> str:
     with app.app_context():
         tmpl = app.jinja_env.from_string(
             "{% from '_components.html' import multiselect_field %}"
             "{{ multiselect_field('f', 'entities', 'Entities', value=value, options=options) }}"
         )
-        html = tmpl.render(value=value, options=options)
+        return tmpl.render(value=value, options=options)
+
+
+def _multiselect_checkbox_order(app: Flask, value: Any, options: list[dict[str, str]]) -> list[str]:
+    """Render the ``multiselect_field`` macro and pull the checkbox
+    values back out in DOM order (which is the order they'd submit in)."""
+    import re
+
+    html = _render_multiselect(app, value, options)
     return re.findall(r'type="checkbox"[^>]*value="([^"]*)"', html)
 
 
@@ -1226,6 +1230,42 @@ def test_multiselect_tolerates_bare_string_and_missing_value(app: Flask) -> None
     ]
     assert _multiselect_checkbox_order(app, "light.b", options) == ["light.b", "light.a"]
     assert _multiselect_checkbox_order(app, None, options) == ["light.a", "light.b"]
+
+
+def test_multiselect_renders_accessible_reorder_handles(app: Flask) -> None:
+    html = _render_multiselect(
+        app,
+        ["light.b", "light.a"],
+        [
+            {"value": "light.a", "label": "Desk"},
+            {"value": "light.b", "label": "Hallway"},
+        ],
+    )
+
+    assert html.count('class="multiselect-drag"') == 2
+    assert html.count('draggable="true"') == 2
+    assert 'aria-label="Reorder Hallway"' in html
+    assert 'aria-keyshortcuts="ArrowUp ArrowDown Home End"' in html
+    assert 'data-ms-order-status aria-live="polite"' in html
+
+
+def test_multiselect_component_wires_mouse_touch_and_keyboard_reordering() -> None:
+    source = (Path(__file__).parents[1] / "static" / "components.js").read_text()
+    styles = (Path(__file__).parents[1] / "static" / "style" / "forms.css").read_text()
+
+    assert 'handle.addEventListener("dragstart"' in source
+    assert 'list.addEventListener("drop"' in source
+    assert 'handle.addEventListener("pointermove"' in source
+    assert 'handle.addEventListener("keydown"' in source
+    assert 'new Event("input", { bubbles: true })' in source
+    assert ".multiselect-drag .ph" in styles
+    assert "radial-gradient(circle, currentColor 1.5px" in styles
+    assert ".multiselect-opt:has(input:checked) + .multiselect-opt:has(input:checked)" in styles
+    assert "border-top-color: transparent" in styles
+    drag_button = styles.split(".multiselect-drag {", 1)[1].split("}", 1)[0]
+    assert "border-left" not in drag_button
+    assert "box-shadow: none" in drag_button
+    assert "transform: none" in drag_button
 
 
 def test_select_with_unmatched_value_does_not_visually_choose_first_option(
