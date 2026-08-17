@@ -504,12 +504,17 @@ def validate_health_summary(
         or _TIME_ZONE_RE.fullmatch(time_zone) is None
     ):
         raise InvalidHealthSummary("data.time_zone must be a valid IANA time zone")
-    try:
-        timezone = ZoneInfo(time_zone)
-    except ZoneInfoNotFoundError as exc:
-        raise InvalidHealthSummary("data.time_zone must be a valid IANA time zone") from exc
+    # Compare before constructing, so ``ZoneInfo`` only ever sees this
+    # instance's own zone. The key regex admits ``..`` as a path component,
+    # and a key that escapes TZPATH raises ``ValueError`` rather than the
+    # ``ZoneInfoNotFoundError`` a missing zone raises, which would leave the
+    # request as an unhandled 500 instead of the contract's 400.
     if time_zone != active_timezone:
         raise InvalidHealthSummary("data.time_zone must match the active Tesserae instance")
+    try:
+        timezone = ZoneInfo(time_zone)
+    except (ZoneInfoNotFoundError, ValueError) as exc:
+        raise InvalidHealthSummary("data.time_zone must be a valid IANA time zone") from exc
 
     window_start = _iso_date(data["window_start_date"], "data.window_start_date")
     window_end = _iso_date(data["window_end_date"], "data.window_end_date")

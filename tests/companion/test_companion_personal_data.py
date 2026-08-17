@@ -401,6 +401,21 @@ def test_health_validation_enforces_ttl_window_and_request_size(app: Flask) -> N
     assert "sensitive" not in response.get_data(as_text=True)
 
 
+@pytest.mark.parametrize("time_zone", ["..", "../../etc/passwd", "Nowhere/Nowhere"])
+def test_health_time_zone_that_escapes_tzpath_is_a_400(app: Flask, time_zone: str) -> None:
+    """``ZoneInfo`` raises ``ValueError`` (not ``ZoneInfoNotFoundError``) for a
+    key that resolves outside TZPATH, and the key regex admits ``..`` as a path
+    component. Validation must stay a contract error rather than a 500."""
+    token = _token(app)
+    snapshot = _health_snapshot(datetime.now(UTC).replace(microsecond=0))
+    snapshot["data"]["time_zone"] = time_zone
+
+    response = _put_health(app, token, snapshot)
+
+    assert response.status_code == 400
+    assert response.get_json()["error"]["code"] == "invalid_snapshot"
+
+
 def test_personal_data_changes_emit_semantic_events_after_storage(app: Flask) -> None:
     token = _token(app)
     capture = _ChangeCapture()
