@@ -8,6 +8,7 @@ render) and the fragment contract.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -813,6 +814,57 @@ def test_source_form_renders_widget_options(app: Flask, monkeypatch: pytest.Monk
     resp = client.post("/pages/canvas/source-form", json={"key": "weather_now", "sid": "e1"})
     assert resp.status_code == 200
     assert 'name="opt_units"' in resp.get_data(as_text=True)
+
+
+def test_secret_url_option_stays_readable_in_the_editor(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """#237: rest_service.url is sensitive (stripped from render context,
+    redacted on share) but has to stay legible to whoever maintains it, so it
+    opts out of masking while keeping the secret flag."""
+    monkeypatch.setenv("TESSERAE_EXPERIMENT_COMPOSER", "1")
+    client = app.test_client()
+    _sign_in(client)
+    url = "https://api.example.com/collections?postcode=3000"
+
+    resp = client.post(
+        "/pages/canvas/source-form",
+        json={"key": "rest_service", "sid": "e1", "options": {"url": url}},
+    )
+
+    assert resp.status_code == 200
+    field = re.search(r'<input[^>]*name="opt_url"[^>]*>', resp.get_data(as_text=True), re.S)
+    assert field is not None
+    assert 'type="text"' in field.group(0)
+    assert url in field.group(0)
+
+
+def test_mask_defaults_to_secret_for_string_options(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A secret option that says nothing about masking is still masked, so the
+    new key is opt-out rather than a behaviour change for existing plugins."""
+    monkeypatch.setenv("TESSERAE_EXPERIMENT_COMPOSER", "1")
+    with app.app_context():
+        template = app.jinja_env.from_string(
+            "{% from '_components.html' import auto_field %}"
+            "{{ auto_field('f', 'opt_token', spec, 'abc123') }}"
+        )
+        masked = template.render(
+            spec={"name": "token", "type": "string", "label": "Token", "secret": True}
+        )
+        unmasked = template.render(
+            spec={
+                "name": "token",
+                "type": "string",
+                "label": "Token",
+                "secret": True,
+                "mask": False,
+            }
+        )
+
+    assert 'type="password"' in masked
+    assert 'type="text"' in unmasked
 
 
 def test_widget_data_live_with_sample_fallback(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:

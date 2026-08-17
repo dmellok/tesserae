@@ -580,10 +580,19 @@ macro here instead.
                   placeholder=spec.get('placeholder', 'HH:MM'),
                   type='time', help=help_text, form=form) }}
   {% else %}
+    {#- ``secret`` answers "keep this out of render context and off the
+       marketplace"; ``mask`` answers "hide it from the person editing it".
+       They're usually the same answer, so mask defaults to secret, but a
+       URL is the counter-example: it's install-specific and can carry a
+       key in its query string, yet nobody can maintain one they can't
+       read (#237). Note masking only ever applied to fields that fall
+       through to this branch, so a ``secret`` textarea was always
+       visible anyway. -#}
+    {% set mask = spec.get('mask', spec.get('secret')) %}
     {{ text_input(field_id, name, label, value=value or '',
                   placeholder=spec.get('placeholder', ''),
-                  type='password' if spec.get('secret') else 'text',
-                  autocomplete='new-password' if spec.get('secret') else None,
+                  type='password' if mask else 'text',
+                  autocomplete='new-password' if mask else None,
                   help=help_text, form=form, readonly=readonly) }}
   {% endif %}
 {%- endmacro -%}

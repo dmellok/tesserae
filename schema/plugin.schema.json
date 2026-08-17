@@ -74,7 +74,14 @@
           "type": { "enum": ["string", "textarea", "variables_textarea", "entity_overrides", "location_search", "number", "slider", "select", "multiselect", "boolean", "color"] },
           "label": { "type": "string" },
           "default": {},
-          "secret": { "type": "boolean" },
+          "secret": {
+            "type": "boolean",
+            "description": "The value is sensitive: it is stripped from the render context handed to the browser and redacted (with an installer question suggested in its place) when the dashboard is shared to the catalog."
+          },
+          "mask": {
+            "type": "boolean",
+            "description": "Render the editor field as a password input. Defaults to the value of 'secret'. Set false on a sensitive value the author still has to be able to read to maintain, such as a URL."
+          },
           "choices": {
             "type": "array",
             "items": {

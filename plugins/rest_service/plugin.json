@@ -14,7 +14,8 @@
       "type": "string",
       "label": "URL (https://…, returns JSON)",
       "default": "",
-      "secret": true
+      "secret": true,
+      "mask": false
     },
     {
       "name": "headers",

@@ -126,6 +126,14 @@ lowercase `[a-z0-9_]` is convention, not enforced. Name it `<family>_<role>`
   cross-widget shape selection. If a widget needs a genuine layout
   shape choice (e.g. `stack` vs `side`), name the option `layout` and
   use shape-describing values.
+* **`secret` and `mask` on a cell option.** `secret: true` marks the
+  value sensitive: it is stripped from the render context handed to the
+  browser, and redacted on share to the catalog with an installer
+  question suggested in its place. `mask: true` is the separate question
+  of whether the editor renders the field as a password input, and
+  defaults to whatever `secret` is. Set `mask: false` on a value that is
+  sensitive but still has to be readable to maintain, a URL being the
+  usual case: nobody can fix an endpoint they can't see (#237).
 * **Careful with an option named `label`.** The host promotes the app-level
   Settings location into every widget's options and fills a blank `label`
   with the place name (see `_resolved_options` in `app/composer.py`). That's
