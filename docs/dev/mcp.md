@@ -265,6 +265,49 @@ moving marker), `length` (a gauge that grows), `pick` (hop between discrete stat
 colour stops, quantised to the panel palette on e-ink), and `icon` (condition to a
 glyph). Full shape in the `set_canvas` tool description.
 
+## Give the dashboard its own settings page
+
+A dashboard an agent builds usually has a handful of values that will need
+changing later: the API endpoint behind a code tile, a postcode, an entity id, a
+city. Left as raw element options, changing one means opening the composer and
+finding the right source drawer.
+
+Instead, an agent can declare them. A canvas carries an `inputs` list, one entry
+per value worth asking about, each pointing at where the answer lands:
+
+```json
+{
+  "name": "bin_api",
+  "label": "Bin collection API URL",
+  "type": "string",
+  "secret": true,
+  "mask": false,
+  "targets": [{"el": "e1", "slot": "source_options", "index": 0, "key": "url"}]
+}
+```
+
+Tesserae then serves a **Settings** page for that dashboard at
+`/pages/canvas/c/<id>/configure`, linked from the Dashboards list, with one
+field per declared input pre-filled from what the dashboard is currently
+rendering. Set `inputs` with `set_canvas`, or with `patch_canvas` alone once the
+elements are already placed. Full field and slot reference is in the
+`set_canvas` tool description.
+
+Two things follow from using the same declaration the template format uses:
+
+- **Sharing asks the same questions.** Declared inputs are what the Share flow
+  offers as install questions, so an installer is asked what the author was
+  asked, with the author's labels rather than derived ones.
+- **A dashboard with no declarations can derive them.** On the Settings page,
+  *Suggest settings* runs the Share flow's own analysis: whatever it would
+  redact and ask an installer about becomes a setting. Existing declarations are
+  kept, so it only ever adds.
+
+`secret: true` keeps a value out of the render context and redacts it on share.
+`mask` is the separate question of whether the settings field is a password box,
+and defaults to `secret`; set it `false` for a value that is sensitive but still
+has to be readable to maintain, a URL being the usual case.
+
 ## Guardrails
 
 - The API **404s** entirely while the `mcp` experiment is off.

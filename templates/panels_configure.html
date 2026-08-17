@@ -1,0 +1,54 @@
+{# A canvas dashboard's own settings page (#237).
+
+   Renders one field per input the dashboard declares in ``canvas.inputs``,
+   pre-filled from what it is currently rendering. The declaration is the same
+   shape the template format uses, so this form and the questions the catalog
+   listing asks an installer are the same thing: configure a dashboard here and
+   share it, and an installer is asked exactly what you were.
+
+   Fields go through ``auto_field`` so a config input renders with the same
+   controls as a per-cell option, and the POST is parsed with the same
+   coercion. #}
+{% extends "_base.html" %}
+{% from "_components.html" import section_card, auto_field, button %}
+{% block title %}Configure {{ page.name }}, Tesserae{% endblock %}
+{% block main %}
+<header class="page-head">
+  <h1><i class="ph ph-sliders-horizontal"></i> Configure {{ page.name }}</h1>
+  <p class="lede">The settings this dashboard asks for. Everything else about it
+    lives in the composer.</p>
+</header>
+
+{% if inputs %}
+{% call section_card(icon='sliders-horizontal', title='Settings',
+                     description='Saved straight onto the dashboard. Re-render or push it to see the change on a panel.') %}
+  <form method="post" action="{{ url_for('panels.configure', canvas_id=page.id) }}">
+    {% for item in inputs %}
+      {{ auto_field('cfg-' ~ item.name, 'opt_' ~ item.name, specs[item.name],
+                    values.get(item.name, item.default)) }}
+    {% endfor %}
+    <div class="actions">
+      {{ button('Save settings', icon='check') }}
+      <a class="ghost-link" href="{{ url_for('panels.editor', canvas_id=page.id) }}">Open in composer</a>
+    </div>
+  </form>
+{% endcall %}
+{% else %}
+{% call section_card(icon='sliders-horizontal', title='No settings yet',
+                     description="This dashboard hasn't declared what it asks for.") %}
+  <p class="note">A dashboard declares its settings as it is built, so whoever
+    inherits it can change the parts meant to be changed without hunting through
+    the composer. Nothing here declares any yet.</p>
+  <p class="note">Suggest settings reads the dashboard the way the Share flow
+    does: anything it would redact and ask an installer about (endpoints, request
+    headers, entity ids) becomes a setting here. Your existing declarations are
+    kept, so this only ever adds.</p>
+  <form method="post" action="{{ url_for('panels.configure_suggest', canvas_id=page.id) }}">
+    <div class="actions">
+      {{ button('Suggest settings', icon='magic-wand') }}
+      <a class="ghost-link" href="{{ url_for('panels.editor', canvas_id=page.id) }}">Open in composer</a>
+    </div>
+  </form>
+{% endcall %}
+{% endif %}
+{% endblock %}

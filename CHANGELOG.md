@@ -4,6 +4,33 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.315.0], 2026-08-18
+
+### Added
+
+- **A freeform dashboard can carry its own settings page.** A canvas declares
+  the values it asks for (`canvas.inputs`), and `/pages/canvas/c/<id>/configure`
+  renders one field per declared setting, pre-filled from what the dashboard is
+  currently rendering. An agent building a dashboard over MCP declares these as
+  it goes, so whoever inherits it changes the API endpoint or the postcode on a
+  settings page instead of hunting through per-element option drawers. A
+  dashboard that never declared any can derive them: Suggest settings runs the
+  Share flow's own analysis, so whatever would be redacted and asked of an
+  installer becomes a setting here. The declaration is the same shape the
+  template format already used, so a dashboard configured locally asks an
+  installer exactly what its author was asked.
+
+### Fixed
+
+- **A sensitive option that has to stay readable no longer renders as a
+  password box.** The `secret` flag on a widget option was answering two
+  questions at once: keep this out of the render context and off the
+  marketplace, and hide it from the person editing it. Those diverge on a URL,
+  which is install-specific and can carry a key in its query string yet cannot
+  be maintained when masked, so masking moves to its own `mask` key that
+  defaults to `secret`. The REST / JSON service's URL opts out and is editable
+  again (#237).
+
 ## [0.314.0], 2026-08-18
 
 ### Added

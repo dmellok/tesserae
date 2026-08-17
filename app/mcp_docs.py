@@ -24,8 +24,30 @@ DOC_SHAPE = """A canvas document is JSON:
   "w": int, "h": int,                 # artboard size in px (match the target panel)
   "theme": str, "style": str,         # appearance ids from list_widgets().appearance
   "font": str, "bg": str,             # optional font id and background colour override
-  "els": [ <element>, ... ]           # painted in list order: first = back, last = front
+  "els": [ <element>, ... ],          # painted in list order: first = back, last = front
+  "inputs": [ <config input>, ... ]   # optional; the settings this dashboard asks for
 }
+"inputs" is the dashboard's own config surface, shown at /pages/canvas/c/<id>/configure
+and offered as the install questions when it's shared to the catalog. Declare one for
+every value the operator will plausibly want to change later -- an API endpoint, a
+postcode, an entity id, a city -- so they can edit it on a settings page instead of
+hunting through element options. Skip it for values that are structural to the design.
+  {"name":"trash_api", "label":"Bin collection API URL", "type":"string",
+   "help":"", "default":"", "required":false, "secret":false, "mask":null,
+   "targets":[{"el":"<element id>","slot":"source_options","index":0,"key":"url"}]}
+"name" is lowercase a-z0-9_ (max 32) and unique; "type" is string|textarea|number|
+boolean|select|location_search ("select" needs "choices":[{"value","label"}]).
+"secret" true keeps the value out of the render context and redacts it on share;
+"mask" decides whether the settings field is a password box and defaults to "secret",
+so set it false on a secret the operator still has to read back, a URL being the usual
+case. A "target" says where the answer lands; list several to have one answer fill
+several elements. "slot" is one of:
+  options        -- the element's own options; "key" names the option
+  source_options -- options of sources[index] on a code element; "key" names the option
+  source_url     -- the url of sources[index]
+  source_header  -- headers of sources[index]; "key" names one header, or omit "key"
+                    to let the answer be the whole header map as JSON
+  bind_options   -- options of bind[index]
 Elements may sit partly off the panel (it clips at the edge). Each element has a
 unique "id" and a box "x","y","w","h" (px, top-left origin; x/y may be negative),
 plus optional "opacity" (0-100) and "rotate" (degrees). By "kind":

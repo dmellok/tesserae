@@ -456,6 +456,62 @@ def apply_inputs(template: dict[str, Any], values: dict[str, Any]) -> dict[str, 
     return canvas
 
 
+def read_inputs(canvas: dict[str, Any], inputs: list[dict[str, Any]]) -> dict[str, Any]:
+    """The inverse of :func:`apply_inputs`: read each input's current value out
+    of ``canvas`` through its declared targets.
+
+    An input can point at several places (one answer filling three tiles' entity
+    ids), so the first target that resolves to a set value wins and the rest are
+    assumed to agree, which is what applying the input made true. Missing
+    targets read as the input's ``default``, so a Configure form pre-fills with
+    what the dashboard is actually rendering rather than blanks.
+    """
+    els_by_id = {el.get("id"): el for el in canvas.get("els") or [] if isinstance(el, dict)}
+    values: dict[str, Any] = {}
+    for input_spec in inputs:
+        name = input_spec.get("name")
+        if not name:
+            continue
+        found: Any = None
+        for target in input_spec.get("targets") or []:
+            el = els_by_id.get(target.get("el"))
+            if el is None:
+                continue
+            slot = target.get("slot")
+            key = target.get("key")
+            index = target.get("index")
+            if slot == "options":
+                found = (el.get("options") or {}).get(key)
+            elif slot in ("source_options", "source_header", "source_url"):
+                sources = el.get("sources") or []
+                if not (isinstance(index, int) and 0 <= index < len(sources)):
+                    continue
+                source = sources[index]
+                if slot == "source_options":
+                    found = (source.get("options") or {}).get(key)
+                elif slot == "source_url":
+                    found = source.get("url")
+                else:
+                    headers = source.get("headers") or {}
+                    # A header input either names one header or owns the whole
+                    # map; the map form is round-tripped as JSON text because
+                    # that is what the textarea control edits.
+                    if key:
+                        found = headers.get(key)
+                    elif headers:
+                        import json as _json
+
+                        found = _json.dumps(headers)
+            elif slot == "bind_options":
+                binds = el.get("bind") or []
+                if isinstance(index, int) and 0 <= index < len(binds):
+                    found = (binds[index].get("options") or {}).get(key)
+            if found not in (None, "", [], {}):
+                break
+        values[name] = found if found not in (None, "", [], {}) else input_spec.get("default", "")
+    return values
+
+
 # -- preview image -------------------------------------------------------
 
 # A dashboard renders at its authored size (up to 1600x1200 on a 13.3"

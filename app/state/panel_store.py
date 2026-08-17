@@ -288,6 +288,51 @@ class Element(BaseModel):
         return self
 
 
+class ConfigInputTarget(BaseModel):
+    """Where one config input's value lands inside the canvas.
+
+    Same shape the template format uses (``schema/template.schema.json``), so a
+    dashboard's local config surface and the questions its catalog listing asks
+    are the same declaration rather than two parallel ones.
+    """
+
+    el: str
+    # options | source_options | source_header | source_url | bind_options.
+    # Validated against the applier's known slots rather than an enum here, so
+    # a doc written by a newer build round-trips instead of failing to load.
+    slot: str = "options"
+    index: int | None = Field(default=None, ge=0)
+    key: str = ""
+
+
+class ConfigInput(BaseModel):
+    """One question a dashboard asks whoever is setting it up.
+
+    An agent building a canvas declares these as it goes, so an MCP-authored
+    dashboard arrives with a config surface instead of forcing whoever inherits
+    it to hunt through per-element drawers for the one URL they need to change
+    (#237). Declared inputs are also what the Share flow offers, so what the
+    author configured locally is what an installer is asked.
+    """
+
+    name: str = Field(pattern=r"^[a-z0-9_]{1,32}$")
+    label: str = Field(min_length=1, max_length=80)
+    type: str = "string"
+    secret: bool = False
+    # Whether the field is masked in the config form. Defaults to ``secret``
+    # via :meth:`masked`, matching the cell-option contract, so a URL can be
+    # sensitive without being unreadable.
+    mask: bool | None = None
+    required: bool = False
+    default: Any = ""
+    help: str = ""
+    choices: list[dict[str, Any]] = Field(default_factory=list)
+    targets: list[ConfigInputTarget] = Field(default_factory=list, max_length=20)
+
+    def masked(self) -> bool:
+        return self.secret if self.mask is None else self.mask
+
+
 class CanvasLayout(BaseModel):
     """The freeform-canvas layout carried by a ``Page`` whose ``layout_kind`` is
     ``"canvas"`` (issue #60). Same shape as :class:`CanvasPage` minus the
@@ -309,6 +354,9 @@ class CanvasLayout(BaseModel):
     bg_image: str = ""
     bg_fit: str = "cover"  # cover | contain | stretch
     els: list[Element] = Field(default_factory=list)
+    # The dashboard's own config surface. Not part of the render payload; the
+    # renderer ignores it and reads the resolved element options as before.
+    inputs: list[ConfigInput] = Field(default_factory=list, max_length=20)
 
 
 class CanvasPage(BaseModel):
@@ -332,6 +380,7 @@ class CanvasPage(BaseModel):
     # Device instances this canvas is sent to.
     device_ids: list[str] = Field(default_factory=list)
     els: list[Element] = Field(default_factory=list)
+    inputs: list[ConfigInput] = Field(default_factory=list, max_length=20)
 
     def to_layout(self) -> CanvasLayout:
         """The render payload for this canvas (drops id/name/device_ids)."""
@@ -345,6 +394,7 @@ class CanvasPage(BaseModel):
             bg_image=self.bg_image,
             bg_fit=self.bg_fit,
             els=list(self.els),
+            inputs=list(self.inputs),
         )
 
 

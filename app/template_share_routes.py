@@ -73,6 +73,22 @@ def _quality(page_id: str, page: Any) -> dict[str, Any]:
     }
 
 
+def _merge_declared_inputs(page: Any, suggested: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The dashboard's declared config surface, plus anything the sanitizer
+    found that it doesn't already cover.
+
+    A dashboard that declares its own inputs (#237) has already answered "what
+    should someone setting this up be asked", usually with better labels than
+    the derivation can infer, so those come first and win on name. The
+    sanitizer's suggestions still matter: they're derived from what was
+    actually redacted, so a value the author never declared can't slip out
+    unasked.
+    """
+    declared = [item.model_dump(mode="json") for item in (page.canvas.inputs or [])]
+    seen = {item["name"] for item in declared}
+    return declared + [item for item in suggested if item.get("name") not in seen]
+
+
 @bp.post("/panels/c/<page_id>/share/prepare")
 def prepare(page_id: str) -> Response | tuple[Response, int]:
     page = _get_canvas_page(page_id)
@@ -90,7 +106,7 @@ def prepare(page_id: str) -> Response | tuple[Response, int]:
     return jsonify(
         {
             "template": result["template"],
-            "inputs_suggested": result["inputs_suggested"],
+            "inputs_suggested": _merge_declared_inputs(page, result["inputs_suggested"]),
             "redactions": result["redactions"],
             "lint": result["lint"],
             "blocking": result["blocking"],

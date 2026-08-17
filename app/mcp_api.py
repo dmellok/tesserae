@@ -35,7 +35,7 @@ from app import experiments
 from app import panels_routes as _pr
 from app.auth import _is_loopback
 from app.panels_schema import build_catalog
-from app.state.panel_store import CanvasLayout, CanvasPage
+from app.state.panel_store import CanvasLayout, CanvasPage, ConfigInput
 from app.state.settings_store import SettingsStore
 from app.touch_spec import PRIMITIVE_KINDS
 from app.webhook_routes import _presented_token, generate_token
@@ -1442,9 +1442,14 @@ def delete_element(page_id: str, element_id: str) -> Response:
 
 @bp.patch("/pages/<page_id>/canvas")
 def patch_canvas(page_id: str) -> Response:
-    """Update document-level fields (name, size, appearance) without touching the
-    elements. Body accepts any of ``{name,w,h,theme,style,font,bg,bg_image,bg_fit}``.
-    Use ``set_canvas`` / element endpoints for ``els``. Supports ``?base_rev=``."""
+    """Update document-level fields (name, size, appearance, config inputs) without
+    touching the elements. Body accepts any of
+    ``{name,w,h,theme,style,font,bg,bg_image,bg_fit,inputs}``. Use ``set_canvas`` /
+    element endpoints for ``els``. Supports ``?base_rev=``.
+
+    ``inputs`` replaces the dashboard's declared config surface wholesale, so an
+    agent that has just placed the elements can declare what the finished
+    dashboard asks its operator in one call without resending the layout."""
     page = _pr._get_canvas(page_id)
     if page is None or page.canvas is None:
         return _err(404, f"no canvas dashboard {page_id!r}")
@@ -1464,6 +1469,13 @@ def patch_canvas(page_id: str) -> Response:
     for field in ("theme", "style", "font", "bg", "bg_image", "bg_fit"):
         if field in body and isinstance(body[field], str):
             setattr(layout, field, body[field])
+    if "inputs" in body:
+        if not isinstance(body["inputs"], list):
+            return _err(400, "inputs must be a list")
+        try:
+            layout.inputs = [ConfigInput.model_validate(item) for item in body["inputs"]]
+        except ValidationError as exc:
+            return _err(422, "invalid config inputs", details=exc.errors(include_url=False))
     _save_mcp(page)
     return _saved(page)
 

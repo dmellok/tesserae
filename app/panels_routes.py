@@ -45,7 +45,7 @@ from app import experiments
 from app.panels_schema import build_catalog
 from app.plugin_loader import PluginRegistry
 from app.state.page_store import Page, PageStore
-from app.state.panel_store import CanvasPage, Element
+from app.state.panel_store import CanvasLayout, CanvasPage, Element
 
 # The freeform (canvas) editor now lives in the dashboards area and persists to
 # the same PageStore as grid pages: a canvas is a Page with layout_kind="canvas"
@@ -105,6 +105,7 @@ def _as_doc(page: Page) -> CanvasPage:
         bg_fit=c.bg_fit,
         device_ids=list(page.device_ids),
         els=list(c.els),
+        inputs=list(c.inputs),
     )
 
 
@@ -698,6 +699,127 @@ def widget_data() -> Response:
         sample = get_sample(widget)
         result = sample if isinstance(sample, dict) else result
     return jsonify({"data": result if isinstance(result, dict) else None})
+
+
+# -- config surface ------------------------------------------------------
+#
+# A canvas declares the questions it asks (``canvas.inputs``) and this pair of
+# routes renders + answers them. The declaration is the same shape the template
+# format uses, so a dashboard's local config surface and the questions its
+# catalog listing asks are one declaration rather than two that drift.
+
+
+def _input_field_spec(item: Any) -> dict[str, Any]:
+    """A declared input as the ``auto_field`` macro's option spec, so a config
+    form renders with the same controls as everything else in the product."""
+    spec: dict[str, Any] = {
+        "name": item.name,
+        "type": item.type,
+        "label": item.label,
+        "default": item.default,
+        "secret": item.secret,
+        "mask": item.masked(),
+    }
+    if item.help:
+        spec["help"] = item.help
+    if item.choices:
+        spec["choices"] = item.choices
+    return spec
+
+
+@bp.get("/c/<canvas_id>/configure")
+def configure(canvas_id: str) -> Response | str:
+    """The dashboard's own settings page: one field per declared input,
+    pre-filled from what the canvas is currently rendering."""
+    _guard()
+    page = _get_canvas(canvas_id)
+    if page is None or page.canvas is None:
+        abort(404)
+    from app import template_export
+
+    canvas = page.canvas.model_dump(mode="json")
+    declared = [item.model_dump(mode="json") for item in page.canvas.inputs]
+    return render_template(
+        "panels_configure.html",
+        page=page,
+        inputs=page.canvas.inputs,
+        specs={item.name: _input_field_spec(item) for item in page.canvas.inputs},
+        values=template_export.read_inputs(canvas, declared),
+    )
+
+
+@bp.post("/c/<canvas_id>/configure")
+def configure_save(canvas_id: str) -> Response:
+    """Write the submitted answers back through each input's declared targets.
+
+    Values route through the same ``apply_inputs`` an install uses, so a
+    dashboard configured here and the same dashboard installed from the catalog
+    land in identical states.
+    """
+    _guard()
+    page = _get_canvas(canvas_id)
+    if page is None or page.canvas is None:
+        abort(404)
+    from app import template_export
+    from app.page_routes import _coerce_cell_option
+
+    declared = [item.model_dump(mode="json") for item in page.canvas.inputs]
+    # The raw MultiDict, not a flattened copy: the shared coercion reads it
+    # directly for the types whose value isn't a single form field (an unchecked
+    # boolean is absent rather than false, a multiselect is a getlist).
+    form = request.form
+    answers: dict[str, Any] = {}
+    for item in page.canvas.inputs:
+        field = f"opt_{item.name}"
+        if field not in form and item.type not in ("boolean", "switch", "multiselect"):
+            continue
+        answers[item.name] = _coerce_cell_option(_input_field_spec(item), form.get(field), form)
+    canvas = template_export.apply_inputs(
+        {"canvas": page.canvas.model_dump(mode="json"), "inputs": declared}, answers
+    )
+    # The inputs are the page's own declaration, not something an answer can
+    # rewrite; apply_inputs only touches els, but rebuild from the stored list
+    # so a hand-edited canvas dict can't drop them either.
+    canvas["inputs"] = declared
+    updated = page.model_copy(update={"canvas": CanvasLayout.model_validate(canvas)})
+    _pages().save(_stamp(updated, "ui"))
+    return redirect(url_for("panels.configure", canvas_id=canvas_id))
+
+
+@bp.post("/c/<canvas_id>/configure/suggest")
+def configure_suggest(canvas_id: str) -> Response:
+    """Derive a config surface for a dashboard that never declared one.
+
+    Runs the export sanitizer's own analysis over the live page: whatever it
+    would redact and ask an installer about is exactly what is worth asking the
+    owner about here. Existing declarations win, so this only ever adds.
+    """
+    _guard()
+    page = _get_canvas(canvas_id)
+    if page is None or page.canvas is None:
+        abort(404)
+    from app import template_export
+
+    marketplace = current_app.config.get("MARKETPLACE")
+    try:
+        result = template_export.build_template(
+            page,
+            registry=_registry(),
+            installed_records=marketplace.installed() if marketplace is not None else {},
+            data_root=current_app.config["DATA_ROOT"],
+        )
+    except template_export.ExportBlocked:
+        return redirect(url_for("panels.configure", canvas_id=canvas_id))
+    existing = {item.name for item in page.canvas.inputs}
+    merged = [item.model_dump(mode="json") for item in page.canvas.inputs]
+    for suggested in result["inputs_suggested"]:
+        if suggested.get("name") not in existing and len(merged) < 20:
+            merged.append(suggested)
+    canvas = page.canvas.model_dump(mode="json")
+    canvas["inputs"] = merged
+    updated = page.model_copy(update={"canvas": CanvasLayout.model_validate(canvas)})
+    _pages().save(_stamp(updated, "ui"))
+    return redirect(url_for("panels.configure", canvas_id=canvas_id))
 
 
 def _materialised_options(plugin: Any) -> list[dict[str, Any]]:

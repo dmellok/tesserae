@@ -76,6 +76,10 @@
               {{ page.name }}
               {% if page.layout_kind == 'canvas' %}<span class="dx-pill">Freeform</span>{% endif %}
               {% if page.created_by == 'mcp' %}<span class="dx-pill" title="Created by an agent over the MCP API"><i class="ph ph-robot" aria-hidden="true"></i> Agent</span>{% endif %}
+              {# A dashboard that declares its own settings says so here, since
+                 the whole point is that whoever inherits it can change the
+                 parts meant to be changed without opening the composer. #}
+              {% if page.layout_kind == 'canvas' and page.canvas and page.canvas.inputs %}<span class="dx-pill" title="This dashboard has its own settings page"><i class="ph ph-sliders-horizontal" aria-hidden="true"></i> {{ page.canvas.inputs|length }} setting{{ '' if page.canvas.inputs|length == 1 else 's' }}</span>{% endif %}
             </div>
             <div class="dx-meta-strip">
               <span><span class="dx-meta-k">Size</span><code>{% if d %}{{ d.w }}×{{ d.h }}{% else %}—{% endif %}</code></span>
@@ -122,6 +126,12 @@
           <a class="dx-btn-primary-sm" href="{{ url_for('pages.edit', page_id=page.id) }}">
             <i class="ph ph-pencil-simple" aria-hidden="true"></i><span>Edit</span>
           </a>
+          {% if page.layout_kind == 'canvas' and page.canvas and page.canvas.inputs %}
+          <a class="dx-btn-ghost-sm" href="{{ url_for('panels.configure', canvas_id=page.id) }}"
+             title="Change this dashboard's own settings without opening the composer">
+            <i class="ph ph-sliders-horizontal" aria-hidden="true"></i><span>Settings</span>
+          </a>
+          {% endif %}
           <form method="post" action="{{ url_for('send.send_page') }}" class="form form--inline">
             <input type="hidden" name="page_id" value="{{ page.id }}">
             <input type="hidden" name="return_to" value="dashboards">
