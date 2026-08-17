@@ -429,3 +429,19 @@ def test_previews_feature_gated_on_a_browser_pool(app: Flask) -> None:
     app.config["BROWSER_POOL"] = None
     body = app.test_client().get("/api/app/v1").get_json()
     assert "previews" not in body["features"]
+
+
+def test_webpage_headers_is_advertised_with_the_browser_pool(app: Flask) -> None:
+    """#234 rides the same route as webpage_push, but gets its own flag: a
+    client sending ``headers`` to a server that predates it would get a 400
+    from ``additionalProperties: false`` with no way to have known."""
+    app.config["BROWSER_POOL"] = object()
+    feats = app.test_client().get("/api/app/v1").get_json()["features"]
+    assert "webpage_headers" in feats
+    assert "webpage_push" in feats
+
+
+def test_webpage_headers_is_absent_without_a_browser_pool(app: Flask) -> None:
+    app.config["BROWSER_POOL"] = None
+    feats = app.test_client().get("/api/app/v1").get_json()["features"]
+    assert "webpage_headers" not in feats

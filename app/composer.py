@@ -248,6 +248,40 @@ def _stamp_touch(item: dict[str, Any], e: Any) -> None:
     item["touch_actions_json"] = json.dumps(actions) if actions else ""
 
 
+def _client_safe_options(plugin_id: str | None, resolved: dict[str, Any]) -> dict[str, Any]:
+    """Drop manifest-declared ``secret: true`` cell options before the page
+    payload reaches the browser.
+
+    ``compose.html`` emits every cell's options into a ``data-options``
+    attribute so client-side widgets can read their config. A credential has no
+    business being there: the composed page is fetchable over loopback, the
+    attribute is captured by anything that reads page source (render reports,
+    diagnostics), and no widget that holds a secret needs it client-side
+    anyway. ``rest_service`` does its fetching in ``server.py``, and the
+    ``webpage`` widget's headers are attached by Chromium's request interceptor
+    rather than by its markup, because an ``<iframe src>`` cannot carry a
+    header (#234).
+
+    Safe to strip here because the server-side data fetch has already run
+    against the unredacted options by the time this is called; see the second
+    pass in :func:`_hydrate_page`. Options with no ``secret`` flag are
+    untouched, so this is a no-op for every widget that doesn't declare one.
+    """
+    if not plugin_id or not resolved:
+        return resolved
+    plugin = _registry().get(plugin_id)
+    if plugin is None:
+        return resolved
+    secret_names = {
+        str(opt.get("name"))
+        for opt in (plugin.manifest.get("cell_options") or [])
+        if isinstance(opt, dict) and opt.get("secret") and opt.get("name")
+    }
+    if not secret_names:
+        return resolved
+    return {key: value for key, value in resolved.items() if key not in secret_names}
+
+
 def _resolved_options(plugin_id: str, raw: dict[str, Any]) -> dict[str, Any]:
     plugin = _registry().get(plugin_id)
     if plugin is None:
@@ -838,7 +872,10 @@ def _hydrate_page(
                 **cell,
                 **meta["layout"],
                 "plugin": plugin_id or "",
-                "options": meta["resolved_options"],
+                # Redacted for the browser: the server-side fetch above already
+                # ran against the full option set, so anything secret can be
+                # dropped before it reaches the DOM (#234).
+                "options": _client_safe_options(plugin_id, meta["resolved_options"]),
                 "data": data_by_cell_index.get(idx),
                 "font_family": meta["font_family"],
                 "full_bleed": meta["full_bleed"],

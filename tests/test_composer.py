@@ -853,3 +853,60 @@ def test_compose_panel_preview_202_when_composition_missing(
 
 def test_compose_panel_preview_unknown_page_404(client: FlaskClient) -> None:
     assert client.get("/compose/nope/panel.png").status_code == 404
+
+
+# -- secret cell options stay out of the DOM (#234) ----------------------
+
+
+def _webpage_page(headers: str) -> Any:
+    from app.state.page_store import Cell, Page
+
+    return Page(
+        id="secretpg",
+        name="Secret",
+        layout_kind="grid",
+        cells=[
+            Cell(
+                id="c1",
+                plugin="webpage",
+                x=0,
+                y=0,
+                w=400,
+                h=300,
+                options={"url": "https://dash.internal.test/s", "headers": headers},
+            )
+        ],
+    )
+
+
+def test_secret_cell_options_are_not_emitted_into_the_composed_page(app: Flask) -> None:
+    """``compose.html`` serialises cell options into ``data-options`` for
+    client-side widgets. A bearer token has no business being there: the
+    composed page is fetchable over loopback and gets read by render reports
+    and diagnostics. The webpage widget's headers are attached by Chromium's
+    request interceptor instead, so nothing client-side needs them (#234)."""
+    app.config["PAGE_STORE"].save(_webpage_page('{"Authorization": "Bearer super-secret"}'))
+    body = app.test_client().get("/compose/secretpg").get_data(as_text=True)
+    assert body.count("data-options") >= 1  # the attribute is still emitted
+    assert "super-secret" not in body
+    assert "Authorization" not in body
+    # The non-secret options still reach the widget.
+    assert "dash.internal.test" in body
+
+
+def test_non_secret_options_are_untouched_by_the_redaction(app: Flask) -> None:
+    """The strip is keyed on the manifest's ``secret`` flag, so a widget that
+    declares none is byte-for-byte unaffected."""
+    from app.state.page_store import Cell, Page
+
+    app.config["PAGE_STORE"].save(
+        Page(
+            id="clockpg",
+            name="Clock",
+            layout_kind="grid",
+            cells=[Cell(id="c1", plugin="clock", x=0, y=0, w=200, h=200, options={})],
+        )
+    )
+    resp = app.test_client().get("/compose/clockpg")
+    assert resp.status_code == 200
+    assert 'data-plugin="clock"' in resp.get_data(as_text=True)

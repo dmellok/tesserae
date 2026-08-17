@@ -81,6 +81,7 @@ from app.device_upcoming import (
 from app.device_upcoming import (
     MAX_LIMIT as DEVICE_TIMELINE_MAX_EVENTS,
 )
+from app.http_headers import HeaderError, validate_header_map
 from app.image_upload import (
     IMAGE_CONTENT_TYPES,
     IMAGE_FIT_MODES,
@@ -387,6 +388,11 @@ def _features() -> list[str]:
         # webpage_push to screenshot an arbitrary URL server-side.
         feats.append("previews")
         feats.append("webpage_push")
+        # Advertised separately from webpage_push even though it rides the same
+        # route: a client that sends ``headers`` to a server predating #234 gets
+        # a 400 from ``additionalProperties: false`` with no way to have known,
+        # so the flag is how it finds out before trying.
+        feats.append("webpage_headers")
     if companion_gallery.gallery_available():
         # The photo library is a plugin, and a plugin can be uninstalled.
         # Advertising Gallery on an instance without it would leave the
@@ -1908,6 +1914,21 @@ def push_webpage_url() -> Any:
             return _error("invalid_request", "viewport_w must be an integer 200-4096.", 400)
         viewport_w = vw
 
+    # Optional request headers (#234). The body is already JSON, so this is a
+    # decoded object rather than the textarea string the Send form posts; both
+    # go through the same validator. Safe at rest: ``_reserve_and_run``
+    # fingerprints the payload with SHA-256 and stores only the digest, so a
+    # bearer token here never lands on disk.
+    headers: dict[str, str] = {}
+    if isinstance(body, dict) and body.get("headers") is not None:
+        candidate = body.get("headers")
+        if not isinstance(candidate, dict):
+            return _error("invalid_request", "headers must be a JSON object.", 400)
+        try:
+            headers = validate_header_map(candidate)
+        except HeaderError as err:
+            return _error("invalid_request", str(err), 400)
+
     raw = request.get_data(cache=True)
     common = _link_send_common(body)
     if isinstance(common, tuple) and len(common) == 2 and isinstance(common[1], int):
@@ -1925,8 +1946,15 @@ def push_webpage_url() -> Any:
         # interceptor holds every hop Chromium follows to the same policy. Render
         # once at the logical viewport, then fan the bytes out per target.
         try:
-            page_bytes = manager.render_webpage_png(url, viewport_w=viewport_w, allow_local=False)
+            page_bytes = manager.render_webpage_png(
+                url,
+                viewport_w=viewport_w,
+                allow_local=False,
+                headers=headers or None,
+            )
         except Exception as err:
+            # ``err`` can quote the failing request; it never carries the header
+            # values, which live only in the closure and the render request.
             return JobOutcome.failed("render_failed", f"The webpage could not be rendered: {err}")
         published, history_event_ids = _fan_out_bytes(
             manager, page_bytes, source="webpage", label=url, fit=fit, active=active

@@ -74,6 +74,17 @@ ERRATA: tuple[Erratum, ...] = (
             "since the projection replays that engine's own gates."
         ),
     ),
+    Erratum(
+        pointer="components/schemas/Capabilities/properties/features/items/enum",
+        values=("webpage_headers",),
+        since="v0.313.0",
+        why=(
+            "POST /webpages accepts an optional headers object (#234), for a "
+            "page behind a bearer token or API key. Advertised separately from "
+            "webpage_push because a client sending headers to a server that "
+            "predates it gets a 400 from additionalProperties: false."
+        ),
+    ),
 )
 
 SCHEMA_ERRATA: tuple[SchemaErratum, ...] = (
@@ -99,6 +110,32 @@ SCHEMA_ERRATA: tuple[SchemaErratum, ...] = (
         },
         since="v0.311.0",
         why="Query bounds for the #232 timeline, advertised rather than hard-coded.",
+    ),
+    SchemaErratum(
+        pointer="components/schemas/WebpagePushRequest/properties",
+        patch={
+            "headers": {
+                "description": (
+                    "Optional request headers for a page behind header-based "
+                    "authentication. Applied only to the target URL's own origin, "
+                    "never to redirects elsewhere or to third-party subresources. "
+                    "User-Agent is honoured as the browser identity for the "
+                    "capture. Transport and browser-managed headers (Host, "
+                    "Content-Length, Connection, Transfer-Encoding, Cookie, "
+                    "Proxy-*, Sec-*) are rejected with invalid_request. Values are "
+                    "never logged or recorded in History."
+                ),
+                "type": "object",
+                "maxProperties": 20,
+                "additionalProperties": {"type": "string", "maxLength": 4096},
+            },
+        },
+        since="v0.313.0",
+        why=(
+            "The #234 request-headers field. WebpagePushRequest is "
+            "additionalProperties: false, so our own responses can't be "
+            "validated against the published shape until it carries this."
+        ),
     ),
     SchemaErratum(
         pointer="components/schemas",

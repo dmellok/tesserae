@@ -166,8 +166,85 @@ def test_webpage_invokes_push_webpage_with_viewport(app: Flask) -> None:
         follow_redirects=False,
     )
     pm.push_webpage.assert_called_once_with(
-        "https://example.com", viewport_w=800, viewport_h=600, device_id=dev, fit=None
+        "https://example.com",
+        viewport_w=800,
+        viewport_h=600,
+        device_id=dev,
+        fit=None,
+        headers=None,
     )
+
+
+def test_webpage_passes_validated_headers_through(app: Flask) -> None:
+    """#234: a page behind a bearer token. The parsed map reaches the push
+    manager, which scopes it to the URL's own origin."""
+    client = app.test_client()
+    _sign_in(client)
+    dev = _register_device(client)
+    pm = MagicMock()
+    pm.push_webpage.return_value = PushResult(status="sent", page_id="https://x")
+    app.config["PUSH_MANAGER"] = pm
+    client.post(
+        "/send/webpage",
+        data={
+            "url": "https://example.com",
+            "viewport_w": "800",
+            "viewport_h": "600",
+            "device_id": dev,
+            "headers": '{"Authorization": "Bearer abc"}',
+        },
+        follow_redirects=False,
+    )
+    assert pm.push_webpage.call_args.kwargs["headers"] == {"Authorization": "Bearer abc"}
+
+
+def test_webpage_refuses_a_browser_managed_header_without_pushing(app: Flask) -> None:
+    """The validator's message goes to the operator; nothing is rendered, so a
+    typo can't burn a render or reach the panel."""
+    client = app.test_client()
+    _sign_in(client)
+    dev = _register_device(client)
+    pm = MagicMock()
+    app.config["PUSH_MANAGER"] = pm
+    resp = client.post(
+        "/send/webpage",
+        data={
+            "url": "https://example.com",
+            "device_id": dev,
+            "headers": '{"Host": "evil.test"}',
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    pm.push_webpage.assert_not_called()
+
+
+def test_webpage_refuses_malformed_header_json_without_pushing(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    dev = _register_device(client)
+    pm = MagicMock()
+    app.config["PUSH_MANAGER"] = pm
+    client.post(
+        "/send/webpage",
+        data={"url": "https://example.com", "device_id": dev, "headers": "not json"},
+        follow_redirects=False,
+    )
+    pm.push_webpage.assert_not_called()
+
+
+def test_the_webpage_form_renders_an_empty_headers_field(app: Flask) -> None:
+    """A token echoed into the page source is how it ends up in a screenshot
+    or a browser cache, so the field is deliberately never pre-filled. The
+    placeholder shows the shape; the element itself has no content."""
+    client = app.test_client()
+    _sign_in(client)
+    _register_device(client)
+    body = client.get("/send?tab=webpage").get_data(as_text=True)
+    assert 'name="headers"' in body
+    # The textarea closes immediately: no value between the tags.
+    assert "></textarea>" in body
+    assert "Bearer …" in body  # placeholder only, not a stored value
 
 
 def test_send_picker_lists_registered_instances_only(app: Flask) -> None:

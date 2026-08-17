@@ -647,3 +647,87 @@ def test_webpage_push_rejects_out_of_range_viewport(app: Flask) -> None:
     )
     assert resp.status_code == 400
     assert resp.get_json()["error"]["code"] == "invalid_request"
+
+
+def test_webpage_push_forwards_validated_headers(app: Flask) -> None:
+    """#234 over the Companion API. The body carries a decoded object rather
+    than the textarea string the Send form posts; both go through the same
+    validator, and the map reaches the renderer origin-scoped."""
+    fake = _install_fake_push(app)
+    app.config["BROWSER_POOL"] = object()
+    d1 = _seed_device(app, "kitchen")
+    token = _token(app)
+    resp = app.test_client().post(
+        "/api/app/v1/webpages",
+        data=json.dumps(
+            {
+                "url": _PUBLIC_WEB,
+                "device_ids": [d1],
+                "headers": {"Authorization": "Bearer abc"},
+                "fit": "fit",
+                "override_quiet_hours": True,
+            }
+        ),
+        content_type="application/json",
+        headers=_auth(token, "idem-webhdr-00001"),
+    )
+    assert resp.status_code == 202, resp.get_data(as_text=True)
+    job = _poll(app, token, resp.get_json()["job"]["id"])
+    assert job["status"] == "succeeded"
+    assert fake.render_calls[0]["headers"] == {"Authorization": "Bearer abc"}
+
+
+def test_webpage_push_refuses_a_browser_managed_header(app: Flask) -> None:
+    fake = _install_fake_push(app)
+    app.config["BROWSER_POOL"] = object()
+    d1 = _seed_device(app, "kitchen")
+    token = _token(app)
+    resp = app.test_client().post(
+        "/api/app/v1/webpages",
+        data=json.dumps({"url": _PUBLIC_WEB, "device_ids": [d1], "headers": {"Host": "evil.test"}}),
+        content_type="application/json",
+        headers=_auth(token, "idem-webhdr-00002"),
+    )
+    assert resp.status_code == 400
+    assert resp.get_json()["error"]["code"] == "invalid_request"
+    assert fake.render_calls == []
+
+
+def test_webpage_push_refuses_headers_that_are_not_an_object(app: Flask) -> None:
+    fake = _install_fake_push(app)
+    app.config["BROWSER_POOL"] = object()
+    d1 = _seed_device(app, "kitchen")
+    token = _token(app)
+    resp = app.test_client().post(
+        "/api/app/v1/webpages",
+        data=json.dumps({"url": _PUBLIC_WEB, "device_ids": [d1], "headers": "Bearer abc"}),
+        content_type="application/json",
+        headers=_auth(token, "idem-webhdr-00003"),
+    )
+    assert resp.status_code == 400
+    assert resp.get_json()["error"]["code"] == "invalid_request"
+    assert fake.render_calls == []
+
+
+def test_webpage_push_without_headers_passes_none(app: Flask) -> None:
+    """The no-headers path must stay exactly what it was before #234."""
+    fake = _install_fake_push(app)
+    app.config["BROWSER_POOL"] = object()
+    d1 = _seed_device(app, "kitchen")
+    token = _token(app)
+    resp = app.test_client().post(
+        "/api/app/v1/webpages",
+        data=json.dumps(
+            {
+                "url": _PUBLIC_WEB,
+                "device_ids": [d1],
+                "fit": "fit",
+                "override_quiet_hours": True,
+            }
+        ),
+        content_type="application/json",
+        headers=_auth(token, "idem-webhdr-00004"),
+    )
+    assert resp.status_code == 202
+    _poll(app, token, resp.get_json()["job"]["id"])
+    assert fake.render_calls[0]["headers"] is None

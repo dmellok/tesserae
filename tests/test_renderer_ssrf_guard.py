@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, call, patch
 
-from app.renderer import RenderRequest, _install_ssrf_guard
+from app.renderer import RenderRequest, _install_request_policy
 
 
 def _route(url: str) -> MagicMock:
@@ -33,7 +33,7 @@ def test_strict_guard_classifies_each_hostname_once_per_page() -> None:
         "app.net_guard.host_is_blocked",
         side_effect=lambda host, *, allow_local: host == "private.example",
     ) as classify:
-        _install_ssrf_guard(page, request)
+        _install_request_policy(page, request)
         handler = page.route.call_args.args[1]
         for route in routes:
             handler(route)
@@ -57,7 +57,7 @@ def test_strict_guard_caches_resolution_failures_as_blocked() -> None:
     ]
 
     with patch("app.net_guard.host_is_blocked", side_effect=OSError("DNS failed")) as classify:
-        _install_ssrf_guard(page, request)
+        _install_request_policy(page, request)
         handler = page.route.call_args.args[1]
         for route in routes:
             handler(route)
@@ -73,7 +73,7 @@ def test_new_page_attempt_gets_a_fresh_hostname_classification() -> None:
 
     with patch("app.net_guard.host_is_blocked", return_value=False) as classify:
         for page in pages:
-            _install_ssrf_guard(page, request)
+            _install_request_policy(page, request)
             handler = page.route.call_args.args[1]
             handler(_route("https://www.example/asset.js"))
 
@@ -87,6 +87,6 @@ def test_operator_render_does_not_install_the_strict_guard() -> None:
     page = MagicMock()
     request = RenderRequest(url="http://display.lan/", allow_local=True)
 
-    _install_ssrf_guard(page, request)
+    _install_request_policy(page, request)
 
     page.route.assert_not_called()

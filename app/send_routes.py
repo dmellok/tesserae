@@ -38,6 +38,7 @@ from flask import (
 from werkzeug.wrappers import Response
 
 from app.device_loader import DeviceRegistry
+from app.http_headers import HeaderError, parse_header_map
 from app.image_upload import IMAGE_ROTATE_MODES
 from app.net_guard import BlockedURLError, assert_operator_url
 from app.panel import device_panel, resolve_settings_panel
@@ -449,6 +450,14 @@ def send_webpage() -> Response:
     except ValueError:
         flash("Viewport dimensions must be integers.", "error")
         return redirect(url_for("send.index", tab="webpage"))
+    # Optional request headers (#234), for a page behind a bearer token or an
+    # API key. The error text comes from the parser so the operator sees which
+    # header it objected to, never the value they typed.
+    try:
+        headers = parse_header_map(request.form.get("headers"))
+    except HeaderError as err:
+        flash(str(err), "error")
+        return redirect(url_for("send.index", tab="webpage"))
     fit = _form_fit()
     targets = _require_target_devices("webpage")
     if isinstance(targets, Response):
@@ -457,7 +466,12 @@ def send_webpage() -> Response:
         f"Webpage {url}",
         targets,
         lambda tid: _push().push_webpage(
-            url, viewport_w=viewport_w, viewport_h=viewport_h, device_id=tid, fit=fit
+            url,
+            viewport_w=viewport_w,
+            viewport_h=viewport_h,
+            device_id=tid,
+            fit=fit,
+            headers=headers or None,
         ),
     )
     return redirect(url_for("history.index"))

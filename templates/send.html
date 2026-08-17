@@ -297,6 +297,19 @@
                  value="{{ form_values.get('viewport_h', panel.h) if tab == 'webpage' else panel.h }}" min="200" step="1">
         </div>
       </div>
+      {# Request headers (#234). Collapsed because most pages need none, and
+         deliberately not pre-filled from ``form_values``: the value can hold a
+         bearer token, and a token echoed back into the page source is how it
+         ends up in a screenshot or a browser cache. #}
+      <details class="dx-send-headers">
+        <summary>Request headers (optional)</summary>
+        <div class="field">
+          <label for="webpage-headers">Headers{{ info_pop('JSON object, for a page behind a bearer token or API key. Sent only to this URL\'s own origin, never to redirects elsewhere or third-party resources. User-Agent is honoured as the browser identity for this capture.') }}</label>
+          <textarea id="webpage-headers" name="headers" rows="4" autocomplete="off" spellcheck="false"
+                    placeholder='{"Authorization": "Bearer …"}'></textarea>
+          <p class="field-help">Not remembered between pushes. Values never appear in History or logs.</p>
+        </div>
+      </details>
       {{ device_picker('webpage-device') }}
       {{ fit_picker('webpage-fit', rotate=false) }}
       <div class="actions">

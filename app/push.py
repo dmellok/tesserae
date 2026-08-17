@@ -44,7 +44,7 @@ import time
 import urllib.error
 import urllib.request
 from collections import OrderedDict
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Literal
@@ -53,6 +53,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from app.device_loader import DeviceRegistry
 from app.device_preview import retained_device_preview, write_device_preview
 from app.dither_regions import has_nearest_region, regions_from_page
+from app.http_headers import header_summary, split_user_agent
 from app.image_upload import orient_for_panel
 from app.net_guard import (
     BlockedURLError,
@@ -76,6 +77,7 @@ from app.renderer import (
     CaptureRequest,
     RenderRequest,
     capture_composed,
+    origin_of,
     render_to_png,
     to_loopback_url,
 )
@@ -93,6 +95,7 @@ from app.touch_regions import (
     split_capture_result,
 )
 from app.transport import MqttTransport
+from app.webpage_headers import headers_by_origin_for_page
 
 # Speculative pre-compose cache bounds (issue #49 linger). TTL keeps a
 # prewarmed composition usable across a linger window's tap cadence but
@@ -1331,6 +1334,7 @@ class PushManager:
                         viewport_w=panel.w,
                         viewport_h=panel.h,
                         timezone_id=self._render_timezone_id(),
+                        headers_by_origin=headers_by_origin_for_page(page),
                     ),
                     script=EXTRACT_INTERACTIVE_JS,
                 ),
@@ -1592,6 +1596,7 @@ class PushManager:
         fit: str | None = None,
         bypass_coalesce: bool = True,
         allow_local: bool = True,
+        headers: Mapping[str, str] | None = None,
     ) -> PushResult:
         """Screenshot an arbitrary URL with Playwright, then publish.
 
@@ -1599,7 +1604,13 @@ class PushManager:
         allowed). The Companion route passes ``False``: the pre-flight refuses
         non-public hosts, and the strict flag rides into the renderer so a
         request interceptor also blocks every redirect hop / subresource
-        Chromium follows internally (a pre-check alone can't see those)."""
+        Chromium follows internally (a pre-check alone can't see those).
+
+        ``headers`` (#234) are validated operator-supplied request headers,
+        scoped to ``url``'s origin by the renderer so nothing off-origin sees
+        them. Only the count and names reach the event log; the values are
+        never recorded, which is why the failure paths below format the URL but
+        never the header map."""
         # SSRF pre-flight. Playwright follows redirects internally, so this is
         # only the initial-URL check; the renderer's interceptor (via
         # RenderRequest.allow_local) enforces the policy on each hop.
@@ -1622,6 +1633,15 @@ class PushManager:
         else:
             try:
                 started = time.monotonic()
+                extra_headers, header_user_agent = split_user_agent(headers or {})
+                target_origin = origin_of(url)
+                if extra_headers or header_user_agent:
+                    logger.info(
+                        "webpage push %s: applying %s%s",
+                        url,
+                        header_summary(extra_headers) or "no extra headers",
+                        ", user-agent override" if header_user_agent else "",
+                    )
                 try:
                     composition = render_to_png(
                         RenderRequest(
@@ -1637,6 +1657,12 @@ class PushManager:
                             # Strict callers (Companion) refuse non-public hosts
                             # on every hop the browser follows internally.
                             allow_local=allow_local,
+                            headers_by_origin=(
+                                {target_origin: extra_headers}
+                                if (extra_headers and target_origin)
+                                else None
+                            ),
+                            user_agent=header_user_agent,
                         ),
                         pool=self._browser_pool_fn(),
                     )
@@ -1677,6 +1703,7 @@ class PushManager:
         viewport_w: int,
         viewport_h: int = 1200,
         allow_local: bool = True,
+        headers: Mapping[str, str] | None = None,
     ) -> bytes:
         """Render a webpage to a composition PNG once (raises on failure).
 
@@ -1684,7 +1711,18 @@ class PushManager:
         logical viewport, then fans the bytes out per target through
         :meth:`push_image` (no per-target re-render). ``allow_local=False``
         installs the renderer's request interceptor so every hop Chromium
-        follows is held to the strict public-only policy."""
+        follows is held to the strict public-only policy.
+
+        ``headers`` (#234) are operator-supplied request headers, already
+        parsed and validated by :mod:`app.http_headers`. They are scoped to
+        ``url``'s own origin, so a redirect off-origin or a third-party
+        subresource never receives them; ``User-Agent`` is lifted out and
+        applied to the browser context instead, so page JavaScript reading
+        ``navigator.userAgent`` agrees with the wire. Never log or persist the
+        values; :func:`app.http_headers.header_summary` is the log-safe form.
+        """
+        extra, user_agent = split_user_agent(headers or {})
+        origin = origin_of(url)
         return render_to_png(
             RenderRequest(
                 url=url,
@@ -1693,6 +1731,8 @@ class PushManager:
                 timezone_id=self._render_timezone_id(),
                 is_composer=False,
                 allow_local=allow_local,
+                headers_by_origin={origin: extra} if (extra and origin) else None,
+                user_agent=user_agent,
             ),
             pool=self._browser_pool_fn(),
         )
@@ -1996,6 +2036,10 @@ class PushManager:
                                     viewport_w=panel.w,
                                     viewport_h=panel.h,
                                     timezone_id=self._render_timezone_id(),
+                                    # Webpage cells behind header auth (#234).
+                                    # Resolved server-side so the credential
+                                    # never enters the composed DOM.
+                                    headers_by_origin=headers_by_origin_for_page(page),
                                 ),
                                 script=EXTRACT_INTERACTIVE_JS,
                             ),

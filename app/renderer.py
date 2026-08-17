@@ -30,6 +30,7 @@ import os
 import queue
 import threading
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Final, Literal, cast
@@ -171,6 +172,40 @@ class RenderRequest:
     # cloud metadata. Operator flows (Web-UI Server preview, HA push) leave it
     # True to keep same-host / LAN capture working.
     allow_local: bool = True
+    # Per-origin request headers (#234), keyed by ``scheme://host[:port]`` as
+    # :func:`origin_of` produces. Injected by the request interceptor rather
+    # than set on the context, because a context header goes to EVERY origin
+    # the page touches: on a composer render that is every widget's upstream,
+    # and an ``Authorization`` meant for one internal dashboard would be handed
+    # to all of them. Keying by origin makes "never forward credentials
+    # cross-origin" a property of the mechanism rather than a rule someone has
+    # to remember, and it covers redirect hops for free since each hop is a
+    # fresh request with its own URL. ``None`` installs no interception, so a
+    # render with no headers configured stays byte-identical to before.
+    headers_by_origin: Mapping[str, Mapping[str, str]] | None = None
+    # Context-level user-agent override, for the single-target paths (Send →
+    # Webpage, the Companion route). Context level rather than per-request so
+    # ``navigator.userAgent`` agrees with what goes on the wire, which matters
+    # for sites that gate on the client-side value. Multi-origin callers (the
+    # webpage widget) leave this None and put ``User-Agent`` in
+    # ``headers_by_origin`` instead, accepting that page JavaScript still reads
+    # the default. When None, external renders keep the #178
+    # ``external_user_agent`` default.
+    user_agent: str | None = None
+
+
+def origin_of(url: str) -> str:
+    """``scheme://host[:port]`` for ``url``, lowercased, or ``""`` if it has no
+    host. The key :attr:`RenderRequest.headers_by_origin` is looked up by, so
+    both sides of the comparison have to be built here rather than formatted by
+    hand at each call site. Default ports are left as written: Chromium reports
+    request URLs without them, and a caller that wrote one explicitly would not
+    match, which is why callers derive the key from the same helper."""
+    parts = urlsplit(url)
+    if not parts.hostname:
+        return ""
+    port = f":{parts.port}" if parts.port is not None else ""
+    return f"{parts.scheme.lower()}://{parts.hostname.lower()}{port}"
 
 
 @dataclass(frozen=True)
@@ -352,40 +387,76 @@ def _screenshot_one(browser: Browser, request: RenderRequest) -> bytes:
     raise last_err
 
 
-def _install_ssrf_guard(page: Any, request: RenderRequest) -> None:
-    """Abort Chromium requests to non-public hosts when the request is strict.
+def _install_request_policy(page: Any, request: RenderRequest) -> None:
+    """Install the per-request interceptor: block non-public hosts when the
+    request is strict, and attach per-origin headers when any are configured.
 
-    Chromium follows redirects and loads subresources internally, outside
-    net_guard's urllib path, so this per-request interceptor is the only place
-    a webpage render can enforce a public-only policy on every hop. Matches
+    Blocking. Chromium follows redirects and loads subresources internally,
+    outside net_guard's urllib path, so this interceptor is the only place a
+    webpage render can enforce a public-only policy on every hop. Matches
     net_guard's guarantee level (each distinct host is resolved and checked;
     no IP pinning against DNS rebinding, same as the fetch path). The result is
     cached for this page attempt so a site with many same-host assets does not
     spend its navigation deadline repeating the same DNS lookup. A retry gets
     a fresh page and cache. Resolution failures and handler errors are cached
-    as blocked rather than failing open."""
-    if request.allow_local:
+    as blocked rather than failing open.
+
+    Headers (#234). Attached only to requests whose origin matches, so a
+    credential for one internal dashboard is never handed to a third-party
+    font CDN, to another widget's upstream on the same composer page, or to
+    wherever a redirect points next. Ordering is load-bearing: the block
+    decision runs first and an aborted request is never given headers, so a
+    misconfigured header for a private host can't turn into a credential sent
+    to something the SSRF guard was about to refuse.
+
+    Installs nothing when the request is permissive and configures no headers,
+    which keeps the common render path free of interception entirely.
+    """
+    strict = not request.allow_local
+    headers_by_origin = {
+        origin: dict(headers)
+        for origin, headers in (request.headers_by_origin or {}).items()
+        if headers
+    }
+    if not strict and not headers_by_origin:
         return
-    import urllib.parse as _urlparse
 
     from app.net_guard import host_is_blocked
 
     host_blocked: dict[str, bool] = {}
 
     def _route(route: Any) -> None:
-        host: str | None = None
-        try:
-            host = _urlparse.urlparse(route.request.url).hostname or ""
-            if host not in host_blocked:
-                host_blocked[host] = host_is_blocked(host, allow_local=False)
-            blocked = host_blocked[host]
-        except Exception:
-            blocked = True
-            if host is not None:
-                host_blocked[host] = True
+        url = ""
+        blocked = False
+        if strict:
+            host: str | None = None
+            try:
+                url = route.request.url
+                host = urlsplit(url).hostname or ""
+                if host not in host_blocked:
+                    host_blocked[host] = host_is_blocked(host, allow_local=False)
+                blocked = host_blocked[host]
+            except Exception:
+                blocked = True
+                if host is not None:
+                    host_blocked[host] = True
         # Page/context may be torn down mid-flight; nothing to do then.
         with contextlib.suppress(PlaywrightError):
-            route.abort() if blocked else route.continue_()
+            if blocked:
+                route.abort()
+                return
+            extra: Mapping[str, str] | None = None
+            if headers_by_origin:
+                try:
+                    extra = headers_by_origin.get(origin_of(url or route.request.url))
+                except Exception:
+                    extra = None
+            if extra:
+                # ``continue_`` REPLACES the header set, so merge onto what
+                # Chromium already built rather than handing it ours alone.
+                route.continue_(headers={**route.request.headers, **extra})
+            else:
+                route.continue_()
 
     page.route("**/*", _route)
 
@@ -400,9 +471,11 @@ def _new_composer_page(browser: Browser, request: RenderRequest) -> tuple[Any, A
     }
     if request.timezone_id:
         context_kwargs["timezone_id"] = request.timezone_id
+    if request.user_agent:
+        context_kwargs["user_agent"] = request.user_agent
     context = browser.new_context(**context_kwargs)
     page = context.new_page()
-    _install_ssrf_guard(page, request)
+    _install_request_policy(page, request)
     page.set_default_timeout(request.timeout_ms)
     page.set_default_navigation_timeout(request.timeout_ms)
     return context, page
@@ -505,14 +578,20 @@ def _screenshot_attempt(browser: Browser, request: RenderRequest, attempt: int) 
     }
     if request.timezone_id:
         context_kwargs["timezone_id"] = request.timezone_id
-    if not request.is_composer:
+    if request.user_agent:
+        # Explicit per-render override (#234), for a service that expects a
+        # particular or vendor-specific client. Wins over the #178 default
+        # below, and applies to composer renders too so a caller can pin the
+        # UA for one push without touching the global identity.
+        context_kwargs["user_agent"] = request.user_agent
+    elif not request.is_composer:
         # External site: don't advertise HeadlessChrome (#178). Composer
         # self-renders keep the default UA; nothing gates localhost.
         context_kwargs["user_agent"] = external_user_agent(browser)
     context = browser.new_context(**context_kwargs)
     try:
         page = context.new_page()
-        _install_ssrf_guard(page, request)
+        _install_request_policy(page, request)
         page.set_default_timeout(request.timeout_ms)
         # ``set_default_timeout`` covers actions (evaluate, click, …) but
         # NOT navigation, ``goto`` uses Playwright's 30s default unless

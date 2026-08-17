@@ -4,6 +4,62 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.313.0], 2026-08-17
+
+### Added
+
+- **Custom request headers on webpage renders**, so a dashboard behind a bearer
+  token or an API key can be put on a panel without making it public (#234).
+  Available on the Webpage widget, on Send → Webpage, and on
+  `POST /api/app/v1/webpages`. The shape is a JSON object, matching the
+  `headers` option `rest_service` already uses rather than inventing a second
+  convention:
+
+  ```json
+  {"Authorization": "Bearer …", "X-API-Key": "…"}
+  ```
+
+  `User-Agent` is accepted and becomes the browser identity for that capture
+  rather than staying a header, so a site that checks `navigator.userAgent`
+  client-side sees the same value that went on the wire. That covers services
+  which reject unknown clients, though as noted in #178 it will not get past
+  protections that also inspect TLS fingerprints.
+
+  **Headers are scoped to the target URL's own origin.** They are attached by
+  Chromium's request interceptor, not set on the browser context, because a
+  context header goes to every origin the page touches: on a dashboard render
+  that is every other widget's upstream. Origin scoping means a credential
+  cannot reach a third-party subresource, another cell's service, or wherever a
+  redirect points next, and it makes that a property of the mechanism rather
+  than a rule to remember. The SSRF block decision still runs first, so a host
+  the guard refuses is never handed headers on the way out.
+
+  Values are never logged, never written to History, and never included in
+  error messages; the log line records how many headers and which names. On the
+  Send page the field is not remembered between pushes. Transport and
+  browser-managed headers (`Host`, `Content-Length`, `Connection`,
+  `Transfer-Encoding`, `Cookie`, `Proxy-*`, `Sec-*`, and others) are refused,
+  as is any value containing a control character, since a newline would be
+  header injection.
+
+  One limitation worth knowing: headers cannot reach the live preview in your
+  browser, only the server-side render. A webpage cell may show a 401 in the
+  editor and render correctly on the panel.
+
+### Fixed
+
+- **Secret cell options are no longer written into the composed page.**
+  `compose.html` serialises every cell's options into a `data-options`
+  attribute for client-side widgets to read, without regard for the manifest's
+  `secret` flag, so a credential stored on a cell was readable in the composed
+  DOM. Reachable only over loopback, and template export already redacted these
+  before sharing, so nothing could leave an install; but it put a token
+  somewhere it had no reason to be, and anything reading page source (render
+  reports, diagnostics) would capture it. Secret-flagged options are now
+  dropped before the payload reaches the browser. The server-side data fetch
+  runs first and still sees the full option set, so `rest_service` is
+  unaffected.
+
 ## [0.312.1], 2026-08-17
 
 ### Changed
