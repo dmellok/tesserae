@@ -32,7 +32,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, time, timedelta, tzinfo
 from functools import partial
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 from pydantic import ValidationError
 
@@ -46,6 +46,10 @@ from app.state.deck_store import DeckStore
 from app.state.event_log import EventLog
 from app.state.rotation_model import Rotation, RotationStep
 from app.state.schedule_model import Schedule
+
+if TYPE_CHECKING:  # pragma: no cover - import cycle: the projection reads us
+    from app.device_upcoming import UpcomingEvent
+    from app.quiet_hours import QuietHoursWindow
 
 logger = logging.getLogger(__name__)
 
@@ -296,6 +300,25 @@ def _compute_step_state(
         cycle_position_minutes=position,
         forced_at=forced_at_local,
     )
+
+
+def compute_step_window(
+    rotation: Rotation,
+    now: datetime,
+    tz: tzinfo | None,
+    *,
+    forced: tuple[datetime, int] | None = None,
+) -> StepState | None:
+    """Public form of the dwell-window math, window edges included.
+
+    ``compute_current_step`` answers "which step" and drops the window it
+    came from, which is all the rotations UI needed. The device timeline
+    (#232) walks the grid forward, so it needs the edges too, and replaying
+    that arithmetic in a second module is how the two would drift apart.
+    ``forced`` is a caller-held manual override, in the shape the
+    scheduler's own state map stores.
+    """
+    return _compute_step_state(rotation, now, tz, forced=forced)
 
 
 class Scheduler:
@@ -2098,6 +2121,158 @@ class Scheduler:
                 }
                 for sid in ids
             }
+
+    def upcoming_for_device(
+        self,
+        device_id: str,
+        *,
+        now: datetime | None = None,
+        hours: int = 24,
+        limit: int = 6,
+        quiet_window: QuietHoursWindow | None = None,
+    ) -> list[UpcomingEvent]:
+        """Project the next visible updates for one display (#232).
+
+        The engine owns this rather than an adapter re-deriving it, because
+        every gate that can move or cancel an update lives here: the dwell
+        grid and its manual overrides, the minimum-hold base, per-record
+        cooldowns and backfill suppression, Smart Sync, Home Return timers.
+        A projection built from the stored records alone would be plausible
+        and wrong the moment any of them applied.
+
+        This method's job is only to decide which records reach this
+        display and to snapshot their runtime state under the lock; the
+        arithmetic is :mod:`app.device_upcoming`, which is pure and can be
+        tested without a scheduler. ``quiet_window`` comes from the caller
+        because resolving it needs the device registry and app settings,
+        neither of which the scheduler holds.
+        """
+        from app.device_upcoming import (
+            CycleRecord,
+            HomeReturnRecord,
+            ProjectionInputs,
+            TimedRecord,
+            project_upcoming,
+        )
+
+        now = now or datetime.now(UTC)
+        pages = []
+        if self._page_store is not None:
+            try:
+                pages = self._page_store.list()
+            except Exception:
+                logger.exception("upcoming: page store read failed")
+        page_names = {p.id: (p.name or p.id) for p in pages}
+        bound_devices = {p.id: set(p.device_ids or ()) for p in pages}
+        decks = {}
+        if self._deck_store is not None:
+            decks = {d.id: d for d in self._deck_store.all()}
+
+        cycles: list[CycleRecord] = []
+        for rotation in self._cycle_records():
+            deck = decks.get(rotation.id)
+            explicit = list(rotation.device_ids) or (list(deck.device_ids) if deck else [])
+            device_pages: frozenset[str] | None = None
+            if explicit:
+                if device_id not in explicit:
+                    continue
+            else:
+                # No binding of its own: the fire lands on whatever displays
+                # each step's dashboard is bound to, which can be a subset of
+                # the steps for any one panel.
+                device_pages = frozenset(
+                    step.page_id
+                    for step in rotation.steps
+                    if device_id in bound_devices.get(step.page_id, set())
+                )
+                if not device_pages:
+                    continue
+            with self._lock:
+                cycles.append(
+                    CycleRecord(
+                        rotation=rotation,
+                        last_step=self._rotation_last_step.get(rotation.id),
+                        last_pushed_at=self._rotation_last_pushed_at.get(rotation.id),
+                        last_window_start=self._rotation_last_window_start.get(rotation.id),
+                        forced=self._rotation_force_state.get(rotation.id),
+                        device_pages=device_pages,
+                    )
+                )
+
+        timed: list[TimedRecord] = []
+        for schedule in self._timed_records():
+            deck = decks.get(schedule.id)
+            explicit = list(deck.device_ids) if deck is not None else []
+            if explicit:
+                if device_id not in explicit:
+                    continue
+            elif device_id not in bound_devices.get(schedule.page_id, set()):
+                continue
+            if self._page_exists is not None and not self._page_exists(schedule.page_id):
+                continue
+            with self._lock:
+                timed.append(
+                    TimedRecord(
+                        schedule=schedule,
+                        last_fired=self._last_fired.get(schedule.id),
+                        first_seen=self._first_seen.get(schedule.id),
+                    )
+                )
+
+        home_returns: list[HomeReturnRecord] = []
+        if self._deck_store is not None and self._deck_nav_store is not None:
+            for deck in decks.values():
+                if not deck.enabled or deck.home_timeout_minutes <= 0:
+                    continue
+                if device_id not in deck.device_ids:
+                    continue
+                try:
+                    rec = self._deck_nav_store.get(device_id)
+                except Exception:
+                    continue
+                if rec is None or rec.get("deck_id") != deck.id:
+                    continue
+                home = deck.resolved_home_page_id
+                if rec.get("page_id") == home:
+                    continue
+                updated_at = rec.get("updated_at")
+                if not isinstance(updated_at, (int, float)):
+                    continue
+                home_returns.append(
+                    HomeReturnRecord(
+                        deck_id=deck.id,
+                        deck_name=deck.name,
+                        home_page_id=home,
+                        idle_since=float(updated_at),
+                        timeout_minutes=deck.home_timeout_minutes,
+                    )
+                )
+
+        current_page_id: str | None = None
+        try:
+            for page_id, device_ids in self._devices_showing_pages(now).items():
+                if device_id in device_ids:
+                    current_page_id = page_id
+                    break
+        except Exception:
+            logger.exception("upcoming: current-page resolution failed")
+
+        return project_upcoming(
+            ProjectionInputs(
+                device_id=device_id,
+                now=now,
+                through=now + timedelta(hours=hours),
+                tz=self._tz_provider(),
+                tick_seconds=self._tick,
+                cycles=cycles,
+                timed=timed,
+                home_returns=home_returns,
+                page_names=page_names,
+                current_page_id=current_page_id,
+                quiet_window=quiet_window,
+            ),
+            limit=limit,
+        )
 
     def rotation_status(self) -> dict[str, dict[str, Any]]:
         """Snapshot of per-rotation runtime state, mirroring ``status``.

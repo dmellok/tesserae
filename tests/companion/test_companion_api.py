@@ -18,7 +18,7 @@ import jsonschema
 import pytest
 from flask import Flask
 
-from app import companion_api, companion_gallery
+from app import companion_api, companion_gallery, device_upcoming
 from app.main import REPO_ROOT, create_app
 from app.state.page_store import Page
 
@@ -137,6 +137,10 @@ def test_capabilities_probe_is_unauthenticated_and_valid(app: Flask) -> None:
         # Needs the same plugin plus the album store, so it rides with it here
         # and is advertised separately (#230).
         "offline_albums",
+        # Gated on a running scheduler, which the app factory always wires
+        # (#232). The projection replays that engine's gates, so an install
+        # without one has nothing honest to answer with.
+        "device_timeline",
     }
     assert body["personal_data"]["sources"] == ["reminders", "reminders.fridge"]
     assert "webpage_push" not in body["features"]
@@ -152,6 +156,10 @@ def test_capabilities_probe_is_unauthenticated_and_valid(app: Flask) -> None:
     assert (
         body["limits"]["gallery_upload_batch_size"] == companion_gallery.GALLERY_UPLOAD_BATCH_SIZE
     )
+    # Mandatory alongside device_timeline, so the client asks for a window
+    # the server will honour instead of finding the ceiling through a 400.
+    assert body["limits"]["device_timeline_max_hours"] == device_upcoming.MAX_HOURS
+    assert body["limits"]["device_timeline_max_events"] == device_upcoming.MAX_LIMIT
     # No household content leaks from the unauthenticated probe.
     assert "devices" not in body and "dashboards" not in body
 

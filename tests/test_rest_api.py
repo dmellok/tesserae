@@ -785,10 +785,12 @@ def test_frame_returns_url_and_etag_when_rendered(app: Flask) -> None:
     assert "/renders/abc123.bin" in body["url"]
     assert "sig=" in body["url"]
     assert resp.headers["ETag"] == '"abc123"'
-    assert push_mgr.last_served_render_for("bedroom_pico") == {
-        "digest": "abc123",
-        "preview_digest": "preview123",
-    }
+    served = push_mgr.last_served_render_for("bedroom_pico")
+    assert served["digest"] == "abc123"
+    assert served["preview_digest"] == "preview123"
+    # Stamped on handover so the Companion timeline has a start for its
+    # progress interval (#232); a bare digest can't say when.
+    assert served["served_at"] is not None
 
 
 def test_frame_carries_button_wake_for_button_kind(app: Flask) -> None:

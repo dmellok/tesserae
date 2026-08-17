@@ -4,6 +4,41 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.311.0], 2026-08-17
+
+### Added
+
+- **A per-display timeline of the next visible updates**, at
+  `GET /api/app/v1/devices/{device_id}/upcoming` behind the
+  `device_timeline` capability. It answers what is expected to change or
+  repaint one panel next, when, and why: Lineup advances, Keep Fresh
+  re-renders, and Home Return, each with the dashboard it lands on and
+  whether the timing is scheduled, conditional, or an estimate.
+
+  The projection replays the running engine's own gates rather than
+  walking the stored records, because everything that decides whether an
+  update actually reaches the glass lives in the engine: the dwell grid
+  and its manual overrides, minimum hold measured window to window,
+  per-record cooldowns, daily backfill suppression, Smart Sync, quiet
+  hours, and which panel an unbound record resolves to. Anything landing
+  inside a display's quiet hours is left out, since it repaints nothing,
+  and records due in the same tick are coalesced to the one the panel is
+  left showing.
+
+  Dashboard and widget refresh timings are deliberately not included.
+  Refresh is becoming event-driven, so covering only its timed half would
+  make the timeline quietly incomplete; the `cause` values are reserved so
+  adding them later is additive. Manual sends, webhooks, and Home
+  Assistant events are not predicted at all.
+
+- **`current_frame_at` on the same response**, so a countdown has a start
+  as well as an end. For a REST display it is when the server handed over
+  the frame the panel now holds, taken from the delivery-side snapshot
+  already persisted next to the served digest, so it survives a restart;
+  for other transports it is when the current frame was published. It is
+  never a claim that the panel finished repainting, and is null when no
+  baseline can be established rather than guessed at.
+
 ## [0.309.1], 2026-08-16
 
 ### Fixed

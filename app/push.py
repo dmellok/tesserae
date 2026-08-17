@@ -687,6 +687,9 @@ class PushManager:
         physical panel completed its download or refresh.  The fields live on
         the persisted latest-render entry so they survive restarts without a
         second state store.
+
+        ``served_at`` is the POSIX moment of the handover, and is absent for a
+        device last served before the field started being written.
         """
         entry = self._latest_renders.get(device_id)
         if not isinstance(entry, dict):
@@ -694,9 +697,11 @@ class PushManager:
         digest = entry.get("last_served_digest")
         if not isinstance(digest, str) or not digest:
             return None
+        served_at = entry.get("last_served_at")
         return {
             "digest": digest,
             "preview_digest": entry.get("last_served_preview_digest"),
+            "served_at": float(served_at) if isinstance(served_at, (int, float)) else None,
         }
 
     def record_frame_served(self, device_id: str, render: dict[str, Any]) -> None:
@@ -706,6 +711,15 @@ class PushManager:
         render may land while that response is being assembled, so record the
         captured digest on the current entry rather than assuming it is still
         the current digest.
+
+        ``last_served_at`` is stamped only when the served digest *changes*.
+        This route runs on every poll, 304s included, so stamping every call
+        would rewrite the file constantly and would answer "when did the
+        device last check in" rather than "when did this frame become the one
+        it holds", which is what the Companion timeline measures its progress
+        interval from.  A device whose frame predates this field therefore
+        carries no timestamp until its next new frame, which is the honest
+        answer rather than a backfilled guess.
         """
         digest = render.get("digest")
         if not isinstance(digest, str) or not digest:
@@ -717,6 +731,8 @@ class PushManager:
                 return
             changed = current.get("last_served_digest") != digest
             current["last_served_digest"] = digest
+            if changed:
+                current["last_served_at"] = time.time()
             if isinstance(preview_digest, str) and preview_digest:
                 changed = changed or current.get("last_served_preview_digest") != preview_digest
                 current["last_served_preview_digest"] = preview_digest
@@ -747,6 +763,7 @@ class PushManager:
         for key in (
             "last_served_digest",
             "last_served_preview_digest",
+            "last_served_at",
         ):
             replacement.pop(key, None)
             if previous is not None and key in previous:

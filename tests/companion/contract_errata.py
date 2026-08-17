@@ -63,19 +63,121 @@ class SchemaErratum:
     why: str = ""
 
 
-# Emptied at the contract 0.12 re-vendor
-# (charmmmz/tesserae-companion-ios@8a9b492): every entry that lived here,
-# Lineups features and scopes, the session read flag, the forbidden and
-# precondition_failed codes, and the whole transcribed Gallery block, is
-# published upstream now, so our responses validate against the client's
-# own shapes rather than our copies of them.
-ERRATA: tuple[Erratum, ...] = ()
+ERRATA: tuple[Erratum, ...] = (
+    Erratum(
+        pointer="components/schemas/Capabilities/properties/features/items/enum",
+        values=("device_timeline",),
+        since="v0.311.0",
+        why=(
+            "Per-display projection of the next visible updates, agreed in "
+            "discussion #232. Advertised only where a scheduler is running, "
+            "since the projection replays that engine's own gates."
+        ),
+    ),
+)
 
-# Emptied at the contract 0.13 re-vendor
-# (charmmmz/tesserae-companion-ios@f37ccd1): DeviceCapabilitySupport.detail,
-# offered in discussion #230 so an Offline Album preflight could say what a
-# target actually holds, is published upstream field for field.
-SCHEMA_ERRATA: tuple[SchemaErratum, ...] = ()
+SCHEMA_ERRATA: tuple[SchemaErratum, ...] = (
+    SchemaErratum(
+        pointer="components/schemas/Limits/properties",
+        patch={
+            "device_timeline_max_hours": {
+                "description": (
+                    "Largest hours window GET /devices/{device_id}/upcoming "
+                    "accepts. Required whenever device_timeline is advertised."
+                ),
+                "type": "integer",
+                "minimum": 1,
+            },
+            "device_timeline_max_events": {
+                "description": (
+                    "Largest limit GET /devices/{device_id}/upcoming accepts. "
+                    "Required whenever device_timeline is advertised."
+                ),
+                "type": "integer",
+                "minimum": 1,
+            },
+        },
+        since="v0.311.0",
+        why="Query bounds for the #232 timeline, advertised rather than hard-coded.",
+    ),
+    SchemaErratum(
+        pointer="components/schemas",
+        patch={
+            "DeviceUpcomingEvent": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": [
+                    "id",
+                    "scheduled_at",
+                    "cause",
+                    "effect",
+                    "certainty",
+                    "lineup_id",
+                    "lineup_name",
+                    "dashboard_id",
+                    "dashboard_name",
+                ],
+                "properties": {
+                    "id": {"type": "string", "minLength": 1},
+                    "scheduled_at": {"type": "string", "format": "date-time"},
+                    "cause": {
+                        "type": "string",
+                        "enum": [
+                            "daily",
+                            "interval",
+                            "cycle",
+                            "home_return",
+                            "dashboard_refresh",
+                            "widget_refresh",
+                        ],
+                    },
+                    "effect": {"type": "string", "enum": ["change_screen", "refresh_screen"]},
+                    "certainty": {
+                        "type": "string",
+                        "enum": ["scheduled", "conditional", "estimated"],
+                    },
+                    "lineup_id": {"type": "string", "nullable": True},
+                    "lineup_name": {"type": "string", "nullable": True},
+                    "dashboard_id": {"type": "string", "nullable": True},
+                    "dashboard_name": {"type": "string", "nullable": True},
+                },
+            },
+            "DeviceUpcomingResponse": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": [
+                    "device_id",
+                    "generated_at",
+                    "timezone",
+                    "through_at",
+                    "current_frame_at",
+                    "events",
+                ],
+                "properties": {
+                    "device_id": {"type": "string", "minLength": 1},
+                    "generated_at": {"type": "string", "format": "date-time"},
+                    "timezone": {"type": "string", "minLength": 1},
+                    "through_at": {"type": "string", "format": "date-time"},
+                    "current_frame_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": True,
+                    },
+                    "events": {
+                        "type": "array",
+                        "items": {"$ref": "#/components/schemas/DeviceUpcomingEvent"},
+                    },
+                },
+            },
+        },
+        since="v0.311.0",
+        why=(
+            "Response shapes for GET /devices/{device_id}/upcoming, transcribed "
+            "from the proposal in discussion #232 so our own responses can be "
+            "validated before the client publishes the endpoint."
+        ),
+    ),
+)
 
 
 def _resolve(spec: dict[str, Any], pointer: str) -> Any:

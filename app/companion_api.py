@@ -33,7 +33,7 @@ import secrets
 import time
 import urllib.parse
 from collections.abc import Callable, Iterable
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from functools import wraps
 from pathlib import Path
 from typing import Any
@@ -69,6 +69,18 @@ from app.data_change_refresh import (
 from app.device_capability import capability_support_map, heartbeat_freshness
 from app.device_loader import Device, DeviceRegistry
 from app.device_preview import retained_device_preview
+from app.device_upcoming import (
+    DEFAULT_HOURS as DEVICE_TIMELINE_DEFAULT_HOURS,
+)
+from app.device_upcoming import (
+    DEFAULT_LIMIT as DEVICE_TIMELINE_DEFAULT_LIMIT,
+)
+from app.device_upcoming import (
+    MAX_HOURS as DEVICE_TIMELINE_MAX_HOURS,
+)
+from app.device_upcoming import (
+    MAX_LIMIT as DEVICE_TIMELINE_MAX_EVENTS,
+)
 from app.image_upload import (
     IMAGE_CONTENT_TYPES,
     IMAGE_FIT_MODES,
@@ -81,7 +93,7 @@ from app.image_upload import (
 from app.lineup_authoring import build_lineup
 from app.net_guard import BlockedURLError, assert_public_url
 from app.panel import device_panel, resolve_settings_panel
-from app.quiet_hours import device_is_quiet
+from app.quiet_hours import device_is_quiet, resolve_quiet_hours
 from app.state.companion_token_store import COMPANION_SCOPES, CompanionTokenStore
 from app.state.event_log import EventLog, EventRow
 from app.state.idempotency_store import IdempotencyStore
@@ -386,6 +398,13 @@ def _features() -> list[str]:
         # separately from ``gallery`` because browsing a library and making a
         # display play one on its own are different things to offer (#230).
         feats.append("offline_albums")
+    if current_app.config.get("SCHEDULER") is not None:
+        # The upcoming projection replays the running engine's own gates, so
+        # it can only be offered where that engine exists. An install without
+        # one would have to answer from the stored records alone, which is
+        # the plausible-but-wrong timeline the feature was built to avoid
+        # (#232).
+        feats.append("device_timeline")
     return feats
 
 
@@ -400,6 +419,18 @@ def _gallery_limits() -> dict[str, Any]:
         "gallery_upload_bytes": companion_gallery.GALLERY_UPLOAD_BYTES,
         "gallery_image_content_types": list(companion_gallery.GALLERY_IMAGE_CONTENT_TYPES),
         "gallery_upload_batch_size": companion_gallery.GALLERY_UPLOAD_BATCH_SIZE,
+    }
+
+
+def _timeline_limits() -> dict[str, Any]:
+    """The device timeline's query bounds, required whenever the capability
+    is advertised so the client asks for a window the server will honour
+    instead of discovering the ceiling through a 400."""
+    if current_app.config.get("SCHEDULER") is None:
+        return {}
+    return {
+        "device_timeline_max_hours": DEVICE_TIMELINE_MAX_HOURS,
+        "device_timeline_max_events": DEVICE_TIMELINE_MAX_EVENTS,
     }
 
 
@@ -434,6 +465,7 @@ def _capabilities() -> dict[str, Any]:
             # (contract 0.7): the client reads freshness/TTL bounds, not guesses.
             "personal_data_stale_after_seconds": PERSONAL_DATA_STALE_SECONDS,
             "personal_data_max_ttl_seconds": PERSONAL_DATA_MAX_TTL_SECONDS,
+            **_timeline_limits(),
             **_gallery_limits(),
         },
         "web_url": _web_url(),
@@ -918,6 +950,115 @@ def list_devices() -> Any:
         if d.kind_of is not None  # instances only, never built-in kinds
     ]
     return jsonify({"devices": devices})
+
+
+# -- device timeline -----------------------------------------------------
+
+
+def _scheduler() -> Any:
+    return current_app.config.get("SCHEDULER")
+
+
+def _current_frame_at(device: Device) -> str | None:
+    """When the frame now on this display was handed over, or ``None``.
+
+    For a REST display that's the delivery-side handover the push manager
+    persists next to the served digest. For every other transport there is no
+    handover to observe, so it's when the current frame was published. Neither
+    is a claim that the panel finished repainting, and a display the server
+    can't establish a baseline for gets ``None`` rather than a guess, which
+    the client reads as "show the next update, no progress bar".
+    """
+    manager = _push_manager()
+    if manager is None:
+        return None
+    if device.transport == "rest":
+        lookup = getattr(manager, "last_served_render_for", None)
+        served = lookup(device.id) if callable(lookup) else None
+        at = served.get("served_at") if isinstance(served, dict) else None
+        return _iso(float(at)) if isinstance(at, (int, float)) else None
+    lookup = getattr(manager, "latest_render_for", None)
+    latest = lookup(device.id) if callable(lookup) else None
+    at = latest.get("timestamp") if isinstance(latest, dict) else None
+    return _iso(float(at)) if isinstance(at, (int, float)) else None
+
+
+def _bounded_query(name: str, default: int, lo: int, hi: int) -> int | None:
+    """Read an integer query parameter, or ``None`` when it's out of range
+    or not a number at all. Absent means the default."""
+    raw = request.args.get(name)
+    if raw is None or raw == "":
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        return None
+    return value if lo <= value <= hi else None
+
+
+@bp.get("/devices/<device_id>/upcoming")
+@_require_companion("devices:read", "dashboards:read", "lineups:read")
+def device_upcoming(device_id: str) -> Any:
+    """What is expected to visibly change or repaint this display next.
+
+    Read-only, and deliberately only the part of the answer the scheduler
+    genuinely owns: Lineup advances, Keep Fresh re-renders, and Home Return.
+    Manual Send, webhooks, Home Assistant events, and data-change refreshes
+    have no schedule to project and are not guessed at (#232).
+
+    Pending delivery is not repeated here. ``has_pending_render`` on
+    ``/devices`` already says a newer frame is waiting for a display to wake,
+    and two representations of one state is how they end up disagreeing.
+    """
+    device = _devices().get(device_id)
+    if device is None or device.kind_of is None:
+        return _error("not_found", "No such display.", 404)
+    scheduler = _scheduler()
+    if scheduler is None:
+        return _error("temporarily_unavailable", "The scheduler isn't running.", 503)
+
+    hours = _bounded_query("hours", DEVICE_TIMELINE_DEFAULT_HOURS, 1, DEVICE_TIMELINE_MAX_HOURS)
+    limit = _bounded_query("limit", DEVICE_TIMELINE_DEFAULT_LIMIT, 1, DEVICE_TIMELINE_MAX_EVENTS)
+    if hours is None or limit is None:
+        return _error(
+            "invalid_request",
+            f"hours must be 1-{DEVICE_TIMELINE_MAX_HOURS} and "
+            f"limit 1-{DEVICE_TIMELINE_MAX_EVENTS}.",
+            400,
+        )
+
+    now = datetime.now(UTC)
+    quiet_window = resolve_quiet_hours(_settings().get_section("app") or {}, device)
+    events = scheduler.upcoming_for_device(
+        device_id,
+        now=now,
+        hours=hours,
+        limit=limit,
+        quiet_window=quiet_window,
+    )
+    return jsonify(
+        {
+            "device_id": device_id,
+            "generated_at": _iso(now.timestamp()),
+            "timezone": _timezone(),
+            "through_at": _iso((now + timedelta(hours=hours)).timestamp()),
+            "current_frame_at": _current_frame_at(device),
+            "events": [
+                {
+                    "id": event.event_id(device_id),
+                    "scheduled_at": _iso(event.scheduled_at.timestamp()),
+                    "cause": event.cause,
+                    "effect": event.effect,
+                    "certainty": event.certainty,
+                    "lineup_id": event.lineup_id,
+                    "lineup_name": event.lineup_name,
+                    "dashboard_id": event.dashboard_id,
+                    "dashboard_name": event.dashboard_name,
+                }
+                for event in events
+            ],
+        }
+    )
 
 
 # -- dashboards ----------------------------------------------------------
