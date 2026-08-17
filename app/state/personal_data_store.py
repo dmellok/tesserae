@@ -1,14 +1,12 @@
 """Latest-only personal-data snapshots for the Companion bridge (#176).
 
-The iOS Companion publishes minimal, expiring Apple Reminders snapshots; the
-server keeps only the *latest* snapshot per paired publisher and source, then
-renders it in a widget. The generic source may group several explicitly
-selected lists, while the legacy fridge source keeps its original one-list
-shape. No history: exactly one snapshot per ``(publisher_id, source_id)``,
-replaced on each accepted PUT and deleted on disable or expiry. The server
-never connects to iCloud, it only stores what each phone explicitly publishes,
-and drops it once expired. Contract:
-``tests/companion/contract/app-v1.openapi.yaml`` (Companion 0.7.0).
+The iOS Companion publishes minimal, expiring Apple Reminders and Health
+summaries; the server keeps only the *latest* snapshot per paired publisher and
+source, then renders it in a widget. No history: exactly one snapshot per
+``(publisher_id, source_id)``, replaced on each accepted PUT and deleted on
+disable or expiry. The server never connects to iCloud or HealthKit, it only
+stores what each phone explicitly publishes, and drops it once expired.
+Contract: ``tests/companion/contract/app-v1.openapi.yaml``.
 
 Each stored record wraps the raw snapshot with the two epochs the API needs for
 ordering and freshness, so this store never parses ISO timestamps itself::
@@ -242,7 +240,7 @@ class PersonalDataSnapshotStore:
         """Remove raw values from snapshots past ``expires_epoch``.
 
         Non-sensitive timing metadata remains as a tombstone so callers can
-        report ``expired`` without retaining Reminder titles or list contents.
+        report ``expired`` without retaining Reminder or Health values.
         Returns the source ids redacted during this call.
         """
         with self._lock:

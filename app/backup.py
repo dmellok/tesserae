@@ -45,12 +45,15 @@ LABEL_PRE_UPDATE = "pre-update"
 #   composition PNGs and per-renderer ``.bin`` artifacts. These regenerate
 #   the moment any dashboard is pushed again, and the push code already
 #   handles the "PNG evicted from disk" case for old history entries.
+# - ``core/companion_personal_data.json`` contains latest-only personal values
+#   explicitly excluded from backups by the Companion privacy contract.
 #
 # Restoring a backup that excluded a subpath does NOT wipe the user's
 # current files there, the photos / render cache persist across restores.
 DEFAULT_EXCLUDED_SUBPATHS: tuple[str, ...] = (
     "plugins/picture_gallery",
     "core/renders",
+    "core/companion_personal_data.json",
 )
 
 

@@ -144,6 +144,28 @@ def test_first_nonempty_snapshot_and_delete_are_narrowed_to_known_lists() -> Non
     assert personal_data_delete_event("reminders", current) == expected
 
 
+def test_health_summary_diff_is_source_wide_and_ignores_envelope_renewal() -> None:
+    before = {
+        "version": "personal_data_bridge_v1",
+        "source_id": "health.summary",
+        "generated_at": "2026-08-14T12:00:00Z",
+        "expires_at": "2026-08-16T12:00:00Z",
+        "data": {"sleep": {"nights": []}},
+    }
+    renewed = {
+        **before,
+        "generated_at": "2026-08-14T12:30:00Z",
+        "expires_at": "2026-08-16T12:30:00Z",
+    }
+    changed = {**renewed, "data": {"sleep": {"nights": [{"wake_date": "2026-08-14"}]}}}
+    expected = DataChangeEvent(source="personal_data.health.summary")
+
+    assert personal_data_update_event("health.summary", None, before) == expected
+    assert personal_data_update_event("health.summary", before, renewed) is None
+    assert personal_data_update_event("health.summary", renewed, changed) == expected
+    assert personal_data_delete_event("health.summary", changed) == expected
+
+
 def test_matching_pages_respects_placement_opt_in_and_selector(tmp_path: Path) -> None:
     registry = PluginRegistry(
         plugins={

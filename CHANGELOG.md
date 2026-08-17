@@ -4,6 +4,17 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [Unreleased]
+
+### Added
+
+- **Apple Health seven-day summaries can now be published through Companion.**
+  Servers advertise the opt-in `health.summary` source, strictly validate its
+  bounded Activity, Sleep, and Workout sections, retain only the latest
+  publisher-isolated snapshot until expiry, and emit source-wide semantic
+  refresh events without putting raw Health values in logs, API errors, or
+  backups.
+
 ## [0.313.0], 2026-08-17
 
 ### Added

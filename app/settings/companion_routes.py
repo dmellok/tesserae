@@ -42,7 +42,7 @@ SCOPE_LABELS: dict[str, str] = {
     "dashboards:read": "See your dashboards",
     "push:write": "Send dashboards to a display",
     "media:write": "Send photos and images",
-    "personal_data:write": "Publish reminders from the phone",
+    "personal_data:write": "Publish selected personal data from the phone",
     "lineups:read": "See your Lineups",
     "lineups:control": "Start, stop, and step Lineups",
     "lineups:write": "Create and edit Lineups",

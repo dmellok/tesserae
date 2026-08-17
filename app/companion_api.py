@@ -81,6 +81,12 @@ from app.device_upcoming import (
 from app.device_upcoming import (
     MAX_LIMIT as DEVICE_TIMELINE_MAX_EVENTS,
 )
+from app.health_summary import (
+    HEALTH_SUMMARY_MAX_BYTES,
+    HEALTH_SUMMARY_SOURCE_ID,
+    InvalidHealthSummary,
+    validate_health_summary,
+)
 from app.http_headers import HeaderError, validate_header_map
 from app.image_upload import (
     IMAGE_CONTENT_TYPES,
@@ -130,7 +136,7 @@ IDEMPOTENCY_RETENTION_SECONDS = 86_400
 # the app does not hard-code them.
 PERSONAL_DATA_STALE_SECONDS = 86_400  # 24 h
 PERSONAL_DATA_MAX_TTL_SECONDS = 172_800  # 48 h
-PERSONAL_DATA_SOURCES = ("reminders", "reminders.fridge")
+PERSONAL_DATA_SOURCES = ("reminders", "reminders.fridge", HEALTH_SUMMARY_SOURCE_ID)
 PERSONAL_DATA_SNAPSHOT_VERSION = "personal_data_bridge_v1"
 PERSONAL_DATA_REMINDERS_MAX_LISTS = 20
 PERSONAL_DATA_REMINDERS_MAX_ITEMS = 200
@@ -148,6 +154,7 @@ FEATURES = (
     "history",
     "image_framing",
     "personal_data_reminders",
+    "personal_data_health",
     # Read + control for Lineups (#205). Authoring is a separate capability
     # so a client can offer the controls without implying it can edit, which
     # it can't until the write path behind #204 exists.
@@ -779,8 +786,28 @@ def put_personal_data(source_id: str) -> Any:
     timestamp is refused so delayed background work can't overwrite newer data."""
     if source_id not in PERSONAL_DATA_SOURCES:
         return _error("unsupported_personal_data_source", f"unknown source {source_id!r}", 400)
+    if source_id == HEALTH_SUMMARY_SOURCE_ID:
+        content_length = request.content_length
+        if content_length is not None and content_length > HEALTH_SUMMARY_MAX_BYTES:
+            return _error("invalid_snapshot", "health.summary exceeds the 256 KiB limit", 400)
+        if len(request.get_data(cache=True)) > HEALTH_SUMMARY_MAX_BYTES:
+            return _error("invalid_snapshot", "health.summary exceeds the 256 KiB limit", 400)
     body = request.get_json(silent=True)
-    if source_id == "reminders":
+    result: tuple[dict[str, Any], float, float] | None
+    err: tuple[Response, int] | None
+    if source_id == HEALTH_SUMMARY_SOURCE_ID:
+        try:
+            result = validate_health_summary(
+                source_id,
+                body,
+                active_timezone=_timezone(),
+                snapshot_version=PERSONAL_DATA_SNAPSHOT_VERSION,
+                maximum_ttl_seconds=PERSONAL_DATA_MAX_TTL_SECONDS,
+            )
+        except InvalidHealthSummary as exc:
+            return _error("invalid_snapshot", str(exc), 400)
+        err = None
+    elif source_id == "reminders":
         result, err = _validate_reminders(source_id, body)
     else:
         result, err = _validate_reminders_fridge(source_id, body)
