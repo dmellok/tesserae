@@ -172,6 +172,7 @@ def test_excluded_subpaths_recorded_in_metadata(tmp_path: Path) -> None:
         meta = json.loads(zf.read(bk.META_NAME))
     assert "plugins/picture_gallery" in meta["excluded_subpaths"]
     assert "core/renders" in meta["excluded_subpaths"]
+    assert "core/companion_personal_data.json" in meta["excluded_subpaths"]
     assert meta["version"] >= 2
 
 
@@ -193,6 +194,21 @@ def test_render_cache_artifacts_are_excluded(tmp_path: Path) -> None:
     assert not any(n.startswith("core/renders/") for n in names), [
         n for n in names if n.startswith("core/renders/")
     ]
+
+
+def test_personal_data_snapshots_are_excluded(tmp_path: Path) -> None:
+    """Personal-data values are latest-only and must never enter backups."""
+    import zipfile
+
+    root = tmp_path / "data"
+    _seed(root)
+    personal_data = root / "core" / "companion_personal_data.json"
+    personal_data.write_text('{"snapshot":{"title":"private"}}', encoding="utf-8")
+
+    backup = bk.create(root)
+
+    with zipfile.ZipFile(backup.path) as zf:
+        assert "core/companion_personal_data.json" not in zf.namelist()
 
 
 def test_restore_preserves_users_gallery_photos(tmp_path: Path) -> None:

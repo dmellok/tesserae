@@ -139,6 +139,45 @@ def _put_multi(app: Flask, token: str, snap: dict[str, Any]) -> Any:
     )
 
 
+def _health_snapshot(
+    generated: datetime,
+    *,
+    ttl_hours: int = 47,
+    sleep: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    window_end = generated.date()
+    window_start = window_end - timedelta(days=6)
+    return {
+        "version": "personal_data_bridge_v1",
+        "source_id": "health.summary",
+        "generated_at": _iso(generated),
+        "expires_at": _iso(generated + timedelta(hours=ttl_hours)),
+        "data": {
+            "time_zone": "UTC",
+            "window_start_date": window_start.isoformat(),
+            "window_end_date": window_end.isoformat(),
+            "activity": None,
+            "sleep": {"nights": []} if sleep is None else sleep,
+            "workouts": None,
+        },
+    }
+
+
+def _put_health(app: Flask, token: str, snap: dict[str, Any]) -> Any:
+    return app.test_client().put(
+        "/api/app/v1/personal-data/health.summary",
+        headers=_auth(token),
+        data=json.dumps(snap),
+    )
+
+
+def _health_contract_fixture() -> dict[str, Any]:
+    fixture_path = (
+        Path(__file__).parent / "contract" / "Fixtures" / "personal-data-health-summary.json"
+    )
+    return json.loads(fixture_path.read_text(encoding="utf-8"))
+
+
 class _ChangeCapture:
     def __init__(self) -> None:
         self.events: list[DataChangeEvent] = []
@@ -156,7 +195,12 @@ def test_capabilities_advertise_personal_data(app: Flask) -> None:
     body = app.test_client().get("/api/app/v1").get_json()
     jsonschema.validate(body, schema_for("Capabilities"), format_checker=_FMT)
     assert "personal_data_reminders" in body["features"]
-    assert body["personal_data"]["sources"] == ["reminders", "reminders.fridge"]
+    assert "personal_data_health" in body["features"]
+    assert body["personal_data"]["sources"] == [
+        "reminders",
+        "reminders.fridge",
+        "health.summary",
+    ]
     assert body["limits"]["personal_data_stale_after_seconds"] == 86400
     assert body["limits"]["personal_data_max_ttl_seconds"] == 172800
 
@@ -194,6 +238,167 @@ def test_multi_list_put_then_status_round_trip(app: Flask) -> None:
     body = listing.get_json()
     jsonschema.validate(body, schema_for("PersonalDataStatusResponse"), format_checker=_FMT)
     assert [source["source_id"] for source in body["sources"]] == ["reminders"]
+
+
+def test_health_summary_put_status_and_delete_round_trip(app: Flask) -> None:
+    token = _token(app)
+    now = datetime.now(UTC).replace(microsecond=0)
+    snapshot = _health_snapshot(now)
+
+    response = _put_health(app, token, snapshot)
+
+    assert response.status_code == 200, response.get_data(as_text=True)
+    status = response.get_json()
+    jsonschema.validate(status, schema_for("PersonalDataSourceStatus"), format_checker=_FMT)
+    assert status["source_id"] == "health.summary"
+    assert status["state"] == "fresh"
+    assert app.config["PERSONAL_DATA_STORE"].get("health.summary")["snapshot"] == snapshot
+
+    listing = app.test_client().get("/api/app/v1/personal-data/status", headers=_auth(token))
+    assert [source["source_id"] for source in listing.get_json()["sources"]] == ["health.summary"]
+
+    deleted = app.test_client().delete(
+        "/api/app/v1/personal-data/health.summary", headers=_auth(token)
+    )
+    assert deleted.status_code == 204
+    assert (
+        app.test_client()
+        .get("/api/app/v1/personal-data/status", headers=_auth(token))
+        .get_json()["sources"]
+        == []
+    )
+
+
+def test_full_health_contract_fixture_is_accepted(app: Flask) -> None:
+    token = _token(app)
+    app.config["SETTINGS_STORE"].patch_section("app", {"timezone": "Asia/Shanghai"})
+    snapshot = _health_contract_fixture()
+
+    response = _put_health(app, token, snapshot)
+
+    assert response.status_code == 200, response.get_data(as_text=True)
+    jsonschema.validate(
+        response.get_json(), schema_for("PersonalDataSourceStatus"), format_checker=_FMT
+    )
+
+
+def test_health_changes_are_source_wide_and_ttl_renewal_is_silent(app: Flask) -> None:
+    token = _token(app)
+    capture = _ChangeCapture()
+    app.config["DATA_CHANGE_COORDINATOR"] = capture
+    now = datetime.now(UTC).replace(microsecond=0)
+    initial = _health_snapshot(now)
+
+    assert _put_health(app, token, initial).status_code == 200
+    assert capture.events == [DataChangeEvent("personal_data.health.summary")]
+
+    capture.events.clear()
+    renewal = _health_snapshot(now + timedelta(seconds=1))
+    assert _put_health(app, token, renewal).status_code == 200
+    assert capture.events == []
+
+    capture.events.clear()
+    changed = _health_snapshot(
+        now + timedelta(seconds=2),
+        sleep={
+            "nights": [
+                {
+                    "wake_date": now.date().isoformat(),
+                    "start_at": _iso(now - timedelta(hours=7)),
+                    "end_at": _iso(now),
+                    "in_bed_minutes": 420,
+                    "asleep_minutes": 390,
+                    "awake_minutes": 30,
+                    "core_minutes": None,
+                    "deep_minutes": None,
+                    "rem_minutes": None,
+                    "unspecified_minutes": 390,
+                }
+            ]
+        },
+    )
+    assert _put_health(app, token, changed).status_code == 200
+    assert capture.events == [DataChangeEvent("personal_data.health.summary")]
+
+    capture.events.clear()
+    response = app.test_client().delete(
+        "/api/app/v1/personal-data/health.summary", headers=_auth(token)
+    )
+    assert response.status_code == 204
+    assert capture.events == [DataChangeEvent("personal_data.health.summary")]
+
+
+def test_health_validation_rejects_privacy_and_shape_violations(app: Flask) -> None:
+    token = _token(app)
+    app.config["SETTINGS_STORE"].patch_section("app", {"timezone": "Asia/Shanghai"})
+
+    def rejected(snapshot: dict[str, Any]) -> Any:
+        response = _put_health(app, token, snapshot)
+        assert response.status_code == 400, response.get_data(as_text=True)
+        assert response.get_json()["error"]["code"] == "invalid_snapshot"
+        return response
+
+    all_sections_null = _health_contract_fixture()
+    all_sections_null["data"]["activity"] = None
+    all_sections_null["data"]["sleep"] = None
+    all_sections_null["data"]["workouts"] = None
+    rejected(all_sections_null)
+
+    wrong_timezone = _health_contract_fixture()
+    wrong_timezone["data"]["time_zone"] = "UTC"
+    rejected(wrong_timezone)
+
+    unexpected_identity = _health_contract_fixture()
+    unexpected_identity["data"]["workouts"]["items"][0]["healthkit_uuid"] = "private-id"
+    response = rejected(unexpected_identity)
+    assert "private-id" not in response.get_data(as_text=True)
+
+    boolean_steps = _health_contract_fixture()
+    boolean_steps["data"]["activity"]["days"][0]["steps"] = True
+    rejected(boolean_steps)
+
+    wrong_wake_date = _health_contract_fixture()
+    wrong_wake_date["data"]["sleep"]["nights"][0]["wake_date"] = "2026-08-13"
+    rejected(wrong_wake_date)
+
+    invalid_activity_type = _health_contract_fixture()
+    invalid_activity_type["data"]["workouts"]["items"][0]["activity_type"] = {"raw": "running"}
+    rejected(invalid_activity_type)
+
+    invalid_segment = _health_contract_fixture()
+    workout = invalid_segment["data"]["workouts"]["items"][0]
+    segment = {
+        key: value
+        for key, value in workout.items()
+        if key not in {"id", "segments", "segments_truncated"}
+    }
+    segment["ordinal"] = 1
+    workout["segments"] = [segment]
+    rejected(invalid_segment)
+
+
+def test_health_validation_enforces_ttl_window_and_request_size(app: Flask) -> None:
+    token = _token(app)
+    now = datetime.now(UTC).replace(microsecond=0)
+
+    too_long = _put_health(app, token, _health_snapshot(now, ttl_hours=49))
+    assert too_long.status_code == 400
+    assert too_long.get_json()["error"]["code"] == "invalid_snapshot"
+
+    wrong_window = _health_snapshot(now)
+    wrong_window["data"]["window_start_date"] = (now.date() - timedelta(days=5)).isoformat()
+    response = _put_health(app, token, wrong_window)
+    assert response.status_code == 400
+    assert response.get_json()["error"]["code"] == "invalid_snapshot"
+
+    oversized = _health_snapshot(now)
+    oversized["data"]["private_padding"] = "sensitive" * 40_000
+    response = _put_health(app, token, oversized)
+    assert response.status_code == 400
+    error = response.get_json()["error"]
+    assert error["code"] == "invalid_snapshot"
+    assert error["message"] == "health.summary exceeds the 256 KiB limit"
+    assert "sensitive" not in response.get_data(as_text=True)
 
 
 def test_personal_data_changes_emit_semantic_events_after_storage(app: Flask) -> None:

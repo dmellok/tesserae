@@ -6,7 +6,7 @@ opaque selector ids. A daemon timer waits for a quiet window, resolves the
 currently opted-in widget placements, deduplicates their containing pages, and
 hands those page ids to the existing scheduler refresh machinery.
 
-No reminder titles, list names, or item bodies enter this event path.
+No reminder or Health values enter this event path.
 """
 
 from __future__ import annotations
@@ -78,8 +78,10 @@ def personal_data_update_event(
     Envelope timestamps and expiry are deliberately ignored. Reminders events
     identify only lists whose title or item set changed; list and item ordering
     alone is not meaningful. The deprecated fridge source likewise treats item
-    ordering as presentation-only. The first usable snapshot is source-wide
-    because freshness/missing-source state can affect every configured placement.
+    ordering as presentation-only. Other sources, including ``health.summary``,
+    emit only a source-wide event when their semantic ``data`` changes. The first
+    usable snapshot is source-wide because freshness/missing-source state can
+    affect every configured placement.
     """
     source = f"personal_data.{source_id}"
     previous_data = _snapshot_data(previous)

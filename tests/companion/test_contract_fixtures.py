@@ -250,6 +250,7 @@ def test_personal_data_capabilities_advertise_source_ids_directly() -> None:
         "health.summary",
     ]
     assert "personal_data_reminders" in capabilities["features"]
+    assert "personal_data_health" in capabilities["features"]
     assert "personal_data_reminders_multi_list" not in capabilities["features"]
 
 

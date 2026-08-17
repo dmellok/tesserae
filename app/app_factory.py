@@ -1035,8 +1035,9 @@ def create_app(
     from app.state.personal_data_store import PersonalDataSnapshotStore
 
     app.config["COMPANION_PAIRING_STORE"] = PairingStore()
-    # Personal-data bridge (#176): latest-only Apple-Reminders snapshot the
-    # Companion publishes, kept off any render/History path.
+    # Personal-data bridge (#176): latest-only, expiring Reminders and Health
+    # snapshots published by Companion. The store is separate from History
+    # and explicitly excluded from backups.
     app.config["PERSONAL_DATA_STORE"] = PersonalDataSnapshotStore(
         data_root / "core" / "companion_personal_data.json"
     )

@@ -128,6 +128,7 @@ def test_capabilities_probe_is_unauthenticated_and_valid(app: Flask) -> None:
         "history",
         "image_framing",
         "personal_data_reminders",
+        "personal_data_health",
         "lineups",
         "lineup_control",
         "lineup_authoring",
@@ -142,7 +143,11 @@ def test_capabilities_probe_is_unauthenticated_and_valid(app: Flask) -> None:
         # without one has nothing honest to answer with.
         "device_timeline",
     }
-    assert body["personal_data"]["sources"] == ["reminders", "reminders.fridge"]
+    assert body["personal_data"]["sources"] == [
+        "reminders",
+        "reminders.fridge",
+        "health.summary",
+    ]
     assert "webpage_push" not in body["features"]
     assert body["limits"]["image_fit_modes"] == list(companion_api.IMAGE_FIT_MODES)
     # Contract 0.6: the zoom bound is mandatory alongside image_framing.
