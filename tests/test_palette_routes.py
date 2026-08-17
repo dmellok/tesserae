@@ -476,3 +476,48 @@ def test_calibration_tab_renders_palette_card(app: Flask) -> None:
     assert "paperlesspaper/epdoptimize" in body
     # Save-as-new fold-out is present.
     assert "Save as new profile" in body
+
+
+def test_edge_settings_survive_an_edit_to_an_already_forked_profile(
+    app: Flask, tmp_path: Path
+) -> None:
+    """Discussion #227: the second tweak of an edge slider was dropped.
+
+    The fork path wrote the new edge settings and the edit-in-place path
+    wrote the base's, so a bundled preset took the first value and then
+    ignored every later one until the profile was reset back to bundled.
+    Everything the tone editor submits has to survive both paths."""
+    client = app.test_client()
+    _sign_in(client)
+    dev = _register_device(client)
+    client.post(
+        f"/settings/devices/{dev}/palette/apply",
+        data={"slug": "paperlesspaper-spectra6"},
+    )
+    # First tweak forks the bundled preset and takes the value.
+    client.post(
+        f"/settings/devices/{dev}/palette/update-tone",
+        data={"protect_native_colours": "24", "smoothing_radius": "2"},
+    )
+    (fork,) = list((tmp_path / "palette_profiles").glob("*.json"))
+    assert json.loads(fork.read_text(encoding="utf-8"))["edges"] == {
+        "preserve_line_art": False,
+        "smoothing_radius": 2,
+        "protect_native_colours": 24,
+    }
+    # Second tweak edits the fork in place and must take the new value.
+    client.post(
+        f"/settings/devices/{dev}/palette/update-tone",
+        data={
+            "protect_native_colours": "8",
+            "smoothing_radius": "0",
+            "preserve_line_art": "on",
+        },
+    )
+    files = list((tmp_path / "palette_profiles").glob("*.json"))
+    assert [f.name for f in files] == [fork.name]  # still no second fork
+    assert json.loads(files[0].read_text(encoding="utf-8"))["edges"] == {
+        "preserve_line_art": True,
+        "smoothing_radius": 0,
+        "protect_native_colours": 8,
+    }

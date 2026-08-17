@@ -1648,6 +1648,13 @@
   z-index: 5;
 }
 .dx-save-bar[hidden] { display: none; }
+/* An inline Save inside a form that also owns a sticky save bar hands over
+   to the bar as soon as the form is dirty. ``data-dirty`` is set by
+   settings.js on the same event that reveals the bar, so the two never
+   overlap. Without this the bar's natural position renders a few pixels
+   below the inline button with the same label on it, which reads as the
+   page having drawn the button twice (#227). */
+form[data-dirty] .dx-inline-save { display: none; }
 .dx-save-bar-msg { font-size: 13px; }
 .dx-save-bar-actions {
   display: flex;

@@ -228,7 +228,11 @@ def devices_palette_update_tone(instance_id: str) -> Response:
         _write_device_slug(instance_id, forked_slug)
         flash(f"Forked {base.name!r} into an editable copy and applied it.", "ok")
         return _redirect_to_calibration(instance_id)
-    # Non-bundled: edit in place.
+    # Non-bundled: edit in place. Every group the tone form submits is
+    # written here, edges included; carrying ``base.edges`` through took the
+    # first value a bundled preset was forked with and then ignored every
+    # later one, so an edge slider could only be changed by resetting the
+    # device back to the preset and forking again (discussion #227).
     updated = PaletteProfile(
         slug=base.slug,
         name=base.name,
@@ -236,7 +240,7 @@ def devices_palette_update_tone(instance_id: str) -> Response:
         palette=base.palette,
         tone=new_tone,
         dither=new_dither,
-        edges=base.edges,
+        edges=new_edges,
         bundled=False,
         based_on=base.based_on,
         attribution=base.attribution,

@@ -4,6 +4,27 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.312.0], 2026-08-17
+
+### Fixed
+
+- **Edge-handling settings were discarded on every edit after the first.**
+  The tone editor forks a bundled preset on first tweak and edits the fork
+  in place afterwards. The fork path wrote the submitted edge settings; the
+  edit-in-place path wrote the *base profile's*, so "Protect the panel's own
+  colours", "Preserve line-art edges" and "Smoothing radius" took whatever
+  value they were forked with and then silently ignored every later change.
+  The only way to move one was to reset the display back to the bundled
+  preset and fork again. Tone and dither were unaffected, which is why the
+  editor looked like it was saving.
+
+- **The tone editor showed two identical Save buttons.** The inline button
+  and the sticky save bar are meant to be alternative affordances, but the
+  bar is sticky rather than fixed, so its natural position is a few pixels
+  under the inline button and both were on screen together the moment a
+  slider moved. The inline button now hands over to the bar while the form
+  is dirty, so exactly one Save is visible at a time.
+
 ## [0.311.0], 2026-08-17
 
 ### Added

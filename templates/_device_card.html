@@ -1059,12 +1059,15 @@
               </div>
             </details>
 
-            {# Inline Save button, always visible in the form flow.
-               The sticky save bar below sits outside the form and
-               reveals when a slider is touched (associated via
-               ``form="..."``). Two clear affordances: scroll-and-click
-               inline, or use the sticky bar without scrolling. #}
-            <button type="submit" class="button primary">
+            {# Inline Save button, shown while the form is clean. The
+               sticky save bar below sits outside the form and takes over
+               the moment a slider is touched (associated via
+               ``form="..."``), so exactly one Save is on screen at a
+               time. Both were visible at once until v0.312.0, which read
+               as a duplicated button rather than two affordances: the bar
+               is sticky, so its natural position sits a few pixels under
+               the inline one and it only detaches on scroll (#227). #}
+            <button type="submit" class="button primary dx-inline-save">
               <i class="ph ph-floppy-disk" aria-hidden="true"></i>
               <span>{% if section.palette_profile_tone.bundled %}Fork &amp; save{% else %}Save tone{% endif %}</span>
             </button>
