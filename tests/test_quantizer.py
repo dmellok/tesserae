@@ -6,10 +6,13 @@ the firmware contract relies on."""
 
 from __future__ import annotations
 
+import io
+
 import numpy as np
 import pytest
 from PIL import Image
 
+from app import quantizer
 from app.quantizer import (
     BWRY_4_PALETTE,
     INKY_7COLOUR_PALETTE,
@@ -684,3 +687,106 @@ def test_fit_to_panel_without_exif_is_unchanged() -> None:
     img = Image.new("RGB", (100, 80), "white")
     out = fit_to_panel(img, target_w=100, target_h=80)
     assert out.size == (100, 80)
+
+
+# -- CircuitPython edge handling (discussion #227) ------------------------
+
+
+def _cp_source() -> bytes:
+    """A near-black noise field, the content this guard exists for.
+
+    Error diffusion against a six-colour palette can only spend its error
+    on saturated entries, so a dark sky picks up red / blue / green
+    speckle it has no business having. That is the artefact reported in
+    discussion #227."""
+    rng = np.random.default_rng(7)
+    sky = rng.integers(0, 26, size=(48, 64, 3), dtype=np.uint8)
+    buf = io.BytesIO()
+    Image.fromarray(sky).save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def _cp_indices(png: bytes, **edges: object) -> bytes:
+    settings: dict[str, object] = {}
+    if edges:
+        settings["_profile_edges"] = edges
+    return quantizer.circuitpython_indexed_image(
+        png, width=64, height=48, gamut="spectra_6", settings=settings
+    ).tobytes()
+
+
+def _speckle(indices: bytes) -> int:
+    """Pixels that landed on a saturated palette entry. On a near-black
+    source every one of these is diffused error rather than content."""
+    return sum(1 for i in indices if i not in (0, 1))
+
+
+def test_circuitpython_edge_defaults_are_byte_identical_to_no_profile() -> None:
+    """Every edge knob is a no-op at its default, so a device that has
+    never opened the Calibration tab's edge block keeps the exact file it
+    had before the wiring landed."""
+    png = _cp_source()
+    baseline = _cp_indices(png)
+    assert (
+        _cp_indices(
+            png,
+            protect_native_colours=0,
+            preserve_line_art=False,
+            smoothing_radius=0,
+        )
+        == baseline
+    )
+
+
+def test_circuitpython_protect_native_colours_clears_the_speckle() -> None:
+    """The guard reaches the CircuitPython path now (#227).
+
+    The tolerance has to be generous here in a way it isn't on the
+    calibrated ``.bin`` path: this pipeline quantises against the gamut's
+    NOMINAL palette, so panel black is (0, 0, 0) and a sky sitting at 0-25
+    is up to ~43 away from it, where the calibrated pre-pass would have
+    parked the same pixels right on top of the measured black."""
+    png = _cp_source()
+    baseline = _cp_indices(png)
+    assert _speckle(baseline) > 0, "fixture stopped producing the artefact"
+    guarded = _cp_indices(png, protect_native_colours=48)
+    assert _speckle(guarded) < _speckle(baseline) / 2
+
+
+def test_circuitpython_edge_settings_survive_a_non_dict_payload() -> None:
+    """``_profile_edges`` is renderer-supplied; a malformed one must not
+    take the render down."""
+    png = _cp_source()
+    assert (
+        _cp_indices(png)
+        == quantizer.circuitpython_indexed_image(
+            png,
+            width=64,
+            height=48,
+            gamut="spectra_6",
+            settings={"_profile_edges": "nonsense"},
+        ).tobytes()
+    )
+
+
+def test_circuitpython_smoothing_radius_reaches_the_pipeline() -> None:
+    png = _cp_source()
+    assert _cp_indices(png, smoothing_radius=2) != _cp_indices(png)
+
+
+def test_circuitpython_guard_keeps_the_palette_attached() -> None:
+    """The override reloads the index buffer in place; rebuilding the
+    image instead would hand back a default colour table and the saved
+    file would carry the wrong palette."""
+    img = quantizer.circuitpython_indexed_image(
+        _cp_source(),
+        width=64,
+        height=48,
+        gamut="spectra_6",
+        settings={"_profile_edges": {"protect_native_colours": 8}},
+    )
+    assert img.mode == "P"
+    palette = quantizer.palette_for_circuitpython_gamut("spectra_6")
+    assert palette is not None
+    flat = img.getpalette()[: len(palette) * 3]
+    assert flat == [channel for entry in palette for channel in entry]

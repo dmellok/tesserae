@@ -35,7 +35,9 @@ so it's 2-8x smaller than a naive 8-bit BMP while still decoding on the
 same ``adafruit_imageload`` path (its unpacker is generic over bit depth).
 
 Same per-device settings as ``circuitpython_png``: a dither-mode select
-and a pre-dither contrast slider.
+and a pre-dither contrast slider. It shares that renderer's palette
+handling too, nominal palette per gamut, with the profile's edge knobs
+applied (discussion #227).
 """
 
 from __future__ import annotations

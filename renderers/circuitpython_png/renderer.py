@@ -32,8 +32,15 @@ indexed image rather than 8-bit RGB.
 
 Same per-device settings shape as ``trmnl_png``: a small select for
 the dither mode and a slider for pre-dither contrast. Calibrated
-palettes are deferred to a follow-up; v0.1.0 always uses the nominal
-palette so the wire format is deterministic per gamut.
+palettes are still deferred: the wire palette stays the gamut's nominal
+one so the format is deterministic per gamut, and switching it would
+repaint every existing client's panel.
+
+The palette profile's edge handling IS applied (discussion #227):
+smoothing, line-art preservation and the native-colour guard all reach
+this path, because they steer which palette entry a pixel lands on
+rather than changing the palette itself. All three are no-ops at their
+defaults, so an untouched device's file is unchanged.
 """
 
 from __future__ import annotations

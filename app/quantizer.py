@@ -27,6 +27,8 @@ from typing import Any, Literal, TypedDict
 import numpy as np
 from PIL import Image, ImageEnhance, ImageFilter, ImageOps
 
+from app.palette_profiles.schema import MAX_NATIVE_TOLERANCE
+
 # DitherMode covers both the Pillow-only callers and the numpy-backed ones.
 # pack_to_panel_bin dispatches on the full set; callers that don't own a
 # numpy implementation (Pillow's quantize) should validate against the
@@ -960,6 +962,21 @@ def circuitpython_indexed_image(
     The device paints what arrives: no on-device quantise, no dither, no
     nibble unpack. This is the shared pixel pipeline behind both the
     ``circuitpython_png`` and ``circuitpython_bmp`` renderers.
+
+    Edge handling (``_profile_edges``, discussion #227) is honoured here:
+    ``smoothing_radius`` before the dither, then ``preserve_line_art`` and
+    ``protect_native_colours`` as a nearest-colour overlay on top of it,
+    reusing the same helpers and the same semantics as the ``.bin``
+    packers. Every one of those is a no-op at its default, so a device
+    that has never touched the Calibration tab's edge block gets a
+    byte-identical file to before.
+
+    The rest of a palette profile is still not applied here: the palette
+    stays the gamut's nominal one and the tone / dither knobs are ignored,
+    both because the wire palette is a per-gamut contract with the client
+    and because changing it would repaint every existing CircuitPython
+    panel. Wiring those is the follow-up the module docstring has always
+    promised, and wants to be opt-in per device when it lands.
     """
     settings = settings or {}
     img: Image.Image = Image.open(io.BytesIO(png_bytes))
@@ -997,6 +1014,23 @@ def circuitpython_indexed_image(
         # physical bezel or mat covering the panel edge.
         img = underscan_image(img, underscan=underscan)
 
+    edges = settings.get("_profile_edges") or {}
+    if not isinstance(edges, dict):
+        edges = {}
+
+    def _edge_int(key: str, lo: int, hi: int) -> int:
+        try:
+            return max(lo, min(hi, int(edges.get(key, 0) or 0)))
+        except (TypeError, ValueError):
+            return 0
+
+    smoothing = _edge_int("smoothing_radius", 0, 3)
+    if smoothing:
+        # Same position in the order as the .bin packers: soften the source
+        # a hair before anything tonal, so error diffusion doesn't build a
+        # noisy tail along each antialiased letterform.
+        img = _apply_smoothing(img.convert("RGB"), smoothing)
+
     contrast = float(settings.get("contrast", _CIRCUITPYTHON_DEFAULTS["contrast"]))  # type: ignore[arg-type]
     if abs(contrast - 1.0) > 1e-6:
         # Pre-dither contrast push: bumping contrast forces more pixels to
@@ -1009,6 +1043,7 @@ def circuitpython_indexed_image(
         # rgb24 / rgb16: full-colour passthrough, no quantise or dither.
         return img.convert("RGB")
 
+    rgb = img.convert("RGB")
     pal_img = _palette_image(palette)
     dither_mode = _PIL_DITHER_MAP.get(
         str(settings.get("dither", _CIRCUITPYTHON_DEFAULTS["dither"])),
@@ -1017,7 +1052,39 @@ def circuitpython_indexed_image(
     # ``Image.quantize`` keeps palette mode ("P"), which is what we want:
     # the saved file carries an indexed pixel format adafruit_imageload
     # reads natively. Deliberately no ``.convert("RGB")`` afterwards.
-    return img.convert("RGB").quantize(palette=pal_img, dither=dither_mode)
+    quantised = rgb.quantize(palette=pal_img, dither=dither_mode)
+
+    # Nearest-colour overlay, identical in meaning to the .bin packers'.
+    # Pillow's dither can't be told to hold a region the way the numpy
+    # error-diffusion paths can, so this is the same post-hoc override the
+    # colour packer applies when it runs on Pillow's Floyd-Steinberg: take
+    # the nearest quantise of the same source and paste it over the
+    # protected pixels. Masks are computed against the palette actually in
+    # use, which here is the gamut's nominal one.
+    tolerance = _edge_int("protect_native_colours", 0, MAX_NATIVE_TOLERANCE)
+    extra_mask: np.ndarray | None = None
+    if edges.get("preserve_line_art"):
+        extra_mask = _line_art_mask(rgb)
+    if tolerance > 0:
+        native = _native_colour_mask(rgb, palette, tolerance)
+        extra_mask = native if extra_mask is None else (extra_mask | native)
+    if extra_mask is not None and extra_mask.any():
+        width_px, height_px = quantised.size
+        merged = _apply_nearest_override(
+            quantised.tobytes(),
+            rgb,
+            palette,
+            width=width_px,
+            height=height_px,
+            region_nearest_mask=None,
+            extra_mask=extra_mask,
+        )
+        # Load the merged indices back into the same image so the mode and
+        # the attached palette survive; rebuilding via ``Image.frombytes``
+        # would hand the caller a "P" image with a default palette and the
+        # saved file would carry the wrong colour table.
+        quantised.frombytes(merged)
+    return quantised
 
 
 # --- numpy-backed dither for the panel-bin packer ---------------------

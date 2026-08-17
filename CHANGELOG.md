@@ -6,6 +6,29 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [0.312.0], 2026-08-17
 
+### Added
+
+- **Edge handling now reaches CircuitPython clients.** The
+  `circuitpython_png` and `circuitpython_bmp` renderers quantise on the
+  server but read only fit, contrast and dither mode, so a palette
+  profile's "Protect the panel's own colours", "Preserve line-art edges"
+  and "Smoothing radius" were resolved, handed over, and dropped. All
+  three apply now, using the same helpers and the same meaning as the
+  `.bin` packers. Each is a no-op at its default, so a display that has
+  never opened that block gets a byte-identical file.
+
+  Tolerance behaves differently here and the difference is worth knowing.
+  This path quantises against the gamut's *nominal* palette, so panel
+  black is `#000000` rather than a measured `#1F2226`, and a photographic
+  near-black sky sits further from it than it would after the calibrated
+  pre-pass. Where the `.bin` path wants single digits on photo content,
+  this one wants 32 to 48 to catch the same pixels.
+
+  The calibrated palette itself is still not applied on this path: the
+  wire palette is a per-gamut contract with the client, and changing it
+  would repaint every existing CircuitPython panel. That stays a
+  follow-up, and wants to be opt-in per display when it lands.
+
 ### Fixed
 
 - **Edge-handling settings were discarded on every edit after the first.**
