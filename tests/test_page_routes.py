@@ -1250,8 +1250,10 @@ def test_multiselect_renders_accessible_reorder_handles(app: Flask) -> None:
 
 
 def test_multiselect_component_wires_mouse_touch_and_keyboard_reordering() -> None:
-    source = (Path(__file__).parents[1] / "static" / "components.js").read_text()
-    styles = (Path(__file__).parents[1] / "static" / "style" / "forms.css").read_text()
+    source = (Path(__file__).parents[1] / "static" / "components.js").read_text(encoding="utf-8")
+    styles = (Path(__file__).parents[1] / "static" / "style" / "forms.css").read_text(
+        encoding="utf-8"
+    )
 
     assert 'handle.addEventListener("dragstart"' in source
     assert 'list.addEventListener("drop"' in source

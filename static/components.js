@@ -224,12 +224,36 @@
         announce(row);
       }
 
+      // ``insertBefore`` on a row already in the list removes and re-inserts
+      // it, which blurs whatever was focused inside it. (That's the whole
+      // reason the DOM grew ``moveBefore``.) Without restoring focus an arrow
+      // key steps an entry exactly once before focus falls through to the
+      // page, and ticking a checkbox drops focus mid-list. Prefer the native
+      // move where it exists, and put focus back where it isn't.
+      const canMoveBefore = typeof Element.prototype.moveBefore === "function";
+      function place(row, before) {
+        if (!list || before === row) return;
+        if (canMoveBefore) {
+          try {
+            list.moveBefore(row, before);
+            return;
+          } catch {
+            // moveBefore throws if the node isn't already in this document;
+            // insertBefore below handles it.
+          }
+        }
+        const focused = document.activeElement;
+        const restore = focused && row.contains(focused) ? focused : null;
+        list.insertBefore(row, before);
+        if (restore && restore.isConnected) restore.focus();
+      }
+
       function partitionSelection() {
         if (!list) return;
         const ordered = rows();
         const checked = ordered.filter((row) => inputFor(row)?.checked);
         const unchecked = ordered.filter((row) => !inputFor(row)?.checked);
-        [...checked, ...unchecked].forEach((row) => list.insertBefore(row, emptyEl || null));
+        [...checked, ...unchecked].forEach((row) => place(row, emptyEl || null));
       }
 
       function beginDrag(row) {
@@ -247,7 +271,7 @@
           const rect = row.getBoundingClientRect();
           return clientY < rect.top + rect.height / 2;
         });
-        list.insertBefore(dragged, before || firstUnchecked());
+        place(dragged, before || firstUnchecked());
       }
 
       function finishDrag() {
@@ -272,7 +296,7 @@
         if (target === current) return;
         const reordered = selected.filter((item) => item !== row);
         reordered.splice(target, 0, row);
-        reordered.forEach((item) => list.insertBefore(item, firstUnchecked()));
+        reordered.forEach((item) => place(item, firstUnchecked()));
         emitOrderChange(row);
       }
 
