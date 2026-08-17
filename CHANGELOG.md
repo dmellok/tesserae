@@ -4,6 +4,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.312.1], 2026-08-17
+
+### Changed
+
+- **App-only Docker upgrades download much smaller changed layers.** System
+  packages and Python runtime dependencies are installed before the frequently
+  changing Tesserae source, and tagged builds can fall back to the `main` build
+  cache, so unchanged large layers can be reused when the cache is available.
+
 ## [0.312.0], 2026-08-17
 
 ### Added
