@@ -115,6 +115,9 @@ jobs:
           # + v* tag push firing together on a release) don't race on layer
           # blob writes. Without a scope, both runs write to the same cache
           # namespace and one gets "not_found" on layer blobs the other
-          # just cleaned up. Cache reuse within a ref stays intact.
-          cache-from: type=gha,scope=${{ github.ref_name }}
+          # just cleaned up. Tags also read main's cache so stable releases can
+          # reuse dependency layers from the edge build when GHA retains them.
+          cache-from: |
+            type=gha,scope=${{ github.ref_name }}
+            type=gha,scope=main
           cache-to: type=gha,mode=max,scope=${{ github.ref_name }}
