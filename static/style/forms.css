@@ -1738,15 +1738,23 @@ input[type="range"].slider:focus::-moz-range-thumb {
 }
 .multiselect-opt {
   display: flex;
+  align-items: stretch;
+  padding: 0;
+  font-size: var(--t-size-sm);
+  border-top: 1px solid var(--t-border);
+  position: relative;
+}
+.multiselect-choice {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: flex;
   align-items: center;
   gap: var(--t-space-2);
   padding: var(--t-space-2) var(--t-space-3);
   cursor: pointer;
-  font-size: var(--t-size-sm);
-  border-top: 1px solid var(--t-border);
   /* The hidden ``<input>`` inside uses ``position: absolute`` so the
      checkbox doesn't take up space in the row layout. Anchoring its
-     containing block to the option label means the auto-focus
+     containing block to this choice label means the auto-focus
      ``scrollIntoView`` the browser fires on click stays bounded to
      the option's own bounding rect, the click target is already in
      view, so no jump occurs. Without this the input's nearest
@@ -1768,7 +1776,7 @@ input[type="range"].slider:focus::-moz-range-thumb {
  *, so the page doesn't jump. ``pointer-events: none`` would defeat
  * this (clicks would skip the input), we WANT the click to land on
  * the input here, unlike older visually-hidden patterns. */
-.multiselect-opt input {
+.multiselect-choice input {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -1780,6 +1788,53 @@ input[type="range"].slider:focus::-moz-range-thumb {
   cursor: pointer;
 }
 .multiselect-opt:hover { background: var(--t-surface-soft); }
+.multiselect-drag {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 34px;
+  display: none;
+  place-items: center;
+  width: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--t-muted);
+  box-shadow: none;
+  transform: none;
+  cursor: grab;
+  touch-action: none;
+}
+.multiselect-opt:has(input:checked) .multiselect-drag { display: grid; }
+.multiselect-opt:has(input:checked) + .multiselect-opt:has(input:checked) {
+  border-top-color: transparent;
+}
+.multiselect.is-filtering .multiselect-drag { display: none; }
+.multiselect-drag:hover,
+.multiselect-drag:active,
+.multiselect-drag:focus-visible {
+  background: var(--t-surface-soft);
+  color: var(--t-fg);
+  box-shadow: none;
+  transform: none;
+}
+.multiselect-drag:focus-visible {
+  outline: 2px solid var(--t-accent);
+  outline-offset: -3px;
+}
+.multiselect-drag .ph {
+  display: block;
+  width: 12px;
+  height: 18px;
+  background: radial-gradient(circle, currentColor 1.5px, transparent 1.75px) 0 0 / 6px 6px;
+}
+.multiselect-drag .ph::before { content: none; }
+.multiselect-opt.is-dragging {
+  z-index: 1;
+  background: var(--t-accent-soft);
+  box-shadow: inset 0 0 0 2px var(--t-accent);
+}
+.multiselect-opt.is-dragging .multiselect-drag { cursor: grabbing; }
 .multiselect-tick {
   flex: 0 0 auto;
   display: grid;
@@ -1801,6 +1856,7 @@ input[type="range"].slider:focus::-moz-range-thumb {
 .multiselect-opt:has(input:checked) { background: var(--t-accent-soft); }
 .multiselect-label {
   min-width: 0;
+  flex: 1 1 auto;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

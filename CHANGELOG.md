@@ -4,6 +4,16 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [Unreleased]
+
+### Fixed
+
+- **Prioritised multi-select lists can actually be reordered.** Checked rows
+  now expose a drag handle that works with a mouse, touch, or pen, plus arrow,
+  Home, and End keys for precise accessible movement. The new DOM order is
+  submitted immediately, so priority-based widgets such as Album Art evaluate
+  Home Assistant entities in the order shown by the editor.
+
 ## [0.313.0], 2026-08-17
 
 ### Added
