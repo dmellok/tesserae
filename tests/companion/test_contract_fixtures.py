@@ -90,10 +90,11 @@ CASES = {
 
 def test_openapi_shape_and_operation_ids_are_stable() -> None:
     assert SPEC["openapi"] == "3.0.3"
-    assert SPEC["info"]["version"] == "0.13.0"
+    assert SPEC["info"]["version"] == "0.14.0"
     assert set(SPEC["paths"]) == {
         "/api/app/v1",
         "/api/app/v1/pair",
+        "/api/app/v1/device-pairings",
         "/api/app/v1/session",
         "/api/app/v1/personal-data/status",
         "/api/app/v1/personal-data/{source_id}",

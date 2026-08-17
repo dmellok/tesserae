@@ -4,6 +4,18 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [Unreleased]
+
+### Added
+
+- **Companion can securely register a physically nearby display during
+  Bluetooth setup.** Authenticated app sessions with `device_setup:write` may
+  mint a short-lived, single-use firmware registration code through
+  `POST /api/app/v1/device-pairings`. Firmware still redeems that code through
+  the existing device registration endpoint, so the app never receives a
+  display token. Existing Companion sessions require an explicit operator
+  grant; new pairings include the setup permission.
+
 ## [0.316.0], 2026-08-18
 
 ### Added
@@ -80,7 +92,6 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   Home Assistant entities in the order shown by the editor. Reordering keeps
   the handle focused across the move, so arrow keys step an entry more than
   once and ticking a row doesn't drop keyboard focus to the page.
-
 ## [0.313.0], 2026-08-17
 
 ### Added

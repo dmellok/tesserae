@@ -146,6 +146,7 @@ _REMINDER_PRIORITIES = frozenset(("none", "low", "medium", "high"))
 # assuming the full set, so unshipped surfaces degrade cleanly.
 FEATURES = (
     "devices",
+    "device_setup",
     "dashboards",
     "dashboard_push",
     "image_push",
@@ -208,6 +209,10 @@ def _tokens() -> CompanionTokenStore:
 
 def _companion_pairings() -> PairingStore:
     return current_app.config["COMPANION_PAIRING_STORE"]  # type: ignore[no-any-return]
+
+
+def _firmware_pairings() -> PairingStore:
+    return current_app.config["PAIRING_STORE"]  # type: ignore[no-any-return]
 
 
 def _devices() -> DeviceRegistry:
@@ -549,6 +554,21 @@ def pair() -> Any:
         "instance": _instance(),
     }
     return jsonify(payload), 201
+
+
+@bp.post("/device-pairings")
+@_require_companion("device_setup:write")
+def create_device_pairing() -> Any:
+    """Mint a registration code for one physically-nearby display.
+
+    Companion passes the code to firmware over its authenticated BLE setup
+    channel. Firmware still redeems it through ``POST /api/v1/device/register``,
+    so the app never receives a firmware access token and this route cannot
+    directly create a device.
+    """
+    record = _firmware_pairings().issue(note=f"Companion: {g.companion.name}"[:64])
+    expires_at = datetime.fromtimestamp(record.expires_at, UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return jsonify({"code": record.code, "expires_at": expires_at}), 201
 
 
 @bp.get("/session")
