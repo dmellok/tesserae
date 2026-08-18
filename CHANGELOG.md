@@ -4,6 +4,24 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.316.0], 2026-08-18
+
+### Added
+
+- **A dashboard's settings open in the composer**, in the same slide-out the
+  source config uses, so the values it asks for can be changed without leaving
+  the canvas. The fields are the same ones the standalone settings page renders,
+  and saving re-reads the dashboard from the server rather than trusting the
+  editor's in-memory copy, so the rewritten element options show up immediately
+  instead of arriving as an "changed externally" prompt.
+
+### Fixed
+
+- **The Dashboards list stays aligned when a dashboard has settings.** The row's
+  actions are anchored to the right, so a button that only some rows carried
+  shifted Edit and Push sideways on those rows. Every row now reserves the slot
+  and only the rows with settings fill it.
+
 ## [0.315.1], 2026-08-18
 
 ### Fixed

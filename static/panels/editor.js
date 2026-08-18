@@ -2278,6 +2278,9 @@
     if (!overlay || !body) return;
     title.textContent = "Pick an icon";
     body.dataset.eid = ""; // Save just closes; selection is immediate
+    body.dataset.mode = "";
+    setDrawerSaveLabel("Save source");
+    setDrawerSaveHidden(false);
     body.innerHTML =
       '<input class="dinput wide" id="panels-icon-search" placeholder="Search icons…" style="width:100%;margin-bottom:8px" autocomplete="off">' +
       '<div class="icon-grid" id="panels-icon-grid"><div class="note" style="padding:10px">Loading…</div></div>';
@@ -2375,6 +2378,9 @@
     if (!overlay || !body) return;
     title.textContent = "Dashboard images";
     body.dataset.eid = "";
+    body.dataset.mode = "";
+    setDrawerSaveLabel("Save source");
+    setDrawerSaveHidden(false);
     body.innerHTML =
       '<div class="note" style="margin-bottom:8px;line-height:1.5">Images cached here live in this dashboard\'s own folder and are referenced by a local URL, so they don\'t break if the source goes away and aren\'t re-fetched every render. Deleted with the dashboard.</div>' +
       '<div style="display:flex;gap:6px;margin-bottom:6px">' +
@@ -2731,6 +2737,9 @@
     title.textContent = (w ? w.name : key) + " · configure";
     body.innerHTML = '<div class="note" style="padding:12px">Loading…</div>';
     body.dataset.eid = eid;
+    body.dataset.mode = "source";
+    setDrawerSaveLabel("Save source");
+    setDrawerSaveHidden(false);
     body.dataset.sidx = hasSidx ? String(srcIdx) : "";
     overlay.classList.add("open");
     fetch(S.cfg.sourceFormUrl, {
@@ -2764,9 +2773,111 @@
     var overlay = $("panels-drawer");
     if (overlay) overlay.classList.remove("open");
   }
+
+  // ---- dashboard settings drawer ---------------------------------------
+  //
+  // The values this dashboard asks whoever sets it up (#237), in the same
+  // slide-out the source config uses. The fields come from the server as the
+  // fragment the standalone settings page includes, so the two surfaces can't
+  // drift; the drawer only supplies the save.
+
+  function formValues(root) {
+    var form = new FormData();
+    root.querySelectorAll("input,select,textarea").forEach(function (node) {
+      if (!node.name) return;
+      if (node.type === "checkbox" || node.type === "radio") {
+        if (node.checked) form.append(node.name, node.value || "on");
+      } else if (node.tagName === "SELECT" && node.multiple) {
+        Array.prototype.forEach.call(node.selectedOptions, function (o) { form.append(node.name, o.value); });
+      } else {
+        form.append(node.name, node.value);
+      }
+    });
+    return form;
+  }
+
+  function openPageSettings() {
+    var overlay = $("panels-drawer"), body = $("panels-drawer-body"), title = $("panels-drawer-title");
+    if (!overlay || !body || !S.cfg.configureFormUrl) return;
+    // Settings writes rewrite element options server-side, and we re-hydrate
+    // from the response. Flush any pending local edit first so that re-hydrate
+    // can't drop something the user just did on the canvas.
+    if (S.dirty) saveNow();
+    title.textContent = "Dashboard settings";
+    body.dataset.eid = "";
+    body.dataset.sidx = "";
+    body.dataset.mode = "settings";
+    body.innerHTML = '<div class="note" style="padding:12px">Loading…</div>';
+    setDrawerSaveLabel("Save settings");
+    overlay.classList.add("open");
+    fetch(S.cfg.configureFormUrl)
+      .then(function (r) { return r.ok ? r.text() : Promise.reject(r.status); })
+      .then(function (html) {
+        if (body.dataset.mode !== "settings") return; // drawer moved on
+        body.innerHTML = html;
+        var tc = window.tesseraeComponents;
+        if (tc) {
+          if (tc.attachLocationSearch) tc.attachLocationSearch(body);
+          if (tc.attachSliders) tc.attachSliders(body);
+          if (tc.attachPresetNumbers) tc.attachPresetNumbers(body);
+          if (tc.attachMultiSelect) tc.attachMultiSelect(body);
+        }
+        var suggest = body.querySelector("[data-cfg-suggest]");
+        if (suggest) suggest.addEventListener("click", function (ev) {
+          ev.preventDefault();
+          suggestPageSettings(suggest.getAttribute("formaction"));
+        });
+        // Nothing to save until something is declared.
+        setDrawerSaveHidden(!body.querySelector("input,select,textarea"));
+      })
+      .catch(function () {
+        body.innerHTML = '<div class="note" style="padding:12px">Failed to load settings.</div>';
+      });
+  }
+
+  function suggestPageSettings(url) {
+    if (!url) return;
+    fetch(url, { method: "POST", headers: { Accept: "application/json" } })
+      .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+      .then(function () { openPageSettings(); })
+      .catch(function () { var s = $("panels-status"); if (s) s.textContent = "suggest failed"; });
+  }
+
+  function savePageSettings() {
+    var body = $("panels-drawer-body");
+    if (!body || !S.cfg.configureUrl) return;
+    fetch(S.cfg.configureUrl, {
+      method: "POST",
+      headers: { Accept: "application/json" },
+      body: formValues(body),
+    })
+      .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+      .then(function () {
+        // The write rewrote element options underneath us, so take the server's
+        // document rather than trusting the one in memory. This also refreshes
+        // S.rev, so the live-sync event our own write raises is a no-op instead
+        // of an "changed externally" banner.
+        closeConfig();
+        return fetch(S.cfg.docUrl)
+          .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+          .then(function (doc) { hydrateDoc(doc); var s = $("panels-status"); if (s) s.textContent = "saved"; });
+      })
+      .catch(function () { var s = $("panels-status"); if (s) s.textContent = "settings save failed"; });
+  }
+
+  function setDrawerSaveLabel(text) {
+    var btn = $("panels-drawer-save");
+    if (btn) btn.textContent = text;
+  }
+  function setDrawerSaveHidden(hidden) {
+    var btn = $("panels-drawer-save");
+    if (btn) btn.style.display = hidden ? "none" : "";
+  }
+
   function saveConfig() {
     var body = $("panels-drawer-body");
     if (!body) return;
+    if (body.dataset.mode === "settings") { savePageSettings(); return; }
     var e = byId(body.dataset.eid);
     if (!e) { closeConfig(); return; }
     var form = new FormData();
@@ -2934,6 +3045,9 @@
     if (!overlay || !body || !S.cfg.previewUrl) return;
     title.textContent = "Panel preview";
     body.dataset.eid = "";
+    body.dataset.mode = "";
+    setDrawerSaveLabel("Save source");
+    setDrawerSaveHidden(false);
     body.innerHTML = '<div class="note" style="padding:12px">Rendering at panel resolution…</div>';
     overlay.classList.add("open");
     fetch(S.cfg.saveUrl, {
@@ -3280,6 +3394,8 @@
       canvasId: root.dataset.canvasId,
       pagesUrl: root.dataset.pagesUrl,
       touchRegionsUrl: root.dataset.touchRegionsUrl,
+      configureFormUrl: root.dataset.configureFormUrl,
+      configureUrl: root.dataset.configureUrl,
     };
     // Canvas-management URLs derive from this editor's own path
     // (…/c/<id>), so they carry any ingress prefix for free.
@@ -3362,6 +3478,8 @@
     if (previewBtn) previewBtn.addEventListener("click", openPreview);
     var assetsBtn = $("panels-assets");
     if (assetsBtn) assetsBtn.addEventListener("click", openAssetsDrawer);
+    var settingsBtn = $("panels-settings");
+    if (settingsBtn) settingsBtn.addEventListener("click", openPageSettings);
     var saveBtn = $("panels-save-btn");
     if (saveBtn) saveBtn.addEventListener("click", saveNow);
     initThemeToggle();

@@ -127,7 +127,9 @@
        data-source-form-url="{{ url_for('panels.source_form') }}"
        data-source-options-url="{{ url_for('panels.source_options') }}"
        data-pages-url="{{ url_for('panels.pages_list') }}"
-       data-touch-regions-url="{{ url_for('panels.touch_regions', canvas_id=canvas_id) }}">
+       data-touch-regions-url="{{ url_for('panels.touch_regions', canvas_id=canvas_id) }}"
+       data-configure-form-url="{{ url_for('panels.configure_form', canvas_id=canvas_id) }}"
+       data-configure-url="{{ url_for('panels.configure', canvas_id=canvas_id) }}">
 
     <div class="tbar" style="grid-column:1/4">
       <a class="tbtn" href="{{ url_for('pages.index') }}" title="Back to Tesserae dashboards" id="panels-back"><i class="ph-bold ph-arrow-left"></i></a>
@@ -146,6 +148,7 @@
       <div class="tbtn" id="panels-touch" title="Show touch targets (renders headless and overlays the extracted regions)"><i class="ph-bold ph-hand-tap"></i></div>
       <div class="tbtn" id="panels-assets" title="Dashboard images: cache remote images or upload your own, referenced locally"><i class="ph-bold ph-images"></i></div>
       <div class="tbtn" id="panels-preview" title="Preview at panel resolution"><i class="ph-bold ph-image"></i></div>
+      <div class="tbtn" id="panels-settings" title="This dashboard's settings: the values it asks whoever sets it up"><i class="ph-bold ph-sliders-horizontal"></i></div>
       {% if templates_enabled %}
       <div class="tbtn" id="panels-share" title="Share as a community template"><i class="ph-bold ph-share-network"></i></div>
       {% endif %}

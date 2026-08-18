@@ -3256,6 +3256,17 @@ select.dx-input:hover {
 }
 .dx-btn-icon-only .ph { font-size: 14px; }
 
+/* Holds one icon-button of width in an actions strip whether or not the row
+   has that button. The strip is right-anchored, so a conditional button
+   otherwise shifts its shared siblings sideways on the rows that have it and
+   the strip stops lining up down the list. */
+.dx-action-slot {
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  display: flex;
+}
+
 /* When an icon-only sibling sits in the same actions row as text
    buttons (e.g. Edit + Push + Duplicate + Delete on the Dashboards
    list, or the equivalent on Devices / History), pin the text

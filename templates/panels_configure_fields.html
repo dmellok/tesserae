@@ -1,0 +1,28 @@
+{# The body of a canvas dashboard's settings surface (#237), shared by the
+   standalone page (panels_configure.html) and the composer's slide-out drawer
+   (panels.configure_form -> editor.js). Fields only: each host supplies its own
+   <form> and submit chrome, so the drawer can save over fetch while the page
+   posts normally.
+
+   The suggest button carries ``formaction`` rather than sitting in its own
+   form, so the page submits it natively and the drawer can read the URL off the
+   element instead of being told it separately. #}
+{% from "_components.html" import auto_field %}
+{% if inputs %}
+  {% for item in inputs %}
+    {{ auto_field('cfg-' ~ item.name, 'opt_' ~ item.name, specs[item.name],
+                  values.get(item.name, item.default)) }}
+  {% endfor %}
+{% else %}
+  <p class="note">A dashboard declares its settings as it is built, so whoever
+    inherits it can change the parts meant to be changed without hunting through
+    the composer. Nothing here declares any yet.</p>
+  <p class="note">Suggest settings reads the dashboard the way the Share flow
+    does: anything it would redact and ask an installer about (endpoints, request
+    headers, entity ids) becomes a setting here. Your existing declarations are
+    kept, so this only ever adds.</p>
+  <button type="submit" class="pbtn" data-cfg-suggest
+          formaction="{{ url_for('panels.configure_suggest', canvas_id=page.id) }}">
+    <i class="ph ph-magic-wand" aria-hidden="true"></i> Suggest settings
+  </button>
+{% endif %}

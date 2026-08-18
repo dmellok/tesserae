@@ -63,6 +63,10 @@
     justify-content: flex-start;
     flex-wrap: wrap;
   }
+  /* The strip is left-aligned and wrapping here, so nothing downstream of an
+     empty slot needs to hold position; reserving the width would just leave a
+     hole mid-strip. */
+  .dx-dashboard-row .dx-action-slot:empty { display: none; }
 }
 
 /* The dashboard name is a single-line truncation by default so a

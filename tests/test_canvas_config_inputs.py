@@ -14,6 +14,7 @@ locally and applied on install must land in the same place.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -221,6 +222,122 @@ def test_configure_404s_for_anything_that_is_not_a_canvas(app: Flask) -> None:
     assert client.get("/pages/canvas/c/gridpage/configure").status_code == 404
     assert client.get("/pages/canvas/c/nope/configure").status_code == 404
     assert client.post("/pages/canvas/c/gridpage/configure").status_code == 404
+
+
+# -- the dashboards list -------------------------------------------------
+
+
+def test_every_dashboard_row_reserves_the_settings_slot(app: Flask) -> None:
+    """The actions strip is right-anchored, so a button that appears only on the
+    rows that have settings shifts Edit and Push sideways on those rows and the
+    strip stops lining up down the list. Every row reserves the width; only the
+    rows with settings put a button in it."""
+    from app.state.page_store import Page
+
+    client = app.test_client()
+    _sign_in(client)
+    with_settings = _make_canvas(client, [_URL_INPUT])
+    # A second canvas: /pages/canvas/ reopens the newest, so mint this one.
+    without = client.post("/pages/canvas/new", data={"name": "Plain"}).location.rsplit("/", 1)[1]
+    client.post(f"/pages/canvas/c/{without}/save", json=_canvas_with_rest_source([]))
+    app.config["PAGE_STORE"].save(Page(id="gridpage", name="Grid", layout_kind="grid"))
+
+    body = client.get("/pages").get_data(as_text=True)
+    rows = body.count("dx-dashboard-row")
+    slots = body.count("dx-action-slot")
+
+    assert rows >= 3
+    assert slots == rows  # one per row, occupied or not
+    assert f"/pages/canvas/c/{with_settings}/configure" in body
+    assert f"/pages/canvas/c/{without}/configure" not in body
+    # Icon-only: a text label would make the slot's width depend on the label,
+    # which is the same alignment problem in a different guise.
+    link = re.search(rf'<a[^>]*{with_settings}/configure"[^>]*>.*?</a>', body, re.S)
+    assert link is not None
+    assert "dx-btn-icon-only" in link.group(0)
+    assert "<span" not in link.group(0)
+
+
+# -- the composer's drawer -----------------------------------------------
+
+
+def test_drawer_fragment_is_the_same_fields_as_the_page(app: Flask) -> None:
+    """The composer drawer and the standalone page share one fragment, so a
+    field added to one can't go missing from the other."""
+    client = app.test_client()
+    _sign_in(client)
+    canvas_id = _make_canvas(client, [_URL_INPUT])
+
+    fragment = client.get(f"/pages/canvas/c/{canvas_id}/configure/form")
+    page = client.get(f"/pages/canvas/c/{canvas_id}/configure")
+
+    assert fragment.status_code == 200
+    body = fragment.get_data(as_text=True)
+    assert 'name="opt_bin_api"' in body
+    assert "https://api.example.com/bins?postcode=3000" in body
+    # A fragment, not a document: the drawer supplies its own chrome.
+    assert "<html" not in body.lower()
+    assert 'name="opt_bin_api"' in page.get_data(as_text=True)
+
+
+def test_drawer_fragment_offers_suggest_when_nothing_is_declared(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    canvas_id = _make_canvas(client, [])
+
+    body = client.get(f"/pages/canvas/c/{canvas_id}/configure/form").get_data(as_text=True)
+
+    assert "data-cfg-suggest" in body
+    assert f"/pages/canvas/c/{canvas_id}/configure/suggest" in body
+
+
+def test_saving_from_the_drawer_acks_with_a_rev(app: Flask) -> None:
+    """The composer re-hydrates from this ack rather than trusting its in-memory
+    document, which the write has just invalidated."""
+    client = app.test_client()
+    _sign_in(client)
+    canvas_id = _make_canvas(client, [_URL_INPUT])
+    before = client.get(f"/pages/canvas/c/{canvas_id}/doc.json").get_json()["rev"]
+
+    resp = client.post(
+        f"/pages/canvas/c/{canvas_id}/configure",
+        data={"opt_bin_api": "https://api.example.com/bins?postcode=3121"},
+        headers={"Accept": "application/json"},
+    )
+
+    assert resp.status_code == 200
+    assert resp.get_json()["status"] == "ok"
+    assert resp.get_json()["rev"] != before
+    page = app.config["PAGE_STORE"].get(canvas_id)
+    assert page.canvas.els[0].sources[0].options["url"].endswith("3121")
+
+
+def test_a_browser_form_post_still_redirects(app: Flask) -> None:
+    """Only the fetch path opts into JSON; the standalone page must keep its
+    post-redirect-get."""
+    client = app.test_client()
+    _sign_in(client)
+    canvas_id = _make_canvas(client, [_URL_INPUT])
+
+    resp = client.post(
+        f"/pages/canvas/c/{canvas_id}/configure",
+        data={"opt_bin_api": "https://example.com/x"},
+        headers={"Accept": "text/html,application/xhtml+xml"},
+    )
+
+    assert resp.status_code == 302
+    assert resp.location.endswith(f"/pages/canvas/c/{canvas_id}/configure")
+
+
+def test_the_editor_exposes_the_settings_drawer(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    canvas_id = _make_canvas(client, [_URL_INPUT])
+
+    body = client.get(f"/pages/canvas/c/{canvas_id}").get_data(as_text=True)
+
+    assert 'id="panels-settings"' in body
+    assert "data-configure-form-url" in body and "data-configure-url" in body
 
 
 # -- read/apply symmetry -------------------------------------------------

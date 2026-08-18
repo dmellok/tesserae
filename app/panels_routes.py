@@ -748,6 +748,30 @@ def configure(canvas_id: str) -> Response | str:
     )
 
 
+@bp.get("/c/<canvas_id>/configure/form")
+def configure_form(canvas_id: str) -> Response:
+    """Just the settings fields, for the composer's slide-out drawer.
+
+    Same fragment the standalone page includes, so the two surfaces can't drift
+    apart; the drawer supplies its own save chrome."""
+    _guard()
+    page = _get_canvas(canvas_id)
+    if page is None or page.canvas is None:
+        abort(404)
+    from app import template_export
+
+    canvas = page.canvas.model_dump(mode="json")
+    declared = [item.model_dump(mode="json") for item in page.canvas.inputs]
+    html = render_template(
+        "panels_configure_fields.html",
+        page=page,
+        inputs=page.canvas.inputs,
+        specs={item.name: _input_field_spec(item) for item in page.canvas.inputs},
+        values=template_export.read_inputs(canvas, declared),
+    )
+    return current_app.response_class(html, mimetype="text/html")
+
+
 @bp.post("/c/<canvas_id>/configure")
 def configure_save(canvas_id: str) -> Response:
     """Write the submitted answers back through each input's declared targets.
@@ -783,6 +807,17 @@ def configure_save(canvas_id: str) -> Response:
     canvas["inputs"] = declared
     updated = page.model_copy(update={"canvas": CanvasLayout.model_validate(canvas)})
     _pages().save(_stamp(updated, "ui"))
+    return _configure_result(canvas_id, updated)
+
+
+def _configure_result(canvas_id: str, page: Page) -> Response:
+    """Redirect back to the settings page, or acknowledge to the drawer.
+
+    The composer saves over fetch and re-hydrates from the ack's rev, so it sees
+    the rewritten options without the live-sync stream having to treat the
+    editor's own write as somebody else's edit."""
+    if request.accept_mimetypes.best == "application/json":
+        return jsonify({"status": "ok", "id": canvas_id, "rev": _canvas_rev(page)})
     return redirect(url_for("panels.configure", canvas_id=canvas_id))
 
 
@@ -809,7 +844,7 @@ def configure_suggest(canvas_id: str) -> Response:
             data_root=current_app.config["DATA_ROOT"],
         )
     except template_export.ExportBlocked:
-        return redirect(url_for("panels.configure", canvas_id=canvas_id))
+        return _configure_result(canvas_id, page)
     existing = {item.name for item in page.canvas.inputs}
     merged = [item.model_dump(mode="json") for item in page.canvas.inputs]
     for suggested in result["inputs_suggested"]:
@@ -819,7 +854,7 @@ def configure_suggest(canvas_id: str) -> Response:
     canvas["inputs"] = merged
     updated = page.model_copy(update={"canvas": CanvasLayout.model_validate(canvas)})
     _pages().save(_stamp(updated, "ui"))
-    return redirect(url_for("panels.configure", canvas_id=canvas_id))
+    return _configure_result(canvas_id, updated)
 
 
 def _materialised_options(plugin: Any) -> list[dict[str, Any]]:

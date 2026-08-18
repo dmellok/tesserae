@@ -126,12 +126,6 @@
           <a class="dx-btn-primary-sm" href="{{ url_for('pages.edit', page_id=page.id) }}">
             <i class="ph ph-pencil-simple" aria-hidden="true"></i><span>Edit</span>
           </a>
-          {% if page.layout_kind == 'canvas' and page.canvas and page.canvas.inputs %}
-          <a class="dx-btn-ghost-sm" href="{{ url_for('panels.configure', canvas_id=page.id) }}"
-             title="Change this dashboard's own settings without opening the composer">
-            <i class="ph ph-sliders-horizontal" aria-hidden="true"></i><span>Settings</span>
-          </a>
-          {% endif %}
           <form method="post" action="{{ url_for('send.send_page') }}" class="form form--inline">
             <input type="hidden" name="page_id" value="{{ page.id }}">
             <input type="hidden" name="return_to" value="dashboards">
@@ -152,6 +146,21 @@
               <span>Push{% if _link_count > 1 %} to {{ _link_count }}{% endif %}</span>
             </button>
           </form>
+          {# A fixed-width slot rendered on EVERY row, not a button that appears
+             only where it applies. The actions strip is right-anchored (the row's
+             main link takes the free space), so anything conditional in here
+             shifts Edit and Push sideways on the rows that have it, and the two
+             actions every row shares stop lining up down the list. Only some
+             dashboards declare settings, so the slot holds the width and the
+             button moves in when there is one. #}
+          <span class="dx-action-slot">
+            {% if page.layout_kind == 'canvas' and page.canvas and page.canvas.inputs %}
+            <a class="dx-btn-ghost-sm dx-btn-icon-only" href="{{ url_for('panels.configure', canvas_id=page.id) }}"
+               title="This dashboard's own settings ({{ page.canvas.inputs|length }})" aria-label="Dashboard settings">
+              <i class="ph ph-sliders-horizontal" aria-hidden="true"></i>
+            </a>
+            {% endif %}
+          </span>
           <form method="post" action="{{ url_for('pages.duplicate', page_id=page.id) }}" class="form form--inline">
             <button type="submit" class="dx-btn-ghost-sm dx-btn-icon-only" title="Duplicate dashboard" aria-label="Duplicate">
               <i class="ph ph-copy" aria-hidden="true"></i>
