@@ -277,10 +277,38 @@ server URL.
      "registered": true,
      "device_token": "eyJ0eXAiOi…",
      "device_id": "circuitpython_kitchen",
+     "device_id_changed": false,
      "config": { "sleep_interval_s": 300 },
      "server_time": 1687000060
    }
    ```
+
+   **The returned `device_id` wins.** On this path the MAC is the
+   identity, so if it matches an instance registered under a different
+   id than the one you announced, you're handed the stored id and its
+   token, and your announced id is ignored. That's what lets a re-flashed
+   board whose settings were wiped re-acquire its token, but it means a
+   client that keeps using its own id afterwards is talking about a
+   device the server doesn't have. Adopt the returned value.
+
+   The claim response says which case you're in two ways (v0.318.0):
+   `device_id_changed` in the body, plus the same answer in headers so a
+   client can branch without parsing JSON:
+
+   ```http
+   X-Tesserae-Device-Id: circuitpython_kitchen
+   X-Tesserae-Device-Id-Changed: false
+   ```
+
+   Both headers are sent on every successful claim, so an absent header
+   means an older server rather than "nothing changed". When the id did
+   change, the body also carries `announced_device_id` (what you sent),
+   and the server logs the mismatch at WARNING so it's visible from the
+   operator's side too.
+
+   To move a device to a new id, delete it in Settings → Devices and pair
+   again. Announcing a new id does not rename the instance: the id is the
+   operator's, and pages, schedules, and bindings hang off it.
 5. Firmware saves the token, drops into the steady-state loop.
 
 ### B. 6-digit pairing code (fallback)

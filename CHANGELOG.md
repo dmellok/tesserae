@@ -4,6 +4,21 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.318.0], 2026-08-18
+
+### Added
+
+- **A `/discover` claim says when the server kept a different device id.** The MAC is the
+  identity on that path, so announcing a new `device_id` for an already-registered MAC hands
+  back the stored id and its token rather than renaming anything. That's what lets a re-flashed
+  board re-acquire, but the response never said so, and a client that missed the echoed id kept
+  talking about a device the server doesn't have. The claim response now carries
+  `device_id_changed` (plus `announced_device_id` when it did), sends
+  `X-Tesserae-Device-Id` / `X-Tesserae-Device-Id-Changed` headers so a client can branch without
+  parsing JSON, and logs the mismatch at WARNING. Still a `200`: the device is paired and its
+  token works. Both headers are sent on every claim, so an absent header means an older server
+  rather than "unchanged". (#239)
+
 ## [0.317.0], 2026-08-18
 
 ### Added

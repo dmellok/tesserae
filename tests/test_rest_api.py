@@ -1551,6 +1551,64 @@ def test_discover_returns_token_when_mac_matches_registered_instance(app: Flask)
     assert body["device_token"] == expected_token
     assert body["device_id"] == "claimed_pico"
     assert "config" in body
+    # Announced id matched the stored one, so nothing changed. The
+    # headers are still present, so a client can tell this apart from a
+    # server too old to report it.
+    assert body["device_id_changed"] is False
+    assert "announced_device_id" not in body
+    assert resp.headers["X-Tesserae-Device-Id"] == "claimed_pico"
+    assert resp.headers["X-Tesserae-Device-Id-Changed"] == "false"
+
+
+def test_discover_flags_a_device_id_the_server_did_not_keep(app: Flask) -> None:
+    """The MAC is the identity on this path, so announcing a different
+    device_id still claims the matched instance and returns the stored
+    id. That's deliberate (a re-flash with wiped settings re-acquires
+    this way), but the response has to say so, or a client keeps using
+    an id the server doesn't have and only notices by diffing the echo
+    (issue #239)."""
+    from app import device_service
+
+    result = device_service.create_instance(
+        devices=app.config["DEVICE_REGISTRY"],
+        renderers=app.config["RENDERER_REGISTRY"],
+        data_root=app.config["DEVICE_DATA_ROOT"],
+        instance_id="device_a",
+        kind_id="pico_bin_client",
+        mac="aa:bb:cc:dd:ee:ff",
+        transport="rest",
+    )
+    assert result.device is not None
+    expected_token = result.device.manifest["access_token"]
+
+    resp = app.test_client().post(
+        "/api/v1/device/discover",
+        headers={"Content-Type": "application/json"},
+        data=json.dumps(
+            {
+                "device_id": "device_b",
+                "kind": "pico_bin_client",
+                "mac": "aa:bb:cc:dd:ee:ff",
+            }
+        ),
+    )
+
+    # Still a success: the client is paired and the token works. An
+    # error here would strand the re-flash case this path exists for.
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["registered"] is True
+    assert body["device_token"] == expected_token
+    assert body["device_id"] == "device_a"
+    assert body["device_id_changed"] is True
+    assert body["announced_device_id"] == "device_b"
+    assert resp.headers["X-Tesserae-Device-Id"] == "device_a"
+    assert resp.headers["X-Tesserae-Device-Id-Changed"] == "true"
+
+    # The announced id is reported, not adopted: no second instance, and
+    # the matched one keeps its id.
+    assert app.config["DEVICE_REGISTRY"].get("device_b") is None
+    assert app.config["DEVICE_REGISTRY"].get("device_a") is not None
 
 
 def test_discover_rejects_missing_mac(app: Flask) -> None:

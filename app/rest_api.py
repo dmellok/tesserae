@@ -2472,16 +2472,44 @@ def _discover() -> Response:
             # button/touch reads as a duplicate.
             _reset_event_counter(claimed.id)
             current = _devices().get(claimed.id) or claimed
-            return jsonify(
-                {
-                    "status": 200,
-                    "registered": True,
-                    "device_token": token,
-                    "device_id": current.id,
-                    "config": _current_config(current),
-                    "server_time": int(time.time()),
-                }
-            )
+            # The MAC is this path's identity key, so a client that
+            # announces a different device_id than the one on the matched
+            # instance is handed the stored id and its token. That's
+            # deliberate (it's how a re-flash with wiped settings
+            # re-acquires), but nothing said so: the only tell was
+            # diffing the echoed device_id, and a client that missed it
+            # kept talking about an id the server doesn't have (#239).
+            # Say it in the body and in a header, so a client can branch
+            # on the header without reading the JSON at all.
+            changed = current.id != device_id
+            claim_payload: dict[str, Any] = {
+                "status": 200,
+                "registered": True,
+                "device_token": token,
+                "device_id": current.id,
+                "device_id_changed": changed,
+                "config": _current_config(current),
+                "server_time": int(time.time()),
+            }
+            if changed:
+                claim_payload["announced_device_id"] = device_id
+                logger.warning(
+                    "rest discover: mac %s matched device=%s but the client "
+                    "announced device_id=%s; returning the stored id. The "
+                    "client should adopt %s (or the device should be deleted "
+                    "and re-paired under the new id).",
+                    mac,
+                    current.id,
+                    device_id,
+                    current.id,
+                )
+            resp = jsonify(claim_payload)
+            # Always sent on a claim, so a client can tell "this server
+            # doesn't report it" (header absent) from "nothing changed"
+            # (header present, false).
+            resp.headers["X-Tesserae-Device-Id"] = current.id
+            resp.headers["X-Tesserae-Device-Id-Changed"] = "true" if changed else "false"
+            return resp
 
     # Not yet registered: add to the Discovered strip so admin can
     # one-click register. The transport hint lives in the body so the
