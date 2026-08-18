@@ -13,8 +13,9 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   mint a short-lived, single-use firmware registration code through
   `POST /api/app/v1/device-pairings`. Firmware still redeems that code through
   the existing device registration endpoint, so the app never receives a
-  display token. Existing Companion sessions require an explicit operator
-  grant; new pairings include the setup permission.
+  display token. Each Companion session keeps at most one unredeemed code;
+  requesting another invalidates the previous one. Existing Companion sessions
+  require an explicit operator grant; new pairings include the setup permission.
 
 ## [0.316.0], 2026-08-18
 

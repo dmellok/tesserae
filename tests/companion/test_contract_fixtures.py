@@ -128,6 +128,8 @@ def test_openapi_shape_and_operation_ids_are_stable() -> None:
         if method in {"get", "post", "put", "patch", "delete"}
     ]
     assert len(operation_ids) == len(set(operation_ids))
+    firmware_code = SPEC["components"]["schemas"]["FirmwareDevicePairing"]["properties"]["code"]
+    assert "writeOnly" not in firmware_code
 
 
 @pytest.mark.parametrize(("fixture_name", "schema_name"), CASES.items())

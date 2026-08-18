@@ -21,6 +21,24 @@ def test_issue_two_codes_returns_distinct_values() -> None:
     assert a.code != b.code
 
 
+def test_issue_replaces_the_same_owners_pending_code() -> None:
+    store = PairingStore()
+    first = store.issue(owner_key="companion:one")
+    second = store.issue(owner_key="companion:one")
+
+    assert first.code != second.code
+    assert store.consume(first.code) is None
+    assert [record.code for record in store.list_pending()] == [second.code]
+
+
+def test_issue_keeps_codes_from_different_owners() -> None:
+    store = PairingStore()
+    first = store.issue(owner_key="companion:one")
+    second = store.issue(owner_key="companion:two")
+
+    assert {record.code for record in store.list_pending()} == {first.code, second.code}
+
+
 def test_consume_succeeds_once_then_fails() -> None:
     store = PairingStore()
     record = store.issue()

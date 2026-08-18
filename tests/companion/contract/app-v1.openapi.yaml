@@ -80,6 +80,8 @@ paths:
         authenticated BLE; the display redeems it through the existing
         firmware registration endpoint. The code is single-use and never
         grants the Companion access to the resulting firmware credential.
+        Issuing another code invalidates any previous unredeemed code created
+        by the same Companion session.
       responses:
         "201":
           description: Firmware registration code created
@@ -1515,10 +1517,11 @@ components:
       required: [code, expires_at]
       properties:
         code:
-          description: Single-use code accepted by the firmware register endpoint
+          description: >-
+            Single-use code accepted by the firmware register endpoint. Treat
+            this response value as secret and do not write it to logs.
           type: string
           pattern: "^[0-9]{6}$"
-          writeOnly: true
         expires_at:
           type: string
           format: date-time

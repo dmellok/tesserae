@@ -566,7 +566,10 @@ def create_device_pairing() -> Any:
     so the app never receives a firmware access token and this route cannot
     directly create a device.
     """
-    record = _firmware_pairings().issue(note=f"Companion: {g.companion.name}"[:64])
+    record = _firmware_pairings().issue(
+        note=f"Companion: {g.companion.name}"[:64],
+        owner_key=f"companion:{g.companion.token_id}",
+    )
     expires_at = datetime.fromtimestamp(record.expires_at, UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     return jsonify({"code": record.code, "expires_at": expires_at}), 201
 
