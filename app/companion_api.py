@@ -570,8 +570,7 @@ def create_device_pairing() -> Any:
         note=f"Companion: {g.companion.name}"[:64],
         owner_key=f"companion:{g.companion.token_id}",
     )
-    expires_at = datetime.fromtimestamp(record.expires_at, UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-    return jsonify({"code": record.code, "expires_at": expires_at}), 201
+    return jsonify({"code": record.code, "expires_at": _iso(record.expires_at)}), 201
 
 
 @bp.get("/session")
