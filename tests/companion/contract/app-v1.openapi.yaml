@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Tesserae Companion API
-  version: 0.13.0
+  version: 0.14.0
   description: >-
     Companion API contract for community-built clients. Previews, History,
     resend, remote-image push, webpage push, and server-advertised image fit
@@ -69,6 +69,30 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "409":
           $ref: "#/components/responses/Conflict"
+  /api/app/v1/device-pairings:
+    post:
+      tags: [Pairing]
+      operationId: createFirmwareDevicePairing
+      summary: Mint a short-lived registration code for one nearby display
+      description: >-
+        Requires the device_setup feature and device_setup:write scope. The
+        Companion passes the returned code to a physically-nearby display over
+        authenticated BLE; the display redeems it through the existing
+        firmware registration endpoint. The code is single-use and never
+        grants the Companion access to the resulting firmware credential.
+        Issuing another code invalidates any previous unredeemed code created
+        by the same Companion session.
+      responses:
+        "201":
+          description: Firmware registration code created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FirmwareDevicePairing"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
   /api/app/v1/session:
     get:
       tags: [Pairing]
@@ -1275,6 +1299,7 @@ components:
             type: string
             enum:
               - devices
+              - device_setup
               - dashboards
               - dashboard_push
               - image_push
@@ -1444,6 +1469,7 @@ components:
             type: string
             enum:
               - devices:read
+              - device_setup:write
               - dashboards:read
               - push:write
               - media:write
@@ -1471,6 +1497,7 @@ components:
             type: string
             enum:
               - devices:read
+              - device_setup:write
               - dashboards:read
               - push:write
               - media:write
@@ -1484,6 +1511,20 @@ components:
         settings_url:
           description: Relative URL for this token's Companion permission settings
           type: string
+    FirmwareDevicePairing:
+      type: object
+      additionalProperties: false
+      required: [code, expires_at]
+      properties:
+        code:
+          description: >-
+            Single-use code accepted by the firmware register endpoint. Treat
+            this response value as secret and do not write it to logs.
+          type: string
+          pattern: "^[0-9]{6}$"
+        expires_at:
+          type: string
+          format: date-time
     Instance:
       type: object
       additionalProperties: false

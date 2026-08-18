@@ -120,6 +120,7 @@ def test_capabilities_probe_is_unauthenticated_and_valid(app: Flask) -> None:
     # covered in test_companion_previews.
     assert set(body["features"]) == {
         "devices",
+        "device_setup",
         "dashboards",
         "dashboard_push",
         "image_push",
@@ -181,6 +182,7 @@ def test_pair_exchanges_code_for_scoped_token(app: Flask) -> None:
     assert body["token"].startswith("tc_live_")
     assert set(body["scopes"]) == {
         "devices:read",
+        "device_setup:write",
         "dashboards:read",
         "push:write",
         "media:write",
@@ -235,6 +237,95 @@ def test_firmware_pairing_code_cannot_mint_a_companion_token(app: Flask) -> None
     resp = _pair(client, firmware_code)
     assert resp.status_code == 400
     assert resp.get_json()["error"]["code"] == "pairing_expired"
+
+
+def test_companion_can_mint_single_use_firmware_pairing_code(app: Flask) -> None:
+    token = _token(app)
+    resp = app.test_client().post(
+        "/api/app/v1/device-pairings",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 201
+    body = resp.get_json()
+    _validate(body, "FirmwareDevicePairing")
+    assert len(body["code"]) == 6
+
+    registered = app.test_client().post(
+        "/api/v1/device/register",
+        headers={"X-Pairing-Code": body["code"], "Content-Type": "application/json"},
+        data=json.dumps(
+            {
+                "device_id": "nearby-display",
+                "kind": "pico_bin_client",
+                "panel_w": 1600,
+                "panel_h": 1200,
+                "fw_version": "1.14.0",
+            }
+        ),
+    )
+    assert registered.status_code == 201
+
+    replay = app.test_client().post(
+        "/api/v1/device/register",
+        headers={"X-Pairing-Code": body["code"], "Content-Type": "application/json"},
+        data=json.dumps(
+            {
+                "device_id": "replay-display",
+                "kind": "pico_bin_client",
+                "panel_w": 1600,
+                "panel_h": 1200,
+                "fw_version": "1.14.0",
+            }
+        ),
+    )
+    assert replay.status_code == 403
+
+
+def test_companion_reissue_replaces_its_previous_firmware_pairing_code(app: Flask) -> None:
+    token = _token(app)
+    client = app.test_client()
+    headers = {"Authorization": f"Bearer {token}"}
+
+    first = client.post("/api/app/v1/device-pairings", headers=headers)
+    second = client.post("/api/app/v1/device-pairings", headers=headers)
+
+    assert first.status_code == 201
+    assert second.status_code == 201
+    first_code = first.get_json()["code"]
+    second_code = second.get_json()["code"]
+    assert first_code != second_code
+    assert app.config["PAIRING_STORE"].consume(first_code) is None
+    assert app.config["PAIRING_STORE"].consume(second_code) is not None
+
+
+def test_device_pairing_requires_dedicated_scope(app: Flask) -> None:
+    token = _token(app)
+    store = app.config["COMPANION_TOKENS"]
+    record = store.list_active()[0]
+    assert store.set_optional_scope(record.token_id, "device_setup:write", granted=False)
+
+    resp = app.test_client().post(
+        "/api/app/v1/device-pairings",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 403
+    assert resp.get_json()["error"]["code"] == "forbidden"
+
+
+def test_existing_pairing_does_not_gain_device_setup_scope_on_load(
+    app: Flask, tmp_path: Path
+) -> None:
+    from app.state.companion_token_store import CompanionTokenStore
+
+    _token(app)
+    path = tmp_path / "core" / "companion_tokens.json"
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    records = raw["tokens"] if isinstance(raw, dict) and "tokens" in raw else raw
+    records[0]["scopes"].remove("device_setup:write")
+    path.write_text(json.dumps(raw), encoding="utf-8")
+
+    reloaded = CompanionTokenStore(path).list_active()[0]
+    assert "device_setup:write" not in reloaded.scopes
 
 
 # -- read models ---------------------------------------------------------

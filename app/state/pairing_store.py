@@ -44,6 +44,7 @@ class PairingCode:
     issued_at: float
     expires_at: float
     note: str  # human-readable description ("for bedroom Pico"); admin UI only
+    owner_key: str | None = None  # opaque issuer identity; never shown in the UI
 
 
 class PairingStore:
@@ -57,13 +58,24 @@ class PairingStore:
         self._codes: dict[str, PairingCode] = {}
         self._lock = threading.Lock()
 
-    def issue(self, *, note: str = "") -> PairingCode:
+    def issue(self, *, note: str = "", owner_key: str | None = None) -> PairingCode:
         """Mint a fresh code. Returns the new PairingCode; the caller
         shows the ``code`` field to the admin so they can paste it
-        into firmware."""
+        into firmware.
+
+        When ``owner_key`` is supplied, a new code replaces that owner's
+        previous live code. This keeps automated issuers such as one paired
+        Companion session from filling the shared pending-code list while
+        preserving the admin UI's existing ability to issue multiple codes."""
         now = time.time()
         with self._lock:
             self._gc(now)
+            if owner_key is not None:
+                replaced = [
+                    code for code, record in self._codes.items() if record.owner_key == owner_key
+                ]
+                for code in replaced:
+                    self._codes.pop(code, None)
             for _ in range(64):
                 code = self._generate_code()
                 if code not in self._codes:
@@ -72,6 +84,7 @@ class PairingStore:
                         issued_at=now,
                         expires_at=now + self._ttl_s,
                         note=note,
+                        owner_key=owner_key,
                     )
                     self._codes[code] = record
                     return record

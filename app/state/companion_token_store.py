@@ -58,6 +58,11 @@ from typing import Any
 # grant instead (#207).
 COMPANION_SCOPES: tuple[str, ...] = (
     "devices:read",
+    # A newly paired app may mint a short-lived firmware registration code for
+    # a physically-nearby display. It never receives the resulting device
+    # credential. Existing pairings retain their saved scope set and must be
+    # granted this ability explicitly by an operator.
+    "device_setup:write",
     "dashboards:read",
     "push:write",
     "media:write",
@@ -73,16 +78,21 @@ COMPANION_SCOPES: tuple[str, ...] = (
     "gallery:write",
 )
 
-# Scopes an operator can grant to an existing pairing from Settings, on top
-# of the set above. Each one is here because it shouldn't arrive by default:
-# rewriting household scheduling is a different ask from pushing a picture,
-# and a client paired months ago shouldn't silently acquire it because the
-# server upgraded (#207).
+# Scopes an operator can toggle on an existing pairing from Settings. Most do
+# not arrive by default: rewriting household scheduling is a different ask
+# from pushing a picture, and a client paired months ago shouldn't silently
+# acquire it because the server upgraded (#207). ``device_setup:write`` is the
+# exception: new pairings include it so onboarding works immediately, while
+# listing it here lets an operator grant it to old pairings or revoke it.
 # ``offline_albums:write`` is here for the same reason: it changes what a
 # physical display does on its own, with the radio off, for hours at a
 # time, which is a stronger action than putting a photo in a library and a
 # different one from pushing a frame (#230).
-OPTIONAL_SCOPES: tuple[str, ...] = ("lineups:write", "offline_albums:write")
+OPTIONAL_SCOPES: tuple[str, ...] = (
+    "lineups:write",
+    "offline_albums:write",
+    "device_setup:write",
+)
 
 # Every scope this server recognises. A record carrying anything else was
 # either hand-edited or written by a newer build; it's dropped on load
@@ -267,9 +277,9 @@ class CompanionTokenStore:
         Takes effect on the client's next request; the bearer is unchanged,
         so the operator can hand an app a new ability without making the
         user re-pair, and take it back the same way. Only scopes in
-        ``OPTIONAL_SCOPES`` move: the pairing set isn't editable here,
-        because withdrawing it would leave a working app failing in ways
-        the operator didn't intend. Returns whether anything changed."""
+        ``OPTIONAL_SCOPES`` move. Most are additional grants; selected
+        security-sensitive defaults may also be listed so the operator can
+        withdraw them. Returns whether anything changed."""
         if scope not in OPTIONAL_SCOPES:
             return False
         with self._lock:
