@@ -651,10 +651,21 @@ Nothing in the protocol requires the post-paint order, and posting
 `/status` **before** `/frame` is a reasonable choice: the response
 carries `config`, `next_poll_s`, `server_time` / `local_time` and the
 `rotation` block, so you apply fresh config and sync your clock before
-the paint rather than after. Two beats per wake (one on connect, one
-just before deep sleep) is also fine; heartbeats arriving within 10
-seconds of each other are treated as the same wake event, so the second
-one doesn't disturb the smart-sync confidence counter.
+the paint rather than after.
+
+Two beats per wake (one on connect, one just before deep sleep) is
+supported, but mind the window: heartbeats arriving within **10 seconds**
+of each other are treated as the same wake event, and only then is the
+second one kept out of the smart-sync confidence counter. An e-ink paint
+often takes 15 to 30 seconds, so a pair straddling the paint falls
+outside that window, the second beat reads as a *new* wake, its offset
+against the standing prediction lands at roughly minus the whole sleep
+interval, and confidence resets on every cycle. Such a device never
+reaches trusted. If you can't keep both beats inside 10 seconds, send
+**one**, just before sleep, carrying `next_sleep_s`. That gets you the
+correct prediction anchor and the freshest readings in a single request;
+the cost is that `config` from the response applies on your next wake
+rather than the current one.
 
 What reordering does *not* do is make a device-reported value current
 in the image you paint. `/frame` doesn't render on demand, it hands
@@ -1353,6 +1364,14 @@ wake-prediction fields the device publishes in `/status`:
   server adds it to the receipt time.
 - Publish neither and the server predicts from the configured
   `sleep_interval_s`.
+
+Publishing is only worth it when your wake timing differs from that
+configured interval. A client that sleeps for exactly the `next_poll_s`
+it was handed gains nothing by echoing the value back, since the
+fallback already predicts from the same number. A client that wakes on
+its own schedule (a local time-table, irregular gaps, clock-aligned
+wakes) should publish, because there the server's fixed-interval
+assumption is simply wrong and no amount of observation will fix it.
 
 A device becomes *trusted* after three consecutive wakes landing within
 ±60s of prediction, at which point the scheduler JIT-renders
