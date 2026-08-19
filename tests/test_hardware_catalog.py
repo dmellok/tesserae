@@ -97,6 +97,53 @@ def test_bundled_hardware_loads_against_real_protocols(
     assert sku.manifest["vendor"] == "Seeed Studio"
 
 
+def test_xiao_75_c3_panel_is_its_own_kind_sharing_the_mono_wire_contract(
+    tmp_path: Path, device_schema_path: Path, hardware_schema_path: Path
+) -> None:
+    """Seeed's integrated XIAO 7.5" ePaper Panel (ESP32-C3 on board) is a
+    different product from the XIAO ePaper 7.5" (S3) DIY kit around the
+    same glass. It packs the identical 1-bpp frame, so it inherits
+    esp32_bw_client + esp32_bw_bin unchanged; it needs its own kind
+    because the kind id names the OTA lineage and the two firmware
+    images are not interchangeable.
+
+    Also pins the display names apart. A tester who picked the S3 kit
+    from the kind list for a C3 panel is what sent this SKU down the
+    wrong path in the first place, so "they read differently in the
+    picker" is the behaviour under test, not incidental copy."""
+    registry = device_loader.discover(
+        REPO_ROOT / "devices",
+        schema_path=device_schema_path,
+        data_root=tmp_path,
+        hardware_dir=REPO_ROOT / "hardware",
+        hardware_schema_path=hardware_schema_path,
+    )
+    assert registry.errors == []
+
+    c3 = registry.devices["xiao_epaper_panel_75_c3"]
+    s3 = registry.devices["xiao_epaper_75"]
+
+    # Distinct kinds, not an alias: the C3 must not resolve to the S3 kit.
+    assert c3.id != s3.id
+    assert c3.kind_of is None and s3.kind_of is None
+
+    # Same wire contract: same protocol, same renderer, same 48000-byte frame.
+    assert c3.manifest["_catalog_entry"]["protocol"] == "esp32_bw_client"
+    assert c3.manifest["renderers"] == s3.manifest["renderers"] == ["esp32_bw_bin"]
+    assert c3.panel is not None
+    assert (c3.panel["w"], c3.panel["h"]) == (800, 480)
+    assert c3.panel["gamut"] == "mono"
+    assert c3.panel["w"] * c3.panel["h"] // 8 == 48000
+
+    # Names have to be tellable apart at a glance in the kind picker.
+    # Three entries share this glass: the C3 panel on Tesserae firmware,
+    # the same C3 panel on TRMNL BYOS, and the S3 DIY kit.
+    names = {d.display_name for d in (c3, s3, registry.devices["seeed_xiao_75"])}
+    assert len(names) == 3, f"XIAO 7.5 kinds must not share a display name: {names}"
+    assert "(C3)" in c3.display_name
+    assert "S3" in s3.display_name
+
+
 def test_discover_validates_schema(tmp_path: Path, hardware_schema_path: Path) -> None:
     """A hardware entry missing a required field surfaces as a LoaderError
     with the field path in the message, not a crash."""

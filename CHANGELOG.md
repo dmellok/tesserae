@@ -4,6 +4,30 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.319.0], 2026-08-19
+
+### Added
+
+- **Hardware catalog entry for the Seeed XIAO 7.5" ePaper Panel (C3).** Seeed's integrated
+  7.5" panel with an ESP32-C3 on board, supported by device-firmware from v1.16.0. Registers as
+  `xiao_epaper_panel_75_c3` on the `esp32_bw_client` protocol with the `esp32_bw_bin` renderer,
+  unchanged: the frame is the same 48000-byte 1-bpp mono buffer the `xiao_epaper_75` kit and the
+  reTerminal E1001 already take. It needs its own kind rather than an alias because the kind id
+  names the OTA lineage and the two firmware images are not interchangeable. Panels running this
+  firmware could announce but not be registered, because nothing in the catalog matched the kind
+  they reported.
+
+### Changed
+
+- **The three XIAO 7.5" kinds now read differently in the kind picker.** Two separate products
+  share this glass, and a third entry covers one of them on TRMNL BYOS firmware, so the names
+  had converged to the point of being unpickable. They are now "XIAO 7.5" ePaper Panel (C3)"
+  (integrated, Tesserae firmware), "XIAO 7.5" ePaper Panel (C3, TRMNL BYOS)" (same hardware,
+  TRMNL firmware), and "XIAO ePaper 7.5" (S3, mono)" (the ESP32-S3 Plus driver board sold as
+  the TRMNL 7.5" OG DIY Kit). The S3 entry's product link pointed at the C3 panel's page and
+  now points at the kit it actually describes. Kind ids are unchanged, so existing devices are
+  unaffected.
+
 ## [0.318.0], 2026-08-18
 
 ### Added

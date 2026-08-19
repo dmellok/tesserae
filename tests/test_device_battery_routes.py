@@ -244,6 +244,77 @@ def test_topbar_battery_indicator_applies_per_device_offset(app: Flask) -> None:
     assert by_id["d_off"]["tone"] == "ok"
 
 
+def test_panel_with_no_battery_sense_reads_as_unknown_not_empty(app: Flask) -> None:
+    """The XIAO 7.5" C3 panel has no divider to any ADC pin, so it can
+    never report a real charge. Every battery surface has to read that
+    as "unknown" and stay out of the way: a panel rendered as 0% would
+    look permanently flat, and at 0% the low-battery frame overlay
+    would paint a warning chip on every single push, forever.
+
+    Absent ``battery_pct`` is the contract. A bare ``battery_mv: 0``
+    alongside it must not be back-derived into a percent either, which
+    is the one path that could turn "no sensor" into "empty"."""
+    from app.app_factory import _collect_battery_status
+    from app.battery_offset import apply_to_pct
+
+    class _FakeDevice:
+        def __init__(self, id_: str, name: str, manifest: dict) -> None:
+            self.id = id_
+            self.display_name = name
+            self.kind_of = "xiao_epaper_panel_75_c3"
+            self.manifest = manifest
+
+    class _FakeRegistry:
+        def __init__(self, devices: dict) -> None:
+            self.devices = devices
+
+    app.config["DEVICE_REGISTRY"] = _FakeRegistry({"c3": _FakeDevice("c3", "Hallway", {})})
+    app.config["DEVICE_STATUS"] = {
+        # What the panel actually sends: telemetry, no charge reading.
+        "c3": {"received_at": time.time(), "parsed": {"battery_mv": 0, "rssi": -58}},
+    }
+
+    with app.app_context():
+        assert _collect_battery_status(app) == [], (
+            "a panel with no battery sense must not appear in the topbar indicator"
+        )
+
+    # 0 mV with no reported percent stays None rather than collapsing to
+    # 0% off the LiPo curve.
+    assert apply_to_pct(None, 0, 0, raw_mv=0) is None
+
+    client = app.test_client()
+    _sign_in(client)
+    resp = client.get("/devices/battery")
+    assert resp.status_code == 200
+    assert "No battery history yet" in resp.get_data(as_text=True)
+
+    # And the low-battery frame overlay leaves the render untouched.
+    from app.push import PushManager
+
+    png = b"not-a-png"
+    host = _StubOverlayHost(app.config["DEVICE_STATUS"])
+    assert PushManager._overlay_low_battery_if_needed(host, png, "c3") is png
+
+
+class _StubOverlayHost:
+    """Minimal stand-in for PushManager's overlay dependencies: the
+    settings section it reads for the threshold, and the status cache
+    it reads the device's battery from."""
+
+    def __init__(self, status: dict) -> None:
+        self._status = status
+
+        class _Settings:
+            def get_section(self, _name: str) -> dict:
+                return {"low_battery_overlay": True, "low_battery_threshold": 15}
+
+        self._settings = _Settings()
+
+    def _device_status_fn(self) -> dict:
+        return self._status
+
+
 def test_clear_history_drops_every_sample_for_device(app: Flask, tmp_path: Path) -> None:
     """The Clear battery history button on each device card must wipe
     every sample for that device only, leaving other devices' history

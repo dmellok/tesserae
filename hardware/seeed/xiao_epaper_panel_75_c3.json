@@ -1,0 +1,25 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "xiao_epaper_panel_75_c3",
+  "name": "Seeed XIAO 7.5\" ePaper Panel (C3)",
+  "vendor": "Seeed Studio",
+  "url": "https://www.seeedstudio.com/XIAO-7-5-ePaper-Panel-p-6416.html",
+  "icon": "device-tablet",
+  "description": "Seeed's integrated XIAO 7.5 inch ePaper Panel, ESP32-C3 on-board (800x480 mono). Speaks Tesserae's v1 REST device API and paints a raw 1-bpp mono buffer (48000 bytes) produced by the esp32_bw_bin renderer; byte-identical wire contract to xiao_epaper_75 and the Seeed reTerminal E1001. Distinct from the XIAO ePaper 7.5\" (S3) DIY kit, which is a different product around the same glass: the C3 unit has its own OTA lineage and its firmware image is not interchangeable. No battery telemetry (no divider to an ADC pin, so the panel reports no battery at all) and no user buttons beyond Boot and Reset.",
+  "protocol": "esp32_bw_client",
+  "panel": {
+    "w": 800,
+    "h": 480,
+    "orientation": "landscape",
+    "name": "7.5 inch monochrome ePaper (800x480)",
+    "gamut": "mono",
+    "native_w": 800,
+    "native_h": 480
+  },
+  "protocol_config": {
+    "model_header": "XIAO_ePaper_Panel_75"
+  },
+  "refresh_floor_s": 60,
+  "image_format": "bin",
+  "notes_md": "Firmware support landed in tesserae-device-firmware v1.16.0; community bring-up in progress, not yet confirmed by the maintainer on real hardware. Wire format is exactly 48000 bytes (800*480/8), MSB=leftmost pixel, bit-set=white, bit-clear=black; no header, no padding, no checksum. Frame is byte-identical to the `xiao_epaper_75` and `seeed_reterminal_e1001` targets, so validate cross-panel by pointing the same renderer output at any of them. Default device ids look like `xiao_epaper_panel_75_<mac-suffix>` (model string `XIAO_ePaper_Panel_75`). OTA-capable; descriptors are signed for this kind id, so a `xiao_epaper_75` descriptor will be rejected by the firmware and vice versa.\n\n**Not the same product as `xiao_epaper_75`.** That kind is the XIAO ePaper 7.5\" (S3) DIY kit: a XIAO ESP32-S3 Plus driver board plus the same 7.5 inch glass, sold as the TRMNL 7.5\" (OG) DIY Kit. This kind is the integrated panel with an ESP32-C3 on board. They pack identical frames but take different firmware images, so pick the one that matches the board you flashed. `seeed_xiao_75` is this same C3 hardware running TRMNL BYOS firmware instead of the Tesserae-native build.\n\n**No battery reporting.** The C3 panel has no divider to any ADC pin, so the firmware reports no battery reading. Tesserae treats an absent `battery_pct` as \"unknown\" rather than \"empty\": the topbar indicator, the /devices/battery dashboard, and the low-battery frame overlay all skip a device with no `battery_pct`, so this panel simply carries no battery UI. Firmware must OMIT `battery_pct` from the heartbeat rather than sending `0`; a literal `battery_pct: 0` would read as a flat cell and paint the low-battery chip on every frame. Sending `battery_mv: 0` alone is harmless server-side, though it does publish a permanent 0 mV \"Battery voltage\" sensor when Home Assistant discovery is enabled, so omitting both fields is cleanest.\n\n**No buttons.** Boot and Reset only, so there are no button-report mappings and no page-turn bindings for this kind. The protocol's `button_wake_s` config field is inherited from `esp32_bw_client` and has no effect here; leave it at 0. No Bluetooth setup path either, Wi-Fi provisioning only."
+}

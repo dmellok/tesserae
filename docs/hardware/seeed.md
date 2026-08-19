@@ -43,11 +43,19 @@ family is supported via the same unified firmware:
 | Model | Panel | Colour | Resolution |
 |---|---|---|---|
 | [XIAO ePaper EE02](https://www.seeedstudio.com/XIAO-ePaper-DIY-Kit-EE02-for-13-3-Spectratm-6-E-Ink.html) | 13.3" | Spectra 6 (6-colour) | 1200×1600 |
-| [XIAO 7.5" ePaper Panel](https://www.seeedstudio.com/XIAO-7-5-ePaper-Panel-p-6416.html) | 7.5" | Mono | 800×480 |
+| [XIAO 7.5" ePaper Panel](https://www.seeedstudio.com/XIAO-7-5-ePaper-Panel-p-6416.html) (C3, integrated) | 7.5" | Mono | 800×480 |
+| [TRMNL 7.5" (OG) DIY Kit](https://www.seeedstudio.com/TRMNL-7-5-Inch-OG-DIY-Kit-p-6481.html) (XIAO ESP32-S3 Plus) | 7.5" | Mono | 800×480 |
 
-The XIAO SKUs share panel families with the reTerminal E1004 and E1001
-respectively, so the wire format is proven; extending coverage to the
-rest of the XIAO ePaper range is on the roadmap.
+The last two are different products around the same glass and are not
+interchangeable at the firmware level, so they register as separate
+kinds (`xiao_epaper_panel_75_c3` and `xiao_epaper_75`). The integrated
+C3 panel reports no battery level; the hardware has no divider to an
+ADC pin, so Tesserae shows no battery for it rather than showing it as
+flat.
+
+The XIAO SKUs share panel families with the reTerminal E1004 (EE02) and
+E1001 (both 7.5" boards), so the wire format is proven; extending
+coverage to the rest of the XIAO ePaper range is on the roadmap.
 
 ## Getting started
 

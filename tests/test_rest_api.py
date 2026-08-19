@@ -1472,6 +1472,134 @@ def test_discover_endpoint_adds_to_discovery_cache(app: Flask) -> None:
     assert discovered["fresh_pico"].parsed.get("kind") == "pico_bin_client"
 
 
+def test_discover_under_an_unknown_kind_recovers_once_the_catalog_entry_lands(
+    app: Flask,
+) -> None:
+    """A panel whose firmware declares a kind the server has never heard
+    of (a SKU that shipped in firmware before its catalog entry did) is
+    still cached by /discover, because /discover deliberately doesn't
+    validate the kind. What fails is the admin's Register click, which
+    goes through create_instance and can't resolve the kind.
+
+    The recovery must not need a factory reset or a re-flash: once the
+    catalog entry exists, the SAME cached announce registers cleanly.
+    That's the path out for the XIAO 7.5" C3 panel, whose firmware
+    support (device-firmware v1.16.0) landed before this entry did.
+    """
+    client = app.test_client()
+    _sign_in(client)
+    devices = app.config["DEVICE_REGISTRY"]
+    kind_id = "xiao_epaper_panel_75_c3"
+    announce = {
+        "device_id": "xiao_epaper_panel_75_a1b2c3",
+        "kind": kind_id,
+        "panel_w": 800,
+        "panel_h": 480,
+        "fw_version": "1.16.0",
+        "mac": "aa:bb:cc:11:22:33",
+    }
+
+    # Rewind to the broken state: the firmware exists, the entry doesn't.
+    entry = devices.devices.pop(kind_id)
+
+    resp = client.post(
+        "/api/v1/device/discover",
+        headers={"Content-Type": "application/json"},
+        data=json.dumps(announce),
+    )
+    assert resp.status_code == 200
+    assert resp.get_json()["registered"] is False
+    cached = app.config["DISCOVERY_CACHE"].get(announce["device_id"])
+    assert cached is not None and cached.parsed.get("kind") == kind_id
+
+    # Admin clicks Register: this is where it dead-ends today.
+    blocked = client.post(
+        f"/settings/devices/discovery/{announce['device_id']}/register",
+        data={},
+        follow_redirects=True,
+    )
+    assert blocked.status_code == 200
+    assert devices.get(announce["device_id"]) is None
+    # The announce stays cached, so nothing is lost while the entry is missing.
+    assert app.config["DISCOVERY_CACHE"].get(announce["device_id"]) is not None
+
+    # Entry ships. No re-flash, no factory reset, no second announce:
+    # the cached row registers on the admin's next Register click.
+    devices.devices[kind_id] = entry
+    ok = client.post(
+        f"/settings/devices/discovery/{announce['device_id']}/register",
+        data={},
+        follow_redirects=True,
+    )
+    assert ok.status_code == 200
+    created = devices.get(announce["device_id"])
+    assert created is not None
+    assert created.kind_of == kind_id
+    assert created.manifest.get("transport") == "rest"
+    assert created.panel is not None
+    assert (created.panel["w"], created.panel["h"]) == (800, 480)
+
+
+def test_c3_panel_registered_against_the_s3_kit_heals_on_rediscover(app: Flask) -> None:
+    """The other way a tester gets unstuck while the entry is missing:
+    pick the visually-closest kind from the picker (the S3 DIY kit, same
+    glass, same frame) and carry on. That leaves the panel on the wrong
+    OTA lineage, so once the C3 entry lands the device has to move.
+
+    It does, via the same-protocol kind heal, keeping its id and token.
+    The heal fires on /discover and /register, NOT on the /status
+    heartbeat, so a device already holding a token only moves when it
+    re-announces (a reflash, a wiped NVS, or a firmware that
+    re-discovers on boot)."""
+    client = app.test_client()
+    _sign_in(client)
+    devices = app.config["DEVICE_REGISTRY"]
+    device_id = "study_xiao_c3"
+    mac = "aa:bb:cc:44:55:66"
+
+    code = _issue_pairing(app)
+    first = client.post(
+        "/api/v1/device/register",
+        headers={"X-Pairing-Code": code, "Content-Type": "application/json"},
+        data=json.dumps({"device_id": device_id, "kind": "xiao_epaper_75", "mac": mac}),
+    )
+    assert first.status_code == 201
+    token = first.get_json()["device_token"]
+
+    # A heartbeat is not a heal: /status leaves the kind alone even when
+    # the body declares one.
+    beat = client.post(
+        f"/api/v1/device/{device_id}/status",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        data=json.dumps({"kind": "xiao_epaper_panel_75_c3", "rssi": -60}),
+    )
+    assert beat.status_code == 200
+    assert devices.get(device_id).kind_of == "xiao_epaper_75"
+
+    # Re-announcing does heal it, and the identity survives.
+    resp = client.post(
+        "/api/v1/device/discover",
+        headers={"Content-Type": "application/json"},
+        data=json.dumps(
+            {
+                "device_id": device_id,
+                "kind": "xiao_epaper_panel_75_c3",
+                "fw_version": "1.16.0",
+                "mac": mac,
+            }
+        ),
+    )
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["registered"] is True
+    assert body["device_token"] == token
+
+    healed = devices.get(device_id)
+    assert healed is not None and healed.kind_of == "xiao_epaper_panel_75_c3"
+    assert healed.manifest.get("access_token") == token
+    assert len([d for d in devices.all() if d.kind_of is not None and d.id == device_id]) == 1
+
+
 def test_discover_endpoint_rejects_missing_device_id(app: Flask) -> None:
     client = app.test_client()
     resp = client.post(
