@@ -1162,7 +1162,52 @@ components:
           type: number
           minimum: 0
           maximum: 100
-        rssi_dbm:
+        battery_mv:
+          type: integer
+          description: |
+            Raw cell millivolts. When `battery_pct` is omitted the
+            server derives it from a linear LiPo curve (3300 mV = 0 %,
+            4200 mV = 100 %), so a client that only measures voltage
+            can send this alone.
+          example: 3850
+        rssi:
+          type: integer
+          description: |
+            Wi-Fi signal in dBm (negative). Named `rssi`, not
+            `rssi_dbm`; the latter is the Companion app API's
+            *response* field name and is not accepted here.
+          example: -72
+        ip:
+          type: string
+          example: 192.168.1.100
+        mac:
+          type: string
+        model:
+          type: string
+        temperature_c:
+          type: number
+          description: Optional ambient temperature, surfaced on the device card.
+        humidity_pct:
+          type: number
+          minimum: 0
+          maximum: 100
+          description: Optional relative humidity, surfaced on the device card.
+        sleep_until:
+          type: number
+          description: |
+            Absolute epoch seconds the device expects to wake at. Feeds
+            the smart-sync wake prediction; the most reliable way to
+            earn scheduler trust.
+          example: 1687000000.5
+        next_sleep_s:
+          type: integer
+          description: |
+            Seconds until the device sleeps, for firmware that can't
+            compute an absolute wake time. The server adds it to the
+            receipt time.
+        panel_w:
+          type: integer
+        panel_h:
           type: integer
         uptime_s:
           type: integer

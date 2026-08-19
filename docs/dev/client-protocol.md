@@ -589,8 +589,9 @@ Sleep and retry; admin needs to bind a dashboard.
 
 ### `POST /api/v1/device/<id>/status`
 
-Heartbeat. Send after every paint cycle (or on a fixed interval if
-always-on).
+Heartbeat. Send once per wake (or on a fixed interval if always-on).
+Either side of the paint works; see [when to send
+it](#when-to-send-the-heartbeat) below.
 
 **Headers**: same auth as `/frame`.
 
@@ -607,11 +608,73 @@ always-on).
 ```
 
 The server merges with the previous heartbeat so partial payloads
-preserve last-known fields. If `battery_mv` is sent but `battery_pct`
-isn't, the server derives `battery_pct` from a linear LiPo curve
-(3300 mV = 0 %, 4200 mV = 100 %). `sleep_until` / `next_sleep_s`
-feed the JIT scheduler (so smart-sync can render *just before*
-wake instead of on a fixed cadence).
+preserve last-known fields.
+
+#### Recognised fields
+
+Unknown fields are tolerated: they ride along in the parsed body and
+render as plain key/value rows on the device card, so sending extra
+costs nothing. These are the ones that actually drive something. None
+of them are device-kind-specific on the server; a kind's `parse_status`
+only decides type coercion, the consumers below key off the names.
+
+| Field | Type | What it drives |
+| --- | --- | --- |
+| `battery_pct` | number, 0-100 | Battery tile, battery history, HA sensor, `tesserae_status` widget |
+| `battery_mv` | int, mV | Same. Sent alone, the server derives `battery_pct` from a linear LiPo curve (3300 mV = 0 %, 4200 mV = 100 %) |
+| `rssi` | int, negative dBm | Signal tile, HA `signal_strength` sensor. **Not** `rssi_dbm`, which is the Companion app API's response field name |
+| `ip` | string | Firmware tile, HA IP address sensor |
+| `mac` / `model` | string | Device card |
+| `fw_version` | string | Device card; also the version the OTA rollout view compares against |
+| `temperature_c` | number, °C | Environment tile, `tesserae_status` widget |
+| `humidity_pct` | number, 0-100 | Same |
+| `sleep_until` | number, epoch seconds | Smart-sync wake prediction |
+| `next_sleep_s` | int | Same, for firmware that can't compute an absolute wake time |
+| `tz` | IANA name | Server resolves `local_time` / `tz_offset_seconds` / `dst_active` back to you |
+| `button` / `button_event_id` | string / uint | Button dispatch and dedup, see below |
+| `deck_page_id` | string | The deck page actually on glass, see [deck cache sync](#deck-cache-sync-on-device-frame-cache) |
+| `panel_w` / `panel_h` | int | Reported panel geometry |
+
+`voltage`, `uptime`, `uptime_s` and `last_paint` are recognised only in
+the sense that they're marked volatile, so a change in one of them
+alone doesn't write an event-log row on every beat. Nothing else
+interprets them.
+
+The capability blocks (`ota`, `deck`, `collection`, `overlay`, `proto`)
+are nested objects rather than scalar fields, and they're sticky: the
+server carries the last advertised value forward across beats that omit
+it, so you only need to send them once per boot.
+
+#### When to send the heartbeat
+
+Nothing in the protocol requires the post-paint order, and posting
+`/status` **before** `/frame` is a reasonable choice: the response
+carries `config`, `next_poll_s`, `server_time` / `local_time` and the
+`rotation` block, so you apply fresh config and sync your clock before
+the paint rather than after. Two beats per wake (one on connect, one
+just before deep sleep) is also fine; heartbeats arriving within 10
+seconds of each other are treated as the same wake event, so the second
+one doesn't disturb the smart-sync confidence counter.
+
+What reordering does *not* do is make a device-reported value current
+in the image you paint. `/frame` doesn't render on demand, it hands
+back the most recently rendered artefact for the device. The frame you
+paint on wake *N* was composed before wake *N*, from the heartbeat you
+sent on wake *N-1*, so a battery percentage baked into the image is one
+cycle old whichever side of the paint you report it from. To narrow
+that gap:
+
+- Publish `sleep_until` or `next_sleep_s` so smart sync JIT-renders
+  roughly `smart_sync_lead_s` before the predicted wake, rather than on
+  a fixed cadence unrelated to when the device is actually awake.
+- For genuinely live values, use the [hybrid render](#overlay-specs-hybrid-render-mode)
+  path: a device advertising the `overlay` capability gets an
+  `overlay_values` document on its `/status` response, computed *after*
+  that heartbeat is ingested, so a slot reflects the reading it just
+  posted. The device composites it over the frame locally.
+- Otherwise, draw device-local values (battery, signal) on-device from
+  what you already hold in RAM, rather than expecting them in the
+  server-composed frame.
 
 An optional `tz` field accepts an IANA name (e.g. `Europe/Berlin`)
 when the device knows its zone better than the server (mobile
@@ -1324,23 +1387,27 @@ A minimum-viable client, ignoring boot / pairing / retry:
 
 ```
 while True:
-    frame = GET /api/v1/device/<id>/frame  (with If-None-Match: <last_etag>)
-    if status == 304:
-        sleep next_poll_s  # nothing to paint
-        continue
-    if status == 204:
-        sleep 60  # admin hasn't bound a dashboard yet
-        continue
-    bytes = GET frame.url  (no auth)
-    paint(bytes, format=frame.format)
-    last_etag = frame.render_id
     status = POST /api/v1/device/<id>/status  {battery_pct, rssi, ip}
     apply_config(status.config)  # if changed
+    set_clock(status.server_time)  # if no battery-backed RTC
+
+    frame = GET /api/v1/device/<id>/frame  (with If-None-Match: <last_etag>)
+    if frame.code == 200:
+        bytes = GET frame.url  (no auth)
+        paint(bytes, format=frame.format)
+        last_etag = frame.render_id
+    # 304: nothing new to paint. 204: admin hasn't bound a dashboard yet.
+
     sleep status.next_poll_s
 ```
 
 That's the whole loop. Everything else (smart-sync, dithering hints,
 TLS, mDNS) is opt-in polish.
+
+The heartbeat leads here so config and clock are current before the
+paint, and so last-seen still ticks on a wake that 304s with nothing to
+paint. Posting it after the paint instead is equally valid; see [when
+to send the heartbeat](#when-to-send-the-heartbeat).
 
 ## Questions, edge cases, suggestions
 
