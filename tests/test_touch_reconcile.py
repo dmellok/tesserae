@@ -238,3 +238,130 @@ def test_debounce_window_tracks_capability(stores: dict[str, Any]) -> None:
     )
     assert svc._reconcile_debounce_seconds("kitchen") == pytest.approx(1.5)
     assert svc._reconcile_debounce_seconds("other") == pytest.approx(7.0)
+
+
+# -- webhook_refresh (#242) -----------------------------------------------
+
+
+def _webhook_region(spec: str) -> dict[str, Any]:
+    action, _, arg = spec.partition(":")
+    return {
+        "x": 0,
+        "y": 0,
+        "w": 400,
+        "h": 300,
+        "depth": 1,
+        "order": 0,
+        "tap": {"action": action, "arg": arg},
+        "swipe": None,
+        "slide": None,
+        "origin": "config",
+        "dangling": [],
+    }
+
+
+def _button_service_with_map(stores: dict[str, Any], pm: StubPushManager, spec: str):
+    stores["settings_store"].update_section("app", {"button_map": {"a": spec}})
+    return _service(stores, pm)
+
+
+def _press(svc: ButtonService) -> Any:
+    return svc.handle_button(device_id="kitchen", button="a", event_id=1)
+
+
+def test_webhook_refresh_fires_the_webhook_and_arms_a_reconcile(stores: dict[str, Any]) -> None:
+    """The whole point of #242: the panel catches up after the receiver
+    has had a chance to act on the POST."""
+    pm = StubPushManager(latest=_latest())
+    svc = _button_service_with_map(stores, pm, "webhook_refresh:https://example.test/book")
+    fired: list[tuple[str, dict[str, Any]]] = []
+    svc._fire_webhook_async = lambda url, payload: fired.append((url, payload))  # type: ignore[method-assign]
+    scheduled: list[str] = []
+    svc._spawn_reconcile = scheduled.append  # type: ignore[method-assign]
+
+    result = _press(svc)
+
+    assert [u for u, _ in fired] == ["https://example.test/book"]
+    assert scheduled == ["kitchen"]
+    assert result.push_result is None  # nothing pushed inside the wake
+
+
+def test_plain_webhook_still_does_not_reconcile(stores: dict[str, Any]) -> None:
+    """Existing `webhook:` buttons keep their fire-and-forget behaviour;
+    #242 must not start repainting panels nobody asked to repaint."""
+    pm = StubPushManager(latest=_latest())
+    svc = _button_service_with_map(stores, pm, "webhook:https://example.test/book")
+    fired: list[str] = []
+    svc._fire_webhook_async = lambda url, payload: fired.append(url)  # type: ignore[method-assign]
+    scheduled: list[str] = []
+    svc._spawn_reconcile = scheduled.append  # type: ignore[method-assign]
+
+    _press(svc)
+
+    assert fired == ["https://example.test/book"]
+    assert scheduled == []
+
+
+def test_webhook_refresh_waits_longer_than_the_normal_debounce(stores: dict[str, Any]) -> None:
+    """The delay floor is what gives the receiver time to commit. Without
+    it the reconcile would read pre-action state."""
+    stores["settings_store"].update_section(
+        "app", {"touch_repush_debounce_s": 0, "button_webhook_refresh_delay_s": 12}
+    )
+    pm = StubPushManager(latest=_latest())
+    svc = _service(stores, pm)
+    svc._spawn_reconcile = lambda device_id: None  # type: ignore[method-assign]
+
+    svc._schedule_reconcile("kitchen", min_delay_s=svc._webhook_refresh_delay_seconds())
+
+    assert svc._reconcile_min_delay["kitchen"] == 12.0
+
+
+def test_reconcile_delay_floor_is_a_max_not_a_replacement(stores: dict[str, Any]) -> None:
+    """A burst mixing an HA tap and a webhook_refresh waits for the longer
+    of the two, so the webhook's receiver still gets its grace period."""
+    pm = StubPushManager(latest=_latest())
+    svc = _service(stores, pm)
+    svc._spawn_reconcile = lambda device_id: None  # type: ignore[method-assign]
+
+    svc._schedule_reconcile("kitchen", min_delay_s=9.0)
+    svc._schedule_reconcile("kitchen")  # HA tap, no floor
+    svc._schedule_reconcile("kitchen", min_delay_s=4.0)
+
+    assert svc._reconcile_min_delay["kitchen"] == 9.0
+
+
+def test_worker_clears_the_delay_floor_when_it_drains(stores: dict[str, Any]) -> None:
+    """A leaked floor would slow every later reconcile on that device."""
+    stores["settings_store"].update_section("app", {"touch_repush_debounce_s": 0})
+    stores["rotation_store"].upsert(
+        Rotation(
+            id="rot",
+            name="Rot",
+            device_ids=["kitchen"],
+            steps=[RotationStep(page_id="morning", dwell_minutes=30)],
+        )
+    )
+    pm = StubPushManager(latest=_latest())
+    svc = _service(stores, pm)
+    svc._spawn_reconcile = lambda device_id: None  # type: ignore[method-assign]
+
+    svc._schedule_reconcile("kitchen", min_delay_s=0)
+    svc._reconcile_worker("kitchen")
+
+    assert svc._reconcile_min_delay == {}
+    assert svc._reconcile_last == {}
+
+
+def test_webhook_refresh_delay_default_when_unset(stores: dict[str, Any]) -> None:
+    pm = StubPushManager(latest=_latest())
+    svc = _service(stores, pm)
+    assert svc._webhook_refresh_delay_seconds() == 5.0
+
+
+def test_webhook_refresh_delay_rejects_a_bool(stores: dict[str, Any]) -> None:
+    """``True`` is an int in Python; a config typo must not become a 1s delay."""
+    stores["settings_store"].update_section("app", {"button_webhook_refresh_delay_s": True})
+    pm = StubPushManager(latest=_latest())
+    svc = _service(stores, pm)
+    assert svc._webhook_refresh_delay_seconds() == 5.0

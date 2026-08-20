@@ -4,6 +4,21 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.321.0], 2026-08-21
+
+### Added
+
+- **`webhook_refresh:<url>` button action (#242).** Fires the same POST as `webhook:`, then
+  re-renders and repaints the panel a few seconds later, for buttons whose webhook changes the
+  state the dashboard reads: book a room, toggle a door, file a ticket. Plain `webhook:` is
+  fire-and-forget and leaves the panel showing pre-action state until its next wake, which on a
+  deep-sleeping panel can be a long time. The repaint is deliberately delayed rather than
+  immediate: the POST carries no acknowledgement, so rendering inside the wake would usually read
+  the receiver's pre-action state and repaint the same frame. Default wait is 5 s, configurable
+  via `button_webhook_refresh_delay_s`; a burst of presses coalesces into one repaint. Existing
+  `webhook:` buttons are unchanged and still never repaint. Works in touch regions as well as
+  physical button maps, since both validate against the same action registry.
+
 ## [0.320.1], 2026-08-20
 
 ### Fixed

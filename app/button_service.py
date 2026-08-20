@@ -111,6 +111,18 @@ _HA_TIMEOUT_SECONDS = 5.0
 _PATCH_DEBOUNCE_SECONDS = 0.4
 _REPUSH_DEBOUNCE_SECONDS = 3.0
 
+# ``webhook_refresh`` reconcile delay (#242). Unlike the HA path, the
+# webhook POST is fire-and-forget: nothing tells us when the receiver has
+# committed, so reconciling on the usual debounce risks re-rendering
+# before the state the dashboard reads has actually changed. This floor
+# is applied on top of the normal debounce and is deliberately generous,
+# since only the operator knows their receiver's latency. Overridable via
+# ``settings.app.button_webhook_refresh_delay_s``.
+_WEBHOOK_REFRESH_DELAY_SECONDS = 5.0
+
+# Actions whose spec carries a webhook URL to fire.
+_WEBHOOK_ACTIONS = ("webhook", "webhook_refresh")
+
 
 def _spec_label(spec: str | dict[str, Any] | None) -> str | None:
     """A loggable string form of an action spec (dict specs serialise)."""
@@ -253,10 +265,15 @@ class ButtonService:
         # from it to pick the patch path over a full re-push.
         self._device_status = device_status
         # Post-action reconcile debounce state: device_id -> monotonic
-        # time of its last HA action. Presence of a key means a worker
+        # time of its last action. Presence of a key means a worker
         # thread is already draining that device.
         self._reconcile_lock = threading.Lock()
         self._reconcile_last: dict[str, float] = {}
+        # Per-device delay floor applied on top of the normal debounce,
+        # raised by actions that need to outwait an external system
+        # (``webhook_refresh``). Cleared with ``_reconcile_last``, so it
+        # never leaks into a later unrelated reconcile.
+        self._reconcile_min_delay: dict[str, float] = {}
 
     # ---- public API --------------------------------------------------
 
@@ -1337,9 +1354,24 @@ class ButtonService:
         """Note an HA action and make sure a reconcile worker is
         draining this device. Every call re-arms the debounce window, so
         a burst of taps produces one render after the burst ends."""
+        self._schedule_reconcile(device_id)
+
+    def _schedule_reconcile(self, device_id: str, *, min_delay_s: float = 0.0) -> None:
+        """Arm (or re-arm) the debounced reconcile for ``device_id``.
+
+        ``min_delay_s`` raises the floor on how long to wait after the
+        last action before rendering, for callers that have to outwait an
+        external system rather than just coalesce a tap burst. The floor
+        is a max, not a replacement: a burst mixing an HA tap and a
+        ``webhook_refresh`` waits for the longer of the two.
+        """
         with self._reconcile_lock:
             already_running = device_id in self._reconcile_last
             self._reconcile_last[device_id] = time.monotonic()
+            if min_delay_s > 0:
+                self._reconcile_min_delay[device_id] = max(
+                    self._reconcile_min_delay.get(device_id, 0.0), min_delay_s
+                )
         if not already_running:
             self._spawn_reconcile(device_id)
 
@@ -1361,6 +1393,8 @@ class ButtonService:
         try:
             while True:
                 debounce = self._reconcile_debounce_seconds(device_id)
+                with self._reconcile_lock:
+                    debounce = max(debounce, self._reconcile_min_delay.get(device_id, 0.0))
                 while True:
                     with self._reconcile_lock:
                         last = self._reconcile_last.get(device_id, 0.0)
@@ -1372,11 +1406,13 @@ class ButtonService:
                 with self._reconcile_lock:
                     if self._reconcile_last.get(device_id, last) == last:
                         self._reconcile_last.pop(device_id, None)
+                        self._reconcile_min_delay.pop(device_id, None)
                         return
         except Exception:
             log.exception("touch reconcile worker failed: device=%s", device_id)
             with self._reconcile_lock:
                 self._reconcile_last.pop(device_id, None)
+                self._reconcile_min_delay.pop(device_id, None)
 
     def _run_reconcile(self, device_id: str) -> None:
         """One reconcile pass: re-render the page the device is showing
@@ -1509,6 +1545,17 @@ class ButtonService:
         if isinstance(value, (int, float)) and value >= 0:
             return float(value)
         return default
+
+    def _webhook_refresh_delay_seconds(self) -> float:
+        """How long ``webhook_refresh`` waits before reconciling, so the
+        receiver has time to commit the change the dashboard reads."""
+        try:
+            value = self._settings.get_section("app").get("button_webhook_refresh_delay_s")
+        except Exception:
+            value = None
+        if isinstance(value, (int, float)) and not isinstance(value, bool) and value >= 0:
+            return float(value)
+        return _WEBHOOK_REFRESH_DELAY_SECONDS
 
     def _dispatch_spec(
         self,
@@ -1654,7 +1701,7 @@ class ButtonService:
         # doesn't block on external endpoints. ``dispatch`` has already
         # validated the URL shape (http(s), non-empty), so we just
         # extract the arg and hand it off to the daemon thread.
-        if action_name == "webhook" and action_arg:
+        if action_name in _WEBHOOK_ACTIONS and action_arg:
             payload: dict[str, object] = {
                 "device_id": device_id,
                 **origin_extra,
@@ -1667,6 +1714,14 @@ class ButtonService:
                 ),
             }
             self._fire_webhook_async(action_arg, payload)
+            if action_name == "webhook_refresh":
+                # #242: catch the panel up with whatever the webhook
+                # changed, off this wake. Delayed rather than immediate,
+                # because the POST is fire-and-forget and rendering now
+                # would likely read pre-action state.
+                self._schedule_reconcile(
+                    device_id, min_delay_s=self._webhook_refresh_delay_seconds()
+                )
 
         # ``fetch_latest`` serves an artefact that already exists, so there is
         # no PushResult carrying the composition thumbnail. Snapshot the
@@ -1716,7 +1771,7 @@ class ButtonService:
         # push, a fire-and-forget webhook (no push), or a rotate/refresh
         # that resolved to "nothing to do" (rare edge case, but worth
         # showing so the user sees the press wasn't lost).
-        if action_name == "webhook":
+        if action_name in _WEBHOOK_ACTIONS:
             status = "webhook_dispatched"
         elif result.force_download:
             status = "fetched"

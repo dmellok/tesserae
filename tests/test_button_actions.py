@@ -190,6 +190,36 @@ def test_webhook_non_http_scheme_raises() -> None:
         dispatch("webhook:ftp://example.com/x", _ctx())
 
 
+def test_webhook_refresh_keeps_the_url_intact() -> None:
+    """Splits on the first colon, so the scheme survives."""
+    result = dispatch("webhook_refresh:https://example.com/x?a=1", _ctx())
+    assert "https://example.com/x?a=1" in result.description
+
+
+def test_webhook_refresh_does_not_force_a_same_wake_render() -> None:
+    """#242 reconciles on a delay instead. Rendering inside the wake would
+    read the receiver's pre-action state, since the POST has no ack."""
+    result = dispatch("webhook_refresh:https://example.com/x", _ctx())
+    assert result.force_refresh is False
+    assert result.force_download is False
+    assert result.target_page_id is None
+
+
+def test_webhook_refresh_validates_the_url_like_webhook() -> None:
+    with pytest.raises(ButtonActionError):
+        dispatch("webhook_refresh:ftp://example.com/x", _ctx())
+    with pytest.raises(ButtonActionError):
+        dispatch("webhook_refresh", _ctx())
+
+
+def test_webhook_refresh_error_names_its_own_action() -> None:
+    """The message is what an operator sees when their button_map is
+    wrong, so it shouldn't tell them to fix a different action."""
+    with pytest.raises(ButtonActionError) as excinfo:
+        dispatch("webhook_refresh", _ctx())
+    assert "webhook_refresh:https://" in str(excinfo.value)
+
+
 # -- unknown actions -----------------------------------------------
 
 
@@ -235,6 +265,7 @@ def test_registered_actions_includes_defaults() -> None:
         "step",
         "page",
         "webhook",
+        "webhook_refresh",
     } <= names
 
 

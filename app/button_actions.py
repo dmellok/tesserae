@@ -236,24 +236,58 @@ def _page(ctx: ActionContext, arg: str | None) -> ActionResult:
     )
 
 
+def _validate_webhook_url(action_name: str, arg: str | None) -> str:
+    """Shared arg check for the webhook actions. Validating here means a
+    ``button_map`` holding a bad URL is rejected at dispatch time rather
+    than silently failing on a daemon thread at fire time."""
+    if arg is None or not arg:
+        raise ButtonActionError(
+            f"{action_name} action requires a URL, e.g. '{action_name}:https://…'"
+        )
+    if not (arg.startswith("http://") or arg.startswith("https://")):
+        raise ButtonActionError(f"webhook URL must be http(s): {arg!r}")
+    return arg
+
+
 def _webhook(_ctx: ActionContext, arg: str | None) -> ActionResult:
     """Stub for the webhook action.
 
     The real implementation lives in the caller (the button service)
     because it needs the HTTP client and the current request context.
-    Here we only validate the arg shape so ``button_map`` values with
-    a bad webhook URL are rejected at dispatch time rather than at
-    fire time.
+    Here we only validate the arg shape.
     """
-    if arg is None or not arg:
-        raise ButtonActionError("webhook action requires a URL, e.g. 'webhook:https://…'")
-    if not (arg.startswith("http://") or arg.startswith("https://")):
-        raise ButtonActionError(f"webhook URL must be http(s): {arg!r}")
+    url = _validate_webhook_url("webhook", arg)
     return ActionResult(
         new_step_index=_ctx.current_step_index,
         target_page_id=None,
         force_refresh=False,
-        description=f"webhook -> {arg}",
+        description=f"webhook -> {url}",
+    )
+
+
+def _webhook_refresh(_ctx: ActionContext, arg: str | None) -> ActionResult:
+    """``webhook`` plus a delayed re-render of whatever the panel is
+    showing (#242).
+
+    For buttons whose webhook mutates the state the dashboard reads: book
+    a meeting room, toggle a door, file a ticket. Plain ``webhook`` is
+    fire-and-forget and leaves the panel showing pre-action state until
+    its next wake, which on a deep-sleeping panel can be a long time.
+
+    ``force_refresh`` stays False deliberately. That would re-render
+    inside this wake, and the POST is fire-and-forget with no ack, so the
+    render would very likely read the receiver's *pre-action* state and
+    repaint the same frame with more conviction. The button service
+    instead schedules a delayed background reconcile, whose delay is
+    configurable because only the operator knows how long their receiver
+    takes to commit.
+    """
+    url = _validate_webhook_url("webhook_refresh", arg)
+    return ActionResult(
+        new_step_index=_ctx.current_step_index,
+        target_page_id=None,
+        force_refresh=False,
+        description=f"webhook_refresh -> {url}",
     )
 
 
@@ -266,6 +300,7 @@ register("fetch_latest", _fetch_latest)
 register("step", _step)
 register("page", _page)
 register("webhook", _webhook)
+register("webhook_refresh", _webhook_refresh)
 
 
 # ---- config defaults ----------------------------------------------

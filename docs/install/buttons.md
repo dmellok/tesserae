@@ -68,9 +68,33 @@ name (`rotate_next`) or `<action>:<arg>` (`page:morning_briefing`,
 | `step:<index>` | rotation step index (0-based) | Jump straight to that step in the rotation. |
 | `page:<page_id>` | dashboard page id | Push a specific dashboard to this device. Doesn't touch rotation state, so a later timer wake resumes the scheduled step. |
 | `webhook:<url>` | absolute `http(s)://` URL | Fire a POST to that URL with `{device_id, button, button_event_id, action_spec, timestamp, rotation_id, step_index, step_page_id}` in the body. Fire-and-forget, 3s timeout. |
+| `webhook_refresh:<url>` | absolute `http(s)://` URL | Same POST as `webhook:`, then re-render and repaint the panel a few seconds later. For buttons whose webhook changes the state the dashboard reads. |
 
 Adding a new action is a plugin hook (`app.button_actions.register`);
 third-party actions show up in the admin UI's help text automatically.
+
+### `webhook` vs `webhook_refresh`
+
+Use `webhook:` when the POST doesn't change anything on screen (log an
+event, ring a bell, start a job you'll see later). Use
+`webhook_refresh:` when it does: book a meeting room, toggle a door,
+file a ticket that the dashboard displays. Plain `webhook:` leaves the
+panel showing pre-action state until its next wake, which on a
+deep-sleeping panel can be a long time.
+
+The repaint is **delayed, not immediate**. The POST is fire-and-forget
+with no acknowledgement, so re-rendering straight away would usually
+read the receiver's *pre-action* state and repaint the same frame with
+more conviction. The default wait is 5 s; set
+`button_webhook_refresh_delay_s` in app settings if your receiver is
+slower. A burst of presses coalesces into one repaint after the last
+one.
+
+If you control the receiving server, calling
+[`POST /api/v1/push`](server.md#webhook-push) from it after the change commits is
+strictly better: it fires when the work is actually done rather than
+after a guessed delay. `webhook_refresh:` is for receivers you can't
+modify.
 
 ## Manual override sticks until the next anchor
 
