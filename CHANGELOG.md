@@ -4,6 +4,24 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.321.1], 2026-08-21
+
+### Fixed
+
+- **`webhook_refresh` was missing from the provenance gate.** `SIDE_EFFECTING_ACTIONS` still
+  listed only `webhook` and `ha`, so a `webhook_refresh:` spec coming from raw widget markup
+  passed the origin check that exists to stop markup aiming HTTP requests. Both the build-time
+  manifest filter and the dispatch-time gate read that set, so the hole was present on both
+  paths. Config-declared actions were always fine; only markup origin was affected.
+- **`webhook_refresh` was absent from the touch editor's action dropdown.** The tap/swipe picker
+  in `static/touch_interaction.js` carries its own hardcoded list rather than reading the action
+  registry, so the action could be set through a device's `button_map` or the API but not chosen
+  in the UI.
+- **`webhook_refresh` fell through to `nav` feedback classification**, so a tap on one showed
+  navigation affordance instead of the webhook one. Now classified alongside `webhook`.
+- Added to the MCP action vocabulary (`/api/mcp/actions/describe`), which previously documented
+  `webhook` alone.
+
 ## [0.321.0], 2026-08-21
 
 ### Added

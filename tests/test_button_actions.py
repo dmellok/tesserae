@@ -276,3 +276,25 @@ def test_default_button_map_covers_conventional_names() -> None:
     assert DEFAULT_BUTTON_MAP["left"] == "rotate_prev"
     assert DEFAULT_BUTTON_MAP["right"] == "rotate_next"
     assert DEFAULT_BUTTON_MAP["refresh"] == "refresh"
+
+
+# -- provenance gate (#242) ------------------------------------------
+
+
+def test_webhook_refresh_is_side_effecting() -> None:
+    """Widget markup must not be able to aim a POST. ``webhook_refresh``
+    carries the same URL as ``webhook``, so it needs the same gate;
+    omitting it would let any widget's HTML fire arbitrary requests."""
+    from app.touch_regions import SIDE_EFFECTING_ACTIONS, is_side_effecting
+
+    assert "webhook_refresh" in SIDE_EFFECTING_ACTIONS
+    assert is_side_effecting("webhook_refresh:https://example.com/x") is True
+
+
+def test_webhook_refresh_from_markup_origin_is_blocked() -> None:
+    """The gate is origin-sensitive: config-declared is fine, markup is not."""
+    from app.manifest import _dispatchable  # type: ignore[attr-defined]
+
+    spec = "webhook_refresh:https://example.com/x"
+    assert _dispatchable({"origin": "config"}, spec) is True
+    assert _dispatchable({"origin": "markup"}, spec) is False

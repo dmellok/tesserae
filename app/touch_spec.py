@@ -83,7 +83,7 @@ def classify_action(spec: str | dict[str, Any] | None) -> tuple[int, str]:
         return (0, "nav")
     if head == "ha":
         return (1, "ha")
-    if head == "webhook":
+    if head in ("webhook", "webhook_refresh"):
         return (2, "webhook")
     if text == "refresh":
         return (2, "refresh")

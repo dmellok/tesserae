@@ -2060,6 +2060,11 @@ _ACTION_STRING_DOCS: dict[str, str] = {
     "step": "jump to a rotation step by index, e.g. 'step:2' (0-based)",
     "page": "switch the device to a saved dashboard, e.g. 'page:kitchen'",
     "webhook": "fire an HTTP request, e.g. 'webhook:https://host/hook' (config origin only)",
+    "webhook_refresh": (
+        "fire an HTTP request, then re-render and repaint a few seconds later, e.g. "
+        "'webhook_refresh:https://host/hook'. Use when the request changes what the "
+        "dashboard displays (config origin only)"
+    ),
 }
 
 
