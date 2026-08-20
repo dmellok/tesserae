@@ -4,6 +4,18 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.321.2], 2026-08-21
+
+### Fixed
+
+- **Guards against the action-surface drift that caused the 0.321.1 fixes.** A button/touch
+  action has to be declared in four places (the registry, the touch editor's hardcoded picker,
+  the side-effecting set behind the provenance gate, and the feedback classifier), and missing
+  one failed silently. Missing the provenance-gate entry failed silently *and* opened a hole.
+  Tests now assert every registered action is offered in the picker, is explicitly classified as
+  side-effecting or safe, and has a feedback type, so a new action forces a decision on each
+  surface instead of inheriting a default.
+
 ## [0.321.1], 2026-08-21
 
 ### Fixed
