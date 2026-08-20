@@ -1358,11 +1358,8 @@ the next poll earlier.
   The device sees it on its next `/frame` poll: `200` + a new ETag,
   otherwise `304`.
 - Nothing wakes a sleeping device. A deep-sleeping REST panel is
-  unreachable between polls, so a scheduled change is only ever seen on
-  the device's own next wake. Set `sleep_interval_s` to the cadence you
-  actually want the panel to refresh at, and use schedules to decide
-  what lands on those wakes. A once-daily schedule against a 5-minute
-  poll means ~288 wakes/day, ~287 of them `304`.
+  unreachable between polls, so a change is only ever seen on the
+  device's own next wake.
 
 **Offline devices get only the last iteration.** The latest-frame slot
 holds one render per device with latest-wins coalescing; there is no
@@ -1395,8 +1392,33 @@ A device becomes *trusted* after three consecutive wakes landing within
 ±60s of prediction, at which point the scheduler JIT-renders
 `smart_sync_lead_s` (default 10s) before the predicted wake. Publishing
 `sleep_until` is the fastest, most reliable way to earn trust. Smart
-sync only improves render freshness; it never changes `next_poll_s` or
-wakes the device.
+sync only improves render freshness; it never wakes the device, and it
+doesn't feed `next_poll_s` (that's the projection above, a separate
+mechanism).
+
+### Sizing `sleep_interval_s`
+
+Treat it as a **backstop, not a cadence**. Because `next_poll_s` is
+pulled forward to bound schedules and rotation steps, a generous
+interval no longer means a stale panel: set it well above your schedule
+interval and the schedule drives the wakes, roughly one per content
+change rather than a fixed grid that's mostly `304`.
+
+Size it against what *can't* be projected: manual Send, webhooks, Home
+Assistant events, data-change refreshes. The interval is their only
+cover, so the question it answers is "how long am I willing to wait for
+a manual Send to appear". A dashboard with no schedule or rotation bound
+to it has nothing to project, and sleeps the full interval every time.
+
+| Setup | Reasonable interval | Why |
+| --- | --- | --- |
+| Hourly schedule, battery panel | 4-6 h | The projection wakes you on each fire; the interval only bounds manual Send |
+| 5-minute rotation | 30-60 min | Same, and the rotation steps dominate the wake count anyway |
+| No schedule or rotation | The staleness you'll accept | Nothing to project, so this *is* the refresh cadence |
+
+This inverts the advice that stood before v0.320.0, which was to set
+`sleep_interval_s` to the refresh cadence you wanted and accept the
+`304`s.
 
 ## Reference implementations
 

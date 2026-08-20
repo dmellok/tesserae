@@ -4,6 +4,17 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.320.1], 2026-08-20
+
+### Fixed
+
+- **Client-protocol guidance on sizing `sleep_interval_s` was left describing the old behaviour.**
+  It still advised setting the interval to the refresh cadence you wanted and accepting the
+  `304`s, which the projection work in 0.320.0 inverts: the interval is now a backstop, and
+  setting it well above the schedule interval lets the schedule drive the wakes. Replaced with a
+  sizing section covering what the ceiling actually covers (manual Send, webhooks, Home Assistant
+  events) and the case with no schedule bound at all, where it remains the refresh cadence.
+
 ## [0.320.0], 2026-08-20
 
 ### Changed
