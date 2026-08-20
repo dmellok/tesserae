@@ -1314,12 +1314,16 @@ def create_app(
         if device is None:
             abort(404)
 
-        # Default refresh: the same priority chain ``_next_poll_s`` uses
-        # in ``app/rest_api.py``, settings-store device override →
+        # Default refresh: the same priority chain ``_configured_poll_s``
+        # uses in ``app/rest_api.py``, settings-store device override →
         # kind's config_schema default → 60s fallback. We can't import
-        # ``_next_poll_s`` directly because it lives behind a blueprint
-        # ``current_app`` lookup pattern, the inline duplication is
-        # cheap and keeps the mirror endpoint independent.
+        # ``_configured_poll_s`` directly because it lives behind a
+        # blueprint ``current_app`` lookup pattern, the inline duplication
+        # is cheap and keeps the mirror endpoint independent.
+        #
+        # Deliberately the configured interval, not the projection-aware
+        # ``_next_poll_s``: this is a browser tab on mains power, so a
+        # steady grid beats chasing content changes.
         default_refresh = 60
         settings_store = app.config.get("SETTINGS_STORE")
         if settings_store is not None:

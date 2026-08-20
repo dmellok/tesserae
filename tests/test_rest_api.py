@@ -2271,3 +2271,154 @@ def test_empty_body_still_names_the_missing_field(app: Flask) -> None:
     resp = client.post("/api/v1/device/discover", headers={"Content-Type": "application/json"})
     assert resp.status_code == 400
     assert "device_id" in resp.get_json()["error"]
+
+
+# -- next_poll_s projection (#241) ---------------------------------------
+
+
+class _StubEvent:
+    """Minimal stand-in for ``app.device_upcoming.UpcomingEvent``; only the
+    two fields ``_projected_poll_s`` reads."""
+
+    def __init__(self, *, in_seconds: float, certainty: str = "scheduled") -> None:
+        from datetime import UTC, datetime, timedelta
+
+        self.scheduled_at = datetime.now(UTC) + timedelta(seconds=in_seconds)
+        self.certainty = certainty
+
+
+class _StubScheduler:
+    def __init__(self, events: list[Any] | None = None, *, boom: bool = False) -> None:
+        self._events = events or []
+        self._boom = boom
+        self.calls: list[dict[str, Any]] = []
+
+    def upcoming_for_device(self, device_id: str, **kwargs: Any) -> list[Any]:
+        self.calls.append({"device_id": device_id, **kwargs})
+        if self._boom:
+            raise RuntimeError("projection exploded")
+        return self._events
+
+
+def _paired_client(app: Flask, device_id: str = "poll_panel") -> tuple[Any, str]:
+    client = app.test_client()
+    _sign_in(client)
+    code = _issue_pairing(app)
+    resp = _register_via_api(client, code=code, device_id=device_id)
+    return client, resp.get_json()["device_token"]
+
+
+def _poll_after_status(app: Flask, client, token: str, device_id: str = "poll_panel") -> int:
+    resp = client.post(
+        f"/api/v1/device/{device_id}/status",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        data=json.dumps({"battery_pct": 80}),
+    )
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    return int(resp.get_json()["next_poll_s"])
+
+
+def _set_sleep_interval(app: Flask, device_id: str, seconds: int) -> None:
+    store = app.config["SETTINGS_STORE"]
+    section = store.get_section("devices") or {}
+    entry = dict(section.get(device_id) or {})
+    entry["sleep_interval_s"] = seconds
+    store.patch_section("devices", {device_id: entry})
+
+
+def test_next_poll_s_pulls_forward_to_a_projected_content_change(app: Flask) -> None:
+    """#241: a dashboard change 120 s out beats the 900 s configured grid,
+    plus the render margin so the client doesn't race the compose."""
+    client, token = _paired_client(app)
+    _set_sleep_interval(app, "poll_panel", 900)
+    app.config["SCHEDULER"] = _StubScheduler([_StubEvent(in_seconds=120)])
+
+    poll = _poll_after_status(app, client, token)
+    assert 130 <= poll <= 141  # 120 + 20 margin, minus a second of test latency
+
+
+def test_next_poll_s_never_exceeds_the_configured_interval(app: Flask) -> None:
+    """The configured interval is the staleness the operator signed up for,
+    and it's the only cover for manual Send / webhooks / HA events, none of
+    which are projectable. A distant change must not extend the sleep."""
+    client, token = _paired_client(app)
+    _set_sleep_interval(app, "poll_panel", 300)
+    app.config["SCHEDULER"] = _StubScheduler([_StubEvent(in_seconds=7200)])
+
+    assert _poll_after_status(app, client, token) == 300
+
+
+def test_next_poll_s_ignores_estimated_events(app: Flask) -> None:
+    """An ``estimated`` projection is the engine guessing at an unanchored
+    cadence; waking early for one trades a real wake for a maybe."""
+    client, token = _paired_client(app)
+    _set_sleep_interval(app, "poll_panel", 600)
+    app.config["SCHEDULER"] = _StubScheduler(
+        [_StubEvent(in_seconds=45, certainty="estimated")],
+    )
+
+    assert _poll_after_status(app, client, token) == 600
+
+
+def test_next_poll_s_takes_the_first_wake_worthy_event(app: Flask) -> None:
+    """Estimated events are skipped rather than terminating the search."""
+    client, token = _paired_client(app)
+    _set_sleep_interval(app, "poll_panel", 900)
+    app.config["SCHEDULER"] = _StubScheduler(
+        [
+            _StubEvent(in_seconds=45, certainty="estimated"),
+            _StubEvent(in_seconds=200, certainty="conditional"),
+        ],
+    )
+
+    assert 210 <= _poll_after_status(app, client, token) <= 221
+
+
+def test_next_poll_s_floors_an_imminent_change(app: Flask) -> None:
+    """A change one second away must not turn into a hot-poll instruction."""
+    client, token = _paired_client(app)
+    _set_sleep_interval(app, "poll_panel", 900)
+    app.config["SCHEDULER"] = _StubScheduler([_StubEvent(in_seconds=1)])
+
+    assert _poll_after_status(app, client, token) == 30
+
+
+def test_next_poll_s_floor_never_slows_a_hot_polling_panel(app: Flask) -> None:
+    """A panel deliberately configured below the floor keeps its cadence;
+    the floor is clamped by the configured interval, not applied over it."""
+    client, token = _paired_client(app)
+    _set_sleep_interval(app, "poll_panel", 10)
+    app.config["SCHEDULER"] = _StubScheduler([_StubEvent(in_seconds=1)])
+
+    assert _poll_after_status(app, client, token) == 10
+
+
+def test_next_poll_s_falls_back_when_the_projection_raises(app: Flask) -> None:
+    """A heartbeat is a hot device path; a projection fault must degrade to
+    the configured interval, not 500 the client."""
+    client, token = _paired_client(app)
+    _set_sleep_interval(app, "poll_panel", 240)
+    app.config["SCHEDULER"] = _StubScheduler(boom=True)
+
+    assert _poll_after_status(app, client, token) == 240
+
+
+def test_next_poll_s_without_a_scheduler_is_the_configured_interval(app: Flask) -> None:
+    """No scheduler (MQTT-only deployments, tests) means no projection."""
+    client, token = _paired_client(app)
+    _set_sleep_interval(app, "poll_panel", 120)
+    app.config["SCHEDULER"] = None
+
+    assert _poll_after_status(app, client, token) == 120
+
+
+def test_next_poll_s_only_projects_as_far_as_the_configured_interval(app: Flask) -> None:
+    """Anything past the ceiling is capped to it anyway, so the record walk
+    is bounded to the configured window rather than the 24 h default."""
+    client, token = _paired_client(app)
+    _set_sleep_interval(app, "poll_panel", 600)
+    sched = _StubScheduler([])
+    app.config["SCHEDULER"] = sched
+
+    _poll_after_status(app, client, token)
+    assert sched.calls[0]["hours"] == 1

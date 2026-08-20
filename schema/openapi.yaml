@@ -1261,7 +1261,15 @@ components:
           additionalProperties: true
         next_poll_s:
           type: integer
-          description: Suggested seconds until the next status POST.
+          description: |
+            Suggested seconds until the next status POST: "new content is
+            probably available then". The device's configured
+            `sleep_interval_s` is the ceiling; within it, the next
+            projected content change (a due schedule or rotation step)
+            pulls the value earlier, plus a margin so the client doesn't
+            race the render. Never extended past the configured interval,
+            since manual Send, webhooks and Home Assistant events can't be
+            projected.
           example: 60
         server_time:
           type: number

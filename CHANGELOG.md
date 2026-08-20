@@ -4,6 +4,29 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.320.0], 2026-08-20
+
+### Changed
+
+- **`next_poll_s` now means "new content is probably available then" (#241).** It previously
+  only ever echoed the device's configured `sleep_interval_s`, which knows nothing about when
+  the dashboard actually changes: a panel on a 15-minute grid against a 07:00 daily schedule
+  burned 95 wakes to catch one change, and could see it up to 15 minutes late. The REST status
+  path now consults the same projection engine that already backs the Companion API and the
+  scheduler, and pulls the returned value forward to the next due schedule or rotation step,
+  plus a margin so the client doesn't poll into the middle of the render. The configured
+  interval stays the ceiling and is never extended, since manual Send, webhooks, Home Assistant
+  events and data-change refreshes have no schedule to project. `estimated` projections are
+  ignored. Purely server-side: clients already honouring `next_poll_s` get the benefit with no
+  firmware change, and clients ignoring it are unaffected.
+
+### Fixed
+
+- **CircuitPython renderers marked as partially tested.** `circuitpython_bmp` is confirmed on
+  Pi-class hardware through the displayio PyGame emulation path; the compatibility matrix still
+  listed it as untested. Held short of Tested because the microcontroller route via
+  `adafruit_imageload` is unverified.
+
 ## [0.319.0], 2026-08-19
 
 ### Added

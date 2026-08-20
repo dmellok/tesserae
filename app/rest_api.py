@@ -398,12 +398,12 @@ def _parse_touch_query() -> TouchStroke | None:
     )
 
 
-def _next_poll_s(device: Device) -> int:
-    """How many seconds until the firmware should poll again. Reads
-    the configured ``sleep_interval_s`` from settings when present
-    (matches the MQTT-side config_topic value), then the schema
-    default, then a transport-wide 60 s fallback for kinds that
-    don't carry a sleep interval."""
+def _configured_poll_s(device: Device) -> int:
+    """The device's configured wake interval. Reads the stored
+    ``sleep_interval_s`` from settings when present (matches the
+    MQTT-side config_topic value), then the schema default, then a
+    transport-wide 60 s fallback for kinds that don't carry a sleep
+    interval."""
     section = _settings().get_section("devices") or {}
     stored = section.get(device.id) if isinstance(section, dict) else None
     if isinstance(stored, dict) and isinstance(stored.get("sleep_interval_s"), int):
@@ -413,6 +413,95 @@ def _next_poll_s(device: Device) -> int:
     if isinstance(spec, dict) and isinstance(spec.get("default"), int):
         return int(spec["default"])
     return 60
+
+
+# Seconds to add to a projected content change before telling the client to
+# poll. The scheduler fires at the projected instant and the render itself is
+# a browser compose plus a quantize, so a client polling at exactly that
+# moment races the render and collects the *previous* frame. A margin costs
+# nothing (the device is asleep for it) and turns a guaranteed miss into a
+# hit.
+_CONTENT_POLL_MARGIN_S: int = 20
+
+# Never ask a client to poll faster than this, however close the next change
+# is. Itself clamped by the configured interval below, so a deliberately
+# hot-polling panel (sleep_interval_s < this) isn't slowed down.
+_MIN_CONTENT_POLL_S: int = 30
+
+# Certainties worth waking for. ``estimated`` events are the engine's own
+# guess at an unanchored cadence, so waking early for one trades a real wake
+# for a maybe; the configured interval is the better answer there.
+_WAKE_WORTHY_CERTAINTIES = frozenset({"scheduled", "conditional"})
+
+
+def _projected_poll_s(device: Device, configured_s: int) -> int | None:
+    """Seconds until the device's next *projected content change*, plus the
+    render margin, or ``None`` when there's nothing to project.
+
+    ``next_poll_s`` is documented to the client as "new content is probably
+    available at" (discussion #190), but historically it only ever echoed the
+    configured interval, which knows nothing about when the dashboard
+    actually changes. The projection engine already answers that question for
+    the Companion API and the scheduler; this reads the same answer onto the
+    device REST path.
+
+    Only ever returns something *sooner* than ``configured_s``; the caller
+    keeps that as the ceiling. Manual Send, webhooks, Home Assistant events
+    and data-change refreshes have no schedule to project, so a device that
+    slept past its configured interval would go blind to all of them.
+    """
+    scheduler = current_app.config.get("SCHEDULER")
+    if scheduler is None:
+        return None
+
+    from datetime import UTC, datetime
+
+    from app.device_upcoming import MAX_HOURS
+    from app.quiet_hours import resolve_quiet_hours
+
+    now = datetime.now(UTC)
+    # Anything past the configured interval gets capped to it anyway, so
+    # there's no point walking the record set further than that.
+    hours = max(1, min(MAX_HOURS, -(-configured_s // 3600)))
+    quiet_window = resolve_quiet_hours(_settings().get_section("app") or {}, device)
+    events = scheduler.upcoming_for_device(
+        device.id,
+        now=now,
+        hours=hours,
+        limit=4,
+        quiet_window=quiet_window,
+    )
+    for event in events:
+        if event.certainty not in _WAKE_WORTHY_CERTAINTIES:
+            continue
+        delta = (event.scheduled_at - now).total_seconds()
+        if delta < 0:
+            continue
+        return int(delta) + _CONTENT_POLL_MARGIN_S
+    return None
+
+
+def _next_poll_s(device: Device) -> int:
+    """How many seconds until the firmware should poll again.
+
+    The configured wake interval is the ceiling: it's the staleness the
+    operator signed up for, and it's the only thing covering the update
+    causes that can't be projected. Within that, a projected content change
+    pulls the wake earlier so the client lands on the new frame instead of
+    on an arbitrary point of a fixed grid.
+    """
+    configured = _configured_poll_s(device)
+    try:
+        projected = _projected_poll_s(device, configured)
+    except Exception:
+        logger.exception("rest: next_poll_s projection failed for device=%s", device.id)
+        return configured
+    if projected is None:
+        return configured
+    # Ceiling: the configured interval. Floor: _MIN_CONTENT_POLL_S, itself
+    # capped by the configured interval so a hot-polling panel keeps its
+    # cadence.
+    return max(min(projected, configured), min(configured, _MIN_CONTENT_POLL_S))
 
 
 def _button_wake_s(device: Device) -> int:

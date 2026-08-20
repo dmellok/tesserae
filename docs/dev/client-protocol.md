@@ -756,8 +756,12 @@ above).
   `devices/<kind>/device.json`. Apply server-side as the source of
   truth; don't trust local cache after a server-initiated change.
 - `next_poll_s`: how long the firmware should sleep before the next
-  status POST. Resolves in priority order: device-instance settings →
-  kind-schema default → fallback 60.
+  status POST. Read it as *"new content is probably available then"*.
+  The device's configured interval (device-instance settings →
+  kind-schema default → fallback 60) is the ceiling; within it, a
+  projected content change pulls the value earlier so you land on the
+  new frame rather than on an arbitrary point of a fixed grid. See
+  [Scheduling and polling](#scheduling-and-polling).
 - `server_time`: Unix epoch **integer** (UTC, whole seconds). Useful
   for RTC sync on devices without a battery-backed clock. Sent as an
   integer, not a float: a MicroPython / CircuitPython client parses a
@@ -1327,13 +1331,27 @@ through here means a flat battery.
 
 ## Scheduling and polling
 
-Scheduling is orthogonal to the poll interval. A schedule or rotation
-never changes how often a device wakes; it only changes *what frame is
-waiting* the next time the device polls.
+A schedule or rotation cannot *wake* a device; it only changes what
+frame is waiting the next time the device polls. It can, however, pull
+the next poll earlier.
 
-- `next_poll_s` is only ever the device's `sleep_interval_s`
-  (device-instance setting → kind-schema default → 60s). A bound
-  schedule does not shorten or lengthen it.
+- `next_poll_s` is the device's configured `sleep_interval_s`
+  (device-instance setting → kind-schema default → 60s) **capped
+  against the next projected content change**. If a bound schedule or
+  rotation step is due in 2 minutes and the configured interval is 15,
+  you're told to come back in about 2 minutes, so you see the change on
+  the wake it happens rather than up to 15 minutes later.
+- The configured interval remains the ceiling. It's never extended,
+  because manual Send, webhooks, Home Assistant events and data-change
+  refreshes have no schedule to project, and a device sleeping past its
+  configured interval would go blind to all of them.
+- Only `scheduled` and `conditional` projections count. An `estimated`
+  one is the engine's own guess at an unanchored cadence, so it's left
+  alone rather than spending a wake on a maybe.
+- The returned value carries a small margin past the projected instant,
+  because the server renders *at* that instant and a browser compose
+  plus quantize isn't free. Polling at exactly the projected time would
+  race the render and collect the previous frame.
 - A schedule is a server-side push. When it fires, the server renders
   the target page and stores the result in that device's single
   latest-frame slot (`data/core/latest_renders.json`, latest-wins).
