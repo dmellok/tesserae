@@ -80,12 +80,32 @@ def cell_options(room: Room) -> dict[str, Any]:
     }
 
 
+def book_action(room: Room) -> str | None:
+    """The cell tap action that books this room, or None.
+
+    ``webhook_refresh`` fires the POST and then repaints once the
+    receiver has had time to commit, which is the whole reason a booking
+    shows up on the panel without waiting for the next wake.
+
+    The room id rides in the query string because the webhook payload
+    cannot carry it: it reports ``device_id`` and, only for a
+    rotation-bound page, the step's page id. A room panel is normally
+    bound directly, so a receiver serving several rooms would otherwise
+    have to reverse a device id back to a room. Appended rather than
+    templated, so the operator's own query string survives.
+    """
+    if not room.book_url:
+        return None
+    sep = "&" if "?" in room.book_url else "?"
+    return f"webhook_refresh:{room.book_url}{sep}room={room.id}"
+
+
 def build_page(room: Room, *, devices: Any = None, settings: Any = None) -> Page:
     """The page a room generates. Deterministic: same room, same page."""
     page_id = room.resolved_page_id()
     draft = Page(id=page_id, name=room.name, device_ids=list(room.device_ids))
     w, h = _panel_dims(draft, devices, settings)
-    on_tap = f"webhook_refresh:{room.book_url}" if room.book_url else None
+    on_tap = book_action(room)
     return Page(
         id=page_id,
         name=room.name,

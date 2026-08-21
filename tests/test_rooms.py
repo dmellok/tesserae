@@ -136,8 +136,35 @@ def test_book_url_becomes_a_cell_tap_action(pages: PageStore) -> None:
     """Booking is dispatched by the cell, because the provenance gate
     rejects a side-effecting action originating in widget markup."""
     page = rooms.build_page(_room(book_url="https://x.example/book"))
-    assert page.cells[0].on_tap == "webhook_refresh:https://x.example/book"
+    assert page.cells[0].on_tap == "webhook_refresh:https://x.example/book?room=kestrel"
     assert page.cells[0].options["show_book_action"] is True
+
+
+def test_book_action_names_the_room(pages: PageStore) -> None:
+    """The webhook payload reports device_id, and a page id only when the
+    page is rotation-bound. A room panel is bound directly, so without
+    this a receiver serving several rooms cannot tell which was tapped."""
+    assert rooms.book_action(_room()) is None
+    assert rooms.book_action(_room(book_url="https://x.example/b")) == (
+        "webhook_refresh:https://x.example/b?room=kestrel"
+    )
+
+
+def test_book_action_preserves_an_existing_query_string(pages: PageStore) -> None:
+    action = rooms.book_action(_room(book_url="https://x.example/b?src=panel"))
+    assert action == "webhook_refresh:https://x.example/b?src=panel&room=kestrel"
+
+
+def test_book_action_survives_the_action_parser(pages: PageStore) -> None:
+    """parse_action_spec splits on the first colon, so a URL with a scheme
+    and a query string has to come back intact."""
+    from app.button_actions import parse_action_spec
+
+    action = rooms.book_action(_room(book_url="https://x.example/b?src=panel"))
+    assert action is not None
+    name, arg = parse_action_spec(action)
+    assert name == "webhook_refresh"
+    assert arg == "https://x.example/b?src=panel&room=kestrel"
 
 
 def test_no_book_url_means_no_tap_and_no_button(pages: PageStore) -> None:

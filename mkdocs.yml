@@ -90,6 +90,7 @@ nav:
   - Install a client: install/clients.md
   - Set up a device: install/devices.md
   - Physical buttons: install/buttons.md
+  - Rooms: install/rooms.md
   - Touch interactions: install/touch.md
   - REST transport (no broker): install/rest-transport.md
   - Remote panel (cloud relay): install/remote-panel.md
