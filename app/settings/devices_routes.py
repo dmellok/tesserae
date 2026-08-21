@@ -444,6 +444,28 @@ def devices_reveal_token(instance_id: str) -> Response:
     return redirect_to
 
 
+def _reproject_wake(instance_id: str, values: dict[str, Any]) -> None:
+    """Re-derive the wake prediction after a sleep-interval edit (#246).
+
+    No-op when the device publishes its own wake time, when the interval
+    did not change, or when telemetry isn't wired.
+    """
+    raw = values.get("sleep_interval_s")
+    if raw in (None, ""):
+        return
+    try:
+        interval = int(raw)
+    except (TypeError, ValueError):
+        return
+    telemetry = current_app.config.get("DEVICE_TELEMETRY")
+    if telemetry is None:
+        return
+    try:
+        telemetry.reproject(instance_id, interval)
+    except Exception:
+        current_app.logger.exception("devices: wake reprojection failed for %s", instance_id)
+
+
 @bp.post("/settings/devices/kinds/<kind_id>/defaults")
 def devices_kind_defaults_save(kind_id: str) -> Response:
     """Persist a per-kind defaults override (issue #22). Whitelisted
@@ -1063,6 +1085,12 @@ def devices_update_combined(instance_id: str) -> Response:
                 flash(f"{device.name} config saved, publish failed: {exc}", "error")
                 ok_messages.append("config saved (publish failed)")
             any_change = True
+
+        # #246: the stored wake prediction was derived from the old
+        # interval, so without this the card reads "overdue" and the
+        # scheduler aims at a moment already past, until the device
+        # happens to wake.
+        _reproject_wake(instance_id, values)
 
     # 2. Picture-quality fields per renderer clone. Inputs are named
     # ``<clone_id>:<field>`` so a device with multiple renderers can

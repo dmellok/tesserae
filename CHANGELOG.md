@@ -4,6 +4,25 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.326.1], 2026-08-21
+
+### Fixed
+
+- **A device read as overdue after its sleep interval was changed (#246).** The wake prediction is
+  stored when a heartbeat arrives, derived from the interval configured at that moment. Editing the
+  interval afterwards left the old prediction in place, so a panel moved from 1 minute to 1 hour
+  looked overdue for the best part of an hour, and the scheduler aimed its smart-sync render at a
+  time already past. Saving a device now re-derives the prediction from its last heartbeat. A
+  firmware-published `sleep_until` / `next_sleep_s` is left alone, since the device's own statement
+  outranks a server setting; the telemetry entry records which of the two it holds. Confidence
+  resets on reprojection, because past on-time wakes say nothing about a cadence that just changed.
+
+- **Offline albums offered frames the device could not fetch (#247).** Frames are addressed by
+  digest, and a frame that failed to render carried an empty digest and measured zero bytes, so it
+  always fit the capacity budget and was always marked `cache: true`. The device was told to cache
+  something it had no way to request, cached nothing, and reported "0 of N frames cached" while the
+  server kept re-offering the same set. A frame with no digest is now never offered for caching.
+
 ## [0.326.0], 2026-08-21
 
 ### Added

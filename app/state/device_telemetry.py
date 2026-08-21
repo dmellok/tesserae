@@ -86,6 +86,12 @@ class DeviceTelemetry:
     predicted_next_wake_at: float | None = None
     consecutive_on_time_wakes: int = 0
     last_wake_offset_s: int | None = None  # actual - predicted, signed
+    # Where the prediction came from: "firmware" when the device published
+    # sleep_until / next_sleep_s, "configured" when it was derived from the
+    # device's sleep_interval_s setting. Only the configured kind may be
+    # re-derived when an operator edits that setting (#246); a firmware
+    # value is the device's own statement and outranks the config.
+    prediction_source: str | None = None
 
     @property
     def is_trusted(self) -> bool:
@@ -120,6 +126,44 @@ class TelemetryStore:
         self._load()
 
     # -- public read API -------------------------------------------------
+
+    def reproject(self, device_id: str, configured_sleep_s: int) -> DeviceTelemetry | None:
+        """Re-derive a config-derived prediction after the operator edits
+        the device's sleep interval (#246).
+
+        Without this the stored prediction keeps the old cadence until the
+        device next wakes, so moving a panel from 1 minute to 1 hour makes
+        it look overdue for the best part of an hour, and the scheduler
+        aims its JIT render at a time that has already passed.
+
+        A firmware-published wake time is left alone: the device's own
+        statement about when it will wake outranks a server-side setting,
+        and overwriting it would undo the accuracy smart sync exists for.
+        """
+        if configured_sleep_s <= 0:
+            return None
+        with self._lock:
+            prev = self._state.devices.get(device_id)
+            if prev is None or prev.last_heartbeat_at is None:
+                return None
+            if prev.prediction_source != "configured":
+                return None
+            if prev.last_sleep_interval_s == configured_sleep_s:
+                return None
+            entry = DeviceTelemetry(
+                device_id=device_id,
+                last_heartbeat_at=prev.last_heartbeat_at,
+                last_sleep_interval_s=configured_sleep_s,
+                predicted_next_wake_at=prev.last_heartbeat_at + configured_sleep_s,
+                # The cadence changed under it, so past on-time wakes say
+                # nothing about the new one. Earning trust starts again.
+                consecutive_on_time_wakes=0,
+                last_wake_offset_s=None,
+                prediction_source="configured",
+            )
+            self._state.devices[device_id] = entry
+            self._flush_locked()
+            return DeviceTelemetry(**entry.as_dict())
 
     def get(self, device_id: str) -> DeviceTelemetry | None:
         with self._lock:
@@ -227,22 +271,27 @@ class TelemetryStore:
 
             effective_interval: int | None
             predicted_wake: float | None
+            source: str | None
             if sleep_until is not None:
                 # Wake time is published directly; derive an effective
                 # interval for storage so the admin UI can show it.
                 effective_interval = max(0, round(sleep_until - received_at))
                 predicted_wake = sleep_until
+                source = "firmware"
             elif next_sleep_s is not None:
                 effective_interval = next_sleep_s
                 predicted_wake = received_at + next_sleep_s
+                source = "firmware"
             elif configured_sleep_s is not None:
                 effective_interval = configured_sleep_s
                 predicted_wake = received_at + configured_sleep_s
+                source = "configured"
             else:
                 # No clue about sleep timing; keep the previous interval
                 # (if any) for display, drop the prediction.
                 effective_interval = prev.last_sleep_interval_s
                 predicted_wake = None
+                source = None
 
             entry = DeviceTelemetry(
                 device_id=device_id,
@@ -251,6 +300,7 @@ class TelemetryStore:
                 predicted_next_wake_at=predicted_wake,
                 consecutive_on_time_wakes=consecutive,
                 last_wake_offset_s=offset_s,
+                prediction_source=source,
             )
             self._state.devices[device_id] = entry
             self._flush_locked()

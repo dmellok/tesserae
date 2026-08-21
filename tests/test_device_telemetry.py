@@ -313,3 +313,73 @@ def test_sleep_until_still_trusted_when_close_to_next_sleep_s(tmp_path: Path) ->
     )
     assert entry.predicted_next_wake_at == t0 + 605
     assert entry.last_sleep_interval_s == 605
+
+
+# -- reprojection after a config change (#246) ----------------------------
+
+
+def test_changing_the_interval_reprojects_a_configured_prediction(tmp_path) -> None:
+    """A device moved from 1 minute to 1 hour looked overdue for the best
+    part of an hour, because the stored prediction kept the old cadence
+    until the device next woke."""
+    from app.state.device_telemetry import TelemetryStore
+
+    store = TelemetryStore(tmp_path / "t.json")
+    store.record_heartbeat("panel", parsed={}, received_at=1000.0, configured_sleep_s=60)
+    before = store.get("panel")
+    assert before is not None and before.predicted_next_wake_at == 1060.0
+
+    after = store.reproject("panel", 3600)
+    assert after is not None
+    assert after.predicted_next_wake_at == 1000.0 + 3600
+    assert after.last_sleep_interval_s == 3600
+
+
+def test_reprojection_leaves_a_firmware_prediction_alone(tmp_path) -> None:
+    """The device's own statement about when it will wake outranks a
+    server-side setting; overwriting it would undo the accuracy smart
+    sync exists for."""
+    from app.state.device_telemetry import TelemetryStore
+
+    store = TelemetryStore(tmp_path / "t.json")
+    store.record_heartbeat("panel", parsed={"next_sleep_s": 120}, received_at=1000.0, configured_sleep_s=60)
+    assert store.reproject("panel", 3600) is None
+    entry = store.get("panel")
+    assert entry is not None and entry.predicted_next_wake_at == 1120.0
+
+
+def test_reprojection_resets_confidence(tmp_path) -> None:
+    """Past on-time wakes say nothing about a cadence that just changed."""
+    from app.state.device_telemetry import TelemetryStore
+
+    store = TelemetryStore(tmp_path / "t.json")
+    store.record_heartbeat("panel", parsed={}, received_at=1000.0, configured_sleep_s=60)
+    store.record_heartbeat("panel", parsed={}, received_at=1060.0, configured_sleep_s=60)
+    store.record_heartbeat("panel", parsed={}, received_at=1120.0, configured_sleep_s=60)
+    assert store.get("panel").consecutive_on_time_wakes > 0
+
+    after = store.reproject("panel", 3600)
+    assert after is not None and after.consecutive_on_time_wakes == 0
+
+
+def test_reprojection_is_a_noop_when_the_interval_is_unchanged(tmp_path) -> None:
+    from app.state.device_telemetry import TelemetryStore
+
+    store = TelemetryStore(tmp_path / "t.json")
+    store.record_heartbeat("panel", parsed={}, received_at=1000.0, configured_sleep_s=60)
+    assert store.reproject("panel", 60) is None
+
+
+def test_reprojection_without_a_heartbeat_is_a_noop(tmp_path) -> None:
+    from app.state.device_telemetry import TelemetryStore
+
+    store = TelemetryStore(tmp_path / "t.json")
+    assert store.reproject("never-seen", 3600) is None
+
+
+def test_reprojection_rejects_a_nonsense_interval(tmp_path) -> None:
+    from app.state.device_telemetry import TelemetryStore
+
+    store = TelemetryStore(tmp_path / "t.json")
+    store.record_heartbeat("panel", parsed={}, received_at=1000.0, configured_sleep_s=60)
+    assert store.reproject("panel", 0) is None

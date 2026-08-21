@@ -250,7 +250,13 @@ def build_manifest(
         size = _artifact_size(renders_dir, artifact) if artifact else 0
 
         # Budget by position (lowest-position frames cache first).
-        cache = kept < cap_count and (budget is None or spent + size <= budget)
+        #
+        # A frame with no digest is not cacheable however well it fits
+        # (#247). Frames are fetched by digest, so telling a device to
+        # cache one it cannot address means it caches nothing and reports
+        # "0 of N"; and because an unwarmed frame also measures 0 bytes,
+        # it always fit the budget and was always offered.
+        cache = bool(digest) and kept < cap_count and (budget is None or spent + size <= budget)
         if cache:
             kept += 1
             spent += size

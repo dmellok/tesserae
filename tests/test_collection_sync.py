@@ -356,3 +356,67 @@ def test_frame_entry_by_digest_scans_frames(tmp_path: Path) -> None:
         collection_sync.frame_entry_by_digest("frame01", "0" * 16, push_mgr=src, frames=frames)
         is None
     )
+
+
+# -- unwarmable frames (#247) --------------------------------------------
+
+
+class _FailingRenderSource(FakeRenderSource):
+    """A render source whose warm never succeeds, e.g. an image the
+    renderer cannot open."""
+
+    def warm_album_frame(
+        self, frame_id: str, device_id: str, image_bytes: bytes, *, fit: str
+    ) -> bool:
+        self.warmed.append((device_id, frame_id))
+        return False
+
+
+def _manifest_with(src: FakeRenderSource, tmp_path: Path, files: list[str]) -> dict[str, Any]:
+    album = _album(order=[])
+    return collection_sync.build_manifest(
+        album,
+        "frame01",
+        push_mgr=src,
+        renders_dir=tmp_path,
+        frames=collection_sync.ordered_frames(album, files),
+        image_loader=lambda f: f.encode(),
+        device_id_for_url="frame01",
+        warm_missing=True,
+    )
+
+
+def test_a_frame_that_cannot_be_rendered_is_never_offered_for_caching(tmp_path: Path) -> None:
+    """Frames are fetched by digest. Offering one with no digest tells the
+    device to cache something it cannot address, so it caches nothing and
+    reports 0 of N (#247)."""
+    manifest = _manifest_with(_FailingRenderSource(tmp_path), tmp_path, ["a.jpg", "b.jpg"])
+    assert [f["digest"] for f in manifest["frames"]] == ["", ""]
+    assert [f["cache"] for f in manifest["frames"]] == [False, False]
+
+
+def test_an_unwarmable_frame_does_not_consume_the_budget(tmp_path: Path) -> None:
+    """It measures zero bytes, so it always fit and was always offered,
+    which is how every frame ended up cache: true and uncacheable."""
+    src = FakeRenderSource(tmp_path)
+    # One good frame, then one the renderer refuses.
+    good = _manifest_with(src, tmp_path, ["a.jpg"])
+    assert good["frames"][0]["cache"] is True
+
+    mixed_src = FakeRenderSource(tmp_path)
+    original = mixed_src.warm_album_frame
+
+    def _selective(frame_id: str, device_id: str, image_bytes: bytes, *, fit: str) -> bool:
+        if image_bytes == b"bad.jpg":
+            return False
+        return original(frame_id, device_id, image_bytes, fit=fit)
+
+    mixed_src.warm_album_frame = _selective  # type: ignore[method-assign]
+    manifest = _manifest_with(mixed_src, tmp_path, ["a.jpg", "bad.jpg", "c.jpg"])
+    caches = [f["cache"] for f in manifest["frames"]]
+    assert caches == [True, False, True]
+
+
+def test_cacheable_count_reflects_only_addressable_frames(tmp_path: Path) -> None:
+    manifest = _manifest_with(_FailingRenderSource(tmp_path), tmp_path, ["a.jpg"])
+    assert sum(1 for f in manifest["frames"] if f["cache"]) == 0
