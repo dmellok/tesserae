@@ -470,6 +470,7 @@ macro here instead.
 {%- endif -%}
 {%- set tabs = tabs + [
   ('devices',   'Devices',   'devices',           url_for('auth.settings_area', area='devices')),
+  ('rooms',     'Rooms',     'door-open',         url_for('auth.rooms_index')),
   ('firmware',  'Firmware',  'download-simple',   url_for('auth.firmware_index')),
   ('relay',     'Cloud relay', 'cloud',           url_for('auth.relay_index')),
   ('companion', 'Companion app', 'device-mobile', url_for('auth.companion_index')),

@@ -62,6 +62,7 @@ from app.ha_discovery import HomeAssistantDiscovery
 from app.scheduler import Scheduler
 from app.state.event_log import EventLog
 from app.state.page_store import PageStore, migrate_canvases_to_pages
+from app.state.room_store import RoomStore
 from app.state.settings_store import SettingsStore
 from app.transport_wiring import _is_reloader_watcher, _rebuild_transport
 
@@ -662,6 +663,9 @@ def create_app(
     page_store.add_delete_listener(_drop_legacy_canvas)
     app.config["SCHEDULE_STORE"] = schedule_store
     app.config["ROTATION_STORE"] = rotation_store
+    # Rooms (#90). Configuration only: the store holds which feed and
+    # which panels a room uses, never a booking.
+    app.config["ROOM_STORE"] = RoomStore(data_root / "core" / "rooms.json")
     app.config["DEVICE_ROTATION_STATE_STORE"] = device_rotation_state_store
     app.config["DECK_STORE"] = deck_store
     app.config["DECK_NAV_STORE"] = deck_nav_store

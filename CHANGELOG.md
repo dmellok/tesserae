@@ -4,6 +4,24 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.323.0], 2026-08-21
+
+### Added
+
+- **Rooms (#90, phase 1).** Settings → Rooms. A room names a calendar feed, the panels showing
+  it, and optionally an endpoint that books it, then generates its dashboard. Twelve rooms used to
+  mean twelve hand-composed pages with the same widget options retyped into each.
+
+  Rooms is a generator, not a runtime. It writes an ordinary page, with an ordinary widget in an
+  ordinary cell, bound to ordinary devices, and stops; nothing renders through a room. It holds
+  configuration and never a booking, so Tesserae does not become the source of truth for whether a
+  room is free, and does not inherit the availability contract that would come with it. Deleting
+  the feature would leave every generated page working exactly as a hand-composed one does.
+
+  Regenerating preserves what rooms does not own: theme, style and font survive a rename, so
+  restyling a room's dashboard to match the rest of an office is not reverted. Removing a room
+  offers to remove its dashboard, and refuses to touch a page it did not generate.
+
 ## [0.322.0], 2026-08-21
 
 ### Added

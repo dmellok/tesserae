@@ -55,6 +55,7 @@ def register(app: Flask) -> None:
         index_routes,
         palette_routes,
         relay_routes,
+        rooms_routes,
         system_routes,
         update_routes,
     )
