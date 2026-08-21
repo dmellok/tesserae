@@ -21,6 +21,10 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   icon plus a word. Works without JavaScript throughout; the three per-room actions remain three
   separate forms, linked by the button `form=` attribute rather than nested.
 
+  Below 720px the column headers drop and each row restates its facts with its own inline labels
+  ("Feed …", "Panels 2", "Booking Off"), since there are no headers left to read them against. A
+  failing feed leads that list, being the reason someone opened the page.
+
 - **A room has one booking method instead of two independent fields.** `book_url` and
   `book_caldav` could both be set, and neither the model nor the UI said which won. They are
   replaced by `booking_mode` (`none` / `endpoint` / `caldav`). Existing rooms migrate on load,

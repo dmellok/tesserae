@@ -279,17 +279,65 @@
 .rooms-first h1 { font-size: 25px; font-weight: 600; margin: 0 0 10px; }
 .rooms-first__lede { font-size: 14.5px; line-height: 1.62; color: var(--t-fg-soft); margin: 0 0 22px; }
 
+/* ---- narrow summary variant -------------------------------------------- */
+
+/* Both summaries live in the DOM and one is display:none at any width.
+   That also removes it from the accessibility tree, so a screen reader
+   never hears the row twice. */
+.room-narrow { display: none; }
+.room-narrow__head { display: flex; align-items: center; gap: 10px; }
+.room-narrow__name {
+  font-size: 15.5px;
+  font-weight: 600;
+  color: var(--t-fg);
+  min-width: 0;
+}
+.room-narrow__head .caret { margin-left: auto; }
+.room-narrow__alert { display: block; margin-top: 6px; font-size: 12.5px; }
+.room-narrow__facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 12px;
+  margin-top: 6px;
+  font-size: 12.5px;
+  color: var(--t-fg-soft);
+}
+/* The column headers are gone at this width, so each fact names itself. */
+.room-narrow__facts b { font-weight: 500; color: var(--t-muted); }
+
+/* Add-a-room costs one line on a phone instead of a screenful. Above the
+   breakpoint the disclosure is dissolved: its summary is hidden and the
+   form forced visible, so the desktop layout is unchanged whether the
+   <details> happens to be open or not. */
+/* The handoff wanted this collapsed behind a disclosure on a phone and
+   open on desktop. That is not expressible without JavaScript: Chromium
+   hides closed <details> content with content-visibility, which still
+   grants it layout height, so a `display` override gives an element that
+   measures as visible and paints nothing. Rather than ship a form that
+   is invisible on desktop, it stays a plain form and simply stacks when
+   narrow, which costs three rows rather than the screenful the
+   disclosure was avoiding.
+   Revisit if the admin UI ever takes a small JS enhancement layer. */
+
 /* ---- narrow ------------------------------------------------------------ */
 
 /* 720px sits just under the row grid's ~724px minimum, so no width ever
    clips a column: it stacks before it would have to. */
 @media (max-width: 720px) {
   .rooms-head { display: none; }
-  .room-row > summary { display: block; padding: 13px 15px; }
-  .room-summary-narrow { display: flex; flex-wrap: wrap; gap: 5px 12px; font-size: 12.5px; }
+  .room-wide { display: none; }
+  .room-narrow { display: block; padding: 13px 15px; }
   .room-edit { padding: 18px 15px; }
+
+  .rooms-add { flex-direction: column; align-items: stretch; }
+  /* flex-basis is on the block axis once the container is a column, so
+     the desktop `flex: 1 1 200px` would give every field a 200px height. */
+  .rooms-add .field { flex: 0 0 auto; }
   .room-edit__grid { grid-template-columns: 1fr; }
   .rooms-add { flex-direction: column; align-items: stretch; }
+  /* flex-basis is on the block axis once the container is a column, so
+     the desktop `flex: 1 1 200px` would give every field a 200px height. */
+  .rooms-add .field { flex: 0 0 auto; }
   .room-edit .actions { flex-direction: column; align-items: stretch; }
   /* Every tap target clears 44px. */
   .room-edit .btn,

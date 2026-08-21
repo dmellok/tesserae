@@ -152,7 +152,8 @@
   {% for view in room_views %}
   {% set room = view.room %}
   <details class="room-row">
-    <summary class="rooms-grid">
+    <summary>
+      <span class="room-wide rooms-grid">
       <span class="caret" aria-hidden="true"><i class="ph ph-caret-right"></i></span>
 
       <span class="room-cell room-cell--name">
@@ -206,6 +207,46 @@
       </span>
 
       <span></span>
+      </span>
+
+      {# Narrow: the column headers are gone, so every fact carries its
+         own label. A failing feed leads, because it is the reason
+         someone opened the page. #}
+      <span class="room-narrow">
+        <span class="room-narrow__head">
+          <span class="room-narrow__name">{{ room.name }}</span>
+          <span class="caret" aria-hidden="true"><i class="ph ph-caret-right"></i></span>
+        </span>
+
+        {% if view.feed_missing or not view.feed_name %}
+        <span class="room-narrow__alert is-warn">
+          <i class="ph-fill ph-warning" aria-hidden="true"></i>
+          {% if view.feed_missing %}Feed {{ room.feed_id }} isn't configured{% else %}No feed{% endif %}
+        </span>
+        {% endif %}
+
+        <span class="room-narrow__facts">
+          {% if view.feed_name %}
+          <span><b>Feed</b> {{ view.feed_name }}</span>
+          {% endif %}
+          {# Counts, not names: panel names wrap badly at this width. #}
+          <span><b>Panels</b>
+            {% if view.panels %}{{ view.panels|length }}{% else %}
+            <span class="is-off">none yet</span>{% endif %}
+          </span>
+          <span><b>Booking</b>
+            {% if room.booking_mode == 'endpoint' %}Endpoint
+            {% elif room.booking_mode == 'caldav' %}In calendar
+            {% else %}<span class="is-off">Off</span>{% endif %}
+          </span>
+          <span><b>Dashboard</b>
+            {% if room.enabled %}Enabled{% else %}<span class="is-warn">Paused</span>{% endif %}
+          </span>
+          {% if room.location_filter %}
+          <span><b>Matches</b> {{ room.location_filter }}</span>
+          {% endif %}
+        </span>
+      </span>
     </summary>
 
     <div class="room-edit">
