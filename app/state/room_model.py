@@ -53,6 +53,13 @@ class Room(BaseModel):
     location_filter: str = ""
     device_ids: list[str] = Field(default_factory=list)
     book_url: str = ""
+    # Direct CalDAV booking (#90 phase 4). When on, a tap writes the event
+    # into the room's own calendar instead of POSTing to book_url. Only
+    # possible on a feed discovered over CalDAV, since an ICS export URL
+    # is not writable, and only with basic/digest auth.
+    book_caldav: bool = False
+    book_minutes: int = 30
+    book_summary: str = "Booked from the panel"
     enabled: bool = True
     # The page this room generated. Tracked so a rename or unbind can
     # update the right page, and so deleting the room can offer to remove
@@ -74,6 +81,13 @@ class Room(BaseModel):
         v = v.strip()
         if not v:
             raise ValueError("room name is required")
+        return v
+
+    @field_validator("book_minutes")
+    @classmethod
+    def _check_book_minutes(cls, v: int) -> int:
+        if not (5 <= v <= 480):
+            raise ValueError("booking length must be between 5 and 480 minutes")
         return v
 
     @field_validator("book_url")

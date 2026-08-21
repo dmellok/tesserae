@@ -89,6 +89,22 @@
       </p>
     </div>
 
+    {{ switch('caldav-' ~ room.id, 'book_caldav', 'Book directly in this calendar',
+              checked=room.book_caldav,
+              help='Writes the booking over CalDAV instead of POSTing to an endpoint. Needs a feed added by CalDAV discovery with a username and password; an ICS export URL cannot be written to. Google and Microsoft 365 need OAuth and are not supported here, so use a booking endpoint for those.') }}
+
+    <div class="field">
+      <label for="mins-{{ room.id }}">Booking length (minutes)</label>
+      <input id="mins-{{ room.id }}" type="number" name="book_minutes" min="5" max="480"
+             value="{{ room.book_minutes }}">
+    </div>
+
+    <div class="field">
+      <label for="summary-{{ room.id }}">Booking title</label>
+      <input id="summary-{{ room.id }}" type="text" name="book_summary" value="{{ room.book_summary }}">
+      <p class="help">What the event is called in the calendar.</p>
+    </div>
+
     {{ switch('enabled-' ~ room.id, 'enabled', 'Enabled', checked=room.enabled,
               help='Off keeps the room configured but stops regenerating its dashboard.') }}
 

@@ -356,7 +356,11 @@ def test_unknown_room_does_not_500(app_client) -> None:
 
 def test_board_has_one_row_per_enabled_room(pages: PageStore) -> None:
     page = rooms.build_board_page(
-        [_room(), _room(id="osprey", name="Osprey"), _room(id="falcon", name="Falcon", enabled=False)]
+        [
+            _room(),
+            _room(id="osprey", name="Osprey"),
+            _room(id="falcon", name="Falcon", enabled=False),
+        ]
     )
     assert [c.options["room_name"] for c in page.cells] == ["Kestrel", "Osprey"]
 
@@ -409,3 +413,185 @@ def test_board_route_builds_and_binds(app_client) -> None:
     assert resp.status_code == 200
     board = app.config["PAGE_STORE"].get("room_board")
     assert board is not None and len(board.cells) == 2
+
+
+# -- CalDAV booking (L4) -------------------------------------------------
+
+
+class _FakeCore:
+    """Stands in for the calendar_core plugin, exposing the three private
+    helpers rooms.book_now leans on."""
+
+    def __init__(self, feeds: list[dict[str, object]], opener: object) -> None:
+        self._feeds = feeds
+        self._opener = opener
+        self.built_for: list[str] = []
+
+        class _Module:
+            @staticmethod
+            def _load_feeds(_dd: object) -> dict[str, object]:
+                return {"feeds": feeds}
+
+            @staticmethod
+            def _feed_auth(feed: dict[str, object]) -> dict[str, object]:
+                return {"mode": "basic", "username": "u", "password": "p"}
+
+            @staticmethod
+            def _build_opener(url: str, _auth: object) -> object:
+                return opener
+
+        self.server_module = _Module()
+        self.data_dir = "/tmp/cal"
+
+
+class _CapturingOpener:
+    def __init__(self, status: int = 201) -> None:
+        self.status = status
+        self.requests: list[object] = []
+
+    def open(self, request: object, timeout: int = 0) -> object:
+        self.requests.append(request)
+
+        class _R:
+            status = self.status
+
+            def getcode(self_inner) -> int:  # noqa: N805
+                return 201
+
+            def __enter__(self_inner):  # noqa: N805
+                return self_inner
+
+            def __exit__(self_inner, *a):  # noqa: N805
+                return None
+
+        return _R()
+
+
+def _feed(**kw: object) -> dict[str, object]:
+    base: dict[str, object] = {
+        "id": "cal_kestrel",
+        "name": "Kestrel",
+        "url": "https://dav.example/cal/kestrel/",
+        "enabled": True,
+    }
+    base.update(kw)
+    return base
+
+
+def test_caldav_booking_writes_into_the_rooms_collection() -> None:
+    opener = _CapturingOpener()
+    core = _FakeCore([_feed()], opener)
+    url = rooms.book_now(_room(book_caldav=True), core=core)
+    assert url.startswith("https://dav.example/cal/kestrel/")
+    assert url.endswith(".ics")
+    assert opener.requests and opener.requests[0].get_method() == "PUT"
+
+
+def test_caldav_booking_uses_the_rooms_length_and_name() -> None:
+    from datetime import UTC, datetime
+
+    opener = _CapturingOpener()
+    core = _FakeCore([_feed()], opener)
+    now = datetime(2026, 8, 21, 14, 0, tzinfo=UTC)
+    rooms.book_now(_room(book_caldav=True, book_minutes=45), core=core, now=now)
+    body = opener.requests[0].data.decode("utf-8")
+    assert "DTSTART:20260821T140000Z" in body
+    assert "DTEND:20260821T144500Z" in body
+    assert "LOCATION:Kestrel" in body
+
+
+def test_caldav_booking_without_a_feed_raises() -> None:
+    from app.caldav_write import CalDavWriteError
+
+    core = _FakeCore([], _CapturingOpener())
+    with pytest.raises(CalDavWriteError, match="no usable calendar feed"):
+        rooms.book_now(_room(book_caldav=True), core=core)
+
+
+def test_caldav_booking_without_a_url_raises() -> None:
+    from app.caldav_write import CalDavWriteError
+
+    core = _FakeCore([_feed(url="")], _CapturingOpener())
+    with pytest.raises(CalDavWriteError):
+        rooms.book_now(_room(book_caldav=True), core=core)
+
+
+def test_feed_lookup_falls_back_to_the_first_enabled_feed() -> None:
+    core = _FakeCore([_feed(id="other"), _feed(id="second")], _CapturingOpener())
+    found = rooms.feed_for(_room(feed_id=""), core=core)
+    assert found is not None and found["id"] == "other"
+
+
+def test_feed_lookup_skips_disabled_feeds() -> None:
+    core = _FakeCore([_feed(id="off", enabled=False), _feed(id="on")], _CapturingOpener())
+    found = rooms.feed_for(_room(feed_id=""), core=core)
+    assert found is not None and found["id"] == "on"
+
+
+# -- the action a CalDAV room generates ----------------------------------
+
+
+def test_caldav_room_taps_book_internally(pages: PageStore) -> None:
+    """There is nothing outbound to point at, so the action names the
+    room rather than a URL."""
+    assert rooms.book_action(_room(book_caldav=True)) == "room_book:kestrel"
+
+
+def test_caldav_booking_wins_over_a_book_url(pages: PageStore) -> None:
+    room = _room(book_caldav=True, book_url="https://x.example/b")
+    assert rooms.book_action(room) == "room_book:kestrel"
+
+
+def test_caldav_room_shows_the_book_button(pages: PageStore) -> None:
+    page = rooms.build_page(_room(book_caldav=True))
+    assert page.cells[0].options["show_book_action"] is True
+    assert page.cells[0].on_tap == "room_book:kestrel"
+
+
+def test_booking_length_is_bounded() -> None:
+    """A mistyped length must not book a room for a year."""
+    with pytest.raises(ValueError):
+        _room(book_minutes=0)
+    with pytest.raises(ValueError):
+        _room(book_minutes=10_000)
+
+
+def test_room_book_is_side_effecting() -> None:
+    """It writes to a calendar, so widget markup must not be able to aim
+    it any more than it can aim a webhook."""
+    from app.touch_regions import SIDE_EFFECTING_ACTIONS, is_side_effecting
+
+    assert "room_book" in SIDE_EFFECTING_ACTIONS
+    assert is_side_effecting("room_book:kestrel") is True
+
+
+def test_room_book_requires_a_room_id() -> None:
+    from app.button_actions import ButtonActionError, dispatch
+    from tests.test_button_actions import _ctx  # type: ignore[import-not-found]
+
+    with pytest.raises(ButtonActionError):
+        dispatch("room_book", _ctx())
+
+
+def test_caldav_booking_can_be_set_from_the_ui(app_client) -> None:
+    app, client = app_client
+    client.post("/settings/rooms", data={"name": "Kestrel", "enabled": "on"})
+    client.post(
+        "/settings/rooms/kestrel",
+        data={"name": "Kestrel", "enabled": "on", "book_caldav": "on", "book_minutes": "45"},
+    )
+    room = app.config["ROOM_STORE"].get("kestrel")
+    assert room is not None and room.book_caldav is True and room.book_minutes == 45
+    page = app.config["PAGE_STORE"].get("room_kestrel")
+    assert page is not None and page.cells[0].on_tap == "room_book:kestrel"
+
+
+def test_an_out_of_range_booking_length_is_rejected_without_500(app_client) -> None:
+    app, client = app_client
+    resp = client.post(
+        "/settings/rooms",
+        data={"name": "Kestrel", "enabled": "on", "book_minutes": "9999"},
+        follow_redirects=True,
+    )
+    assert resp.status_code == 200
+    assert app.config["ROOM_STORE"].all() == []

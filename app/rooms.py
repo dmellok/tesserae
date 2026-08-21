@@ -76,8 +76,66 @@ def cell_options(room: Room) -> dict[str, Any]:
         "location_filter": room.location_filter,
         "layout": "auto",
         "show_titles": False,
-        "show_book_action": bool(room.book_url),
+        "show_book_action": bool(room.book_url or room.book_caldav),
     }
+
+
+def feed_for(room: Room, *, core: Any) -> dict[str, Any] | None:
+    """The calendar_core feed record backing this room."""
+    loader = getattr(core.server_module, "_load_feeds", None)
+    if loader is None:
+        return None
+    from pathlib import Path as _Path
+
+    try:
+        feeds = loader(_Path(core.data_dir)).get("feeds") or []
+    except Exception:
+        logger.exception("rooms: could not read feeds for %s", room.id)
+        return None
+    enabled = [f for f in feeds if f.get("enabled", True) and f.get("url")]
+    if room.feed_id:
+        return next((f for f in enabled if f.get("id") == room.feed_id), None)
+    return enabled[0] if enabled else None
+
+
+def book_now(room: Room, *, core: Any, now: Any = None) -> str:
+    """Write a booking into the room's own calendar. Returns the new
+    event's URL, or raises ``CalDavWriteError`` with a message fit to show
+    an operator.
+
+    Everything needed is already on the feed: ``calendar_core`` stored the
+    collection URL and the credentials when the feed was discovered, so
+    this adds no new secrets and no new auth path.
+    """
+    from datetime import UTC, datetime, timedelta
+
+    from app.caldav_write import CalDavWriteError, build_event_ics, new_uid, put_event
+
+    feed = feed_for(room, core=core)
+    if feed is None:
+        raise CalDavWriteError("This room has no usable calendar feed.")
+    collection_url = str(feed.get("url") or "")
+    if not collection_url:
+        raise CalDavWriteError("This room's feed has no calendar URL.")
+
+    build_opener = getattr(core.server_module, "_build_opener", None)
+    feed_auth = getattr(core.server_module, "_feed_auth", None)
+    if build_opener is None or feed_auth is None:
+        raise CalDavWriteError("This install's calendar_core is too old to book.")
+
+    start = now or datetime.now(UTC)
+    end = start + timedelta(minutes=room.book_minutes)
+    uid = new_uid()
+    ics = build_event_ics(
+        uid=uid,
+        summary=room.book_summary,
+        start=start,
+        end=end,
+        location=room.name,
+        now=start,
+    )
+    opener = build_opener(collection_url, feed_auth(feed))
+    return put_event(collection_url, ics, uid, opener=opener)
 
 
 def book_action(room: Room) -> str | None:
@@ -94,6 +152,10 @@ def book_action(room: Room) -> str | None:
     have to reverse a device id back to a room. Appended rather than
     templated, so the operator's own query string survives.
     """
+    if room.book_caldav:
+        # Booked by Tesserae itself, so the action names the room rather
+        # than an endpoint: there is nothing outbound to point at.
+        return f"room_book:{room.id}"
     if not room.book_url:
         return None
     sep = "&" if "?" in room.book_url else "?"

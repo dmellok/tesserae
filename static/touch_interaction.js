@@ -46,6 +46,7 @@
     { id: "page", label: "Go to page…", arg: "page" },
     { id: "webhook", label: "Webhook…", arg: "url" },
     { id: "webhook_refresh", label: "Webhook, then refresh…", arg: "url" },
+    { id: "room_book", label: "Book this room…", arg: "text" },
     { id: "ha", label: "Home Assistant…", arg: "ha" },
   ];
 

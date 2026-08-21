@@ -66,7 +66,9 @@ _SIDECAR_VERSION: Final[int] = 3
 # markup, so a third-party widget can't aim a webhook at an arbitrary
 # URL just by annotating its own HTML. Navigation-class actions
 # (refresh / rotate / step / page) are safe from any origin.
-SIDE_EFFECTING_ACTIONS: Final[frozenset[str]] = frozenset({"webhook", "webhook_refresh", "ha"})
+SIDE_EFFECTING_ACTIONS: Final[frozenset[str]] = frozenset(
+    {"webhook", "webhook_refresh", "room_book", "ha"}
+)
 
 
 def is_side_effecting(spec: str | dict[str, Any]) -> bool:

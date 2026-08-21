@@ -123,6 +123,11 @@ _WEBHOOK_REFRESH_DELAY_SECONDS = 5.0
 # Actions whose spec carries a webhook URL to fire.
 _WEBHOOK_ACTIONS = ("webhook", "webhook_refresh")
 
+# ``room_book`` writes into the room's own calendar (#90). It reuses the
+# webhook_refresh delay rather than having its own: the reason for
+# waiting is the same, the calendar needs a moment to reflect the write
+# before the panel re-reads it.
+
 
 def _spec_label(spec: str | dict[str, Any] | None) -> str | None:
     """A loggable string form of an action spec (dict specs serialise)."""
@@ -1546,6 +1551,36 @@ class ButtonService:
             return float(value)
         return default
 
+    def _book_room(self, device_id: str, room_id: str) -> None:
+        """Write the booking, then arm the same delayed reconcile a
+        webhook booking uses so the panel shows the room it just took."""
+        from flask import current_app
+
+        try:
+            from app import rooms as rooms_service
+
+            store = current_app.config.get("ROOM_STORE")
+            room = store.get(room_id) if store is not None else None
+            if room is None:
+                log.warning("room_book: no such room %r (device=%s)", room_id, device_id)
+                return
+            if not room.book_caldav:
+                log.warning("room_book: %r does not have calendar booking on", room_id)
+                return
+            registry = current_app.config.get("PLUGIN_REGISTRY")
+            core = registry.get("calendar_core") if registry is not None else None
+            if core is None or core.server_module is None:
+                log.warning("room_book: calendar_core is not installed")
+                return
+            url = rooms_service.book_now(room, core=core)
+            log.info("room_book: booked %s for device=%s (%s)", room_id, device_id, url)
+        except Exception:
+            # A failed booking must not break the wake; the panel simply
+            # repaints unchanged, which is the truthful outcome.
+            log.exception("room_book: booking failed for %r (device=%s)", room_id, device_id)
+            return
+        self._schedule_reconcile(device_id, min_delay_s=self._webhook_refresh_delay_seconds())
+
     def _webhook_refresh_delay_seconds(self) -> float:
         """How long ``webhook_refresh`` waits before reconciling, so the
         receiver has time to commit the change the dashboard reads."""
@@ -1722,6 +1757,13 @@ class ButtonService:
                 self._schedule_reconcile(
                     device_id, min_delay_s=self._webhook_refresh_delay_seconds()
                 )
+
+        # room_book:<id> books the room in its own calendar (#90). Run
+        # inline rather than on a daemon thread: a booking that silently
+        # failed would leave someone standing at a panel that said it
+        # worked, so the outcome belongs in this wake's history row.
+        if action_name == "room_book" and action_arg:
+            self._book_room(device_id, action_arg.strip())
 
         # ``fetch_latest`` serves an artefact that already exists, so there is
         # no PushResult carrying the composition thumbnail. Snapshot the

@@ -113,6 +113,10 @@ def _form_room(existing: Room | None = None) -> Room:
         location_filter=(request.form.get("location_filter") or "").strip(),
         device_ids=[d for d in request.form.getlist("device_ids") if d],
         book_url=(request.form.get("book_url") or "").strip(),
+        book_caldav=request.form.get("book_caldav") is not None,
+        book_minutes=int(request.form.get("book_minutes") or 30),
+        book_summary=(request.form.get("book_summary") or "Booked from the panel").strip()
+        or "Booked from the panel",
         enabled=request.form.get("enabled") is not None,
         page_id=existing.page_id if existing is not None else "",
     )

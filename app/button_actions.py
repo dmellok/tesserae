@@ -291,6 +291,28 @@ def _webhook_refresh(_ctx: ActionContext, arg: str | None) -> ActionResult:
     )
 
 
+def _room_book(_ctx: ActionContext, arg: str | None) -> ActionResult:
+    """``room_book:<room_id>`` books the room in its own calendar (#90).
+
+    Like ``webhook_refresh``, ``force_refresh`` stays False: the write
+    goes out and the panel is repainted by the delayed reconcile, because
+    re-rendering inside this wake would race the calendar server and
+    repaint the room's *pre-booking* state.
+
+    The real work lives in the button service, which has the room store
+    and the HTTP client; here we only validate the shape so a bad
+    ``button_map`` is rejected at dispatch time rather than at fire time.
+    """
+    if not arg or not arg.strip():
+        raise ButtonActionError("room_book action requires a room id, e.g. 'room_book:kestrel'")
+    return ActionResult(
+        new_step_index=_ctx.current_step_index,
+        target_page_id=None,
+        force_refresh=False,
+        description=f"room_book -> {arg.strip()}",
+    )
+
+
 # Register built-ins at import time so ``dispatch`` sees them from
 # the first call. Third-party plugins can ``register(...)`` later.
 register("rotate_prev", _rotate_prev)
@@ -301,6 +323,7 @@ register("step", _step)
 register("page", _page)
 register("webhook", _webhook)
 register("webhook_refresh", _webhook_refresh)
+register("room_book", _room_book)
 
 
 # ---- config defaults ----------------------------------------------

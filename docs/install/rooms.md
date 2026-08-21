@@ -107,6 +107,36 @@ call [`POST /api/v1/push`](server.md#webhook-push) once the booking
 commits. That fires when the work is actually done instead of after a
 fixed delay, so there's no race at all and no delay to tune.
 
+## Booking directly in the calendar
+
+If your calendar speaks CalDAV and accepts a username and password, the
+panel can write the booking itself with no endpoint in between.
+
+Turn on **Book directly in this calendar** on the room. A tap then
+creates an event in the room's own calendar and the panel repaints.
+
+Requirements, and they are strict:
+
+- The feed must have been added by **CalDAV discovery**, not pasted in as
+  an ICS URL. An export URL is read-only; writing to one fails with
+  "the calendar refused a write".
+- The feed needs a **username and password** on it. Basic and digest auth
+  are supported, which covers Radicale, Baikal, Nextcloud and iCloud
+  app-specific passwords.
+- **Google Calendar and Microsoft 365 are not supported here.** Both
+  require OAuth with a registered application and a consent flow. Use a
+  booking endpoint for those, where your own server holds the
+  credentials.
+
+The event is created, never overwritten: Tesserae sends
+`If-None-Match: *`, so a collision fails rather than replacing an
+existing meeting.
+
+Set the booking length and title on the room. Nothing here checks whether
+the slot is free first, because between checking and writing someone else
+can book it anyway; the calendar server is the only place that can
+arbitrate, and a rejected write is reported rather than swallowed.
+
 ## Wake timing
 
 A room panel is only as current as its last wake, and a panel that sleeps
