@@ -342,7 +342,9 @@ def test_reprojection_leaves_a_firmware_prediction_alone(tmp_path) -> None:
     from app.state.device_telemetry import TelemetryStore
 
     store = TelemetryStore(tmp_path / "t.json")
-    store.record_heartbeat("panel", parsed={"next_sleep_s": 120}, received_at=1000.0, configured_sleep_s=60)
+    store.record_heartbeat(
+        "panel", parsed={"next_sleep_s": 120}, received_at=1000.0, configured_sleep_s=60
+    )
     assert store.reproject("panel", 3600) is None
     entry = store.get("panel")
     assert entry is not None and entry.predicted_next_wake_at == 1120.0

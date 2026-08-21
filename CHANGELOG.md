@@ -4,6 +4,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.326.2], 2026-08-21
+
+### Fixed
+
+- Formatting only: `tests/test_device_telemetry.py` was left unformatted in 0.326.1, failing
+  `ruff format --check` in CI. No behaviour change.
+
 ## [0.326.1], 2026-08-21
 
 ### Fixed
