@@ -51,7 +51,7 @@ def test_room_name_is_required() -> None:
 def test_book_url_must_be_http() -> None:
     with pytest.raises(ValueError):
         _room(book_url="ftp://example.com/book")
-    assert _room(book_url="https://x.example/book").book_url
+    assert _room(booking_mode="endpoint", book_url="https://x.example/book").book_url
 
 
 def test_page_id_is_namespaced() -> None:
@@ -135,7 +135,7 @@ def test_titles_are_off_in_generated_pages(pages: PageStore) -> None:
 def test_book_url_becomes_a_cell_tap_action(pages: PageStore) -> None:
     """Booking is dispatched by the cell, because the provenance gate
     rejects a side-effecting action originating in widget markup."""
-    page = rooms.build_page(_room(book_url="https://x.example/book"))
+    page = rooms.build_page(_room(booking_mode="endpoint", book_url="https://x.example/book"))
     assert page.cells[0].on_tap == "webhook_refresh:https://x.example/book?room=kestrel"
     assert page.cells[0].options["show_book_action"] is True
 
@@ -145,13 +145,15 @@ def test_book_action_names_the_room(pages: PageStore) -> None:
     page is rotation-bound. A room panel is bound directly, so without
     this a receiver serving several rooms cannot tell which was tapped."""
     assert rooms.book_action(_room()) is None
-    assert rooms.book_action(_room(book_url="https://x.example/b")) == (
+    assert rooms.book_action(_room(booking_mode="endpoint", book_url="https://x.example/b")) == (
         "webhook_refresh:https://x.example/b?room=kestrel"
     )
 
 
 def test_book_action_preserves_an_existing_query_string(pages: PageStore) -> None:
-    action = rooms.book_action(_room(book_url="https://x.example/b?src=panel"))
+    action = rooms.book_action(
+        _room(booking_mode="endpoint", book_url="https://x.example/b?src=panel")
+    )
     assert action == "webhook_refresh:https://x.example/b?src=panel&room=kestrel"
 
 
@@ -160,7 +162,9 @@ def test_book_action_survives_the_action_parser(pages: PageStore) -> None:
     and a query string has to come back intact."""
     from app.button_actions import parse_action_spec
 
-    action = rooms.book_action(_room(book_url="https://x.example/b?src=panel"))
+    action = rooms.book_action(
+        _room(booking_mode="endpoint", book_url="https://x.example/b?src=panel")
+    )
     assert action is not None
     name, arg = parse_action_spec(action)
     assert name == "webhook_refresh"
@@ -260,10 +264,12 @@ def app_client(tmp_path: Path):
 
 
 def test_rooms_page_renders_with_no_rooms(app_client) -> None:
+    """With no feeds configured the page teaches the dependency instead of
+    offering a form that could not work."""
     _app, client = app_client
     resp = client.get("/settings/rooms")
     assert resp.status_code == 200
-    assert b"No rooms yet" in resp.data
+    assert b"Rooms need a calendar to read" in resp.data
 
 
 def test_creating_a_room_generates_its_dashboard(app_client) -> None:
@@ -386,7 +392,9 @@ def test_board_rows_use_the_horizontal_layout(pages: PageStore) -> None:
 
 def test_board_never_offers_booking(pages: PageStore) -> None:
     """A tap would book whichever room the finger landed on."""
-    page = rooms.build_board_page([_room(book_url="https://x.example/book")])
+    page = rooms.build_board_page(
+        [_room(booking_mode="endpoint", book_url="https://x.example/book")]
+    )
     assert page.cells[0].options["show_book_action"] is False
     assert page.cells[0].on_tap is None
 
@@ -481,7 +489,7 @@ def _feed(**kw: object) -> dict[str, object]:
 def test_caldav_booking_writes_into_the_rooms_collection() -> None:
     opener = _CapturingOpener()
     core = _FakeCore([_feed()], opener)
-    url = rooms.book_now(_room(book_caldav=True), core=core)
+    url = rooms.book_now(_room(booking_mode="caldav"), core=core)
     assert url.startswith("https://dav.example/cal/kestrel/")
     assert url.endswith(".ics")
     assert opener.requests and opener.requests[0].get_method() == "PUT"
@@ -493,7 +501,7 @@ def test_caldav_booking_uses_the_rooms_length_and_name() -> None:
     opener = _CapturingOpener()
     core = _FakeCore([_feed()], opener)
     now = datetime(2026, 8, 21, 14, 0, tzinfo=UTC)
-    rooms.book_now(_room(book_caldav=True, book_minutes=45), core=core, now=now)
+    rooms.book_now(_room(booking_mode="caldav", book_minutes=45), core=core, now=now)
     body = opener.requests[0].data.decode("utf-8")
     assert "DTSTART:20260821T140000Z" in body
     assert "DTEND:20260821T144500Z" in body
@@ -505,7 +513,7 @@ def test_caldav_booking_without_a_feed_raises() -> None:
 
     core = _FakeCore([], _CapturingOpener())
     with pytest.raises(CalDavWriteError, match="no usable calendar feed"):
-        rooms.book_now(_room(book_caldav=True), core=core)
+        rooms.book_now(_room(booking_mode="caldav"), core=core)
 
 
 def test_caldav_booking_without_a_url_raises() -> None:
@@ -513,7 +521,7 @@ def test_caldav_booking_without_a_url_raises() -> None:
 
     core = _FakeCore([_feed(url="")], _CapturingOpener())
     with pytest.raises(CalDavWriteError):
-        rooms.book_now(_room(book_caldav=True), core=core)
+        rooms.book_now(_room(booking_mode="caldav"), core=core)
 
 
 def test_feed_lookup_falls_back_to_the_first_enabled_feed() -> None:
@@ -534,16 +542,16 @@ def test_feed_lookup_skips_disabled_feeds() -> None:
 def test_caldav_room_taps_book_internally(pages: PageStore) -> None:
     """There is nothing outbound to point at, so the action names the
     room rather than a URL."""
-    assert rooms.book_action(_room(book_caldav=True)) == "room_book:kestrel"
+    assert rooms.book_action(_room(booking_mode="caldav")) == "room_book:kestrel"
 
 
 def test_caldav_booking_wins_over_a_book_url(pages: PageStore) -> None:
-    room = _room(book_caldav=True, book_url="https://x.example/b")
+    room = _room(booking_mode="caldav", book_url="https://x.example/b")
     assert rooms.book_action(room) == "room_book:kestrel"
 
 
 def test_caldav_room_shows_the_book_button(pages: PageStore) -> None:
-    page = rooms.build_page(_room(book_caldav=True))
+    page = rooms.build_page(_room(booking_mode="caldav"))
     assert page.cells[0].options["show_book_action"] is True
     assert page.cells[0].on_tap == "room_book:kestrel"
 
@@ -578,10 +586,16 @@ def test_caldav_booking_can_be_set_from_the_ui(app_client) -> None:
     client.post("/settings/rooms", data={"name": "Kestrel", "enabled": "on"})
     client.post(
         "/settings/rooms/kestrel",
-        data={"name": "Kestrel", "enabled": "on", "book_caldav": "on", "book_minutes": "45"},
+        data={
+            "name": "Kestrel",
+            "enabled_present": "1",
+            "enabled": "on",
+            "booking_mode": "caldav",
+            "book_minutes": "45",
+        },
     )
     room = app.config["ROOM_STORE"].get("kestrel")
-    assert room is not None and room.book_caldav is True and room.book_minutes == 45
+    assert room is not None and room.booking_mode == "caldav" and room.book_minutes == 45
     page = app.config["PAGE_STORE"].get("room_kestrel")
     assert page is not None and page.cells[0].on_tap == "room_book:kestrel"
 
@@ -595,3 +609,163 @@ def test_an_out_of_range_booking_length_is_rejected_without_500(app_client) -> N
     )
     assert resp.status_code == 200
     assert app.config["ROOM_STORE"].all() == []
+
+
+# -- booking mode migration ----------------------------------------------
+
+
+def test_legacy_caldav_toggle_becomes_caldav_mode() -> None:
+    """Rooms written before booking_mode stored a bool alongside a URL,
+    which is exactly the ambiguity the mode replaced. Resolve it the way
+    the old dispatch did: the toggle won."""
+    room = Room(id="a", name="A", book_caldav=True, book_url="https://x/b")
+    assert room.booking_mode == "caldav"
+
+
+def test_legacy_url_alone_becomes_endpoint_mode() -> None:
+    assert Room(id="a", name="A", book_url="https://x/b").booking_mode == "endpoint"
+
+
+def test_legacy_room_with_neither_is_not_bookable() -> None:
+    assert Room(id="a", name="A").booking_mode == "none"
+
+
+def test_an_explicit_mode_is_never_overridden_by_migration() -> None:
+    room = Room(id="a", name="A", booking_mode="none", book_url="https://x/b")
+    assert room.booking_mode == "none"
+    assert room.is_bookable is False
+
+
+def test_endpoint_mode_without_a_url_is_not_bookable() -> None:
+    """The mode says how, the URL says where. Without one there is
+    nothing to POST to, so no button is drawn."""
+    room = Room(id="a", name="A", booking_mode="endpoint")
+    assert room.is_bookable is False
+    assert rooms.book_action(room) is None
+
+
+# -- row view -------------------------------------------------------------
+
+
+def _feed_row(**kw: object) -> dict[str, object]:
+    base: dict[str, object] = {
+        "id": "cal_a",
+        "name": "Kestrel calendar",
+        "url": "https://dav.example/cal/kestrel/",
+        "auth_mode": "basic",
+        "username": "rooms",
+        "enabled": True,
+    }
+    base.update(kw)
+    return base
+
+
+def test_row_view_resolves_the_named_feed(pages: PageStore) -> None:
+    view = rooms.row_view(_room(feed_id="cal_a"), feeds=[_feed_row()], page_store=pages)
+    assert view["feed_name"] == "Kestrel calendar"
+    assert view["feed_missing"] is False
+
+
+def test_row_view_flags_a_feed_that_no_longer_exists(pages: PageStore) -> None:
+    """Deleting a feed shouldn't make a room silently read the wrong one."""
+    view = rooms.row_view(_room(feed_id="gone"), feeds=[_feed_row()], page_store=pages)
+    assert view["feed_missing"] is True
+
+
+def test_row_view_marks_an_implicit_feed(pages: PageStore) -> None:
+    view = rooms.row_view(_room(feed_id=""), feeds=[_feed_row()], page_store=pages)
+    assert view["feed_implicit"] is True
+    assert view["feed_name"] == "Kestrel calendar"
+
+
+def test_row_view_reports_the_dashboard_build_state(pages: PageStore) -> None:
+    room = _room()
+    assert rooms.row_view(room, feeds=[], page_store=pages)["dashboard_exists"] is False
+    rooms.sync(room, page_store=pages)
+    assert rooms.row_view(room, feeds=[], page_store=pages)["dashboard_exists"] is True
+
+
+def test_row_view_names_panels_and_flags_missing_ones(pages: PageStore) -> None:
+    class _Reg:
+        def __init__(self) -> None:
+            self.devices = {"door": type("D", (), {"display_name": "Kestrel door"})()}
+
+    view = rooms.row_view(
+        _room(device_ids=["door", "ghost"]), feeds=[], devices=_Reg(), page_store=pages
+    )
+    assert [p["name"] for p in view["panels"]] == ["Kestrel door", "ghost"]
+    assert [p["missing"] for p in view["panels"]] == [False, True]
+
+
+# -- caldav capability ----------------------------------------------------
+
+
+def test_a_credentialled_caldav_feed_can_write() -> None:
+    assert rooms.feed_can_write(_feed_row()) is True
+
+
+def test_a_feed_without_credentials_cannot_write() -> None:
+    """An ICS export URL is read-only however good the credentials are,
+    and a collection with no credentials cannot authenticate."""
+    assert rooms.feed_can_write(_feed_row(auth_mode="none", username="")) is False
+
+
+def test_a_feed_with_no_url_cannot_write() -> None:
+    assert rooms.feed_can_write(_feed_row(url="")) is False
+
+
+def test_no_feed_cannot_write() -> None:
+    assert rooms.feed_can_write(None) is False
+
+
+# -- partial form updates -------------------------------------------------
+
+
+def test_saving_one_section_does_not_clear_the_others(app_client) -> None:
+    """The add form carries two fields and the row editor carries the
+    rest. A post that doesn't include a section must leave it alone,
+    or editing the name would silently unbind every panel."""
+    app, client = app_client
+    client.post("/settings/rooms", data={"name": "Kestrel", "enabled": "on"})
+    client.post(
+        "/settings/rooms/kestrel",
+        data={
+            "name": "Kestrel",
+            "enabled_present": "1",
+            "enabled": "on",
+            "booking_mode": "endpoint",
+            "book_url": "https://x.example/book",
+            "book_minutes": "45",
+        },
+    )
+    # A later post that omits booking entirely.
+    client.post("/settings/rooms/kestrel", data={"name": "Kestrel Boardroom"})
+    room = app.config["ROOM_STORE"].get("kestrel")
+    assert room is not None
+    assert room.name == "Kestrel Boardroom"
+    assert room.booking_mode == "endpoint"
+    assert room.book_url == "https://x.example/book"
+    assert room.book_minutes == 45
+
+
+def test_an_unticked_enabled_box_still_disables(app_client) -> None:
+    """A checkbox posts nothing when unticked, so the form declares its
+    own presence; without that, unticking could never be saved."""
+    app, client = app_client
+    client.post("/settings/rooms", data={"name": "Kestrel", "enabled": "on"})
+    client.post("/settings/rooms/kestrel", data={"name": "Kestrel", "enabled_present": "1"})
+    room = app.config["ROOM_STORE"].get("kestrel")
+    assert room is not None and room.enabled is False
+
+
+def test_an_unknown_booking_mode_falls_back_rather_than_500(app_client) -> None:
+    app, client = app_client
+    client.post("/settings/rooms", data={"name": "Kestrel", "enabled": "on"})
+    resp = client.post(
+        "/settings/rooms/kestrel",
+        data={"name": "Kestrel", "booking_mode": "nonsense"},
+        follow_redirects=True,
+    )
+    assert resp.status_code == 200
+    room = app.config["ROOM_STORE"].get("kestrel")
+    assert room is not None and room.booking_mode == "none"

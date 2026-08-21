@@ -62,9 +62,15 @@ finger happened to land on.
 
 Optional, and it needs a server you control.
 
-Set **Booking endpoint** on the room. The panel then shows a book button,
-and a tap POSTs to your endpoint and repaints a few seconds later so the
-panel shows the room it just booked.
+On the room's row, open **Booking** and pick **Post to a booking
+endpoint**, then fill in the URL. The panel shows a book button, and a
+tap POSTs to your endpoint and repaints a few seconds later so the panel
+shows the room it just booked.
+
+A room has one booking method, not several: the three options (not
+bookable, post to an endpoint, write into the calendar) are mutually
+exclusive, so there is never a state where a URL and a calendar write are
+both configured and nothing says which applies.
 
 ### What your endpoint receives
 
@@ -112,8 +118,13 @@ fixed delay, so there's no race at all and no delay to tune.
 If your calendar speaks CalDAV and accepts a username and password, the
 panel can write the booking itself with no endpoint in between.
 
-Turn on **Book directly in this calendar** on the room. A tap then
-creates an event in the room's own calendar and the panel repaints.
+On the room's row, open **Booking** and pick **Write straight into this
+calendar**. A tap then creates an event in the room's own calendar and
+the panel repaints.
+
+When the room's feed can't be written to, that option is shown disabled
+with the reason next to it, naming the feed. An `.ics` URL is read-only
+whatever credentials you give it.
 
 Requirements, and they are strict:
 

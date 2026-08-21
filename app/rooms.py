@@ -76,7 +76,7 @@ def cell_options(room: Room) -> dict[str, Any]:
         "location_filter": room.location_filter,
         "layout": "auto",
         "show_titles": False,
-        "show_book_action": bool(room.book_url or room.book_caldav),
+        "show_book_action": room.is_bookable,
     }
 
 
@@ -138,6 +138,65 @@ def book_now(room: Room, *, core: Any, now: Any = None) -> str:
     return put_event(collection_url, ics, uid, opener=opener)
 
 
+def feed_can_write(feed: dict[str, Any] | None) -> bool:
+    """Whether a booking could be written into this feed.
+
+    An ICS export URL is read-only however good the credentials are, and
+    a CalDAV collection without credentials cannot authenticate, so both
+    are needed. Drives the disabled state on the "write straight into
+    this calendar" option, where the reason matters more than the fact.
+    """
+    if not feed:
+        return False
+    if not str(feed.get("url") or "").strip():
+        return False
+    mode = str(feed.get("auth_mode") or "none").strip().lower()
+    return mode in ("basic", "digest") and bool(str(feed.get("username") or "").strip())
+
+
+def row_view(
+    room: Room,
+    *,
+    feeds: list[dict[str, Any]],
+    devices: Any = None,
+    page_store: PageStore | None = None,
+) -> dict[str, Any]:
+    """Everything the Rooms list shows for one room, resolved once.
+
+    Deliberately returns ``None`` for anything the server cannot actually
+    establish rather than a plausible-looking placeholder: a settings page
+    that invents a feed's health is worse than one that admits it doesn't
+    poll feeds yet.
+    """
+    by_id = {f.get("id"): f for f in feeds}
+    feed = by_id.get(room.feed_id) if room.feed_id else (feeds[0] if feeds else None)
+    page = page_store.get(room.resolved_page_id()) if page_store is not None else None
+
+    panels: list[dict[str, Any]] = []
+    registry = getattr(devices, "devices", {}) if devices is not None else {}
+    for device_id in room.device_ids:
+        device = registry.get(device_id)
+        panels.append(
+            {
+                "id": device_id,
+                "name": getattr(device, "display_name", device_id) if device else device_id,
+                "missing": device is None,
+            }
+        )
+
+    return {
+        "room": room,
+        "feed": feed,
+        "feed_name": (feed or {}).get("name") or (feed or {}).get("id") or "",
+        "feed_missing": room.feed_id != "" and feed is None,
+        "feed_implicit": room.feed_id == "" and feed is not None,
+        "can_write": feed_can_write(feed),
+        "panels": panels,
+        "dashboard_built_at": getattr(page, "updated_at", None) if page else None,
+        "dashboard_exists": page is not None,
+    }
+
+
 def book_action(room: Room) -> str | None:
     """The cell tap action that books this room, or None.
 
@@ -152,11 +211,11 @@ def book_action(room: Room) -> str | None:
     have to reverse a device id back to a room. Appended rather than
     templated, so the operator's own query string survives.
     """
-    if room.book_caldav:
+    if room.books_by_caldav:
         # Booked by Tesserae itself, so the action names the room rather
         # than an endpoint: there is nothing outbound to point at.
         return f"room_book:{room.id}"
-    if not room.book_url:
+    if not room.books_by_endpoint:
         return None
     sep = "&" if "?" in room.book_url else "?"
     return f"webhook_refresh:{room.book_url}{sep}room={room.id}"

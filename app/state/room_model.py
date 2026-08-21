@@ -17,9 +17,9 @@ mypy --strict applies via re-export through app.state.
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 ROOM_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 
@@ -27,6 +27,10 @@ ROOM_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 # collide with a hand-made page, and so orphan cleanup can recognise its
 # own output without keeping a second index.
 PAGE_ID_PREFIX = "room_"
+
+# How a room can be booked. Exported so route code can narrow a posted
+# string to it without redeclaring the literals.
+BookingMode = Literal["none", "endpoint", "caldav"]
 
 
 def page_id_for(room_id: str) -> str:
@@ -52,12 +56,12 @@ class Room(BaseModel):
     feed_id: str = ""
     location_filter: str = ""
     device_ids: list[str] = Field(default_factory=list)
+    # How this room is booked, if at all. One field rather than a URL plus
+    # an independent toggle: those two could both be set, and nothing in
+    # the model or the UI said which won. ``endpoint`` needs ``book_url``;
+    # ``caldav`` needs a feed discovered over CalDAV with credentials.
+    booking_mode: BookingMode = "none"
     book_url: str = ""
-    # Direct CalDAV booking (#90 phase 4). When on, a tap writes the event
-    # into the room's own calendar instead of POSTing to book_url. Only
-    # possible on a feed discovered over CalDAV, since an ICS export URL
-    # is not writable, and only with basic/digest auth.
-    book_caldav: bool = False
     book_minutes: int = 30
     book_summary: str = "Booked from the panel"
     enabled: bool = True
@@ -83,6 +87,24 @@ class Room(BaseModel):
             raise ValueError("room name is required")
         return v
 
+    @model_validator(mode="before")
+    @classmethod
+    def _migrate_booking(cls, data: Any) -> Any:
+        """Carry rooms written before ``booking_mode`` existed.
+
+        They stored ``book_caldav`` (bool) alongside ``book_url``, which is
+        exactly the ambiguity this replaced, so resolve it the way the old
+        dispatch did: the CalDAV toggle won over a URL.
+        """
+        if not isinstance(data, dict) or data.get("booking_mode"):
+            return data
+        data = dict(data)
+        if data.pop("book_caldav", False):
+            data["booking_mode"] = "caldav"
+        elif str(data.get("book_url") or "").strip():
+            data["booking_mode"] = "endpoint"
+        return data
+
     @field_validator("book_minutes")
     @classmethod
     def _check_book_minutes(cls, v: int) -> int:
@@ -97,6 +119,18 @@ class Room(BaseModel):
         if v and not (v.startswith("http://") or v.startswith("https://")):
             raise ValueError("book URL must be http(s)")
         return v
+
+    @property
+    def books_by_endpoint(self) -> bool:
+        return self.booking_mode == "endpoint" and bool(self.book_url)
+
+    @property
+    def books_by_caldav(self) -> bool:
+        return self.booking_mode == "caldav"
+
+    @property
+    def is_bookable(self) -> bool:
+        return self.books_by_endpoint or self.books_by_caldav
 
     def resolved_page_id(self) -> str:
         return self.page_id or page_id_for(self.id)

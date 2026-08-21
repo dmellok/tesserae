@@ -4,6 +4,32 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.325.0], 2026-08-21
+
+### Changed
+
+- **Settings → Rooms redesigned (#90).** The page rendered every room as a fully expanded
+  nine-field form stacked vertically, so eight rooms was eight identical forms with nothing
+  scannable and the add form buried at the bottom. A room is configured once and then checked on,
+  so the page is now a list of state: one row per room stating its feed, panels, booking method and
+  dashboard status, with editing behind a disclosure. Adding a room moved to the top and asks for
+  two fields instead of nine; everything else is set on the row afterwards.
+
+  Panels are checkbox cards rather than a `<select multiple>`, which hides its own state and is
+  hard to operate on a phone. Removing a room is a guarded disclosure, and deleting its dashboard
+  stays a separate, never-preselected choice. No state is conveyed by colour alone: every one is an
+  icon plus a word. Works without JavaScript throughout; the three per-room actions remain three
+  separate forms, linked by the button `form=` attribute rather than nested.
+
+- **A room has one booking method instead of two independent fields.** `book_url` and
+  `book_caldav` could both be set, and neither the model nor the UI said which won. They are
+  replaced by `booking_mode` (`none` / `endpoint` / `caldav`). Existing rooms migrate on load,
+  resolving the ambiguity the way dispatch actually did: the CalDAV toggle won over a URL.
+
+  When a room's feed cannot be written to, the CalDAV option is disabled with the reason beside it
+  naming the feed, rather than a footnote. An `.ics` URL is read-only whatever credentials it
+  carries.
+
 ## [0.324.0], 2026-08-21
 
 ### Added

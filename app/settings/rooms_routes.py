@@ -11,13 +11,13 @@ writes an ordinary page and stops. Nothing here renders.
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import Any, cast
 
 from flask import current_app, flash, redirect, render_template, request, url_for
 from werkzeug.wrappers import Response
 
 from app import rooms as rooms_service
-from app.state.room_model import Room
+from app.state.room_model import BookingMode, Room
 
 from ._shared import bp, devices, settings_store
 
@@ -84,15 +84,22 @@ def rooms_index() -> str:
     all_rooms = store.all() if store is not None else []
     pages = page_store()
     board = pages.get(rooms_service.BOARD_PAGE_ID) if pages is not None else None
+    feeds = _feeds()
+    views = [
+        rooms_service.row_view(room, feeds=feeds, devices=devices(), page_store=pages)
+        for room in all_rooms
+    ]
     return render_template(
         "settings_rooms.html",
         active="rooms",
         rooms=all_rooms,
-        feeds=_feeds(),
+        room_views=views,
+        feeds=feeds,
         panels=_panels(),
         widget_installed=_widget_installed(),
         board=board,
         board_devices=(board.device_ids if board is not None else []),
+        board_room_count=sum(1 for r in all_rooms if r.enabled),
     )
 
 
@@ -102,22 +109,65 @@ def _widget_installed() -> bool:
 
 
 def _form_room(existing: Room | None = None) -> Room:
+    """Build a Room from the posted form.
+
+    The add form carries only name and feed; everything else is set later
+    on the room's row. So absent fields fall back to the existing room's
+    values, not to defaults, or editing one section would silently reset
+    the others.
+    """
     name = (request.form.get("name") or "").strip()
     room_id = (existing.id if existing is not None else "") or _unique_id(
         room_store(), _slugify(name)
     )
+
+    def field(key: str, current: Any) -> Any:
+        raw = request.form.get(key)
+        return current if raw is None else raw.strip()
+
+    raw_mode = (request.form.get("booking_mode") or "").strip()
+    mode: BookingMode
+    if raw_mode in ("none", "endpoint", "caldav"):
+        mode = cast(BookingMode, raw_mode)
+    else:
+        mode = existing.booking_mode if existing is not None else "none"
+
+    try:
+        minutes = int(request.form.get("book_minutes") or 0) or (
+            existing.book_minutes if existing is not None else 30
+        )
+    except (TypeError, ValueError):
+        minutes = existing.book_minutes if existing is not None else 30
+
+    # A form section that wasn't posted must not clear what it doesn't
+    # carry; "panels" is only absent when its fieldset wasn't rendered.
+    if "device_ids" in request.form or "panels_present" in request.form:
+        device_ids = [d for d in request.form.getlist("device_ids") if d]
+    else:
+        device_ids = list(existing.device_ids) if existing is not None else []
+
+    if "enabled_present" in request.form:
+        enabled = request.form.get("enabled") is not None
+    else:
+        enabled = existing.enabled if existing is not None else True
+
     return Room(
         id=room_id,
-        name=name,
-        feed_id=(request.form.get("feed_id") or "").strip(),
-        location_filter=(request.form.get("location_filter") or "").strip(),
-        device_ids=[d for d in request.form.getlist("device_ids") if d],
-        book_url=(request.form.get("book_url") or "").strip(),
-        book_caldav=request.form.get("book_caldav") is not None,
-        book_minutes=int(request.form.get("book_minutes") or 30),
-        book_summary=(request.form.get("book_summary") or "Booked from the panel").strip()
+        name=name or (existing.name if existing is not None else ""),
+        feed_id=field("feed_id", existing.feed_id if existing is not None else ""),
+        location_filter=field(
+            "location_filter", existing.location_filter if existing is not None else ""
+        ),
+        device_ids=device_ids,
+        booking_mode=mode,
+        book_url=field("book_url", existing.book_url if existing is not None else ""),
+        book_minutes=minutes,
+        book_summary=field(
+            "book_summary",
+            existing.book_summary if existing is not None else "Booked from the panel",
+        )
         or "Booked from the panel",
-        enabled=request.form.get("enabled") is not None,
+        enabled=enabled,
         page_id=existing.page_id if existing is not None else "",
     )
 

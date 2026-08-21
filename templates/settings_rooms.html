@@ -1,217 +1,440 @@
 {% extends "_base.html" %}
-{% from "_components.html" import settings_tabs, card_head, empty_state, switch %}
+{% from "_components.html" import settings_tabs, switch %}
 {% block title %}Rooms, Tesserae{% endblock %}
+
+{#
+  Settings -> Rooms, per the redesign handoff.
+
+  The page is a scannable list first and an editor second: a room is set
+  up once and then checked on, so every row states its facts in the
+  summary and editing is something you open deliberately.
+
+  Everything works without JavaScript. Disclosure is <details>, and the
+  three per-room actions stay three separate <form> elements, linked by
+  the button `form=` attribute rather than nested.
+#}
+
+{% macro feed_options(feeds, selected) %}
+  <option value="">First enabled feed</option>
+  {% for feed in feeds %}
+  <option value="{{ feed.id }}" {% if feed.id == selected %}selected{% endif %}>
+    {{ feed.name }}{% if not feed.enabled %} (disabled){% endif %}
+  </option>
+  {% endfor %}
+{% endmacro %}
 
 {% block main %}
 <header class="page-head">
   <h1><i class="ph ph-door-open" aria-hidden="true"></i> Rooms</h1>
   <p class="lede">
-    Point a panel at a room's calendar and it shows whether the room is free, when that
-    changes, and what's booked next. Each room generates an ordinary dashboard, so you
-    can open and edit it like any other.
+    A room names a calendar feed and the panels that show it. Saving one builds an ordinary
+    dashboard, which you can then open and edit like any other. Bookings themselves live in
+    the calendar, never here.
   </p>
 </header>
 
 {{ settings_tabs('rooms') }}
 
+{# ---- notices ---------------------------------------------------------- #}
 {% if not widget_installed %}
-<section class="card">
-  {{ card_head('Room Status widget not installed', blurb='Rooms generate a dashboard built on it.') }}
-  <p class="muted">
-    Install <strong>Room Status</strong> from <a href="{{ url_for('auth.settings_area', area='plugins') }}">Widgets</a>,
-    then come back. You can still define rooms now; their dashboards will render once it's installed.
-  </p>
-</section>
+<div class="rooms-notice rooms-notice--warn">
+  <i class="ph ph-puzzle-piece" aria-hidden="true"></i>
+  <div>
+    <h2>The Room Status widget isn't installed</h2>
+    <p>
+      Rooms will still save and their dashboards will still build. The room rows on them
+      will just come out blank until the widget is there to draw them.
+    </p>
+    <a class="btn btn-quiet" href="{{ url_for('auth.settings_area', area='plugins') }}">
+      <i class="ph ph-download-simple" aria-hidden="true"></i> Install Room Status
+    </a>
+  </div>
+</div>
 {% endif %}
 
 {% if not feeds %}
-<section class="card">
-  {{ card_head('No calendar feeds yet', blurb='A room reads its bookings from a calendar feed.') }}
-  <p class="muted">
-    Add the room's calendar under <strong>Widgets &rarr; Calendar Feeds</strong> first. Any ICS URL
-    works, which covers Google Calendar, iCloud and Outlook. The usual setup is one feed per room.
+{# Blocking: without a feed a room has nothing to read, so this takes the
+   place of the add form rather than sitting above it as a warning. #}
+<div class="rooms-notice rooms-notice--dep">
+  <i class="ph ph-rss" aria-hidden="true"></i>
+  <div>
+    <h2>Rooms need a calendar to read</h2>
+    <p>
+      There aren't any feeds set up yet, so there's nothing for a room to show. Add one,
+      an .ics URL or a CalDAV account will do, and it'll appear in the feed list here.
+    </p>
+    <a class="btn" href="{{ url_for('auth.settings_area', area='plugins') }}">Add a calendar feed</a>
+  </div>
+</div>
+
+{% elif not rooms %}
+{# First run: the page becomes the form. Booking and the shared-calendar
+   match are deliberately absent, being noise before a room exists and
+   one click away afterwards. #}
+<section class="rooms-first">
+  <div class="rooms-first__badge"><i class="ph ph-door-open" aria-hidden="true"></i></div>
+  <h1>Add your first room</h1>
+  <p class="rooms-first__lede">
+    A room is just configuration: the calendar it reads and the panels that show it. Save one
+    and Tesserae builds it an ordinary dashboard, the kind you can open and edit yourself.
+    Bookings stay in the calendar; nothing is stored here.
   </p>
-</section>
-{% endif %}
-
-{# ---- Existing rooms ------------------------------------------------------ #}
-{% for room in rooms %}
-<section class="card">
-  {{ card_head(room.name, blurb=('Disabled.' if not room.enabled else ('Shown on ' ~ room.device_ids|length ~ ' panel' ~ ('' if room.device_ids|length == 1 else 's') if room.device_ids else 'No panel bound yet.'))) }}
-  <form method="post" action="{{ url_for('auth.rooms_update', room_id=room.id) }}" class="form">
+  <form method="post" action="{{ url_for('auth.rooms_create') }}" class="card form">
     <div class="field">
-      <label for="name-{{ room.id }}">Room name</label>
-      <input id="name-{{ room.id }}" type="text" name="name" value="{{ room.name }}" required>
-      <p class="help">Shown on the panel. The room's id (<code>{{ room.id }}</code>) doesn't change.</p>
+      <label for="first-name">Room name</label>
+      <input id="first-name" type="text" name="name" placeholder="e.g. Kestrel" required>
     </div>
-
     <div class="field">
-      <label for="feed-{{ room.id }}">Calendar feed</label>
-      <select id="feed-{{ room.id }}" name="feed_id">
-        <option value="">First enabled feed</option>
-        {% for feed in feeds %}
-        <option value="{{ feed.id }}" {% if feed.id == room.feed_id %}selected{% endif %}>
-          {{ feed.name }}{% if not feed.enabled %} (disabled){% endif %}
-        </option>
-        {% endfor %}
-      </select>
+      <label for="first-feed">Calendar feed</label>
+      <select id="first-feed" name="feed_id">{{ feed_options(feeds, '') }}</select>
     </div>
-
-    <div class="field">
-      <label for="loc-{{ room.id }}">Room name in the calendar (optional)</label>
-      <input id="loc-{{ room.id }}" type="text" name="location_filter" value="{{ room.location_filter }}"
-             placeholder="Kestrel">
-      <p class="help">
-        Only needed when one calendar carries several rooms. Events are matched on their
-        location field. Leave blank when the feed is this room's own calendar.
-      </p>
-    </div>
-
-    <div class="field">
-      <label for="panels-{{ room.id }}">Panels</label>
-      <select id="panels-{{ room.id }}" name="device_ids" multiple size="{{ [panels|length, 6]|min if panels else 1 }}">
+    <fieldset class="field">
+      <legend>Panels <span class="muted">&mdash; optional</span></legend>
+      <input type="hidden" name="panels_present" value="1">
+      <div class="panel-grid">
         {% for panel in panels %}
-        <option value="{{ panel.id }}" {% if panel.id in room.device_ids %}selected{% endif %}>
-          {{ panel.display_name }}
-        </option>
+        <label>
+          <input type="checkbox" name="device_ids" value="{{ panel.id }}"> {{ panel.display_name }}
+        </label>
         {% endfor %}
-      </select>
-      <p class="help">The displays showing this room. Each sizes its own layout.</p>
-    </div>
-
-    <div class="field">
-      <label for="book-{{ room.id }}">Booking endpoint (optional)</label>
-      <input id="book-{{ room.id }}" type="url" name="book_url" value="{{ room.book_url }}"
-             placeholder="https://your-server/book">
+      </div>
       <p class="help">
-        Tesserae never writes to your calendar. Set this and the panel shows a book button
-        that POSTs here, then repaints. Whatever owns the calendar does the booking.
+        Skip this if the panel isn't on the wall yet. You can bind it later without
+        rebuilding anything by hand.
       </p>
-    </div>
-
-    {{ switch('caldav-' ~ room.id, 'book_caldav', 'Book directly in this calendar',
-              checked=room.book_caldav,
-              help='Writes the booking over CalDAV instead of POSTing to an endpoint. Needs a feed added by CalDAV discovery with a username and password; an ICS export URL cannot be written to. Google and Microsoft 365 need OAuth and are not supported here, so use a booking endpoint for those.') }}
-
-    <div class="field">
-      <label for="mins-{{ room.id }}">Booking length (minutes)</label>
-      <input id="mins-{{ room.id }}" type="number" name="book_minutes" min="5" max="480"
-             value="{{ room.book_minutes }}">
-    </div>
-
-    <div class="field">
-      <label for="summary-{{ room.id }}">Booking title</label>
-      <input id="summary-{{ room.id }}" type="text" name="book_summary" value="{{ room.book_summary }}">
-      <p class="help">What the event is called in the calendar.</p>
-    </div>
-
-    {{ switch('enabled-' ~ room.id, 'enabled', 'Enabled', checked=room.enabled,
-              help='Off keeps the room configured but stops regenerating its dashboard.') }}
-
+    </fieldset>
+    <input type="hidden" name="enabled_present" value="1">
+    <input type="hidden" name="enabled" value="on">
     <div class="actions">
-      <button type="submit" class="btn">Save</button>
-      {% if room.page_id %}
-      <a class="btn btn-quiet" href="{{ url_for('pages.edit', page_id=room.page_id) }}">Open dashboard</a>
-      {% endif %}
-    </div>
-  </form>
-
-  <form method="post" action="{{ url_for('auth.rooms_resync', room_id=room.id) }}" class="form form-inline">
-    <button type="submit" class="btn btn-quiet">Rebuild dashboard</button>
-    <span class="help">Discards hand edits to the generated dashboard and regenerates it.</span>
-  </form>
-
-  <form method="post" action="{{ url_for('auth.rooms_delete', room_id=room.id) }}" class="form form-inline"
-        onsubmit="return confirm('Remove {{ room.name }}?');">
-    <label class="check">
-      <input type="checkbox" name="delete_page" checked>
-      Also delete its dashboard
-    </label>
-    <button type="submit" class="btn btn-danger">Remove room</button>
-  </form>
-</section>
-{% else %}
-<section class="card">
-  {{ empty_state('door-open', 'No rooms yet', 'Add one below. It generates its own dashboard, ready to bind to a panel.') }}
-</section>
-{% endfor %}
-
-{# ---- Board --------------------------------------------------------------- #}
-{% if rooms %}
-<section class="card">
-  {{ card_head('Room board', blurb='One panel, every room, a row each. For a lobby or corridor.') }}
-  <form method="post" action="{{ url_for('auth.rooms_board') }}" class="form">
-    <div class="field">
-      <label for="board-panels">Panels</label>
-      <select id="board-panels" name="device_ids" multiple size="{{ [panels|length, 6]|min if panels else 1 }}">
-        {% for panel in panels %}
-        <option value="{{ panel.id }}" {% if panel.id in board_devices %}selected{% endif %}>
-          {{ panel.display_name }}
-        </option>
-        {% endfor %}
-      </select>
-      <p class="help">The board is a normal dashboard; bind it to whichever display shows the overview.</p>
-    </div>
-    <div class="actions">
-      <button type="submit" class="btn">{{ 'Rebuild board' if board else 'Build board' }}</button>
-      {% if board %}
-      <a class="btn btn-quiet" href="{{ url_for('pages.edit', page_id=board.id) }}">Open board</a>
-      {% endif %}
+      <button type="submit" class="btn">Create room and build its dashboard</button>
     </div>
     <p class="help">
-      Rebuild after adding or removing a room: the rows are laid out for the number of rooms
-      enabled at build time. Booking is off on a board, so a tap can't book whichever room the
-      finger landed on.
+      Booking, and the setting for calendars that cover several rooms, appear on the room's
+      row once it exists.
     </p>
   </form>
 </section>
 {% endif %}
 
-{# ---- Add a room ---------------------------------------------------------- #}
-<section class="card">
-  {{ card_head('Add a room', blurb='Names a calendar and the panels showing it.') }}
-  <form method="post" action="{{ url_for('auth.rooms_create') }}" class="form">
-    <div class="field">
-      <label for="new-name">Room name</label>
-      <input id="new-name" type="text" name="name" placeholder="Kestrel" required>
-    </div>
+{% if feeds and rooms %}
+{# ---- add a room, at the top ------------------------------------------- #}
+<form method="post" action="{{ url_for('auth.rooms_create') }}" class="rooms-add">
+  <span class="rooms-add__lead"><i class="ph ph-plus-circle" aria-hidden="true"></i> Add a room</span>
+  <div class="field">
+    <label for="add-name">Room name</label>
+    <input id="add-name" type="text" name="name" placeholder="e.g. Sunflower" required>
+  </div>
+  <div class="field">
+    <label for="add-feed">Calendar feed</label>
+    <select id="add-feed" name="feed_id">{{ feed_options(feeds, '') }}</select>
+  </div>
+  <input type="hidden" name="enabled_present" value="1">
+  <input type="hidden" name="enabled" value="on">
+  <button type="submit" class="btn">Add room</button>
+  <p class="help rooms-add__note">
+    Panels, booking and the rest you can set on the room's row once it's on the list.
+  </p>
+</form>
 
-    <div class="field">
-      <label for="new-feed">Calendar feed</label>
-      <select id="new-feed" name="feed_id">
-        <option value="">First enabled feed</option>
-        {% for feed in feeds %}
-        <option value="{{ feed.id }}">{{ feed.name }}{% if not feed.enabled %} (disabled){% endif %}</option>
-        {% endfor %}
-      </select>
-    </div>
+{# ---- the list ---------------------------------------------------------- #}
+<div class="rooms-eyebrow">
+  <h2>{{ rooms|length }} room{{ '' if rooms|length == 1 else 's' }}</h2>
+</div>
 
-    <div class="field">
-      <label for="new-loc">Room name in the calendar (optional)</label>
-      <input id="new-loc" type="text" name="location_filter" placeholder="Kestrel">
-      <p class="help">Only when one calendar carries several rooms.</p>
-    </div>
+<div class="rooms-list">
+  {# aria-hidden: every cell below states its own meaning in words, so
+     this is redundant to a screen reader, and it is dropped when narrow. #}
+  <div class="rooms-grid rooms-head" aria-hidden="true">
+    <span></span><span>Room</span><span>Calendar feed</span><span>Panels</span>
+    <span>Booking</span><span>Dashboard</span><span></span>
+  </div>
 
-    <div class="field">
-      <label for="new-panels">Panels</label>
-      <select id="new-panels" name="device_ids" multiple size="{{ [panels|length, 6]|min if panels else 1 }}">
+  {% for view in room_views %}
+  {% set room = view.room %}
+  <details class="room-row">
+    <summary class="rooms-grid">
+      <span class="caret" aria-hidden="true"><i class="ph ph-caret-right"></i></span>
+
+      <span class="room-cell room-cell--name">
+        {{ room.name }}
+        {% if room.location_filter %}
+        <span class="room-cell__mono">LOCATION "{{ room.location_filter }}"</span>
+        {% endif %}
+      </span>
+
+      <span class="room-cell">
+        {% if view.feed_missing %}
+        <span class="is-warn"><i class="ph-fill ph-warning" aria-hidden="true"></i> Feed missing</span>
+        <span class="room-cell__sub">{{ room.feed_id }} isn't configured</span>
+        {% elif view.feed_name %}
+        {{ view.feed_name }}
+        {% if view.feed_implicit %}<span class="room-cell__sub">first enabled feed</span>{% endif %}
+        {% else %}
+        <span class="is-warn"><i class="ph-fill ph-warning" aria-hidden="true"></i> No feed</span>
+        {% endif %}
+      </span>
+
+      <span class="room-cell">
+        {% if view.panels %}
+        {{ view.panels | map(attribute='name') | join(', ') }}
+        {% else %}
+        <span class="is-off"><i class="ph ph-link-break" aria-hidden="true"></i> No panel yet</span>
+        {% endif %}
+      </span>
+
+      <span class="room-cell">
+        {% if room.booking_mode == 'endpoint' %}
+        <span class="is-on"><i class="ph ph-paper-plane-tilt" aria-hidden="true"></i></span> Endpoint
+        {% elif room.booking_mode == 'caldav' %}
+        <span class="is-on"><i class="ph ph-calendar-plus" aria-hidden="true"></i></span> In calendar
+        {% else %}
+        <span class="is-off">Off</span>
+        {% endif %}
+      </span>
+
+      <span class="room-cell">
+        {% if room.enabled %}
+        <span class="is-on"><i class="ph ph-check-circle" aria-hidden="true"></i></span> Enabled
+        {% else %}
+        <span class="is-warn"><i class="ph-fill ph-pause-circle" aria-hidden="true"></i> Paused</span>
+        {% endif %}
+        {% if view.dashboard_built_at %}
+        <span class="room-cell__sub">built {{ view.dashboard_built_at[:16] | replace('T', ' ') }}</span>
+        {% elif not view.dashboard_exists %}
+        <span class="room-cell__sub">not built yet</span>
+        {% endif %}
+      </span>
+
+      <span></span>
+    </summary>
+
+    <div class="room-edit">
+      <form id="room-{{ room.id }}" method="post"
+            action="{{ url_for('auth.rooms_update', room_id=room.id) }}" class="form room-edit__grid">
+        <div class="field">
+          <label for="name-{{ room.id }}">Room name</label>
+          <input id="name-{{ room.id }}" type="text" name="name" value="{{ room.name }}" required>
+          <p class="help">Shown on the panel by the door.</p>
+        </div>
+
+        <div class="field">
+          <label for="feed-{{ room.id }}">Calendar feed</label>
+          <select id="feed-{{ room.id }}" name="feed_id">{{ feed_options(feeds, room.feed_id) }}</select>
+          <p class="help">
+            Managed under <a href="{{ url_for('auth.settings_area', area='plugins') }}">Calendar feeds</a>.
+          </p>
+        </div>
+
+        {# Labelled by its condition, not by its field: the field means
+           nothing unless the condition holds. #}
+        <details class="room-sub span-2" {% if room.location_filter %}open{% endif %}>
+          <summary>
+            <span>This feed covers more than one room</span>
+            {% if room.location_filter %}
+            <span class="room-sub__state">{{ room.location_filter }}</span>
+            {% endif %}
+          </summary>
+          <div class="field">
+            <label for="loc-{{ room.id }}">Room name in the calendar</label>
+            <input id="loc-{{ room.id }}" type="text" name="location_filter"
+                   value="{{ room.location_filter }}" placeholder="Kestrel">
+            <p class="help">
+              Matched against each event's <code>LOCATION</code>. Leave it blank when the feed
+              belongs to this room alone.
+            </p>
+          </div>
+        </details>
+
+        <fieldset class="field span-2">
+          <legend>Panels</legend>
+          <input type="hidden" name="panels_present" value="1">
+          <div class="panel-grid">
+            {% for panel in panels %}
+            <label>
+              <input type="checkbox" name="device_ids" value="{{ panel.id }}"
+                     {% if panel.id in room.device_ids %}checked{% endif %}>
+              {{ panel.display_name }}
+            </label>
+            {% endfor %}
+          </div>
+          <p class="help">
+            Optional. The dashboard is built either way, so you can bind a panel whenever
+            it arrives.
+          </p>
+        </fieldset>
+
+        <div class="field span-2">
+          <input type="hidden" name="enabled_present" value="1">
+          {{ switch('enabled-' ~ room.id, 'enabled', 'Enabled', checked=room.enabled,
+                    help='Turn this off to keep the settings and stop rebuilding the dashboard. The dashboard itself stays where it is.') }}
+        </div>
+
+        <details class="room-sub span-2" {% if room.is_bookable %}open{% endif %}>
+          <summary>
+            <span>Booking</span>
+            <span class="room-sub__state">
+              {%- if room.booking_mode == 'caldav' %}In calendar &middot; {{ room.book_minutes }} min
+              {%- elif room.booking_mode == 'endpoint' %}Endpoint &middot; {{ room.book_minutes }} min
+              {%- else %}Not bookable{% endif -%}
+            </span>
+          </summary>
+
+          <fieldset class="booking-modes">
+            <legend class="visually-hidden">How this room is booked</legend>
+
+            <label>
+              <input type="radio" name="booking_mode" value="none"
+                     {% if room.booking_mode == 'none' %}checked{% endif %}>
+              <span>
+                <strong>Not bookable</strong>
+                <p class="help">The panel shows the schedule and nothing else.</p>
+              </span>
+            </label>
+
+            <label>
+              <input type="radio" name="booking_mode" value="endpoint"
+                     {% if room.booking_mode == 'endpoint' %}checked{% endif %}>
+              <span>
+                <strong>Post to a booking endpoint</strong>
+                <p class="help">The panel shows a book button that POSTs to a URL you run.</p>
+              </span>
+            </label>
+            <div class="field booking-indent">
+              <label for="url-{{ room.id }}">Endpoint URL</label>
+              <input id="url-{{ room.id }}" type="url" name="book_url" value="{{ room.book_url }}"
+                     placeholder="https://your-server/book">
+            </div>
+
+            <label>
+              <input type="radio" name="booking_mode" value="caldav"
+                     {% if not view.can_write %}disabled{% endif %}
+                     {% if room.booking_mode == 'caldav' %}checked{% endif %}>
+              <span>
+                <strong>Write straight into this calendar</strong>
+                {% if view.can_write %}
+                <p class="help">Tesserae creates the event itself, with no endpoint in between.</p>
+                {% else %}
+                {# The reason sits where the sub-copy would, not in a
+                   footnote, because it names the fix. #}
+                <p class="help">
+                  Needs a CalDAV feed with saved credentials.
+                  {% if view.feed_name %}{{ view.feed_name }} can't be written to as it stands.{% endif %}
+                  <a href="{{ url_for('auth.settings_area', area='plugins') }}">Set up CalDAV</a>
+                </p>
+                {% endif %}
+              </span>
+            </label>
+          </fieldset>
+
+          <div class="field">
+            <label for="mins-{{ room.id }}">Booking length (minutes)</label>
+            <input id="mins-{{ room.id }}" type="number" name="book_minutes"
+                   min="5" max="480" step="5" value="{{ room.book_minutes }}">
+          </div>
+          <div class="field">
+            <label for="summary-{{ room.id }}">Booking title</label>
+            <input id="summary-{{ room.id }}" type="text" name="book_summary"
+                   value="{{ room.book_summary }}">
+            <p class="help">
+              Used by whichever booking method you pick. Ignored while the room isn't bookable.
+            </p>
+          </div>
+        </details>
+
+        <div class="actions span-2">
+          <button type="submit" class="btn">Save changes</button>
+          {% if view.dashboard_exists %}
+          <a class="btn btn-quiet" href="{{ url_for('pages.edit', page_id=room.resolved_page_id()) }}">
+            <i class="ph ph-arrow-square-out" aria-hidden="true"></i> Open dashboard
+          </a>
+          {% endif %}
+          {# form= posts a different form from inside this one: valid HTML,
+             no nesting, no JavaScript. #}
+          <button type="submit" class="btn btn-quiet" form="rebuild-{{ room.id }}">
+            <i class="ph ph-arrows-clockwise" aria-hidden="true"></i> Rebuild dashboard
+          </button>
+          <span class="help">
+            Rebuilding regenerates from these settings and discards edits made to the dashboard
+            by hand.
+          </span>
+        </div>
+      </form>
+
+      <form id="rebuild-{{ room.id }}" method="post"
+            action="{{ url_for('auth.rooms_resync', room_id=room.id) }}"></form>
+
+      <details class="room-danger">
+        <summary><i class="ph ph-trash" aria-hidden="true"></i> Remove room&hellip;</summary>
+        <form method="post" action="{{ url_for('auth.rooms_delete', room_id=room.id) }}"
+              class="room-danger__panel">
+          <p>
+            Removing <strong>{{ room.name }}</strong> deletes its settings here. The dashboard
+            it generated stays where it is unless you ask for that too.
+          </p>
+          {# Never pre-ticked: deleting the room and deleting its dashboard
+             stay two separate, explicit choices. #}
+          <label class="check">
+            <input type="checkbox" name="delete_page"> Also delete the dashboard it generated
+          </label>
+          <button type="submit" class="btn btn-danger">Remove {{ room.name }}</button>
+        </form>
+      </details>
+    </div>
+  </details>
+  {% endfor %}
+</div>
+
+{# ---- board -------------------------------------------------------------- #}
+<section class="rooms-board">
+  <h2>Room board</h2>
+  <p class="lede">
+    One dashboard with a row per room, for the display in a lobby or a corridor. It's built
+    from the rooms above, so it follows them as they change.
+  </p>
+
+  {% if rooms|length < 2 %}
+  <p class="help">
+    Worth setting up once you have a few rooms. With one room it's the same as that room's
+    own dashboard.
+  </p>
+  <form method="post" action="{{ url_for('auth.rooms_board') }}">
+    <button type="submit" class="btn btn-quiet">Set up a board anyway</button>
+  </form>
+  {% else %}
+  {% if board %}
+  <div class="board-status">
+    <i class="ph ph-monitor" aria-hidden="true"></i>
+    <span>
+      <strong>Built</strong>
+      {{ board.updated_at[:16] | replace('T', ' ') if board.updated_at else 'just now' }}
+      &middot; showing {{ board.cells|length }} of {{ board_room_count }} enabled rooms
+    </span>
+    <a class="btn btn-quiet board-status__spacer"
+       href="{{ url_for('pages.edit', page_id=board.id) }}">Open board</a>
+  </div>
+  {% endif %}
+  <form method="post" action="{{ url_for('auth.rooms_board') }}" class="form">
+    <fieldset class="field">
+      <legend>Panels showing the board</legend>
+      <div class="panel-grid">
         {% for panel in panels %}
-        <option value="{{ panel.id }}">{{ panel.display_name }}</option>
+        <label>
+          <input type="checkbox" name="device_ids" value="{{ panel.id }}"
+                 {% if panel.id in board_devices %}checked{% endif %}>
+          {{ panel.display_name }}
+        </label>
         {% endfor %}
-      </select>
-      <p class="help">Optional now; you can bind a panel later.</p>
-    </div>
-
-    <div class="field">
-      <label for="new-book">Booking endpoint (optional)</label>
-      <input id="new-book" type="url" name="book_url" placeholder="https://your-server/book">
-    </div>
-
-    {{ switch('new-enabled', 'enabled', 'Enabled', checked=True) }}
-
+      </div>
+      <p class="help">Paused rooms are left off the board either way.</p>
+    </fieldset>
     <div class="actions">
-      <button type="submit" class="btn">Add room</button>
+      <button type="submit" class="btn">
+        {% if board %}<i class="ph ph-arrows-clockwise" aria-hidden="true"></i> Rebuild board
+        {% else %}Build board{% endif %}
+      </button>
     </div>
   </form>
+  {% endif %}
 </section>
+{% endif %}
 {% endblock %}

@@ -1564,7 +1564,7 @@ class ButtonService:
             if room is None:
                 log.warning("room_book: no such room %r (device=%s)", room_id, device_id)
                 return
-            if not room.book_caldav:
+            if not room.books_by_caldav:
                 log.warning("room_book: %r does not have calendar booking on", room_id)
                 return
             registry = current_app.config.get("PLUGIN_REGISTRY")

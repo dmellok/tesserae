@@ -1,0 +1,297 @@
+/* Settings -> Rooms.
+ *
+ * Layout, hierarchy and interaction follow the Rooms redesign handoff;
+ * the colours do not. The handoff specifies its own green and grey ramp,
+ * which would make this the one page in Settings that looks like a
+ * different product. Every value below maps onto the admin tokens in
+ * base.css instead, so Rooms inherits themes like every other page.
+ *
+ * The load-bearing idea: a room is configured once and then checked on,
+ * so the default state is a scannable list of facts and editing is
+ * something you enter deliberately.
+ */
+
+/* ---- add a room ------------------------------------------------------ */
+
+.rooms-add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 14px 18px;
+  padding: 16px 18px;
+  background: var(--t-surface);
+  border: 1px solid var(--t-border);
+  border-radius: 10px;
+}
+.rooms-add__lead {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--t-fg);
+}
+.rooms-add__lead i { color: var(--t-accent); font-size: 17px; }
+.rooms-add .field { flex: 1 1 200px; min-width: 170px; margin: 0; }
+.rooms-add__note { flex: 1 1 100%; margin: 0; }
+
+/* ---- list ------------------------------------------------------------ */
+
+.rooms-eyebrow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 30px 0 10px;
+}
+.rooms-eyebrow h2 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--t-muted);
+}
+
+.rooms-list {
+  background: var(--t-surface);
+  border: 1px solid var(--t-border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+/* One grid shared by the header and every summary row, so the columns
+   line up without the header knowing about the rows. */
+.rooms-grid {
+  display: grid;
+  grid-template-columns:
+    22px
+    minmax(112px, 1.5fr)
+    minmax(104px, 1.45fr)
+    minmax(88px, 1.25fr)
+    82px
+    minmax(96px, 1.3fr)
+    100px;
+  gap: 0 14px;
+  align-items: start;
+  padding: 13px 18px;
+}
+
+.rooms-head {
+  padding: 9px 18px;
+  background: var(--t-surface-sunk);
+  border-bottom: 1px solid var(--t-border);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--t-muted);
+}
+
+.room-row { border-bottom: 1px solid var(--t-border); }
+.room-row:last-child { border-bottom: 0; }
+.room-row[open] { background: var(--t-surface-soft); }
+.room-row > summary {
+  list-style: none;
+  cursor: pointer;
+  background: var(--t-surface);
+}
+.room-row > summary::-webkit-details-marker { display: none; }
+.room-row > summary:hover { background: var(--t-surface-soft); }
+.room-row > summary:focus-visible {
+  outline: 2px solid var(--t-accent);
+  outline-offset: -2px;
+}
+
+.caret { color: var(--t-muted); font-size: 14px; transition: transform 120ms ease; }
+.room-row[open] > summary .caret { transform: rotate(90deg); color: var(--t-accent); }
+@media (prefers-reduced-motion: reduce) { .caret { transition: none; } }
+
+.room-cell { min-width: 0; font-size: 13px; line-height: 1.35; color: var(--t-fg-soft); }
+.room-cell--name { font-size: 14.5px; font-weight: 600; color: var(--t-fg); }
+.room-cell__sub { display: block; font-size: 12px; color: var(--t-muted); }
+.room-cell__mono {
+  display: block;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 11.5px;
+  color: var(--t-muted);
+}
+.room-cell i { font-size: 14px; vertical-align: -1px; }
+
+/* State is always an icon plus a word. Colour only ever reinforces, so
+   the list stays readable for anyone who can't separate these hues. */
+.is-on   { color: var(--t-accent); }
+.is-warn { color: #8a5a10; font-weight: 600; }
+.is-off  { color: var(--t-muted); }
+
+/* ---- expanded editor ------------------------------------------------- */
+
+.room-edit {
+  padding: 22px 24px 24px 40px;
+  border-top: 1px solid var(--t-border);
+}
+.room-edit__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 20px 28px;
+  max-width: 860px;
+}
+.room-edit__grid > .span-2 { grid-column: 1 / -1; }
+.room-edit .field { margin: 0; }
+
+.room-sub {
+  border: 1px solid var(--t-border);
+  border-radius: 7px;
+  background: var(--t-surface-sunk);
+  padding: 14px 16px;
+}
+.room-sub > summary {
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.room-sub > summary:focus-visible { outline: 2px solid var(--t-accent); outline-offset: 2px; }
+.room-sub__state { font-weight: 400; color: var(--t-muted); }
+.room-sub > *:not(summary) { margin-top: 14px; }
+
+/* Panel picker: checkboxes rather than a multi-select, which hides its
+   own state and is miserable on a phone. */
+.panel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 8px 18px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.panel-grid label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid var(--t-border);
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.panel-grid label:hover { border-color: var(--t-border-strong); }
+.panel-grid input { accent-color: var(--t-accent); }
+
+.booking-modes { display: grid; gap: 10px; margin: 0; padding: 0; border: 0; }
+.booking-modes label { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
+.booking-modes input { margin-top: 3px; accent-color: var(--t-accent); }
+.booking-modes .help { margin: 2px 0 0; }
+.booking-modes label:has(input:disabled) { cursor: not-allowed; color: var(--t-muted); }
+.booking-indent { margin-left: 30px; }
+
+/* ---- destructive ------------------------------------------------------ */
+
+.room-danger { margin-top: 18px; }
+.room-danger > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #9d2b20;
+  border: 1px solid #e6cfcc;
+  border-radius: 6px;
+  padding: 7px 12px;
+  background: var(--t-surface);
+  list-style: none;
+}
+.room-danger > summary::-webkit-details-marker { display: none; }
+.room-danger > summary:hover { background: #fdf3f2; }
+.room-danger > summary:focus-visible { outline: 2px solid #9d2b20; outline-offset: 2px; }
+.room-danger__panel {
+  margin-top: 12px;
+  background: #fdf3f2;
+  border: 1px solid #e6cfcc;
+  border-radius: 8px;
+  padding: 15px 16px;
+  max-width: 470px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #6d322c;
+}
+.room-danger__panel .check { margin: 12px 0; }
+
+/* ---- board ------------------------------------------------------------ */
+
+.rooms-board {
+  margin-top: 34px;
+  padding-top: 28px;
+  border-top: 1px solid var(--t-border-strong);
+}
+.rooms-board h2 { font-size: 19px; font-weight: 600; margin: 0 0 6px; letter-spacing: -0.01em; }
+.board-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  background: var(--t-surface-sunk);
+  border: 1px solid var(--t-border);
+  border-radius: 8px;
+  padding: 14px 18px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+.board-status__spacer { margin-left: auto; }
+
+/* ---- notices ----------------------------------------------------------- */
+
+.rooms-notice {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  border-radius: 8px;
+  padding: 16px 18px;
+  margin-bottom: 18px;
+}
+.rooms-notice--dep {
+  background: var(--t-surface);
+  border: 1px solid var(--t-border);
+  border-left: 3px solid var(--t-accent);
+}
+.rooms-notice--dep i { color: var(--t-accent); font-size: 20px; }
+.rooms-notice--warn { background: #fdf6e9; border: 1px solid #ecdcbe; }
+.rooms-notice--warn i { color: #8a5a10; font-size: 18px; }
+.rooms-notice h2 { font-size: 14.5px; font-weight: 600; margin: 0 0 4px; }
+.rooms-notice p { margin: 0 0 10px; font-size: 13.5px; line-height: 1.55; }
+
+/* First run: the page becomes the form, with no empty table above it. */
+.rooms-first { max-width: 580px; margin: 0 auto; padding: 32px 0 40px; }
+.rooms-first__badge {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: var(--t-accent-soft);
+  display: grid;
+  place-items: center;
+  margin-bottom: 16px;
+}
+.rooms-first__badge i { font-size: 23px; color: var(--t-accent); }
+.rooms-first h1 { font-size: 25px; font-weight: 600; margin: 0 0 10px; }
+.rooms-first__lede { font-size: 14.5px; line-height: 1.62; color: var(--t-fg-soft); margin: 0 0 22px; }
+
+/* ---- narrow ------------------------------------------------------------ */
+
+/* 720px sits just under the row grid's ~724px minimum, so no width ever
+   clips a column: it stacks before it would have to. */
+@media (max-width: 720px) {
+  .rooms-head { display: none; }
+  .room-row > summary { display: block; padding: 13px 15px; }
+  .room-summary-narrow { display: flex; flex-wrap: wrap; gap: 5px 12px; font-size: 12.5px; }
+  .room-edit { padding: 18px 15px; }
+  .room-edit__grid { grid-template-columns: 1fr; }
+  .rooms-add { flex-direction: column; align-items: stretch; }
+  .room-edit .actions { flex-direction: column; align-items: stretch; }
+  /* Every tap target clears 44px. */
+  .room-edit .btn,
+  .panel-grid label { min-height: 44px; }
+}
