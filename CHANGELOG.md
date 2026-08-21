@@ -4,6 +4,49 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.324.0], 2026-08-21
+
+### Added
+
+- **Room board (#90).** Settings → Rooms builds one dashboard carrying a row per enabled room, for
+  a lobby or corridor display. It needs no widget of its own: a board is a generated page with a
+  `room_status` cell per room, so it inherits every fix the widget gets. Booking is off on a board,
+  because a tap would book whichever room the finger landed on. Rebuild after adding or removing a
+  room, since the row geometry depends on how many there are.
+
+- **Booking from a room panel (#90).** Set a room's booking endpoint and its panel shows a book
+  button; a tap POSTs there and repaints a few seconds later, so the panel shows the room it just
+  booked. The room id rides in the query string (`?room=kestrel`), because the webhook payload
+  carries the device and, only for a rotation-bound page, a page id; a room panel is normally bound
+  directly, so one endpoint serving several rooms could not otherwise tell which was tapped. An
+  operator's own query string is preserved.
+
+- **Book a room directly over CalDAV (#90).** A room whose feed was added by CalDAV discovery and
+  carries a username and password can be booked with no endpoint in between: a tap writes the event
+  into the room's own calendar. New `room_book:<id>` action, side-effecting like the webhook
+  actions, so widget markup cannot aim it.
+
+  One `PUT` of one `VEVENT`, reusing the collection URL, credentials and HTTP opener `calendar_core`
+  already stored, so no new credential storage and no new auth surface. Basic and digest only,
+  covering Radicale, Baikal, Nextcloud and iCloud app passwords; Google and Microsoft 365 need OAuth
+  with a registered application and use a booking endpoint instead. `If-None-Match: *` makes it a
+  create, never an overwrite, so a collision fails rather than replacing an existing meeting.
+  Availability is not pre-checked: between checking and writing someone else can book anyway, and
+  the calendar server is the only thing that can arbitrate.
+
+- **Rooms documentation** at `docs/install/rooms.md`: setup, the shared-calendar location filter,
+  the board, what a booking endpoint receives, the CalDAV requirements, and why `POST /api/v1/push`
+  from the receiving server beats the timed repaint.
+
+### Fixed
+
+- **CalDAV write failures pointed at the wrong problem.** Found by running the booking path against
+  a real Radicale server rather than a stub. A collection that doesn't exist answers `409`, not
+  `404`, and was falling through to a bare "the calendar returned HTTP 409"; it now says no calendar
+  exists at that address, which is the likeliest real misconfiguration. A `403` was reported as
+  rejected credentials, sending an operator to re-check a password that was never wrong; it now says
+  the login was accepted and the write refused. `401` keeps the credentials message.
+
 ## [0.323.0], 2026-08-21
 
 ### Added
