@@ -97,14 +97,52 @@ def test_plugin_assets_bypass_the_gate_but_admin_pages_do_not() -> None:
     widget's ``client.js`` and static assets while composing. It is not meant
     to cover a plugin's admin page: those list loader errors and plugin
     contents, and some (gtfs's stop finder) turn a query argument into an
-    outbound HTTP request. A trailing slash used to satisfy the old
-    "has a second segment" test, so every one of them was reachable without
-    a session from loopback."""
-    assert auth._path_is_loopback_only("/plugins/gtfs/client.js") is True
-    assert auth._path_is_loopback_only("/plugins/weather_now/client.css") is True
-    assert auth._path_is_loopback_only("/plugins/f1_next_race/static/circuits/monza.svg") is True
+    outbound HTTP request.
 
-    assert auth._path_is_loopback_only("/plugins/") is False
-    assert auth._path_is_loopback_only("/plugins/gtfs") is False
-    assert auth._path_is_loopback_only("/plugins/gtfs/") is False
-    assert auth._path_is_loopback_only("/plugins/calendar_core/") is False
+    The decision is the resolved ENDPOINT, not the path. Path shape cannot
+    tell the asset handler apart from a plugin's own blueprint routes, which
+    mount under the same prefix."""
+    asset = "plugins.plugin_asset"
+    assert auth._path_is_loopback_only("/plugins/gtfs/client.js", asset) is True
+    assert auth._path_is_loopback_only("/plugins/weather_now/client.css", asset) is True
+    assert (
+        auth._path_is_loopback_only("/plugins/f1_next_race/static/circuits/monza.svg", asset)
+        is True
+    )
+
+    assert auth._path_is_loopback_only("/plugins/", "plugins.plugins_index") is False
+    assert auth._path_is_loopback_only("/plugins/gtfs/", "gtfs_admin.index") is False
+    assert (
+        auth._path_is_loopback_only("/plugins/calendar_core/", "calendar_core_admin.index") is False
+    )
+
+    # A plugin blueprint route that merely LOOKS like an asset path.
+    assert (
+        auth._path_is_loopback_only(
+            "/plugins/picture_gallery/folders/holidays/delete",
+            "picture_gallery_admin.delete_folder",
+        )
+        is False
+    )
+    # An unmatched path resolves to no endpoint and grants nothing.
+    assert auth._path_is_loopback_only("/plugins/gtfs/client.js", None) is False
+
+    # A plugin's declared render-safe endpoint passes; its undeclared
+    # siblings on the same blueprint do not.
+    declared = frozenset({"picture_gallery_admin.serve_image"})
+    assert (
+        auth._path_is_loopback_only(
+            "/plugins/picture_gallery/folders/holidays/a.jpg",
+            "picture_gallery_admin.serve_image",
+            declared,
+        )
+        is True
+    )
+    assert (
+        auth._path_is_loopback_only(
+            "/plugins/picture_gallery/folders/holidays/delete",
+            "picture_gallery_admin.delete_folder",
+            declared,
+        )
+        is False
+    )

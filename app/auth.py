@@ -100,12 +100,21 @@ _LOOPBACK_PATHS: Final[tuple[str, ...]] = (
     "/page-assets/",
 )
 _LAN_PATHS: Final[tuple[str, ...]] = ("/renders/", "/preview/", "/mirror/")
-# Plugin assets, /plugins/<id>/<asset> only, NOT /plugins/ (the admin
-# index, which stays authed). The composer's dynamic import pulls
+# The ONE plugin route the loopback exemption is for: the static asset
+# handler in app.plugin_loader, whose own allowlist (_ALLOWED_ASSETS)
+# bounds what it will serve. The composer's dynamic import pulls
 # /plugins/<id>/client.js while rendering from loopback, so it has to
-# pass without a session. The index page is sensitive enough (lists
-# loader errors, plugin contents) to keep behind auth.
-_PLUGIN_ASSET_PREFIX: Final[str] = "/plugins/"
+# pass without a session.
+#
+# Matched by ENDPOINT, not path shape. Plugin-provided blueprints mount
+# under the same /plugins/<id>/ prefix, so any prefix test also exempts
+# every route a plugin registers: gallery folder deletes (shutil.rmtree),
+# calendar feed writes, and CalDAV discovery against an arbitrary URL,
+# all reachable with no session from anything that can make the server
+# issue a loopback request. The operator screenshot flow is exactly that
+# (see app/net_guard.py: allow_local skips the interceptor entirely), and
+# there are no CSRF tokens to fall back on.
+_PLUGIN_ASSET_ENDPOINT: Final[str] = "plugins.plugin_asset"
 _LOOPBACK_HOSTS: Final[frozenset[str]] = frozenset({"127.0.0.1", "::1", "localhost"})
 # RFC1918 + loopback + link-local: addresses that can only originate
 # from a trusted local network. /renders/ payloads are content-addressed
@@ -253,20 +262,27 @@ def _path_is_open(path: str) -> bool:
     return any(path == p or path.startswith(p) for p in _OPEN_PATHS)
 
 
-def _path_is_loopback_only(path: str) -> bool:
+def _path_is_loopback_only(
+    path: str,
+    endpoint: str | None = None,
+    render_safe: frozenset[str] = frozenset(),
+) -> bool:
+    """Whether this request may skip the password gate when it comes from
+    loopback.
+
+    ``endpoint`` is Flask's resolved endpoint (available by the time
+    ``before_request`` runs); None, as for an unmatched path, grants nothing.
+    ``render_safe`` is the set of plugin endpoints declared safe to serve
+    during a session-less render (collected by the plugin loader from each
+    plugin's ``RENDER_SAFE_ENDPOINTS``). Opt-in and read-only by convention:
+    anything a plugin does not declare stays gated, and reviewing that list is
+    part of reviewing the plugin, the same trust boundary that already lets it
+    run in-process."""
     if any(path.startswith(p) for p in _LOOPBACK_PATHS):
         return True
-    # /plugins/<id>/<asset> bypasses for the renderer; bare /plugins/ (the
-    # index) and /plugins/<id>/ (a plugin's own admin page) do not. Both
-    # segments must be non-empty: a trailing slash used to satisfy the
-    # "has a second segment" test, which let every plugin admin page —
-    # including ones that fetch arbitrary URLs on request, like gtfs's stop
-    # finder — answer unauthenticated requests from loopback.
-    if path.startswith(_PLUGIN_ASSET_PREFIX):
-        tail = path[len(_PLUGIN_ASSET_PREFIX) :]
-        plugin_id, _, asset = tail.partition("/")
-        return bool(plugin_id) and bool(asset)
-    return False
+    if endpoint is None:
+        return False
+    return endpoint == _PLUGIN_ASSET_ENDPOINT or endpoint in render_safe
 
 
 def _path_is_lan_reachable(path: str) -> bool:
@@ -339,7 +355,11 @@ def install_gate(app: Flask, settings: SettingsStore) -> None:
             return Response("forbidden", status=403)
         # Compose is loopback-only (the in-process Playwright renderer)
         # OR authed (the editor's preview iframe loads it over the LAN).
-        if _path_is_loopback_only(path):
+        if _path_is_loopback_only(
+            path,
+            request.endpoint,
+            current_app.config.get("RENDER_SAFE_ENDPOINTS", frozenset()),
+        ):
             if _is_loopback():
                 return None
             if is_authed():

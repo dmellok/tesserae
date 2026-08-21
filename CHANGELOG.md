@@ -4,6 +4,26 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.329.0], 2026-08-22
+
+### Security
+
+- **Plugin routes no longer answer unauthenticated requests from loopback.** The exemption that
+  lets the in-process renderer fetch `/plugins/<id>/client.js` without a session was matched by
+  path shape, and plugin-provided blueprints mount under that same prefix, so every route a plugin
+  registered inherited it: Picture Gallery folder deletes, Calendar feed writes, and CalDAV
+  discovery against a caller-supplied URL were all reachable with no password. Loopback is not
+  only the operator: the screenshot and remote-image flows run Chromium with local addresses
+  allowed and no request interceptor, so a rendered page could POST to `127.0.0.1` itself, and
+  there are no CSRF tokens behind the gate. The exemption is now matched on the resolved endpoint
+  and covers only the static asset handler, whose own allowlist bounds what it serves.
+
+### Added
+
+- **Plugins can declare `RENDER_SAFE_ENDPOINTS`.** A widget whose markup points at its own
+  plugin's media route needs that route served during a session-less render. Picture Gallery
+  declares its two read-only image endpoints; anything undeclared stays behind the gate.
+
 ## [0.328.0], 2026-08-21
 
 ### Added

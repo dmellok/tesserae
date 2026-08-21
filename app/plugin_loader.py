@@ -482,6 +482,12 @@ def register_routes(app: Flask, registry: PluginRegistry) -> None:
 
     app.register_blueprint(bp, url_prefix="/plugins")
 
+    # Endpoints a plugin declares safe to serve during a loopback render with
+    # no session (see app/auth.py). A widget whose markup references its own
+    # plugin's media route needs this, or the panel renders with broken
+    # images; everything undeclared stays behind the password gate.
+    render_safe: set[str] = set()
+
     for plugin in registry.plugins.values():
         if plugin.server_module is None:
             continue
@@ -499,3 +505,8 @@ def register_routes(app: Flask, registry: PluginRegistry) -> None:
             )
             continue
         app.register_blueprint(plugin_bp, url_prefix=f"/plugins/{plugin.id}")
+        declared = getattr(plugin.server_module, "RENDER_SAFE_ENDPOINTS", ())
+        if isinstance(declared, (list, tuple, set, frozenset)):
+            render_safe.update(str(name) for name in declared)
+
+    app.config["RENDER_SAFE_ENDPOINTS"] = frozenset(render_safe)

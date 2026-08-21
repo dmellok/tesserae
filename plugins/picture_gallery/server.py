@@ -559,6 +559,17 @@ def _album_for_folder(folder: str) -> Any | None:
 # ----- admin blueprint ------------------------------------------------
 
 
+# Read-only image serving, declared safe for a loopback render with no session
+# (see app/auth.py). The widget's data payload hands the panel an <img src>
+# pointing at ``serve_image``, so without this the renderer's fetch is refused
+# and every gallery photo on a panel comes back broken. Nothing that writes,
+# deletes, or reaches the network belongs in this list.
+RENDER_SAFE_ENDPOINTS: tuple[str, ...] = (
+    "picture_gallery_admin.serve_image",
+    "picture_gallery_admin.serve_thumbnail",
+)
+
+
 def blueprint() -> Blueprint:
     bp = Blueprint("picture_gallery_admin", __name__, template_folder="templates")
 
