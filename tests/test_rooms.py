@@ -455,13 +455,13 @@ class _CapturingOpener:
         class _R:
             status = self.status
 
-            def getcode(self_inner) -> int:  # noqa: N805
+            def getcode(self_inner) -> int:
                 return 201
 
-            def __enter__(self_inner):  # noqa: N805
+            def __enter__(self_inner):
                 return self_inner
 
-            def __exit__(self_inner, *a):  # noqa: N805
+            def __exit__(self_inner, *a):
                 return None
 
         return _R()

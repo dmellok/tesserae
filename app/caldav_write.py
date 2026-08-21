@@ -113,10 +113,32 @@ def put_event(
         with opener.open(request, timeout=timeout) as resp:
             status = getattr(resp, "status", 0) or resp.getcode()
     except urllib.error.HTTPError as err:
-        if err.code in (401, 403):
+        if err.code == 401:
             raise CalDavWriteError("The calendar rejected the credentials on this feed.") from err
+        if err.code == 403:
+            # Not a credentials problem: the login was accepted and the
+            # write refused. Verified against Radicale, where a collection
+            # that does not exist answers 403 rather than 404, so the
+            # likeliest cause is a feed URL pointing at the wrong calendar.
+            # Reported separately because sending someone to re-check a
+            # password that was never wrong wastes the whole session.
+            raise CalDavWriteError(
+                "The calendar accepted the login but refused the write. Check that the "
+                "feed's URL points at this room's calendar and that the account may "
+                "write to it."
+            ) from err
         if err.code == 412:
             raise CalDavWriteError("That slot was taken while booking.") from err
+        if err.code == 409:
+            # Measured against Radicale: writing into a collection that
+            # does not exist is a 409, not a 404. This is the likeliest
+            # real misconfiguration, a feed URL naming a calendar that
+            # was renamed or never created, so it gets its own message
+            # rather than falling through to a bare status code.
+            raise CalDavWriteError(
+                "No calendar exists at that address. Check the feed's URL names an "
+                "existing collection on the server."
+            ) from err
         if err.code == 405:
             raise CalDavWriteError(
                 "The calendar refused a write. This feed may be an export-only URL "

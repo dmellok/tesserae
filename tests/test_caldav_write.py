@@ -174,9 +174,25 @@ def test_bad_credentials_say_so() -> None:
         put_event("https://d/c/", "x", "u1", opener=_Opener(raises=_http_error(401)))
 
 
+def test_a_forbidden_write_is_not_reported_as_a_password_problem() -> None:
+    """Verified against live Radicale: a collection that does not exist
+    answers 403, not 404. Lumping that in with 401 sent an operator off
+    to re-check a password that was never wrong."""
+    with pytest.raises(CalDavWriteError, match="accepted the login"):
+        put_event("https://d/c/", "x", "u1", opener=_Opener(raises=_http_error(403)))
+
+
 def test_a_precondition_failure_reads_as_a_taken_slot() -> None:
     with pytest.raises(CalDavWriteError, match="taken"):
         put_event("https://d/c/", "x", "u1", opener=_Opener(raises=_http_error(412)))
+
+
+def test_a_missing_collection_says_so_rather_than_showing_a_status() -> None:
+    """Measured against live Radicale: a collection that doesn't exist
+    answers 409, not 404. It's the likeliest real misconfiguration (a
+    feed naming a calendar that was renamed), so it earns a message."""
+    with pytest.raises(CalDavWriteError, match="No calendar exists"):
+        put_event("https://d/c/", "x", "u1", opener=_Opener(raises=_http_error(409)))
 
 
 def test_method_not_allowed_points_at_an_export_only_url() -> None:
