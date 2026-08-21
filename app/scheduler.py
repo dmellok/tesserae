@@ -1931,6 +1931,9 @@ class Scheduler:
           - No telemetry dependencies wired (test path / bare run).
           - The page has no bound devices.
           - No bound device is trusted yet (warm-up).
+          - At least one bound device stays awake: there is no wake to
+            aim at because it is reachable right now, and holding would
+            only delay a frame it could already have collected.
           - At least one trusted device is inside the lead window.
         """
         if self._device_telemetry is None or self._device_ids_for_page is None:
@@ -1941,7 +1944,11 @@ class Scheduler:
         trusted_predictions: list[float] = []
         for device_id in device_ids:
             entry = self._device_telemetry.get(device_id)
-            if entry is None or not entry.is_trusted:
+            if entry is None:
+                continue
+            if entry.always_on:
+                return False
+            if not entry.is_trusted:
                 continue
             if entry.predicted_next_wake_at is None:
                 continue

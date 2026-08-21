@@ -92,6 +92,10 @@ class DeviceTelemetry:
     # re-derived when an operator edits that setting (#246); a firmware
     # value is the device's own statement and outranks the config.
     prediction_source: str | None = None
+    # True while the device is configured to stay awake. Such a device has
+    # no wake to predict: it is reachable continuously, so smart sync has
+    # nothing to wait for and must not hold a fire on its behalf.
+    always_on: bool = False
 
     @property
     def is_trusted(self) -> bool:
@@ -160,6 +164,7 @@ class TelemetryStore:
                 consecutive_on_time_wakes=0,
                 last_wake_offset_s=None,
                 prediction_source="configured",
+                always_on=prev.always_on,
             )
             self._state.devices[device_id] = entry
             self._flush_locked()
@@ -188,6 +193,7 @@ class TelemetryStore:
         received_at: float,
         parsed: dict[str, Any],
         configured_sleep_s: int | None,
+        always_on: bool = False,
     ) -> DeviceTelemetry:
         """Update the telemetry for ``device_id`` after a new heartbeat.
 
@@ -199,6 +205,12 @@ class TelemetryStore:
           enter. We add to ``received_at`` to derive the wake time.
         - Neither present → fall back to ``configured_sleep_s`` (the
           per-kind config the user set in the admin UI).
+
+        ``always_on`` records that the device stays awake between polls.
+        The prediction machinery still runs (its poll cadence is regular,
+        so the numbers stay meaningful on the device card), but the flag
+        rides along so smart sync can tell "wakes in 40s" from "is awake
+        right now".
 
         Returns the updated entry."""
         sleep_until = _coerce_float(parsed.get("sleep_until"))
@@ -301,6 +313,7 @@ class TelemetryStore:
                 consecutive_on_time_wakes=consecutive,
                 last_wake_offset_s=offset_s,
                 prediction_source=source,
+                always_on=always_on,
             )
             self._state.devices[device_id] = entry
             self._flush_locked()
@@ -345,6 +358,7 @@ class TelemetryStore:
                     predicted_next_wake_at=_coerce_float(raw_entry.get("predicted_next_wake_at")),
                     consecutive_on_time_wakes=int(raw_entry.get("consecutive_on_time_wakes") or 0),
                     last_wake_offset_s=_coerce_int(raw_entry.get("last_wake_offset_s")),
+                    always_on=bool(raw_entry.get("always_on")),
                 )
             except (TypeError, ValueError) as err:
                 logger.warning(

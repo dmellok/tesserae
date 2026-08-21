@@ -36,6 +36,39 @@ logger = logging.getLogger(__name__)
 # starts with a letter, 2–32 chars of [a-z0-9_-].
 DEVICE_ID_RE = re.compile(r"^[a-z][a-z0-9_-]{1,31}$")
 
+# Always-on defaults. Mirrored in the ESP32 kinds' config_schema; kept
+# here too so a kind whose schema predates the fields still delivers a
+# complete config block, on the same "firmware always sees the field"
+# rule ``always_on`` itself follows.
+DEFAULT_AWAKE_POLL_S = 15
+AWAKE_POLL_MIN_S = 5
+AWAKE_POLL_MAX_S = 300
+
+
+def awake_poll_interval_s(stored: Any) -> int | None:
+    """The poll cadence a device set to stay awake is actually on, or
+    ``None`` when it deep-sleeps like everything else.
+
+    ``stored`` is the device's ``settings.devices.<id>`` block. An
+    always-on panel is not on the sleep grid at all, so every surface that
+    asks "how long until this device comes back" (``next_poll_s``, the
+    wake prediction, the mirror page's auto-refresh) has to read the
+    awake cadence instead of ``sleep_interval_s``, which is why this is
+    shared rather than inlined three times.
+
+    The result is clamped: the value reaches here from a settings file
+    that a user may have hand-edited past the form's bounds, and every
+    caller turns it straight into a poll interval.
+    """
+    if not isinstance(stored, dict) or stored.get("always_on") is not True:
+        return None
+    raw = stored.get("awake_poll_s", DEFAULT_AWAKE_POLL_S)
+    try:
+        poll = int(raw)
+    except (TypeError, ValueError):
+        return DEFAULT_AWAKE_POLL_S
+    return max(AWAKE_POLL_MIN_S, min(poll, AWAKE_POLL_MAX_S))
+
 
 @dataclass(frozen=True)
 class InstanceResult:
@@ -78,6 +111,10 @@ def device_config_doc(settings: Any, device: Device) -> dict[str, Any]:
     # sleep interval. Default false so the firmware always sees the field; a
     # stored true (set only for can_stay_awake devices) overrides.
     out.setdefault("always_on", False)
+    # The cadence that pairs with it. Delivered unconditionally for the same
+    # reason: firmware reads one config block and shouldn't have to carry a
+    # default for a field the server knows the answer to.
+    out.setdefault("awake_poll_s", DEFAULT_AWAKE_POLL_S)
     return out
 
 

@@ -1241,6 +1241,7 @@ def create_app(
     # Device ID validation mirrors device_service so a 404 reflects an
     # unknown device rather than a path-traversal attempt.
     from app.device_service import DEVICE_ID_RE as _DEVICE_ID_RE
+    from app.device_service import awake_poll_interval_s as _awake_poll_interval_s
 
     @app.get("/preview/<device_id>.png")
     def preview_png(device_id: str) -> Response:
@@ -1336,7 +1337,10 @@ def create_app(
         if settings_store is not None:
             devices_section = settings_store.get_section("devices") or {}
             stored = devices_section.get(device.id) if isinstance(devices_section, dict) else None
-            if isinstance(stored, dict) and isinstance(stored.get("sleep_interval_s"), int):
+            awake_poll_s = _awake_poll_interval_s(stored)
+            if awake_poll_s is not None:
+                default_refresh = awake_poll_s
+            elif isinstance(stored, dict) and isinstance(stored.get("sleep_interval_s"), int):
                 default_refresh = int(stored["sleep_interval_s"])
             else:
                 schema = device.config_schema or {}

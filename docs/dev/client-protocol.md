@@ -1329,6 +1329,55 @@ Validate client-side too. The ESP32 reference bounds are
 `30 ≤ sleep_interval_s ≤ 604800` (7 days). A bad value sneaking
 through here means a flat battery.
 
+### Always on (mains-powered panels)
+
+The 30-second floor under `sleep_interval_s` exists to stop a typo
+flattening a battery. A panel on a wall socket doesn't need it, and
+deep-sleeping at all costs it responsiveness: a Send, a schedule fire or
+a touch can't reach a sleeping device, so it lands whenever the panel
+next happens to wake.
+
+Firmware opts a board into the faster path by advertising a capability in
+its register / heartbeat body:
+
+```json
+{ "can_stay_awake": true }
+```
+
+This is a statement about *power*, not about the SoC: advertise it when
+the board is running from a supply that can sustain continuous Wi-Fi, and
+withhold it (or send `false`) when it isn't, e.g. when the battery gauge
+says the panel is running unplugged. It's sticky server-side, so a beat
+that omits it keeps the last known answer.
+
+Only devices that advertise it are offered the setting, which then rides
+the same config block as everything else:
+
+```json
+{ "always_on": true, "awake_poll_s": 15 }
+```
+
+`always_on` is always present in the config block, defaulting to `false`,
+so firmware never has to handle its absence. When it's true:
+
+- Skip deep sleep. Stay connected and poll `/frame` on `awake_poll_s`
+  (bounds `5 ≤ awake_poll_s ≤ 300`).
+- `next_poll_s` is derived from `awake_poll_s` rather than
+  `sleep_interval_s`, and the 30-second content-poll floor no longer
+  applies, so a server that knows content is changing can hand back
+  intervals in the single-digit seconds. Honouring `next_poll_s`
+  continues to be the right behaviour.
+- Most polls answer `304`. Re-check cheaply and only repaint the panel
+  on a `200`; an e-paper refresh is the expensive part, not the request.
+- Smart sync stops holding fires for the device. There's no wake to time
+  a render against when the panel is reachable continuously, so bound
+  schedules fire on their own cadence and the frame is waiting on the
+  next poll.
+
+`sleep_interval_s` keeps its meaning as the deep-sleep cadence and is
+what the device falls back to if `always_on` goes false again, so leave
+it set to something sensible.
+
 ## Scheduling and polling
 
 A schedule or rotation cannot *wake* a device; it only changes what

@@ -151,8 +151,8 @@ def test_publisher_syncs_sealed_config_and_dedupes(tmp_path: Path) -> None:
     up = client.config_uploads[0]
     doc = json.loads(unseal(up["sealed"], key))
     # The doc is what a local REST device would see: stored values + the
-    # always_on default the firmware contract requires.
-    assert doc == {"sleep_interval_s": 300, "always_on": False}
+    # always-on defaults the firmware contract requires.
+    assert doc == {"sleep_interval_s": 300, "always_on": False, "awake_poll_s": 15}
 
     # Unchanged content → deduped.
     pub._maybe_send_config(client, dev)  # type: ignore[arg-type]

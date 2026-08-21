@@ -205,6 +205,7 @@ class _FakeTelemetry:
         class _E:
             predicted_next_wake_at = raw.get("predicted_next_wake_at")
             is_trusted = bool(raw.get("is_trusted", False))
+            always_on = bool(raw.get("always_on", False))
 
         return _E()
 
@@ -315,6 +316,39 @@ def test_smart_sync_holds_when_trusted_device_not_in_lead_window(
         )
     )
     assert sched.find_due(now) == []
+
+
+def test_smart_sync_never_holds_for_an_always_on_device(store: ScheduleStore, push_manager) -> None:
+    """The panel is reachable right now, so there is no wake to aim at.
+    Holding would only delay a frame it could already have collected."""
+    now = datetime(2026, 6, 1, 10, tzinfo=UTC)
+    far_future = now.timestamp() + 600
+    sched = _make_smart_scheduler(
+        store,
+        push_manager,
+        device_ids={"home": ["esp"]},
+        telemetry=_FakeTelemetry(
+            {
+                "esp": {
+                    "is_trusted": True,
+                    "predicted_next_wake_at": far_future,
+                    "always_on": True,
+                }
+            }
+        ),
+    )
+    store.upsert(
+        Schedule(
+            id="a",
+            name="A",
+            page_id="home",
+            type="interval",
+            interval_minutes=15,
+            smart_sync=True,
+            smart_sync_lead_s=10,
+        )
+    )
+    assert [s.id for s in sched.find_due(now)] == ["a"]
 
 
 def test_smart_sync_fires_inside_lead_window(store: ScheduleStore, push_manager) -> None:

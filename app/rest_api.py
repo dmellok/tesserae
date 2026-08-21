@@ -29,7 +29,8 @@ config AND a ``next_poll_s`` field telling the firmware when to wake
 again. One round-trip per wake; the firmware doesn't need to make a
 separate config poll. The ``next_poll_s`` value is the device's
 configured ``sleep_interval_s`` (when one exists in the kind's
-config_schema), or a reasonable per-transport default.
+config_schema), or ``awake_poll_s`` on a device set to stay awake, or a
+reasonable per-transport default.
 
 mypy --strict applies to this module, see pyproject.toml.
 """
@@ -50,6 +51,7 @@ from werkzeug.wrappers import Response
 from app.button_service import ButtonService, TouchStroke
 from app.device_loader import Device, DeviceRegistry
 from app.device_service import (
+    awake_poll_interval_s,
     create_instance,
     generate_access_token,
     panel_geometry_from_report,
@@ -403,9 +405,23 @@ def _configured_poll_s(device: Device) -> int:
     ``sleep_interval_s`` from settings when present (matches the
     MQTT-side config_topic value), then the schema default, then a
     transport-wide 60 s fallback for kinds that don't carry a sleep
-    interval."""
+    interval.
+
+    A device set to stay awake answers from ``awake_poll_s`` instead: it
+    isn't on the sleep grid, so its sleep interval says nothing about
+    when it comes back. That's the one path that can ask for a cadence
+    under 30 s, so it's also the one that has to respect a panel's
+    declared ``refresh_floor_s``: some glass simply can't be driven
+    faster, and the always-on switch shouldn't be a way around that.
+    """
     section = _settings().get_section("devices") or {}
     stored = section.get(device.id) if isinstance(section, dict) else None
+    awake = awake_poll_interval_s(stored)
+    if awake is not None:
+        floor = device.manifest.get("refresh_floor_s")
+        if isinstance(floor, int) and floor > 0:
+            return max(awake, floor)
+        return awake
     if isinstance(stored, dict) and isinstance(stored.get("sleep_interval_s"), int):
         return int(stored["sleep_interval_s"])
     schema = device.config_schema or {}

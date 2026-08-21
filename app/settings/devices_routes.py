@@ -449,8 +449,13 @@ def _reproject_wake(instance_id: str, values: dict[str, Any]) -> None:
 
     No-op when the device publishes its own wake time, when the interval
     did not change, or when telemetry isn't wired.
+
+    A device switched to stay awake reprojects against its awake poll
+    cadence instead: that's the interval it will actually come back on,
+    and leaving the prediction on the old sleep interval would make it
+    read as overdue for the rest of that interval.
     """
-    raw = values.get("sleep_interval_s")
+    raw = device_service.awake_poll_interval_s(values) or values.get("sleep_interval_s")
     if raw in (None, ""):
         return
     try:

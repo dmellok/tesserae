@@ -53,7 +53,7 @@ Key fields:
 | `description` | no | One-paragraph description. |
 | `protocol_config` | no | Free-form protocol-specific defaults. Each protocol owns its own validation. |
 | `config_schema_extends` | no | Additive merge over the protocol's `config_schema`. Use sparingly. |
-| `refresh_floor_s` | no | Lower bound on the device's poll cadence. |
+| `refresh_floor_s` | no | Lower bound on the device's poll cadence. Enforced on the always-on path, which is the only one that can ask for a sub-30s cadence; set it on glass that can't be driven faster. |
 | `image_format` | no | Wire format hint: `png` / `bin` / `webp`. |
 | `notes_md` | no | Maintainer notes shown on the docs hardware page. |
 | `deprecated_aliases` | no | Older ids this SKU also registers under, for back-compat after a rename. |

@@ -41,6 +41,27 @@
         {"value": 30, "label": "30 seconds"}
       ],
       "help": "After a button press changes the page, stay awake this many seconds to catch rapid repeat presses before deep-sleeping, so scrolling several pages doesn't pay a fresh wake and Wi-Fi cycle per press. 0 sleeps immediately (best battery). Applies only to button wakes, not scheduled refreshes or rotation."
+    },
+    "always_on": {
+      "type": "boolean",
+      "label": "Stay awake",
+      "default": false,
+      "help": "Skip deep sleep entirely and poll on the awake interval below. A Send, a schedule or a touch then lands within seconds instead of on the next wake, and the 30-second floor under the sleep interval no longer applies. Draws Wi-Fi power continuously, so this is for mains-powered panels only; the option is offered only to firmware that reports it can stay awake."
+    },
+    "awake_poll_s": {
+      "type": "int",
+      "label": "Awake poll interval",
+      "default": 15,
+      "min": 5,
+      "max": 300,
+      "presets": [
+        {"value": 5,  "label": "5 seconds"},
+        {"value": 10, "label": "10 seconds"},
+        {"value": 15, "label": "15 seconds"},
+        {"value": 30, "label": "30 seconds"},
+        {"value": 60, "label": "1 minute"}
+      ],
+      "help": "How often to re-check for a new frame while staying awake. Ignored unless Stay awake is on. Unchanged content answers 304 without a panel refresh, so a short interval costs one small request rather than an e-paper repaint."
     }
   }
 }

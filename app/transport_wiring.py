@@ -26,6 +26,7 @@ from typing import Any
 from flask import Flask
 
 from app import collection_sync, deck_sync, device_loader, overlay_sync, renderer_loader
+from app.device_service import awake_poll_interval_s
 from app.discovery import DiscoveryCache, device_id_from_status_topic
 from app.embedded_broker import EmbeddedBroker
 from app.ha_discovery import HomeAssistantDiscovery
@@ -419,6 +420,13 @@ def record_status_heartbeat(
         settings: SettingsStore = app.config["SETTINGS_STORE"]
         device_settings = (settings.get_section("devices") or {}).get(device.id) or {}
         configured_sleep_s = device_settings.get("sleep_interval_s")
+        # An always-on panel polls on its awake cadence, not the sleep
+        # interval, so that's the number the prediction has to be derived
+        # from; otherwise every poll reads as a wildly early wake and the
+        # device never earns trust.
+        awake_poll_s = awake_poll_interval_s(device_settings)
+        if awake_poll_s is not None:
+            configured_sleep_s = awake_poll_s
         try:
             telemetry.record_heartbeat(
                 device.id,
@@ -427,6 +435,7 @@ def record_status_heartbeat(
                 configured_sleep_s=(
                     int(configured_sleep_s) if configured_sleep_s is not None else None
                 ),
+                always_on=awake_poll_s is not None,
             )
         except Exception:
             logger.exception("telemetry: record_heartbeat failed for %s", device.id)

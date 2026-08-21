@@ -831,7 +831,7 @@ def _build_sections() -> list[dict[str, Any]]:
         if device.kind_of is None:
             continue
         sid = f"device-{device.id}"
-        fields = config_fields_from_schema(device.config_schema)
+        fields = _visible_config_fields(device)
         is_instance = device.kind_of is not None
         # Picture-quality (dither / saturation / contrast) lives on the
         # clone renderer keyed ``<base_id>__<device_id>``, one clone
@@ -1191,6 +1191,45 @@ def _build_sections() -> list[dict[str, Any]]:
         )
 
     return sections
+
+
+# Config fields that only make sense on a panel the firmware says can hold
+# a connection open. Offering "Stay awake" on a battery display is an
+# invitation to flatten it overnight, and nothing about the model name
+# answers the question: a reTerminal on USB and the same board on its
+# battery are the same kind. So the switch follows the advertised
+# ``can_stay_awake`` capability, which the firmware decides.
+_ALWAYS_ON_FIELDS = frozenset({"always_on", "awake_poll_s"})
+
+
+def _can_stay_awake(device_id: str) -> bool:
+    """Whether this device has told us it can stay powered and awake.
+
+    Live status cache first, then the persisted facts, so a server
+    restart doesn't hide the switch from an already-configured panel
+    until its next heartbeat.
+    """
+    status = (current_app.config.get("DEVICE_STATUS") or {}).get(device_id)
+    if isinstance(status, dict) and status.get("can_stay_awake") is not None:
+        return bool(status.get("can_stay_awake"))
+    facts = current_app.config.get("DEVICE_FACTS")
+    entry = facts.get(device_id) if facts is not None else None
+    return bool(entry.get("can_stay_awake")) if isinstance(entry, dict) else False
+
+
+def _visible_config_fields(device: Any) -> list[dict[str, Any]]:
+    """The device kind's config fields, minus any this particular panel
+    can't act on.
+
+    Hiding is presentation only: the save handlers still walk the full
+    schema, so a device that stops advertising the capability has
+    ``always_on`` written back to its default on the next save rather
+    than holding a setting its firmware no longer honours.
+    """
+    fields = config_fields_from_schema(device.config_schema)
+    if _can_stay_awake(device.id):
+        return fields
+    return [f for f in fields if f.get("name") not in _ALWAYS_ON_FIELDS]
 
 
 def _button_map_stored_json(store: Any, device_id: str) -> str:
@@ -1916,7 +1955,16 @@ def _smart_sync_view(device_id: str) -> dict[str, Any]:
     # sleep_until / next_sleep_s AND the configured sleep_interval_s
     # doesn't match the firmware's actual cycle, so every wake
     # arrives way off the prediction and confidence never accrues.
-    if entry.predicted_next_wake_at is None:
+    if entry.always_on:
+        # Nothing to time a render against: the panel is reachable
+        # continuously, so smart sync stops holding fires for it rather
+        # than aiming at a wake that never comes.
+        reason = (
+            "This device stays awake, so there's no wake to sync to. Smart sync "
+            "fires immediately for pages bound to it and the frame is waiting on "
+            "the device's next poll."
+        )
+    elif entry.predicted_next_wake_at is None:
         reason = (
             "No prediction possible. The firmware isn't publishing "
             "'sleep_until' or 'next_sleep_s' AND no sleep cycle is configured "
@@ -1957,7 +2005,10 @@ def _smart_sync_view(device_id: str) -> dict[str, Any]:
         )
 
     return {
-        "state": "active" if entry.is_trusted else "warming",
+        # An always-on device needs no confidence ramp to be useful to
+        # smart sync, so it reads as active rather than sitting on
+        # "warming" forever.
+        "state": "active" if (entry.always_on or entry.is_trusted) else "warming",
         "is_trusted": entry.is_trusted,
         "confidence": entry.consecutive_on_time_wakes,
         "last_heartbeat_rel": format_relative(max(0.0, now_ts - entry.last_heartbeat_at)),

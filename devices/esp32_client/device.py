@@ -92,6 +92,14 @@ TOUCH_LINGER_MAX_S = 60
 # awake longer than this to catch repeat presses is never worth the battery.
 BUTTON_WAKE_MAX_S = 60
 
+# Bounds for the always-on poll cadence. The floor is well under
+# ``SLEEP_INTERVAL_MIN_S`` on purpose: that floor exists to stop a typo
+# flattening a battery, and a device that reports it can stay awake has
+# already said it isn't on one. The ceiling is where staying awake stops
+# buying anything over a deep-sleep cycle.
+AWAKE_POLL_MIN_S = 5
+AWAKE_POLL_MAX_S = 300
+
 
 def validate_config(payload: dict[str, Any]) -> tuple[bool, str | None]:
     """Check the payload makes sense before it goes on the wire."""
@@ -126,4 +134,18 @@ def validate_config(payload: dict[str, Any]) -> tuple[bool, str | None]:
             return False, "touch_linger_s must be an integer"
         if not 0 <= linger <= TOUCH_LINGER_MAX_S:
             return False, f"touch_linger_s must be 0..{TOUCH_LINGER_MAX_S} (got {linger})"
+    # Always-on (mains-powered panels): optional, so a form that predates
+    # the field still validates.
+    if "always_on" in payload and not isinstance(payload["always_on"], bool):
+        return False, "always_on must be a boolean"
+    if "awake_poll_s" in payload:
+        try:
+            poll = int(payload["awake_poll_s"])
+        except (TypeError, ValueError):
+            return False, "awake_poll_s must be an integer"
+        if not AWAKE_POLL_MIN_S <= poll <= AWAKE_POLL_MAX_S:
+            return (
+                False,
+                f"awake_poll_s must be {AWAKE_POLL_MIN_S}..{AWAKE_POLL_MAX_S} (got {poll})",
+            )
     return True, None

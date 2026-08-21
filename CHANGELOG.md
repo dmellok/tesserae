@@ -4,6 +4,34 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.330.0], 2026-08-22
+
+### Added
+
+- **Mains-powered panels can stay awake.** The 30-second floor under the sleep interval exists so
+  a typo can't flatten a battery, and every reachability limit follows from deep sleep: a Send, a
+  schedule fire or a touch cannot reach a sleeping device, so it lands whenever the panel next
+  happens to wake. A panel on a wall socket is paying that cost for a guarantee it doesn't need.
+  Devices whose firmware advertises `can_stay_awake` are now offered a Stay awake switch and an
+  awake poll interval (5-300s, default 15s) on their device card. With it on, `next_poll_s` is
+  derived from the awake cadence rather than the sleep interval and the 30-second content-poll
+  floor no longer applies, so a server that knows content is about to change can hand back
+  intervals in the single-digit seconds. A panel's declared `refresh_floor_s` is enforced here,
+  which is the first path that could ask for a cadence under 30s.
+
+  The switch is gated on the advertised capability rather than on the model, because a reTerminal
+  on USB and the same board on its battery are the same kind, and only the firmware can tell them
+  apart. Server-side support only; firmware handoff in
+  `notes/design-handoffs/firmware-always-on-prompt.md`.
+
+### Changed
+
+- **Smart sync no longer holds renders for an always-on device.** It exists to time a render to
+  land just before a panel wakes, which has no meaning when the panel is reachable continuously;
+  holding would only delay a frame the device could already have collected. Bound schedules and
+  rotations fire on their own cadence instead, and the device card explains why rather than
+  leaving the panel on "warming up" forever.
+
 ## [0.329.0], 2026-08-22
 
 ### Security

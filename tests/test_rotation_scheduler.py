@@ -419,6 +419,7 @@ class _FakeTelemetry:
         class _E:
             predicted_next_wake_at = raw.get("predicted_next_wake_at")
             is_trusted = bool(raw.get("is_trusted", False))
+            always_on = bool(raw.get("always_on", False))
 
         return _E()
 
