@@ -4,6 +4,19 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.321.3], 2026-08-21
+
+### Fixed
+
+- **Relay pairing could resolve an Xteink X4 to the new Seeed Sticky grayscale SKU.** The two are
+  indistinguishable on the wire: same `esp32_bw_client` protocol, same `gray_4` gamut, same 480x800
+  declared panel, same `esp32_gray2_bin` renderer, byte-identical frames. With nothing in the
+  self-report to separate them, the id sort that settles ties handed the announcement to
+  `seeed_sticky_gray`, which would have pinned a confirmed X4 to an unconfirmed SKU's OTA lineage.
+  `seeed_sticky_gray` now declares `auto_select: false`, the mechanism already used for the E1001's
+  two grayscale glass variants, so an ambiguous report keeps resolving to `xteink_x4_gray` and a
+  real Sticky reaches the kind by declaring it at register or discover.
+
 ## [0.321.2], 2026-08-21
 
 ### Fixed
