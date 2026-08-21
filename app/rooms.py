@@ -28,6 +28,16 @@ logger = logging.getLogger(__name__)
 
 WIDGET_ID = "room_status"
 
+# A board is one page carrying a cell per room, so it needs no widget of
+# its own and no runtime: the same generator, laid out as rows.
+BOARD_PAGE_ID = "room_board"
+
+# A board row is a strip, not a panel. The stacked layouts put the room
+# name at a few pixels tall and leave most of the row empty, so rows use
+# the widget's horizontal layout instead. Pinned rather than left to
+# ``auto`` so a board with two rooms (tall rows) still reads as a board.
+_BOARD_ROW_LAYOUT = "row"
+
 # Fallback panel when a room has no device bound yet, so the page is
 # still previewable while it's being set up. The moment a device is
 # bound the real panel wins.
@@ -93,6 +103,72 @@ def build_page(room: Room, *, devices: Any = None, settings: Any = None) -> Page
             )
         ],
     )
+
+
+def build_board_page(
+    rooms: list[Room],
+    *,
+    devices: Any = None,
+    settings: Any = None,
+    page_id: str = BOARD_PAGE_ID,
+    name: str = "Room board",
+    device_ids: list[str] | None = None,
+) -> Page:
+    """One page, one row per room, for a lobby or corridor panel.
+
+    Rows rather than a grid: a board is read top to bottom at a glance,
+    and a room's name and state have to sit on one line to be scannable.
+    Each row is a normal ``room_status`` cell, so the board inherits every
+    fix the widget gets and carries no rendering code of its own.
+    """
+    bound = list(device_ids or [])
+    draft = Page(id=page_id, name=name, device_ids=bound)
+    w, h = _panel_dims(draft, devices, settings)
+    shown = [r for r in rooms if r.enabled]
+    cells: list[Cell] = []
+    if shown:
+        row_h = h // len(shown)
+        for i, room in enumerate(shown):
+            options = cell_options(room)
+            options["layout"] = _BOARD_ROW_LAYOUT
+            # A board is a status surface, not a control: tapping a row
+            # would book whichever room the finger landed on, which is
+            # not a mistake worth making possible.
+            options["show_book_action"] = False
+            cells.append(
+                Cell(
+                    id=f"{page_id}_{room.id}",
+                    plugin=WIDGET_ID,
+                    x=0,
+                    y=i * row_h,
+                    w=w,
+                    # Last row absorbs the remainder so the board fills
+                    # the panel exactly rather than leaving a seam.
+                    h=(h - i * row_h) if i == len(shown) - 1 else row_h,
+                    options=options,
+                )
+            )
+    return Page(id=page_id, name=name, device_ids=bound, cells=cells)
+
+
+def sync_board(
+    rooms: list[Room],
+    *,
+    page_store: PageStore,
+    devices: Any = None,
+    settings: Any = None,
+    device_ids: list[str] | None = None,
+) -> Page:
+    """Write the board page, keeping its binding and styling if it exists."""
+    existing = page_store.get(BOARD_PAGE_ID)
+    bound = device_ids if device_ids is not None else (existing.device_ids if existing else [])
+    page = build_board_page(rooms, devices=devices, settings=settings, device_ids=list(bound))
+    if existing is not None:
+        page.theme = existing.theme
+        page.style = existing.style
+        page.font = existing.font
+    page_store.save(page)
+    return page
 
 
 def sync(room: Room, *, page_store: PageStore, devices: Any = None, settings: Any = None) -> Page:

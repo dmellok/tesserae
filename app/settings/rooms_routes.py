@@ -82,6 +82,8 @@ def _panels() -> list[Any]:
 def rooms_index() -> str:
     store = room_store()
     all_rooms = store.all() if store is not None else []
+    pages = page_store()
+    board = pages.get(rooms_service.BOARD_PAGE_ID) if pages is not None else None
     return render_template(
         "settings_rooms.html",
         active="rooms",
@@ -89,6 +91,8 @@ def rooms_index() -> str:
         feeds=_feeds(),
         panels=_panels(),
         widget_installed=_widget_installed(),
+        board=board,
+        board_devices=(board.device_ids if board is not None else []),
     )
 
 
@@ -188,4 +192,31 @@ def rooms_resync(room_id: str) -> Response:
         return redirect(url_for("auth.rooms_index"))
     _sync(existing)
     flash(f"Rebuilt {existing.name}'s dashboard.", "ok")
+    return redirect(url_for("auth.rooms_index"))
+
+
+@bp.post("/settings/rooms/board")
+def rooms_board() -> Response:
+    """Build or rebuild the board: one page, one row per enabled room.
+
+    Regenerated rather than incrementally patched, because the row
+    geometry depends on how many rooms there are; adding a room has to
+    re-lay the whole board out anyway.
+    """
+    store = room_store()
+    if store is None:
+        flash("Rooms store unavailable.", "error")
+        return redirect(url_for("auth.rooms_index"))
+    device_ids = [d for d in request.form.getlist("device_ids") if d]
+    page = rooms_service.sync_board(
+        store.all(),
+        page_store=page_store(),
+        devices=devices(),
+        settings=settings_store(),
+        device_ids=device_ids,
+    )
+    if not page.cells:
+        flash("Board built, but no rooms are enabled yet.", "ok")
+    else:
+        flash(f"Board built with {len(page.cells)} room(s).", "ok")
     return redirect(url_for("auth.rooms_index"))

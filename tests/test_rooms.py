@@ -322,3 +322,63 @@ def test_unknown_room_does_not_500(app_client) -> None:
         "/settings/rooms/nope/resync",
     ):
         assert client.post(path, data={}, follow_redirects=True).status_code == 200
+
+
+# -- board (L2) ----------------------------------------------------------
+
+
+def test_board_has_one_row_per_enabled_room(pages: PageStore) -> None:
+    page = rooms.build_board_page(
+        [_room(), _room(id="osprey", name="Osprey"), _room(id="falcon", name="Falcon", enabled=False)]
+    )
+    assert [c.options["room_name"] for c in page.cells] == ["Kestrel", "Osprey"]
+
+
+def test_board_rows_tile_the_panel_without_a_seam(pages: PageStore) -> None:
+    """Integer row height leaves a remainder; the last row absorbs it so
+    the board fills the panel exactly."""
+    roomset = [_room(id=f"r{i}", name=f"Room {i}") for i in range(7)]
+    page = rooms.build_board_page(roomset)
+    height = page.cells[0].h * 0 + sum(c.h for c in page.cells)
+    assert page.cells[0].y == 0
+    assert height == 480
+    for prev, nxt in zip(page.cells, page.cells[1:], strict=False):
+        assert prev.y + prev.h == nxt.y
+
+
+def test_board_rows_use_the_horizontal_layout(pages: PageStore) -> None:
+    """A board row is a strip. Every stacked layout renders the room name
+    a few pixels tall and leaves most of the row empty."""
+    page = rooms.build_board_page([_room(), _room(id="osprey", name="Osprey")])
+    assert {c.options["layout"] for c in page.cells} == {"row"}
+
+
+def test_board_never_offers_booking(pages: PageStore) -> None:
+    """A tap would book whichever room the finger landed on."""
+    page = rooms.build_board_page([_room(book_url="https://x.example/book")])
+    assert page.cells[0].options["show_book_action"] is False
+    assert page.cells[0].on_tap is None
+
+
+def test_board_with_no_enabled_rooms_is_empty_not_broken(pages: PageStore) -> None:
+    page = rooms.build_board_page([_room(enabled=False)])
+    assert page.cells == []
+
+
+def test_sync_board_keeps_its_binding_when_not_given_one(pages: PageStore) -> None:
+    rooms.sync_board([_room()], page_store=pages, device_ids=["lobby"])
+    rooms.sync_board([_room(), _room(id="osprey", name="Osprey")], page_store=pages)
+    board = pages.get("room_board")
+    assert board is not None
+    assert board.device_ids == ["lobby"]
+    assert len(board.cells) == 2
+
+
+def test_board_route_builds_and_binds(app_client) -> None:
+    app, client = app_client
+    client.post("/settings/rooms", data={"name": "Kestrel", "enabled": "on"})
+    client.post("/settings/rooms", data={"name": "Osprey", "enabled": "on"})
+    resp = client.post("/settings/rooms/board", data={}, follow_redirects=True)
+    assert resp.status_code == 200
+    board = app.config["PAGE_STORE"].get("room_board")
+    assert board is not None and len(board.cells) == 2

@@ -120,6 +120,37 @@
 </section>
 {% endfor %}
 
+{# ---- Board --------------------------------------------------------------- #}
+{% if rooms %}
+<section class="card">
+  {{ card_head('Room board', blurb='One panel, every room, a row each. For a lobby or corridor.') }}
+  <form method="post" action="{{ url_for('auth.rooms_board') }}" class="form">
+    <div class="field">
+      <label for="board-panels">Panels</label>
+      <select id="board-panels" name="device_ids" multiple size="{{ [panels|length, 6]|min if panels else 1 }}">
+        {% for panel in panels %}
+        <option value="{{ panel.id }}" {% if panel.id in board_devices %}selected{% endif %}>
+          {{ panel.display_name }}
+        </option>
+        {% endfor %}
+      </select>
+      <p class="help">The board is a normal dashboard; bind it to whichever display shows the overview.</p>
+    </div>
+    <div class="actions">
+      <button type="submit" class="btn">{{ 'Rebuild board' if board else 'Build board' }}</button>
+      {% if board %}
+      <a class="btn btn-quiet" href="{{ url_for('pages.edit', page_id=board.id) }}">Open board</a>
+      {% endif %}
+    </div>
+    <p class="help">
+      Rebuild after adding or removing a room: the rows are laid out for the number of rooms
+      enabled at build time. Booking is off on a board, so a tap can't book whichever room the
+      finger landed on.
+    </p>
+  </form>
+</section>
+{% endif %}
+
 {# ---- Add a room ---------------------------------------------------------- #}
 <section class="card">
   {{ card_head('Add a room', blurb='Names a calendar and the panels showing it.') }}
