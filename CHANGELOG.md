@@ -4,6 +4,25 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.326.0], 2026-08-21
+
+### Added
+
+- **calendar_core records why a fetch failed.** The fetch path knew whether a feed was reachable
+  and threw it away, so a 401 was indistinguishable from a calendar with no events, and anything
+  reading that feed showed an empty result as though it were the truth. Outcomes now go to
+  `feed_health.json` next to the feed cache: last success, the reason for the current failure, and
+  how long it has been failing. Written only when a fetch is genuinely attempted, which the cache
+  TTL bounds to once per feed per 15 minutes, so it is not hot-path I/O.
+
+- **Settings → Rooms shows feed health and what's on next (#90).** A room whose feed is failing says
+  so on its row, with the reason, instead of appearing to be a free room. The Next column shows the
+  current booking's end or the next one's start.
+
+  Next is read only when the feed's cache is already warm. A settings page must not make one network
+  call per room to render, so a cold feed shows a dash rather than blocking the page on up to a
+  15 second timeout each. The dash means "not known right now", never "free".
+
 ## [0.325.0], 2026-08-21
 
 ### Changed

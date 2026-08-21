@@ -146,7 +146,7 @@
      this is redundant to a screen reader, and it is dropped when narrow. #}
   <div class="rooms-grid rooms-head" aria-hidden="true">
     <span></span><span>Room</span><span>Calendar feed</span><span>Panels</span>
-    <span>Booking</span><span>Dashboard</span><span></span>
+    <span>Booking</span><span>Next</span><span>Dashboard</span>
   </div>
 
   {% for view in room_views %}
@@ -169,7 +169,11 @@
         <span class="room-cell__sub">{{ room.feed_id }} isn't configured</span>
         {% elif view.feed_name %}
         {{ view.feed_name }}
-        {% if view.feed_implicit %}<span class="room-cell__sub">first enabled feed</span>{% endif %}
+        {% if view.feed_error %}
+        <span class="room-cell__sub is-warn">
+          <i class="ph-fill ph-warning" aria-hidden="true"></i> {{ view.feed_error }}
+        </span>
+        {% elif view.feed_implicit %}<span class="room-cell__sub">first enabled feed</span>{% endif %}
         {% else %}
         <span class="is-warn"><i class="ph-fill ph-warning" aria-hidden="true"></i> No feed</span>
         {% endif %}
@@ -194,6 +198,20 @@
       </span>
 
       <span class="room-cell">
+        {% if view.next_event %}
+          {% if view.next_event.state == 'busy' %}
+          Busy until {{ view.next_event.until.strftime('%H:%M') }}
+          {% elif view.next_event.until %}
+          Free until {{ view.next_event.until.strftime('%H:%M') }}
+          {% else %}
+          <span class="is-off">Free all day</span>
+          {% endif %}
+        {% else %}
+        <span class="is-off">&mdash;</span>
+        {% endif %}
+      </span>
+
+      <span class="room-cell">
         {% if room.enabled %}
         <span class="is-on"><i class="ph ph-check-circle" aria-hidden="true"></i></span> Enabled
         {% else %}
@@ -205,8 +223,6 @@
         <span class="room-cell__sub">not built yet</span>
         {% endif %}
       </span>
-
-      <span></span>
       </span>
 
       {# Narrow: the column headers are gone, so every fact carries its
@@ -218,10 +234,12 @@
           <span class="caret" aria-hidden="true"><i class="ph ph-caret-right"></i></span>
         </span>
 
-        {% if view.feed_missing or not view.feed_name %}
+        {% if view.feed_missing or not view.feed_name or view.feed_error %}
         <span class="room-narrow__alert is-warn">
           <i class="ph-fill ph-warning" aria-hidden="true"></i>
-          {% if view.feed_missing %}Feed {{ room.feed_id }} isn't configured{% else %}No feed{% endif %}
+          {% if view.feed_error %}{{ view.feed_name }}: {{ view.feed_error }}
+          {% elif view.feed_missing %}Feed {{ room.feed_id }} isn't configured
+          {% else %}No feed{% endif %}
         </span>
         {% endif %}
 
@@ -239,6 +257,13 @@
             {% elif room.booking_mode == 'caldav' %}In calendar
             {% else %}<span class="is-off">Off</span>{% endif %}
           </span>
+          {% if view.next_event %}
+          <span><b>Next</b>
+            {%- if view.next_event.state == 'busy' %} busy until {{ view.next_event.until.strftime('%H:%M') }}
+            {%- elif view.next_event.until %} free until {{ view.next_event.until.strftime('%H:%M') }}
+            {%- else %} free all day{% endif %}
+          </span>
+          {% endif %}
           <span><b>Dashboard</b>
             {% if room.enabled %}Enabled{% else %}<span class="is-warn">Paused</span>{% endif %}
           </span>

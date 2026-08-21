@@ -48,6 +48,12 @@ def _unique_id(store: Any, base: str) -> str:
     return base
 
 
+def _calendar_core() -> Any:
+    registry = current_app.config.get("PLUGIN_REGISTRY")
+    plugin = registry.get("calendar_core") if registry is not None else None
+    return plugin if plugin is not None and plugin.server_module is not None else None
+
+
 def _feeds() -> list[dict[str, Any]]:
     """Calendar feeds from calendar_core, for the picker. Empty when the
     plugin isn't installed, which the template turns into a prompt rather
@@ -85,8 +91,17 @@ def rooms_index() -> str:
     pages = page_store()
     board = pages.get(rooms_service.BOARD_PAGE_ID) if pages is not None else None
     feeds = _feeds()
+    core = _calendar_core()
+    health = rooms_service.feed_health(core) if core is not None else {}
     views = [
-        rooms_service.row_view(room, feeds=feeds, devices=devices(), page_store=pages)
+        rooms_service.row_view(
+            room,
+            feeds=feeds,
+            devices=devices(),
+            page_store=pages,
+            core=core,
+            health=health,
+        )
         for room in all_rooms
     ]
     return render_template(

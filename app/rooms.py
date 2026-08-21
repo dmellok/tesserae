@@ -19,6 +19,7 @@ rendered per room through the normal compose/bind/push flow.
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any
 
 from app.state.page_store import Cell, Page, PageStore
@@ -154,12 +155,105 @@ def feed_can_write(feed: dict[str, Any] | None) -> bool:
     return mode in ("basic", "digest") and bool(str(feed.get("username") or "").strip())
 
 
+def feed_health(core: Any) -> dict[str, Any]:
+    """Per-feed fetch health from calendar_core, or empty when this
+    install predates it."""
+    loader = getattr(core.server_module, "load_health", None) if core is not None else None
+    if loader is None:
+        return {}
+    from pathlib import Path as _Path
+
+    try:
+        result = loader(_Path(core.data_dir))
+    except Exception:
+        logger.exception("rooms: could not read feed health")
+        return {}
+    return result if isinstance(result, dict) else {}
+
+
+def next_event(room: Room, *, core: Any, feed: dict[str, Any] | None, now: Any = None) -> Any:
+    """The room's current or next booking, but only when answering costs
+    nothing.
+
+    A settings page must not make N network calls to render. So this
+    reads only when the feed's ICS cache is already warm, which is the
+    same condition under which ``load_events`` serves without fetching.
+    A cold feed reports nothing rather than blocking the page on up to a
+    15 second timeout per room.
+    """
+    from datetime import UTC, datetime, timedelta
+    from pathlib import Path as _Path
+
+    if core is None or feed is None or not feed.get("id"):
+        return None
+    mod = core.server_module
+    path_for = getattr(mod, "_ics_cache_path", None)
+    ttl = getattr(mod, "CACHE_TTL_S", 15 * 60)
+    if path_for is None:
+        return None
+    try:
+        cache = path_for(_Path(core.data_dir), feed["id"])
+        if not cache.exists() or (time.time() - cache.stat().st_mtime) >= ttl:
+            return None
+    except OSError:
+        return None
+
+    now = now or datetime.now(UTC)
+    try:
+        events = mod.load_events(
+            [feed["id"]],
+            now - timedelta(hours=1),
+            now + timedelta(hours=36),
+            data_dir=_Path(core.data_dir),
+        )
+    except Exception:
+        logger.exception("rooms: next-event lookup failed for %s", room.id)
+        return None
+
+    location = room.location_filter.casefold()
+    spans: list[tuple[Any, Any, dict[str, Any]]] = []
+    for ev in events:
+        if location and location not in str(ev.get("location") or "").casefold():
+            continue
+        sp = _event_span(ev)
+        if sp is not None:
+            spans.append((sp[0], sp[1], ev))
+    spans.sort(key=lambda t: t[0])
+
+    current = next(((s, e, ev) for s, e, ev in spans if s <= now < e), None)
+    if current is not None:
+        return {"state": "busy", "until": current[1], "summary": current[2].get("summary") or ""}
+    upcoming = next((t for t in spans if t[0] > now), None)
+    if upcoming is None:
+        return {"state": "free", "until": None, "summary": ""}
+    return {"state": "free", "until": upcoming[0], "summary": upcoming[2].get("summary") or ""}
+
+
+def _event_span(ev: dict[str, Any]) -> tuple[Any, Any] | None:
+    from datetime import UTC, datetime
+
+    def _parse(raw: Any) -> Any:
+        try:
+            dt = datetime.fromisoformat(str(raw))
+        except (TypeError, ValueError):
+            return None
+        return dt.replace(tzinfo=UTC) if dt.tzinfo is None else dt
+
+    start = _parse(ev.get("start"))
+    end = _parse(ev.get("end")) or start
+    if start is None or end is None or end <= start:
+        return None
+    return start, end
+
+
 def row_view(
     room: Room,
     *,
     feeds: list[dict[str, Any]],
     devices: Any = None,
     page_store: PageStore | None = None,
+    core: Any = None,
+    health: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Everything the Rooms list shows for one room, resolved once.
 
@@ -184,9 +278,16 @@ def row_view(
             }
         )
 
+    feed_id = (feed or {}).get("id") or ""
+    feed_health_entry = (health or {}).get(feed_id) or {}
+
     return {
         "room": room,
         "feed": feed,
+        "feed_error": feed_health_entry.get("error"),
+        "feed_failing_since": feed_health_entry.get("failing_since"),
+        "feed_checked_at": feed_health_entry.get("checked_at"),
+        "next_event": next_event(room, core=core, feed=feed) if core is not None else None,
         "feed_name": (feed or {}).get("name") or (feed or {}).get("id") or "",
         "feed_missing": room.feed_id != "" and feed is None,
         "feed_implicit": room.feed_id == "" and feed is not None,

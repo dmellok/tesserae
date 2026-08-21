@@ -155,7 +155,7 @@ def test_load_todos_tags_feed_and_honours_enabled(
     )
     seen: list[str] = []
 
-    def fake_http_get(url: str, auth: Any) -> bytes:
+    def fake_http_get(url: str, auth: Any, **kwargs: Any) -> bytes:
         seen.append(url)
         return ICS_TODOS
 
@@ -187,7 +187,7 @@ def test_load_todos_passes_feed_auth_through(
     )
     captured: dict[str, Any] = {}
 
-    def fake_http_get(url: str, auth: Any) -> bytes:
+    def fake_http_get(url: str, auth: Any, **kwargs: Any) -> bytes:
         captured["auth"] = auth
         return ICS_TODOS
 

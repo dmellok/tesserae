@@ -769,3 +769,132 @@ def test_an_unknown_booking_mode_falls_back_rather_than_500(app_client) -> None:
     assert resp.status_code == 200
     room = app.config["ROOM_STORE"].get("kestrel")
     assert room is not None and room.booking_mode == "none"
+
+
+# -- feed health and next event (pass 2) ----------------------------------
+
+
+class _HealthCore:
+    """calendar_core stand-in exposing the health store and load_events."""
+
+    def __init__(self, health=None, events=None, cache_age_s: float = 5.0):
+        import time as _t
+
+        self._health = health or {}
+        self._events = events or []
+        self._age = cache_age_s
+        outer = self
+
+        class _Module:
+            CACHE_TTL_S = 900
+
+            @staticmethod
+            def load_health(_dd):
+                return outer._health
+
+            @staticmethod
+            def _ics_cache_path(_dd, feed_id):
+                import pathlib
+                import tempfile
+
+                p = pathlib.Path(tempfile.mkdtemp()) / f"{feed_id}.ics"
+                p.write_text("x", encoding="utf-8")
+                import os
+
+                stamp = _t.time() - outer._age
+                os.utime(p, (stamp, stamp))
+                return p
+
+            @staticmethod
+            def load_events(_ids, _start, _end, *, data_dir=None):
+                return list(outer._events)
+
+        self.server_module = _Module()
+        self.data_dir = "/tmp/cal_health"
+
+
+def _ev_between(start_h: float, end_h: float, **kw):
+    from datetime import UTC, datetime, timedelta
+
+    base = datetime.now(UTC).replace(minute=0, second=0, microsecond=0)
+    ev = {
+        "summary": "Design review",
+        "location": "",
+        "start": (base + timedelta(hours=start_h)).isoformat(),
+        "end": (base + timedelta(hours=end_h)).isoformat(),
+    }
+    ev.update(kw)
+    return ev
+
+
+def test_row_view_surfaces_a_feed_error() -> None:
+    core = _HealthCore(health={"cal_a": {"error": "HTTP 401", "failing_since": 1.0}})
+    view = rooms.row_view(
+        _room(feed_id="cal_a"), feeds=[_feed_row()], core=core, health=core._health
+    )
+    assert view["feed_error"] == "HTTP 401"
+
+
+def test_row_view_has_no_error_for_a_healthy_feed() -> None:
+    core = _HealthCore(health={"cal_a": {"error": None, "failing_since": None}})
+    view = rooms.row_view(
+        _room(feed_id="cal_a"), feeds=[_feed_row()], core=core, health=core._health
+    )
+    assert view["feed_error"] is None
+
+
+def test_next_event_reports_busy_with_its_end() -> None:
+    core = _HealthCore(events=[_ev_between(-1, 2)])
+    got = rooms.next_event(_room(), core=core, feed=_feed_row())
+    assert got["state"] == "busy"
+
+
+def test_next_event_reports_the_next_booking_when_free() -> None:
+    core = _HealthCore(events=[_ev_between(2, 3)])
+    got = rooms.next_event(_room(), core=core, feed=_feed_row())
+    assert got["state"] == "free" and got["until"] is not None
+
+
+def test_next_event_reports_free_all_day_with_nothing_booked() -> None:
+    core = _HealthCore(events=[])
+    got = rooms.next_event(_room(), core=core, feed=_feed_row())
+    assert got["state"] == "free" and got["until"] is None
+
+
+def test_next_event_refuses_to_fetch_on_a_cold_cache() -> None:
+    """The settings page must not make N network calls to render, so a
+    feed that would need fetching reports nothing instead of blocking
+    the page on a timeout per room."""
+    core = _HealthCore(events=[_ev_between(-1, 2)], cache_age_s=99_999)
+    assert rooms.next_event(_room(), core=core, feed=_feed_row()) is None
+
+
+def test_next_event_honours_the_location_filter() -> None:
+    """A shared calendar must not make every room look busy."""
+    core = _HealthCore(events=[_ev_between(-1, 2, location="Osprey")])
+    got = rooms.next_event(_room(location_filter="Kestrel"), core=core, feed=_feed_row())
+    assert got["state"] == "free"
+
+
+def test_next_event_without_a_feed_is_none() -> None:
+    assert rooms.next_event(_room(), core=_HealthCore(), feed=None) is None
+
+
+def test_next_event_survives_a_broken_loader() -> None:
+    core = _HealthCore()
+
+    def _boom(*a, **k):
+        raise RuntimeError("nope")
+
+    core.server_module.load_events = _boom  # type: ignore[method-assign]
+    assert rooms.next_event(_room(), core=core, feed=_feed_row()) is None
+
+
+def test_feed_health_tolerates_an_install_without_it() -> None:
+    """An older calendar_core has no health store; the page still renders."""
+
+    class _Old:
+        server_module = type("M", (), {})()
+        data_dir = "/tmp"
+
+    assert rooms.feed_health(_Old()) == {}

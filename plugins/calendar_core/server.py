@@ -152,9 +152,88 @@ def _build_opener(url: str, auth: dict[str, str] | None) -> urllib.request.Opene
     return urllib.request.build_opener(handler)
 
 
-def _http_get(url: str, auth: dict[str, str] | None) -> bytes | None:
+# ----- feed health ----------------------------------------------------
+#
+# Whether a feed is actually working is something only the fetch path
+# knows, and it used to throw that away: a 401 looked exactly like a
+# calendar with no events. Recorded here so surfaces that list feeds
+# (Settings -> Rooms) can say "401 since yesterday" instead of showing a
+# room as free because nothing could be read.
+#
+# Written only when a fetch is genuinely attempted, which the cache TTL
+# bounds to once per feed per CACHE_TTL_S, so this is not hot-path I/O.
+
+
+def _health_path(data_dir: Path) -> Path:
+    return data_dir / "feed_health.json"
+
+
+def load_health(data_dir: Path | None = None) -> dict[str, Any]:
+    """Per-feed fetch health, keyed by feed id."""
+    path = _health_path(data_dir or _data_dir())
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def record_fetch(data_dir: Path, feed_id: str, *, ok: bool, error: str | None = None) -> None:
+    """Note the outcome of one fetch.
+
+    ``failing_since`` is preserved across consecutive failures so a
+    surface can say how long a feed has been broken, and cleared the
+    moment one succeeds.
+    """
+    try:
+        health = load_health(data_dir)
+        prior = health.get(feed_id) or {}
+        now = time.time()
+        entry: dict[str, Any] = {"checked_at": now}
+        if ok:
+            entry["last_ok"] = now
+            entry["error"] = None
+            entry["failing_since"] = None
+        else:
+            entry["last_ok"] = prior.get("last_ok")
+            entry["error"] = error or "unknown"
+            entry["failing_since"] = prior.get("failing_since") or now
+        health[feed_id] = entry
+        path = _health_path(data_dir)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(health, indent=2), encoding="utf-8")
+        tmp.replace(path)
+    except Exception:
+        # Health is diagnostic. Failing to record it must never break the
+        # fetch that was actually asked for.
+        _log.debug("calendar_core: could not record feed health", exc_info=True)
+
+
+def _describe_fetch_error(err: Exception) -> str:
+    """A short reason fit to show an operator.
+
+    "401" tells someone their credentials are wrong; "HTTPError" tells
+    them nothing, and a traceback tells them less.
+    """
+    if isinstance(err, urllib.error.HTTPError):
+        return f"HTTP {err.code}"
+    if isinstance(err, urllib.error.URLError):
+        return f"unreachable ({err.reason})"
+    return type(err).__name__
+
+
+def _http_get(
+    url: str, auth: dict[str, str] | None, *, error_out: list[str] | None = None
+) -> bytes | None:
     """GET ``url`` (server-side), honouring the feed's auth. Returns the
-    body bytes, or None on any failure (unreachable, 401, timeout)."""
+    body bytes, or None on any failure (unreachable, 401, timeout).
+
+    ``error_out`` collects the reason when there is one, so callers that
+    care (feed health) can report it without this having to raise and
+    every existing caller having to catch."""
     fixed = url.replace("webcal://", "https://", 1) if url.startswith("webcal://") else url
     try:
         opener = _build_opener(fixed, auth)
@@ -167,18 +246,32 @@ def _http_get(url: str, auth: dict[str, str] | None) -> bytes | None:
             blob: bytes = resp.read()
             blob = decode_content_encoding(blob, str(resp.headers.get("Content-Encoding", "")))
         return blob
-    except Exception:
+    except Exception as err:
+        if error_out is not None:
+            error_out.append(_describe_fetch_error(err))
         return None
 
 
-def _fetch_ics(url: str, cache_path: Path, auth: dict[str, str] | None = None) -> bytes | None:
+def _fetch_ics(
+    url: str,
+    cache_path: Path,
+    auth: dict[str, str] | None = None,
+    *,
+    feed_id: str = "",
+    data_dir: Path | None = None,
+) -> bytes | None:
     if cache_path.exists() and time.time() - cache_path.stat().st_mtime < CACHE_TTL_S:
         try:
             return cache_path.read_bytes()
         except OSError:
             pass
     # Some providers (notably Google) require https; webcal:// → https://.
-    blob = _http_get(url, auth)
+    errors: list[str] = []
+    blob = _http_get(url, auth, error_out=errors)
+    # Only record when a fetch was actually attempted: a served-from-cache
+    # read above is not evidence the feed is reachable.
+    if feed_id and data_dir is not None:
+        record_fetch(data_dir, feed_id, ok=blob is not None, error=errors[0] if errors else None)
     if blob is None:
         return None
     with contextlib.suppress(OSError):
@@ -449,7 +542,7 @@ def load_todos(
         url = feed.get("url")
         if not url:
             continue
-        blob = _fetch_ics(url, _ics_cache_path(dd, fid), _feed_auth(feed))
+        blob = _fetch_ics(url, _ics_cache_path(dd, fid), _feed_auth(feed), feed_id=fid, data_dir=dd)
         if blob is None:
             continue
         for item in _parse_todos(blob):

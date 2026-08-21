@@ -72,7 +72,7 @@
     minmax(88px, 1.25fr)
     82px
     minmax(96px, 1.3fr)
-    100px;
+    minmax(96px, 1.2fr);
   gap: 0 14px;
   align-items: start;
   padding: 13px 18px;
