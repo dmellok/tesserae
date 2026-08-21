@@ -1,0 +1,21 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "seeed_sticky",
+  "name": "Seeed Sticky",
+  "vendor": "Seeed Studio",
+  "icon": "device-tablet",
+  "description": "3.97 inch monochrome ePaper reader, ESP32-S3, 800x480 panel composed portrait (480x800 presentation). Speaks Tesserae's v1 REST device API when running CrossInk firmware with Tesserae client support: the dashboard is painted as the reader's sleep screen on an explicit sleep transition, so the radio never comes up on a timer. Server-side pack via esp32_bw_bin produces a raw 1-bpp mono buffer (48000 bytes) that is byte-identical to the firmware's framebuffer and is painted with no on-device decode.",
+  "protocol": "esp32_bw_client",
+  "panel": {
+    "w": 480,
+    "h": 800,
+    "orientation": "portrait_flipped",
+    "name": "3.97 inch monochrome ePaper (800x480 native)",
+    "gamut": "mono",
+    "native_w": 800,
+    "native_h": 480
+  },
+  "refresh_floor_s": 60,
+  "image_format": "bin",
+  "notes_md": "**Not yet confirmed on hardware.** Contributed alongside CrossInk's Sticky board support, which is itself derived from the V01 schematic and Seeed's vendor peripheral demo rather than from a validated unit. Treat the orientation as provisional until someone reports back from a real device.\n\nWire format is exactly 48000 bytes (800*480/8), MSB=leftmost pixel, bit-set=white, bit-clear=black; no header, no padding, no checksum. The panel is the same 800x480 SSD1677 used by the Xteink X4 and de-link, and CrossInk drives all three through the same framebuffer path, so the packed frame is byte-identical to `xteink_x4`.\n\n`orientation` is inherited from `xteink_x4` on that basis: CrossInk's Portrait transform is board-independent, and both boards ship the same `NO_FLIP` panel-mount setting, so the same 180-degree offset from the renderer's default should apply. CrossInk's own board profile flags the Sticky's mount transform as pending hardware validation. If a unit paints upside-down, the fix is `portrait` here, and it likely means upstream needs `ROTATE_180` in the board profile too.\n\nSee `seeed_sticky_gray` for the 4-level grayscale variant of the same panel."
+}
