@@ -111,16 +111,44 @@ def test_awake_cadence_ignored_while_always_on_is_off(app: Flask) -> None:
     assert _status(client, token)["next_poll_s"] == 300
 
 
-def test_awake_cadence_respects_a_declared_refresh_floor(app: Flask) -> None:
-    """The always-on path is the only one that can ask for under 30s, so
-    it's the one that has to respect glass that can't be driven faster."""
+def test_awake_cadence_is_not_clamped_by_the_panel_refresh_floor(app: Flask) -> None:
+    """``refresh_floor_s`` is how fast the glass can be REPAINTED, not how
+    often the device may ask. A poll is a conditional GET that answers 304
+    while the frame is unchanged, and a 304 never reaches the panel.
+
+    Clamping the two together defeated always-on outright: a real E1003
+    (floor 60) polled once a minute with its awake cadence set to 5, so a
+    manual Send took up to a minute to land."""
     client = app.test_client()
     token = _register(app, client, "e1003")
     app.config["DEVICE_REGISTRY"].get("e1003").manifest["refresh_floor_s"] = 60
     app.config["SETTINGS_STORE"].update_section(
         "devices", {"e1003": {"always_on": True, "awake_poll_s": 5}}
     )
-    assert _status(client, token)["next_poll_s"] == 60
+    assert _status(client, token)["next_poll_s"] == 5
+
+
+def test_a_sleeping_device_still_respects_its_refresh_floor(app: Flask) -> None:
+    """Only the always-on path changed. A deep-sleeping panel's cadence comes
+    from ``sleep_interval_s`` and is unaffected either way."""
+    client = app.test_client()
+    token = _register(app, client, "e1003")
+    app.config["DEVICE_REGISTRY"].get("e1003").manifest["refresh_floor_s"] = 60
+    app.config["SETTINGS_STORE"].update_section("devices", {"e1003": {"sleep_interval_s": 900}})
+    assert _status(client, token)["next_poll_s"] == 900
+
+
+def test_changing_the_awake_cadence_takes_effect_on_the_next_heartbeat(app: Flask) -> None:
+    """No reboot, no re-register: the value is read from settings per poll."""
+    client = app.test_client()
+    token = _register(app, client, "e1003")
+    store = app.config["SETTINGS_STORE"]
+
+    store.update_section("devices", {"e1003": {"always_on": True, "awake_poll_s": 5}})
+    assert _status(client, token)["next_poll_s"] == 5
+
+    store.update_section("devices", {"e1003": {"always_on": True, "awake_poll_s": 30}})
+    assert _status(client, token)["next_poll_s"] == 30
 
 
 def test_always_on_field_hidden_until_capability_advertised(app: Flask) -> None:

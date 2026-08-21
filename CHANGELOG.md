@@ -4,6 +4,22 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.332.0], 2026-08-22
+
+### Fixed
+
+- **An always-on panel now polls on its awake cadence instead of its panel refresh floor.** A
+  reTerminal E1003 set to stay awake with a 5 second cadence was told to poll every 60, so a
+  manual Send took up to a minute to appear. The cause was `refresh_floor_s`, which describes how
+  fast the *glass* can be repainted, being applied to how often the device *asks*. A poll is a
+  conditional GET that answers 304 while the frame is unchanged, and a 304 never reaches the
+  panel, so the two limits are about different things. The awake cadence is now used as-is.
+
+  The 30 second content-poll floor also no longer applies to an always-on device. It exists to
+  stop a sleeping panel spinning its radio up for a change it could have waited for; a panel that
+  never sleeps is already associated, and holding it there discarded the pull-forward the floor
+  sits inside. Deep-sleeping devices are unchanged, floor included.
+
 ## [0.331.0], 2026-08-22
 
 ### Added

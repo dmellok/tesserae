@@ -61,6 +61,7 @@ from werkzeug.wrappers import Response
 from app.button_service import ButtonService, TouchStroke
 from app.device_loader import Device, DeviceRegistry
 from app.device_service import (
+    AWAKE_POLL_MIN_S,
     awake_poll_interval_s,
     create_instance,
     generate_access_token,
@@ -432,6 +433,16 @@ def _parse_touch_query() -> TouchStroke | None:
     )
 
 
+def _device_awake_poll_s(device: Device) -> int | None:
+    """This device's always-on poll cadence, or None when it deep-sleeps.
+
+    Read live from settings on every heartbeat, so changing the cadence in
+    Settings takes effect on the device's next poll with no reboot."""
+    section = _settings().get_section("devices") or {}
+    stored = section.get(device.id) if isinstance(section, dict) else None
+    return awake_poll_interval_s(stored)
+
+
 def _configured_poll_s(device: Device) -> int:
     """The device's configured wake interval. Reads the stored
     ``sleep_interval_s`` from settings when present (matches the
@@ -441,19 +452,22 @@ def _configured_poll_s(device: Device) -> int:
 
     A device set to stay awake answers from ``awake_poll_s`` instead: it
     isn't on the sleep grid, so its sleep interval says nothing about
-    when it comes back. That's the one path that can ask for a cadence
-    under 30 s, so it's also the one that has to respect a panel's
-    declared ``refresh_floor_s``: some glass simply can't be driven
-    faster, and the always-on switch shouldn't be a way around that.
+    when it comes back.
+
+    A panel's ``refresh_floor_s`` deliberately does NOT clamp this. That
+    field is how fast the *glass* can be repainted; this is how often the
+    device *asks*. A poll is a conditional GET that answers 304 whenever
+    the frame is unchanged, and 304 never reaches the panel. Clamping the
+    ask to the repaint limit made an E1003 (floor 60) poll once a minute
+    however low its awake cadence was set, which is the whole always-on
+    feature defeated by a field about something else. The repaint limit
+    belongs on the path that decides to send a new frame.
     """
+    awake = _device_awake_poll_s(device)
+    if awake is not None:
+        return awake
     section = _settings().get_section("devices") or {}
     stored = section.get(device.id) if isinstance(section, dict) else None
-    awake = awake_poll_interval_s(stored)
-    if awake is not None:
-        floor = device.manifest.get("refresh_floor_s")
-        if isinstance(floor, int) and floor > 0:
-            return max(awake, floor)
-        return awake
     if isinstance(stored, dict) and isinstance(stored.get("sleep_interval_s"), int):
         return int(stored["sleep_interval_s"])
     schema = device.config_schema or {}
@@ -625,7 +639,15 @@ def _next_poll_s(device: Device) -> int:
     # Ceiling: the configured interval. Floor: _MIN_CONTENT_POLL_S, itself
     # capped by the configured interval so a hot-polling panel keeps its
     # cadence.
-    return max(min(min(candidates), configured), min(configured, _MIN_CONTENT_POLL_S))
+    #
+    # An always-on panel floors at the awake minimum instead. The 30 s floor
+    # exists to stop a sleeping device spinning its radio up for a change it
+    # could have waited for; a device that never sleeps is already associated,
+    # so the cost of an early poll is one conditional GET. Holding it at 30 s
+    # would also throw away the pull-forward it is here to deliver: told a
+    # change lands in 8 s, an awake panel should ask in 8 s.
+    floor = AWAKE_POLL_MIN_S if _device_awake_poll_s(device) is not None else _MIN_CONTENT_POLL_S
+    return max(min(min(candidates), configured), min(configured, floor))
 
 
 def _button_wake_s(device: Device) -> int:

@@ -20,6 +20,7 @@ from typing import Any
 import pytest
 from flask import Flask
 
+from app.device_service import AWAKE_POLL_MIN_S
 from app.main import REPO_ROOT, create_app
 
 
@@ -2391,6 +2392,41 @@ def test_next_poll_s_floor_never_slows_a_hot_polling_panel(app: Flask) -> None:
     app.config["SCHEDULER"] = _StubScheduler([_StubEvent(in_seconds=1)])
 
     assert _poll_after_status(app, client, token) == 10
+
+
+def _set_always_on(app: Flask, device_id: str, awake_poll_s: int) -> None:
+    store = app.config["SETTINGS_STORE"]
+    section = store.get_section("devices") or {}
+    entry = dict(section.get(device_id) or {})
+    entry["always_on"] = True
+    entry["awake_poll_s"] = awake_poll_s
+    store.patch_section("devices", {device_id: entry})
+
+
+def test_next_poll_s_floor_does_not_hold_back_an_always_on_panel(app: Flask) -> None:
+    """The 30 s floor stops a SLEEPING device spinning its radio up for a
+    change it could have waited for. An always-on panel is already
+    associated, so an early poll costs one conditional GET, and holding it
+    at 30 s would discard the pull-forward this exists to deliver."""
+    client, token = _paired_client(app)
+    _set_always_on(app, "poll_panel", 60)
+    app.config["SCHEDULER"] = _StubScheduler([_StubEvent(in_seconds=1)])
+
+    poll = _poll_after_status(app, client, token)
+    # An imminent change resolves to the render margin (~20 s). The old floor
+    # would have rounded that up to 30; the awake floor leaves it alone.
+    assert AWAKE_POLL_MIN_S <= poll < 30
+
+
+def test_next_poll_s_still_pulls_forward_for_an_always_on_panel(app: Flask) -> None:
+    """Pull-forward survives the floor change: a change 25 s out beats the
+    60 s awake cadence rather than being rounded up to it."""
+    client, token = _paired_client(app)
+    _set_always_on(app, "poll_panel", 60)
+    app.config["SCHEDULER"] = _StubScheduler([_StubEvent(in_seconds=25)])
+
+    poll = _poll_after_status(app, client, token)
+    assert 35 <= poll <= 46  # 25 + 20 margin, capped by the 60 s cadence
 
 
 def test_next_poll_s_falls_back_when_the_projection_raises(app: Flask) -> None:
