@@ -4,6 +4,26 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.327.0], 2026-08-21
+
+### Added
+
+- **The offline-album sync path says what it did (#247).** It was almost entirely silent on the
+  happy path, so a device that never requested a manifest and a device that requested one and got
+  nothing usable looked identical in a journal. The manifest endpoint now logs the device, album,
+  version and frame count, and the builder logs how many frames are cacheable.
+
+- **`SyslogIdentifier=tesserae` in the generated systemd unit (#247).** journald tagged every line
+  `python[<pid>]`, which is indistinguishable from any other Python on the machine. Existing
+  installs pick this up by re-running `scripts/install-systemd.sh`.
+
+### Fixed
+
+- **Frames that could not be rendered were reported as exceeding the device's caps.** Two different
+  situations: being over a device's `max_frames` or byte budget is expected on a large album, while
+  having no render at all is a fault that leaves the frame unfetchable. They shared one log line, so
+  the second was invisible.
+
 ## [0.326.2], 2026-08-21
 
 ### Fixed

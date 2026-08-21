@@ -420,3 +420,26 @@ def test_an_unwarmable_frame_does_not_consume_the_budget(tmp_path: Path) -> None
 def test_cacheable_count_reflects_only_addressable_frames(tmp_path: Path) -> None:
     manifest = _manifest_with(_FailingRenderSource(tmp_path), tmp_path, ["a.jpg"])
     assert sum(1 for f in manifest["frames"] if f["cache"]) == 0
+
+
+def test_unrendered_frames_are_reported_separately_from_over_caps(tmp_path, caplog) -> None:
+    """A frame over the device's caps is expected on a big album; a frame
+    with no render is a fault. Reporting both as "exceeds caps" is what
+    made the second invisible in a journal (#247)."""
+    import logging
+
+    with caplog.at_level(logging.INFO, logger="app.collection_sync"):
+        _manifest_with(_FailingRenderSource(tmp_path), tmp_path, ["a.jpg", "b.jpg"])
+    text = caplog.text
+    assert "have no render" in text
+    assert "exceed device caps" not in text
+
+
+def test_a_healthy_manifest_still_says_it_ran(tmp_path, caplog) -> None:
+    """Silence on the happy path meant a device that never asked and one
+    that asked and got nothing looked identical."""
+    import logging
+
+    with caplog.at_level(logging.INFO, logger="app.collection_sync"):
+        _manifest_with(FakeRenderSource(tmp_path), tmp_path, ["a.jpg"])
+    assert "frames=1 cacheable=1 unrendered=0" in caplog.text

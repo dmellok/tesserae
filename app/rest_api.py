@@ -1589,6 +1589,17 @@ def get_collection_manifest(device_id: str) -> Response:
         max_frames=max_frames if isinstance(max_frames, int) and max_frames > 0 else None,
     )
     manifest = paged_manifest(manifest, request.args.get("cursor"))
+    # The album path was previously silent on success, so a device that
+    # never asked and a device that asked and got nothing looked
+    # identical in the journal (#247).
+    logger.info(
+        "rest /collection/manifest: device=%s album=%s version=%s frames=%d cursor=%s",
+        device.id,
+        getattr(album, "id", "?"),
+        manifest.get("version"),
+        len(manifest.get("frames") or []),
+        request.args.get("cursor") or "-",
+    )
     return jsonify({"status": 200, **manifest})
 
 

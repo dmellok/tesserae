@@ -273,16 +273,37 @@ def build_manifest(
             }
         )
 
-    dropped = [f["frame_id"] for f in frame_views if not f["cache"]]
-    if dropped:
+    # Two different reasons a frame is not cacheable, reported apart:
+    # exceeding the device's caps is expected on a big album, while an
+    # absent digest means the frame could not be rendered and nothing can
+    # fetch it. Lumping them together hid the second entirely (#247).
+    unrendered = [f["frame_id"] for f in frame_views if not f["digest"]]
+    over_caps = [f["frame_id"] for f in frame_views if f["digest"] and not f["cache"]]
+    if over_caps:
         logger.info(
             "collection manifest: %d frame(s) exceed device caps (max_frames=%s "
             "capacity=%s) for %s; marked cache=false",
-            len(dropped),
+            len(over_caps),
             cap_count,
             capacity_bytes,
             device_id,
         )
+    if unrendered:
+        logger.warning(
+            "collection manifest: %d of %d frame(s) have no render for %s; they cannot be "
+            "cached or fetched, so the device will report fewer frames than the album holds",
+            len(unrendered),
+            len(frame_views),
+            device_id,
+        )
+    logger.info(
+        "collection manifest: album=%s device=%s frames=%d cacheable=%d unrendered=%d",
+        album.id,
+        device_id,
+        len(frame_views),
+        sum(1 for f in frame_views if f["cache"]),
+        len(unrendered),
+    )
 
     manifest: dict[str, Any] = {
         "schema": 1,

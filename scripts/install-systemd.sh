@@ -185,6 +185,9 @@ User=$RUN_AS_USER
 Group=$(id -gn "$RUN_AS_USER")
 WorkingDirectory=$INSTALL_DIR
 ExecStart=$INSTALL_DIR/.venv/bin/python -m app.main --port $PORT
+# Without this journald tags every line "python[<pid>]", which is
+# indistinguishable from any other Python on the box (#247).
+SyslogIdentifier=tesserae
 Restart=on-failure
 RestartSec=5s
 # PYTHONUNBUFFERED keeps logging.warning / print() flowing into journald
