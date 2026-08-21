@@ -34,6 +34,7 @@ from flask import (
 )
 from werkzeug.wrappers import Response as WerkzeugResponse
 
+from app import widget_next_change
 from app.bindings import apply_binding
 from app.panel import PANEL_PRESETS, resolve_panel_for_page
 from app.plugin_http import fetch_json
@@ -862,6 +863,23 @@ def _hydrate_page(
         page_name=str(page_dict.get("name") or ""),
         page_icon=str(page_dict.get("icon") or ""),
     )
+
+    # #243: remember when a widget says its own output goes stale, so the
+    # status path can wake the panel then instead of on a blind grid.
+    # Previews and sample renders are excluded: they are not what any
+    # device is showing.
+    if not preview and not sample:
+        _device_for_hint = str(page_dict.get("target_device_id") or "")
+        if _device_for_hint:
+            try:
+                widget_next_change.record(
+                    current_app._get_current_object(),  # type: ignore[attr-defined]
+                    _device_for_hint,
+                    widget_next_change.collect(data_by_cell_index),
+                    now=time.time(),
+                )
+            except Exception:
+                logger.exception("compose: next-change hint failed for %s", _device_for_hint)
 
     cells_out: list[dict[str, Any]] = []
     for idx, meta in enumerate(cells_meta):

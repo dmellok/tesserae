@@ -36,7 +36,7 @@ import jsonschema
 from flask import Blueprint, Flask, abort, current_app, render_template, send_from_directory
 from werkzeug.wrappers import Response
 
-from app.capabilities import Capabilities
+from app.capabilities import Capabilities, set_delegate_resolver
 from app.capabilities import parse as _parse_capabilities
 
 logger = logging.getLogger(__name__)
@@ -295,6 +295,16 @@ def discover(
         if not source_dir.exists():
             continue
         _scan_plugin_dir(source_dir, registry, schema=schema, data_root=data_root)
+
+    # Resolve ``plugin:<id>`` delegations (#244) against the finished
+    # registry. Late-bound on purpose: a delegate can load after the
+    # widget that names it, so binding at parse time would depend on
+    # directory order.
+    def _delegate(plugin_id: str) -> Capabilities | None:
+        target = registry.get(plugin_id)
+        return target.capabilities if target is not None else None
+
+    set_delegate_resolver(_delegate)
     return registry
 
 

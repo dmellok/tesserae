@@ -2422,3 +2422,196 @@ def test_next_poll_s_only_projects_as_far_as_the_configured_interval(app: Flask)
 
     _poll_after_status(app, client, token)
     assert sched.calls[0]["hours"] == 1
+
+
+# -- widget-declared next change (#243) ----------------------------------
+
+
+def _set_widget_change(app: Flask, device_id: str, when: float) -> None:
+    from app import widget_next_change
+
+    widget_next_change.record(app, device_id, [when], now=when - 1)
+
+
+def test_widget_declared_change_pulls_the_poll_forward(app: Flask) -> None:
+    """A meeting ending is neither a schedule nor a rotation step, so the
+    projection cannot see it; only the widget can say."""
+    client, token = _paired_client(app)
+    _set_sleep_interval(app, "poll_panel", 3600)
+    app.config["SCHEDULER"] = None
+    _set_widget_change(app, "poll_panel", time.time() + 300)
+
+    poll = _poll_after_status(app, client, token)
+    assert 310 <= poll <= 321  # 300 + 20 margin, minus test latency
+
+
+def test_widget_hint_never_exceeds_the_configured_ceiling(app: Flask) -> None:
+    client, token = _paired_client(app)
+    _set_sleep_interval(app, "poll_panel", 120)
+    app.config["SCHEDULER"] = None
+    _set_widget_change(app, "poll_panel", time.time() + 9000)
+
+    assert _poll_after_status(app, client, token) == 120
+
+
+def test_soonest_of_schedule_and_widget_wins(app: Flask) -> None:
+    """Both sources feed one answer; whichever comes first decides."""
+    client, token = _paired_client(app)
+    _set_sleep_interval(app, "poll_panel", 3600)
+    app.config["SCHEDULER"] = _StubScheduler([_StubEvent(in_seconds=900)])
+    _set_widget_change(app, "poll_panel", time.time() + 200)
+
+    assert 210 <= _poll_after_status(app, client, token) <= 221
+
+
+def test_schedule_still_wins_when_it_is_sooner(app: Flask) -> None:
+    client, token = _paired_client(app)
+    _set_sleep_interval(app, "poll_panel", 3600)
+    app.config["SCHEDULER"] = _StubScheduler([_StubEvent(in_seconds=100)])
+    _set_widget_change(app, "poll_panel", time.time() + 2000)
+
+    assert 110 <= _poll_after_status(app, client, token) <= 121
+
+
+def test_a_broken_projection_does_not_lose_the_widget_hint(app: Flask) -> None:
+    """The two sources are gathered independently on purpose: a scheduler
+    fault used to return the configured interval and drop everything."""
+    client, token = _paired_client(app)
+    _set_sleep_interval(app, "poll_panel", 3600)
+    app.config["SCHEDULER"] = _StubScheduler(boom=True)
+    _set_widget_change(app, "poll_panel", time.time() + 240)
+
+    assert 250 <= _poll_after_status(app, client, token) <= 261
+
+
+def test_an_elapsed_widget_hint_is_ignored(app: Flask) -> None:
+    client, token = _paired_client(app)
+    _set_sleep_interval(app, "poll_panel", 600)
+    app.config["SCHEDULER"] = None
+    _set_widget_change(app, "poll_panel", time.time() - 60)
+
+    assert _poll_after_status(app, client, token) == 600
+
+
+def test_next_change_parsing_accepts_the_shapes_widgets_use() -> None:
+    from app.widget_next_change import parse_next_change
+
+    assert parse_next_change("2026-08-21T15:00:00+00:00") is not None
+    assert parse_next_change("2026-08-21T15:00:00Z") is not None
+    assert parse_next_change(1_800_000_000) == 1_800_000_000.0
+    assert parse_next_change(None) is None
+    assert parse_next_change("not a date") is None
+    assert parse_next_change("") is None
+    # True is an int in Python; a boolean is never a timestamp.
+    assert parse_next_change(True) is None
+
+
+def test_record_keeps_only_the_soonest_future_hint(app: Flask) -> None:
+    from app import widget_next_change
+
+    now = time.time()
+    got = widget_next_change.record(app, "poll_panel", [now + 900, now + 120, now - 30], now=now)
+    assert got == now + 120
+
+
+def test_record_replaces_rather_than_merges(app: Flask) -> None:
+    """A re-render supersedes the last one, including a hint that has gone
+    because the page was edited or the widget swapped out."""
+    from app import widget_next_change
+
+    now = time.time()
+    widget_next_change.record(app, "poll_panel", [now + 60], now=now)
+    widget_next_change.record(app, "poll_panel", [], now=now)
+    assert widget_next_change.peek(app, "poll_panel") is None
+
+
+def test_absurdly_distant_hints_are_dropped(app: Flask) -> None:
+    from app import widget_next_change
+
+    now = time.time()
+    assert widget_next_change.record(app, "poll_panel", [now + 40 * 86400], now=now) is None
+
+
+class _StubPush:
+    """Minimal PushManager stand-in for the widget-change refresh path."""
+
+    def __init__(self, latest: dict[str, Any] | None):
+        self.latest = latest
+        self.pushes: list[dict[str, Any]] = []
+
+    def latest_render_for(self, device_id: str) -> dict[str, Any] | None:
+        return self.latest
+
+    def push(self, page_id: str, *, device_ids=None, source: str = "page", **kw: Any) -> Any:
+        self.pushes.append({"page_id": page_id, "device_ids": device_ids, "source": source})
+        return None
+
+    def record_frame_served(self, *a: Any, **k: Any) -> None:
+        return None
+
+
+def _refresh(app: Flask, *, rendered_at: float, change_at: float, page_id: str | None = "morning"):
+    from app import widget_next_change
+    from app.rest_api import _refresh_if_widget_change_elapsed
+
+    device = _devices_registry_device(app)
+    latest: dict[str, Any] = {"digest": "d", "ext": "bin", "timestamp": rendered_at}
+    if page_id is not None:
+        latest["page_id"] = page_id
+    pm = _StubPush(latest)
+    widget_next_change.record(app, device.id, [change_at], now=change_at - 1)
+    with app.test_request_context():
+        _refresh_if_widget_change_elapsed(device, pm)
+    return pm, widget_next_change.peek(app, device.id)
+
+
+def _devices_registry_device(app: Flask):
+    reg = app.config["DEVICE_REGISTRY"]
+    for dev in reg.devices.values():
+        if dev.kind_of is None:
+            return dev
+    raise AssertionError("no device kind available")
+
+
+def test_frame_rerenders_when_the_change_invalidated_the_frame(app: Flask) -> None:
+    """Waking at the right moment is pointless if /frame hands back the
+    artefact composed before the change."""
+    now = time.time()
+    pm, remaining = _refresh(app, rendered_at=now - 600, change_at=now - 60)
+    assert [p["page_id"] for p in pm.pushes] == ["morning"]
+    assert remaining is None  # consumed, so it cannot fire twice
+
+
+def test_frame_does_not_rerender_a_frame_newer_than_the_change(app: Flask) -> None:
+    now = time.time()
+    pm, _ = _refresh(app, rendered_at=now - 10, change_at=now - 60)
+    assert pm.pushes == []
+
+
+def test_frame_does_not_rerender_before_the_change(app: Flask) -> None:
+    now = time.time()
+    pm, remaining = _refresh(app, rendered_at=now - 600, change_at=now + 300)
+    assert pm.pushes == []
+    assert remaining is not None  # still pending, not consumed
+
+
+def test_frame_refresh_needs_a_timestamp_to_prove_staleness(app: Flask) -> None:
+    """Without one we cannot show the frame is old, and re-rendering on
+    every poll would be worse than one stale wake."""
+    from app import widget_next_change
+    from app.rest_api import _refresh_if_widget_change_elapsed
+
+    now = time.time()
+    device = _devices_registry_device(app)
+    pm = _StubPush({"digest": "d", "ext": "bin", "page_id": "morning"})
+    widget_next_change.record(app, device.id, [now - 60], now=now - 61)
+    with app.test_request_context():
+        _refresh_if_widget_change_elapsed(device, pm)
+    assert pm.pushes == []
+
+
+def test_frame_refresh_survives_a_render_without_a_page(app: Flask) -> None:
+    now = time.time()
+    pm, remaining = _refresh(app, rendered_at=now - 600, change_at=now - 60, page_id=None)
+    assert pm.pushes == []
+    assert remaining is None

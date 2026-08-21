@@ -1348,6 +1348,23 @@ the next poll earlier.
 - Only `scheduled` and `conditional` projections count. An `estimated`
   one is the engine's own guess at an unanchored cadence, so it's left
   alone rather than spending a wake on a maybe.
+- **A widget can also declare its own next change.** Schedules and
+  rotation steps are the only things the projection can see, so anything
+  whose displayed state turns over on its own clock is invisible to it: a
+  meeting ending at 15:00, a bin collection at dawn, a countdown hitting
+  zero. A widget's `fetch()` may return `next_change_at` (ISO 8601 or a
+  unix timestamp) meaning "what I just produced becomes wrong then". The
+  soonest such value across the page feeds `next_poll_s` alongside the
+  schedule projection, under the same ceiling, floor and margin. Nothing
+  changes for a widget that doesn't return it.
+- **The frame is re-rendered when that moment has passed.** Waking at the
+  right instant would otherwise achieve nothing, because `/frame` returns
+  the last rendered artefact: a panel told to come back at 15:00:20 would
+  collect the frame composed at 14:45 and keep showing the meeting that
+  just ended. So when a declared change is in the past and the stored
+  frame predates it, the poll re-renders before serving. The hint is
+  consumed on the way out, so this is at most one synchronous render per
+  declared change, not per poll.
 - The returned value carries a small margin past the projected instant,
   because the server renders *at* that instant and a browser compose
   plus quantize isn't free. Polling at exactly the projected time would

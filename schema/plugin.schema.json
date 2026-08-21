@@ -233,10 +233,10 @@
       "type": "array",
       "items": {
         "type": "string",
-        "pattern": "^(network|settings|filesystem):[A-Za-z0-9_./*-]+$"
+        "pattern": "^(network|settings|filesystem|plugin):[A-Za-z0-9_./*-]+$"
       },
       "uniqueItems": true,
-      "description": "Declared capability list. Each entry is `<category>:<value>`. Supported categories: `network:<hostname>` (specific egress target; `network:*` for unrestricted but flagged in review), `settings:plugin` (own plugin settings, the common case; `settings:plugin/<other_id>` for a sibling's; `settings:app` for top-level app settings like lat/lon), `filesystem:write:<path>` (write outside data_dir; reads are implicit for data_dir and the plugin folder). Enforcement in v1: network egress is blocked at the socket layer for hostnames not in the list; settings + filesystem entries are review-only. Widgets without a `requires:` block load with no enforcement (existing behaviour) but should declare in new submissions, the catalog review checklist demands it."
+      "description": "Declared capability list. Each entry is `<category>:<value>`. Supported categories: `network:<hostname>` (specific egress target; `network:*` for unrestricted but flagged in review), `settings:plugin` (own plugin settings, the common case; `settings:plugin/<other_id>` for a sibling's; `settings:app` for top-level app settings like lat/lon), `filesystem:write:<path>` (write outside data_dir; reads are implicit for data_dir and the plugin folder), `plugin:<other_id>` (this widget fetches through another plugin, so that plugin's declared hosts are allowed while this one runs; needed because the delegate's request happens inside this widget's capability scope). Enforcement in v1: network egress is blocked at the socket layer for hostnames not in the list; settings + filesystem entries are review-only. Widgets without a `requires:` block load with no enforcement (existing behaviour) but should declare in new submissions, the catalog review checklist demands it."
     },
     "fonts": {
       "type": "array",

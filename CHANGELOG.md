@@ -4,6 +4,32 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.322.0], 2026-08-21
+
+### Added
+
+- **A widget can declare when its own data goes stale (#243).** `next_poll_s` was derived from
+  schedules and rotation steps only, so anything whose displayed state turns over on its own clock
+  was invisible: a room going free at 15:00, a bin collection at dawn, a countdown hitting zero. A
+  widget's `fetch()` may now return `next_change_at` (ISO 8601 or a unix timestamp); the composer
+  records the soonest across the page, and the status path folds it in beside the schedule
+  projection under the same ceiling, floor and margin. The two sources are gathered independently,
+  so a scheduler fault no longer discards the widget's hint along with its own.
+- **A frame invalidated by a declared change is re-rendered on the next poll (#243).** Waking at the
+  right instant achieved nothing on its own, because `/frame` returns the last rendered artefact: a
+  panel told to come back at 15:00:20 would collect the frame composed at 14:45. When a declared
+  change is in the past and the stored frame predates it, the poll re-renders before serving. The
+  hint is consumed on the way out, so it is at most one synchronous render per change, never per
+  poll.
+- **`plugin:<id>` capability delegation (#244).** A widget that fetches through another plugin makes
+  no requests of its own, but the delegate's request runs inside the widget's capability scope, so
+  declaring any `requires:` entry got the widget denied at the socket layer for a host it cannot
+  know. The only working declaration was no declaration, which is the opposite of what the catalog
+  asks for. `plugin:<other_id>` now means "that plugin's declared hosts are allowed while I run":
+  narrower than `network:*`, visible in review, and bounded by the delegate's own declaration. An
+  undeclared or missing delegate grants nothing, so it cannot be used to inherit a legacy plugin's
+  implicit pass, and cycles terminate.
+
 ## [0.321.3], 2026-08-21
 
 ### Fixed

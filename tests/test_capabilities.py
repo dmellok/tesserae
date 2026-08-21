@@ -314,3 +314,111 @@ def test_undeclared_plugin_in_scope_still_allows_network(
     with capability_scope(legacy):
         socket.create_connection(("any.example", 80))
     assert seen == [("any.example", 80)]
+
+
+# -- plugin delegation (#244) -------------------------------------------
+
+
+def _caps(plugin_id: str, requires):
+    from app.capabilities import parse
+
+    return parse(plugin_id, requires)
+
+
+def _with_resolver(mapping):
+    """Install a delegate resolver backed by a dict, and tear it down."""
+    import contextlib
+
+    from app.capabilities import set_delegate_resolver
+
+    @contextlib.contextmanager
+    def _ctx():
+        set_delegate_resolver(lambda pid: mapping.get(pid))
+        try:
+            yield
+        finally:
+            set_delegate_resolver(None)
+
+    return _ctx()
+
+
+def test_delegating_widget_inherits_the_delegates_hosts() -> None:
+    """The case #244 exists for: a widget that fetches through another
+    plugin makes no requests itself, but the delegate's request runs
+    inside this widget's scope, so it is this widget that gets denied."""
+    core = _caps("calendar_core", ["network:calendar.example"])
+    widget = _caps("room_status", ["plugin:calendar_core"])
+    with _with_resolver({"calendar_core": core}):
+        assert widget.allows_host("calendar.example") is True
+
+
+def test_delegation_does_not_widen_beyond_the_delegate() -> None:
+    core = _caps("calendar_core", ["network:calendar.example"])
+    widget = _caps("room_status", ["plugin:calendar_core"])
+    with _with_resolver({"calendar_core": core}):
+        assert widget.allows_host("evil.example") is False
+
+
+def test_an_undeclared_delegate_grants_nothing() -> None:
+    """Otherwise any widget could name a legacy plugin that has no
+    requires block and inherit its implicit unrestricted pass, which
+    would make the whole mechanism a bypass."""
+    legacy = _caps("calendar_core", None)
+    widget = _caps("room_status", ["plugin:calendar_core"])
+    assert legacy.declared is False
+    with _with_resolver({"calendar_core": legacy}):
+        assert widget.allows_host("anything.example") is False
+
+
+def test_a_missing_delegate_grants_nothing() -> None:
+    widget = _caps("room_status", ["plugin:not_installed"])
+    with _with_resolver({}):
+        assert widget.allows_host("anything.example") is False
+
+
+def test_delegation_cycle_terminates() -> None:
+    """A delegates to B, B back to A. Must answer, not recurse forever."""
+    a = _caps("a", ["plugin:b"])
+    b = _caps("b", ["plugin:a"])
+    with _with_resolver({"a": a, "b": b}):
+        assert a.allows_host("anywhere.example") is False
+
+
+def test_delegation_chain_reaches_a_grandchild() -> None:
+    a = _caps("a", ["plugin:b"])
+    b = _caps("b", ["plugin:c"])
+    c = _caps("c", ["network:deep.example"])
+    with _with_resolver({"a": a, "b": b, "c": c}):
+        assert a.allows_host("deep.example") is True
+
+
+def test_self_delegation_is_dropped() -> None:
+    widget = _caps("room_status", ["plugin:room_status", "network:x.example"])
+    assert widget.delegates == frozenset()
+    assert widget.allows_host("x.example") is True
+
+
+def test_delegation_still_leaves_undeclared_widgets_unenforced() -> None:
+    """The implicit pass for widgets with no requires block is what keeps
+    every pre-existing install working; delegation must not disturb it."""
+    assert _caps("legacy", None).allows_host("anything.example") is True
+
+
+def test_plugin_category_survives_the_manifest_schema() -> None:
+    import json
+    from pathlib import Path
+
+    import jsonschema
+
+    root = Path(__file__).resolve().parent.parent
+    schema = json.loads((root / "schema" / "plugin.schema.json").read_text(encoding="utf-8"))
+    manifest = {
+        "tesserae_compat": "1.x",
+        "name": "X",
+        "version": "0.1.0",
+        "kind": "widget",
+        "description": "x",
+        "supports": {"sizes": ["lg"]},
+        "requires": ["plugin:calendar_core"],
+    }
+    jsonschema.validate(manifest, schema)

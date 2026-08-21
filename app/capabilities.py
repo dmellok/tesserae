@@ -48,7 +48,7 @@ from __future__ import annotations
 import contextvars
 import logging
 import socket
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Any
@@ -59,7 +59,11 @@ logger = logging.getLogger(__name__)
 # Recognised capability category prefixes. The schema regex enforces
 # the shape; this constant keeps the parser honest if the schema
 # grows a new category.
-_CATEGORIES: frozenset[str] = frozenset({"network", "settings", "filesystem"})
+_CATEGORIES: frozenset[str] = frozenset({"network", "settings", "filesystem", "plugin"})
+
+# Guard against a delegation cycle (A delegates to B delegates to A) and
+# against a long chain turning one connect check into a deep walk.
+_MAX_DELEGATION_DEPTH = 4
 
 
 class CapabilityDenied(RuntimeError):
@@ -83,6 +87,11 @@ class Capabilities:
       in v1, surfaced to docs / reviewer output.
     * ``filesystem_writes``: paths the widget may write outside its
       ``data_dir``; same, review-only in v1.
+    * ``delegates``: plugin ids this widget hands fetching to (#244).
+      Their declared hosts count as allowed while this widget runs,
+      because the request they make happens inside this widget's
+      capability scope. Narrower than ``network:*`` and reviewable:
+      the delegate's own declaration still bounds it.
     * ``declared``: True when the manifest had a ``requires:`` array
       at all. Widgets without one default to unenforced (the
       pre-#2 behaviour) so the marketplace upgrade doesn't break
@@ -92,21 +101,41 @@ class Capabilities:
     network_hosts: frozenset[str] = field(default_factory=frozenset)
     settings_scopes: frozenset[str] = field(default_factory=frozenset)
     filesystem_writes: frozenset[str] = field(default_factory=frozenset)
+    delegates: frozenset[str] = field(default_factory=frozenset)
     declared: bool = False
 
     @property
     def allows_any_network(self) -> bool:
         return "*" in self.network_hosts
 
-    def allows_host(self, host: str) -> bool:
+    def allows_host(self, host: str, _depth: int = 0) -> bool:
         """True when the widget may connect to ``host``. Undeclared
         widgets (no ``requires:`` block in the manifest) get an
-        implicit pass so we don't break every existing install."""
+        implicit pass so we don't break every existing install.
+
+        Delegated plugins are consulted last (#244). A widget that
+        fetches through another plugin makes no requests of its own, but
+        the delegate's request runs inside *this* scope, so without this
+        the only working declaration would be no declaration at all.
+        """
         if not self.declared:
             return True
         if self.allows_any_network:
             return True
-        return host in self.network_hosts
+        if host in self.network_hosts:
+            return True
+        if not self.delegates or _depth >= _MAX_DELEGATION_DEPTH:
+            return False
+        for target in sorted(self.delegates):
+            caps = _resolve_delegate(target)
+            # An undeclared delegate does not become a blanket pass: it
+            # would let any widget name a legacy plugin and inherit
+            # unrestricted egress. Only explicit grants delegate.
+            if caps is None or not caps.declared or caps.plugin_id == self.plugin_id:
+                continue
+            if caps.allows_host(host, _depth + 1):
+                return True
+        return False
 
 
 # Active capability scope for the current render call. ``None`` means
@@ -154,6 +183,7 @@ def parse(plugin_id: str, raw: object) -> Capabilities:
     network: set[str] = set()
     settings: set[str] = set()
     fs: set[str] = set()
+    delegates: set[str] = set()
 
     for entry in raw:
         if not isinstance(entry, str) or ":" not in entry:
@@ -182,14 +212,43 @@ def parse(plugin_id: str, raw: object) -> Capabilities:
             if value.startswith("write:"):
                 value = value[len("write:") :]
             fs.add(value)
+        elif category == "plugin":
+            if value == plugin_id:
+                logger.warning("plugin %s: cannot delegate to itself; skipping", plugin_id)
+                continue
+            delegates.add(value)
 
     return Capabilities(
         plugin_id=plugin_id,
         network_hosts=frozenset(network),
         settings_scopes=frozenset(settings),
         filesystem_writes=frozenset(fs),
+        delegates=frozenset(delegates),
         declared=True,
     )
+
+
+# Resolver for ``plugin:`` delegation, installed by the plugin loader once
+# the registry exists. Kept as a hook rather than an import so this module
+# stays free of a loader dependency (the socket hook it owns is imported
+# very early).
+_delegate_resolver: Callable[[str], Capabilities | None] | None = None
+
+
+def set_delegate_resolver(fn: Callable[[str], Capabilities | None] | None) -> None:
+    """Install the lookup used to resolve ``plugin:<id>`` delegations."""
+    global _delegate_resolver
+    _delegate_resolver = fn
+
+
+def _resolve_delegate(plugin_id: str) -> Capabilities | None:
+    if _delegate_resolver is None:
+        return None
+    try:
+        return _delegate_resolver(plugin_id)
+    except Exception:
+        logger.exception("capabilities: delegate lookup failed for %r", plugin_id)
+        return None
 
 
 @contextmanager

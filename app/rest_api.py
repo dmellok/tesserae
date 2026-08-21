@@ -481,27 +481,103 @@ def _projected_poll_s(device: Device, configured_s: int) -> int | None:
     return None
 
 
+def _widget_change_poll_s(device: Device) -> int | None:
+    """Seconds until a widget on this device said its own output goes
+    stale, plus the render margin (#243).
+
+    Schedules and rotation steps are what ``project_upcoming`` can see. A
+    meeting ending, a bin going out, a countdown hitting zero are none of
+    those: only the widget knows, and only once it has fetched. The
+    composer records the soonest hint per device on every render.
+    """
+    from app import widget_next_change
+
+    app = current_app._get_current_object()  # type: ignore[attr-defined]
+    ts = widget_next_change.peek(app, device.id)
+    if ts is None:
+        return None
+    delta = ts - time.time()
+    if delta < 0:
+        return None
+    return int(delta) + _CONTENT_POLL_MARGIN_S
+
+
+def _refresh_if_widget_change_elapsed(device: Device, push_mgr: Any) -> None:
+    """Re-render before serving when a widget's declared change has passed
+    and the frame on the panel predates it (#243).
+
+    Waking the device at the right moment achieves nothing on its own:
+    ``/frame`` hands back the last rendered artefact, so a panel told to
+    come back at 15:00:20 would collect the frame composed at 14:45 and
+    keep showing the meeting that just ended.
+
+    Bounded by construction. It fires only while a recorded change sits in
+    the past *and* the artefact is older than it, and the hint is dropped
+    on the way out, so a device cannot loop on this: at most one
+    synchronous render per declared change.
+    """
+    if push_mgr is None:
+        return
+    from app import widget_next_change
+
+    app = current_app._get_current_object()  # type: ignore[attr-defined]
+    ts = widget_next_change.peek(app, device.id)
+    if ts is None or ts > time.time():
+        return
+    try:
+        latest = push_mgr.latest_render_for(device.id)
+        rendered_at = (latest or {}).get("timestamp")
+        # No timestamp means we cannot prove the frame is stale, and
+        # re-rendering on every poll would be worse than one stale wake.
+        if not isinstance(rendered_at, (int, float)) or rendered_at >= ts:
+            widget_next_change.clear(app, device.id)
+            return
+        page_id = (latest or {}).get("page_id")
+        widget_next_change.clear(app, device.id)
+        if not page_id:
+            return
+        push_mgr.push(str(page_id), device_ids={device.id}, source="widget_change")
+    except Exception:
+        logger.exception("rest /frame: widget-change refresh failed for device=%s", device.id)
+        widget_next_change.clear(app, device.id)
+
+
 def _next_poll_s(device: Device) -> int:
     """How many seconds until the firmware should poll again.
 
     The configured wake interval is the ceiling: it's the staleness the
     operator signed up for, and it's the only thing covering the update
-    causes that can't be projected. Within that, a projected content change
+    causes that can't be projected. Within that, the soonest known change
     pulls the wake earlier so the client lands on the new frame instead of
     on an arbitrary point of a fixed grid.
+
+    Two sources feed it: the scheduler's projection of schedules and
+    rotation steps, and a widget's own declaration of when its data turns
+    over (#243). Either can be absent; a fault in one must not lose the
+    other, so they're gathered independently.
     """
     configured = _configured_poll_s(device)
+    candidates: list[int] = []
     try:
         projected = _projected_poll_s(device, configured)
     except Exception:
         logger.exception("rest: next_poll_s projection failed for device=%s", device.id)
-        return configured
-    if projected is None:
+        projected = None
+    if projected is not None:
+        candidates.append(projected)
+    try:
+        declared = _widget_change_poll_s(device)
+    except Exception:
+        logger.exception("rest: next_poll_s widget hint failed for device=%s", device.id)
+        declared = None
+    if declared is not None:
+        candidates.append(declared)
+    if not candidates:
         return configured
     # Ceiling: the configured interval. Floor: _MIN_CONTENT_POLL_S, itself
     # capped by the configured interval so a hot-polling panel keeps its
     # cadence.
-    return max(min(projected, configured), min(configured, _MIN_CONTENT_POLL_S))
+    return max(min(min(candidates), configured), min(configured, _MIN_CONTENT_POLL_S))
 
 
 def _button_wake_s(device: Device) -> int:
@@ -947,6 +1023,7 @@ def get_frame(device_id: str) -> Response:
                 button_result = None
 
     push_mgr = current_app.config.get("PUSH_MANAGER")
+    _refresh_if_widget_change_elapsed(device, push_mgr)
     latest = push_mgr.latest_render_for(device.id) if push_mgr is not None else None
     if latest is None:
         return _error(204, "no frame rendered yet for this device")
