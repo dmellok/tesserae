@@ -185,6 +185,20 @@ def version_digest(manifest: dict[str, Any]) -> str:
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
 
 
+def resynced_version(version: str, resync_token: str | None) -> str:
+    """The content digest, folded together with a resync token when one is set
+    (``app.state.collection_resync_store``).
+
+    Applied AFTER :func:`version_digest` and deliberately not part of the
+    hashed body: the manifest a device receives stays byte-identical, and only
+    the opaque string it compares against moves. A forced resync is therefore
+    indistinguishable, to firmware, from a genuine content change."""
+    if not resync_token:
+        return version
+    blob = f"{version}.{resync_token}"
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
+
+
 def _producer(album: Album) -> dict[str, Any]:
     return {
         "album": {
@@ -209,6 +223,7 @@ def build_manifest(
     warm_missing: bool,
     capacity_bytes: int | None = None,
     max_frames: int | None = None,
+    resync_token: str | None = None,
 ) -> dict[str, Any]:
     """The collection manifest for one device, per ``docs/dev/frame-cache.md``.
 
@@ -223,7 +238,11 @@ def build_manifest(
     is computed here, before any slicing). ``cache`` is true for the
     lowest-``position`` frames that fit BOTH the frame count cap
     (``max_frames``) and the byte budget (``capacity_bytes``); the rest are
-    ``cache: false`` and fetched on demand."""
+    ``cache: false`` and fetched on demand.
+
+    ``resync_token`` forces a version change without a content change; it must
+    match what the ``/status`` version check used, or the two disagree on every
+    beat and the device re-syncs forever."""
     cap_count = max_frames if (max_frames and max_frames > 0) else DEFAULT_MAX_FRAMES
     budget = capacity_bytes if (capacity_bytes and capacity_bytes > 0) else None
 
@@ -315,7 +334,7 @@ def build_manifest(
         "frames": frame_views,
         "producer": _producer(album),
     }
-    manifest["version"] = version_digest(manifest)
+    manifest["version"] = resynced_version(version_digest(manifest), resync_token)
     return manifest
 
 
@@ -376,6 +395,7 @@ def current_version(
     renders_dir: Path,
     frames: list[tuple[str, str]],
     device_id_for_url: str,
+    resync_token: str | None = None,
 ) -> str:
     """The collection version for a device right now, without warming anything.
     Cheap enough for every ``/status`` response."""
@@ -389,6 +409,7 @@ def current_version(
             image_loader=lambda _f: None,
             device_id_for_url=device_id_for_url,
             warm_missing=False,
+            resync_token=resync_token,
         )["version"]
     )
 

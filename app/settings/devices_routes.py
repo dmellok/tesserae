@@ -921,6 +921,50 @@ def devices_update_quiet_hours(instance_id: str) -> Response:
     )
 
 
+@bp.post("/settings/devices/<instance_id>/album/resync")
+def devices_album_resync(instance_id: str) -> Response:
+    """Force this device to re-sync its offline album (#247).
+
+    The collection version is a digest of the manifest content, so it moves
+    only when the album does. That is right almost always and useless in the
+    one case you need a lever: server and device disagree for a reason the
+    content can't express (an interrupted sync, a swapped card, frames the
+    device dropped). Bumping a per-device token changes the version the next
+    check-in sees, which firmware already knows how to handle.
+
+    Nothing is pushed here. The device picks this up on its own next wake."""
+    anchor = f"device-{instance_id}"
+    redirect_to = redirect(
+        url_for("auth.settings_area", area="devices", opened=instance_id, _anchor=anchor)
+    )
+
+    device = devices().get(instance_id)
+    if device is None:
+        flash(f"Unknown device {instance_id!r}.", "error")
+        return redirect_to
+
+    store = current_app.config.get("ALBUM_STORE")
+    resync_store = current_app.config.get("COLLECTION_RESYNC_STORE")
+    if store is None or resync_store is None:
+        flash("Offline albums aren't available on this install.", "error")
+        return redirect_to
+
+    from app.collection_sync import bound_album_for
+
+    album = bound_album_for(store, device.id)
+    if album is None:
+        flash(f"No offline album is bound to {device.name!r}.", "error")
+        return redirect_to
+
+    resync_store.bump(device.id, album_id=album.id)
+    flash(
+        f"{album.name!r} will re-sync on {device.name!r}'s next check-in. "
+        f"A sleeping panel won't act on this until it wakes.",
+        "ok",
+    )
+    return redirect_to
+
+
 @bp.post("/settings/devices/<instance_id>/battery-offset")
 def devices_update_battery_offset(instance_id: str) -> Response:
     """Save a per-device battery-display offset.

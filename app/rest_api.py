@@ -738,6 +738,22 @@ def _collection_image_loader(album: Any) -> Any:
     return load
 
 
+def _collection_resync_token(device_id: str) -> str | None:
+    """This device's pending resync token, or None. Read on BOTH the /status
+    version check and the manifest build; if the two ever disagree the device
+    re-syncs on every beat, so failures here fall back to None rather than
+    guessing."""
+    store = current_app.config.get("COLLECTION_RESYNC_STORE")
+    if store is None:
+        return None
+    try:
+        token = store.token(device_id)
+    except Exception:
+        current_app.logger.exception("rest: resync token lookup failed for device=%s", device_id)
+        return None
+    return token if isinstance(token, str) and token else None
+
+
 def _collection_status_envelope(device: Device, body: dict[str, Any]) -> dict[str, Any] | None:
     """``{"id", "kind", "version"}`` for the /status response, when this device
     advertised the frame-cache capability on this beat AND has a bound album.
@@ -760,6 +776,7 @@ def _collection_status_envelope(device: Device, body: dict[str, Any]) -> dict[st
         renders_dir=renders_dir,
         frames=frames,
         device_id_for_url=device.id,
+        resync_token=_collection_resync_token(device.id),
     )
     return {"id": f"album:{album.id}", "kind": "album", "version": version}
 
@@ -1587,6 +1604,7 @@ def get_collection_manifest(device_id: str) -> Response:
         warm_missing=True,
         capacity_bytes=capacity if isinstance(capacity, int) and capacity > 0 else None,
         max_frames=max_frames if isinstance(max_frames, int) and max_frames > 0 else None,
+        resync_token=_collection_resync_token(device.id),
     )
     manifest = paged_manifest(manifest, request.args.get("cursor"))
     # The album path was previously silent on success, so a device that

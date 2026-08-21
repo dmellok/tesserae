@@ -88,6 +88,21 @@ def _renders_dir() -> Any:
     return current_app.config.get("RENDERS_DIR")
 
 
+def _resync_token(device_id: str) -> str | None:
+    """The device's pending resync token, folded into the version the same way
+    the device-facing endpoints fold it. Omitting it here would leave the app
+    comparing a token-free version against a device that holds a token-bearing
+    one, i.e. permanent phantom drift after any resync."""
+    store = current_app.config.get("COLLECTION_RESYNC_STORE")
+    if store is None:
+        return None
+    try:
+        token = store.token(device_id)
+    except Exception:
+        return None
+    return token if isinstance(token, str) and token else None
+
+
 def albums_available() -> bool:
     """Whether the Offline Album surface can be advertised at all.
 
@@ -235,6 +250,7 @@ def _projection(
         warm_missing=False,
         capacity_bytes=capacity_bytes,
         max_frames=max_frames,
+        resync_token=_resync_token(device_id),
     )
 
 

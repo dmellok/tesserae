@@ -1693,7 +1693,10 @@ def _status_view(device: Device) -> dict[str, Any]:
         "reported_panel_hint": None,
         "firmware": _firmware_view(device, {}),
         "ota": None,
-        "collection": None,
+        # Bound albums show even with no heartbeat on record: a binding that
+        # has never reported is when you most need to see it, and the line
+        # carries the Resync control (#247).
+        "collection": _collection_view(device, {}),
     }
     if cache is None:
         return base
@@ -1732,22 +1735,31 @@ _COLLECTION_PILL_CLASS = {
 def _collection_view(device: Device, cache: dict[str, Any]) -> dict[str, Any] | None:
     """Shape the offline-album playback line for the Devices card, or None.
 
-    Shown only while an enabled album is bound to this device AND the device's
-    last report describes that album, so a leftover report from an unbound
-    album doesn't linger. Deliberately never names a current frame: once
+    Shown while an enabled album is bound to this device. The *reported* half
+    (state pill, counts, age) is filled only when the device's last report
+    describes that album, so a leftover report from an unbound album doesn't
+    linger; the line itself stays either way, because a binding that has never
+    produced a report is exactly when you want to see it, and it carries the
+    Resync control (#247). Deliberately never names a current frame: once
     playback is local the report is an observation, not a live "current
     screen" (frame-cache contract, "Reporting and truthful state")."""
-    report = cache.get("collection_report")
-    if not isinstance(report, dict):
-        return None
     store = current_app.config.get("ALBUM_STORE")
     if store is None:
         return None
     from app.collection_sync import bound_album_for
 
     album = bound_album_for(store, device.id)
-    if album is None or report.get("id") != f"album:{album.id}":
+    if album is None:
         return None
+    report = cache.get("collection_report")
+    if not isinstance(report, dict) or report.get("id") != f"album:{album.id}":
+        return {
+            "album_name": album.name,
+            "state": "",
+            "pill_class": None,
+            "counts": None,
+            "relative": None,
+        }
     cached = report.get("cached")
     total = report.get("total")
     counts = None

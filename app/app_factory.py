@@ -577,11 +577,13 @@ def create_app(
         data_root / "core" / "device_rotation_state.json"
     )
     from app.state.album_store import AlbumStore
+    from app.state.collection_resync_store import CollectionResyncStore
     from app.state.deck_nav_store import DeckNavStore
 
     # deck_store constructed above (before the legacy migration).
     deck_nav_store = DeckNavStore(data_root / "core" / "deck_nav.json")
     album_store = AlbumStore(data_root / "core" / "albums.json")
+    collection_resync_store = CollectionResyncStore(data_root / "core" / "collection_resync.json")
     # User themes live alongside core stores at ``data/themes/user.json``.
     # The store creates the directory on first save so a fresh install
     # without any custom themes leaves no empty directory behind.
@@ -670,6 +672,7 @@ def create_app(
     app.config["DECK_STORE"] = deck_store
     app.config["DECK_NAV_STORE"] = deck_nav_store
     app.config["ALBUM_STORE"] = album_store
+    app.config["COLLECTION_RESYNC_STORE"] = collection_resync_store
     app.config["USER_THEMES_STORE"] = user_themes_store
     app.config["COMMUNITY_THEMES_STORE"] = community_themes_store
     app.config["EVENT_LOG"] = event_log

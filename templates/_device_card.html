@@ -176,6 +176,11 @@
     </div>
     {% endif %}
 
+    {# Empty target for the Status tab's album Resync button, which lives
+       inside the combined form and so can't wrap itself in one. #}
+    <form method="post" id="album-resync-{{ section.device_id }}"
+          action="{{ url_for('auth.devices_album_resync', instance_id=section.device_id) }}"></form>
+
     {# TAB BAR #}
     <nav class="dx-tabs" role="tablist" aria-label="Device settings">
       {% for tab_id, tab_label in [('status', 'Status'), ('general', 'General'), ('schedule', 'Schedule'), ('calibration', 'Calibration')] %}
@@ -310,7 +315,11 @@
         <div class="dx-status-line">
           <span class="dx-status-muted">Offline album</span>
           <span class="dx-status-headline">{{ coll.album_name }}</span>
+          {% if coll.pill_class %}
           <span class="pill {{ coll.pill_class }}">{{ coll.state }}</span>
+          {% else %}
+          <span class="dx-status-muted">no report yet</span>
+          {% endif %}
           {% if coll.counts %}
           <span class="dx-status-muted">·</span>
           <span class="dx-status-muted">{{ coll.counts }}</span>
@@ -319,6 +328,16 @@
           <span class="dx-status-muted">·</span>
           <span class="dx-status-muted">reported {{ coll.relative }}</span>
           {% endif %}
+          {# Forces a version change so the next check-in re-syncs, for when
+             the counts above stop moving and the album itself is fine.
+             Associated by id, not nesting: this line sits inside the combined
+             form, where an inner <form> would close it early (see above). #}
+          <button type="submit" form="album-resync-{{ section.device_id }}"
+                  class="dx-btn-ghost-sm"
+                  title="Re-send this album on the device's next check-in">
+            <i class="ph ph-arrows-clockwise" aria-hidden="true"></i>
+            <span>Resync</span>
+          </button>
         </div>
         {% endif %}
 

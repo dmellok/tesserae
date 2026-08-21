@@ -4,6 +4,24 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.328.0], 2026-08-21
+
+### Added
+
+- **Resync an offline album from Settings → Devices (#247).** The collection version is a digest
+  of the manifest content, so it moves only when the album does. That leaves no lever for the case
+  where server and device disagree for a reason the content cannot express: an interrupted sync, a
+  swapped card, frames the device dropped. Until now the only workaround was editing the album, a
+  real change made for a fake reason. Resync folds a per-device token into the version after the
+  content digest, so the manifest body stays byte-identical and only the version the device
+  compares against moves. Firmware needs no support for it; it looks like an ordinary content
+  change. The device acts on it at its next wake, not immediately.
+
+- **The album line shows before a device has reported.** It previously required a matching
+  playback report, so a fresh binding, or one whose device had gone quiet, showed nothing at all.
+  The line now appears whenever an enabled album is bound, with the state pill replaced by "no
+  report yet" until one arrives, and it carries the Resync control.
+
 ## [0.327.0], 2026-08-21
 
 ### Added

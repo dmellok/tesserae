@@ -466,6 +466,38 @@ def test_a_warmed_album_reports_exact_storage_and_a_version(
     assert len(target["desired_version"]) == 16
 
 
+def test_a_resync_does_not_show_the_app_phantom_drift(app: Flask, auth: dict[str, str]) -> None:
+    """The app compares ``desired_version`` against what a display reports.
+    A forced resync (#247) moves the device-facing version, so a projection
+    that skipped the token would read as drift that never clears."""
+    _seed_folder(app, "holidays", ["a.jpg"])
+    _register(app, "frame01")
+    _create(app, auth)
+    _warm(app, "frame01", "a.jpg", b"frame-a")
+
+    before = app.test_client().get(_url(), headers=auth).get_json()["targets"][0]
+    app.config["COLLECTION_RESYNC_STORE"].bump("frame01", album_id="holidays")
+    after = app.test_client().get(_url(), headers=auth).get_json()["targets"][0]
+    assert after["desired_version"] != before["desired_version"]
+
+    # ...and it matches what the display is actually told to sync to.
+    from app.rest_api import _collection_frames
+
+    with app.test_request_context():
+        album = app.config["ALBUM_STORE"].get("holidays")
+        assert album is not None
+        device_facing = collection_sync.current_version(
+            album,
+            "frame01",
+            push_mgr=app.config["PUSH_MANAGER"],
+            renders_dir=app.config["RENDERS_DIR"],
+            frames=_collection_frames(album),
+            device_id_for_url="frame01",
+            resync_token=app.config["COLLECTION_RESYNC_STORE"].token("frame01"),
+        )
+    assert after["desired_version"] == device_facing
+
+
 def test_a_partly_warmed_album_still_withholds_storage_and_the_version(
     app: Flask, auth: dict[str, str]
 ) -> None:

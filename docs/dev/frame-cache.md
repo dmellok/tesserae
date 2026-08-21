@@ -164,6 +164,13 @@ max-age=31536000`. Same content-addressed semantics as `/deck/frame/<digest>`; a
   already hold.
 - Orphan cleanup is **client-side by contract**: delete cached files the current
   manifest no longer references. The server does not track device-side files.
+- **Forced resync.** Because the version is derived from content, it cannot
+  express "we disagree for a reason the album doesn't show" (an interrupted
+  sync, a swapped card, frames the device dropped). Settings → Devices carries a
+  **Resync** control that folds a per-device token into the version *after* the
+  content digest. The manifest body is byte-identical; only the version moves.
+  Firmware needs no support for this: it is indistinguishable from an ordinary
+  content change, which is the point. The device acts on it at its next wake.
 
 ## Producer extensions (opaque to the cache)
 
