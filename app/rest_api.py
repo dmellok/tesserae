@@ -12,6 +12,14 @@ one-to-one to the existing MQTT contract:
                                            MQTT relies on the user knowing the
                                            broker creds out of band)
 
+Two routes sit outside that mapping, for clients that can't walk the
+frame envelope's JSON-then-fetch hop:
+
+* ``GET /api/v1/device/<id>/frame.bmp``   <- the image bytes themselves
+* ``GET /api/v1/device/<id>/frames.json`` <- a small on-device picker
+
+See the "sleep screen" section below for what constrains them.
+
 Auth: per-device bearer token, same primitive TRMNL devices already
 use through ``/api/display``. The token is stored on the device
 instance manifest as ``access_token`` and the same constant-time
@@ -37,6 +45,7 @@ mypy --strict applies to this module, see pyproject.toml.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import secrets
@@ -44,6 +53,7 @@ import threading
 import time
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlencode
 
 from flask import Blueprint, Flask, current_app, jsonify, request
 from werkzeug.wrappers import Response
@@ -58,6 +68,7 @@ from app.device_service import (
     parse_rotation,
     usable_mac,
 )
+from app.panel import device_panel
 from app.render_signing import sign_render_query
 from app.renderer_loader import RendererRegistry
 from app.state.event_log import EventLog
@@ -226,16 +237,34 @@ def _device_data_root() -> Path:
 # -- auth ----------------------------------------------------------------
 
 
-def _request_token() -> str:
+# Query-parameter name for the device token on the routes that opt into
+# it. Deliberately short: it is embedded in a URL that has to survive
+# being typed, QR-scanned, or stored in a tiny on-device list.
+TOKEN_QUERY_PARAM = "k"
+
+
+def _request_token(*, allow_query: bool = False) -> str:
     """Pull the bearer token out of the request. Two header forms are
     accepted: ``Authorization: Bearer <token>`` (the canonical REST
     form) and ``X-Tesserae-Token: <token>`` (a fallback for firmware
     libs whose HTTP client makes Authorization headers awkward, e.g.
-    very small embedded HTTP stacks)."""
+    very small embedded HTTP stacks).
+
+    ``allow_query`` additionally accepts ``?k=<token>``, and is opt-in per
+    route rather than global. Some clients fetch a URL from a declarative
+    handler that owns the request and cannot be given headers at all: the
+    URL is the only channel. That convenience costs real secrecy (a query
+    string lands in access logs, proxy logs, and browser history in a way
+    a header does not), so it stays confined to the routes that genuinely
+    have no alternative. Headers still win when both are present.
+    """
     auth = request.headers.get("Authorization", "")
     if auth.lower().startswith("bearer "):
         return auth[7:].strip()
-    return request.headers.get("X-Tesserae-Token", "").strip()
+    header = request.headers.get("X-Tesserae-Token", "").strip()
+    if header or not allow_query:
+        return header
+    return request.args.get(TOKEN_QUERY_PARAM, "").strip()
 
 
 def _device_by_token(token: str) -> Device | None:
@@ -262,12 +291,15 @@ def _device_by_token(token: str) -> Device | None:
     return matched
 
 
-def _auth_device(device_id: str) -> tuple[Device | None, Response | None]:
+def _auth_device(
+    device_id: str, *, allow_query_token: bool = False
+) -> tuple[Device | None, Response | None]:
     """Resolve + authorise a request against a URL-path device id.
 
     Returns ``(device, None)`` on success, ``(None, response)`` to be
     returned directly when auth fails. Centralises the
-    "token-must-match-the-id-in-the-URL" check.
+    "token-must-match-the-id-in-the-URL" check. ``allow_query_token``
+    forwards to :func:`_request_token`; see there for why it is per-route.
 
     Three distinct failure shapes:
 
@@ -285,7 +317,7 @@ def _auth_device(device_id: str) -> tuple[Device | None, Response | None]:
       belongs to a different device. This is the only genuine-auth
       failure of the three; keep the vague message so a rogue
       client can't map "which id owns this token"."""
-    token = _request_token()
+    token = _request_token(allow_query=allow_query_token)
     if not token:
         return None, _error(401, "missing bearer token")
     device = _device_by_token(token)
@@ -1188,6 +1220,264 @@ def get_frame(device_id: str) -> Response:
     if push_mgr is not None:
         push_mgr.record_frame_served(device.id, latest)
     return resp
+
+
+# -- sleep screen: one request, image bytes, no redirect -----------------
+#
+# The normal frame path is a two-hop envelope: GET /frame returns JSON
+# naming a content-addressed artifact under /renders/, and the client
+# fetches that. Some clients cannot walk it. An e-reader that pulls a
+# dashboard as its sleep screen does so from a declarative download
+# handler wired into its sleep transition: exactly one HTTP request, no
+# redirect following, and no way to attach headers of its own. For that
+# shape the URL has to be stable and answer with the image itself.
+#
+# The overriding rule on this path is that a 2xx must always carry a
+# complete image. Such a client streams the response to a temporary file
+# and renames it over the live sleep screen on any 2xx, so a 204, or a
+# 200 with an empty body, silently replaces a working screen with a
+# zero-byte file that renders as nothing. Every "no image right now"
+# outcome here is therefore a 404 and every failure a 5xx: on a non-2xx
+# the client keeps whatever it already had, which is the correct
+# degradation.
+
+# Renderer whose output this route serves. BMP rather than the device's
+# own configured format on purpose: an uncompressed indexed BMP needs no
+# decoder at all on the client, and pinning it here means adding this
+# route cannot change the bytes any existing client of the same device
+# receives.
+_SLEEP_SCREEN_RENDERER = "circuitpython_bmp"
+
+# Hard ceiling on the body. The target firmware caps an event download at
+# 1 MB, and an over-size body fails the download rather than truncating
+# into a smaller picture. Serving one anyway would be a coin-flip on the
+# exact corruption this route is shaped to avoid, so it errors instead —
+# loudly, and with the measured size, because the fix is a configuration
+# one (panel dims or gamut) and the number is the diagnosis.
+_SLEEP_SCREEN_MAX_BYTES = 1024 * 1024
+
+# One rendered BMP per device, keyed by everything that changes the
+# bytes. The quantise is a real cost (fit, contrast, dither, pack) and
+# nothing about this route is rate-limited: a client left polling it, or
+# a dashboard embedding it, would otherwise re-run the whole pipeline per
+# request for an image that hasn't moved. In memory on purpose, like
+# every other derived-frame cache here — a restart re-derives on the
+# next request, which is the same answer at a slightly higher cost.
+_sleep_screen_cache: dict[str, tuple[str, bytes]] = {}
+_sleep_screen_lock = threading.Lock()
+
+
+def _sleep_screen_renderer(device: Device) -> Any | None:
+    """The BMP renderer to transform with, preferring this device's own
+    clone so per-device dither / contrast tuning applies.
+
+    Clones are ``<base>__<instance>`` and only exist for devices whose
+    kind actually consumes the renderer, so a panel on some other format
+    falls through to the base renderer and its manifest defaults.
+    """
+    registry = _renderers()
+    for clone in registry.for_device(device.id):
+        if clone.id.split("__", 1)[0] == _SLEEP_SCREEN_RENDERER:
+            return clone
+    return registry.get(_SLEEP_SCREEN_RENDERER)
+
+
+def _composition_png_bytes(latest: dict[str, Any]) -> bytes | None:
+    """The composition PNG behind a latest-render entry, or None.
+
+    This is what Playwright wrote before any per-renderer transform, so
+    it is the right input to re-transform from regardless of what the
+    device's own artifact ended up being (a packed ``.bin`` can't be
+    re-rendered into anything).
+    """
+    renders_dir = current_app.config.get("RENDERS_DIR")
+    if renders_dir is None:
+        return None
+    comp_digest = latest.get("composition_digest")
+    if not isinstance(comp_digest, str) or not comp_digest:
+        # Pre-0.8.6 latest-render entries predate the composition digest.
+        # They repopulate on the device's next push; until then there is
+        # no PNG to transform and the caller reports "nothing to serve"
+        # rather than inventing something.
+        return None
+    path = Path(renders_dir) / f"{comp_digest}.png"
+    try:
+        return path.read_bytes()
+    except OSError:
+        return None
+
+
+def _sleep_screen_bmp(device: Device, latest: dict[str, Any]) -> tuple[bytes | None, str]:
+    """Render the device's current frame as an indexed BMP.
+
+    Returns ``(bytes, "")`` on success or ``(None, reason)``, where the
+    reason distinguishes "nothing to serve" from "this went wrong" so the
+    caller can pick 404 vs 5xx.
+    """
+    comp_png = _composition_png_bytes(latest)
+    if comp_png is None:
+        return None, "no composition available for the current frame"
+    panel = device_panel(device)
+    if panel is None:
+        return None, "device declares no panel block"
+    renderer = _sleep_screen_renderer(device)
+    if renderer is None:
+        return None, f"renderer {_SLEEP_SCREEN_RENDERER!r} is not installed"
+    try:
+        settings = _settings().get_for_runtime(
+            "renderers", renderer.id, renderer.manifest.get("settings", [])
+        )
+    except Exception:
+        current_app.logger.exception(
+            "rest /frame.bmp: settings lookup failed for renderer=%s", renderer.id
+        )
+        settings = {}
+
+    signature = hashlib.sha256(
+        json.dumps(
+            {
+                "comp": latest.get("composition_digest"),
+                "renderer": renderer.id,
+                "panel": panel.model_dump(),
+                "settings": settings,
+            },
+            sort_keys=True,
+            default=str,
+        ).encode("utf-8")
+    ).hexdigest()[:16]
+    with _sleep_screen_lock:
+        cached = _sleep_screen_cache.get(device.id)
+    if cached is not None and cached[0] == signature:
+        return cached[1], ""
+
+    try:
+        body = renderer.transform(comp_png, panel=panel, settings=settings)
+    except Exception:
+        current_app.logger.exception(
+            "rest /frame.bmp: transform failed for device=%s renderer=%s",
+            device.id,
+            renderer.id,
+        )
+        return None, "frame conversion failed"
+    if not body:
+        # Belt and braces. A renderer returning nothing would otherwise
+        # become a 200 with an empty body, which is the one response this
+        # route must never produce.
+        return None, "frame conversion produced no bytes"
+    with _sleep_screen_lock:
+        _sleep_screen_cache[device.id] = (signature, body)
+    return body, ""
+
+
+@bp.get("/<device_id>/frame.bmp")
+def get_frame_bmp(device_id: str) -> Response:
+    """The current frame as an uncompressed indexed BMP, bytes in the body.
+
+    A single-request alternative to the ``/frame`` envelope for clients
+    that cannot follow it: the URL is stable, the response is the image,
+    and nothing here redirects. Auth is the same per-device token as every
+    other device route, additionally accepted as ``?k=<token>`` because
+    the clients this exists for cannot set headers.
+
+    Serves BMP whatever the device's configured frame format is, so a
+    panel painting ``.bin`` frames keeps painting them; this route just
+    re-transforms the same composition into a second, decoder-free
+    container.
+
+    ``404`` when there is no frame to serve, ``401`` / ``403`` on auth,
+    ``5xx`` on a conversion failure. Never ``204``, and never a 2xx
+    without a complete body: the client renames its download over the
+    live sleep screen on any 2xx.
+    """
+    device, err = _auth_device(device_id, allow_query_token=True)
+    if err is not None or device is None:
+        return err  # type: ignore[return-value]
+
+    push_mgr = current_app.config.get("PUSH_MANAGER")
+    if push_mgr is None:
+        return _error(503, "push manager unavailable")
+    # Same freshness pass the envelope route runs: a widget that declared
+    # its output goes stale at a given moment gets one re-render here, so
+    # a sleep screen pulled just after that moment isn't the pre-change
+    # frame. Bounded to at most one render per declared change.
+    _refresh_if_widget_change_elapsed(device, push_mgr)
+    latest = push_mgr.latest_render_for(device.id)
+    if latest is None:
+        # 404, NOT the 204 the envelope route uses for this case.
+        return _error(404, "no frame rendered yet for this device")
+
+    body, reason = _sleep_screen_bmp(device, latest)
+    if body is None:
+        if reason.startswith("no composition"):
+            return _error(404, reason)
+        return _error(500, reason)
+    if len(body) > _SLEEP_SCREEN_MAX_BYTES:
+        current_app.logger.warning(
+            "rest /frame.bmp: %s bytes exceeds the %s byte client cap for device=%s "
+            "(panel %sx%s, gamut %s)",
+            len(body),
+            _SLEEP_SCREEN_MAX_BYTES,
+            device.id,
+            (device.panel or {}).get("w"),
+            (device.panel or {}).get("h"),
+            (device.panel or {}).get("gamut"),
+        )
+        return _error(
+            500,
+            "frame exceeds the client's download cap",
+            bytes=len(body),
+            max_bytes=_SLEEP_SCREEN_MAX_BYTES,
+        )
+
+    resp = Response(body, mimetype="image/bmp")
+    resp.headers["ETag"] = f'"{hashlib.sha256(body).hexdigest()[:16]}"'
+    resp.headers["Cache-Control"] = "no-store"
+    # Deliberately no ``record_frame_served``: that is delivery bookkeeping
+    # for the device's own frame slot, and this route may be pulled by
+    # something other than the panel that owns the id (a second screen
+    # borrowing the dashboard, a browser checking the output). Advancing
+    # the slot from here would clear a pending badge for a panel that
+    # never received anything.
+    return resp
+
+
+@bp.get("/<device_id>/frames.json")
+def get_frames_index(device_id: str) -> Response:
+    """A tiny list of pullable frames, for an on-device picker.
+
+    Lets a reader fetch a dashboard on demand without a computer in the
+    loop. Each ``url`` is absolute and directly downloadable under the
+    same one-request, no-redirect rule as ``/frame.bmp``, and carries the
+    device token as a query parameter because the on-device downloader
+    that consumes it cannot attach headers.
+
+    ``items`` is always a JSON array. Clients cast it to one, so an object
+    here would silently yield an empty picker.
+    """
+    device, err = _auth_device(device_id, allow_query_token=True)
+    if err is not None or device is None:
+        return err  # type: ignore[return-value]
+
+    token = _request_token(allow_query=True)
+    base = request.url_root.rstrip("/")
+    frame_url = f"{base}/api/v1/device/{device.id}/frame.bmp"
+    if token:
+        frame_url = f"{frame_url}?{urlencode({TOKEN_QUERY_PARAM: token})}"
+    # ASCII only in the display strings: the target's e-ink UI font has no
+    # guaranteed coverage for arrows, dashes or symbols, and a missing
+    # glyph is a tofu box on a screen with no way to report it.
+    return jsonify(
+        {
+            "items": [
+                {
+                    "id": "current",
+                    "title": "Current dashboard",
+                    "subtitle": "Download as sleep screen",
+                    "url": frame_url,
+                }
+            ]
+        }
+    )
 
 
 # -- tap -----------------------------------------------------------------

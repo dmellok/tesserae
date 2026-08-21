@@ -396,6 +396,12 @@ The token grants access only to `/api/v1/device/<own_id>/*` paths.
 Hitting another device's endpoint with a valid-but-wrong token
 returns `403`. Missing or malformed token returns `401`.
 
+Two routes additionally accept the token as a `?k=<token>` query
+parameter: [`frame.bmp`](#get-apiv1deviceidframebmp) and
+[`frames.json`](#get-apiv1deviceidframesjson). Both exist for clients
+that fetch a URL from a handler they don't control and so cannot set
+headers at all. Everything else is header-only on purpose.
+
 Frame downloads (`/renders/<file>`, `/preview/<id>.png`) do **not**
 require auth. They're on the LAN-bypass list because the URLs are
 already random + opaque (SHA-256 digests for `/renders/`) and the
@@ -808,6 +814,78 @@ remote debugging without a serial cable.
 Entries surface in Settings → Events with `type: device`,
 `source: <device_id>`, `target: client_log`. No retention guarantees;
 the Events store caps at 500 device rows.
+
+### `GET /api/v1/device/<id>/frame.bmp`
+
+The current frame as an uncompressed indexed BMP, bytes in the body. A
+single-request alternative to the `/frame` envelope, for clients that
+cannot walk the JSON-then-fetch hop: an e-reader pulling a dashboard as
+its sleep screen typically does so from a declarative download handler
+that makes exactly one request and follows no redirects.
+
+**Response** (`200 OK`): `Content-Type: image/bmp`, the complete image,
+sized to the device's panel dimensions and rotation. An `ETag` is sent
+but no conditional request is required.
+
+BMP is served regardless of the device's configured frame format, so
+adding this route to an existing device does not change what its normal
+client receives; the same composition is simply re-transformed into a
+second, decoder-free container. The body is capped at 1 MB, which an
+800x480 4-bit BMP (~192 KB) clears comfortably; a panel large enough to
+exceed it gets a `500` naming the measured size rather than a body its
+client would fail to download.
+
+**This route never answers `2xx` without a complete body.** Clients of
+this shape stream the response to a temporary file and rename it over the
+live sleep screen on any `2xx`, so a `204`, or a `200` with an empty
+body, would replace a working screen with a zero-byte file. Accordingly:
+
+| Situation | Status |
+| --- | --- |
+| No frame rendered yet | `404` (**not** `204`, unlike `/frame`) |
+| Missing or bad token | `401` |
+| Token belongs to another device | `403` |
+| Conversion failed | `5xx` |
+
+**Auth** is the usual device token, and this route additionally accepts
+it as `?k=<token>`, because the download handlers this exists for own the
+request and cannot attach headers. Headers still win when both are
+present. The query form is opt-in per route rather than a global change:
+a token in a query string lands in access logs, proxy logs and browser
+history in a way a header does not, so it is confined to the routes with
+no alternative. Plain `http://` on the LAN is fine; nothing here
+redirects, so an `https` → `http` hop never arises.
+
+### `GET /api/v1/device/<id>/frames.json`
+
+A small list of pullable frames, for an on-device picker. Lets a reader
+fetch a dashboard on demand without a computer in the loop.
+
+**Response** (`200 OK`):
+```json
+{
+  "items": [
+    {
+      "id": "current",
+      "title": "Current dashboard",
+      "subtitle": "Download as sleep screen",
+      "url": "http://<server>/api/v1/device/<id>/frame.bmp?k=<token>"
+    }
+  ]
+}
+```
+
+`items` is always a JSON array; clients cast it to one, so an object
+would silently yield an empty picker. Each `url` is absolute and directly
+downloadable under the same one-request, no-redirect rule as above, and
+carries the token as a query parameter so the on-device downloader can
+use it as-is. Display strings are ASCII: the e-ink UI fonts these land on
+have no guaranteed coverage for arrows or symbols, and a missing glyph is
+a tofu box on a screen with no way to report it.
+
+Same auth as `/frame.bmp`, query parameter included. The list is
+available before any frame exists; it describes what can be pulled, and
+the download itself `404`s until there is something to serve.
 
 ### `GET /renders/<filename>` (no auth)
 

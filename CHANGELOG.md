@@ -4,6 +4,37 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.331.0], 2026-08-22
+
+### Added
+
+- **`GET /api/v1/device/<id>/frame.bmp` serves the frame's bytes directly.** The normal frame path
+  is a two-hop envelope: JSON naming a content-addressed artefact, then a fetch of that URL. Some
+  clients cannot walk it. An e-reader pulling a dashboard as its sleep screen does so from a
+  declarative download handler that makes exactly one request, follows no redirects, and cannot
+  attach headers of its own. This route answers that shape: stable URL, image in the body, no
+  redirect. It serves an uncompressed indexed BMP whatever the device's configured frame format
+  is, so adding it changes nothing for that device's existing client; the same composition is
+  re-transformed into a second, decoder-free container.
+
+  The route never answers `2xx` without a complete body. Such clients stream to a temporary file
+  and rename it over the live sleep screen on any `2xx`, so a `204`, or a `200` with an empty body,
+  would replace a working screen with a zero-byte file. "No frame yet" is a `404` rather than the
+  `204` the envelope route uses, a failed conversion is a `5xx`, and a body over the client's 1 MB
+  download cap is refused with the measured size rather than served for the client to fail on.
+
+- **`GET /api/v1/device/<id>/frames.json` lists pullable frames for an on-device picker**, so a
+  reader can fetch a dashboard on demand without a computer in the loop.
+
+### Changed
+
+- **Those two routes also accept the device token as `?k=<token>`.** The download handlers they
+  exist for own the request and cannot set headers, so the URL is the only channel. Opt-in per
+  route rather than a global auth change: a token in a query string lands in access logs, proxy
+  logs and browser history in a way a header does not, so it stays confined to the routes with no
+  alternative. Headers still win when both are present, and every other endpoint remains
+  header-only.
+
 ## [0.330.0], 2026-08-22
 
 ### Added
