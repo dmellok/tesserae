@@ -4,6 +4,22 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.341.0], 2026-08-22
+
+### Fixed
+
+- **A relay refusal says why.** Registering an install against a relay reported only
+  `POST https://... -> 400`. The relay had already explained itself in the JSON error body it
+  returns, and the client parsed that body for its `code` and then discarded the human-readable
+  `message`. The message now reaches the error, truncated, so an operator sees
+  `-> 400: install_pubkey required` rather than a bare status.
+
+- **The relay container logs one line per request.** Method, path and status. Without it a refusal
+  was invisible from the relay side: an operator had only whatever status their Tesserae install
+  reported and nothing to compare it against, which matters most when something between the two,
+  such as a reverse proxy, is the thing refusing. Paths only, never query strings or headers,
+  since tokens live in both.
+
 ## [0.340.0], 2026-08-22
 
 ### Fixed

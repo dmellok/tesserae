@@ -110,6 +110,13 @@ async function handle(req, res, env, maxBody) {
   });
   res.writeHead(response.status, headers);
   res.end(payload);
+
+  // One line per request. Without it a refusal is invisible from the outside:
+  // an operator sees only the status their Tesserae install reports and has
+  // nothing on the relay side to compare it against. Path only, never the
+  // query string or a header, because tokens live in both.
+  const path = new URL(request.url).pathname;
+  console.log(`${req.method} ${path} -> ${response.status}`);
 }
 
 function toHeaders(nodeHeaders) {

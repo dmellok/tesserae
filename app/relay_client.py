@@ -80,15 +80,27 @@ def _call(
     except urllib.error.HTTPError as exc:
         body = exc.read()
         code: str | None = None
+        message: str | None = None
         try:
             parsed = json.loads(body)
             if isinstance(parsed, dict):
                 err = parsed.get("error")
-                if isinstance(err, dict) and isinstance(err.get("code"), str):
-                    code = err["code"]
+                if isinstance(err, dict):
+                    if isinstance(err.get("code"), str):
+                        code = err["code"]
+                    if isinstance(err.get("message"), str) and err["message"].strip():
+                        message = err["message"].strip()[:200]
         except (ValueError, TypeError):
             pass
-        raise RelayError(f"{method} {url} -> {exc.code}", status=exc.code, code=code) from exc
+        # The relay says WHY it refused ("install_pubkey required", "body must
+        # be JSON"). Reporting only the status left an operator staring at
+        # "-> 400" with the answer already in hand but discarded.
+        detail = f"{method} {url} -> {exc.code}"
+        if message:
+            detail = f"{detail}: {message}"
+        elif code:
+            detail = f"{detail}: {code}"
+        raise RelayError(detail, status=exc.code, code=code) from exc
     except urllib.error.URLError as exc:
         raise RelayError(f"{method} {url} failed: {exc.reason}") from exc
 
