@@ -17,12 +17,31 @@ Two halves are covered:
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 import pytest
 
 from app.renderer import _IMAGE_WAIT_JS, _log_failed_images
 
-playwright = pytest.importorskip("playwright.sync_api")
+
+def _chromium_available() -> bool:
+    """CI installs the Playwright package but not always its browsers, so
+    importorskip on the module is not enough: the binary has to be there
+    too. Same check the other live-Chromium suites use."""
+    try:
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as p:
+            return Path(p.chromium.executable_path).exists()
+    except Exception:
+        return False
+
+
+# Only the browser half is skipped. The reporter tests below are pure Python
+# and are exactly what should keep running where no browser is installed.
+requires_chromium = pytest.mark.skipif(
+    not _chromium_available(), reason="Playwright Chromium not installed"
+)
 
 
 # -- the reporter ---------------------------------------------------------
@@ -70,6 +89,7 @@ def _evaluate(html: str) -> dict:
             browser.close()
 
 
+@requires_chromium
 def test_a_broken_image_is_counted_and_named() -> None:
     result = _evaluate('<img src="http://127.0.0.1:9/definitely-not-there.png" alt="">')
     assert result["failed"] == 1
@@ -77,6 +97,7 @@ def test_a_broken_image_is_counted_and_named() -> None:
     assert any("definitely-not-there.png" in u for u in result["failed_urls"])
 
 
+@requires_chromium
 def test_a_query_string_is_stripped_so_a_token_is_not_logged() -> None:
     """HA hands out album art as
     ``/api/media_player_proxy/media_player.x?token=<secret>``. The whole point
@@ -92,6 +113,7 @@ def test_a_query_string_is_stripped_so_a_token_is_not_logged() -> None:
     assert "media_player_proxy/media_player.x" in joined
 
 
+@requires_chromium
 def test_a_working_image_is_not_reported() -> None:
     # A 1x1 gif as a data URI always loads, so this isolates the failure path
     # from network flakiness.
@@ -101,6 +123,7 @@ def test_a_working_image_is_not_reported() -> None:
     assert result["failed_urls"] == []
 
 
+@requires_chromium
 def test_images_inside_a_shadow_root_are_covered() -> None:
     """Every widget renders into its own shadow tree, so a collector that only
     walked the light DOM would miss the case this exists for."""
