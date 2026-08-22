@@ -20,7 +20,7 @@ transits the relay.
 ## What you need
 
 - Your home Tesserae instance (any network, behind NAT is fine).
-- A relay: the hosted `relay.tesserae.ink`, or [your own Cloudflare Worker](../relay/self-host.md).
+- A relay: the hosted `relay.tesserae.ink`, or [your own](../relay/self-host.md), as a container or a Cloudflare Worker.
 - A panel whose firmware supports the relay transport (it must decrypt frames;
   see the [contract](../relay/contract.md)).
 

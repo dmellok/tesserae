@@ -26,7 +26,7 @@
       <label for="relay-url">Relay URL</label>
       <input id="relay-url" type="url" name="base_url" value="{{ base_url }}"
              placeholder="{{ default_base_url }}">
-      <p class="help">The hosted <code>{{ default_base_url }}</code>, or your own self-hosted Worker.</p>
+      <p class="help">The hosted <code>{{ default_base_url }}</code>, or your own, self-hosted as a container or a Cloudflare Worker.</p>
     </div>
     {{ switch('relay-allow-local', 'allow_local',
               'Allow a LAN / localhost relay (development only)',

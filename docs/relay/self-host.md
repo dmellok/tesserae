@@ -100,17 +100,22 @@ consistency is doing quiet work in the Worker deployment. One container.
 
 ## Point Tesserae at it
 
-**Settings → Cloud relay**, set the relay URL to your Worker's origin, and
-**Register this install**. Everything else (adding a remote panel, pairing) is
-the same as with the hosted relay.
+**Settings → Cloud relay**, set the relay URL to your relay's origin (the
+Worker URL, or the hostname in front of your container), and **Register this
+install**. Everything else (adding a remote panel, pairing) is the same as with
+the hosted relay.
 
 ## Cost
 
-One R2 bucket holds the sealed frames and the small install/token/pairing
+**Worker.** One R2 bucket holds the sealed frames and the small install/token/pairing
 records. A panel polling every 15–60 minutes is a few requests per day and a few
 KB per frame, well inside Cloudflare's free tier. There are no Durable Objects
 (v1 is scheduled-poll-only and R2 is strongly consistent), so no paid Workers
 plan is required.
+
+**Container.** The same traffic against a directory. A mailbox holds one sealed
+frame per device, so storage is bounded by how many panels you have rather than
+by how long the relay has been running.
 
 ## Storage cleanup
 
@@ -137,7 +142,8 @@ above, so a mailbox holds one sealed frame per device either way.
 ## Analytics (optional)
 
 The Worker writes aggregate counts (frames pushed, mailboxes created / removed)
-to a Workers Analytics Engine dataset for a dashboard. It's fire-and-forget and
+to a Workers Analytics Engine dataset for a dashboard. Cloudflare-only: the
+container never has the binding, so the same code path is a no-op there. It's fire-and-forget and
 a no-op if you remove the `analytics_engine_datasets` binding from
 `wrangler.jsonc`. No frame content is involved (it's sealed); the recorded ids
 are opaque. Query it via the Analytics Engine SQL API, sample queries are in
