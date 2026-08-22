@@ -321,3 +321,198 @@ def test_frames_index_bad_token_is_401(app: Flask) -> None:
         ).status_code
         == 401
     )
+
+
+# -- button dispatch on the BMP route ------------------------------------
+#
+# The route's reason for existing. ``/frame`` hands back the last rendered
+# artefact and the re-render checks hang off the poll, so a route that only
+# serves the newest stored render returns identical bytes for ever. A reader
+# whose only interaction is "download my sleep screen" would never see the
+# dashboard change.
+
+
+class _RecordingButtons:
+    """Stands in for ButtonService. Records the dispatch and swaps the
+    composition, so a test can tell whether the dispatch ran BEFORE the
+    artefact was selected: if it ran after, the response carries the old
+    image."""
+
+    def __init__(self, app: Flask, new_digest: str, shade: int) -> None:
+        self._app = app
+        self._new_digest = new_digest
+        self._shade = shade
+        self.calls: list[dict] = []
+
+    def handle_button(self, *, device_id: str, button: str, event_id: int | None):
+        self.calls.append({"device_id": device_id, "button": button, "event_id": event_id})
+        renders_dir = Path(self._app.config["RENDERS_DIR"])
+        img = Image.new("RGB", (PANEL_W, PANEL_H), (self._shade, self._shade, self._shade))
+        img.save(renders_dir / f"{self._new_digest}.png")
+        entry = dict(self._app.config["PUSH_MANAGER"]._latest_renders[device_id])
+        entry["composition_digest"] = self._new_digest
+        self._app.config["PUSH_MANAGER"]._latest_renders[device_id] = entry
+        return None
+
+
+def _install_buttons(
+    app: Flask,
+    monkeypatch: pytest.MonkeyPatch,
+    digest: str = "comp0002",
+    shade: int = 0,
+    cls: type = _RecordingButtons,
+) -> _RecordingButtons:
+    """Install a button-service double.
+
+    ``_button_service()`` isinstance-checks the real class, so the check has
+    to accept the double. Done through monkeypatch rather than by assigning
+    the module attribute directly, so it is restored afterwards: leaking a
+    patched ButtonService into the rest of the session would break unrelated
+    tests in whichever worker happened to run this file."""
+    stub = cls(app, digest, shade)
+    app.config["BUTTON_SERVICE"] = stub
+    import app.rest_api as rest_api
+
+    monkeypatch.setattr(rest_api, "ButtonService", cls)
+    return stub
+
+
+def test_button_is_dispatched_and_its_frame_is_the_one_served(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client = app.test_client()
+    token = _register(app, client)
+    _seed_frame(app)
+    before = client.get(
+        "/api/v1/device/reader/frame.bmp", headers={"Authorization": f"Bearer {token}"}
+    ).get_data()
+
+    stub = _install_buttons(app, monkeypatch)
+    after = client.get(
+        "/api/v1/device/reader/frame.bmp?button=refresh&button_event_id=1787000000",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert after.status_code == 200
+    assert stub.calls == [{"device_id": "reader", "button": "refresh", "event_id": 1787000000}]
+    # The dispatch ran first, so these are the bytes it produced.
+    assert after.get_data() != before
+
+
+def test_a_button_wake_without_an_event_id_still_dispatches(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``button_event_id`` is a dedup counter, not a requirement. Absent or
+    unparseable means "no dedup hint", never an error."""
+    client = app.test_client()
+    token = _register(app, client)
+    _seed_frame(app)
+    stub = _install_buttons(app, monkeypatch)
+
+    resp = client.get(
+        "/api/v1/device/reader/frame.bmp?button=refresh",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 200
+    assert stub.calls[0]["event_id"] is None
+
+
+def test_an_unknown_button_is_a_plain_fetch_not_an_error(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client = app.test_client()
+    token = _register(app, client)
+    _seed_frame(app)
+    _install_buttons(app, monkeypatch)
+
+    resp = client.get(
+        "/api/v1/device/reader/frame.bmp?button=not_a_real_button&button_event_id=7",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 200
+    assert resp.get_data()[:2] == b"BM"
+
+
+def test_a_failing_button_still_serves_a_frame(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Best-effort action, always serve a frame. A dispatch that raises must
+    not turn a sleep-screen pull into a 5xx, because the reader renames its
+    download over the live screen on any 2xx and gets nothing on an error."""
+    client = app.test_client()
+    token = _register(app, client)
+    _seed_frame(app)
+
+    class _Boom(_RecordingButtons):
+        def handle_button(self, **kwargs):
+            raise RuntimeError("action exploded")
+
+    _install_buttons(app, monkeypatch, digest="comp0003", cls=_Boom)
+
+    resp = client.get(
+        "/api/v1/device/reader/frame.bmp?button=refresh&button_event_id=2",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 200
+    assert resp.get_data()[:2] == b"BM"
+
+
+def test_no_button_does_not_dispatch(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    client = app.test_client()
+    token = _register(app, client)
+    _seed_frame(app)
+    stub = _install_buttons(app, monkeypatch)
+
+    client.get("/api/v1/device/reader/frame.bmp", headers={"Authorization": f"Bearer {token}"})
+    assert stub.calls == []
+
+
+# -- Range probe ---------------------------------------------------------
+
+
+def test_a_single_byte_range_probe_is_answered_exactly(app: Flask) -> None:
+    """A reachability check sends ``Range: bytes=0-0`` so it does not pull the
+    whole image through a client-side relay that may cap well below the frame
+    size. HEAD is not usable for this: it promises a Content-Length with no
+    body, which such a relay reports as truncated."""
+    client = app.test_client()
+    token = _register(app, client)
+    _seed_frame(app)
+
+    resp = client.get(
+        "/api/v1/device/reader/frame.bmp",
+        headers={"Authorization": f"Bearer {token}", "Range": "bytes=0-0"},
+    )
+    assert resp.status_code == 206
+    body = resp.get_data()
+    assert len(body) == 1
+    assert body == b"B"
+    assert resp.headers["Content-Type"] == "image/bmp"
+    assert resp.headers["Content-Range"].startswith("bytes 0-0/")
+
+
+def test_any_other_range_falls_through_to_the_whole_body(app: Flask) -> None:
+    """A full body is a valid answer to any range request, so only the one
+    form a client actually sends is special-cased."""
+    client = app.test_client()
+    token = _register(app, client)
+    _seed_frame(app)
+
+    resp = client.get(
+        "/api/v1/device/reader/frame.bmp",
+        headers={"Authorization": f"Bearer {token}", "Range": "bytes=100-200"},
+    )
+    assert resp.status_code == 200
+    assert resp.get_data()[:2] == b"BM"
+
+
+def test_the_frames_index_url_triggers_a_render(app: Flask) -> None:
+    """The picker's URL has to carry the button, or choosing it hands back a
+    frame that may be hours old, which reads as a broken download."""
+    client = app.test_client()
+    token = _register(app, client)
+    _seed_frame(app)
+
+    items = client.get(f"/api/v1/device/reader/frames.json?k={token}").get_json()["items"]
+    url = items[0]["url"]
+
+    assert "button=refresh" in url
+    assert "button_event_id=" in url

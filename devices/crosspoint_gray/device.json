@@ -1,0 +1,33 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "CrossPoint e-reader (sleep screen)",
+  "icon": "book-open-text",
+  "version": "0.1.0",
+  "description": "CrossPoint e-readers painting a Tesserae dashboard as their sleep screen, over the LAN with no cloud component. The reader draws the image twice, through its GRAYSCALE_LSB and GRAYSCALE_MSB planes, quantising each pixel to 0-3, so the panel is a four-level greyscale ramp and the composition is rendered to the gray_4 gamut rather than to mono. Registering as a generic CircuitPython client left the panel on a mono default and threw those levels away server-side, before the file was written. Pairing is the v1 REST flow: POST /api/v1/device/discover with the reader's derived MAC (locally administered 02: range, so it cannot collide with a real NIC), or the 6-digit code fallback via /register. Steady state is a heartbeat to /status on book close, and a pull of GET /api/v1/device/<id>/frame.bmp for the image itself, which the reader downloads in one request with no redirects.",
+  "renderers": ["circuitpython_bmp"],
+  "panel": {
+    "w": 480,
+    "h": 800,
+    "orientation": "portrait",
+    "name": "CrossPoint 480x800 (4-level greyscale)",
+    "gamut": "gray_4"
+  },
+  "config_schema": {
+    "sleep_interval_s": {
+      "type": "int",
+      "label": "Refresh interval",
+      "default": 3600,
+      "min": 300,
+      "max": 604800,
+      "presets": [
+        {"value": 900,   "label": "15 minutes"},
+        {"value": 1800,  "label": "30 minutes"},
+        {"value": 3600,  "label": "1 hour"},
+        {"value": 21600, "label": "6 hours"},
+        {"value": 43200, "label": "12 hours"},
+        {"value": 86400, "label": "1 day"}
+      ],
+      "help": "How often the server expects the reader back. The reader pulls its sleep screen when the book closes rather than on a timer, so this mainly decides how long it can be silent before the Devices card calls it stale."
+    }
+  }
+}

@@ -4,6 +4,38 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.342.0], 2026-08-23
+
+### Added
+
+- **`crosspoint_gray` device kind.** A CrossPoint e-reader painting a Tesserae dashboard as its
+  sleep screen over the LAN, with no cloud component. The reader draws the image twice, through
+  its greyscale LSB and MSB planes, quantising each pixel to 0-3, so the kind declares a 480x800
+  portrait panel on the `gray_4` gamut. Registering as a generic CircuitPython client left the
+  panel on a mono default and those levels were discarded server-side, before the file was
+  written.
+
+  The renderer is shared with the CircuitPython kinds rather than forked: it selects its palette
+  from the bound panel's gamut, so the same pipeline emits four levels here and one bit elsewhere,
+  and the wire format (uncompressed indexed BMP) is identical. Verified end to end: a gradient
+  comes back as 4 bpp, uncompressed, 480x800, under 190 KiB, with exactly four grey values.
+
+- **`GET /frame.bmp` honours `?button=`.** The route previously served the newest stored render
+  and nothing else, so a client whose only interaction is "download my sleep screen" saw the same
+  bytes for ever: `/frame` hands back the last rendered artefact and the re-render checks hang off
+  the poll. A button now dispatches synchronously before the artefact is chosen, exactly as on the
+  poll, and the frame it produces is what that same response carries. Both routes share one
+  dispatch helper so they cannot drift, including the `event` alias older firmware sends.
+
+  `frames.json` entries carry `button=refresh` for the same reason; without it the on-device
+  picker links to a frame that may be hours old.
+
+- **`frame.bmp` answers a `Range: bytes=0-0` probe** with a `206` and one byte, so a reachability
+  check does not pull a whole image through a client-side relay that may cap well below the frame
+  size. Any other range falls through to the full body, which is a valid answer to any range
+  request. `HEAD` is deliberately not the mechanism: it promises a Content-Length with no body,
+  which such a relay reports as truncated.
+
 ## [0.341.0], 2026-08-22
 
 ### Fixed

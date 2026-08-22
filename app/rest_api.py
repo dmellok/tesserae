@@ -389,6 +389,60 @@ def _parse_button_event_id(raw: Any) -> int | None:
     return None
 
 
+def _wants_first_byte(range_header: str | None) -> bool:
+    """Whether this is the single-byte reachability probe ``bytes=0-0``.
+
+    Deliberately narrow. General range support on a frame nobody caches would
+    be machinery for one caller; this recognises the one form a client
+    actually sends and lets every other range fall through to the full body,
+    which is a valid answer to any range request a client can make."""
+    if not range_header:
+        return False
+    return range_header.replace(" ", "").lower() == "bytes=0-0"
+
+
+def _dispatch_query_button(device: Device, *, route: str) -> Any | None:
+    """Dispatch a ``?button=`` wake through the button service, or None when
+    there is no button on this request.
+
+    Shared by ``/frame`` and ``/frame.bmp`` so the two cannot drift. Both
+    dispatch BEFORE selecting the artefact: a rotate or refresh action
+    publishes synchronously, and the point is that the response carries the
+    frame the button just produced rather than the previous one. Without it a
+    route that only serves the newest stored render returns the same bytes
+    for ever.
+
+    Errors are swallowed by design. The contract is best-effort action plus
+    always-serve-a-frame, so a wake still returns a valid response when the
+    action path fails.
+    """
+    svc = _button_service()
+    button_raw = request.args.get("button", "").strip()
+    if svc is None or not button_raw:
+        return None
+    try:
+        # ``button_event_id`` is the canonical client-protocol parameter.
+        # Firmware through v1.5.0 sent the same monotonic counter as ``event``
+        # on /frame, so that stays a compatibility alias; a present canonical
+        # parameter always wins, even when malformed.
+        raw_event_id = request.args.get("button_event_id")
+        if raw_event_id is None:
+            raw_event_id = request.args.get("event")
+        return svc.handle_button(
+            device_id=device.id,
+            button=button_raw,
+            event_id=_parse_button_event_id(raw_event_id),
+        )
+    except Exception:
+        current_app.logger.exception(
+            "rest %s: button dispatch failed for device=%s button=%s",
+            route,
+            device.id,
+            button_raw,
+        )
+        return None
+
+
 def _parse_coord(raw: Any) -> int | None:
     """A touch coordinate: int or numeric string, >= 0."""
     if isinstance(raw, bool):
@@ -1080,27 +1134,7 @@ def get_frame(device_id: str) -> Response:
     touch_stroke = _parse_touch_query()
     if button_svc is not None:
         if button_raw:
-            try:
-                # ``button_event_id`` is the canonical client-protocol
-                # parameter. Firmware through v1.5.0 sent the same monotonic
-                # counter as ``event`` on /frame (while /status used the
-                # canonical name), so retain that as a compatibility alias.
-                # A present canonical parameter always wins, even if malformed.
-                raw_event_id = request.args.get("button_event_id")
-                if raw_event_id is None:
-                    raw_event_id = request.args.get("event")
-                button_result = button_svc.handle_button(
-                    device_id=device.id,
-                    button=button_raw,
-                    event_id=_parse_button_event_id(raw_event_id),
-                )
-            except Exception:
-                current_app.logger.exception(
-                    "rest /frame: button dispatch failed for device=%s button=%s",
-                    device.id,
-                    button_raw,
-                )
-                button_result = None
+            button_result = _dispatch_query_button(device, route="/frame")
         elif touch_stroke is not None:
             # Touch wake (issue #49): same shape as a button wake. The
             # stroke dispatches through the region map before the frame
@@ -1438,6 +1472,12 @@ def get_frame_bmp(device_id: str) -> Response:
     push_mgr = current_app.config.get("PUSH_MANAGER")
     if push_mgr is None:
         return _error(503, "push manager unavailable")
+    # Button dispatch FIRST, exactly like the /frame poll, and for the reason
+    # this route exists: /frame hands back the last rendered artefact and the
+    # re-render hangs off the poll, so a route that only serves the newest
+    # stored render would return identical bytes for ever. ``?button=refresh``
+    # publishes synchronously and the new frame is what gets served below.
+    _dispatch_query_button(device, route="/frame.bmp")
     # Same freshness pass the envelope route runs: a widget that declared
     # its output goes stale at a given moment gets one re-render here, so
     # a sleep screen pulled just after that moment isn't the pre-change
@@ -1471,8 +1511,23 @@ def get_frame_bmp(device_id: str) -> Response:
             max_bytes=_SLEEP_SCREEN_MAX_BYTES,
         )
 
+    # A reachability probe sends ``Range: bytes=0-0`` to confirm the route
+    # answers without pulling the whole image through a client-side HTTP relay
+    # that may cap at 32 KiB. Answering it exactly costs one branch. HEAD is
+    # deliberately NOT the mechanism for this: a correct HEAD promises a
+    # Content-Length with no body, which such a relay reports as a truncated
+    # response. Only the single-byte prefix form is honoured; anything else
+    # falls through to the full body, which is always valid.
+    if _wants_first_byte(request.headers.get("Range")):
+        probe = Response(body[:1], status=206, mimetype="image/bmp")
+        probe.headers["Content-Range"] = f"bytes 0-0/{len(body)}"
+        probe.headers["Accept-Ranges"] = "bytes"
+        probe.headers["Cache-Control"] = "no-store"
+        return probe
+
     resp = Response(body, mimetype="image/bmp")
     resp.headers["ETag"] = f'"{hashlib.sha256(body).hexdigest()[:16]}"'
+    resp.headers["Accept-Ranges"] = "bytes"
     resp.headers["Cache-Control"] = "no-store"
     # Deliberately no ``record_frame_served``: that is delivery bookkeeping
     # for the device's own frame slot, and this route may be pulled by
@@ -1502,9 +1557,15 @@ def get_frames_index(device_id: str) -> Response:
 
     token = _request_token(allow_query=True)
     base = request.url_root.rstrip("/")
-    frame_url = f"{base}/api/v1/device/{device.id}/frame.bmp"
+    # ``button=refresh`` so picking this item re-renders rather than handing
+    # back whatever was last stored. Without it the picker is a link to a
+    # frame that may be hours old, which reads as the download being broken.
+    # ``button_event_id`` is the dedup counter; a wall-clock stamp is
+    # monotonic across requests, which is all the dedup needs.
+    params: dict[str, Any] = {"button": "refresh", "button_event_id": int(time.time())}
     if token:
-        frame_url = f"{frame_url}?{urlencode({TOKEN_QUERY_PARAM: token})}"
+        params[TOKEN_QUERY_PARAM] = token
+    frame_url = f"{base}/api/v1/device/{device.id}/frame.bmp?{urlencode(params)}"
     # ASCII only in the display strings: the target's e-ink UI font has no
     # guaranteed coverage for arrows, dashes or symbols, and a missing
     # glyph is a tofu box on a screen with no way to report it.
