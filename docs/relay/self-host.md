@@ -39,11 +39,21 @@ The same Worker module runs on Node with the filesystem standing in for R2.
 Nothing about the protocol changes.
 
 ```sh
-docker build -t tesserae-relay packages/relay
 docker run -d --name tesserae-relay \
   -p 8787:8787 \
   -v relay-data:/data \
-  tesserae-relay
+  ghcr.io/dmellok/tesserae-relay:latest
+```
+
+`:latest` follows the most recent relay release, `:edge` tracks `main`, and
+every build also publishes an immutable `sha-<commit>` tag to pin to. The relay
+is versioned separately from Tesserae: the two are coupled by the wire
+contract, not by a version number, and the relay changes far more slowly.
+
+To build it yourself instead:
+
+```sh
+docker build -t tesserae-relay packages/relay
 ```
 
 Or without Docker, on any machine with Node 18 or newer:

@@ -1,0 +1,112 @@
+# Build + publish the relay image to GHCR.
+#
+# Separate from docker.yml on purpose:
+#
+#   * Path-filtered. The relay is a 480-line mailbox that changes rarely;
+#     rebuilding it on every application commit would be noise.
+#   * Its own tags. The relay and the application are coupled by the wire
+#     contract (docs/relay/contract.md), not by a version number, and the
+#     relay moves far more slowly. Tagging an image ``v0.336.0`` because
+#     that happened to be the app version would imply a lockstep that does
+#     not exist, so releases come from a ``relay-v*`` tag instead.
+#
+# The source still lives in the monorepo: the Worker deployment and this
+# container run the SAME packages/relay/src/index.js, and splitting the repo
+# would reintroduce exactly the protocol drift that sharing it prevents.
+#
+# Multi-arch: linux/amd64 + linux/arm64. No Playwright here, unlike the
+# application image, so arm64 is a plain cross-build.
+
+name: docker-relay
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "packages/relay/**"
+      - ".github/workflows/docker-relay.yml"
+    tags: ["relay-v*"]
+  pull_request:
+    branches: [main]
+    paths:
+      - "packages/relay/**"
+      - ".github/workflows/docker-relay.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: docker-relay-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      # No install step: the relay has no runtime dependencies and the suite
+      # runs on plain node --test, no wrangler or Miniflare.
+      - name: Run relay tests
+        working-directory: packages/relay
+        run: npm test
+
+  build:
+    name: build${{ github.event_name == 'pull_request' && '' || ' + publish' }}
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute image tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          # Owner comes from the repo so a fork publishes into its own GHCR
+          # namespace without editing this file.
+          images: ghcr.io/${{ github.repository }}-relay
+          tags: |
+            # relay-v0.2.0 → :0.2.0 + :0.2 + :latest. ``match`` rather than
+            # ``semver`` because the tag carries a relay- prefix, which keeps
+            # it out of the application's v* release flow.
+            type=match,pattern=relay-v(\d+\.\d+\.\d+),group=1
+            type=match,pattern=relay-v(\d+\.\d+),group=1
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/relay-v') }}
+            # Push to main → :edge, plus an immutable per-commit tag so a
+            # deployment can pin something that will not move under it.
+            type=raw,value=edge,enable={{is_default_branch}}
+            type=sha,format=short,enable={{is_default_branch}}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ./packages/relay
+          file: ./packages/relay/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          # PRs build without pushing, so Dockerfile drift is caught without
+          # publishing from an unmerged branch.
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: |
+            type=gha,scope=relay-${{ github.ref_name }}
+            type=gha,scope=relay-main
+          cache-to: type=gha,mode=max,scope=relay-${{ github.ref_name }}

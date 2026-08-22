@@ -4,6 +4,20 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.337.0], 2026-08-22
+
+### Added
+
+- **The relay image is published to GHCR.** `ghcr.io/dmellok/tesserae-relay`, multi-arch
+  (amd64 + arm64), so self-hosting no longer means cloning the whole repository to build a
+  480-line mailbox. `:latest` follows the most recent relay release, `:edge` tracks `main`, and
+  every build publishes an immutable `sha-<commit>` tag.
+
+  The relay is versioned independently of Tesserae, from a `relay-v*` tag. The two are coupled by
+  the wire contract rather than a version number, and tagging the image with an application
+  version would imply a lockstep that does not exist. Its workflow is path-filtered, so an
+  application commit does not rebuild it, and it runs the relay test suite before publishing.
+
 ## [0.336.0], 2026-08-22
 
 ### Added

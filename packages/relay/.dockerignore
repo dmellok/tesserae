@@ -1,0 +1,14 @@
+# The image copies only package.json and src/, but everything here would still
+# be uploaded to the builder as build context. node_modules alone is ~200 MB of
+# wrangler, which the container never uses (it is a devDependency, and the
+# relay has no runtime dependencies at all).
+node_modules
+npm-debug.log*
+
+# Worker-deployment and development files: not part of the container.
+wrangler.jsonc
+wrangler.prod.jsonc
+test
+README.md
+.dockerignore
+Dockerfile
