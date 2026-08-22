@@ -42,13 +42,14 @@ Nothing about the protocol changes.
 docker run -d --name tesserae-relay \
   -p 8787:8787 \
   -v relay-data:/data \
-  ghcr.io/dmellok/tesserae-relay:latest
+  ghcr.io/dmellok/tesserae-relay:edge
 ```
 
-`:latest` follows the most recent relay release, `:edge` tracks `main`, and
-every build also publishes an immutable `sha-<commit>` tag to pin to. The relay
-is versioned separately from Tesserae: the two are coupled by the wire
-contract, not by a version number, and the relay changes far more slowly.
+`:edge` tracks `main`, and every build also publishes an immutable
+`sha-<commit>` tag to pin to. `:latest` appears with the first tagged relay
+release. The relay is versioned separately from Tesserae: the two are coupled
+by the wire contract, not by a version number, and the relay changes far more
+slowly.
 
 To build it yourself instead:
 

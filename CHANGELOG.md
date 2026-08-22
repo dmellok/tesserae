@@ -10,8 +10,8 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 - **The relay image is published to GHCR.** `ghcr.io/dmellok/tesserae-relay`, multi-arch
   (amd64 + arm64), so self-hosting no longer means cloning the whole repository to build a
-  480-line mailbox. `:latest` follows the most recent relay release, `:edge` tracks `main`, and
-  every build publishes an immutable `sha-<commit>` tag.
+  480-line mailbox. `:edge` tracks `main` and every build publishes an immutable `sha-<commit>`
+  tag; `:latest` appears with the first tagged relay release.
 
   The relay is versioned independently of Tesserae, from a `relay-v*` tag. The two are coupled by
   the wire contract rather than a version number, and tagging the image with an application
