@@ -115,6 +115,9 @@ _LAN_PATHS: Final[tuple[str, ...]] = ("/renders/", "/preview/", "/mirror/")
 # (see app/net_guard.py: allow_local skips the interceptor entirely), and
 # there are no CSRF tokens to fall back on.
 _PLUGIN_ASSET_ENDPOINT: Final[str] = "plugins.plugin_asset"
+# Prefix every plugin blueprint mounts under, used to tell a plugin's own
+# sub-route from its index (see _path_is_loopback_only).
+_PLUGIN_ROUTE_PREFIX: Final[str] = "/plugins/"
 _LOOPBACK_HOSTS: Final[frozenset[str]] = frozenset({"127.0.0.1", "::1", "localhost"})
 # RFC1918 + loopback + link-local: addresses that can only originate
 # from a trusted local network. /renders/ payloads are content-addressed
@@ -266,23 +269,49 @@ def _path_is_loopback_only(
     path: str,
     endpoint: str | None = None,
     render_safe: frozenset[str] = frozenset(),
+    method: str = "GET",
 ) -> bool:
     """Whether this request may skip the password gate when it comes from
     loopback.
 
     ``endpoint`` is Flask's resolved endpoint (available by the time
     ``before_request`` runs); None, as for an unmatched path, grants nothing.
-    ``render_safe`` is the set of plugin endpoints declared safe to serve
-    during a session-less render (collected by the plugin loader from each
-    plugin's ``RENDER_SAFE_ENDPOINTS``). Opt-in and read-only by convention:
-    anything a plugin does not declare stays gated, and reviewing that list is
-    part of reviewing the plugin, the same trust boundary that already lets it
-    run in-process."""
+    ``render_safe`` is the set of plugin endpoints a plugin declared through
+    ``RENDER_SAFE_ENDPOINTS``, collected by the loader.
+
+    Three things pass:
+
+    1. The static asset handler, which the composer needs for every widget's
+       ``client.js`` and whose own allowlist bounds what it serves.
+    2. Anything a plugin explicitly declared render-safe.
+    3. A **read** of a plugin's own sub-route.
+
+    Rule 3 exists because rules 1 and 2 were not enough (#255). A widget that
+    serves its own media from its blueprint, which an installed catalog widget
+    may well do, renders with a broken image on every panel and no way for its
+    author to know why: the declaration is an in-tree convention they never
+    saw. Read-only is the line that keeps the original hole shut, because
+    every dangerous route found when this was tightened was a mutation:
+    ``shutil.rmtree`` on a gallery folder, calendar feed writes, CalDAV
+    discovery against a caller-supplied URL. Those stay gated.
+
+    A plugin's INDEX (``/plugins/<id>/``) also stays gated even on a read: it
+    lists loader errors and plugin contents, and gtfs turns a query argument
+    on it into an outbound request. That is the case #221 closed and this must
+    not reopen it, so the exemption needs a non-empty tail after the plugin id.
+    """
     if any(path.startswith(p) for p in _LOOPBACK_PATHS):
         return True
     if endpoint is None:
         return False
-    return endpoint == _PLUGIN_ASSET_ENDPOINT or endpoint in render_safe
+    if endpoint == _PLUGIN_ASSET_ENDPOINT or endpoint in render_safe:
+        return True
+    if method.upper() not in ("GET", "HEAD"):
+        return False
+    if not path.startswith(_PLUGIN_ROUTE_PREFIX):
+        return False
+    _plugin_id, _, tail = path[len(_PLUGIN_ROUTE_PREFIX) :].partition("/")
+    return bool(_plugin_id) and bool(tail)
 
 
 def _path_is_lan_reachable(path: str) -> bool:
@@ -359,6 +388,7 @@ def install_gate(app: Flask, settings: SettingsStore) -> None:
             path,
             request.endpoint,
             current_app.config.get("RENDER_SAFE_ENDPOINTS", frozenset()),
+            request.method,
         ):
             if _is_loopback():
                 return None

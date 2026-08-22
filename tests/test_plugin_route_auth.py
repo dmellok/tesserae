@@ -138,3 +138,69 @@ def test_an_authenticated_operator_can_still_delete_a_folder(app: Flask) -> None
 
     assert resp.status_code in (200, 302)
     assert not folder.exists()
+
+
+# -- a plugin serving its own media (#255) --------------------------------
+
+
+def test_a_plugin_can_serve_its_own_media_to_the_renderer(app: Flask) -> None:
+    """A catalog widget that serves artwork from its own blueprint rendered a
+    broken image on every panel: the RENDER_SAFE_ENDPOINTS declaration is an
+    in-tree convention its author never saw. A read of a plugin's own
+    sub-route is allowed from loopback again."""
+    from app import auth
+
+    assert (
+        auth._path_is_loopback_only(
+            "/plugins/album_art/artwork/deadbeef.jpg",
+            "album_art_admin.artwork",
+            frozenset(),
+            "GET",
+        )
+        is True
+    )
+
+
+def test_a_write_to_a_plugin_route_is_still_refused(app: Flask) -> None:
+    """Read-only is the line. Every dangerous route found when this was
+    tightened was a mutation, and those must stay shut."""
+    from app import auth
+
+    for method in ("POST", "PUT", "DELETE", "PATCH"):
+        assert (
+            auth._path_is_loopback_only(
+                "/plugins/picture_gallery/folders/holidays/delete",
+                "picture_gallery_admin.delete_folder",
+                frozenset(),
+                method,
+            )
+            is False
+        ), method
+
+
+def test_a_plugin_index_is_still_refused_even_on_a_read(app: Flask) -> None:
+    """#221: the index lists loader errors and plugin contents, and gtfs turns
+    a query argument on it into an outbound request."""
+    from app import auth
+
+    for path, endpoint in [
+        ("/plugins/gtfs/", "gtfs_admin.index"),
+        ("/plugins/picture_gallery/", "picture_gallery_admin.index"),
+        ("/plugins/", "plugins.plugins_index"),
+    ]:
+        assert auth._path_is_loopback_only(path, endpoint, frozenset(), "GET") is False, path
+
+
+def test_the_live_gate_serves_a_plugin_read_and_refuses_its_write(app: Flask) -> None:
+    """End to end through the real gate, from an unauthenticated loopback
+    client: the exact shape of a render fetching a widget's media."""
+    client = app.test_client()
+    folder = _seed_folder(app, "family_photos")
+
+    ok = client.get("/plugins/picture_gallery/folders/family_photos/holiday.jpg")
+    assert ok.status_code == 200
+    ok.close()
+
+    denied = client.post("/plugins/picture_gallery/folders/family_photos/delete")
+    assert denied.status_code != 200
+    assert folder.exists()

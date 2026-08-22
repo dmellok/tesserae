@@ -116,11 +116,16 @@ def test_plugin_assets_bypass_the_gate_but_admin_pages_do_not() -> None:
         auth._path_is_loopback_only("/plugins/calendar_core/", "calendar_core_admin.index") is False
     )
 
-    # A plugin blueprint route that merely LOOKS like an asset path.
+    # A plugin blueprint route that merely LOOKS like an asset path. Asserted
+    # on POST, the method that route actually serves: since #255 a plugin's
+    # own sub-route is readable from loopback so a widget can serve its media,
+    # and only mutations stay refused.
     assert (
         auth._path_is_loopback_only(
             "/plugins/picture_gallery/folders/holidays/delete",
             "picture_gallery_admin.delete_folder",
+            frozenset(),
+            "POST",
         )
         is False
     )
@@ -143,6 +148,7 @@ def test_plugin_assets_bypass_the_gate_but_admin_pages_do_not() -> None:
             "/plugins/picture_gallery/folders/holidays/delete",
             "picture_gallery_admin.delete_folder",
             declared,
+            "POST",
         )
         is False
     )

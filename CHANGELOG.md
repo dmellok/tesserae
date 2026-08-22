@@ -4,6 +4,28 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.340.0], 2026-08-22
+
+### Fixed
+
+- **A widget that serves its own media renders again (#255).** v0.329.0 put plugin blueprint
+  routes behind the password gate, exempting only the static asset handler and endpoints a plugin
+  declared through `RENDER_SAFE_ENDPOINTS`. An installed catalog widget that serves artwork from
+  its own blueprint therefore had that fetch refused during a render, which happens over loopback
+  with no session, and every panel drew a broken image. The declaration is an in-tree convention
+  its author never saw, and the widget is not in this repository, so the sweep that added it for
+  Picture Gallery could not have found it.
+
+  A **read** of a plugin's own sub-route is allowed from loopback again. Read-only is the line
+  that keeps the original hole shut: every dangerous route found when this was tightened was a
+  mutation (a gallery folder delete calling `shutil.rmtree`, calendar feed writes, CalDAV
+  discovery against a caller-supplied URL), and those stay refused. A plugin's index stays refused
+  even on a read, since it lists loader errors and plugin contents and gtfs turns a query argument
+  on it into an outbound request.
+
+  Narrower than before as a result: a plugin exposing a destructive action over GET would now be
+  reachable from loopback. Every such route in this repository is a POST.
+
 ## [0.339.0], 2026-08-22
 
 ### Fixed
