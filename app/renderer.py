@@ -281,23 +281,48 @@ _IMAGE_WAIT_JS: Final[str] = """async () => {
             if (el.shadowRoot) yield* allImages(el.shadowRoot);
         }
     }
+    // An image that ERRORS also settles, so waiting alone cannot tell a
+    // loaded frame from one full of broken-image glyphs. Failures are
+    // collected by URL so a render that looks fine to the server but wrong
+    // on the panel says so in the log (issue #255).
+    //
+    // Query strings are stripped before reporting: an HA entity_picture
+    // carries its auth token there, and a diagnostic is not a place to
+    // write someone's credential.
+    const seen = [];
     let total = 0;
     const pending = [];
+    function record(img) {
+        try {
+            const u = new URL(img.currentSrc || img.src, document.baseURI);
+            seen.push(u.origin + u.pathname);
+        } catch { seen.push('(unparsable src)'); }
+    }
     for (const img of allImages(document)) {
         total += 1;
         if (img.complete && img.naturalWidth > 0) continue;
+        if (img.complete && !img.naturalWidth) { record(img); continue; }
         pending.push(new Promise((resolve) => {
             const done = () => resolve();
+            const failed = () => { record(img); resolve(); };
             img.addEventListener('load', done, { once: true });
-            img.addEventListener('error', done, { once: true });
+            img.addEventListener('error', failed, { once: true });
         }));
     }
-    if (!pending.length) return { total, awaited: 0, timed_out: false };
+    if (!pending.length) {
+        return { total, awaited: 0, timed_out: false, failed: seen.length, failed_urls: seen };
+    }
     const outcome = await Promise.race([
         Promise.all(pending).then(() => 'done'),
         new Promise((r) => setTimeout(() => r('timeout'), 5000)),
     ]);
-    return { total, awaited: pending.length, timed_out: outcome === 'timeout' };
+    return {
+        total,
+        awaited: pending.length,
+        timed_out: outcome === 'timeout',
+        failed: seen.length,
+        failed_urls: seen.slice(0, 8),
+    };
 }"""
 
 
@@ -461,6 +486,32 @@ def _install_request_policy(page: Any, request: RenderRequest) -> None:
     page.route("**/*", _route)
 
 
+def _log_failed_images(settle: Any) -> None:
+    """Say so when a render finished with images that never loaded.
+
+    The wait resolves on ``error`` as well as ``load``, which is correct (a
+    dead CDN must not hold a render) but meant a page full of broken-image
+    glyphs completed silently: the frame reached the panel, the server logged
+    a success, and the only evidence was on the glass (issue #255). URLs
+    arrive already stripped of their query string, so an HA entity_picture
+    token never lands in a log.
+    """
+    if not isinstance(settle, dict):
+        return
+    failed = settle.get("failed")
+    if not isinstance(failed, int) or failed <= 0:
+        return
+    urls = settle.get("failed_urls")
+    listed = ", ".join(str(u) for u in urls) if isinstance(urls, list) and urls else "?"
+    logger.warning(
+        "render: %d of %s image(s) failed to load: %s. The frame was still "
+        "captured, so the panel will show a broken image where these were.",
+        failed,
+        settle.get("total", "?"),
+        listed,
+    )
+
+
 def _new_composer_page(browser: Browser, request: RenderRequest) -> tuple[Any, Any]:
     """Open a fresh context + page sized to the request and return
     ``(context, page)``. Caller owns closing the context."""
@@ -518,6 +569,7 @@ def _navigate_and_settle(page: Any, request: RenderRequest, attempt: int) -> dic
     settle["compose_ms"] = int((t1 - t_goto) * 1000)
     try:
         settle["images"] = page.evaluate(_IMAGE_WAIT_JS)
+        _log_failed_images(settle["images"])
     except PlaywrightError as err:
         logger.warning("image wait skipped: %s", err)
         settle["images"] = {"error": str(err).splitlines()[0][:200]}
@@ -665,7 +717,7 @@ def _screenshot_attempt(browser: Browser, request: RenderRequest, attempt: int) 
         # CDN) keep downloading after that, and the screenshot would
         # otherwise capture a half-loaded / broken-image frame.
         try:
-            page.evaluate(_IMAGE_WAIT_JS)
+            _log_failed_images(page.evaluate(_IMAGE_WAIT_JS))
         except PlaywrightError as err:
             logger.warning("image wait skipped: %s", err)
         t_img = time.monotonic()

@@ -4,6 +4,20 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.338.0], 2026-08-22
+
+### Fixed
+
+- **A render that finishes with broken images now says so (#255).** The image wait resolves on
+  `error` as well as `load`, which is right (a dead upstream must not hold a render hostage) but
+  meant a page full of broken-image glyphs completed silently: the frame reached the panel, the
+  server logged a success, and the only evidence was on the glass. Failed images are now counted
+  and named in a warning, and carried in `render_report?debug=1` alongside the existing settle
+  timings.
+
+  URLs are logged without their query string. A Home Assistant `entity_picture` carries its auth
+  token there, and a diagnostic is not a place to write someone's credential.
+
 ## [0.337.0], 2026-08-22
 
 ### Added
