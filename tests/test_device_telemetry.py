@@ -385,3 +385,40 @@ def test_reprojection_rejects_a_nonsense_interval(tmp_path) -> None:
     store = TelemetryStore(tmp_path / "t.json")
     store.record_heartbeat("panel", parsed={}, received_at=1000.0, configured_sleep_s=60)
     assert store.reproject("panel", 0) is None
+
+
+def test_always_on_polls_are_not_scored_against_a_wake_prediction(tmp_path: Path) -> None:
+    """An always-on panel has no wake to predict: it polls on a cadence the
+    operator can change at any moment and never sleeps between beats. Scoring
+    those polls logged "wake missed prediction ... resetting confidence" over
+    and over for a device behaving perfectly (production, 2026-08-22)."""
+    store = _make_store(tmp_path)
+    store.record_heartbeat(
+        "e1003_always_on",
+        received_at=1_000_000.0,
+        parsed={"battery_pct": 90},
+        configured_sleep_s=5,
+        always_on=True,
+    )
+    # Nine minutes later: wildly "late" against a 5 s cadence, but meaningless.
+    entry = store.record_heartbeat(
+        "e1003_always_on",
+        received_at=1_000_540.0,
+        parsed={"battery_pct": 90},
+        configured_sleep_s=5,
+        always_on=True,
+    )
+    assert entry.consecutive_on_time_wakes == 0
+    assert entry.always_on is True
+
+
+def test_a_sleeping_device_is_still_scored(tmp_path: Path) -> None:
+    """Only the always-on path changed."""
+    store = _make_store(tmp_path)
+    store.record_heartbeat(
+        "esp32_sleeper", received_at=1_000_000.0, parsed={}, configured_sleep_s=600
+    )
+    entry = store.record_heartbeat(
+        "esp32_sleeper", received_at=1_000_600.0, parsed={}, configured_sleep_s=600
+    )
+    assert entry.consecutive_on_time_wakes == 1

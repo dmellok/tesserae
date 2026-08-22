@@ -5,6 +5,7 @@ version the device reported in its heartbeat."""
 from __future__ import annotations
 
 import json
+import time
 from typing import Any
 from unittest.mock import patch
 
@@ -157,3 +158,32 @@ def test_compare_versions_unparseable_falls_back_to_unknown() -> None:
         "outdated",
         "current",
     )
+
+
+def test_a_kind_with_no_feed_is_not_re_fetched_hourly(monkeypatch) -> None:
+    """A 404 means the kind has no release feed, which is a stable fact.
+    Re-asking every hour for each such kind is traffic that cannot produce
+    an answer."""
+    import app.firmware_check as fc
+
+    fc.clear_cache()
+    calls: list[str] = []
+
+    def _fetch(kind: str, *, api_base: str, current: str = "") -> None:
+        calls.append(kind)
+        return None
+
+    monkeypatch.setattr(fc, "_fetch", _fetch)
+    assert fc.latest_for_kind("no_such_kind") is None
+    assert len(calls) == 1
+
+    # An hour later a hit would have expired; a miss must not.
+    now = time.time()
+    monkeypatch.setattr(fc.time, "time", lambda: now + fc._CACHE_TTL_SECONDS + 60)
+    assert fc.latest_for_kind("no_such_kind") is None
+    assert len(calls) == 1, "re-fetched a known-missing kind within the miss TTL"
+
+    # Past the longer miss TTL it does try again, so a new feed is picked up.
+    monkeypatch.setattr(fc.time, "time", lambda: now + fc._MISS_CACHE_TTL_SECONDS + 60)
+    assert fc.latest_for_kind("no_such_kind") is None
+    assert len(calls) == 2

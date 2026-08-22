@@ -237,7 +237,16 @@ class TelemetryStore:
             # info about the upcoming sleep, not a new wake.
             consecutive = prev.consecutive_on_time_wakes
             offset_s: int | None = prev.last_wake_offset_s
-            if not is_same_wake and prev.predicted_next_wake_at is not None:
+            # An always-on panel has no wake to predict: it polls on a cadence
+            # the operator can change at any time, and it never sleeps between
+            # beats. Scoring those polls against a prediction meant a device
+            # that was behaving perfectly logged "wake missed prediction" and
+            # reset its confidence over and over. Nothing consumes the
+            # prediction for such a device either (the scheduler's smart-sync
+            # hold returns early on always_on), so there is nothing to score.
+            if always_on:
+                pass
+            elif not is_same_wake and prev.predicted_next_wake_at is not None:
                 offset_s = round(received_at - prev.predicted_next_wake_at)
                 if abs(offset_s) <= ON_TIME_TOLERANCE_S:
                     consecutive = min(consecutive + 1, CONFIDENCE_MAX)

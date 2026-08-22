@@ -327,3 +327,29 @@ def test_telemetry_poll_skips_without_ha_device_id(app: Flask) -> None:
     with app.app_context():
         assert poller.poll_once() == 0
     assert "kitchen_tag" not in app.config["DEVICE_STATUS"]
+
+
+def test_telemetry_poll_works_without_an_outer_app_context(app: Flask) -> None:
+    """The poller runs on its own thread, where there is no app context.
+    ha_core's ``render_template`` reads config through ``current_app``, so
+    every query raised "Working outside of application context", was
+    swallowed at DEBUG, and the integration silently never worked
+    (production, 2026-08-22)."""
+    from app.opendisplay_ha import OpenDisplayHaTelemetryPoller
+
+    _make_tag(app)
+    core = app.config["PLUGIN_REGISTRY"].get("ha_core").server_module
+    core.render_template = (  # type: ignore[attr-defined]
+        lambda _t, timeout=10: '{"fw_version": "1.4.2", "battery_pct": "88", "rssi": "-58"}'
+    )
+    poller = OpenDisplayHaTelemetryPoller(
+        app=app,
+        devices=app.config["DEVICE_REGISTRY"],
+        settings=app.config["SETTINGS_STORE"],
+        run_async=False,
+    )
+
+    # Deliberately NO ``with app.app_context()`` here: that is the thread's
+    # real situation, and it is what used to fail.
+    assert poller.poll_once() == 1
+    assert app.config["DEVICE_STATUS"]["kitchen_tag"]["parsed"]["battery_pct"] == 88

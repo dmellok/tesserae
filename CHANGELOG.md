@@ -4,6 +4,34 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.333.0], 2026-08-22
+
+### Fixed
+
+- **The admin UI no longer stalls behind abandoned device streams.** A device that reopened
+  `/stream` faster than the keepalive interval stacked one waitress thread per attempt. The SSE
+  generator only learns its client has gone when a write fails, and between writes it slept
+  holding the connection, so at a 25 second keepalive and a ~1.6 second reconnect loop roughly 16
+  of 24 threads sat on connections nobody was reading, each still scanning server state and
+  issuing Home Assistant queries every 2 seconds. Page loads queued behind them for 9 to 23
+  seconds. There is now at most one live stream per device (a new connection retires the older
+  one) and the keepalive is 5 seconds, so a dead peer is reaped promptly.
+
+- **OpenDisplay Home Assistant telemetry works at all.** The poller runs on its own thread, where
+  there is no Flask application context, and the Home Assistant query it makes needs one. Every
+  poll raised "Working outside of application context" and was swallowed at DEBUG, so the
+  integration had never once recorded a reading. A poll where every configured tag fails now logs
+  a warning rather than leaving a total failure invisible.
+
+- **An always-on panel's polls are no longer scored against a wake prediction.** Such a device has
+  no wake to predict, so every poll read as a missed prediction and reset smart-sync confidence
+  repeatedly for a device behaving correctly. Nothing consumed the prediction for it either.
+
+### Changed
+
+- **A firmware kind with no release feed is re-checked every 12 hours instead of every hour.** A
+  404 is a stable fact about the kind, not a transient failure.
+
 ## [0.332.0], 2026-08-22
 
 ### Fixed

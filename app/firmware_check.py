@@ -39,6 +39,11 @@ logger = logging.getLogger(__name__)
 # check widget. Override for local development via ``TESSERAE_FIRMWARE_API``.
 _DEFAULT_API_BASE = "https://api.tesserae.ink"
 _CACHE_TTL_SECONDS = 60 * 60
+# A kind with no release feed answers 404 every time, and that is a stable
+# fact about the kind rather than a transient failure. Re-asking hourly for
+# each of them is pointless traffic, so a miss is held longer than a hit.
+# Still bounded: a kind that gains a feed starts reporting within the day.
+_MISS_CACHE_TTL_SECONDS = 12 * 60 * 60
 _HTTP_TIMEOUT_SECONDS = 4.0
 
 
@@ -83,8 +88,13 @@ def latest_for_kind(
     """
     now = time.time()
     hit = _cache.get(kind)
-    if hit is not None and (now - hit[0]) < _CACHE_TTL_SECONDS:
-        return hit[1]
+    if hit is not None:
+        # A remembered miss is held longer than a hit: a kind with no release
+        # feed 404s every time, and re-asking hourly for each such kind is
+        # traffic that can never produce an answer.
+        ttl = _CACHE_TTL_SECONDS if hit[1] is not None else _MISS_CACHE_TTL_SECONDS
+        if (now - hit[0]) < ttl:
+            return hit[1]
     info = _fetch(kind, api_base=api_base, current=current)
     _cache[kind] = (now, info)
     return info

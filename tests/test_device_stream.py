@@ -194,3 +194,60 @@ def test_stream_endpoint_requires_token(app: Flask) -> None:
     client = app.test_client()
     _register(app, client)
     assert client.get("/api/v1/device/e1003/stream").status_code == 401
+
+
+# -- one stream per device (production incident, 2026-08-22) --------------
+
+
+def test_a_second_stream_retires_the_first(app: Flask) -> None:
+    """A firmware reconnect loop opened ``/stream`` every ~1.6 s. Each
+    abandoned generator kept a waitress thread and kept scanning (including
+    live Home Assistant queries) until a write finally failed, so ~16 of 24
+    threads were parked on connections nobody was reading and the admin UI
+    queued behind them for 9-23 s."""
+    from app.rest_api import _claim_device_stream, _stream_events
+
+    _register(app, app.test_client())
+    device = app.config["DEVICE_REGISTRY"].get("e1003")
+    _seed_frame(app, "a" * 16)
+
+    first_gen = _claim_device_stream(app, "e1003")
+    stream = _stream_events(app, device, max_ticks=5, scan_s=0, generation=first_gen)
+    assert next(stream)  # first tick works while it is the current stream
+
+    # The device reconnects: the newer claim must end the older generator.
+    _claim_device_stream(app, "e1003")
+    assert list(stream) == [], "superseded stream kept scanning"
+
+
+def test_the_newest_stream_survives(app: Flask) -> None:
+    from app.rest_api import _claim_device_stream, _stream_events
+
+    _register(app, app.test_client())
+    device = app.config["DEVICE_REGISTRY"].get("e1003")
+    _seed_frame(app, "a" * 16)
+
+    _claim_device_stream(app, "e1003")
+    newest = _claim_device_stream(app, "e1003")
+    stream = _stream_events(app, device, max_ticks=1, scan_s=0, generation=newest)
+    assert _events(list(stream)), "newest stream should still emit"
+
+
+def test_streams_are_tracked_per_device(app: Flask) -> None:
+    """One panel reconnecting must not close another panel's stream."""
+    from app.rest_api import _claim_device_stream, _stream_is_current
+
+    a = _claim_device_stream(app, "panel_a")
+    b = _claim_device_stream(app, "panel_b")
+    _claim_device_stream(app, "panel_a")  # panel_a reconnects
+
+    assert _stream_is_current(app, "panel_a", a) is False
+    assert _stream_is_current(app, "panel_b", b) is True
+
+
+def test_keepalive_is_short_enough_to_reap_a_dead_peer() -> None:
+    """The keepalive write is the only thing that detects a hung-up client,
+    so it bounds how long a dead connection holds a thread."""
+    from app.rest_api import _STREAM_KEEPALIVE_S
+
+    assert _STREAM_KEEPALIVE_S <= 10.0

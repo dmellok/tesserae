@@ -337,15 +337,27 @@ class OpenDisplayHaTelemetryPoller:
 
     def poll_once(self) -> int:
         """Refresh telemetry for every configured tag. Returns the count
-        recorded (useful for tests)."""
+        recorded (useful for tests).
+
+        Runs inside an app context: this is called from a worker thread, and
+        ha_core's ``render_template`` reads configuration through
+        ``current_app``. Without it every query raised "Working outside of
+        application context", was swallowed at DEBUG, and the telemetry
+        silently never worked for any tag."""
         mod = _ha_core_module(self._app)
         if mod is None or not hasattr(mod, "render_template"):
             return 0
+        with self._app.app_context():
+            return self._poll_once_locked(mod)
+
+    def _poll_once_locked(self, mod: Any) -> int:
         recorded = 0
+        attempted = 0
         for device in self._ha_devices():
             ha_device_id = str(self._device_cfg(device.id).get("ha_device_id") or "").strip()
             if not ha_device_id:
                 continue
+            attempted += 1
             try:
                 rendered = mod.render_template(ha_telemetry.build_template(ha_device_id))
             except Exception as exc:
@@ -358,6 +370,16 @@ class OpenDisplayHaTelemetryPoller:
                 continue
             if self._record(device, heartbeat):
                 recorded += 1
+        # A poll where every configured tag failed is a broken integration, not
+        # a slow one. The per-device causes stay at DEBUG (they repeat per
+        # interval); this one line is what makes a total failure visible, which
+        # it was not while the app-context bug was live.
+        if attempted and not recorded:
+            logger.warning(
+                "opendisplay_ha telemetry: %d configured tag(s), none recorded; "
+                "check the ha_core connection",
+                attempted,
+            )
         return recorded
 
     def _record(self, device: Device, heartbeat: dict[str, Any]) -> bool:

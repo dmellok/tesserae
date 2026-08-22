@@ -2397,7 +2397,36 @@ def post_interact(device_id: str) -> Response:
 # the same server state /frame/data and /status expose, so a device that
 # can't hold the connection loses nothing but latency.
 _STREAM_SCAN_S = 2.0
-_STREAM_KEEPALIVE_S = 25.0
+# Keepalive doubles as the dead-peer detector: the generator only learns the
+# client is gone when a write fails, and between writes it just sleeps holding
+# a waitress thread. At 25 s a device that reconnected every ~1.6 s (bench,
+# 2026-08-22) kept ~16 of 24 threads parked on connections nobody was reading,
+# and the admin UI queued behind them for 9-23 s. Five seconds bounds that
+# window; the frames are one comment line each.
+_STREAM_KEEPALIVE_S = 5.0
+
+# One live stream per device. Without this a firmware reconnect loop stacks a
+# new thread per attempt, each still scanning (and issuing Home Assistant
+# queries) every _STREAM_SCAN_S for a client that has hung up.
+_stream_gen_lock = threading.Lock()
+
+
+def _claim_device_stream(app_obj: Any, device_id: str) -> int:
+    """Register a new stream for this device and retire any earlier one.
+
+    Returns the generation token the generator must keep presenting; a
+    superseded generator sees a newer number and exits on its next tick."""
+    with _stream_gen_lock:
+        gens = app_obj.config.setdefault("DEVICE_STREAM_GENERATIONS", {})
+        token = int(gens.get(device_id, 0)) + 1
+        gens[device_id] = token
+        return token
+
+
+def _stream_is_current(app_obj: Any, device_id: str, token: int) -> bool:
+    with _stream_gen_lock:
+        gens = app_obj.config.get("DEVICE_STREAM_GENERATIONS") or {}
+        return int(gens.get(device_id, 0)) == token
 
 
 def _sse(event: str, data: dict[str, Any]) -> str:
@@ -2432,12 +2461,17 @@ def _stream_events(
     max_ticks: int | None = None,
     scan_s: float = _STREAM_SCAN_S,
     keepalive_s: float = _STREAM_KEEPALIVE_S,
+    generation: int | None = None,
 ) -> Any:
     """The SSE generator for one device: ``values`` / ``patches`` /
     ``sync`` events on change, comment keepalives in between. Runs
     outside any request context (waitress streams it on its own
     thread), so everything is read through ``app_obj.config`` directly.
-    ``max_ticks`` bounds the loop for tests."""
+    ``max_ticks`` bounds the loop for tests.
+
+    ``generation`` is the token from :func:`_claim_device_stream`; when the
+    same device opens a newer stream this one stops scanning immediately
+    rather than waiting for a failed write to notice nobody is reading."""
     last_values: str | None = None
     last_patch_seq = 0
     last_sync: tuple[str, str] | None = None
@@ -2445,6 +2479,11 @@ def _stream_events(
     ticks = 0
     while max_ticks is None or ticks < max_ticks:
         ticks += 1
+        if generation is not None and not _stream_is_current(app_obj, device.id, generation):
+            logging.getLogger(__name__).info(
+                "device stream superseded for %s; closing the older connection", device.id
+            )
+            return
         try:
             push_mgr = app_obj.config.get("PUSH_MANAGER")
             latest = push_mgr.latest_render_for(device.id) if push_mgr else None
@@ -2575,15 +2614,17 @@ def get_device_stream(device_id: str) -> Response:
     """Protocol v2 push channel: a Server-Sent Events feed of ``values``
     / ``patches`` / ``sync`` envelopes (identical payloads to the
     /status piggybacks and /frame/data), with a comment keepalive every
-    25 s. One waitress thread per connected device; deep-sleep clients
-    should keep polling instead. Reverse proxies must not buffer this
-    route (Caddy: ``flush_interval -1``)."""
+    ``_STREAM_KEEPALIVE_S``. At most ONE live stream per device: opening a
+    second retires the first, so a firmware reconnect loop cannot stack
+    threads. Deep-sleep clients should keep polling instead. Reverse proxies
+    must not buffer this route (Caddy: ``flush_interval -1``)."""
     device, err = _auth_device(device_id)
     if err is not None or device is None:
         return err  # type: ignore[return-value]
     app_obj = current_app._get_current_object()  # type: ignore[attr-defined]
+    generation = _claim_device_stream(app_obj, device.id)
     resp = Response(
-        _stream_events(app_obj, device),
+        _stream_events(app_obj, device, generation=generation),
         mimetype="text/event-stream",
     )
     resp.headers["Cache-Control"] = "no-cache"
