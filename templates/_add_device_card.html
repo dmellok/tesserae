@@ -125,6 +125,48 @@
         </ul>
       </div>
       {% endif %}
+
+      {# Manual REST add (discussion #240). Pairing needs the device to run
+         the handshake, which a digital sign, a browser tab, or anything that
+         only fetches an image URL never will. Those still need to exist as a
+         device so a page can target them and /preview/<id>.png follows the
+         lineup. Same fields as the MQTT form; ids differ because both forms
+         are in the DOM at once. #}
+      <details class="dx-manual-add">
+        <summary>
+          <i class="ph ph-caret-right" aria-hidden="true"></i>
+          <span>Add without pairing</span>
+        </summary>
+        <p class="field-help">
+          For a display that fetches an image URL and never checks in: a digital sign,
+          a browser tab, a photo frame. It gets an access token like any REST device,
+          and <code>/preview/&lt;id&gt;.png</code> serves its latest render.
+        </p>
+        <form method="post" action="{{ url_for('auth.devices_add') }}" class="form add-device-form">
+          <input type="hidden" name="transport" value="rest">
+          {{ text_input('rest-add-device-id', 'id', 'Device id', value='', placeholder='lobby_sign', required=True,
+                        help='Used in its URLs. Lowercase, no spaces.') }}
+          {% set rest_kind_options = [] %}
+          {% for k in device_kinds %}{% set _ = rest_kind_options.append({'value': k.id, 'label': k.name}) %}{% endfor %}
+          {{ select_field('rest-add-device-kind', 'kind', 'Kind', value=device_kinds[0].id if device_kinds else '', options=rest_kind_options) }}
+          {{ text_input('rest-add-device-name', 'name', 'Display name', value='', placeholder='Lobby sign') }}
+          {{ select_field('rest-add-device-preset', 'panel_preset', 'Panel size', value='', options=panel_preset_choices,
+                          help='Pick a common panel, or Custom for a screen size like 1920x1080.') }}
+          <div class="add-device-custom-fields">
+            {{ number_input('rest-add-device-w', 'panel_w', 'Logical panel width (px)', value='', min=1, step=1) }}
+            {{ number_input('rest-add-device-h', 'panel_h', 'Logical panel height (px)', value='', min=1, step=1) }}
+          </div>
+          {{ select_field('rest-add-device-orientation', 'panel_orientation', 'Rotation', value='landscape',
+                          options=[{'value':'landscape','label':'0°'},
+                                   {'value':'portrait','label':'90°'},
+                                   {'value':'landscape_flipped','label':'180°'},
+                                   {'value':'portrait_flipped','label':'270°'}],
+                          help='Clockwise turn applied to match how the screen is mounted.') }}
+          <div class="dx-actions-right">
+            <button type="submit" class="dx-btn-primary"><i class="ph ph-plus" aria-hidden="true"></i><span>Add device</span></button>
+          </div>
+        </form>
+      </details>
     </div>
 
     {# MQTT branch: warning band if broker.host isn't configured;

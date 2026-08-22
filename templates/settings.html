@@ -1425,17 +1425,19 @@ docker compose up -d</code></pre>
   // Add-device: pick a panel preset that matches the chosen kind's
   // dimensions, fall back to Custom + prefilled w/h if none match.
   // Hide the manual width/height inputs unless Custom is selected.
-  (function () {
-    const form = document.querySelector('.add-device-form');
-    if (!form) return;
-    const kindSelect = form.querySelector('#add-device-kind');
-    const presetSelect = form.querySelector('#add-device-preset');
-    const wInput = form.querySelector('#add-device-w');
-    const hInput = form.querySelector('#add-device-h');
+  // Runs over EVERY .add-device-form: there are two (REST and MQTT), and
+  // fields are resolved by name within each form rather than by id, so the
+  // two copies don't fight over a shared id.
+  document.querySelectorAll('.add-device-form').forEach(function (form) {
+    const kindSelect = form.querySelector('[name="kind"]');
+    const presetSelect = form.querySelector('[name="panel_preset"]');
+    const wInput = form.querySelector('[name="panel_w"]');
+    const hInput = form.querySelector('[name="panel_h"]');
     const customWrap = form.querySelector('.add-device-custom-fields');
     const kindsNode = document.querySelector('#add-device-kinds');
     const presetsNode = document.querySelector('#add-device-presets');
     if (!kindSelect || !presetSelect || !wInput || !hInput || !customWrap) return;
+    if (!kindsNode || !presetsNode) return;
     let kinds, presets;
     try {
       kinds = JSON.parse(kindsNode.textContent || '[]');
@@ -1463,7 +1465,7 @@ docker compose up -d</code></pre>
     presetSelect.addEventListener('change', syncCustom);
     kindSelect.addEventListener('change', applyKind);
     applyKind();
-  })();
+  });
 
   // Per-instance panel edit: changing the ASPECT (landscape↔portrait)
   // swaps the width/height inputs live so the form stays WYSIWYG. The

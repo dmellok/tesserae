@@ -128,6 +128,28 @@ def devices_dev_seed() -> Response:
 # -- add / discover / dismiss ------------------------------------------
 
 
+def _make_rest_instance(device: Any) -> str | None:
+    """Put a freshly created instance on the REST transport and give it a
+    token, the same end state as pairing or the card's transport switch.
+
+    Returns the token, or None if the instance file couldn't be rewritten.
+    The caller's one-shot reveal reads it back off the manifest."""
+    try:
+        raw = json.loads(device.path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as err:
+        flash(f"Created {device.name!r}, but couldn't set REST transport: {err}", "error")
+        return None
+    raw["transport"] = "rest"
+    device.manifest["transport"] = "rest"
+    token = device.manifest.get("access_token")
+    if not isinstance(token, str) or not token:
+        token = device_service.generate_native_access_token(devices())
+        raw["access_token"] = token
+        device.manifest["access_token"] = token
+    device.path.write_text(json.dumps(raw, indent=2) + "\n", encoding="utf-8")
+    return str(token)
+
+
 @bp.post("/settings/devices/add")
 def devices_add() -> Response:
     """Create a new device instance from the Devices-tab form. No restart
@@ -169,6 +191,12 @@ def devices_add() -> Response:
     if not result.ok or result.device is None:
         flash(result.error or "Failed to add device.", "error")
         return redirect(url_for("auth.settings_area", area="devices"))
+    # A device that will never call /register needs to exist without pairing:
+    # a digital sign, a browser tab, anything that only fetches an image URL
+    # (discussion #240). Pairing is still the right default for firmware that
+    # can run the handshake; this is the escape hatch for what cannot.
+    if (form.get("transport") or "").strip().lower() == "rest":
+        _make_rest_instance(result.device)
     # TRMNL-style clients need their access token displayed once so the
     # user can paste it into the client config. Stash in session and let
     # the Settings GET that follows the redirect pop it into a one-shot

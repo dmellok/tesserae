@@ -4,6 +4,18 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.335.0], 2026-08-22
+
+### Added
+
+- **Add a REST device without pairing (discussion #240).** Pairing needs the device to run the
+  `/register` handshake, which a digital sign, a browser tab, or a photo frame never will: they
+  only fetch an image URL. Those still have to exist as a device so a page can target them and
+  `/preview/<id>.png` follows their lineup. The REST branch of Add device now carries an "Add
+  without pairing" form with the same fields as the MQTT one; it puts the instance on the REST
+  transport and mints its access token in one step. Adding without that field still reads as MQTT,
+  so the existing path is unchanged.
+
 ## [0.334.0], 2026-08-22
 
 ### Fixed
