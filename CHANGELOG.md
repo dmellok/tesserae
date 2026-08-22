@@ -4,6 +4,24 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.334.0], 2026-08-22
+
+### Fixed
+
+- **The day calendar no longer draws tomorrow's events across today (#248).** The widget fetches a
+  rolling window from now, `hours_ahead` wide, so the 24 hour default reaches into tomorrow.
+  All-day events were filtered to the day being drawn; timed events were not, so an event moved to
+  tomorrow stayed in today's list. Drawn against today's 0-24 axis it hit the clamp meant for
+  events that overlap today (an overnight shift, a multi-day trip), whose rule reads "neither edge
+  is today" as "runs straight through today", and painted the whole column while its label still
+  read the real 10:00-11:00. It looked like today's copy had gone stale, which is also why the
+  week view disagreed: that one buckets by date and was correct. Timed events are now filtered to
+  the day being drawn, and the client refuses to clamp an event that does not touch that day.
+  Overnight and multi-day events that genuinely occupy today are unaffected.
+
+  One consequence worth knowing: `hours_ahead` above 24 no longer shows anything extra, because
+  the widget draws a single day's axis and anything beyond it is filtered out.
+
 ## [0.333.0], 2026-08-22
 
 ### Fixed

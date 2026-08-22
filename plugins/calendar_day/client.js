@@ -111,6 +111,11 @@ export function clampToDay(ev, dayDate) {
   const startKey = localDateKey(new Date(ev.start));
   const endDate = ev.end ? new Date(ev.end) : null;
   const endKey = endDate ? localDateKey(endDate) : startKey;
+  // An event that does not touch this day at all is not clampable: the rule
+  // below reads "neither edge is today" as "spans straight through today",
+  // so an event living wholly on another day would paint the full column
+  // (#248). Keys are ISO dates, so the comparison is lexicographic.
+  if (dayDate && (dayDate < startKey || dayDate > endKey)) return null;
   const isStartDay = !dayDate || dayDate === startKey;
   const isEndDay = !dayDate || dayDate === endKey;
   const top = isStartDay ? s : 0;

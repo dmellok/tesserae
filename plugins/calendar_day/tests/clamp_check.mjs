@@ -54,6 +54,19 @@ assert.deepEqual(
   "single-day event is unaffected"
 );
 
+// #248: an event living wholly on another day must not clamp at all. The
+// pass-through rule above reads "neither edge is today" as "runs straight
+// through today", so tomorrow's 10-11 used to paint the entire column while
+// its label still read 10:00-11:00 — which looked like a stale cached copy
+// of an event that had been moved to tomorrow.
+const tomorrow = { start: "2026-08-22T10:00:00", end: "2026-08-22T11:00:00" };
+assert.equal(clampToDay(tomorrow, "2026-08-21"), null, "an event entirely tomorrow does not draw today");
+assert.equal(clampToDay(tomorrow, "2026-08-23"), null, "an event entirely yesterday does not draw today");
+assert.deepEqual(clampToDay(tomorrow, "2026-08-22"), { s: 10, e: 11 }, "on its own day it draws normally");
+// The multi-day trip must survive the new guard on every day it occupies.
+assert.deepEqual(clampToDay(trip, "2026-08-10"), { s: 0, e: 24 }, "pass-through day still clamps, not rejected");
+assert.equal(clampToDay(trip, "2026-08-12"), null, "the day after a trip ends draws nothing");
+
 // pctSpan: a block's [s,e) hour span must clamp to the visible lane
 // without ever exceeding 100% height, even when day_start_hour/
 // day_end_hour narrows the range well below a pass-through day's full

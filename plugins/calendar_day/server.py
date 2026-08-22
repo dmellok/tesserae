@@ -8,7 +8,7 @@ from typing import Any
 
 from flask import current_app
 
-from app.calendar_time import all_day_event_overlaps_date
+from app.calendar_time import all_day_event_overlaps_date, timed_event_date_keys
 from app.tz_resolve import app_timezone
 
 
@@ -46,10 +46,27 @@ def fetch(
     except Exception as err:
         return {"error": f"{type(err).__name__}: {err}", "events": []}
 
+    # Both kinds are filtered to the day being drawn (#248). ``hours_ahead``
+    # is a rolling window from now, so a 24 h default reaches into tomorrow;
+    # a timed event living entirely on tomorrow used to survive into today's
+    # list. The client then drew it against today's 0-24 axis, where neither
+    # edge is today, and clampToDay's multi-day rule painted it across the
+    # whole column while the label still read its real 10:00-11:00. Moving an
+    # event to tomorrow therefore looked like today's copy had gone stale.
+    #
+    # Overnight and multi-day events still belong here: they genuinely occupy
+    # part of today, and clamping them to the day is exactly what that rule is
+    # for.
     target_date = now_local.date()
-    visible_events = [
-        e for e in events if not e.get("all_day") or all_day_event_overlaps_date(e, target_date)
-    ]
+    target_key = target_date.isoformat()
+    window_end = target_date + timedelta(days=1)
+
+    def _occupies_today(event: dict[str, Any]) -> bool:
+        if event.get("all_day"):
+            return all_day_event_overlaps_date(event, target_date)
+        return target_key in timed_event_date_keys(event, zone, target_date, window_end)
+
+    visible_events = [e for e in events if _occupies_today(e)]
     slim = [
         {
             "summary": e["summary"],

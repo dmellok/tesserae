@@ -95,3 +95,84 @@ if __name__ == "__main__":
     test_fetch_slims_events()
     test_max_events_truncates()
     print("test_smoke.py: all assertions passed")
+
+
+# -- #248: only events that actually occupy today ------------------------
+
+
+class _FixedNow(datetime):
+    """A clock pinned to 2026-08-21 09:00 UTC (a Friday), so "tomorrow"
+    is unambiguous regardless of when the suite runs. The bug is a
+    boundary bug; testing it against the wall clock would only reproduce
+    near midnight."""
+
+    @classmethod
+    def now(cls, tz: Any = None) -> datetime:  # type: ignore[override]
+        return datetime(2026, 8, 21, 9, 0, tzinfo=tz or UTC)
+
+
+def _fetch_with_events(events: list[dict[str, Any]], **options: Any) -> dict[str, Any]:
+    """Clock AND zone are pinned. The widget works in local time, so with the
+    machine's own zone a UTC event time lands on a different date depending on
+    where the suite runs, which is precisely the boundary under test."""
+    app = _stub_app(events)
+    with (
+        patch.object(server, "current_app", app),
+        patch.object(server, "datetime", _FixedNow),
+        patch.object(server, "app_timezone", lambda: UTC),
+    ):
+        return server.fetch(options=options, settings={}, ctx={})
+
+
+def _timed(summary: str, start: str, end: str) -> dict[str, Any]:
+    return {
+        "summary": summary,
+        "start": start,
+        "end": end,
+        "all_day": False,
+        "feed_colour": "#3366CC",
+        "feed_name": "Work",
+        "location": "",
+    }
+
+
+def test_an_event_moved_to_tomorrow_leaves_todays_view() -> None:
+    """The reported bug (#248). ``hours_ahead`` is a rolling window from now,
+    so a 24 h default reaches into tomorrow and a timed event living wholly
+    on tomorrow survived into today's list. The client drew it against
+    today's 0-24 axis, where neither edge is today, so the multi-day rule
+    painted it across the whole column while its label still read
+    10:00-11:00. It looked like today's copy had gone stale."""
+    out = _fetch_with_events(
+        [_timed("Moved", "2026-08-22T10:00:00+00:00", "2026-08-22T11:00:00+00:00")]
+    )
+    assert out["count"] == 0
+    assert out["events"] == []
+
+
+def test_an_event_later_today_is_kept() -> None:
+    out = _fetch_with_events(
+        [_timed("Standup", "2026-08-21T10:00:00+00:00", "2026-08-21T11:00:00+00:00")]
+    )
+    assert [e["summary"] for e in out["events"]] == ["Standup"]
+
+
+def test_an_overnight_event_starting_today_is_kept() -> None:
+    """It genuinely occupies part of today; clamping it to the day is what
+    the client's multi-day rule is for."""
+    out = _fetch_with_events(
+        [_timed("Night shift", "2026-08-21T22:00:00+00:00", "2026-08-22T06:00:00+00:00")]
+    )
+    assert [e["summary"] for e in out["events"]] == ["Night shift"]
+
+
+def test_a_multi_day_event_spanning_today_is_kept() -> None:
+    out = _fetch_with_events(
+        [_timed("Conference", "2026-08-20T09:00:00+00:00", "2026-08-23T17:00:00+00:00")]
+    )
+    assert [e["summary"] for e in out["events"]] == ["Conference"]
+
+
+def test_todays_date_is_reported() -> None:
+    out = _fetch_with_events([])
+    assert out["date"] == "2026-08-21"
