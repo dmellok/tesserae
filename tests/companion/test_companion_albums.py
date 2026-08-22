@@ -488,11 +488,7 @@ def test_a_resync_does_not_show_the_app_phantom_drift(app: Flask, auth: dict[str
         assert album is not None
         device_facing = collection_sync.current_version(
             album,
-            "frame01",
-            push_mgr=app.config["PUSH_MANAGER"],
-            renders_dir=app.config["RENDERS_DIR"],
-            frames=_collection_frames(album),
-            device_id_for_url="frame01",
+            _collection_frames(album),
             resync_token=app.config["COLLECTION_RESYNC_STORE"].token("frame01"),
         )
     assert after["desired_version"] == device_facing

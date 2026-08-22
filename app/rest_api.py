@@ -824,28 +824,48 @@ def _collection_resync_token(device_id: str) -> str | None:
     return token if isinstance(token, str) and token else None
 
 
+def _collection_caps(device_id: str) -> tuple[int | None, int | None]:
+    """``(capacity_bytes, max_frames)`` this device advertised, as
+    ``(None, None)`` when it has said nothing useful.
+
+    Read from the STICKY status entry rather than a beat's own body, and read
+    that way by both the /status envelope and the manifest endpoint. The caps
+    feed the collection version, so two readers taking them from different
+    places would recreate the mismatch this function exists to avoid (#247).
+    ``record_status_heartbeat`` has already merged the current beat into the
+    sticky entry by the time the envelope is built."""
+    status = (current_app.config.get("DEVICE_STATUS") or {}).get(device_id)
+    cache_cap = status.get("frame_cache") if isinstance(status, dict) else None
+    if not isinstance(cache_cap, dict):
+        return None, None
+    capacity = cache_cap.get("capacity_bytes")
+    max_frames = cache_cap.get("max_frames")
+    return (
+        capacity if isinstance(capacity, int) and capacity > 0 else None,
+        max_frames if isinstance(max_frames, int) and max_frames > 0 else None,
+    )
+
+
 def _collection_status_envelope(device: Device, body: dict[str, Any]) -> dict[str, Any] | None:
     """``{"id", "kind", "version"}`` for the /status response, when this device
     advertised the frame-cache capability on this beat AND has a bound album.
     Absent otherwise, so /status stays byte-identical for devices without the
-    feature. Computed without warming (cheap)."""
+    feature.
+
+    The version is the SAME computation the manifest endpoint serves under, and
+    the caps come from the same sticky status entry it reads. Two versions
+    computed from different inputs is what made a cold album unsyncable
+    (#247)."""
     from app import collection_sync
 
     if collection_sync.advertised_frame_cache(body) is None:
         return None
     album = _bound_album(device.id)
-    push_mgr = current_app.config.get("PUSH_MANAGER")
-    renders_dir = current_app.config.get("RENDERS_DIR")
-    if album is None or push_mgr is None or renders_dir is None:
+    if album is None:
         return None
-    frames = _collection_frames(album)
     version = collection_sync.current_version(
         album,
-        device.id,
-        push_mgr=push_mgr,
-        renders_dir=renders_dir,
-        frames=frames,
-        device_id_for_url=device.id,
+        _collection_frames(album),
         resync_token=_collection_resync_token(device.id),
     )
     return {"id": f"album:{album.id}", "kind": "album", "version": version}
@@ -1914,12 +1934,10 @@ def get_collection_manifest(device_id: str) -> Response:
 
     from app.collection_sync import build_manifest, paged_manifest
 
-    # The device's advertised card capacity + frame cap (current-state, from its
-    # heartbeats); frames beyond either get cache=false.
-    status = (current_app.config.get("DEVICE_STATUS") or {}).get(device.id)
-    cache_cap = status.get("frame_cache") if isinstance(status, dict) else None
-    capacity = cache_cap.get("capacity_bytes") if isinstance(cache_cap, dict) else None
-    max_frames = cache_cap.get("max_frames") if isinstance(cache_cap, dict) else None
+    # The device's advertised card capacity + frame cap; frames beyond either
+    # get cache=false. Read through the same helper the /status envelope uses,
+    # because these feed the version and the two must not diverge (#247).
+    capacity, max_frames = _collection_caps(device.id)
 
     manifest = build_manifest(
         album,
@@ -1930,8 +1948,8 @@ def get_collection_manifest(device_id: str) -> Response:
         image_loader=_collection_image_loader(album),
         device_id_for_url=device.id,
         warm_missing=True,
-        capacity_bytes=capacity if isinstance(capacity, int) and capacity > 0 else None,
-        max_frames=max_frames if isinstance(max_frames, int) and max_frames > 0 else None,
+        capacity_bytes=capacity,
+        max_frames=max_frames,
         resync_token=_collection_resync_token(device.id),
     )
     manifest = paged_manifest(manifest, request.args.get("cursor"))

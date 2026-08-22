@@ -8,11 +8,11 @@ locally. The shared cache owns digests, the capacity budget, and versioning;
 the producer owns the opaque ``producer`` block (here the album's playback
 settings). The REST endpoints live in :mod:`app.rest_api`.
 
-Version semantics mirror the deck version: the digest of the manifest content
-(frame membership, order, digests, ttls, and the producer block), excluding the
-volatile ``version`` / ``cursor`` / ``next_cursor`` fields, so ANY change to what
-the device should cache bumps it. Per-device, because frame digests are
-per-device renders.
+Version semantics: the digest of what the device is syncing AGAINST, namely the
+album identity, its ordered frame ids, its fit, and the producer block. It is
+deliberately independent of whether the server has rendered those frames yet;
+see :func:`collection_version` for why a warm-dependent version made a cold
+album unsyncable (#247).
 """
 
 from __future__ import annotations
@@ -176,13 +176,65 @@ def _artifact_size(renders_dir: Path, filename: str) -> int:
         return 0
 
 
-def version_digest(manifest: dict[str, Any]) -> str:
-    """Digest of the manifest content, excluding the volatile paging fields.
-    Same truncation convention as frame digests (sha256[:16])."""
-    volatile = {"version", "cursor", "next_cursor"}
-    body = {k: v for k, v in manifest.items() if k not in volatile}
-    blob = json.dumps(body, sort_keys=True, separators=(",", ":"))
-    return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
+def collection_version(
+    album: Album,
+    frames: list[tuple[str, str]],
+    *,
+    resync_token: str | None = None,
+) -> str:
+    """The collection version for an album on a device.
+
+    Derived from what the device is syncing AGAINST, never from whether the
+    server has rendered it yet. That distinction is the whole point (#247).
+
+    The version used to be a digest of the manifest body, which carries each
+    frame's ``digest``, ``bytes``, ``cache`` and ``url``. All four are empty or
+    false until a frame is warmed, so a cold album announced one version on
+    ``/status`` (computed without warming, because that path runs on every
+    heartbeat and must stay cheap) and served a different one from the manifest
+    endpoint (which warms as a side effect of the fetch). Firmware requires the
+    two to match, correctly: the version is its only guarantee that the
+    manifest it is caching against is the one the server currently intends. So
+    a cold album was rejected on every wake, cached nothing, re-warmed, and
+    reported "0 of 0" for ever.
+
+    What DOES belong here:
+
+    * the album's identity, and the ordered frame ids: membership and order are
+      what a device re-syncs for;
+    * ``fit``, because changing it re-renders every frame to different bytes
+      and drops the warm cache;
+    * the playback block the firmware honours.
+
+    Warming is a server-side cache-fill detail and is deliberately absent. A
+    frame's digest still drives which frames a device FETCHES, through the
+    manifest body; it just no longer moves the version underneath it.
+
+    The device's advertised caps are deliberately absent too, which is a
+    departure worth stating. They shape ``cache`` in the served manifest, so
+    including them would let a card swap trigger a re-sync. But the contract
+    describes ``capacity_bytes`` only as "the storage budget the server plans
+    against", with nothing promising it is constant: a firmware reporting FREE
+    space rather than total would move it on every beat, and a version that
+    moves on every beat is a permanent re-sync loop. That is a worse failure
+    than the one being fixed here, and it would look identical from the
+    outside. A caps change therefore leaves the device on its previous cache
+    plan until something else moves the version, which is the safe direction to
+    be wrong in.
+    """
+    identity = {
+        "schema": 1,
+        "collection_id": f"album:{album.id}",
+        "kind": "album",
+        "fit": album.fit,
+        "producer": _producer(album),
+        "frames": [
+            {"frame_id": frame_id, "position": position, "ttl_s": _ALBUM_TTL_S}
+            for position, (frame_id, _filename) in enumerate(frames)
+        ],
+    }
+    blob = json.dumps(identity, sort_keys=True, separators=(",", ":"))
+    return resynced_version(hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16], resync_token)
 
 
 def resynced_version(version: str, resync_token: str | None) -> str:
@@ -334,7 +386,9 @@ def build_manifest(
         "frames": frame_views,
         "producer": _producer(album),
     }
-    manifest["version"] = resynced_version(version_digest(manifest), resync_token)
+    # Computed from the album, NOT from the body above: the body carries warm
+    # state, and the same call on the /status path has not warmed anything.
+    manifest["version"] = collection_version(album, frames, resync_token=resync_token)
     return manifest
 
 
@@ -389,29 +443,19 @@ def paged_manifest(
 
 def current_version(
     album: Album,
-    device_id: str,
-    *,
-    push_mgr: _AlbumRenderSource,
-    renders_dir: Path,
     frames: list[tuple[str, str]],
-    device_id_for_url: str,
+    *,
     resync_token: str | None = None,
 ) -> str:
-    """The collection version for a device right now, without warming anything.
-    Cheap enough for every ``/status`` response."""
-    return str(
-        build_manifest(
-            album,
-            device_id,
-            push_mgr=push_mgr,
-            renders_dir=renders_dir,
-            frames=frames,
-            image_loader=lambda _f: None,
-            device_id_for_url=device_id_for_url,
-            warm_missing=False,
-            resync_token=resync_token,
-        )["version"]
-    )
+    """The collection version to announce on ``/status``.
+
+    The SAME call the manifest endpoint makes, which is the fix for #247: two
+    computations that had to be kept in step by hand is what produced a cold
+    album that could never sync. It no longer builds a manifest to get here, so
+    the heartbeat path stops walking frames and stat-ing artifacts entirely.
+
+    """
+    return collection_version(album, frames, resync_token=resync_token)
 
 
 def frame_entry_by_digest(

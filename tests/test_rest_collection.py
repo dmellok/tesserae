@@ -570,3 +570,138 @@ def test_use_as_album_takes_over_when_asked(app: Flask) -> None:
     # The displaced album is unbound, not deleted.
     assert store.get("holidays") is not None
     assert store.get("holidays").device_ids == []
+
+
+# -- #247: a cold album must be syncable ---------------------------------
+
+
+def _seed_real_images(app: Flask, names: list[str], folder: str = "holidays") -> None:
+    """Decodable PNGs, so the warm path actually produces digests.
+
+    ``_seed_folder`` writes placeholder bytes that Pillow refuses, which means
+    warming fails and every frame keeps an empty digest. Any test asserting on
+    the difference between a cold and a warm album has to use real images or it
+    passes against the bug it is meant to catch."""
+    target = _gallery_dir(app, folder)
+    for i, name in enumerate(names):
+        buf = io.BytesIO()
+        Image.new("RGB", (240, 160), (10 + i * 20, 60, 90)).save(buf, "PNG")
+        (target / name).write_bytes(buf.getvalue())
+
+
+def _status_collection(app: Flask, client, token: str, device_id: str = "frame01") -> dict:
+    resp = client.post(
+        f"/api/v1/device/{device_id}/status",
+        headers=_auth(token),
+        data=json.dumps({**CAP, "battery_pct": 80}),
+    )
+    assert resp.status_code == 200
+    return resp.get_json()["collection"]
+
+
+def test_a_cold_album_announces_the_version_it_then_serves(app: Flask) -> None:
+    """The bug: /status computed the version without warming (it runs on every
+    heartbeat and must stay cheap) while the manifest endpoint warmed as a side
+    effect of the fetch. An unwarmed frame has no digest and cache=False, both
+    of which were hashed into the version, so the two could not agree on a cold
+    album. Firmware requires them to match, correctly, so it rejected every
+    manifest, cached nothing, re-warmed, and reported "0 of 0" for ever."""
+    client = app.test_client()
+    token = _register_esp32(app, client, "frame01")
+    _seed_real_images(app, ["a.png", "b.png", "c.png"])
+    _bind_album(app, "frame01")
+    # Deliberately NO _warm() calls: this is the cold case. The images are real
+    # so the manifest fetch genuinely warms them, which is what used to move
+    # the version out from under the announcement.
+
+    announced = _status_collection(app, client, token)["version"]
+    manifest = client.get("/api/v1/device/frame01/collection", headers=_auth(token)).get_json()
+
+    assert manifest["version"] == announced
+
+
+def test_the_version_holds_still_while_frames_warm(app: Flask) -> None:
+    """Warming is a server-side cache-fill detail. If it moves the version the
+    device is chasing a target that runs away from it as it syncs."""
+    client = app.test_client()
+    token = _register_esp32(app, client, "frame01")
+    # Real images, so the fetch genuinely warms. With placeholder bytes the
+    # warm fails, no digest ever appears, and the test passes against the very
+    # bug it exists to catch.
+    folder = _gallery_dir(app, "holidays")
+    for i, color in enumerate([(10, 20, 30), (40, 50, 60)]):
+        buf = io.BytesIO()
+        Image.new("RGB", (240, 160), color).save(buf, "PNG")
+        (folder / f"{i}.png").write_bytes(buf.getvalue())
+    _bind_album(app, "frame01")
+
+    cold = _status_collection(app, client, token)["version"]
+    manifest = client.get("/api/v1/device/frame01/collection", headers=_auth(token)).get_json()
+    assert all(f["digest"] for f in manifest["frames"]), "the fetch must actually warm"
+    warm = _status_collection(app, client, token)["version"]
+
+    assert warm == cold
+
+
+def test_a_cold_album_serves_cacheable_frames_on_first_contact(app: Flask) -> None:
+    """The acceptance criterion: first fetch caches something rather than
+    reporting 0 of 0."""
+    client = app.test_client()
+    token = _register_esp32(app, client, "frame01")
+    # Real images: this one asserts on the warm path's output, so the bytes
+    # have to be decodable rather than the placeholder _seed_folder writes.
+    folder = _gallery_dir(app, "holidays")
+    for i, color in enumerate([(200, 30, 30), (30, 200, 30)]):
+        buf = io.BytesIO()
+        Image.new("RGB", (240, 160), color).save(buf, "PNG")
+        (folder / f"{i}.png").write_bytes(buf.getvalue())
+    _bind_album(app, "frame01")
+
+    manifest = client.get("/api/v1/device/frame01/collection", headers=_auth(token)).get_json()
+
+    assert manifest["total_frames"] == 2
+    assert [f["cache"] for f in manifest["frames"]] == [True, True]
+    assert all(f["digest"] for f in manifest["frames"])
+
+
+def test_an_album_change_still_moves_the_version(app: Flask) -> None:
+    """The version must stop moving for warming WITHOUT going inert: membership
+    and order are exactly what a device re-syncs for."""
+    client = app.test_client()
+    token = _register_esp32(app, client, "frame01")
+    _seed_folder(app, "holidays", ["a.jpg", "b.jpg"])
+    album = _bind_album(app, "frame01")
+    before = _status_collection(app, client, token)["version"]
+
+    _seed_folder(app, "holidays", ["a.jpg", "b.jpg", "c.jpg"])
+    assert _status_collection(app, client, token)["version"] != before, "membership"
+
+    reordered = album.model_copy(update={"order": ["c.jpg", "b.jpg", "a.jpg"]})
+    app.config["ALBUM_STORE"].upsert(reordered)
+    after_order = _status_collection(app, client, token)["version"]
+    assert after_order != before, "order"
+
+    refit = reordered.model_copy(update={"fit": "fit"})
+    app.config["ALBUM_STORE"].upsert(refit)
+    assert _status_collection(app, client, token)["version"] != after_order, "fit"
+
+
+def test_a_device_with_smaller_caps_still_agrees_on_the_version(app: Flask) -> None:
+    """Caps shape which frames are offered for caching, but they are not in the
+    version, so a device advertising something other than the default must not
+    end up in a fetch-reject loop."""
+    client = app.test_client()
+    token = _register_esp32(app, client, "frame01")
+    _seed_real_images(app, ["a.png", "b.png", "c.png"])
+    _bind_album(app, "frame01")
+
+    small = {"frame_cache": {"schema": 1, "capacity_bytes": 4096, "max_frames": 2}}
+    resp = client.post(
+        "/api/v1/device/frame01/status", headers=_auth(token), data=json.dumps(small)
+    )
+    announced = resp.get_json()["collection"]["version"]
+    manifest = client.get("/api/v1/device/frame01/collection", headers=_auth(token)).get_json()
+
+    assert manifest["version"] == announced
+    # The cap still binds on the served plan, it just doesn't move the version.
+    assert sum(1 for f in manifest["frames"] if f["cache"]) <= 2

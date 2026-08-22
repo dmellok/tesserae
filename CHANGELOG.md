@@ -4,6 +4,36 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.339.0], 2026-08-22
+
+### Fixed
+
+- **A cold offline album can sync (#247).** The version announced on `/status` and the version the
+  manifest endpoint served were computed from different inputs, so on an album whose frames had
+  never been rendered they could not match. `/status` computes without warming, because it runs on
+  every heartbeat and must stay cheap, which leaves each frame with an empty digest and
+  `cache: false`; the manifest endpoint warms as a side effect of the fetch, which fills both in.
+  Both were hashed into the version. Firmware requires the fetched manifest to carry the announced
+  version and rejects it otherwise, correctly, since the version is its only guarantee that it is
+  caching against what the server currently intends. So every fetch was rejected, nothing cached,
+  the frames re-warmed, and the device reported `syncing, 0 of 0` for ever while the event log
+  filled with `album_warm`.
+
+  There is now one computation, derived from what a device syncs against: the album identity, its
+  ordered frame ids, its fit, and the playback block. Warming cannot move it. `/status` no longer
+  builds a manifest to get there, so the heartbeat path stops walking frames and stat-ing
+  artifacts entirely.
+
+  `fit` is newly part of it. Changing it drops the warm cache and re-renders every frame to
+  different bytes, and the manifest body never carried it.
+
+  The device's advertised caps are deliberately **not** part of it, though they still shape which
+  frames are offered for caching. Including them would let a card swap force a re-sync, but the
+  contract describes `capacity_bytes` only as "the storage budget the server plans against" and
+  nothing promises it is constant: firmware reporting free rather than total space would move the
+  version on every beat, which is a permanent re-sync loop, the same failure this fixes and harder
+  to see. Both endpoints now read caps through one helper so they cannot drift either.
+
 ## [0.338.0], 2026-08-22
 
 ### Fixed

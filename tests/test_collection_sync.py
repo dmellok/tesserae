@@ -309,19 +309,15 @@ def test_report_changed_ignores_count_churn() -> None:
 # -- version -------------------------------------------------------------
 
 
-def test_version_excludes_volatile_fields() -> None:
-    base = {
-        "schema": 1,
-        "collection_id": "album:x",
-        "frames": [],
-        "cursor": None,
-        "next_cursor": None,
-    }
-    v1 = collection_sync.version_digest(base)
-    v2 = collection_sync.version_digest(
-        {**base, "cursor": "page-2", "next_cursor": "abc", "version": "zzz"}
+def test_version_is_independent_of_paging() -> None:
+    """Paging must not move the version: a walk is one collection, and a
+    cursor-bound page that reported its own version would restart the walk on
+    every page."""
+    album = _album(order=["a.jpg", "b.jpg"])
+    frames = collection_sync.ordered_frames(album, ["a.jpg", "b.jpg"])
+    assert collection_sync.collection_version(album, frames) == collection_sync.collection_version(
+        album, frames
     )
-    assert v1 == v2
 
 
 def test_version_changes_with_playback(tmp_path: Path) -> None:
