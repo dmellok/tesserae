@@ -27,12 +27,12 @@ repo.
 docker run -d --name tesserae-relay \
   -p 8787:8787 \
   -v relay-data:/data \
-  ghcr.io/dmellok/tesserae-relay:edge
+  ghcr.io/dmellok/tesserae-relay:latest
 ```
 
-Multi-arch (amd64 + arm64). `:edge` tracks `main`, every build also publishes an
-immutable `sha-<commit>` tag, and `:latest` follows a tagged `relay-v*` release.
-Without Docker, on Node 18 or newer:
+Multi-arch (amd64 + arm64). `:latest` follows the most recent `relay-v*` tag,
+`:0.1` / `:0.1.0` pin harder, `:edge` tracks `main`, and every build publishes
+an immutable `sha-<commit>` tag. Without Docker, on Node 18 or newer:
 
 ```sh
 cd packages/relay
@@ -81,8 +81,9 @@ bridge, and the expiry sweep.
 
 ## Point Tesserae at it
 
-In Tesserae: **Settings → Cloud relay**, set the relay URL to your Worker's
-origin, and **Register this install**. Then **Add a remote panel** to get a
+In Tesserae: **Settings → Cloud relay**, set the relay URL to your relay's
+origin (the Worker URL, or the hostname in front of your container), and
+**Register this install**. Then **Add a remote panel** to get a
 pairing code, and enter that code + the relay URL on the panel.
 
 ## Cost
