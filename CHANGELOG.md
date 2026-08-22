@@ -4,6 +4,30 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.336.0], 2026-08-22
+
+### Added
+
+- **The relay runs as a container, without Cloudflare (discussion #254).** Self-hosting it
+  previously meant deploying the Worker to your own Cloudflare account. It now also runs on Node
+  with the filesystem standing in for R2: `docker build -t tesserae-relay packages/relay`, or
+  `npm start` on any machine with Node 18 or newer.
+
+  The same `src/index.js` runs in both deployments. The Cloudflare coupling was only ever the R2
+  binding used as a blob store (`get`, `put`, `delete`, `list`) plus an optional analytics
+  binding, so the container swaps the backend rather than forking the Worker. The wire contract is
+  unchanged, which means a panel paired against one relay reaches the other by changing its base
+  URL, with no firmware change.
+
+  Two differences the container handles itself. Cloudflare provides public HTTPS; a container
+  wants TLS in front of it, so it speaks plain HTTP and answers `GET /healthz`. And where the
+  Worker deployment expires abandoned pairing records with an R2 lifecycle rule, the container
+  sweeps `code/` and `pair/` in-process every hour against the `expires_at` the records already
+  carry. Frame blobs self-clean on upload in both.
+
+  `packages/relay` also gains a `test` script; the suite runs on plain `node --test` with no
+  wrangler or Miniflare, and now covers the storage backend, the HTTP bridge, and the sweep.
+
 ## [0.335.0], 2026-08-22
 
 ### Added

@@ -3,10 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Cloudflare Worker: zero-knowledge store-and-forward mailbox for remote Tesserae e-ink panels.",
+  "description": "Zero-knowledge store-and-forward mailbox for remote Tesserae e-ink panels. Runs as a Cloudflare Worker or as a container on Node.",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "start": "node src/server.js",
+    "test": "node --test 'test/*.test.mjs'"
   },
   "devDependencies": {
     "wrangler": "^4"
