@@ -135,3 +135,30 @@ def test_json_wraps_http_error(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     out = bridge._json("PUT", "/pages/x/canvas", {"w": 0})
     assert out["error"] == "bad" and out["_status"] == 422
+
+
+def test_probe_payload_truncation_keeps_shape():
+    """A 24h Home Assistant history overflowed the MCP result limit with no
+    truncation, so the whole result was unusable and the only recourse was
+    grepping a saved tool-result file. Long lists are shortened; the shape and
+    the scalars stay, and each trimmed list says how long it really was."""
+    from tesserae_mcp import _truncate_payload
+
+    payload = {
+        "history": [{"t": i, "v": i * 1.5} for i in range(400)],
+        "unit": "C",
+        "nested": {"rows": list(range(100))},
+    }
+    out, dropped = _truncate_payload(payload, 20)
+
+    assert len(out["history"]) == 20
+    assert out["history__truncated"] == {"total": 400, "shown": 20}
+    assert len(out["nested"]["rows"]) == 20
+    assert out["nested"]["rows__truncated"] == {"total": 100, "shown": 20}
+    # Scalars and short lists are untouched, and the shape is preserved.
+    assert out["unit"] == "C"
+    assert out["history"][0] == {"t": 0, "v": 0.0}
+    assert dropped == ["data.history (400 items)", "data.nested.rows (100 items)"]
+
+    small = {"a": [1, 2, 3]}
+    assert _truncate_payload(small, 20) == (small, [])

@@ -294,6 +294,44 @@ def _request(method: str, path: str, body: dict[str, Any] | None = None) -> tupl
         ) from exc
 
 
+def _truncate_payload(value: Any, max_items: int, _path: str = "data") -> tuple[Any, list[str]]:
+    """Shorten long lists in a probe payload, returning (value, trimmed paths).
+
+    A widget's data is for picking field paths, so the SHAPE matters and the
+    hundredth row does not. A 24h Home Assistant history overflows the MCP
+    result limit with no truncation, which leaves the whole result unusable and
+    the only recourse grepping a saved tool-result file.
+
+    Each trimmed list keeps its first ``max_items`` entries, and its parent
+    object gains ``<key>__truncated`` naming the real length, so the shape stays
+    self-describing rather than silently looking short. Dicts recurse; scalars
+    pass through untouched.
+    """
+    dropped: list[str] = []
+    if isinstance(value, list):
+        out_list: list[Any] = []
+        for i, item in enumerate(value[:max_items]):
+            child, child_dropped = _truncate_payload(item, max_items, f"{_path}[{i}]")
+            out_list.append(child)
+            dropped.extend(child_dropped)
+        if len(value) > max_items:
+            dropped.append(f"{_path} ({len(value)} items)")
+        return out_list, dropped
+    if isinstance(value, dict):
+        out_dict: dict[str, Any] = {}
+        for key, item in value.items():
+            child, child_dropped = _truncate_payload(item, max_items, f"{_path}.{key}")
+            out_dict[key] = child
+            dropped.extend(child_dropped)
+            if isinstance(item, list) and len(item) > max_items:
+                out_dict[f"{key}__truncated"] = {
+                    "total": len(item),
+                    "shown": max_items,
+                }
+        return out_dict, dropped
+    return value, dropped
+
+
 def _json(method: str, path: str, body: dict[str, Any] | None = None) -> Any:
     """Call the API expecting JSON. Non-2xx bodies are returned as-is (so the agent
     sees 422 validation details) rather than raised."""
@@ -537,14 +575,46 @@ def build_server() -> Any:
             path += f"&q={q}"
         return _json("GET", path)
 
-    def probe_widget_data(widget: str, options: dict[str, Any] | None = None) -> Any:
+    def probe_widget_data(
+        widget: str,
+        options: dict[str, Any] | None = None,
+        max_items: int = 20,
+        full: bool = False,
+    ) -> Any:
         """Return a widget's data as JSON to pick "field" paths before binding a data
         primitive. Returns {data, data_source, reason, fields}: "data_source" is
         "live" (real fetch), "sample" (demo fallback because nothing was configured),
         or "error" (fetch failed) so you never mistake a placeholder for a real
         result; "fields" lists the bindable dot-paths with sample values (a wrong key
-        simply isn't in the list; an empty payload has fields with null values)."""
-        return _json("POST", f"/widgets/{widget}/data", {"options": options or {}})
+        simply isn't in the list; an empty payload has fields with null values).
+
+        Long lists in "data" are truncated to "max_items" entries, each trimmed
+        list carrying a sibling "<name>__truncated" note with the real length, so
+        a big payload (a 24h Home Assistant history runs to hundreds of KB) stays
+        readable instead of blowing the result limit and being unusable. "fields"
+        is never truncated: it is the reason to call this tool. Pass full=True for
+        the whole payload, or raise max_items, when you genuinely need every row.
+        """
+        out = _json("POST", f"/widgets/{widget}/data", {"options": options or {}})
+        if full or not isinstance(out, dict):
+            return out
+        data = out.get("data")
+        if data is None:
+            return out
+        trimmed, dropped = _truncate_payload(data, max_items)
+        if dropped:
+            out = dict(out)
+            out["data"] = trimmed
+            out["truncated"] = {
+                "max_items": max_items,
+                "lists_trimmed": dropped,
+                "note": (
+                    "Long lists were shortened so the result fits. "
+                    "'fields' above is complete. Re-run with full=True or a higher "
+                    "max_items for the whole payload."
+                ),
+            }
+        return out
 
     def list_devices() -> Any:
         """List registered display devices with panel dims AND colour capability:

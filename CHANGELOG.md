@@ -4,6 +4,20 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.349.0], 2026-08-23
+
+### Fixed
+
+- **`probe_widget_data` truncates long lists.** A large payload (a 24h Home Assistant history runs
+  to hundreds of KB) overflowed the MCP result limit with no truncation or pagination, so the whole
+  result was unusable and the only recourse was grepping a saved tool-result file. Lists are now
+  capped at `max_items` (default 20), each trimmed list gaining a sibling `<key>__truncated` with
+  its real length so the shape stays self-describing rather than silently looking short. Scalars,
+  short lists and nesting are untouched.
+
+  `fields` is never truncated, since the bindable dot-paths are the reason to call the tool at all.
+  `full=True` returns the whole payload for the cases that genuinely need every row.
+
 ## [0.348.0], 2026-08-23
 
 ### Fixed
