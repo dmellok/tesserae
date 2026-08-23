@@ -7,11 +7,27 @@
 
 name: ci
 
+# Prose-only changes don't run the Python matrix. A markdown edit used to run
+# the whole suite four times (pytest, coverage, and both forward-compat legs)
+# for files no test imports. paths-ignore skips a run only when EVERY changed
+# file matches, so a commit touching docs AND code still runs in full.
+#
+# Safe to skip rather than report because nothing here is a required status
+# check (main has no branch protection). If that changes, a skipped required
+# check blocks the merge for ever and the fix is a same-named no-op job, not
+# removing this.
 on:
   push:
     branches: [main]
+    paths-ignore: &prose
+      - "docs/**"
+      - "notes/**"
+      - "**.md"
+      - "LICENSE"
+      - ".github/ISSUE_TEMPLATE/**"
   pull_request:
     branches: [main]
+    paths-ignore: *prose
 
 # Cancel in-progress runs for the same branch when a new push lands.
 concurrency:
@@ -91,15 +107,20 @@ jobs:
   pytest-forward:
     name: pytest (forward-compat)
     runs-on: ubuntu-latest
-    # 3.12 / 3.13 run informationally: requires-python is >=3.11 and the
-    # shipped runtime (Docker base, HA add-on) is 3.11. Failures surface as a
-    # warning instead of blocking main. Promote to a required matrix once
-    # these are consistently green.
+    # 3.12 runs informationally: requires-python is >=3.11 and the shipped
+    # runtime (Docker base, HA add-on) is 3.11. Failures surface as a warning
+    # instead of blocking main. Promote to a required matrix once consistently
+    # green.
+    #
+    # 3.13 is deliberately NOT here: the `coverage` job already runs the whole
+    # suite on 3.13, so a second leg was paying for a duplicate run that could
+    # not block anything anyway. 3.12 is the only interpreter nothing else
+    # covers.
     continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.12", "3.13"]
+        python-version: ["3.12"]
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
