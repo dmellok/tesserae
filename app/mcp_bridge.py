@@ -31,8 +31,8 @@ from app.state.settings_store import SettingsStore
 
 # The bridge version this Tesserae ships alongside. Both live in this repo
 # (``packages/tesserae-mcp``), so the server knows what "current" means without
-# a network call; ``test_mcp_bridge.py`` fails the build if the two drift.
-EXPECTED_VERSION = "0.12.0"
+# a network call; ``test_mcp_bridge_version.py`` fails the build if they drift.
+EXPECTED_VERSION = "0.13.0"
 
 UPGRADE_COMMAND = "pipx upgrade tesserae-mcp"
 
@@ -46,7 +46,7 @@ _SEEN_KEY = "mcp_bridge_seen"
 # written through immediately, which is the case that matters.
 _REFRESH_SECONDS = 300.0
 
-# ``tesserae-mcp/0.12.0``. Anything else (curl, a hand-rolled client) is still
+# ``tesserae-mcp/0.13.0``. Anything else (curl, a hand-rolled client) is still
 # recorded as activity, just without a version to compare.
 _UA_RE = re.compile(r"^tesserae-mcp/(\d[A-Za-z0-9.+-]*)$")
 

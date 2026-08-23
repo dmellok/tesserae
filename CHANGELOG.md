@@ -4,6 +4,19 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.355.0], 2026-08-23
+
+### Added
+
+- **tesserae-mcp 0.13.0.** The bridge has carried unreleased changes since 0.12.0 went to PyPI on
+  31 July, and two of them are functional rather than cosmetic: `probe_widget_data` now truncates
+  long lists (a 24h Home Assistant history overflowed the tool-result cap, making the whole result
+  unusable) and `list_widgets` summarises the ~95k-character catalog. The rest are tool
+  descriptions, which the server cannot push to an installed bridge: `create_schedule`'s `name` and
+  `fires_at` contract, `render_report`'s `icon_invalid` and `injected_libs` sections, and
+  `list_icons`' query normalisation. Upgrade with `pipx upgrade tesserae-mcp`; an install that
+  doesn't will now be told, by the card added in 0.354.0.
+
 ## [0.354.0], 2026-08-23
 
 ### Added
