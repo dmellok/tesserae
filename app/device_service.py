@@ -615,6 +615,88 @@ def backfill_native_panel_dims(data_root: Path) -> list[str]:
     return patched
 
 
+# The two CrossInk Sticky kinds retired in v0.344.0, and their panel blocks
+# as they were copied into instance files at create_instance. Hard-coded
+# because this migration runs before the loader scan, so the catalog isn't
+# available to look them up, and the entries no longer exist to look up.
+_RETIRED_STICKY_PANELS: dict[str, dict[str, Any]] = {
+    "seeed_sticky": {
+        "w": 480,
+        "h": 800,
+        "orientation": "portrait_flipped",
+        "name": "3.97 inch monochrome ePaper (800x480 native)",
+        "gamut": "mono",
+        "native_w": 800,
+        "native_h": 480,
+    },
+    "seeed_sticky_gray": {
+        "w": 480,
+        "h": 800,
+        "orientation": "portrait_flipped",
+        "name": "3.97 inch ePaper, 4-level grayscale (800x480 native)",
+        "gamut": "gray_4",
+        "native_w": 800,
+        "native_h": 480,
+    },
+}
+
+_STICKY_SUCCESSOR = "seeed_reterminal_sticky"
+_STICKY_SUCCESSOR_PANEL: dict[str, Any] = {
+    "w": 480,
+    "h": 800,
+    "orientation": "portrait",
+    "name": "ePaper, 4-level grayscale (800x480 native, composed 480x800 portrait)",
+    "gamut": "gray_4",
+    "native_w": 800,
+    "native_h": 480,
+}
+
+
+def migrate_retired_sticky_kinds(data_root: Path) -> list[str]:
+    """One-shot migration: move Sticky instances off the retired CrossInk
+    kinds onto ``seeed_reterminal_sticky``.
+
+    ``seeed_sticky`` and ``seeed_sticky_gray`` described the same hardware
+    running CrossInk, from the V01 schematic rather than a validated unit.
+    Both were retired in v0.344.0 in favour of the hardware-confirmed kind.
+    An instance left pointing at a kind the catalog no longer has fails to
+    load and the device 404s, so the pointer has to move here.
+
+    The panel block moves with it. Instances carry a copy of their kind's
+    panel, and the retired kinds declared ``portrait_flipped`` where the
+    confirmed one is ``portrait``: keeping that value paints every frame 180
+    degrees out. Fields the operator changed are left alone, same rule as a
+    kind heal. A retired mono instance also picks up the successor's
+    ``gray_4`` gamut, since the successor packs 2-bpp and there is no 1-bpp
+    variant of it.
+
+    Idempotent, and does nothing on a fresh install."""
+    migrated: list[str] = []
+    if not data_root.is_dir():
+        return migrated
+    for path in sorted(data_root.glob("*.json")):
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        old_panel = _RETIRED_STICKY_PANELS.get(str(raw.get("kind") or ""))
+        if old_panel is None:
+            continue
+        raw["kind"] = _STICKY_SUCCESSOR
+        # The successor offers esp32_gray2_bin only; a mono instance's pin
+        # would be silently ignored at load, so drop it rather than leave a
+        # stale field on disk.
+        if raw.get("renderer_id") not in (None, "esp32_gray2_bin"):
+            raw.pop("renderer_id", None)
+        _refresh_inherited_panel(raw, old_panel=old_panel, new_panel=_STICKY_SUCCESSOR_PANEL)
+        try:
+            path.write_text(json.dumps(raw, indent=2) + "\n", encoding="utf-8")
+        except OSError:
+            continue
+        migrated.append(str(raw.get("id") or path.stem))
+    return migrated
+
+
 def relocate_orphan_instance_files(*, data_root: Path, device_data_root: Path) -> list[str]:
     """One-shot migration: move stray instance manifests out of the data
     root and into ``data/devices/`` where the loader scans.

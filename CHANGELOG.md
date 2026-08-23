@@ -4,6 +4,33 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.344.0], 2026-08-23
+
+### Removed
+
+- **`seeed_sticky` and `seeed_sticky_gray` retired.** One physical product carried three catalog
+  entries. These two described it running CrossInk and were written from the V01 schematic and
+  Seeed's vendor peripheral demo rather than a validated unit: never confirmed on hardware, and
+  declaring a self-flagged provisional `portrait_flipped` the board does not use.
+  `seeed_reterminal_sticky` supersedes both, and the Sticky now appears once.
+
+  The split was never cosmetic, which is why the merge is a removal rather than a fold. A kind is
+  an OTA lineage: release descriptors are signed with a `device_kind`, rejected on
+  `kind_mismatch`, and `auto_update_ids` sweeps every device of a kind. Two firmwares sharing one
+  kind would offer tesserae-device-firmware images to CrossInk units. Supporting a second firmware
+  again means a second kind, not a variant of this one.
+
+- **`migrate_retired_sticky_kinds` moves instances off the retired ids** at startup, before the
+  loader scan, since an instance pointing at a kind the catalog no longer carries doesn't load and
+  the device 404s. The panel block moves with it: instances carry a copy of their kind's panel, so
+  a device left on the retired `portrait_flipped` would paint every frame 180 degrees out. Fields
+  the operator changed are left alone, same rule as a kind heal. A retired mono instance also
+  picks up `gray_4`, since the successor packs 2-bpp and has no 1-bpp variant.
+
+  Done as a migration rather than `deprecated_aliases` deliberately. Under an alias both ids
+  resolve to the same object, so the old kind's panel *is* the new kind's, and a stale
+  `portrait_flipped` on an instance would read as a deliberate operator override and survive.
+
 ## [0.343.0], 2026-08-23
 
 ### Added

@@ -264,17 +264,17 @@ def test_update_instance_kind_heals_to_catalog_sibling(registries_with_catalog) 
 
 
 def test_update_instance_kind_moves_inherited_orientation(registries_with_catalog) -> None:
-    """A Sticky registered under the CrossInk kind and re-registering on the
-    tesserae-device-firmware build must not keep the old kind's flip: the two
-    describe the same glass mounted the same way but composed differently, and
-    a stale ``portrait_flipped`` paints every frame 180 degrees out."""
+    """``xteink_x4_gray`` and ``seeed_reterminal_sticky`` are the same protocol,
+    gamut and 480x800 geometry, and differ only in orientation. A device moving
+    between them must not keep the old kind's flip: a stale ``portrait_flipped``
+    paints every frame 180 degrees out on a panel that is otherwise working."""
     devices, renderers, data_root = registries_with_catalog
     assert device_service.create_instance(
         devices=devices,
         renderers=renderers,
         data_root=data_root,
-        instance_id="crossink_b064dc",
-        kind_id="seeed_sticky_gray",
+        instance_id="sticky_heal",
+        kind_id="xteink_x4_gray",
         name="Sticky",
     ).ok
 
@@ -282,7 +282,7 @@ def test_update_instance_kind_moves_inherited_orientation(registries_with_catalo
         devices=devices,
         renderers=renderers,
         data_root=data_root,
-        instance_id="crossink_b064dc",
+        instance_id="sticky_heal",
         kind_id="seeed_reterminal_sticky",
     )
     assert changed is True and result.ok
@@ -290,7 +290,7 @@ def test_update_instance_kind_moves_inherited_orientation(registries_with_catalo
     assert result.device.kind_of == "seeed_reterminal_sticky"
     assert result.device.manifest["panel"]["orientation"] == "portrait"
     assert result.device.manifest["name"] == "Sticky"
-    saved = json.loads((data_root / "crossink_b064dc.json").read_text())
+    saved = json.loads((data_root / "sticky_heal.json").read_text())
     assert saved["panel"]["orientation"] == "portrait"
     # Geometry was already right on both kinds; the heal must leave it alone.
     assert (saved["panel"]["w"], saved["panel"]["h"]) == (480, 800)
@@ -308,7 +308,7 @@ def test_update_instance_kind_keeps_a_deliberate_panel_override(
         renderers=renderers,
         data_root=data_root,
         instance_id="sticky_upside_down",
-        kind_id="seeed_sticky_gray",
+        kind_id="xteink_x4_gray",
         name="Sticky",
         orientation="landscape",
     ).ok
@@ -410,6 +410,78 @@ def test_reterminal_sticky_packs_a_96000_byte_frame(registries_with_catalog) -> 
     # grayscale, which is the mistake crosspoint_gray was added to fix.
     levels = {(byte >> shift) & 0b11 for byte in packed for shift in (0, 2, 4, 6)}
     assert levels == {0, 1, 2, 3}
+
+
+def test_migrate_retired_sticky_kinds(tmp_path: Path) -> None:
+    """A Sticky registered under the retired CrossInk grayscale kind moves to
+    the confirmed kind, and drops the flip it inherited with it. Mirrors the
+    real ``crossink_b064dc`` record."""
+    data_root = tmp_path / "devices"
+    data_root.mkdir()
+    (data_root / "crossink_b064dc.json").write_text(
+        json.dumps(
+            {
+                "id": "crossink_b064dc",
+                "kind": "seeed_sticky_gray",
+                "name": "Sticky",
+                "panel": {
+                    "w": 480,
+                    "h": 800,
+                    "orientation": "portrait_flipped",
+                    "name": "3.97 inch ePaper, 4-level grayscale (800x480 native)",
+                    "gamut": "gray_4",
+                    "native_w": 800,
+                    "native_h": 480,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    # An unrelated device must not be touched.
+    (data_root / "lounge.json").write_text(
+        json.dumps({"id": "lounge", "kind": "esp32_client", "panel": {"w": 800, "h": 480}}),
+        encoding="utf-8",
+    )
+
+    moved = device_service.migrate_retired_sticky_kinds(data_root)
+    assert moved == ["crossink_b064dc"]
+
+    saved = json.loads((data_root / "crossink_b064dc.json").read_text())
+    assert saved["kind"] == "seeed_reterminal_sticky"
+    assert saved["panel"]["orientation"] == "portrait"
+    assert saved["name"] == "Sticky"
+    assert json.loads((data_root / "lounge.json").read_text())["kind"] == "esp32_client"
+
+    # Idempotent: a second pass has nothing left to do.
+    assert device_service.migrate_retired_sticky_kinds(data_root) == []
+
+
+def test_migrate_retired_sticky_keeps_an_operator_orientation(tmp_path: Path) -> None:
+    """An orientation the operator set for this display is not the retired
+    kind's default, so the migration leaves it alone."""
+    data_root = tmp_path / "devices"
+    data_root.mkdir()
+    (data_root / "sticky_sideways.json").write_text(
+        json.dumps(
+            {
+                "id": "sticky_sideways",
+                "kind": "seeed_sticky",
+                "panel": {
+                    "w": 480,
+                    "h": 800,
+                    "orientation": "landscape",
+                    "gamut": "mono",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert device_service.migrate_retired_sticky_kinds(data_root) == ["sticky_sideways"]
+    saved = json.loads((data_root / "sticky_sideways.json").read_text())
+    assert saved["kind"] == "seeed_reterminal_sticky"
+    assert saved["panel"]["orientation"] == "landscape"
+    # The mono gamut was the retired kind's, and the successor packs 2-bpp.
+    assert saved["panel"]["gamut"] == "gray_4"
 
 
 def test_update_instance_kind_noop_cases(registries_with_catalog) -> None:

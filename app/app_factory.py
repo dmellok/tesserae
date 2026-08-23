@@ -494,6 +494,7 @@ def create_app(
     # nothing on a fresh install or for already-migrated manifests.
     from app.device_service import (
         backfill_native_panel_dims,
+        migrate_retired_sticky_kinds,
         relocate_orphan_instance_files,
     )
 
@@ -514,6 +515,17 @@ def create_app(
         logger.info(
             "device migration: backfilled native panel dims on %s",
             ", ".join(_patched_ids),
+        )
+
+    # Move Sticky instances off the retired CrossInk kinds. Runs before the
+    # loader scan below: an instance pointing at a kind the catalog no
+    # longer carries doesn't load, and the device 404s.
+    _sticky_ids = migrate_retired_sticky_kinds(device_data_root)
+    if _sticky_ids:
+        logger.info(
+            "device migration: moved %s onto %s",
+            ", ".join(_sticky_ids),
+            "seeed_reterminal_sticky",
         )
 
     devices = device_loader.discover(
