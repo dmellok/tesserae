@@ -60,6 +60,64 @@ class PaletteColors:
 
 
 @dataclass(frozen=True)
+class GrayRamp:
+    """What a grayscale panel's levels actually paint, darkest first.
+
+    The grey packers assumed a perfectly linear ramp (``i * 85`` for
+    4-level, ``i * 17`` for 16-level). Real e-paper grey waveforms are
+    not linear in reflectance, so a panel whose mid-levels come out
+    lighter than that renders washed out, and error diffusion makes it
+    worse by diffusing against values the panel never produces.
+
+    ``levels`` holds ``#rrggbb`` anchors in **ascending** order, darkest
+    first, because the wire format fixes index 0 as black and the top
+    index as white. Order is meaning here, not presentation: entry *i*
+    is what level *i* paints.
+
+    Any anchor count of two or more is allowed and
+    :meth:`as_tuples` interpolates to whatever a given gamut needs, so
+    four measured patches can drive a 16-level panel. Empty (the
+    default) means no override and the caller keeps its linear ramp.
+    """
+
+    levels: tuple[str, ...] = ()
+
+    def as_tuples(self, count: int) -> tuple[tuple[int, int, int], ...] | None:
+        """Resolve to exactly ``count`` RGB triplets, or ``None`` when
+        there is nothing usable to override with.
+
+        Fewer than two anchors can't describe a ramp, so that returns
+        ``None`` rather than a guess. An exact-length ramp is used as
+        given; otherwise anchors are spread evenly across the output and
+        linearly interpolated between."""
+        if count <= 0:
+            return None
+        anchors = [_hex_to_rgb(value) for value in self.levels]
+        if len(anchors) < 2:
+            return None
+        if len(anchors) == count:
+            return tuple(anchors)
+        if count == 1:
+            return (anchors[0],)
+        last = len(anchors) - 1
+        out: list[tuple[int, int, int]] = []
+        for i in range(count):
+            pos = i * last / (count - 1)
+            lo = min(int(pos), last)
+            hi = min(lo + 1, last)
+            frac = pos - lo
+            a, b = anchors[lo], anchors[hi]
+            out.append(
+                (
+                    round(a[0] + (b[0] - a[0]) * frac),
+                    round(a[1] + (b[1] - a[1]) * frac),
+                    round(a[2] + (b[2] - a[2]) * frac),
+                )
+            )
+        return tuple(out)
+
+
+@dataclass(frozen=True)
 class ToneSettings:
     """Tone knobs applied before quantisation. ``contrast`` and
     ``saturation`` mirror the existing per-clone renderer fields so the
@@ -123,6 +181,9 @@ class PaletteProfile:
     name: str
     family: str
     palette: PaletteColors = field(default_factory=PaletteColors)
+    # Grayscale panels ignore ``palette`` entirely: their wire format
+    # carries levels, not colours. Empty on every colour profile.
+    gray: GrayRamp = field(default_factory=GrayRamp)
     tone: ToneSettings = field(default_factory=ToneSettings)
     dither: DitherSettings = field(default_factory=DitherSettings)
     edges: EdgeSettings = field(default_factory=EdgeSettings)
@@ -139,6 +200,10 @@ class PaletteProfile:
         payload = asdict(self)
         if payload["palette"].get("orange") is None:
             payload["palette"].pop("orange", None)
+        # Colour profiles carry no ramp; an empty key on every one of
+        # them is noise in the file and in a diff.
+        if not payload.get("gray", {}).get("levels"):
+            payload.pop("gray", None)
         return payload
 
 
@@ -169,6 +234,19 @@ def _colors_from_dict(raw: dict[str, Any]) -> PaletteColors:
         green=str(raw.get("green", "#00ff00")),
         orange=(str(raw["orange"]) if raw.get("orange") else None),
     )
+
+
+def _gray_from_dict(raw: dict[str, Any]) -> GrayRamp:
+    """Hydrate a grey ramp. A non-list, or anything under two usable
+    anchors, degrades to empty (no override) rather than a partial ramp
+    the packer would have to second-guess."""
+    levels = raw.get("levels")
+    if not isinstance(levels, (list, tuple)):
+        return GrayRamp()
+    parsed = tuple(str(value) for value in levels if isinstance(value, str) and value.strip())
+    if len(parsed) < 2:
+        return GrayRamp()
+    return GrayRamp(levels=parsed)
 
 
 def _tone_from_dict(raw: dict[str, Any]) -> ToneSettings:
@@ -228,6 +306,7 @@ def profile_from_dict(raw: dict[str, Any], *, bundled: bool = False) -> PaletteP
         name=name,
         family=family,
         palette=_colors_from_dict(raw.get("palette") or {}),
+        gray=_gray_from_dict(raw.get("gray") or {}),
         tone=_tone_from_dict(raw.get("tone") or {}),
         dither=_dither_from_dict(raw.get("dither") or {}),
         edges=_edges_from_dict(raw.get("edges") or {}),

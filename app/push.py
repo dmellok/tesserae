@@ -2704,6 +2704,15 @@ class PushManager:
                     "preserve_line_art": profile.edges.preserve_line_art,
                     "protect_native_colours": profile.edges.protect_native_colours,
                 }
+                # Grayscale calibration. Carried as the profile's raw
+                # anchors rather than a resolved ramp: only the renderer
+                # knows how many levels its gamut has (4 for
+                # esp32_gray2_bin, 16 for esp32_gray_bin), and one set of
+                # measured patches should drive either. Absent on colour
+                # profiles, which is every profile until someone
+                # calibrates a grey panel.
+                if profile.gray.levels:
+                    extras["_gray_ramp"] = tuple(profile.gray.levels)
                 settings = {**settings, **extras}
         return settings
 

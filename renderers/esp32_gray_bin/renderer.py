@@ -64,6 +64,23 @@ def _setting(settings: dict[str, Any], key: str) -> Any:
     return settings.get(key, DEFAULTS[key])
 
 
+def _gray_ramp(settings: dict[str, Any], levels: int) -> tuple[tuple[int, int, int], ...] | None:
+    """The device's measured grey ramp resolved to ``levels`` entries, or
+    None when it has no calibration profile.
+
+    ``_gray_ramp`` is injected by the push layer from the device's palette
+    profile (see ``PushManager._renderer_settings``). It carries the raw
+    anchors because only this renderer knows its gamut's level count, so
+    four measured patches can drive this 16-level panel by interpolation.
+    """
+    from app.palette_profiles.schema import GrayRamp
+
+    anchors = settings.get("_gray_ramp")
+    if not anchors:
+        return None
+    return GrayRamp(levels=tuple(str(value) for value in anchors)).as_tuples(levels)
+
+
 def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> bytes:
     img = Image.open(io.BytesIO(png_bytes))
     # Per-cell dither map (issue #86): rasterise at composition dims and
@@ -120,6 +137,7 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
         height=native_h,
         dither=_setting(settings, "dither"),
         contrast=float(_setting(settings, "contrast")),
+        palette_override=_gray_ramp(settings, 16),
         region_nearest_mask=mask_img,
     )
 

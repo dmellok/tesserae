@@ -798,12 +798,34 @@ def fit_to_panel(
 
 
 def _palette_image(palette: tuple[tuple[int, int, int], ...]) -> Image.Image:
+    """Build the 256-entry ``P`` image Pillow's ``quantize`` matches against.
+
+    Pillow always considers all 256 slots, so the padding past the real
+    entries is a live part of the match. Padding with zeroes made those
+    slots *pure black*, which is a colour a real palette may not contain:
+    a black pixel then matched a padding slot instead of entry 0, and the
+    packers, which clip an out-of-range index to the top of the range,
+    turned it white. Invisible while every palette's first entry happened
+    to be #000000 (Pillow resolves the tie to the lowest index), and not
+    invisible for a measured palette, whose black is nearer #1F2226, or a
+    calibrated grey ramp whose darkest level is what the panel actually
+    prints rather than an ideal.
+
+    Padding repeats the last real entry instead. A stray match then lands
+    on a colour the palette genuinely has, so clipping resolves it to that
+    entry rather than inventing one.
+    """
     pal = Image.new("P", (1, 1))
     flat: list[int] = []
     for r, g, b in palette:
         flat.extend([r, g, b])
-    flat.extend([0] * (256 * 3 - len(flat)))
-    pal.putpalette(flat)
+    if palette:
+        pad_r, pad_g, pad_b = palette[-1]
+        while len(flat) < 256 * 3:
+            flat.extend([pad_r, pad_g, pad_b])
+    else:
+        flat.extend([0] * (256 * 3 - len(flat)))
+    pal.putpalette(flat[: 256 * 3])
     return pal
 
 
@@ -1896,6 +1918,7 @@ def pack_to_panel_bin_4bpp_gray(
     height: int,
     dither: DitherMode = "floyd-steinberg",
     contrast: float = 1.0,
+    palette_override: tuple[tuple[int, int, int], ...] | None = None,
     region_nearest_mask: Image.Image | None = None,
 ) -> bytes:
     """Quantise to 16-level grayscale and pack to the panel's native 4-bpp
@@ -1935,7 +1958,7 @@ def pack_to_panel_bin_4bpp_gray(
     if img.size != (width, height):
         raise ValueError(f"image must be {width}x{height}, got {img.size}")
 
-    palette = _GRAY_16_PALETTE
+    palette = _resolve_gray_palette(_GRAY_16_PALETTE, palette_override)
     pal_arr = np.array(palette, dtype=np.float32)
 
     # Grayscale-first, then back to RGB so the dither routines that
@@ -2007,6 +2030,29 @@ _GRAY_4_PALETTE: tuple[tuple[int, int, int], ...] = tuple(
 )
 
 
+def _resolve_gray_palette(
+    nominal: tuple[tuple[int, int, int], ...],
+    override: tuple[tuple[int, int, int], ...] | None,
+) -> tuple[tuple[int, int, int], ...]:
+    """Pick the grey ramp to quantise against.
+
+    ``nominal`` is the evenly-spaced ramp the wire format implies;
+    ``override`` is what the panel measurably paints, from the device's
+    calibration profile. Only used for the nearest-match and error
+    diffusion decisions: the packed bytes are still level *indices*, so
+    an override changes which level each pixel gets, never the format.
+
+    That also means index order is load-bearing. The override is used
+    positionally (entry *i* is level *i*), so it has to arrive darkest
+    first; the profile schema is where that's enforced. A wrong-length
+    override is ignored rather than padded, since a partial ramp would
+    silently remap every level above the gap.
+    """
+    if override is None or len(override) != len(nominal):
+        return nominal
+    return tuple(override)
+
+
 def pack_to_panel_bin_2bpp_gray(
     img: Image.Image,
     *,
@@ -2014,6 +2060,7 @@ def pack_to_panel_bin_2bpp_gray(
     height: int,
     dither: DitherMode = "floyd-steinberg",
     contrast: float = 1.0,
+    palette_override: tuple[tuple[int, int, int], ...] | None = None,
     region_nearest_mask: Image.Image | None = None,
 ) -> bytes:
     """Quantise to 4-level grayscale and pack to a 2-bpp wire format.
@@ -2045,7 +2092,7 @@ def pack_to_panel_bin_2bpp_gray(
     if img.size != (width, height):
         raise ValueError(f"image must be {width}x{height}, got {img.size}")
 
-    palette = _GRAY_4_PALETTE
+    palette = _resolve_gray_palette(_GRAY_4_PALETTE, palette_override)
     pal_arr = np.array(palette, dtype=np.float32)
 
     # Grayscale-first, then back to RGB, same as the 4-bpp packer: the

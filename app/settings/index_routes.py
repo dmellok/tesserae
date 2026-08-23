@@ -586,6 +586,11 @@ def _palette_family_for(device: Device) -> str:
         return "spectra6"
     if gamut == "bwry_4":
         return "bwry_4"
+    # Grayscale ramps. These profiles carry no ``palette`` at all, only
+    # a ``gray`` ramp of what the panel's levels actually print, which
+    # is what the grey packers quantise against.
+    if gamut in ("gray_4", "gray_16"):
+        return gamut
     # mono, rgb24, rgb16, unknown: no bundled profile family applies,
     # hide the picker rather than showing incompatible Spectra 6
     # profiles as the pre-v0.69.11 default did.

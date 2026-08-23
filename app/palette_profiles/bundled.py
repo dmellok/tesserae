@@ -37,6 +37,7 @@ from __future__ import annotations
 from app.palette_profiles.schema import (
     DitherSettings,
     EdgeSettings,
+    GrayRamp,
     PaletteColors,
     PaletteProfile,
     ToneSettings,
@@ -55,6 +56,7 @@ def _profile(
     attribution: str | None = None,
     notes: str = "",
     dither: DitherSettings | None = None,
+    gray: GrayRamp | None = None,
 ) -> PaletteProfile:
     """Bundled-profile constructor with the defaults every preset uses:
     tone / dither / edges at their neutral values. Fine-tuning is what
@@ -70,6 +72,7 @@ def _profile(
         name=name,
         family=family,
         palette=palette,
+        gray=gray if gray is not None else GrayRamp(),
         tone=ToneSettings(),
         dither=dither if dither is not None else DitherSettings(),
         edges=EdgeSettings(),
@@ -267,6 +270,71 @@ BUNDLED_PROFILES: tuple[PaletteProfile, ...] = (
             "profile and adjust the colours if yours looks off."
         ),
     ),
+    # ---- grayscale ramps ------------------------------------------
+    #
+    # A grey profile carries no ``palette``: the wire format for these
+    # panels holds levels, not colours, so only ``gray`` is read. The
+    # value you enter is what the panel ACTUALLY PAINTS, and the renderer
+    # compensates. That inverts the intuition: a panel rendering too
+    # light is fixed by declaring its mid-levels LIGHTER than nominal,
+    # because that tells the quantizer those levels overshoot and it
+    # should reach for a darker one.
+    #
+    # Nominal is first and is the family default, so unlocking the tab
+    # can't change how an existing panel renders.
+    _profile(
+        slug="nominal-gray4",
+        name="Nominal 4-level grey",
+        family="gray_4",
+        palette=PaletteColors(),
+        gray=GrayRamp(levels=("#000000", "#555555", "#AAAAAA", "#FFFFFF")),
+        notes=(
+            "Evenly-spaced levels, what Tesserae has always assumed for these panels. "
+            "The default, so existing screens don't change. Try the softer ramp if "
+            "your panel looks washed out."
+        ),
+    ),
+    _profile(
+        slug="soft-mid-gray4",
+        name="4-level grey, lifted mid-tones",
+        family="gray_4",
+        palette=PaletteColors(),
+        gray=GrayRamp(levels=("#1E1E1E", "#6E6E6E", "#B4B4B4", "#E8E8E8")),
+        notes=(
+            "A starting point for panels that render washed out, NOT a measurement of "
+            "any particular unit. It says the two middle levels come out lighter than "
+            "evenly-spaced, and that the panel's black isn't truly black nor its white "
+            "truly white, which is normal for e-paper. The renderer answers by "
+            "reaching for darker levels, so the image gets darker overall. Copy this "
+            "profile and adjust it against your own panel rather than trusting these "
+            "numbers."
+        ),
+    ),
+    _profile(
+        slug="nominal-gray16",
+        name="Nominal 16-level grey",
+        family="gray_16",
+        palette=PaletteColors(),
+        gray=GrayRamp(levels=("#000000", "#FFFFFF")),
+        notes=(
+            "Evenly-spaced levels, what Tesserae has always assumed for these panels. "
+            "Two anchors interpolated across all 16 steps, which is exactly the linear "
+            "ramp. The default, so existing screens don't change."
+        ),
+    ),
+    _profile(
+        slug="soft-mid-gray16",
+        name="16-level grey, lifted mid-tones",
+        family="gray_16",
+        palette=PaletteColors(),
+        gray=GrayRamp(levels=("#1E1E1E", "#6E6E6E", "#B4B4B4", "#E8E8E8")),
+        notes=(
+            "The same four anchors as the 4-level ramp, interpolated across 16 steps. "
+            "A starting point for a panel that renders washed out, NOT a measurement. "
+            "Four patches are far easier to judge by eye than sixteen, which is why "
+            "the ramp interpolates rather than asking for every level."
+        ),
+    ),
     # Known characteristic of the measured palette, recorded here rather
     # than worked around: the real red ink is desaturated enough to sit
     # geometrically next to neutral mid-grey, so grey levels ~80-160 snap
@@ -313,6 +381,13 @@ def default_slug_for(family: str) -> str:
         # silently change how existing PicPak panels render. Measured is
         # one click away in the picker.
         return "nominal-bwry"
+    # Same rule for the grey ramps: the evenly-spaced one is what these
+    # panels have always rendered against, so it stays the default and
+    # the corrective ramp is a deliberate choice.
+    if family == "gray_4":
+        return "nominal-gray4"
+    if family == "gray_16":
+        return "nominal-gray16"
     return "paperlesspaper-spectra6"
 
 

@@ -4,6 +4,47 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.346.0], 2026-08-23
+
+### Added
+
+- **Grayscale calibration.** The grey packers quantised against a perfectly even ramp (`i * 85` for
+  4-level, `i * 17` for 16-level) and took no palette at all, while the colour packer has had
+  `palette_override` and a full tone-knob set for versions. Real e-paper grey waveforms are not
+  even in reflectance, so a panel whose middle levels print lighter than that renders washed out,
+  and error diffusion compounds it by diffusing error against values the panel never produces.
+
+  A profile now carries a `gray` ramp: `#rrggbb` anchors, darkest first, describing **what the
+  panel actually prints**. That inverts the intuition, and is the thing to know before touching it:
+  a panel rendering too light is corrected by declaring its mid-levels *lighter*, because that
+  tells the quantizer those levels overshoot and it should reach for a darker one.
+
+  Any two-or-more anchor count works and interpolates to whatever a gamut needs, so four patches
+  judged by eye drive a 16-level panel. The override changes which level each pixel gets and never
+  the wire format, since the packed bytes are level indices either way. A wrong-length override is
+  ignored rather than padded, which would silently remap every level above the gap.
+
+  Bundled: `nominal-gray4` / `nominal-gray16` (evenly spaced, the default, so nothing changes for
+  an existing panel) and `soft-mid-gray4` / `soft-mid-gray16`, a starting point for a washed-out
+  panel. The soft ramps are **not** measurements of any particular unit and say so.
+
+- **Grey panels get a Calibration tab.** `_palette_family_for` mapped only the colour gamuts to a
+  profile family and returned empty for everything else, so a `gray_4` / `gray_16` device had no
+  picker at all and no way to reach a ramp.
+
+### Fixed
+
+- **A palette whose first entry is not pure black could paint black pixels white.** The 256-entry
+  palette image Pillow matches against was padded with zeroes, and Pillow considers every slot, so
+  the padding acted as pure black in the match. A black pixel took a padding slot instead of entry
+  0, and the packers, which clip an out-of-range index to the top of the range, resolved that to
+  white.
+
+  Invisible while every palette's first entry happened to be `#000000`, since Pillow settles the
+  tie on the lowest index. Not invisible for a measured colour profile, whose black is nearer
+  `#1F2226`, and it surfaced immediately on the first calibrated grey ramp. Padding now repeats the
+  last real entry, so a stray match lands on a colour the palette genuinely has.
+
 ## [0.345.0], 2026-08-23
 
 ### Fixed
