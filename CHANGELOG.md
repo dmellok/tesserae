@@ -4,6 +4,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.355.1], 2026-08-23
+
+### Fixed
+
+- **Changelog accuracy.** The 0.355.0 entry listed the icon-reference work as unreleased; the
+  `mcp-v0.12.0` tag pointed at that commit, so it shipped inside 0.12.0.
+
 ## [0.355.0], 2026-08-23
 
 ### Added
@@ -13,9 +20,9 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   long lists (a 24h Home Assistant history overflowed the tool-result cap, making the whole result
   unusable) and `list_widgets` summarises the ~95k-character catalog. The rest are tool
   descriptions, which the server cannot push to an installed bridge: `create_schedule`'s `name` and
-  `fires_at` contract, `render_report`'s `icon_invalid` and `injected_libs` sections, and
-  `list_icons`' query normalisation. Upgrade with `pipx upgrade tesserae-mcp`; an install that
-  doesn't will now be told, by the card added in 0.354.0.
+  `fires_at` contract, and `render_report`'s `injected_libs` section and CSS-diagnostic wording.
+  Upgrade with `pipx upgrade tesserae-mcp`; an install that doesn't will now be told, by the card
+  added in 0.354.0.
 
 ## [0.354.0], 2026-08-23
 
