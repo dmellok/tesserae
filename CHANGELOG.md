@@ -4,6 +4,56 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.343.0], 2026-08-23
+
+### Added
+
+- **`seeed_reterminal_sticky` device kind.** A Seeed reTerminal Sticky running the
+  tesserae-device-firmware build, confirmed on real hardware. The wire format is byte-identical to
+  `seeed_reterminal_e1001_gray`: exactly 96000 bytes (800*480/4), row-major from top-left, 4 pixels
+  per byte MSB first, 2-bit `0b00` black to `0b11` white. The renderer and packer are shared
+  unchanged.
+
+  `orientation` is `portrait`, not the `portrait_flipped` the existing CrossInk Sticky entries
+  declare. The controller scans 800x480 landscape and the glass is mounted at 90 degrees, so the
+  firmware transposes on the device and the server renders ordinary 480x800 portrait. That mapping
+  was pinned on hardware rather than inherited. `seeed_sticky` and `seeed_sticky_gray` are
+  unchanged and continue to serve CrossInk units, which composite a base frame plus two planes and
+  may map the panel the other way round.
+
+  Declares `touch: true`, so tap dispatch and the editors' Interaction UI apply to it. A room
+  panel that shows what's on next and takes a booking tap is the case this matters for.
+
+  Carries `auto_select: false`. On the wire this SKU is indistinguishable from `xteink_x4_gray`:
+  same protocol, gamut, 480x800 geometry and byte count. A device running this firmware names its
+  own kind at register and discover, but relay pairing infers a SKU from the wire signature
+  instead, and this id sorts ahead of `xteink_x4_gray` in that tie-break. Without the flag an
+  Xteink X4 pairing over a relay would be relabelled a reTerminal Sticky, the failure v0.321.3
+  fixed for `seeed_sticky_gray`.
+
+- **`touch` documented in `schema/hardware.schema.json`.** The key has gated touch dispatch and the
+  Interaction UI since #49, but was absent from the schema, so a manifest author had no way to know
+  it existed. Additional properties are permitted, so it validated either way and a SKU with a
+  digitizer silently came out untappable.
+
+### Fixed
+
+- **A healed device kept its old kind's panel.** `create_instance` copies the kind's panel block
+  into the instance file, and an instance's panel overrides its kind's, so moving a device to the
+  kind its firmware now declares left it describing the previous board. The heal rewrote `kind` and
+  dropped a stale `renderer_id` but never touched `panel`.
+
+  Mostly invisible between siblings that share a panel, and wrong in two ways that are not. A
+  Sticky healing from `seeed_sticky_gray` to `seeed_reterminal_sticky` kept `portrait_flipped` and
+  painted every frame 180 degrees out on a panel that was otherwise working. Worse, the case the
+  heal was written for, a device pairing under a generic protocol kind and coming back announcing
+  its SKU, kept the generic kind's 800x480 landscape default: `esp32_client` healing to
+  `seeed_reterminal_e1004` rendered at 800x480 instead of 1200x1600 portrait.
+
+  Panel fields still equal to the old kind's value now move to the new kind's. Fields the user
+  changed are left alone, so a deliberate per-display override survives; same reasoning as the
+  stale `renderer_id` drop it sits beside.
+
 ## [0.342.0], 2026-08-23
 
 ### Added

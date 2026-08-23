@@ -255,6 +255,76 @@ def test_update_instance_kind_heals_to_catalog_sibling(registries_with_catalog) 
     assert renderers.get("esp32_bin__frame_office") is not None
     saved = json.loads((data_root / "frame_office.json").read_text())
     assert saved["kind"] == "seeed_reterminal_e1004"
+    # The instance carried the generic kind's 800x480 landscape default,
+    # copied in at create_instance. It has to follow the heal, or the
+    # device renders at the wrong geometry on the SKU it just announced.
+    assert saved["panel"]["w"] == 1200
+    assert saved["panel"]["h"] == 1600
+    assert saved["panel"]["orientation"] == "portrait"
+
+
+def test_update_instance_kind_moves_inherited_orientation(registries_with_catalog) -> None:
+    """A Sticky registered under the CrossInk kind and re-registering on the
+    tesserae-device-firmware build must not keep the old kind's flip: the two
+    describe the same glass mounted the same way but composed differently, and
+    a stale ``portrait_flipped`` paints every frame 180 degrees out."""
+    devices, renderers, data_root = registries_with_catalog
+    assert device_service.create_instance(
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="crossink_b064dc",
+        kind_id="seeed_sticky_gray",
+        name="Sticky",
+    ).ok
+
+    result, changed = device_service.update_instance_kind(
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="crossink_b064dc",
+        kind_id="seeed_reterminal_sticky",
+    )
+    assert changed is True and result.ok
+    assert result.device is not None
+    assert result.device.kind_of == "seeed_reterminal_sticky"
+    assert result.device.manifest["panel"]["orientation"] == "portrait"
+    assert result.device.manifest["name"] == "Sticky"
+    saved = json.loads((data_root / "crossink_b064dc.json").read_text())
+    assert saved["panel"]["orientation"] == "portrait"
+    # Geometry was already right on both kinds; the heal must leave it alone.
+    assert (saved["panel"]["w"], saved["panel"]["h"]) == (480, 800)
+
+
+def test_update_instance_kind_keeps_a_deliberate_panel_override(
+    registries_with_catalog,
+) -> None:
+    """Only fields still matching the old kind move. An orientation the user
+    chose for this display is theirs, and a heal is not a licence to revert
+    it."""
+    devices, renderers, data_root = registries_with_catalog
+    assert device_service.create_instance(
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="sticky_upside_down",
+        kind_id="seeed_sticky_gray",
+        name="Sticky",
+        orientation="landscape",
+    ).ok
+    saved = json.loads((data_root / "sticky_upside_down.json").read_text())
+    assert saved["panel"]["orientation"] == "landscape"
+
+    result, changed = device_service.update_instance_kind(
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="sticky_upside_down",
+        kind_id="seeed_reterminal_sticky",
+    )
+    assert changed is True and result.ok
+    assert result.device is not None
+    assert result.device.manifest["panel"]["orientation"] == "landscape"
 
 
 def test_e1001_gray_legacy_packs_identically_to_the_plain_gray_kind(
@@ -297,6 +367,49 @@ def test_e1001_gray_legacy_packs_identically_to_the_plain_gray_kind(
 
     assert len(plain) == 800 * 480 // 4  # 2bpp -> 96000
     assert legacy == plain
+
+
+def test_reterminal_sticky_packs_a_96000_byte_frame(registries_with_catalog) -> None:
+    """The Sticky presents 480x800 portrait but its controller scans 800x480,
+    so the packed frame must still be exactly 800*480/4 bytes. A short or long
+    buffer is the failure mode the firmware cannot recover from: it paints
+    whatever it is handed."""
+    import io
+
+    from PIL import Image
+
+    from app.panel import device_panel
+
+    devices, renderers, data_root = registries_with_catalog
+    created = device_service.create_instance(
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="sticky_pack",
+        kind_id="seeed_reterminal_sticky",
+        name="Sticky",
+    )
+    assert created.ok, created.error
+    device = devices.get("sticky_pack")
+    assert device is not None
+    # The panel has a digitizer, so touch dispatch and the editors'
+    # Interaction UI have to apply to it (and to instances of it).
+    assert devices.get("seeed_reterminal_sticky").manifest.get("touch") is True
+    assert device.manifest.get("touch") is True
+    panel = device_panel(device)
+    assert panel is not None
+    clones = renderers.for_device("sticky_pack")
+    assert [c.id for c in clones] == ["esp32_gray2_bin__sticky_pack"]
+
+    buf = io.BytesIO()
+    Image.linear_gradient("L").resize((480, 800)).convert("RGB").save(buf, "PNG")
+    packed = clones[0].transform(buf.getvalue(), panel=panel, settings={})
+    assert len(packed) == 800 * 480 // 4  # 2bpp -> 96000
+    # A gradient must come back using all four levels. Asserting the values
+    # merely fit in 2 bits would pass on a mono buffer dressed up as
+    # grayscale, which is the mistake crosspoint_gray was added to fix.
+    levels = {(byte >> shift) & 0b11 for byte in packed for shift in (0, 2, 4, 6)}
+    assert levels == {0, 1, 2, 3}
 
 
 def test_update_instance_kind_noop_cases(registries_with_catalog) -> None:

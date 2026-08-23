@@ -48,6 +48,7 @@ The bundled client kinds Tesserae knows how to talk to. A flashed client announc
 | Device kind | Default panel | Renderers | What it is |
 |---|---|---|---|
 | `circuitpython_generic` | 800×480 | `circuitpython_png`, `circuitpython_bmp` | Generic CircuitPython client kind for boards driving an e-paper panel from a Pico W / Pico 2 W / Feather / similar microcontroller. |
+| `crosspoint_gray` | 480×800 | `circuitpython_bmp` | CrossPoint e-readers painting a Tesserae dashboard as their sleep screen, over the LAN with no cloud component. |
 | `esp32_bw_client` | 400×300 | `esp32_bw_bin` | Battery-powered ESP32 firmware for mono B/W e-paper panels (e.g. |
 | `esp32_client` | 800×480 | `esp32_bin` | Battery-powered ESP32 firmware that subscribes to tesserae/esp32/frame/bin (retained), paints the panel via SPI, and goes back to deep sleep. |
 | `opendisplay` | 800×480 | `pi_png` | An OpenDisplay BLE e-paper tag, driven by the tesserae-opendisplay bridge. |
@@ -77,6 +78,7 @@ The reTerminal E-Series and XIAO ePaper family run the [Tesserae-native firmware
 | [Seeed reTerminal E1002](https://www.seeedstudio.com/reTerminal-E1002-p-6533.html) | 800×480 | `spectra_6` | `esp32_client` (inherit) | `seeed_reterminal_e1002` |
 | [Seeed reTerminal E1003](https://www.seeedstudio.com/reTerminal-E1003-p-6731.html) | 1872×1404 | `gray_16` | `esp32_client` <br> `esp32_gray_bin` | `seeed_reterminal_e1003` |
 | [Seeed reTerminal E1004](https://www.seeedstudio.com/reTerminal-E1004-p-6692.html) | 1200×1600 portrait | `spectra_6` | `esp32_client` (inherit) | `seeed_reterminal_e1004` |
+| Seeed reTerminal Sticky | 480×800 portrait | `gray_4` | `esp32_bw_client` <br> `esp32_gray2_bin` | `seeed_reterminal_sticky` |
 | Seeed Sticky | 480×800 portrait_flipped | `mono` | `esp32_bw_client` (inherit) | `seeed_sticky` |
 | Seeed Sticky (4-level grayscale) | 480×800 portrait_flipped | `gray_4` | `esp32_bw_client` <br> `esp32_gray2_bin` | `seeed_sticky_gray` |
 | [Seeed XIAO 7.5" ePaper Panel (C3, TRMNL BYOS)](https://www.seeedstudio.com/XIAO-7-5-ePaper-Panel-p-6416.html) | 800×480 | `mono` | `trmnl_client` (inherit) | `seeed_xiao_75` |

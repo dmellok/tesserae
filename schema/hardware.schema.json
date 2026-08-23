@@ -80,6 +80,10 @@
       "enum": ["png", "bin", "webp"],
       "description": "Wire format this SKU expects. Informational; the protocol's renderers still drive the actual encoding."
     },
+    "touch": {
+      "type": "boolean",
+      "description": "Whether this SKU's panel has a digitizer. A hardware fact, distinct from the firmware's touch_enabled config. Set true and Tesserae's touch dispatch and the editors' Interaction UI apply to the panel, and the device APIs report it so agents and the editor know it is tappable. Absent → not tappable."
+    },
     "renderers": {
       "type": "array",
       "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },

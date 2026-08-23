@@ -795,6 +795,53 @@ def kind_protocol(kind: Device) -> str:
     return kind.id
 
 
+def _refresh_inherited_panel(
+    raw: dict[str, Any],
+    *,
+    old_panel: dict[str, Any] | None,
+    new_panel: dict[str, Any] | None,
+) -> None:
+    """Move panel fields the instance inherited from its old kind onto the
+    new kind's values, in place.
+
+    ``create_instance`` copies the kind's panel block into the instance
+    file, and an instance's panel overrides its kind's. So after a heal the
+    instance still describes the *old* board until something rewrites it.
+
+    Usually harmless between same-protocol siblings that share a panel, but
+    not always. ``seeed_reterminal_sticky`` is ``portrait`` where the
+    CrossInk ``seeed_sticky_gray`` it heals from is ``portrait_flipped``:
+    keeping the stale value paints every frame 180 degrees out, on a panel
+    that is otherwise working. Geometry moves too, so a device healing from
+    a generic protocol kind onto its SKU (``esp32_client`` ->
+    ``seeed_reterminal_e1004``, the case this heal was written for) stops
+    rendering at the generic kind's 800x480 default.
+
+    Only fields still equal to the old kind's value are moved, so a
+    deliberate per-device override survives. Same reasoning as the stale
+    ``renderer_id`` drop in the caller: a value the user never chose should
+    not outlive the kind it came from, and one they did choose should not be
+    silently reverted.
+    """
+    panel = raw.get("panel")
+    if not isinstance(panel, dict):
+        return
+    old = old_panel or {}
+    new = new_panel or {}
+    for key, inherited in old.items():
+        if key not in panel or panel[key] != inherited:
+            continue  # absent, or the user moved it off the kind default
+        if key in new:
+            panel[key] = new[key]
+        else:
+            # The new kind doesn't describe this field; carrying the old
+            # kind's answer for it is worse than falling back to the new
+            # kind's own default at load.
+            panel.pop(key, None)
+    for key, value in new.items():
+        panel.setdefault(key, value)
+
+
 def update_instance_kind(
     *,
     devices: DeviceRegistry,
@@ -850,6 +897,7 @@ def update_instance_kind(
     # doesn't carry a stale field forever.
     if raw.get("renderer_id") not in new_kind.renderer_ids:
         raw.pop("renderer_id", None)
+    _refresh_inherited_panel(raw, old_panel=current_kind.panel, new_panel=new_kind.panel)
     inst_file.write_text(json.dumps(raw, indent=2) + "\n", encoding="utf-8")
 
     devices.devices.pop(instance_id, None)
