@@ -1145,6 +1145,9 @@ def _build_canvas_els(
                     # library/font auto-injection (decorate.js infers what to
                     # inline from the code itself; false means inline nothing).
                     "autolibs": e.autolibs,
+                    # Explicit icon opt-in; None means "infer", which is what
+                    # every element built before this field did.
+                    "icons": e.icons,
                     "opacity": e.opacity,
                     "rotate": e.rotate,
                     "x": e.x,

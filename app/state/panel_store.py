@@ -192,6 +192,24 @@ class Element(BaseModel):
     # heuristic can restyle what it draws. render_report's ``injected_libs``
     # says what the inference chose and which token triggered it.
     autolibs: bool = True
+    # Explicit Phosphor icon opt-in for kind == "code", and the path to prefer.
+    # ``None`` keeps the legacy inference: the sandbox scans the element's own
+    # html/css/js for icon classes and injects the weights it finds. That scan
+    # is a heuristic on author text, so it can both miss (icons built by script
+    # after the scan) and over-reach (the injected stylesheet owns ``.ph`` /
+    # ``.ph-*``, so an element using ``.ph`` as its OWN class name has that
+    # span restyled to the icon font and its Latin text disappears).
+    #
+    # Declaring the field takes the guesswork out and always wins:
+    #   ``False``            inject no icon CSS at all
+    #   ``True``             inject the regular weight
+    #   ``["bold", "fill"]`` inject exactly those weights
+    #
+    # Narrower than ``autolibs: False``, which also refuses Chart.js, fonts and
+    # every other bundle. render_report's ``injected_libs`` marks each entry
+    # ``inferred: false`` when it came from this field, so a report says which
+    # path chose it.
+    icons: bool | list[str] | None = None
     # Named data sources for kind == "code": each ``{key, options, name}`` is a
     # widget whose fetched data lands at ``ctx.data[name]`` (name falls back to
     # key). Lets one code element combine data from several widgets. A legacy

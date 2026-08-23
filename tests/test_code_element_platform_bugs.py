@@ -93,3 +93,28 @@ def test_css_diagnostic_does_not_report_a_rewrite_as_a_drop() -> None:
         ("li:nth-child(2n + 1)", "li:nth-child(2n+1)"),
     ):
         assert norm(authored) == norm(parsed), authored
+
+
+def test_icons_field_round_trips_and_defaults_to_inference() -> None:
+    """Explicit icon opt-in, alongside the legacy scan rather than replacing it.
+
+    The scan is a heuristic on author text: it can miss icons a script builds
+    after render, and it can over-reach, because the injected stylesheet owns
+    ``.ph`` / ``.ph-*`` and an element using ``.ph`` as its OWN class name has
+    that span restyled to the icon font. Declaring the field removes the guess;
+    omitting it keeps every previously-built element behaving identically."""
+    from app.state.panel_store import Element
+
+    assert Element(id="e1", kind="code").icons is None, "default must stay inference"
+    for value in (True, False, ["bold", "fill"]):
+        assert Element(id="e1", kind="code", icons=value).icons == value
+
+    src = (REPO_ROOT / "app" / "composer.py").read_text(encoding="utf-8")
+    code_branch = src.split('if e.kind == "code":', 1)[1].split("_stamp_touch", 1)[0]
+    assert '"icons": e.icons' in code_branch, "the field has to reach the sandbox"
+
+    js = DECORATE_JS.read_text(encoding="utf-8")
+    assert "function iconChoice(" in js
+    # Non-icon libs must keep inferring: the field scopes to icons only, unlike
+    # autolibs:false which refuses Chart.js, fonts and everything else too.
+    assert "if (weight === undefined) return null; // not an icon lib" in js

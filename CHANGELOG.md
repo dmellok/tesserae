@@ -4,6 +4,28 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.351.0], 2026-08-23
+
+### Added
+
+- **`icons` on a code element: explicit Phosphor opt-in, alongside the scan rather than replacing
+  it.** The sandbox infers which icon weights to inline by scanning the element's own html/css/js.
+  That is a heuristic on author text, so it cuts both ways: it misses icons a script builds after
+  render, and it over-reaches, because the injected stylesheet owns `.ph` / `.ph-*` and an element
+  using `.ph` as its OWN class name has that span restyled to the icon font, silently losing its
+  Latin text.
+
+  Declaring the field takes the guess out and always wins:
+
+  - `false` injects no icon CSS at all
+  - `true` injects the regular weight
+  - `["bold", "fill"]` injects exactly those weights
+
+  Omitted (the default) keeps the scan, so every element built before this field behaves
+  identically. Narrower than `autolibs: false`, which also refuses Chart.js, fonts and every other
+  bundle; non-icon libraries keep inferring either way. `render_report`'s `injected_libs` marks an
+  entry `inferred: false` when the field chose it, so a report says which path was taken.
+
 ## [0.350.0], 2026-08-23
 
 ### Fixed

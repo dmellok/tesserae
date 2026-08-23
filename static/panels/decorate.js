@@ -495,9 +495,45 @@
     var headCss = "";
     var libScripts = "";
     var needFont = false;
+    // Explicit icon opt-in (el.icons) beats the scan, for the icon libs only.
+    // The scan stays the default so every element built before this field keeps
+    // behaving identically; declaring the field is the path to prefer, because
+    // a text scan can both miss icons a script builds after render and pull the
+    // stylesheet in when the author never wanted it. Returns true / false to
+    // decide, or null to fall through to the heuristic.
+    //   false            -> no icon CSS at all
+    //   true             -> the regular weight
+    //   ["bold","fill"]  -> exactly those weights
+    var ICON_LIBS = {
+      "ph-regular": "regular", "ph-thin": "thin", "ph-light": "light",
+      "ph-bold": "bold", "ph-fill": "fill", "ph-duotone": "duotone",
+    };
+    function iconChoice(libName) {
+      var want = el.icons;
+      var weight = ICON_LIBS[libName];
+      if (weight === undefined) return null; // not an icon lib
+      if (want === null || want === undefined) return null; // infer
+      if (want === false) return false;
+      if (want === true) return weight === "regular";
+      if (Object.prototype.toString.call(want) === "[object Array]") {
+        for (var n = 0; n < want.length; n++) {
+          if (String(want[n]).toLowerCase() === weight) return true;
+        }
+        return false;
+      }
+      return null;
+    }
+
     for (var i = 0; autolibs && i < SANDBOX_LIBS.length; i++) {
       var lib = SANDBOX_LIBS[i];
-      var hit = libMatch(lib, probeLibs);
+      var choice = iconChoice(lib.name);
+      var hit;
+      if (choice === false) continue;
+      if (choice === true) {
+        hit = "icons:declared";
+      } else {
+        hit = libMatch(lib, probeLibs);
+      }
       if (!hit) continue;
       var joined = "";
       for (var j = 0; j < lib.files.length; j++) {
@@ -510,13 +546,13 @@
       }
       if (!joined) {
         libReport.libs.push({
-          name: lib.name, injected: false, inferred: true, matched: hit,
+          name: lib.name, injected: false, inferred: choice !== true, matched: hit,
           reason: "source fetch failed",
         });
         continue;
       }
       libReport.libs.push({
-        name: lib.name, injected: true, kind: lib.kind, inferred: true, matched: hit,
+        name: lib.name, injected: true, kind: lib.kind, inferred: choice !== true, matched: hit,
       });
       if (lib.kind === "css") {
         headCss += joined;
