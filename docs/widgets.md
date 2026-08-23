@@ -315,6 +315,46 @@ keeps Flask from colliding with the host's `templates/index.html`).
 Extend `_base.html` for visual consistency with the rest of the
 admin UI; the `card_head` macro + `card` class wrap content.
 
+### Serving your own media, `RENDER_SAFE_ENDPOINTS`
+
+Blueprint routes sit behind the password gate. A render happens over
+loopback with no session, so a widget whose markup points at its own
+plugin route — an `<img src>` handed to the panel, say — needs that
+route reachable during the render, or every panel shows a broken image
+while the browser preview looks fine.
+
+A plugin declares such routes by name:
+
+```python
+# plugins/<id>/server.py
+RENDER_SAFE_ENDPOINTS: tuple[str, ...] = (
+    "picture_gallery_admin.serve_image",
+    "picture_gallery_admin.serve_thumbnail",
+)
+```
+
+The loader collects these into `app.config["RENDER_SAFE_ENDPOINTS"]` and
+`app/auth.py` consults them. `picture_gallery` is the in-tree example.
+
+**Read-only, always.** Anything that writes, deletes, or reaches the
+network does not belong in this list. The routes found when this was
+tightened were mutations — `shutil.rmtree` on a gallery folder, calendar
+feed writes, CalDAV discovery against a caller-supplied URL — and those
+stay gated. Reviewing the list is part of reviewing a plugin.
+
+**You may not need it.** A loopback `GET`/`HEAD` of a plugin's own
+sub-route already passes without a declaration. What that rule does not
+cover, and a declaration does:
+
+- the plugin **index** (`/plugins/<id>/`) stays gated even on a read, since
+  it lists loader errors and plugin contents
+- routes outside the `/plugins/<id>/…` prefix
+- being explicit, so the requirement survives someone tightening the gate
+  later
+
+Declaring a route you serve media from is the safer default even where the
+sub-route rule would carry it today.
+
 ---
 
 ## `client.js` contract
