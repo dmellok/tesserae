@@ -4,6 +4,31 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.345.0], 2026-08-23
+
+### Fixed
+
+- **The Sticky painted every frame repeated sideways, in the wrong orientation.**
+  `seeed_reterminal_sticky` declared `native_w`/`native_h` as the controller's 800x480 landscape
+  scan. Those fields mean the row stride the *firmware* reads, and this firmware transposes on the
+  device: it wants 120-byte portrait rows and rotates them itself. The renderer took the landscape
+  declaration at face value, rotated the composition 90 degrees and packed 200-byte rows.
+
+  Both layouts are exactly 96000 bytes, so every size check passed and the frame was simply read
+  at the wrong stride. Now `480x800`, matching the composition, and the renderer's
+  `orientation_mismatch` branch no longer fires.
+
+  The test that covered this asserted the byte count only, which is the one property both layouts
+  share. It now asserts the row layout: a source whose top 8 rows are black must pack to 8*120
+  leading zero bytes, which fails under the landscape pack.
+
+- **Sticky instances migrated under v0.344.0 are corrected in place.** An instance carries its own
+  copy of the kind's panel block and that copy wins, so correcting the manifest alone would never
+  have reached a device that had already migrated: it would have kept the landscape stride
+  indefinitely. `migrate_retired_sticky_kinds` now also rewrites the stride on instances already on
+  the successor kind, and only when it is the exact wrong pair, so an operator's deliberate value
+  is left alone.
+
 ## [0.344.0], 2026-08-23
 
 ### Removed

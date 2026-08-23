@@ -369,11 +369,17 @@ def test_e1001_gray_legacy_packs_identically_to_the_plain_gray_kind(
     assert legacy == plain
 
 
-def test_reterminal_sticky_packs_a_96000_byte_frame(registries_with_catalog) -> None:
-    """The Sticky presents 480x800 portrait but its controller scans 800x480,
-    so the packed frame must still be exactly 800*480/4 bytes. A short or long
-    buffer is the failure mode the firmware cannot recover from: it paints
-    whatever it is handed."""
+def test_reterminal_sticky_packs_portrait_rows(registries_with_catalog) -> None:
+    """The Sticky's firmware transposes on the device, so the server must pack
+    480-wide portrait rows (120 bytes) and not rotate to the controller's
+    800x480 scan.
+
+    Byte count cannot catch this: both stride choices are exactly 96000 bytes,
+    which is why declaring the landscape scan shipped a frame that painted as
+    the image repeated sideways. So this asserts the row *layout*. A source
+    whose top 8 rows are solid black must pack to 8*120 leading zero bytes;
+    under an 800-wide pack the same source rotates and those bytes are white.
+    """
     import io
 
     from PIL import Image
@@ -401,14 +407,27 @@ def test_reterminal_sticky_packs_a_96000_byte_frame(registries_with_catalog) -> 
     clones = renderers.for_device("sticky_pack")
     assert [c.id for c in clones] == ["esp32_gray2_bin__sticky_pack"]
 
+    assert (panel.native_w, panel.native_h) == (480, 800)
+
+    # White page with a solid black band across the top 8 rows.
+    src = Image.new("RGB", (480, 800), "white")
+    src.paste((0, 0, 0), (0, 0, 480, 8))
     buf = io.BytesIO()
-    Image.linear_gradient("L").resize((480, 800)).convert("RGB").save(buf, "PNG")
+    src.save(buf, "PNG")
     packed = clones[0].transform(buf.getvalue(), panel=panel, settings={})
-    assert len(packed) == 800 * 480 // 4  # 2bpp -> 96000
+
+    assert len(packed) == 480 * 800 // 4  # 2bpp -> 96000
+    stride = 480 // 4  # 120 bytes per portrait row
+    assert set(packed[: stride * 8]) == {0x00}, "top band must pack as the first 8 rows"
+    assert set(packed[stride * 8 : stride * 9]) == {0xFF}, "row 9 must be white"
+
     # A gradient must come back using all four levels. Asserting the values
     # merely fit in 2 bits would pass on a mono buffer dressed up as
     # grayscale, which is the mistake crosspoint_gray was added to fix.
-    levels = {(byte >> shift) & 0b11 for byte in packed for shift in (0, 2, 4, 6)}
+    grad = io.BytesIO()
+    Image.linear_gradient("L").resize((480, 800)).convert("RGB").save(grad, "PNG")
+    shades = clones[0].transform(grad.getvalue(), panel=panel, settings={})
+    levels = {(byte >> shift) & 0b11 for byte in shades for shift in (0, 2, 4, 6)}
     assert levels == {0, 1, 2, 3}
 
 
@@ -452,8 +471,60 @@ def test_migrate_retired_sticky_kinds(tmp_path: Path) -> None:
     assert saved["name"] == "Sticky"
     assert json.loads((data_root / "lounge.json").read_text())["kind"] == "esp32_client"
 
+    assert (saved["panel"]["native_w"], saved["panel"]["native_h"]) == (480, 800)
+
     # Idempotent: a second pass has nothing left to do.
     assert device_service.migrate_retired_sticky_kinds(data_root) == []
+
+
+def test_migrate_fixes_sticky_stride_from_0_344_0(tmp_path: Path) -> None:
+    """A device that already reached the successor under v0.344.0 carries that
+    version's landscape stride in its own panel block, which overrides the
+    corrected kind. Fixing the manifest alone would never reach it, and it
+    would keep painting the frame repeated sideways."""
+    data_root = tmp_path / "devices"
+    data_root.mkdir()
+    (data_root / "crossink_b064dc.json").write_text(
+        json.dumps(
+            {
+                "id": "crossink_b064dc",
+                "kind": "seeed_reterminal_sticky",
+                "panel": {
+                    "w": 480,
+                    "h": 800,
+                    "orientation": "portrait",
+                    "name": "ePaper, 4-level grayscale (800x480 native, composed 480x800 portrait)",
+                    "gamut": "gray_4",
+                    "native_w": 800,
+                    "native_h": 480,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert device_service.migrate_retired_sticky_kinds(data_root) == ["crossink_b064dc"]
+    saved = json.loads((data_root / "crossink_b064dc.json").read_text())
+    assert (saved["panel"]["native_w"], saved["panel"]["native_h"]) == (480, 800)
+    assert device_service.migrate_retired_sticky_kinds(data_root) == []
+
+
+def test_migrate_leaves_a_deliberate_sticky_stride_alone(tmp_path: Path) -> None:
+    """Only the exact wrong pair is corrected; anything else was chosen."""
+    data_root = tmp_path / "devices"
+    data_root.mkdir()
+    (data_root / "odd.json").write_text(
+        json.dumps(
+            {
+                "id": "odd",
+                "kind": "seeed_reterminal_sticky",
+                "panel": {"w": 480, "h": 800, "native_w": 792, "native_h": 528},
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert device_service.migrate_retired_sticky_kinds(data_root) == []
+    saved = json.loads((data_root / "odd.json").read_text())
+    assert (saved["panel"]["native_w"], saved["panel"]["native_h"]) == (792, 528)
 
 
 def test_migrate_retired_sticky_keeps_an_operator_orientation(tmp_path: Path) -> None:

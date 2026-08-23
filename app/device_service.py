@@ -645,11 +645,40 @@ _STICKY_SUCCESSOR_PANEL: dict[str, Any] = {
     "w": 480,
     "h": 800,
     "orientation": "portrait",
-    "name": "ePaper, 4-level grayscale (800x480 native, composed 480x800 portrait)",
+    "name": "ePaper, 4-level grayscale (480x800 portrait)",
     "gamut": "gray_4",
-    "native_w": 800,
-    "native_h": 480,
+    "native_w": 480,
+    "native_h": 800,
 }
+
+# v0.344.0 shipped the successor declaring the controller's 800x480 landscape
+# scan as the firmware stride. The Sticky's firmware transposes on the device
+# and reads 120-byte portrait rows, so the server rotated and packed 200-byte
+# rows instead: still exactly 96000 bytes, so nothing errored, and every frame
+# painted as the image repeated sideways. Instances created or migrated under
+# that version carry the wrong pair in their own panel block, which overrides
+# the corrected kind, so fixing the manifest alone would not reach them.
+_STICKY_WRONG_NATIVE = (800, 480)
+
+
+def _fix_sticky_native_dims(raw: dict[str, Any]) -> bool:
+    """Correct a Sticky instance still carrying v0.344.0's landscape stride.
+
+    Returns True when the file changed. Only the exact wrong pair is touched:
+    an operator who set something else did so deliberately, and the panel
+    ``name`` moves with it only if it is still the one that shipped alongside
+    the wrong dims.
+    """
+    panel = raw.get("panel")
+    if not isinstance(panel, dict):
+        return False
+    if (panel.get("native_w"), panel.get("native_h")) != _STICKY_WRONG_NATIVE:
+        return False
+    panel["native_w"] = _STICKY_SUCCESSOR_PANEL["native_w"]
+    panel["native_h"] = _STICKY_SUCCESSOR_PANEL["native_h"]
+    if panel.get("name") == "ePaper, 4-level grayscale (800x480 native, composed 480x800 portrait)":
+        panel["name"] = _STICKY_SUCCESSOR_PANEL["name"]
+    return True
 
 
 def migrate_retired_sticky_kinds(data_root: Path) -> list[str]:
@@ -670,6 +699,12 @@ def migrate_retired_sticky_kinds(data_root: Path) -> list[str]:
     ``gray_4`` gamut, since the successor packs 2-bpp and there is no 1-bpp
     variant of it.
 
+    Also corrects the firmware stride on instances that already reached the
+    successor under v0.344.0, which declared the controller's 800x480 scan
+    where this firmware wants 480x800 portrait rows. Their own panel block
+    overrides the fixed kind, so the manifest correction alone would never
+    reach them and they would keep painting the frame repeated sideways.
+
     Idempotent, and does nothing on a fresh install."""
     migrated: list[str] = []
     if not data_root.is_dir():
@@ -679,16 +714,19 @@ def migrate_retired_sticky_kinds(data_root: Path) -> list[str]:
             raw = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             continue
-        old_panel = _RETIRED_STICKY_PANELS.get(str(raw.get("kind") or ""))
+        kind = str(raw.get("kind") or "")
+        old_panel = _RETIRED_STICKY_PANELS.get(kind)
         if old_panel is None:
-            continue
-        raw["kind"] = _STICKY_SUCCESSOR
-        # The successor offers esp32_gray2_bin only; a mono instance's pin
-        # would be silently ignored at load, so drop it rather than leave a
-        # stale field on disk.
-        if raw.get("renderer_id") not in (None, "esp32_gray2_bin"):
-            raw.pop("renderer_id", None)
-        _refresh_inherited_panel(raw, old_panel=old_panel, new_panel=_STICKY_SUCCESSOR_PANEL)
+            if kind != _STICKY_SUCCESSOR or not _fix_sticky_native_dims(raw):
+                continue
+        else:
+            raw["kind"] = _STICKY_SUCCESSOR
+            # The successor offers esp32_gray2_bin only; a mono instance's pin
+            # would be silently ignored at load, so drop it rather than leave a
+            # stale field on disk.
+            if raw.get("renderer_id") not in (None, "esp32_gray2_bin"):
+                raw.pop("renderer_id", None)
+            _refresh_inherited_panel(raw, old_panel=old_panel, new_panel=_STICKY_SUCCESSOR_PANEL)
         try:
             path.write_text(json.dumps(raw, indent=2) + "\n", encoding="utf-8")
         except OSError:
