@@ -124,6 +124,7 @@ def devices_palette_save(instance_id: str) -> Response:
         name=name,
         family=base.family,
         palette=base.palette,
+        gray=base.gray,
         tone=base.tone,
         dither=base.dither,
         edges=base.edges,
@@ -215,6 +216,7 @@ def devices_palette_update_tone(instance_id: str) -> Response:
             name=f"{base.name} (edited)",
             family=base.family,
             palette=base.palette,
+            gray=base.gray,
             tone=new_tone,
             dither=new_dither,
             edges=new_edges,
@@ -238,6 +240,7 @@ def devices_palette_update_tone(instance_id: str) -> Response:
         name=base.name,
         family=base.family,
         palette=base.palette,
+        gray=base.gray,
         tone=new_tone,
         dither=new_dither,
         edges=new_edges,
@@ -252,6 +255,25 @@ def devices_palette_update_tone(instance_id: str) -> Response:
     return _redirect_to_calibration(instance_id)
 
 
+def _gray_level_count_for(family: str) -> int:
+    """Levels in a grayscale profile family, or 0 when it's a colour one."""
+    if family == "gray_4":
+        return 4
+    if family == "gray_16":
+        return 16
+    return 0
+
+
+def _unique_slug(store: Any, wanted: str) -> str:
+    """First free slug at or after ``wanted``, suffixing ``-2``, ``-3``..."""
+    slug = wanted
+    suffix = 2
+    while not store.slug_available(slug):
+        slug = f"{wanted}-{suffix}"
+        suffix += 1
+    return slug
+
+
 @bp.post("/settings/devices/<instance_id>/palette/update-palette")
 def devices_palette_update_palette(instance_id: str) -> Response:
     """Update the RGB values on the device's active profile.
@@ -262,7 +284,9 @@ def devices_palette_update_palette(instance_id: str) -> Response:
     on first edit, mirroring the tone-editor flow; user profiles are
     edited in place. The renderer picks up the new palette on the next
     push."""
-    from app.palette_profiles.schema import PaletteColors
+    from dataclasses import replace
+
+    from app.palette_profiles.schema import GrayRamp, PaletteColors
 
     device = devices().get(instance_id)
     if device is None:
@@ -291,6 +315,40 @@ def devices_palette_update_palette(instance_id: str) -> Response:
             except ValueError:
                 return default
         return default
+
+    # Grayscale panels post one ``level<i>`` per level instead of named
+    # inks, and the result lands on the profile's ramp rather than its
+    # colours. Reading the colour names here would have discarded every
+    # edit a grey panel's editor submitted.
+    gray_levels = _gray_level_count_for(base.family)
+    if gray_levels:
+        current = base.gray.as_tuples(gray_levels) or ()
+        anchors: list[str] = []
+        for i in range(gray_levels):
+            fallback = (
+                f"#{current[i][0]:02x}{current[i][1]:02x}{current[i][2]:02x}"
+                if i < len(current)
+                else "#000000"
+            )
+            anchors.append(_hex(f"level{i}", fallback))
+        new_gray = GrayRamp(levels=tuple(anchors))
+        updated_profile = replace(base, gray=new_gray, bundled=False, saved_at=_now_iso())
+        store = _profile_store()
+        if base.bundled:
+            forked_slug = _unique_slug(store, f"{base.slug}-edited")
+            forked = replace(
+                updated_profile,
+                slug=forked_slug,
+                name=f"{base.name} (edited)",
+                based_on=base.based_on or base.slug,
+            )
+            store.save(forked)
+            _write_device_slug(instance_id, forked_slug)
+            flash(f"Forked {base.name!r} into an editable copy with your grey levels.", "ok")
+        else:
+            store.save(updated_profile)
+            flash(f"Updated grey levels for profile {base.name!r}.", "ok")
+        return _redirect_to_calibration(instance_id)
 
     new_palette = PaletteColors(
         black=_hex("black", base.palette.black),
@@ -425,6 +483,7 @@ def palette_profile_import() -> Response:
         name=profile.name or slug,
         family=profile.family,
         palette=profile.palette,
+        gray=profile.gray,
         tone=profile.tone,
         dither=profile.dither,
         edges=profile.edges,

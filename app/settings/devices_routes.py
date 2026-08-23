@@ -1611,6 +1611,20 @@ def _resolve_pattern_context(instance_id: str) -> tuple[Any, dict[str, Any]] | N
     }
 
 
+def _gray_level_count(gamut: str) -> int:
+    """How many levels a grayscale gamut has, or 0 when it isn't one.
+
+    Drives the calibration preview: a grey panel's profile carries a
+    ramp rather than named inks, so the override, the live-preview query
+    params and the completeness check all key off this instead of the
+    colour-slot names."""
+    if gamut == "gray_4":
+        return 4
+    if gamut == "gray_16":
+        return 16
+    return 0
+
+
 def _custom_image_path_for(instance_id: str) -> Path:
     """Where an uploaded calibration reference lives on disk. One file
     per device; overwritten on subsequent uploads. Format is always PNG
@@ -1805,7 +1819,16 @@ def devices_test_pattern_preview(instance_id: str) -> Response:
             Path(current_app.config["DATA_ROOT"])
         ).load(slug)
         if profile is not None:
-            palette_override = profile.palette.as_tuples()
+            # A grey profile carries no colours, only a ramp. Reading
+            # ``palette`` here handed the preview a default PaletteColors,
+            # i.e. literal Spectra 6 primaries, so the calibration preview
+            # for a grayscale panel painted colours it cannot produce and
+            # showed nothing of the ramp actually being applied.
+            gray_levels = _gray_level_count(str(params["gamut"]))
+            if gray_levels:
+                palette_override = profile.gray.as_tuples(gray_levels)
+            else:
+                palette_override = profile.palette.as_tuples()
             tone_defaults["exposure"] = profile.tone.exposure
             tone_defaults["s_curve"] = profile.tone.s_curve
             tone_defaults["lab_compress_min"] = profile.tone.lab_compress_min
@@ -1820,7 +1843,14 @@ def devices_test_pattern_preview(instance_id: str) -> Response:
     # painted into the preview before hitting Save.
     import contextlib
 
-    palette_names = ("black", "white", "yellow", "red", "blue", "green", "orange")
+    # Grey panels post ``level0..levelN`` instead of colour names: they
+    # have no named inks, and the editor is a ramp rather than a set of
+    # slots. Same live-preview contract otherwise.
+    gray_levels = _gray_level_count(str(params["gamut"]))
+    if gray_levels:
+        palette_names = tuple(f"level{i}" for i in range(gray_levels))
+    else:
+        palette_names = ("black", "white", "yellow", "red", "blue", "green", "orange")
     swatches: list[tuple[int, int, int]] = []
     for name in palette_names:
         raw = request.args.get(name)
@@ -1837,7 +1867,7 @@ def devices_test_pattern_preview(instance_id: str) -> Response:
     # neutral: it moves inky_7colour to 7 and the profile-less gamuts
     # (bwr_3 / mono / gray_4) to 3 / 2 / 4, and this change is scoped to
     # PicPak only. Leave the rest exactly as they were.
-    required_swatches = 4 if str(params["gamut"]) == "bwry_4" else 6
+    required_swatches = gray_levels or (4 if str(params["gamut"]) == "bwry_4" else 6)
     if len(swatches) >= required_swatches:
         palette_override = tuple(swatches)
 

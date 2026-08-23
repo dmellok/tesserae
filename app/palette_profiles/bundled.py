@@ -311,6 +311,21 @@ BUNDLED_PROFILES: tuple[PaletteProfile, ...] = (
         ),
     ),
     _profile(
+        slug="strong-mid-gray4",
+        name="4-level grey, strongly lifted",
+        family="gray_4",
+        palette=PaletteColors(),
+        gray=GrayRamp(levels=("#2A2A2A", "#8C8C8C", "#C8C8C8", "#F0F0F0")),
+        notes=(
+            "Same idea as the lifted ramp but a much larger correction, for a panel "
+            "still washed out with that one. It moves the level boundaries a long way: "
+            "the mid-grey that used to land on level 2 lands on level 1, and a good "
+            "deal of what was level 1 drops to black. Expect noticeably heavier, "
+            "higher-contrast output. If this overshoots and the image looks crushed, "
+            "copy it and walk the two middle values back toward the lifted ramp."
+        ),
+    ),
+    _profile(
         slug="nominal-gray16",
         name="Nominal 16-level grey",
         family="gray_16",

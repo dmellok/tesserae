@@ -4,6 +4,32 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.347.0], 2026-08-23
+
+### Fixed
+
+- **The calibration preview showed Spectra 6 on grayscale panels.** v0.346.0 unhid the Calibration
+  tab for grey gamuts without making the surfaces behind it grey-aware, so three of them still
+  assumed colour. `test_patterns._palette_for` fell through to the six-colour E6 deck for any
+  unrecognised gamut, so the preview painted primaries a grey panel cannot produce, and the
+  profile's own ramp was then discarded by the length guard so none of the calibration being
+  applied was visible. The preview override read `profile.palette`, which on a grey profile is an
+  untouched default, i.e. literal `#ff0000` / `#00ff00`. The solid-fill picker offered six inks
+  from the same fallback.
+
+- **The palette editor offered ink pickers a grey profile has no slots for.** The grid is now one
+  cell per level, keyed `level0..levelN`, and its save route writes the ramp instead of reading
+  colour names it would never find. Live preview posts the same keys.
+
+- **Editing a grey profile wiped its ramp.** Every settings route rebuilds the profile field by
+  field to save it, and none of them carried `gray`, so touching an unrelated tone slider silently
+  reset a calibrated panel back to the even ramp. All five rebuild sites now carry it.
+
+### Added
+
+- **`strong-mid-gray4`,** a much larger correction than `soft-mid-gray4` for a panel still washed
+  out with that one. Also not a measurement.
+
 ## [0.346.0], 2026-08-23
 
 ### Added

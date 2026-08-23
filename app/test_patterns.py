@@ -58,12 +58,34 @@ _COLOUR_LABELS_INKY7: tuple[str, ...] = (
 )
 
 
+_GRAY_4_LABELS: tuple[str, ...] = ("black", "dark grey", "light grey", "white")
+_GRAY_16_LABELS: tuple[str, ...] = tuple(f"level {i}" for i in range(16))
+
+
+def gray_ramp_palette(levels: int) -> tuple[RGB, ...]:
+    """The evenly-spaced ramp a grayscale panel nominally paints."""
+    step = 255 // (levels - 1)
+    return tuple((i * step, i * step, i * step) for i in range(levels))
+
+
 def _palette_for(gamut: str, calibrated: bool) -> tuple[tuple[RGB, ...], tuple[str, ...]]:
     """Return the (palette, labels) pair for a given panel gamut.
 
     Falls back to the Waveshare E6 nominal deck for unknown gamuts so
     the pattern generator degrades gracefully on custom panels rather
     than raising."""
+    # Grayscale panels carry levels, not colours. Without these the E6
+    # fallback below hands a grey panel a six-colour deck, so the
+    # calibration preview paints Spectra 6 primaries onto a panel that
+    # has no colour at all, and the profile's grey ramp is discarded by
+    # the length guard in :func:`build_pattern` so it never reaches the
+    # preview either. ``calibrated`` is not consulted: the calibrated
+    # ramp IS the profile override, which arrives via
+    # ``palette_override``, and there is no second bundled ramp to pick.
+    if gamut == "gray_4":
+        return gray_ramp_palette(4), _GRAY_4_LABELS
+    if gamut == "gray_16":
+        return gray_ramp_palette(16), _GRAY_16_LABELS
     if gamut == "inky_7colour":
         pal = INKY_7COLOUR_CALIBRATED_PALETTE if calibrated else INKY_7COLOUR_PALETTE
         return pal, _COLOUR_LABELS_INKY7

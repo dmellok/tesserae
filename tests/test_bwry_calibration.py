@@ -419,8 +419,14 @@ def test_inky_preview_threshold_is_unchanged():
 
     from app.settings import devices_routes
 
+    # Grayscale gamuts now supply their own level count ahead of this
+    # expression. That must stay inert for every colour gamut, or the
+    # hazard above comes back through the new branch.
+    for gamut in ("waveshare_e6", "spectra_6", "inky_7colour", "bwry_4", "mono", ""):
+        assert devices_routes._gray_level_count(gamut) == 0, gamut
+
     src = inspect.getsource(devices_routes.devices_test_pattern_preview)
-    assert 'required_swatches = 4 if str(params["gamut"]) == "bwry_4" else 6' in src
+    assert '4 if str(params["gamut"]) == "bwry_4" else 6' in src
 
 
 def test_spectra6_swatch_grid_still_has_six(app):

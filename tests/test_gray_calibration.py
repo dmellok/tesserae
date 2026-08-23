@@ -153,3 +153,59 @@ def test_grey_panels_get_a_calibration_picker() -> None:
     # Unchanged for the gamuts that never had a family.
     assert _palette_family_for(_Dev("mono")) == ""
     assert _palette_family_for(_Dev("spectra_6")) == "spectra6"
+
+
+_STRONG = ((0x2A,) * 3, (0x8C,) * 3, (0xC8,) * 3, (0xF0,) * 3)
+
+
+def test_strong_ramp_darkens_more_than_the_lifted_one() -> None:
+    """The lifted ramp moves two boundaries by about 20 levels, which was
+    not enough for the panel that prompted this. The strong ramp has to be
+    a strictly bigger correction in the same direction, or it is just
+    another value with no purpose."""
+    src = Image.linear_gradient("L").resize((256, 16)).convert("RGB")
+
+    def mean_level(override: object) -> float:
+        packed = pack_to_panel_bin_2bpp_gray(
+            src, width=256, height=16, dither="none", palette_override=override
+        )
+        vals = [(byte >> shift) & 0b11 for byte in packed for shift in (6, 4, 2, 0)]
+        return sum(vals) / len(vals)
+
+    assert mean_level(_STRONG) < mean_level(_LIFTED) < mean_level(None)
+
+
+def test_grey_ramp_survives_a_profile_rebuild() -> None:
+    """Every settings route rebuilds the profile to save it. Dropping
+    ``gray`` there would wipe a calibrated ramp the moment the user
+    touched an unrelated tone slider."""
+    from dataclasses import replace
+
+    profile = bundled_profile("soft-mid-gray4")
+    assert profile is not None
+    rebuilt = replace(profile, bundled=False, saved_at="2026-08-23T00:00:00+00:00")
+    assert rebuilt.gray.levels == profile.gray.levels
+
+
+def test_grey_editor_offers_levels_not_inks() -> None:
+    """A grey panel was shown Spectra 6 ink pickers its profile has no
+    slots for and its packer would never read."""
+    from app.settings.palette_routes import _gray_level_count_for
+
+    assert _gray_level_count_for("gray_4") == 4
+    assert _gray_level_count_for("gray_16") == 16
+    assert _gray_level_count_for("spectra6") == 0
+
+
+def test_grey_preview_uses_the_ramp_not_the_colour_palette() -> None:
+    """``_palette_for`` fell through to the six-colour E6 deck for grey
+    gamuts, so the calibration preview painted Spectra 6 primaries onto a
+    panel with no colour at all."""
+    from app.test_patterns import _palette_for
+
+    for gamut, count in (("gray_4", 4), ("gray_16", 16)):
+        palette, labels = _palette_for(gamut, calibrated=False)
+        assert len(palette) == count, gamut
+        assert len(labels) == count, gamut
+        # Every entry neutral: r == g == b.
+        assert all(r == g == b for r, g, b in palette), gamut

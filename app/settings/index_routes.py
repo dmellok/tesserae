@@ -426,6 +426,11 @@ _TEST_PATTERN_GAMUT_LABELS: dict[str, tuple[str, ...]] = {
     # falls back to the E6 row and the solid-fill picker offers a PicPak
     # two colours it physically cannot paint.
     "bwry_4": ("black", "white", "yellow", "red"),
+    # Grayscale panels have levels, not inks. Without these the lookup
+    # falls back to the E6 row and offers a grey panel six colours it
+    # cannot paint.
+    "gray_4": ("black", "dark grey", "light grey", "white"),
+    "gray_16": tuple(f"level {i}" for i in range(16)),
     "inky_7colour": (
         "black",
         "white",
@@ -451,6 +456,13 @@ _TEST_PATTERN_GAMUT_HEXES: dict[str, tuple[str, ...]] = {
     # and see what the ink actually does. Feeding it measured values
     # would beg the question.
     "bwry_4": ("#000000", "#ffffff", "#ffff00", "#ff0000"),
+    # Nominal ramps for the same reason as BWRY above: the solid-fill
+    # pattern's job is to send one pure level and see what the panel
+    # actually prints, which is exactly the measurement a calibrated
+    # ramp is derived from. Feeding it the calibrated values would beg
+    # the question.
+    "gray_4": ("#000000", "#555555", "#aaaaaa", "#ffffff"),
+    "gray_16": tuple(f"#{i * 17:02x}{i * 17:02x}{i * 17:02x}" for i in range(16)),
     "inky_7colour": (
         "#000000",
         "#ffffff",
@@ -612,6 +624,23 @@ def _palette_profile_colors_for(device: Device) -> list[dict[str, str]] | None:
         profile = store.load(slug)
     if profile is None:
         return None
+    # Grayscale panels edit a ramp, not named inks. Same editor grid and
+    # the same ``<input type="color">`` cells, keyed ``level0..levelN``,
+    # so one level per cell and the live preview's query params line up.
+    # Without this a grey panel was offered Spectra 6 ink pickers that
+    # its profile has no slots for and its packer would never read.
+    family = _palette_family_for(device)
+    if family in ("gray_4", "gray_16"):
+        levels = 4 if family == "gray_4" else 16
+        ramp = profile.gray.as_tuples(levels) or _test_pattern_gray_ramp(levels)
+        return [
+            {
+                "name": f"level{i}",
+                "label": f"Level {i}" + (" (black)" if i == 0 else ""),
+                "hex": f"#{rgb[0]:02x}{rgb[1]:02x}{rgb[2]:02x}",
+            }
+            for i, rgb in enumerate(ramp)
+        ]
     out = [
         {"name": "black", "label": "Black", "hex": profile.palette.black},
         {"name": "white", "label": "White", "hex": profile.palette.white},
@@ -629,13 +658,22 @@ def _palette_profile_colors_for(device: Device) -> list[dict[str, str]] | None:
     # families (a spectra6 profile carrying an orange would lose it), and
     # this change is meant to touch PicPak only. Every other gamut takes
     # the original path below unchanged.
-    if _palette_family_for(device) == "bwry_4":
+    if family == "bwry_4":
         return out
     out.append({"name": "blue", "label": "Blue", "hex": profile.palette.blue})
     out.append({"name": "green", "label": "Green", "hex": profile.palette.green})
     if profile.palette.orange:
         out.append({"name": "orange", "label": "Orange", "hex": profile.palette.orange})
     return out
+
+
+def _test_pattern_gray_ramp(levels: int) -> tuple[tuple[int, int, int], ...]:
+    """Evenly-spaced fallback so the ramp editor still populates on a
+    profile that carries no ``gray`` block (a colour profile applied to a
+    grey panel, or one saved before ramps existed)."""
+    from app.test_patterns import gray_ramp_palette
+
+    return gray_ramp_palette(levels)
 
 
 def _palette_profile_tone_for(device: Device) -> dict[str, Any]:
