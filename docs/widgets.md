@@ -342,6 +342,11 @@ tightened were mutations — `shutil.rmtree` on a gallery folder, calendar
 feed writes, CalDAV discovery against a caller-supplied URL — and those
 stay gated. Reviewing the list is part of reviewing a plugin.
 
+The same rule applies to routes you *don't* declare. A loopback `GET`
+reaches any of your plugin's sub-routes, declared or not, so a destructive
+action exposed over `GET` is reachable during a render. Keep mutations on
+`POST`; every in-tree plugin does.
+
 **You may not need it.** A loopback `GET`/`HEAD` of a plugin's own
 sub-route already passes without a declaration. What that rule does not
 cover, and a declaration does:
