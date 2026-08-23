@@ -1,0 +1,71 @@
+"""Regressions for the code-element renderer's silent-failure class.
+
+Each of these rendered "successfully" and wrong, with nothing in the debug
+channel, which is what made them expensive to find.
+"""
+
+from __future__ import annotations
+
+import re
+from pathlib import Path
+from typing import Any
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+DECORATE_JS = REPO_ROOT / "static" / "panels" / "decorate.js"
+
+
+def test_code_element_payload_carries_its_options() -> None:
+    """``ctx.options`` was always ``{}``. decorate.js builds it from
+    ``el.options``, and the composer's code branch never put options in the
+    payload, so a config input declared with ``slot: "options"`` rendered in
+    the form, saved into the document, and did nothing at render. Only a
+    source's options travelled, and those go to the widget fetch."""
+    src = (REPO_ROOT / "app" / "composer.py").read_text(encoding="utf-8")
+    code_branch = src.split('if e.kind == "code":', 1)[1].split("_stamp_touch", 1)[0]
+    assert '"options": e.options or {}' in code_branch
+
+
+def test_author_js_runs_in_its_own_scope() -> None:
+    """``var top = ...`` at global scope cannot overwrite the read-only
+    ``window.top``: the assignment silently fails, ``top`` stays a
+    cross-origin Window, and the next property read throws "Blocked a frame
+    with origin null", blanking the element. Same for name/status/length/
+    self/parent/closed. Inside a function they are ordinary locals."""
+    js = DECORATE_JS.read_text(encoding="utf-8")
+    assert '"<script>try{(function(){" + (el.js || "")' in js, (
+        "author JS must be wrapped in a function, not bare inside try{}"
+    )
+
+
+def test_phosphor_probe_ignores_a_css_variable() -> None:
+    """``--ph`` (e.g. "plate height") matched the old ``/\\bph\\b(?!-)/``
+    because ``-`` is a non-word character, pulling in the whole icon
+    stylesheet, whose ``fill`` rules then blanked every inline SVG on the
+    page: correct geometry, nothing painted, no error."""
+    js = DECORATE_JS.read_text(encoding="utf-8")
+    assert "/\\bph\\b(?!-)/" not in js, "the over-broad bare-word probe is back"
+
+    # Mirror the shipped predicate and check the cases that mattered.
+    def probe(s: str) -> bool:
+        return bool(
+            re.search(r"(^|[^\w-])ph(?![\w-])", s) and re.search(r"(^|[^\w-])ph-[a-z0-9]", s)
+        )
+
+    assert not probe(":root{--ph:12px}.plate{height:var(--ph)}")
+    assert not probe("the ph value is high")
+    assert probe('<i class="ph ph-heart"></i>')
+
+
+def test_console_log_reaches_the_debug_channel(monkeypatch: Any) -> None:
+    """``console.log`` from a code element was dropped outright, so
+    print-debugging a sandboxed element was impossible. Errors and warnings
+    must keep priority: a chatty element cannot cost a stack trace."""
+    from app import renderer
+
+    src = (REPO_ROOT / "app" / "renderer.py").read_text(encoding="utf-8")
+    body = src.split("def _on_console", 1)[1].split("def _on_pageerror", 1)[0]
+    assert 'if msg.type not in ("error", "warning"):\n            return' not in body, (
+        "non-error console levels are being dropped again"
+    )
+    assert "_DIAG_MAX_CHATTY" in body, "logs must have their own budget, not the shared one"
+    assert renderer._DIAG_MAX_EVENTS > 0

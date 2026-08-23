@@ -594,7 +594,16 @@
       (el.html || "") +
       libScripts +
       "<script>window.ctx=" + ctxJson + ";</" + "script>" +
-      "<script>try{" + (el.js || "") + "}catch(e){" +
+      // Author JS runs inside a function, not at global scope. At global scope
+      // a plain ``var top = ...`` cannot overwrite the read-only ``window.top``:
+      // the assignment silently fails, ``top`` stays a cross-origin Window, and
+      // the next property read throws "Blocked a frame with origin null",
+      // blanking the whole element. Same trap for name, status, length, self,
+      // parent and closed. Inside a function those are ordinary locals.
+      // The cost is that a top-level ``function foo(){}`` is no longer reachable
+      // from an inline ``onclick``; the frame is pointer-events:none and taps go
+      // through touch regions, so nothing in a panel can call one anyway.
+      "<script>try{(function(){" + (el.js || "") + "\n}).call(window);}catch(e){" +
       "console.error(" + tag + "+' script threw: '+String(e&&e.stack||e));" +
       "document.body.innerHTML='<pre style=\"color:#900;font:12px monospace;white-space:pre-wrap\">'" +
       "+String(e&&e.message||e)+'</pre>';}</" + "script>" +

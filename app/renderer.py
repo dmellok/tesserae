@@ -811,14 +811,27 @@ def _attach_diag_listeners(page: Any) -> dict[str, list[dict[str, Any]]]:
         if len(bucket) < _DIAG_MAX_EVENTS:
             bucket.append(entry)
 
+    # Non-error console levels get their own smaller budget. They were dropped
+    # entirely, so a code element's own ``console.log`` never reached
+    # render_report(debug=1) and print-debugging a sandboxed element was
+    # impossible. Letting them share the single bucket is not enough either: a
+    # chatty element would fill it and push out the errors, which are the
+    # entries the report exists for. Separate budgets mean a flood of logs can
+    # never cost a stack trace.
+    _chatty = {"count": 0}
+    _DIAG_MAX_CHATTY = max(1, _DIAG_MAX_EVENTS // 2)
+
     def _on_console(msg: Any) -> None:
-        if msg.type not in ("error", "warning"):
-            return
+        level = msg.type
+        if level not in ("error", "warning"):
+            if _chatty["count"] >= _DIAG_MAX_CHATTY:
+                return
+            _chatty["count"] += 1
         loc = msg.location or {}
         _add(
             "console",
             {
-                "level": msg.type,
+                "level": level,
                 "text": msg.text[:500],
                 "url": str(loc.get("url", ""))[:300],
                 "line": loc.get("lineNumber"),

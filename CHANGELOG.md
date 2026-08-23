@@ -4,6 +4,33 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.348.0], 2026-08-23
+
+### Fixed
+
+- **`ctx.options` was always `{}` for code elements.** decorate.js builds it from `el.options`, and
+  the composer's `kind == "code"` branch never put options in the payload. A config input declared
+  with `slot: "options"` therefore rendered in the form, saved into the document, and did nothing at
+  render. Only a source's options travelled, and those go to the widget fetch rather than to the
+  author's code.
+
+- **A window-shadowing global blanked the whole element.** Author JS ran at the sandbox's global
+  scope inside a bare `try{}`, which is not a function scope. `var top = ...` there cannot overwrite
+  the read-only `window.top`: the assignment silently fails, `top` stays a cross-origin Window, and
+  the next property read throws "Blocked a frame with origin null", so the element rendered as red
+  error text. Same trap for `name`, `status`, `length`, `self`, `parent` and `closed`, none of which
+  a dashboard author has reason to treat as reserved. The code now runs inside a function, where
+  they are ordinary locals.
+
+  The tradeoff is that a top-level `function foo(){}` is no longer reachable from an inline
+  `onclick`. The frame is `pointer-events: none` and taps arrive through touch regions, so nothing
+  in a panel could call one anyway.
+
+- **`console.log` never reached `render_report(debug=1)`.** The console hook dropped every level
+  that wasn't `error` or `warning`, so print-debugging a sandboxed code element was impossible.
+  Non-error levels now come through on their own budget rather than sharing the single event cap,
+  so a chatty element can never push a stack trace out of the report.
+
 ## [0.347.0], 2026-08-23
 
 ### Fixed

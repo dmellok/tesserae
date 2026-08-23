@@ -1133,6 +1133,14 @@ def _build_canvas_els(
                     "html": e.html,
                     "css": e.css,
                     "js": e.js,
+                    # The element's own options, read in the sandbox as
+                    # ``ctx.options``. Without this key every config input
+                    # declared with ``slot: "options"`` rendered in the form and
+                    # saved into the document, then reached the render as ``{}``:
+                    # the input appeared to work and silently did nothing. Only
+                    # a source's options travelled, and those go to the widget
+                    # fetch, not to the author's code.
+                    "options": e.options or {},
                     # Carried through so the sandbox can honour an opt-out of
                     # library/font auto-injection (decorate.js infers what to
                     # inline from the code itself; false means inline nothing).
