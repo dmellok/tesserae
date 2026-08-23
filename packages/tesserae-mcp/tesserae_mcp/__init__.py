@@ -922,9 +922,14 @@ def build_server() -> Any:
 
     def create_schedule(schedule: dict[str, Any]) -> Any:
         """Create or replace a schedule. 'schedule' is a full object:
-        {id, page_id, type ("interval"|"daily"), interval_minutes? or fires_at?
-        ("HH:MM"), days_of_week?, priority?}. Returns {ok, id}, or 422 with
-        "details" on a bad shape."""
+        {id, name, page_id, type ("interval"|"daily"), interval_minutes? or
+        fires_at?, days_of_week?, priority?}. Returns {ok, id}, or 422 with
+        "details" on a bad shape.
+
+        'name' is REQUIRED alongside 'id' and must be non-empty; omitting it
+        422s. A daily schedule's 'fires_at' is a FULL datetime, not "HH:MM":
+        only the time-of-day is used, so the date is a placeholder and
+        "2000-01-01T06:00:00" is the conventional way to write 6am."""
         return _json("POST", "/schedules", schedule)
 
     def delete_schedule(schedule_id: str) -> Any:

@@ -4,6 +4,16 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.352.0], 2026-08-23
+
+### Fixed
+
+- **`create_schedule`'s tool doc contradicted the model.** It described `fires_at` as `"HH:MM"` and
+  never mentioned `name`, so a daily schedule written straight from the doc 422s twice over.
+  `fires_at` is a full datetime (only the time-of-day is read, so the date is a placeholder and
+  `"2000-01-01T06:00:00"` is the conventional way to write 6am), and `name` is required alongside
+  `id` with `min_length=1`.
+
 ## [0.351.0], 2026-08-23
 
 ### Added

@@ -118,3 +118,22 @@ def test_icons_field_round_trips_and_defaults_to_inference() -> None:
     # Non-icon libs must keep inferring: the field scopes to icons only, unlike
     # autolibs:false which refuses Chart.js, fonts and everything else too.
     assert "if (weight === undefined) return null; // not an icon lib" in js
+
+
+def test_create_schedule_doc_matches_the_model() -> None:
+    """The tool doc said fires_at was "HH:MM" and never mentioned name, so a
+    daily schedule written from the doc 422s twice over."""
+    from app.state.schedule_model import Schedule
+
+    assert Schedule.model_fields["name"].is_required(), "name must stay required"
+    doc = (REPO_ROOT / "packages" / "tesserae-mcp" / "tesserae_mcp" / "__init__.py").read_text(
+        encoding="utf-8"
+    )
+    body = doc.split("def create_schedule", 1)[1].split("def delete_schedule", 1)[0]
+    # The doc still mentions "HH:MM", now to say it is NOT that. What must be
+    # gone is the old claim that fires_at takes one.
+    assert 'fires_at?\n        ("HH:MM")' not in body
+    assert 'fires_at? ("HH:MM")' not in body
+    assert "FULL datetime" in body
+    assert "REQUIRED" in body and "name" in body
+    assert "2000-01-01T06:00:00" in body
