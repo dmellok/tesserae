@@ -2453,10 +2453,13 @@ def instructions() -> Response:
     keeps an embedded copy as a fallback. ``schema`` lets an older bridge tell
     whether it understands the payload shape.
 
-    ``bridge`` names the release this server ships with, so a bridge can tell the
-    agent it is behind on the very docs it just fetched. It's an additive key: a
-    bridge that predates it reads ``instructions`` / ``doc_shape`` and ignores
-    the rest, so no ``schema`` bump is needed."""
+    ``tool_docs`` carries each tool's own description, so a corrected contract
+    reaches an installed bridge too, and ``bridge`` names the release this server
+    ships with so a bridge can tell the agent it is behind. Both are additive
+    keys: a bridge that predates them reads ``instructions`` / ``doc_shape`` and
+    ignores the rest, so no ``schema`` bump is needed (bumping would be actively
+    wrong -- the bridge treats a schema it doesn't know as unreadable and falls
+    back to its embedded copy wholesale)."""
     from app import mcp_docs
 
     return jsonify(
@@ -2464,6 +2467,7 @@ def instructions() -> Response:
             "schema": mcp_docs.DOCS_SCHEMA,
             "instructions": mcp_docs.INSTRUCTIONS,
             "doc_shape": mcp_docs.DOC_SHAPE,
+            "tool_docs": mcp_docs.TOOL_DOCS,
             "bridge": {
                 "latest": mcp_bridge.EXPECTED_VERSION,
                 "upgrade": mcp_bridge.UPGRADE_COMMAND,

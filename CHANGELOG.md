@@ -4,6 +4,27 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.356.0], 2026-08-23
+
+### Added
+
+- **Tool descriptions are served, not baked in.** `/api/mcp/instructions` already served the
+  handshake instructions and canvas doc-shape, so those reached an installed bridge without a
+  release; each tool's own description did not, which is why a wrong `create_schedule` contract sat
+  on PyPI for three weeks. The payload now carries `tool_docs`, a description per tool, and the
+  bridge prefers it over its embedded docstring. What still needs a release is a *new* tool (the
+  tool list is code) and any change to how the bridge handles a result. Additive key, no `schema`
+  bump: bumping would make older bridges treat the whole payload as unreadable.
+
+- **An out-of-date bridge says so in the agent session.** 0.354.0 surfaced this in Settings, which
+  only helps someone who looks. The bridge now compares its own version against the `bridge.latest`
+  the server reports and, when behind, appends a note to the handshake instructions telling the
+  agent to ask the operator to run `pipx upgrade tesserae-mcp`. Silent when level, ahead (running
+  from a clone), or unparseable.
+
+- **tesserae-mcp 0.14.0** carries both, plus a `set_canvas` docstring so every registered tool has
+  a description of its own to fall back on.
+
 ## [0.355.1], 2026-08-23
 
 ### Fixed

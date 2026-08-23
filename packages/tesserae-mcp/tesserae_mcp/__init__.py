@@ -23,7 +23,7 @@ import urllib.error
 import urllib.request
 from typing import Any
 
-__version__ = "0.13.0"
+__version__ = "0.14.0"
 
 _BASE = os.environ.get("TESSERAE_URL", "http://127.0.0.1:8765").rstrip("/")
 _TOKEN = os.environ.get("TESSERAE_MCP_TOKEN", "").strip()
@@ -33,6 +33,10 @@ _TOKEN = os.environ.get("TESSERAE_MCP_TOKEN", "").strip()
 # change freely without a bump. A mismatch means the bridge falls back to the
 # embedded copy below rather than trusting a shape it can't read.
 _DOCS_SCHEMA = 1
+
+# The two tools that write a canvas document, so their description carries the
+# doc-shape. Kept out of the served per-tool text so the shape is stated once.
+_DOC_SHAPE_TOOLS = ("set_canvas", "add_element")
 
 # The canvas-document shape, embedded in the set_canvas tool description so the
 # agent knows exactly what to write.
@@ -390,16 +394,20 @@ def _json(method: str, path: str, body: dict[str, Any] | None = None) -> Any:
     return parsed
 
 
-def _fetch_docs() -> dict[str, str]:
-    """Pull the canonical agent-facing docs (handshake instructions + canvas
-    doc-shape) from a running Tesserae, so a server-side copy / capability change
-    goes live on the next agent connection with no bridge republish.
+def _fetch_docs() -> dict[str, Any]:
+    """Pull the canonical agent-facing docs from a running Tesserae, so a
+    server-side copy / capability change goes live on the next agent connection
+    with no bridge republish.
 
-    Returns a dict with any of ``instructions`` / ``doc_shape`` it could read, or
-    ``{}`` on any failure -- unreachable server, ``mcp`` experiment off (404),
-    an older Tesserae without the endpoint, or a payload schema this bridge
-    doesn't understand. The caller falls back to the embedded copy per key, so
-    the bridge always works offline."""
+    Reads the handshake ``instructions``, the canvas ``doc_shape``, per-tool
+    descriptions (``tool_docs``), and ``bridge`` (the release that Tesserae ships
+    with, so we can tell the agent this bridge is behind).
+
+    Returns whichever of those it could read, or ``{}`` on any failure --
+    unreachable server, ``mcp`` experiment off (404), an older Tesserae without
+    the endpoint, or a payload schema this bridge doesn't understand. The caller
+    falls back to the embedded copy per key, so the bridge always works offline.
+    """
     try:
         status, raw, _ = _request("GET", "/instructions")
     except Exception:
@@ -412,12 +420,59 @@ def _fetch_docs() -> dict[str, str]:
         return {}
     if not isinstance(data, dict) or data.get("schema") != _DOCS_SCHEMA:
         return {}
-    out: dict[str, str] = {}
+    out: dict[str, Any] = {}
     for key in ("instructions", "doc_shape"):
         val = data.get(key)
         if isinstance(val, str) and val.strip():
             out[key] = val
+    served_tools = data.get("tool_docs")
+    if isinstance(served_tools, dict):
+        # Per-tool descriptions, keyed by tool name. Take only non-empty strings:
+        # a malformed entry falls back to this bridge's own docstring rather than
+        # registering a tool with no description at all.
+        out["tool_docs"] = {
+            str(name): text
+            for name, text in served_tools.items()
+            if isinstance(text, str) and text.strip()
+        }
+    served_bridge = data.get("bridge")
+    if isinstance(served_bridge, dict):
+        out["bridge"] = served_bridge
     return out
+
+
+def _version_tuple(text: str) -> tuple[int, ...] | None:
+    """``"0.13.0"`` -> ``(0, 13, 0)``; None if it isn't plain dotted numbers.
+    Deliberately strict and stdlib-only -- the bridge has no packaging dep, and
+    an unparseable version should simply mean "say nothing"."""
+    parts = text.strip().split(".")
+    if not parts or not all(p.isdigit() for p in parts):
+        return None
+    return tuple(int(p) for p in parts)
+
+
+def _upgrade_note(served_bridge: Any) -> str:
+    """A line appended to the handshake instructions when Tesserae ships a newer
+    bridge than this one, so the agent can tell the operator instead of silently
+    running against stale tool descriptions.
+
+    Empty string whenever we can't be sure: no ``bridge`` block, an unparseable
+    version on either side, or a bridge that's level with (or ahead of) the
+    server, which is the running-from-a-clone case."""
+    if not isinstance(served_bridge, dict):
+        return ""
+    latest = str(served_bridge.get("latest") or "")
+    mine = _version_tuple(__version__)
+    theirs = _version_tuple(latest)
+    if mine is None or theirs is None or theirs <= mine:
+        return ""
+    upgrade = str(served_bridge.get("upgrade") or "pipx upgrade tesserae-mcp")
+    return (
+        f"\n\nBRIDGE OUT OF DATE: this is tesserae-mcp {__version__}; the connected Tesserae "
+        f"ships {latest}. Tool descriptions and result handling come from the installed bridge, "
+        f"so some tools may be missing or documented wrongly here. Tell the operator to run "
+        f"`{upgrade}` on this machine and restart you. Carry on in the meantime."
+    )
 
 
 # Sent to the connecting agent at handshake (FastMCP ``instructions``) so it drives
@@ -740,6 +795,12 @@ def build_server() -> Any:
         return f"?base_rev={base_rev}" if base_rev else ""
 
     def set_canvas(page_id: str, canvas: dict[str, Any], base_rev: str = "") -> Any:
+        """Replace a canvas dashboard's document. Returns a compact {ok,id,rev,elements}
+        ack (not the full document), or an error with field-level "details" (HTTP 422) if
+        the document is invalid, so you can correct it and retry. Pass base_rev (the rev
+        from get_canvas) to be warned with HTTP 409 if the page changed under you. For a
+        one-field change prefer update_element / patch_canvas. After setting, call
+        render_preview() (or render_report()) to check the result."""
         return _json("PUT", f"/pages/{page_id}/canvas{_rev_suffix(base_rev)}", canvas)
 
     def set_canvas_background(
@@ -770,11 +831,11 @@ def build_server() -> Any:
         return _json("POST", f"/pages/{page_id}/background", body)
 
     def add_element(page_id: str, element: dict[str, Any], base_rev: str = "") -> Any:
-        """Append ONE element to a canvas and save. Each call is a separate save, so
-        an editor open on the page updates live as you build. "element" is a single
-        element object (same shapes as set_canvas's "els"). Returns the compact ack
-        plus the new "element_id". Prefer this when building incrementally; use
-        set_canvas to replace the whole layout at once.
+        """Append ONE element to a canvas and save (each call is a separate save, so an
+        open editor updates live as you build). "element" is a single element object
+        (same shapes as set_canvas's "els"); returns {ok,id,rev,elements,element_id}.
+        Prefer this when building incrementally; use set_canvas to replace the whole
+        layout at once.
 
         The element's type goes in "kind", NOT "type": {"kind": "code", "x": 0,
         "y": 0, "w": 480, "h": 800, ...}. Unknown fields are refused with a 422
@@ -1039,8 +1100,9 @@ def build_server() -> Any:
     docs = _fetch_docs()
     instructions = docs.get("instructions") or _INSTRUCTIONS
     doc_shape = docs.get("doc_shape") or _DOC_SHAPE
+    tool_docs = docs.get("tool_docs") or {}
 
-    mcp = FastMCP("tesserae", instructions=instructions)
+    mcp = FastMCP("tesserae", instructions=instructions + _upgrade_note(docs.get("bridge")))
     for fn in (
         list_widgets,
         list_icons,
@@ -1053,7 +1115,9 @@ def build_server() -> Any:
         create_canvas_page,
         delete_canvas_page,
         get_canvas,
+        set_canvas,
         set_canvas_background,
+        add_element,
         add_elements_bulk,
         update_element,
         append_code,
@@ -1077,27 +1141,15 @@ def build_server() -> Any:
         create_deck,
         delete_deck,
     ):
-        mcp.add_tool(fn)
-    mcp.add_tool(
-        set_canvas,
-        description=(
-            "Replace a canvas dashboard's document. Returns a compact {ok,id,rev,elements} "
-            'ack (not the full document), or an error with field-level "details" (HTTP 422) '
-            "if the document is invalid, so you can correct it and retry. Pass base_rev (the rev "
-            "from get_canvas) to be warned with HTTP 409 if the page changed under you. For a "
-            "one-field change prefer update_element / patch_canvas. After setting, call "
-            "render_preview() (or render_report()) to check the result.\n\n" + doc_shape
-        ),
-    )
-    mcp.add_tool(
-        add_element,
-        description=(
-            "Append ONE element to a canvas and save (each call is a separate save, so an "
-            "open editor updates live as you build). 'element' is a single element object; "
-            "returns {ok,id,rev,elements,element_id}. Use set_canvas to replace the whole "
-            "layout at once.\n\n" + doc_shape
-        ),
-    )
+        # The server's copy wins when it has one, so a description fix reaches an
+        # installed bridge the same way an instructions fix already does; this
+        # function's own docstring is the offline fallback. The two document-writing
+        # tools carry the canvas doc-shape either way, so the shape stays attached
+        # to the call that needs it without the served text having to repeat it.
+        description = tool_docs.get(fn.__name__) or (fn.__doc__ or "").strip()
+        if fn.__name__ in _DOC_SHAPE_TOOLS:
+            description = f"{description}\n\n{doc_shape}"
+        mcp.add_tool(fn, description=description)
     return mcp
 
 

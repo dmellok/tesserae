@@ -198,3 +198,159 @@ def test_catalog_summary_keeps_identity_and_drops_option_schemas():
     # A catalog with nothing to trim gains no note.
     lean = {"widgets": [{"key": "a", "name": "A"}], "appearance": {}}
     assert "summarised" not in _summarise_catalog(lean)
+
+
+def test_served_tool_docs_replace_the_embedded_docstring(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A tool description fix on the server reaches an installed bridge, the same
+    way an instructions fix already does. This is what stops a wrong contract
+    (create_schedule's fires_at, say) needing a PyPI release to correct."""
+    import asyncio
+    import json
+
+    payload = json.dumps(
+        {
+            "schema": bridge._DOCS_SCHEMA,
+            "instructions": "SERVER INSTRUCTIONS",
+            "doc_shape": "SERVER DOC SHAPE",
+            "tool_docs": {"create_schedule": "SERVED create_schedule CONTRACT"},
+        }
+    ).encode()
+    monkeypatch.setattr(bridge, "_request", _fake_request(200, payload))
+
+    tools = asyncio.run(bridge.build_server().list_tools())
+    by_name = {t.name: t for t in tools}
+
+    assert by_name["create_schedule"].description == "SERVED create_schedule CONTRACT"
+    # Tools the server didn't override keep their embedded docstring.
+    assert "Delete a schedule by id" in (by_name["delete_schedule"].description or "")
+
+
+def test_doc_shape_is_appended_to_served_tool_docs(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The canvas shape rides on the two document-writing tools whether their
+    prose came from the server or the embedded copy, so the served text never has
+    to repeat it (and can't drift from DOC_SHAPE)."""
+    import asyncio
+    import json
+
+    payload = json.dumps(
+        {
+            "schema": bridge._DOCS_SCHEMA,
+            "instructions": "SERVER INSTRUCTIONS",
+            "doc_shape": "SERVER DOC SHAPE abc",
+            "tool_docs": {"set_canvas": "SERVED set_canvas PROSE"},
+        }
+    ).encode()
+    monkeypatch.setattr(bridge, "_request", _fake_request(200, payload))
+
+    tools = asyncio.run(bridge.build_server().list_tools())
+    description = next(t for t in tools if t.name == "set_canvas").description or ""
+
+    assert "SERVED set_canvas PROSE" in description
+    assert "SERVER DOC SHAPE abc" in description
+    # add_element gets it too, and it is stated exactly once.
+    add_element = next(t for t in tools if t.name == "add_element").description or ""
+    assert add_element.count("SERVER DOC SHAPE abc") == 1
+
+
+def test_malformed_tool_docs_fall_back_to_the_docstring(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A junk entry must not register a tool with an empty description."""
+    import asyncio
+    import json
+
+    payload = json.dumps(
+        {
+            "schema": bridge._DOCS_SCHEMA,
+            "instructions": "SERVER INSTRUCTIONS",
+            "tool_docs": {"list_devices": "   ", "list_pages": 42},
+        }
+    ).encode()
+    monkeypatch.setattr(bridge, "_request", _fake_request(200, payload))
+
+    tools = asyncio.run(bridge.build_server().list_tools())
+    by_name = {t.name: t for t in tools}
+
+    assert "colour capability" in (by_name["list_devices"].description or "")
+    assert "canvas (freeform) dashboards" in (by_name["list_pages"].description or "")
+
+
+def test_every_tool_has_a_description() -> None:
+    """Registration reads each function's docstring, so a new tool without one
+    would silently register blank."""
+    import asyncio
+
+    tools = asyncio.run(bridge.build_server().list_tools())
+
+    blank = [t.name for t in tools if not (t.description or "").strip()]
+    assert blank == []
+
+
+def test_an_older_bridge_is_told_it_is_behind(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The handshake carries the upgrade note, so the agent can tell the operator
+    rather than silently running against stale tool descriptions."""
+    import json
+
+    payload = json.dumps(
+        {
+            "schema": bridge._DOCS_SCHEMA,
+            "instructions": "SERVER INSTRUCTIONS",
+            "bridge": {"latest": "99.0.0", "upgrade": "pipx upgrade tesserae-mcp"},
+        }
+    ).encode()
+    monkeypatch.setattr(bridge, "_request", _fake_request(200, payload))
+
+    text = bridge.build_server().instructions or ""
+
+    assert "BRIDGE OUT OF DATE" in text
+    assert "99.0.0" in text and bridge.__version__ in text
+    assert "pipx upgrade tesserae-mcp" in text
+
+
+def test_a_current_bridge_gets_no_upgrade_note(monkeypatch: pytest.MonkeyPatch) -> None:
+    import json
+
+    payload = json.dumps(
+        {
+            "schema": bridge._DOCS_SCHEMA,
+            "instructions": "SERVER INSTRUCTIONS",
+            "bridge": {"latest": bridge.__version__},
+        }
+    ).encode()
+    monkeypatch.setattr(bridge, "_request", _fake_request(200, payload))
+
+    assert "BRIDGE OUT OF DATE" not in (bridge.build_server().instructions or "")
+
+
+def test_a_bridge_ahead_of_the_server_gets_no_upgrade_note(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Running from a clone: telling the operator to "upgrade" to an older
+    release would be wrong."""
+    import json
+
+    payload = json.dumps(
+        {
+            "schema": bridge._DOCS_SCHEMA,
+            "instructions": "SERVER INSTRUCTIONS",
+            "bridge": {"latest": "0.0.1"},
+        }
+    ).encode()
+    monkeypatch.setattr(bridge, "_request", _fake_request(200, payload))
+
+    assert "BRIDGE OUT OF DATE" not in (bridge.build_server().instructions or "")
+
+
+def test_an_unparseable_version_says_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
+    import json
+
+    payload = json.dumps(
+        {
+            "schema": bridge._DOCS_SCHEMA,
+            "instructions": "SERVER INSTRUCTIONS",
+            "bridge": {"latest": "not-a-version"},
+        }
+    ).encode()
+    monkeypatch.setattr(bridge, "_request", _fake_request(200, payload))
+
+    assert "BRIDGE OUT OF DATE" not in (bridge.build_server().instructions or "")

@@ -203,3 +203,63 @@ def test_settings_card_stays_shut_for_a_current_bridge(app: Flask) -> None:
 
     assert "Connected bridge" in html
     assert "<details open>" not in html
+
+
+# -- served per-tool docs -----------------------------------------------
+
+
+def _bridge_tool_names() -> set[str]:
+    """The tools the bridge registers, read from its source (importing would
+    need the mcp SDK, which the app's env doesn't carry)."""
+    import ast
+
+    source = (REPO_ROOT / "packages" / "tesserae-mcp" / "tesserae_mcp" / "__init__.py").read_text(
+        encoding="utf-8"
+    )
+    build_server = next(
+        n
+        for n in ast.parse(source).body
+        if isinstance(n, ast.FunctionDef) and n.name == "build_server"
+    )
+    for node in ast.walk(build_server):
+        if isinstance(node, ast.For) and isinstance(node.iter, ast.Tuple):
+            return {e.id for e in node.iter.elts if isinstance(e, ast.Name)}
+    raise AssertionError("couldn't find the bridge's tool registration loop")
+
+
+def test_instructions_serves_a_description_for_every_tool() -> None:
+    """The point of serving these is that a description fix reaches an installed
+    bridge. A tool missing from the map silently keeps whatever text shipped in
+    the wheel, so the gap has to fail here."""
+    from app import mcp_docs
+
+    missing = _bridge_tool_names() - set(mcp_docs.TOOL_DOCS)
+
+    assert missing == set(), f"TOOL_DOCS is missing entries for {sorted(missing)}"
+
+
+def test_served_tool_docs_are_all_non_empty() -> None:
+    from app import mcp_docs
+
+    blank = [name for name, text in mcp_docs.TOOL_DOCS.items() if not text.strip()]
+
+    assert blank == []
+
+
+def test_the_document_writers_dont_repeat_the_doc_shape() -> None:
+    """The bridge appends DOC_SHAPE to set_canvas / add_element itself. If the
+    served prose carried it too the agent would read it twice, and the two copies
+    could disagree."""
+    from app import mcp_docs
+
+    for name in ("set_canvas", "add_element"):
+        assert "A canvas document is JSON" not in mcp_docs.TOOL_DOCS[name]
+
+
+def test_instructions_endpoint_carries_the_tool_docs(app: Flask) -> None:
+    from app import mcp_docs
+
+    payload = app.test_client().get("/api/mcp/instructions").get_json()
+
+    assert payload["tool_docs"] == mcp_docs.TOOL_DOCS
+    assert payload["tool_docs"]["create_schedule"].count("fires_at") >= 1

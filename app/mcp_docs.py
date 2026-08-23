@@ -436,3 +436,325 @@ WIRE UP NAVIGATION / SCHEDULING (once the pages exist):
   better: they store the deck's frames on local storage (SD) and navigate with the radio off, so
   decks are the single snappiest navigation you can give those panels.
 """
+
+
+# Per-tool descriptions, keyed by the bridge's tool name. Served alongside
+# INSTRUCTIONS / DOC_SHAPE so a corrected contract (create_schedule's fires_at
+# taking a full datetime, say) reaches an INSTALLED bridge instead of waiting for
+# a PyPI release. The bridge keeps its own docstrings as the offline fallback and
+# lets them lag, exactly as it does for the text above.
+#
+# What still needs a bridge release: a NEW tool (the tool list is code, not text)
+# and any change to how the bridge handles a result client-side.
+#
+# set_canvas / add_element are deliberately stated WITHOUT the canvas doc-shape;
+# the bridge appends DOC_SHAPE to those two itself, so it is written once.
+
+TOOL_DOCS: dict[str, str] = {
+    "list_widgets": """\
+List every widget that can be placed on a canvas (with its fragments), the
+available theme/style/font appearance options, the vendored code-element
+libraries (Chart.js, canvas-gauges, dayjs, qrcode, marked, chroma, SVG.js,
+Phosphor), and an icon-set descriptor. Search icon names with list_icons().
+
+The whole catalog runs to ~95k characters, past the tool-result cap, so by
+default each widget is summarised to {key, name, summary, fragments} and the
+appearance/library blocks are returned in full (they are small and are what
+the summary can't replace). That is enough to answer "which widget do I
+want"; follow with get_widget_options(key) for one widget's full option
+schema, which is the call that actually matters before placing it.
+
+"section" narrows to one top-level block ("widgets", "appearance",
+"libraries", "icons"). "full" returns the unsummarised catalog for the rare
+case that needs it, and will likely overflow the cap.""",
+    "list_icons": """\
+Search the vendored Phosphor icon set (all six weights) by case-insensitive
+substring, so you pick a real slug instead of guessing. The query is
+normalised to slug form first (a "ph-" prefix is stripped, underscores become
+dashes), so q="ph-heart" and q="calendar_heart" both match. Use a returned
+slug as an icon element's "icon" value, or in code-element markup as ph-<slug>
+(weight via ph / ph-bold / ph-thin / ph-light / ph-fill / ph-duotone; regular
+weight needs BOTH classes, class="ph ph-heart" -- ph-heart alone renders
+nothing). An icon name that isn't in this set renders a BLANK BOX with no
+error; render_report().icon_invalid names such references after the fact.
+Empty "q" returns a capped sample plus the total; "limit" caps results
+(max 500).""",
+    "list_services": """\
+List SERVICE data sources (kind "service") -- non-placeable plugins that
+expose a whole external service's API (e.g. Home Assistant, a weather API, a
+generic REST endpoint) as data for a code element. They don't appear in
+list_widgets (they can't be placed), but you use one exactly like a widget
+source: its "key" is a valid "source"/"sources[].key" for a code or data
+element. Workflow: list_services() -> get_widget_options(key) to see its
+scope options -> probe_widget_data(key, {}) with EMPTY options first (a
+service returns a self-describing map of the scopes/endpoints it offers) ->
+probe_widget_data(key, {scope...}) to see a specific slice -> use it as a
+source. Returns {services: [{key, name, description, options}]}.""",
+    "get_widget_options": """\
+Get the configurable options for one widget, so you can fill an element's
+"options" correctly (e.g. a weather widget's location). Each option carries a
+"format" hint for its type. Big choice lists (HA entity pickers) are omitted
+by default (the option shows "choices_count" + a "choices_endpoint"); pass
+include_choices=True to inline them, or call get_widget_choices() to page.""",
+    "get_widget_choices": """\
+Page through the choice rows for one of a widget's options (kept out of
+get_widget_options so a picker with hundreds of entries doesn't bloat the
+schema). "q" filters by case-insensitive substring on value/label.""",
+    "probe_widget_data": """\
+Return a widget's data as JSON to pick "field" paths before binding a data
+primitive. Returns {data, data_source, reason, fields}: "data_source" is
+"live" (real fetch), "sample" (demo fallback because nothing was configured),
+or "error" (fetch failed) so you never mistake a placeholder for a real
+result; "fields" lists the bindable dot-paths with sample values (a wrong key
+simply isn't in the list; an empty payload has fields with null values).
+
+Long lists in "data" are truncated to "max_items" entries, each trimmed
+list carrying a sibling "<name>__truncated" note with the real length, so
+a big payload (a 24h Home Assistant history runs to hundreds of KB) stays
+readable instead of blowing the result limit and being unusable. "fields"
+is never truncated: it is the reason to call this tool. Pass full=True for
+the whole payload, or raise max_items, when you genuinely need every row.""",
+    "list_devices": """\
+List registered display devices with panel dims AND colour capability:
+"color_mode" (e.g. "6-colour (Spectra 6)"), "colors" (the renderable palette
+as hex), "gamut", "orientation", and a "mono" flag. Match a canvas's w/h to
+the target panel. The panel dithers the full-colour render down to these inks,
+so DESIGN IN FULL COLOUR -- the palette guides fine detail (thin text/icons),
+it doesn't cap the whole layout. Honour "mono" for grayscale-only panels.
+
+"touch": true appears on panels with a touch digitizer (e.g. the Seeed
+reTerminal E1003). On those, the on_tap / on_swipe / on_slide actions you
+put on a dashboard's elements actually fire on the hardware. If a device
+has no "touch" flag it's display-only (or button-driven), so don't add
+touch actions expecting them to work there.
+
+Firmware capability flags ride along when the hardware reports them:
+"overlay": {schema, max_targets} means the panel repaints small regions
+locally (instant tap echo, plus data-overlay-key live value slots --
+see the LIVE VALUE SLOTS section of the server instructions for the
+guardrails). "schema": 2 additionally means frame patches: after a tap
+fires a Home Assistant action, and on periodic re-renders that only
+move small chrome (a header clock), the panel partial-paints the
+changed regions on its own instead of full-flashing, so control
+dashboards stay truthful and clock chrome is flash-free without any
+authoring tricks ("schema": 1 panels converge via a full re-push a
+few seconds after a tap burst).
+"proto": {"v": 2} means the panel speaks protocol v2: it hit-tests
+touch locally against stable region ids and gives instant feedback
+(inverts, state tiles, slider thumbs) with the server confirming by
+patch -- pin ids on interactive code-element markup with
+data-touch-id (see the STABLE REGION IDS section of the server
+instructions). "deck_cache": {capacity_bytes} means the device caches
+deck frames on local storage and navigates decks instantly with the
+radio off. "kind" is the hardware model id. All read-only facts; never
+ask the user to enable them, the firmware advertises them.""",
+    "list_pages": """\
+List existing canvas (freeform) dashboards.""",
+    "create_canvas_page": """\
+Create a new, empty canvas dashboard and return its id. Size it to your
+target panel (see list_devices), then call bind_devices(page_id, [device_ids])
+RIGHT AWAY so the artboard and Send/schedule target the real hardware from the
+start. Then build the layout (add an empty code element + append_code, or
+set_canvas).""",
+    "delete_canvas_page": """\
+Delete a canvas dashboard by id (e.g. a throwaway QA page). Returns
+{ok: true} on success, or 404 if it isn't a canvas page.""",
+    "get_canvas": """\
+Get the full canvas document (size, appearance, and every element) for a
+page, plus "rev" / "updated_at" / "updated_by". Keep the "rev" and pass it as
+base_rev on your next write to be warned (HTTP 409) if the page drifted.""",
+    "set_canvas": """\
+Replace a canvas dashboard's document. Returns a compact {ok,id,rev,elements}
+ack (not the full document), or an error with field-level "details" (HTTP 422) if
+the document is invalid, so you can correct it and retry. Pass base_rev (the rev
+from get_canvas) to be warned with HTTP 409 if the page changed under you. For a
+one-field change prefer update_element / patch_canvas. After setting, call
+render_preview() (or render_report()) to check the result.""",
+    "set_canvas_background": """\
+Generate an AI background image (fal.ai) from "prompt" and set it as the
+canvas' full-bleed background; the data elements composite crisply ON TOP,
+so the data never passes through the image model. Sized to the canvas'
+aspect. Optional "model" (default flux/schnell), "style" (e.g. watercolor,
+bauhaus, risograph), and "fit" (cover|contain|stretch).
+The fal.ai API key lives on the "AI image" widget (the fal-image widget) --
+that's the primary place it's configured, so if this returns a 400 about a
+missing key, tell the user to paste their fal.ai key into that widget's
+settings (Settings -> Plugins -> Fal Image). It also falls back to
+app.fal.api_key or the FAL_KEY env var. Returns the ack plus the stored
+"bg_image" URL; 502 if generation fails.""",
+    "add_element": """\
+Append ONE element to a canvas and save (each call is a separate save, so an
+open editor updates live as you build). "element" is a single element object
+(same shapes as set_canvas's "els"); returns {ok,id,rev,elements,element_id}.
+Prefer this when building incrementally; use set_canvas to replace the whole
+layout at once.
+
+The element's type goes in "kind", NOT "type": {"kind": "code", "x": 0,
+"y": 0, "w": 480, "h": 800, ...}. Unknown fields are refused with a 422
+naming them rather than silently ignored, so "type" fails outright.""",
+    "add_elements_bulk": """\
+Append MANY elements to a canvas in one save (max 500). Built for a large
+primitive board that won't fit in a single set_canvas body: chunk the elements
+across a few calls instead of inlining a 20k+ document. All-or-nothing: if any
+element is invalid (unknown field / schema error) nothing is appended and the
+offending index is named, so a bad chunk never half-lands. Returns the ack plus
+"element_ids" (in order) and "appended" (the count).""",
+    "update_element": """\
+Change ONE element in place without re-sending the whole document. "patch"
+is a partial element ({field: value, ...}) merged over the existing one (a
+provided "options"/"parts" replaces wholesale). The cheap edit path for a big
+canvas: change a precision, a colour, a location, one box. Returns the ack.""",
+    "append_code": """\
+Append "text" to a code element's "field" ("html" | "css" | "js") and save.
+Each call is a separate save, which pushes a live update to an editor open on
+the page, so you can STREAM a code element in (chunk by chunk / line by line)
+and watch it build up, instead of posting the whole blob at once. Typical flow:
+add_element an empty code element (with its sources), then append_code repeatedly
+for html, then css, then js. Returns the ack plus the field's new "length".
+Don't thread base_rev while streaming (the rev changes every append).""",
+    "delete_element": """\
+Remove ONE element from a canvas by id. Returns the compact ack.""",
+    "patch_canvas": """\
+Change document-level fields (any of name, w, h, theme, style, font, bg,
+bg_image, bg_fit) without touching the elements. Use update_element / set_canvas
+for elements. Returns the ack.""",
+    "arrange": """\
+Compute "count" aligned child boxes inside "box" ({x,y,w,h}) for a
+"grid" / "row" / "column" layout, so you place cells by intent instead of
+hand-computing pixels. "gap" is the space between cells, "pad" the inset from
+the box edge, "cols" forces a grid column count (default ~sqrt). Returns
+{boxes:[{x,y,w,h}, ...]}; spread them across your elements' geometry (bake
+them in as normal elements — they stay individually editable).""",
+    "measure_text": """\
+Measure how wide/tall text renders in a widget font, so a box fits its
+content (prevents clipping). "items" is a list of {text, font?, size?, weight?,
+max_width?}. Returns {items:[{text,width,height,fits}]} where "fits" is whether
+the text is within max_width. Font names come from list_widgets().appearance.""",
+    "describe_actions": """\
+The authoritative touch-action vocabulary for canvas elements, so you don't
+have to reverse-engineer it: the element fields (on_tap / on_swipe / on_slide /
+actions), the string grammar (refresh / rotate_next / rotate_prev / step:<n> /
+page:<id> / webhook:<url>), the Home Assistant object form and every input
+variation that normalises to it, the slider {value} placeholder, the provenance
+rule (webhook/HA fire only from config, not raw markup), and how to verify wiring.
+Element-level actions are NOT part of get_widget_options (that's cell data).""",
+    "render_report": """\
+Read back what a canvas actually rendered, as JSON (a companion to
+render_preview's image). Per element: the resolved box, the text that
+rendered, overflow/clip flags (overflow_x when content is wider than its box),
+"data_source" (live | sample | error | static), and computed colours; plus the
+board's resolved background / theme. Also "tap_regions" (every touch region that
+rendered: box + resolved on_tap/on_swipe/on_slide action), "tap_dangling" (code
+element @name refs with no matching entry), and "tap_invalid" (regions whose action
+would NOT dispatch: box + gesture + reason). A region in tap_regions was only
+STORED -- it fires only if it is NOT in tap_invalid, so check tap_invalid == [] to
+trust a touch dashboard. Use it to verify a render — catch clipping, confirm live
+data, read the real colours, check touch targets fire — without parsing a PNG.
+(Widget cells render into shadow DOM, so their "text" may be empty; data
+primitives and decorations report their text.)
+
+"icon_invalid" (always on, same spirit as tap_invalid): icon references that
+resolve to NO glyph and render a blank box -- an icon element's unknown slug or
+weight, a bind icon-table value, or a ph-<name> class in code/html markup that
+isn't a real Phosphor name -- each with the element id and reason. Check it
+whenever you placed icons; fix with a slug from list_icons(q).
+
+"injected_libs" (always on): the vendored bundles each code element's sandbox
+inlined -- Chart.js, a Phosphor weight, a bundled font. The choice is INFERRED
+from the element's own html/css/js, so each entry carries "inferred" and the
+"matched" token behind it; an element that ended up carrying a stylesheet it
+never asked for is named here instead of deduced from pixels. Set an element's
+"autolibs": false to inject nothing at all.
+
+On a large board the full report can be big. Pass view="touch" for just the
+touch-wiring sections (tap_regions / tap_invalid / tap_dangling), or
+fields="tap_invalid,tap_dangling" (any of board / elements / tap_regions /
+tap_invalid / tap_dangling / injected_libs) to trim it. id + rev always ride
+along.
+
+debug=True adds a "diagnostics" section -- reach for it whenever a render
+looks wrong and the cause isn't visible: "console" (error/warn output from
+every frame; a throwing code-element script lands here tagged
+[code-el <id>]), "page_errors" (uncaught exceptions), "network" (failed and
+4xx/5xx requests -- a 404 font names its URL), "settle" (what gated the
+capture: goto / compose-signal / image-wait / font-wait outcome + ms),
+"fonts" (every face: loaded | pending-at-capture | failed | never-requested,
+with src), "css" (CSS the browser silently dropped: invalid authored
+declarations, plus any rule missing from the stylesheet a code element's
+sandbox actually composed), "libraries" (the same record as injected_libs,
+with per-element detail). Diagnose from this instead of pixel-hunting.
+
+fresh=True re-fetches widget data (bypasses the last-good fallback and
+widget caches), so a stale cached result can't mislead a debugging pass.""",
+    "render_preview": """\
+Render the canvas to a PNG at its authored size and return the image, so you
+can visually check the layout and iterate. This is your feedback loop: place →
+render_preview → adjust → set_canvas → render_preview again. For a
+machine-readable check (values, overflow, colours), use render_report().
+fresh=True re-fetches widget data (bypasses the last-good fallback and widget
+caches) -- use it while debugging so a stale cached result can't mislead you.""",
+    "push_to_device": """\
+Render the canvas ONCE and fan it out to the given devices (ids from
+list_devices), each fitted/quantised to its own panel by the server.
+device_ids is required and may list many panels -- pushing is always
+explicit. This is a one-off; use bind_devices to remember the target set
+for scheduling. Returns {sent: [...], errors: [...]}.""",
+    "bind_devices": """\
+Persistently bind a canvas to a set of devices (replaces the set; []
+unbinds). Call this EARLY -- right after create_canvas_page -- not just before
+a push: it SAVES the target set on the page so the artboard, a later schedule /
+rotation, and the visual editor's Send all hit the same panels. Unlike
+push_to_device (a one-off fan-out), it doesn't render. Ids not matching a
+registered device (list_devices) are dropped and returned under "unknown".
+Returns {bound, unknown}.""",
+    "list_rotations": """\
+List rotations: ordered page cycles that advance on a wall-clock
+anchor (and via prev/next buttons). Each has steps [{page_id,
+dwell_minutes}] and device_ids.""",
+    "create_rotation": """\
+Create or replace a rotation. 'rotation' is a full object:
+{id, name, device_ids, steps:[{page_id, dwell_minutes}], anchor?
+("HH:MM"), days_of_week?}. Bind the step pages to the devices first
+(bind_devices). Returns {ok, id}, or 422 with "details" on a bad shape.""",
+    "delete_rotation": """\
+Delete a rotation by id.""",
+    "list_schedules": """\
+List schedules: time-driven pushes of a page to its devices (interval
+or daily, with day-of-week + time-window filters).""",
+    "create_schedule": """\
+Create or replace a schedule. 'schedule' is a full object:
+{id, name, page_id, type ("interval"|"daily"), interval_minutes? or
+fires_at?, days_of_week?, priority?}. Returns {ok, id}, or 422 with
+"details" on a bad shape.
+
+'name' is REQUIRED alongside 'id' and must be non-empty; omitting it
+422s. A daily schedule's 'fires_at' is a FULL datetime, not "HH:MM":
+only the time-of-day is used, so the date is a placeholder and
+"2000-01-01T06:00:00" is the conventional way to write 6am.""",
+    "delete_schedule": """\
+Delete a schedule by id.""",
+    "list_decks": """\
+List decks: groups of pages kept pre-rendered per device so a button
+press or touch that moves between them is instant. Each page links to
+others by a button name or a touch zone.""",
+    "suggest_decks": """\
+Suggest decks derived from the page:<id> tap/swipe links you set on
+page elements (on_tap / on_swipe): connected clusters of linked pages,
+each a ready-to-create Deck with its graph + touch zones filled in. Use
+this after wiring inter-page navigation to offer the user a deck.""",
+    "create_deck": """\
+Create or replace a deck. 'deck' is a full object: {id, name,
+device_ids, pages:[{page_id, refresh_interval_minutes? (per-page
+override of the deck default; 0 = warm only on first visit), links:
+[{target_page_id, and exactly one of button:"left"/"right"/... OR
+zone:{x,y,w,h in 0..1}}]}], entry_page_id?, refresh_interval_minutes?}.
+Link targets must be pages in the deck. Prefer suggest_decks() to build
+one from existing page links. Omitting links entirely is also fine: the
+server derives the graph from the pages' page:<id> tap/swipe links, and
+pages still link-less after that get default prev/next (left/right)
+navigation on-device, so a plain {id, name, device_ids, pages:[{page_id}]}
+deck navigates out of the box. Returns {ok, id, links_derived}, or 422
+on a bad shape.""",
+    "delete_deck": """\
+Delete a deck by id.""",
+}
