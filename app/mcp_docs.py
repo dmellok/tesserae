@@ -27,6 +27,12 @@ DOC_SHAPE = """A canvas document is JSON:
   "els": [ <element>, ... ],          # painted in list order: first = back, last = front
   "inputs": [ <config input>, ... ]   # optional; the settings this dashboard asks for
 }
+An <element> is {"kind": ..., "x","y","w","h", ...}. The type goes in "kind",
+NOT "type": {"kind":"code","x":0,"y":0,"w":480,"h":800,"html":"","css":"","js":""}.
+Unknown fields are refused with a 422 naming them rather than silently ignored,
+so "type" fails outright instead of drawing nothing. Kinds: widget, code, data,
+text, icon, shape, line, html, svg, hotspot, and the touch primitives
+(button, switch, slider, stepper).
 "inputs" is the dashboard's own config surface, shown at /pages/canvas/c/<id>/configure
 and offered as the install questions when it's shared to the catalog. Declare one for
 every value the operator will plausibly want to change later -- an API endpoint, a

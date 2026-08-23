@@ -332,6 +332,51 @@ def _truncate_payload(value: Any, max_items: int, _path: str = "data") -> tuple[
     return value, dropped
 
 
+_CATALOG_SUMMARY_KEYS = ("key", "id", "name", "title", "summary", "description", "fragments")
+
+
+def _summarise_catalog(catalog: dict[str, Any]) -> dict[str, Any]:
+    """Trim the widget list to what "which widget do I want" needs.
+
+    The full catalog is ~95k characters, past the MCP result cap, so it spools to
+    a file the caller then has to grep, which is worse than useless for a
+    question this cheap. Each widget keeps its identity, one-line description and
+    fragment list; its full option schema is dropped, because
+    get_widget_options(key) is the call that answers that and it answers it for
+    one widget instead of every widget at once.
+
+    Everything that isn't the widget list passes through untouched: the
+    appearance / libraries / icons blocks are small, and they are exactly the
+    parts a summary could not stand in for.
+    """
+    out: dict[str, Any] = {}
+    trimmed = 0
+    for block, value in catalog.items():
+        if block != "widgets" or not isinstance(value, list):
+            out[block] = value
+            continue
+        items: list[Any] = []
+        for w in value:
+            if not isinstance(w, dict):
+                items.append(w)
+                continue
+            slim = {k: w[k] for k in _CATALOG_SUMMARY_KEYS if k in w}
+            if len(slim) < len(w):
+                trimmed += 1
+            items.append(slim)
+        out[block] = items
+    if trimmed:
+        out["summarised"] = {
+            "widgets": trimmed,
+            "note": (
+                "Each widget is trimmed to its identity + description + fragments. "
+                "Call get_widget_options(key) for one widget's full option schema, "
+                "or list_widgets(full=True) for the unsummarised catalog."
+            ),
+        }
+    return out
+
+
 def _json(method: str, path: str, body: dict[str, Any] | None = None) -> Any:
     """Call the API expecting JSON. Non-2xx bodies are returned as-is (so the agent
     sees 422 validation details) rather than raised."""
@@ -518,12 +563,28 @@ def build_server() -> Any:
     """
     from mcp.server.fastmcp import FastMCP, Image
 
-    def list_widgets() -> Any:
+    def list_widgets(section: str = "", full: bool = False) -> Any:
         """List every widget that can be placed on a canvas (with its fragments), the
         available theme/style/font appearance options, the vendored code-element
         libraries (Chart.js, canvas-gauges, dayjs, qrcode, marked, chroma, SVG.js,
-        Phosphor), and an icon-set descriptor. Search icon names with list_icons()."""
-        return _json("GET", "/catalog")
+        Phosphor), and an icon-set descriptor. Search icon names with list_icons().
+
+        The whole catalog runs to ~95k characters, past the tool-result cap, so by
+        default each widget is summarised to {key, name, summary, fragments} and the
+        appearance/library blocks are returned in full (they are small and are what
+        the summary can't replace). That is enough to answer "which widget do I
+        want"; follow with get_widget_options(key) for one widget's full option
+        schema, which is the call that actually matters before placing it.
+
+        "section" narrows to one top-level block ("widgets", "appearance",
+        "libraries", "icons"). "full" returns the unsummarised catalog for the rare
+        case that needs it, and will likely overflow the cap."""
+        out = _json("GET", "/catalog")
+        if full or not isinstance(out, dict):
+            return out
+        if section:
+            return {section: out.get(section)}
+        return _summarise_catalog(out)
 
     def list_icons(q: str = "", limit: int = 100) -> Any:
         """Search the vendored Phosphor icon set (all six weights) by case-insensitive
@@ -713,7 +774,11 @@ def build_server() -> Any:
         an editor open on the page updates live as you build. "element" is a single
         element object (same shapes as set_canvas's "els"). Returns the compact ack
         plus the new "element_id". Prefer this when building incrementally; use
-        set_canvas to replace the whole layout at once."""
+        set_canvas to replace the whole layout at once.
+
+        The element's type goes in "kind", NOT "type": {"kind": "code", "x": 0,
+        "y": 0, "w": 480, "h": 800, ...}. Unknown fields are refused with a 422
+        naming them rather than silently ignored, so "type" fails outright."""
         return _json("POST", f"/pages/{page_id}/elements{_rev_suffix(base_rev)}", element)
 
     def add_elements_bulk(page_id: str, elements: list[dict[str, Any]], base_rev: str = "") -> Any:

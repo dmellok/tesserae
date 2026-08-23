@@ -162,3 +162,39 @@ def test_probe_payload_truncation_keeps_shape():
 
     small = {"a": [1, 2, 3]}
     assert _truncate_payload(small, 20) == (small, [])
+
+
+def test_catalog_summary_keeps_identity_and_drops_option_schemas():
+    """The full catalog is ~95k characters, past the tool-result cap, so it
+    spools to a file the caller has to grep. Each widget keeps what answers
+    "which widget do I want"; get_widget_options(key) answers the rest, for one
+    widget instead of all of them."""
+    from tesserae_mcp import _summarise_catalog
+
+    catalog = {
+        "widgets": [
+            {
+                "key": f"w{i}",
+                "name": f"W{i}",
+                "summary": "does a thing",
+                "fragments": ["sm", "lg"],
+                "options": {"a": {"blob": "y" * 400}},
+            }
+            for i in range(60)
+        ],
+        "appearance": {"themes": ["a", "b"]},
+        "libraries": ["chartjs"],
+    }
+    out = _summarise_catalog(catalog)
+
+    assert sorted(out["widgets"][0]) == ["fragments", "key", "name", "summary"]
+    assert "options" not in out["widgets"][0]
+    assert len(out["widgets"]) == 60, "every widget still listed, just trimmed"
+    # The small blocks are exactly what a summary can't stand in for.
+    assert out["appearance"] == catalog["appearance"]
+    assert out["libraries"] == catalog["libraries"]
+    assert out["summarised"]["widgets"] == 60
+
+    # A catalog with nothing to trim gains no note.
+    lean = {"widgets": [{"key": "a", "name": "A"}], "appearance": {}}
+    assert "summarised" not in _summarise_catalog(lean)

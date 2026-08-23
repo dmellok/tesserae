@@ -4,6 +4,24 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.353.0], 2026-08-23
+
+### Fixed
+
+- **The element discriminator is documented.** The canvas doc shape showed `"els": [ <element>, … ]`
+  and never expanded `<element>` or named the field the type goes in, so the only way to learn it
+  was to `get_canvas` an existing page and read a real element back. `DOC_SHAPE` now spells out that
+  the type goes in `kind` and not `type`, and lists the kinds. `add_element` says the same, since it
+  is where the 422 is met.
+
+- **`list_widgets` no longer overflows the tool-result cap.** The full catalog runs to ~95k
+  characters, so it spooled to a file the caller then had to grep, for a question ("which widget do
+  I want") that is cheap to answer. Each widget is now summarised to its identity, description and
+  fragments; `get_widget_options(key)` already answers the option schema, for one widget rather than
+  every widget at once. The appearance / libraries / icons blocks pass through untouched, being
+  small and exactly what a summary cannot stand in for. `section=` narrows to one block and
+  `full=True` returns the unsummarised catalog.
+
 ## [0.352.0], 2026-08-23
 
 ### Fixed
