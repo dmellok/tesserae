@@ -4,6 +4,30 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.354.0], 2026-08-23
+
+### Added
+
+- **Settings flags an out-of-date MCP bridge.** `tesserae-mcp` is installed separately from
+  Tesserae, so an install could sit on an old bridge indefinitely with nothing to say so. The
+  handshake instructions and canvas doc-shape are served live from `/api/mcp/instructions`, so
+  those keep up on their own; what only a release moves is the tool list, each tool's own
+  description, and the bridge's client-side result trimming. Every bridge call already names its
+  version in `User-Agent`, so Settings → System → MCP now records it and reveals a "Connected
+  bridge" card with the version, when it was last seen, and the `pipx upgrade` line when it is
+  behind the release this repo ships. The card appears only once a client has actually connected,
+  and opens on its own only when there is something to act on. A client that isn't the bridge is
+  shown as a connection without a version to compare, and a bridge *ahead* of this server (a clone)
+  is not nagged. `/api/mcp/instructions` also names the shipped bridge, as an additive key needing
+  no schema bump.
+
+### Fixed
+
+- **The bridge install command pointed at an archived repo.** Settings, the package README, and the
+  missing-SDK error all said `pip install git+https://github.com/dmellok/tesserae-mcp`, which is
+  archived at 0.5.0; development moved into this monorepo. All three now say
+  `pipx install tesserae-mcp`, matching the install guide.
+
 ## [0.353.0], 2026-08-23
 
 ### Fixed

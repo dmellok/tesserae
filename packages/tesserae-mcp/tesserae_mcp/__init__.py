@@ -1108,7 +1108,7 @@ def main() -> None:
         if exc.name and exc.name.split(".")[0] == "mcp":
             raise SystemExit(
                 "The MCP SDK isn't installed. Reinstall the bridge with its dependency:\n\n"
-                "    pip install git+https://github.com/dmellok/tesserae-mcp\n"
+                "    pipx install tesserae-mcp\n"
             ) from exc
         raise
     server.run()

@@ -1048,6 +1048,39 @@ docker compose up -d</code></pre>
       {% endif %}
     </p>
 
+    {% if system_mcp_bridge.seen %}
+    {# Only rendered once something has actually called /api/mcp, and opened by
+       default when that client is behind, so a current bridge stays a quiet
+       one-line status and an outdated one asks to be dealt with. #}
+    <details{% if system_mcp_bridge.update_available %} open{% endif %}>
+      <summary>
+        <i class="ph ph-plug" aria-hidden="true"></i> Connected bridge
+        {% if system_mcp_bridge.unknown_client %}
+          &middot; <span class="pill">{{ system_mcp_bridge.client }}</span>
+        {% elif system_mcp_bridge.update_available %}
+          &middot; <span class="pill is-warn">v{{ system_mcp_bridge.version }} &rarr; v{{ system_mcp_bridge.expected }}</span>
+        {% else %}
+          &middot; <span class="pill is-ok">v{{ system_mcp_bridge.version }}</span>
+        {% endif %}
+      </summary>
+
+      <p class="field-help">
+        Last seen {{ system_mcp_bridge.at | fmt_time }}.
+        {% if system_mcp_bridge.unknown_client %}
+          This client doesn't identify itself as <code>tesserae-mcp</code>, so there's no version to compare.
+        {% endif %}
+      </p>
+
+      {% if system_mcp_bridge.update_available %}
+      <p>Your agent is running <code>tesserae-mcp {{ system_mcp_bridge.version }}</code>; this Tesserae ships with <code>{{ system_mcp_bridge.expected }}</code>.</p>
+      <p class="field-help">The handshake instructions and canvas doc-shape are served from here, so those are already current. What only a release moves is the tool list, each tool's own description, and how the bridge trims big results, so an older bridge can miss tools or mis-call the ones it has. Run this on the machine your <em>agent</em> runs on, then restart the agent:</p>
+      <pre class="code-snippet"><code>{{ system_mcp_bridge.upgrade_command }}</code></pre>
+      {% elif not system_mcp_bridge.unknown_client %}
+      <p class="field-help">Matches the bridge this Tesserae ships with. Nothing to do.</p>
+      {% endif %}
+    </details>
+    {% endif %}
+
     <details>
       <summary>Connect an agent (Claude Desktop / Claude Code)</summary>
       <pre class="code-snippet"><code>{
@@ -1061,7 +1094,7 @@ docker compose up -d</code></pre>
     }
   }
 }</code></pre>
-      <p class="field-help">Install the bridge on your agent's machine with <code>pip install git+https://github.com/dmellok/tesserae-mcp</code>. On the same machine as Tesserae you can omit the token (loopback is trusted).</p>
+      <p class="field-help">Install the bridge on your agent's machine with <code>pipx install tesserae-mcp</code> (upgrade later with <code>pipx upgrade tesserae-mcp</code>). On the same machine as Tesserae you can omit the token (loopback is trusted).</p>
     </details>
 
     <form method="post" action="{{ url_for('auth.system_mcp_regenerate') }}" class="form" onsubmit="return confirm('Generate a new MCP token? Any agent using the old token will stop authenticating.');">

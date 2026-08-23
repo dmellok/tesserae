@@ -140,6 +140,12 @@ def settings_area(area: str) -> str | Response:
     system_mcp_enabled = _experiments.is_enabled("mcp")
     system_mcp_token_set = False
     system_mcp_reveal_token = session.pop("_mcp_token_reveal", "") if area == "system" else ""
+    # Which bridge has actually connected, and whether it's behind the release
+    # this repo ships. Stays empty until something calls /api/mcp, which is what
+    # keeps the card out of the way on an install that never uses an agent.
+    from app import mcp_bridge as _mcp_bridge
+
+    system_mcp_bridge = _mcp_bridge.status(settings_store())
     # Experiments card: one row per catalogued flag, with the resolved state
     # and whether an env var pins it (row renders read-only then).
     # ``needs_online`` marks a row whose feature is hosted on api.tesserae.ink
@@ -268,6 +274,7 @@ def settings_area(area: str) -> str | Response:
         system_webhook_reveal_token=system_webhook_reveal_token,
         system_mcp_enabled=system_mcp_enabled,
         system_mcp_token_set=system_mcp_token_set,
+        system_mcp_bridge=system_mcp_bridge,
         system_mcp_reveal_token=system_mcp_reveal_token,
         system_experiments=system_experiments,
         system_password_set=system_password_set,

@@ -31,7 +31,7 @@ from flask import Blueprint, Flask, abort, current_app, jsonify, request, url_fo
 from pydantic import ValidationError
 from werkzeug.wrappers import Response
 
-from app import experiments
+from app import experiments, mcp_bridge
 from app import panels_routes as _pr
 from app.auth import _is_loopback
 from app.panels_schema import build_catalog
@@ -76,20 +76,32 @@ def rotate_token(settings: SettingsStore) -> str:
 
 @bp.before_request
 def _gate() -> Response | None:
-    """404 when the experiment is off; otherwise allow loopback or a valid token."""
+    """404 when the experiment is off; otherwise allow loopback or a valid token.
+
+    An authorised call also records which client made it (:mod:`app.mcp_bridge`),
+    so Settings can show the connected bridge and flag an out-of-date one. Only
+    authorised calls are recorded, so an unauthenticated prod can't write there.
+    """
     if not experiments.is_enabled(_EXPERIMENT):
         abort(404)
+    if not _authorised():
+        return _err(
+            401,
+            "unauthorized: present the MCP token as 'Authorization: Bearer <token>' "
+            "(generate one in Settings → System → MCP), or call from localhost.",
+        )
+    mcp_bridge.record_request(_settings(), request.headers.get("User-Agent", ""))
+    return None
+
+
+def _authorised() -> bool:
+    """Loopback is trusted (a co-located agent needs zero config); anything else
+    presents the stored MCP token as a bearer token."""
     if _is_loopback():
-        return None
+        return True
     stored = mcp_token(_settings())
     presented = _presented_token(request)
-    if stored and presented and secrets.compare_digest(presented, stored):
-        return None
-    return _err(
-        401,
-        "unauthorized: present the MCP token as 'Authorization: Bearer <token>' "
-        "(generate one in Settings → System → MCP), or call from localhost.",
-    )
+    return bool(stored and presented and secrets.compare_digest(presented, stored))
 
 
 def _err(status: int, message: str, **extra: Any) -> Response:
@@ -2439,7 +2451,12 @@ def instructions() -> Response:
     The tesserae-mcp bridge fetches this at startup so a capability / copy change
     goes live on the next agent connection with no bridge republish; the bridge
     keeps an embedded copy as a fallback. ``schema`` lets an older bridge tell
-    whether it understands the payload shape."""
+    whether it understands the payload shape.
+
+    ``bridge`` names the release this server ships with, so a bridge can tell the
+    agent it is behind on the very docs it just fetched. It's an additive key: a
+    bridge that predates it reads ``instructions`` / ``doc_shape`` and ignores
+    the rest, so no ``schema`` bump is needed."""
     from app import mcp_docs
 
     return jsonify(
@@ -2447,6 +2464,10 @@ def instructions() -> Response:
             "schema": mcp_docs.DOCS_SCHEMA,
             "instructions": mcp_docs.INSTRUCTIONS,
             "doc_shape": mcp_docs.DOC_SHAPE,
+            "bridge": {
+                "latest": mcp_bridge.EXPECTED_VERSION,
+                "upgrade": mcp_bridge.UPGRADE_COMMAND,
+            },
         }
     )
 

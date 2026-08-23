@@ -30,10 +30,16 @@ Run this on the machine where your **agent** runs (your laptop/desktop), which
 may be different from where Tesserae runs.
 
 ```bash
-pip install git+https://github.com/dmellok/tesserae-mcp
+pipx install tesserae-mcp
 ```
 
-That gives you the `tesserae-mcp` command.
+That gives you the `tesserae-mcp` command. Upgrade it later with `pipx upgrade
+tesserae-mcp`; Tesserae flags an out-of-date bridge under **Settings → System →
+MCP** once one has connected.
+
+(From source: `pip install "git+https://github.com/dmellok/tesserae#subdirectory=packages/tesserae-mcp"`.
+The standalone `dmellok/tesserae-mcp` repo is archived at 0.5.0 — development
+moved into the monorepo.)
 
 ## Configure your agent
 
