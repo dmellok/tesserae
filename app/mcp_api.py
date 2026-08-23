@@ -1695,7 +1695,16 @@ _DIAG_JS: str = r"""() => {
   // The browser drops invalid rules/declarations without a trace; re-parse
   // each element's authored CSS with the browser's own parser and diff.
   // Best-effort: native nesting and exotic at-rules are skipped, not flagged.
-  const normSel = (s) => String(s).replace(/\s+/g, '').replace(/['"]/g, '').toLowerCase();
+  // The parser rewrites what it KEEPS, so the diff has to compare on a shape
+  // both spellings collapse to or it reports a rewrite as a drop. Legacy
+  // ``a:before`` comes back as ``a::before``, so without the ``::`` collapse
+  // every author using the single-colon form was told their rule had been
+  // "dropped by the CSS parser" while it was applying perfectly well. A
+  // diagnostic that contradicts the render is worse than no diagnostic.
+  // Same normalisation as decorate.js's in-sandbox cssSelfCheck, which had it
+  // and this one didn't, so the two analysers disagreed with each other.
+  const normSel = (s) =>
+    String(s).replace(/\s+/g, '').replace(/['"]/g, '').replace(/::/g, ':').toLowerCase();
   const walkBlocks = (text) => {
     const blocks = [];
     let depth = 0, buf = '', body = '', sel = '';

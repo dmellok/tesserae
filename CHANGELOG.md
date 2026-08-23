@@ -4,6 +4,20 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.350.0], 2026-08-23
+
+### Fixed
+
+- **The CSS diagnostic reported a rewrite as a drop.** `render_report`'s analysis diffs the authored
+  selectors against the ones the parser kept, but the parser rewrites what it keeps: legacy
+  `a:before` comes back as `a::before`. `normSel` collapsed whitespace and quotes but not `::`, so
+  any rule written with the single-colon form was reported as "dropped by the CSS parser" while it
+  was applying perfectly well.
+
+  decorate.js's in-sandbox `cssSelfCheck` already collapsed `::` in its own normaliser, so the two
+  analysers disagreed with each other about the same stylesheet. A diagnostic that contradicts the
+  render is worse than no diagnostic: it sends the author looking for a parser bug that isn't there.
+
 ## [0.349.0], 2026-08-23
 
 ### Fixed

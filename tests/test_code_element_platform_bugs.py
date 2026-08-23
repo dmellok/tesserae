@@ -69,3 +69,27 @@ def test_console_log_reaches_the_debug_channel(monkeypatch: Any) -> None:
     )
     assert "_DIAG_MAX_CHATTY" in body, "logs must have their own budget, not the shared one"
     assert renderer._DIAG_MAX_EVENTS > 0
+
+
+def test_css_diagnostic_does_not_report_a_rewrite_as_a_drop() -> None:
+    """The render-report CSS analysis diffs authored selectors against what the
+    parser kept, but the parser REWRITES what it keeps: legacy ``a:before``
+    comes back as ``a::before``. Without collapsing ``::`` the diff called that
+    a drop, so an author was told a rule was "dropped by the CSS parser" while
+    it was applying fine. decorate.js's in-sandbox check already collapsed it;
+    the two analysers disagreed with each other."""
+    src = (REPO_ROOT / "app" / "mcp_api.py").read_text(encoding="utf-8")
+    norm_line = next(line for line in src.splitlines() if "const normSel" in line)
+    body = src.split("const normSel", 1)[1].split(";", 1)[0]
+    assert "replace(/::/g, ':')" in body, f"normSel must collapse ::, got {norm_line!r}"
+
+    # Mirror both normalisers and prove they now agree on the forms that matter.
+    def norm(s: str) -> str:
+        return re.sub(r"\s+", "", s).replace("'", "").replace('"', "").replace("::", ":").lower()
+
+    for authored, parsed in (
+        ("a:before", "a::before"),
+        ("p:first-letter", "p::first-letter"),
+        ("li:nth-child(2n + 1)", "li:nth-child(2n+1)"),
+    ):
+        assert norm(authored) == norm(parsed), authored
