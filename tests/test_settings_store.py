@@ -267,3 +267,65 @@ def test_get_section_tolerates_per_value_decryption_failures(tmp_path: Path) -> 
     # ciphertext. Downstream is_configured() / entity-picker
     # sentinel handle empty as "needs to be re-entered".
     assert section["spotify"]["api_key_secret"] == ""
+
+
+# -- secrets that outlive their key ---------------------------------------
+
+
+def test_an_unreadable_secret_is_reported_not_masked(tmp_path: Path) -> None:
+    """A stored secret that no longer decrypts (the encryption key moved:
+    a recreated container, a restored data folder) must not be shown to the
+    admin UI as a saved value. Masking it claims a working credential is
+    stored while every runtime read gets an empty string, which is what
+    makes this look like "the token is wiped on every upgrade"."""
+    from app.state.settings_store import SECRET_MASK
+
+    path = tmp_path / "s.json"
+    first = SettingsStore(path, secret_box=_box())
+    first.update_for_namespace("plugins", "weather", {"api_key": "hass-token-xyz"}, WIDGET_FIELDS)
+    assert first.get_for_admin("plugins", "weather", WIDGET_FIELDS)["api_key"] == SECRET_MASK
+    assert first.unreadable_secrets("plugins", "weather") == set()
+
+    # Same data, different key: exactly what an upgrade with an unpinned
+    # TESSERAE_SECRET_KEY does.
+    second = SettingsStore(path, secret_box=_box())
+    assert second.unreadable_secrets("plugins", "weather") == {"api_key_secret"}
+    assert second.get_for_admin("plugins", "weather", WIDGET_FIELDS)["api_key"] == ""
+    # The read path still degrades quietly rather than taking the section
+    # down with it, which is what keeps the rest of the install running.
+    assert second.get_section("plugins")["weather"]["api_key_secret"] == ""
+
+
+def test_non_secret_values_survive_a_key_change(tmp_path: Path) -> None:
+    """Only the ciphertext is lost. This is why the symptom reads as "my
+    URL is right but it says not configured"."""
+    path = tmp_path / "s.json"
+    first = SettingsStore(path, secret_box=_box())
+    first.update_for_namespace(
+        "plugins", "weather", {"api_key": "k", "base_url": "http://ha.local:8123"}, WIDGET_FIELDS
+    )
+    second = SettingsStore(path, secret_box=_box())
+    state = second.get_for_admin("plugins", "weather", WIDGET_FIELDS)
+    assert state["base_url"] == "http://ha.local:8123"
+    assert state["api_key"] == ""
+
+
+def test_repairing_the_secret_clears_the_report(tmp_path: Path) -> None:
+    """Typing it in again is the whole fix, and the store must agree."""
+    path = tmp_path / "s.json"
+    SettingsStore(path, secret_box=_box()).update_for_namespace(
+        "plugins", "weather", {"api_key": "old"}, WIDGET_FIELDS
+    )
+    store = SettingsStore(path, secret_box=_box())
+    assert store.unreadable_secrets("plugins", "weather") == {"api_key_secret"}
+    store.update_for_namespace("plugins", "weather", {"api_key": "new"}, WIDGET_FIELDS)
+    assert store.unreadable_secrets("plugins", "weather") == set()
+    assert store.get_for_runtime("plugins", "weather", WIDGET_FIELDS)["api_key"] == "new"
+
+
+def test_nothing_is_unreadable_without_a_box(tmp_path: Path) -> None:
+    """No encryption, nothing to fail: the query is meaningless and says so
+    rather than guessing from the shape of a value."""
+    store = SettingsStore(tmp_path / "s.json")
+    store.update_for_namespace("plugins", "weather", {"api_key": "plain"}, WIDGET_FIELDS)
+    assert store.unreadable_secrets("plugins", "weather") == set()

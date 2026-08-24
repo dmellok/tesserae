@@ -4,6 +4,26 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.364.1], 2026-08-25
+
+### Fixed
+
+- **A saved secret that can no longer be decrypted now says so, instead of looking like it was
+  never entered.** Tesserae encrypts secrets at rest. If the encryption key changes, which is
+  what a recreated container or a restored data folder does when `TESSERAE_SECRET_KEY` isn't
+  pinned, the stored value can't be read and every runtime read gets an empty string. That is
+  deliberate, so one stale value can't take a whole settings section down with it, but the
+  admin UI still showed the field masked as though a working secret were saved, and widgets
+  reported "Home Assistant is not configured" to people who had configured it.
+
+  The settings form now leaves such a field empty, marks it "Re-enter to repair", and explains
+  what happened. Home Assistant widgets say the token can no longer be decrypted and where to
+  fix it, rather than claiming nothing was set up. A missing token is also now distinguished
+  from a completely unconfigured install.
+
+  Nothing else is affected by the key change: URLs, dashboards and every non-secret setting are
+  stored in the clear and survive. Re-entering the secret repairs it.
+
 ## [0.364.0], 2026-08-25
 
 ### Added

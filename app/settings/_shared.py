@@ -335,6 +335,36 @@ def render_for_admin(namespace: str, item_id: str, fields: list[dict[str, Any]])
     return settings_store().get_for_admin(namespace, item_id, fields)
 
 
+def mark_unreadable_secrets(
+    fields: list[dict[str, Any]], namespace: str, item_id: str | None = None
+) -> list[dict[str, Any]]:
+    """Copy ``fields``, flagging any secret whose stored value will not
+    decrypt with the current key.
+
+    The form renders the flag as a warning. Without it the box is simply
+    empty, which reads as "never set" and invites the operator to wonder
+    whether they have to re-enter it after every upgrade (they don't: the
+    encryption key moved, usually a recreated container or a restored data
+    folder, see app/secret_box.py)."""
+    store = settings_store()
+    try:
+        unreadable = store.unreadable_secrets(namespace, item_id)
+    except Exception:
+        return fields
+    if not unreadable:
+        return fields
+    out: list[dict[str, Any]] = []
+    for field in fields:
+        name = str(field.get("name") or "")
+        if field.get("secret") and f"{name}_secret" in unreadable:
+            marked = dict(field)
+            marked["secret_unreadable"] = True
+            out.append(marked)
+        else:
+            out.append(field)
+    return out
+
+
 # -- redirect helpers ---------------------------------------------------
 
 

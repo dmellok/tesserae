@@ -183,6 +183,46 @@ class SettingsStore:
             assert isinstance(unwrapped, dict)  # type narrowing for mypy
             return unwrapped
 
+    def unreadable_secrets(self, section: str, item_id: str | None = None) -> set[str]:
+        """Disk keys under ``section`` (or ``section.item_id``) whose stored
+        ciphertext will not decrypt with the current key.
+
+        The read paths deliberately turn an undecryptable secret into an
+        empty string so one stale value can't take a whole section down with
+        it. That keeps the app running and makes the value falsy everywhere,
+        which is the safe outcome, but it leaves the admin UI unable to tell
+        "never set" from "set, and unreadable since the key changed" -- and
+        those need opposite things from the operator. This answers that
+        question on demand rather than by tracking state, so it cannot go
+        stale relative to what is actually on disk.
+
+        Empty when no SecretBox is wired (nothing is encrypted, so nothing
+        can fail to decrypt).
+        """
+        if self._secret_box is None:
+            return set()
+        item = (
+            self._get_item(section, item_id) if item_id is not None else self.raw_section(section)
+        )
+        bad: set[str] = set()
+        for key, value in item.items():
+            if not (isinstance(key, str) and key.endswith("_secret")):
+                continue
+            if not isinstance(value, str) or not is_wrapped(value):
+                continue
+            try:
+                self._maybe_unwrap(value)
+            except SecretBoxError:
+                bad.add(key)
+        return bad
+
+    def raw_section(self, section: str) -> dict[str, Any]:
+        """A section exactly as stored, secrets still wrapped. Only for
+        callers that need to reason about the ciphertext itself."""
+        with self._lock:
+            data = self._data.get(section, {})
+            return dict(data) if isinstance(data, dict) else {}
+
     def update_section(self, section: str, values: dict[str, Any]) -> None:
         """Replace the entire section with ``values``. The auth + app
         sections use this; per-plugin / per-renderer flows go through
@@ -239,12 +279,20 @@ class SettingsStore:
         ``SECRET_MASK`` if a value is present (or left absent if not). Use
         this when shipping settings back over the wire to the UI."""
         on_disk = self._get_item(namespace, item_id)
+        unreadable = self.unreadable_secrets(namespace, item_id)
         out: dict[str, Any] = {}
         for field in manifest_settings:
             name = str(field["name"])
             is_secret = bool(field.get("secret"))
             disk = _disk_key(name, secret=is_secret)
-            if disk in on_disk:
+            if disk in unreadable:
+                # Stored, but the key that encrypted it is gone. Masking it
+                # would tell the operator a working secret is saved while
+                # every runtime read gets an empty string, which is exactly
+                # the confusion this avoids: show it as absent, and let the
+                # form say why.
+                out[name] = ""
+            elif disk in on_disk:
                 out[name] = SECRET_MASK if is_secret else on_disk[disk]
             elif "default" in field:
                 out[name] = field["default"]

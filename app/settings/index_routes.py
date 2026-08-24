@@ -44,6 +44,7 @@ from ._shared import (
     discovery_cache,
     format_discovered,
     format_relative,
+    mark_unreadable_secrets,
     plugins,
     render_for_admin,
     renderers,
@@ -1224,7 +1225,9 @@ def _build_sections() -> list[dict[str, Any]]:
         )
 
     for plugin in plugins().plugins.values():
-        fields = list(plugin.manifest.get("settings", []))
+        fields = mark_unreadable_secrets(
+            list(plugin.manifest.get("settings", [])), "plugins", plugin.id
+        )
         if not fields:
             continue
         sid = f"plugin-{plugin.id}"

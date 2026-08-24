@@ -590,8 +590,17 @@ macro here instead.
        through to this branch, so a ``secret`` textarea was always
        visible anyway. -#}
     {% set mask = spec.get('mask', spec.get('secret')) %}
+    {#- A stored secret that no longer decrypts (the encryption key moved:
+       recreated container, restored data folder) reads as empty everywhere,
+       so the box looks like it was never filled in. Say so, or the operator
+       reasonably concludes they must re-enter it after every upgrade. -#}
+    {% set unreadable_hint = 'Saved, but it can no longer be decrypted, so it is being ignored. That happens when the encryption key changes (a recreated container, or a restored data folder). Enter it again to repair it, and set TESSERAE_SECRET_KEY to keep it stable across upgrades.' %}
+    {% if spec.get('secret_unreadable') %}
+      {% set help_text = (help_text ~ ' ' if help_text else '') ~ unreadable_hint %}
+    {% endif %}
     {{ text_input(field_id, name, label, value=value or '',
-                  placeholder=spec.get('placeholder', ''),
+                  placeholder='Re-enter to repair' if spec.get('secret_unreadable')
+                              else spec.get('placeholder', ''),
                   type='password' if mask else 'text',
                   autocomplete='new-password' if mask else None,
                   help=help_text, form=form, readonly=readonly) }}

@@ -50,6 +50,35 @@ def _verify_tls() -> bool:
     return _settings().get("verify_tls", True) is not False
 
 
+def _not_configured() -> RuntimeError:
+    """The error every call raises when Home Assistant can't be used, said
+    precisely enough to act on.
+
+    "Not configured" is true but unhelpful when the operator did configure
+    it and the stored token has since become unreadable: that happens when
+    the encryption key changes (a recreated container, a restored data
+    folder), and the settings read turns the ciphertext into an empty
+    string. Telling those apart is the difference between "set this up" and
+    "type your token in again"."""
+    have_url = bool(base_url())
+    try:
+        store = current_app.config["SETTINGS_STORE"]
+        unreadable = store.unreadable_secrets("plugins", "ha_core")
+    except Exception:
+        unreadable = set()
+    if "token_secret" in unreadable:
+        return RuntimeError(
+            "Home Assistant token can no longer be decrypted (the encryption key "
+            "changed); re-enter it in Settings -> Plugins -> Home Assistant Core"
+        )
+    if have_url:
+        return RuntimeError(
+            "Home Assistant access token is missing; add it in Settings -> Plugins "
+            "-> Home Assistant Core"
+        )
+    return RuntimeError("Home Assistant is not configured")
+
+
 def is_configured() -> bool:
     return bool(base_url() and token())
 
@@ -78,7 +107,7 @@ def request_json(path: str, *, timeout: int = 10) -> Any:
     to surface them (see ``coerce_error``). ``path`` must start with '/'.
     """
     if not is_configured():
-        raise RuntimeError("Home Assistant is not configured")
+        raise _not_configured()
     req = urllib.request.Request(base_url() + path, headers=_headers(), method="GET")
     with urllib.request.urlopen(req, timeout=timeout, context=_ssl_context()) as resp:
         return json.loads(resp.read().decode("utf-8"))
@@ -106,7 +135,7 @@ def call_service_with_response(
     Raises on missing config or HTTP errors so the caller can decide how
     to surface them (see ``coerce_error``)."""
     if not is_configured():
-        raise RuntimeError("Home Assistant is not configured")
+        raise _not_configured()
     path = f"/api/services/{quote(domain)}/{quote(service)}?return_response"
     body = json.dumps(data or {}).encode("utf-8")
     req = urllib.request.Request(base_url() + path, data=body, headers=_headers(), method="POST")
@@ -135,7 +164,7 @@ def call_service(
 
     Raises on missing config or HTTP errors so the caller can surface them."""
     if not is_configured():
-        raise RuntimeError("Home Assistant is not configured")
+        raise _not_configured()
     path = f"/api/services/{quote(domain)}/{quote(service)}"
     body = json.dumps(data or {}).encode("utf-8")
     req = urllib.request.Request(base_url() + path, data=body, headers=_headers(), method="POST")
@@ -159,7 +188,7 @@ def render_template(template: str, *, timeout: int = 10) -> str:
     WebSocket connection. Raises on missing config or HTTP errors.
     """
     if not is_configured():
-        raise RuntimeError("Home Assistant is not configured")
+        raise _not_configured()
     body = json.dumps({"template": template}).encode("utf-8")
     req = urllib.request.Request(
         base_url() + "/api/template", data=body, headers=_headers(), method="POST"
