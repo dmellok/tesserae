@@ -38,7 +38,17 @@ def _stub_app(events: list[dict[str, Any]]) -> MagicMock:
 
 
 def _future_iso(hours: float) -> str:
-    return (datetime.now(UTC) + timedelta(hours=hours)).isoformat()
+    """An event time on TODAY, whatever time the suite runs.
+
+    ``fetch`` keeps only events occupying the current date IN THE APP'S
+    TIMEZONE, so offsets from "now" fall off the end of the day when the run
+    happens late: CI at 22:44 UTC turned a five-event fixture into one. Noon
+    in that same zone is safely mid-day whatever the hour, and spacing in
+    minutes keeps every event inside it."""
+    local_noon = datetime.now(server.app_timezone()).replace(
+        hour=12, minute=0, second=0, microsecond=0
+    )
+    return (local_noon + timedelta(minutes=hours * 10)).astimezone(UTC).isoformat()
 
 
 def test_missing_calendar_core_surfaces_error() -> None:

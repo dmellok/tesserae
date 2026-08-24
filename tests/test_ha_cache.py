@@ -241,23 +241,23 @@ def test_an_unreadable_token_says_so(monkeypatch: pytest.MonkeyPatch) -> None:
     key changed, and re-entering it is the fix."""
     core = _load_plugin("ha_core")
     app = _app_with({"base_url": "http://ha.local:8123", "token_secret": ""}, {"token_secret"})
-    with app.app_context():
-        with pytest.raises(RuntimeError) as err:
-            core.get_states()
+    with app.app_context(), pytest.raises(RuntimeError) as err:
+        core.get_states()
     assert "can no longer be decrypted" in str(err.value)
     assert "re-enter it" in str(err.value).lower()
 
 
 def test_a_missing_token_is_distinguished_from_no_setup() -> None:
     core = _load_plugin("ha_core")
-    with _app_with({"base_url": "http://ha.local:8123"}).app_context():
-        with pytest.raises(RuntimeError) as err:
-            core.get_states()
+    with (
+        _app_with({"base_url": "http://ha.local:8123"}).app_context(),
+        pytest.raises(RuntimeError) as err,
+    ):
+        core.get_states()
     assert "access token is missing" in str(err.value)
 
-    with _app_with({}).app_context():
-        with pytest.raises(RuntimeError) as err:
-            core.get_states()
+    with _app_with({}).app_context(), pytest.raises(RuntimeError) as err:
+        core.get_states()
     assert str(err.value) == "Home Assistant is not configured"
 
 
@@ -270,7 +270,6 @@ def test_the_helper_survives_a_store_that_cannot_answer() -> None:
         get_section=lambda name: {"ha_core": {}},
         unreadable_secrets=lambda ns, item=None: (_ for _ in ()).throw(AttributeError("old")),
     )
-    with app.app_context():
-        with pytest.raises(RuntimeError) as err:
-            core.get_states()
+    with app.app_context(), pytest.raises(RuntimeError) as err:
+        core.get_states()
     assert "not configured" in str(err.value)

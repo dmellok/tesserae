@@ -4,6 +4,16 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.364.2], 2026-08-25
+
+### Fixed
+
+- **A calendar test failed depending on what time of day CI ran.** `calendar_day` shows only
+  events on the current date, and its fixtures placed them at "now plus one to five hours", so
+  a run late in the evening pushed most of them past midnight and the day view correctly
+  dropped them. Anchored to midday in the app's own timezone instead, which is the same date
+  whatever the hour.
+
 ## [0.364.1], 2026-08-25
 
 ### Fixed
