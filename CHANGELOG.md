@@ -4,6 +4,26 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.364.0], 2026-08-25
+
+### Added
+
+- **You can talk back to the agent from the editor.** The rail narrated what the agent was
+  doing and gave you no way to answer it, so noticing a build going the wrong way meant
+  switching to wherever the agent was running and typing there.
+
+  The rail's header now carries a reply button. Type a note, press Enter, and it reaches the
+  agent on its very next call, which during a build is a second or two. There is no way to do
+  better than that and it is worth knowing why: MCP is driven entirely by the client, so a
+  server can never push anything into a model's context. The only channel is the return value
+  of a call the agent was going to make anyway, which is exactly what this rides on.
+
+  Off unless you open it, and the choice sticks per browser. The button only appears when the
+  `mcp` experiment is on, so an install with no agent shows no dead control. Notes are queued
+  in memory, capped at eight, and delivered once each: a note repeated back to a model reads
+  as you saying it twice. Posting one needs an admin session, since the MCP token authorises
+  the agent and this is the human going the other way.
+
 ## [0.363.0], 2026-08-24
 
 ### Fixed

@@ -67,6 +67,14 @@ _CAP: int = 300
 # always show it as approximate.
 _CHARS_PER_TOKEN: int = 4
 
+# Operator notes (the reply box on the editor's rail). Bounded because
+# nothing guarantees an agent is running to drain them: an operator typing
+# into a dead run should hit a limit, not fill memory. The per-note cap is
+# generous enough for a sentence of steering and small enough that a pasted
+# document can't blow up the next tool response.
+_NOTES_MAX: int = 8
+_NOTE_CHARS: int = 500
+
 
 # -- the step table -----------------------------------------------------
 #
@@ -253,6 +261,7 @@ class ActivityBus:
     _seq: int = field(default=0, init=False)
     _run: int = field(default=0, init=False)
     _last_ts: float = field(default=0.0, init=False)
+    _notes: list[str] = field(default_factory=list, init=False)
 
     def __post_init__(self) -> None:
         if self.cap != _CAP:
@@ -324,6 +333,42 @@ class ActivityBus:
         # request, same rule the EventLog follows.
         self._emit(step)
         return step
+
+    # -- operator notes -------------------------------------------------
+    #
+    # The only way a word from the operator reaches the model is the return
+    # value of a call the agent makes anyway: MCP is client-driven and this
+    # server can never push into the agent's context. So a note typed in the
+    # editor queues here and rides the next tool response out, the same
+    # piggyback the device ``/status`` route uses for overlay values.
+
+    def post_note(self, text: str) -> bool:
+        """Queue a note for the agent. False when the text is empty or the
+        queue is full (a bounded queue matters because nothing guarantees an
+        agent is running to drain it)."""
+        note = text.strip()
+        if not note:
+            return False
+        with self._lock:
+            if len(self._notes) >= _NOTES_MAX:
+                return False
+            self._notes.append(note[:_NOTE_CHARS])
+        return True
+
+    def take_notes(self) -> list[str]:
+        """Drain the queue. Consume-once: a note delivered twice reads to the
+        model as the operator repeating themselves, which is worse than a
+        note arriving a call later than it might have."""
+        with self._lock:
+            if not self._notes:
+                return []
+            notes = list(self._notes)
+            self._notes.clear()
+            return notes
+
+    def pending_notes(self) -> int:
+        with self._lock:
+            return len(self._notes)
 
     # -- reading --------------------------------------------------------
 
@@ -491,6 +536,25 @@ def _serialise(step: Step, names: dict[str, str]) -> dict[str, Any]:
         else:
             out["page_name"] = name
     return out
+
+
+@bp.post("/note")
+def post_note() -> Response:
+    """Queue a note from the operator for the agent (the rail's reply box).
+
+    Admin-session only, like every other page in the admin: the MCP token
+    authorises the *agent*, and this is the human going the other way.
+    Returns ``{queued: bool, pending: int}``; ``queued`` is False when the
+    text was empty or the queue is full, which the rail shows rather than
+    pretending the note went anywhere.
+    """
+    _guard()
+    body = request.get_json(silent=True) or {}
+    text = str(body.get("text") or "")
+    queued = bus().post_note(text)
+    if queued:
+        logger.info("agent note queued (%d char(s))", len(text.strip()))
+    return jsonify({"queued": queued, "pending": bus().pending_notes()})
 
 
 @bp.get("/activity.json")

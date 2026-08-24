@@ -408,3 +408,84 @@ def test_admin_shell_wires_the_follow_toast_only_when_mcp_is_on(app: Flask) -> N
     html = client.get("/send").get_data(as_text=True)
     assert 'id="agent-follow"' in html
     assert 'data-editor-url="/pages/canvas/c/__ID__"' in html
+
+
+# -- operator notes (the rail's reply box) --------------------------------
+
+
+def test_a_note_rides_out_on_the_next_tool_result(app: Flask) -> None:
+    """The only channel there is: MCP is client-driven, so a note typed in
+    the editor reaches the model as a field on the next tool response."""
+    _enable(app)
+    client = app.test_client()
+    _sign_in(client)
+
+    posted = client.post("/agent/note", json={"text": "use the 7 day forecast, not 3"})
+    assert posted.status_code == 200
+    assert posted.get_json() == {"queued": True, "pending": 1}
+
+    body = client.get("/api/mcp/pages").get_json()
+    assert body["operator_note"] == "use the 7 day forecast, not 3"
+    # Consume-once: a repeat delivery reads as the operator saying it twice.
+    assert "operator_note" not in client.get("/api/mcp/pages").get_json()
+
+
+def test_several_notes_arrive_together(app: Flask) -> None:
+    _enable(app)
+    client = app.test_client()
+    _sign_in(client)
+    client.post("/agent/note", json={"text": "first"})
+    client.post("/agent/note", json={"text": "second"})
+
+    body = client.get("/api/mcp/pages").get_json()
+    assert body["operator_note"] == "first\nsecond"
+
+
+def test_an_empty_note_is_refused(app: Flask) -> None:
+    _enable(app)
+    client = app.test_client()
+    _sign_in(client)
+    assert client.post("/agent/note", json={"text": "   "}).get_json() == {
+        "queued": False,
+        "pending": 0,
+    }
+
+
+def test_the_note_queue_is_bounded(app: Flask) -> None:
+    """Nothing guarantees an agent is running to drain it, so typing into a
+    dead run hits a limit rather than filling memory."""
+    _enable(app)
+    client = app.test_client()
+    _sign_in(client)
+    for i in range(8):
+        assert client.post("/agent/note", json={"text": f"note {i}"}).get_json()["queued"] is True
+    refused = client.post("/agent/note", json={"text": "one too many"}).get_json()
+    assert refused == {"queued": False, "pending": 8}
+
+
+def test_notes_need_an_admin_session(app: Flask) -> None:
+    """The MCP token authorises the agent; this is the human going the other
+    way, so it sits behind the same gate as the rest of the admin."""
+    _enable(app)
+    app.config["SETTINGS_STORE"].patch_section("app", {"password_hash": "x", "auth_enabled": True})
+    client = app.test_client()
+    resp = client.post(
+        "/agent/note",
+        json={"text": "let me in"},
+        environ_overrides={"REMOTE_ADDR": "203.0.113.9"},
+    )
+    assert resp.status_code in (302, 401, 403), resp.status_code
+
+
+def test_a_failed_call_keeps_the_note_queued(app: Flask) -> None:
+    """An error body is the one thing a client may not surface verbatim, so
+    the note waits for a result the agent will actually read."""
+    _enable(app)
+    client = app.test_client()
+    _sign_in(client)
+    client.post("/agent/note", json={"text": "hold on"})
+
+    failed = client.get("/api/mcp/pages/nope/canvas")
+    assert failed.status_code >= 400
+    assert "operator_note" not in (failed.get_json() or {})
+    assert client.get("/api/mcp/pages").get_json()["operator_note"] == "hold on"

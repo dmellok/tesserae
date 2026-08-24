@@ -79,3 +79,22 @@
   .ag-pill.is-live .ag-bars i{height:11px;opacity:1}
   .ag-move{transition:none}
 }
+
+/* ---- reply box ----
+   Hidden until asked for (the header toggle, sticky per browser). The one
+   channel from the operator back to the model: the note rides out on the
+   agent's next tool result, so the status line under the box talks about
+   the agent's next call rather than pretending it was delivered. */
+.ag-reply-t{width:22px;height:22px;flex:none;display:grid;place-items:center;border:0;background:transparent;color:var(--t-muted);font-size:12px;cursor:pointer;border-radius:6px;margin-left:6px}
+.ag-reply-t[hidden]{display:none}
+.ag-reply-t:hover{background:var(--t-surface-sunk);color:var(--t-fg)}
+.ag-reply-t.is-on{background:var(--t-accent-soft);color:var(--t-accent-ink,var(--t-accent))}
+.ag-reply{border-top:1px solid var(--t-border);padding:9px 11px 10px;background:var(--t-surface-soft)}
+.ag-reply[hidden]{display:none}
+.ag-reply-i{width:100%;box-sizing:border-box;resize:vertical;min-height:44px;font:500 11.5px/1.45 var(--t-font);color:var(--t-fg);background:var(--t-surface);border:1px solid var(--t-border-strong);border-radius:7px;padding:6px 8px}
+.ag-reply-i:focus{outline:none;border-color:var(--t-accent);box-shadow:var(--t-ring-soft)}
+.ag-reply-b{display:flex;align-items:center;gap:8px;margin-top:6px}
+.ag-reply-n{flex:1;min-width:0;font:500 10px var(--t-font-mono);color:var(--t-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ag-reply-n.is-bad{color:var(--t-danger)}
+.ag-reply-s{font:600 11px var(--t-font);padding:5px 11px;border-radius:7px;cursor:pointer;background:var(--t-accent);color:var(--t-accent-fg);border:0}
+.ag-reply-s:hover{background:var(--t-accent-hover)}

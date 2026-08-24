@@ -87,6 +87,88 @@ window.PanelsAgentRail = (function () {
     return [step.target, step.detail].filter(Boolean).map(esc).join(" &middot; ");
   }
 
+
+  // ---- reply box ------------------------------------------------------
+  //
+  // The one way a word from the operator reaches the model: the server queues
+  // it and hands it to the agent on its next tool result (MCP is client-driven,
+  // so nothing can be pushed). Off unless asked for, and the toggle only
+  // appears once the ``noteUrl`` hook is configured, so an install without the
+  // endpoint shows no dead control.
+  var REPLY_KEY = "tesserae-agent-reply";
+  var replyEl = null, replyToggle = null, replyInput = null, replyNote = null;
+
+  function replyOpen() {
+    try { return localStorage.getItem(REPLY_KEY) === "on"; } catch { return false; }
+  }
+  function setReplyOpen(on) {
+    try { localStorage.setItem(REPLY_KEY, on ? "on" : "off"); } catch { /* private mode */ }
+  }
+
+  function buildReply() {
+    replyEl = el("div", "ag-reply");
+    replyEl.hidden = true;
+    replyEl.innerHTML =
+      '<textarea class="ag-reply-i" rows="2" maxlength="500" ' +
+      'placeholder="Tell the agent something. Enter sends."></textarea>' +
+      '<div class="ag-reply-b"><span class="ag-reply-n"></span>' +
+      '<button type="button" class="ag-reply-s">Send</button></div>';
+    return replyEl;
+  }
+
+  function wireReply() {
+    replyToggle = card.querySelector(".ag-reply-t");
+    replyInput = replyEl.querySelector(".ag-reply-i");
+    replyNote = replyEl.querySelector(".ag-reply-n");
+    if (!cfg.noteUrl) return;          // no endpoint: leave the toggle hidden
+    replyToggle.hidden = false;
+    applyReply(replyOpen());
+    replyToggle.addEventListener("click", function () {
+      var on = !replyEl.hidden ? false : true;
+      setReplyOpen(on);
+      applyReply(on);
+      if (on) replyInput.focus();
+    });
+    replyEl.querySelector(".ag-reply-s").addEventListener("click", sendNote);
+    replyInput.addEventListener("keydown", function (e) {
+      // Enter sends, Shift+Enter is a newline: this is a message, not a form.
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendNote(); }
+    });
+  }
+
+  function applyReply(on) {
+    replyEl.hidden = !on;
+    replyToggle.setAttribute("aria-pressed", on ? "true" : "false");
+    replyToggle.classList.toggle("is-on", !!on);
+  }
+
+  function say(text, bad) {
+    replyNote.textContent = text;
+    replyNote.classList.toggle("is-bad", !!bad);
+  }
+
+  function sendNote() {
+    var text = (replyInput.value || "").trim();
+    if (!text) return;
+    say("sending…", false);
+    fetch(cfg.noteUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: text }),
+    })
+      .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+      .then(function (data) {
+        if (!data.queued) { say("not sent, queue is full", true); return; }
+        replyInput.value = "";
+        // Honest about the latency: it lands on the agent's next call, which
+        // during a build is a second or two and after one is whenever it
+        // next does anything.
+        say(settled ? "queued for the agent's next call" : "sent", false);
+        setTimeout(function () { say("", false); }, 4000);
+      })
+      .catch(function () { say("not sent", true); });
+  }
+
   // ---- chrome ---------------------------------------------------------
 
   function build() {
@@ -98,15 +180,20 @@ window.PanelsAgentRail = (function () {
     card.hidden = true;
     card.innerHTML =
       '<div class="pnh"><span class="t"><i class="ph-bold ph-sparkle"></i>Agent</span>' +
-      '<span class="x ag-count"></span></div>' +
+      '<span class="x ag-count"></span>' +
+      '<button type="button" class="ag-reply-t" title="Send the agent a note" ' +
+      'aria-pressed="false" hidden><i class="ph-bold ph-chat-teardrop-text"></i></button>' +
+      "</div>" +
       '<div class="ag-bar" hidden><i></i></div>';
     nowEl = el("div", "ag-now");
     ticksEl = el("div", "pnb scroll ag-ticks");
     card.appendChild(nowEl);
     card.appendChild(ticksEl);
+    card.appendChild(buildReply());
     right.insertBefore(card, right.firstChild);
     countEl = card.querySelector(".ag-count");
     barEl = card.querySelector(".ag-bar");
+    wireReply();
 
     // Toolbar throbber, so a build is visible with the sidebar collapsed.
     var menu = document.getElementById("panels-canvas-menu");

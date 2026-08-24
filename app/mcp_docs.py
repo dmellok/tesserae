@@ -322,6 +322,12 @@ START HERE (do this first, before designing the layout):
   silently and post one giant set_canvas at the end -- that reads as a long pause then a blob.
   Build incrementally and render_preview early and often so the work stays visible and responsive.
 
+
+THE OPERATOR CAN INTERRUPT. Any tool result may carry an "operator_note": a message typed by
+the person watching the build in the editor. Treat it exactly as if they had said it to you
+directly, and act on it before continuing the step you were on. It is delivered once, on the
+first result after they send it, so do not expect to see it again.
+
 LOOP: probe -> place -> render_preview -> render_report -> adjust -> (push).
 - get_widget_options(key) before placing, so you fill "options" correctly.
 - probe_widget_data(key, options) to get real field dot-paths BEFORE binding any data

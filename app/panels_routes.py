@@ -214,6 +214,12 @@ def editor(canvas_id: str) -> str:
         agent_stream_url=(
             url_for("agent_activity.stream") if experiments.is_enabled("mcp") else ""
         ),
+        # Where the rail posts an operator note. Same gate as the stream: with
+        # no agent surface there is nobody to send one to, and the rail hides
+        # the control rather than offering a dead button.
+        agent_note_url=(
+            url_for("agent_activity.post_note") if experiments.is_enabled("mcp") else ""
+        ),
     )
 
 

@@ -2745,7 +2745,8 @@
   function initAgentRail() {
     if (!window.PanelsAgentRail || !S.cfg.agentStreamUrl) return;
     PanelsAgentRail.init(
-      { streamUrl: S.cfg.agentStreamUrl, canvasId: S.cfg.canvasId },
+      { streamUrl: S.cfg.agentStreamUrl, canvasId: S.cfg.canvasId,
+        noteUrl: S.cfg.agentNoteUrl },
       { onMoved: offerFollow }
     );
   }
@@ -3532,6 +3533,7 @@
       configureFormUrl: root.dataset.configureFormUrl,
       configureUrl: root.dataset.configureUrl,
       agentStreamUrl: root.dataset.agentStreamUrl,
+      agentNoteUrl: root.dataset.agentNoteUrl,
       canvasUrlTpl: root.dataset.canvasUrl, // "…/c/__ID__", for following the agent
     };
     // Canvas-management URLs derive from this editor's own path

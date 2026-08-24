@@ -96,6 +96,35 @@ def _gate() -> Response | None:
     return None
 
 
+def _deliver_operator_notes(response: Response) -> None:
+    """Attach any queued operator note to this tool result, in place.
+
+    This is the only channel there is. MCP is client-driven: the server
+    cannot push into the agent's context, so a note typed into the editor's
+    rail has to ride out on the return value of a call the agent was making
+    anyway. Consume-once, and only on a successful JSON object, because an
+    error body is the one thing a client may not surface verbatim and a note
+    delivered into a discarded response is a note the operator thinks landed.
+
+    Best-effort like the narration around it: failing to attach a note must
+    never fail the call.
+    """
+    if response.status_code >= 400 or not response.is_json:
+        return
+    try:
+        body = response.get_json(silent=True)
+        if not isinstance(body, dict):
+            return
+        notes = agent_activity.bus().take_notes()
+        if not notes:
+            return
+        body["operator_note"] = "\n".join(notes)
+        response.set_data(json.dumps(body))
+        logger.info("delivered %d operator note(s) on %s", len(notes), request.path)
+    except Exception:
+        logger.debug("attaching operator note to %r failed", request.path, exc_info=True)
+
+
 @bp.after_request
 def _narrate(response: Response) -> Response:
     """Record the call on the agent-activity bus, so the canvas editor's rail
@@ -109,6 +138,7 @@ def _narrate(response: Response) -> Response:
     if started is None:
         return response
     endpoint = (request.endpoint or "").rsplit(".", 1)[-1]
+    _deliver_operator_notes(response)
     try:
         payload = (
             response.get_json(silent=True)
