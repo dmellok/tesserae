@@ -371,8 +371,10 @@ def test_beep_config_reaches_the_firmware_off_by_default(app: Flask) -> None:
     )
     config = status.get_json()["config"]
     assert config.get("beep_enabled") is False
-    assert config.get("beep_tone") == "beep"
     assert config.get("beep_volume") == 60
+    # The notes, not the name: the panel holds no tone table, so retuning one
+    # is a settings change rather than a firmware release.
+    assert config.get("beep_pattern") == "2000:60"
 
 
 def test_beep_config_reaches_a_button_only_reterminal(app: Flask) -> None:
@@ -415,8 +417,8 @@ def test_beep_settings_survive_to_the_config_block(app: Flask) -> None:
     )
     config = status.get_json()["config"]
     assert config.get("beep_enabled") is True
-    assert config.get("beep_tone") == "chirp"
     assert config.get("beep_volume") == 30
+    assert config.get("beep_pattern") == "1800:30,2600:40"
 
 
 def test_a_board_without_a_buzzer_gets_no_beep_fields(app: Flask) -> None:
@@ -433,4 +435,50 @@ def test_a_board_without_a_buzzer_gets_no_beep_fields(app: Flask) -> None:
     )
     config = status.get_json()["config"]
     assert "beep_enabled" not in config
-    assert "beep_tone" not in config
+    assert "beep_pattern" not in config
+
+
+def test_a_custom_tone_goes_to_the_panel_verbatim(app: Flask) -> None:
+    """``custom`` hands over what the operator typed. The panel plays notes
+    and knows no tone names, so this is the only place the choice lives."""
+    client = app.test_client()
+    _sign_in(client)
+    token = _register_kind(app, client, "hall_e1003", "seeed_reterminal_e1003")
+    section = app.config["SETTINGS_STORE"].get_section("devices") or {}
+    section["hall_e1003"] = {
+        **section.get("hall_e1003", {}),
+        "sleep_interval_s": 900,
+        "beep_tone": "custom",
+        "beep_pattern": "440:80,0:40,880:80",
+    }
+    app.config["SETTINGS_STORE"].patch_section("devices", section)
+
+    status = client.post(
+        "/api/v1/device/hall_e1003/status",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        data=json.dumps({}),
+    )
+    assert status.get_json()["config"]["beep_pattern"] == "440:80,0:40,880:80"
+
+
+def test_custom_with_nothing_written_falls_back_to_a_beep(app: Flask) -> None:
+    """Picking Custom and leaving the box empty is a half-finished edit, not
+    a request for silence: the panel still acknowledges the tap."""
+    client = app.test_client()
+    _sign_in(client)
+    token = _register_kind(app, client, "hall_e1003", "seeed_reterminal_e1003")
+    section = app.config["SETTINGS_STORE"].get_section("devices") or {}
+    section["hall_e1003"] = {
+        **section.get("hall_e1003", {}),
+        "sleep_interval_s": 900,
+        "beep_tone": "custom",
+        "beep_pattern": "   ",
+    }
+    app.config["SETTINGS_STORE"].patch_section("devices", section)
+
+    status = client.post(
+        "/api/v1/device/hall_e1003/status",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        data=json.dumps({}),
+    )
+    assert status.get_json()["config"]["beep_pattern"] == "2000:60"

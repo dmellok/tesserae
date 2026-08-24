@@ -115,7 +115,42 @@ def device_config_doc(settings: Any, device: Device) -> dict[str, Any]:
     # reason: firmware reads one config block and shouldn't have to carry a
     # default for a field the server knows the answer to.
     out.setdefault("awake_poll_s", DEFAULT_AWAKE_POLL_S)
+    _resolve_beep_pattern(out, device)
     return out
+
+
+# Buzzer tones (#258), as the notes themselves: ``freq:ms`` steps, comma
+# separated. The named tones live here rather than in firmware so retuning
+# one is a settings change instead of a firmware release, and so an operator
+# can write their own without waiting for a build. Frequencies sit where a
+# small piezo is loudest; the device clamps anything silly.
+BEEP_PATTERNS: dict[str, str] = {
+    "click": "2400:12",
+    "beep": "2000:60",
+    "chirp": "1800:30,2600:40",
+    "low": "1200:60",
+    "double": "2000:40,0:60,2000:40",
+    "rising": "1500:40,2000:40,2600:60",
+}
+BEEP_PATTERN_FALLBACK = BEEP_PATTERNS["beep"]
+
+
+def _resolve_beep_pattern(out: dict[str, Any], device: Device) -> None:
+    """Turn the stored tone choice into the notes the panel plays.
+
+    The device is never sent a tone NAME: names are a server-side
+    convenience, and a firmware that knew them would have to ship a new
+    build to change one. ``custom`` hands over whatever the operator typed,
+    validated by the device kind before it was stored.
+    """
+    if "beep_tone" not in (device.config_schema or {}):
+        return
+    tone = str(out.get("beep_tone") or "beep")
+    if tone == "custom":
+        pattern = str(out.get("beep_pattern") or "").strip() or BEEP_PATTERN_FALLBACK
+    else:
+        pattern = BEEP_PATTERNS.get(tone, BEEP_PATTERN_FALLBACK)
+    out["beep_pattern"] = pattern
 
 
 def _kind_uses_access_token(kind: Device) -> bool:

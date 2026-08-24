@@ -50,6 +50,13 @@ Off by default, and worth thinking about before switching it on in a shared
 room. Volume is the drive strength as a percentage: the piezo is loud at
 100 and discreet around 30.
 
+The tones are the server's, not the firmware's. Tesserae sends the notes
+themselves (`freq:ms` pairs, `0` for a rest), so picking **Custom** and
+writing `1500:40,2000:40,2600:60` in the box below gets you exactly that,
+and retuning any of the built-in tones never needs a firmware update. Up to
+eight notes, 200-8000 Hz, one second in total: it plays before the tap is
+dispatched, so it has to be brief.
+
 ## Attaching actions in the editor
 
 Every element in the **grid** and **canvas** editors has an

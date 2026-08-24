@@ -19,6 +19,11 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   server triggered would arrive with the repaint, which is the wait it exists to cover. The
   button-only models (E1001, E1002, E1004) get it on presses; the E1003 gets it on taps too.
 
+  The tones are data, not firmware: Tesserae sends the notes themselves, as `freq:ms` pairs,
+  so retuning one is a settings change rather than a firmware release, and **Custom** lets you
+  write your own (up to eight notes, 200-8000 Hz, a second in total, since it plays before the
+  tap is dispatched). The display holds no tone table and clamps whatever it is sent.
+
   Off by default, because a display that starts beeping after an update nobody asked for is
   worse than a silent one. Needs firmware v1.22.0 or later; displays on older firmware ignore
   the setting.

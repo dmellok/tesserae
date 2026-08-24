@@ -20,5 +20,42 @@
   "refresh_floor_s": 60,
   "image_format": "bin",
   "auto_select": false,
-  "notes_md": "Awaiting confirmed test on real hardware. Wire format is exactly 96000 bytes (800*480/4), row-major from top-left, 4 pixels per byte MSB first (bits 7-6 = leftmost pixel), 2-bit value 0b00 = black, 0b11 = white, linear 4-level gray; no header, no padding, no checksum. Byte-identical to `seeed_reterminal_e1001_gray`, so a frame rendered for one kind paints correctly on the other.\n\nPick this kind only when the unit does not refresh on the default grayscale build. The E1001 ships with two glass variants and the panel is write-only, so no controller id can be read back and no image can detect which variant it is driving; the choice is the operator's, made by flashing one build or the other. The default build selects the glass's built-in OTP 4-gray waveform; this one uploads register LUTs for glass that has none.\n\nThe two grayscale kinds are separate OTA lineages, so which one a device is on decides which firmware image it is offered. A registered device follows whatever kind its firmware declares at register or discover (same-protocol kind heal), which keeps the lineage matched to the build actually flashed. Nothing else moves a device between them: relay pairing resolves an ambiguous self-report to `seeed_reterminal_e1001_gray` and never infers this kind, because the wire report is identical for both and offering a panel the wrong image leaves it unable to refresh until it is re-flashed over USB."
+  "notes_md": "Awaiting confirmed test on real hardware. Wire format is exactly 96000 bytes (800*480/4), row-major from top-left, 4 pixels per byte MSB first (bits 7-6 = leftmost pixel), 2-bit value 0b00 = black, 0b11 = white, linear 4-level gray; no header, no padding, no checksum. Byte-identical to `seeed_reterminal_e1001_gray`, so a frame rendered for one kind paints correctly on the other.\n\nPick this kind only when the unit does not refresh on the default grayscale build. The E1001 ships with two glass variants and the panel is write-only, so no controller id can be read back and no image can detect which variant it is driving; the choice is the operator's, made by flashing one build or the other. The default build selects the glass's built-in OTP 4-gray waveform; this one uploads register LUTs for glass that has none.\n\nThe two grayscale kinds are separate OTA lineages, so which one a device is on decides which firmware image it is offered. A registered device follows whatever kind its firmware declares at register or discover (same-protocol kind heal), which keeps the lineage matched to the build actually flashed. Nothing else moves a device between them: relay pairing resolves an ambiguous self-report to `seeed_reterminal_e1001_gray` and never infers this kind, because the wire report is identical for both and offering a panel the wrong image leaves it unable to refresh until it is re-flashed over USB.",
+  "config_schema_extends": {
+    "beep_enabled": {
+      "type": "boolean",
+      "label": "Beep on interaction",
+      "default": false,
+      "help": "Sound the on-board buzzer the moment a button press registers, before the server is contacted. E-ink takes seconds to repaint, so without it there is no confirmation the panel heard you. Off by default: a panel that starts beeping unannounced is worse than a silent one."
+    },
+    "beep_tone": {
+      "type": "select",
+      "label": "Beep tone",
+      "default": "beep",
+      "choices": [
+        {"value": "click", "label": "Click"},
+        {"value": "beep", "label": "Beep"},
+        {"value": "chirp", "label": "Chirp (rising two-tone)"},
+        {"value": "low", "label": "Low beep"},
+        {"value": "double", "label": "Double beep"},
+        {"value": "rising", "label": "Rising three-tone"},
+        {"value": "custom", "label": "Custom (write your own below)"}
+      ],
+      "help": "Which sound to make. The server sends the actual notes, so these are editable without a firmware update. The buzzer is a passive piezo, loudest around 2 kHz."
+    },
+    "beep_pattern": {
+      "type": "string",
+      "label": "Custom tone",
+      "default": "",
+      "help": "Only used when the tone is set to Custom. Notes as frequency:milliseconds pairs, comma separated, e.g. 1800:30,2600:40. A frequency of 0 is a rest. Up to 8 notes, 200-8000 Hz, 1 second total."
+    },
+    "beep_volume": {
+      "type": "int",
+      "label": "Beep volume",
+      "default": 60,
+      "min": 0,
+      "max": 100,
+      "help": "Drive strength as a percentage. The piezo is loudest at 100 and audible but discreet around 30; 0 is silent, same as turning the beep off."
+    }
+  }
 }

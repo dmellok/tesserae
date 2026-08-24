@@ -23,5 +23,42 @@
   "image_format": "bin",
   "touch": true,
   "auto_select": false,
-  "notes_md": "The only Sticky kind. Confirmed on real hardware running the tesserae-device-firmware build for this board. Wire format is exactly 96000 bytes, 4 pixels per byte MSB first (bits 7-6 = leftmost pixel), 2-bit value 0b00 = black, 0b11 = white, linear 4-level gray; no header, no padding, no checksum.\n\n**`native_w`/`native_h` are 480x800, matching the composition, not the controller's 800x480 scan.** These fields mean the row stride the *firmware* reads, and this firmware transposes on the device: it wants 120-byte portrait rows and rotates them itself. Declaring the controller's landscape scan here instead made the renderer rotate to landscape and pack 200-byte rows, which is still exactly 96000 bytes, so nothing errors and every frame painted as the image repeated sideways with the orientation wrong. Byte count alone does not validate this kind; the stride does.\n\nOnly the stride distinguishes it from `seeed_reterminal_e1001_gray`, which packs the same 96000 bytes at 800 wide because that firmware does not transpose.\n\n`orientation` is `portrait`, pinned on hardware rather than inferred: a test frame of four grey bands with a white corner marker painted with the bands running top to bottom, black first, and the marker in the top-left, confirming both axes. Getting this wrong is a 180-degree error, so change it only against a real unit.\n\nSupersedes `seeed_sticky` and `seeed_sticky_gray`, retired in v0.344.0. Those described the same hardware running CrossInk, were derived from the V01 schematic and Seeed's vendor demo rather than a validated unit, and declared a provisional `portrait_flipped` this board does not use. A kind is also an OTA lineage (release descriptors are signed with a `device_kind` and rejected on mismatch), so a second firmware would need its own kind again rather than a variant of this one. `migrate_retired_sticky_kinds` moves any instance still on the old ids.\n\n`auto_select: false` because this SKU is indistinguishable on the wire from `xteink_x4_gray`: same protocol, same gamut, same 480x800 geometry, same 96000 bytes. A device running this firmware names its own kind at register and discover, so nothing is lost there, but relay pairing infers a SKU from the wire signature instead of reading a declared kind, and this id sorts ahead of `xteink_x4_gray` in that tie-break. Without this flag an Xteink X4 pairing over a relay would be relabelled a reTerminal Sticky."
+  "notes_md": "The only Sticky kind. Confirmed on real hardware running the tesserae-device-firmware build for this board. Wire format is exactly 96000 bytes, 4 pixels per byte MSB first (bits 7-6 = leftmost pixel), 2-bit value 0b00 = black, 0b11 = white, linear 4-level gray; no header, no padding, no checksum.\n\n**`native_w`/`native_h` are 480x800, matching the composition, not the controller's 800x480 scan.** These fields mean the row stride the *firmware* reads, and this firmware transposes on the device: it wants 120-byte portrait rows and rotates them itself. Declaring the controller's landscape scan here instead made the renderer rotate to landscape and pack 200-byte rows, which is still exactly 96000 bytes, so nothing errors and every frame painted as the image repeated sideways with the orientation wrong. Byte count alone does not validate this kind; the stride does.\n\nOnly the stride distinguishes it from `seeed_reterminal_e1001_gray`, which packs the same 96000 bytes at 800 wide because that firmware does not transpose.\n\n`orientation` is `portrait`, pinned on hardware rather than inferred: a test frame of four grey bands with a white corner marker painted with the bands running top to bottom, black first, and the marker in the top-left, confirming both axes. Getting this wrong is a 180-degree error, so change it only against a real unit.\n\nSupersedes `seeed_sticky` and `seeed_sticky_gray`, retired in v0.344.0. Those described the same hardware running CrossInk, were derived from the V01 schematic and Seeed's vendor demo rather than a validated unit, and declared a provisional `portrait_flipped` this board does not use. A kind is also an OTA lineage (release descriptors are signed with a `device_kind` and rejected on mismatch), so a second firmware would need its own kind again rather than a variant of this one. `migrate_retired_sticky_kinds` moves any instance still on the old ids.\n\n`auto_select: false` because this SKU is indistinguishable on the wire from `xteink_x4_gray`: same protocol, same gamut, same 480x800 geometry, same 96000 bytes. A device running this firmware names its own kind at register and discover, so nothing is lost there, but relay pairing infers a SKU from the wire signature instead of reading a declared kind, and this id sorts ahead of `xteink_x4_gray` in that tie-break. Without this flag an Xteink X4 pairing over a relay would be relabelled a reTerminal Sticky.",
+  "config_schema_extends": {
+    "beep_enabled": {
+      "type": "boolean",
+      "label": "Beep on interaction",
+      "default": false,
+      "help": "Sound the on-board buzzer the moment a button press registers, before the server is contacted. E-ink takes seconds to repaint, so without it there is no confirmation the panel heard you. Off by default: a panel that starts beeping unannounced is worse than a silent one."
+    },
+    "beep_tone": {
+      "type": "select",
+      "label": "Beep tone",
+      "default": "beep",
+      "choices": [
+        {"value": "click", "label": "Click"},
+        {"value": "beep", "label": "Beep"},
+        {"value": "chirp", "label": "Chirp (rising two-tone)"},
+        {"value": "low", "label": "Low beep"},
+        {"value": "double", "label": "Double beep"},
+        {"value": "rising", "label": "Rising three-tone"},
+        {"value": "custom", "label": "Custom (write your own below)"}
+      ],
+      "help": "Which sound to make. The server sends the actual notes, so these are editable without a firmware update. The buzzer is a passive piezo, loudest around 2 kHz."
+    },
+    "beep_pattern": {
+      "type": "string",
+      "label": "Custom tone",
+      "default": "",
+      "help": "Only used when the tone is set to Custom. Notes as frequency:milliseconds pairs, comma separated, e.g. 1800:30,2600:40. A frequency of 0 is a rest. Up to 8 notes, 200-8000 Hz, 1 second total."
+    },
+    "beep_volume": {
+      "type": "int",
+      "label": "Beep volume",
+      "default": 60,
+      "min": 0,
+      "max": 100,
+      "help": "Drive strength as a percentage. The piezo is loudest at 100 and audible but discreet around 30; 0 is silent, same as turning the beep off."
+    }
+  }
 }

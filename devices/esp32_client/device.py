@@ -100,13 +100,58 @@ BUTTON_WAKE_MAX_S = 60
 AWAKE_POLL_MIN_S = 5
 AWAKE_POLL_MAX_S = 300
 
-# Buzzer feedback (#258). Tones are names rather than frequencies: the
-# firmware owns the pitch and envelope of each, so a board with a
-# different resonant peak can voice "click" its own way without every
-# stored config becoming wrong. Volume is a percentage of drive strength.
-BEEP_TONES = ("click", "beep", "chirp", "low")
+# Buzzer feedback (#258). A tone name is a server-side convenience: the
+# names resolve to actual notes (``app.device_service.BEEP_PATTERNS``)
+# before the config goes on the wire, so the device is never told a name
+# and retuning one never needs a firmware release. ``custom`` means play
+# what the operator wrote in ``beep_pattern``. Volume is a percentage of
+# drive strength.
+BEEP_TONES = ("click", "beep", "chirp", "low", "double", "rising", "custom")
 BEEP_VOLUME_MIN = 0
 BEEP_VOLUME_MAX = 100
+
+
+# Custom tone bounds (#258). The pattern blocks the input path on the device
+# while it plays, so the ceiling is about how long a person is willing to hold
+# a finger on the glass, not about what the buzzer can do. Frequencies are the
+# band a small piezo actually reproduces; 0 is a rest.
+BEEP_MAX_STEPS = 8
+BEEP_MAX_TOTAL_MS = 1000
+BEEP_STEP_MAX_MS = 500
+BEEP_FREQ_MIN_HZ = 200
+BEEP_FREQ_MAX_HZ = 8000
+
+
+def _validate_beep_pattern(raw: str) -> tuple[bool, str | None]:
+    """Check a ``freq:ms,freq:ms`` tone. Empty is fine: it means the named
+    tone is in use and the server resolves the notes."""
+    text = raw.strip()
+    if not text:
+        return True, None
+    steps = [s for s in text.split(",") if s.strip()]
+    if len(steps) > BEEP_MAX_STEPS:
+        return False, f"beep_pattern takes at most {BEEP_MAX_STEPS} notes (got {len(steps)})"
+    total = 0
+    for step in steps:
+        head, sep, tail = step.partition(":")
+        if not sep:
+            return False, f"beep_pattern note {step.strip()!r} must be frequency:milliseconds"
+        try:
+            freq, ms = int(head.strip()), int(tail.strip())
+        except ValueError:
+            return False, f"beep_pattern note {step.strip()!r} must be two whole numbers"
+        if freq != 0 and not BEEP_FREQ_MIN_HZ <= freq <= BEEP_FREQ_MAX_HZ:
+            return (
+                False,
+                f"beep_pattern frequency must be 0 (a rest) or "
+                f"{BEEP_FREQ_MIN_HZ}..{BEEP_FREQ_MAX_HZ} Hz (got {freq})",
+            )
+        if not 1 <= ms <= BEEP_STEP_MAX_MS:
+            return False, f"beep_pattern note length must be 1..{BEEP_STEP_MAX_MS} ms (got {ms})"
+        total += ms
+    if total > BEEP_MAX_TOTAL_MS:
+        return False, f"beep_pattern must total <= {BEEP_MAX_TOTAL_MS} ms (got {total})"
+    return True, None
 
 
 def _validate_beep(payload: dict[str, Any]) -> tuple[bool, str | None]:
@@ -119,6 +164,13 @@ def _validate_beep(payload: dict[str, Any]) -> tuple[bool, str | None]:
         tone = payload["beep_tone"]
         if not isinstance(tone, str) or tone not in BEEP_TONES:
             return False, f"beep_tone must be one of {', '.join(BEEP_TONES)} (got {tone!r})"
+    if "beep_pattern" in payload:
+        pattern = payload["beep_pattern"]
+        if not isinstance(pattern, str):
+            return False, "beep_pattern must be a string"
+        ok, err = _validate_beep_pattern(pattern)
+        if not ok:
+            return False, err
     if "beep_volume" in payload:
         try:
             volume = int(payload["beep_volume"])

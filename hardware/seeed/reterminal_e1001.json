@@ -31,12 +31,21 @@
       "label": "Beep tone",
       "default": "beep",
       "choices": [
-        {"value": "click", "label": "Click (short, 2.4 kHz)"},
-        {"value": "beep", "label": "Beep (2 kHz)"},
+        {"value": "click", "label": "Click"},
+        {"value": "beep", "label": "Beep"},
         {"value": "chirp", "label": "Chirp (rising two-tone)"},
-        {"value": "low", "label": "Low beep (1.2 kHz)"}
+        {"value": "low", "label": "Low beep"},
+        {"value": "double", "label": "Double beep"},
+        {"value": "rising", "label": "Rising three-tone"},
+        {"value": "custom", "label": "Custom (write your own below)"}
       ],
-      "help": "Which sound to make. The buzzer is a passive piezo, loudest around 2 kHz."
+      "help": "Which sound to make. The server sends the actual notes, so these are editable without a firmware update. The buzzer is a passive piezo, loudest around 2 kHz."
+    },
+    "beep_pattern": {
+      "type": "string",
+      "label": "Custom tone",
+      "default": "",
+      "help": "Only used when the tone is set to Custom. Notes as frequency:milliseconds pairs, comma separated, e.g. 1800:30,2600:40. A frequency of 0 is a rest. Up to 8 notes, 200-8000 Hz, 1 second total."
     },
     "beep_volume": {
       "type": "int",
