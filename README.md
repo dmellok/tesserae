@@ -145,9 +145,26 @@ The reTerminal E-Series and XIAO ePaper family run the [Tesserae-native firmware
 | [reTerminal E1002](https://www.seeedstudio.com/reTerminal-E1002-p-6533.html) | 7.3" Spectra 6, 800×480 | [tesserae-device-firmware](https://github.com/dmellok/tesserae-device-firmware) | ✅ |
 | [reTerminal E1003](https://www.seeedstudio.com/reTerminal-E1003-p-6731.html) | 10.3" mono, 16-level grey, 1872×1404 | [tesserae-device-firmware](https://github.com/dmellok/tesserae-device-firmware) | ✅ |
 | [reTerminal E1004](https://www.seeedstudio.com/reTerminal-E1004-p-6692.html) | 13.3" Spectra 6, 1200×1600 | [tesserae-device-firmware](https://github.com/dmellok/tesserae-device-firmware) | ✅ |
+| [reTerminal Sticky](https://www.seeedstudio.com/reTerminal-Sticky-p-6861.html) | 3.97" mono, 4-level grey, 480×800 portrait | [tesserae-device-firmware](https://github.com/dmellok/tesserae-device-firmware) | ✅ |
 | [XIAO ePaper EE02](https://www.seeedstudio.com/XIAO-ePaper-DIY-Kit-EE02-for-13-3-Spectratm-6-E-Ink.html) | 13.3" Spectra 6, 1200×1600 | [tesserae-device-firmware](https://github.com/dmellok/tesserae-device-firmware) | ✅ |
 | [XIAO 7.5" ePaper Panel](https://www.seeedstudio.com/XIAO-7-5-ePaper-Panel-p-6416.html) | 7.5" mono, 800×480 | [tesserae-device-firmware](https://github.com/dmellok/tesserae-device-firmware) | TBD |
 | [TRMNL 7.5" OG DIY Kit](https://www.seeedstudio.com/TRMNL-7-5-Inch-OG-DIY-Kit-p-6481.html) | 7.5" mono, 800×480 | TRMNL firmware | ✅ via BYOS |
+
+### M5Stack
+
+The PaperS3's screen has no controller chip: the ESP32-S3 drives the glass
+directly and the 16 grey levels come from a waveform table in the firmware
+rather than from the panel. Greyscale tuning is therefore a firmware change.
+Partial refresh is not implemented yet, so this panel has no tap echo or
+on-device touch controls, and its touch digitiser is not wired up.
+
+The link goes to M5's documentation rather than their store: M5 have marked
+the PaperS3 end of life and it is sold out, so this entry is for people who
+already own one.
+
+| Model | Panel | Client | Status |
+|---|---|---|---|
+| [PaperS3](https://docs.m5stack.com/en/core/PaperS3) | 4.7" mono, 16-level grey, 960×540 | [tesserae-device-firmware](https://github.com/dmellok/tesserae-device-firmware) | TBD |
 
 ### Pimoroni Inky
 

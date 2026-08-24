@@ -4,6 +4,22 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.357.1], 2026-08-24
+
+### Fixed
+
+- **The reTerminal Sticky was missing from the surfaces that list supported hardware.** It has
+  shipped since 0.344.0 with a confirmed-on-hardware manifest, a firmware build and a flasher
+  entry, but it was absent from the README's Seeed table, absent from the confirmed-panel list on
+  the docs home page (which still said thirteen), and absent from `esp32_gray2_bin`'s tested note
+  despite being one of the panels that renderer is confirmed on. Its catalog entry also carried no
+  `url`, so it was the one Seeed SKU in the compatibility matrix rendered as plain text rather than
+  a product link.
+
+- **The M5Stack PaperS3 is listed in the README**, pointing at M5's documentation rather than their
+  store: M5 have marked it end of life and it is sold out, so the entry is for people who already
+  own one rather than an invitation to buy.
+
 ## [0.357.0], 2026-08-24
 
 ### Added

@@ -33,8 +33,8 @@
     },
     "esp32_gray2_bin": {
       "status": "Tested",
-      "hardware": "Xteink X4 (SSD1677, 800x480) and Xteink X3 (UC8279d, 792x528), both running CrossInk with Tesserae client support + Seeed reTerminal E1001 (4-gray mode) running tesserae-device-firmware",
-      "notes": "4-level grayscale confirmed end-to-end: the 2-bpp frame is fetched and composited as a base frame plus LSB/MSB planes, with distinct grey levels. Packing is byte-identical to the firmware's own 2-bpp bitmap reader, so no decode step is involved. Notable that this works on the X3's UC8253/UC8279d silicon as well as the UC8179-class panels the renderer was written for."
+      "hardware": "Xteink X4 (SSD1677, 800x480) and Xteink X3 (UC8279d, 792x528), both running CrossInk with Tesserae client support + Seeed reTerminal E1001 (4-gray mode) running tesserae-device-firmware + Seeed reTerminal Sticky (SSD1677, 480x800 portrait) running tesserae-device-firmware",
+      "notes": "4-level grayscale confirmed end-to-end: the 2-bpp frame is fetched and composited as a base frame plus LSB/MSB planes, with distinct grey levels. Packing is byte-identical to the firmware's own 2-bpp bitmap reader, so no decode step is involved. Notable that this works on the X3's UC8253/UC8279d silicon as well as the UC8179-class panels the renderer was written for. The Sticky packs the same 96000 bytes at a portrait 120-byte stride because its firmware transposes on the device; only the stride distinguishes it from the E1001."
     },
     "circuitpython_bmp": {
       "status": "Partial",

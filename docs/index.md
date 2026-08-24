@@ -41,9 +41,9 @@ maintainer with a growing group of community contributors. The
 composer → renderers → transport → devices pipeline, scheduler, Home
 Assistant MQTT auto-discovery, webhook push, the Spectra theme system
 (browse / builder / image-to-palette extraction), font picker, and
-form-driven page editor are all shipping. **Thirteen panels are
+form-driven page editor are all shipping. **Fourteen panels are
 confirmed on real hardware**: the Seeed reTerminal E1001, E1002,
-E1003, and E1004 and the Seeed XIAO 13.3" ePaper EE02 on the
+E1003, E1004 and Sticky, and the Seeed XIAO 13.3" ePaper EE02 on the
 Tesserae-native firmware (browser flash, battery-powered), the Seeed
 TRMNL 7.5" OG DIY Kit over TRMNL BYOS, the Waveshare 13.3" Spectra 6
 and 7.3" PhotoPainter via `esp32_bin`, the Pimoroni Inky Impression
