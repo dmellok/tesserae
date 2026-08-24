@@ -4,6 +4,25 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.362.0], 2026-08-24
+
+### Added
+
+- **The reTerminal E series can beep when you touch it (#258).** E-ink repaints in seconds, so
+  a tap or a button press gives the person standing at the panel nothing to go on until the
+  whole pipeline has finished: dispatch, render, download, flash. Every display in the series
+  has a buzzer on the board that Tesserae has never used.
+
+  **Settings → Devices** → the display → **General** now carries **Beep on interaction**, with a
+  tone (click, beep, chirp, low) and a volume next to it. The panel sounds it itself, the instant
+  the touch controller or a button reports the input, before the server is contacted: a beep the
+  server triggered would arrive with the repaint, which is the wait it exists to cover. The
+  button-only models (E1001, E1002, E1004) get it on presses; the E1003 gets it on taps too.
+
+  Off by default, because a display that starts beeping after an update nobody asked for is
+  worse than a silent one. Needs firmware v1.22.0 or later; displays on older firmware ignore
+  the setting.
+
 ## [0.361.0], 2026-08-24
 
 ### Fixed

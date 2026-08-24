@@ -46,6 +46,13 @@ SLEEP_INTERVAL_MAX_S = 7 * 24 * 60 * 60
 # awake longer than this to catch repeat presses is never worth the battery.
 BUTTON_WAKE_MAX_S = 60
 
+# Buzzer feedback (#258). Tone names rather than frequencies: the firmware
+# owns the pitch and envelope, so a board with a different resonant peak
+# can voice "click" its own way without invalidating a stored config.
+BEEP_TONES = ("click", "beep", "chirp", "low")
+BEEP_VOLUME_MIN = 0
+BEEP_VOLUME_MAX = 100
+
 # Bounds for the always-on poll cadence. The floor is well under
 # ``SLEEP_INTERVAL_MIN_S`` on purpose: that floor exists to stop a typo
 # flattening a battery, and a device that reports it can stay awake has
@@ -123,6 +130,29 @@ def parse_status(payload: bytes) -> dict[str, Any]:
     return out
 
 
+def _validate_beep(payload: dict[str, Any]) -> tuple[bool, str | None]:
+    """Shared check for the three buzzer fields (#258). The reTerminal E
+    series carries a passive piezo; on the mono boards it sounds on a
+    button press, since they have no touchscreen."""
+    if "beep_enabled" in payload and not isinstance(payload["beep_enabled"], bool):
+        return False, "beep_enabled must be a boolean"
+    if "beep_tone" in payload:
+        tone = payload["beep_tone"]
+        if not isinstance(tone, str) or tone not in BEEP_TONES:
+            return False, f"beep_tone must be one of {', '.join(BEEP_TONES)} (got {tone!r})"
+    if "beep_volume" in payload:
+        try:
+            volume = int(payload["beep_volume"])
+        except (TypeError, ValueError):
+            return False, "beep_volume must be an integer"
+        if not BEEP_VOLUME_MIN <= volume <= BEEP_VOLUME_MAX:
+            return (
+                False,
+                f"beep_volume must be {BEEP_VOLUME_MIN}..{BEEP_VOLUME_MAX} (got {volume})",
+            )
+    return True, None
+
+
 def validate_config(payload: dict[str, Any]) -> tuple[bool, str | None]:
     """Check the payload makes sense before it goes on the wire."""
     if "sleep_interval_s" not in payload:
@@ -144,6 +174,12 @@ def validate_config(payload: dict[str, Any]) -> tuple[bool, str | None]:
             return False, "button_wake_s must be an integer"
         if not 0 <= wake <= BUTTON_WAKE_MAX_S:
             return False, f"button_wake_s must be 0..{BUTTON_WAKE_MAX_S} (got {wake})"
+    # Buzzer feedback (#258): only on kinds whose hardware entry extends
+    # the schema with it (the reTerminal E series), optional for the same
+    # reason as the button window above.
+    ok, err = _validate_beep(payload)
+    if not ok:
+        return False, err
     # Always-on (mains-powered panels): optional, so a form that predates
     # the field still validates.
     if "always_on" in payload and not isinstance(payload["always_on"], bool):

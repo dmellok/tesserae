@@ -100,6 +100,37 @@ BUTTON_WAKE_MAX_S = 60
 AWAKE_POLL_MIN_S = 5
 AWAKE_POLL_MAX_S = 300
 
+# Buzzer feedback (#258). Tones are names rather than frequencies: the
+# firmware owns the pitch and envelope of each, so a board with a
+# different resonant peak can voice "click" its own way without every
+# stored config becoming wrong. Volume is a percentage of drive strength.
+BEEP_TONES = ("click", "beep", "chirp", "low")
+BEEP_VOLUME_MIN = 0
+BEEP_VOLUME_MAX = 100
+
+
+def _validate_beep(payload: dict[str, Any]) -> tuple[bool, str | None]:
+    """Shared check for the three buzzer fields (#258). Split out because
+    both ESP32 protocols carry them: the E1003 beeps on touch, the rest of
+    the reTerminal E series on a button press."""
+    if "beep_enabled" in payload and not isinstance(payload["beep_enabled"], bool):
+        return False, "beep_enabled must be a boolean"
+    if "beep_tone" in payload:
+        tone = payload["beep_tone"]
+        if not isinstance(tone, str) or tone not in BEEP_TONES:
+            return False, f"beep_tone must be one of {', '.join(BEEP_TONES)} (got {tone!r})"
+    if "beep_volume" in payload:
+        try:
+            volume = int(payload["beep_volume"])
+        except (TypeError, ValueError):
+            return False, "beep_volume must be an integer"
+        if not BEEP_VOLUME_MIN <= volume <= BEEP_VOLUME_MAX:
+            return (
+                False,
+                f"beep_volume must be {BEEP_VOLUME_MIN}..{BEEP_VOLUME_MAX} (got {volume})",
+            )
+    return True, None
+
 
 def validate_config(payload: dict[str, Any]) -> tuple[bool, str | None]:
     """Check the payload makes sense before it goes on the wire."""
@@ -134,6 +165,12 @@ def validate_config(payload: dict[str, Any]) -> tuple[bool, str | None]:
             return False, "touch_linger_s must be an integer"
         if not 0 <= linger <= TOUCH_LINGER_MAX_S:
             return False, f"touch_linger_s must be 0..{TOUCH_LINGER_MAX_S} (got {linger})"
+    # Buzzer feedback (#258): only on kinds whose hardware entry extends the
+    # schema with it (the reTerminal E series), optional here for the same
+    # reason as the touch fields.
+    ok, err = _validate_beep(payload)
+    if not ok:
+        return False, err
     # Always-on (mains-powered panels): optional, so a form that predates
     # the field still validates.
     if "always_on" in payload and not isinstance(payload["always_on"], bool):

@@ -31,6 +31,25 @@ Two sides to it:
    by default. **Touch linger** keeps the device awake briefly after a
    touch so follow-up taps skip the deep-sleep wake latency.
 
+## Audible feedback
+
+E-ink repaints in seconds, not milliseconds, so a tap gives the person in
+front of the panel nothing to go on until the whole pipeline (dispatch,
+render, download, flash) has finished. On the Seeed reTerminal E series
+there's a buzzer on the board to close that gap: **Settings → Devices** →
+the device card → **General** → **Beep on interaction**, with a tone and a
+volume next to it.
+
+The panel sounds it itself, the moment the touch controller reports the
+stroke, before the server is contacted at all. That's the whole point: a
+beep the server triggered would arrive with the repaint, which is the wait
+it exists to cover. It fires for physical button presses too, so the
+button-only models in the series (E1001, E1002, E1004) get it as well.
+
+Off by default, and worth thinking about before switching it on in a shared
+room. Volume is the drive strength as a percentage: the piezo is loud at
+100 and discreet around 30.
+
 ## Attaching actions in the editor
 
 Every element in the **grid** and **canvas** editors has an

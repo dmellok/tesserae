@@ -19,5 +19,33 @@
   },
   "refresh_floor_s": 60,
   "image_format": "bin",
-  "notes_md": "Confirmed on real hardware running the tesserae-device-firmware grayscale build. Wire format is exactly 96000 bytes (800*480/4), row-major from top-left, 4 pixels per byte MSB first (bits 7-6 = leftmost pixel), 2-bit value 0b00 = black, 0b11 = white, linear 4-level gray; no header, no padding, no checksum. Same physical unit as `seeed_reterminal_e1001`; pick this kind when the unit runs the grayscale firmware build. The server migrates a registered E1001 to this kind automatically when its firmware re-registers or re-discovers declaring it (same-protocol kind heal)."
+  "notes_md": "Confirmed on real hardware running the tesserae-device-firmware grayscale build. Wire format is exactly 96000 bytes (800*480/4), row-major from top-left, 4 pixels per byte MSB first (bits 7-6 = leftmost pixel), 2-bit value 0b00 = black, 0b11 = white, linear 4-level gray; no header, no padding, no checksum. Same physical unit as `seeed_reterminal_e1001`; pick this kind when the unit runs the grayscale firmware build. The server migrates a registered E1001 to this kind automatically when its firmware re-registers or re-discovers declaring it (same-protocol kind heal).",
+  "config_schema_extends": {
+    "beep_enabled": {
+      "type": "boolean",
+      "label": "Beep on interaction",
+      "default": false,
+      "help": "Sound the on-board buzzer the moment a button press registers, before the server is contacted. E-ink takes seconds to repaint, so without it there is no confirmation the panel heard you. Off by default: a panel that starts beeping unannounced is worse than a silent one."
+    },
+    "beep_tone": {
+      "type": "select",
+      "label": "Beep tone",
+      "default": "beep",
+      "choices": [
+        {"value": "click", "label": "Click (short, 2.4 kHz)"},
+        {"value": "beep", "label": "Beep (2 kHz)"},
+        {"value": "chirp", "label": "Chirp (rising two-tone)"},
+        {"value": "low", "label": "Low beep (1.2 kHz)"}
+      ],
+      "help": "Which sound to make. The buzzer is a passive piezo, loudest around 2 kHz."
+    },
+    "beep_volume": {
+      "type": "int",
+      "label": "Beep volume",
+      "default": 60,
+      "min": 0,
+      "max": 100,
+      "help": "Drive strength as a percentage. The piezo is loudest at 100 and audible but discreet around 30; 0 is silent, same as turning the beep off."
+    }
+  }
 }

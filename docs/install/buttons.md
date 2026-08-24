@@ -106,6 +106,15 @@ a booking that takes four seconds to commit needs more than the 5 s
 default wait to fit inside a 10 s window. Miss the window and the panel
 still catches up, just not until its next scheduled wake.
 
+## Audible feedback
+
+The Seeed reTerminal E series has a buzzer on the board, and Tesserae can
+sound it the instant a press registers rather than leaving the user waiting
+on the repaint: **Settings → Devices** → the device card → **General** →
+**Beep on interaction**, with a tone and volume beside it. The panel makes
+the sound locally, before the server is contacted. Off by default. The same
+setting covers taps on the touch models. Needs firmware v1.22.0 or later.
+
 ## Manual override sticks until the next anchor
 
 When a button press moves the device's rotation position (a rotate,

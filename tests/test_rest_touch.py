@@ -340,3 +340,97 @@ def test_e1003_status_config_carries_touch_linger_default(app: Flask) -> None:
     assert config.get("touch_linger_s") == 30
     # Touch input itself stays opt-in (battery cost through deep sleep).
     assert config.get("touch_enabled") is False
+
+
+# -- buzzer feedback config (#258) ----------------------------------------
+
+
+def _register_kind(app: Flask, client, device_id: str, kind: str) -> str:
+    code = app.config["PAIRING_STORE"].issue(note="test").code
+    resp = client.post(
+        "/api/v1/device/register",
+        headers={"X-Pairing-Code": code, "Content-Type": "application/json"},
+        data=json.dumps({"device_id": device_id, "kind": kind, "fw_version": "1.21.0"}),
+    )
+    assert resp.status_code == 201, resp.get_data(as_text=True)
+    return str(resp.get_json()["device_token"])
+
+
+def test_beep_config_reaches_the_firmware_off_by_default(app: Flask) -> None:
+    """The buzzer fields ride the same /status config block as the touch
+    ones, and start silent: a panel that begins beeping after an update
+    nobody asked for is worse than a silent one."""
+    client = app.test_client()
+    _sign_in(client)
+    token = _register_kind(app, client, "hall_e1003", "seeed_reterminal_e1003")
+
+    status = client.post(
+        "/api/v1/device/hall_e1003/status",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        data=json.dumps({"battery_pct": 80}),
+    )
+    config = status.get_json()["config"]
+    assert config.get("beep_enabled") is False
+    assert config.get("beep_tone") == "beep"
+    assert config.get("beep_volume") == 60
+
+
+def test_beep_config_reaches_a_button_only_reterminal(app: Flask) -> None:
+    """The E1001 has the same buzzer and no touchscreen, so it gets the
+    fields too and sounds them on a button press."""
+    client = app.test_client()
+    _sign_in(client)
+    token = _register_kind(app, client, "hall_e1001", "seeed_reterminal_e1001")
+
+    status = client.post(
+        "/api/v1/device/hall_e1001/status",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        data=json.dumps({"battery_pct": 80}),
+    )
+    config = status.get_json()["config"]
+    assert config.get("beep_enabled") is False
+    assert "touch_linger_s" not in config, "no touchscreen on this board"
+
+
+def test_beep_settings_survive_to_the_config_block(app: Flask) -> None:
+    """What an operator picks in Settings -> Devices is what the panel is
+    told, unchanged."""
+    client = app.test_client()
+    _sign_in(client)
+    token = _register_kind(app, client, "hall_e1003", "seeed_reterminal_e1003")
+    section = app.config["SETTINGS_STORE"].get_section("devices") or {}
+    section["hall_e1003"] = {
+        **section.get("hall_e1003", {}),
+        "sleep_interval_s": 900,
+        "beep_enabled": True,
+        "beep_tone": "chirp",
+        "beep_volume": 30,
+    }
+    app.config["SETTINGS_STORE"].patch_section("devices", section)
+
+    status = client.post(
+        "/api/v1/device/hall_e1003/status",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        data=json.dumps({}),
+    )
+    config = status.get_json()["config"]
+    assert config.get("beep_enabled") is True
+    assert config.get("beep_tone") == "chirp"
+    assert config.get("beep_volume") == 30
+
+
+def test_a_board_without_a_buzzer_gets_no_beep_fields(app: Flask) -> None:
+    """Only the hardware entries that declare the buzzer extend the schema
+    with it, so nothing else is told about a beep it cannot make."""
+    client = app.test_client()
+    _sign_in(client)
+    token = _register_kind(app, client, "study_xiao", "xiao_epaper_75")
+
+    status = client.post(
+        "/api/v1/device/study_xiao/status",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        data=json.dumps({}),
+    )
+    config = status.get_json()["config"]
+    assert "beep_enabled" not in config
+    assert "beep_tone" not in config
