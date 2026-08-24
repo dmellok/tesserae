@@ -15,6 +15,7 @@ routes only.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -380,3 +381,44 @@ def test_preview_empty_slug_query_hides_applied_profile(app: Flask) -> None:
     swatch_w = img.width // 6
     r = img.getpixel((3 * swatch_w + swatch_w // 4, 2))
     assert r == WAVESHARE_E6_PALETTE[3]
+
+
+def test_devices_page_has_no_nested_form_tags(app: Flask) -> None:
+    """A ``<form>`` start tag seen while another form is open is dropped
+    by the HTML5 parser and its buttons silently re-own to the enclosing
+    form. The device card therefore hoists its action forms (combined
+    save, orientation calibrate) as empty elements above the tab panels
+    and points buttons at them via ``form=""``. Guard both page states:
+    nesting anywhere on the page breaks whichever form comes first."""
+    client = app.test_client()
+    _sign_in(client)
+    dev = _register_device(client)
+    for url in (
+        f"/settings/devices?opened={dev}",
+        f"/settings/devices?calibrating={dev}",
+    ):
+        body = client.get(url).get_data(as_text=True)
+        depth = 0
+        for tag in re.findall(r"</?form\b", body):
+            depth += 1 if tag == "<form" else -1
+            assert 0 <= depth <= 1, f"nested <form> tag in {url}"
+        assert depth == 0, f"unbalanced <form> tags in {url}"
+
+
+def test_orientation_card_buttons_target_calibrate_forms(app: Flask) -> None:
+    """The orientation-card send button and the 1-4 answer buttons must
+    associate with the hoisted calibrate forms, not sit as bare submit
+    buttons that would fall through to the combined save."""
+    client = app.test_client()
+    _sign_in(client)
+    dev = _register_device(client)
+
+    body = client.get(f"/settings/devices?opened={dev}").get_data(as_text=True)
+    assert f'id="device-{dev}-calibrate"' in body
+    assert f'action="/settings/devices/{dev}/calibrate"' in body
+    assert f'form="device-{dev}-calibrate"' in body
+
+    body = client.get(f"/settings/devices?calibrating={dev}").get_data(as_text=True)
+    assert f'id="device-{dev}-calibrate-apply"' in body
+    assert f'action="/settings/devices/{dev}/calibrate/apply"' in body
+    assert body.count(f'form="device-{dev}-calibrate-apply"') == 4

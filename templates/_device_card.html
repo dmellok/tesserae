@@ -42,14 +42,14 @@
   {% set active_tab = 'general' %}
 {% endif %}
 
-{# v0.69.9: the outer combined-save form's id, used via HTML5
+{# v0.69.9: the combined-save form's id, used via HTML5
    ``form="..."`` attribute on every input in the tab panels that
-   should submit to the combined endpoint. Bypasses the nested-forms
-   HTML5 restriction: the calibrate / palette / tone forms are legally
-   nested by DOM but their inputs belong to their own <form>, while
-   the combined-endpoint inputs (device name, panel dims, sleep
-   interval, quiet hours, picture quality) associate back to the
-   outer form via this id regardless of DOM position. #}
+   should submit to the combined endpoint. The combined form itself is
+   an empty element above the tab bar (see the COMBINED FORM comment),
+   so the calibrate / palette / tone forms in the panels are never
+   nested inside another form, while the combined-endpoint inputs
+   (device name, panel dims, sleep interval, quiet hours, picture
+   quality) associate to it via this id regardless of DOM position. #}
 {% set _combined_form_id = section.id ~ '-combined' %}
 <section class="card dx-device-card"
          id="{{ section.id }}"
@@ -181,6 +181,18 @@
     <form method="post" id="album-resync-{{ section.device_id }}"
           action="{{ url_for('auth.devices_album_resync', instance_id=section.device_id) }}"></form>
 
+    {# Same trick for the General tab's orientation-calibrate buttons.
+       Their <form> tags were the first ones nested inside the combined
+       form, and the HTML5 parser drops a <form> start tag while another
+       form is open, so the buttons fell through to the combined save
+       and the card never sent. #}
+    {% if section.calibrate_endpoint %}
+    <form method="post" id="{{ section.id }}-calibrate"
+          action="{{ section.calibrate_endpoint }}"></form>
+    <form method="post" id="{{ section.id }}-calibrate-apply"
+          action="{{ section.calibrate_apply_endpoint }}"></form>
+    {% endif %}
+
     {# TAB BAR #}
     <nav class="dx-tabs" role="tablist" aria-label="Device settings">
       {% for tab_id, tab_label in [('status', 'Status'), ('general', 'General'), ('schedule', 'Schedule'), ('calibration', 'Calibration')] %}
@@ -193,21 +205,23 @@
       {% endfor %}
     </nav>
 
-    {# COMBINED FORM. v0.69.9: DOM-wrapping the tab panels used to
-       break the sticky save bar and the calibration fields because
-       the calibrate / palette / tone <form> tags inside are illegal
-       nested-form structures per HTML5 (the first inner </form>
-       closes the OUTER form early, orphaning the picture-quality
-       fields and the save bar itself). Every input that submits to
-       the combined endpoint now uses ``form="{{ _combined_form_id }}"``
-       via the shared macros, so DOM nesting doesn't matter. The
-       outer <form> stays for the DOM-descendant inputs (nothing
-       broken by wrapping), and its id ties the ``form=""``
-       associations together. #}
+    {# COMBINED FORM. An empty element like the action forms above,
+       never a DOM wrapper around the tab panels: the parser drops any
+       <form> start tag seen while another form is open, so wrapping
+       silently re-owned the first nested form's buttons (the
+       orientation-calibrate send) to the combined save, and only the
+       stray inner </form> closing the wrapper early kept the forms
+       after it (test patterns, palette) working. Every combined-save
+       input associates here via ``form="{{ _combined_form_id }}"``
+       (the shared macros emit it), the save bar resolves via
+       ``data-save-bar-for``, and the dirty-tracking JS filters on
+       ``target.form`` rather than bubbling, so nothing needs the
+       wrapper. #}
     {% if section.combined_endpoint %}
     <form method="post" action="{{ section.combined_endpoint }}"
           id="{{ _combined_form_id }}"
-          class="form dx-device-form" data-dirty-form>
+          data-dirty-form></form>
+    <div class="form dx-device-form">
 
       {# v0.69.17: carry the currently-active tab through the save
          redirect so saving from General / Calibration doesn't jump
@@ -216,7 +230,7 @@
          ``tab=`` lands on the default (Status). JS updates this field
          when the user switches tabs via the tab bar. #}
       <input type="hidden" name="_active_tab" value="{{ active_tab }}"
-             data-active-tab-field>
+             form="{{ _combined_form_id }}" data-active-tab-field>
 
       {# STATUS TAB (read-only) #}
       <section role="tabpanel" data-panel="status"
@@ -597,9 +611,10 @@
 
         {# Orientation calibration card, moved from the Calibration tab
            in v0.68 because it's a physical-mount concern (which way is
-           up?), not a colour-tuning concern. Nested forms are fine here;
-           they post to their own endpoint independent of the combined
-           Save. #}
+           up?), not a colour-tuning concern. The buttons post to the
+           empty calibrate forms hoisted above the combined form via
+           ``form=""``; a nested <form> tag here would be dropped by the
+           parser and the buttons would submit the combined save. #}
         {% if section.calibrate_endpoint %}
         <hr class="dx-divider">
         <p class="device-subhead">Orientation calibration</p>
@@ -614,24 +629,29 @@
             A test card was sent to <code>{{ section.device_id }}</code>. Look at the panel:
             <strong>which number is in the top-left corner?</strong>
           </p>
-          <form method="post" action="{{ section.calibrate_apply_endpoint }}" class="form calibrate-answer">
+          <div class="form calibrate-answer">
             <div class="calibrate-choices">
               {% for n in [1, 2, 3, 4] %}
-              <button type="submit" name="top_left" value="{{ n }}" class="ghost calibrate-num">{{ n }}</button>
+              <button type="submit" form="{{ section.id }}-calibrate-apply" name="top_left" value="{{ n }}" class="ghost calibrate-num">{{ n }}</button>
               {% endfor %}
             </div>
-          </form>
-          <form method="post" action="{{ section.calibrate_endpoint }}" class="form form--inline">
-            <div class="actions">{{ button('Re-send card', icon='arrow-clockwise', variant='ghost') }}</div>
-          </form>
+          </div>
+          <div class="form form--inline">
+            <div class="actions">
+              <button type="submit" form="{{ section.id }}-calibrate" class="ghost">
+                <i class="ph ph-arrow-clockwise" aria-hidden="true"></i>
+                <span>Re-send card</span>
+              </button>
+            </div>
+          </div>
         </div>
         {% else %}
-        <form method="post" action="{{ section.calibrate_endpoint }}" class="form form--inline">
-          <button type="submit" class="button">
+        <div class="form form--inline">
+          <button type="submit" form="{{ section.id }}-calibrate" class="button">
             <i class="ph ph-compass" aria-hidden="true"></i>
             <span>Send orientation card</span>
           </button>
-        </form>
+        </div>
         {% endif %}
         {% endif %}
 
@@ -1145,8 +1165,8 @@
          nested-form bug fixed, dirty tracking works and hide-until-
          dirty is the right shape again. The Save + Discard buttons
          use ``form="{{ _combined_form_id }}"`` so they submit / reset
-         the outer form even though the bar sits outside it in the
-         DOM after the nested-form parse quirk. #}
+         the combined form, which is an empty element above the tab
+         bar rather than a DOM ancestor. #}
       <div class="dx-save-bar" data-save-bar data-save-bar-for="{{ _combined_form_id }}" hidden>
         <span class="dx-save-bar-msg">Unsaved changes for {{ section.device_name or section.title.replace('Device: ', '') }}</span>
         <div class="dx-save-bar-actions">
@@ -1157,7 +1177,7 @@
           </button>
         </div>
       </div>
-    </form>
+    </div>
     {% endif %}
 
     {# FOOTER ACTION ROW (separate forms; cannot live inside the combined form) #}
