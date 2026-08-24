@@ -96,6 +96,16 @@ strictly better: it fires when the work is actually done rather than
 after a guessed delay. `webhook_refresh:` is for receivers you can't
 modify.
 
+Either way the repaint reaches a touch panel while it is still awake
+from the tap, provided the panel is inside its touch linger window and
+running firmware v1.21.0 or later. Small changes arrive as patched
+rectangles; a change too big for that arrives as a whole new frame, and
+the panel is told to come and fetch it. Set the display's **Touch
+linger** long enough to cover your receiver's latency plus the repaint:
+a booking that takes four seconds to commit needs more than the 5 s
+default wait to fit inside a 10 s window. Miss the window and the panel
+still catches up, just not until its next scheduled wake.
+
 ## Manual override sticks until the next anchor
 
 When a button press moves the device's rotation position (a rotate,

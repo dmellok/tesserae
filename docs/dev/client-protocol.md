@@ -1195,6 +1195,42 @@ server re-pushes the page asynchronously ~3 s after the last action
 (`app.touch_repush_debounce_s`), and the next `/frame` poll or MQTT
 publish delivers a normal full frame.
 
+### Stale frame signal
+
+Not every change fits in a patch. A diff past the caps, a page edit, a
+renderer setting change, or an external `POST /api/v1/push` all mint a
+new frame digest, and a device that is awake in a touch-linger window
+is not polling `/frame` to notice. Since v0.360 the `/frame/data`
+response says so directly (server #242):
+
+```json
+{"seq": 1753430000123, "values": {}, "stale": true, "frame_digest": "<newer>"}
+```
+
+Contract:
+
+* **Meaning.** The server's live frame for this device is no longer the
+  one named in the poll's `?digest=`. Run a normal `/frame` poll; the
+  digest really did change, so a conditional GET answers `200` without
+  dropping the stored ETag.
+* **Both fields or neither.** A bare `"stale": true` with no
+  `frame_digest` is malformed, and a client that acted on one would
+  refetch on every poll of the window. Compare the digest against the
+  frame on glass and ignore a match.
+* **Precedence.** A stale response never carries `patches`: the full
+  frame supersedes them.
+* **Locally-cached frames are never stale.** A device painting a deck
+  page or a collection frame from its own cache navigated there itself,
+  so the live slot moving underneath is not reported against it.
+* **Deep sleep vs always-on.** A deep-sleep device should fetch and
+  paint before its window closes (that is the whole point: the
+  alternative is waiting out `sleep_interval_s`). An always-on device
+  should bring its next scheduled poll forward instead and let the
+  panel's own refresh floor bound the repaint.
+
+Devices predating the field ignore it and converge on their next poll
+as before.
+
 ## Protocol v2 (device-owned touch)
 
 Advertise `"proto": {"v": 2}` in register/status bodies (sticky,
@@ -1225,7 +1261,10 @@ surfaces:
   grace applies to `/frame/data`, and any KNOWN digest on
   `/frame/data` answers `200` (an empty `values` document when nothing
   is live or staged) so a device never latches data-off from a poll
-  that raced a re-render — `404` = genuinely unknown digest on both.
+  that raced a re-render — `404` = genuinely unknown digest on
+  `/frame/manifest`, and on `/frame/data` an unknown digest for a
+  device that has no live render at all (otherwise it answers `200`
+  with the stale signal above).
   When a frame carries more regions than the device's advertised
   budget, the trim keeps navigation first, then sliders, then taps,
   then swipes (document order within each class) and logs the dropped

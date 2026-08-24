@@ -2810,19 +2810,94 @@ def get_frame_data(device_id: str) -> Response:
     with an empty ``values`` document when the frame has no slots and
     nothing is staged: a 404 reads as data-off and a device that latched
     it mid-linger would then miss the patch a tap stages a second later
-    (bench, 2026-07-25). 404 = genuinely unknown digest only."""
+    (bench, 2026-07-25). 404 = genuinely unknown digest only.
+
+    A poll about a frame the live slot has already moved past answers
+    ``"stale": true`` plus the current ``frame_digest`` (#242), which
+    tells a lingering device to run a normal /frame poll rather than
+    wait for its next timer wake. See ``_superseding_frame_digest``."""
     device, err = _auth_device(device_id)
     if err is not None or device is None:
         return err  # type: ignore[return-value]
     digest = _normalize_digest(request.args.get("digest", ""))
     doc = _overlay_values_doc(device, digest)
-    patches = _frame_patches_doc(device.id, digest)
-    if doc is None and patches is None and _frame_info_for_digest(device, digest) is None:
+    stale_digest = _superseding_frame_digest(device, digest)
+    # A full frame supersedes any staged patch: the patch would paint rects
+    # of a frame the device is about to download whole.
+    patches = _frame_patches_doc(device.id, digest) if stale_digest is None else None
+    if (
+        doc is None
+        and patches is None
+        and stale_digest is None
+        and _frame_info_for_digest(device, digest) is None
+    ):
         return _error(404, "unknown frame digest")
     out: dict[str, Any] = doc if doc is not None else {"seq": int(time.time() * 1000), "values": {}}
     if patches is not None:
         out["patches"] = patches
+    if stale_digest is not None:
+        out["stale"] = True
+        out["frame_digest"] = stale_digest
     return jsonify(out)
+
+
+def _superseding_frame_digest(device: Device, wanted: str) -> str | None:
+    """The device's live frame digest when ``wanted`` is not it, else None.
+
+    A deep-sleep device polls ``/frame/data`` only while awake in its
+    touch-linger window, and in that window it does not poll ``/frame``
+    at all: the sanctioned ways to change the glass are a patch document
+    on the current digest, or this signal. Without it a frame minted
+    during the window (a promoted reconcile whose diff was too big to
+    patch, an external ``/api/v1/push``) sat undelivered until the next
+    timer wake, which is the whole of #242.
+
+    Locally-cached frames are NOT stale: a device painting a deck page or
+    an album frame from its own SD cache navigated there itself, and the
+    live slot moving underneath is not a reason to yank it back."""
+    push_mgr = current_app.config.get("PUSH_MANAGER")
+    if push_mgr is None or not wanted:
+        return None
+    live = push_mgr.latest_render_for(device.id)
+    live_digest = str(live.get("digest") or "") if live else ""
+    if not live_digest or live_digest == wanted:
+        return None
+    if _is_locally_cached_frame(device, wanted):
+        return None
+    return live_digest
+
+
+def _is_locally_cached_frame(device: Device, wanted: str) -> bool:
+    """True when ``wanted`` is a frame the device holds in its own cache
+    (a deck page or a collection frame) rather than one the server
+    delivered from the live slot."""
+    push_mgr = current_app.config.get("PUSH_MANAGER")
+    if push_mgr is None:
+        return False
+    deck = _bound_deck(device.id)
+    if deck is not None:
+        from app.deck_sync import frame_entry_by_digest as deck_frame
+
+        try:
+            if deck_frame(deck, device.id, wanted, push_mgr=push_mgr) is not None:
+                return True
+        except Exception:
+            current_app.logger.exception("rest: deck frame lookup failed for %s", device.id)
+    album = _bound_album(device.id)
+    if album is not None:
+        from app.collection_sync import frame_entry_by_digest as collection_frame
+
+        try:
+            if (
+                collection_frame(
+                    device.id, wanted, push_mgr=push_mgr, frames=_collection_frames(album)
+                )
+                is not None
+            ):
+                return True
+        except Exception:
+            current_app.logger.exception("rest: collection frame lookup failed for %s", device.id)
+    return False
 
 
 def _frame_patches_doc(device_id: str, frame_digest: str) -> dict[str, Any] | None:

@@ -114,7 +114,8 @@ def test_frame_data_never_hands_out_patches_for_other_frames(app: Flask) -> None
     _seed_patch(app, "e1003", anchor="a" * 16)
 
     resp = client.get(f"/api/v1/device/e1003/frame/data?digest={'b' * 16}", headers=_auth(token))
-    assert resp.status_code == 404
+    assert resp.status_code == 200
+    assert "patches" not in resp.get_json()
 
 
 def test_frame_data_empty_200_when_nothing_pending(app: Flask) -> None:
@@ -129,6 +130,94 @@ def test_frame_data_empty_200_when_nothing_pending(app: Flask) -> None:
     body = resp.get_json()
     assert body["values"] == {} and "patches" not in body
     assert body["seq"] > 1_700_000_000_000
+
+
+# -- stale-frame signal (#242) --------------------------------------------
+
+
+def test_frame_data_reports_a_superseded_frame_as_stale(app: Flask) -> None:
+    """A device polling about a frame the live slot has moved past is
+    told so. It only polls this endpoint while awake in a linger window,
+    where it does not poll /frame at all, so without the signal a frame
+    minted during the window waits for the next timer wake (#242)."""
+    client = app.test_client()
+    token = _register(app, client, "e1003")
+    _seed_frame(app, "e1003", digest="b" * 16)
+
+    resp = client.get(f"/api/v1/device/e1003/frame/data?digest={'a' * 16}", headers=_auth(token))
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["stale"] is True
+    assert body["frame_digest"] == "b" * 16
+
+
+def test_frame_data_on_the_live_digest_is_never_stale(app: Flask) -> None:
+    client = app.test_client()
+    token = _register(app, client, "e1003")
+    _seed_frame(app, "e1003", digest="a" * 16)
+
+    body = client.get(
+        f"/api/v1/device/e1003/frame/data?digest={'a' * 16}", headers=_auth(token)
+    ).get_json()
+    assert "stale" not in body and "frame_digest" not in body
+
+
+def test_stale_suppresses_a_patch_staged_on_the_old_digest(app: Flask) -> None:
+    """A full frame supersedes a patch: painting rects of a frame the
+    device is about to download whole is wasted panel time, and would
+    leave the glass a blend of two renders if the fetch then failed."""
+    client = app.test_client()
+    token = _register(app, client, "e1003")
+    _seed_frame(app, "e1003", digest="a" * 16)
+    _seed_patch(app, "e1003", anchor="a" * 16)
+    # A newer frame lands (a promoted reconcile, or an external push).
+    _seed_frame(app, "e1003", digest="b" * 16)
+
+    body = client.get(
+        f"/api/v1/device/e1003/frame/data?digest={'a' * 16}", headers=_auth(token)
+    ).get_json()
+    assert body["stale"] is True
+    assert "patches" not in body
+
+
+def test_deck_cached_frame_is_not_stale(app: Flask) -> None:
+    """A device painting a deck page from its own SD cache navigated
+    there itself; the live slot moving underneath must not yank it back
+    to the last-pushed page."""
+    from app.state.deck_model import Deck, DeckPage
+
+    client = app.test_client()
+    token = _register(app, client, "e1003")
+    _seed_frame(app, "e1003", digest="b" * 16)
+    app.config["DECK_STORE"].upsert(
+        Deck(
+            id="kitchen",
+            name="Kitchen",
+            device_ids=["e1003"],
+            refresh_interval_minutes=15,
+            pages=[DeckPage(page_id="weather")],
+        )
+    )
+    app.config["PUSH_MANAGER"]._deck_renders.setdefault("e1003", {})["weather"] = {
+        "digest": "d" * 16,
+        "ext": "bin",
+        "filename": f"{'d' * 16}.bin",
+    }
+
+    body = client.get(
+        f"/api/v1/device/e1003/frame/data?digest={'d' * 16}", headers=_auth(token)
+    ).get_json()
+    assert "stale" not in body
+
+
+def test_frame_data_without_a_live_render_stays_404(app: Flask) -> None:
+    """Nothing rendered for this device yet: there is no newer frame to
+    point at, so an unknown digest is still just unknown."""
+    client = app.test_client()
+    token = _register(app, client, "e1003")
+
+    resp = client.get(f"/api/v1/device/e1003/frame/data?digest={'a' * 16}", headers=_auth(token))
+    assert resp.status_code == 404
 
 
 # -- blob endpoint --------------------------------------------------------

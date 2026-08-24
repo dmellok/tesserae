@@ -4,6 +4,30 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.360.0], 2026-08-24
+
+### Fixed
+
+- **A touch panel that is already awake now picks up a new dashboard instead of sleeping
+  through it (#242).** After a tap, a touch display stays awake for its touch linger window,
+  and in that window it watches a data endpoint for small changes rather than polling for a
+  whole new frame. That works when the change is small enough to arrive as patched rectangles.
+  Anything bigger mints a new frame instead: a booking that repaints most of the screen, a page
+  edit, a renderer setting change, or an external `POST /api/v1/push` from your own software.
+  None of those had any way to reach a display that was awake and watching, so the panel sat
+  there, went back to sleep, and only caught up on its next scheduled wake, up to a full sleep
+  interval later.
+
+  The data endpoint now answers `"stale": true` with the current frame digest when the display
+  is showing something the server has moved past, which sends it to fetch the new frame there
+  and then. This is what makes `webhook_refresh` land promptly on a screen-sized change, and it
+  also means a webhook receiver of your own that pushes back to Tesserae updates the panel
+  within a second or two of the push rather than at the next wake.
+
+  Displays playing a deck page or a collection frame from their own cache are excluded: those
+  navigated there locally, and the live frame changing underneath is not a reason to pull them
+  back. Firmware v1.21.0 acts on the signal; older firmware ignores it and behaves as before.
+
 ## [0.359.0], 2026-08-24
 
 ### Added
