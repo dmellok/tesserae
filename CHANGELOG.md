@@ -4,6 +4,32 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.361.0], 2026-08-24
+
+### Fixed
+
+- **Following the agent could land you on a dashboard that isn't there.** The toast and the
+  editor's rail take the dashboard to open from the calls the agent makes, and a call names a
+  dashboard whether or not one exists: an agent that writes to a page before creating it gets a
+  404 and the toast offered to follow it there anyway. The same went for a page the agent had
+  just deleted, and for pages the canvas editor cannot open at all. Both surfaces are now handed
+  a dashboard id only when it names a canvas dashboard that exists, so the step still narrates
+  but there is nothing to follow.
+
+### Changed
+
+- **The rail no longer announces the end of a build that is still going.** It called a run
+  finished after twelve seconds without a call, which is a pause, not an ending: the model thinks
+  between tool calls, and long code elements stream in bursts. A gap now reads as thinking, with
+  the ring still turning and the count still climbing, and only a silence long enough for the
+  server to close the run reads as finished. The toast follows the same two stages instead of
+  vanishing mid-build and popping back.
+- **The follow toast is a tape of the last few steps** rather than a single line that replaces
+  itself. Older steps dim, repeats fold (streaming a code element is one call per chunk), and the
+  header carries the dashboard name with the step count and elapsed time. A dot in the header
+  pulses while calls are landing and stalls while the agent is thinking, so the state is legible
+  without reading it.
+
 ## [0.360.0], 2026-08-24
 
 ### Fixed

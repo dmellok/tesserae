@@ -451,19 +451,45 @@ def _guard() -> None:
 
 
 def _page_names() -> dict[str, str]:
+    """Id -> name for the canvas dashboards the editor can actually open.
+
+    Canvas only, and resolved fresh on every read, because this is what the
+    UI's ``page_id`` is FOR: naming a run, and offering to navigate to it.
+    ``panels.editor`` 404s on anything else, so an id that isn't in here is
+    not somewhere to send an operator.
+    """
     store = current_app.config.get("PAGE_STORE")
     if store is None:
         return {}
     try:
-        return {p.id: p.name for p in store.list()}
+        return {p.id: p.name for p in store.list() if getattr(p, "layout_kind", "") == "canvas"}
     except Exception:
         return {}
+
+
+def _idle_s() -> float | None:
+    """Seconds since the last agent call, or None when there has never been
+    one. ``None`` rather than the bus's ``inf``: that serialises as a bare
+    ``Infinity``, which is not JSON, and both clients already read a missing
+    value as "nothing is happening"."""
+    idle = bus().idle_for()
+    return None if idle == float("inf") else idle
 
 
 def _serialise(step: Step, names: dict[str, str]) -> dict[str, Any]:
     out = step.as_dict()
     if step.page_id:
-        out["page_name"] = names.get(step.page_id, "")
+        name = names.get(step.page_id)
+        if name is None:
+            # The id doesn't name a canvas dashboard: a call that 404'd
+            # against a page the agent had not created yet, a page it just
+            # deleted, or a non-canvas page the editor cannot open. The step
+            # still narrates; it just carries nowhere to navigate to, which
+            # is the difference between describing a build and sending an
+            # operator to a dead URL.
+            out["page_id"] = None
+        else:
+            out["page_name"] = name
     return out
 
 
@@ -482,7 +508,7 @@ def activity() -> Response:
         {
             "run": run,
             "seq": seq,
-            "idle_s": bus().idle_for(),
+            "idle_s": _idle_s(),
             "steps": [_serialise(s, names) for s in steps],
         }
     )
@@ -518,11 +544,17 @@ def stream() -> Response:
 
     names = _page_names()
     opening = [_serialise(s, names) for s in activity_bus.current_run()]
+    idle_s = _idle_s()
     activity_bus.add_listener(on_step)
 
     def generate() -> Iterator[str]:
         yield ":connected\n\n"
-        yield f"event: snapshot\ndata: {json.dumps({'steps': opening}, default=str)}\n\n"
+        # ``idle_s`` is how long the surface has been quiet, measured here so
+        # the rail never has to compare a server timestamp against its own
+        # clock: it decides from this whether the run it just joined is in
+        # flight, thinking, or long over.
+        opening_doc = {"steps": opening, "idle_s": idle_s}
+        yield f"event: snapshot\ndata: {json.dumps(opening_doc, default=str)}\n\n"
         last_send = time.monotonic()
         try:
             while True:

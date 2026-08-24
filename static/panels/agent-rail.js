@@ -17,12 +17,27 @@
 window.PanelsAgentRail = (function () {
   "use strict";
 
-  // A run is treated as finished after this long with no step. Generous
-  // because an agent streaming a code element pauses between chunks to think,
-  // and a build that reads as "finished" every time the model takes a breath is
-  // worse than one that lingers. The server splits runs far more coarsely
-  // (45s); this is only when the ring stops turning.
-  var QUIET_MS = 12000;
+  // Two thresholds, because a gap between calls means two different things.
+  //
+  // A pause of a few seconds is the model thinking mid-build: the rail stops
+  // claiming a step is in flight (it isn't) but keeps the run alive and says
+  // so. Only a silence long enough for the SERVER to end the run (_RUN_IDLE_S
+  // in app/agent_activity.py) is a finish, so "Agent finished" and "the next
+  // call starts a new run" are the same moment. Calling it finished earlier is
+  // what made the rail announce the end of a build that was still going.
+  var THINK_MS = 9000;
+  var DONE_MS = 45000;
+  // How long each thinking word holds before the next one. Long enough to read,
+  // short enough that a stalled-looking rail still shows a pulse of life.
+  var WORD_MS = 3800;
+  // What to call it while the agent is between calls. Nothing here claims to
+  // know what the model is doing -- the object line underneath carries the one
+  // fact we have, which is how long it has been quiet.
+  var THINKING = [
+    "Thinking", "Pondering", "Mulling it over", "Working it out", "Deliberating",
+    "Musing", "Considering", "Weighing it up", "Ruminating", "Puzzling it out",
+    "Percolating", "Chewing on it", "Turning it over", "Composing",
+  ];
   // Ticks kept in the DOM. Nobody scrolls back past this in a 300px column,
   // and the header keeps the true count.
   var MAX_TICKS = 80;
@@ -36,7 +51,9 @@ window.PanelsAgentRail = (function () {
   var run = null;
   var total = 0;      // every step this run, including ones that never showed
   var startedAt = 0;
-  var quietT = null, tickT = null;
+  var quietSince = 0; // when the last step landed, for the thinking block's clock
+  var lastWord = "";
+  var thinkT = null, doneT = null, wordT = null, tickT = null;
   var current = null; // the step the "now" block is showing
   var movedTo = null;
   var settled = true; // the run has gone quiet; the next step revives the chrome
@@ -111,6 +128,8 @@ window.PanelsAgentRail = (function () {
   // take, so the sweep means "working" and the header carries the count.
   function renderNow(step) {
     current = step;
+    clearInterval(wordT);   // a real step outranks the thinking block
+    wordT = null;
     nowEl.className = "ag-now is-live";
     nowEl.innerHTML =
       '<div class="ag-ring">' +
@@ -120,6 +139,25 @@ window.PanelsAgentRail = (function () {
       '<div class="ag-txt">' +
         '<div class="ag-verb">' + esc(step.verb || step.label) + "</div>" +
         '<div class="ag-obj">' + (objectOf(step) || "&nbsp;") + "</div>" +
+      "</div>";
+  }
+
+  // Between calls. The ring keeps sweeping because the run is still open, but
+  // the step that WAS in flight has finished, so nothing here pretends
+  // otherwise: the sentence is about the agent, not about a call.
+  function renderThinking() {
+    var word = THINKING[Math.floor(Math.random() * THINKING.length)];
+    if (word === lastWord) word = THINKING[(THINKING.indexOf(word) + 1) % THINKING.length];
+    lastWord = word;
+    nowEl.className = "ag-now is-think";
+    nowEl.innerHTML =
+      '<div class="ag-ring">' +
+        '<span class="ag-ring-sweep"></span>' +
+        '<i class="ph-bold ph-dots-three"></i>' +
+      "</div>" +
+      '<div class="ag-txt">' +
+        '<div class="ag-verb">' + esc(word) + "…</div>" +
+        '<div class="ag-obj">no calls for ' + fmtSecs(Date.now() - quietSince) + "</div>" +
       "</div>";
   }
 
@@ -134,6 +172,8 @@ window.PanelsAgentRail = (function () {
   }
 
   function renderElsewhere() {
+    clearInterval(wordT);
+    wordT = null;
     nowEl.className = "ag-now is-away";
     nowEl.innerHTML =
       '<div class="ag-ring"><span class="ag-ring-sweep"></span>' +
@@ -227,6 +267,8 @@ window.PanelsAgentRail = (function () {
   // ticks it already has.
   function goLive() {
     settled = false;
+    clearInterval(wordT);
+    wordT = null;
     card.hidden = false;
     barEl.hidden = false;
     pill.hidden = false;
@@ -235,10 +277,23 @@ window.PanelsAgentRail = (function () {
     tickT = setInterval(renderCount, 200);
   }
 
+  // The gap between calls. The run stays open and the chrome stays live: the
+  // only thing that changes is that the rail stops naming a step as in flight,
+  // because the last one has landed and the next hasn't been made yet.
+  function enterThinking() {
+    pushTick(current);   // the step it was showing is done; it's history now
+    current = null;
+    renderThinking();
+    clearInterval(wordT);
+    wordT = setInterval(renderThinking, WORD_MS);
+  }
+
   function endRun() {
     settled = true;
     clearInterval(tickT);
     tickT = null;
+    clearInterval(wordT);
+    wordT = null;
     pushTick(current);
     current = null;
     pill.classList.remove("is-live");
@@ -248,9 +303,18 @@ window.PanelsAgentRail = (function () {
     renderCount();
   }
 
-  function armQuiet() {
-    clearTimeout(quietT);
-    quietT = setTimeout(endRun, QUIET_MS);
+  // ``gapMs`` is how long the surface has ALREADY been quiet, which is only
+  // non-zero when the rail opens onto a run in progress: the snapshot carries
+  // the server's own idle time, so a build that stopped ten minutes ago settles
+  // at once instead of spending 45 s claiming to think.
+  function armQuiet(gapMs) {
+    var gap = gapMs > 0 ? gapMs : 0;
+    quietSince = Date.now() - gap;
+    clearTimeout(thinkT);
+    clearTimeout(doneT);
+    if (gap >= DONE_MS) { endRun(); return; }
+    thinkT = setTimeout(enterThinking, Math.max(0, THINK_MS - gap));
+    doneT = setTimeout(endRun, DONE_MS - gap);
   }
 
   // ``replay`` marks a step from the opening snapshot: it already happened, so
@@ -305,11 +369,12 @@ window.PanelsAgentRail = (function () {
       got.forEach(function (s) { onStep(s, true); });
       if (!got.length) return;
       // A snapshot is history. Backdate the clock by the span it covers (from
-      // the server's own timestamps, so no clock skew creeps in) and let the
-      // quiet timer settle the rail if the agent has already stopped.
+      // the server's own timestamps, so no clock skew creeps in) and hand the
+      // quiet timer the server's idle time, so the rail settles or starts
+      // thinking from where the run actually is rather than from now.
       var span = (got[got.length - 1].ts - got[0].ts) * 1000;
       if (span > 0) startedAt -= span;
-      armQuiet();
+      armQuiet(data.idle_s > 0 ? data.idle_s * 1000 : 0);
     });
     es.addEventListener("step", function (ev) {
       var step;

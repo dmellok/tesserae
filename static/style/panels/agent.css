@@ -27,6 +27,11 @@
 .ag-obj{font:500 10.5px var(--t-font-mono);color:var(--t-muted);margin-top:3px;line-height:1.45;overflow-wrap:anywhere}
 .ag-now.is-away .ag-verb,.ag-now.is-away .ag-obj{color:var(--t-muted)}
 .ag-now.is-away .ag-verb{font-weight:600}
+/* Between calls: the run is still open, so the ring keeps turning, but the
+   block is no longer naming a step in flight and reads quieter for it. */
+.ag-now.is-think .ag-ring{color:var(--t-muted)}
+.ag-now.is-think .ag-ring-sweep{animation-duration:2.4s;border-top-color:var(--t-border-strong);border-right-color:transparent}
+.ag-now.is-think .ag-verb{font-weight:600;color:var(--t-fg-soft)}
 
 /* ---- the ticks ---- */
 .ag-ticks{max-height:224px;padding:6px 0 9px}

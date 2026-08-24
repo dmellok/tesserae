@@ -1,35 +1,59 @@
-/* ---- follow-the-agent toast ----
+/* ---- follow-the-agent toast, "tape" ----
    Raised by static/agent-follow.js on any admin page when the MCP agent starts
    building a canvas dashboard. Bottom-right so it clears the topbar and the
-   flash-notification stack, and narrow enough not to cover a form. */
-#agent-follow{position:fixed;right:18px;bottom:18px;z-index:250;width:min(340px,calc(100vw - 36px));opacity:0;transform:translateY(14px);transition:opacity .2s ease,transform .22s cubic-bezier(.2,.8,.3,1);pointer-events:none}
+   flash-notification stack, and narrow enough not to cover a form.
+
+   The toast shows the last few steps rather than only the current one, because
+   the useful question mid-build is "where has it got to", which one line can't
+   answer. Older lines dim, the live line is full ink, and the whole thing is a
+   fixed three-line window: what it just did, and what it is doing now. */
+#agent-follow{position:fixed;right:18px;bottom:18px;z-index:250;width:min(370px,calc(100vw - 36px));opacity:0;transform:translateY(14px);transition:opacity .2s ease,transform .22s cubic-bezier(.2,.8,.3,1);pointer-events:none}
 #agent-follow.is-up{opacity:1;transform:none;pointer-events:auto}
 #agent-follow[hidden]{display:none}
-.af-card{position:relative;display:flex;gap:12px;padding:13px 14px 12px;background:var(--t-surface);border:1px solid var(--t-border);border-left:3px solid var(--t-accent);border-radius:12px;box-shadow:var(--t-shadow-lg)}
-.af-body{min-width:0;flex:1}
-.af-head{font:600 13px var(--t-font);color:var(--t-fg);line-height:1.35;padding-right:14px}
-.af-head b{font-weight:700}
-.af-step{font:500 11px var(--t-font-mono);color:var(--t-muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.af-dot{padding:0 5px;opacity:.55}
-.af-acts{display:flex;align-items:center;gap:7px;margin-top:9px;flex-wrap:wrap}
-.af-btn{font:600 11.5px var(--t-font);padding:5px 10px;border-radius:7px;cursor:pointer;background:var(--t-surface-soft);color:var(--t-fg);border:1px solid var(--t-border-strong)}
-.af-btn:hover{border-color:var(--t-accent)}
-.af-btn.accent{background:var(--t-accent);color:var(--t-accent-fg);border-color:transparent}
-.af-btn.accent:hover{background:var(--t-accent-hover)}
-.af-follow{display:inline-flex;align-items:center;gap:5px;font:500 11px var(--t-font);color:var(--t-muted);cursor:pointer;margin-left:auto}
-.af-follow input{margin:0;accent-color:var(--t-accent)}
-.af-x{position:absolute;right:6px;top:4px;width:22px;height:22px;display:grid;place-items:center;border:0;background:transparent;color:var(--t-muted);font-size:17px;line-height:1;cursor:pointer;border-radius:6px}
-.af-x:hover{background:var(--t-surface-soft);color:var(--t-fg)}
+.af-card{background:var(--t-surface);border:1px solid var(--t-border);border-radius:10px;box-shadow:var(--t-shadow-lg);overflow:hidden}
 
-/* The throbber: three bars filling bottom-up, one after another, like a panel
-   being written in bands. Reads as "work in progress" without spinning. */
-.af-throb{flex:none;display:flex;flex-direction:column-reverse;gap:3px;padding-top:3px;width:14px}
-.af-throb i{display:block;height:5px;border-radius:1.5px;background:var(--t-border-strong)}
-.af-card.is-live .af-throb i{animation:af-band 1.35s ease-in-out infinite}
-.af-card.is-live .af-throb i:nth-child(2){animation-delay:.18s}
-.af-card.is-live .af-throb i:nth-child(3){animation-delay:.36s}
-@keyframes af-band{0%,72%,100%{background:var(--t-border-strong)}20%,52%{background:var(--t-accent)}}
+/* ---- header: what is being built, and how far in ---- */
+.af-head{display:flex;align-items:center;gap:8px;padding:8px 6px 8px 12px;border-bottom:1px solid var(--t-border);background:var(--t-surface-soft)}
+.af-name{flex:1;min-width:0;font:600 12px var(--t-font);color:var(--t-fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.af-count{font:500 10px var(--t-font-mono);color:var(--t-muted);white-space:nowrap}
+.af-x{width:22px;height:22px;flex:none;display:grid;place-items:center;border:0;background:transparent;color:var(--t-muted);font-size:16px;line-height:1;cursor:pointer;border-radius:6px}
+.af-x:hover{background:var(--t-surface-sunk);color:var(--t-fg)}
+/* One dot, pulsing outward. Slows to a stall while the agent is between calls,
+   so the difference between working and thinking is visible from across a room
+   without reading a word of it. */
+.af-pulse{flex:none;width:6px;height:6px;border-radius:50%;background:var(--t-accent);animation:af-pulse 1.8s ease-out infinite}
+.af-pulse.is-slow{background:var(--t-border-strong);animation-duration:3.4s}
+@keyframes af-pulse{
+  0%{box-shadow:0 0 0 0 color-mix(in srgb, var(--t-accent) 55%, transparent)}
+  70%{box-shadow:0 0 0 7px transparent}
+  100%{box-shadow:0 0 0 0 transparent}
+}
+
+/* ---- the tape ---- */
+.af-tape{padding:7px 12px 8px;display:grid;gap:3px}
+.af-l{display:flex;align-items:baseline;gap:7px;font:500 10.5px var(--t-font-mono);color:var(--t-muted);min-width:0}
+.af-m{flex:none;width:9px;text-align:center;color:var(--t-border-strong)}
+.af-lt{white-space:nowrap;flex:none}
+.af-lo{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:.85}
+.af-lo::before{content:"· ";opacity:.6}
+/* Everything above the live line is history: present, but not competing. */
+.af-l:not(.is-now):not(.is-think):not(.is-err){opacity:.62}
+.af-l.is-now{color:var(--t-fg)}
+.af-l.is-now .af-m{color:var(--t-accent)}
+.af-l.is-think{color:var(--t-fg-soft)}
+.af-l.is-err{color:var(--t-danger)}
+.af-l.is-err .af-m{color:var(--t-danger)}
+
+/* ---- actions ---- */
+.af-acts{display:flex;align-items:center;gap:7px;padding:0 12px 11px}
+.af-btn{font:600 11px var(--t-font);padding:5px 11px;border-radius:999px;cursor:pointer;background:transparent;color:var(--t-muted);border:1px solid var(--t-border-strong)}
+.af-btn:hover{color:var(--t-fg);border-color:var(--t-muted)}
+.af-btn.accent{background:var(--t-accent);color:var(--t-accent-fg);border-color:transparent}
+.af-btn.accent:hover{background:var(--t-accent-hover);color:var(--t-accent-fg)}
+.af-follow{display:inline-flex;align-items:center;gap:5px;font:500 10px var(--t-font-mono);color:var(--t-muted);cursor:pointer;margin-left:auto}
+.af-follow input{margin:0;accent-color:var(--t-accent)}
+
 @media (prefers-reduced-motion:reduce){
   #agent-follow{transition:none}
-  .af-card.is-live .af-throb i{animation:none;background:var(--t-accent)}
+  .af-pulse{animation:none}
 }

@@ -292,6 +292,72 @@ def test_activity_json_returns_steps_with_page_names(app: Flask) -> None:
     assert client.get("/agent/activity.json?since=nonsense").status_code == 200
 
 
+def test_a_page_id_that_cannot_be_opened_is_not_offered(app: Flask) -> None:
+    """The UI navigates to ``page_id``, so a step only carries one when it
+    names a canvas dashboard that exists. A call against an id the agent had
+    not created yet describes itself and offers nowhere to go."""
+    _enable(app)
+    client = app.test_client()
+    _sign_in(client)
+    resp = client.post(
+        "/api/mcp/pages/not-a-page-yet/elements",
+        json={"kind": "text", "text": "hi", "x": 0, "y": 0, "w": 80, "h": 30},
+    )
+    assert resp.status_code >= 400
+    step = client.get("/agent/activity.json").get_json()["steps"][-1]
+    assert step["label"] == "Add element"
+    assert step["page_id"] is None
+
+    # The bus itself still holds the id: it is the delivery that withholds it,
+    # so the server-side record stays honest about what was called.
+    steps, _, _ = app.config["AGENT_ACTIVITY"].snapshot()
+    assert steps[-1].page_id == "not-a-page-yet"
+
+
+def test_a_deleted_dashboard_stops_being_offered(app: Flask) -> None:
+    """Same rule, the other way round: the id was real when the call was made
+    and is gone by the time anyone reads the step."""
+    _enable(app)
+    client = app.test_client()
+    _sign_in(client)
+    page_id = _create_page(client)
+    assert client.get("/agent/activity.json").get_json()["steps"][-1]["page_id"] == page_id
+
+    client.delete(f"/api/mcp/pages/{page_id}")
+    for step in client.get("/agent/activity.json").get_json()["steps"]:
+        assert step["page_id"] is None
+
+
+def test_activity_json_reports_no_idle_time_before_the_first_call(app: Flask) -> None:
+    """An empty bus is idle for ``inf``, which is not JSON. Both clients read
+    a missing value as "nothing is happening", so it goes out as null."""
+    _enable(app)
+    client = app.test_client()
+    _sign_in(client)
+    body = client.get("/agent/activity.json").get_json()
+    assert body["idle_s"] is None
+    _create_page(client)
+    assert client.get("/agent/activity.json").get_json()["idle_s"] >= 0
+
+
+def test_stream_snapshot_carries_the_servers_idle_time(app: Flask) -> None:
+    """The rail decides from this whether the run it just joined is live,
+    thinking, or long over, without comparing clocks with the server."""
+    _enable(app)
+    client = app.test_client()
+    _sign_in(client)
+    _create_page(client)
+    resp = client.get("/agent/stream")
+    chunks = resp.response.__iter__()
+    next(chunks)  # ":connected"
+    snapshot = next(chunks).decode()
+    resp.close()
+    assert snapshot.startswith("event: snapshot")
+    doc = json.loads(snapshot.split("data: ", 1)[1])
+    assert doc["idle_s"] >= 0
+    assert doc["steps"][0]["label"] == "Create dashboard"
+
+
 def test_read_surfaces_404_without_the_experiment(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
