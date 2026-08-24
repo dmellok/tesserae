@@ -20,8 +20,12 @@
      no profile is ever created.
    * ``disable_session_recording: true`` — no session replay.
    * ``autocapture: false`` — no automatic click / form / scroll
-     tracking. We only get the page view events the snippet captures
-     by default (URL, referrer, basic browser info).
+     tracking. The snippet captures exactly two things: the page
+     view events below (URL, referrer, basic browser info) and
+     ``store_outbound_click`` for clicks on links to device-vendor
+     stores (destination URL + link text only), so the store demand
+     the docs generate — affiliate-tagged links included — is
+     counted alongside tesserae.ink's.
    * ``respect_dnt: true`` — honour Do-Not-Track headers.
    * ``capture_pageview: false`` — we fire ``$pageview`` ourselves
      via the ``document$`` subscription below. Material's
@@ -86,6 +90,24 @@
           $current_url: window.location.href,
           $pathname: window.location.pathname,
         });
+      });
+    });
+    // Outbound store clicks, captured explicitly because autocapture
+    // is off. tesserae.ink captures the same clicks via autocapture's
+    // ``$external_click_url``; the metrics dashboard reads both event
+    // shapes, so the docs' affiliate-tagged store links (e.g. the
+    // compatibility matrix) count too. Nothing but the destination
+    // URL and the link text is sent.
+    document.addEventListener('click', function (e) {
+      var a = e.target && e.target.closest ? e.target.closest('a[href^="http"]') : null;
+      if (!a) return;
+      var host;
+      try { host = new URL(a.href).hostname.replace(/^(www|shop)\./, ''); } catch (_) { return; }
+      if (['seeedstudio.com', 'waveshare.com', 'pimoroni.com',
+           'trmnl.com', 'usetrmnl.com'].indexOf(host) === -1) return;
+      posthog.capture('store_outbound_click', {
+        url: a.href,
+        text: (a.textContent || '').trim().slice(0, 80),
       });
     });
   </script>
