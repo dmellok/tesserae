@@ -63,24 +63,27 @@ The bundled client kinds Tesserae knows how to talk to. A flashed client announc
 
 Per-vendor catalog of specific device / panel SKUs Tesserae ships manifests for. Each entry maps to a device kind (protocol) + renderer combination that Tesserae picks automatically once the device pairs. Click a product name for the vendor's own page.
 
+!!! info "Some links are affiliate links"
+    Seeed product links on this page carry a Tesserae affiliate tag, so a purchase made through one pays a small commission that goes back into the project. **It costs you nothing extra**: the price is the same as going to the store directly. Nothing on this page is listed because of it, and the tested / not-tested status of every panel is reported the same way it always has been. Links without the tag are plain product links.
+
 ### [Seeed Studio](https://www.seeedstudio.com/)
 
 The reTerminal E-Series and XIAO ePaper family run the [Tesserae-native firmware](https://github.com/dmellok/tesserae-device-firmware); flash from the browser in one click at [tesserae.ink/flash](https://tesserae.ink/flash) (Chrome / Edge, Web Serial, no toolchain). Battery-powered, no assembly required. The XIAO 7.5" and TRMNL 7.5" OG DIY Kit also run the TRMNL BYOS firmware path if you'd rather stay on stock.
 
 | SKU | Panel | Gamut | Protocol / Renderer | Kind id |
 |---|---|---|---|---|
-| [Seeed XIAO ePaper EE02 (13.3")](https://www.seeedstudio.com/XIAO-ePaper-DIY-Kit-EE02-for-13-3-Spectratm-6-E-Ink.html) | 1200×1600 portrait | `spectra_6` | `esp32_client` (inherit) | `seeed_ee02` |
+| [Seeed XIAO ePaper EE02 (13.3")](https://www.seeedstudio.com/XIAO-ePaper-DIY-Kit-EE02-for-13-3-Spectratm-6-E-Ink.html?sensecap_affiliate=YcT0R1h&referring_service=link) | 1200×1600 portrait | `spectra_6` | `esp32_client` (inherit) | `seeed_ee02` |
 | [Seeed XIAO ePaper EE04 (7.3" Spectra 6)](https://www.seeedstudio.com/XIAO-ePaper-Display-Board-EE04-p-6560.html) | 800×480 | `spectra_6` | `esp32_client` (inherit) | `seeed_ee04_73e6` |
 | [Seeed XIAO ePaper EE04 (7.5" mono)](https://www.seeedstudio.com/XIAO-ePaper-Display-Board-EE04-p-6560.html) | 800×480 | `mono` | `esp32_bw_client` (inherit) | `seeed_ee04_75` |
-| [Seeed reTerminal E1001](https://www.seeedstudio.com/reTerminal-E1001-p-6534.html) | 800×480 | `mono` | `esp32_bw_client` (inherit) | `seeed_reterminal_e1001` |
-| [Seeed reTerminal E1001 (4-level grayscale)](https://www.seeedstudio.com/reTerminal-E1001-p-6534.html) | 800×480 | `gray_4` | `esp32_bw_client` <br> `esp32_gray2_bin` | `seeed_reterminal_e1001_gray` |
-| [Seeed reTerminal E1001 (4-level grayscale, legacy glass)](https://www.seeedstudio.com/reTerminal-E1001-p-6534.html) | 800×480 | `gray_4` | `esp32_bw_client` <br> `esp32_gray2_bin` | `seeed_reterminal_e1001_gray_legacy` |
-| [Seeed reTerminal E1002](https://www.seeedstudio.com/reTerminal-E1002-p-6533.html) | 800×480 | `spectra_6` | `esp32_client` (inherit) | `seeed_reterminal_e1002` |
-| [Seeed reTerminal E1003](https://www.seeedstudio.com/reTerminal-E1003-p-6731.html) | 1872×1404 | `gray_16` | `esp32_client` <br> `esp32_gray_bin` | `seeed_reterminal_e1003` |
-| [Seeed reTerminal E1004](https://www.seeedstudio.com/reTerminal-E1004-p-6692.html) | 1200×1600 portrait | `spectra_6` | `esp32_client` (inherit) | `seeed_reterminal_e1004` |
-| [Seeed reTerminal Sticky](https://www.seeedstudio.com/reTerminal-Sticky-p-6861.html) | 480×800 portrait | `gray_4` | `esp32_bw_client` <br> `esp32_gray2_bin` | `seeed_reterminal_sticky` |
+| [Seeed reTerminal E1001](https://www.seeedstudio.com/reTerminal-E1001-p-6534.html?sensecap_affiliate=YcT0R1h&referring_service=link) | 800×480 | `mono` | `esp32_bw_client` (inherit) | `seeed_reterminal_e1001` |
+| [Seeed reTerminal E1001 (4-level grayscale)](https://www.seeedstudio.com/reTerminal-E1001-p-6534.html?sensecap_affiliate=YcT0R1h&referring_service=link) | 800×480 | `gray_4` | `esp32_bw_client` <br> `esp32_gray2_bin` | `seeed_reterminal_e1001_gray` |
+| [Seeed reTerminal E1001 (4-level grayscale, legacy glass)](https://www.seeedstudio.com/reTerminal-E1001-p-6534.html?sensecap_affiliate=YcT0R1h&referring_service=link) | 800×480 | `gray_4` | `esp32_bw_client` <br> `esp32_gray2_bin` | `seeed_reterminal_e1001_gray_legacy` |
+| [Seeed reTerminal E1002](https://www.seeedstudio.com/reTerminal-E1002-p-6533.html?sensecap_affiliate=YcT0R1h&referring_service=link) | 800×480 | `spectra_6` | `esp32_client` (inherit) | `seeed_reterminal_e1002` |
+| [Seeed reTerminal E1003](https://www.seeedstudio.com/reTerminal-E1003-p-6731.html?sensecap_affiliate=YcT0R1h&referring_service=link) | 1872×1404 | `gray_16` | `esp32_client` <br> `esp32_gray_bin` | `seeed_reterminal_e1003` |
+| [Seeed reTerminal E1004](https://www.seeedstudio.com/reTerminal-E1004-p-6692.html?sensecap_affiliate=YcT0R1h&referring_service=link) | 1200×1600 portrait | `spectra_6` | `esp32_client` (inherit) | `seeed_reterminal_e1004` |
+| [Seeed reTerminal Sticky](https://www.seeedstudio.com/reTerminal-Sticky-p-6861.html?sensecap_affiliate=YcT0R1h&referring_service=link) | 480×800 portrait | `gray_4` | `esp32_bw_client` <br> `esp32_gray2_bin` | `seeed_reterminal_sticky` |
 | [Seeed XIAO 7.5" ePaper Panel (C3, TRMNL BYOS)](https://www.seeedstudio.com/XIAO-7-5-ePaper-Panel-p-6416.html) | 800×480 | `mono` | `trmnl_client` (inherit) | `seeed_xiao_75` |
-| [Seeed XIAO ePaper 7.5" (S3, mono)](https://www.seeedstudio.com/TRMNL-7-5-Inch-OG-DIY-Kit-p-6481.html) | 800×480 | `mono` | `esp32_bw_client` (inherit) | `xiao_epaper_75` |
+| [Seeed XIAO ePaper 7.5" (S3, mono)](https://www.seeedstudio.com/TRMNL-7-5-Inch-OG-DIY-Kit-p-6481.html?sensecap_affiliate=YcT0R1h&referring_service=link) | 800×480 | `mono` | `esp32_bw_client` (inherit) | `xiao_epaper_75` |
 | [Seeed XIAO ePaper 7.5" (black/white/red)](https://www.seeedstudio.com/XIAO-7-5-ePaper-Panel-p-6416.html) | 800×480 | `bwr_3` | `esp32_bw_client` <br> `esp32_bin` | `xiao_epaper_75_bwr` |
 | [Seeed XIAO 7.5" ePaper Panel (C3)](https://www.seeedstudio.com/XIAO-7-5-ePaper-Panel-p-6416.html) | 800×480 | `mono` | `esp32_bw_client` (inherit) | `xiao_epaper_panel_75_c3` |
 

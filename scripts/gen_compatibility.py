@@ -40,6 +40,25 @@ VENDOR_ORDER: list[tuple[str, str]] = [
     ("community", "Community"),
 ]
 
+# Affiliate disclosure, rendered under the SKU-table intro.
+#
+# Some Seeed product links carry an affiliate parameter, so the wording has to
+# be visible next to the links rather than buried in a footer. It says only what
+# is true: the link pays a commission and does NOT change the price. Seeed's
+# affiliate programme does offer a follower discount, but that arrives as a
+# separate custom code, and the affiliate parameter alone leaves the price
+# identical (checked against the product page with and without it). Do not
+# promise a discount here until a code exists to back it up.
+AFFILIATE_DISCLOSURE = (
+    '!!! info "Some links are affiliate links"\n'
+    "    Seeed product links on this page carry a Tesserae affiliate tag, so a "
+    "purchase made through one pays a small commission that goes back into the "
+    "project. **It costs you nothing extra**: the price is the same as going to "
+    "the store directly. Nothing on this page is listed because of it, and the "
+    "tested / not-tested status of every panel is reported the same way it "
+    "always has been. Links without the tag are plain product links."
+)
+
 # Vendor id -> URL. Displayed as the section link so a reader can jump
 # straight to the vendor's own catalog.
 VENDOR_URL: dict[str, str] = {
@@ -238,6 +257,8 @@ def _hardware_sections() -> list[str]:
         "renderer combination that Tesserae picks automatically once the "
         "device pairs. Click a product name for the vendor's own page."
     )
+    out.append("")
+    out.append(AFFILIATE_DISCLOSURE)
     out.append("")
     for vendor_id, vendor_label in ordered:
         entries = by_vendor.get(vendor_id)

@@ -3,7 +3,7 @@
   "id": "seeed_reterminal_e1004",
   "name": "Seeed reTerminal E1004",
   "vendor": "Seeed Studio",
-  "url": "https://www.seeedstudio.com/reTerminal-E1004-p-6692.html",
+  "url": "https://www.seeedstudio.com/reTerminal-E1004-p-6692.html?sensecap_affiliate=YcT0R1h&referring_service=link",
   "icon": "device-tablet",
   "description": "13.3 inch 6-colour Spectra 6 ePaper terminal, ESP32-S3, battery-powered (up to 6-month runtime at 1 refresh/day per Seeed). Speaks Tesserae's v1 REST device API when flashed with the tesserae-device-firmware ESP-IDF build (unified firmware, boards/seeed_reterminal_e1004.h). Server-side pack via esp32_bin produces a 4-bpp Spectra 6 buffer (960000 bytes) that the firmware paints without any on-device quantise.",
   "protocol": "esp32_client",

@@ -3,7 +3,7 @@
   "id": "seeed_reterminal_sticky",
   "name": "Seeed reTerminal Sticky",
   "vendor": "Seeed Studio",
-  "url": "https://www.seeedstudio.com/reTerminal-Sticky-p-6861.html",
+  "url": "https://www.seeedstudio.com/reTerminal-Sticky-p-6861.html?sensecap_affiliate=YcT0R1h&referring_service=link",
   "icon": "device-tablet",
   "description": "ePaper reader, ESP32-S3, driven in the panel's 4-level grayscale mode. The controller scans 800x480 landscape and the glass is mounted at 90 degrees, but the firmware transposes on the device, so the server composes AND packs ordinary 480x800 portrait: 120-byte rows, no server-side rotation. Pairs with the tesserae-device-firmware build that declares this kind at register, and speaks Tesserae's v1 REST device API. Server-side pack via esp32_gray2_bin produces a raw 2-bpp 4-level grayscale buffer (96000 bytes) the firmware paints without any on-device decode.",
   "protocol": "esp32_bw_client",

@@ -4,6 +4,28 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.358.0], 2026-08-24
+
+### Added
+
+- **Seeed product links are affiliate links now, and say so.** The seven SKUs covered by the
+  programme carry a Tesserae affiliate tag in their catalog `url`, which is the single field the
+  README table and the generated compatibility matrix both read. A disclosure sits next to the
+  links on every surface that renders one, rather than in a footer.
+
+  The wording claims a commission and explicitly **not** a discount, because there isn't one: the
+  affiliate parameter sets a tracking cookie and leaves the price identical (checked against the
+  store page with and without it). Seeed's programme does offer a follower discount, but it
+  arrives as a separate custom code. Nothing should promise readers money off until such a code
+  exists.
+
+  Five Seeed SKUs keep plain product links: the EE04 pair, the XIAO 7.5" Panel and its BWR
+  sibling, and the C3 panel. The affiliate id looks account-level rather than per-product, so
+  extending it is a one-line change per manifest if wanted.
+
+  The tag never reaches the app: no template renders a hardware `url`, so a self-hosted Tesserae
+  contains no affiliate link.
+
 ## [0.357.1], 2026-08-24
 
 ### Fixed

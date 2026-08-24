@@ -3,7 +3,7 @@
   "id": "seeed_reterminal_e1001_gray",
   "name": "Seeed reTerminal E1001 (4-level grayscale)",
   "vendor": "Seeed Studio",
-  "url": "https://www.seeedstudio.com/reTerminal-E1001-p-6534.html",
+  "url": "https://www.seeedstudio.com/reTerminal-E1001-p-6534.html?sensecap_affiliate=YcT0R1h&referring_service=link",
   "icon": "device-tablet",
   "description": "7.5 inch monochrome ePaper terminal, ESP32-S3, battery-powered (800x480), driven in the panel's 4-gray waveform mode. Pairs with the tesserae-device-firmware ESP-IDF grayscale build (seeed-reterminal-e1001-gray env) and speaks Tesserae's v1 REST device API. Server-side pack via esp32_gray2_bin produces a raw 2-bpp 4-level grayscale buffer (96000 bytes) the firmware paints without any on-device decode.",
   "protocol": "esp32_bw_client",

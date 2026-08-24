@@ -3,7 +3,7 @@
   "id": "seeed_reterminal_e1001",
   "name": "Seeed reTerminal E1001",
   "vendor": "Seeed Studio",
-  "url": "https://www.seeedstudio.com/reTerminal-E1001-p-6534.html",
+  "url": "https://www.seeedstudio.com/reTerminal-E1001-p-6534.html?sensecap_affiliate=YcT0R1h&referring_service=link",
   "icon": "device-tablet",
   "description": "7.5 inch monochrome ePaper terminal, ESP32-S3, battery-powered (800x480). Pairs with the tesserae-device-firmware ESP-IDF build (unified firmware) and speaks Tesserae's v1 REST device API. Server-side pack via esp32_bw_bin produces a raw 1-bpp mono buffer (48000 bytes) the firmware paints without any on-device decode.",
   "protocol": "esp32_bw_client",

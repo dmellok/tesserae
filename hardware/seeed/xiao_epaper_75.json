@@ -3,7 +3,7 @@
   "id": "xiao_epaper_75",
   "name": "Seeed XIAO ePaper 7.5\" (S3, mono)",
   "vendor": "Seeed Studio",
-  "url": "https://www.seeedstudio.com/TRMNL-7-5-Inch-OG-DIY-Kit-p-6481.html",
+  "url": "https://www.seeedstudio.com/TRMNL-7-5-Inch-OG-DIY-Kit-p-6481.html?sensecap_affiliate=YcT0R1h&referring_service=link",
   "icon": "device-tablet",
   "description": "Seeed XIAO ESP32-S3 Plus driver board plus a 7.5 inch monochrome ePaper panel (800x480), sold as the TRMNL 7.5\" (OG) DIY Kit. Not the integrated XIAO 7.5\" ePaper Panel (C3), which is a separate product around the same glass, see xiao_epaper_panel_75_c3. Speaks Tesserae's v1 REST device API and paints a raw 1-bpp mono buffer (48000 bytes) produced by the esp32_bw_bin renderer. Byte-identical wire contract to the Seeed reTerminal E1001; the two panels are cross-compatible on the frame side. Battery state is reported as unknown for now, sense pin not wired in the reference board.",
   "protocol": "esp32_bw_client",

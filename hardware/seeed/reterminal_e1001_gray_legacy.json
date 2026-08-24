@@ -3,7 +3,7 @@
   "id": "seeed_reterminal_e1001_gray_legacy",
   "name": "Seeed reTerminal E1001 (4-level grayscale, legacy glass)",
   "vendor": "Seeed Studio",
-  "url": "https://www.seeedstudio.com/reTerminal-E1001-p-6534.html",
+  "url": "https://www.seeedstudio.com/reTerminal-E1001-p-6534.html?sensecap_affiliate=YcT0R1h&referring_service=link",
   "icon": "device-tablet",
   "description": "The same 7.5 inch reTerminal E1001 as `seeed_reterminal_e1001_gray`, driven by the grayscale firmware build for panels whose glass has no built-in 4-gray waveform. That build uploads register LUTs instead of selecting the panel's OTP table, which is the only difference between the two: rendering, wire format, and frame bytes are identical. Pairs with the tesserae-device-firmware seeed-reterminal-e1001-gray-legacy env and speaks Tesserae's v1 REST device API.",
   "protocol": "esp32_bw_client",

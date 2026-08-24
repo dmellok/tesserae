@@ -3,7 +3,7 @@
   "id": "seeed_ee02",
   "name": "Seeed XIAO ePaper EE02 (13.3\")",
   "vendor": "Seeed Studio",
-  "url": "https://www.seeedstudio.com/XIAO-ePaper-DIY-Kit-EE02-for-13-3-Spectratm-6-E-Ink.html",
+  "url": "https://www.seeedstudio.com/XIAO-ePaper-DIY-Kit-EE02-for-13-3-Spectratm-6-E-Ink.html?sensecap_affiliate=YcT0R1h&referring_service=link",
   "icon": "device-tablet",
   "description": "Seeed XIAO ePaper Driver Board EE02 (ESP32-S3) driving a 13.3\" T133A01 6-colour Spectra E6 panel (1200x1600). Same wire format as the reTerminal E1004 and the Waveshare 13.3E6 target; server-side pack via esp32_bin produces a raw 4-bpp Spectra 6 buffer (960000 bytes) the firmware paints without on-device decode. Battery state is reported as unknown for now, sense pin not yet wired in the reference board.",
   "protocol": "esp32_client",

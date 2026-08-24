@@ -3,7 +3,7 @@
   "id": "seeed_reterminal_e1003",
   "name": "Seeed reTerminal E1003",
   "vendor": "Seeed Studio",
-  "url": "https://www.seeedstudio.com/reTerminal-E1003-p-6731.html",
+  "url": "https://www.seeedstudio.com/reTerminal-E1003-p-6731.html?sensecap_affiliate=YcT0R1h&referring_service=link",
   "icon": "device-tablet",
   "description": "10.3 inch monochrome ePaper terminal with 16-level greyscale (IT8951 controller), ESP32-S3, up to six-month battery, 1872x1404 native landscape. Pairs with the tesserae-device-firmware ESP-IDF build (unified firmware) and speaks Tesserae's v1 REST device API. Server-side pack via esp32_gray_bin produces a raw 4-bpp linear grayscale buffer (1314144 bytes) the firmware streams straight into the IT8951's image buffer.",
   "protocol": "esp32_client",
