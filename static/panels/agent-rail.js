@@ -17,9 +17,12 @@
 window.PanelsAgentRail = (function () {
   "use strict";
 
-  // A run is treated as finished after this long with no step. The server
-  // splits runs far more coarsely (45s); this is just when the ring stops.
-  var QUIET_MS = 7000;
+  // A run is treated as finished after this long with no step. Generous
+  // because an agent streaming a code element pauses between chunks to think,
+  // and a build that reads as "finished" every time the model takes a breath is
+  // worse than one that lingers. The server splits runs far more coarsely
+  // (45s); this is only when the ring stops turning.
+  var QUIET_MS = 12000;
   // Ticks kept in the DOM. Nobody scrolls back past this in a 300px column,
   // and the header keeps the true count.
   var MAX_TICKS = 80;
@@ -33,6 +36,7 @@ window.PanelsAgentRail = (function () {
   var quietT = null, tickT = null;
   var current = null; // the step the "now" block is showing
   var movedTo = null;
+  var settled = true; // the run has gone quiet; the next step revives the chrome
   var lastSeq = 0;    // highest step seq seen; EventSource reconnects replay
 
   function el(tag, cls, html) {
@@ -190,6 +194,15 @@ window.PanelsAgentRail = (function () {
     current = null;
     startedAt = Date.now();
     ticksEl.innerHTML = "";
+    goLive();
+  }
+
+  // Show the working chrome. Called when a run starts AND when a step arrives
+  // after the rail had settled: an agent that pauses longer than QUIET_MS is
+  // still the same run, so it has to come back to life without losing the
+  // ticks it already has.
+  function goLive() {
+    settled = false;
     card.hidden = false;
     barEl.hidden = false;
     pill.hidden = false;
@@ -199,6 +212,7 @@ window.PanelsAgentRail = (function () {
   }
 
   function endRun() {
+    settled = true;
     clearInterval(tickT);
     tickT = null;
     pushTick(current);
@@ -226,6 +240,7 @@ window.PanelsAgentRail = (function () {
     if (step.seq && step.seq <= lastSeq) return;
     if (step.seq) lastSeq = step.seq;
     if (step.run !== run) beginRun(step.run);
+    else if (settled) goLive();
     total += 1;
 
     // A step on a different canvas: the agent has moved on. Tell the host once

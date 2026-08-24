@@ -2643,8 +2643,9 @@
   var MARK_MS = 900;
   // A code element streaming in changes on every append_code chunk. Hold it in
   // one continuous "streaming" state until the chunks stop, rather than
-  // flashing "edited" a dozen times.
-  var STREAM_IDLE_MS = 2600;
+  // flashing "edited" a dozen times. Long enough to bridge an agent's think
+  // time between chunks, so the underline doesn't blink out mid-build.
+  var STREAM_IDLE_MS = 9000;
 
   function elFp(e) {
     try { return JSON.stringify(e); } catch { return String(e && e.id); }

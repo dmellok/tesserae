@@ -23,8 +23,10 @@
   var POLL_COLD_MS = 6000;
   var WARM_IDLE_S = 12;
   // How long the toast lingers after the agent stops, and how long the
-  // countdown runs before it navigates.
-  var LINGER_MS = 7000;
+  // countdown runs before it navigates. The linger outlasts an agent's pause
+  // between calls, so a build that stops to think doesn't flicker the toast
+  // away and back.
+  var LINGER_MS = 14000;
   var COUNTDOWN_S = 4;
 
   var seq = 0;
