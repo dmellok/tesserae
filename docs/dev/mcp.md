@@ -187,11 +187,18 @@ agent saves, so you can watch it place and adjust elements. Each element arrives
 on its own: a new one reveals top-down, an edited one pulses, and a code element
 being streamed in holds a running underline until the chunks stop.
 
-An **Agent** panel in the right sidebar narrates the build — the step in flight
+An **Agent** panel in the right sidebar narrates the build: the step in flight
 at the top ("Streaming code in · css · +260 B of 833 B"), everything already done
 as ticks below it, with reads and repeated steps folded into single counted
 lines. A pill next to the dashboard name shows the same thing when the sidebar is
 collapsed.
+
+The rail also shows roughly what the build is costing your agent's context
+(`~6.3k ctx`). Tesserae can't see real token usage, which lives in your agent's
+client, so it measures the bytes each call sends and returns and estimates from
+those; treat it as a floor. It's most useful for spotting which calls are
+expensive: reading the widget catalog costs more than every write in a typical
+build combined.
 
 You don't have to be in the editor to notice. On any Tesserae page, a toast names
 the dashboard the agent has started building and offers to open it, following

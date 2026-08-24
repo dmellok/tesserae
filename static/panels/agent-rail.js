@@ -26,6 +26,9 @@ window.PanelsAgentRail = (function () {
   // Ticks kept in the DOM. Nobody scrolls back past this in a 300px column,
   // and the header keeps the true count.
   var MAX_TICKS = 80;
+  // Below this a step's context cost is noise (a written element is ~40
+  // tokens); above it, it's worth knowing which call is eating the budget.
+  var CTX_FLOOR = 150;
 
   var cfg = null, hooks = null;
   var card = null, ticksEl = null, nowEl = null, countEl = null, barEl = null, pill = null;
@@ -37,6 +40,7 @@ window.PanelsAgentRail = (function () {
   var current = null; // the step the "now" block is showing
   var movedTo = null;
   var settled = true; // the run has gone quiet; the next step revives the chrome
+  var ctxTotal = 0;   // estimated tokens this run has cost the agent's context
   var lastSeq = 0;    // highest step seq seen; EventSource reconnects replay
 
   function el(tag, cls, html) {
@@ -55,6 +59,12 @@ window.PanelsAgentRail = (function () {
     return ms >= 1000 ? (ms / 1000).toFixed(1) + "s" : ms + "ms";
   }
   function fmtSecs(ms) { return (ms / 1000).toFixed(1) + "s"; }
+  // Always approximate, and always says so: the server estimates from bytes on
+  // the wire because nothing on this side of an MCP call sees real token usage.
+  function fmtCtx(tokens) {
+    if (!tokens) return "";
+    return tokens >= 1000 ? "~" + (tokens / 1000).toFixed(1) + "k ctx" : "~" + tokens + " ctx";
+  }
   // What the step touched, as the sentence's object.
   function objectOf(step) {
     return [step.target, step.detail].filter(Boolean).map(esc).join(" &middot; ");
@@ -119,7 +129,8 @@ window.PanelsAgentRail = (function () {
       '<div class="ag-ring is-done"><i class="ph-bold ph-check"></i></div>' +
       '<div class="ag-txt"><div class="ag-verb">Agent finished</div>' +
       '<div class="ag-obj">' + total + " step" + (total === 1 ? "" : "s") +
-      " in " + fmtSecs(Date.now() - startedAt) + "</div></div>";
+      " in " + fmtSecs(Date.now() - startedAt) +
+      (ctxTotal ? " &middot; " + fmtCtx(ctxTotal) : "") + "</div></div>";
   }
 
   function renderElsewhere() {
@@ -144,6 +155,12 @@ window.PanelsAgentRail = (function () {
   // reads far more than it writes, and streaming a code element is one call per
   // chunk. Folding keeps the history a summary rather than a transcript, and
   // the folded tick shows the LATEST detail, which is the running total.
+  // Duration always; context cost only once it's worth reading.
+  function tickMeta(ms, tokens) {
+    var ctx = tokens >= CTX_FLOOR ? fmtCtx(tokens) : "";
+    return esc(fmtMs(ms)) + (ctx ? '<span class="ag-ctx">' + esc(ctx) + "</span>" : "");
+  }
+
   function pushTick(step) {
     if (!step) return;
     var probe = step.kind === "probe";
@@ -161,7 +178,11 @@ window.PanelsAgentRail = (function () {
         probe ? "read " + n + " things" : step.label + " ×" + n;
       var t = last.querySelector(".ag-tick-t");
       if (t) t.innerHTML = objectOf(step);
-      last.querySelector(".ag-tick-ms").textContent = fmtMs(step.duration_ms);
+      // A fold carries the SUM of what it hid, which is the whole point: the
+      // reads are individually cheap and collectively the expensive part.
+      var tok = Number(last.dataset.tok || 0) + (step.tokens_est || 0);
+      last.dataset.tok = String(tok);
+      last.querySelector(".ag-tick-ms").innerHTML = tickMeta(step.duration_ms, tok);
       ticksEl.scrollTop = ticksEl.scrollHeight;
       return;
     }
@@ -171,6 +192,7 @@ window.PanelsAgentRail = (function () {
       (step.kind === "send" ? " is-send" : ""));
     tick.dataset.n = "1";
     tick.dataset.ep = step.endpoint || "";
+    tick.dataset.tok = String(step.tokens_est || 0);
     tick.innerHTML =
       '<span class="ag-tick-m">' +
         (step.status === "error"
@@ -179,7 +201,8 @@ window.PanelsAgentRail = (function () {
       "</span>" +
       '<span class="ag-tick-l">' + esc(probe ? "read 1 thing" : step.label) + "</span>" +
       (probe ? "" : '<span class="ag-tick-t">' + objectOf(step) + "</span>") +
-      '<span class="ag-tick-ms">' + fmtMs(step.duration_ms) + "</span>";
+      '<span class="ag-tick-ms">' + tickMeta(step.duration_ms, step.tokens_est) +
+      "</span>";
     ticksEl.appendChild(tick);
     while (ticksEl.children.length > MAX_TICKS) ticksEl.removeChild(ticksEl.firstChild);
     ticksEl.scrollTop = ticksEl.scrollHeight;
@@ -190,6 +213,7 @@ window.PanelsAgentRail = (function () {
   function beginRun(n) {
     run = n;
     total = 0;
+    ctxTotal = 0;
     movedTo = null;
     current = null;
     startedAt = Date.now();
@@ -242,6 +266,7 @@ window.PanelsAgentRail = (function () {
     if (step.run !== run) beginRun(step.run);
     else if (settled) goLive();
     total += 1;
+    ctxTotal += step.tokens_est || 0;
 
     // A step on a different canvas: the agent has moved on. Tell the host once
     // per target and keep the rail showing this canvas's work.

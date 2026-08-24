@@ -129,6 +129,11 @@ def _narrate(response: Response) -> Response:
             target=target,
             detail=detail,
             page_id=page_id,
+            # Declared lengths only: reading a body to size it would defeat the
+            # point on the endpoints that stream. None (a streamed response)
+            # counts as zero rather than guessing.
+            bytes_in=request.content_length or 0,
+            bytes_out=response.content_length or 0,
         )
     except Exception:
         logger.debug("narrating MCP call %r failed", endpoint, exc_info=True)

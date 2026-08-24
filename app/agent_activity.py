@@ -56,6 +56,17 @@ _RUN_IDLE_S: float = 45.0
 # is a few dozen calls, so this holds several runs.
 _CAP: int = 300
 
+# Context cost. The real token count lives in the agent's client and the model
+# API response; MCP carries no usage field and this server is nowhere near that
+# path. What IS exact is the bytes on the wire, and since every tool call and
+# its result end up in the agent's context, those bytes are a fair proxy.
+#
+# The divisor turns them into a figure an operator can reason about. It runs
+# optimistic for JSON, which tokenizes worse than prose because of the
+# punctuation and short repeated keys, so treat the estimate as a floor and
+# always show it as approximate.
+_CHARS_PER_TOKEN: int = 4
+
 
 # -- the step table -----------------------------------------------------
 #
@@ -198,6 +209,14 @@ class Step:
     target: str = ""
     detail: str = ""
     page_id: str | None = None
+    bytes_in: int = 0
+    bytes_out: int = 0
+
+    @property
+    def tokens_est(self) -> int:
+        """Rough tokens this call cost the agent's context. Both directions
+        count: the call it wrote is in its context, and so is the result."""
+        return (self.bytes_in + self.bytes_out) // _CHARS_PER_TOKEN
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -215,6 +234,9 @@ class Step:
             "target": self.target,
             "detail": self.detail,
             "page_id": self.page_id,
+            "bytes_in": self.bytes_in,
+            "bytes_out": self.bytes_out,
+            "tokens_est": self.tokens_est,
         }
 
 
@@ -268,6 +290,8 @@ class ActivityBus:
         target: str = "",
         detail: str = "",
         page_id: str | None = None,
+        bytes_in: int = 0,
+        bytes_out: int = 0,
         now: float | None = None,
     ) -> Step:
         spec = _spec(endpoint)
@@ -292,6 +316,8 @@ class ActivityBus:
                 target=target,
                 detail=detail,
                 page_id=page_id,
+                bytes_in=bytes_in,
+                bytes_out=bytes_out,
             )
             self._steps.append(step)
         # Fire outside the lock so a slow subscriber can't stall the agent's

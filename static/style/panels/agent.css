@@ -35,7 +35,11 @@
 .ag-tick-m{grid-row:1;width:16px;height:16px;display:grid;place-items:center;border-radius:50%;background:var(--t-accent-soft);color:var(--t-accent-ink,var(--t-accent));font-size:9px;align-self:center}
 .ag-tick-l{font:600 12px var(--t-font);color:var(--t-fg-soft);line-height:1.35}
 .ag-tick-t{grid-column:2;font:500 10px var(--t-font-mono);color:var(--t-muted);overflow-wrap:anywhere}
-.ag-tick-ms{grid-row:1;grid-column:3;font:500 10px var(--t-font-mono);color:var(--t-muted);white-space:nowrap}
+.ag-tick-ms{grid-row:1;grid-column:3;font:500 10px var(--t-font-mono);color:var(--t-muted);white-space:nowrap;display:flex;gap:6px;align-items:baseline}
+/* Context cost, shown only when it's worth reading. Set apart from the timing
+   so the eye can scan one column or the other, not a run-on number. */
+.ag-ctx{color:var(--t-accent);font-weight:600}
+.ag-tick.is-probe .ag-ctx{color:var(--t-fg-soft)}
 .ag-tick.is-send .ag-tick-m{background:var(--t-accent);color:var(--t-accent-fg)}
 .ag-tick.is-send .ag-tick-l{color:var(--t-fg)}
 /* Reads: dimmer, no marker fill, counted rather than listed. */

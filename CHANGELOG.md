@@ -31,6 +31,14 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   typing in, or an open modal, and history never triggers it: a tab opened after a build
   finished stays put.
 
+  The rail also reports what a build costs the agent's context. Real token usage isn't available
+  to a self-hosted server (MCP carries no usage field, and the model's accounting lives in the
+  agent's client), so this measures the exact bytes each call sends and returns and estimates
+  tokens from them. Individually small steps stay quiet; a fold shows the sum, which is where it
+  earns its place: reading the widget catalog costs around 5,700 tokens, more than every write in
+  a typical build put together. The figure is always marked approximate, and runs low, since JSON
+  tokenizes worse than prose.
+
   The editor's rail reads a Server-Sent Events stream for immediacy; the admin shell polls a
   snapshot instead, and only while its tab is visible, because every open tab would otherwise
   hold a worker thread it never uses. Both surfaces are gated on the `mcp` experiment, so with

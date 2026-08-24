@@ -236,6 +236,44 @@ def test_unauthorised_calls_are_not_recorded(app: Flask) -> None:
     assert steps == [], "a rejected call never reaches the bus"
 
 
+# -- context cost -------------------------------------------------------
+
+
+def test_tokens_are_estimated_from_both_directions() -> None:
+    bus = ActivityBus()
+    step = bus.record(
+        endpoint="catalog", status="ok", code=200, duration_ms=1, bytes_in=400, bytes_out=22800
+    )
+    # Bytes are exact; the token figure is a documented estimate over the sum,
+    # since the call and its result both sit in the agent's context.
+    assert (step.bytes_in, step.bytes_out) == (400, 22800)
+    assert step.tokens_est == 5800
+    assert step.as_dict()["tokens_est"] == 5800
+
+
+def test_a_step_with_no_declared_lengths_costs_nothing() -> None:
+    bus = ActivityBus()
+    step = bus.record(endpoint="preview", status="ok", code=200, duration_ms=1)
+    assert (step.bytes_in, step.bytes_out, step.tokens_est) == (0, 0, 0)
+
+
+def test_real_calls_carry_their_wire_size(app: Flask) -> None:
+    _enable(app)
+    client = app.test_client()
+    _create_page(client)
+    # The widget catalog is the one read that dominates a build's context cost,
+    # which is the whole reason for surfacing this.
+    client.get("/api/mcp/catalog")
+    steps, _, _ = app.config["AGENT_ACTIVITY"].snapshot()
+    created, catalog = steps[0], steps[-1]
+    assert catalog.endpoint == "catalog"
+    assert catalog.bytes_out > 10_000
+    assert catalog.tokens_est > created.tokens_est * 10, (
+        "reading the catalog should dwarf writing a page"
+    )
+    assert created.bytes_in > 0, "the request body counts too"
+
+
 # -- read surfaces ------------------------------------------------------
 
 
