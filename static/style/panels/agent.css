@@ -1,0 +1,72 @@
+/* ---- agent pipeline rail, "beacon" ----
+   Built by static/panels/agent-rail.js, docked at the top of the editor's right
+   sidebar. Two registers on purpose: the step in flight is a loud sentence at
+   the top, and everything already done shrinks into ticks below it. A glance
+   should answer "what is it doing", not "what did it do". */
+.ag{flex:none;margin:12px 12px 0}
+.ag .pnh .t i{color:var(--t-accent)}
+.ag-count{font:500 10px var(--t-font-mono);color:var(--t-muted);cursor:default}
+
+/* Indeterminate sliver under the header: a build has no known length, so this
+   says "still going" without pretending to know how far along it is. */
+.ag-bar{position:relative;height:2px;background:var(--t-border);overflow:hidden;flex:none}
+.ag-bar[hidden]{display:none}
+.ag-bar i{position:absolute;top:0;bottom:0;width:38%;background:var(--t-accent);animation:ag-slide 1.6s cubic-bezier(.5,0,.5,1) infinite}
+@keyframes ag-slide{0%{left:-38%}100%{left:100%}}
+
+/* ---- the "now" block ---- */
+.ag-now{display:flex;gap:13px;align-items:flex-start;padding:15px 14px 14px;background:var(--t-surface-soft);border-bottom:1px solid var(--t-border)}
+.ag-ring{position:relative;flex:none;width:40px;height:40px;display:grid;place-items:center;border-radius:50%;background:var(--t-surface);border:1px solid var(--t-border);color:var(--t-accent);font-size:17px}
+.ag-ring.is-done{background:var(--t-accent);border-color:transparent;color:var(--t-accent-fg)}
+/* The throbber: an arc sweeping the tile that carries the step's own icon, so
+   the thing that spins is the thing being done. */
+.ag-ring-sweep{position:absolute;inset:-2px;border-radius:50%;border:2px solid transparent;border-top-color:var(--t-accent);border-right-color:color-mix(in srgb, var(--t-accent) 30%, transparent);animation:ag-spin .95s linear infinite}
+@keyframes ag-spin{to{transform:rotate(360deg)}}
+.ag-txt{min-width:0;flex:1;padding-top:1px}
+.ag-verb{font:700 14px var(--t-font);letter-spacing:-.01em;color:var(--t-fg);line-height:1.3}
+.ag-obj{font:500 10.5px var(--t-font-mono);color:var(--t-muted);margin-top:3px;line-height:1.45;overflow-wrap:anywhere}
+.ag-now.is-away .ag-verb,.ag-now.is-away .ag-obj{color:var(--t-muted)}
+.ag-now.is-away .ag-verb{font-weight:600}
+
+/* ---- the ticks ---- */
+.ag-ticks{max-height:224px;padding:6px 0 9px}
+.ag-tick{display:grid;grid-template-columns:16px 1fr auto;align-items:baseline;gap:0 8px;padding:4px 13px 4px 11px;animation:ag-in .28s ease both}
+@keyframes ag-in{from{opacity:0;transform:translateX(-5px)}to{opacity:1;transform:none}}
+.ag-tick-m{grid-row:1;width:16px;height:16px;display:grid;place-items:center;border-radius:50%;background:var(--t-accent-soft);color:var(--t-accent-ink,var(--t-accent));font-size:9px;align-self:center}
+.ag-tick-l{font:600 12px var(--t-font);color:var(--t-fg-soft);line-height:1.35}
+.ag-tick-t{grid-column:2;font:500 10px var(--t-font-mono);color:var(--t-muted);overflow-wrap:anywhere}
+.ag-tick-ms{grid-row:1;grid-column:3;font:500 10px var(--t-font-mono);color:var(--t-muted);white-space:nowrap}
+.ag-tick.is-send .ag-tick-m{background:var(--t-accent);color:var(--t-accent-fg)}
+.ag-tick.is-send .ag-tick-l{color:var(--t-fg)}
+/* Reads: dimmer, no marker fill, counted rather than listed. */
+.ag-tick.is-probe .ag-tick-m{background:transparent;border:1px solid var(--t-border-strong)}
+.ag-tick.is-probe .ag-tick-l{font-weight:500;font-size:11px;color:var(--t-muted)}
+.ag-tick.is-err .ag-tick-m{background:color-mix(in srgb, var(--t-danger) 16%, transparent);color:var(--t-danger)}
+.ag-tick.is-err .ag-tick-l{color:var(--t-danger)}
+
+/* ---- toolbar throbber pill ---- */
+.ag-pill{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 9px;border-radius:999px;background:var(--t-accent-soft);color:var(--t-accent-ink,var(--t-accent));border:1px solid color-mix(in srgb, var(--t-accent) 30%, transparent);font:700 10px var(--t-font);letter-spacing:.07em;text-transform:uppercase;cursor:pointer;white-space:nowrap}
+.ag-pill[hidden]{display:none}
+.ag-bars{display:inline-flex;align-items:flex-end;gap:2px;height:11px}
+.ag-bars i{display:block;width:2.5px;height:4px;border-radius:1px;background:currentColor;opacity:.45}
+.ag-pill.is-live .ag-bars i{animation:ag-bar .9s ease-in-out infinite}
+.ag-pill.is-live .ag-bars i:nth-child(2){animation-delay:.15s}
+.ag-pill.is-live .ag-bars i:nth-child(3){animation-delay:.3s}
+@keyframes ag-bar{0%,100%{height:4px;opacity:.4}50%{height:11px;opacity:1}}
+
+/* ---- "the agent moved on" prompt ---- */
+.ag-move{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(16px);z-index:230;display:flex;align-items:center;gap:11px;padding:11px 13px;background:var(--t-surface);border:1px solid var(--t-border);border-left:3px solid var(--t-accent);border-radius:11px;box-shadow:var(--t-shadow-lg);opacity:0;transition:opacity .18s ease,transform .2s cubic-bezier(.2,.8,.3,1);pointer-events:none}
+.ag-move.show{opacity:1;transform:translateX(-50%);pointer-events:auto}
+.ag-move-t{font:600 12.5px var(--t-font);color:var(--t-fg)}
+.ag-move-t b{font-weight:700}
+.ag-move-b{font:600 11.5px var(--t-font);padding:5px 10px;border-radius:7px;cursor:pointer;border:1px solid var(--t-border-strong);background:var(--t-surface-soft);color:var(--t-fg)}
+.ag-move-b.accent{background:var(--t-accent);color:var(--t-accent-fg);border-color:transparent}
+.ag-move-b:hover{border-color:var(--t-accent)}
+
+@media (prefers-reduced-motion:reduce){
+  .ag-ring-sweep,.ag-bar i,.ag-pill.is-live .ag-bars i,.ag-tick{animation:none}
+  .ag-ring-sweep{border-color:var(--t-accent)}
+  .ag-bar i{left:0;width:100%;opacity:.5}
+  .ag-pill.is-live .ag-bars i{height:11px;opacity:1}
+  .ag-move{transition:none}
+}

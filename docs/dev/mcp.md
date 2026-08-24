@@ -183,9 +183,24 @@ top"), and when you're happy, `push_to_device`.
 
 Open the dashboard in Tesserae's canvas editor (Dashboards → the agent-made page,
 tagged **Agent**) while the agent works. The editor updates in real time as the
-agent saves, so you can watch it place and adjust elements. If you start editing
-yourself, it won't overwrite your unsaved changes — you'll get a "changed
-externally" reload prompt instead.
+agent saves, so you can watch it place and adjust elements. Each element arrives
+on its own: a new one reveals top-down, an edited one pulses, and a code element
+being streamed in holds a running underline until the chunks stop.
+
+An **Agent** panel in the right sidebar narrates the build — the step in flight
+at the top ("Streaming code in · css · +260 B of 833 B"), everything already done
+as ticks below it, with reads and repeated steps folded into single counted
+lines. A pill next to the dashboard name shows the same thing when the sidebar is
+collapsed.
+
+You don't have to be in the editor to notice. On any Tesserae page, a toast names
+the dashboard the agent has started building and offers to open it, following
+after a short countdown. Turn following off with the **follow** checkbox on the
+toast; the choice sticks. It won't navigate away from unsaved edits, a form
+you're typing in, or an open dialog.
+
+If you start editing while the agent is working, it won't overwrite your unsaved
+changes — you'll get a "changed externally" reload prompt instead.
 
 ---
 

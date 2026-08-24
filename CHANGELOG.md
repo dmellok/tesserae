@@ -4,6 +4,38 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.359.0], 2026-08-24
+
+### Added
+
+- **You can watch the agent build.** An MCP build used to be a silent canvas that
+  occasionally changed under you. Every authorised call to the MCP surface is now recorded on an
+  in-process activity bus (endpoint, what it touched, how long it took, whether it worked) and
+  fed to three new pieces of UI.
+
+  In the canvas editor, a rail in the right sidebar leads with the step in flight, phrased as a
+  sentence ("Streaming code in, css, +260 B of 833 B") with a ring that sweeps while it runs.
+  Finished steps compress into ticks below it, repeats folding into one counted line, so
+  streaming a code element reads as `Stream code x8` rather than eight rows. The agent's reads
+  fold the same way. A pill in the toolbar keeps the build visible with the sidebar collapsed.
+
+  Elements now land one at a time instead of the whole canvas repainting: the editor diffs the
+  incoming document, so a new element reveals top-down like a panel refresh, an edited one
+  pulses, and a code element being streamed holds a running underline until the chunks stop.
+  Untouched widgets keep their live mount and no longer flicker, and the selection survives an
+  agent edit.
+
+  Everywhere else in the admin, a toast names the dashboard being built, narrates each step, and
+  offers to open the editor, following after a short countdown by default. Following is a
+  checkbox on the toast and it sticks. It never navigates over unsaved edits, a form you are
+  typing in, or an open modal, and history never triggers it: a tab opened after a build
+  finished stays put.
+
+  The editor's rail reads a Server-Sent Events stream for immediacy; the admin shell polls a
+  snapshot instead, and only while its tab is visible, because every open tab would otherwise
+  hold a worker thread it never uses. Both surfaces are gated on the `mcp` experiment, so with
+  no agent connected nothing is wired up at all.
+
 ## [0.358.0], 2026-08-24
 
 ### Added

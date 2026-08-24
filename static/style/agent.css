@@ -1,0 +1,35 @@
+/* ---- follow-the-agent toast ----
+   Raised by static/agent-follow.js on any admin page when the MCP agent starts
+   building a canvas dashboard. Bottom-right so it clears the topbar and the
+   flash-notification stack, and narrow enough not to cover a form. */
+#agent-follow{position:fixed;right:18px;bottom:18px;z-index:250;width:min(340px,calc(100vw - 36px));opacity:0;transform:translateY(14px);transition:opacity .2s ease,transform .22s cubic-bezier(.2,.8,.3,1);pointer-events:none}
+#agent-follow.is-up{opacity:1;transform:none;pointer-events:auto}
+#agent-follow[hidden]{display:none}
+.af-card{position:relative;display:flex;gap:12px;padding:13px 14px 12px;background:var(--t-surface);border:1px solid var(--t-border);border-left:3px solid var(--t-accent);border-radius:12px;box-shadow:var(--t-shadow-lg)}
+.af-body{min-width:0;flex:1}
+.af-head{font:600 13px var(--t-font);color:var(--t-fg);line-height:1.35;padding-right:14px}
+.af-head b{font-weight:700}
+.af-step{font:500 11px var(--t-font-mono);color:var(--t-muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.af-dot{padding:0 5px;opacity:.55}
+.af-acts{display:flex;align-items:center;gap:7px;margin-top:9px;flex-wrap:wrap}
+.af-btn{font:600 11.5px var(--t-font);padding:5px 10px;border-radius:7px;cursor:pointer;background:var(--t-surface-soft);color:var(--t-fg);border:1px solid var(--t-border-strong)}
+.af-btn:hover{border-color:var(--t-accent)}
+.af-btn.accent{background:var(--t-accent);color:var(--t-accent-fg);border-color:transparent}
+.af-btn.accent:hover{background:var(--t-accent-hover)}
+.af-follow{display:inline-flex;align-items:center;gap:5px;font:500 11px var(--t-font);color:var(--t-muted);cursor:pointer;margin-left:auto}
+.af-follow input{margin:0;accent-color:var(--t-accent)}
+.af-x{position:absolute;right:6px;top:4px;width:22px;height:22px;display:grid;place-items:center;border:0;background:transparent;color:var(--t-muted);font-size:17px;line-height:1;cursor:pointer;border-radius:6px}
+.af-x:hover{background:var(--t-surface-soft);color:var(--t-fg)}
+
+/* The throbber: three bars filling bottom-up, one after another, like a panel
+   being written in bands. Reads as "work in progress" without spinning. */
+.af-throb{flex:none;display:flex;flex-direction:column-reverse;gap:3px;padding-top:3px;width:14px}
+.af-throb i{display:block;height:5px;border-radius:1.5px;background:var(--t-border-strong)}
+.af-card.is-live .af-throb i{animation:af-band 1.35s ease-in-out infinite}
+.af-card.is-live .af-throb i:nth-child(2){animation-delay:.18s}
+.af-card.is-live .af-throb i:nth-child(3){animation-delay:.36s}
+@keyframes af-band{0%,72%,100%{background:var(--t-border-strong)}20%,52%{background:var(--t-accent)}}
+@media (prefers-reduced-motion:reduce){
+  #agent-follow{transition:none}
+  .af-card.is-live .af-throb i{animation:none;background:var(--t-accent)}
+}

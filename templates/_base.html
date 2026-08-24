@@ -113,6 +113,9 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='style/send.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='style/events.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='style/editor.css') }}">
+  {% if agent_watch_enabled %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='style/agent.css') }}">
+  {% endif %}
   {% block head_extra %}{% endblock %}
 </head>
 <body class="admin{% if config.DEV_MODE %} dev-mode{% endif %}">
@@ -359,6 +362,18 @@
     </a>
   </footer>
   {% include "_restart_modal.html" %}
+  {# Follow-the-agent toast: raised when the MCP agent starts building a canvas
+     dashboard, so whichever page you're on tells you and offers to jump to the
+     editor. Only wired when the MCP experiment is on, so the poll never hits a
+     route that would 404. ``__ID__`` is the page-id placeholder the script
+     substitutes; empty when the canvas editor itself is switched off, in which
+     case the toast narrates without offering to navigate. #}
+  {% if agent_watch_enabled %}
+  <div id="agent-follow" hidden
+       data-activity-url="{{ url_for('agent_activity.activity') }}"
+       data-editor-url="{{ url_for('panels.editor', canvas_id='__ID__') if agent_editor_enabled else '' }}"></div>
+  <script src="{{ url_for('static', filename='agent-follow.js') }}" defer></script>
+  {% endif %}
   <script src="{{ url_for('static', filename='restart-form.js') }}"></script>
   <script src="{{ url_for('static', filename='components.js') }}"></script>
   <script src="{{ url_for('static', filename='info-pop.js') }}"></script>

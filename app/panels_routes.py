@@ -208,6 +208,12 @@ def editor(canvas_id: str) -> str:
         font_face_css=_font_face_css(_registry().fonts),
         code_fonts=[{"id": f.id, "name": f.name} for f in _registry().fonts.values()],
         templates_enabled=experiments.is_enabled("templates"),
+        # The agent pipeline rail. Only handed a stream URL when the MCP
+        # surface is on, so with no agent to watch the editor doesn't open a
+        # connection (each one pins a worker thread, see app/main.py).
+        agent_stream_url=(
+            url_for("agent_activity.stream") if experiments.is_enabled("mcp") else ""
+        ),
     )
 
 

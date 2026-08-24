@@ -23,15 +23,16 @@ import json
 import logging
 import re
 import secrets
+import time
 import uuid
 from pathlib import Path
 from typing import Any
 
-from flask import Blueprint, Flask, abort, current_app, jsonify, request, url_for
+from flask import Blueprint, Flask, abort, current_app, g, jsonify, request, url_for
 from pydantic import ValidationError
 from werkzeug.wrappers import Response
 
-from app import experiments, mcp_bridge
+from app import agent_activity, experiments, mcp_bridge
 from app import panels_routes as _pr
 from app.auth import _is_loopback
 from app.panels_schema import build_catalog
@@ -91,7 +92,47 @@ def _gate() -> Response | None:
             "(generate one in Settings → System → MCP), or call from localhost.",
         )
     mcp_bridge.record_request(_settings(), request.headers.get("User-Agent", ""))
+    g.mcp_started = time.monotonic()
     return None
+
+
+@bp.after_request
+def _narrate(response: Response) -> Response:
+    """Record the call on the agent-activity bus, so the canvas editor's rail
+    and the admin shell's follow toast can show the build as it happens.
+
+    Only calls that got past :func:`_gate` carry a start time, so a 401/404 is
+    never narrated. Best-effort throughout: a step is decoration, and failing to
+    describe a call must not fail the call.
+    """
+    started = g.pop("mcp_started", None)
+    if started is None:
+        return response
+    endpoint = (request.endpoint or "").rsplit(".", 1)[-1]
+    try:
+        payload = (
+            response.get_json(silent=True)
+            if endpoint in agent_activity._READS_RESPONSE and response.is_json
+            else None
+        )
+        target, detail, page_id = agent_activity.summarise(
+            endpoint,
+            request.view_args,
+            request.get_json(silent=True) if request.is_json else None,
+            payload if isinstance(payload, dict) else None,
+        )
+        agent_activity.bus().record(
+            endpoint=endpoint,
+            status="ok" if response.status_code < 400 else "error",
+            code=response.status_code,
+            duration_ms=int((time.monotonic() - started) * 1000),
+            target=target,
+            detail=detail,
+            page_id=page_id,
+        )
+    except Exception:
+        logger.debug("narrating MCP call %r failed", endpoint, exc_info=True)
+    return response
 
 
 def _authorised() -> bool:

@@ -39,6 +39,7 @@ from app import (
     device_battery_routes,
     device_loader,
     events_routes,
+    experiments,
     history_routes,
     onboarding,
     page_routes,
@@ -1018,8 +1019,10 @@ def create_app(
     onboarding.register(app)
     themes_routes.register(app)
     webhook_routes.register(app)
-    from app import mcp_api
+    from app import agent_activity, mcp_api
 
+    # The activity bus must exist before mcp_api narrates its first call.
+    agent_activity.register(app)
     mcp_api.register(app)
     trmnl_api.register(app)
     # New REST transport: per-device bearer-token HTTP endpoints under
@@ -1180,6 +1183,15 @@ def create_app(
             # last background-refreshed result (never blocks the render); off
             # entirely when online features are disabled. See app/version_check.
             "update_status": _version_check.status(app),
+            # Whether the admin shell should watch for agent activity (the
+            # follow toast). Gated on the same experiment as the MCP surface,
+            # checked here so the base template never wires a poll against a
+            # route that would 404.
+            "agent_watch_enabled": experiments.is_enabled("mcp"),
+            # Whether the toast may offer to open the canvas editor. The MCP
+            # surface and the editor are separately gated, so with the editor
+            # off the toast narrates but doesn't link anywhere.
+            "agent_editor_enabled": experiments.is_enabled("composer"),
         }
 
     @app.get("/")

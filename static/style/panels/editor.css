@@ -167,6 +167,28 @@ body.dragging-palette .pi{cursor:grabbing}
 .cm-act{width:26px;height:26px;display:grid;place-items:center;border:0;border-radius:6px;background:transparent;color:var(--t-muted);font-size:14px;cursor:pointer}
 .cm-act:hover{background:var(--t-surface-sunk);color:var(--t-fg)}
 
+/* ---- agent arrivals ----
+   What an external edit (the MCP agent) just did to each element, stamped by
+   elNode from S.marks. An element ARRIVES with a top-down reveal, the same
+   direction a panel refreshes; an EDIT pulses its outline in place; a code
+   element being streamed in chunk by chunk holds a running underline until the
+   chunks stop. All three are pointer-transparent and sit under the selection
+   ring (z-index 20) so they never interfere with editing. */
+.el.is-arriving{animation:el-arrive .42s cubic-bezier(.2,.8,.3,1) both}
+.el.is-arriving::before{content:"";position:absolute;inset:-2px;z-index:19;pointer-events:none;border:1.5px solid var(--t-accent);border-radius:3px;animation:el-arrive-ring .62s ease-out both}
+@keyframes el-arrive{from{clip-path:inset(0 0 100% 0);opacity:.35}to{clip-path:inset(0);opacity:1}}
+@keyframes el-arrive-ring{0%{opacity:.9}70%{opacity:.55}100%{opacity:0}}
+.el.is-edited::before{content:"";position:absolute;inset:-2px;z-index:19;pointer-events:none;border:1.5px solid var(--t-accent);border-radius:3px;animation:el-edited .8s ease-out both}
+@keyframes el-edited{0%{opacity:0}18%{opacity:.85}100%{opacity:0}}
+.el.is-streaming::before{content:"";position:absolute;inset:-2px;z-index:19;pointer-events:none;border:1px solid color-mix(in srgb, var(--t-accent) 55%, transparent);border-radius:3px}
+.el.is-streaming::after{content:"";position:absolute;left:0;right:0;bottom:-2px;height:2px;z-index:19;pointer-events:none;background:linear-gradient(90deg,transparent,var(--t-accent),transparent) no-repeat;background-size:55% 100%;animation:el-stream 1.1s linear infinite}
+@keyframes el-stream{from{background-position:-55% 0}to{background-position:155% 0}}
+@media (prefers-reduced-motion:reduce){
+  .el.is-arriving,.el.is-arriving::before,.el.is-edited::before,.el.is-streaming::after{animation:none}
+  .el.is-arriving::before,.el.is-edited::before{opacity:.7}
+  .el.is-streaming::after{display:none}
+}
+
 /* ---- touch interaction (issue #49) ---- */
 .el-hotspot{position:absolute;inset:0;z-index:21;pointer-events:none;border:2px dashed var(--t-accent);border-radius:6px;background:color-mix(in srgb, var(--t-accent) 8%, transparent);display:grid;place-items:center;color:var(--t-accent)}
 .el-hotspot i{font-size:22px;opacity:.75}

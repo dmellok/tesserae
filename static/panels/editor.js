@@ -97,6 +97,8 @@
     sim: false,
     devices: [],
     mount: {}, // elId -> { fp, host } cached widget shadow hosts
+    marks: {}, // elId -> "add" | "edit" | "stream": what an agent just did to it
+    markT: {}, // elId -> timer clearing that mark
     pq: "", // palette search query (lowercased)
     data: {}, // live data keyed by "<widget>|<options-json>"
     dataPending: {}, // in-flight data fetches, same key
@@ -725,9 +727,12 @@
     return k === "button" || k === "switch" || k === "slider" || k === "stepper";
   }
 
+  var MARK_CLASS = { add: "is-arriving", edit: "is-edited", stream: "is-streaming" };
+
   function elNode(e) {
     var node = el("div", "el" + (isSel(e.id) ? " psel" : "") +
-      (isWidget(e) && !e.widget ? " el-empty" : ""));
+      (isWidget(e) && !e.widget ? " el-empty" : "") +
+      (MARK_CLASS[S.marks[e.id]] ? " " + MARK_CLASS[S.marks[e.id]] : ""));
     node.dataset.id = e.id;
     var op = e.visible === false ? 0.4 : (e.opacity == null ? 1 : e.opacity / 100);
     // Node geometry is the footprint: identical to the render box when not
@@ -2625,16 +2630,80 @@
   }
 
   // ---- live sync: reflect external edits (e.g. the MCP agent) -----------
-  // Rebuild the whole editor from a fresh doc without a page reload.
-  function hydrateDoc(doc) {
-    S.doc = doc || {};
-    if (!S.doc.els) S.doc.els = [];
+  // An agent builds one call at a time, so a wholesale repaint throws away the
+  // one thing worth seeing: WHICH element just arrived. hydrateDoc diffs the
+  // incoming doc against the current one and marks each element add / edit /
+  // stream; elNode stamps the mark on the wrapper and the CSS draws it landing.
+
+  // Changing any of these rebakes every mounted widget's tokens, so the diff is
+  // pointless: everything remounts and nothing is singled out.
+  var APPEARANCE_KEYS = ["theme", "style", "font", "bg", "bg_image", "bg_fit", "w", "h"];
+  // How long an add / edit mark lingers. Long enough for the animation to play,
+  // short enough that an unrelated repaint doesn't replay it.
+  var MARK_MS = 900;
+  // A code element streaming in changes on every append_code chunk. Hold it in
+  // one continuous "streaming" state until the chunks stop, rather than
+  // flashing "edited" a dozen times.
+  var STREAM_IDLE_MS = 2600;
+
+  function elFp(e) {
+    try { return JSON.stringify(e); } catch { return String(e && e.id); }
+  }
+
+  function diffEls(prev, next) {
+    var was = {};
+    (prev || []).forEach(function (e) { if (e && e.id) was[e.id] = elFp(e); });
+    var marks = {};
+    (next || []).forEach(function (e) {
+      if (!e || !e.id) return;
+      var before = was[e.id];
+      if (before === undefined) marks[e.id] = "add";
+      else if (before !== elFp(e)) marks[e.id] = e.kind === "code" ? "stream" : "edit";
+    });
+    return marks;
+  }
+
+  // Marks expire on their own so they don't outlive the burst that set them.
+  // A streaming element's timer is pushed back by every chunk; when it finally
+  // fires the class comes off the live node without a repaint.
+  function armMark(id, kind) {
+    clearTimeout(S.markT[id]);
+    S.markT[id] = setTimeout(function () {
+      delete S.marks[id];
+      delete S.markT[id];
+      var node = artboard && artboard.querySelector('[data-id="' + id + '"]');
+      if (node) node.classList.remove("is-arriving", "is-edited", "is-streaming");
+    }, kind === "stream" ? STREAM_IDLE_MS : MARK_MS);
+  }
+
+  // Rebuild the editor from a fresh doc without a page reload. ``opts.live``
+  // means this is an external edit landing mid-session (agent), not a first
+  // load or a discard-and-reload, so it earns the arrival treatment.
+  function hydrateDoc(doc, opts) {
+    var prev = S.doc || {};
+    var live = !!(opts && opts.live);
+    doc = doc || {};
+    if (!doc.els) doc.els = [];
+    var reskin = APPEARANCE_KEYS.some(function (k) { return prev[k] !== doc[k]; });
+    S.marks = live && !reskin ? diffEls(prev.els, doc.els) : {};
+    Object.keys(S.marks).forEach(function (id) { armMark(id, S.marks[id]); });
+
+    S.doc = doc;
     S.rev = S.doc.rev || null;
     S.dirty = false;
     S.past = []; S.future = []; // history is relative to the old doc; drop it
-    S.mount = {}; // wholesale doc swap: force a full remount so a theme/style/font
-    //               change from an external edit (agent) recolours token-baking widgets.
-    setSel([]);
+    // Only a reskin needs the wholesale remount (token-baking widgets have to
+    // repaint); otherwise fpOf already remounts just the elements that changed,
+    // so untouched widgets keep their live host and don't flicker.
+    if (reskin || !live) S.mount = {};
+    // Keep the operator's selection across an agent edit when the element is
+    // still there; a build that appends elsewhere shouldn't clear the inspector.
+    var keep = live && !reskin
+      ? Array.from(S.sel).filter(function (id) {
+          return doc.els.some(function (e) { return e.id === id; });
+        })
+      : [];
+    setSel(keep);
     renderAppearance();
     applyAppearance();
     var title = $("panels-title");
@@ -2663,10 +2732,75 @@
         if (S.dirty) { showExternalBanner(); return; } // a local edit raced in
         closeConfig();
         hideExternalBanner();
-        hydrateDoc(doc);
+        hydrateDoc(doc, { live: true });
         flashLiveBadge();
       })
       .catch(function () { /* transient; the next event will retry */ });
+  }
+
+  // ---- agent pipeline rail ---------------------------------------------
+  // The rail (static/panels/agent-rail.js) narrates the MCP agent's calls. It
+  // only exists when the MCP experiment is on, so everything here is optional.
+  function initAgentRail() {
+    if (!window.PanelsAgentRail || !S.cfg.agentStreamUrl) return;
+    PanelsAgentRail.init(
+      { streamUrl: S.cfg.agentStreamUrl, canvasId: S.cfg.canvasId },
+      { onMoved: offerFollow }
+    );
+  }
+
+  // The agent started working on a DIFFERENT dashboard. Following is on by
+  // default (shared preference with the admin shell's toast), but never while
+  // there are unsaved local edits: the operator's work outranks the agent's.
+  var FOLLOW_KEY = "tesserae-agent-follow";
+  var FOLLOW_DELAY_MS = 4000;
+  function followEnabled() {
+    try { return localStorage.getItem(FOLLOW_KEY) !== "off"; } catch { return true; }
+  }
+  function canvasHref(id) {
+    return (S.cfg.canvasUrlTpl || "").replace("__ID__", id);
+  }
+  function offerFollow(pageId, pageName) {
+    if (!pageId || !canvasHref(pageId)) return;
+    var auto = followEnabled() && !S.dirty;
+    var name = pageName || "another dashboard";
+    var b = $("panels-agent-move");
+    if (!b) {
+      b = el("div", "ag-move");
+      b.id = "panels-agent-move";
+      document.body.appendChild(b);
+    }
+    var left = auto ? Math.round(FOLLOW_DELAY_MS / 1000) : 0;
+    function draw() {
+      b.innerHTML =
+        '<span class="ag-move-t">The agent moved to <b></b></span>' +
+        '<button type="button" class="ag-move-b accent" data-go>' +
+        (left > 0 ? "Follow in " + left + "…" : "Open it") + "</button>" +
+        '<button type="button" class="ag-move-b" data-stay>Stay here</button>';
+      b.querySelector("b").textContent = name;
+      b.querySelector("[data-go]").addEventListener("click", function () {
+        window.location.href = canvasHref(pageId);
+      });
+      b.querySelector("[data-stay]").addEventListener("click", function () {
+        clearInterval(S.followT); S.followT = null;
+        b.classList.remove("show");
+      });
+      b.classList.add("show");
+    }
+    draw();
+    clearInterval(S.followT);
+    if (!auto) return;
+    S.followT = setInterval(function () {
+      left -= 1;
+      if (left <= 0) {
+        clearInterval(S.followT); S.followT = null;
+        // A local edit that raced in cancels the jump.
+        if (S.dirty) { draw(); return; }
+        window.location.href = canvasHref(pageId);
+        return;
+      }
+      draw();
+    }, 1000);
   }
 
   function flashLiveBadge() {
@@ -3396,6 +3530,8 @@
       touchRegionsUrl: root.dataset.touchRegionsUrl,
       configureFormUrl: root.dataset.configureFormUrl,
       configureUrl: root.dataset.configureUrl,
+      agentStreamUrl: root.dataset.agentStreamUrl,
+      canvasUrlTpl: root.dataset.canvasUrl, // "…/c/__ID__", for following the agent
     };
     // Canvas-management URLs derive from this editor's own path
     // (…/c/<id>), so they carry any ingress prefix for free.
@@ -3548,6 +3684,7 @@
         if (palette) renderPalette(palette);
         hydrateDoc(res[1]);
         initLiveSync();
+        initAgentRail();
       })
       .catch(function () { var s = $("panels-status"); if (s) s.textContent = "load failed"; });
   }
