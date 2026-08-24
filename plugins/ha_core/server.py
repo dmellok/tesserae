@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import json
 import ssl
+import threading
+import time
 import urllib.error
 import urllib.request
 from datetime import UTC, datetime, timedelta
@@ -110,6 +112,7 @@ def call_service_with_response(
     req = urllib.request.Request(base_url() + path, data=body, headers=_headers(), method="POST")
     with urllib.request.urlopen(req, timeout=timeout, context=_ssl_context()) as resp:
         payload = json.loads(resp.read().decode("utf-8"))
+    _invalidate_states_cache()
     return payload if isinstance(payload, dict) else {}
 
 
@@ -138,6 +141,7 @@ def call_service(
     req = urllib.request.Request(base_url() + path, data=body, headers=_headers(), method="POST")
     with urllib.request.urlopen(req, timeout=timeout, context=_ssl_context()) as resp:
         raw = resp.read().decode("utf-8")
+    _invalidate_states_cache()
     try:
         parsed = json.loads(raw) if raw.strip() else []
     except json.JSONDecodeError:
@@ -164,10 +168,59 @@ def render_template(template: str, *, timeout: int = 10) -> str:
         return resp.read().decode("utf-8")
 
 
+# Short-TTL caches. The page editor hydrates every cell on each preview
+# cycle and resolves an entity dropdown per ha_* widget on load; without
+# caching each of those costs a full ``/api/states`` dump (hundreds of KB
+# on a real install). A single dump per few seconds is fresh enough for a
+# preview or a panel push, so all callers inside the window share one
+# request. Errors are cached for the same window so an unreachable HA
+# fails fast once instead of stacking sequential 10 s timeouts. History
+# is cached longer: a 24 h sparkline's shape doesn't change within a
+# couple of minutes. Both caches key on (base_url, token) so a settings
+# change invalidates them implicitly.
+_STATES_TTL_S = 5.0
+_HISTORY_TTL_S = 120.0
+_HISTORY_CACHE_MAX = 256
+
+_states_lock = threading.Lock()
+_states_cache: tuple[tuple[str, str], float, list[dict[str, Any]] | Exception] | None = None
+_history_lock = threading.Lock()
+_history_cache: dict[tuple[str, str, str, int], tuple[float, list[dict[str, Any]]]] = {}
+
+
+def _invalidate_states_cache() -> None:
+    """Drop the cached states dump. Called after every service call so a
+    touch action's re-render (tap echo, overlay refresh) reads the
+    post-toggle state instead of a dump from a few seconds ago."""
+    global _states_cache
+    with _states_lock:
+        _states_cache = None
+
+
 def get_states() -> list[dict[str, Any]]:
-    """All entity states: ``[{entity_id, state, attributes, ...}, ...]``."""
-    data = request_json("/api/states")
-    return data if isinstance(data, list) else []
+    """All entity states: ``[{entity_id, state, attributes, ...}, ...]``.
+
+    Served from a shared short-TTL cache (see above); callers must treat
+    the returned list as read-only. Holding the lock across the fetch is
+    deliberate: concurrent cell hydrations queue behind one request and
+    then all hit the cache, instead of racing N identical dumps."""
+    global _states_cache
+    key = (base_url(), token())
+    with _states_lock:
+        if _states_cache is not None:
+            cached_key, ts, value = _states_cache
+            if cached_key == key and time.monotonic() - ts < _STATES_TTL_S:
+                if isinstance(value, Exception):
+                    raise value
+                return value
+        try:
+            data = request_json("/api/states")
+        except Exception as err:
+            _states_cache = (key, time.monotonic(), err)
+            raise
+        states = data if isinstance(data, list) else []
+        _states_cache = (key, time.monotonic(), states)
+        return states
 
 
 def get_state(entity_id: str) -> dict[str, Any]:
@@ -181,7 +234,13 @@ def history(entity_id: str, *, hours: int = 24, timeout: int = 12) -> list[dict[
 
     Uses ``/api/history/period`` with ``minimal_response`` so each sample
     is just ``{state, last_changed}``, enough for a sparkline without the
-    attribute payload. Returns the (possibly empty) sample list."""
+    attribute payload. Returns the (possibly empty) sample list, served
+    from a per-entity TTL cache (errors are not cached)."""
+    key = (base_url(), token(), entity_id, hours)
+    with _history_lock:
+        hit = _history_cache.get(key)
+        if hit is not None and time.monotonic() - hit[0] < _HISTORY_TTL_S:
+            return hit[1]
     start = (datetime.now(UTC) - timedelta(hours=hours)).isoformat()
     path = (
         f"/api/history/period/{quote(start)}"
@@ -189,9 +248,14 @@ def history(entity_id: str, *, hours: int = 24, timeout: int = 12) -> list[dict[
         "&minimal_response&significant_changes_only"
     )
     data = request_json(path, timeout=timeout)
+    samples: list[dict[str, Any]] = []
     if isinstance(data, list) and data and isinstance(data[0], list):
-        return [s for s in data[0] if isinstance(s, dict)]
-    return []
+        samples = [s for s in data[0] if isinstance(s, dict)]
+    with _history_lock:
+        if len(_history_cache) >= _HISTORY_CACHE_MAX:
+            _history_cache.clear()
+        _history_cache[key] = (time.monotonic(), samples)
+    return samples
 
 
 def friendly_name(state: dict[str, Any]) -> str:

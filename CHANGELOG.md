@@ -4,6 +4,24 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.363.0], 2026-08-24
+
+### Fixed
+
+- **Editing a page full of Home Assistant widgets no longer crawls.** Every preview refresh
+  used to download Home Assistant's complete entity state list once per cell, and the trend
+  arrows and sparklines added a separate 24-hour history query per entity, one after another.
+  Opening the editor was worse still: each HA widget's entity dropdown pulled its own full
+  state dump, in sequence, before the page appeared. On a modest host (a NAS, a Pi) with a
+  busy HA install, Edit mode was close to unusable.
+
+  The state list is now fetched once and shared through a short-lived cache, so six cells and
+  thirteen dropdowns cost one request instead of nineteen, and an unreachable HA fails fast
+  once instead of stacking timeouts. History queries run in parallel, keep within the render
+  budget, and are cached for a couple of minutes. Typing in the sensor widget's per-entity
+  overrides no longer re-renders the preview on every keystroke; it refreshes when you leave
+  the field, and drag-to-reorder now refreshes immediately.
+
 ## [0.362.0], 2026-08-24
 
 ### Added

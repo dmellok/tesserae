@@ -9,9 +9,17 @@ grid (client-side).
 from __future__ import annotations
 
 import re
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from flask import current_app
+
+# History calls run in a small pool so a multi-entity cell doesn't pay
+# one HA round-trip per entity in sequence. The per-call timeout stays
+# inside the composer's 6 s per-widget hydration budget (ha_core's 12 s
+# default would guarantee the whole widget times out on a slow HA).
+_HISTORY_TIMEOUT_S = 5
+_HISTORY_MAX_WORKERS = 4
 
 # Map common HA device_classes to Phosphor icons; everything else falls
 # back to a generic gauge. Picked server-side so the client just renders
@@ -187,6 +195,42 @@ def _downsample(values: list[float], cap: int = 24) -> list[float]:
     return [values[round(i * step)] for i in range(cap)]
 
 
+def _attach_history(
+    core: Any,
+    pending: list[tuple[dict[str, Any], str]],
+    *,
+    show_trend: bool,
+    show_sparkline: bool,
+) -> None:
+    """Fetch 24 h history for each (item, entity_id) pair in parallel and
+    attach trend/sparkline in place. ha_core caches the results, so only
+    the first preview cycle in a couple of minutes pays the round-trips."""
+    app = current_app._get_current_object()
+
+    def one(eid: str) -> list[dict[str, Any]]:
+        # Worker threads don't inherit the request's app context, but
+        # ha_core reads its settings through current_app.
+        with app.app_context():
+            try:
+                return core.history(eid, hours=24, timeout=_HISTORY_TIMEOUT_S)
+            except Exception:
+                return []
+
+    eids = [eid for _item, eid in pending]
+    if len(eids) == 1:
+        results = [one(eids[0])]
+    else:
+        with ThreadPoolExecutor(max_workers=min(_HISTORY_MAX_WORKERS, len(eids))) as pool:
+            results = list(pool.map(one, eids))
+    for (item, _eid), samples in zip(pending, results, strict=True):
+        values = [v for v in (_to_float(s.get("state")) for s in samples) if v is not None]
+        if len(values) >= 2:
+            if show_trend:
+                item["trend"] = _trend(values)
+            if show_sparkline:
+                item["sparkline"] = [round(v, 2) for v in _downsample(values, cap=24)]
+
+
 def _trend(values: list[float]) -> str:
     """up / down / flat based on the window's first sample → last
     sample, treating moves smaller than 5% of the range as flat so a
@@ -229,6 +273,7 @@ def fetch(
     number_format = str(options.get("number_format") or "").strip()
     overrides = _parse_overrides(options.get("overrides"))
     items: list[dict[str, Any]] = []
+    needs_history: list[tuple[dict[str, Any], str]] = []
     for eid in wanted:
         ov = overrides.get(eid) or {}
         st = by_id.get(eid)
@@ -256,17 +301,11 @@ def fetch(
         # Trend + sparkline only for numeric, available sensors. Skip
         # the API call for non-numeric or unavailable entries.
         if (show_trend or show_sparkline) and not is_unavailable and _to_float(raw) is not None:
-            try:
-                samples = core.history(eid, hours=24)
-            except Exception:
-                samples = []
-            values = [v for v in (_to_float(s.get("state")) for s in samples) if v is not None]
-            if len(values) >= 2:
-                if show_trend:
-                    item["trend"] = _trend(values)
-                if show_sparkline:
-                    item["sparkline"] = [round(v, 2) for v in _downsample(values, cap=24)]
+            needs_history.append((item, eid))
         items.append(item)
+
+    if needs_history:
+        _attach_history(core, needs_history, show_trend=show_trend, show_sparkline=show_sparkline)
 
     # Title precedence: explicit override → the single entity's name → generic.
     if not title:

@@ -88,20 +88,29 @@
     }
 
     function writeStorage() {
+      // Dispatch 'input' only: the editor defers textarea input to the
+      // 'change' commit point, so per-keystroke updates just mark the
+      // form dirty without re-hydrating the whole page. The commit
+      // arrives naturally, the row's own <input> fires a native
+      // 'change' on blur/Enter (and the icon picker dispatches one on
+      // pick), which bubbles to the form and schedules the preview
+      // with this textarea already up to date. A synthetic 'change'
+      // here used to re-render the preview on every keystroke.
       const next = serialiseOverrides(state);
       if (next === textarea.value) return;
       textarea.value = next;
       textarea.dispatchEvent(new Event("input", { bubbles: true }));
-      textarea.dispatchEvent(new Event("change", { bubbles: true }));
     }
 
     function markFormDirty() {
       // The reorder doesn't change the textarea value, but it does
       // change the order entities submit in (FormData reads form
       // inputs in DOM order, and we've just reordered the
-      // multiselect's .multiselect-opt). Bump the form watcher so the
-      // preview re-renders with the new order.
+      // multiselect's .multiselect-opt). A drop is a discrete commit,
+      // so fire 'change' (not just 'input', which textareas defer) so
+      // the preview re-renders with the new order.
       textarea.dispatchEvent(new Event("input", { bubbles: true }));
+      textarea.dispatchEvent(new Event("change", { bubbles: true }));
     }
 
     function updateState(eid, patch) {
