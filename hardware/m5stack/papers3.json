@@ -1,0 +1,26 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "m5stack_papers3",
+  "name": "M5Stack PaperS3",
+  "vendor": "M5Stack",
+  "url": "https://docs.m5stack.com/en/core/PaperS3",
+  "icon": "device-tablet",
+  "description": "4.7 inch touch ePaper handheld with 16-level greyscale, ESP32-S3R8 with 8 MB PSRAM, 1800 mAh battery, 960x540 native landscape scan mounted portrait. Pairs with the tesserae-device-firmware ESP-IDF build (unified firmware) and speaks Tesserae's v1 REST device API. Server-side pack via esp32_gray_bin produces a raw 4-bpp linear greyscale buffer (259200 bytes) the firmware drives straight onto the panel's parallel bus.",
+  "protocol": "esp32_client",
+  "renderers": [
+    "esp32_gray_bin"
+  ],
+  "panel": {
+    "w": 540,
+    "h": 960,
+    "orientation": "portrait",
+    "name": "4.7 inch ePaper (16-level greyscale, 960x540 scan, portrait mount)",
+    "gamut": "gray_16",
+    "native_w": 960,
+    "native_h": 540
+  },
+  "refresh_floor_s": 60,
+  "image_format": "bin",
+  "touch": false,
+  "notes_md": "**UNVERIFIED ON HARDWARE.** Added from issue #21 on tesserae-device-firmware, against the reporter's working pin map and bitbank2 FastEPD's `BB_PANEL_M5PAPERS3` definition. Flash the `m5stack-papers3-selftest` firmware target first and judge the 16 grey bands before pointing a real dashboard at it.\n\nWire format is exactly 259200 bytes (960*540/2), row-major, top-left origin, no mirror. Per byte: high nibble = LEFT pixel, low nibble = RIGHT pixel; nibble value 0x0 = black, 0xF = white, linear 16-level greyscale. Identical in shape to `seeed_reterminal_e1003`, which is why this panel needed no new renderer or packer -- only this entry.\n\n**Composition is 540x960 portrait while `native_w`/`native_h` are 960x540.** Those fields mean the row stride the *firmware* reads, and this firmware does not transpose: the panel's source driver scans 960 across, so `esp32_gray_bin` rotates the portrait composition 90 degrees CW and packs 240-byte landscape rows. Portrait is the composition because the device is a portrait handheld -- the body is 121.5 x 67.7 mm and the 4.7\" 16:9 glass puts its 960-pixel axis along the long side. Byte count alone does not validate this: a landscape composition packs to the same 259200 bytes and paints sideways.\n\n**The 90-degree direction is a guess, not a measurement.** Nothing here has been on real glass, so if the first frame lands upside down, set the display's `flip` and the pair is correct; that is the expected correction and it needs no code change.\n\nThis is the first panel Tesserae drives with no controller chip in between. The firmware's `parallel_epd_gray` driver (Family F) shifts 2-bit drive codes into the panel's source driver over the ESP32-S3's LCD/i80 bus and clocks the gate driver by hand, with the 16 greys coming from a per-level pass matrix rather than a controller's waveform flash. Consequences worth knowing: greyscale tuning is a table in the board header rather than a vendor LUT, and there is no partial refresh yet, so this SKU does not offer overlay tap-echo or touch-v3.\n\nThe GT911 digitiser is present on the hardware but `touch` is false: this board routes no touch-reset line to the MCU, and the firmware's GT911 driver needs one to pin the controller's I2C address. Touch is a follow-up, sequenced after the panel deliberately -- a display that paints correctly is the prerequisite for any touch result being meaningful."
+}

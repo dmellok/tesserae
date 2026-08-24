@@ -84,6 +84,14 @@ The reTerminal E-Series and XIAO ePaper family run the [Tesserae-native firmware
 | [Seeed XIAO ePaper 7.5" (black/white/red)](https://www.seeedstudio.com/XIAO-7-5-ePaper-Panel-p-6416.html) | 800×480 | `bwr_3` | `esp32_bw_client` <br> `esp32_bin` | `xiao_epaper_75_bwr` |
 | [Seeed XIAO 7.5" ePaper Panel (C3)](https://www.seeedstudio.com/XIAO-7-5-ePaper-Panel-p-6416.html) | 800×480 | `mono` | `esp32_bw_client` (inherit) | `xiao_epaper_panel_75_c3` |
 
+### [M5Stack](https://m5stack.com/)
+
+Runs the [Tesserae-native firmware](https://github.com/dmellok/tesserae-device-firmware). The PaperS3's glass has no controller chip: the ESP32-S3 drives the panel's parallel bus directly and the 16 greys come from a waveform table in the firmware, so greyscale tuning is a build-time edit rather than a vendor LUT. That also means no partial refresh yet, and so no tap echo or on-device touch widgets on this SKU.
+
+| SKU | Panel | Gamut | Protocol / Renderer | Kind id |
+|---|---|---|---|---|
+| [M5Stack PaperS3](https://docs.m5stack.com/en/core/PaperS3) | 540×960 portrait | `gray_16` | `esp32_client` <br> `esp32_gray_bin` | `m5stack_papers3` |
+
 ### [Pimoroni](https://shop.pimoroni.com/)
 
 | SKU | Panel | Gamut | Protocol / Renderer | Kind id |
@@ -136,7 +144,7 @@ Honest status from the maintainer's own bench. Untested doesn't mean broken, it 
 | `esp32_bin` | Waveshare 13.3" Spectra 6 (ESP32-S3-WROOM-2) + Waveshare 7.3" PhotoPainter (ESP32-S3) + Seeed reTerminal E1002 and E1004 (Spectra 6) + Seeed XIAO 13.3" ePaper EE02 (Spectra 6) via tesserae-device-firmware | :material-check-circle: Tested | Primary daily driver, battery-powered, deep-sleep. The 13.3" client lives at tesserae-device-esp32-bin; the 7.3" PhotoPainter client at tesserae-device-photopainter-7.3-bin. Both pair with the same renderer; the panel preset (waveshare_e6_13_3 vs waveshare_photopainter_7_3) selects the firmware-native row stride. The reTerminal Spectra 6 SKUs consume the same 4-bpp packed frames through tesserae-device-firmware. |
 | `esp32_bw_bin` | Xteink X4 (GDEQ0426T82 / SSD1677, 800x480 mono) running CrossInk with Tesserae client support + Seeed reTerminal E1001 (800x480 mono) running tesserae-device-firmware | :material-check-circle: Tested | 1-bpp packing confirmed end-to-end: a 48000-byte frame fetched and painted on the panel with no on-device decode, upright in the portrait_flipped composition. The X4 is an e-reader, so the dashboard is its sleep screen rather than a wake-cycle refresh. The remaining Seeed 800x480 mono SKUs (XIAO ePaper 7.5", EE04 7.5") and the Waveshare 4.2" share this renderer but are still unconfirmed. |
 | `esp32_gray2_bin` | Xteink X4 (SSD1677, 800x480) and Xteink X3 (UC8279d, 792x528), both running CrossInk with Tesserae client support + Seeed reTerminal E1001 (4-gray mode) running tesserae-device-firmware | :material-check-circle: Tested | 4-level grayscale confirmed end-to-end: the 2-bpp frame is fetched and composited as a base frame plus LSB/MSB planes, with distinct grey levels. Packing is byte-identical to the firmware's own 2-bpp bitmap reader, so no decode step is involved. Notable that this works on the X3's UC8253/UC8279d silicon as well as the UC8179-class panels the renderer was written for. |
-| `esp32_gray_bin` | Seeed reTerminal E1003 (10.3" 1872x1404, 16-level grayscale) running tesserae-device-firmware | :material-check-circle: Tested | Confirmed end-to-end on the bench, including GT911 touch input round-tripping through the tap pipeline. The 4-bpp nibble-packed frame (1314144 bytes) is fetched over REST and painted with no on-device decode. |
+| `esp32_gray_bin` | Seeed reTerminal E1003 (10.3" 1872x1404, 16-level grayscale) running tesserae-device-firmware; also targets the M5Stack PaperS3 (4.7" 960x540), not yet tested | :material-check-circle: Tested | Confirmed end-to-end on the bench, including GT911 touch input round-tripping through the tap pipeline. The 4-bpp nibble-packed frame (1314144 bytes) is fetched over REST and painted with no on-device decode. The PaperS3 shares this renderer at a different geometry and is awaiting a first bring-up on real hardware. |
 | `pi_bin` | Pimoroni Inky Impression (Spectra 6 / Waveshare E6) | :material-check-circle: Tested | Fastest Pi path, packed buffer written straight to inky's _buf. |
 | `pi_png` | Pimoroni Inky Impression (via inky set_image) | :material-check-circle: Tested | Works on every inky-supported panel; quantises on the Pi each frame. |
 | `pico_bin` | - | :material-circle-outline: Not yet tested | - |

@@ -70,6 +70,29 @@ def _sha256_hex(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
+def _declares_geometry(manifest: dict[str, Any], w: int, h: int) -> bool:
+    """True when ``manifest``'s panel block claims a ``w`` x ``h`` display.
+
+    A panel's self-report carries the row stride its firmware reads, which for
+    a transposed SKU is the manifest's ``native_w``/``native_h`` rather than
+    the composition ``w``/``h`` (the M5Stack PaperS3 reports its 960x540 scan
+    while composing 540x960 portrait). So both pairs count as a claim.
+
+    Both are compared EXACTLY, in the declared axis order. Tolerating a
+    swapped pair would be looser than it looks: the Xteink X4 composes 480x800
+    over a native 800x480, so a swap-tolerant match would have it answer to
+    the reTerminal E1001's 800x480 report as well as its own, and the tie
+    would fall back to whichever id sorts first. Zero dims match nothing.
+    """
+    if w <= 0 or h <= 0:
+        return False
+    panel = manifest.get("panel") or {}
+    return (panel.get("w"), panel.get("h")) == (w, h) or (
+        panel.get("native_w"),
+        panel.get("native_h"),
+    ) == (w, h)
+
+
 def register_this_install(
     settings: Any, *, base: str, label: str = "", allow_local: bool = False
 ) -> str:
@@ -274,6 +297,15 @@ class RelayPairingPoller:
         id sort settles anything left, since by then every candidate packs
         the same bytes.
 
+        Geometry matching goes through :func:`_declares_geometry`, which
+        accepts the composition dims OR the firmware-native ones, in either
+        axis order. A panel reports the stride its firmware reads, and for a
+        transposed SKU that is not what the manifest's ``panel`` block says:
+        the M5Stack PaperS3 reports its 960x540 scan while composing 540x960
+        portrait. Comparing composition dims alone left that SKU unmatched
+        against every candidate, so the answer fell through to the id sort --
+        correct for the pair that exists today, and only by alphabet.
+
         SKUs marked ``auto_select: false`` are never candidates. Those are
         variants a device cannot identify itself as: same protocol, same
         gamut, same geometry, same bytes as a sibling, differing only in
@@ -317,12 +349,7 @@ class RelayPairingPoller:
                 rh = int(reported.get("panel_h") or 0)
             except (TypeError, ValueError):
                 rw = rh = 0
-            dims_matched = [
-                d
-                for d in candidates
-                if (d.manifest.get("panel") or {}).get("w") == rw
-                and (d.manifest.get("panel") or {}).get("h") == rh
-            ]
+            dims_matched = [d for d in candidates if _declares_geometry(d.manifest, rw, rh)]
             if dims_matched:
                 candidates = dims_matched
         return min(candidates, key=lambda d: d.id).id

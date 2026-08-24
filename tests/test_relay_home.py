@@ -424,27 +424,37 @@ def _poller(registries: Any, tmp_path: Path) -> RelayPairingPoller:
 
 
 @pytest.mark.parametrize(
-    "model,gamut,expected",
+    "model,gamut,dims,expected",
     [
         # The gamut names a catalog SKU whose renderer override packs at
         # the right bit depth; the bare kind's default would mis-pack.
-        ("esp32_bw_client", "gray_4", "seeed_reterminal_e1001_gray"),
-        ("esp32_bw_client", "bwr_3", "xiao_epaper_75_bwr"),
-        ("esp32_client", "gray_16", "seeed_reterminal_e1003"),
+        ("esp32_bw_client", "gray_4", (800, 480), "seeed_reterminal_e1001_gray"),
+        ("esp32_bw_client", "bwr_3", (800, 480), "xiao_epaper_75_bwr"),
+        # gray_16 has two SKUs at different sizes, so the reported stride is
+        # what separates them. Both report their firmware-native scan: the
+        # E1003 composes at that geometry, the PaperS3 composes 540x960
+        # portrait and still reports the 960x540 its driver reads.
+        ("esp32_client", "gray_16", (1872, 1404), "seeed_reterminal_e1003"),
+        ("esp32_client", "gray_16", (960, 540), "m5stack_papers3"),
         # Default-gamut reports keep the bare kind: catalog SKUs for these
         # rows pack identically, so upgrading would only mislabel hardware.
-        ("esp32_bw_client", "mono", "esp32_bw_client"),
-        ("esp32_client", "spectra_6", "esp32_client"),
+        ("esp32_bw_client", "mono", (800, 480), "esp32_bw_client"),
+        ("esp32_client", "spectra_6", (800, 480), "esp32_client"),
         # Unknown / absent gamut regresses nothing.
-        ("esp32_bw_client", "plasma_9000", "esp32_bw_client"),
-        ("esp32_bw_client", "", "esp32_bw_client"),
+        ("esp32_bw_client", "plasma_9000", (800, 480), "esp32_bw_client"),
+        ("esp32_bw_client", "", (800, 480), "esp32_bw_client"),
     ],
 )
 def test_resolve_kind_prefers_catalog_kind_for_reported_gamut(
-    registries: Any, tmp_path: Path, model: str, gamut: str, expected: str
+    registries: Any,
+    tmp_path: Path,
+    model: str,
+    gamut: str,
+    dims: tuple[int, int],
+    expected: str,
 ) -> None:
     poller = _poller(registries, tmp_path)
-    reported = {"model": model, "gamut": gamut, "panel_w": 800, "panel_h": 480}
+    reported = {"model": model, "gamut": gamut, "panel_w": dims[0], "panel_h": dims[1]}
     assert poller._resolve_kind("", model, reported) == expected
 
 

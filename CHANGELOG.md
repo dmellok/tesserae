@@ -4,6 +4,36 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.357.0], 2026-08-24
+
+### Added
+
+- **M5Stack PaperS3.** A 4.7" 960x540 touch e-ink handheld, added as kind `m5stack_papers3` on
+  the existing `esp32_gray_bin` path: same 4-bpp linear-greyscale wire format as the reTerminal
+  E1003, 259200 bytes at this geometry, so the server side is a catalog entry and nothing else.
+  The firmware needed a driver family of its own, since this is the first panel with no controller
+  chip between the MCU and the glass.
+
+  Composition is 540x960 portrait against a 960x540 firmware stride: the panel's source driver
+  scans landscape and the device is a portrait handheld, so `esp32_gray_bin` rotates and packs
+  landscape rows. **Nothing here has been on real glass.** If a first frame lands upside down,
+  the display's `flip` is the correction and it needs no code change.
+
+  `touch` is false and there is no partial-refresh path, so this SKU offers neither tap echo nor
+  on-device touch controls yet. Both are follow-ups, sequenced behind a panel that paints
+  correctly.
+
+### Fixed
+
+- **Relay pairing now separates same-gamut SKUs by the stride a panel actually reports.** When two
+  catalog SKUs share a protocol and gamut, the tie-break compared the reported geometry against the
+  manifest's *composition* dimensions only. A transposed SKU reports the row stride its firmware
+  reads, not the orientation it composes at, so it matched nothing and the answer fell through to an
+  alphabetical id sort. That was right for the pair that existed and right by accident. The
+  comparison now also accepts `native_w`/`native_h`, still exact and still in the declared axis
+  order (tolerating a swapped pair would have the Xteink X4 answer to the reTerminal E1001's report
+  as well as its own).
+
 ## [0.356.0], 2026-08-23
 
 ### Added

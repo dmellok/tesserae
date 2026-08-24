@@ -32,6 +32,7 @@ OUT = REPO_ROOT / "docs" / "compatibility.md"
 # the supported devices lineup"). Others alphabetical after.
 VENDOR_ORDER: list[tuple[str, str]] = [
     ("seeed", "Seeed Studio"),
+    ("m5stack", "M5Stack"),
     ("pimoroni", "Pimoroni"),
     ("trmnl", "TRMNL"),
     ("waveshare", "Waveshare"),
@@ -43,6 +44,7 @@ VENDOR_ORDER: list[tuple[str, str]] = [
 # straight to the vendor's own catalog.
 VENDOR_URL: dict[str, str] = {
     "seeed": "https://www.seeedstudio.com/",
+    "m5stack": "https://m5stack.com/",
     "pimoroni": "https://shop.pimoroni.com/",
     "trmnl": "https://usetrmnl.com/",
     "waveshare": "https://www.waveshare.com/",
@@ -62,6 +64,15 @@ VENDOR_INTRO: dict[str, str] = {
         "Web Serial, no toolchain). Battery-powered, no assembly required. "
         'The XIAO 7.5" and TRMNL 7.5" OG DIY Kit also run the TRMNL BYOS '
         "firmware path if you'd rather stay on stock."
+    ),
+    "m5stack": (
+        "Runs the "
+        "[Tesserae-native firmware](https://github.com/dmellok/tesserae-device-firmware). "
+        "The PaperS3's glass has no controller chip: the ESP32-S3 drives the "
+        "panel's parallel bus directly and the 16 greys come from a waveform "
+        "table in the firmware, so greyscale tuning is a build-time edit rather "
+        "than a vendor LUT. That also means no partial refresh yet, and so no "
+        "tap echo or on-device touch widgets on this SKU."
     ),
     "xteink": (
         "E-readers rather than dedicated dashboard panels. These run "

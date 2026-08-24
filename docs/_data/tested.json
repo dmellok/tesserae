@@ -8,8 +8,8 @@
     },
     "esp32_gray_bin": {
       "status": "Tested",
-      "hardware": "Seeed reTerminal E1003 (10.3\" 1872x1404, 16-level grayscale) running tesserae-device-firmware",
-      "notes": "Confirmed end-to-end on the bench, including GT911 touch input round-tripping through the tap pipeline. The 4-bpp nibble-packed frame (1314144 bytes) is fetched over REST and painted with no on-device decode."
+      "hardware": "Seeed reTerminal E1003 (10.3\" 1872x1404, 16-level grayscale) running tesserae-device-firmware; also targets the M5Stack PaperS3 (4.7\" 960x540), not yet tested",
+      "notes": "Confirmed end-to-end on the bench, including GT911 touch input round-tripping through the tap pipeline. The 4-bpp nibble-packed frame (1314144 bytes) is fetched over REST and painted with no on-device decode. The PaperS3 shares this renderer at a different geometry and is awaiting a first bring-up on real hardware."
     },
     "pi_bin": {
       "status": "Tested",
