@@ -1118,6 +1118,49 @@ def update_instance_quiet_hours(
     return InstanceResult(reloaded)
 
 
+def update_instance_locale(
+    *,
+    devices: DeviceRegistry,
+    renderers: RendererRegistry,
+    data_root: Path,
+    instance_id: str,
+    locale: str | None,
+) -> InstanceResult:
+    """Patch a registered instance's ``locale`` field on disk and
+    hot-reload it in place. A blank value clears the override so the
+    device falls back to the app-wide default on next reload (see
+    app.locale_resolve.resolve_locale). Not format-validated here, same
+    trade-off update_instance_quiet_hours already accepts for HH:MM: a
+    malformed value just fails to match any of the widget's strings at
+    read time and the panel renders in English, rather than a write-time
+    rejection the admin has to puzzle out."""
+    device = devices.get(instance_id)
+    if device is None or device.kind_of is None:
+        return InstanceResult(None, f"Unknown device {instance_id!r}.")
+
+    inst_file = device.path
+    try:
+        raw = json.loads(inst_file.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as err:
+        return InstanceResult(None, f"Couldn't read {inst_file.name}: {err}")
+
+    clean_locale = (locale or "").strip()
+    if not clean_locale:
+        raw.pop("locale", None)
+    else:
+        raw["locale"] = clean_locale
+    inst_file.write_text(json.dumps(raw, indent=2) + "\n", encoding="utf-8")
+
+    devices.devices.pop(instance_id, None)
+    _drop_clones(renderers, instance_id)
+    reloaded = load_instance_file(devices, inst_file=inst_file, data_root=data_root)
+    if reloaded is None:
+        last_err = devices.errors[-1] if devices.errors else None
+        return InstanceResult(None, last_err.message if last_err else "unknown error")
+    clone_for_instances(renderers, devices)
+    return InstanceResult(reloaded)
+
+
 def update_instance_battery_offset(
     *,
     devices: DeviceRegistry,

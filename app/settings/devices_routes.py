@@ -1367,6 +1367,24 @@ def devices_update_combined(instance_id: str) -> Response:
                     ok_messages.append("button map saved")
                     any_change = True
 
+    # 7. Per-device locale override (see app.locale_resolve). Blank
+    # clears the override so this device falls back to the app-wide
+    # default; a select rather than free text, so this is really "pick
+    # one of the locales we know about" not "type a BCP-47 tag".
+    if "locale" in form:
+        locale_result = device_service.update_instance_locale(
+            devices=devices_registry,
+            renderers=renderers(),
+            data_root=device_data_root(),
+            instance_id=instance_id,
+            locale=form.get("locale"),
+        )
+        if not locale_result.ok:
+            flash(locale_result.error or "Couldn't save locale.", "error")
+        else:
+            ok_messages.append("locale saved")
+            any_change = True
+
     if any_change:
         rebuild_transport_fn()()
         if device.transport == "relay":

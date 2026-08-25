@@ -418,6 +418,25 @@
         {% endfor %}
         {% endif %}
 
+        {# Per-device locale override (see app.locale_resolve). Widgets
+           placed on pages bound to this device render their panel text
+           in this locale instead of the app-wide default -- the
+           "German kitchen panel, English office panel" case. Blank =
+           inherit the app default. Only en/fr have real translations
+           today (calendar_day); picking anything else falls back to
+           each widget's own English text, which is still useful for
+           spotting layout issues before a translation exists. #}
+        {% if section.locale_editable %}
+        {{ select_field(section.id ~ '-locale', 'locale', 'Panel text locale',
+                        value=section.locale, blank_label='Use app default',
+                        options=[
+                          {'value': 'en', 'label': 'English'},
+                          {'value': 'fr', 'label': 'Français'}
+                        ],
+                        help='Overrides the app-wide default for widgets rendered on this device. Only widgets that have shipped a translation for the picked language actually change; others keep their built-in English text.',
+                        form=_combined_form_id) }}
+        {% endif %}
+
         {# Per-device quiet hours override + dependent dim of Start/End. #}
         {% if section.quiet_hours_endpoint %}
         <div class="dx-quiet-hours" data-dep-group>
