@@ -456,6 +456,12 @@
     return one ? dataForSrc(one) : null;
   }
   function ctxFor(e) {
+    // Locales contract (docs/widgets.md#locales-strings): the catalog
+    // entry (fetched once at load, see the S.locale assignment above)
+    // already carries this widget's strings resolved for S.locale; {}
+    // for a widget that hasn't declared any, same as a real render.
+    var w = widgetFor(e.widget);
+    var strings = (w && w.strings) || {};
     return {
       cell: {
         w: e.w, h: e.h, size: resolveSize(e.w, e.h),
@@ -466,6 +472,9 @@
       font: { family: fontFamily(S.doc.font), weight: 400 },
       data: dataFor(e),
       fragment: e.fragment || "full",
+      locale: S.locale || "en",
+      strings: strings,
+      t: function (key, fallback) { return strings[key] != null ? strings[key] : (fallback != null ? fallback : key); },
       preview: false,
     };
   }
@@ -3683,6 +3692,11 @@
       .then(function (res) {
         S.catalog = (res[0] && res[0].widgets) || [];
         S.appearance = (res[0] && res[0].appearance) || { themes: [], styles: [], fonts: [] };
+        // Locales contract (docs/widgets.md#locales-strings): the app-wide
+        // default locale, resolved server-side since the editor's preview
+        // isn't rendering for any particular device. Each catalog entry
+        // already carries its own widget's resolved `strings` for it.
+        S.locale = (res[0] && res[0].locale) || "en";
         var palette = $("panels-palette");
         if (palette) renderPalette(palette);
         hydrateDoc(res[1]);

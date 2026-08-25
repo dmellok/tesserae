@@ -8,7 +8,7 @@ palette can list a widget and expand it to its parts.
 
 The catalog entry the editor consumes is
 ``{key, name, icon, desc, fragments:[...], updates_on_change,
-updates_on_schedule}``.
+updates_on_schedule, strings}``.
 
 mypy --strict does not apply here; see pyproject.toml.
 """
@@ -65,9 +65,14 @@ def _preview_sample(plugin: Plugin) -> dict[str, Any] | None:
     return payload if isinstance(payload, dict) else None
 
 
-def catalog_entry(plugin: Plugin) -> dict[str, Any]:
-    """Catalog entry for a placeable widget: identity, fragments, and a preview
-    sample for the editor's live mount."""
+def catalog_entry(plugin: Plugin, locale: str = "en") -> dict[str, Any]:
+    """Catalog entry for a placeable widget: identity, fragments, a preview
+    sample for the editor's live mount, and this widget's resolved strings
+    for ``locale`` ({} for a widget that hasn't declared any locales --
+    see Plugin.strings_for). The editor's live preview isn't rendering
+    for any particular device, so it always uses the app-wide default
+    locale (composer.py's ``_resolve_locale_for_device_id("")``), same
+    as an unbound grid/canvas preview."""
     return {
         "key": plugin.id,
         "name": plugin.name,
@@ -82,12 +87,13 @@ def catalog_entry(plugin: Plugin) -> dict[str, Any]:
             and plugin.manifest["updates"].get("on_change")
         ),
         "updates_on_schedule": [dict(spec) for spec in plugin.on_schedule_updates],
+        "strings": plugin.strings_for(locale),
     }
 
 
-def build_catalog(registry: PluginRegistry) -> list[dict[str, Any]]:
+def build_catalog(registry: PluginRegistry, locale: str = "en") -> list[dict[str, Any]]:
     """Assemble the editor's widget palette: every renderable widget plugin
     (kind ``widget``), each with its fragments, sorted by display name."""
-    entries = [catalog_entry(p) for p in registry.widgets()]
+    entries = [catalog_entry(p, locale) for p in registry.widgets()]
     entries.sort(key=lambda e: str(e["name"]).lower())
     return entries
