@@ -84,7 +84,12 @@ macro here instead.
 {%- set is_custom = value is not none and value not in preset_values -%}
 <div class="field field--preset" data-preset-field>
   <label for="{{ field_id }}-preset">{{ label }}{{ info_pop(help) }}</label>
-  <select id="{{ field_id }}-preset" class="preset-select" data-preset-select>
+  {#- ``form`` on a nameless select changes nothing about submission; it
+     exists so the select's own change event resolves to this form for
+     dirty tracking, which stops depending on the select happening to sit
+     inside the <form> element (#260). -#}
+  <select id="{{ field_id }}-preset" class="preset-select" data-preset-select
+          {% if form %}form="{{ form }}"{% endif %}>
     {% for preset in presets %}
     <option value="{{ preset.value }}" {% if not is_custom and preset.value == value %}selected{% endif %}>{{ preset.label }}</option>
     {% endfor %}

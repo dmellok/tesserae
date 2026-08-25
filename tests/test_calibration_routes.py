@@ -422,3 +422,30 @@ def test_orientation_card_buttons_target_calibrate_forms(app: Flask) -> None:
     assert f'id="device-{dev}-calibrate-apply"' in body
     assert f'action="/settings/devices/{dev}/calibrate/apply"' in body
     assert body.count(f'form="device-{dev}-calibrate-apply"') == 4
+
+
+def test_preset_controls_stay_associated_with_the_combined_form(app: Flask) -> None:
+    """Every control that edits a combined-save field must resolve to that
+    form, including ones that are never submitted.
+
+    The sleep interval renders as a preset ``<select>`` plus a hidden
+    number input. The select carries no ``name`` (picking a preset copies
+    its value into the input), so it used to rely on sitting inside the
+    ``<form>`` element for the page to attribute its change event. Once
+    the card's fields moved to ``form=""`` association, that stopped being
+    true: choosing a preset changed the value with nothing hearing about
+    it, the save bar never appeared, and the edit looked ignored until the
+    operator touched some other field (#260)."""
+    client = app.test_client()
+    _sign_in(client)
+    dev = _register_device(client)
+
+    body = client.get(f"/settings/devices?opened={dev}").get_data(as_text=True)
+    combined = f'form="device-{dev}-combined"'
+    select = re.search(rf'<select[^>]*id="device-{dev}-sleep_interval_s-preset"[^>]*>', body)
+    assert select is not None, "the sleep interval should render as a preset control"
+    assert combined in select.group(0)
+    # The input it writes into has to point at the same form, or the
+    # value never reaches the save at all.
+    number = re.search(r'<input[^>]*name="sleep_interval_s"[^>]*>', body)
+    assert number is not None and combined in number.group(0)

@@ -165,7 +165,18 @@
       const select = field.querySelector("[data-preset-select]");
       const custom = field.querySelector("[data-preset-custom]");
       if (!select || !custom) return;
-      const sync = (focusCustom) => {
+      // ``notify`` marks a user-driven change. Assigning ``.value`` in
+      // script fires no input event, and the preset <select> carries no
+      // name (it isn't submitted) so it has no form association of its
+      // own once the card's inputs belong to the form by ``form=""``
+      // rather than by nesting. Between the two, picking a preset used
+      // to change the value with nothing in the page hearing about it,
+      // so the save bar never appeared and the edit looked ignored until
+      // some other field was touched (#260). Dispatch on the input that
+      // IS associated, and only for real interaction: doing it during
+      // the initial sync would mark every form on the page dirty on
+      // load.
+      const sync = (focusCustom, notify) => {
         if (select.value === "__custom__") {
           custom.hidden = false;
           if (focusCustom) custom.focus();
@@ -173,9 +184,10 @@
           custom.value = select.value;
           custom.hidden = true;
         }
+        if (notify) custom.dispatchEvent(new Event("input", { bubbles: true }));
       };
-      select.addEventListener("change", () => sync(true));
-      sync(false);
+      select.addEventListener("change", () => sync(true, true));
+      sync(false, false);
       field.dataset.presetBound = "1";
     });
   }

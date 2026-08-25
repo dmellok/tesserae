@@ -4,6 +4,22 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.364.5], 2026-08-25
+
+### Fixed
+
+- **Changing a device's sleep interval left the Save button hidden (#260).** The interval is a
+  preset dropdown backed by a hidden number field, and picking a preset copies the value across
+  in script. Script assignment fires no input event, and the dropdown itself isn't submitted so
+  it had no form association of its own once the device card's fields moved to attribute-based
+  association in v0.364.4. Between the two, the value changed with nothing on the page hearing
+  about it: the save bar stayed hidden and the edit looked ignored until some other field was
+  touched, which then saved the interval along with it.
+
+  Picking a preset now announces the change on the field that carries it, and the dropdown is
+  associated with the same form regardless. This applies to every preset field, not just the
+  sleep interval.
+
 ## [0.364.4], 2026-08-25
 
 ### Fixed
