@@ -50,6 +50,12 @@ _ALLOWED_ASSET_PREFIXES: tuple[str, ...] = ("static/", "files/")
 
 _COMPAT_RE = re.compile(r"^(\d+)\.(x|\d+)")
 
+# Matches schema/plugin.schema.json's `locales` item pattern exactly.
+# This is the point that turns the value into a
+# filename, so it validates again right before that happens instead
+# of relying on a caller having gone through jsonschema first.
+_LOCALE_TAG_RE = re.compile(r"^[a-z]{2,3}(-[A-Z]{2})?\Z")
+
 
 # A folder skipped because an earlier scan root already claimed its id.
 # Shared with the Widgets page, which offers to delete the shadowed copy,
@@ -450,6 +456,13 @@ def _scan_plugin_dir(
 
         for raw_locale in manifest.get("locales", []):
             locale = str(raw_locale)
+            if not _LOCALE_TAG_RE.match(locale):
+                registry.errors.append(
+                    LoaderError(
+                        plugin_id, child, f"locales entry {locale!r} is not a valid locale tag"
+                    )
+                )
+                continue
             strings_path = child / "strings" / f"{locale}.json"
             try:
                 raw_strings = json.loads(strings_path.read_text(encoding="utf-8"))

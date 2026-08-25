@@ -82,6 +82,11 @@
         },
         "name": { "type": "string", "description": "Friendly name shown in the UI." }
       }
+    },
+    "locale": {
+      "type": "string",
+      "pattern": "^[a-z]{2,3}(-[A-Z]{2})?\\Z",
+      "description": "locale this device renders widget panel text in (e.g. 'fr', 'pt-BR'). An instance overrides its kind's value if the kind declares one; absent at both levels falls back to the app-wide default (settings.app.locale). Lets one server drive a German kitchen panel and an English office panel with the same widgets. See app/locale_resolve.py."
     }
   }
 }

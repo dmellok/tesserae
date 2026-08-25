@@ -241,7 +241,7 @@
     "locales": {
       "type": "array",
       "description": "locale tags this widget ships panel text for (e.g. 'en', 'fr', 'pt-BR'). Each tag must have a matching strings/<tag>.json file next to plugin.json, a flat { \"key\": \"translated text\" } map. A widget's own hardcoded fallback text is always assumed to be English; strings/en.json is what a locale with no exact or base-language match falls back to. The host resolves the active locale (per device, falling back to the app default) and hands the widget ctx.locale + ctx.strings/ctx.t() at render time. See docs/widgets.md#locales-strings.",
-      "items": { "type": "string", "pattern": "^[a-z]{2,3}(-[A-Z]{2})?$" },
+      "items": { "type": "string", "pattern": "^[a-z]{2,3}(-[A-Z]{2})?\\Z" },
       "minItems": 1,
       "uniqueItems": true
     },
