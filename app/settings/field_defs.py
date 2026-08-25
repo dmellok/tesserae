@@ -90,6 +90,30 @@ APP_FIELDS: list[dict[str, Any]] = [
         ),
     },
     {
+        # See app.locale_resolve.resolve_locale: this is the fallback a
+        # device's own locale override (Settings -> Devices, General
+        # tab) reads when it's set to "Use app default". 'system'
+        # mirrors the timezone field above exactly, both in the
+        # sentinel value and in what it means (ask the host OS).
+        "name": "locale",
+        "type": "select",
+        "label": "Panel text language",
+        "default": "system",
+        "group": "location",
+        "choices": [
+            {"value": "system", "label": "System (host language)"},
+            {"value": "en", "label": "English"},
+            {"value": "fr", "label": "Français"},
+        ],
+        "help": (
+            "Default language widgets render their panel text in, for every "
+            "device that hasn't set its own override on Settings → Devices. "
+            "'System' uses this server's own OS language. Only widgets that "
+            "ship a translation for the picked language actually change; "
+            "others keep rendering their built-in English text."
+        ),
+    },
+    {
         # v0.69.6 (issue #52 item 5): app-level location picker replaces
         # the flat lat/lon pair below. Stores the same
         # ``{latitude, longitude, name}`` dict that per-cell widget
@@ -329,7 +353,7 @@ APP_FIELD_GROUPS: list[dict[str, Any]] = [
     {
         "id": "location",
         "title": "Location & time",
-        "description": "Default coordinates for weather widgets and the scheduler's timezone.",
+        "description": "Default coordinates for weather widgets, the scheduler's timezone, and the default panel text language.",
         "icon": "compass",
         "master": None,
     },
