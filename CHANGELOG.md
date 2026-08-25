@@ -4,6 +4,17 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.364.4], 2026-08-25
+
+### Fixed
+
+- **The colour-calibration buttons on a device card did nothing.** Send and the answer buttons
+  sat inside the card's combined-save form, and a browser drops a nested form start tag while
+  another form is open, so those buttons submitted the save instead and no calibration card was
+  ever pushed to the panel. The combined form is now an empty element above the tabs, with its
+  inputs and the calibration buttons attached to it by name, so no form on the page nests inside
+  another.
+
 ## [0.364.2], 2026-08-25
 
 ### Fixed
