@@ -42,6 +42,7 @@ from pydantic import ValidationError
 from werkzeug.wrappers import Response
 
 from app import experiments
+from app.locale_resolve import resolve_locale
 from app.panels_schema import build_catalog
 from app.plugin_loader import PluginRegistry
 from app.state.page_store import Page, PageStore
@@ -65,6 +66,17 @@ def _guard() -> None:
 def _registry() -> PluginRegistry:
     registry: PluginRegistry = current_app.config["PLUGIN_REGISTRY"]
     return registry
+
+
+def _editor_locale() -> str:
+    """Locale the editor's live preview renders widget text in. The
+    preview isn't for any particular device (it's a look at the
+    design, not a paint -- see composer.py's own preview/paint
+    distinction), so it always resolves the app-wide default rather
+    than any one device's override."""
+    store = current_app.config.get("SETTINGS_STORE")
+    app_section = store.get_section("app") or {} if store is not None else {}
+    return resolve_locale(app_section, None)
 
 
 def _pages() -> PageStore:
@@ -661,7 +673,14 @@ def catalog() -> Response:
     canvas appearance options (themes / styles / fonts) the editor's pickers
     consume."""
     _guard()
-    return jsonify({"widgets": build_catalog(_registry()), "appearance": _appearance()})
+    locale = _editor_locale()
+    return jsonify(
+        {
+            "widgets": build_catalog(_registry(), locale),
+            "appearance": _appearance(),
+            "locale": locale,
+        }
+    )
 
 
 @bp.post("/data.json")

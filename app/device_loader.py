@@ -210,6 +210,19 @@ class Device:
                 out["col_offset"] = offset
         return out
 
+    @property
+    def locale(self) -> str | None:
+        """This device's own locale override, or ``None`` if it doesn't
+        declare one. An instance's manifest is a copy of its kind's
+        manifest with per-instance fields layered on (see
+        ``load_instance_file``), so this reads correctly for both —
+        an instance's own ``locale`` wins, falling through to the
+        kind's if the instance didn't set one. ``None`` here means
+        "defer to the app-wide default", resolved by
+        ``app.locale_resolve.resolve_locale``."""
+        value = self.manifest.get("locale")
+        return str(value) if isinstance(value, str) and value.strip() else None
+
     def parse_status(self, payload: bytes) -> dict[str, Any]:
         """Normalise a heartbeat payload. Falls back to ``{"raw": ...}`` if
         the device's parser raises so the UI still has something to show."""
@@ -584,6 +597,9 @@ def load_instance_file(
     # device on incoming /api/display requests.
     if isinstance(raw_inst.get("access_token"), str) and raw_inst["access_token"].strip():
         inst_manifest["access_token"] = raw_inst["access_token"].strip()
+    # Per-device locale override (see app.locale_resolve).
+    if isinstance(raw_inst.get("locale"), str) and raw_inst["locale"].strip():
+        inst_manifest["locale"] = raw_inst["locale"].strip()
     # Per-panel cloud-relay frame key (base64url of the 32-byte X25519+HKDF
     # shared secret, set at rendezvous pairing). Carried through so
     # app.relay_publisher can seal each frame for a transport="relay" device.

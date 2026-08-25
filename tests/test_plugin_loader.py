@@ -329,3 +329,131 @@ def test_discover_bundled_wins_on_duplicate_id(tmp_path: Path, schema_path: Path
     )
     assert registry.plugins["shared"].name == "Bundled copy"
     assert any(err.plugin_id == "shared" and "duplicate" in err.message for err in registry.errors)
+
+
+# ---------------------------------------------------------------------
+# locales contract
+# ---------------------------------------------------------------------
+
+
+def test_locales_loads_strings_files(tmp_path: Path, schema_path: Path) -> None:
+    plugins_dir = tmp_path / "plugins"
+    plugins_dir.mkdir()
+    plugin_dir = _write_minimal_plugin(plugins_dir, "greeter", {"locales": ["en", "fr"]})
+    strings_dir = plugin_dir / "strings"
+    strings_dir.mkdir()
+    (strings_dir / "en.json").write_text(json.dumps({"hello": "Hello"}))
+    (strings_dir / "fr.json").write_text(json.dumps({"hello": "Bonjour"}))
+
+    registry = plugin_loader.discover(
+        plugins_dir, schema_path=schema_path, data_root=tmp_path / "data"
+    )
+    assert registry.errors == []
+    plugin = registry.plugins["greeter"]
+    assert plugin.strings_for("fr") == {"hello": "Bonjour"}
+    assert plugin.strings_for("en") == {"hello": "Hello"}
+
+
+def test_locale_tag_regex_rejects_trailing_newline_smuggling() -> None:
+    """Python's `$` also matches just before a trailing newline, so a
+    naively `$`-anchored pattern would accept 'fr\\n' as if it were
+    'fr'. The locale tag becomes a filename (strings/<locale>.json),
+    so this has to be a hard reject, not a value that gets silently
+    normalised. `\\Z` (true end-of-string) is what actually closes
+    this off; this test pins that choice directly against the regex
+    the loader re-checks right before building that path, independent
+    of whether the schema layer ran first."""
+    from app.plugin_loader import _LOCALE_TAG_RE
+
+    assert _LOCALE_TAG_RE.match("fr") is not None
+    assert _LOCALE_TAG_RE.match("en-US") is not None
+    assert _LOCALE_TAG_RE.match("fr\n") is None
+    assert _LOCALE_TAG_RE.match("en-US\n") is None
+    assert _LOCALE_TAG_RE.match("../../../etc/passwd") is None
+
+
+def test_locales_manifest_rejects_smuggled_trailing_newline(
+    tmp_path: Path, schema_path: Path
+) -> None:
+    """End-to-end: the schema pattern itself (not just the loader's
+    internal re-check) refuses a locale tag carrying a trailing
+    newline, so a manifest can't even pass validation with one."""
+    plugins_dir = tmp_path / "plugins"
+    plugins_dir.mkdir()
+    _write_minimal_plugin(plugins_dir, "sneaky", {"locales": ["fr\n"]})
+
+    registry = plugin_loader.discover(
+        plugins_dir, schema_path=schema_path, data_root=tmp_path / "data"
+    )
+    assert "sneaky" not in registry.plugins
+    assert any("manifest schema" in err.message for err in registry.errors)
+
+
+def test_locales_missing_strings_file_is_a_soft_error(tmp_path: Path, schema_path: Path) -> None:
+    """A declared locale with no matching strings/<locale>.json file
+    doesn't fail the whole plugin, it's a loader warning and the
+    widget keeps loading (falls back to its English text)."""
+    plugins_dir = tmp_path / "plugins"
+    plugins_dir.mkdir()
+    _write_minimal_plugin(plugins_dir, "half_translated", {"locales": ["en", "fr"]})
+
+    registry = plugin_loader.discover(
+        plugins_dir, schema_path=schema_path, data_root=tmp_path / "data"
+    )
+    assert "half_translated" in registry.plugins
+    assert any(
+        err.plugin_id == "half_translated" and "strings/en.json" in err.message
+        for err in registry.errors
+    )
+
+
+def test_strings_for_falls_back_to_base_language(tmp_path: Path, schema_path: Path) -> None:
+    """fr-CA with no exact match falls back to plain fr before giving
+    up on English, so a widget doesn't need every regional variant
+    declared to serve a close-enough translation."""
+    plugins_dir = tmp_path / "plugins"
+    plugins_dir.mkdir()
+    plugin_dir = _write_minimal_plugin(plugins_dir, "greeter", {"locales": ["en", "fr"]})
+    strings_dir = plugin_dir / "strings"
+    strings_dir.mkdir()
+    (strings_dir / "en.json").write_text(json.dumps({"hello": "Hello"}))
+    (strings_dir / "fr.json").write_text(json.dumps({"hello": "Bonjour"}))
+
+    registry = plugin_loader.discover(
+        plugins_dir, schema_path=schema_path, data_root=tmp_path / "data"
+    )
+    assert registry.plugins["greeter"].strings_for("fr-CA") == {"hello": "Bonjour"}
+
+
+def test_strings_for_falls_back_to_english_then_empty() -> None:
+    plugin_with_strings = plugin_loader.Plugin(
+        id="greeter",
+        path=Path("/tmp/greeter"),
+        manifest={"kind": "widget", "name": "Greeter", "supports": {"sizes": ["md"]}},
+        data_dir=Path("/tmp/greeter_data"),
+        strings={"en": {"hello": "Hello"}},
+    )
+    assert plugin_with_strings.strings_for("de") == {"hello": "Hello"}
+
+    untranslated = plugin_loader.Plugin(
+        id="toy",
+        path=Path("/tmp/toy"),
+        manifest={"kind": "widget", "name": "Toy", "supports": {"sizes": ["md"]}},
+        data_dir=Path("/tmp/toy_data"),
+    )
+    assert untranslated.strings_for("fr") == {}
+
+
+def test_locales_rejected_on_non_widget_kind(tmp_path: Path, schema_path: Path) -> None:
+    plugins_dir = tmp_path / "plugins"
+    plugins_dir.mkdir()
+    _write_minimal_plugin(
+        plugins_dir,
+        "data_source",
+        {"kind": "data", "supports": {"sizes": []}, "locales": ["en"]},
+    )
+    registry = plugin_loader.discover(
+        plugins_dir, schema_path=schema_path, data_root=tmp_path / "data"
+    )
+    assert "data_source" not in registry.plugins
+    assert any("manifest schema" in err.message for err in registry.errors)

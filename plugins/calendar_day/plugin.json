@@ -1,10 +1,11 @@
 {
   "tesserae_compat": "1.x",
   "name": "Calendar, Day",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "kind": "widget",
   "description": "Today's agenda with tunable event text sizing, a configurable visible-hour range, and a location toggle. Reads from feeds configured in Widgets \u2192 Calendar Feeds; each feed's colour drives the stripe / marker / fill colour.",
   "icon": "ph-calendar-check",
+  "locales": ["en", "fr"],
   "supports": {
     "sizes": [
       "xs",

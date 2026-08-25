@@ -102,6 +102,16 @@ function buildCtx(cell, options, pluginData, fontFamily) {
   // default) is the whole widget, so grid cells and un-decomposed widgets
   // are unaffected.
   const fragment = cell.dataset.fragment || "full";
+  // Locales contract (docs/widgets.md#locales-strings): the host resolves
+  // one locale for the whole page (composer.py's _resolve_page_locale)
+  // and each cell's own widget's resolved strings map, {} for a widget
+  // that hasn't declared any `locales`. ctx.t() degrades to `fallback`
+  // (or the bare key) in that case, so an untranslated widget's own
+  // literal text, passed as the fallback argument, is what renders --
+  // unchanged from before this existed.
+  const locale = cell.dataset.locale || "en";
+  let strings = {};
+  try { strings = JSON.parse(cell.dataset.strings || "{}"); } catch { strings = {}; }
   return {
     cell: {
       w: virtualW,
@@ -116,6 +126,9 @@ function buildCtx(cell, options, pluginData, fontFamily) {
     font: { family: fontFamily, weight: 400 },
     data: pluginData,
     fragment,
+    locale,
+    strings,
+    t(key, fallback) { return strings[key] ?? fallback ?? key; },
     preview: new URLSearchParams(location.search).get("preview") === "1",
   };
 }

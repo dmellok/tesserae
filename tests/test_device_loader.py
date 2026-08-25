@@ -171,3 +171,77 @@ def parse_status(payload):
     parsed = device.parse_status(b"x")
     assert "error" in parsed
     assert "RuntimeError" in parsed["error"]
+
+
+# ---------------------------------------------------------------------
+# per-device locale
+# ---------------------------------------------------------------------
+
+
+def test_locale_absent_by_default() -> None:
+    """A device (kind or instance) that never mentions locale defers to
+    the app-wide default -- None here means "no override", not
+    "render in English"."""
+    from types import ModuleType
+
+    from app.device_loader import Device
+
+    device = Device(
+        id="lounge_frame",
+        path=Path("/tmp/lounge_frame"),
+        manifest={"name": "Lounge", "status_topic": "t"},
+        module=ModuleType("stub"),
+        data_dir=Path("/tmp/lounge_frame_data"),
+    )
+    assert device.locale is None
+
+
+def test_locale_property_reads_manifest() -> None:
+    from types import ModuleType
+
+    from app.device_loader import Device
+
+    device = Device(
+        id="kitchen",
+        path=Path("/tmp/kitchen"),
+        manifest={"name": "Kitchen", "status_topic": "t", "locale": "de"},
+        module=ModuleType("stub"),
+        data_dir=Path("/tmp/kitchen_data"),
+    )
+    assert device.locale == "de"
+
+
+def test_instance_locale_overrides_kind(tmp_path: Path, schema_path: Path) -> None:
+    """An instance's own locale wins over its kind's -- the German
+    kitchen panel / English office panel off one server scenario."""
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    (data_dir / "kitchen.json").write_text(
+        json.dumps(
+            {
+                "id": "kitchen",
+                "kind": "pi_bin_client",
+                "name": "Kitchen",
+                "status_topic": "tesserae/pi_bin/kitchen/status",
+                "locale": "de",
+            }
+        ),
+        encoding="utf-8",
+    )
+    (data_dir / "office.json").write_text(
+        json.dumps(
+            {
+                "id": "office",
+                "kind": "pi_bin_client",
+                "name": "Office",
+                "status_topic": "tesserae/pi_bin/office/status",
+            }
+        ),
+        encoding="utf-8",
+    )
+    registry = device_loader.discover(
+        REPO_ROOT / "devices", schema_path=schema_path, data_root=data_dir
+    )
+    assert registry.errors == []
+    assert registry.devices["kitchen"].locale == "de"
+    assert registry.devices["office"].locale is None

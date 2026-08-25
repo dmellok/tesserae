@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="{{ page.locale|default('en') }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -138,6 +138,8 @@
          data-panel-h="{{ page.panel.h }}"
          data-font-family="{{ cell.font_family }}"
          data-cell-zoom="{{ cell.zoom }}"
+         data-locale="{{ cell.locale }}"
+         data-strings='{{ cell.strings|tojson }}'
          {% if cell.on_tap_attr %}data-on-tap="{{ cell.on_tap_attr }}"{% endif %}
          {% if cell.on_swipe_attr %}data-on-swipe="{{ cell.on_swipe_attr }}"{% endif %}
          {% if cell.on_slide_attr %}data-on-slide="{{ cell.on_slide_attr }}"{% endif %}

@@ -1177,6 +1177,15 @@ def _build_sections() -> list[dict[str, Any]]:
                     if is_instance
                     else None
                 ),
+                # Per-device locale override (see app.locale_resolve).
+                # Instances-only, same reasoning as quiet_hours /
+                # battery_offset above: a kind's own manifest isn't
+                # editable through this UI. Saved through the combined
+                # form (no dedicated AJAX endpoint -- unlike quiet hours
+                # / battery offset this isn't a dependent-field group,
+                # just one select).
+                "locale": (device.manifest.get("locale") or "" if is_instance else ""),
+                "locale_editable": is_instance,
                 # Per-device button map (physical button wakes). The
                 # textarea shows the stored per-device override (empty
                 # when nothing is set); the "effective map" fold-out

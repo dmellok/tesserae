@@ -111,6 +111,22 @@ def test_catalog_includes_appearance(app: Flask) -> None:
     assert isinstance(ap["fonts"], list)
 
 
+def test_catalog_locale_defaults_to_app_setting(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The editor preview isn't for any particular device, so its locale
+    is always the app-wide default -- same value a device-less
+    grid/canvas render would resolve to."""
+    monkeypatch.delenv("LC_ALL", raising=False)
+    monkeypatch.delenv("LANG", raising=False)
+    client = app.test_client()
+    _sign_in(client)
+    assert client.get("/pages/canvas/catalog.json").get_json()["locale"] == "en"
+
+    app.config["SETTINGS_STORE"].patch_section("app", {"locale": "fr"})
+    assert client.get("/pages/canvas/catalog.json").get_json()["locale"] == "fr"
+
+
 def test_appearance_roundtrips(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("TESSERAE_EXPERIMENT_COMPOSER", "1")
     client = app.test_client()
@@ -198,9 +214,12 @@ def test_compose_applies_theme_and_background(app: Flask) -> None:
 
 
 class _FakePlugin:
-    def __init__(self, pid: str, manifest: dict[str, Any]) -> None:
+    def __init__(
+        self, pid: str, manifest: dict[str, Any], strings: dict[str, dict[str, str]] | None = None
+    ) -> None:
         self.id = pid
         self.manifest = manifest
+        self.strings = strings or {}
 
     @property
     def name(self) -> str:
@@ -215,6 +234,9 @@ class _FakePlugin:
         return [
             dict(spec) for spec in raw if isinstance(spec, dict) and spec.get("kind") == "daily"
         ]
+
+    def strings_for(self, locale: str) -> dict[str, str]:
+        return self.strings.get(locale, {})
 
 
 class _FakeRegistry:
@@ -272,6 +294,21 @@ def test_catalog_entry_shape() -> None:
     plain = catalog_entry(_FakePlugin("plain", {"name": "Plain"}))  # type: ignore[arg-type]
     assert plain["updates_on_change"] is False
     assert plain["updates_on_schedule"] == []
+    assert plain["strings"] == {}  # no locales declared -> untouched by the contract
+
+
+def test_catalog_entry_carries_resolved_strings_for_locale() -> None:
+    translated = _FakePlugin("greeter", {"name": "Greeter"}, strings={"fr": {"hello": "Bonjour"}})
+    assert catalog_entry(translated)["strings"] == {}  # default locale is "en"
+    assert catalog_entry(translated, "fr")["strings"] == {"hello": "Bonjour"}  # type: ignore[arg-type]
+
+
+def test_build_catalog_passes_locale_through() -> None:
+    registry = _FakeRegistry(
+        [_FakePlugin("greeter", {"name": "Greeter"}, strings={"fr": {"hello": "Bonjour"}})]
+    )
+    catalog = build_catalog(registry, "fr")  # type: ignore[arg-type]
+    assert catalog[0]["strings"] == {"hello": "Bonjour"}
 
 
 def test_build_catalog_sorts_by_name() -> None:

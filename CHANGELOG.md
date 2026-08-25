@@ -4,6 +4,18 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.366.0], 2026-08-26
+
+### Added
+
+- **Widgets can now be translated into other languages, starting with Calendar Day in French
+  (#261).** Widget authors can add a translation for their widget's on-screen text; Tesserae
+  shows the right language automatically. A widget with no translation yet keeps working
+  exactly as before, in English.
+- **You can now choose what language your dashboards display in.** Set one default for the
+  whole install under Settings → Server, or give an individual panel its own language under
+  Settings → Devices.
+
 ## [0.365.0], 2026-08-26
 
 ### Added

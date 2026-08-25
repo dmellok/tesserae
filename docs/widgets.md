@@ -397,6 +397,9 @@ export default async function render(shadow, ctx) {
     weight: 400
   },
   data: { ... } | null,    // server.py fetch() result, if present
+  locale: "fr",            // active locale for this render, see "Locales & strings" below
+  strings: { ... },        // this widget's resolved strings for `locale`, {} if untranslated
+  t(key, fallback) { ... },// strings[key] ?? fallback ?? key
   preview: false           // true when rendered in the editor iframe
 }
 ```
@@ -416,6 +419,53 @@ resolved colour strings.
   animations, CSS transitions, requestAnimationFrame loops.
 * **Error path**: if `ctx.data?.error` is set (server.py raised),
   render a small error card with `ph-warning-circle` and the message.
+
+### Locales & strings
+
+Optional. A widget with no `locales` in its manifest renders exactly as
+before this existed: `ctx.locale` and `ctx.strings` are still present,
+but `ctx.strings` is `{}`, so `ctx.t(key, fallback)` always returns
+`fallback` (or `key` if you omit it). There's no reason to touch
+`client.js` at all unless you want the widget's panel text to actually
+translate.
+
+To opt in:
+
+```json
+// plugin.json
+"locales": ["en", "fr"]
+```
+
+```json
+// strings/en.json
+{ "sunrise": "Sunrise", "daylight": "Daylight" }
+// strings/fr.json
+{ "sunrise": "Lever du soleil", "daylight": "Durée du jour" }
+```
+
+```js
+// client.js
+label.textContent = ctx.t("sunrise", "Sunrise");
+```
+
+`ctx.locale` is resolved once per page render (every widget on a page
+gets the same one) from, in order: the target device's own `locale`
+(Settings → Devices), the app-wide `settings.app.locale`, the host's
+own locale, else `"en"`. `ctx.strings` is the widget's own
+`strings/<locale>.json`, falling back to the base language
+(`fr-CA` → `fr`) and then to English if the exact tag isn't shipped.
+
+Dates and numbers aren't part of this contract: use
+`Intl.DateTimeFormat(ctx.locale, {...})` /
+`Intl.NumberFormat(ctx.locale, {...})` directly rather than a hand-rolled
+month/weekday table, so day names, ordering, and separators come from
+the browser's own locale data instead of one you'd have to maintain.
+
+Translating a widget is a normal contribution to that widget: a PR
+adding `strings/<locale>.json` (bundled widgets) or a new catalog
+release (marketplace widgets, installed the normal way from Browse).
+There's no separate override mechanism, and no per-widget forking
+required to add a language.
 
 ---
 

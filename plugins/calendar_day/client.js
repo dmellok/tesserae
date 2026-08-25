@@ -34,6 +34,20 @@ export function styleLabel(full, style, minimalMap) {
   return full.toUpperCase();
 }
 
+export function localizedFull(date, unit, locale) {
+  const lang = (locale || "en").split("-")[0];
+  if (lang === "en") {
+    return unit === "weekday" ? WEEKDAY_FULL[(date.getDay() + 6) % 7] : MONTH_FULL[date.getMonth()];
+  }
+  return new Intl.DateTimeFormat(locale, { [unit]: "long" }).format(date);
+}
+
+export function minimalMapFor(unit, locale) {
+  const lang = (locale || "en").split("-")[0];
+  if (lang !== "en") return {};
+  return unit === "weekday" ? DOW_MINIMAL : MONTH_MINIMAL;
+}
+
 function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
@@ -207,8 +221,11 @@ function hourLabels(range) {
 // by how many events overlap that hour. 0 events = empty surface-
 // sunken; 1+ events scale through accent-4 (teal) at increasing
 // opacity. Quick scan of "where the day is busy". Half-open intervals
-// [hour, hour+1).
-function densityStrip(range, timed) {
+// [hour, hour+1). ``t`` is ctx.t(): the hover tooltip is the one piece
+// of this widget's text that needs a plural, and ctx.t() has no
+// interpolation of its own, so the sentence is composed here from
+// three translated atoms (singular noun / plural noun / "at").
+function densityStrip(range, timed, t) {
   const cells = [];
   const maxCount = Math.max(
     1,
@@ -234,8 +251,9 @@ function densityStrip(range, timed) {
     const bg = count === 0
       ? "var(--surface-sunken)"
       : `color-mix(in oklab, var(--accent-4) ${(alpha * 100).toFixed(0)}%, var(--surface))`;
+    const noun = t(count === 1 ? "event" : "events", count === 1 ? "event" : "events");
     cells.push(
-      `<span class="tt-density-cell" style="background:${bg}" title="${count} event${count === 1 ? "" : "s"} at ${String(h).padStart(2, "0")}:00"></span>`
+      `<span class="tt-density-cell" style="background:${bg}" title="${count} ${noun} ${t("at", "at")} ${String(h).padStart(2, "0")}:00"></span>`
     );
   }
   return `<div class="tt-density" aria-hidden="true">${cells.join("")}</div>`;
@@ -243,6 +261,7 @@ function densityStrip(range, timed) {
 
 export default function render(shadow, ctx) {
   const data = ctx?.data ?? {};
+  const t = ctx?.t || ((key, fallback) => fallback ?? key);
   const css = `<link rel="stylesheet" href="/static/style/spectra-widgets.css">`;
 
   if (data.error) {
@@ -256,13 +275,14 @@ export default function render(shadow, ctx) {
 
   const options = readOptions(ctx);
   const labelStyle = ["full", "short", "minimal"].includes(options.date_label_style) ? options.date_label_style : "full";
+  const locale = ctx?.locale || "en";
 
   const isoDate = data.date || new Date().toISOString().slice(0, 10);
   const [y, m, d] = isoDate.split("-").map(Number);
   const localDate = new Date(y, m - 1, d);
   const dayNum = String(d);
-  const monthName = styleLabel(MONTH_FULL[m - 1] || "", labelStyle, MONTH_MINIMAL);
-  const weekday = styleLabel(WEEKDAY_FULL[(localDate.getDay() + 6) % 7], labelStyle, DOW_MINIMAL);
+  const monthName = styleLabel(localizedFull(localDate, "month", locale), labelStyle, minimalMapFor("month", locale));
+  const weekday = styleLabel(localizedFull(localDate, "weekday", locale), labelStyle, minimalMapFor("weekday", locale));
 
   const events = Array.isArray(data.events) ? data.events : [];
   const allDay = events.filter((e) => e.all_day);
@@ -309,7 +329,7 @@ export default function render(shadow, ctx) {
     : "";
 
   const emptyHint = events.length === 0
-    ? `<div style="position:absolute;inset:0;display:grid;place-items:center"><p class="u-muted">No events today.</p></div>`
+    ? `<div style="position:absolute;inset:0;display:grid;place-items:center"><p class="u-muted">${escapeHtml(t("no_events", "No events today."))}</p></div>`
     : "";
 
   const now = new Date();
@@ -322,7 +342,7 @@ export default function render(shadow, ctx) {
     : "";
 
   const showDensity = options.show_density !== false;
-  const density = (showDensity && timed.length) ? densityStrip(range, timed) : "";
+  const density = (showDensity && timed.length) ? densityStrip(range, timed, t) : "";
 
   const titleScale = clampScale(options.event_title_scale, 1.0, 0.01, 10.0);
   const timeScale = clampScale(options.event_time_scale, 1.0, 0.01, 10.0);
