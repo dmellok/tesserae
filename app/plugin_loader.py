@@ -124,6 +124,10 @@ class Plugin:
     # block (or an undeclared snapshot when the field is absent).
     # See app/capabilities.py for the enforcement layer.
     capabilities: Capabilities | None = None
+    # locale -> {key: translated text}, empty for a widget that hasn't
+    # opted into the locales contract, so strings_for() always degrades
+    # to the widget's own hardcoded text.
+    strings: dict[str, dict[str, str]] = field(default_factory=dict)
 
     @property
     def kind(self) -> str:
@@ -156,6 +160,28 @@ class Plugin:
             if value in ("strict", "extended"):
                 return str(value)
         return "strict"
+
+    def strings_for(self, locale: str) -> dict[str, str]:
+        """Resolved ``{key: text}`` map for ``locale``, or ``{}`` for a
+        widget that hasn't declared any (the common case today — its
+        ``client.js`` keeps its own hardcoded text and ``ctx.t()``
+        degrades to returning the key/fallback text unchanged).
+
+        Falls back in three steps so a caller doesn't need to know
+        which locales a widget actually ships: exact tag (``fr-CA``),
+        then base language (``fr``), then ``"en"`` — every widget's
+        hardcoded fallback text is English, so that's the one locale
+        ``strings_for`` can always assume exists rather than guess at
+        a per-widget default. A locale a widget genuinely has no
+        strings for still renders — in English — rather than blank."""
+        if not self.strings:
+            return {}
+        if locale in self.strings:
+            return self.strings[locale]
+        base = locale.split("-", 1)[0]
+        if base in self.strings:
+            return self.strings[base]
+        return self.strings.get("en", {})
 
     @property
     def on_change_updates(self) -> list[dict[str, str]]:
@@ -421,6 +447,38 @@ def _scan_plugin_dir(
             capabilities=_parse_capabilities(plugin_id, manifest.get("requires")),
         )
         registry.plugins[plugin_id] = plugin
+
+        for raw_locale in manifest.get("locales", []):
+            locale = str(raw_locale)
+            strings_path = child / "strings" / f"{locale}.json"
+            try:
+                raw_strings = json.loads(strings_path.read_text(encoding="utf-8"))
+            except FileNotFoundError:
+                registry.errors.append(
+                    LoaderError(
+                        plugin_id,
+                        child,
+                        f"locales declares {locale!r} but strings/{locale}.json is missing",
+                    )
+                )
+                continue
+            except (json.JSONDecodeError, OSError) as err:
+                registry.errors.append(
+                    LoaderError(plugin_id, child, f"strings/{locale}.json invalid: {err}")
+                )
+                continue
+            if not isinstance(raw_strings, dict) or not all(
+                isinstance(k, str) and isinstance(v, str) for k, v in raw_strings.items()
+            ):
+                registry.errors.append(
+                    LoaderError(
+                        plugin_id,
+                        child,
+                        f"strings/{locale}.json must be a flat {{string: string}} map",
+                    )
+                )
+                continue
+            plugin.strings[locale] = {str(k): str(v) for k, v in raw_strings.items()}
 
         if plugin.kind == "font":
             for raw_font in manifest.get("fonts", []):

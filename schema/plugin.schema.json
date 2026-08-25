@@ -238,6 +238,13 @@
       "uniqueItems": true,
       "description": "Declared capability list. Each entry is `<category>:<value>`. Supported categories: `network:<hostname>` (specific egress target; `network:*` for unrestricted but flagged in review), `settings:plugin` (own plugin settings, the common case; `settings:plugin/<other_id>` for a sibling's; `settings:app` for top-level app settings like lat/lon), `filesystem:write:<path>` (write outside data_dir; reads are implicit for data_dir and the plugin folder), `plugin:<other_id>` (this widget fetches through another plugin, so that plugin's declared hosts are allowed while this one runs; needed because the delegate's request happens inside this widget's capability scope). Enforcement in v1: network egress is blocked at the socket layer for hostnames not in the list; settings + filesystem entries are review-only. Widgets without a `requires:` block load with no enforcement (existing behaviour) but should declare in new submissions, the catalog review checklist demands it."
     },
+    "locales": {
+      "type": "array",
+      "description": "locale tags this widget ships panel text for (e.g. 'en', 'fr', 'pt-BR'). Each tag must have a matching strings/<tag>.json file next to plugin.json, a flat { \"key\": \"translated text\" } map. A widget's own hardcoded fallback text is always assumed to be English; strings/en.json is what a locale with no exact or base-language match falls back to. The host resolves the active locale (per device, falling back to the app default) and hands the widget ctx.locale + ctx.strings/ctx.t() at render time. See docs/widgets.md#locales-strings.",
+      "items": { "type": "string", "pattern": "^[a-z]{2,3}(-[A-Z]{2})?$" },
+      "minItems": 1,
+      "uniqueItems": true
+    },
     "fonts": {
       "type": "array",
       "items": {
@@ -269,6 +276,11 @@
     {
       "description": "Only placeable widgets may declare update capabilities.",
       "if": { "required": ["updates"] },
+      "then": { "properties": { "kind": { "const": "widget" } } }
+    },
+    {
+      "description": "Only placeable widgets render panel text, so only they may declare locales.",
+      "if": { "required": ["locales"] },
       "then": { "properties": { "kind": { "const": "widget" } } }
     }
   ]
