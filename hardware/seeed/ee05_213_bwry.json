@@ -1,0 +1,26 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "seeed_ee05_213_bwry",
+  "name": "Seeed XIAO ePaper EE05 (2.13\" BWRY)",
+  "vendor": "Seeed Studio",
+  "url": "https://www.seeedstudio.com/2-13-Quadruple-Color-ePaper-Display-with-122x250-Pixels-p-5779.html",
+  "icon": "device-tablet",
+  "description": "Seeed XIAO ePaper Display Board EE05 (XIAO ESP32-S3 Plus) driving the 2.13 inch quadruple-colour BWRY panel on the 24-pin FPC (JD79676 controller, 122x250 visible). Speaks Tesserae's v1 REST device API and paints a raw 2-bpp BWRY buffer (8000 bytes) produced by the esp32_bin renderer. The controller stride is 128 columns with 6 hidden, so the server pads the frame rather than scaling it.",
+  "protocol": "esp32_client",
+  "panel": {
+    "w": 250,
+    "h": 122,
+    "orientation": "landscape",
+    "name": "2.13 inch quadruple-colour BWRY ePaper (122x250)",
+    "gamut": "bwry_4",
+    "native_w": 128,
+    "native_h": 250,
+    "col_offset": 6
+  },
+  "protocol_config": {
+    "model_header": "Seeed_EE05_213_BWRY"
+  },
+  "refresh_floor_s": 60,
+  "image_format": "bin",
+  "notes_md": "Awaiting confirmed test on real hardware; bring-up tracked in tesserae-device-firmware issue #29. Wire format is exactly 8000 bytes (128*250*2/8): 2-bpp packed, four pixels per byte, MSB pair = leftmost pixel, palette indices 0=black, 1=white, 2=yellow, 3=red, row-major at the controller's 128-column native stride, top-left origin. The glass shows 122 of the 128 columns; the server pastes the visible frame at col_offset 6 and pads the hidden columns white. The offset edge and colour order are provisional until the selftest photo run confirms them."
+}

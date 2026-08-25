@@ -203,12 +203,16 @@ def device_panel(device: Device) -> Panel | None:
     native_w: int | None = None
     native_h: int | None = None
     native_declared = False
+    col_offset: int | None = None
     # Explicit manifest declaration wins.
     if "native_w" in block and "native_h" in block:
         with contextlib.suppress(TypeError, ValueError):
             native_w = int(block["native_w"])
             native_h = int(block["native_h"])
             native_declared = True
+        if "col_offset" in block:
+            with contextlib.suppress(TypeError, ValueError):
+                col_offset = max(0, int(block["col_offset"]))
     else:
         # Try to match the device's (w, h) against a known preset's
         # landscape composition. If a preset matches, lift its native
@@ -233,6 +237,7 @@ def device_panel(device: Device) -> Panel | None:
         native_w=native_w,
         native_h=native_h,
         native_declared=native_declared,
+        col_offset=col_offset,
     )
 
 

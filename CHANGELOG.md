@@ -4,6 +4,23 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.365.0], 2026-08-26
+
+### Added
+
+- **Seeed XIAO ePaper EE05 with the 2.13" quadruple-colour BWRY panel (firmware #29).** New
+  hardware kind `seeed_ee05_213_bwry`: the XIAO ESP32-S3 Plus display board driving the
+  122x250 black/white/yellow/red panel (JD79676 controller) over the 24-pin FPC, packed by the
+  existing esp32_bin 2-bpp BWRY path. Awaiting confirmation on real hardware; the matching
+  firmware target ships separately in tesserae-device-firmware.
+
+- **Panels can declare hidden columns (`panel.col_offset`).** Small panels often have a
+  controller stride wider than the glass; the EE05's 2.13" panel drives 128 columns with only
+  122 visible. A manifest that declares `col_offset` alongside `native_w`/`native_h` now gets
+  its frame pasted into the native stride at that offset with white padding, instead of being
+  scaled to the stride and distorted. Manifests without the field keep the previous behaviour
+  unchanged.
+
 ## [0.364.6], 2026-08-25
 
 ### Fixed

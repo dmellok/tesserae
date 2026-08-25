@@ -120,11 +120,29 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
     if panel.flip:
         # Upside-down physical mount, turn 180° so it reads upright.
         img = img.rotate(180, expand=True)
+    pad_offset: int | None = None
     if img.size != (native_w, native_h):
-        # Normally the composition dims equal the native dims (or are the
-        # exact swapped pair after rotation). Keep a bounded fallback for
-        # custom/legacy manifests whose declared sizes differ.
-        img = fit_to_panel(img, target_w=native_w, target_h=native_h, scale=fit, bg="white")
+        if (
+            panel.col_offset is not None
+            and img.width + panel.col_offset <= native_w
+            and img.height == native_h
+        ):
+            # Hidden-column panel (Seeed 2.13" BWRY: 122 visible columns
+            # in a 128-wide JD79676 buffer). Scaling here would distort
+            # every frame by native_w/visible_w; instead paste the
+            # visible image into a white native-stride canvas at the
+            # declared offset. The hidden columns exist only inside the
+            # controller and never reach the glass.
+            pad_offset = panel.col_offset
+            canvas = Image.new("RGB", (native_w, native_h), "white")
+            canvas.paste(img.convert("RGB"), (pad_offset, 0))
+            img = canvas
+        else:
+            # Normally the composition dims equal the native dims (or are
+            # the exact swapped pair after rotation). Keep a bounded
+            # fallback for custom/legacy manifests whose declared sizes
+            # differ.
+            img = fit_to_panel(img, target_w=native_w, target_h=native_h, scale=fit, bg="white")
     # Per-device underscan: inset content so it clears a physical mat/bezel.
     if panel.underscan:
         img = underscan_image(img, underscan=panel.underscan)
@@ -145,6 +163,7 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
             flip=bool(panel.flip),
             underscan=int(panel.underscan or 0),
             vflip=bool(panel.vflip),
+            col_offset=pad_offset,
         )
     # Profile tone / dither knobs (v0.67.1). Populated by app.push
     # only when the device has a Calibration-tab profile applied;

@@ -1038,3 +1038,50 @@ def test_usable_mac_drops_placeholders_but_keeps_spelling() -> None:
     # Not every client sends a spec-shaped MAC; a stable unique id still
     # pairs, so shape is not policed beyond the placeholder check.
     assert usable_mac("aa-bb-cc-00-00-01") == "aa-bb-cc-00-00-01"
+
+
+def test_ee05_bwry_manifest_pads_hidden_columns(registries_with_catalog) -> None:
+    """The Seeed EE05 2.13" BWRY kind declares a 128-column native stride
+    with 6 hidden columns (JD79676 ``COL_OFFSET``). ``device_panel`` must
+    carry ``col_offset`` through from the manifest, and the packed frame
+    must be the padded 8000-byte native buffer, not a 122→128 stretch."""
+    import io
+
+    from PIL import Image
+
+    from app.panel import device_panel
+
+    devices, renderers, data_root = registries_with_catalog
+    created = device_service.create_instance(
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="ee05_desk",
+        kind_id="seeed_ee05_213_bwry",
+        name="EE05",
+    )
+    assert created.ok, created.error
+    device = devices.get("ee05_desk")
+    assert device is not None
+    panel = device_panel(device)
+    assert panel is not None
+    assert (panel.native_w, panel.native_h) == (128, 250)
+    assert panel.col_offset == 6
+    assert panel.gamut == "bwry_4"
+
+    clones = renderers.for_device("ee05_desk")
+    assert [c.id for c in clones] == ["esp32_bin__ee05_desk"]
+    buf = io.BytesIO()
+    Image.new("RGB", (250, 122), (255, 0, 0)).save(buf, "PNG")
+    out = clones[0].transform(
+        buf.getvalue(),
+        panel=panel,
+        settings={"dither": "none", "saturation": 1.0, "contrast": 1.0},
+    )
+    assert len(out) == 128 * 250 // 4  # 8000 bytes at the native stride
+    # Row layout: 6 hidden white columns, then red glass. Byte 0 = four
+    # whites (0x55); byte 1 = white, white, red, red (0x5F); rest red.
+    row = out[: 128 // 4]
+    assert row[0] == 0x55
+    assert row[1] == 0x5F
+    assert row[2:] == b"\xff" * (128 // 4 - 2)

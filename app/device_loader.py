@@ -196,6 +196,18 @@ class Device:
                 continue
             if value > 0:
                 out[stride_key] = value
+        # Hidden-column padding (Seeed 2.13" BWRY: 122 visible in a
+        # 128-wide JD79676 buffer). 0 is meaningful (hidden columns after
+        # the visible area), so pass any non-negative int through rather
+        # than gating on truthiness like underscan.
+        raw_offset = block.get("col_offset")
+        if raw_offset is not None:
+            try:
+                offset = int(raw_offset)
+            except (TypeError, ValueError):
+                offset = -1
+            if offset >= 0:
+                out["col_offset"] = offset
         return out
 
     def parse_status(self, payload: bytes) -> dict[str, Any]:

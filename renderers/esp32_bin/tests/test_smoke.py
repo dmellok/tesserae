@@ -366,3 +366,80 @@ def test_bwr_msb_first_pixel_order_and_no_reserved_value(registry) -> None:
     for byte in dithered:
         for shift in (6, 4, 2, 0):
             assert (byte >> shift) & 0b11 != 0b11
+
+
+def test_col_offset_pads_hidden_columns_instead_of_scaling(registry) -> None:
+    """Seeed 2.13" BWRY (JD79676): 122 visible columns inside a
+    128-column native stride, 6 hidden on the offset side. A panel that
+    declares ``col_offset`` must get white padding at the declared
+    offset, not a 122→128 stretch. Landscape composition (250×122)
+    rotates CW onto the portrait 128×250 stride first."""
+    img = Image.new("RGB", (250, 122), (255, 0, 0))
+
+    esp = registry.get("esp32_bin")
+    assert esp is not None
+    panel = Panel(w=250, h=122, gamut="bwry_4", native_w=128, native_h=250, col_offset=6)
+    out = esp.transform(
+        _png_bytes(img),
+        panel=panel,
+        settings={"dither": "none", "saturation": 1.0, "contrast": 1.0},
+    )
+    # 2-bpp at the native stride: 128*250/4 = 8000 bytes, 32 per row.
+    assert len(out) == 128 * 250 // 4
+    row_bytes = 128 // 4
+    for row in range(250):
+        row_data = out[row * row_bytes : (row + 1) * row_bytes]
+        # Columns 0-5 hidden padding = white (index 1): byte 0 is four
+        # whites (0x55); byte 1 is white, white, red, red (0b01011111).
+        assert row_data[0] == 0x55
+        assert row_data[1] == 0b01011111
+        # Columns 8-127 all red (index 3 in every 2-bit slot).
+        assert row_data[2:] == b"\xff" * (row_bytes - 2)
+
+
+def test_col_offset_zero_pads_at_the_far_edge(registry) -> None:
+    """``col_offset: 0`` is meaningful (hidden columns after the visible
+    area): the visible frame sits at x=0 and the padding lands on the
+    far edge instead."""
+    img = Image.new("RGB", (250, 122), (255, 0, 0))
+
+    esp = registry.get("esp32_bin")
+    assert esp is not None
+    panel = Panel(w=250, h=122, gamut="bwry_4", native_w=128, native_h=250, col_offset=0)
+    out = esp.transform(
+        _png_bytes(img),
+        panel=panel,
+        settings={"dither": "none", "saturation": 1.0, "contrast": 1.0},
+    )
+    assert len(out) == 128 * 250 // 4
+    row_bytes = 128 // 4
+    row_data = out[:row_bytes]
+    # Columns 0-121 red; byte 30 = red, red, white, white (0b11110101);
+    # byte 31 = four whites.
+    assert row_data[:30] == b"\xff" * 30
+    assert row_data[30] == 0b11110101
+    assert row_data[31] == 0x55
+
+
+def test_no_col_offset_keeps_legacy_centered_fit(registry) -> None:
+    """Manifests without ``col_offset`` keep the pre-existing behaviour:
+    a composition that doesn't match the native dims goes through
+    ``fit_to_panel``, which letterboxes centred, so the white bars land
+    on BOTH edges instead of the declared-offset side."""
+    img = Image.new("RGB", (250, 122), (255, 0, 0))
+
+    esp = registry.get("esp32_bin")
+    assert esp is not None
+    panel = Panel(w=250, h=122, gamut="bwry_4", native_w=128, native_h=250)
+    out = esp.transform(
+        _png_bytes(img),
+        panel=panel,
+        settings={"dither": "none", "saturation": 1.0, "contrast": 1.0},
+    )
+    assert len(out) == 128 * 250 // 4
+    # Centred letterbox: 3 white columns each side ((128-122)//2), so byte
+    # 0 is white, white, white, red (0b01010111) and the last byte of the
+    # row is red, white, white, white (0b11010101).
+    row = out[: 128 // 4]
+    assert row[0] == 0b01010111
+    assert row[-1] == 0b11010101

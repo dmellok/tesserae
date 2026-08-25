@@ -122,6 +122,7 @@ def transform_mask(
     flip: bool = False,
     underscan: int = 0,
     vflip: bool = False,
+    col_offset: int | None = None,
 ) -> Image.Image:
     """Apply a ``.bin`` renderer's geometric pipeline to a dither mask so it
     stays pixel-aligned with the packed image.
@@ -144,7 +145,17 @@ def transform_mask(
     if flip:
         m = m.rotate(180, expand=True)
     if m.size != (native_w, native_h):
-        m = m.resize((native_w, native_h), Image.Resampling.NEAREST)
+        if col_offset is not None and m.width + col_offset <= native_w and m.height == native_h:
+            # Hidden-column panel: the image was pasted into a white
+            # native-stride canvas at ``col_offset``, mirror that here
+            # instead of stretching the mask over columns the image never
+            # moved to. The padding is flat white, so nearest-snapping it
+            # (same as the underscan border) is correct and cheap.
+            canvas = Image.new("L", (native_w, native_h), _NEAREST)
+            canvas.paste(m, (col_offset, 0))
+            m = canvas
+        else:
+            m = m.resize((native_w, native_h), Image.Resampling.NEAREST)
     if underscan > 0:
         inner_w = native_w - 2 * underscan
         inner_h = native_h - 2 * underscan

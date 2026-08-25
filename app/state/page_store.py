@@ -68,6 +68,15 @@ class Panel(BaseModel):
     # not a per-page choice.
     native_w: int | None = Field(default=None, gt=0)
     native_h: int | None = Field(default=None, gt=0)
+    # Hidden-column padding inside the native buffer. Small panels often
+    # have a controller stride wider than the glass (Seeed 2.13" BWRY:
+    # 122 visible columns in a 128-column JD79676 buffer, 6 hidden). When
+    # set (0 is meaningful: hidden columns after the visible area), the
+    # .bin packers paste the composition into a white native-size canvas
+    # at this x-offset instead of scaling it to the native width. None
+    # keeps the legacy scale-to-native behaviour for manifests that
+    # declare native dims as a pure orientation fact.
+    col_offset: int | None = Field(default=None, ge=0)
     # True when the native dims came from the device itself (a manifest
     # block, or a client declaring ``rotation`` at registration) rather
     # than from the dims-matching preset fallback in ``device_panel``.
