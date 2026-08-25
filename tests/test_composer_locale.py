@@ -149,3 +149,25 @@ def test_canvas_path_untranslated_widget_gets_empty_strings(
     body = resp.get_data(as_text=True)
     assert _cell_dataset(body, "locale") == "en"
     assert json.loads(_cell_dataset(body, "strings")) == {}
+
+
+# -- calendar_day: the real pilot widget, not a synthetic fixture -------
+
+
+def test_calendar_day_receives_its_real_french_strings(client: FlaskClient, app: Flask) -> None:
+    """End-to-end proof against the actual bundled widget (not mini_i18n):
+    calendar_day declares locales in plugins/calendar_day/plugin.json and
+    ships plugins/calendar_day/strings/fr.json, so this is what a real
+    contributed translation looks like flowing all the way to the DOM."""
+    app.config["SETTINGS_STORE"].patch_section("app", {"locale": "fr"})
+    resp = client.get("/_test/render?plugin=calendar_day&size=md")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert _cell_dataset(body, "locale") == "fr"
+    strings = json.loads(_cell_dataset(body, "strings"))
+    assert strings == {
+        "no_events": "Aucun événement aujourd'hui.",
+        "event": "événement",
+        "events": "événements",
+        "at": "à",
+    }
