@@ -36,6 +36,7 @@ from werkzeug.wrappers import Response as WerkzeugResponse
 
 from app import widget_next_change
 from app.bindings import apply_binding
+from app.locale_resolve import resolve_locale
 from app.panel import PANEL_PRESETS, resolve_panel_for_page
 from app.plugin_http import fetch_json
 from app.plugin_loader import Font, PluginRegistry
@@ -71,6 +72,29 @@ def clamp_screenshot_dim(value: int) -> int:
 def _registry() -> PluginRegistry:
     registry: PluginRegistry = current_app.config["PLUGIN_REGISTRY"]
     return registry
+
+
+def _resolve_locale_for_device_id(device_id: str) -> str:
+    """Effective locale for a render targeting ``device_id`` (possibly
+    ``""``, meaning no bound device -- a non-push preview): the
+    device's own override if it has one, else the app-wide default.
+    Shared by the grid path (``_resolve_page_locale``) and the canvas
+    path (``_build_canvas_els``), the two places a render actually
+    knows which device it's for."""
+    store = current_app.config.get("SETTINGS_STORE")
+    app_section = store.get_section("app") or {} if store is not None else {}
+    devices = current_app.config.get("DEVICE_REGISTRY")
+    device = devices.devices.get(device_id) if devices is not None and device_id else None
+    return resolve_locale(app_section, device)
+
+
+def _resolve_page_locale(page_dict: dict[str, Any]) -> str:
+    """Effective locale for this render: the page's ``target_device_id``
+    (already resolved by ``compose()`` before ``_hydrate_page`` runs, see
+    ``_preview_target_device`` / the explicit ``?device_id=``) if bound
+    to a real device, else the app-wide default. One call per page, not
+    per cell -- every widget on a page renders in the same locale."""
+    return _resolve_locale_for_device_id(str(page_dict.get("target_device_id") or ""))
 
 
 def _app_location_dict() -> dict[str, Any] | None:
@@ -739,6 +763,7 @@ def _hydrate_page(
 ) -> dict[str, Any]:
     """Resolve options, fonts, server-side data, and visual layout."""
     registry = _registry()
+    locale = _resolve_page_locale(page_dict)
     page_font = _resolve_font(page_dict.get("font"), registry)
     page_font_family = page_font.name if page_font else "system-ui"
     # Default to ``light`` when no per-page override is set so the
@@ -885,6 +910,7 @@ def _hydrate_page(
     for idx, meta in enumerate(cells_meta):
         cell = meta["cell"]
         plugin_id = meta["plugin_id"]
+        plugin = registry.get(plugin_id) if plugin_id else None
         cells_out.append(
             {
                 **cell,
@@ -897,6 +923,13 @@ def _hydrate_page(
                 "data": data_by_cell_index.get(idx),
                 "font_family": meta["font_family"],
                 "full_bleed": meta["full_bleed"],
+                # Locales contract (see docs/widgets.md#locales-strings):
+                # every cell renders in the same page-level locale, and
+                # gets its own widget's resolved strings map, {} for a
+                # widget that hasn't opted into ``locales`` -- ctx.t()
+                # then falls through to client.js's own hardcoded text.
+                "locale": locale,
+                "strings": plugin.strings_for(locale) if plugin else {},
                 # Touch attributes (issue #49): stamped on the cell
                 # container so the render-time extractor picks the whole
                 # cell up as a region. Cell override wins over the
@@ -913,6 +946,7 @@ def _hydrate_page(
         "font_family": page_font_family,
         "font_face_css": _font_face_css(registry.fonts),
         "corner_radius": corner_radius,
+        "locale": locale,
     }
 
 
@@ -982,6 +1016,12 @@ def _build_canvas_els(
     paint: a widget that advances state per render should move for the panel,
     not for someone opening the editor (#209)."""
     from app.widget_samples import get_sample
+
+    # Locales contract (docs/widgets.md#locales-strings): one locale for
+    # every widget element on this canvas, same "resolve once, not per
+    # element" rule the grid path follows.
+    locale = _resolve_locale_for_device_id(target_device_id)
+    registry = _registry()
 
     # Dedupe fetches across elements that resolve to the same widget +
     # options: a canvas often has several data primitives (temp, humidity,
@@ -1220,12 +1260,16 @@ def _build_canvas_els(
             "options": {},
             "data": None,
             "data_source": "none",
+            "locale": locale,
+            "strings": {},
         }
         if e.widget:
             opts, data, wsrc = _resolve_source(e.widget, e.options, e.w, e.h)
             item["options"] = opts
             item["data"] = data
             item["data_source"] = wsrc
+            plugin = registry.get(e.widget)
+            item["strings"] = plugin.strings_for(locale) if plugin else {}
         _apply_binds(e, item)
         _stamp_touch(item, e)
         els_out.append(item)
@@ -1298,6 +1342,7 @@ def _render_canvas(
         theme=layout.theme or "light",
         style=layout.style or "standard",
         font_family=font.name if font else "system-ui, sans-serif",
+        locale=_resolve_locale_for_device_id(target_device_id),
         bg=layout.bg or "",
         bg_image=layout.bg_image or "",
         bg_fit=layout.bg_fit or "cover",

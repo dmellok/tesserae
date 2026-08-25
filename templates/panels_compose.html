@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="{{ locale|default('en') }}">
 <head>
   <meta charset="utf-8">
   {# Canvas render target (issue #60). Playwright screenshots this at panel
@@ -78,6 +78,8 @@
          data-panel-h="{{ ch }}"
          data-cell-zoom="1"
          data-font-family="{{ font_family }}, system-ui, sans-serif"
+         data-locale="{{ e.locale }}"
+         data-strings='{{ e.strings|tojson }}'
          {% if e.on_tap_attr %}data-on-tap="{{ e.on_tap_attr }}"{% endif %}
          {% if e.on_swipe_attr %}data-on-swipe="{{ e.on_swipe_attr }}"{% endif %}
          {% if e.on_slide_attr %}data-on-slide="{{ e.on_slide_attr }}"{% endif %}
