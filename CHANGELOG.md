@@ -4,6 +4,22 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.364.6], 2026-08-25
+
+### Fixed
+
+- **The edge add-on could offer an update whose image did not exist yet.** The add-on repo was
+  bumped by the same push event that starts the container build, and the two are not the same
+  length: the bump takes about fifteen seconds, the multi-arch build about five minutes. For
+  those five minutes after every commit to main, Home Assistant was told a new edge version was
+  available and could not pull it, failing with "image does not exist". Worse, the add-on was
+  then left pointing at an image it had never pulled, so every later start raised a repair
+  notice rather than recovering.
+
+  The edge sync now runs when the image build finishes rather than when the commit lands, and
+  refuses to publish a version it cannot pull from the registry. Anyone who hit this can update
+  again; the image has been there since shortly after the failure.
+
 ## [0.364.5], 2026-08-25
 
 ### Fixed

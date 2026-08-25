@@ -7,10 +7,21 @@
 #   ``gh release create vX.Y.Z --latest …`` runs; routine patch tags
 #   that don't carry a Release do not churn the add-on.
 #
-# * **edge**: triggered on ``push: branches: [main]``.
-#   Bumps ``tesserae-edge/config.yaml`` to ``<pyproject>-edge.<sha7>``.
-#   The matching docker image tag is pushed by ``docker.yml`` on the
-#   same main-push event, so HA Supervisor's pull always resolves.
+# * **edge**: triggered by ``docker.yml`` FINISHING on main, not by the
+#   push itself. Bumps ``tesserae-edge/config.yaml`` to
+#   ``<pyproject>-edge.<commit-unix-time>``.
+#
+#   It used to run on the same push event as the image build, on the
+#   assumption that the two would land together. They don't: this job
+#   takes ~15 s and the multi-arch build takes ~5 min, so for five
+#   minutes after every main commit the add-on advertised a version
+#   whose image did not exist yet. A Supervisor that refreshed inside
+#   that window failed the pull with "image does not exist", and the
+#   add-on was then left configured for an image it had never pulled,
+#   so every later start raised a ``missing_image`` repair. Waiting for
+#   the build closes the window; the existence check below is the
+#   backstop for a build that succeeds without publishing (a skipped
+#   or docs-only run).
 #
 # Both jobs push a single commit to
 # https://github.com/dmellok/homeassistant-tesserae-addon via the
@@ -22,8 +33,9 @@ name: sync-addon
 on:
   release:
     types: [published]
-  push:
-    branches: [main]
+  workflow_run:
+    workflows: [docker]
+    types: [completed]
   workflow_dispatch:
     inputs:
       version:
@@ -47,7 +59,7 @@ concurrency:
 jobs:
   # Stable bump, release: published + workflow_dispatch.
   bump-stable:
-    if: github.event_name != 'push'
+    if: github.event_name != 'workflow_run'
     runs-on: ubuntu-latest
     steps:
       - name: Resolve version
@@ -154,14 +166,23 @@ jobs:
           fi
           echo "Bumped stable add-on to ${VERSION}."
 
-  # Edge bump, push: branches: [main]. Tracks every main commit.
+  # Edge bump, after a successful docker build of a main commit.
   bump-edge:
-    if: github.event_name == 'push'
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.event == 'push'
     runs-on: ubuntu-latest
     steps:
       - name: Check out tesserae core (for pyproject.toml + log subject)
         uses: actions/checkout@v6
         with:
+          # The commit the image was actually built from. Under
+          # workflow_run, ``github.sha`` is the default branch tip when the
+          # event was delivered, which is a different commit whenever
+          # another push lands while a build is running.
+          ref: ${{ github.event.workflow_run.head_sha }}
           # Just the tip commit, we only need pyproject.toml + the
           # commit subject for the CHANGELOG entry.
           fetch-depth: 2
@@ -169,7 +190,7 @@ jobs:
       - name: Resolve edge version
         id: ver
         env:
-          GITHUB_SHA_FULL: ${{ github.sha }}
+          GITHUB_SHA_FULL: ${{ github.event.workflow_run.head_sha }}
         run: |
           set -euo pipefail
           # Pyproject version is the "base" of the edge version string -
@@ -197,6 +218,28 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           echo "Resolved edge version=${edge_version} sha=${sha}"
 
+      - name: Confirm the image tag exists
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          # The build finishing is not quite the same as the tag being
+          # pullable: a run can succeed while skipping the push (a
+          # docs-only change, a cache-only path), and Supervisor's error
+          # for a missing tag is indistinguishable from a broken add-on.
+          # Anonymous pull token, then ask for the manifest.
+          token=$(curl -fsSL "https://ghcr.io/token?scope=repository:dmellok/tesserae:pull&service=ghcr.io" | jq -r .token)
+          code=$(curl -sS -o /dev/null -w '%{http_code}' \
+                   -H "Authorization: Bearer ${token}" \
+                   -H "Accept: application/vnd.oci.image.index.v1+json" \
+                   -H "Accept: application/vnd.docker.distribution.manifest.list.v2+json" \
+                   "https://ghcr.io/v2/dmellok/tesserae/manifests/${VERSION}")
+          if [ "${code}" != "200" ]; then
+              echo "::error::ghcr.io/dmellok/tesserae:${VERSION} is not pullable (HTTP ${code}); refusing to advertise it to Supervisor"
+              exit 1
+          fi
+          echo "Image ghcr.io/dmellok/tesserae:${VERSION} is pullable."
+
       - name: Check out add-on repo
         uses: actions/checkout@v6
         with:
@@ -211,7 +254,7 @@ jobs:
           VERSION: ${{ steps.ver.outputs.version }}
           SHA: ${{ steps.ver.outputs.sha }}
           SUBJECT: ${{ steps.ver.outputs.subject }}
-          FULL_SHA: ${{ github.sha }}
+          FULL_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           set -euo pipefail
           # If the edge directory doesn't exist yet, give up loudly -
