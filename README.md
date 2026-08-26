@@ -134,11 +134,10 @@ frame on the physical panel yet. The per-renderer bench matrix lives at
 [Screens & compatibility](https://docs.tesserae.ink/compatibility/).
 
 > **Some links below are affiliate links.** Seeed product links carry a
-> Tesserae affiliate tag, so buying through one pays a small commission that
-> goes back into the project. It costs you nothing extra, the price is the same
-> as going to the store directly. Nothing is listed here because of it, and a
-> panel's ✅ / TBD status means exactly what it says above. Links without the
-> tag are plain product links.
+> Tesserae affiliate tag: buying through one gets you a discount at checkout
+> and pays a small commission that goes back into the project. Nothing is
+> listed here because of it, and a panel's ✅ / TBD status means exactly what
+> it says above. Links without the tag are plain product links.
 
 ### Seeed Studio
 

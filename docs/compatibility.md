@@ -64,7 +64,7 @@ The bundled client kinds Tesserae knows how to talk to. A flashed client announc
 Per-vendor catalog of specific device / panel SKUs Tesserae ships manifests for. Each entry maps to a device kind (protocol) + renderer combination that Tesserae picks automatically once the device pairs. Click a product name for the vendor's own page.
 
 !!! info "Some links are affiliate links"
-    Seeed product links on this page carry a Tesserae affiliate tag, so a purchase made through one pays a small commission that goes back into the project. **It costs you nothing extra**: the price is the same as going to the store directly. Nothing on this page is listed because of it, and the tested / not-tested status of every panel is reported the same way it always has been. Links without the tag are plain product links.
+    Seeed product links on this page carry a Tesserae affiliate tag: a purchase made through one gets a discount at checkout and pays a small commission that goes back into the project. Nothing on this page is listed because of it, and the tested / not-tested status of every panel is reported the same way it always has been. Links without the tag are plain product links.
 
 ### [Seeed Studio](https://www.seeedstudio.com/)
 

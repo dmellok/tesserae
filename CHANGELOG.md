@@ -4,6 +4,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.366.1], 2026-08-26
+
+### Changed
+
+- **The affiliate-link disclosure now mentions the checkout discount.** The earlier wording
+  said the tagged links leave the price unchanged, based on the product page, which shows the
+  undiscounted price. A real checkout through a tagged link does apply a discount, so the
+  disclosure in the README and the compatibility page now says so.
+
 ## [0.366.0], 2026-08-26
 
 ### Added

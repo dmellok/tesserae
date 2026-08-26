@@ -43,20 +43,17 @@ VENDOR_ORDER: list[tuple[str, str]] = [
 # Affiliate disclosure, rendered under the SKU-table intro.
 #
 # Some Seeed product links carry an affiliate parameter, so the wording has to
-# be visible next to the links rather than buried in a footer. It says only what
-# is true: the link pays a commission and does NOT change the price. Seeed's
-# affiliate programme does offer a follower discount, but that arrives as a
-# separate custom code, and the affiliate parameter alone leaves the price
-# identical (checked against the product page with and without it). Do not
-# promise a discount here until a code exists to back it up.
+# be visible next to the links rather than buried in a footer. The link pays a
+# commission and also applies a discount at checkout (confirmed on a real
+# checkout, not just the product page, which shows the undiscounted price).
 AFFILIATE_DISCLOSURE = (
     '!!! info "Some links are affiliate links"\n'
-    "    Seeed product links on this page carry a Tesserae affiliate tag, so a "
-    "purchase made through one pays a small commission that goes back into the "
-    "project. **It costs you nothing extra**: the price is the same as going to "
-    "the store directly. Nothing on this page is listed because of it, and the "
-    "tested / not-tested status of every panel is reported the same way it "
-    "always has been. Links without the tag are plain product links."
+    "    Seeed product links on this page carry a Tesserae affiliate tag: a "
+    "purchase made through one gets a discount at checkout and pays a small "
+    "commission that goes back into the project. Nothing on this page is "
+    "listed because of it, and the tested / not-tested status of every panel "
+    "is reported the same way it always has been. Links without the tag are "
+    "plain product links."
 )
 
 # Vendor id -> URL. Displayed as the section link so a reader can jump
