@@ -741,16 +741,29 @@ def placeholder_png(device_id: str, width: int, height: int) -> Response:
 def _refresh_rate_for(device: Device) -> int:
     """The cadence the device should poll at, read from its saved
     settings (Settings → Devices → refresh_rate_s) with the manifest
-    default as fallback."""
+    default as fallback.
+
+    The fallback must come from the kind's config_schema, not a
+    constant: the settings card renders the schema default in the
+    form, so serving anything else means an instance that has never
+    been saved polls at a rate the UI never showed. That skew is
+    invisible until someone compares the form against the device's
+    reported ``Refresh-Rate`` header and concludes the setting
+    "reverted"."""
     from app.state.settings_store import SettingsStore
 
     store: SettingsStore = current_app.config["SETTINGS_STORE"]
-    fields = [{"name": "refresh_rate_s", "type": "number", "default": 900}]
+    schema = device.config_schema or {}
+    spec = schema.get("refresh_rate_s") if isinstance(schema, dict) else None
+    default = spec.get("default") if isinstance(spec, dict) else None
+    if not isinstance(default, int) or default <= 0:
+        default = 900
+    fields = [{"name": "refresh_rate_s", "type": "number", "default": default}]
     values = store.get_for_runtime("devices", device.id, fields)
     try:
-        return int(values.get("refresh_rate_s") or 900)
+        return int(values.get("refresh_rate_s") or default)
     except (TypeError, ValueError):
-        return 900
+        return default
 
 
 def register(app: Flask) -> None:

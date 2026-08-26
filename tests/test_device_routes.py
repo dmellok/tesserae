@@ -571,6 +571,39 @@ def test_trmnl_api_setup_returns_manifest_friendly_id_for_known_device(app: Flas
     assert body.get("friendly_id") == friendly
 
 
+def test_trmnl_display_default_rate_matches_the_manifest(app: Flask) -> None:
+    """An instance whose refresh rate has never been saved polls at the
+    manifest's schema default (the number the settings card displays),
+    not a hardcoded constant. The old 900 fallback made a never-saved
+    device look like its setting kept 'reverting' to 900."""
+    client = app.test_client()
+    _sign_in(client)
+    _add_instance(client, id="trmnl_fresh", kind="trmnl_client")
+    token = app.config["DEVICE_REGISTRY"].get("trmnl_fresh").manifest["access_token"]
+
+    body = client.get("/api/display", headers={"Access-Token": token}).get_json()
+    assert body["refresh_rate"] == 60
+
+
+def test_trmnl_display_serves_the_saved_rate(app: Flask) -> None:
+    """A rate saved through the settings form is served verbatim,
+    including values below the old 300-adjacent folklore thresholds."""
+    client = app.test_client()
+    _sign_in(client)
+    _add_instance(client, id="trmnl_saved", kind="trmnl_client")
+    token = app.config["DEVICE_REGISTRY"].get("trmnl_saved").manifest["access_token"]
+
+    for rate in (600, 300, 60, 5):
+        resp = client.post(
+            "/settings/device-trmnl_saved",
+            data={"refresh_rate_s": str(rate)},
+            follow_redirects=True,
+        )
+        assert resp.status_code == 200
+        body = client.get("/api/display", headers={"Access-Token": token}).get_json()
+        assert body["refresh_rate"] == rate
+
+
 def test_trmnl_api_display_envelope_matches_terminus_shape(app: Flask) -> None:
     """0.44.1: /api/display response shape matches the official
     Terminus BYOS contract. Every field a native TRMNL firmware

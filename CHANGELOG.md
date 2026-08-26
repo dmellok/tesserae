@@ -4,6 +4,16 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.367.1], 2026-08-26
+
+### Fixed
+
+- **A TRMNL device whose refresh rate was never saved polled at 900 seconds while the
+  settings form showed 60.** The /api/display fallback was a hardcoded 900 instead of the
+  schema default the form displays. Combined with the silent preset-save bug fixed in
+  v0.364.5, this read as the refresh rate "reverting to 900" whenever a preset pick failed
+  to save. The fallback now comes from the device kind's own schema default.
+
 ## [0.367.0], 2026-08-26
 
 ### Changed
