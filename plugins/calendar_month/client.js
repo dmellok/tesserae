@@ -26,19 +26,44 @@ function escapeHtml(s) {
   }[c]));
 }
 
-const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const DOW_SUN = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const MONTH_FULL = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+const WEEKDAY_FULL = [
+  "Monday", "Tuesday", "Wednesday", "Thursday",
+  "Friday", "Saturday", "Sunday",
+];
 
 // date_label_style cell option: "short" (default, current 3-letter
 // behaviour), "minimal" (1-2 chars, just enough to stay unambiguous), or
-// "full" (the whole word).
-const DOW_MINIMAL = { Sun: "Su", Mon: "M", Tue: "Tu", Wed: "W", Thu: "Th", Fri: "F", Sat: "Sa" };
-const DOW_FULL = { Sun: "Sunday", Mon: "Monday", Tue: "Tuesday", Wed: "Wednesday", Thu: "Thursday", Fri: "Friday", Sat: "Saturday" };
+// "full" (the whole word). Base label is always the *full* localised
+// name, short/minimal are derived from it.
+const DOW_MINIMAL = { Monday: "M", Tuesday: "Tu", Wednesday: "W", Thursday: "Th", Friday: "F", Saturday: "Sa", Sunday: "Su" };
+const MONTH_MINIMAL = { January: "Ja", February: "F", March: "Mr", April: "Ap", May: "My", June: "Jn", July: "Jl", August: "Au", September: "S", October: "O", November: "N", December: "D" };
 
-export function styleShortLabel(label, style, minimalMap, fullMap) {
-  if (style === "minimal") return minimalMap[label] || label.slice(0, 2);
-  if (style === "full") return (fullMap && fullMap[label]) || label;
-  return label;
+export function styleLabel(full, style, minimalMap) {
+  if (style === "minimal") return (minimalMap[full] || full.slice(0, 2)).toUpperCase();
+  if (style === "short") return full.slice(0, 3).toUpperCase();
+  return full.toUpperCase();
+}
+
+// locales contract (docs/widgets.md#locales-strings): English keeps the
+// hardcoded arrays above (so styleLabel's minimal map, keyed by the
+// English full name, still resolves); any other locale asks Intl for
+// the real localised name instead of a hand-rolled weekday/month table.
+export function localizedFull(date, unit, locale) {
+  const lang = (locale || "en").split("-")[0];
+  if (lang === "en") {
+    return unit === "weekday" ? WEEKDAY_FULL[(date.getDay() + 6) % 7] : MONTH_FULL[date.getMonth()];
+  }
+  return new Intl.DateTimeFormat(locale, { [unit]: "long" }).format(date);
+}
+
+export function minimalMapFor(unit, locale) {
+  const lang = (locale || "en").split("-")[0];
+  if (lang !== "en") return {};
+  return unit === "weekday" ? DOW_MINIMAL : MONTH_MINIMAL;
 }
 
 // Clamps a cell-option slider value, defaulting on missing/non-numeric
@@ -77,9 +102,13 @@ function heatBackground(count) {
   return `background: color-mix(in oklab, var(--accent-4) ${alpha.toFixed(0)}%, var(--surface));`;
 }
 
+const WEEK_ANCHOR_DAYS = [5, 6, 7, 8, 9, 10, 11]; // Mon..Sun
+
 export default function render(shadow, ctx) {
   const data = ctx?.data ?? {};
   const opts = ctx?.cell?.options || {};
+  const locale = ctx?.locale || "en";
+  const t = ctx?.t || ((key, fallback) => fallback ?? key);
   const display = opts.event_display === "text" ? "text" : "bars";
   const maxPerDay = Math.max(1, Number(opts.max_events_per_day) || 3);
   // Heat-tint on by default; cell option flips it off for users who
@@ -105,13 +134,23 @@ export default function render(shadow, ctx) {
   }
 
   const days = Array.isArray(data.days) ? data.days : [];
-  const dowNames = (data.week_start === "sunday") ? DOW_SUN : DOW;
-  const monthName = (data.month_name || "").toUpperCase();
+  const weekdayDates = WEEK_ANCHOR_DAYS.map((day) => new Date(2026, 0, day)); // Mon..Sun
+  const orderedDates = (data.week_start === "sunday")
+    ? [weekdayDates[6], ...weekdayDates.slice(0, 6)]
+    : weekdayDates;
+  const monthDate = new Date(data.year || 2026, (data.month || 1) - 1, 1);
+  const monthName = localizedFull(monthDate, "month", locale).toUpperCase();
   const year = data.year || "";
-  const weekStartLabel = (data.week_start === "sunday") ? "WEEK STARTS SUN" : "WEEK STARTS MON";
+  const weekStartLabel = (data.week_start === "sunday")
+    ? t("week_start_sunday", "Week starts Sun")
+    : t("week_start_monday", "Week starts Mon");
 
-  const dowHeader = dowNames
-    .map((name) => `<span>${escapeHtml(styleShortLabel(name, labelStyle, DOW_MINIMAL, DOW_FULL))}</span>`)
+  const dowMinimalMap = minimalMapFor("weekday", locale);
+  const dowHeader = orderedDates
+    .map((d) => {
+      const full = localizedFull(d, "weekday", locale);
+      return `<span>${escapeHtml(styleLabel(full, labelStyle, dowMinimalMap))}</span>`;
+    })
     .join("");
 
   const cells = days.map((d) => {
