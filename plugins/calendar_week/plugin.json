@@ -5,6 +5,7 @@
   "kind": "widget",
   "description": "Seven-day strip timetable with tunable event text sizing/spacing, configurable visible hour range, and a location toggle. Each event's colour comes from its feed (Widgets → Calendar Feeds).",
   "icon": "ph-calendar",
+  "locales": ["en", "fr"],
   "supports": {
     "sizes": [
       "sm",
