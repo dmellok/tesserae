@@ -17,7 +17,7 @@
       "type": "int",
       "label": "Refresh interval",
       "default": 3600,
-      "min": 300,
+      "min": 5,
       "max": 604800,
       "presets": [
         {"value": 900,   "label": "15 minutes"},

@@ -29,7 +29,7 @@ from typing import Any
 # purpose: the manifest lives next to the form (UI affordance),
 # the constants live next to validate_config (server-side guard) -
 # neither one trusts the other.
-REFRESH_RATE_MIN_S = 30
+REFRESH_RATE_MIN_S = 5
 REFRESH_RATE_MAX_S = 24 * 60 * 60
 
 

@@ -23,7 +23,7 @@ from typing import Any
 # Bounds match config_schema in device.json. Duplicated here on purpose:
 # the manifest lives next to the form (UI affordance), the constants live
 # next to validate_config (server-side guard), neither one trusts the other.
-SLEEP_INTERVAL_MIN_S = 30
+SLEEP_INTERVAL_MIN_S = 5
 SLEEP_INTERVAL_MAX_S = 7 * 24 * 60 * 60
 
 

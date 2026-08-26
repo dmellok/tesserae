@@ -98,7 +98,7 @@ def test_validate_config_rejects_missing_sleep_interval(cp) -> None:
 
 
 def test_validate_config_rejects_too_short(cp) -> None:
-    ok, err = cp.validate_config({"sleep_interval_s": 10})
+    ok, err = cp.validate_config({"sleep_interval_s": 4})
     assert ok is False
     assert err is not None and ">=" in err
 

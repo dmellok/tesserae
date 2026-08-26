@@ -33,7 +33,7 @@ from typing import Any
 # the other. Firmware SLEEP_INTERVAL_MIN_S is 30s (guards against a
 # runaway 1s-poll loop draining the battery in hours); MAX is 7 days
 # so a monthly-refresh dashboard doesn't accidentally slip out.
-SLEEP_INTERVAL_MIN_S = 30
+SLEEP_INTERVAL_MIN_S = 5
 SLEEP_INTERVAL_MAX_S = 7 * 24 * 60 * 60
 
 

@@ -55,7 +55,7 @@ def test_validate_config_accepts_in_range(pi_bin_client) -> None:
 
 
 def test_validate_config_rejects_below_min(pi_bin_client) -> None:
-    ok, err = pi_bin_client.validate_config({"sleep_interval_s": 10})
+    ok, err = pi_bin_client.validate_config({"sleep_interval_s": 4})
     assert not ok
     assert err is not None and ">=" in err
 

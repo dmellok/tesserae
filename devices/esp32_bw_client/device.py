@@ -39,7 +39,7 @@ from typing import Any
 # purpose: the manifest lives next to the form (UI affordance), the
 # constants live next to validate_config (server-side guard), neither
 # one trusts the other.
-SLEEP_INTERVAL_MIN_S = 30
+SLEEP_INTERVAL_MIN_S = 5
 SLEEP_INTERVAL_MAX_S = 7 * 24 * 60 * 60
 
 # Upper bound for the post-button stay-awake window (issue #123). Staying
@@ -56,11 +56,11 @@ BEEP_TONES = ("click", "beep", "chirp", "low", "double", "rising", "custom")
 BEEP_VOLUME_MIN = 0
 BEEP_VOLUME_MAX = 100
 
-# Bounds for the always-on poll cadence. The floor is well under
-# ``SLEEP_INTERVAL_MIN_S`` on purpose: that floor exists to stop a typo
-# flattening a battery, and a device that reports it can stay awake has
-# already said it isn't on one. The ceiling is where staying awake stops
-# buying anything over a deep-sleep cycle.
+# Bounds for the always-on poll cadence. The floor matches
+# ``SLEEP_INTERVAL_MIN_S``: both are low enough for hot polling, and a
+# device that reports it can stay awake has already said it isn't on a
+# battery. The ceiling is where staying awake stops buying anything over
+# a deep-sleep cycle.
 AWAKE_POLL_MIN_S = 5
 AWAKE_POLL_MAX_S = 300
 

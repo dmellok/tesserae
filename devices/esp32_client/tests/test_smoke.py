@@ -96,7 +96,7 @@ def test_validate_config_accepts_in_bounds(esp) -> None:
 
 
 def test_validate_config_rejects_too_short(esp) -> None:
-    ok, err = esp.validate_config({"sleep_interval_s": 5})
+    ok, err = esp.validate_config({"sleep_interval_s": 4})
     assert not ok and "must be >=" in err
 
 

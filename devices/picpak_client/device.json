@@ -20,7 +20,7 @@
       "type": "int",
       "label": "Sleep interval",
       "default": 900,
-      "min": 30,
+      "min": 5,
       "max": 604800,
       "presets": [
         {"value": 60,    "label": "1 minute"},

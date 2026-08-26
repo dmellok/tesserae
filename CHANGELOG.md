@@ -4,6 +4,17 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.367.0], 2026-08-26
+
+### Changed
+
+- **Panels can now be set to refresh as often as every 5 seconds.** The minimum
+  sleep/refresh interval across every device kind drops to 5 seconds (it was 30 seconds,
+  or 5 minutes for the Crosspoint reader), and the server's own poll floor drops to
+  match, so a device asked to poll hot actually gets told to. The old floor existed to
+  stop a typo from flattening a battery; on battery-powered panels long intervals are
+  still the right choice, since every refresh is a full wake plus Wi-Fi cycle.
+
 ## [0.366.1], 2026-08-26
 
 ### Changed

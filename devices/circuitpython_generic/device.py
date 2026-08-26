@@ -29,7 +29,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-SLEEP_INTERVAL_MIN_S = 30
+SLEEP_INTERVAL_MIN_S = 5
 SLEEP_INTERVAL_MAX_S = 7 * 24 * 60 * 60
 
 

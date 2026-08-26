@@ -46,7 +46,7 @@ from typing import Any
 # Matches the manifest's config_schema. The reader fetches on book close
 # rather than on a timer, so this bounds how long it may be silent before
 # the Devices card calls it stale, not how often it wakes.
-REFRESH_INTERVAL_MIN_S = 300
+REFRESH_INTERVAL_MIN_S = 5
 REFRESH_INTERVAL_MAX_S = 7 * 24 * 60 * 60
 
 

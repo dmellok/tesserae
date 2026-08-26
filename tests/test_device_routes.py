@@ -206,10 +206,10 @@ def test_config_form_rejects_out_of_bounds(app: Flask, tmp_path: Path) -> None:
     client = app.test_client()
     _sign_in(client)
     _add_instance(client, id="esp32_lab", kind="esp32_client", name="Lab ESP32")
-    # 5 seconds is below the 30-second min the device declares.
+    # 4 seconds is below the 5-second min the device declares.
     resp = client.post(
         "/settings/device-esp32_lab",
-        data={"sleep_interval_s": "5"},
+        data={"sleep_interval_s": "4"},
         follow_redirects=True,
     )
     body = resp.get_data(as_text=True)

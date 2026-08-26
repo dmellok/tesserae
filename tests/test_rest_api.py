@@ -2376,12 +2376,14 @@ def test_next_poll_s_takes_the_first_wake_worthy_event(app: Flask) -> None:
 
 
 def test_next_poll_s_floors_an_imminent_change(app: Flask) -> None:
-    """A change one second away must not turn into a hot-poll instruction."""
+    """A change one second away lands at the render margin, never below
+    the content floor."""
     client, token = _paired_client(app)
     _set_sleep_interval(app, "poll_panel", 900)
     app.config["SCHEDULER"] = _StubScheduler([_StubEvent(in_seconds=1)])
 
-    assert _poll_after_status(app, client, token) == 30
+    poll = _poll_after_status(app, client, token)
+    assert 20 <= poll <= 21  # ~1 s out + 20 s render margin
 
 
 def test_next_poll_s_floor_never_slows_a_hot_polling_panel(app: Flask) -> None:
@@ -2404,10 +2406,11 @@ def _set_always_on(app: Flask, device_id: str, awake_poll_s: int) -> None:
 
 
 def test_next_poll_s_floor_does_not_hold_back_an_always_on_panel(app: Flask) -> None:
-    """The 30 s floor stops a SLEEPING device spinning its radio up for a
-    change it could have waited for. An always-on panel is already
+    """The content floor stops a SLEEPING device spinning its radio up for
+    a change it could have waited for. An always-on panel is already
     associated, so an early poll costs one conditional GET, and holding it
-    at 30 s would discard the pull-forward this exists to deliver."""
+    at the content floor would discard the pull-forward this exists to
+    deliver."""
     client, token = _paired_client(app)
     _set_always_on(app, "poll_panel", 60)
     app.config["SCHEDULER"] = _StubScheduler([_StubEvent(in_seconds=1)])

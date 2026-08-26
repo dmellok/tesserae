@@ -108,7 +108,7 @@ def test_validate_config_accepts_in_bounds(pic) -> None:
 
 
 def test_validate_config_rejects_too_short(pic) -> None:
-    ok, err = pic.validate_config({"sleep_interval_s": 5})
+    ok, err = pic.validate_config({"sleep_interval_s": 4})
     assert not ok and "must be >=" in err
 
 

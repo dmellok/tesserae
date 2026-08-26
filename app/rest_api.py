@@ -542,7 +542,7 @@ _CONTENT_POLL_MARGIN_S: int = 20
 # Never ask a client to poll faster than this, however close the next change
 # is. Itself clamped by the configured interval below, so a deliberately
 # hot-polling panel (sleep_interval_s < this) isn't slowed down.
-_MIN_CONTENT_POLL_S: int = 30
+_MIN_CONTENT_POLL_S: int = 5
 
 # Certainties worth waking for. ``estimated`` events are the engine's own
 # guess at an unanchored cadence, so waking early for one trades a real wake
@@ -694,12 +694,10 @@ def _next_poll_s(device: Device) -> int:
     # capped by the configured interval so a hot-polling panel keeps its
     # cadence.
     #
-    # An always-on panel floors at the awake minimum instead. The 30 s floor
-    # exists to stop a sleeping device spinning its radio up for a change it
-    # could have waited for; a device that never sleeps is already associated,
-    # so the cost of an early poll is one conditional GET. Holding it at 30 s
-    # would also throw away the pull-forward it is here to deliver: told a
-    # change lands in 8 s, an awake panel should ask in 8 s.
+    # An always-on panel floors at the awake minimum instead. The content
+    # floor exists to stop a sleeping device spinning its radio up for a
+    # change it could have waited for; a device that never sleeps is already
+    # associated, so the cost of an early poll is one conditional GET.
     floor = AWAKE_POLL_MIN_S if _device_awake_poll_s(device) is not None else _MIN_CONTENT_POLL_S
     return max(min(min(candidates), configured), min(configured, floor))
 
