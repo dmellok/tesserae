@@ -535,6 +535,7 @@
   font-size: var(--fs-caption); font-weight: var(--fw-black);
   letter-spacing: var(--ls-label); color: var(--text-muted);
   text-align: center;
+  text-transform: var(--label-transform, uppercase);
 }
 .mc-grid{
   flex: 1 1 auto;

@@ -11,13 +11,14 @@ assert.equal(clampScale(9, 1.0, 0.1, 5.0), 5.0, "above max clamps down");
 assert.equal(clampScale(0.0, 1.0, 0.1, 5.0), 0.1, "below min clamps up");
 
 // date_label_style: full (default) / short (3-letter) / minimal (1-2
-// chars, disambiguated). Base label is always the full name.
+// chars, disambiguated). Base label is always the full name; display
+// casing is CSS's job (--label-transform), not styleLabel's.
 const DOW_MINIMAL = { Tuesday: "Tu", Thursday: "Th" };
-assert.equal(styleLabel("Monday", "full", {}), "MONDAY", "full keeps the whole word, upper-cased");
-assert.equal(styleLabel("Tuesday", "short", {}), "TUE", "short is a 3-letter abbreviation");
-assert.equal(styleLabel("Tuesday", "minimal", DOW_MINIMAL), "TU", "minimal uses the disambiguation map");
-assert.equal(styleLabel("Thursday", "minimal", DOW_MINIMAL), "TH", "Tue/Thu don't collide at 1 char");
-assert.equal(styleLabel("Zzyzx", "minimal", {}), "ZZ", "unmapped label falls back to first 2 chars");
+assert.equal(styleLabel("Monday", "full", {}), "Monday", "full keeps the whole word, natural casing");
+assert.equal(styleLabel("Tuesday", "short", {}), "Tue", "short is a 3-letter abbreviation");
+assert.equal(styleLabel("Tuesday", "minimal", DOW_MINIMAL), "Tu", "minimal uses the disambiguation map");
+assert.equal(styleLabel("Thursday", "minimal", DOW_MINIMAL), "Th", "Tue/Thu don't collide at 1 char");
+assert.equal(styleLabel("Zzyzx", "minimal", {}), "Zz", "unmapped label falls back to first 2 chars");
 
 // locales contract (docs/widgets.md#locales-strings): localizedFull() /
 // minimalMapFor() are what feed a locale-aware name into styleLabel above.
