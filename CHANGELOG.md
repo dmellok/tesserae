@@ -4,6 +4,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.367.3], 2026-08-27
+
+### Fixed
+
+- **Corrected the Xteink X4 hardware notes: no per-firmware orientation is needed.**
+  v0.367.2 claimed the native firmware required plain `landscape`; hardware testing
+  showed the same registration paints upright on both CrossInk and the native firmware,
+  so orientation is the ordinary mounting choice and the notes now say so.
+
 ## [0.367.2], 2026-08-27
 
 ### Changed
