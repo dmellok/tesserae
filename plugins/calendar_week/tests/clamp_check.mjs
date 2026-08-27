@@ -1,7 +1,7 @@
 // Plain-node self-check (no test framework in this repo).
 // Run: node tests/clamp_check.mjs
 import assert from "node:assert/strict";
-import { clampScale, clampToDay, computeRange, pctSpan, styleShortLabel } from "../client.js";
+import { clampScale, clampToDay, computeRange, localizedFull, minimalMapFor, pctSpan, styleLabel } from "../client.js";
 
 assert.equal(clampScale(undefined, 1.0, 0.7, 1.5), 1.0, "missing falls back to default");
 assert.equal(clampScale(null, 1.0, 0.7, 1.5), 1.0, "null falls back to default");
@@ -43,13 +43,28 @@ assert.deepEqual(pctSpan(0, 24, 8, 4), { top: 0, height: 100 }, "a full 0-24h pa
 assert.deepEqual(pctSpan(0, 24, 8, 10), { top: 0, height: 100 }, "still clamps to 100% with a wider (but still partial) range");
 assert.deepEqual(pctSpan(20, 24, 8, 4), { top: 100, height: 2 }, "a span entirely after the visible range clamps to the bottom edge, not off it");
 
-// date_label_style: short (current) / minimal (1-2 chars) / full (whole word).
-const DOW_MINIMAL = { TUE: "TU", THU: "TH" };
-const DOW_FULL = { TUE: "Tuesday" };
-assert.equal(styleShortLabel("TUE", "short", DOW_MINIMAL), "TUE", "short passes the existing label through unchanged");
-assert.equal(styleShortLabel("TUE", "minimal", DOW_MINIMAL), "TU", "minimal uses the disambiguation map");
-assert.equal(styleShortLabel("ZZZ", "minimal", {}), "ZZ", "unmapped label falls back to first 2 chars");
-assert.equal(styleShortLabel("TUE", "full", DOW_MINIMAL, DOW_FULL), "Tuesday", "full looks up the whole word");
-assert.equal(styleShortLabel("ZZZ", "full", {}, {}), "ZZZ", "unmapped full falls back to the short label as-is");
+// date_label_style: full (default) / short (3-letter) / minimal (1-2
+// chars, disambiguated). Base label is always the full name; display
+// casing is CSS's job (--label-transform), not styleLabel's.
+const DOW_MINIMAL = { Tuesday: "Tu", Thursday: "Th" };
+assert.equal(styleLabel("Monday", "full", {}), "Monday", "full keeps the whole word, natural casing");
+assert.equal(styleLabel("Tuesday", "short", {}), "Tue", "short is a 3-letter abbreviation");
+assert.equal(styleLabel("Tuesday", "minimal", DOW_MINIMAL), "Tu", "minimal uses the disambiguation map");
+assert.equal(styleLabel("Thursday", "minimal", DOW_MINIMAL), "Th", "Tue/Thu don't collide at 1 char");
+assert.equal(styleLabel("Zzyzx", "minimal", {}), "Zz", "unmapped label falls back to first 2 chars");
+
+// locales contract (docs/widgets.md#locales-strings): localizedFull() /
+// minimalMapFor() are what feed a locale-aware name into styleLabel above.
+// A Monday, so weekday indices are unambiguous either way.
+const monday = new Date(2026, 0, 5);
+assert.equal(localizedFull(monday, "weekday", "en"), "Monday", "English reads the hardcoded array, not Intl");
+assert.equal(localizedFull(monday, "month", "en-US"), "January", "English variants (en-US) still count as English");
+assert.equal(localizedFull(monday, "weekday", "fr"), "lundi", "non-English asks Intl for the real localised name");
+assert.equal(localizedFull(monday, "month", "fr"), "janvier", "same for months");
+assert.equal(localizedFull(monday, "weekday", ""), "Monday", "no locale at all defaults to English");
+
+assert.equal(minimalMapFor("weekday", "en").Tuesday, "Tu", "English gets the real disambiguation map");
+assert.deepEqual(minimalMapFor("weekday", "fr"), {}, "non-English gets {} -- styleLabel's generic slice, not English abbreviations");
+assert.deepEqual(minimalMapFor("month", "de"), {}, "same for months");
 
 console.log("clamp_check.mjs: all assertions passed");

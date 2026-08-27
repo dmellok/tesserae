@@ -13,25 +13,46 @@
 // widget), and date_label_style (short/minimal weekday+month
 // abbreviations).
 
-const MONTH_SHORT = [
-  "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
-  "JUL", "AUG", "SEP", "OCT", "NOV", "DEC",
+const MONTH_FULL = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
 ];
-const DOW = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+const WEEKDAY_FULL = [
+  "Monday", "Tuesday", "Wednesday", "Thursday",
+  "Friday", "Saturday", "Sunday",
+];
 
 // date_label_style cell option: "short" (default, current 3-letter
 // behaviour), "minimal" (1-2 chars, just enough to stay unambiguous), or
-// "full" (the whole word, derived from the short code since that's all
-// this widget stores).
-const DOW_MINIMAL = { SUN: "SU", MON: "M", TUE: "TU", WED: "W", THU: "TH", FRI: "F", SAT: "SA" };
-const MONTH_MINIMAL = { JAN: "JA", FEB: "F", MAR: "MR", APR: "AP", MAY: "MY", JUN: "JN", JUL: "JL", AUG: "AU", SEP: "S", OCT: "O", NOV: "N", DEC: "D" };
-const DOW_FULL = { SUN: "Sunday", MON: "Monday", TUE: "Tuesday", WED: "Wednesday", THU: "Thursday", FRI: "Friday", SAT: "Saturday" };
-const MONTH_FULL = { JAN: "January", FEB: "February", MAR: "March", APR: "April", MAY: "May", JUN: "June", JUL: "July", AUG: "August", SEP: "September", OCT: "October", NOV: "November", DEC: "December" };
+// "full" (the whole word). Base label is always the *full* localised
+// name, short/minimal are derived from it. Labels keep their natural
+// casing here; display casing belongs to CSS (--label-transform), so
+// sentence-case styles like Editorial stay sentence-case.
+const DOW_MINIMAL = { Monday: "M", Tuesday: "Tu", Wednesday: "W", Thursday: "Th", Friday: "F", Saturday: "Sa", Sunday: "Su" };
+const MONTH_MINIMAL = { January: "Ja", February: "F", March: "Mr", April: "Ap", May: "My", June: "Jn", July: "Jl", August: "Au", September: "S", October: "O", November: "N", December: "D" };
 
-export function styleShortLabel(label, style, minimalMap, fullMap) {
-  if (style === "minimal") return minimalMap[label] || label.slice(0, 2);
-  if (style === "full") return (fullMap && fullMap[label]) || label;
-  return label;
+export function styleLabel(full, style, minimalMap) {
+  if (style === "minimal") return minimalMap[full] || full.slice(0, 2);
+  if (style === "short") return full.slice(0, 3);
+  return full;
+}
+
+// locales contract (docs/widgets.md#locales-strings): English keeps the
+// hardcoded arrays above (so styleLabel's minimal map, keyed by the
+// English full name, still resolves); any other locale asks Intl for
+// the real localised name instead of a hand-rolled weekday/month table.
+export function localizedFull(date, unit, locale) {
+  const lang = (locale || "en").split("-")[0];
+  if (lang === "en") {
+    return unit === "weekday" ? WEEKDAY_FULL[(date.getDay() + 6) % 7] : MONTH_FULL[date.getMonth()];
+  }
+  return new Intl.DateTimeFormat(locale, { [unit]: "long" }).format(date);
+}
+
+export function minimalMapFor(unit, locale) {
+  const lang = (locale || "en").split("-")[0];
+  if (lang !== "en") return {};
+  return unit === "weekday" ? DOW_MINIMAL : MONTH_MINIMAL;
 }
 
 function escapeHtml(s) {
@@ -188,12 +209,13 @@ function hourLabels(range) {
   return out.join("");
 }
 
-function fmtRange(startIso, endIso, labelStyle) {
+function fmtRange(startIso, endIso, labelStyle, locale) {
   if (!startIso || !endIso) return "";
   const [sy, sm, sd] = startIso.split("-").map(Number);
   const [ey, em, ed] = endIso.split("-").map(Number);
-  const startMonth = styleShortLabel(MONTH_SHORT[sm - 1] || "", labelStyle, MONTH_MINIMAL, MONTH_FULL);
-  const endMonth = styleShortLabel(MONTH_SHORT[em - 1] || "", labelStyle, MONTH_MINIMAL, MONTH_FULL);
+  const monthMinimalMap = minimalMapFor("month", locale);
+  const startMonth = styleLabel(localizedFull(new Date(sy, sm - 1, sd), "month", locale), labelStyle, monthMinimalMap);
+  const endMonth = styleLabel(localizedFull(new Date(ey, em - 1, ed), "month", locale), labelStyle, monthMinimalMap);
   const startBit = `${startMonth} ${sd}`;
   const endBit = (sm === em) ? `${ed}` : `${endMonth} ${ed}`;
   const year = sy === ey ? `${sy}` : `${sy}/${ey}`;
@@ -203,6 +225,8 @@ function fmtRange(startIso, endIso, labelStyle) {
 export default function render(shadow, ctx) {
   const data = ctx?.data ?? {};
   const opts = ctx?.cell?.options || {};
+  const locale = ctx?.locale || "en";
+  const t = ctx?.t || ((key, fallback) => fallback ?? key);
   const hideLabels = opts.hide_labels === true;
   const titleScale = clampScale(opts.event_title_scale, 1.0, 0.01, 10.0);
   const locScale = clampScale(opts.event_location_scale, 1.0, 0.01, 10.0);
@@ -229,13 +253,17 @@ export default function render(shadow, ctx) {
   const days = Array.isArray(data.days) ? data.days.slice(0, 7) : [];
   const range = computeRange(days, startHour, endHour);
   const span = Math.max(1, range.end - range.start);
-  const rangeMeta = fmtRange(data.start, data.end, labelStyle);
+  const rangeMeta = fmtRange(data.start, data.end, labelStyle, locale);
 
+  const dowMinimalMap = minimalMapFor("weekday", locale);
   const heads = days.map((d) => {
-    const name = styleShortLabel(DOW[d.weekday] || "", labelStyle, DOW_MINIMAL, DOW_FULL);
+    const [dy, dm, dd] = (d.date || "").split("-").map(Number);
+    const dowFull = Number.isFinite(dy) ? localizedFull(new Date(dy, dm - 1, dd), "weekday", locale) : "";
+    const name = dowFull ? styleLabel(dowFull, labelStyle, dowMinimalMap) : "";
     const isToday = !!d.is_today;
     const isWeekend = d.weekday === 5 || d.weekday === 6;
     const count = Array.isArray(d.events) ? d.events.length : 0;
+    const noun = t(count === 1 ? "event" : "events", count === 1 ? "event" : "events");
     const classes = ["tt-col-head"];
     if (isToday) classes.push("is-today");
     if (isWeekend) classes.push("is-weekend");
@@ -243,7 +271,7 @@ export default function render(shadow, ctx) {
       <div class="${classes.join(" ")}">
         <span class="tt-col-dow">${escapeHtml(name)}</span>
         <span class="tt-col-day">${escapeHtml(String(d.day || ""))}</span>
-        ${count > 0 ? `<span class="tt-col-count" title="${count} event${count === 1 ? "" : "s"}">${count}</span>` : ""}
+        ${count > 0 ? `<span class="tt-col-count" title="${count} ${noun}">${count}</span>` : ""}
       </div>`;
   }).join("");
 
@@ -441,7 +469,7 @@ export default function render(shadow, ctx) {
       <div class="w-body" style="gap:var(--space-3)">
         <div class="cal-head">
           <div class="cal-head-row">
-            <span class="cal-head-title">THIS WEEK</span>
+            <span class="cal-head-title">${escapeHtml(t("this_week", "THIS WEEK"))}</span>
             <span class="cal-head-meta">${escapeHtml(rangeMeta)}</span>
           </div>
           <div class="cal-head-rule"></div>

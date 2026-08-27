@@ -12,6 +12,9 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   `/_test/preview` now carry an English / French locale picker; it adds `?locale=<tag>` to the
   render so a contributor can check a widget's translated strings and its `Intl` date / number
   formatting without touching any install-wide or per-device setting.
+- **The Calendar (week) widget is translated to French.** Header, event counts, and the
+  weekday / month labels follow the render locale; non-English names come from `Intl`
+  rather than a hand-rolled table.
 
 ## [0.367.3], 2026-08-27
 
