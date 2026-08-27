@@ -194,6 +194,18 @@ def test_test_render_locale_param_forces_render_language(
     assert json.loads(_cell_dataset(body, "strings"))["event"] == "événement"
 
 
+def test_test_render_unknown_locale_falls_back_to_production_resolution(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A free-typed ``?locale=`` outside the picker's tags is dropped, not
+    forwarded: it would reach the client as ``ctx.locale`` and an invalid
+    BCP-47 tag makes ``Intl.DateTimeFormat`` throw mid-render."""
+    monkeypatch.delenv("LC_ALL", raising=False)
+    monkeypatch.delenv("LANG", raising=False)
+    resp = client.get("/_test/render?plugin=calendar_day&size=md&locale=zz-not-a-tag")
+    assert _cell_dataset(resp.get_data(as_text=True), "locale") == "en"
+
+
 def test_widget_preview_page_honours_locale_param(client: FlaskClient) -> None:
     """The single-widget preview's iframe (``/_test/preview/page``) threads
     the picked locale through ``_parse_preview_args`` the same way."""

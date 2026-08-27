@@ -468,9 +468,9 @@ There's no separate override mechanism, and no per-widget forking
 required to add a language.
 
 To eyeball a translation without changing any settings, the dev preview
-surfaces (`/_test/widgets` and `/_test/preview`) carry a language picker; 
-it just adds `?locale=<tag>` to the render,
-which is also handy on a raw `/_test/render?plugin=<id>&locale=fr` URL.
+surfaces (`/_test/widgets` and `/_test/preview`) carry a language picker;
+it just adds `?locale=<tag>` to the render, which is also handy on a raw
+`/_test/render?plugin=<id>&locale=fr` URL.
 
 ---
 

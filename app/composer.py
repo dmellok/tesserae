@@ -1888,7 +1888,12 @@ def test_render() -> str:
     # ?locale=<bcp47> forces the render language for the dev preview
     # surfaces' language picker (/_test/widgets, /_test/preview). Absent
     # -> the production resolution (device override / app default / host).
+    # Clamped to the picker's own tags: the value reaches the client as
+    # ``ctx.locale``, and a free-typed invalid tag would make
+    # ``Intl.DateTimeFormat`` throw mid-render.
     locale_override = request.args.get("locale") or ""
+    if locale_override not in _PREVIEW_LOCALE_IDS:
+        locale_override = ""
 
     # Per-widget content zoom from the gallery's zoom picker. Same
     # 0.5–3.0 clamp the Cell model enforces; out-of-range or unparseable
@@ -2037,6 +2042,7 @@ _PREVIEW_LOCALES: Final[list[dict[str, str]]] = [
     {"id": "en", "label": "English"},
     {"id": "fr", "label": "Français"},
 ]
+_PREVIEW_LOCALE_IDS: Final[set[str]] = {loc["id"] for loc in _PREVIEW_LOCALES}
 
 
 # Multi-cell layout for the preview synthetic page. Spiral halving:
@@ -2156,6 +2162,8 @@ def _parse_preview_args() -> dict[str, Any]:
     theme_id = request.args.get("theme") or "light"
     style_id = request.args.get("style") or "standard"
     locale_id = request.args.get("locale") or ""
+    if locale_id not in _PREVIEW_LOCALE_IDS:
+        locale_id = ""
     sample_mode = request.args.get("sample") == "1"
     panel_id = request.args.get("panel") or _DEFAULT_PREVIEW_PANEL_ID
     if panel_id not in _PREVIEW_PANEL_IDS:
