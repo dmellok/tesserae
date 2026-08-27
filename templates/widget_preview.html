@@ -284,6 +284,22 @@
         </select>
       </div>
 
+      <h2>Locale</h2>
+      <div class="field">
+        {# Forces ``ctx.locale`` for every cell in the preview, and with
+           it the widget's own ``strings/<tag>.json`` and anything it
+           derives via ``Intl.DateTimeFormat`` / ``Intl.NumberFormat``.
+           "System default" omits ?locale so the language resolves
+           exactly as a bound device would (device override / app
+           setting / host locale). #}
+        <select name="locale" data-auto-submit>
+          <option value="">System default</option>
+          {% for loc in locales %}
+          <option value="{{ loc.id }}" {% if loc.id == locale_id %}selected{% endif %}>{{ loc.label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
       <h2>Look</h2>
       <div class="pickers">
         <div class="field">
@@ -398,11 +414,13 @@
         <span class="chip">panel <strong>{{ panel_w }}×{{ panel_h }}</strong></span>
         <span class="chip">theme <strong>{{ theme_id }}</strong></span>
         <span class="chip">style <strong>{{ style_id }}</strong></span>
+        {% if locale_id %}<span class="chip">locale <strong>{{ locale_id }}</strong></span>{% endif %}
         {% if sample %}<span class="chip">sample data</span>{% endif %}
       </div>
     </header>
 
     {% set preview_qs = '?widget=' ~ widget.id ~ '&panel=' ~ panel_id ~ '&theme=' ~ theme_id ~ '&style=' ~ style_id %}
+    {% if locale_id %}{% set preview_qs = preview_qs ~ '&locale=' ~ (locale_id | urlencode) %}{% endif %}
     {% if sample %}{% set preview_qs = preview_qs ~ '&sample=1' %}{% endif %}
     {% if opts_json %}{% set preview_qs = preview_qs ~ '&opts=' ~ (opts_json | urlencode) %}{% endif %}
 

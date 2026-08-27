@@ -4,6 +4,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [Unreleased]
+
+### Added
+
+- **The dev widget previews can be rendered in a chosen language.** `/_test/widgets` and
+  `/_test/preview` now carry an English / French locale picker; it adds `?locale=<tag>` to the
+  render so a contributor can check a widget's translated strings and its `Intl` date / number
+  formatting without touching any install-wide or per-device setting.
+
 ## [0.367.3], 2026-08-27
 
 ### Fixed

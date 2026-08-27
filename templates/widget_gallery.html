@@ -565,6 +565,21 @@ Not linked from the main nav, visit /_test/widgets directly. #}
           <i class="ph ph-database" aria-hidden="true"></i>
           <span data-sample-label>Sample data</span>
         </button>
+        {# Render-locale picker: threads ?locale=<tag> onto every iframe so
+           each widget's ctx.locale / ctx.strings (and the Intl date /
+           number formatting it drives) reflect the chosen language.
+           "System default" sends no param, so the preview matches what a
+           bound device would actually show. Persisted to localStorage. #}
+        <label class="widget-pill" title="Preview locale">
+          <i class="ph ph-translate" aria-hidden="true"></i>
+          <span class="visually-hidden">Preview locale</span>
+          <select data-locale-select>
+            <option value="">System default</option>
+            {% for loc in locales %}
+            <option value="{{ loc.id }}">{{ loc.label }}</option>
+            {% endfor %}
+          </select>
+        </label>
         <div class="orient-toggle" role="radiogroup" aria-label="Orientation">
           <button type="button" data-orient="landscape" class="is-active" aria-pressed="true">
             <i class="ph ph-rectangle" aria-hidden="true"></i>Landscape
@@ -678,10 +693,14 @@ Not linked from the main nav, visit /_test/widgets directly. #}
     const SAMPLE_KEY   = "tesserae:gallery-sample";
     const ZOOM_KEY     = "tesserae:gallery-zooms";
     const REVIEWED_KEY = "tesserae:gallery-reviewed";
+    const LOCALE_KEY   = "tesserae:gallery-locale";
 
     const state = {
       orient: "landscape",
       sample: true,
+      // "" = let the server resolve the locale as production would;
+      // any other value is a forced BCP-47 tag from the picker.
+      locale: "",
       selected: new Set(),
       // Per-widget content zoom. {widget_id: "1" | "1.5" | …}.
       zooms: {},
@@ -694,6 +713,7 @@ Not linked from the main nav, visit /_test/widgets directly. #}
     const toggle         = document.querySelector(".orient-toggle");
     const sampleBtn      = document.querySelector("[data-sample-toggle]");
     const sampleLabel    = document.querySelector("[data-sample-label]");
+    const localeSelect   = document.querySelector("[data-locale-select]");
     const emptyState     = document.querySelector("[data-gallery-empty]");
     const loadedCount    = document.querySelector("[data-loaded-count]");
     const checkboxes     = Array.from(document.querySelectorAll("[data-widget-toggle]"));
@@ -720,6 +740,7 @@ Not linked from the main nav, visit /_test/widgets directly. #}
       const url = new URL(iframe.dataset.baseSrc, location.origin);
       url.searchParams.set("_o", state.orient === "portrait" ? "p" : "l");
       if (state.sample)  url.searchParams.set("sample", "1");
+      if (state.locale)  url.searchParams.set("locale", state.locale);
       const zoom = state.zooms[widgetId];
       if (zoom && zoom !== "1") url.searchParams.set("zoom", zoom);
       return url.pathname + url.search;
@@ -809,6 +830,7 @@ Not linked from the main nav, visit /_test/widgets directly. #}
           if (openLink) {
             const url = new URL(openLink.dataset.baseHref, location.origin);
             if (state.sample) url.searchParams.set("sample", "1");
+            if (state.locale) url.searchParams.set("locale", state.locale);
             const zoom = state.zooms[id];
             if (zoom && zoom !== "1") url.searchParams.set("zoom", zoom);
             openLink.href = url.pathname + url.search;
@@ -908,6 +930,14 @@ Not linked from the main nav, visit /_test/widgets directly. #}
       });
     }
 
+    if (localeSelect) {
+      localeSelect.addEventListener("change", () => {
+        state.locale = localeSelect.value;
+        try { localStorage.setItem(LOCALE_KEY, state.locale); } catch {}
+        applyAll();
+      });
+    }
+
     // Per-widget zoom pickers. Server clamps 0.5–3.0; iframe rewrites
     // when the value changes.
     zoomPickers.forEach((picker) => {
@@ -941,6 +971,14 @@ Not linked from the main nav, visit /_test/widgets directly. #}
       const s = localStorage.getItem(SAMPLE_KEY);
       if (s === "0") state.sample = false;
     } catch {}
+
+    try {
+      const l = localStorage.getItem(LOCALE_KEY);
+      if (l && localeSelect && [...localeSelect.options].some((o) => o.value === l)) {
+        state.locale = l;
+      }
+    } catch {}
+    if (localeSelect) localeSelect.value = state.locale;
 
     loadSelected();
     checkboxes.forEach((cb) => { cb.checked = state.selected.has(cb.value); });
