@@ -4,6 +4,17 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [0.367.2], 2026-08-27
+
+### Changed
+
+- **The Xteink X4 hardware entry now covers the native device firmware as well as
+  CrossInk.** The `xteink_x4` kind's notes spell out that the two firmware paths need
+  different orientation values (CrossInk keeps the `portrait_flipped` default; the native
+  `xteink-x4` firmware wants the device set to plain `landscape`), and that the native
+  build drives the SSD1677 panel revision only, while CrossInk auto-detects the later
+  UC8179/UC8279 revisions.
+
 ## [0.367.1], 2026-08-26
 
 ### Fixed
