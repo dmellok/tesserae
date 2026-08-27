@@ -2281,9 +2281,7 @@ def test_widget_preview_page() -> str:
     )
     return render_template(
         "compose.html",
-        page=_hydrate_page(
-            page, preview=True, sample=parsed["sample"], locale=parsed["locale_id"]
-        ),
+        page=_hydrate_page(page, preview=True, sample=parsed["sample"], locale=parsed["locale_id"]),
         for_push=False,
         preview_mode=True,
     )
