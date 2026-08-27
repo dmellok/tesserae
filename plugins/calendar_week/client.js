@@ -25,14 +25,16 @@ const WEEKDAY_FULL = [
 // date_label_style cell option: "short" (default, current 3-letter
 // behaviour), "minimal" (1-2 chars, just enough to stay unambiguous), or
 // "full" (the whole word). Base label is always the *full* localised
-// name, short/minimal are derived from it.
+// name, short/minimal are derived from it. Labels keep their natural
+// casing here; display casing belongs to CSS (--label-transform), so
+// sentence-case styles like Editorial stay sentence-case.
 const DOW_MINIMAL = { Monday: "M", Tuesday: "Tu", Wednesday: "W", Thursday: "Th", Friday: "F", Saturday: "Sa", Sunday: "Su" };
 const MONTH_MINIMAL = { January: "Ja", February: "F", March: "Mr", April: "Ap", May: "My", June: "Jn", July: "Jl", August: "Au", September: "S", October: "O", November: "N", December: "D" };
 
 export function styleLabel(full, style, minimalMap) {
-  if (style === "minimal") return (minimalMap[full] || full.slice(0, 2)).toUpperCase();
-  if (style === "short") return full.slice(0, 3).toUpperCase();
-  return full.toUpperCase();
+  if (style === "minimal") return minimalMap[full] || full.slice(0, 2);
+  if (style === "short") return full.slice(0, 3);
+  return full;
 }
 
 // locales contract (docs/widgets.md#locales-strings): English keeps the
