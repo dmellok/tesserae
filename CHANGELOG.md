@@ -15,6 +15,10 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 - **The Calendar (week) widget is translated to French.** Header, event counts, and the
   weekday / month labels follow the render locale; non-English names come from `Intl`
   rather than a hand-rolled table.
+- **The Calendar (month) widget is translated to French.** Month title, weekday header,
+  and the week-start note follow the render locale, on the same `Intl` + `strings/` path
+  as the week widget. The weekday header row now upper-cases by default like the other
+  calendar labels (sentence-case styles still get sentence case via `--label-transform`).
 
 ## [0.367.3], 2026-08-27
 
