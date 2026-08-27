@@ -171,3 +171,52 @@ def test_calendar_day_receives_its_real_french_strings(client: FlaskClient, app:
         "events": "événements",
         "at": "à",
     }
+
+
+# -- dev preview surfaces: the ?locale= override + the picker ----------
+
+
+def test_test_render_locale_param_forces_render_language(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The dev gallery's language picker rides on ``/_test/render?locale=``.
+    It overrides the production resolution (no app-level locale set here,
+    host locale cleared) so a reviewer can eyeball any widget in any
+    language without touching Settings."""
+    monkeypatch.delenv("LC_ALL", raising=False)
+    monkeypatch.delenv("LANG", raising=False)
+    plain = client.get("/_test/render?plugin=calendar_day&size=md")
+    assert _cell_dataset(plain.get_data(as_text=True), "locale") == "en"
+
+    forced = client.get("/_test/render?plugin=calendar_day&size=md&locale=fr")
+    body = forced.get_data(as_text=True)
+    assert _cell_dataset(body, "locale") == "fr"
+    assert json.loads(_cell_dataset(body, "strings"))["event"] == "événement"
+
+
+def test_widget_preview_page_honours_locale_param(client: FlaskClient) -> None:
+    """The single-widget preview's iframe (``/_test/preview/page``) threads
+    the picked locale through ``_parse_preview_args`` the same way."""
+    resp = client.get("/_test/preview/page?widget=calendar_day&locale=fr")
+    assert resp.status_code == 200
+    assert _cell_dataset(resp.get_data(as_text=True), "locale") == "fr"
+
+
+def test_widget_gallery_offers_the_locale_picker(client: FlaskClient) -> None:
+    resp = client.get("/_test/widgets")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "data-locale-select" in body
+    assert ">System default<" in body  # the leading "resolve as prod" option
+    assert 'value="en"' in body
+    assert 'value="fr"' in body
+
+
+def test_widget_preview_controls_include_the_locale_select(client: FlaskClient) -> None:
+    resp = client.get("/_test/preview?widget=calendar_day&locale=fr")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert 'name="locale"' in body
+    assert ">System default<" in body
+    # The picked tag round-trips as the selected option.
+    assert 'value="fr" selected' in body

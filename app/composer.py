@@ -759,11 +759,22 @@ def _fetch_plugin_data(
 
 
 def _hydrate_page(
-    page_dict: dict[str, Any], *, preview: bool = False, sample: bool = False, fresh: bool = False
+    page_dict: dict[str, Any],
+    *,
+    preview: bool = False,
+    sample: bool = False,
+    fresh: bool = False,
+    locale: str | None = None,
 ) -> dict[str, Any]:
-    """Resolve options, fonts, server-side data, and visual layout."""
+    """Resolve options, fonts, server-side data, and visual layout.
+
+    ``locale`` forces the render language, used by the dev ``/_test/*``
+    preview surfaces' language picker. Left ``None`` (or ``""``) it
+    resolves exactly as production does: the target device's own
+    override, then the app-wide default, then the host locale (see
+    ``_resolve_page_locale``)."""
     registry = _registry()
-    locale = _resolve_page_locale(page_dict)
+    locale = locale or _resolve_page_locale(page_dict)
     page_font = _resolve_font(page_dict.get("font"), registry)
     page_font_family = page_font.name if page_font else "system-ui"
     # Default to ``light`` when no per-page override is set so the
@@ -1874,6 +1885,11 @@ def test_render() -> str:
     # data_dir cache) and skips the render path's last-good fallback. Default off.
     fresh = request.args.get("fresh") in ("1", "true", "True")
 
+    # ?locale=<bcp47> forces the render language for the dev preview
+    # surfaces' language picker (/_test/widgets, /_test/preview). Absent
+    # -> the production resolution (device override / app default / host).
+    locale_override = request.args.get("locale") or ""
+
     # Per-widget content zoom from the gallery's zoom picker. Same
     # 0.5–3.0 clamp the Cell model enforces; out-of-range or unparseable
     # values silently fall back to 1.0.
@@ -1928,7 +1944,9 @@ def test_render() -> str:
     }
     return render_template(
         "compose.html",
-        page=_hydrate_page(page, preview=True, sample=sample_mode, fresh=fresh),
+        page=_hydrate_page(
+            page, preview=True, sample=sample_mode, fresh=fresh, locale=locale_override
+        ),
         for_push=False,
         preview_mode=False,
     )
@@ -2014,6 +2032,11 @@ _PREVIEW_PANELS: Final[list[dict[str, Any]]] = [
 ]
 _PREVIEW_PANEL_IDS: Final[set[str]] = {p["id"] for p in _PREVIEW_PANELS}
 _DEFAULT_PREVIEW_PANEL_ID: Final[str] = "waveshare_e6_13_3"
+
+_PREVIEW_LOCALES: Final[list[dict[str, str]]] = [
+    {"id": "en", "label": "English"},
+    {"id": "fr", "label": "Français"},
+]
 
 
 # Multi-cell layout for the preview synthetic page. Spiral halving:
@@ -2132,6 +2155,7 @@ def _parse_preview_args() -> dict[str, Any]:
     widget_id = request.args.get("widget") or ""
     theme_id = request.args.get("theme") or "light"
     style_id = request.args.get("style") or "standard"
+    locale_id = request.args.get("locale") or ""
     sample_mode = request.args.get("sample") == "1"
     panel_id = request.args.get("panel") or _DEFAULT_PREVIEW_PANEL_ID
     if panel_id not in _PREVIEW_PANEL_IDS:
@@ -2150,6 +2174,7 @@ def _parse_preview_args() -> dict[str, Any]:
         "widget_id": widget_id,
         "theme_id": theme_id,
         "style_id": style_id,
+        "locale_id": locale_id,
         "sample": sample_mode,
         "panel_id": panel_id,
         "panel_w": preset.w,
@@ -2215,8 +2240,10 @@ def test_widget_preview() -> str:
         themes=_MATRIX_THEMES,
         styles=_MATRIX_STYLES,
         panels=_PREVIEW_PANELS,
+        locales=_PREVIEW_LOCALES,
         theme_id=parsed["theme_id"],
         style_id=parsed["style_id"],
+        locale_id=parsed["locale_id"],
         panel_id=parsed["panel_id"],
         panel_w=parsed["panel_w"],
         panel_h=parsed["panel_h"],
@@ -2254,7 +2281,9 @@ def test_widget_preview_page() -> str:
     )
     return render_template(
         "compose.html",
-        page=_hydrate_page(page, preview=True, sample=parsed["sample"]),
+        page=_hydrate_page(
+            page, preview=True, sample=parsed["sample"], locale=parsed["locale_id"]
+        ),
         for_push=False,
         preview_mode=True,
     )
@@ -2290,4 +2319,5 @@ def test_widget_gallery() -> str:
         "widget_gallery.html",
         widgets=rows,
         size_dims=SIZE_DIMENSIONS,
+        locales=_PREVIEW_LOCALES,
     )
