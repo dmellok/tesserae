@@ -288,6 +288,24 @@ code {
   .flash.is-leaving { transform: none; }
 }
 
+/* Inline error strip on the auth-flow cards (/setup, /login). These
+   pages surface validation failures in the card itself rather than as
+   a corner toast: the toast auto-dismisses after 5s and is easy to
+   miss when the re-rendered page otherwise looks unchanged (#265). */
+.auth-error {
+  display: flex;
+  align-items: center;
+  gap: var(--t-space-2);
+  margin-bottom: var(--t-space-4);
+  padding: var(--t-space-3) var(--t-space-4);
+  border-radius: var(--t-radius-md);
+  border: 1px solid color-mix(in oklab, var(--t-danger) 45%, transparent);
+  background: var(--t-danger-bg);
+  color: var(--t-fg);
+  font-size: var(--t-size-md);
+}
+.auth-error .ph-fill { color: var(--t-danger); font-size: 18px; flex-shrink: 0; }
+
 /* Display setup wizard (#167, redesigned): native <dialog>, compact
    three-step flow per the design handoff. Design hexes translate to the
    token system so the dark theme keeps working:

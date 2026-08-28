@@ -20,6 +20,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   as the week widget. The weekday header row now upper-cases by default like the other
   calendar labels (sentence-case styles still get sentence case via `--label-transform`).
 
+### Fixed
+
+- **Setup and sign-in errors now show inline in the card.** A too-short or mismatched
+  password on `/setup`, and a wrong password on `/login`, previously surfaced only as a
+  corner toast that auto-dismisses after five seconds; when the field was filled by a
+  password manager (which bypasses the browser's `minlength` check) the page could appear
+  to reload with no feedback at all (#265). The error now renders as a persistent strip
+  inside the form card.
+
 ## [0.367.3], 2026-08-27
 
 ### Fixed

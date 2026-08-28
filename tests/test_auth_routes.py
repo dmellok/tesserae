@@ -166,3 +166,37 @@ def test_enable_password_with_no_hash_redirects_to_setup(app: Flask) -> None:
     resp = client.post("/settings/system/auth/enable")
     assert resp.status_code == 302
     assert resp.headers["Location"].endswith("/setup")
+
+
+def test_setup_short_password_shows_inline_error(app: Flask) -> None:
+    """A too-short password re-renders /setup with the error inline in
+    the card (not only as an auto-dismissing flash toast, #265)."""
+    client = app.test_client()
+    resp = client.post("/setup", data={"password": "short", "password_confirm": "short"})
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "auth-error" in body
+    assert "Password must be at least 8 characters." in body
+    assert not auth.password_is_set(_settings_store(app))
+
+
+def test_setup_mismatched_confirm_shows_inline_error(app: Flask) -> None:
+    client = app.test_client()
+    resp = client.post("/setup", data={"password": "longenough", "password_confirm": "different"})
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "auth-error" in body
+    assert "Passwords do not match." in body
+    assert not auth.password_is_set(_settings_store(app))
+
+
+def test_login_wrong_password_shows_inline_error(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    with client.session_transaction() as sess:
+        sess.clear()
+    resp = client.post("/login", data={"password": "wrong"})
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "auth-error" in body
+    assert "Incorrect password." in body

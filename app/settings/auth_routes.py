@@ -26,13 +26,17 @@ def setup() -> Response | str:
     # silently take over the admin.
     if auth.password_is_set(settings):
         return redirect(url_for("auth.settings"))
+    # Validation failures render inline in the card, not as a flash: the
+    # corner toast auto-dismisses after 5s and is easy to miss when the
+    # re-rendered page otherwise looks unchanged (#265).
+    error = None
     if request.method == "POST":
         pw = request.form.get("password", "")
         pw2 = request.form.get("password_confirm", "")
         if len(pw) < 8:
-            flash("Password must be at least 8 characters.", "error")
+            error = "Password must be at least 8 characters."
         elif pw != pw2:
-            flash("Passwords do not match.", "error")
+            error = "Passwords do not match."
         else:
             auth.set_password(settings, pw)
             auth.login()
@@ -40,7 +44,7 @@ def setup() -> Response | str:
             # First run drops into the setup wizard, not straight to
             # Settings, the wizard sequences broker → device → dashboard.
             return redirect(url_for("onboarding.index"))
-    return render_template("setup.html")
+    return render_template("setup.html", error=error)
 
 
 @bp.route("/login", methods=["GET", "POST"], endpoint="login_view")
@@ -50,6 +54,7 @@ def login_view() -> Response | str:
         return redirect(url_for("auth.setup"))
     if auth.is_authed():
         return redirect(safe_next(request.args.get("next")))
+    error = None
     if request.method == "POST":
         pw = request.form.get("password", "")
         if auth.verify_password(settings, pw):
@@ -57,8 +62,8 @@ def login_view() -> Response | str:
             log_auth("login", "ok")
             return redirect(safe_next(request.form.get("next")))
         log_auth("login", "denied", error="incorrect password")
-        flash("Incorrect password.", "error")
-    return render_template("login.html", next=request.args.get("next", ""))
+        error = "Incorrect password."
+    return render_template("login.html", next=request.args.get("next", ""), error=error)
 
 
 @bp.post("/logout")

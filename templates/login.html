@@ -9,6 +9,12 @@
       <span>Sign in</span>
     </h1>
   </header>
+  {% if error %}
+  <div class="auth-error" role="alert">
+    <i class="ph-fill ph-x-circle" aria-hidden="true"></i>
+    <span>{{ error }}</span>
+  </div>
+  {% endif %}
   <form method="post" class="form">
     <input type="hidden" name="next" value="{{ next }}">
     {# Match the username on the setup form so Safari / iCloud Keychain

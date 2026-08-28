@@ -13,6 +13,12 @@
       <em>Settings → Server</em>.
     </p>
   </header>
+  {% if error %}
+  <div class="auth-error" role="alert">
+    <i class="ph-fill ph-x-circle" aria-hidden="true"></i>
+    <span>{{ error }}</span>
+  </div>
+  {% endif %}
   <form method="post" class="form">
     {# Tesserae has a single admin login (no per-user accounts), so the
        form has no username field for the user to fill in. Safari /
