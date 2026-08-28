@@ -86,6 +86,24 @@ def test_hide_units(app: Flask, monkeypatch) -> None:
     assert out["items"][0]["unit"] == ""
 
 
+def test_visibility_toggles_pass_through(app: Flask, monkeypatch) -> None:
+    """show_title / show_names ride the payload for the client; absent
+    options (cells saved before the toggles existed) default to on."""
+    sensor, core = _mods(app)
+    with app.app_context():
+        monkeypatch.setattr(core, "get_states", lambda: _STATES)
+        default = sensor.fetch({"entities": "sensor.lounge_temp"}, {}, ctx={})
+        hidden = sensor.fetch(
+            {"entities": "sensor.lounge_temp", "show_title": False, "show_names": False},
+            {},
+            ctx={},
+        )
+    assert default["show_title"] is True
+    assert default["show_names"] is True
+    assert hidden["show_title"] is False
+    assert hidden["show_names"] is False
+
+
 def test_missing_entity_marked_unavailable(app: Flask, monkeypatch) -> None:
     sensor, core = _mods(app)
     with app.app_context():

@@ -104,7 +104,7 @@ function sparklineSvg(series, color, opts = {}) {
     </svg>`;
 }
 
-function renderStat(item, title) {
+function renderStat(item, title, showTitle) {
   const accent = sensorAccent(item.icon);
   const muted = item.unavailable;
   const color = muted ? "var(--text-muted)" : accent;
@@ -116,11 +116,14 @@ function renderStat(item, title) {
   const spark = Array.isArray(item.sparkline) && item.sparkline.length >= 2
     ? `<div class="sensor-spark">${sparklineSvg(item.sparkline, color, { w: 200, h: 36, fill: true, strokeWidth: 2.4 })}</div>`
     : "";
-  return `
-    <div class="w-title">
+  const titleRow = showTitle
+    ? `<div class="w-title">
       <i class="ph-bold ${ph}" style="color:${color}"></i>
       <h3>${escapeHtml(title)}</h3>
-    </div>
+    </div>`
+    : "";
+  return `
+    ${titleRow}
     <div class="w-body stat-body" style="gap:var(--space-2)">
       <div class="stat-value">
         ${escapeHtml(item.value ?? "-")}
@@ -131,7 +134,7 @@ function renderStat(item, title) {
     </div>`;
 }
 
-function renderList(items, title) {
+function renderList(items, title, showTitle, showNames) {
   const rows = items.map((it, i) => {
     const accent = it.unavailable ? "var(--text-muted)" : sensorAccent(it.icon);
     const ph = `ph-${it.icon || "gauge"}`;
@@ -147,7 +150,7 @@ function renderList(items, title) {
       <div class="sensor-row ${i % 2 ? "is-zebra" : ""}">
         <div class="list-lead sensor-row-lead">
           <i class="ph-bold ${ph}" style="color:${accent}"></i>
-          <span class="list-title">${escapeHtml(it.name)}</span>
+          ${showNames ? `<span class="list-title">${escapeHtml(it.name)}</span>` : ""}
         </div>
         <div class="sensor-row-meta">
           ${spark}
@@ -156,12 +159,15 @@ function renderList(items, title) {
         </div>
       </div>`;
   }).join("");
-  return `
-    <div class="w-title">
+  const titleRow = showTitle
+    ? `<div class="w-title">
       <i class="ph-bold ph-gauge" style="color:var(--accent-3)"></i>
       <h3>${escapeHtml(title)}</h3>
       <span class="w-title-meta">${items.length}</span>
-    </div>
+    </div>`
+    : "";
+  return `
+    ${titleRow}
     <div class="w-body list-body">${rows}</div>`;
 }
 
@@ -284,7 +290,13 @@ export default function render(shadow, ctx) {
     return;
   }
 
-  const body = items.length === 1 ? renderStat(items[0], title) : renderList(items, title);
+  // Visibility toggles from the server payload; default on so cells
+  // saved before the options existed keep their title / names.
+  const showTitle = data.show_title !== false;
+  const showNames = data.show_names !== false;
+  const body = items.length === 1
+    ? renderStat(items[0], title, showTitle)
+    : renderList(items, title, showTitle, showNames);
   shadow.innerHTML = `
     ${css}
     <style>${layout}</style>

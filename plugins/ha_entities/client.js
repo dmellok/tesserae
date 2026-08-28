@@ -63,6 +63,10 @@ export default function render(shadow, ctx) {
 
   const items = data.items;
   const title = data.title || "Entities";
+  // Visibility toggles from the server payload; default on so cells
+  // saved before the options existed keep their title / names.
+  const showTitle = data.show_title !== false;
+  const showNames = data.show_names !== false;
 
   // Count recently-changed items so the title bar can carry a hint.
   let recentCount = 0;
@@ -81,7 +85,7 @@ export default function render(shadow, ctx) {
       <div class="entity-row ${i % 2 ? "is-zebra" : ""}${changedClass}">
         <div class="list-lead entity-row-lead">
           <i class="ph-bold ph-${escapeHtml(it.icon || "circle")}" style="color:${accent}"></i>
-          <span class="list-title">${escapeHtml(it.name)}</span>
+          ${showNames ? `<span class="list-title">${escapeHtml(it.name)}</span>` : ""}
           ${changeBadge}
         </div>
         <span class="list-meta" style="color:${accent}">${escapeHtml(it.label || "-")}</span>
@@ -143,15 +147,19 @@ export default function render(shadow, ctx) {
     ? `<span class="w-title-meta" style="color:var(--accent-4)"><i class="ph-bold ph-circle-notch" style="margin-right:.2em"></i>${recentCount}</span>`
     : `<span class="w-title-meta">${items.length}</span>`;
 
+  const titleRow = showTitle
+    ? `<div class="w-title">
+        <i class="ph-bold ph-list" style="color:var(--accent-3)"></i>
+        <h3>${escapeHtml(title)}</h3>
+        ${meta}
+      </div>`
+    : "";
+
   shadow.innerHTML = `
     ${css}
     <style>${layout}</style>
     <div class="w" data-widget="ha_entities">
-      <div class="w-title">
-        <i class="ph-bold ph-list" style="color:var(--accent-3)"></i>
-        <h3>${escapeHtml(title)}</h3>
-        ${meta}
-      </div>
+      ${titleRow}
       <div class="w-body list-body">${rows}</div>
     </div>`;
 }

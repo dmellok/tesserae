@@ -58,6 +58,22 @@ def test_lock_icon_flips_when_unlocked(app: Flask, monkeypatch) -> None:
     assert out["items"][0]["icon"] == "lock-open"
 
 
+def test_visibility_toggles_pass_through(app: Flask, monkeypatch) -> None:
+    """show_title / show_names ride the payload for the client; absent
+    options (cells saved before the toggles existed) default to on."""
+    ent, core = _mods(app)
+    with app.app_context():
+        monkeypatch.setattr(core, "get_states", lambda: _STATES)
+        default = ent.fetch({"entities": "light.desk"}, {}, ctx={})
+        hidden = ent.fetch(
+            {"entities": "light.desk", "show_title": False, "show_names": False}, {}, ctx={}
+        )
+    assert default["show_title"] is True
+    assert default["show_names"] is True
+    assert hidden["show_title"] is False
+    assert hidden["show_names"] is False
+
+
 def test_choices_delegates_to_core(app: Flask, monkeypatch) -> None:
     ent, core = _mods(app)
     with app.app_context():
