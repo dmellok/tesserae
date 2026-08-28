@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "Webpage",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "kind": "widget",
   "description": "Embed an external URL in a cell. The composer captures whatever the iframe renders, handy for status pages, public dashboards, or any site that doesn't deny embedding. A URL that points straight at an image (PNG, GIF, JPEG, WebP, SVG) is drawn as an image and scaled to the cell rather than embedded, so tall charts keep their bottom edge. Same headless-render path as the Send tab is used when the panel renders. Pages that fetch their data with JavaScript get a short settle delay after load so the content is captured, not a blank frame; raise it for slow pages. Sites that set X-Frame-Options:DENY or strict CSP cannot be embedded. A page behind header-based auth (bearer token, API key) can be reached by setting Request headers; the server attaches them when the panel renders, scoped to that URL's own origin only.",
   "icon": "ph-globe",

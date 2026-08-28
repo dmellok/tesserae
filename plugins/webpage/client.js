@@ -12,13 +12,19 @@ function escapeHtml(s) {
   }[c]));
 }
 
-// Absolute cap on the whole wait (load + settle) so a slow / hung site
-// can't pin the render. Kept comfortably under the renderer's 15s
-// ``__tesseraeComposed`` budget so the screenshot still happens even when
-// the iframe never fires ``load`` or the settle is set high.
-const IFRAME_HARD_CAP_MS = 12000;
+// Grace period for the iframe's ``load`` on top of the configured settle.
+// The overall cap is ``settle + grace`` rather than a fixed number: a fixed
+// 12s cap silently ate into the settle window whenever the page loaded
+// slowly, so a 10s settle on a 5s-loading page got 7s and a page that took
+// longer than the cap to load was captured blank (the "sometimes blank"
+// intermittent). Worst case (12s settle) is 22s, which the renderer's 25s
+// ``__tesseraeComposed`` budget (_COMPOSE_SIGNAL_TIMEOUT_MS) is sized to
+// outlast, so a slow / hung site still can't pin the render.
+const IFRAME_LOAD_GRACE_MS = 10000;
 // Default settle window (seconds) after ``load`` when the cell doesn't set one.
 const DEFAULT_SETTLE_S = 2;
+// Ceiling on the settle option, mirrors plugin.json's ``max: 12``.
+const MAX_SETTLE_MS = 12000;
 // Cap on the "is this URL an image?" probe. Kept short because it is spent
 // before the iframe path even starts, and an HTML URL normally fails the
 // probe immediately (the decoder rejects the first bytes).
@@ -144,15 +150,16 @@ export default async function render(shadow, ctx) {
   // weather dashboard, an SPA) runs its post-load fetch and updates the
   // DOM. Screenshotting on ``load`` alone captures the empty pre-data
   // state (issue #152). So after ``load`` we hold for a settle window to
-  // let that async work paint, capped by ``IFRAME_HARD_CAP_MS`` so a
-  // never-loading or deliberately-slow site can't pin the render.
+  // let that async work paint, capped at settle + ``IFRAME_LOAD_GRACE_MS``
+  // so a never-loading or deliberately-slow site can't pin the render.
   const iframe = shadow.querySelector("iframe");
   if (!iframe) return;
   const rawSettle = Number(opts.settle_seconds);
   const settleMs = Math.max(
     0,
-    Math.min(IFRAME_HARD_CAP_MS, (Number.isFinite(rawSettle) ? rawSettle : DEFAULT_SETTLE_S) * 1000),
+    Math.min(MAX_SETTLE_MS, (Number.isFinite(rawSettle) ? rawSettle : DEFAULT_SETTLE_S) * 1000),
   );
+  const hardCapMs = settleMs + IFRAME_LOAD_GRACE_MS;
   await new Promise((resolve) => {
     let settled = false;
     let settleTimer = null;
@@ -169,7 +176,8 @@ export default async function render(shadow, ctx) {
     };
     iframe.addEventListener("load", afterLoad, { once: true });
     iframe.addEventListener("error", done, { once: true });
-    // Absolute cap regardless of load / settle.
-    setTimeout(done, IFRAME_HARD_CAP_MS);
+    // Absolute cap: full settle + the load grace, so a hung site can't pin
+    // the render but a slow-loading one no longer eats the settle window.
+    setTimeout(done, hardCapMs);
   });
 }

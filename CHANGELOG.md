@@ -8,6 +8,12 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **The Home Assistant Sensor and Entities widgets can hide the title row and entity
+  names.** Two new toggles per cell: "Show title row" removes the whole header (so a
+  single entity renders as just its value), and "Show entity names" drops the per-row
+  label in list mode, leaving icon + value. Both default to on, so existing cells are
+  unchanged.
+
 - **Synchronized wake: a fleet of devices can paint together on a wall-clock grid.**
   New per-device setting on the device card's Schedule tab (REST devices, off by
   default). "On the clock" keeps the sleep interval as the period but lands each wake on
@@ -35,6 +41,12 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **The Webpage widget's settle delay is now honoured in full, fixing intermittent blank
+  captures.** The wait for the embedded page previously ran under a fixed 12-second cap
+  covering page load *and* settle together, so a slow-loading site silently ate into the
+  configured settle window, and a site that took longer than the cap to load was captured
+  blank. The cap is now the full settle delay plus a 10-second load grace, and the
+  renderer's screenshot budget was raised to outlast the worst case.
 - **Setup and sign-in errors now show inline in the card.** A too-short or mismatched
   password on `/setup`, and a wrong password on `/login`, previously surfaced only as a
   corner toast that auto-dismisses after five seconds; when the field was filled by a

@@ -45,6 +45,15 @@ logger = logging.getLogger(__name__)
 DEFAULT_PANEL_W: Final[int] = 1600
 DEFAULT_PANEL_H: Final[int] = 1200
 
+# Floor for the ``__tesseraeComposed`` wait, independent of the request's
+# navigation timeout. Sized to outlast the slowest legitimate widget wait:
+# the webpage widget holds compose for up to settle (12s max) + load grace
+# (10s, IFRAME_LOAD_GRACE_MS in plugins/webpage/client.js) = 22s. With only
+# the old 15s wait the screenshot fired mid-settle and captured the iframe
+# blank. Widgets that hang forever still get cut off here; the screenshot
+# then proceeds on whatever painted.
+_COMPOSE_SIGNAL_TIMEOUT_MS: Final[int] = 25_000
+
 WaitUntil = Literal["load", "domcontentloaded", "networkidle", "commit"]
 
 _CHROMIUM_SIDECAR: Final[Path] = (
@@ -558,7 +567,10 @@ def _navigate_and_settle(page: Any, request: RenderRequest, attempt: int) -> dic
     settle["goto_ms"] = int((t_goto - t0) * 1000)
     if request.is_composer:
         try:
-            page.wait_for_function("window.__tesseraeComposed === true", timeout=request.timeout_ms)
+            page.wait_for_function(
+                "window.__tesseraeComposed === true",
+                timeout=max(request.timeout_ms, _COMPOSE_SIGNAL_TIMEOUT_MS),
+            )
             settle["compose_signal"] = "fired"
         except PlaywrightError as err:
             logger.warning("composer mount wait timed out: %s", err)
@@ -705,7 +717,7 @@ def _screenshot_attempt(browser: Browser, request: RenderRequest, attempt: int) 
             try:
                 page.wait_for_function(
                     "window.__tesseraeComposed === true",
-                    timeout=request.timeout_ms,
+                    timeout=max(request.timeout_ms, _COMPOSE_SIGNAL_TIMEOUT_MS),
                 )
             except PlaywrightError as err:
                 logger.warning("composer mount wait timed out: %s", err)
