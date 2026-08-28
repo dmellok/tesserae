@@ -129,6 +129,15 @@ server URL.
    polling forever on `registered: false` (issue #226). A client that
    has no MAC to report pairs with a 6-digit code instead (path B).
 
+   `device_id` must match `^[a-z][a-z0-9_-]{1,31}$`: 2–32 characters,
+   lowercase, starting with a letter, with `_` and `-` allowed after
+   the first character. Ids that fail the pattern are rejected
+   everywhere a device id is accepted (announce, register, MQTT status
+   topics). Clients deriving a default id from hardware identifiers
+   (board name plus MAC) should keep the result under the length cap
+   and sanitize the leading character, since some board names start
+   with a digit.
+
    Send the real MAC, not a stand-in. `null`, `"None"` (a client's own
    null formatted into the body), `00:00:00:00:00:00` and
    `ff:ff:ff:ff:ff:ff` are all rejected the same way an absent MAC is,
