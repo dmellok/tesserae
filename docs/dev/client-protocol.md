@@ -791,6 +791,16 @@ above).
 - `dst_active`: true if daylight saving was in effect at the moment
   the response was assembled. Informational; combined with the
   offset it lets a smarter client predict the next DST transition.
+- `wake_at` (optional): Unix epoch **integer** of the same instant
+  `next_poll_s` encodes, present only when the device has *synchronized
+  wake* enabled (Settings → Devices → Schedule tab). A client that
+  ignores it still lands close by sleeping `next_poll_s`; a client that
+  honours it should sleep until `wake_at - now` computed at the moment
+  it actually enters deep sleep, which sheds the awake-time slip a
+  relative timer carries (frame fetch + panel refresh happen after the
+  response was received, and a relative countdown started at sleep
+  entry drifts late by exactly that much). Treat it as a one-shot
+  value, like `next_poll_s`: never persist it.
 
 The local-time fields are always present in the response regardless
 of whether the heartbeat sent `tz`. A pre-existing client that doesn't
@@ -1578,6 +1588,33 @@ A device becomes *trusted* after three consecutive wakes landing within
 sync only improves render freshness; it never wakes the device, and it
 doesn't feed `next_poll_s` (that's the projection above, a separate
 mechanism).
+
+### Synchronized wake (wake alignment)
+
+Off by default; enabled per device (or fleet-wide) in Settings →
+Devices → Schedule tab. When on, the server reshapes `next_poll_s` so
+wakes land on a wall-clock grid instead of counting from the last
+check-in, and every device sharing the grid paints together — the clock
+is the coordinator, so there is no cross-device protocol.
+
+- **On the clock**: `sleep_interval_s` stays the period, wakes land on
+  `anchor + k × interval` in the server's local time (anchor `HH:MM`,
+  default midnight). Projected content changes still pull the poll
+  earlier, same as above.
+- **At set times**: the device wakes only at a listed set of `HH:MM`
+  times. This is the one case where `next_poll_s` may exceed the
+  configured interval, and nothing pulls it earlier.
+
+Grid points inside the effective quiet-hours window are skipped. The
+server also learns each device's wake-to-checkin latency from its
+telemetry and shifts the wake earlier by that lead, so the *paint*
+lands on the grid rather than the radio.
+
+No client change is required — the value is recomputed on every
+check-in, so alignment error never accumulates. A client that also
+honours the optional `wake_at` field (see the `/status` response)
+converts the target to a delta at the moment it enters deep sleep and
+lands tighter still.
 
 ### Sizing `sleep_interval_s`
 

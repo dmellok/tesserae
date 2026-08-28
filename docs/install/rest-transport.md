@@ -161,6 +161,30 @@ per-clone renderer settings stay; only the transport flips.
   one doesn't exist, shows the token in a one-shot reveal so you can
   copy it into firmware.
 
+## Synchronized wake (optional)
+
+By default each device counts its sleep from whenever it last checked
+in, so two panels on the same interval drift apart and repaint at
+unrelated moments. **Synchronized wake** pins the wake grid to the wall
+clock instead: open the device card → **Schedule** tab → *Synchronized
+wake*.
+
+- **On the clock**: keeps the sleep interval as the period but lands
+  every wake on `anchor + multiples of it` in local time. A 15-minute
+  panel anchored at `00:00` wakes at :00 / :15 / :30 / :45; every
+  device set to the same grid repaints together.
+- **At set times**: the device wakes only at the times you list
+  (e.g. `07:00, 12:30, 19:00`), ignoring the interval. Good for very
+  long battery life on content that changes a few times a day.
+
+The **Apply to all devices** switch copies the setting to every REST
+device in one save, which is the quickest way to put a whole fleet on
+one grid. Grid points inside quiet hours are skipped, and the server
+learns each device's wake-to-paint latency after a cycle or two so the
+paint itself, not just the check-in, lands on the grid. No firmware
+update is required; firmware that understands the optional `wake_at`
+field lands tighter still (see the client protocol spec).
+
 ## Firmware
 
 The Tesserae repo's `notes/prompts/` directory has self-contained

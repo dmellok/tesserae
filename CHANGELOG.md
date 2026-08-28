@@ -8,6 +8,19 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Synchronized wake: a fleet of devices can paint together on a wall-clock grid.**
+  New per-device setting on the device card's Schedule tab (REST devices, off by
+  default). "On the clock" keeps the sleep interval as the period but lands each wake on
+  `anchor + k × interval` local time (a 15-minute panel anchored at 00:05 wakes at :05 /
+  :20 / :35 / :50); "at set times" wakes only at a listed set of `HH:MM` times. Devices
+  set to the same grid wake and repaint together with no cross-device coordination; an
+  "apply to all devices" switch copies the setting to every REST device in one save. The
+  server recomputes the grid delta on every check-in (so error never accumulates), skips
+  grid points inside quiet hours, learns each device's wake-to-paint latency from its
+  telemetry and shifts the wake earlier by that lead so the paint itself lands on the
+  grid. The `/status` response additionally carries the same instant as an absolute
+  `wake_at` epoch for firmware that can sleep to a wall-clock target; older firmware
+  ignores it and still lands close via `next_poll_s`.
 - **The dev widget previews can be rendered in a chosen language.** `/_test/widgets` and
   `/_test/preview` now carry an English / French locale picker; it adds `?locale=<tag>` to the
   render so a contributor can check a widget's translated strings and its `Intl` date / number

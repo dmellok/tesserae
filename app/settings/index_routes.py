@@ -1220,6 +1220,15 @@ def _build_sections() -> list[dict[str, Any]]:
                     if is_instance
                     else []
                 ),
+                # Synchronized wake (wake alignment). REST instances
+                # only: the per-cycle next_poll_s that implements the
+                # grid rides the /status response, which MQTT / relay /
+                # push devices never poll. Values come from the same
+                # settings.devices.<id> block the sleep interval lives
+                # in; the Schedule tab renders the form and the
+                # combined save handler owns validation.
+                "wake_align_capable": bool(is_instance and device.transport == "rest"),
+                "wake_align": (_wake_align_view(store, device.id) if is_instance else {}),
                 # Read-only diagnostic block: app version, resolved
                 # kind + renderer clone ids, panel details, on-disk
                 # instance file, raw JSON with secrets masked. Renders
@@ -1292,6 +1301,31 @@ def _visible_config_fields(device: Any) -> list[dict[str, Any]]:
     if _can_stay_awake(device.id):
         return fields
     return [f for f in fields if f.get("name") not in _ALWAYS_ON_FIELDS]
+
+
+def _wake_align_view(store: Any, device_id: str) -> dict[str, str]:
+    """Stored wake-alignment values shaped for the Schedule-tab form.
+
+    ``mode`` is ``''`` (off), ``'interval'`` or ``'times'``; junk in a
+    hand-edited settings file reads as off rather than erroring the
+    page. ``times_csv`` flattens the stored list back to the comma form
+    the single text input ships."""
+    from app import wake_alignment
+
+    stored = (store.get_section("devices") or {}).get(device_id)
+    if not isinstance(stored, dict):
+        stored = {}
+    mode = str(stored.get("wake_align_mode") or "").strip().lower()
+    if mode not in (wake_alignment.MODE_INTERVAL, wake_alignment.MODE_TIMES):
+        mode = ""
+    anchor = stored.get("wake_align_anchor")
+    hm = wake_alignment.parse_hhmm(anchor)
+    times = wake_alignment.parse_times_list(stored.get("wake_align_times"))
+    return {
+        "mode": mode,
+        "anchor": f"{hm[0]:02d}:{hm[1]:02d}" if hm is not None else "00:00",
+        "times_csv": ", ".join(times),
+    }
 
 
 def _button_map_stored_json(store: Any, device_id: str) -> str:

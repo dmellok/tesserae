@@ -60,6 +60,16 @@ CONFIDENCE_MAX: int = 10
 # really bad ``sleep_until`` value is caught and ignored.
 SLEEP_UNTIL_VS_NEXT_SLEEP_MISMATCH_S: float = 30.0
 
+# Lead-compensation EWMA (synchronized wakes). When the server issued the
+# previous wake directive itself (prediction_source == "server", i.e. wake
+# alignment), the arrival offset measures the device's wake-to-checkin
+# latency: Wi-Fi connect + frame fetch + panel refresh. Smoothing it gives
+# the lead the alignment math subtracts so the *paint* lands on the grid.
+# Samples outside [0, MAX] are faults (clock jump, outage retry), not
+# latency, and are ignored rather than folded in.
+LEAD_EWMA_ALPHA: float = 0.3
+LEAD_SAMPLE_MAX_S: int = 180
+
 # Some firmwares send two heartbeats per wake cycle, e.g. one on connect
 # (battery + rssi for the dashboard) and one just before deep-sleep
 # (with the sleep_until timing). Without debouncing, the second
@@ -88,10 +98,19 @@ class DeviceTelemetry:
     last_wake_offset_s: int | None = None  # actual - predicted, signed
     # Where the prediction came from: "firmware" when the device published
     # sleep_until / next_sleep_s, "configured" when it was derived from the
-    # device's sleep_interval_s setting. Only the configured kind may be
-    # re-derived when an operator edits that setting (#246); a firmware
-    # value is the device's own statement and outranks the config.
+    # device's sleep_interval_s setting, "server" when the server issued the
+    # wake itself (wake alignment: the /status response dictated a one-shot
+    # next_poll_s, so the firmware's own sleep_until — computed before it
+    # read that response — is stale and the server's answer outranks it).
+    # Only the configured kind may be re-derived when an operator edits
+    # that setting (#246); a firmware value is the device's own statement
+    # and outranks the config.
     prediction_source: str | None = None
+    # Smoothed wake-to-checkin latency, learned from arrival offsets
+    # against server-issued wake directives. The wake-alignment math
+    # subtracts it so the paint lands on the grid. None until the first
+    # aligned cycle completes.
+    wake_lead_ewma_s: float | None = None
     # True while the device is configured to stay awake. Such a device has
     # no wake to predict: it is reachable continuously, so smart sync has
     # nothing to wait for and must not hold a fire on its behalf.
@@ -164,6 +183,7 @@ class TelemetryStore:
                 consecutive_on_time_wakes=0,
                 last_wake_offset_s=None,
                 prediction_source="configured",
+                wake_lead_ewma_s=prev.wake_lead_ewma_s,
                 always_on=prev.always_on,
             )
             self._state.devices[device_id] = entry
@@ -237,6 +257,7 @@ class TelemetryStore:
             # info about the upcoming sleep, not a new wake.
             consecutive = prev.consecutive_on_time_wakes
             offset_s: int | None = prev.last_wake_offset_s
+            lead_ewma = prev.wake_lead_ewma_s
             # An always-on panel has no wake to predict: it polls on a cadence
             # the operator can change at any time, and it never sleeps between
             # beats. Scoring those polls against a prediction meant a device
@@ -248,6 +269,15 @@ class TelemetryStore:
                 pass
             elif not is_same_wake and prev.predicted_next_wake_at is not None:
                 offset_s = round(received_at - prev.predicted_next_wake_at)
+                # Against a server-issued wake directive the offset IS the
+                # device's wake-to-checkin latency; fold it into the lead
+                # EWMA the alignment math subtracts next cycle.
+                if prev.prediction_source == "server" and 0 <= offset_s <= LEAD_SAMPLE_MAX_S:
+                    lead_ewma = (
+                        float(offset_s)
+                        if lead_ewma is None
+                        else (1 - LEAD_EWMA_ALPHA) * lead_ewma + LEAD_EWMA_ALPHA * offset_s
+                    )
                 if abs(offset_s) <= ON_TIME_TOLERANCE_S:
                     consecutive = min(consecutive + 1, CONFIDENCE_MAX)
                 else:
@@ -322,11 +352,36 @@ class TelemetryStore:
                 consecutive_on_time_wakes=consecutive,
                 last_wake_offset_s=offset_s,
                 prediction_source=source,
+                wake_lead_ewma_s=lead_ewma,
                 always_on=always_on,
             )
             self._state.devices[device_id] = entry
             self._flush_locked()
             return DeviceTelemetry(**entry.as_dict())
+
+    def note_server_directive(
+        self, device_id: str, *, wake_at: float, interval_s: int
+    ) -> DeviceTelemetry | None:
+        """Record that the server just told this device when to wake
+        (wake alignment: the /status response carried a one-shot
+        ``next_poll_s`` aimed at a wall-clock grid point).
+
+        Called right after ``record_heartbeat`` for the same check-in.
+        The heartbeat's own ``sleep_until`` was computed by the firmware
+        *before* it read the response, from the previous cadence, so for
+        an aligned device the stored prediction is stale the moment it
+        lands; this overwrites it with the instant the server actually
+        asked for. Confidence is left alone — the on-time scoring keeps
+        working against the corrected prediction."""
+        with self._lock:
+            prev = self._state.devices.get(device_id)
+            if prev is None:
+                return None
+            prev.predicted_next_wake_at = wake_at
+            prev.last_sleep_interval_s = max(0, int(interval_s))
+            prev.prediction_source = "server"
+            self._flush_locked()
+            return DeviceTelemetry(**prev.as_dict())
 
     def forget(self, device_id: str) -> None:
         """Drop a device's telemetry. Called when the user deletes
@@ -367,6 +422,16 @@ class TelemetryStore:
                     predicted_next_wake_at=_coerce_float(raw_entry.get("predicted_next_wake_at")),
                     consecutive_on_time_wakes=int(raw_entry.get("consecutive_on_time_wakes") or 0),
                     last_wake_offset_s=_coerce_int(raw_entry.get("last_wake_offset_s")),
+                    # prediction_source persists so a restart doesn't turn a
+                    # server-issued (aligned) or configured prediction into
+                    # an unknown-source one, which would stall both the
+                    # reproject path and the lead EWMA until the next cycle.
+                    prediction_source=(
+                        str(raw_entry["prediction_source"])
+                        if isinstance(raw_entry.get("prediction_source"), str)
+                        else None
+                    ),
+                    wake_lead_ewma_s=_coerce_float(raw_entry.get("wake_lead_ewma_s")),
                     always_on=bool(raw_entry.get("always_on")),
                 )
             except (TypeError, ValueError) as err:

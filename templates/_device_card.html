@@ -745,6 +745,51 @@
           </a>
         </div>
         {% endif %}
+
+        {# Synchronized wake (wake alignment). Advanced, off by default:
+           pins this device's wake grid to the wall clock so every
+           device on the same grid paints together. REST-only (the
+           per-cycle next_poll_s that implements it rides the /status
+           response), hence the wake_align_capable gate. Saved through
+           the combined form like everything else on the card. #}
+        {% if section.wake_align_capable %}
+        <details class="dx-wake-align"{% if section.wake_align.mode %} open{% endif %}>
+          <hr class="dx-divider">
+          <summary class="device-subhead">Synchronized wake</summary>
+          <p class="field-help" style="margin: 4px 0 8px;">
+            Align this device's wakes to the clock instead of counting
+            from its last check-in. Devices set to the same grid wake and
+            repaint together. The server learns each device's wake-to-paint
+            latency after a cycle or two and shifts the wake earlier so the
+            paint itself lands on the grid. Off = today's behaviour.
+          </p>
+          {{ select_field(section.id ~ '-wa-mode', 'wake_align_mode', 'Mode',
+                          value=section.wake_align.mode,
+                          blank_label='Off (wake every sleep interval)',
+                          options=[
+                            {'value': 'interval', 'label': 'On the clock (sleep interval, aligned)'},
+                            {'value': 'times', 'label': 'At set times only'}
+                          ],
+                          help='"On the clock" keeps the sleep interval as the period but lands each wake on anchor + multiples of it, e.g. a 15-minute interval anchored at 00:05 wakes at :05, :20, :35, :50. "At set times" ignores the interval and wakes only at the times listed below. Scheduled dashboards can still wake the device early in interval mode; set-times mode wakes at the listed times only.',
+                          form=_combined_form_id) }}
+          <div class="dx-field-grid">
+            {{ text_input(section.id ~ '-wa-anchor', 'wake_align_anchor', 'Anchor (on-the-clock mode)',
+                          value=section.wake_align.anchor,
+                          placeholder='00:00', type='time',
+                          help='Offset of the wall-clock grid. 00:00 lands wakes on the hour boundaries; 00:05 shifts the whole grid five minutes later.',
+                          form=_combined_form_id) }}
+            {{ text_input(section.id ~ '-wa-times', 'wake_align_times', 'Times (set-times mode)',
+                          value=section.wake_align.times_csv,
+                          placeholder='07:00, 12:30, 19:00',
+                          help='Comma-separated HH:MM local times. The device sleeps from one listed time to the next.',
+                          form=_combined_form_id) }}
+          </div>
+          {{ switch(section.id ~ '-wa-apply-all', 'wake_align_apply_all', 'Apply to all devices on save',
+                    checked=False,
+                    help='Copies this synchronized-wake setting to every REST device on this server, so one save puts the whole fleet on the same grid. Not remembered between saves.',
+                    form=_combined_form_id) }}
+        </details>
+        {% endif %}
       </section>
 
       {# CALIBRATION TAB (orientation card + colour test patterns +

@@ -1385,6 +1385,78 @@ def devices_update_combined(instance_id: str) -> Response:
             ok_messages.append("locale saved")
             any_change = True
 
+    # 8. Synchronized wake (wake alignment). The Schedule tab always
+    # submits the mode select on the combined form; blank means off.
+    # Stored next to sleep_interval_s in settings.devices.<id> as
+    # wake_align_mode / wake_align_anchor / wake_align_times; off drops
+    # all three so the store stays clean. The apply-all switch copies
+    # the same block to every REST device, which is the whole fleet-sync
+    # point: one save, one shared wall-clock grid.
+    if "wake_align_mode" in form:
+        from app import wake_alignment
+
+        wa_mode = (form.get("wake_align_mode") or "").strip().lower()
+        wa_error: str | None = None
+        wa_block: dict[str, Any] = {}
+        if wa_mode in ("", wake_alignment.MODE_OFF):
+            pass
+        elif wa_mode == wake_alignment.MODE_INTERVAL:
+            anchor_raw = (form.get("wake_align_anchor") or "").strip()
+            hm = wake_alignment.parse_hhmm(anchor_raw) if anchor_raw else (0, 0)
+            if hm is None:
+                wa_error = "anchor must be a valid HH:MM time."
+            else:
+                wa_block = {
+                    "wake_align_mode": wake_alignment.MODE_INTERVAL,
+                    "wake_align_anchor": f"{hm[0]:02d}:{hm[1]:02d}",
+                }
+        elif wa_mode == wake_alignment.MODE_TIMES:
+            wa_times = wake_alignment.parse_times_list(form.get("wake_align_times") or "")
+            if not wa_times:
+                wa_error = "list at least one valid HH:MM time for set-times mode."
+            else:
+                wa_block = {
+                    "wake_align_mode": wake_alignment.MODE_TIMES,
+                    "wake_align_times": wa_times,
+                }
+        else:
+            wa_error = f"unknown mode {wa_mode!r}."
+        if wa_error is not None:
+            flash(f"{device.name} synchronized wake: {wa_error}", "error")
+        else:
+            wa_targets = [instance_id]
+            if form.get("wake_align_apply_all"):
+                # Fleet apply: every REST instance shares the grid. REST
+                # only because the per-cycle next_poll_s that implements
+                # alignment rides the /status response.
+                wa_targets = sorted(
+                    d.id
+                    for d in devices_registry.all()
+                    if d.kind_of is not None and d.transport == "rest"
+                )
+                if instance_id not in wa_targets:
+                    wa_targets.append(instance_id)
+            wa_keys = ("wake_align_mode", "wake_align_anchor", "wake_align_times")
+            devices_section = store.get_section("devices") or {}
+            wa_changed = 0
+            for target_id in wa_targets:
+                target_section = dict(devices_section.get(target_id) or {})
+                before = {k: target_section.get(k) for k in wa_keys}
+                for k in wa_keys:
+                    target_section.pop(k, None)
+                target_section.update(wa_block)
+                if before != {k: target_section.get(k) for k in wa_keys}:
+                    store.patch_section("devices", {target_id: target_section})
+                    wa_changed += 1
+            if wa_changed:
+                any_change = True
+                if len(wa_targets) > 1:
+                    ok_messages.append(f"synchronized wake applied to {wa_changed} devices")
+                elif wa_block:
+                    ok_messages.append("synchronized wake saved")
+                else:
+                    ok_messages.append("synchronized wake turned off")
+
     if any_change:
         rebuild_transport_fn()()
         if device.transport == "relay":

@@ -658,8 +658,56 @@ def _refresh_if_widget_change_elapsed(device: Device, push_mgr: Any) -> None:
         widget_next_change.clear(app, device.id)
 
 
-def _next_poll_s(device: Device) -> int:
-    """How many seconds until the firmware should poll again.
+def _wake_alignment_for(device: Device) -> Any:
+    """The device's resolved wake alignment, or ``None`` when off.
+
+    Always-on panels are excluded: they aren't on the sleep grid at all,
+    so aligning their poll cadence would only add jitter to a device
+    that is already continuously reachable."""
+    from app import wake_alignment
+
+    if _device_awake_poll_s(device) is not None:
+        return None
+    section = _settings().get_section("devices") or {}
+    stored = section.get(device.id) if isinstance(section, dict) else None
+    return wake_alignment.alignment_from_stored(stored)
+
+
+def _aligned_wake_epoch(device: Device, alignment: Any, configured: int) -> float | None:
+    """Epoch of the next aligned wake for ``device``, or ``None``.
+
+    The lead comes from telemetry's measured wake-to-checkin EWMA so the
+    paint (not the radio) lands on the grid; zero until the first
+    aligned cycle has been observed. Quiet hours resolve the same way
+    the projection path resolves them, so grid points inside the window
+    are skipped rather than waking a panel automation won't repaint."""
+    from app import wake_alignment
+    from app.quiet_hours import resolve_quiet_hours
+    from app.tz_resolve import app_timezone
+
+    lead = 0
+    telemetry = current_app.config.get("DEVICE_TELEMETRY")
+    if telemetry is not None:
+        try:
+            entry = telemetry.get(device.id)
+            if entry is not None and entry.wake_lead_ewma_s is not None:
+                lead = round(entry.wake_lead_ewma_s)
+        except Exception:
+            lead = 0
+    quiet = resolve_quiet_hours(_settings().get_section("app") or {}, device)
+    return wake_alignment.next_aligned_wake_epoch(
+        alignment,
+        now=time.time(),
+        tz=app_timezone(),
+        interval_s=configured,
+        quiet=quiet,
+        lead_s=lead,
+    )
+
+
+def _next_poll_decision(device: Device) -> tuple[int, int | None]:
+    """How many seconds until the firmware should poll again, plus the
+    absolute wake instant (epoch) when wake alignment issued it.
 
     The configured wake interval is the ceiling: it's the staleness the
     operator signed up for, and it's the only thing covering the update
@@ -671,8 +719,45 @@ def _next_poll_s(device: Device) -> int:
     rotation steps, and a widget's own declaration of when its data turns
     over (#243). Either can be absent; a fault in one must not lose the
     other, so they're gathered independently.
-    """
+
+    Wake alignment reshapes the ceiling. In ``interval`` mode the
+    ceiling becomes "seconds to the next wall-clock grid point" (always
+    at most the configured interval), and the projected-content pulls
+    still apply — a scheduled push is deliberate content, waking early
+    for it is correct. In ``times`` mode the device wakes *only* at the
+    listed times; that's the operator asking for exact wake moments, so
+    nothing pulls it earlier. Any fault in the alignment math falls back
+    to today's relative behaviour rather than stranding the device.
+
+    The second element of the return is ``None`` unless alignment is
+    active; when set it is the same instant as the first element, as an
+    absolute epoch, so capable firmware can sleep to a wall-clock target
+    instead of a relative timer and shed the awake-time slip."""
+    from app import wake_alignment
+
+    now = time.time()
     configured = _configured_poll_s(device)
+    aligned_epoch: float | None = None
+    alignment = None
+    try:
+        alignment = _wake_alignment_for(device)
+        if alignment is not None:
+            aligned_epoch = _aligned_wake_epoch(device, alignment, configured)
+    except Exception:
+        logger.exception("rest: wake alignment failed for device=%s", device.id)
+        alignment, aligned_epoch = None, None
+
+    if alignment is not None and aligned_epoch is not None:
+        aligned_delta = max(1, round(aligned_epoch - now))
+        if alignment.mode == wake_alignment.MODE_TIMES:
+            return aligned_delta, int(now) + aligned_delta
+        configured = aligned_delta
+
+    def _wake_at(result: int) -> int | None:
+        if aligned_epoch is None:
+            return None
+        return int(now) + result
+
     candidates: list[int] = []
     try:
         projected = _projected_poll_s(device, configured)
@@ -689,7 +774,7 @@ def _next_poll_s(device: Device) -> int:
     if declared is not None:
         candidates.append(declared)
     if not candidates:
-        return configured
+        return configured, _wake_at(configured)
     # Ceiling: the configured interval. Floor: _MIN_CONTENT_POLL_S, itself
     # capped by the configured interval so a hot-polling panel keeps its
     # cadence.
@@ -699,7 +784,14 @@ def _next_poll_s(device: Device) -> int:
     # change it could have waited for; a device that never sleeps is already
     # associated, so the cost of an early poll is one conditional GET.
     floor = AWAKE_POLL_MIN_S if _device_awake_poll_s(device) is not None else _MIN_CONTENT_POLL_S
-    return max(min(min(candidates), configured), min(configured, floor))
+    result = max(min(min(candidates), configured), min(configured, floor))
+    return result, _wake_at(result)
+
+
+def _next_poll_s(device: Device) -> int:
+    """Relative-only view of :func:`_next_poll_decision`, kept for
+    callers that don't care about the absolute wake instant."""
+    return _next_poll_decision(device)[0]
 
 
 def _button_wake_s(device: Device) -> int:
@@ -1798,10 +1890,11 @@ def post_status(device_id: str) -> Response:
         except Exception:
             button_result = None
 
+    next_poll_s, wake_at = _next_poll_decision(device)
     response = {
         "status": 200,
         "config": _current_config(device),
-        "next_poll_s": _next_poll_s(device),
+        "next_poll_s": next_poll_s,
         # Integer epoch, NOT a float: CircuitPython / MicroPython clients parse a
         # JSON float into a single-precision float32, whose resolution near 1.78e9
         # is ~128s, so a float server_time rounds to the nearest ~2 minutes (#143).
@@ -1809,6 +1902,30 @@ def post_status(device_id: str) -> Response:
         "server_time": int(time.time()),
         **_resolve_local_time_fields(request_tz),
     }
+    # Wake alignment: the same instant as next_poll_s, as an absolute epoch.
+    # Present only when alignment is active, so /status stays byte-identical
+    # for everything else. Capable firmware sleeps to this wall-clock target
+    # (its clock is disciplined from the HTTP Date header every wake) and
+    # sheds the awake-time slip a relative timer carries; older firmware
+    # ignores it and still lands close via next_poll_s.
+    if wake_at is not None:
+        response["wake_at"] = wake_at
+        # The heartbeat recorded above predicted this device's next wake
+        # from the firmware's own sleep_until, which was computed before
+        # it read this response — stale by construction for an aligned
+        # device. Overwrite with the instant we actually asked for, so
+        # smart sync aims its JIT render at the real wake and the lead
+        # EWMA has a truthful baseline to score arrivals against.
+        telemetry = current_app.config.get("DEVICE_TELEMETRY")
+        if telemetry is not None:
+            try:
+                telemetry.note_server_directive(
+                    device.id, wake_at=float(wake_at), interval_s=next_poll_s
+                )
+            except Exception:
+                current_app.logger.exception(
+                    "rest /status: wake directive note failed for device=%s", device.id
+                )
     if button_result is not None and button_result.rotation_id is not None:
         response["rotation"] = button_result.to_envelope()
     # OTA (#121): hand back a staged, signed descriptor when the device
