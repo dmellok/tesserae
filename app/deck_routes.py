@@ -198,8 +198,13 @@ def _nav_badge(deck: Deck) -> str:
     the deck is idle when it is not."""
     if deck.advance == "manual":
         return "By hand"
-    every = max(1, int(deck.advance_interval_minutes or 0))
-    return f"Every {every} min + tap"
+    dwells = {p.effective_dwell_minutes(deck.advance_interval_minutes) for p in deck.pages}
+    if len(dwells) <= 1:
+        every = max(1, int(next(iter(dwells), deck.advance_interval_minutes) or 0))
+        return f"Every {every} min + tap"
+    # Mixed per-page dwells: the fallback interval describes nothing the
+    # cycle actually does, so badge the full loop instead (#266).
+    return f"Loop {max(1, int(deck.advance_cycle_minutes or 0))} min + tap"
 
 
 def _nav_meta(deck: Deck) -> str:
@@ -879,7 +884,7 @@ def editor(deck_id: str | None = None) -> str | Response:
         "home": (deck.resolved_home_page_id if deck and deck.pages else ""),
         "timeout": deck.home_timeout_minutes if deck else 0,
         "overrides": override_map,
-        "cadence": deck.refresh_interval_minutes if deck else 30,
+        "cadence": deck.refresh_interval_minutes if deck else 15,
         "touchBound": touch_bound,
         "suggestions": suggestions,
         # Device-first flow: the primary display drives the page-library filter.
@@ -1031,9 +1036,9 @@ def editor_save() -> Response:
     except ValueError:
         timeout = 0
     try:
-        cadence = max(0, min(1440, int(form.get("refresh_interval_minutes") or 30)))
+        cadence = max(0, min(1440, int(form.get("refresh_interval_minutes") or 15)))
     except ValueError:
-        cadence = 30
+        cadence = 15
 
     advance_raw = form.get("advance") or "manual"
     if advance_raw not in ("manual", "timer", "both"):

@@ -50,9 +50,15 @@
             <label class="dxe-seg"><input type="radio" name="advance" value="both" {% if adv == 'both' %}checked{% endif %}><span>Both</span></label>
           </div>
           <span class="dxe-interval" id="dxe-interval-wrap">
-            <span class="dxe-every">every</span>
+            {# This is the FALLBACK dwell, not the loop period: a page with
+               its own dwell ignores it entirely (discussion #266 confusion).
+               Label it for what it is and let the hint carry the loop total. #}
+            <span class="dxe-every" title="Used for pages without their own dwell">default dwell</span>
             <select name="advance_interval_minutes" id="dxe-interval">
               {% set ai = deck.advance_interval_minutes if deck else 30 %}
+              {% if ai not in (5, 15, 30, 60) %}
+              <option value="{{ ai }}" selected>{{ ai }} min</option>
+              {% endif %}
               <option value="5" {% if ai == 5 %}selected{% endif %}>5 min</option>
               <option value="15" {% if ai == 15 %}selected{% endif %}>15 min</option>
               <option value="30" {% if ai == 30 %}selected{% endif %}>30 min</option>
@@ -208,7 +214,7 @@
           </div>
           <div class="dxe-set">
             <label class="dxe-mono-label" for="dxe-cadence-num">BACKGROUND REFRESH</label>
-            {% set cad = deck.refresh_interval_minutes if deck else 30 %}
+            {% set cad = deck.refresh_interval_minutes if deck else 15 %}
             <div class="dxe-slider-row">
               <input type="range" id="dxe-cadence-range" min="0" max="360" step="5" value="{{ cad }}"
                      aria-label="Background refresh minutes">
@@ -218,7 +224,7 @@
                 <span class="dxe-dwell-suf">min</span>
               </div>
             </div>
-            <p class="dxe-help" id="dxe-cadence-help">How often pages re-render out of view.</p>
+            <p class="dxe-help" id="dxe-cadence-help">How often member dashboards re-render out of view; takes over from each dashboard's own "Updates" setting while it's in this lineup.</p>
           </div>
           {# Smart sync: promoted per-deck switch (the lead window stays under
              Advanced timing). Hidden by JS while advance is by-hand. #}

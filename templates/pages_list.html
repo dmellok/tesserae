@@ -103,7 +103,8 @@
              renders as itself rather than falling back to the first option. #}
           {% set refresh_presets = [0, 1, 5, 15, 30, 60, 1440] %}
           {% set is_custom = page.refresh_minutes not in refresh_presets %}
-          <select name="refresh_minutes" data-updates-preset aria-label="How often this dashboard re-renders">
+          <select name="refresh_minutes" data-updates-preset aria-label="How often this dashboard re-renders"
+                  title="While this dashboard is in a Lineup, the Lineup's background refresh cadence takes over">
             <option value="0" {% if page.refresh_minutes == 0 %}selected{% endif %}>only when pushed</option>
             <option value="1" {% if page.refresh_minutes == 1 %}selected{% endif %}>every minute</option>
             <option value="5" {% if page.refresh_minutes == 5 %}selected{% endif %}>every 5 min</option>

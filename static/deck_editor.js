@@ -287,6 +287,7 @@
         inp.value = (dwellInput(selected) && dwellInput(selected).value) || "";
         inp.addEventListener("input", () => {
           if (dwellInput(selected)) dwellInput(selected).value = inp.value;
+          updateAdvHint();
           markDirty();
         });
         const suf = document.createElement("span");
@@ -346,6 +347,32 @@
     if (statusWord) statusWord.textContent = enabledBox.checked ? "Enabled" : "Disabled";
   }
 
+  // A full loop is the SUM of per-page dwells (pages without one inherit the
+  // default-dwell select). Shown in the advance hint so the editor states the
+  // real loop period instead of leaving the fallback to be read as one (#266).
+  function loopMinutes(ids) {
+    const fallback = parseInt((el("dxe-interval") || {}).value, 10) || 30;
+    return ids.reduce((total, id) => {
+      const inp = dwellInput(id);
+      const v = inp ? parseInt(inp.value, 10) : NaN;
+      return total + (isNaN(v) || v <= 0 ? fallback : v);
+    }, 0);
+  }
+
+  function updateAdvHint() {
+    if (!advHint) return;
+    const mode = advanceMode();
+    const base =
+      mode === "manual"
+        ? "a tap on the display flips to the next page"
+        : mode === "timer"
+          ? "pages auto-cycle, taps do nothing"
+          : "auto-cycles, and a tap flips early";
+    const ids = orderedIds();
+    advHint.textContent =
+      mode === "manual" || !ids.length ? base : base + " · full loop " + loopMinutes(ids) + " min";
+  }
+
   // -- main render ----------------------------------------------------------
   function render() {
     const ids = orderedIds();
@@ -372,14 +399,7 @@
     const returnWrap = el("dxe-returnhome-wrap");
     if (returnWrap) returnWrap.style.display = mode === "manual" ? "" : "none";
     if (returnSel) returnSel.disabled = mode !== "manual";
-    if (advHint) {
-      advHint.textContent =
-        mode === "manual"
-          ? "a tap on the display flips to the next page"
-          : mode === "timer"
-            ? "pages auto-cycle, taps do nothing"
-            : "auto-cycles, and a tap flips early";
-    }
+    updateAdvHint();
     if (returnHelp) {
       const hn = (pagesById[homeId()] || {}).name;
       returnHelp.textContent = hn ? `Snaps back to ★ ${hn}.` : "Snaps back to the home page.";
@@ -413,7 +433,9 @@
     cadenceRange.value = String(Math.min(v, +cadenceRange.max));
     if (cadenceHelp) {
       cadenceHelp.textContent =
-        v === 0 ? "Manual only, pages re-render when pushed." : "How often pages re-render out of view.";
+        v === 0
+          ? "Manual only, pages re-render when pushed."
+          : "How often member dashboards re-render out of view; takes over from each dashboard's own \"Updates\" setting while it's in this lineup.";
     }
   }
   if (cadenceRange) cadenceRange.addEventListener("input", () => { syncCadence(cadenceRange); markDirty(); });
