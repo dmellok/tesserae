@@ -7,6 +7,7 @@ roundtrip + 422 validation, the grid-page guardrail, and the preview/push paths
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
@@ -1728,3 +1729,89 @@ def test_render_report_lists_touch_primitives_and_who_draws_them(
     report = client.get(f"/api/mcp/pages/{pid}/render_report").get_json()
     # Only the protocol-v2 panel draws its own; "plain" gets a painted control.
     assert all(p["device_drawn"] == ["e1003"] for p in report["touch_primitives"])
+
+
+# -- catalog description budget (#257) ---------------------------------
+
+
+def test_catalog_carries_only_the_first_sentence_of_each_description(app: Flask) -> None:
+    """The catalog was 48% description by weight, paid on every build.
+
+    Every widget's full ``desc`` rode along in ``/catalog`` whether or not the
+    agent placed it. This pins the summary down to one sentence.
+    """
+    _enable(app)
+    resp = app.test_client().get("/api/mcp/catalog")
+    assert resp.status_code == 200
+    widgets = resp.get_json()["widgets"]
+    assert widgets, "no widgets in the catalog"
+
+    for w in widgets:
+        desc = w["desc"]
+        assert "\n" not in desc
+        # One sentence: no full stop followed by more prose.
+        assert not re.search(r"[.!?]\s+\S", desc), f"{w['key']} carries more than one sentence"
+
+
+def test_catalog_summary_is_materially_smaller_than_the_full_text(app: Flask) -> None:
+    """Guards the point of the change, not just its mechanism.
+
+    A summariser that returned the whole string would satisfy every other
+    assertion here; this fails if the saving quietly disappears.
+    """
+    _enable(app)
+    catalog = app.test_client().get("/api/mcp/catalog").get_json()["widgets"]
+    registry = app.config["PLUGIN_REGISTRY"]
+
+    summarised = sum(len(w["desc"].encode()) for w in catalog)
+    full = sum(
+        len(str(registry.get(w["key"]).manifest.get("description") or "").encode()) for w in catalog
+    )
+    assert summarised < full // 2, (
+        f"summarised {summarised} B vs full {full} B — the catalog is no longer paying off"
+    )
+
+
+def test_the_full_description_is_still_reachable_per_widget(app: Flask) -> None:
+    """The text moved, it was not dropped — the round trip has to hold.
+
+    Without this the change is indistinguishable from deleting information the
+    agent needs to pick a widget.
+    """
+    _enable(app)
+    client = app.test_client()
+    catalog = client.get("/api/mcp/catalog").get_json()["widgets"]
+    registry = app.config["PLUGIN_REGISTRY"]
+
+    # The widget with the longest description: the one the truncation matters for.
+    longest = max(
+        catalog,
+        key=lambda w: len(str(registry.get(w["key"]).manifest.get("description") or "")),
+    )
+    expected = str(registry.get(longest["key"]).manifest.get("description") or "")
+
+    resp = client.get(f"/api/mcp/widgets/{longest['key']}/options")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["desc"] == expected
+    assert len(body["desc"]) > len(longest["desc"])
+    # And the summary really is a prefix of the full text, not a rewrite.
+    assert expected.startswith(longest["desc"].rstrip("…"))
+
+
+def test_a_widget_with_no_description_summarises_to_empty(app: Flask) -> None:
+    _enable(app)
+    from app.mcp_api import _desc_summary
+
+    assert _desc_summary("") == ""
+    assert _desc_summary("   ") == ""
+
+
+def test_a_single_long_sentence_is_cut_at_a_word_boundary(app: Flask) -> None:
+    from app.mcp_api import _DESC_SUMMARY_MAX, _desc_summary
+
+    long_sentence = "word " * 100
+    out = _desc_summary(long_sentence)
+    assert len(out) <= _DESC_SUMMARY_MAX + 1  # +1 for the ellipsis
+    assert out.endswith("…")
+    assert "  " not in out
