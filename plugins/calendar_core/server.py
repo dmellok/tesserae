@@ -303,6 +303,37 @@ _WARM_WINDOW_BACK_DAYS = 30
 _WARM_WINDOW_FORWARD_DAYS = 180
 
 
+def _disambiguate_duplicate_uids(cal: Any) -> None:
+    """Give plain VEVENTs that share a UID their own one.
+
+    ``recurring_ical_events`` folds every component carrying the same
+    UID into a single event (per spec a UID names exactly one event),
+    so a feed that reuses a UID across separate VEVENTs — Outlook
+    keeps the UID when an appointment is copied to another day —
+    silently drops all but one of them. Suffix such UIDs with the
+    component's DTSTART so each VEVENT expands on its own. Components
+    with an RRULE or a RECURRENCE-ID keep the shared UID untouched:
+    that is a genuine series plus its overrides, and splitting them
+    would detach the overrides from the rule. Two components with the
+    same UID *and* the same DTSTART still fold into one, which is the
+    right call for a feed that repeats an identical VEVENT verbatim.
+    """
+    plain_uid_counts: dict[str, int] = {}
+    for comp in cal.walk("VEVENT"):
+        if comp.get("RRULE") is None and comp.get("RECURRENCE-ID") is None:
+            uid = str(comp.get("UID") or "")
+            plain_uid_counts[uid] = plain_uid_counts.get(uid, 0) + 1
+    for comp in cal.walk("VEVENT"):
+        if comp.get("RRULE") is not None or comp.get("RECURRENCE-ID") is not None:
+            continue
+        uid = str(comp.get("UID") or "")
+        if plain_uid_counts.get(uid, 0) < 2:
+            continue
+        dtstart = comp.get("DTSTART")
+        suffix = dtstart.dt.isoformat() if dtstart is not None else "no-dtstart"
+        comp["UID"] = f"{uid}#tesserae-dup-{suffix}"
+
+
 def _expand_events_full(blob: bytes, start: datetime, end: datetime) -> list[dict[str, Any]]:
     """Uncached expansion (the previous ``_expand_events`` body). Used
     for the initial warm-cache fill and for windows outside it."""
@@ -310,6 +341,8 @@ def _expand_events_full(blob: bytes, start: datetime, end: datetime) -> list[dic
         cal = icalendar.Calendar.from_ical(blob)
     except Exception:
         return []
+    with contextlib.suppress(Exception):
+        _disambiguate_duplicate_uids(cal)
     out: list[dict[str, Any]] = []
     try:
         events = recurring_ical_events.of(cal).between(start, end)

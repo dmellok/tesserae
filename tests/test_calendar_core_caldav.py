@@ -134,6 +134,78 @@ def test_expand_events_cached_keeps_all_day_event_past_utc_midnight(cc: Any) -> 
     assert [e["summary"] for e in out] == ["Conference"]
 
 
+# -- _expand_events_full duplicate-UID handling --------------------------
+
+ICS_DUP_UID = b"""BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//test//EN
+BEGIN:VEVENT
+UID:travel@test
+DTSTART;VALUE=DATE:20260901
+DTEND;VALUE=DATE:20260902
+SUMMARY:Travel
+END:VEVENT
+BEGIN:VEVENT
+UID:travel@test
+DTSTART;VALUE=DATE:20260902
+DTEND;VALUE=DATE:20260903
+SUMMARY:Travel
+END:VEVENT
+END:VCALENDAR
+"""
+
+ICS_SERIES_WITH_OVERRIDE = b"""BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//test//EN
+BEGIN:VEVENT
+UID:series@test
+DTSTART;VALUE=DATE:20260905
+DTEND;VALUE=DATE:20260906
+RRULE:FREQ=DAILY;COUNT=2
+SUMMARY:Series
+END:VEVENT
+BEGIN:VEVENT
+UID:series@test
+RECURRENCE-ID;VALUE=DATE:20260906
+DTSTART;VALUE=DATE:20260906
+DTEND;VALUE=DATE:20260907
+SUMMARY:Series (moved)
+END:VEVENT
+END:VCALENDAR
+"""
+
+
+def _september_window() -> tuple[Any, Any]:
+    from datetime import UTC, datetime
+
+    return datetime(2026, 8, 25, tzinfo=UTC), datetime(2026, 10, 1, tzinfo=UTC)
+
+
+def test_expand_events_keeps_separate_vevents_that_share_a_uid(cc: Any) -> None:
+    """Feeds from clients that reuse a UID across copied appointments
+    (Outlook drag-copy) used to lose every copy but one, because
+    ``recurring_ical_events`` folds same-UID components into a single
+    event. Both 'Travel' days must survive expansion."""
+    start, end = _september_window()
+    out = cc._expand_events_full(ICS_DUP_UID, start, end)
+    assert [(e["summary"], e["start"]) for e in out] == [
+        ("Travel", "2026-09-01"),
+        ("Travel", "2026-09-02"),
+    ]
+
+
+def test_expand_events_leaves_series_and_overrides_folded(cc: Any) -> None:
+    """A recurring series and its RECURRENCE-ID override legitimately
+    share a UID; the duplicate-UID rewrite must not split them, or the
+    override would stop replacing its occurrence."""
+    start, end = _september_window()
+    out = cc._expand_events_full(ICS_SERIES_WITH_OVERRIDE, start, end)
+    assert [(e["summary"], e["start"]) for e in out] == [
+        ("Series", "2026-09-05"),
+        ("Series (moved)", "2026-09-06"),
+    ]
+
+
 # -- load_todos (feeds.json + auth-aware fetch) --------------------------
 
 
