@@ -352,6 +352,38 @@ def _invalid_icons(layout: CanvasLayout) -> list[dict[str, Any]]:
 
 # -- catalog / widget options -------------------------------------------
 
+# Longest summary the catalog carries before it is cut at a word boundary.
+# Sized off the bundled set: most first sentences are well under this, and the
+# few that run past carry a second clause after a colon rather than being one
+# genuinely long sentence.
+_DESC_SUMMARY_MAX = 160
+
+# A sentence ends at . ! or ? followed by whitespace. Deliberately not a real
+# sentence tokenizer: these are hand-written single paragraphs, and the cost of
+# getting one slightly wrong is a slightly long summary, not a wrong answer.
+_SENTENCE_END = re.compile(r"(?<=[.!?])\s")
+
+
+def _desc_summary(desc: str) -> str:
+    """First sentence of a widget description, capped at a word boundary.
+
+    ``/catalog`` used to carry every widget's full ``desc``: 9,256 B across the
+    36 bundled widgets, 48% of the ``widgets`` block and the largest single
+    line item in an agent's context budget — paid on every build, for every
+    widget, whether or not it was placed (#257). Summarised it is 2,884 B.
+
+    The full text is not lost, it moves one call along: ``GET
+    /widgets/<key>/options`` now returns it, and that is the call an agent
+    already makes for the two or three widgets it actually places.
+    """
+    text = " ".join(desc.split())
+    if not text:
+        return ""
+    first = _SENTENCE_END.split(text, 1)[0]
+    if len(first) <= _DESC_SUMMARY_MAX:
+        return first
+    return first[:_DESC_SUMMARY_MAX].rsplit(" ", 1)[0] + "…"
+
 
 @bp.get("/catalog")
 def catalog() -> Response:
@@ -361,9 +393,20 @@ def catalog() -> Response:
 
     The per-widget ``sample`` payload is omitted here to keep the response small;
     fetch a widget's live data shape with ``POST /widgets/<key>/data`` instead.
-    The full icon name list is searched via ``GET /icons?q=`` rather than inlined."""
+    The full icon name list is searched via ``GET /icons?q=`` rather than inlined.
+    ``desc`` is the first sentence only; ``GET /widgets/<key>/options`` returns
+    the widget's full description alongside its options."""
     widgets = build_catalog(_pr._registry())
-    lean = [{k: v for k, v in w.items() if k != "sample"} for w in widgets]
+    lean = [
+        {
+            **{k: v for k, v in w.items() if k != "sample"},
+            # Summarised, not dropped: the descriptions are what let an agent
+            # pick the right widget, so the full text stays reachable on the
+            # per-widget call rather than riding along 36 times (#257).
+            "desc": _desc_summary(str(w.get("desc") or "")),
+        }
+        for w in widgets
+    ]
     return jsonify(
         {
             "widgets": lean,
@@ -470,7 +513,10 @@ def widget_options(key: str) -> Response:
     Big ``choices`` lists (HA entity pickers) are omitted by default to keep the
     response small: an option with a long list shows ``choices_count`` and a
     ``choices_endpoint`` instead. Pass ``?include_choices=true`` to inline them
-    anyway. Each option also carries a ``format`` hint for its type."""
+    anyway. Each option also carries a ``format`` hint for its type.
+
+    Also returns this widget's full ``desc``. ``/catalog`` carries only the
+    first sentence, so this is where the rest of it lives."""
     plugin = _pr._registry().get(key)
     if plugin is None:
         return _err(404, f"unknown widget {key!r}")
@@ -487,7 +533,13 @@ def widget_options(key: str) -> Response:
             o["choices_endpoint"] = f"/widgets/{key}/choices?option={o.get('name')}"
             o.pop("choices", None)
         opts.append(o)
-    return jsonify({"key": key, "options": opts})
+    return jsonify(
+        {
+            "key": key,
+            "desc": str(plugin.manifest.get("description") or ""),
+            "options": opts,
+        }
+    )
 
 
 @bp.get("/widgets/<key>/choices")
