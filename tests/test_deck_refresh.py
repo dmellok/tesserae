@@ -233,3 +233,42 @@ def test_home_return_respects_quiet_hours(tmp_path: Path) -> None:
     pusher.quiet = False
     sched._maybe_return_decks_home(T0 + timedelta(minutes=31))
     assert pusher.promoted == [("panel", "home")]
+
+
+def test_same_cadence_pages_dephase_after_first_pass(tmp_path: Path) -> None:
+    """Same-interval siblings all warm on the first pass (fresh cache), but
+    their NEXT due times spread across the interval instead of staying in
+    lockstep forever (#266: History read as N identical rows on a grid)."""
+    store = DeckStore(tmp_path / "decks.json")
+    store.upsert(
+        Deck(
+            id="d",
+            name="D",
+            device_ids=["panel"],
+            refresh_interval_minutes=15,
+            pages=[DeckPage(page_id="one"), DeckPage(page_id="two"), DeckPage(page_id="three")],
+        )
+    )
+    pusher = FakePush()
+    s = _scheduler(tmp_path, store, pusher)
+
+    s._warm_decks(T0)
+    assert set(pusher.warmed) == {("one", "panel"), ("two", "panel"), ("three", "panel")}
+
+    # The 15-minute interval is walked in 5-minute thirds: one page per slot.
+    pusher.warmed.clear()
+    s._warm_decks(T0 + timedelta(minutes=5))
+    assert pusher.warmed == [("three", "panel")]
+
+    pusher.warmed.clear()
+    s._warm_decks(T0 + timedelta(minutes=10))
+    assert pusher.warmed == [("two", "panel")]
+
+    pusher.warmed.clear()
+    s._warm_decks(T0 + timedelta(minutes=15))
+    assert pusher.warmed == [("one", "panel")]
+
+    # Steady state: each page then keeps its own 15-minute cadence.
+    pusher.warmed.clear()
+    s._warm_decks(T0 + timedelta(minutes=20))
+    assert pusher.warmed == [("three", "panel")]

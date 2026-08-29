@@ -205,3 +205,40 @@ def test_a_hold_longer_than_the_dwell_still_slows_the_cycle(wiring) -> None:
     # Every other 30-minute window is held, so the panel repaints hourly,
     # which is what asking for a 60-minute hold means.
     assert fired_at == ["00:00", "01:00", "02:00"]
+
+
+def test_promoted_advance_writes_a_history_row(tmp_path: Path) -> None:
+    """A cache-hit promote changes what the panel shows without a push, so the
+    scheduler writes the History (``type="push"``) row itself; otherwise the
+    flip a person actually saw never appears on /history (#266)."""
+    from app.state.event_log import EventLog
+
+    deck_store = DeckStore(tmp_path / "decks.json")
+    deck_store.upsert(_deck())
+    push = MagicMock()
+    push.promote_deck_page.return_value = True
+    push.deck_render_for.return_value = {"composition_digest": "compdigest"}
+    push.device_in_quiet_hours.return_value = False
+    log = EventLog(tmp_path / "events.db")
+    scheduler = Scheduler(
+        store=ScheduleStore(tmp_path / "s.json"),
+        deck_store=deck_store,
+        deck_nav_store=MagicMock(),
+        push_manager=lambda: push,
+        page_exists=lambda _pid: True,
+        timezone_provider=lambda: UTC,
+        event_log=log,
+    )
+    scheduler._tick_once(datetime(2026, 6, 15, 0, 0, tzinfo=UTC))
+
+    push.push.assert_not_called()
+    rows = log.list(type="push", source="deck", limit=5)
+    assert len(rows) == 1
+    row = rows[0]
+    assert row.status == "sent"
+    assert row.target == "a"
+    assert row.digest == "compdigest"
+    assert row.extra["promoted"] is True
+    assert row.extra["device_ids"] == ["panel"]
+    # The internal advance event is still recorded alongside.
+    assert log.list(type="deck", limit=5)

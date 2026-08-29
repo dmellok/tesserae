@@ -168,3 +168,9 @@
   background: var(--t-pill-neutral-bg);
   color: var(--t-pill-neutral-fg);
 }
+/* Background work (deck / album warms): deliberately quieter than the
+   real push tones, matching its hidden-by-default standing in the feed. */
+.dx-source-warm {
+  background: color-mix(in oklab, var(--t-muted) 12%, var(--t-surface));
+  color: var(--t-muted);
+}

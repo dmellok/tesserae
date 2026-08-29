@@ -19,6 +19,11 @@
   'resend':         ('Resend',         'arrow-clockwise',      'resend'),
   'onboarding':     ('Setup',          'sparkle',              'setup'),
   'button':         ('Button',         'hand-tap',             'button'),
+  'deck':           ('Rotation step',      'arrows-clockwise', 'rotation'),
+  'deck_init':      ('Lineup start',       'play',             'rotation'),
+  'deck_warm':      ('Background refresh', 'clock-clockwise',  'warm'),
+  'album_warm':     ('Album refresh',      'images',           'warm'),
+  'page_refresh':   ('Auto update',        'clock-clockwise',  'schedule'),
 } %}
 
 {% macro source_chip(source) %}
@@ -37,6 +42,9 @@
      matches the actual guarantee; separate receipt tracking is a
      follow-up. #}
   {% if status == 'sent' %}<span class="dx-pill is-ok"><span class="dx-pill-dot"></span>pushed</span>
+  {# A warm renders into the deck/album side cache without repainting the
+     panel; it must not wear the same pill as a push the display showed. #}
+  {% elif status == 'warmed' %}<span class="dx-pill is-info"><span class="dx-pill-dot"></span>warmed</span>
   {% elif status == 'no_change' %}<span class="dx-pill is-info"><span class="dx-pill-dot"></span>no change</span>
   {% elif status == 'dispatched' %}<span class="dx-pill is-ok"><span class="dx-pill-dot"></span>button</span>
   {% elif status == 'webhook_dispatched' %}<span class="dx-pill is-info"><span class="dx-pill-dot"></span>webhook</span>
@@ -75,26 +83,40 @@
   {% endfor %}
   {# Skipped-pushes toggle preserves the existing behaviour, restyled. #}
   {% if include_skipped %}
-  <a href="{{ url_for('history.index', source=active_source, split_presses=(1 if split_presses else None), sort=(sort_mode if sort_mode != 'time' else None)) }}"
+  <a href="{{ url_for('history.index', source=active_source, include_background=(1 if include_background else None), split_presses=(1 if split_presses else None), sort=(sort_mode if sort_mode != 'time' else None)) }}"
      class="dx-filter-chip is-active" title="Hide skipped pushes (quiet hours, condition holds)">
     <i class="ph ph-eye" aria-hidden="true"></i><span>Skipped shown</span>
   </a>
   {% else %}
-  <a href="{{ url_for('history.index', source=active_source, include_skipped=1, split_presses=(1 if split_presses else None), sort=(sort_mode if sort_mode != 'time' else None)) }}"
+  <a href="{{ url_for('history.index', source=active_source, include_skipped=1, include_background=(1 if include_background else None), split_presses=(1 if split_presses else None), sort=(sort_mode if sort_mode != 'time' else None)) }}"
      class="dx-filter-chip" title="Show pushes skipped by quiet hours or condition holds">
     <i class="ph ph-eye-closed" aria-hidden="true"></i><span>Show skipped</span>
+  </a>
+  {% endif %}
+  {# Background work (deck / album warms) is hidden by default so the feed
+     reads as "what the panels actually showed"; this toggle brings it back
+     for anyone auditing the render pipeline. #}
+  {% if include_background %}
+  <a href="{{ url_for('history.index', source=active_source, include_skipped=(1 if include_skipped else None), split_presses=(1 if split_presses else None), sort=(sort_mode if sort_mode != 'time' else None)) }}"
+     class="dx-filter-chip is-active" title="Hide background refresh renders (they never repaint a panel)">
+    <i class="ph ph-clock-clockwise" aria-hidden="true"></i><span>Background shown</span>
+  </a>
+  {% else %}
+  <a href="{{ url_for('history.index', source=active_source, include_background=1, include_skipped=(1 if include_skipped else None), split_presses=(1 if split_presses else None), sort=(sort_mode if sort_mode != 'time' else None)) }}"
+     class="dx-filter-chip" title="Show background refresh renders (warmed frames that never repainted a panel)">
+    <i class="ph ph-clock-clockwise" aria-hidden="true"></i><span>Show background</span>
   </a>
   {% endif %}
   {# Press-fold toggle: by default a button/touch press and the push it
      triggered render as one merged row; splitting shows the raw
      two-row log for auditing. #}
   {% if split_presses %}
-  <a href="{{ url_for('history.index', source=active_source, include_skipped=(1 if include_skipped else None), sort=(sort_mode if sort_mode != 'time' else None)) }}"
+  <a href="{{ url_for('history.index', source=active_source, include_skipped=(1 if include_skipped else None), include_background=(1 if include_background else None), sort=(sort_mode if sort_mode != 'time' else None)) }}"
      class="dx-filter-chip is-active" title="Fold button presses into the push they triggered">
     <i class="ph ph-arrows-in-line-vertical" aria-hidden="true"></i><span>Presses split</span>
   </a>
   {% else %}
-  <a href="{{ url_for('history.index', source=active_source, include_skipped=(1 if include_skipped else None), split_presses=1, sort=(sort_mode if sort_mode != 'time' else None)) }}"
+  <a href="{{ url_for('history.index', source=active_source, include_skipped=(1 if include_skipped else None), include_background=(1 if include_background else None), split_presses=1, sort=(sort_mode if sort_mode != 'time' else None)) }}"
      class="dx-filter-chip" title="Show presses and the pushes they triggered as separate rows">
     <i class="ph ph-arrows-out-line-vertical" aria-hidden="true"></i><span>Split presses</span>
   </a>
@@ -103,12 +125,12 @@
      (rows already come back that way from the event log); "By
      dashboard" groups rows sharing a target so a per-dashboard read
      is one scroll rather than a needle-in-haystack scan. #}
-  <a href="{{ url_for('history.index', source=active_source, include_skipped=(1 if include_skipped else None), split_presses=(1 if split_presses else None)) }}"
+  <a href="{{ url_for('history.index', source=active_source, include_skipped=(1 if include_skipped else None), include_background=(1 if include_background else None), split_presses=(1 if split_presses else None)) }}"
      class="dx-filter-chip{% if sort_mode == 'time' %} is-active{% endif %}"
      title="Sort chronologically (newest first)">
     <i class="ph ph-clock-counter-clockwise" aria-hidden="true"></i><span>Newest first</span>
   </a>
-  <a href="{{ url_for('history.index', source=active_source, include_skipped=(1 if include_skipped else None), split_presses=(1 if split_presses else None), sort='dashboard') }}"
+  <a href="{{ url_for('history.index', source=active_source, include_skipped=(1 if include_skipped else None), include_background=(1 if include_background else None), split_presses=(1 if split_presses else None), sort='dashboard') }}"
      class="dx-filter-chip{% if sort_mode == 'dashboard' %} is-active{% endif %}"
      title="Group rows sharing a dashboard (or device, for button rows)">
     <i class="ph ph-squares-four" aria-hidden="true"></i><span>By dashboard</span>
@@ -152,7 +174,7 @@
   </div>
   {% else %}
   <ul class="dx-discovered-list">
-    {% set ok_statuses = ('sent', 'busy', 'quiet', 'no_change', 'dispatched', 'webhook_dispatched', 'fetched', 'noop', 'deduped', 'unmapped') %}
+    {% set ok_statuses = ('sent', 'warmed', 'busy', 'quiet', 'no_change', 'dispatched', 'webhook_dispatched', 'fetched', 'noop', 'deduped', 'unmapped') %}
     {% for ev in history %}
     {% set is_failed = ev.status not in ok_statuses or (ev.push_status and ev.push_status not in ok_statuses) %}
     <li class="dx-inset-row dx-history-row{% if is_failed %} dx-history-row--failed{% endif %}">

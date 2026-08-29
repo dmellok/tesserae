@@ -189,3 +189,13 @@ def test_forget_device_survives_a_restart(wired, tmp_path) -> None:
     manager.forget_device("panel")
     reloaded = manager._load_latest_renders()
     assert "panel" not in reloaded
+
+
+def test_warm_is_logged_as_warmed_not_pushed(wired) -> None:
+    """A warm never repaints a panel, so its History row must not carry the
+    same ``sent`` status as a push a display actually showed (#266)."""
+    manager = wired
+    with patch("app.push.capture_composed", return_value=(_png((0, 0, 255)), [])):
+        assert manager.warm_deck_page("p_b", "panel") is True
+    rows = manager._event_log.list(type="push", source="deck_warm", limit=1)
+    assert rows and rows[0].status == "warmed"

@@ -1343,6 +1343,27 @@ class Scheduler:
                 "promoted" if promoted else "pushed",
             )
             if self._event_log is not None:
+                if promoted:
+                    # A cache-hit promote changes what the panel shows without
+                    # touching the push pipeline, so nothing else writes a
+                    # History (``type="push"``) row for it. Record one here,
+                    # otherwise History lists the background warms nobody sees
+                    # while the flip the person actually watched is invisible.
+                    render_for = getattr(pusher, "deck_render_for", None)
+                    info = render_for(device_id, target) if callable(render_for) else None
+                    comp = (info or {}).get("composition_digest")
+                    self._event_log.record(
+                        type="push",
+                        source="deck",
+                        target=target,
+                        status="sent",
+                        digest=str(comp) if comp else None,
+                        extra={
+                            "device_ids": [device_id],
+                            "promoted": True,
+                            "deck_id": deck.id,
+                        },
+                    )
                 self._event_log.record(
                     type="deck",
                     source="deck",
@@ -1383,11 +1404,22 @@ class Scheduler:
         for deck in self._deck_store.all():
             if not deck.enabled or not deck.device_ids:
                 continue
+            # Pages sharing an effective cadence, for the first-pass stagger
+            # below: same-interval siblings are the ones that would otherwise
+            # re-warm in lockstep forever.
+            cadence_peers: dict[int, int] = {}
+            for page in deck.pages:
+                interval = page.effective_refresh_minutes(deck.refresh_interval_minutes)
+                if interval > 0:
+                    cadence_peers[interval] = cadence_peers.get(interval, 0) + 1
             for device_id in deck.device_ids:
+                cadence_pos: dict[int, int] = {}
                 for page in deck.pages:
                     interval = page.effective_refresh_minutes(deck.refresh_interval_minutes)
                     if interval <= 0:
                         continue
+                    pos = cadence_pos.get(interval, 0)
+                    cadence_pos[interval] = pos + 1
                     key = f"{deck.id}\x00{device_id}\x00{page.page_id}"
                     last = self._deck_last_warm.get(key)
                     if last is not None and now_ts - last < interval * 60:
@@ -1401,7 +1433,18 @@ class Scheduler:
                             page.page_id,
                             device_id,
                         )
-                    self._deck_last_warm[key] = now_ts
+                    if last is None:
+                        # First sighting (fresh start): every page warms in this
+                        # pass, and stamping same-cadence siblings all with
+                        # ``now`` would keep them re-warming in lockstep forever
+                        # (History then reads as N identical rows on a grid,
+                        # discussion #266). Backdate each stamp by its position
+                        # among its cadence peers so the next due times spread
+                        # across the interval instead of landing together.
+                        offset_s = (pos * interval * 60.0) / cadence_peers[interval]
+                        self._deck_last_warm[key] = now_ts - offset_s
+                    else:
+                        self._deck_last_warm[key] = now_ts
 
     def compute_step_state(
         self, rotation: Rotation, now: datetime | None = None

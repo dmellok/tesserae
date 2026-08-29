@@ -2489,11 +2489,18 @@ class PushManager:
             # History returns it for reproduce / re-target; the retained
             # composition is already framed, so resend needs nothing more.
             event_extra["framing"] = dict(framing)
+        # A successful warm (deck / album background refresh) rendered into
+        # the side cache and never repainted a panel, so it must not be
+        # logged with the same status as a push a display actually showed.
+        # Only the recorded row changes: callers still see ``sent``.
+        recorded_status: str = status
+        if status == "sent" and source in ("deck_warm", "album_warm"):
+            recorded_status = "warmed"
         event_id = self._event_log.record(
             type="push",
             source=source,
             target=target,
-            status=status,
+            status=recorded_status,
             digest=comp_digest,
             error=error,
             duration_s=duration,

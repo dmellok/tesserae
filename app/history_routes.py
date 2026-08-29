@@ -30,6 +30,10 @@ FILTERABLE_SOURCES = (
     "page",
     "scheduler",
     "rotation",
+    "deck",
+    "deck_warm",
+    "deck_init",
+    "page_refresh",
     "webhook",
     "home_assistant",
     "file",
@@ -265,12 +269,25 @@ def _button_detail(ev: EventRow, page_names: dict[str, str]) -> str | None:
 # slot didn't fire.
 _DEFAULT_HIDDEN_STATUSES: tuple[str, ...] = ("quiet", "held")
 
+# Sources whose successful rows are background warms (rendered into the
+# deck / album side cache, never painted on a panel). Their rows carry
+# status ``warmed`` and are hidden by default so the feed reads as "what
+# the panels actually showed"; ``?include_background=1`` (or filtering to
+# one of these sources directly) brings them back.
+_BACKGROUND_SOURCES: tuple[str, ...] = ("deck_warm", "album_warm")
+
 
 @bp.get("")
 def index() -> str:
     raw_source = (request.args.get("source") or "").strip()
     source = raw_source or None
     include_skipped = (request.args.get("include_skipped") or "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+    include_background = (request.args.get("include_background") or "").strip().lower() in (
         "1",
         "true",
         "yes",
@@ -292,7 +309,10 @@ def index() -> str:
     if sort_mode not in ("dashboard",):
         sort_mode = "time"
     events = _events()
-    exclude_statuses = None if include_skipped else _DEFAULT_HIDDEN_STATUSES
+    hidden: tuple[str, ...] = () if include_skipped else _DEFAULT_HIDDEN_STATUSES
+    if not include_background and source not in _BACKGROUND_SOURCES:
+        hidden = (*hidden, "warmed")
+    exclude_statuses = hidden or None
     history = history_view(
         events.list(
             type="push",
@@ -330,6 +350,7 @@ def index() -> str:
         chips=chips,
         active_source=source,
         include_skipped=include_skipped,
+        include_background=include_background,
         split_presses=split_presses,
         sort_mode=sort_mode,
     )
