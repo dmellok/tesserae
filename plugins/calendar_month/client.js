@@ -176,7 +176,14 @@ export default function render(shadow, ctx) {
           const colour = ev.colour || "var(--accent-4)";
           const location = showLocations && ev.location ? ev.location : "";
           const text = location ? `${ev.summary || ""} · ${location}` : (ev.summary || "");
-          return `<span class="mc-text" style="border-left-color:${colour}" title="${escapeHtml(text)}">${escapeHtml(text)}</span>`;
+          // A multi-day event occupies every cell it runs through. A month
+          // grid has far less room per cell than a week column, so repeating
+          // the full title in each is mostly noise: mark the pass-through
+          // days with a leading arrow. The untouched title stays in the
+          // tooltip, so the cell is still identifiable.
+          const label = ev.continued ? `↳ ${text}` : text;
+          const cls = ev.continued ? "mc-text is-continued" : "mc-text";
+          return `<span class="${cls}" style="border-left-color:${colour}" title="${escapeHtml(text)}">${escapeHtml(label)}</span>`;
         }).join("")}
         ${remainder > 0 ? `<span class="mc-more">+${remainder}</span>` : ""}`;
     } else {
@@ -244,6 +251,11 @@ export default function render(shadow, ctx) {
        title_scale: the "MONTH YYYY" dashboard title. */
     .mc-num { font-size: calc(var(--fs-body) * var(--mc-header-scale, 1)); }
     .mc-text { font-size: calc(var(--fs-caption) * var(--mc-event-scale, 1)); }
+    /* Pass-through day of a multi-day event: present, but visually
+       subordinate to the cell where it actually starts. Opacity rather
+       than a lighter colour so it survives the 1-bit and greyscale
+       panels the same way the rest of the grid does. */
+    .mc-text.is-continued { opacity: 0.72; }
     .mc-cell { padding: calc(var(--space-1) + var(--mc-row-pad, 0em)) var(--space-2); }
     .cal-head-title { font-size: calc(1em * var(--mc-dash-title-scale, 1)); }
     .cal-head-meta { font-size: calc(1em * var(--mc-dash-title-scale, 1)); }

@@ -229,3 +229,98 @@ def test_calendar_month_expands_all_day_events_across_visible_dates(
     assert events_by_date["2026-07-05"] == ["Long weekend"]
     assert events_by_date["2026-07-06"] == ["Long weekend"]
     assert events_by_date["2026-07-07"] == []
+
+
+def test_calendar_month_spreads_multi_day_timed_events_across_covered_dates(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A timed span occupies every day it runs through, not just its start.
+
+    The week view already spreads these (#210); bucketing them on the start
+    day alone made a trip vanish from every later month cell.
+    """
+    month = _plugin(app, "calendar_month")
+    core = _core_plugin(app)
+    app.config["SETTINGS_STORE"].update_section("app", {"timezone": "Asia/Hong_Kong"})
+    frozen = datetime(2026, 7, 5, 10, 0, tzinfo=UTC)
+
+    def load_events(
+        _feeds_filter: list[str] | None,
+        _start: datetime,
+        _end: datetime,
+        *,
+        data_dir: Any,
+    ) -> list[dict[str, Any]]:
+        del data_dir
+        return [
+            {
+                # Friday 16:00 -> Monday 10:00, Hong Kong local.
+                "summary": "Trip",
+                "start": "2026-07-03T08:00:00+00:00",
+                "end": "2026-07-06T02:00:00+00:00",
+                "all_day": False,
+                "feed_colour": "#0d8c7e",
+            }
+        ]
+
+    monkeypatch.setattr(month, "datetime", _freeze_datetime(frozen))
+    monkeypatch.setattr(core.server_module, "load_events", load_events)
+
+    with app.app_context():
+        out = month.fetch({}, {}, ctx={})
+
+    by_date = {day["date"]: [e["summary"] for e in day["events"]] for day in out["days"]}
+    # The bug: only 07-03 carried the trip, every later cell of the span
+    # was empty while the week view spanned all four columns.
+    assert by_date["2026-07-03"] == ["Trip"]
+    assert by_date["2026-07-04"] == ["Trip"]
+    assert by_date["2026-07-05"] == ["Trip"]
+    assert by_date["2026-07-06"] == ["Trip"]
+    assert by_date["2026-07-07"] == []
+
+    # Only the start day is a fresh occurrence; the rest are pass-throughs,
+    # so the cell can mark them instead of repeating the title.
+    continued = {day["date"]: [e["continued"] for e in day["events"]] for day in out["days"]}
+    assert continued["2026-07-03"] == [False]
+    assert continued["2026-07-04"] == [True]
+    assert continued["2026-07-05"] == [True]
+    assert continued["2026-07-06"] == [True]
+
+
+def test_calendar_month_timed_event_ending_at_midnight_does_not_spill(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """End is exclusive: a block ending at local midnight stops the day before."""
+    month = _plugin(app, "calendar_month")
+    core = _core_plugin(app)
+    app.config["SETTINGS_STORE"].update_section("app", {"timezone": "Asia/Hong_Kong"})
+    frozen = datetime(2026, 7, 5, 10, 0, tzinfo=UTC)
+
+    def load_events(
+        _feeds_filter: list[str] | None,
+        _start: datetime,
+        _end: datetime,
+        *,
+        data_dir: Any,
+    ) -> list[dict[str, Any]]:
+        del data_dir
+        return [
+            {
+                # 22:00 Friday -> 00:00 Saturday, Hong Kong local.
+                "summary": "Night shift",
+                "start": "2026-07-03T14:00:00+00:00",
+                "end": "2026-07-03T16:00:00+00:00",
+                "all_day": False,
+                "feed_colour": "#0d8c7e",
+            }
+        ]
+
+    monkeypatch.setattr(month, "datetime", _freeze_datetime(frozen))
+    monkeypatch.setattr(core.server_module, "load_events", load_events)
+
+    with app.app_context():
+        out = month.fetch({}, {}, ctx={})
+
+    by_date = {day["date"]: [e["summary"] for e in day["events"]] for day in out["days"]}
+    assert by_date["2026-07-03"] == ["Night shift"]
+    assert by_date["2026-07-04"] == []
