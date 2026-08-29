@@ -6,6 +6,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **Calendar widgets no longer fail with "invalid language tag: C".** With the app
+  locale left on "system", a host `LANG`/`LC_ALL` of `C.UTF-8` (the usual default in
+  Docker and Ubuntu environments) leaked through locale detection as the literal tag
+  `C`, which the calendar Day / Week / Month widgets' date formatting rejects. `C` and
+  `POSIX` values are now treated as "no locale configured" regardless of codeset
+  suffix, falling back to the next source in the chain.
+
 ### Added
 
 - **Calendar widgets can read Home Assistant calendars.** A calendar feed can now point

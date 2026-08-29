@@ -59,11 +59,15 @@ def _system_locale() -> str | None:
     keeps this module free of a stdlib API on its way out."""
     for var in _LOCALE_ENV_VARS:
         raw = os.environ.get(var, "").strip()
-        if not raw or raw.upper() in ("C", "POSIX"):
+        if not raw:
             continue
         tag = raw.split(".", 1)[0].replace("_", "-")  # drop ".UTF-8", "_" -> "-"
-        if tag:
-            return tag
+        # Compare after stripping the codeset so "C.UTF-8" (the usual
+        # Docker/Ubuntu default) is skipped like bare "C", not returned
+        # as a language tag Intl will reject.
+        if not tag or tag.upper() in ("C", "POSIX"):
+            continue
+        return tag
     return None
 
 

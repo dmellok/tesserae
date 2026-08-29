@@ -63,6 +63,20 @@ def test_c_and_posix_locale_are_treated_as_unset(monkeypatch: pytest.MonkeyPatch
     assert resolve_locale({}, None) == DEFAULT_LOCALE
 
 
+def test_c_with_codeset_is_treated_as_unset(monkeypatch: pytest.MonkeyPatch) -> None:
+    """ "C.UTF-8" (the usual Docker/Ubuntu default) must be skipped like
+    bare "C"; leaking the tag "C" makes Intl throw in calendar widgets."""
+    monkeypatch.setenv("LC_ALL", "C.UTF-8")
+    monkeypatch.setenv("LANG", "POSIX.UTF-8")
+    assert resolve_locale({}, None) == DEFAULT_LOCALE
+
+
+def test_c_codeset_lc_all_still_yields_to_real_lang(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LC_ALL", "C.UTF-8")
+    monkeypatch.setenv("LANG", "de_DE.UTF-8")
+    assert resolve_locale({}, None) == "de-DE"
+
+
 def test_no_env_vars_falls_back_to_en(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("LC_ALL", raising=False)
     monkeypatch.delenv("LANG", raising=False)
