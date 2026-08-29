@@ -9,6 +9,8 @@ expansion live in one place.
 
 Feeds are stored in ``feeds.json`` inside the plugin's data_dir:
   {"feeds": [{"id": "..", "name": "..", "url": "..", "colour": "#..", "enabled": true}]}
+A feed can instead point at a Home Assistant calendar entity:
+  {"id": "..", "name": "..", "source": "ha", "entity_id": "calendar...", ...}
 The admin page (mounted at /plugins/calendar_core/) provides CRUD for
 this list, same shape as the todo plugin.
 
@@ -405,6 +407,134 @@ def _expand_events_cached(
 _expand_events = _expand_events_full
 
 
+# ----- Home Assistant calendars ---------------------------------------
+#
+# A feed row can point at a Home Assistant calendar entity instead of an
+# ICS URL: ``{"source": "ha", "entity_id": "calendar.family", ...}``
+# (rows without a ``source`` are the original ICS/CalDAV kind). Events
+# come from HA's REST API through the ha_core plugin, which owns the
+# base URL + token, via the same registry reach-in the calendar widgets
+# use to call into this module. HA expands recurrences server-side, so
+# these feeds skip the ICS expansion cache entirely; each requested
+# window is cached whole for the same TTL as an ICS fetch. Widget
+# windows are local-midnight aligned, so the cache keys stay stable
+# between renders.
+
+_HA_CACHE_MAX = 64
+_ha_events_cache: dict[tuple[str, str, str], tuple[float, list[dict[str, Any]]]] = {}
+
+
+def feed_source(feed: dict[str, Any]) -> str:
+    """``"ha"`` for a Home Assistant calendar feed, else ``"ics"``."""
+    return "ha" if str(feed.get("source") or "").strip().lower() == "ha" else "ics"
+
+
+def _ha_core() -> Any:
+    """ha_core's server module via the live registry, or None when the
+    plugin isn't installed (or there is no app context, e.g. standalone
+    module use in tests)."""
+    try:
+        plugin = current_app.config["PLUGIN_REGISTRY"].get("ha_core")
+    except Exception:
+        return None
+    return plugin.server_module if plugin is not None else None
+
+
+def _parse_ha_when(value: Any) -> tuple[str, bool] | None:
+    """One HA event boundary (``{"dateTime": ...}`` / ``{"date": ...}``,
+    or a bare ISO string) → ``(iso, all_day)``, or None when unusable.
+    Timed values are normalised to UTC ISO like the ICS path, so the
+    widgets' local-day bucketing sees a single shape."""
+    raw: Any = value
+    if isinstance(value, dict):
+        if value.get("date"):
+            return str(value["date"]), True
+        raw = value.get("dateTime")
+    if not raw or not isinstance(raw, str):
+        return None
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", raw):  # bare date, all-day
+        return raw, True
+    try:
+        dt = datetime.fromisoformat(raw)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC).isoformat(), False
+
+
+def _normalise_ha_event(raw: dict[str, Any]) -> dict[str, Any] | None:
+    """One HA API event → the event dict shape ``load_events`` emits, or
+    None when it has no usable start."""
+    start = _parse_ha_when(raw.get("start"))
+    if start is None:
+        return None
+    s_iso, all_day = start
+    end = _parse_ha_when(raw.get("end"))
+    e_iso = end[0] if end is not None else s_iso
+    return {
+        "summary": str(raw.get("summary") or "").strip() or "(untitled)",
+        "location": str(raw.get("location") or "").strip(),
+        "start": s_iso,
+        "end": e_iso,
+        "all_day": all_day,
+    }
+
+
+def _fetch_ha_events(
+    feed: dict[str, Any],
+    start: datetime,
+    end: datetime,
+    data_dir: Path,
+) -> list[dict[str, Any]]:
+    """Events for one HA-source feed inside [start, end). Failures record
+    feed health (the same surface the ICS path writes) and return []."""
+    fid = str(feed.get("id") or "")
+    entity_id = str(feed.get("entity_id") or "").strip()
+    if not entity_id:
+        return []
+    start_iso = start.astimezone(UTC).isoformat()
+    end_iso = end.astimezone(UTC).isoformat()
+    key = (fid, start_iso, end_iso)
+    hit = _ha_events_cache.get(key)
+    if hit is not None and time.monotonic() - hit[0] < CACHE_TTL_S:
+        return hit[1]
+    core = _ha_core()
+    if core is None:
+        record_fetch(data_dir, fid, ok=False, error="ha_core plugin not installed")
+        return []
+    path = (
+        f"/api/calendars/{urllib.parse.quote(entity_id)}"
+        f"?start={urllib.parse.quote(start_iso)}&end={urllib.parse.quote(end_iso)}"
+    )
+    try:
+        data = core.request_json(path, timeout=HTTP_TIMEOUT_S)
+    except Exception as err:
+        # A RuntimeError is ha_core's own "not configured / token
+        # unreadable" guidance; keep its wording, it says what to fix.
+        msg = str(err) if isinstance(err, RuntimeError) else _describe_fetch_error(err)
+        record_fetch(data_dir, fid, ok=False, error=msg)
+        return []
+    events: list[dict[str, Any]] = []
+    for raw in data if isinstance(data, list) else []:
+        if isinstance(raw, dict):
+            ev = _normalise_ha_event(raw)
+            if ev is not None:
+                events.append(ev)
+    events.sort(key=lambda e: (not e["all_day"], e["start"]))
+    record_fetch(data_dir, fid, ok=True)
+    if len(_ha_events_cache) >= _HA_CACHE_MAX:
+        _ha_events_cache.clear()
+    _ha_events_cache[key] = (time.monotonic(), events)
+    return events
+
+
+def _drop_ha_cache(feed_id: str) -> None:
+    """Forget every cached window for one HA feed (Refresh button)."""
+    for key in [k for k in _ha_events_cache if k[0] == feed_id]:
+        _ha_events_cache.pop(key, None)
+
+
 def load_events(
     feed_ids: list[str] | None,
     start: datetime,
@@ -425,6 +555,13 @@ def load_events(
             continue
         fid = feed.get("id")
         if wanted is not None and fid not in wanted:
+            continue
+        if feed_source(feed) == "ha":
+            for ev in _fetch_ha_events(feed, start, end, dd):
+                ev["feed_id"] = fid
+                ev["feed_name"] = feed.get("name") or fid
+                ev["feed_colour"] = feed.get("colour") or DEFAULT_COLOUR
+                out.append(ev)
             continue
         url = feed.get("url")
         if not url:
@@ -814,9 +951,36 @@ def choices(name: str) -> list[dict[str, str]]:
 def blueprint() -> Blueprint:
     bp = Blueprint("calendar_core_admin", __name__, template_folder="templates")
 
+    def _ha_calendar_list() -> tuple[list[dict[str, Any]], str | None]:
+        """Calendar entities from Home Assistant for the add-from-HA
+        section: ``([{entity_id, name}], error)``. The error string is
+        guidance fit to flash (plugin missing / not configured /
+        unreachable)."""
+        core = _ha_core()
+        if core is None:
+            return [], "Install the Home Assistant Core plugin to list HA calendars."
+        if not core.is_configured():
+            return [], (
+                "Home Assistant is not configured; set URL + token in "
+                "Settings → Widgets → Home Assistant Core."
+            )
+        try:
+            states = core.get_states()
+        except Exception as err:
+            return [], str(core.coerce_error(err))
+        cals: list[dict[str, Any]] = []
+        for st in states:
+            eid = str(st.get("entity_id") or "")
+            if not eid.startswith("calendar."):
+                continue
+            cals.append({"entity_id": eid, "name": str(core.friendly_name(st)) or eid})
+        cals.sort(key=lambda c: c["name"].lower())
+        return cals, None
+
     def _render_index(
         discovered: list[dict[str, Any]] | None = None,
         discover_auth: dict[str, str] | None = None,
+        ha_calendars: list[dict[str, Any]] | None = None,
     ) -> str:
         feeds = _load_feeds().get("feeds") or []
         # Cache-status per feed so the admin page can chip "fresh"
@@ -849,10 +1013,13 @@ def blueprint() -> Blueprint:
                 "ttl_s": CACHE_TTL_S,
             }
         # Mark which feeds a discovered collection would duplicate (by
-        # export URL) so the UI can show "already added".
+        # export URL / entity id) so the UI can show "already added".
         existing_urls = {f.get("url") for f in feeds}
         for col in discovered or []:
             col["already_added"] = col.get("export_url") in existing_urls
+        existing_entities = {f.get("entity_id") for f in feeds if feed_source(f) == "ha"}
+        for cal in ha_calendars or []:
+            cal["already_added"] = cal.get("entity_id") in existing_entities
         return render_template(
             "calendar_core/index.html",
             feeds=feeds,
@@ -860,6 +1027,7 @@ def blueprint() -> Blueprint:
             auth_modes=AUTH_MODES,
             discovered=discovered or [],
             discover_auth=discover_auth or {},
+            ha_calendars=ha_calendars or [],
         )
 
     @bp.get("/")
@@ -885,11 +1053,38 @@ def blueprint() -> Blueprint:
         # echoes the discovery URL). We re-render the discovered list afterwards
         # so adding one calendar doesn't wipe the others off the page.
         discover_base_url = (request.form.get("discover_base_url") or "").strip()
+        if not re.match(r"^#[0-9a-fA-F]{6}$", colour):
+            colour = DEFAULT_COLOUR
+        if (request.form.get("source") or "").strip().lower() == "ha":
+            entity_id = (request.form.get("entity_id") or "").strip()
+            if not name or not entity_id:
+                flash("Name and calendar entity are required.", "warn")
+                return redirect(url_for("calendar_core_admin.index"))
+            if not entity_id.startswith("calendar."):
+                flash(f"'{entity_id}' isn't a calendar entity.", "warn")
+                return redirect(url_for("calendar_core_admin.index"))
+            data = _load_feeds()
+            fid = _unique_id(data, _slugify(name))
+            data["feeds"].append(
+                {
+                    "id": fid,
+                    "name": name,
+                    "source": "ha",
+                    "entity_id": entity_id,
+                    "colour": colour,
+                    "enabled": True,
+                    "created_at": datetime.now(UTC).replace(microsecond=0).isoformat(),
+                }
+            )
+            _save_feeds(data)
+            flash(f"Added Home Assistant calendar '{name}'.", "ok")
+            # Keep the HA list on screen (same as the CalDAV discovery flow)
+            # so adding one calendar doesn't wipe the rest off the page.
+            calendars, _err = _ha_calendar_list()
+            return _render_index(ha_calendars=calendars)
         if not name or not url:
             flash("Name and URL are required.", "warn")
             return redirect(url_for("calendar_core_admin.index"))
-        if not re.match(r"^#[0-9a-fA-F]{6}$", colour):
-            colour = DEFAULT_COLOUR
         data = _load_feeds()
         fid = _unique_id(data, _slugify(name))
         auth = _read_auth_form()
@@ -927,6 +1122,14 @@ def blueprint() -> Blueprint:
         feed = next((f for f in data.get("feeds", []) if f.get("id") == feed_id), None)
         if not feed:
             abort(404)
+        if feed_source(feed) == "ha":
+            flash(
+                "Home Assistant feeds use the shared connection from "
+                "Settings → Widgets → Home Assistant Core; there are no "
+                "per-feed credentials.",
+                "warn",
+            )
+            return redirect(url_for("calendar_core_admin.index"))
         auth = _read_auth_form()
         if auth["auth_mode"] == "none":
             for key in ("auth_mode", "username", "password"):
@@ -968,6 +1171,19 @@ def blueprint() -> Blueprint:
             discover_auth={**auth, "base_url": base_url},
         )
 
+    @bp.post("/ha/list")
+    def ha_list() -> str:
+        """List Home Assistant calendar entities so the user can add each
+        as a feed in one click, mirroring the CalDAV discovery flow. A
+        POST-triggered listing (not part of the index render) so an
+        unreachable HA can't slow the page down."""
+        calendars, error = _ha_calendar_list()
+        if error:
+            flash(error, "warn")
+        elif not calendars:
+            flash("No calendar entities found in Home Assistant.", "warn")
+        return _render_index(ha_calendars=calendars)
+
     @bp.post("/feeds/<feed_id>/toggle")
     def toggle_feed(feed_id: str) -> Response:
         data = _load_feeds()
@@ -1008,6 +1224,25 @@ def blueprint() -> Blueprint:
         if not feed:
             abort(404)
         name = feed.get("name") or feed_id
+        if feed_source(feed) == "ha":
+            _drop_ha_cache(feed_id)
+            window_start = datetime.now(UTC) - timedelta(days=30)
+            window_end = datetime.now(UTC) + timedelta(days=90)
+            # The cache was just dropped, so this is a real fetch and the
+            # health record reflects its outcome.
+            events = _fetch_ha_events(feed, window_start, window_end, _data_dir())
+            health = load_health().get(feed_id) or {}
+            if health.get("error"):
+                flash(f"Refresh failed for '{name}': {health['error']}", "warn")
+            else:
+                now_iso = datetime.now(UTC).isoformat()
+                future = [e for e in events if str(e.get("start") or "") >= now_iso]
+                flash(
+                    f"Refreshed '{name}': {len(events)} events in the past 30 / "
+                    f"next 90 days ({len(future)} upcoming).",
+                    "ok",
+                )
+            return redirect(url_for("calendar_core_admin.index"))
         url = feed.get("url") or ""
         if not url:
             flash(f"Feed '{name}' has no URL to refresh from.", "warn")

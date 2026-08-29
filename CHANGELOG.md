@@ -8,6 +8,16 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Calendar widgets can read Home Assistant calendars.** A calendar feed can now point
+  at any `calendar.*` entity instead of an iCal URL: on the Calendar Feeds page, "Add
+  from Home Assistant" lists the calendars HA knows about (Local Calendar, Google, waste
+  collection, anything an integration exposes) and adds each as a feed in one click,
+  using the connection already configured in the Home Assistant Core plugin. Events flow
+  through the same `load_events()` path, so every calendar widget (Day / Week / Month
+  and the marketplace Schedule widget) picks them up unchanged, with per-feed name and
+  colour, feed-health reporting, and a 15-minute cache per requested window. Recurrence
+  expansion happens inside Home Assistant, so these feeds skip the ICS expansion cache.
+
 - **The Home Assistant Sensor and Entities widgets can hide the title row and entity
   names.** Two new toggles per cell: "Show title row" removes the whole header (so a
   single entity renders as just its value), and "Show entity names" drops the per-row

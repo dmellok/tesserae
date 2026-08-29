@@ -26,7 +26,7 @@
 {% block main %}
 <div class="page-head">
   <h1><i class="ph-bold ph-calendar-dots" aria-hidden="true"></i> Calendar Feeds</h1>
-  <p class="page-blurb">iCal URLs that the calendar widgets read from. Google Calendar → Settings → Integrate calendar → Secret address in iCal format. iCloud → Calendar → Share Calendar → Public. Self-hosted (Baikal / Radicale / Nextcloud) works too: use the auth fields, or Discover below.</p>
+  <p class="page-blurb">Calendars that the calendar widgets read from. Add iCal URLs (Google Calendar → Settings → Integrate calendar → Secret address in iCal format; iCloud → Calendar → Share Calendar → Public), Discover a self-hosted CalDAV server (Baikal / Radicale / Nextcloud), or pull calendars straight from Home Assistant below.</p>
 </div>
 
 <section class="card">
@@ -81,6 +81,46 @@
 </section>
 
 <section class="card">
+  {{ card_head('Add from Home Assistant', icon_name='house-line', level=2) }}
+  <p class="field-help" style="margin-top:0">Show the calendars Home Assistant knows about (Local Calendar, Google, waste collection, anything with a <code>calendar.*</code> entity) and add each as a feed in one click. Uses the connection from Settings → Widgets → Home Assistant Core; events are fetched through Home Assistant, so no extra URLs or credentials.</p>
+  <form method="post" action="{{ url_for('calendar_core_admin.ha_list') }}" class="form">
+    <div class="actions">{{ button('List Home Assistant calendars', icon='magnifying-glass') }}</div>
+  </form>
+
+  {% if ha_calendars %}
+  <div class="cf-discovered">
+    <h3 class="cf-sub">Found {{ ha_calendars|length }} calendar{{ 's' if ha_calendars|length != 1 }}</h3>
+    <ul class="cf-list">
+      {% for cal in ha_calendars %}
+      <li class="cf-row cf-disc-row">
+        <span class="cf-swatch" style="background: #0d8c7e;" aria-hidden="true"></span>
+        <span class="cf-name">
+          <span class="cf-name-line">
+            <span class="cf-name-text">{{ cal.name }}</span>
+            <span class="cf-chip cf-chip--comp">Home Assistant</span>
+          </span>
+          <span class="cf-id">{{ cal.entity_id }}</span>
+        </span>
+        <div class="cf-actions">
+          {% if cal.already_added %}
+          <span class="cf-chip cf-chip--ok">already added</span>
+          {% else %}
+          <form method="post" action="{{ url_for('calendar_core_admin.create_feed') }}" class="inline">
+            <input type="hidden" name="source" value="ha">
+            <input type="hidden" name="name" value="{{ cal.name }}">
+            <input type="hidden" name="entity_id" value="{{ cal.entity_id }}">
+            <button type="submit" class="button"><i class="ph ph-plus" aria-hidden="true"></i><span>Add</span></button>
+          </form>
+          {% endif %}
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+</section>
+
+<section class="card">
   {{ card_head('Add feed', icon_name='plus-circle', level=2) }}
   <form method="post" action="{{ url_for('calendar_core_admin.create_feed') }}" class="form">
     <div class="field-grid">
@@ -118,7 +158,12 @@
           <span class="cf-chip cf-chip--auth" title="Fetched with {{ f.auth_mode }} auth as {{ f.username }}."><i class="ph ph-lock-simple" aria-hidden="true"></i> {{ f.auth_mode }}</span>
           {% endif %}
           <span class="cf-cache">
-            {% if not ci.has_cache %}
+            {% if f.source == 'ha' %}
+              <span class="cf-chip cf-chip--comp"
+                    title="Events come from Home Assistant's calendar API, cached 15 minutes per window.">
+                Home Assistant
+              </span>
+            {% elif not ci.has_cache %}
               <span class="cf-chip cf-chip--warn">no cache yet</span>
             {% elif ci.is_stale %}
               <span class="cf-chip cf-chip--warn"
@@ -135,21 +180,23 @@
         </span>
         <span class="cf-id">{{ f.id }}</span>
       </span>
-      <span class="cf-url" title="{{ f.url }}">{{ f.url }}</span>
+      <span class="cf-url" title="{{ f.entity_id if f.source == 'ha' else f.url }}">{{ f.entity_id if f.source == 'ha' else f.url }}</span>
       <div class="cf-actions">
         {# v0.71.3 (r/eink launch feedback): icon-only refresh button was
            invisible to users who couldn't SSH to clear the cache. Now
            labelled + flashes an event-count message on click so HA / Docker
            users can tell whether the refresh pulled new events. #}
         <form method="post" action="{{ url_for('calendar_core_admin.refresh_feed', feed_id=f.id) }}" class="inline">
-          <button type="submit" class="button" title="Delete cached bytes and re-fetch the URL now.">
+          <button type="submit" class="button" title="Drop the cache and re-fetch now.">
             <i class="ph ph-arrows-clockwise" aria-hidden="true"></i>
             <span>Refresh</span>
           </button>
         </form>
+        {% if f.source != 'ha' %}
         <button type="button" class="ghost" title="Credentials" onclick="document.getElementById('cf-auth-{{ f.id }}').hidden = !document.getElementById('cf-auth-{{ f.id }}').hidden">
           <i class="ph ph-lock-simple" aria-hidden="true"></i>
         </button>
+        {% endif %}
         <form method="post" action="{{ url_for('calendar_core_admin.toggle_feed', feed_id=f.id) }}" class="inline">
           <button type="submit" class="ghost" title="{{ 'Disable' if f.enabled else 'Enable' }}">
             <i class="ph ph-{{ 'eye' if f.enabled else 'eye-slash' }}" aria-hidden="true"></i>
@@ -159,12 +206,14 @@
           <button type="submit" class="ghost danger" title="Delete"><i class="ph ph-trash" aria-hidden="true"></i></button>
         </form>
       </div>
+      {% if f.source != 'ha' %}
       <div class="cf-auth-edit" id="cf-auth-{{ f.id }}" hidden>
         <form method="post" action="{{ url_for('calendar_core_admin.update_auth', feed_id=f.id) }}" class="form">
           {{ auth_fields(prefix=f.id ~ '-', mode=f.auth_mode or 'none', username=f.username or '') }}
           <div class="actions">{{ button('Save credentials', icon='check') }}</div>
         </form>
       </div>
+      {% endif %}
     </li>
     {% endfor %}
   </ul>
