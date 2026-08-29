@@ -41,6 +41,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **Six widgets that fetch with raw urllib now request and decode plain responses**
+  (#215). Reddit News, Hacker News, Wikipedia On This Day, NASA APOD, Sunrise & Sunset,
+  and the Home Assistant core plugin sent no `Accept-Encoding` header, which lets a
+  CDN-fronted upstream answer with gzip that urllib does not decompress; the widget then
+  reports a parser error instead of the real cause. Each site now asks for `identity`
+  and decodes any `Content-Encoding` the server sends anyway, the same guard the RSS and
+  calendar widgets already carry.
 - **The Webpage widget's settle delay is now honoured in full, fixing intermittent blank
   captures.** The wait for the embedded page previously ran under a fixed 12-second cap
   covering page load *and* settle together, so a slow-loading site silently ate into the

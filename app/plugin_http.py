@@ -76,6 +76,16 @@ def _content_encoding(resp: Any) -> str:
     return str(getter("Content-Encoding", "") or "")
 
 
+def decode_body(resp: Any) -> bytes:
+    """Read ``resp`` fully and undo any ``Content-Encoding`` it declares.
+
+    For plugins that call ``urllib`` themselves (auth, custom SSL context,
+    fallback chains) but still want the compressed-upstream guard the
+    ``fetch_*`` helpers apply. Tolerates file-like stand-ins without
+    ``headers`` (tests, custom openers)."""
+    return decode_content_encoding(resp.read(), _content_encoding(resp))
+
+
 def fetch_text(
     url: str,
     *,

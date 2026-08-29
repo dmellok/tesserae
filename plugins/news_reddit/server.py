@@ -42,6 +42,8 @@ from xml.etree import ElementTree as ET
 
 from flask import current_app
 
+from app.plugin_http import decode_body
+
 logger = logging.getLogger(__name__)
 
 CACHE_TTL_S = 600
@@ -60,6 +62,7 @@ USER_AGENT = (
 URLLIB_HEADERS: dict[str, str] = {
     "User-Agent": USER_AGENT,
     "Accept": "application/atom+xml, application/xml;q=0.9, */*;q=0.5",
+    "Accept-Encoding": "identity",
     "Accept-Language": "en-US,en;q=0.9",
     "Cache-Control": "no-cache",
     "Pragma": "no-cache",
@@ -128,7 +131,7 @@ def _fetch_via_pool(url: str) -> ET.Element | None:
 def _fetch_via_urllib(url: str) -> ET.Element:
     req = urllib.request.Request(url, headers=URLLIB_HEADERS)
     with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT_S) as resp:
-        return ET.fromstring(resp.read())
+        return ET.fromstring(decode_body(resp))
 
 
 def _fetch_feed(url: str, *, allow_pool: bool) -> ET.Element | str:

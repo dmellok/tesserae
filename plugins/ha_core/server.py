@@ -24,6 +24,8 @@ from urllib.parse import quote
 
 from flask import current_app
 
+from app.plugin_http import decode_body
+
 USER_AGENT = "tesserae/0.1 (+ha_core)"
 
 
@@ -97,6 +99,7 @@ def _headers() -> dict[str, str]:
         "User-Agent": USER_AGENT,
         "Authorization": f"Bearer {token()}",
         "Content-Type": "application/json",
+        "Accept-Encoding": "identity",
     }
 
 
@@ -110,7 +113,7 @@ def request_json(path: str, *, timeout: int = 10) -> Any:
         raise _not_configured()
     req = urllib.request.Request(base_url() + path, headers=_headers(), method="GET")
     with urllib.request.urlopen(req, timeout=timeout, context=_ssl_context()) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+        return json.loads(decode_body(resp).decode("utf-8"))
 
 
 def call_service_with_response(
@@ -140,7 +143,7 @@ def call_service_with_response(
     body = json.dumps(data or {}).encode("utf-8")
     req = urllib.request.Request(base_url() + path, data=body, headers=_headers(), method="POST")
     with urllib.request.urlopen(req, timeout=timeout, context=_ssl_context()) as resp:
-        payload = json.loads(resp.read().decode("utf-8"))
+        payload = json.loads(decode_body(resp).decode("utf-8"))
     _invalidate_states_cache()
     return payload if isinstance(payload, dict) else {}
 
@@ -169,7 +172,7 @@ def call_service(
     body = json.dumps(data or {}).encode("utf-8")
     req = urllib.request.Request(base_url() + path, data=body, headers=_headers(), method="POST")
     with urllib.request.urlopen(req, timeout=timeout, context=_ssl_context()) as resp:
-        raw = resp.read().decode("utf-8")
+        raw = decode_body(resp).decode("utf-8")
     _invalidate_states_cache()
     try:
         parsed = json.loads(raw) if raw.strip() else []

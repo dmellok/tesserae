@@ -10,6 +10,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from app.plugin_http import decode_body
+
 CACHE_TTL_S = 6 * 3600
 HTTP_TIMEOUT_S = 12
 USER_AGENT = "tesserae/0.1 (+news_wikipedia_otd)"
@@ -44,10 +46,15 @@ def fetch(
     url = f"https://api.wikimedia.org/feed/v1/wikipedia/en/onthisday/{kind}/{mm}/{dd}"
     try:
         req = urllib.request.Request(
-            url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"}
+            url,
+            headers={
+                "User-Agent": USER_AGENT,
+                "Accept": "application/json",
+                "Accept-Encoding": "identity",
+            },
         )
         with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT_S) as resp:
-            payload = json.loads(resp.read().decode("utf-8"))
+            payload = json.loads(decode_body(resp).decode("utf-8"))
     except Exception as err:
         return {"error": f"{type(err).__name__}: {err}", "items": []}
 

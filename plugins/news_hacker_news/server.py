@@ -9,6 +9,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
+from app.plugin_http import decode_body
+
 CACHE_TTL_S = 600
 HTTP_TIMEOUT_S = 10
 USER_AGENT = "tesserae/0.1 (+news_hacker_news)"
@@ -16,9 +18,11 @@ BASE = "https://hacker-news.firebaseio.com/v0"
 
 
 def _get_json(url: str) -> Any:
-    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    req = urllib.request.Request(
+        url, headers={"User-Agent": USER_AGENT, "Accept-Encoding": "identity"}
+    )
     with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT_S) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+        return json.loads(decode_body(resp).decode("utf-8"))
 
 
 def fetch(

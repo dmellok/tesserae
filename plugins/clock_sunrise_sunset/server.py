@@ -9,6 +9,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
+from app.plugin_http import decode_body
+
 CACHE_TTL_S = 6 * 3600  # sunrise/set don't change intraday
 HTTP_TIMEOUT_S = 12
 USER_AGENT = "tesserae/0.1 (+clock_sunrise_sunset)"
@@ -62,9 +64,11 @@ def fetch(
         "&forecast_days=1"
     )
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+        req = urllib.request.Request(
+            url, headers={"User-Agent": USER_AGENT, "Accept-Encoding": "identity"}
+        )
         with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT_S) as resp:
-            payload = json.loads(resp.read().decode("utf-8"))
+            payload = json.loads(decode_body(resp).decode("utf-8"))
     except Exception as err:
         return {"error": f"{type(err).__name__}: {err}"}
 

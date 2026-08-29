@@ -18,6 +18,8 @@ from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from app.plugin_http import decode_body
+
 CACHE_TTL_S = 60 * 60
 LOOKBACK_DAYS = 14
 DEMO_KEY = "DEMO_KEY"
@@ -29,9 +31,11 @@ def _api_request(api_key: str, when: date | None = None) -> dict[str, Any]:
     if when is not None:
         params["date"] = when.isoformat()
     url = "https://api.nasa.gov/planetary/apod?" + urllib.parse.urlencode(params)
-    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    req = urllib.request.Request(
+        url, headers={"User-Agent": USER_AGENT, "Accept-Encoding": "identity"}
+    )
     with urllib.request.urlopen(req, timeout=15) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+        return json.loads(decode_body(resp).decode("utf-8"))
 
 
 def _pick_image_url(entry: dict[str, Any]) -> str | None:
