@@ -23,7 +23,7 @@ import urllib.error
 import urllib.request
 from typing import Any
 
-__version__ = "0.14.0"
+__version__ = "0.15.0"
 
 _BASE = os.environ.get("TESSERAE_URL", "http://127.0.0.1:8765").rstrip("/")
 _TOKEN = os.environ.get("TESSERAE_MCP_TOKEN", "").strip()
@@ -336,7 +336,16 @@ def _truncate_payload(value: Any, max_items: int, _path: str = "data") -> tuple[
     return value, dropped
 
 
-_CATALOG_SUMMARY_KEYS = ("key", "id", "name", "title", "summary", "description", "fragments")
+_CATALOG_SUMMARY_KEYS = (
+    "key",
+    "id",
+    "name",
+    "title",
+    "summary",
+    "desc",
+    "description",
+    "fragments",
+)
 
 
 def _summarise_catalog(catalog: dict[str, Any]) -> dict[str, Any]:
@@ -625,10 +634,11 @@ def build_server() -> Any:
         Phosphor), and an icon-set descriptor. Search icon names with list_icons().
 
         The whole catalog runs to ~95k characters, past the tool-result cap, so by
-        default each widget is summarised to {key, name, summary, fragments} and the
+        default each widget is summarised to {key, name, desc, fragments} and the
         appearance/library blocks are returned in full (they are small and are what
-        the summary can't replace). That is enough to answer "which widget do I
-        want"; follow with get_widget_options(key) for one widget's full option
+        the summary can't replace). "desc" is the first sentence of the widget's
+        description only. That is enough to answer "which widget do I want"; follow
+        with get_widget_options(key) for one widget's full description and option
         schema, which is the call that actually matters before placing it.
 
         "section" narrows to one top-level block ("widgets", "appearance",
@@ -673,10 +683,12 @@ def build_server() -> Any:
 
     def get_widget_options(widget: str, include_choices: bool = False) -> Any:
         """Get the configurable options for one widget, so you can fill an element's
-        "options" correctly (e.g. a weather widget's location). Each option carries a
-        "format" hint for its type. Big choice lists (HA entity pickers) are omitted
-        by default (the option shows "choices_count" + a "choices_endpoint"); pass
-        include_choices=True to inline them, or call get_widget_choices() to page."""
+        "options" correctly (e.g. a weather widget's location). Also returns the
+        widget's full "desc" (list_widgets carries only its first sentence). Each
+        option carries a "format" hint for its type. Big choice lists (HA entity
+        pickers) are omitted by default (the option shows "choices_count" + a
+        "choices_endpoint"); pass include_choices=True to inline them, or call
+        get_widget_choices() to page."""
         suffix = "?include_choices=true" if include_choices else ""
         return _json("GET", f"/widgets/{widget}/options{suffix}")
 

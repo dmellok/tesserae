@@ -176,7 +176,7 @@ def test_catalog_summary_keeps_identity_and_drops_option_schemas():
             {
                 "key": f"w{i}",
                 "name": f"W{i}",
-                "summary": "does a thing",
+                "desc": "Does a thing.",
                 "fragments": ["sm", "lg"],
                 "options": {"a": {"blob": "y" * 400}},
             }
@@ -187,8 +187,12 @@ def test_catalog_summary_keeps_identity_and_drops_option_schemas():
     }
     out = _summarise_catalog(catalog)
 
-    assert sorted(out["widgets"][0]) == ["fragments", "key", "name", "summary"]
+    assert sorted(out["widgets"][0]) == ["desc", "fragments", "key", "name"]
     assert "options" not in out["widgets"][0]
+    # "desc" is what the catalog actually calls it (panels_schema.catalog_entry);
+    # it was missing from the summary keys, so the default list_widgets() view
+    # carried no description at all and agents picked widgets from key+name alone.
+    assert out["widgets"][0]["desc"] == "Does a thing."
     assert len(out["widgets"]) == 60, "every widget still listed, just trimmed"
     # The small blocks are exactly what a summary can't stand in for.
     assert out["appearance"] == catalog["appearance"]

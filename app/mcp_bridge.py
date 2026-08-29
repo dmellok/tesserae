@@ -32,7 +32,7 @@ from app.state.settings_store import SettingsStore
 # The bridge version this Tesserae ships alongside. Both live in this repo
 # (``packages/tesserae-mcp``), so the server knows what "current" means without
 # a network call; ``test_mcp_bridge_version.py`` fails the build if they drift.
-EXPECTED_VERSION = "0.14.0"
+EXPECTED_VERSION = "0.15.0"
 
 UPGRADE_COMMAND = "pipx upgrade tesserae-mcp"
 

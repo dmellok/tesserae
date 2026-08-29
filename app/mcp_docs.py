@@ -464,10 +464,11 @@ libraries (Chart.js, canvas-gauges, dayjs, qrcode, marked, chroma, SVG.js,
 Phosphor), and an icon-set descriptor. Search icon names with list_icons().
 
 The whole catalog runs to ~95k characters, past the tool-result cap, so by
-default each widget is summarised to {key, name, summary, fragments} and the
+default each widget is summarised to {key, name, desc, fragments} and the
 appearance/library blocks are returned in full (they are small and are what
-the summary can't replace). That is enough to answer "which widget do I
-want"; follow with get_widget_options(key) for one widget's full option
+the summary can't replace). "desc" is the first sentence of the widget's
+description only. That is enough to answer "which widget do I want"; follow
+with get_widget_options(key) for one widget's full description and option
 schema, which is the call that actually matters before placing it.
 
 "section" narrows to one top-level block ("widgets", "appearance",
@@ -498,10 +499,12 @@ probe_widget_data(key, {scope...}) to see a specific slice -> use it as a
 source. Returns {services: [{key, name, description, options}]}.""",
     "get_widget_options": """\
 Get the configurable options for one widget, so you can fill an element's
-"options" correctly (e.g. a weather widget's location). Each option carries a
-"format" hint for its type. Big choice lists (HA entity pickers) are omitted
-by default (the option shows "choices_count" + a "choices_endpoint"); pass
-include_choices=True to inline them, or call get_widget_choices() to page.""",
+"options" correctly (e.g. a weather widget's location). Also returns the
+widget's full "desc" (list_widgets carries only its first sentence). Each
+option carries a "format" hint for its type. Big choice lists (HA entity
+pickers) are omitted by default (the option shows "choices_count" + a
+"choices_endpoint"); pass include_choices=True to inline them, or call
+get_widget_choices() to page.""",
     "get_widget_choices": """\
 Page through the choice rows for one of a widget's options (kept out of
 get_widget_options so a picker with hundreds of entries doesn't bloat the
