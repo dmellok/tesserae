@@ -13,6 +13,7 @@ from app.calendar_time import (
     all_day_event_date_keys,
     event_local_date_key,
     local_midnight_utc,
+    timed_event_date_keys,
 )
 from app.tz_resolve import app_timezone
 
@@ -59,16 +60,26 @@ def fetch(
     except Exception as err:
         return {"error": f"{type(err).__name__}: {err}", "days": []}
 
-    # Bucket timed events by their local start date. All-day event DTEND values
-    # are exclusive, so expand them across each covered visible date.
+    # Expand both kinds of event across every visible date they cover: all-day
+    # DTEND values are exclusive, and a multi-day *timed* span (a trip that
+    # starts Friday 16:00 and ends Monday 10:00) occupies each day it runs
+    # through. Bucketing a timed event on its start day alone made it vanish
+    # from every later cell while the week view spanned it correctly.
+    #
+    # Days after the event's own start day are flagged as continuations, so
+    # the cell can mark them instead of repeating the title four times in a
+    # grid that has far less room per cell than a week column.
     buckets: dict[str, list[dict[str, Any]]] = {}
     for ev in events:
         if ev.get("all_day"):
             day_keys = all_day_event_date_keys(ev, grid_start, grid_end)
         else:
-            day_keys = [event_local_date_key(ev, zone)]
+            day_keys = timed_event_date_keys(ev, zone, grid_start, grid_end)
+        # The event's own first day, which may fall before the visible grid -
+        # then every visible day of it is a continuation.
+        first_key = event_local_date_key(ev, zone)
         for day_key in day_keys:
-            buckets.setdefault(day_key, []).append(ev)
+            buckets.setdefault(day_key, []).append({"event": ev, "continued": day_key != first_key})
 
     days = []
     cur = grid_start
@@ -77,8 +88,8 @@ def fetch(
         all_evs = buckets.get(key, [])
         # All-day events first, then timed; cap to max_per_day for the
         # cell, but keep total for the "+N more" badge.
-        all_day = [e for e in all_evs if e.get("all_day")]
-        timed = [e for e in all_evs if not e.get("all_day")]
+        all_day = [e for e in all_evs if e["event"].get("all_day")]
+        timed = [e for e in all_evs if not e["event"].get("all_day")]
         visible = (all_day + timed)[:max_per_day]
         days.append(
             {
@@ -89,18 +100,22 @@ def fetch(
                 "is_today": cur == today,
                 "events": [
                     {
-                        "summary": e["summary"],
-                        "start": e["start"],
+                        "summary": e["event"]["summary"],
+                        "start": e["event"]["start"],
                         # Forward end so a future client variant that wants
                         # to time-slot events in the day cell can; the
                         # current month grid only shows summaries but
                         # keeping the field consistent across calendar_*
                         # avoids drift if/when the month cell grows a
                         # mini-timeline.
-                        "end": e.get("end"),
-                        "all_day": e.get("all_day", False),
-                        "colour": e.get("feed_colour"),
-                        "location": e.get("location") or "",
+                        "end": e["event"].get("end"),
+                        "all_day": e["event"].get("all_day", False),
+                        "colour": e["event"].get("feed_colour"),
+                        "location": e["event"].get("location") or "",
+                        # True on every day of a multi-day event except the
+                        # one it starts on, so the cell can mark it as
+                        # running through rather than starting here.
+                        "continued": e["continued"],
                     }
                     for e in visible
                 ],
