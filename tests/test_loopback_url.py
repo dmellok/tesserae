@@ -43,6 +43,28 @@ def test_falls_back_to_url_port_without_bind_env(monkeypatch: pytest.MonkeyPatch
     )
 
 
+def test_https_base_url_downgraded_to_http(monkeypatch: pytest.MonkeyPatch) -> None:
+    # An https base_url (reverse proxy terminating TLS in front of the
+    # container) must not leak its scheme into the loopback URL: nothing
+    # inside the container speaks TLS, so Chromium would hang in the
+    # handshake until page.goto's 15s timeout and the preview breaks.
+    monkeypatch.setenv("TESSERAE_BIND_PORT", "8765")
+    assert (
+        to_loopback_url("https://tess.example/compose/abc?w=800")
+        == "http://127.0.0.1:8765/compose/abc?w=800"
+    )
+
+
+def test_https_explicit_port_downgraded_without_bind_env(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("TESSERAE_BIND_PORT", raising=False)
+    assert (
+        to_loopback_url("https://tess.example:8765/compose/abc")
+        == "http://127.0.0.1:8765/compose/abc"
+    )
+
+
 def test_ingress_prefix_stripped(monkeypatch: pytest.MonkeyPatch) -> None:
     """Under HA Ingress every in-app path carries HA's
     ``/api/hassio_ingress/<token>`` prefix. Loopback skips HA's proxy, so the

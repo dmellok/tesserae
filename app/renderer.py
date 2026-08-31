@@ -132,7 +132,11 @@ def to_loopback_url(url: str) -> str:
         netloc = f"127.0.0.1:{bind_port}"
     elif parts.port:
         netloc = f"127.0.0.1:{parts.port}"
-    return urlunsplit((parts.scheme, netloc, path, parts.query, parts.fragment))
+    # Always plain http: the in-process server never terminates TLS (that is
+    # the reverse proxy's job), so carrying an https scheme from base_url /
+    # the incoming request would stall the TLS handshake against waitress
+    # until page.goto's timeout.
+    return urlunsplit(("http", netloc, path, parts.query, parts.fragment))
 
 
 @dataclass(frozen=True)
