@@ -6,6 +6,18 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added
+
+- **Seeed XIAO ePaper EE03 (10.3" mono) hardware kind.** The EE03 DIY kit puts
+  the reTerminal E1003's exact 10.3" panel + controller combo (ED103TC2 behind
+  an IT8951, 1872x1404, 16-level greyscale) on the XIAO ESP32-S3 Plus driver
+  board, so the new `seeed_ee03` kind reuses the `esp32_gray_bin` renderer and
+  packs a byte-identical 1314144-byte frame. Registered with `auto_select`
+  off: the two kinds are indistinguishable on the wire and a kind names an
+  OTA lineage, so relay pairing keeps resolving to the E1003 and EE03 units
+  declare their kind themselves at registration. Firmware target lands in
+  tesserae-device-firmware as `seeed-ee03` (awaiting hardware verification).
+
 ### Fixed
 
 - **Calendar widgets no longer fail with "invalid language tag: C".** With the app

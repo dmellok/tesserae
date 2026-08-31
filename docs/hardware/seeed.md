@@ -43,6 +43,7 @@ family is supported via the same unified firmware:
 | Model | Panel | Colour | Resolution |
 |---|---|---|---|
 | [XIAO ePaper EE02](https://www.seeedstudio.com/XIAO-ePaper-DIY-Kit-EE02-for-13-3-Spectratm-6-E-Ink.html) | 13.3" | Spectra 6 (6-colour) | 1200×1600 |
+| [XIAO ePaper EE03](https://www.seeedstudio.com/XIAO-ePaper-DIY-Kit-EE03-for-10-3-Monochrome-ePaper-Display.html) | 10.3" | Mono, 16-level grey | 1872×1404 |
 | [XIAO ePaper EE04](https://www.seeedstudio.com/XIAO-ePaper-Display-Board-EE04-p-6560.html) (7.5" mono or 7.3" Spectra 6) | 7.5" / 7.3" | Mono / Spectra 6 | 800×480 |
 | [XIAO ePaper EE05](https://wiki.seeedstudio.com/epaper_ee05/) + [2.13" quadruple-colour panel](https://www.seeedstudio.com/2-13-Quadruple-Color-ePaper-Display-with-122x250-Pixels-p-5779.html) | 2.13" | BWRY (4-colour) | 250×122 |
 | [XIAO 7.5" ePaper Panel](https://www.seeedstudio.com/XIAO-7-5-ePaper-Panel-p-6416.html) (C3, integrated) | 7.5" | Mono | 800×480 |

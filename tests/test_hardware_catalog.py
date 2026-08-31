@@ -144,6 +144,48 @@ def test_xiao_75_c3_panel_is_its_own_kind_sharing_the_mono_wire_contract(
     assert "S3" in s3.display_name
 
 
+def test_ee03_is_its_own_kind_sharing_the_e1003_gray_wire_contract(
+    tmp_path: Path, device_schema_path: Path, hardware_schema_path: Path
+) -> None:
+    """The XIAO ePaper EE03 puts the reTerminal E1003's exact panel +
+    controller combo (ED103TC2 behind an IT8951) on the XIAO driver board,
+    so it packs the identical 4-bpp grayscale frame via esp32_gray_bin. It
+    still needs its own kind because the kind id names the OTA lineage and
+    the two firmware images are not interchangeable, and it must carry
+    auto_select: false so relay pairing never infers it over the E1003
+    (identical protocol, gamut, and geometry on the wire)."""
+    registry = device_loader.discover(
+        REPO_ROOT / "devices",
+        schema_path=device_schema_path,
+        data_root=tmp_path,
+        hardware_dir=REPO_ROOT / "hardware",
+        hardware_schema_path=hardware_schema_path,
+    )
+    assert registry.errors == []
+
+    ee03 = registry.devices["seeed_ee03"]
+    e1003 = registry.devices["seeed_reterminal_e1003"]
+
+    # Distinct kinds, not an alias.
+    assert ee03.id != e1003.id
+    assert ee03.kind_of is None and e1003.kind_of is None
+
+    # Same wire contract: same protocol, renderer, geometry, gamut, bytes.
+    assert ee03.manifest["_catalog_entry"]["protocol"] == "esp32_client"
+    assert ee03.manifest["renderers"] == e1003.manifest["renderers"] == ["esp32_gray_bin"]
+    assert ee03.panel is not None
+    assert (ee03.panel["w"], ee03.panel["h"]) == (1872, 1404)
+    assert ee03.panel["gamut"] == "gray_16"
+    assert ee03.panel["w"] * ee03.panel["h"] // 2 == 1314144
+
+    # Indistinguishable on the wire -> inference must stay off.
+    assert ee03.manifest["_catalog_entry"]["auto_select"] is False
+
+    # The EE03 has no touch overlay; the E1003 does.
+    assert ee03.manifest.get("touch") is not True
+    assert e1003.manifest.get("touch") is True
+
+
 def test_discover_validates_schema(tmp_path: Path, hardware_schema_path: Path) -> None:
     """A hardware entry missing a required field surfaces as a LoaderError
     with the field path in the message, not a crash."""

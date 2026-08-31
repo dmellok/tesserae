@@ -12,7 +12,7 @@ device-registration flow described in [Set up a device](devices.md).
 
 | Client | Transport | Default id | Best for |
 |---|---|---|---|
-| [`tesserae-device-firmware`](https://github.com/dmellok/tesserae-device-firmware) | REST | `esp32` | Seeed reTerminal E1001-E1004, XIAO EE02, XIAO 7.5", Waveshare 13.3" Spectra 6, PhotoPainter 7.3" (browser flash at [tesserae.ink/flash](https://tesserae.ink/flash)) |
+| [`tesserae-device-firmware`](https://github.com/dmellok/tesserae-device-firmware) | REST | `esp32` | Seeed reTerminal E1001-E1004, XIAO EE02, XIAO EE03, XIAO 7.5", Waveshare 13.3" Spectra 6, PhotoPainter 7.3" (browser flash at [tesserae.ink/flash](https://tesserae.ink/flash)) |
 | `tesserae-device-esp32-bw` | MQTT | `esp32_bw` | Waveshare 4.2" B/W (400×300, 1-bpp) and other small B/W panels |
 | `tesserae-device-pi-bin` | MQTT | `pi_bin` | Plugged-in Pimoroni Inky Impression (fastest path) |
 | `tesserae-device-pi-png` | REST / MQTT | `pi_png` | Any inky-supported panel (2/3/6/7 colour) |
@@ -29,7 +29,7 @@ client and what's been tested on real hardware.
 
 Battery-powered **ESP32-S3** firmware, one codebase across every board Tesserae
 supports natively on ESP32: the whole Seeed reTerminal E-Series (E1001, E1002,
-E1003, E1004), the Seeed XIAO ePaper family (EE02, XIAO 7.5"), and the
+E1003, E1004), the Seeed XIAO ePaper family (EE02, EE03, XIAO 7.5"), and the
 Waveshare 13.3" Spectra 6 + PhotoPainter 7.3". Speaks Tesserae's v1 REST device
 API and streams panel-native `.bin` frames the firmware paints without
 on-device quantise or dither.

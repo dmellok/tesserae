@@ -2,7 +2,7 @@
 
 The recommended path for every Seeed ePaper device Tesserae supports. One firmware image, one web flasher, one Wi-Fi captive-portal flow, one Tesserae registration. About ten minutes from opening the box to the panel painting a dashboard.
 
-Covers the reTerminal E-series (E1001 / E1002 / E1003 / E1004) plus the XIAO ePaper family (XIAO EE02 for the 13.3" Spectra 6 kit, the integrated XIAO 7.5" ePaper Panel with an ESP32-C3 on board, and the XIAO ePaper 7.5" S3 driver board sold as the TRMNL 7.5" OG DIY Kit).
+Covers the reTerminal E-series (E1001 / E1002 / E1003 / E1004) plus the XIAO ePaper family (XIAO EE02 for the 13.3" Spectra 6 kit, XIAO EE03 for the 10.3" monochrome kit, the integrated XIAO 7.5" ePaper Panel with an ESP32-C3 on board, and the XIAO ePaper 7.5" S3 driver board sold as the TRMNL 7.5" OG DIY Kit).
 
 !!! tip "Prefer TRMNL BYOS firmware?"
     If you'd rather stay on TRMNL's firmware and use Tesserae as a BYOS server, follow the older [Seeed reTerminal E-Series (TRMNL BYOS)](seeed-reterminal.md) or [Seeed XIAO 7.5" (TRMNL BYOS)](seeed-xiao.md) guide. This page is for the native Tesserae firmware path.
@@ -16,6 +16,7 @@ Covers the reTerminal E-series (E1001 / E1002 / E1003 / E1004) plus the XIAO ePa
 | Seeed reTerminal E1003 | 10.3", 1872×1404 | Mono + 16-level greyscale | Raw 4-bpp grayscale bin (1314144 bytes) | `seeed_reterminal_e1003` |
 | Seeed reTerminal E1004 | 13.3", 1200×1600 | 6-colour Spectra 6 | Raw 4-bpp bin (960000 bytes) | `seeed_reterminal_e1004` |
 | Seeed XIAO EE02 | 13.3", 1200×1600 | 6-colour Spectra 6 | Raw 4-bpp bin (960000 bytes) | `seeed_ee02` |
+| Seeed XIAO EE03 | 10.3", 1872×1404 | Mono + 16-level greyscale | Raw 4-bpp grayscale bin (1314144 bytes) | `seeed_ee03` |
 | Seeed XIAO 7.5" ePaper Panel (C3, integrated) | 7.5", 800×480 | Mono B/W | Raw 1-bpp bin (48000 bytes) | `xiao_epaper_panel_75_c3` |
 | Seeed XIAO ePaper 7.5" (S3, TRMNL OG DIY Kit) | 7.5", 800×480 | Mono B/W | Raw 1-bpp bin (48000 bytes) | `xiao_epaper_75` |
 
@@ -89,6 +90,7 @@ Some panels have quirks worth knowing about.
 - **E1003 (mono greyscale, 10.3"):** the panel supports 16 levels of grey via its IT8951 driver. Tesserae's greyscale renderer ships photos as real gradients rather than 1-bit dither. Portrait aspect (1872 tall) suits list-shaped dashboards.
 - **E1004 (Spectra 6, 13.3"):** same colour behaviour as E1002 but at a much larger canvas. Refresh cycle is roughly 40 seconds. Seeed advertises up to 6 months of battery life at one refresh per day.
 - **XIAO EE02:** frame format is byte-identical to the E1004 (both are 13.3" Spectra 6 at 1200×1600). The XIAO driver board is smaller and cheaper; useful when you want the panel without the reTerminal case.
+- **XIAO EE03:** frame format is byte-identical to the E1003 (both are the same 10.3" panel behind an IT8951 controller at 1872×1404, 16-level greyscale). Same relationship as the EE02 to the E1004: the panel without the reTerminal case. No touch overlay, unlike the E1003.
 - **XIAO 7.5" ePaper Panel (C3):** Seeed's integrated unit, ESP32-C3 soldered on. Frame format is byte-identical to the E1001. Two things differ from the rest of the family: it reports no battery at all (see below), and it has no user buttons, only Boot and Reset, so there are no page-turn bindings to set up. Supported from device-firmware v1.16.0.
 - **Seeed XIAO ePaper 7.5" (S3):** a XIAO ESP32-S3 Plus driver board plus the same 7.5" glass, sold as the TRMNL 7.5" (OG) DIY Kit. Frame format is byte-identical to the E1001 and to the C3 panel above. If you already followed the [TRMNL OG quickstart](trmnl.md), it also applies here; this unified flow is the alternative if you'd rather run the native Tesserae firmware.
 - **Battery reporting:** the reTerminal E1001 / E1002 / E1003 / E1004 and the XIAO EE02 report battery correctly. The **XIAO 7.5" ePaper Panel (C3)** cannot: the hardware has no divider to an ADC pin, so there's nothing to measure the cell with. It reports no battery reading, and Tesserae treats that as unknown rather than empty, so the panel carries no battery indicator, no history chart, and no low-battery overlay. That's expected, not a fault.

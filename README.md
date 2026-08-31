@@ -153,6 +153,7 @@ The reTerminal E-Series and XIAO ePaper family run the [Tesserae-native firmware
 | [reTerminal E1004](https://www.seeedstudio.com/reTerminal-E1004-p-6692.html?sensecap_affiliate=YcT0R1h&referring_service=link) | 13.3" Spectra 6, 1200×1600 | [tesserae-device-firmware](https://github.com/dmellok/tesserae-device-firmware) | ✅ |
 | [reTerminal Sticky](https://www.seeedstudio.com/reTerminal-Sticky-p-6861.html?sensecap_affiliate=YcT0R1h&referring_service=link) | 3.97" mono, 4-level grey, 480×800 portrait | [tesserae-device-firmware](https://github.com/dmellok/tesserae-device-firmware) | ✅ |
 | [XIAO ePaper EE02](https://www.seeedstudio.com/XIAO-ePaper-DIY-Kit-EE02-for-13-3-Spectratm-6-E-Ink.html?sensecap_affiliate=YcT0R1h&referring_service=link) | 13.3" Spectra 6, 1200×1600 | [tesserae-device-firmware](https://github.com/dmellok/tesserae-device-firmware) | ✅ |
+| [XIAO ePaper EE03](https://www.seeedstudio.com/XIAO-ePaper-DIY-Kit-EE03-for-10-3-Monochrome-ePaper-Display.html?sensecap_affiliate=YcT0R1h&referring_service=link) | 10.3" mono, 16-level grey, 1872×1404 | [tesserae-device-firmware](https://github.com/dmellok/tesserae-device-firmware) | TBD |
 | [XIAO 7.5" ePaper Panel](https://www.seeedstudio.com/XIAO-7-5-ePaper-Panel-p-6416.html) | 7.5" mono, 800×480 | [tesserae-device-firmware](https://github.com/dmellok/tesserae-device-firmware) | TBD |
 | [TRMNL 7.5" OG DIY Kit](https://www.seeedstudio.com/TRMNL-7-5-Inch-OG-DIY-Kit-p-6481.html?sensecap_affiliate=YcT0R1h&referring_service=link) | 7.5" mono, 800×480 | TRMNL firmware | ✅ via BYOS |
 

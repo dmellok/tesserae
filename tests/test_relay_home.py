@@ -497,6 +497,32 @@ def test_resolve_kind_never_infers_an_auto_select_false_variant(
     assert poller._resolve_kind("", "esp32_bw_client", reported) == "seeed_reterminal_e1001_gray"
 
 
+def test_resolve_kind_never_infers_the_ee03_over_the_e1003(registries: Any, tmp_path: Path) -> None:
+    """The XIAO EE03 and the reTerminal E1003 drive the same 10.3" glass
+    through the same IT8951 controller: identical protocol, gamut, geometry
+    and packed bytes. A self-report cannot distinguish them, and the EE03's
+    id sorts first, so without auto_select: false it would steal inference
+    from every relay-paired E1003 and repoint its OTA lineage. Resolution
+    must land on the E1003 every time; EE03 units declare their kind
+    themselves at registration."""
+    devices, _, _ = registries
+    ee03 = devices.get("seeed_ee03")
+    e1003 = devices.get("seeed_reterminal_e1003")
+    assert ee03 is not None and e1003 is not None
+    # Guard the premise: indistinguishable on the wire.
+    assert ee03.manifest["panel"]["w"] == e1003.manifest["panel"]["w"]
+    assert ee03.manifest["panel"]["gamut"] == e1003.manifest["panel"]["gamut"]
+    assert ee03.manifest["renderers"] == e1003.manifest["renderers"]
+    assert ee03.manifest["_catalog_entry"]["auto_select"] is False
+
+    poller = _poller(registries, tmp_path)
+    reported = {"model": "esp32_client", "gamut": "gray_16", "panel_w": 1872, "panel_h": 1404}
+    assert poller._resolve_kind("", "esp32_client", reported) == "seeed_reterminal_e1003"
+
+    # An operator naming the EE03 explicitly still wins.
+    assert poller._resolve_kind("seeed_ee03", "esp32_client", reported) == "seeed_ee03"
+
+
 def test_operator_can_still_pin_the_legacy_variant_explicitly(
     registries: Any, tmp_path: Path
 ) -> None:

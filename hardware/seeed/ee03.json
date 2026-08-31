@@ -1,0 +1,29 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "seeed_ee03",
+  "name": "Seeed XIAO ePaper EE03 (10.3\" mono)",
+  "vendor": "Seeed Studio",
+  "url": "https://www.seeedstudio.com/XIAO-ePaper-DIY-Kit-EE03-for-10-3-Monochrome-ePaper-Display.html?sensecap_affiliate=YcT0R1h&referring_service=link",
+  "icon": "device-tablet",
+  "description": "Seeed XIAO ePaper Display Board EE03 (XIAO ESP32-S3 Plus) driving the 10.3 inch monochrome panel (ED103TC2, 1872x1404) through the board's onboard IT8951E T-CON, with 16-level greyscale. Speaks Tesserae's v1 REST device API; server-side pack via esp32_gray_bin produces a raw 4-bpp linear grayscale buffer (1314144 bytes) the firmware streams straight into the IT8951's image buffer. Byte-identical wire contract to the Seeed reTerminal E1003, which productizes the same panel + controller combo. Reports battery percentage via the onboard ADC divider, carries the refresh/left/right three-button set like the EE02/EE04 boards, and has an onboard SHT40 temperature/humidity sensor; no touch overlay and no microSD slot.",
+  "protocol": "esp32_client",
+  "renderers": [
+    "esp32_gray_bin"
+  ],
+  "auto_select": false,
+  "panel": {
+    "w": 1872,
+    "h": 1404,
+    "orientation": "landscape",
+    "name": "10.3 inch monochrome ePaper (16-level greyscale, 1872x1404)",
+    "gamut": "gray_16",
+    "native_w": 1872,
+    "native_h": 1404
+  },
+  "protocol_config": {
+    "model_header": "Seeed_EE03"
+  },
+  "refresh_floor_s": 60,
+  "image_format": "bin",
+  "notes_md": "Awaiting confirmed test on real hardware. Wire format is exactly 1314144 bytes (1872*1404/2), row-major, top-left origin, no mirror. Per byte: high nibble = LEFT pixel, low nibble = RIGHT pixel; nibble value 0x0 = black, 0xF = white, linear 16-level grayscale. Byte-identical to the seeed_reterminal_e1003 target (same ED103TC2 glass behind the same IT8951 controller), so validate cross-panel by pointing the same renderer output at both. The firmware compensates for the panel's physical X-mirror on-device; the renderer keeps a normal orientation so a browser preview and the panel paint agree. auto_select is off: relay pairing must not infer this kind over the E1003's (identical protocol/gamut/geometry, but a kind names an OTA lineage); EE03 units declare their kind themselves at registration."
+}
