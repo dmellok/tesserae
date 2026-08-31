@@ -2420,6 +2420,14 @@ class PushManager:
                     # The live frame changed; a pending patch document
                     # anchored to the previous frame must not survive it.
                     self._drop_patches_locked(renderer.device, keep_digest=result.digest)
+                    # Write-through (discussion #266): when this page also
+                    # sits warmed in the device's deck cache, the fresh
+                    # frame replaces the warm; otherwise the next rotation
+                    # pass re-promotes the staler frame over what the
+                    # panel just showed.
+                    per_deck = self._deck_renders.get(renderer.device)
+                    if page_id and per_deck is not None and page_id in per_deck:
+                        per_deck[page_id] = dict(render_info)
             # One event per renderer per push: lets /events filter for a
             # single renderer's history without scanning every push's
             # nested extras.

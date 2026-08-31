@@ -191,6 +191,31 @@ def test_forget_device_survives_a_restart(wired, tmp_path) -> None:
     assert "panel" not in reloaded
 
 
+def test_live_push_writes_through_to_the_deck_cache(wired) -> None:
+    """A live render of a page that also sits warmed in the deck cache must
+    replace the warmed frame, or the next rotation pass re-promotes the
+    staler frame over what the panel just showed (discussion #266)."""
+    manager = wired
+    with patch("app.push.capture_composed", return_value=(_png((0, 0, 255)), [])):
+        assert manager.warm_deck_page("p_b", "panel") is True
+    stale = manager._deck_renders["panel"]["p_b"]["digest"]
+
+    with patch("app.push.capture_composed", return_value=(_png((0, 255, 0)), [])):
+        manager.push("p_b", device_ids={"panel"}, source="page_refresh")
+    fresh = manager.latest_render_for("panel")["digest"]
+    assert fresh != stale
+    assert manager._deck_renders["panel"]["p_b"]["digest"] == fresh
+
+
+def test_live_push_does_not_create_deck_cache_entries(wired) -> None:
+    """The write-through only refreshes existing warms; pushing a page that
+    was never warmed must not invent a deck cache entry for it."""
+    manager = wired
+    with patch("app.push.capture_composed", return_value=(_png((255, 0, 0)), [])):
+        manager.push("p_a", device_ids={"panel"})
+    assert not manager.has_warm_deck_page("panel", "p_a")
+
+
 def test_warm_is_logged_as_warmed_not_pushed(wired) -> None:
     """A warm never repaints a panel, so its History row must not carry the
     same ``sent`` status as a push a display actually showed (#266)."""
