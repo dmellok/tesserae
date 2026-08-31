@@ -8,6 +8,22 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **The web port is settable from Docker compose via `TESSERAE_BIND_PORT`.**
+  The env var (already used to point loopback renders at the real bind port)
+  now also drives the `--port` default, and the image CMD no longer passes an
+  explicit `--port` that would override it. Under host networking, moving
+  Tesserae off a contested 8765 is now one `environment:` line instead of a
+  `command:` override. An explicit `--port` flag still wins, and the env var
+  is rewritten to the resolved port so loopback renders always target the
+  actual bind.
+
+- **Consolidated configuration reference in the docs.** New
+  `install/configuration.md` page listing every CLI flag and `TESSERAE_*`
+  environment variable (serving, storage, secrets, logging, experiment
+  overrides) plus the role of `settings.json`, so deployment knobs are no
+  longer scattered across install pages and source comments. The Docker page
+  gains "Change the web port" and broker-on-the-Docker-host sections.
+
 - **Seeed XIAO ePaper EE03 (10.3" mono) hardware kind.** The EE03 DIY kit puts
   the reTerminal E1003's exact 10.3" panel + controller combo (ED103TC2 behind
   an IT8951, 1872x1404, 16-level greyscale) on the XIAO ESP32-S3 Plus driver

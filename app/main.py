@@ -42,6 +42,20 @@ __all__ = [
 ]
 
 
+def _default_bind_port() -> int:
+    """Default for ``--port``: ``TESSERAE_BIND_PORT`` if set, else 8765.
+
+    Docker operators can't reach the CLI flag without overriding the
+    image CMD, so the bind port has to be settable from a compose
+    ``environment:`` block. ``TESSERAE_BIND_PORT`` already means
+    "the port the server actually listens on" (the HA add-on sets it,
+    and the renderer's loopback rewrite trusts it), so it doubles as
+    the input rather than minting a third port variable.
+    """
+    raw = os.environ.get("TESSERAE_BIND_PORT", "").strip()
+    return int(raw) if raw.isdigit() else 8765
+
+
 def _serve(argv: list[str] | None = None) -> None:
     """Entry point for ``python -m app.main`` and the ``tesserae``
     console script. Defaults to a production WSGI server (waitress);
@@ -64,7 +78,12 @@ def _serve(argv: list[str] | None = None) -> None:
         "Default is waitress, a production WSGI server.",
     )
     parser.add_argument("--host", default="0.0.0.0", help="Bind host (default: 0.0.0.0)")
-    parser.add_argument("--port", type=int, default=8765, help="Bind port (default: 8765)")
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=_default_bind_port(),
+        help="Bind port (default: TESSERAE_BIND_PORT env var if set, else 8765)",
+    )
     parser.add_argument(
         "--log-level",
         default=None,
@@ -90,10 +109,12 @@ def _serve(argv: list[str] | None = None) -> None:
     # port the browser used. Behind a reverse proxy / k8s Service / Docker
     # port map (external 4567 -> container 8765), request.host carries the
     # external port, and a loopback fetch to it is refused because nothing
-    # listens there inside the container (#129). The HA add-on already sets
-    # TESSERAE_BIND_PORT in its own config for the same reason; setdefault
-    # keeps that value and covers every other CLI-launched deployment.
-    os.environ.setdefault("TESSERAE_BIND_PORT", str(args.port))
+    # listens there inside the container (#129). The env var also feeds the
+    # --port default above, so a pre-set value normally round-trips
+    # unchanged; writing it unconditionally covers the one divergent case
+    # (env set AND an explicit --port flag), where the flag wins the bind
+    # and the env var must follow it or loopback renders break.
+    os.environ["TESSERAE_BIND_PORT"] = str(args.port)
 
     # Log level for self-hosted installs (Docker / LXC / bare): --log-level
     # wins, then TESSERAE_LOG_LEVEL, else INFO. The HA add-on's log_level

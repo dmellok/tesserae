@@ -54,6 +54,11 @@ services:
       # instead). Listed here so it's discoverable.
       TESSERAE_IN_DOCKER: "1"
 
+      # Under host networking Tesserae binds 8765 directly on the
+      # host. If something else already owns 8765 (nginx, another
+      # app), move the web port here, no CMD override needed:
+      # TESSERAE_BIND_PORT: "8766"
+
     # ---- Bridge-networking alternative (Docker Desktop on Mac/Windows,
     # or any setup where host networking isn't an option) -------------
     #

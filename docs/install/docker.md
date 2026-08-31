@@ -53,6 +53,36 @@ below if you're testing there.
   process and can read anything this user can read (see
   [issue #3](https://github.com/dmellok/tesserae/issues/3)).
 
+## Change the web port
+
+Under **host networking**, Tesserae binds its web port directly on
+the host, so a clash with something already on 8765 (nginx, another
+app) is a real possibility. Move it with the `TESSERAE_BIND_PORT`
+environment variable, no `command:` override needed:
+
+```yaml
+services:
+  tesserae:
+    image: ghcr.io/dmellok/tesserae:latest
+    network_mode: host
+    volumes: ["./data:/app/data"]
+    environment:
+      TESSERAE_BIND_PORT: "8766"
+```
+
+Then browse to `http://<host-ip>:8766`.
+
+Under **bridge networking**, leave the container's internal port
+alone and remap the host side instead: `ports: ["8766:8765"]`, and
+browse to `http://<host-ip>:8766`.
+
+(`TESSERAE_BIND_PORT` needs image `0.378.0` or newer. On older
+images, override the CMD instead:
+`command: ["tesserae", "--port", "8766"]`.)
+
+The full list of environment variables and flags lives in the
+[configuration reference](configuration.md).
+
 ## Configuring the MQTT broker
 
 Tesserae publishes frames over MQTT. Two ways to configure it:
@@ -106,6 +136,19 @@ services:
 
 Then set the broker host to `mosquitto` in Tesserae's settings (the
 service name is the resolvable hostname inside the compose network).
+
+If your broker runs **on the Docker host itself** and Tesserae is on
+bridge networking, the container can't reach it via `localhost` (that
+is the container's own loopback). Either use the host's LAN IP as the
+broker host, or add the standard host alias to the service:
+
+```yaml
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+```
+
+and set the broker host to `host.docker.internal`. Under host
+networking this doesn't come up, `localhost:1883` just works.
 
 ## Bridge networking
 

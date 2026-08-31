@@ -134,5 +134,8 @@ EXPOSE 8765
 
 ENTRYPOINT ["docker-entrypoint.sh"]
 # `tesserae` is the console script declared in pyproject [project.scripts].
-# Defaults to waitress on 0.0.0.0:8765.
-CMD ["tesserae", "--host", "0.0.0.0", "--port", "8765"]
+# Defaults to waitress on 0.0.0.0:8765. No explicit --port here: an
+# explicit flag would override the TESSERAE_BIND_PORT env var, which is
+# how compose users move the web port off 8765 without overriding this
+# CMD (the port default resolves env-then-8765 in app/main.py).
+CMD ["tesserae"]
