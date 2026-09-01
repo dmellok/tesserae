@@ -1287,7 +1287,14 @@ def create_app(
         push_mgr = app.config.get("PUSH_MANAGER")
         if push_mgr is None:
             abort(503)
-        latest = push_mgr.latest_render_for(device_id)
+        # A patch divert holds the live slot at its anchor while the
+        # freshest accepted render sits parked for delivery (#271). The
+        # preview should show what History shows -- the newest content --
+        # not the anchor the device is converging away from.
+        held_fn = getattr(push_mgr, "held_render_for", None)
+        latest = held_fn(device_id) if callable(held_fn) else None
+        if not latest:
+            latest = push_mgr.latest_render_for(device_id)
         if not latest:
             # No render yet for this device, return 404 rather than a
             # placeholder so HA's camera entity shows "unavailable",

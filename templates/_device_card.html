@@ -437,6 +437,21 @@
                         form=_combined_form_id) }}
         {% endif %}
 
+        {# Update delivery (#271). Auto ships small same-page changes as
+           partial-refresh patches when the firmware can apply them (with
+           a full-frame fallback on the next poll when it can't); Always
+           full refresh disables patching for this device entirely, so
+           every visible change repaints the whole panel. #}
+        {% if section.refresh_mode_capable %}
+        {{ select_field(section.id ~ '-refresh-mode', 'refresh_mode', 'Update delivery',
+                        value=section.refresh_mode, blank_label='Auto (partial refresh when possible)',
+                        options=[
+                          {'value': 'full', 'label': 'Always full refresh'}
+                        ],
+                        help='Auto delivers small changes as partial-refresh patches on capable firmware and falls back to a full frame on the next poll otherwise. Always full refresh repaints the whole panel on every change; use it if updates look incomplete or ghosted.',
+                        form=_combined_form_id) }}
+        {% endif %}
+
         {# Per-device quiet hours override + dependent dim of Start/End. #}
         {% if section.quiet_hours_endpoint %}
         <div class="dx-quiet-hours" data-dep-group>

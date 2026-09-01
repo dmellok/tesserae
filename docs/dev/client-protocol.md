@@ -1163,6 +1163,19 @@ behaviour for either case. Diffing runs in composition space (before
 per-renderer dithering), so error-diffusion dither noise never inflates
 a patch; the blob content is still byte-exact with the new artifact.
 
+**Promote-on-poll fallback** (#271): a deep-sleep device has no
+framebuffer in RAM on a timer wake, so it cannot composite a
+status-borne patch and used to keep 304ing on the held digest with the
+change never landing. The server now keeps the full render a divert
+replaced; if the patch blob was never fetched by the time the device's
+next `GET /frame` arrives, that render is promoted into the live slot
+and the poll serves a normal 200 with the full frame. A device that did
+fetch the blob (linger window, SSE) converged via patches and keeps
+304ing as before. Firmware needs no new behaviour. Per device, the
+Settings card's "Update delivery" select can also force "Always full
+refresh", which disables the divert entirely for panels where partial
+refresh is undesirable.
+
 The document arrives under `patches` on `GET /frame/data` (poll at
 1-2 s cadence during the touch-linger window) and as `overlay_patches`
 on `/status` responses:

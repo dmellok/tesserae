@@ -1229,6 +1229,21 @@ def _build_sections() -> list[dict[str, Any]]:
                 # combined save handler owns validation.
                 "wake_align_capable": bool(is_instance and device.transport == "rest"),
                 "wake_align": (_wake_align_view(store, device.id) if is_instance else {}),
+                # Update delivery (#271). REST instances only: the patch
+                # divert this steers never fires for MQTT / relay / push
+                # transports. Stored in settings.devices.<id> as
+                # refresh_mode; absent reads as "auto".
+                "refresh_mode_capable": bool(is_instance and device.transport == "rest"),
+                "refresh_mode": (
+                    str(
+                        ((store.get_section("devices") or {}).get(device.id) or {}).get(
+                            "refresh_mode"
+                        )
+                        or ""
+                    )
+                    if is_instance
+                    else ""
+                ),
                 # Read-only diagnostic block: app version, resolved
                 # kind + renderer clone ids, panel details, on-disk
                 # instance file, raw JSON with secrets masked. Renders

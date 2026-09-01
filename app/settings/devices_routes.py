@@ -1385,6 +1385,30 @@ def devices_update_combined(instance_id: str) -> Response:
             ok_messages.append("locale saved")
             any_change = True
 
+    # 7b. Update delivery (#271). "full" disables the patch divert so
+    # every visible change mints a new frame and a full repaint;
+    # "auto"/blank drops the key so the device gets the default
+    # behaviour (patches when the firmware can apply them, with the
+    # promote-on-poll fallback). Stored in settings.devices.<id> like
+    # button_map / wake alignment: it steers server-side delivery, not
+    # the device manifest.
+    if "refresh_mode" in form:
+        wanted = (form.get("refresh_mode") or "").strip().lower()
+        devices_section = store.get_section("devices") or {}
+        device_section = dict(devices_section.get(instance_id) or {})
+        existing_mode = device_section.get("refresh_mode")
+        if wanted == "full":
+            if existing_mode != "full":
+                device_section["refresh_mode"] = "full"
+                store.patch_section("devices", {instance_id: device_section})
+                ok_messages.append("update delivery saved")
+                any_change = True
+        elif existing_mode is not None:
+            device_section.pop("refresh_mode", None)
+            store.patch_section("devices", {instance_id: device_section})
+            ok_messages.append("update delivery saved")
+            any_change = True
+
     # 8. Synchronized wake (wake alignment). The Schedule tab always
     # submits the mode select on the combined form; blank means off.
     # Stored next to sleep_interval_s in settings.devices.<id> as

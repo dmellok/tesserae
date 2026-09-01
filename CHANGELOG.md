@@ -6,7 +6,29 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **Small dashboard changes no longer strand deep-sleep panels on an old
+  frame** (#271). A small same-page change on a patch-capable REST device is
+  delivered as partial-refresh patches with the frame digest held stable, but
+  a deep-sleep device has no framebuffer in RAM on a timer wake and could
+  never apply them, so the change silently never landed while the History tab
+  showed the new render. The server now keeps the full render a patch divert
+  replaced and, when the patch blob was never fetched by the device's next
+  `/frame` poll, promotes it into the live slot so that poll serves a normal
+  full frame. Devices that do apply patches (touch linger, SSE) keep the
+  battery-friendly partial path unchanged; no firmware update is needed.
+  `/preview/<device>.png` (and `/mirror/<device>`) now also serve the newest
+  accepted composition instead of the held anchor, and a diverted render now
+  writes through to the warmed deck cache the same way a normal stamp does.
+
 ### Added
+
+- **Per-device "Update delivery" setting** (#271). Settings → Devices →
+  General on REST instances: "Auto (partial refresh when possible)" is the
+  default behaviour above; "Always full refresh" disables patch delivery for
+  the device entirely, so every visible change mints a new frame and a full
+  repaint. Useful where partial refresh ghosts or looks incomplete.
 
 - **The web port is settable from Docker compose via `TESSERAE_BIND_PORT`.**
   The env var (already used to point loopback renders at the real bind port)

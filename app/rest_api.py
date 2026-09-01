@@ -1255,6 +1255,16 @@ def get_frame(device_id: str) -> Response:
 
     push_mgr = current_app.config.get("PUSH_MANAGER")
     _refresh_if_widget_change_elapsed(device, push_mgr)
+    # Promote-on-poll fallback (#271): a render diverted to patches whose
+    # blob was never fetched means patch delivery didn't happen (deep
+    # sleep: no framebuffer in RAM on a timer wake, and the refetch hint
+    # only fires inside a linger window). Swap the parked full render
+    # into the live slot now, so this poll's ETag moves and the device
+    # downloads the change it would otherwise never see.
+    if push_mgr is not None:
+        promote = getattr(push_mgr, "promote_held_render", None)
+        if callable(promote):
+            promote(device.id)
     latest = push_mgr.latest_render_for(device.id) if push_mgr is not None else None
     if latest is None:
         return _error(204, "no frame rendered yet for this device")
@@ -2873,6 +2883,13 @@ def get_frame_patch_blob(device_id: str, digest: str) -> Response:
     path = Path(renders_dir) / f"overlay-patch-{wanted}.bin"
     if not path.is_file():
         return _error(404, "unknown patch digest")
+    # Delivery evidence for the promote-on-poll fallback (#271): a
+    # fetched blob means the device is applying the patch, so the parked
+    # full render is redundant and must not repaint the panel later.
+    push_mgr = current_app.config.get("PUSH_MANAGER")
+    note_fetched = getattr(push_mgr, "note_patch_blob_fetched", None) if push_mgr else None
+    if callable(note_fetched):
+        note_fetched(device.id, wanted)
     from flask import send_file
 
     resp = send_file(path, mimetype="application/octet-stream")

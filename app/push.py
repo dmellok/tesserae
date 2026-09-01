@@ -557,6 +557,15 @@ class PushManager:
         # the documents that reference them.
         self._patch_docs: dict[str, dict[str, Any]] = {}
         self._patch_seq = 0
+        # Diverted full renders (#271): when a push is delivered as
+        # patches instead of a new frame, the full render it replaced is
+        # parked here. A deep-sleep device can't composite patches on a
+        # timer wake (no framebuffer in RAM), so its next /frame poll
+        # promotes this entry and serves the full frame; a lingering /
+        # SSE device that fetched the patch blob converged already and
+        # the entry is dropped instead. In-memory only, same lifetime
+        # reasoning as ``_patch_docs``.
+        self._held_renders: dict[str, dict[str, Any]] = {}
         # Grace slot: the entry each device's live frame most recently
         # replaced, kept answering digest-addressed lookups for ~60 s so
         # a device mid-linger on the old digest isn't orphaned by a
@@ -679,6 +688,7 @@ class PushManager:
             self._deck_renders.pop(device_id, None)
             self._album_renders.pop(device_id, None)
             self._patch_docs.pop(device_id, None)
+            self._held_renders.pop(device_id, None)
             if had:
                 self._save_latest_renders()
         return had
@@ -773,6 +783,10 @@ class PushManager:
                 replacement[key] = previous[key]
         self._retire_live_locked(device_id, str(replacement.get("digest") or ""))
         self._latest_renders[device_id] = replacement
+        # Any parked diverted render is now behind the live frame;
+        # promoting it later would revert the panel (#271). The promote
+        # path pops its own entry before calling here.
+        self._held_renders.pop(device_id, None)
         self._save_latest_renders()
 
     def consume_force_refetch(self, device_id: str) -> None:
@@ -962,7 +976,7 @@ class PushManager:
             doc = self._patch_docs.get(device_id)
             if doc is None or not frame_digest or doc.get("frame_digest") != frame_digest:
                 return None
-            return {k: v for k, v in doc.items() if k != "blob_digest"}
+            return {k: v for k, v in doc.items() if k not in ("blob_digest", "fetched")}
 
     def _drop_patches_locked(self, device_id: str, *, keep_digest: str | None = None) -> None:
         """Discard a device's patch document (and its blob file) unless
@@ -977,6 +991,74 @@ class PushManager:
         if blob:
             with contextlib.suppress(OSError):
                 (self._renders_dir / f"overlay-patch-{blob}.bin").unlink()
+
+    def _refresh_mode_for(self, device_id: str) -> str:
+        """The device's update-delivery preference (#271): ``"full"``
+        disables the patch divert so every visible change mints a new
+        frame and a full repaint; anything else reads as ``"auto"``."""
+        try:
+            section = self._settings.get_section("devices") or {}
+        except Exception:
+            return "auto"
+        entry = section.get(device_id)
+        mode = str((entry or {}).get("refresh_mode") or "").strip().lower()
+        return "full" if mode == "full" else "auto"
+
+    def note_patch_blob_fetched(self, device_id: str, blob_digest: str) -> None:
+        """Record that a device downloaded its pending patch blob. This
+        is the delivery evidence promote_held_render() keys off: a
+        fetched blob means the device converged via patches, so serving
+        it the parked full frame again would only cost a redundant
+        download and repaint."""
+        if not blob_digest:
+            return
+        with self._lock:
+            doc = self._patch_docs.get(device_id)
+            if doc is not None and doc.get("blob_digest") == blob_digest:
+                doc["fetched"] = True
+                # Converged (or about to, within this linger poll cycle);
+                # the parked full frame is redundant now.
+                self._held_renders.pop(device_id, None)
+
+    def held_render_for(self, device_id: str) -> dict[str, Any] | None:
+        """The full render a patch divert parked for this device, if
+        any: the newest content the server has accepted, even though
+        the live slot still holds the patch anchor. /preview reads it
+        so the mirror shows what History shows (#271)."""
+        with self._lock:
+            held = self._held_renders.get(device_id)
+            return dict(held) if held is not None else None
+
+    def promote_held_render(self, device_id: str) -> bool:
+        """Swap a parked diverted render into the live slot (#271).
+
+        Called at the top of a REST /frame poll. A lingering or SSE
+        device picks its patches up within seconds of staging (and the
+        blob fetch clears the parked entry), so reaching a poll with the
+        entry still parked means patch delivery didn't happen -- the
+        deep-sleep case, where the firmware has no framebuffer in RAM to
+        composite into and the change would otherwise never land on
+        glass. Promoting moves the ETag, so this poll serves a 200 with
+        the full frame. Returns whether a promotion happened."""
+        with self._lock:
+            held = self._held_renders.pop(device_id, None)
+            if held is None:
+                return False
+            self._replace_latest_render_locked(device_id, held)
+            self._drop_patches_locked(device_id, keep_digest=str(held.get("digest") or ""))
+            # Same write-through the normal stamp branch does: the page
+            # may also sit warmed in the deck cache, and a later
+            # promote_deck_page must not revert the panel.
+            page_id = str(held.get("page_id") or "")
+            per_deck = self._deck_renders.get(device_id)
+            if page_id and per_deck is not None and page_id in per_deck:
+                per_deck[page_id] = dict(held)
+            logger.info(
+                "held render promoted for device=%s (digest %s, patches unfetched)",
+                device_id,
+                held.get("digest"),
+            )
+            return True
 
     def shadow_render_page(self, page_id: str, device_id: str) -> dict[str, Any] | None:
         """Render ``page_id`` for one device WITHOUT touching the live
@@ -1143,6 +1225,10 @@ class PushManager:
             "bytes": len(blob),
             "rects": entries,
             "blob_digest": blob_digest,
+            # Delivery evidence (#271): flipped by the blob fetch. The
+            # promote-on-poll fallback reads it to tell "the device
+            # picked this patch up" from "nobody ever came for it".
+            "fetched": False,
         }
         logger.info(
             "frame patch: %d rect(s), %d bytes staged for device=%s (anchor=%s)",
@@ -1174,6 +1260,10 @@ class PushManager:
             return False
         if not self._renderer_is_http_polled(renderer):
             return False
+        if self._refresh_mode_for(device_id) == "full":
+            # Per-device opt-out (#271): every visible change mints a
+            # full frame, no patch delivery for this device.
+            return False
         status = (self._device_status_fn() or {}).get(device_id)
         cap = status.get("overlay") if isinstance(status, dict) else None
         schema = cap.get("schema") if isinstance(cap, dict) else None
@@ -1186,6 +1276,15 @@ class PushManager:
         payload = self._build_patch_payload(prev, render_info, panel.model_dump())
         if payload == "no_visual_change":
             # Sub-tolerance jitter only: hold the digest, stage nothing.
+            # The content is visually back at the anchor, so an earlier
+            # UNFETCHED patch doc (and the render parked for promotion)
+            # would now paint a state the composition has left; drop both
+            # (#271). A fetched doc stays: the glass likely applied it,
+            # and re-applying is the established convergence there.
+            doc = self._patch_docs.get(device_id)
+            if doc is None or not doc.get("fetched"):
+                self._drop_patches_locked(device_id)
+                self._held_renders.pop(device_id, None)
             prev["timestamp"] = time.time()
             self._save_latest_renders()
             return True
@@ -1197,6 +1296,10 @@ class PushManager:
         blob, entries = payload
         if not self._stage_patches_locked(device_id, str(prev.get("digest") or ""), blob, entries):
             return False
+        # Park the full render for the promote-on-poll fallback (#271): a
+        # deep-sleep device can't composite patches on a timer wake, so
+        # its next /frame poll swaps this in and downloads the full frame.
+        self._held_renders[device_id] = dict(render_info)
         # Freshness bump only; digest / filename / signature stay the
         # anchor's, so the device keeps 304ing and the next render
         # re-diffs against the same base.
@@ -1854,6 +1957,9 @@ class PushManager:
         # /collection manifest and firmware fetches them by digest.
         for per_frame in list(self._album_renders.values()):
             entries.extend(per_frame.values())
+        # Diverted renders parked for promote-on-poll (#271): the next
+        # /frame poll may serve them, so their artifacts must survive.
+        entries.extend(list(self._held_renders.values()))
         for entry in entries:
             for key in (
                 "digest",
@@ -2415,6 +2521,14 @@ class PushManager:
                         renderer.device,
                         self._latest_renders.get(renderer.device, {}).get("digest"),
                     )
+                    # Same write-through as the stamp branch below: the
+                    # deck cache must carry the freshest render even when
+                    # the live slot is deliberately held, or a later
+                    # promote_deck_page re-promotes a frame even older
+                    # than the patch anchor (#271, same class as #266).
+                    per_deck = self._deck_renders.get(renderer.device)
+                    if page_id and per_deck is not None and page_id in per_deck:
+                        per_deck[page_id] = dict(render_info)
                 else:
                     self._replace_latest_render_locked(renderer.device, render_info)
                     # The live frame changed; a pending patch document
