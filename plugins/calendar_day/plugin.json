@@ -18,7 +18,7 @@
     {
       "name": "hours_ahead",
       "type": "number",
-      "label": "Hours of agenda to show",
+      "label": "Hours ahead to include (within today)",
       "default": 24
     },
     {

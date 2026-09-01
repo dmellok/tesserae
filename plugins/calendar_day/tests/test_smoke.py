@@ -186,3 +186,57 @@ def test_a_multi_day_event_spanning_today_is_kept() -> None:
 def test_todays_date_is_reported() -> None:
     out = _fetch_with_events([])
     assert out["date"] == "2026-08-21"
+
+
+def _fetch_capturing_window(**options: Any) -> tuple[datetime, datetime]:
+    """The (start, end) `fetch` asks calendar_core for.
+
+    Asserted here rather than through the returned events, because the stub returns
+    whatever it is given regardless of the window - so a test reading the output cannot
+    see the bug at all. The window IS the bug (#252).
+    """
+    core = _stub_calendar_core([])
+    registry = MagicMock()
+    registry.get.return_value = core
+    app = MagicMock()
+    app.config = {"PLUGIN_REGISTRY": registry}
+    with (
+        patch.object(server, "current_app", app),
+        patch.object(server, "datetime", _FixedNow),
+        patch.object(server, "app_timezone", lambda: UTC),
+    ):
+        server.fetch(options=options, settings={}, ctx={})
+    args = core.server_module.load_events.call_args.args
+    return args[1], args[2]
+
+
+def test_the_window_starts_at_local_midnight_not_now() -> None:
+    """The day view must not lose the morning as the day goes on.
+
+    The window started at `now`, so at 09:00 an 07:00 meeting was never fetched: not
+    filtered out, absent from the payload. The auto-fitted range then shrank around
+    what was left, which on a widget drawing a day's timeline reads as missing data.
+    """
+    start, _end = _fetch_capturing_window()
+    assert start == datetime(2026, 8, 21, 0, 0, tzinfo=UTC)
+
+
+def test_hours_ahead_still_bounds_the_window_forward_from_now() -> None:
+    """It keeps its meaning; it just no longer decides where the day begins.
+
+    Measured from NOW rather than from midnight, so "hours ahead" stays the number of
+    hours ahead - at 09:00, 4 reaches 13:00, not 04:00.
+    """
+    _start, end = _fetch_capturing_window(hours_ahead=4)
+    assert end == datetime(2026, 8, 21, 13, 0, tzinfo=UTC)
+
+
+def test_a_small_hours_ahead_does_not_hide_the_morning() -> None:
+    """The two halves together: a narrow forward bound still shows the day so far.
+
+    This is the combination that made the old behaviour indefensible - a 2 h agenda at
+    09:00 showed 09:00-11:00 and called it a day view.
+    """
+    start, end = _fetch_capturing_window(hours_ahead=2)
+    assert start == datetime(2026, 8, 21, 0, 0, tzinfo=UTC)
+    assert end == datetime(2026, 8, 21, 11, 0, tzinfo=UTC)
