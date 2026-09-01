@@ -27,7 +27,7 @@ from app import updater as _updater_mod
 from app.button_actions import DEFAULT_BUTTON_MAP, registered_actions
 from app.device_loader import Device
 from app.ha_options import is_ha_addon
-from app.network import detect_local_ip, docker_bridge_ip_warning, is_docker_bridge_ip
+from app.network import detect_local_ip, docker_bridge_ip_warning, is_docker_bridge_ip, url_host
 from app.panel import PANEL_PRESET_CHOICES, PANEL_PRESETS
 from app.state.settings_store import SECRET_MASK
 
@@ -2182,7 +2182,7 @@ def _broker_mqtt_url(raw: dict[str, Any]) -> str:
         port = raw.get("port") or 1883
         if not host:
             return "-"
-    url = f"mqtt://{host}:{port}"
+    url = f"mqtt://{url_host(host)}:{port}"
     if docker_bridge_ip_warning() and is_docker_bridge_ip(host):
         url += ", set TESSERAE_HOST_IP"
     return url

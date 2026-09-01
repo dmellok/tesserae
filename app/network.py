@@ -11,6 +11,7 @@ mypy --strict applies to this module, see pyproject.toml.
 
 from __future__ import annotations
 
+import ipaddress
 import json
 import logging
 import os
@@ -19,6 +20,23 @@ import urllib.error
 import urllib.request
 
 logger = logging.getLogger(__name__)
+
+
+def url_host(host: str) -> str:
+    """``host`` as it may appear in a URL authority: bare IPv6 literals
+    get RFC 3986 square brackets, everything else passes through.
+
+    Without the brackets an IPv6 base_url reads
+    ``http://2403:aa:bb::1:8765/...``, where the port is indistinguishable
+    from the address; HA's MQTT image entity rejects it outright and
+    clients that don't just mis-parse it."""
+    if ":" not in host or host.startswith("["):
+        return host
+    try:
+        version = ipaddress.ip_address(host).version
+    except ValueError:
+        return host
+    return f"[{host}]" if version == 6 else host
 
 
 # Cached Supervisor lookup. The host IP doesn't change between
@@ -106,7 +124,8 @@ def detect_local_ip(fallback: str = "127.0.0.1") -> str:
     locked-down test environments).
     """
     # 1. Explicit override, handy for unusual setups (reverse proxies,
-    #    Docker Compose networks) or NAT.
+    #    Docker Compose networks) or NAT. May be an IPv6 address; URL
+    #    builders bracket it via url_host().
     override = os.environ.get("TESSERAE_HOST_IP", "").strip()
     if override:
         return override
@@ -140,7 +159,7 @@ def detect_base_url(port: int | None = None) -> str:
     if port is None:
         env_port = os.environ.get("TESSERAE_HTTP_PORT", "").strip()
         port = int(env_port) if env_port.isdigit() else 8765
-    return f"http://{detect_local_ip()}:{port}"
+    return f"http://{url_host(detect_local_ip())}:{port}"
 
 
 def is_docker_bridge_ip(ip: str) -> bool:

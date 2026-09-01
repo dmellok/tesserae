@@ -17,6 +17,7 @@ from app.renderer import to_loopback_url
 
 def test_host_swapped_to_loopback_port_preserved(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("TESSERAE_BIND_PORT", raising=False)
+    monkeypatch.delenv("TESSERAE_BIND_HOST", raising=False)
     assert (
         to_loopback_url("http://tess.example:8765/compose/abc?w=800")
         == "http://127.0.0.1:8765/compose/abc?w=800"
@@ -27,6 +28,7 @@ def test_bind_port_overrides_external_request_port(monkeypatch: pytest.MonkeyPat
     # The browser reached the UI on the external port 4567; the container binds
     # 8765. Without the override the renderer would fetch 127.0.0.1:4567 and be
     # refused (#129).
+    monkeypatch.delenv("TESSERAE_BIND_HOST", raising=False)
     monkeypatch.setenv("TESSERAE_BIND_PORT", "8765")
     assert (
         to_loopback_url("http://tess.example:4567/compose/abc")
@@ -63,6 +65,31 @@ def test_https_explicit_port_downgraded_without_bind_env(
         to_loopback_url("https://tess.example:8765/compose/abc")
         == "http://127.0.0.1:8765/compose/abc"
     )
+
+
+def test_ipv6_bind_uses_v6_loopback(monkeypatch: pytest.MonkeyPatch) -> None:
+    # ``--host ::`` (IPv6-only on many stacks): 127.0.0.1 has no listener,
+    # so the compose fetch must go to [::1] on the same bind port.
+    monkeypatch.setenv("TESSERAE_BIND_HOST", "::")
+    monkeypatch.setenv("TESSERAE_BIND_PORT", "8765")
+    assert (
+        to_loopback_url("http://tess.example:4567/compose/abc?w=800")
+        == "http://[::1]:8765/compose/abc?w=800"
+    )
+
+
+def test_ipv6_bind_without_bind_port(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("TESSERAE_BIND_HOST", "::")
+    monkeypatch.delenv("TESSERAE_BIND_PORT", raising=False)
+    assert (
+        to_loopback_url("http://tess.example:5050/compose/abc") == "http://[::1]:5050/compose/abc"
+    )
+
+
+def test_ipv4_bind_keeps_v4_loopback(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("TESSERAE_BIND_HOST", "0.0.0.0")
+    monkeypatch.setenv("TESSERAE_BIND_PORT", "8765")
+    assert to_loopback_url("http://tess.example/compose/abc") == "http://127.0.0.1:8765/compose/abc"
 
 
 def test_ingress_prefix_stripped(monkeypatch: pytest.MonkeyPatch) -> None:

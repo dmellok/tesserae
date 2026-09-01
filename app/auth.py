@@ -246,17 +246,33 @@ def logout() -> None:
 # -- before_request gate -----------------------------------------------
 
 
-def _is_loopback() -> bool:
-    return request.remote_addr in _LOOPBACK_HOSTS
-
-
-def _is_private_client() -> bool:
-    addr = request.remote_addr
+def _canonical_ip(addr: str | None) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
+    """``addr`` parsed to an address object, with IPv4-mapped IPv6
+    (``::ffff:a.b.c.d``, what a dual-stack ``::`` bind reports for IPv4
+    clients) unwrapped to the plain IPv4 address so the loopback and
+    private-range checks below see the family they expect. None when
+    ``addr`` is empty or not an IP literal (e.g. ``localhost``)."""
     if not addr:
-        return False
+        return None
     try:
         ip = ipaddress.ip_address(addr)
     except ValueError:
+        return None
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
+        return ip.ipv4_mapped
+    return ip
+
+
+def _is_loopback() -> bool:
+    if request.remote_addr in _LOOPBACK_HOSTS:
+        return True
+    ip = _canonical_ip(request.remote_addr)
+    return ip is not None and ip.is_loopback
+
+
+def _is_private_client() -> bool:
+    ip = _canonical_ip(request.remote_addr)
+    if ip is None:
         return False
     return any(ip in net for net in _PRIVATE_NETWORKS)
 

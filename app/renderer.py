@@ -98,8 +98,8 @@ def _strip_script_root(path: str) -> str:
 
 
 def to_loopback_url(url: str) -> str:
-    """Rewrite the host portion of ``url`` to ``127.0.0.1`` while preserving
-    the port + path + query.
+    """Rewrite the host portion of ``url`` to the loopback literal while
+    preserving the port + path + query.
 
     The renderer always runs in-process with Flask, so internal compose URLs
     should always resolve via loopback regardless of what the user set
@@ -127,11 +127,18 @@ def to_loopback_url(url: str) -> str:
 
     bind_port_raw = _os.environ.get("TESSERAE_BIND_PORT", "").strip()
     bind_port = int(bind_port_raw) if bind_port_raw.isdigit() else None
-    netloc = "127.0.0.1"
+    # Match the loopback literal to the bind family: an IPv6-only bind
+    # (``--host ::``) has nothing listening on 127.0.0.1, so the fetch
+    # must go to [::1] instead. ``TESSERAE_BIND_HOST`` is set by the CLI
+    # from ``--host``; absent (tests, embedded use) we keep the IPv4
+    # literal, matching the 0.0.0.0 default bind.
+    bind_host = _os.environ.get("TESSERAE_BIND_HOST", "").strip()
+    loopback = "[::1]" if ":" in bind_host else "127.0.0.1"
+    netloc = loopback
     if bind_port:
-        netloc = f"127.0.0.1:{bind_port}"
+        netloc = f"{loopback}:{bind_port}"
     elif parts.port:
-        netloc = f"127.0.0.1:{parts.port}"
+        netloc = f"{loopback}:{parts.port}"
     # Always plain http: the in-process server never terminates TLS (that is
     # the reverse proxy's job), so carrying an https scheme from base_url /
     # the incoming request would stall the TLS handshake against waitress

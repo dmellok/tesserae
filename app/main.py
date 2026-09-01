@@ -56,6 +56,15 @@ def _default_bind_port() -> int:
     return int(raw) if raw.isdigit() else 8765
 
 
+def _default_bind_host() -> str:
+    """Default for ``--host``: ``TESSERAE_BIND_HOST`` if set, else 0.0.0.0.
+
+    Same rationale as ``_default_bind_port``: Docker operators reach this
+    through a compose ``environment:`` block rather than a CMD override.
+    Set it to ``::`` for an IPv6 (or dual-stack, OS-dependent) bind."""
+    return os.environ.get("TESSERAE_BIND_HOST", "").strip() or "0.0.0.0"
+
+
 def _serve(argv: list[str] | None = None) -> None:
     """Entry point for ``python -m app.main`` and the ``tesserae``
     console script. Defaults to a production WSGI server (waitress);
@@ -77,7 +86,12 @@ def _serve(argv: list[str] | None = None) -> None:
         help="Use Flask's dev server (auto-reload, debugger). "
         "Default is waitress, a production WSGI server.",
     )
-    parser.add_argument("--host", default="0.0.0.0", help="Bind host (default: 0.0.0.0)")
+    parser.add_argument(
+        "--host",
+        default=_default_bind_host(),
+        help="Bind host (default: TESSERAE_BIND_HOST env var if set, else 0.0.0.0). "
+        "Use :: to listen on IPv6.",
+    )
     parser.add_argument(
         "--port",
         type=int,
@@ -115,6 +129,10 @@ def _serve(argv: list[str] | None = None) -> None:
     # (env set AND an explicit --port flag), where the flag wins the bind
     # and the env var must follow it or loopback renders break.
     os.environ["TESSERAE_BIND_PORT"] = str(args.port)
+    # Same handshake for the bind host: the renderer's loopback rewrite
+    # needs to know the bind family, because an IPv6-only bind (--host ::)
+    # isn't listening on 127.0.0.1 and compose fetches must target [::1].
+    os.environ["TESSERAE_BIND_HOST"] = args.host
 
     # Log level for self-hosted installs (Docker / LXC / bare): --log-level
     # wins, then TESSERAE_LOG_LEVEL, else INFO. The HA add-on's log_level

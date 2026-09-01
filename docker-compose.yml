@@ -59,6 +59,9 @@ services:
       # app), move the web port here, no CMD override needed:
       # TESSERAE_BIND_PORT: "8766"
 
+      # Listen on IPv6 (dual-stack where the OS supports it):
+      # TESSERAE_BIND_HOST: "::"
+
     # ---- Bridge-networking alternative (Docker Desktop on Mac/Windows,
     # or any setup where host networking isn't an option) -------------
     #

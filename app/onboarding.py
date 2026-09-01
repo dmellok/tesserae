@@ -36,7 +36,7 @@ from app import device_service
 from app.device_loader import DeviceRegistry
 from app.discovery import DiscoveryCache
 from app.layouts import LAYOUTS_BY_SLUG, to_panel_pixels
-from app.network import detect_local_ip, docker_bridge_ip_warning
+from app.network import detect_local_ip, docker_bridge_ip_warning, url_host
 from app.panel import (
     PANEL_PRESET_CHOICES,
     PANEL_PRESETS,
@@ -238,7 +238,7 @@ def step(step: str) -> Response | str:
         # Address clients point at when using the built-in broker. detect_
         # local_ip routes a UDP socket to find this host's LAN IP (no
         # packets sent); honours TESSERAE_HOST_IP.
-        ctx["builtin_url"] = f"mqtt://{detect_local_ip()}:{port}"
+        ctx["builtin_url"] = f"mqtt://{url_host(detect_local_ip())}:{port}"
         # Under the Docker image with bridge networking, ``detect_local_ip``
         # returns the container's bridge address (172.18.0.x or similar)
         # , useless for LAN panels. Flag it so the wizard can show a hint

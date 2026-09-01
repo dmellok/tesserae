@@ -23,7 +23,7 @@ tesserae [--dev] [--host HOST] [--port PORT] [--log-level LEVEL] [--reset-passwo
 
 | Flag | Default | What it does |
 | --- | --- | --- |
-| `--host` | `0.0.0.0` | Bind address. |
+| `--host` | `TESSERAE_BIND_HOST` if set, else `0.0.0.0` | Bind address. Set `::` to listen on IPv6 (dual-stack where the OS supports it). |
 | `--port` | `TESSERAE_BIND_PORT` if set, else `8765` | Bind port for the web UI + API. |
 | `--dev` | off | Flask dev server with auto-reload + debugger instead of waitress. |
 | `--log-level` | `info` | Root log level (`trace`/`debug`/`info`/`warning`/`error`). Wins over `TESSERAE_LOG_LEVEL`. |
@@ -36,8 +36,9 @@ tesserae [--dev] [--host HOST] [--port PORT] [--log-level LEVEL] [--reset-passwo
 | Variable | Default | What it does |
 | --- | --- | --- |
 | `TESSERAE_BIND_PORT` | `8765` | The port the server actually listens on. Feeds the `--port` default (image `0.378.0`+), so a compose `environment:` entry is enough to move the web port; an explicit `--port` flag wins if both are given. Also used internally so loopback renders target the real bind port behind a reverse proxy or Docker port map. |
+| `TESSERAE_BIND_HOST` | `0.0.0.0` | The address the server binds. Feeds the `--host` default (image `0.381.0`+); an explicit `--host` flag wins. Set `::` for IPv6. Also used internally so loopback renders target `[::1]` instead of `127.0.0.1` under an IPv6 bind. |
 | `TESSERAE_HTTP_PORT` | `8765` | The *advertised* port, what panels and generated URLs should use when it differs from the bind port (reverse proxy, `ports: ["8766:8765"]` remap). Only the fallback before the first request captures the real external port. |
-| `TESSERAE_HOST_IP` | auto-detected | The LAN IP baked into frame URLs and the broker URL shown to panels. Required under Docker bridge networking, where auto-detection finds the container's unreachable `172.x` address. |
+| `TESSERAE_HOST_IP` | auto-detected | The LAN IP baked into frame URLs and the broker URL shown to panels. Required under Docker bridge networking, where auto-detection finds the container's unreachable `172.x` address. May be an IPv6 address (`0.381.0`+); URLs bracket it automatically. |
 | `TESSERAE_THREADS` | `24` | Waitress worker threads (minimum 4). Raise if many open editors + SSE streams starve renders. |
 | `TESSERAE_FORWARDED_HOPS` | `1` | Trusted `X-Forwarded-*` proxy hops (Flask ProxyFix). Set `2` behind a double proxy, `0` to trust none. |
 
