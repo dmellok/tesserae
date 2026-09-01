@@ -26,12 +26,12 @@
 {% block main %}
 <div class="page-head">
   <h1><i class="ph-bold ph-calendar-dots" aria-hidden="true"></i> Calendar Feeds</h1>
-  <p class="page-blurb">Calendars that the calendar widgets read from. Add iCal URLs (Google Calendar → Settings → Integrate calendar → Secret address in iCal format; iCloud → Calendar → Share Calendar → Public), Discover a self-hosted CalDAV server (Baikal / Radicale / Nextcloud), or pull calendars straight from Home Assistant below.</p>
+  <p class="page-blurb">Calendars that the calendar widgets read from. Add iCal URLs (Google Calendar → Settings → Integrate calendar → Secret address in iCal format; iCloud → Calendar → Share Calendar → Public), Discover a CalDAV server (Baikal / Radicale / Nextcloud / iCloud), or pull calendars straight from Home Assistant below.</p>
 </div>
 
 <section class="card">
   {{ card_head('Discover a CalDAV server', icon_name='binoculars', level=2) }}
-  <p class="field-help" style="margin-top:0">Point this at your calendar-home URL (the folder holding your calendars, e.g. <code>https://baikal.lan/dav.php/calendars/you/</code>) and Tesserae lists the calendars + todo lists it finds, so you can add each in one click. Fetches run server-side, so a LAN-only server works as long as Tesserae can reach it.</p>
+  <p class="field-help" style="margin-top:0">Point this at your calendar-home URL (the folder holding your calendars, e.g. <code>https://baikal.lan/dav.php/calendars/you/</code>) and Tesserae lists the calendars + todo lists it finds, so you can add each in one click. For iCloud, use <code>https://caldav.icloud.com/</code> with your Apple ID and an <a href="https://support.apple.com/en-us/102654" target="_blank" rel="noopener">app-specific password</a> (basic auth). Fetches run server-side, so a LAN-only server works as long as Tesserae can reach it.</p>
   <form method="post" action="{{ url_for('calendar_core_admin.discover') }}" class="form">
     <div class="field">
       <label for="disc-url">CalDAV calendar-home URL</label>

@@ -716,3 +716,231 @@ def test_manual_add_without_discovery_still_redirects(app: Any) -> None:
     )
     assert resp.status_code == 302
     assert any(f["name"] == "Manual" for f in _feeds(app))
+
+
+# -- CalDAV REPORT fallback (iCloud) -------------------------------------
+#
+# iCloud has no GET-able .ics export: a plain GET is answered with a 403
+# that carries no auth challenge, and events are only readable through
+# REPORT calendar-query requests. The fetch path must fall back to
+# REPORT, rebuild the collection into one VCALENDAR, and remember the
+# URL so later refreshes skip the doomed GET (#272).
+
+REPORT_EVENTS_XML = b"""<?xml version="1.0"?>
+<d:multistatus xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
+ <d:response>
+  <d:href>/cal/home/e1.ics</d:href>
+  <d:propstat><d:prop><c:calendar-data>BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VTIMEZONE
+TZID:Europe/Berlin
+BEGIN:STANDARD
+DTSTART:19701025T030000
+TZOFFSETFROM:+0200
+TZOFFSETTO:+0100
+END:STANDARD
+END:VTIMEZONE
+BEGIN:VEVENT
+UID:e1
+DTSTART;TZID=Europe/Berlin:20260910T100000
+DTEND;TZID=Europe/Berlin:20260910T110000
+SUMMARY:Standup
+END:VEVENT
+END:VCALENDAR
+</c:calendar-data></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+ </d:response>
+ <d:response>
+  <d:href>/cal/home/e2.ics</d:href>
+  <d:propstat><d:prop><c:calendar-data>BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VTIMEZONE
+TZID:Europe/Berlin
+BEGIN:STANDARD
+DTSTART:19701025T030000
+TZOFFSETFROM:+0200
+TZOFFSETTO:+0100
+END:STANDARD
+END:VTIMEZONE
+BEGIN:VEVENT
+UID:e2
+DTSTART:20260911T090000Z
+DTEND:20260911T093000Z
+SUMMARY:Review
+END:VEVENT
+END:VCALENDAR
+</c:calendar-data></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+ </d:response>
+</d:multistatus>
+"""
+
+REPORT_TODOS_XML = b"""<?xml version="1.0"?>
+<d:multistatus xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
+ <d:response>
+  <d:href>/cal/home/t1.ics</d:href>
+  <d:propstat><d:prop><c:calendar-data>BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VTODO
+UID:t1
+SUMMARY:Water plants
+STATUS:NEEDS-ACTION
+END:VTODO
+END:VCALENDAR
+</c:calendar-data></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+ </d:response>
+</d:multistatus>
+"""
+
+
+class _ICloudishOpener:
+    """GET → challenge-less 403 (what iCloud actually does); REPORT →
+    canned multistatus, VTODO or VEVENT flavour by the query body."""
+
+    def __init__(self) -> None:
+        self.gets = 0
+        self.reports: list[Any] = []
+
+    def open(self, req: Any, timeout: float = 0) -> Any:
+        if req.get_method() == "GET":
+            self.gets += 1
+            raise urllib.error.HTTPError(
+                req.full_url,
+                403,
+                "Forbidden",
+                None,
+                io.BytesIO(b""),  # type: ignore[arg-type]
+            )
+        self.reports.append(req)
+        body = req.data or b""
+        return _FakeResp(REPORT_TODOS_XML if b'name="VTODO"' in body else REPORT_EVENTS_XML)
+
+
+def test_auth_headers_preemptive_basic_only(cc: Any) -> None:
+    hdrs = cc._auth_headers({"mode": "basic", "username": "you@x", "password": "app-pw"})
+    assert hdrs["Authorization"] == "Basic eW91QHg6YXBwLXB3"
+    assert cc._auth_headers({"mode": "digest", "username": "u", "password": "p"}) == {}
+    assert cc._auth_headers({"mode": "none", "username": "", "password": ""}) == {}
+    assert cc._auth_headers(None) == {}
+
+
+def test_fetch_feed_blob_falls_back_to_report(cc: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    server = _ICloudishOpener()
+    monkeypatch.setattr(cc, "_build_opener", lambda url, auth: server)
+    auth = {"mode": "basic", "username": "you@x", "password": "app-pw"}
+    errors: list[str] = []
+    blob = cc._fetch_feed_blob(
+        "https://p43-caldav.icloud.com/1/calendars/home/?export", auth, error_out=errors
+    )
+    assert blob is not None
+    # Both events and the todo were stitched into one calendar, with the
+    # duplicated VTIMEZONE kept once.
+    assert b"SUMMARY:Standup" in blob
+    assert b"SUMMARY:Review" in blob
+    assert b"SUMMARY:Water plants" in blob
+    assert blob.count(b"BEGIN:VTIMEZONE") == 1
+    # The REPORT addressed the collection itself (?export stripped), with
+    # Depth 1, preemptive basic credentials, and a time-range only on the
+    # VEVENT query.
+    ev_req, todo_req = server.reports
+    assert ev_req.full_url.endswith("/calendars/home/")
+    assert ev_req.get_header("Depth") == "1"
+    assert ev_req.get_header("Authorization") == "Basic eW91QHg6YXBwLXB3"
+    assert b"time-range" in ev_req.data and b'name="VEVENT"' in ev_req.data
+    assert b"time-range" not in todo_req.data and b'name="VTODO"' in todo_req.data
+    # Downstream parsers see a normal feed blob.
+    assert [t["summary"] for t in cc._parse_todos(blob)] == ["Water plants"]
+
+
+def test_fetch_feed_blob_remembers_report_urls(cc: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    server = _ICloudishOpener()
+    monkeypatch.setattr(cc, "_build_opener", lambda url, auth: server)
+    url = "https://p43-caldav.icloud.com/1/calendars/home/"
+    assert cc._fetch_feed_blob(url, None) is not None
+    assert server.gets == 1
+    # Second fetch goes straight to REPORT, no doomed GET.
+    assert cc._fetch_feed_blob(url, None) is not None
+    assert server.gets == 1
+
+
+def test_fetch_feed_blob_falls_back_when_get_returns_html(
+    cc: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A 200 that isn't ICS (a login page, a WebDAV listing) must not be
+    cached as a calendar; it triggers the REPORT fallback instead."""
+
+    class _HtmlThenReport(_ICloudishOpener):
+        def open(self, req: Any, timeout: float = 0) -> Any:
+            if req.get_method() == "GET":
+                self.gets += 1
+                return _FakeResp(b"<html>sign in</html>")
+            return super().open(req, timeout)
+
+    server = _HtmlThenReport()
+    monkeypatch.setattr(cc, "_build_opener", lambda url, auth: server)
+    errors: list[str] = []
+    blob = cc._fetch_feed_blob("https://x/cal/", None, error_out=errors)
+    assert blob is not None and b"SUMMARY:Standup" in blob
+    assert "response wasn't an .ics calendar" in errors
+
+
+def test_load_events_via_report_and_health(
+    cc: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """End-to-end through load_events: an iCloud-shaped feed yields its
+    events via REPORT, and the fetch outcome lands in feed health (the
+    events path used to skip health recording entirely)."""
+    dd = tmp_path / "cc"
+    _write_feeds(dd, [{"id": "icloud", "name": "iCloud", "url": "https://x/cal/home/"}])
+    server = _ICloudishOpener()
+    monkeypatch.setattr(cc, "_build_opener", lambda url, auth: server)
+    start, end = _september_window()
+    out = cc.load_events(None, start, end, data_dir=dd)
+    assert {e["summary"] for e in out} == {"Standup", "Review"}
+    assert all(e["feed_id"] == "icloud" for e in out)
+    assert cc.load_health(data_dir=dd)["icloud"]["error"] is None
+
+
+def test_load_events_records_failure_reasons(
+    cc: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """When both paths fail, feed health carries each distinct reason, so
+    the operator sees an HTTP status instead of a generic shrug."""
+
+    class _AllRefused:
+        def open(self, req: Any, timeout: float = 0) -> Any:
+            code = 403 if req.get_method() == "GET" else 401
+            raise urllib.error.HTTPError(
+                req.full_url,
+                code,
+                "nope",
+                None,
+                io.BytesIO(b""),  # type: ignore[arg-type]
+            )
+
+    dd = tmp_path / "cc"
+    _write_feeds(dd, [{"id": "icloud", "name": "iCloud", "url": "https://x/cal/home/"}])
+    monkeypatch.setattr(cc, "_build_opener", lambda url, auth: _AllRefused())
+    start, end = _september_window()
+    assert cc.load_events(None, start, end, data_dir=dd) == []
+    assert cc.load_health(data_dir=dd)["icloud"]["error"] == "HTTP 403 / HTTP 401"
+
+
+def test_refresh_flash_carries_fetch_reason(app: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The Refresh button used to flash a generic "couldn't reach the feed
+    URL" for every failure; it now surfaces the recorded reason (#272)."""
+    client = app.test_client()
+    _sign_in(client)
+    client.post(
+        "/plugins/calendar_core/feeds",
+        data={"name": "IC", "url": "https://x/cal/", "auth_mode": "none"},
+    )
+    fid = next(f["id"] for f in _feeds(app) if f["name"] == "IC")
+    core = _live_core(app)
+
+    def fail(url: str, auth: Any, *, error_out: Any = None) -> None:
+        if error_out is not None:
+            error_out.append("HTTP 403")
+        return None
+
+    monkeypatch.setattr(core, "_fetch_feed_blob", fail)
+    resp = client.post(f"/plugins/calendar_core/feeds/{fid}/refresh", follow_redirects=True)
+    assert "HTTP 403" in resp.get_data(as_text=True)

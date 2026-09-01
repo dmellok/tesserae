@@ -22,6 +22,7 @@ slices they need.
 
 from __future__ import annotations
 
+import base64
 import contextlib
 import json
 import logging
@@ -59,10 +60,11 @@ USER_AGENT = "tesserae/0.1 (+calendar_core)"
 DEFAULT_COLOUR = "#0d8c7e"
 
 # Per-feed HTTP auth modes. "none" is the default (public Google / iCloud
-# share URLs); "basic" and "digest" cover a self-hosted CalDAV server
-# (Baikal / Radicale / Nextcloud) that gates its .ics export behind
-# credentials. Both run server-side, so a LAN-only server the panel can't
-# reach directly still works as long as Tesserae can reach it.
+# share URLs); "basic" and "digest" cover a CalDAV server that gates its
+# calendars behind credentials (Baikal / Radicale / Nextcloud, or iCloud
+# with an app-specific password). Both run server-side, so a LAN-only
+# server the panel can't reach directly still works as long as Tesserae
+# can reach it.
 AUTH_MODES = ("none", "basic", "digest")
 
 
@@ -154,6 +156,20 @@ def _build_opener(url: str, auth: dict[str, str] | None) -> urllib.request.Opene
     return urllib.request.build_opener(handler)
 
 
+def _auth_headers(auth: dict[str, str] | None) -> dict[str, str]:
+    """A preemptive ``Authorization`` header for basic auth. The reactive
+    handlers above only answer a 401 challenge, but iCloud answers an
+    unauthenticated GET with a 403 that carries no challenge at all, so
+    basic credentials must ride on the first request. Digest can't be
+    preemptive (it needs the server's nonce) and stays reactive."""
+    if not auth or auth.get("mode") != "basic" or not auth.get("username"):
+        return {}
+    token = base64.b64encode(f"{auth['username']}:{auth.get('password', '')}".encode()).decode(
+        "ascii"
+    )
+    return {"Authorization": f"Basic {token}"}
+
+
 # ----- feed health ----------------------------------------------------
 #
 # Whether a feed is actually working is something only the fetch path
@@ -242,7 +258,12 @@ def _http_get(
         # Ask for an uncompressed body (urllib doesn't decompress); decode
         # defensively if a proxy compresses the feed anyway (#168).
         req = urllib.request.Request(
-            fixed, headers={"User-Agent": USER_AGENT, "Accept-Encoding": "identity"}
+            fixed,
+            headers={
+                "User-Agent": USER_AGENT,
+                "Accept-Encoding": "identity",
+                **_auth_headers(auth),
+            },
         )
         with opener.open(req, timeout=HTTP_TIMEOUT_S) as resp:
             blob: bytes = resp.read()
@@ -252,6 +273,43 @@ def _http_get(
         if error_out is not None:
             error_out.append(_describe_fetch_error(err))
         return None
+
+
+def _looks_like_ics(blob: bytes) -> bool:
+    """Whether a fetched body is plausibly an iCalendar file (vs the HTML
+    login page or WebDAV XML some servers answer a GET with)."""
+    return b"BEGIN:VCALENDAR" in blob[:512]
+
+
+# URLs whose server turned out to have no GET-able .ics export (iCloud):
+# remembered for the process lifetime so later refreshes go straight to
+# CalDAV REPORT instead of repeating a doomed GET each cache expiry.
+_REPORT_URLS: set[str] = set()
+
+
+def _fetch_feed_blob(
+    url: str, auth: dict[str, str] | None, *, error_out: list[str] | None = None
+) -> bytes | None:
+    """The ICS bytes of one feed, by whichever protocol the server speaks:
+    a plain GET where the URL is a .ics export, else a CalDAV REPORT
+    rebuild of the collection (iCloud has no export URL at all)."""
+    if url in _REPORT_URLS:
+        blob = _fetch_via_report(url, auth, error_out=error_out)
+        if blob is not None:
+            return blob
+        # Fall through: the server (or the URL's meaning) may have changed.
+    blob = _http_get(url, auth, error_out=error_out)
+    if blob is not None:
+        if _looks_like_ics(blob):
+            return blob
+        if error_out is not None:
+            error_out.append("response wasn't an .ics calendar")
+    if url in _REPORT_URLS:
+        return None  # REPORT already failed above
+    blob = _fetch_via_report(url, auth, error_out=error_out)
+    if blob is not None:
+        _REPORT_URLS.add(url)
+    return blob
 
 
 def _fetch_ics(
@@ -267,13 +325,19 @@ def _fetch_ics(
             return cache_path.read_bytes()
         except OSError:
             pass
-    # Some providers (notably Google) require https; webcal:// → https://.
     errors: list[str] = []
-    blob = _http_get(url, auth, error_out=errors)
+    blob = _fetch_feed_blob(url, auth, error_out=errors)
     # Only record when a fetch was actually attempted: a served-from-cache
-    # read above is not evidence the feed is reachable.
+    # read above is not evidence the feed is reachable. On a fetch that
+    # failed all the way through, keep each distinct reason (the GET's and
+    # the REPORT fallback's) so the operator sees why both paths failed.
     if feed_id and data_dir is not None:
-        record_fetch(data_dir, feed_id, ok=blob is not None, error=errors[0] if errors else None)
+        record_fetch(
+            data_dir,
+            feed_id,
+            ok=blob is not None,
+            error=" / ".join(dict.fromkeys(errors)) if errors else None,
+        )
     if blob is None:
         return None
     with contextlib.suppress(OSError):
@@ -600,7 +664,7 @@ def load_events(
         if not url:
             continue
         cache_path = _ics_cache_path(dd, fid)
-        blob = _fetch_ics(url, cache_path, _feed_auth(feed))
+        blob = _fetch_ics(url, cache_path, _feed_auth(feed), feed_id=fid, data_dir=dd)
         if blob is None:
             continue
         try:
@@ -804,6 +868,7 @@ def _propfind(
                 # gzip/brotli response, and an absent Accept-Encoding lets the
                 # server compress at will (#168).
                 "Accept-Encoding": "identity",
+                **_auth_headers(auth),
             },
         )
         with opener.open(req, timeout=HTTP_TIMEOUT_S) as resp:
@@ -961,6 +1026,125 @@ def discover_collections(base_url: str, auth: dict[str, str] | None) -> dict[str
         "(the folder that holds your calendars, e.g. .../calendars/<user>/), "
         "your principal URL, or the CalDAV root.",
     }
+
+
+# ----- CalDAV REPORT fetch (iCloud) -----------------------------------
+#
+# Some CalDAV servers, iCloud foremost, have no GET-able .ics export of a
+# collection: events are only readable through REPORT calendar-query
+# requests (RFC 4791 §7.8), one calendar object per response. When the
+# GET path in ``_fetch_feed_blob`` comes back empty or non-ICS, these
+# rebuild the collection into a single VCALENDAR and hand it back as the
+# same cached blob shape, so everything downstream (expansion cache,
+# widgets, todos, feed health) is unchanged.
+
+
+def _calendar_query_body(comp: str, start: str = "", end: str = "") -> bytes:
+    """A calendar-query REPORT body for ``comp`` (VEVENT / VTODO),
+    optionally bounded by a UTC time range (``YYYYMMDDTHHMMSSZ``)."""
+    time_range = f'<c:time-range start="{start}" end="{end}"/>' if start else ""
+    return (
+        '<?xml version="1.0" encoding="utf-8"?>'
+        '<c:calendar-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">'
+        "<d:prop><c:calendar-data/></d:prop>"
+        '<c:filter><c:comp-filter name="VCALENDAR">'
+        f'<c:comp-filter name="{comp}">{time_range}</c:comp-filter>'
+        "</c:comp-filter></c:filter></c:calendar-query>"
+    ).encode()
+
+
+def _caldav_report(
+    url: str, auth: dict[str, str] | None, body: bytes, *, error_out: list[str] | None = None
+) -> Any:
+    """One REPORT round-trip → the parsed multistatus root, or None on
+    any failure (reason appended to ``error_out``)."""
+    import defusedxml.ElementTree as DET
+
+    try:
+        opener = _build_opener(url, auth)
+        req = urllib.request.Request(
+            url,
+            data=body,
+            method="REPORT",
+            headers={
+                "User-Agent": USER_AGENT,
+                "Depth": "1",
+                "Content-Type": 'application/xml; charset="utf-8"',
+                "Accept-Encoding": "identity",
+                **_auth_headers(auth),
+            },
+        )
+        with opener.open(req, timeout=HTTP_TIMEOUT_S) as resp:
+            raw = resp.read()
+            raw = decode_content_encoding(raw, str(resp.headers.get("Content-Encoding", "")))
+    except Exception as err:
+        if error_out is not None:
+            error_out.append(_describe_fetch_error(err))
+        return None
+    # Same junk-before-<?xml tolerance as _propfind (#168).
+    lt = raw.find(b"<")
+    if lt > 0:
+        raw = raw[lt:]
+    try:
+        return DET.fromstring(raw)
+    except Exception:
+        if error_out is not None:
+            error_out.append("REPORT response wasn't valid CalDAV XML")
+        return None
+
+
+def _fetch_via_report(
+    url: str, auth: dict[str, str] | None, *, error_out: list[str] | None = None
+) -> bytes | None:
+    """Fetch a collection's contents via CalDAV REPORT, rebuilt into one
+    VCALENDAR blob.
+
+    Two queries: VEVENTs inside the warm expansion window (bounded, or a
+    decade of history comes back), and VTODOs unbounded (todo lists are
+    small and mostly undated). A collection that rejects one query can
+    still succeed on the other, an events-only server may refuse the
+    VTODO filter outright. Returns None only when neither query yields a
+    parseable multistatus; a valid-but-empty calendar is a success."""
+    base = url.replace("webcal://", "https://", 1) if url.startswith("webcal://") else url
+    # Discovery appends the sabre-style ?export; strip it for the REPORT,
+    # which addresses the collection itself.
+    base = re.sub(r"[?&]export$", "", base)
+    now = datetime.now(UTC)
+    start = (now - timedelta(days=_WARM_WINDOW_BACK_DAYS)).strftime("%Y%m%dT%H%M%SZ")
+    end = (now + timedelta(days=_WARM_WINDOW_FORWARD_DAYS)).strftime("%Y%m%dT%H%M%SZ")
+    got_multistatus = False
+    components: list[Any] = []
+    seen_tzids: set[str] = set()
+    for body in (_calendar_query_body("VEVENT", start, end), _calendar_query_body("VTODO")):
+        root = _caldav_report(base, auth, body, error_out=error_out)
+        if root is None:
+            continue
+        got_multistatus = True
+        for el in root.findall(".//c:calendar-data", _NS):
+            try:
+                sub = icalendar.Calendar.from_ical(el.text or "")
+            except Exception:
+                continue
+            for comp in sub.subcomponents:
+                name = str(getattr(comp, "name", "") or "")
+                if name == "VTIMEZONE":
+                    # Each object carries its own copy; keep one per TZID.
+                    tzid = str(comp.get("TZID") or "")
+                    if tzid in seen_tzids:
+                        continue
+                    seen_tzids.add(tzid)
+                elif name not in ("VEVENT", "VTODO"):
+                    continue
+                components.append(comp)
+    if not got_multistatus:
+        return None
+    cal = icalendar.Calendar()
+    cal.add("VERSION", "2.0")
+    cal.add("PRODID", "-//tesserae//calendar_core//EN")
+    for comp in components:
+        cal.add_component(comp)
+    blob: bytes = cal.to_ical()
+    return blob
 
 
 # ----- cell-option choices --------------------------------------------
@@ -1280,11 +1464,22 @@ def blueprint() -> Blueprint:
         if not url:
             flash(f"Feed '{name}' has no URL to refresh from.", "warn")
             return redirect(url_for("calendar_core_admin.index"))
-        blob = _fetch_ics(url, _ics_cache_path(_data_dir(), feed_id), _feed_auth(feed))
+        blob = _fetch_ics(
+            url,
+            _ics_cache_path(_data_dir(), feed_id),
+            _feed_auth(feed),
+            feed_id=feed_id,
+            data_dir=_data_dir(),
+        )
         if blob is None:
+            # The fetch just recorded why it failed; show that instead of a
+            # generic "couldn't reach" (an iCloud 403 is not a DNS problem).
+            reason = (load_health().get(feed_id) or {}).get(
+                "error"
+            ) or "couldn't reach the feed URL"
             flash(
-                f"Refresh failed for '{name}': couldn't reach the feed URL. "
-                f"Check the URL is reachable from the server.",
+                f"Refresh failed for '{name}': {reason}. Check the URL (and "
+                f"any credentials) are correct and reachable from the server.",
                 "warn",
             )
             return redirect(url_for("calendar_core_admin.index"))

@@ -6,7 +6,25 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added
+
+- **iCloud calendars work as private CalDAV feeds** (#272). iCloud has no
+  GET-able `.ics` export: a plain GET is answered with a challenge-less 403,
+  and events are only readable through CalDAV REPORT requests. Calendar feeds
+  now fall back to a REPORT calendar-query (events across the expansion
+  window, todos unbounded) and stitch the collection back into the same
+  cached blob shape the widgets already read, and basic credentials ride on
+  the first request since there is no 401 challenge to react to. Point
+  Discover at `https://caldav.icloud.com/` with an Apple ID plus
+  app-specific password and add calendars in one click.
+
 ### Fixed
+
+- **Calendar feed failures now say why** (#272). The event fetch path never
+  recorded feed health (only the todo path did), and the Refresh button
+  flashed a generic "couldn't reach the feed URL" for every failure. Both now
+  carry the real reason, e.g. `HTTP 403`, including which of the GET / REPORT
+  paths failed how.
 
 - **Small dashboard changes no longer strand deep-sleep panels on an old
   frame** (#271). A small same-page change on a patch-capable REST device is
