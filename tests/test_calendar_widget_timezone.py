@@ -60,7 +60,12 @@ def test_calendar_day_uses_app_timezone_for_display_date(
         out = day.fetch({"hours_ahead": 24}, {}, ctx={})
 
     assert out["date"] == "2026-07-05"
-    assert captured["start"] == frozen
+    # The window now opens at LOCAL midnight rather than at `now` (#252), which makes this
+    # a stronger timezone assertion than it was: 18:30 UTC is 02:30 the next day in Hong
+    # Kong, so the day being drawn began at 16:00 UTC. Reading `now` back proved nothing
+    # about the zone, since `now` is the same instant everywhere.
+    assert captured["start"] == datetime(2026, 7, 4, 16, 0, tzinfo=UTC)
+    # `hours_ahead` is still measured forward from now.
     assert captured["end"] == datetime(2026, 7, 5, 18, 30, tzinfo=UTC)
 
 
