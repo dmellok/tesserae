@@ -1,0 +1,25 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "waveshare_1085g",
+  "name": "Waveshare 10.85\" e-Paper HAT+ (G) (ESP32-S3 Zero)",
+  "vendor": "Waveshare",
+  "url": "https://www.waveshare.com/10.85inch-e-paper-hat-plus-g.htm",
+  "icon": "device-tablet",
+  "description": "10.85 inch four-colour (black/white/yellow/red) ePaper HAT+ (G) driven by a Waveshare ESP32-S3 Zero (ESP32-S3FH4R2, 4 MB flash, 2 MB PSRAM). 1360x480 landscape-native panel split across two 680-column controllers. Speaks Tesserae's v1 REST device API and paints a raw 2-bpp BWRY buffer (163200 bytes) produced by the esp32_bin renderer. Pair with the tesserae-device-firmware ESP-IDF build (env waveshare-1085g, boards/waveshare_1085g.h); the firmware bit-bangs the panel's SPI because the adapter needs a chip-select pulse per byte.",
+  "protocol": "esp32_client",
+  "panel": {
+    "w": 1360,
+    "h": 480,
+    "orientation": "landscape",
+    "name": "Waveshare 10.85\" four-colour BWRY ePaper (1360x480)",
+    "gamut": "bwry_4",
+    "native_w": 1360,
+    "native_h": 480
+  },
+  "protocol_config": {
+    "model_header": "Waveshare_1085G"
+  },
+  "refresh_floor_s": 60,
+  "image_format": "bin",
+  "notes_md": "Confirmed on real hardware running tesserae-device-firmware (community bring-up, firmware PR #31). Wire format is exactly 163200 bytes (1360*480*2/8): 2-bpp packed, four pixels per byte, MSB pair = leftmost pixel, palette indices 0=black, 1=white, 2=yellow, 3=red, row-major, 340 bytes per row, top-left origin. The firmware splits each row into two 170-byte halves for the left and right controllers, so the server packs one flat landscape frame with no stride padding. The ESP32-S3 Zero pin map in the firmware is a no-solder profile that differs from Waveshare's own ESP32-S3 demo wiring; follow boards/waveshare_1085g.h."
+}
