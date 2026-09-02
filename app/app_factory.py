@@ -242,6 +242,10 @@ def create_app(
         "yes",
         "on",
     }
+    # Extra networks the auth gate treats as local, on top of the fixed
+    # private ranges (comma-separated CIDRs). Merged with the Settings UI
+    # list at request time; see app.auth._is_private_client.
+    app.config["TRUSTED_NETWORKS"] = os.environ.get("TESSERAE_TRUSTED_NETWORKS", "").strip()
 
     class _IngressPrefixMiddleware:
         """Read the public path HA Supervisor proxied this request from

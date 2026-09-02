@@ -132,3 +132,21 @@ def enable_password_view() -> Response:
         return redirect(url_for("auth.setup"))
     flash("Password protection re-enabled.", "ok")
     return redirect(url_for("auth.settings_area", area="system"))
+
+
+@bp.post("/settings/system/auth/trusted-networks")
+def trusted_networks_view() -> Response:
+    """Save the operator's extra trusted networks (one CIDR per line)."""
+    settings = settings_store()
+    raw = request.form.get("trusted_networks", "")
+    try:
+        nets = auth.set_trusted_networks(settings, raw)
+    except ValueError as exc:
+        flash(f"Trusted networks not saved: {exc}", "error")
+        return redirect(url_for("auth.settings_area", area="system"))
+    log_auth("trusted_networks", "ok")
+    if nets:
+        flash(f"Trusted networks saved: {', '.join(nets)}.", "ok")
+    else:
+        flash("Trusted networks cleared; only the standard private ranges count as local.", "ok")
+    return redirect(url_for("auth.settings_area", area="system"))

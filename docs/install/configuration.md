@@ -41,6 +41,7 @@ tesserae [--dev] [--host HOST] [--port PORT] [--log-level LEVEL] [--reset-passwo
 | `TESSERAE_HOST_IP` | auto-detected | The LAN IP baked into frame URLs and the broker URL shown to panels. Required under Docker bridge networking, where auto-detection finds the container's unreachable `172.x` address. May be an IPv6 address (`0.381.0`+); URLs bracket it automatically. |
 | `TESSERAE_THREADS` | `24` | Waitress worker threads (minimum 4). Raise if many open editors + SSE streams starve renders. |
 | `TESSERAE_FORWARDED_HOPS` | `1` | Trusted `X-Forwarded-*` proxy hops (Flask ProxyFix). Set `2` behind a double proxy, `0` to trust none. |
+| `TESSERAE_TRUSTED_NETWORKS` | unset | Comma-separated CIDRs the auth gate treats as local on top of the fixed private ranges, e.g. `2001:db8:abcd::/48` for a LAN on an ISP-delegated IPv6 prefix. Clients in these networks fetch `/renders/` without a session and, with the password disabled, reach the admin UI. Merged with the list under Settings → System → Authentication → Trusted networks. |
 
 ### Storage and secrets
 

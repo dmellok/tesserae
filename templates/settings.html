@@ -1,5 +1,5 @@
 {% extends "_base.html" %}
-{% from "_components.html" import auto_field, button, card_head, info_pop, number_input, section_card, select_field, settings_tabs, slider, switch, text_input %}
+{% from "_components.html" import auto_field, button, card_head, info_pop, number_input, section_card, select_field, settings_tabs, slider, switch, text_input, textarea_field %}
 {% set AREA_TITLES = {'server':'Server','renderers':'Renderers','devices':'Devices','plugins':'Widgets','system':'System','about':'About'} %}
 {% set AREA_ICONS = {'server':'desktop-tower','renderers':'image-square','devices':'devices','plugins':'puzzle-piece','system':'wrench','about':'info'} %}
 {% set AREA_BLURBS = {
@@ -739,6 +739,15 @@ docker compose up -d</code></pre>
       <div class="actions">{{ button('Enable password', icon='lock', variant='primary') }}</div>
     </form>
     {% endif %}
+
+    <p class="device-subhead">Trusted networks</p>
+    <form method="post" action="{{ url_for('auth.trusted_networks_view') }}" class="form">
+      {{ textarea_field('auth-trusted-networks', 'trusted_networks', 'Networks treated as local', value=system_trusted_networks | join('\n'), rows=3, placeholder='2001:db8:abcd::/48&#10;100.64.0.0/10', help='One CIDR per line. The standard private ranges (10/8, 172.16/12, 192.168/16, fc00::/7, link-local, loopback) are always local. Add your own prefix when your LAN sits on addresses outside them, most often a globally routable IPv6 prefix from your ISP: clients in these networks reach /renders/ without a session, and the whole admin UI while the password is disabled. Never list a /0.') }}
+      {% if system_trusted_networks_env %}
+      <p class="field-help">Also trusted from <code>TESSERAE_TRUSTED_NETWORKS</code>: <code>{{ system_trusted_networks_env }}</code>.</p>
+      {% endif %}
+      <div class="actions">{{ button('Save trusted networks', icon='globe-hemisphere-west', variant='ghost') }}</div>
+    </form>
 
     <p class="field-help">
       Forgot your password? Run <code>tesserae --reset-password</code> on the host. That clears the stored hash so the next page load drops to <code>/setup</code>.

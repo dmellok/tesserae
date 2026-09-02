@@ -417,6 +417,14 @@ already random + opaque (SHA-256 digests for `/renders/`) and the
 server's primary auth boundary is the admin UI, not the asset CDN.
 This makes the painting loop trivial: hit the URL, get the bytes.
 
+"LAN" here means the standard private ranges (RFC 1918, `fc00::/7`,
+link-local, loopback) plus any networks the operator lists under
+Settings → System → Authentication → Trusted networks or in
+`TESSERAE_TRUSTED_NETWORKS`. A home network on a globally routable
+IPv6 prefix from the ISP is outside the fixed ranges, so a device
+there gets `403` on `/renders/` until that prefix is listed (or it
+fetches the signed URL handed out by `/frame`).
+
 ## REST endpoints
 
 CORS is enabled on every device-facing route

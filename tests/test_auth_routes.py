@@ -200,3 +200,83 @@ def test_login_wrong_password_shows_inline_error(app: Flask) -> None:
     body = resp.get_data(as_text=True)
     assert "auth-error" in body
     assert "Incorrect password." in body
+
+
+# -- trusted networks -------------------------------------------------------
+
+
+def _from(client: FlaskClient, path: str, remote_addr: str):
+    return client.get(path, environ_overrides={"REMOTE_ADDR": remote_addr})
+
+
+def _gated(app: Flask) -> Flask:
+    """``create_app(testing=True)`` leaves the auth gate uninstalled so
+    route tests don't have to sign in; these tests are about the gate."""
+    auth.install_gate(app, _settings_store(app))
+    return app
+
+
+def test_trusted_networks_parse_normalises_and_rejects_bad_entries() -> None:
+    assert auth.parse_trusted_networks("2001:db8:abcd::/48, 2001:db8:abcd::/48\n 10.9.0.7/16 ") == [
+        "2001:db8:abcd::/48",
+        "10.9.0.0/16",
+    ]
+    assert auth.parse_trusted_networks("") == []
+    with pytest.raises(ValueError, match="not an IP network"):
+        auth.parse_trusted_networks("kitchen")
+    with pytest.raises(ValueError, match="every address"):
+        auth.parse_trusted_networks("::/0")
+
+
+def test_trusted_networks_settings_route_saves_and_rejects(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    resp = client.post(
+        "/settings/system/auth/trusted-networks",
+        data={"trusted_networks": "2001:db8:abcd::/48\n192.0.2.0/24"},
+    )
+    assert resp.status_code == 302
+    assert auth.trusted_networks(_settings_store(app)) == ["2001:db8:abcd::/48", "192.0.2.0/24"]
+
+    resp = client.post("/settings/system/auth/trusted-networks", data={"trusted_networks": "nope"})
+    assert resp.status_code == 302
+    # A bad entry leaves the previous list untouched.
+    assert auth.trusted_networks(_settings_store(app)) == ["2001:db8:abcd::/48", "192.0.2.0/24"]
+
+    resp = client.post("/settings/system/auth/trusted-networks", data={"trusted_networks": ""})
+    assert resp.status_code == 302
+    assert auth.trusted_networks(_settings_store(app)) == []
+
+
+def test_public_ipv6_prefix_counts_as_lan_once_trusted(app: Flask) -> None:
+    """A home LAN on an ISP-delegated global prefix is public to the fixed
+    ranges. Listing the prefix makes it local for /renders/ and, with the
+    password off, for the admin UI too. Everything outside stays blocked."""
+    _gated(app)
+    client = app.test_client()
+    _sign_in(client)
+    device = "2001:db8:abcd:1::42"
+    stranger = "2001:db8:ffff::1"
+
+    # Renders are LAN-only: 403 from the global prefix before it is trusted.
+    assert _from(app.test_client(), "/renders/nope.png", device).status_code == 403
+
+    auth.set_trusted_networks(_settings_store(app), "2001:db8:abcd::/48")
+    # Gate passes; the missing artifact is the router's 404, not the gate's 403.
+    assert _from(app.test_client(), "/renders/nope.png", device).status_code == 404
+    assert _from(app.test_client(), "/renders/nope.png", stranger).status_code == 403
+
+    # With the password disabled, the trusted prefix reaches the admin UI.
+    auth.set_password_disabled(_settings_store(app), True)
+    assert _from(app.test_client(), "/settings/system", device).status_code == 200
+    assert _from(app.test_client(), "/settings/system", stranger).status_code == 403
+
+
+def test_trusted_networks_env_var_merges_with_settings(app: Flask) -> None:
+    _gated(app)
+    _sign_in(app.test_client())
+    app.config["TRUSTED_NETWORKS"] = "203.0.113.0/24, not-a-network"
+    auth.set_trusted_networks(_settings_store(app), "2001:db8:abcd::/48")
+    assert _from(app.test_client(), "/renders/nope.png", "203.0.113.9").status_code == 404
+    assert _from(app.test_client(), "/renders/nope.png", "2001:db8:abcd::9").status_code == 404
+    assert _from(app.test_client(), "/renders/nope.png", "203.0.114.9").status_code == 403

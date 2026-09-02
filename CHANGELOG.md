@@ -8,6 +8,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Trusted networks for the auth gate.** Settings → System →
+  Authentication gains a "Trusted networks" list (also
+  `TESSERAE_TRUSTED_NETWORKS`, comma-separated CIDRs). Networks listed
+  there count as local alongside the fixed private ranges, so a LAN on a
+  globally routable IPv6 prefix delegated by the ISP can fetch `/renders/`
+  and, with the password disabled, reach the admin UI, instead of being
+  treated as the open internet. `/0` is refused.
 - **iCloud calendars work as private CalDAV feeds** (#272). iCloud has no
   GET-able `.ics` export: a plain GET is answered with a challenge-less 403,
   and events are only readable through CalDAV REPORT requests. Calendar feeds

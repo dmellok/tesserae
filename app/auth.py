@@ -16,9 +16,11 @@ its own server is silly. Anything that isn't loopback still needs auth.
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import hmac
 import ipaddress
+import logging
 import os
 import secrets
 from dataclasses import dataclass
@@ -28,6 +30,8 @@ from flask import Flask, current_app, redirect, request, session, url_for
 from werkzeug.wrappers import Response
 
 from app.state.settings_store import SettingsStore
+
+logger = logging.getLogger(__name__)
 
 # PBKDF2-HMAC-SHA256, 200k iterations is the rough 2024 floor for shared
 # passwords; bump if/when CPU budget allows. Hashes + salts are stored as
@@ -132,6 +136,13 @@ _PRIVATE_NETWORKS: Final[tuple[Any, ...]] = (
     ipaddress.ip_network("fc00::/7"),
     ipaddress.ip_network("fe80::/10"),
 )
+# Operator-declared networks that count as private on top of the fixed
+# ranges above: a globally routable IPv6 prefix delegated by an ISP, a
+# VPN range, a routed IPv4 block. Stored as ``auth.trusted_networks`` (a
+# list of CIDR strings) and also taken from ``TESSERAE_TRUSTED_NETWORKS``
+# (comma-separated) for Docker / HA installs that template settings.
+TRUSTED_NETWORKS_KEY: Final[str] = "trusted_networks"
+TRUSTED_NETWORKS_ENV: Final[str] = "TESSERAE_TRUSTED_NETWORKS"
 
 
 @dataclass(frozen=True)
@@ -228,6 +239,78 @@ def set_password_disabled(settings: SettingsStore, disabled: bool) -> None:
     settings.patch_section("auth", {"disabled": bool(disabled)})
 
 
+def parse_trusted_networks(raw: str) -> list[str]:
+    """Split operator input (one network per line or comma) into
+    normalised CIDR strings. Raises ``ValueError`` naming the first entry
+    that isn't a network, or that would trust everything (``/0``)."""
+    nets: list[str] = []
+    for token in raw.replace(",", "\n").splitlines():
+        entry = token.strip()
+        if not entry:
+            continue
+        try:
+            net = ipaddress.ip_network(entry, strict=False)
+        except ValueError as exc:
+            raise ValueError(
+                f"{entry!r} is not an IP network (use CIDR, e.g. 2001:db8::/48)"
+            ) from exc
+        if net.prefixlen == 0:
+            raise ValueError(f"{entry!r} would trust every address; list your own prefix instead")
+        text = str(net)
+        if text not in nets:
+            nets.append(text)
+    return nets
+
+
+def trusted_networks(settings: SettingsStore) -> list[str]:
+    """The operator's stored trusted networks, as CIDR strings."""
+    raw = settings.get_section("auth").get(TRUSTED_NETWORKS_KEY)
+    if not isinstance(raw, list):
+        return []
+    return [str(entry) for entry in raw if isinstance(entry, str) and entry]
+
+
+def set_trusted_networks(settings: SettingsStore, raw: str) -> list[str]:
+    """Validate and store the operator's trusted networks. Returns what
+    was stored; raises ``ValueError`` (nothing written) on a bad entry."""
+    nets = parse_trusted_networks(raw)
+    settings.patch_section("auth", {TRUSTED_NETWORKS_KEY: nets})
+    return nets
+
+
+@functools.lru_cache(maxsize=8)
+def _parsed_networks(entries: tuple[str, ...]) -> tuple[Any, ...]:
+    """CIDR strings to network objects, memoised on the exact tuple so the
+    per-request gate doesn't re-parse. Entries that don't parse (a hand-
+    edited settings.json, a typo in the env var) are skipped with one
+    warning rather than taking the gate down."""
+    nets: list[Any] = []
+    for entry in entries:
+        try:
+            net = ipaddress.ip_network(entry, strict=False)
+        except ValueError:
+            logger.warning("auth: ignoring trusted network %r (not a CIDR)", entry)
+            continue
+        if net.prefixlen == 0:
+            logger.warning("auth: ignoring trusted network %r (/0 trusts everything)", entry)
+            continue
+        nets.append(net)
+    return tuple(nets)
+
+
+def _operator_trusted_networks() -> tuple[Any, ...]:
+    """Networks the operator added, from settings and the env var. Empty
+    outside an app that carries a settings store (bare test contexts)."""
+    entries: list[str] = []
+    env_raw = current_app.config.get("TRUSTED_NETWORKS")
+    if isinstance(env_raw, str) and env_raw.strip():
+        entries.extend(t.strip() for t in env_raw.replace(",", "\n").splitlines() if t.strip())
+    store = current_app.config.get("SETTINGS_STORE")
+    if isinstance(store, SettingsStore):
+        entries.extend(trusted_networks(store))
+    return _parsed_networks(tuple(entries)) if entries else ()
+
+
 # -- session helpers ---------------------------------------------------
 
 
@@ -271,10 +354,17 @@ def _is_loopback() -> bool:
 
 
 def _is_private_client() -> bool:
+    """Whether the request comes from a network the gate treats as the
+    local LAN: the fixed private ranges, plus anything the operator listed
+    under Settings → System → Authentication → Trusted networks (or the
+    ``TESSERAE_TRUSTED_NETWORKS`` env var). The second half is what lets a
+    home network on a globally routable IPv6 prefix count as local."""
     ip = _canonical_ip(request.remote_addr)
     if ip is None:
         return False
-    return any(ip in net for net in _PRIVATE_NETWORKS)
+    if any(ip in net for net in _PRIVATE_NETWORKS):
+        return True
+    return any(ip in net for net in _operator_trusted_networks())
 
 
 def _path_is_open(path: str) -> bool:

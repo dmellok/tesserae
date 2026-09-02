@@ -216,6 +216,8 @@ def settings_area(area: str) -> str | Response:
 
     system_password_set = _auth.password_is_set(settings_store())
     system_password_required = _auth.password_required(settings_store())
+    system_trusted_networks = _auth.trusted_networks(settings_store())
+    system_trusted_networks_env = str(current_app.config.get("TRUSTED_NETWORKS") or "").strip()
 
     # Issue #16 unified Add-device card needs the default transport
     # (REST or MQTT) + a "broker_configured" flag so the MQTT branch
@@ -280,6 +282,8 @@ def settings_area(area: str) -> str | Response:
         system_experiments=system_experiments,
         system_password_set=system_password_set,
         system_password_required=system_password_required,
+        system_trusted_networks=system_trusted_networks,
+        system_trusted_networks_env=system_trusted_networks_env,
         # v0.70.0: install-identifier metadata for the Settings -> System
         # "Install identifier" section (regeneration button + display).
         install_id_meta=(
