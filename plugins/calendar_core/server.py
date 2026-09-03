@@ -810,6 +810,17 @@ _PROPFIND_BODY = (
     b"<d:current-user-principal/><c:calendar-home-set/>"
     b"</d:prop></d:propfind>"
 )
+# The Depth 0 body used to *locate* the calendar home from a service root
+# or principal. Kept to the two location props: iCloud rejects a Depth 1
+# PROPFIND on its service root outright (HTTP 400) rather than listing it,
+# and the walk root -> principal -> calendar-home-set is what every client
+# that works with it does (Depth 0 at each hop, Depth 1 only on the home).
+_LOCATE_BODY = (
+    b'<?xml version="1.0" encoding="utf-8"?>'
+    b'<d:propfind xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav"><d:prop>'
+    b"<d:current-user-principal/><c:calendar-home-set/>"
+    b"</d:prop></d:propfind>"
+)
 
 
 def _export_url(collection_url: str) -> str:
@@ -845,11 +856,13 @@ def _prop_find(props: list[Any], tag: str) -> Any:
 
 
 def _propfind(
-    url: str, auth: dict[str, str] | None, depth: str
+    url: str, auth: dict[str, str] | None, depth: str, body: bytes = _PROPFIND_BODY
 ) -> tuple[Any, dict[str, Any] | None]:
     """One PROPFIND round-trip. Returns ``(root_element, None)`` on success,
     or ``(None, error_dict)`` where ``error_dict`` is a discovery result
-    shape (``{"collections": [], "error": <msg>}``). Never raises."""
+    shape (``{"collections": [], "error": <msg>}``, plus ``"status"`` for an
+    HTTP error so the caller can tell a refused listing from a bad
+    password). Never raises."""
     import defusedxml.ElementTree as DET
 
     content_encoding = ""
@@ -858,7 +871,7 @@ def _propfind(
         opener = _build_opener(url, auth)
         req = urllib.request.Request(
             url,
-            data=_PROPFIND_BODY,
+            data=body,
             method="PROPFIND",
             headers={
                 "User-Agent": USER_AGENT,
@@ -882,8 +895,9 @@ def _propfind(
             return None, {
                 "collections": [],
                 "error": "Authentication failed (check username / password).",
+                "status": code,
             }
-        return None, {"collections": [], "error": f"Server returned HTTP {code}."}
+        return None, {"collections": [], "error": f"Server returned HTTP {code}.", "status": code}
     except Exception as err:
         return None, {
             "collections": [],
@@ -995,23 +1009,17 @@ def discover_collections(base_url: str, auth: dict[str, str] | None) -> dict[str
         else base_url
     )
     root, err = _propfind(fixed, auth, "1")
-    if err is not None:
-        return err
-    collections = _calendars_from_multistatus(root, fixed)
+    collections = _calendars_from_multistatus(root, fixed) if root is not None else []
     if collections:
         return {"collections": collections, "error": None}
+    if err is not None and err.get("status") == 401:
+        return err  # wrong password: no point walking any further
 
-    # No calendars at the given URL. It may be a principal or the service
-    # root, so follow calendar-home-set to the collection that holds them,
-    # resolving current-user-principal first when the home isn't advertised
-    # on this resource directly.
-    home = _href_in_prop(root, fixed, "c:calendar-home-set")
-    if home is None:
-        principal = _href_in_prop(root, fixed, "d:current-user-principal")
-        if principal and principal != fixed:
-            proot, _perr = _propfind(principal, auth, "0")
-            if proot is not None:
-                home = _href_in_prop(proot, principal, "c:calendar-home-set")
+    # No calendars at the given URL, or the server refused to list it
+    # (iCloud answers a Depth 1 PROPFIND on its service root with HTTP 400).
+    # It may be a principal or the service root, so locate the calendar
+    # home and enumerate there.
+    home = _locate_calendar_home(fixed, auth, root)
     if home and home != fixed:
         hroot, herr = _propfind(home, auth, "1")
         if herr is not None:
@@ -1020,12 +1028,38 @@ def discover_collections(base_url: str, auth: dict[str, str] | None) -> dict[str
         if collections:
             return {"collections": collections, "error": None}
 
+    if err is not None:
+        return err
     return {
         "collections": [],
         "error": "No calendars found at that URL. Point it at your calendar home "
         "(the folder that holds your calendars, e.g. .../calendars/<user>/), "
         "your principal URL, or the CalDAV root.",
     }
+
+
+def _locate_calendar_home(url: str, auth: dict[str, str] | None, root: Any) -> str | None:
+    """The absolute calendar-home URL reachable from ``url``: read straight
+    off ``root`` (a multistatus already fetched for ``url``) when it names
+    one, otherwise via ``current-user-principal``, each hop a Depth 0
+    PROPFIND. With no ``root`` (the listing was refused) the walk starts
+    with a Depth 0 PROPFIND of ``url`` itself. The home may live on another
+    host (iCloud hands out ``pNN-caldav.icloud.com`` per account); the
+    absolute href is kept as-is."""
+    if root is None:
+        root, _err = _propfind(url, auth, "0", _LOCATE_BODY)
+        if root is None:
+            return None
+    home = _href_in_prop(root, url, "c:calendar-home-set")
+    if home is not None:
+        return home
+    principal = _href_in_prop(root, url, "d:current-user-principal")
+    if not principal or principal == url:
+        return None
+    proot, _perr = _propfind(principal, auth, "0", _LOCATE_BODY)
+    if proot is None:
+        return None
+    return _href_in_prop(proot, principal, "c:calendar-home-set")
 
 
 # ----- CalDAV REPORT fetch (iCloud) -----------------------------------

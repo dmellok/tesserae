@@ -944,3 +944,118 @@ def test_refresh_flash_carries_fetch_reason(app: Any, monkeypatch: pytest.Monkey
     monkeypatch.setattr(core, "_fetch_feed_blob", fail)
     resp = client.post(f"/plugins/calendar_core/feeds/{fid}/refresh", follow_redirects=True)
     assert "HTTP 403" in resp.get_data(as_text=True)
+
+
+# iCloud: the service root refuses a Depth 1 listing (HTTP 400); the walk is
+# root (Depth 0) -> principal (Depth 0) -> calendar home on a per-account
+# host (Depth 1).
+ICLOUD_ROOT_XML = b"""<?xml version="1.0"?>
+<d:multistatus xmlns:d="DAV:" xmlns:cal="urn:ietf:params:xml:ns:caldav">
+ <d:response><d:href>/</d:href>
+  <d:propstat><d:prop>
+   <d:current-user-principal><d:href>/1234567/principal/</d:href></d:current-user-principal>
+  </d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+  <d:propstat><d:prop><cal:calendar-home-set/></d:prop>
+   <d:status>HTTP/1.1 404 Not Found</d:status></d:propstat>
+ </d:response>
+</d:multistatus>
+"""
+ICLOUD_PRINCIPAL_XML = b"""<?xml version="1.0"?>
+<d:multistatus xmlns:d="DAV:" xmlns:cal="urn:ietf:params:xml:ns:caldav">
+ <d:response><d:href>/1234567/principal/</d:href>
+  <d:propstat><d:prop>
+   <cal:calendar-home-set><d:href>https://p42-caldav.icloud.com/1234567/calendars/</d:href></cal:calendar-home-set>
+  </d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+ </d:response>
+</d:multistatus>
+"""
+ICLOUD_HOME_XML = b"""<?xml version="1.0"?>
+<d:multistatus xmlns:d="DAV:" xmlns:cal="urn:ietf:params:xml:ns:caldav">
+ <d:response><d:href>/1234567/calendars/</d:href>
+  <d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop>
+   <d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
+ <d:response><d:href>/1234567/calendars/inbox/</d:href>
+  <d:propstat><d:prop><d:resourcetype><d:collection/><cal:schedule-inbox/></d:resourcetype></d:prop>
+   <d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
+ <d:response><d:href>/1234567/calendars/0A1B2C3D-4E5F/</d:href>
+  <d:propstat><d:prop>
+   <d:resourcetype><d:collection/><cal:calendar/></d:resourcetype><d:displayname>Home</d:displayname>
+  </d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
+</d:multistatus>
+"""
+
+
+def _icloud_opener_factory(calls: list[tuple[str, str]]) -> Any:
+    """A fake opener that behaves like iCloud: 400 on a Depth 1 listing of
+    the root, principal + home walk at Depth 0, calendars at the home."""
+
+    def fake_build(url: str, auth: Any) -> Any:
+        class _FakeOpener:
+            def open(self, req: Any, timeout: float = 0) -> Any:
+                depth = req.get_header("Depth")
+                calls.append((req.full_url, depth))
+                if "p42-caldav" in url:
+                    return _FakeResp(ICLOUD_HOME_XML)
+                if depth != "0":
+                    raise urllib.error.HTTPError(url, 400, "Bad Request", None, io.BytesIO(b""))  # type: ignore[arg-type]
+                if "/principal/" in url:
+                    return _FakeResp(ICLOUD_PRINCIPAL_XML)
+                return _FakeResp(ICLOUD_ROOT_XML)
+
+        return _FakeOpener()
+
+    return fake_build
+
+
+def test_discover_collections_walks_icloud_root_at_depth_zero(
+    cc: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """iCloud refuses a Depth 1 PROPFIND on its service root with HTTP 400;
+    discovery falls back to the Depth 0 root -> principal -> home walk and
+    lists the calendars on the per-account host (#272)."""
+    calls: list[tuple[str, str]] = []
+    monkeypatch.setattr(cc, "_build_opener", _icloud_opener_factory(calls))
+    auth = {"mode": "basic", "username": "me@icloud.com", "password": "abcd-efgh"}
+    result = cc.discover_collections("https://caldav.icloud.com/", auth)
+    assert result["error"] is None
+    assert [c["name"] for c in result["collections"]] == ["Home"]  # inbox skipped
+    assert result["collections"][0]["url"] == (
+        "https://p42-caldav.icloud.com/1234567/calendars/0A1B2C3D-4E5F/"
+    )
+    assert calls == [
+        ("https://caldav.icloud.com/", "1"),
+        ("https://caldav.icloud.com/", "0"),
+        ("https://caldav.icloud.com/1234567/principal/", "0"),
+        ("https://p42-caldav.icloud.com/1234567/calendars/", "1"),
+    ]
+
+
+def test_discover_collections_wrong_password_does_not_walk(
+    cc: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[str] = []
+
+    class _FakeOpener:
+        def open(self, req: Any, timeout: float = 0) -> Any:
+            calls.append(req.full_url)
+            raise urllib.error.HTTPError("http://x", 401, "Unauthorized", None, io.BytesIO(b""))  # type: ignore[arg-type]
+
+    monkeypatch.setattr(cc, "_build_opener", lambda url, auth: _FakeOpener())
+    result = cc.discover_collections("https://caldav.icloud.com/", None)
+    assert "Authentication failed" in result["error"]
+    assert calls == ["https://caldav.icloud.com/"]
+
+
+def test_discover_collections_keeps_original_error_when_walk_fails(
+    cc: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A 400 the Depth 0 walk can't get past still surfaces as the 400."""
+
+    class _FakeOpener:
+        def open(self, req: Any, timeout: float = 0) -> Any:
+            raise urllib.error.HTTPError("http://x", 400, "Bad Request", None, io.BytesIO(b""))  # type: ignore[arg-type]
+
+    monkeypatch.setattr(cc, "_build_opener", lambda url, auth: _FakeOpener())
+    result = cc.discover_collections("https://caldav.icloud.com/", None)
+    assert result["collections"] == []
+    assert result["error"] == "Server returned HTTP 400."

@@ -27,6 +27,12 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **iCloud calendar discovery no longer fails with HTTP 400** (#272).
+  iCloud refuses a Depth 1 PROPFIND on its service root instead of listing
+  it. When the listing is refused, Discover now walks root → principal →
+  calendar-home-set with Depth 0 requests (the same path other CalDAV
+  clients take) and enumerates the calendars on the per-account host it
+  lands on. A wrong password still reports as an authentication failure.
 - **Calendar feed failures now say why** (#272). The event fetch path never
   recorded feed health (only the todo path did), and the Refresh button
   flashed a generic "couldn't reach the feed URL" for every failure. Both now
