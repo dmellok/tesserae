@@ -150,7 +150,11 @@
     {% for f in feeds %}
     {% set ci = (cache_info or {}).get(f.id) or {} %}
     <li class="cf-row {% if not f.enabled %}is-disabled{% endif %}">
-      <span class="cf-swatch" style="background: {{ f.colour }};" aria-hidden="true"></span>
+      <form method="post" action="{{ url_for('calendar_core_admin.update_colour', feed_id=f.id) }}" class="inline cf-colour">
+        <input type="color" name="colour" value="{{ f.colour or '#0d8c7e' }}" class="cf-swatch cf-swatch--input"
+               title="Change colour" aria-label="Colour for {{ f.name }}"
+               onchange="this.form.requestSubmit()">
+      </form>
       <span class="cf-name">
         <span class="cf-name-line">
           <span class="cf-name-text">{{ f.name }}</span>
@@ -239,6 +243,11 @@
   .cf-disc-row { grid-template-columns: auto 1fr auto; }
   .cf-row.is-disabled { opacity: 0.55; }
   .cf-swatch { width: 14px; height: 14px; border-radius: 4px; border: 1px solid rgba(0,0,0,0.1); }
+  .cf-colour { margin: 0; display: flex; }
+  .cf-swatch--input { padding: 0; cursor: pointer; background: none; }
+  .cf-swatch--input::-webkit-color-swatch-wrapper { padding: 0; }
+  .cf-swatch--input::-webkit-color-swatch { border: none; border-radius: 3px; }
+  .cf-swatch--input::-moz-color-swatch { border: none; border-radius: 3px; }
   .cf-name { display: grid; gap: 1px; font-weight: 600; font-size: var(--t-size-md); min-width: 0; }
   .cf-name-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .cf-id { font: var(--t-size-xs)/1.2 var(--t-font-mono); color: var(--t-fg-soft); font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -8,6 +8,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Editable calendar feed colours.** The colour swatch on each saved feed in Settings → Widgets → Calendar feeds is now a colour picker; pick a new colour and it saves in place, no need to delete and re-add the feed. Useful when tuning feed colours for a specific panel's gamut. (#276)
 - **Trusted networks for the auth gate.** Settings → System →
   Authentication gains a "Trusted networks" list (also
   `TESSERAE_TRUSTED_NETWORKS`, comma-separated CIDRs). Networks listed

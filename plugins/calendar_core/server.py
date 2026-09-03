@@ -1398,6 +1398,24 @@ def blueprint() -> Blueprint:
         flash(f"Updated credentials for '{feed.get('name') or feed_id}'.", "ok")
         return redirect(url_for("calendar_core_admin.index"))
 
+    @bp.post("/feeds/<feed_id>/colour")
+    def update_colour(feed_id: str) -> Response:
+        """Change a saved feed's colour in place. The colour is stamped
+        onto events at load time from the feed record, so no cache needs
+        dropping; the next widget render picks it up."""
+        data = _load_feeds()
+        feed = next((f for f in data.get("feeds", []) if f.get("id") == feed_id), None)
+        if not feed:
+            abort(404)
+        colour = (request.form.get("colour") or "").strip()
+        if not re.match(r"^#[0-9a-fA-F]{6}$", colour):
+            flash("Pick a colour as #RRGGBB.", "warn")
+            return redirect(url_for("calendar_core_admin.index"))
+        feed["colour"] = colour.lower()
+        _save_feeds(data)
+        flash(f"Updated colour for '{feed.get('name') or feed_id}'.", "ok")
+        return redirect(url_for("calendar_core_admin.index"))
+
     @bp.post("/discover")
     def discover() -> str:
         """Enumerate a self-hosted CalDAV server's calendars / todo lists

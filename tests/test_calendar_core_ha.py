@@ -265,3 +265,59 @@ def test_ha_list_route_unconfigured_flashes_guidance(app: Any) -> None:
     _sign_in(client)
     resp = client.post("/plugins/calendar_core/ha/list")
     assert resp.status_code == 200
+
+
+def test_update_colour_changes_saved_feed(app: Any) -> None:
+    """#276: a feed's colour is editable after it was saved."""
+    client = app.test_client()
+    _sign_in(client)
+    client.post(
+        "/plugins/calendar_core/feeds",
+        data={"source": "ha", "name": "Family", "entity_id": "calendar.family"},
+    )
+    fid = next(f["id"] for f in _feeds(app) if f["name"] == "Family")
+    resp = client.post(f"/plugins/calendar_core/feeds/{fid}/colour", data={"colour": "#FF8800"})
+    assert resp.status_code == 302
+    feed = next(f for f in _feeds(app) if f["id"] == fid)
+    assert feed["colour"] == "#ff8800"
+
+
+def test_update_colour_rejects_bad_value(app: Any) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    client.post(
+        "/plugins/calendar_core/feeds",
+        data={"source": "ha", "name": "Family", "entity_id": "calendar.family"},
+    )
+    fid = next(f["id"] for f in _feeds(app) if f["name"] == "Family")
+    before = next(f for f in _feeds(app) if f["id"] == fid)["colour"]
+    client.post(
+        f"/plugins/calendar_core/feeds/{fid}/colour",
+        data={"colour": "red"},
+        follow_redirects=True,
+    )
+    assert next(f for f in _feeds(app) if f["id"] == fid)["colour"] == before
+    assert (
+        client.post(
+            "/plugins/calendar_core/feeds/nope/colour", data={"colour": "#000000"}
+        ).status_code
+        == 404
+    )
+
+
+def test_feed_row_renders_colour_input(app: Any) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    client.post(
+        "/plugins/calendar_core/feeds",
+        data={
+            "source": "ha",
+            "name": "Family",
+            "entity_id": "calendar.family",
+            "colour": "#123456",
+        },
+    )
+    fid = next(f["id"] for f in _feeds(app) if f["name"] == "Family")
+    html = client.get("/plugins/calendar_core/").get_data(as_text=True)
+    assert f"/plugins/calendar_core/feeds/{fid}/colour" in html
+    assert 'name="colour" value="#123456"' in html
