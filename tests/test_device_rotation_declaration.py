@@ -151,6 +151,25 @@ def test_register_with_rotation_90_stores_landscape_canvas_and_portrait_buffer(
     assert panel["orientation"] == "landscape"
 
 
+def test_send_page_dims_carry_the_declared_buffer(app: Flask) -> None:
+    """Resend / gallery / file pushes resolve their panel through
+    ``_panel_dims_for_send`` rather than the page push's ``model_dump``.
+    The dict it builds must vouch for the declared buffer too, or the
+    CircuitPython renderers skip the rotation and the client paints a
+    landscape frame on its portrait buffer (issue #275)."""
+    client = app.test_client()
+    _sign_in(client)
+    resp = _register(client, app, device_id="pi_touch_2", rotation=90)
+    assert resp.status_code == 201, resp.get_json()
+    dims = app.config["PUSH_MANAGER"]._panel_dims_for_send("pi_touch_2")
+    assert (dims["w"], dims["h"]) == (1920, 1200)
+    assert (dims["native_w"], dims["native_h"]) == (1200, 1920)
+    assert dims["native_declared"] is True
+    panel = Panel(**dims)
+    out = png_renderer.transform(_composition(1920, 1200), panel=panel, settings={})
+    assert _size(out) == (1200, 1920)
+
+
 def test_register_with_rotation_0_composes_at_the_reported_dims(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)

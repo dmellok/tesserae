@@ -27,6 +27,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **Resend and Send-page pushes honour a client-declared rotation** (#275).
+  A device that registers with `rotation` gets its dashboard composed for
+  the turned canvas and rotated back onto its framebuffer on the way out.
+  Pushing a page did this; resending it from History, or pushing a gallery
+  / file / URL image from Send, did not: that path rebuilt the panel by
+  hand and dropped the "declared by the device" flag the CircuitPython
+  renderers key the turn on, so the client received a landscape frame for
+  its portrait buffer. The Send-page path now carries the resolved panel
+  through unchanged (which also restores `col_offset` on it).
 - **iCloud calendar discovery no longer fails with HTTP 400** (#272).
   iCloud refuses a Depth 1 PROPFIND on its service root instead of listing
   it. When the listing is refused, Discover now walks root → principal →

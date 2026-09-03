@@ -2995,11 +2995,15 @@ class PushManager:
         portrait orientation are honoured identically to every other
         code path.
 
-        Crucially: copy ``native_w / native_h`` through. Skipping them
-        sends the renderer (e.g. esp32_bin) back to the pre-v0.19.19
-        "pack at panel (w, h)" path, which paints ghosts on any panel
-        whose composition orientation doesn't match the firmware's
-        hardware stride (the PhotoPainter calibration symptom)."""
+        Crucially: carry the WHOLE resolved model through, the same
+        ``panel.model_dump()`` the page push hands to ``_fan_out``.
+        Every field this dict has ever dropped became a bug on this
+        path alone: ``native_w / native_h`` (packing at composition dims
+        painted ghosts on the PhotoPainter), ``vflip`` (issue #65), and
+        ``native_declared`` (issue #275: the CircuitPython renderers only
+        rotate onto a ``rotation``-declared buffer when the device
+        vouched for it, so a resend or gallery push, unlike the page
+        push, landed the composition-shaped frame on a turned panel)."""
         if device_id and self._devices is not None:
             device = self._devices.devices.get(device_id)
             if device is not None and device.panel is not None:
@@ -3008,24 +3012,7 @@ class PushManager:
                 # reuse it instead of rebuilding the dict by hand.
                 resolved = device_panel(device)
                 if resolved is not None:
-                    out: dict[str, Any] = {
-                        "w": resolved.w,
-                        "h": resolved.h,
-                        "flip": resolved.flip,
-                        # v0.69.18: the push pipeline rebuilds a Panel
-                        # dict from the resolved model, then reconstructs
-                        # ``Panel(**dict)`` for the renderer. Without
-                        # ``vflip`` here the flag round-trips through
-                        # ``device_panel()`` correctly but gets dropped
-                        # again on the send-side rebuild (issue #65).
-                        "vflip": resolved.vflip,
-                        "gamut": resolved.gamut,
-                        "underscan": resolved.underscan,
-                    }
-                    if resolved.native_w is not None and resolved.native_h is not None:
-                        out["native_w"] = resolved.native_w
-                        out["native_h"] = resolved.native_h
-                    return out
+                    return resolved.model_dump()
         panel = resolve_settings_panel(self._settings)
         out2: dict[str, Any] = {"w": panel.w, "h": panel.h}
         if panel.native_w is not None and panel.native_h is not None:
