@@ -12,7 +12,7 @@ from __future__ import annotations
 import contextlib
 import json
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Literal, cast
 
 from flask import (
@@ -214,6 +214,41 @@ def _nav_meta(deck: Deck) -> str:
     return f"{count} · auto-advance, button, tap, swipe"
 
 
+def _cycle_fires_on(rotation: Any, day_start: datetime) -> list[datetime]:
+    """Projected step starts for a cycle record on the local day that begins
+    at ``day_start``: every dwell window the engine would open between the
+    anchor and ``end_at`` (or midnight), each one a push to the display.
+
+    Mirrors the gates in ``scheduler._compute_step_state``: day-of-week,
+    anchor, ``end_at``; an end earlier than the anchor stops at midnight
+    because the engine treats before-anchor as dormant. Conditions and the
+    minimum hold can skip windows at run time, so this is a ceiling, the
+    same way the schedule rail is."""
+    from app.schedule_routes import MAX_PROJECTED_FIRES
+
+    if not rotation.enabled or day_start.weekday() not in rotation.days_of_week:
+        return []
+    if rotation.cycle_minutes <= 0:
+        return []
+    hh, mm = (int(part) for part in rotation.anchor.split(":"))
+    start = day_start.replace(hour=hh, minute=mm, second=0, microsecond=0)
+    end = day_start + timedelta(days=1)
+    if rotation.end_at:
+        eh, em = (int(part) for part in rotation.end_at.split(":"))
+        end_today = day_start.replace(hour=eh, minute=em, second=0, microsecond=0)
+        if end_today > start:
+            end = end_today
+    fires: list[datetime] = []
+    t = start
+    while t < end and len(fires) < MAX_PROJECTED_FIRES:
+        for step in rotation.steps:
+            if t >= end:
+                break
+            fires.append(t)
+            t += timedelta(minutes=step.dwell_minutes)
+    return fires
+
+
 def _design_cards(
     *,
     nav_decks: list[Deck],
@@ -228,10 +263,14 @@ def _design_cards(
 ) -> dict[str, Any]:
     """View-models for the Lineups page: one row per deck with a
     kind-specific body (screen cards, 24h rail, steppers), grouped per
-    display. Returns {"cards": [...], "groups": [...], "now_hhmm": ...}."""
-    from datetime import timedelta
+    display. Returns {"cards": [...], "groups": [...], "now_hhmm": ...}.
 
+    Every timed card carries ``refreshes_today``, the number of pushes its
+    timer projects for the local day (#278), and each display section sums
+    them so the refresh load per panel is readable at a glance. By-hand
+    decks carry ``None``: taps have no schedule to project."""
     from app.schedule_routes import _project_fires
+    from app.scheduler import _deck_to_rotation
     from app.tz_resolve import app_timezone
 
     tz = app_timezone()
@@ -307,11 +346,20 @@ def _design_cards(
                 live_page = rec[1]
                 break
         deck_device_ids = resolve_devices(deck.device_ids, [dp.page_id for dp in deck.pages])
+        # A "both" deck on the cycle trigger rides the rotation engine, so
+        # its timer pushes project the same way a rotation's do.
+        timer_refreshes: int | None = None
+        if deck.advance == "both" and deck.advance_trigger == "cycle":
+            adapted = _deck_to_rotation(deck)
+            if adapted is not None:
+                timer_refreshes = len(_cycle_fires_on(adapted, day_start))
         cards.append(
             {
                 "kind": "nav",
                 "id": deck.id,
                 "name": deck.name,
+                "advance": deck.advance,
+                "refreshes_today": timer_refreshes,
                 "warning": binding_warning(deck.device_ids, [dp.page_id for dp in deck.pages]),
                 "enabled": deck.enabled,
                 "playing": live_page is not None,
@@ -380,6 +428,7 @@ def _design_cards(
                 "step_index": step_index,
                 "live_name": page_names.get(current_page, current_page) if playing else None,
                 "next_advance": next_advance,
+                "refreshes_today": len(_cycle_fires_on(r, day_start)) if r.enabled else None,
                 "fire_url": url_for("rotations.fire", rotation_id=r.id),
                 "play_url": url_for("rotations.play", rotation_id=r.id, step_index=play_next),
                 "edit_url": url_for("decks.editor", deck_id=r.id),
@@ -435,6 +484,7 @@ def _design_cards(
                     else f"every {s.interval_minutes} min"
                 ),
                 "next_fire": next_fire,
+                "refreshes_today": len(fires_today) if s.enabled else None,
                 "fire_url": url_for("schedules.fire", schedule_id=s.id),
                 "edit_url": url_for("decks.index", sedit=s.id) + "#schedule-form-card",
                 "toggle_url": url_for("schedules.toggle", schedule_id=s.id),
@@ -453,6 +503,11 @@ def _design_cards(
     # omitted entirely. Cards with no resolvable display land in a trailing
     # "not on a display yet" group.
     groups: list[dict[str, Any]] = []
+
+    def refresh_total(group_cards: list[dict[str, Any]]) -> int | None:
+        counted = [c["refreshes_today"] for c in group_cards if c["refreshes_today"] is not None]
+        return sum(counted) if counted else None
+
     for d in devices:
         dev_cards = [c for c in cards if d.id in c["device_ids"]]
         if not dev_cards:
@@ -466,6 +521,7 @@ def _design_cards(
                 "icon": d.icon,
                 "showing": page_names.get(live_pid, live_pid) if live_pid else None,
                 "thumb": thumbs.get(live_pid, "") if live_pid else "",
+                "refreshes_today": refresh_total(dev_cards),
                 "cards": dev_cards,
             }
         )
@@ -478,6 +534,7 @@ def _design_cards(
                 "icon": "plugs",
                 "showing": None,
                 "thumb": "",
+                "refreshes_today": None,
                 "cards": unbound,
             }
         )

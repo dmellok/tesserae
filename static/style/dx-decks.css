@@ -387,6 +387,15 @@
   font: 12px var(--t-font-mono);
   color: var(--t-accent);
 }
+.dk-group-count {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: 12px var(--t-font-mono);
+  color: color-mix(in oklab, var(--t-fg) 55%, transparent);
+  cursor: default;
+}
 .dk-live-dot {
   width: 7px;
   height: 7px;
@@ -617,6 +626,12 @@
 .dk-next span { font: 12px var(--t-font-mono); color: color-mix(in oklab, var(--t-fg) 55%, transparent); }
 .dk-next strong { font: 600 19px var(--t-font-mono); color: var(--t-accent); }
 .dk-next strong.is-ink { color: var(--t-fg); }
+/* The per-day count sits beside the next-fire stat; only the first stat in a
+   body takes the auto margin, so a pair reads as one right-aligned cluster. */
+.dk-next.dk-count { cursor: default; }
+.dk-next.dk-count + .dk-next { margin-left: 0; }
+.dk-body--nav .dk-next.dk-count { padding-bottom: 26px; }
+.dk-body--nav .dk-next.dk-count + .dk-steppers { margin-left: 0; }
 
 .dk-rail-wrap { flex: 1; display: flex; flex-direction: column; gap: 9px; padding-bottom: 22px; min-width: 0; }
 .dk-rail-scale { display: flex; justify-content: space-between; font: 11.5px var(--t-font-mono); color: color-mix(in oklab, var(--t-fg) 40%, transparent); }

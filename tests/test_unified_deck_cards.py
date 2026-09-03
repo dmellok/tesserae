@@ -434,3 +434,126 @@ def test_manual_deck_still_says_by_hand(app: Flask) -> None:
     _sign_in(client)
     body = client.get("/decks").get_data(as_text=True)
     assert "By hand" in body
+
+
+# ---- refreshes per day (#278) ---------------------------------------------
+
+
+def _local_midnight():
+    from datetime import datetime
+
+    from app.tz_resolve import app_timezone
+
+    return datetime.now(app_timezone()).replace(hour=0, minute=0, second=0, microsecond=0)
+
+
+def test_cycle_fires_walk_the_days_dwell_grid() -> None:
+    """A rotation pushes at every dwell window it opens today: from the
+    anchor to ``end_at`` (or midnight), one push per step start."""
+    from app.deck_routes import _cycle_fires_on
+
+    day = _local_midnight()
+    two_by_fifteen = [
+        RotationStep(page_id="kitchen", dwell_minutes=15),
+        RotationStep(page_id="hall", dwell_minutes=15),
+    ]
+    all_day = Rotation(id="r", name="r", steps=two_by_fifteen)
+    assert len(_cycle_fires_on(all_day, day)) == 96
+
+    office_hours = Rotation(id="r", name="r", steps=two_by_fifteen, anchor="08:00", end_at="20:00")
+    fires = _cycle_fires_on(office_hours, day)
+    assert len(fires) == 48
+    assert fires[0].strftime("%H:%M") == "08:00"
+    assert fires[-1].strftime("%H:%M") == "19:45"
+
+    # An end before the anchor stops at midnight, as the engine does.
+    late = Rotation(
+        id="r",
+        name="r",
+        steps=[RotationStep(page_id="kitchen", dwell_minutes=30)],
+        anchor="22:00",
+        end_at="06:00",
+    )
+    assert len(_cycle_fires_on(late, day)) == 4
+
+    # Disabled or off-day records project nothing.
+    off = Rotation(id="r", name="r", steps=two_by_fifteen, enabled=False)
+    assert _cycle_fires_on(off, day) == []
+    other_days = Rotation(
+        id="r", name="r", steps=two_by_fifteen, days_of_week=[(day.weekday() + 1) % 7]
+    )
+    assert _cycle_fires_on(other_days, day) == []
+
+
+def test_timed_cards_show_refreshes_today(app: Flask) -> None:
+    """Each timed row carries its projected pushes for the day; a by-hand
+    deck has nothing to project and shows no count."""
+    from app.state.deck_model import Deck, DeckPage
+
+    _seed_all_shapes(app)  # brief: every 30 min; loop: 2 x 15 min, all day
+    app.config["DECK_STORE"].upsert(
+        Deck(
+            id="mixed",
+            name="Lounge mixed",
+            pages=[DeckPage(page_id="hall"), DeckPage(page_id="kitchen")],
+            advance="both",
+            advance_interval_minutes=20,
+        )
+    )
+    client = app.test_client()
+    _sign_in(client)
+    body = client.get("/decks").get_data(as_text=True)
+
+    def count_block(n: int) -> str:
+        return f'<span>refreshes today</span><strong class="is-ink">{n}</strong>'
+
+    assert count_block(48) in body  # schedule, 24h / 30 min
+    assert count_block(96) in body  # rotation, 24h / 15 min per step
+    assert count_block(72) in body  # both-mode deck, 24h / 20 min per page
+    # Three timed rows, one count each; the by-hand deck adds none.
+    assert body.count("refreshes today</span>") == 3
+    # The both-mode note no longer claims there is no timer.
+    assert "advances on its timer, or on a press" in body
+    assert body.count("waiting on a press") == 1
+
+
+def test_display_header_sums_refreshes_across_its_rows(app: Flask) -> None:
+    from app.state.deck_model import Deck, DeckPage
+
+    client = app.test_client()
+    _sign_in(client)
+    _register_display(app, client, "panel")
+    for pid in ("kitchen", "hall"):
+        app.config["PAGE_STORE"].save(Page(id=pid, name=pid.title(), device_ids=["panel"]))
+    _seed_all_shapes(app)
+    app.config["DECK_STORE"].upsert(
+        Deck(
+            id="wayfind",
+            name="Hall wayfinding",
+            device_ids=["panel"],
+            pages=[DeckPage(page_id="hall")],
+        )
+    )
+    body = client.get("/decks").get_data(as_text=True)
+    assert 'id="display-panel"' in body
+    # 48 (schedule) + 96 (rotation); the by-hand deck contributes nothing.
+    assert "144 refreshes today" in body
+    assert "dk-group-count" in body
+
+
+def test_disabled_timed_rows_show_no_count(app: Flask) -> None:
+    app.config["SCHEDULE_STORE"].upsert(
+        Schedule(
+            id="brief",
+            name="Morning brief",
+            page_id="kitchen",
+            type="interval",
+            interval_minutes=30,
+            enabled=False,
+        )
+    )
+    client = app.test_client()
+    _sign_in(client)
+    body = client.get("/decks").get_data(as_text=True)
+    assert "Morning brief" in body
+    assert "refreshes today" not in body

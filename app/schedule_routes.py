@@ -186,6 +186,12 @@ def _parse_form(form: dict[str, Any], *, existing_id: str | None = None) -> Sche
     return Schedule.model_validate(payload)
 
 
+# Walk ceiling for a projection: a full day at the 1-minute interval floor,
+# with headroom. The Lineups page counts a day's fires from this walk, so a
+# cap below 1440 would under-report the fastest schedules.
+MAX_PROJECTED_FIRES = 1500
+
+
 def _project_fires(schedule: Schedule, start: datetime, end: datetime) -> list[datetime]:
     """Cheap, deterministic projection of when a schedule will fire in
     [start, end). Used by the timeline visualisation only; the real
@@ -226,7 +232,7 @@ def _project_fires(schedule: Schedule, start: datetime, end: datetime) -> list[d
 
     t = cur
     safety = 0
-    while t < end and safety < 500:
+    while t < end and safety < MAX_PROJECTED_FIRES:
         if _in_window(t):
             fires.append(t)
         t = t + step

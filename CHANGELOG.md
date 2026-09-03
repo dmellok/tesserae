@@ -8,6 +8,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Refreshes per day on the Lineups page** (#278). Every schedule,
+  rotation and timer-advancing deck card now shows how many pushes its
+  timer projects for today, next to the next-fire time, and each display's
+  section header sums them so the refresh load on a panel is readable at a
+  glance. Counts are projections from the same walk that draws the 24h
+  rail: conditions and the minimum hold can skip some, and taps, Send now
+  and data-change refreshes are extra.
 - **Editable calendar feed colours.** The colour swatch on each saved feed in Settings → Widgets → Calendar feeds is now a colour picker; pick a new colour and it saves in place, no need to delete and re-add the feed. Useful when tuning feed colours for a specific panel's gamut. (#276)
 - **Trusted networks for the auth gate.** Settings → System →
   Authentication gains a "Trusted networks" list (also
