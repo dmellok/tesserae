@@ -1584,6 +1584,7 @@ class PushManager:
         force_publish: bool = True,
         source: str = "file",
         framing: dict[str, float] | None = None,
+        page_id: str | None = None,
     ) -> PushResult:
         """Hand arbitrary image bytes to every renderer.
 
@@ -1610,7 +1611,12 @@ class PushManager:
         panel dims into a :class:`~app.quantizer.SourceCrop` and applied
         ahead of the fan-out, so the retained composition is the framed,
         panel-sized frame and resend stays pixel-exact. The intent itself
-        rides the History row's ``extra`` for reproduce / re-target."""
+        rides the History row's ``extra`` for reproduce / re-target.
+        ``page_id`` (optional): the canvas page these bytes render, when
+        the caller composed a page itself (the MCP push route). Recorded
+        on the live-render entry so the touch-v3 spec and the post-action
+        reconcile can find the page behind the frame; without it the
+        frame is an anonymous image and the spec comes back empty."""
         supersede = self._acquire_or_supersede(
             device_id=device_id,
             source=source,
@@ -1630,6 +1636,7 @@ class PushManager:
                     source_label,
                     source=source,
                     device_id=device_id,
+                    page_id=page_id,
                     fit=fit,
                     rotate=rotate,
                     force_publish=force_publish,
@@ -2239,6 +2246,7 @@ class PushManager:
         force_publish: bool = False,
         force_client_refetch: bool = False,
         framing: dict[str, float] | None = None,
+        page_id: str | None = None,
     ) -> PushResult:
         """Shared tail end of push_image / push_webpage / republish."""
         started = started if started is not None else time.monotonic()
@@ -2267,6 +2275,7 @@ class PushManager:
             force_publish=force_publish,
             force_client_refetch=force_client_refetch,
             framing=framing,
+            page_id=page_id,
         )
 
     def _fan_out(

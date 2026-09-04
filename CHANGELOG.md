@@ -6,6 +6,17 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **Pages pushed through the MCP bridge now carry their touch-v3 controls.**
+  The bridge's push composed the page itself and handed the bytes to the
+  image push path, which recorded the frame as an anonymous image. The
+  device's touch spec is resolved from the page behind its live frame, so
+  a device-drawn button or switch on an agent-pushed dashboard came back
+  as an empty spec and was never drawn; the post-action reconcile could not
+  find the page either. The image push now records the page id when the
+  caller knows it, and the bridge passes it.
+
 ### Changed
 
 - The reTerminal Sticky hardware notes record touch as verified on hardware

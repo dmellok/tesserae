@@ -489,6 +489,26 @@ def test_push_image_bypass_coalesce_always_fires(tmp_path: Path, composition_png
     assert r2.status == "sent"
 
 
+def test_push_image_records_the_page_behind_the_bytes(
+    tmp_path: Path, composition_png: bytes
+) -> None:
+    """A caller that composed a page itself (the MCP push route) passes the
+    page id, and the live-render record carries it: /frame/spec and the
+    post-action reconcile resolve the page from that record, so an
+    anonymous image push leaves a device-drawn button undrawn."""
+    renderers = [_make_renderer(tmp_path, "esp32_bin", "bin", retain=False)]
+    manager, _, _ = _wired(tmp_path, composition_png, renderers)
+    manager.push_image(composition_png, source_label="mcp:p1", device_id="esp32", page_id="p1")
+    latest = manager.latest_render_for("esp32")
+    assert latest is not None
+    assert latest["page_id"] == "p1"
+    # A plain image push stays anonymous.
+    manager.push_image(composition_png, source_label="file", device_id="esp32")
+    latest = manager.latest_render_for("esp32")
+    assert latest is not None
+    assert not latest.get("page_id")
+
+
 # -- orientation on ingest (discussion #231) -----------------------------
 
 

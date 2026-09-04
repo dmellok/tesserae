@@ -2378,7 +2378,12 @@ def push(page_id: str) -> Response:
     errors: list[dict[str, str]] = []
     for did in device_ids:
         try:
-            result = manager.push_image(png, source_label=f"mcp:{page_id}", device_id=did)
+            # Carry the page id: the live-render record is what /frame/spec
+            # and the post-action reconcile resolve the page from, and an
+            # anonymous image push leaves the device's touch-v3 spec empty.
+            result = manager.push_image(
+                png, source_label=f"mcp:{page_id}", device_id=did, page_id=page_id
+            )
         except Exception as err:  # a renderer / broker fault shouldn't 500 the route
             errors.append({"device": did, "error": f"{type(err).__name__}: {err}"})
             continue
