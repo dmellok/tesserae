@@ -8,6 +8,11 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Touch settings on the Seeed reTerminal Sticky.** The Sticky's device
+  settings now carry the same "Touch input" and "Touch linger" fields as the
+  reTerminal E1003, so a firmware build with the Sticky's GT911 wired up can
+  be switched on from the server. The digitiser's orientation is confirmed
+  on hardware; the hardware entry notes touch wake as the remaining check.
 - **Refreshes per day on the Lineups page** (#278). Every schedule,
   rotation and timer-advancing deck card now shows how many pushes its
   timer projects for today, next to the next-fire time, and each display's
