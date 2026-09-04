@@ -6,6 +6,12 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Changed
+
+- The reTerminal Sticky hardware notes describe the partial refresh that
+  firmware 1.30.0 brings (tap echo, device-drawn controls, live value slots
+  and frame patches on this panel) and what still falls back to a full paint.
+
 ### Fixed
 
 - **Pages pushed through the MCP bridge now carry their touch-v3 controls.**
