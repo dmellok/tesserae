@@ -6,6 +6,12 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Changed
+
+- The reTerminal Sticky hardware notes record touch as verified on hardware
+  (firmware 1.29.1 or later), with wake-from-deep-sleep on a tap the one
+  path still to exercise.
+
 ## [0.386.1], 2026-09-04
 
 ### Added
