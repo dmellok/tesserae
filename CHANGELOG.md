@@ -6,6 +6,8 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.386.1], 2026-09-04
+
 ### Added
 
 - **Touch settings on the Seeed reTerminal Sticky.** The Sticky's device
@@ -28,6 +30,21 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   globally routable IPv6 prefix delegated by the ISP can fetch `/renders/`
   and, with the password disabled, reach the admin UI, instead of being
   treated as the open internet. `/0` is refused.
+- **Waveshare 10.85" e-Paper HAT+ (G) hardware kind.** New `waveshare_1085g`
+  kind for the 1360x480 four-colour (black/white/yellow/red) panel on an
+  ESP32-S3 Zero: `bwry_4` gamut, a 163200-byte 2-bpp frame from the
+  `esp32_bin` renderer, paired with the `waveshare-1085g` target in
+  tesserae-device-firmware. Confirmed on real hardware and added to the
+  test matrix.
+- **The MCP bridge's widget catalog carries a one-sentence description per
+  widget** (#257). `list_widgets` used to ship every widget's full description
+  whether or not the agent placed it, the largest single item in a build's
+  context budget. The catalog now carries the first sentence (capped at 160
+  characters) and the per-widget options call returns the full text, which
+  matches the list-then-read-options loop the tool docs already prescribe.
+  Measured on the bundled set, the description block shrinks by about 69%.
+  Bridge 0.15.0 also fixes the summarised view dropping descriptions
+  entirely (it read the wrong key).
 - **iCloud calendars work as private CalDAV feeds** (#272). iCloud has no
   GET-able `.ics` export: a plain GET is answered with a challenge-less 403,
   and events are only readable through CalDAV REPORT requests. Calendar feeds
@@ -60,6 +77,47 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   flashed a generic "couldn't reach the feed URL" for every failure. Both now
   carry the real reason, e.g. `HTTP 403`, including which of the GET / REPORT
   paths failed how.
+- **IPv6 binds work end to end.** Base URLs (Home Assistant discovery,
+  frame URLs, broker URLs) bracket IPv6 hosts, the renderer's loopback
+  rewrite targets `[::1]` when the server binds an IPv6 host (carried via
+  `TESSERAE_BIND_HOST`, which now also feeds the `--host` default), and the
+  auth gate unwraps IPv4-mapped IPv6 addresses so dual-stack binds keep the
+  loopback and private-range checks working.
+- **Previews behind a TLS-terminating reverse proxy no longer hang.** An
+  `https` public URL leaked its scheme into the internal compose URL, so
+  renders attempted a TLS handshake against the plain-HTTP in-process
+  server and timed out. Loopback compose URLs are now always plain `http`.
+- **Calendar (day) opens its window at local midnight** (#252). The widget
+  draws one day, so the fetch window now starts at midnight instead of at
+  the render time; "hours ahead" keeps its meaning as a forward bound from
+  now, and the option label says so.
+- **Calendar feeds keep separate events that reuse a UID.** The recurrence
+  expander folds every VEVENT with the same UID into one event, so feeds
+  that reuse a UID across copied appointments lost all but one. Plain
+  duplicate VEVENTs (no RRULE or RECURRENCE-ID) are keyed by their start
+  before expansion; recurring series and their overrides keep the shared
+  UID.
+- **Calendar (month) spreads multi-day timed events across every day they
+  cover** (#267). A trip starting Friday afternoon and ending Monday morning
+  showed in Friday's cell only, while the week view already spanned it.
+  Each continued day renders as a dimmed pass-through row in the text
+  layout (with the full title in the tooltip); the default bars mode is
+  unchanged.
+- **Lineup editor states the real loop length.** The advance interval is
+  labelled as the default dwell with the computed full-loop total in the
+  hint, the navigation badge uses the loop total when per-page dwells
+  differ, and the background-refresh fallbacks match the model default of
+  15 minutes, with help text noting the lineup cadence supersedes a member
+  dashboard's own Updates setting (discussion #266).
+- **History distinguishes background warms from frames a panel showed**
+  (discussion #266). Deck and album warms log as "warmed" behind a History
+  toggle, a cache-hit rotation advance writes the push row for the frame
+  the panel actually showed, deck sources get friendly chips, and
+  same-cadence warms de-phase after the first pass instead of staying in
+  lockstep.
+- **The per-device button map saves again.** The textarea on the device
+  card was not associated with the card's combined form, so edits never
+  showed the save bar and the value was dropped on submit.
 
 - **Small dashboard changes no longer strand deep-sleep panels on an old
   frame** (#271). A small same-page change on a patch-capable REST device is
