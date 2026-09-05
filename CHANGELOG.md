@@ -8,6 +8,8 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Changed
 
+- The TRMNL X hardware profile and the tested matrix record the panel as
+  confirmed on real hardware with the stock firmware (1872x1404 mono PNG).
 - The reTerminal Sticky hardware notes describe the partial refresh that
   firmware 1.30.0 brings (tap echo, device-drawn controls, live value slots
   and frame patches on this panel) and what still falls back to a full paint.

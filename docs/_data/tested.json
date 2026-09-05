@@ -28,8 +28,8 @@
     },
     "trmnl_png": {
       "status": "Tested",
-      "hardware": "Amazon Kindle Paperwhite 2 (jailbroken) via KOReader trmnl-display plugin + Seeed TRMNL 7.5\" OG DIY Kit (XIAO 7.5\" panel running the TRMNL firmware)",
-      "notes": "1-bit greyscale PNG fitted to the panel + dithered server-side. The TRMNL X is supported but not yet confirmed here."
+      "hardware": "Amazon Kindle Paperwhite 2 (jailbroken) via KOReader trmnl-display plugin + Seeed TRMNL 7.5\" OG DIY Kit (XIAO 7.5\" panel running the TRMNL firmware) + TRMNL X (stock firmware, 1872x1404)",
+      "notes": "1-bit greyscale PNG fitted to the panel + dithered server-side."
     },
     "esp32_gray2_bin": {
       "status": "Tested",
