@@ -223,6 +223,21 @@ APP_FIELDS: list[dict[str, Any]] = [
         ),
     },
     {
+        "name": "automation_paused",
+        "type": "switch",
+        "label": "Pause automation",
+        "default": False,
+        "group": "automation",
+        "group_role": "master",
+        "help": (
+            "Hold every automated push: lineup rotations and schedules, timed "
+            "page refreshes, deck pre-renders and home returns. Manual pushes "
+            "from the Send page, Push-now buttons, physical buttons and Home "
+            "Assistant still go through. Also exposed as the 'Automation' "
+            "switch on the Tesserae hub device in Home Assistant."
+        ),
+    },
+    {
         "name": "quiet_hours_enabled",
         "type": "switch",
         "label": "Quiet hours",
@@ -359,6 +374,13 @@ APP_FIELD_GROUPS: list[dict[str, Any]] = [
         "description": "Default coordinates for weather widgets, the scheduler's timezone, and the default panel text language.",
         "icon": "compass",
         "master": None,
+    },
+    {
+        "id": "automation",
+        "title": "Automation",
+        "description": "Pause every scheduled push until you resume. Manual sends still work.",
+        "icon": "pause-circle",
+        "master": "automation_paused",
     },
     {
         "id": "quiet_hours",

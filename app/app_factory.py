@@ -908,6 +908,10 @@ def create_app(
             logger.warning("settings.app.timezone=%r is not a known IANA zone", raw)
             return None
 
+    # Shared with HA discovery (quiet-hours evaluation) so both read the
+    # same Settings → App → Timezone value.
+    app.config["RESOLVE_TIMEZONE"] = _resolve_timezone
+
     def _device_ids_for_page(page_id: str) -> list[str]:
         page = page_store.get(page_id)
         return list(page.device_ids) if page else []
@@ -964,6 +968,7 @@ def create_app(
         device_ids_for_page=_device_ids_for_page,
         device_telemetry=app.config["DEVICE_TELEMETRY"],
         condition_evaluator=condition_evaluator,
+        paused_provider=lambda: bool(settings.get_section("app").get("automation_paused")),
     )
     app.config["SCHEDULER"] = scheduler
     from app.data_change_refresh import DataChangeRefreshCoordinator

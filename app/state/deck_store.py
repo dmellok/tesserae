@@ -6,17 +6,44 @@ mypy --strict applies via re-export through app.state.
 from __future__ import annotations
 
 import json
+import logging
 import threading
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 from app.state.deck_model import Deck
+
+logger = logging.getLogger(__name__)
 
 
 class DeckStore:
     def __init__(self, path: Path) -> None:
         self._path = path
         self._lock = threading.Lock()
+        # Change listeners, called (outside the lock) after every upsert /
+        # delete so surfaces that mirror the deck list (HA discovery's
+        # per-lineup entities) can republish without polling.
+        self._listeners: list[Callable[[], None]] = []
+
+    def add_listener(self, callback: Callable[[], None]) -> None:
+        with self._lock:
+            if callback not in self._listeners:
+                self._listeners.append(callback)
+
+    def remove_listener(self, callback: Callable[[], None]) -> None:
+        with self._lock:
+            if callback in self._listeners:
+                self._listeners.remove(callback)
+
+    def _notify(self) -> None:
+        with self._lock:
+            listeners = list(self._listeners)
+        for callback in listeners:
+            try:
+                callback()
+            except Exception:
+                logger.exception("deck store listener failed")
 
     def _load_raw(self) -> list[dict[str, Any]]:
         if not self._path.exists():
@@ -62,6 +89,7 @@ class DeckStore:
             else:
                 raw.append(record)
             self._save_raw(raw)
+        self._notify()
 
     def delete(self, deck_id: str) -> bool:
         with self._lock:
@@ -70,7 +98,8 @@ class DeckStore:
             if len(kept) == len(raw):
                 return False
             self._save_raw(kept)
-            return True
+        self._notify()
+        return True
 
     def for_device(self, device_id: str) -> list[Deck]:
         """Enabled decks bound to a device. Used by the navigation + refresh

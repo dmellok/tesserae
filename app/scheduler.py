@@ -349,6 +349,7 @@ class Scheduler:
         # settings.app lat/lon.
         condition_evaluator: ConditionEvaluator | None = None,
         tick_seconds: int = 30,
+        paused_provider: Callable[[], bool] | None = None,
     ) -> None:
         """``push_manager`` is a zero-arg factory that resolves the
         currently-installed PushManager. We can't hold the instance because
@@ -375,6 +376,10 @@ class Scheduler:
         self._deck_nav_store = deck_nav_store
         self._page_store = page_store
         self._plugin_registry = plugin_registry
+        # Global automation pause (Settings → App → Automation, or the HA
+        # "Automation" switch). Read on every tick so a toggle applies
+        # without restarting the thread; ``None`` means never paused.
+        self._paused_provider = paused_provider
         # Page content-refresh bookkeeping: page_id -> POSIX timestamp of
         # the last refresh attempt that reached devices (discussion #140).
         self._page_last_refresh: dict[str, float] = {}
@@ -614,8 +619,24 @@ class Scheduler:
         candidates.sort(key=lambda s: (-s.priority, s.id))
         return candidates
 
+    def is_paused(self) -> bool:
+        """Whether automated pushes are globally paused right now."""
+        if self._paused_provider is None:
+            return False
+        try:
+            return bool(self._paused_provider())
+        except Exception:
+            logger.exception("scheduler: paused provider failed; treating as running")
+            return False
+
     def _tick_once(self, now: datetime) -> None:
         self._observe(now)
+        # Global pause: every automated transition (rotation steps, timer
+        # decks, schedules, page refreshes, deck warms, home returns) holds
+        # until the operator resumes. Manual pushes still go through, so
+        # this behaves like a quiet-hours window with no end time.
+        if self.is_paused():
+            return
         # v0.48: refresh the HA state cache once per tick so each
         # condition evaluation across schedules + rotation steps reads
         # consistent state. Best-effort; HA unreachable returns False

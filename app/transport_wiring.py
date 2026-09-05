@@ -857,6 +857,8 @@ def _rebuild_transport(
             logger.exception("stopping previous HA discovery")
     ha_enabled = bool(app_section.get("ha_discovery_enabled"))
     if ha_enabled:
+        from app.ha_hooks import build_ha_hooks
+
         new_ha = HomeAssistantDiscovery(
             transport=transport,
             push_manager=app.config["PUSH_MANAGER"],
@@ -864,6 +866,7 @@ def _rebuild_transport(
             base_url_fn=_base_url,
             device_registry=devices,
             device_status=app.config["DEVICE_STATUS"],
+            hooks=build_ha_hooks(app),
         )
         try:
             new_ha.start()

@@ -279,6 +279,71 @@ class ButtonService:
         # (``webhook_refresh``). Cleared with ``_reconcile_last``, so it
         # never leaks into a later unrelated reconcile.
         self._reconcile_min_delay: dict[str, float] = {}
+        # Input-event listeners (HA discovery's per-display ``event``
+        # entity). Called after a button / touch has been fully handled,
+        # on the request thread, with a small serialisable dict.
+        self._listeners: list[Callable[[dict[str, Any]], None]] = []
+
+    # ---- event listeners --------------------------------------------
+
+    def add_listener(self, callback: Callable[[dict[str, Any]], None]) -> None:
+        """Register ``callback`` for every handled button press / touch.
+
+        The payload is ``{device_id, kind, name, outcome, ...}`` where
+        ``kind`` is ``button`` / ``tap`` / ``swipe`` / ``slide`` and the rest
+        are gesture details (button name, gesture, page landed on, slider
+        value). Listeners must not raise; failures are logged and dropped
+        so an observer can never break the wake that produced the event."""
+        if callback not in self._listeners:
+            self._listeners.append(callback)
+
+    def remove_listener(self, callback: Callable[[dict[str, Any]], None]) -> None:
+        if callback in self._listeners:
+            self._listeners.remove(callback)
+
+    def _emit(self, payload: dict[str, Any]) -> None:
+        for callback in list(self._listeners):
+            try:
+                callback(payload)
+            except Exception:
+                log.exception("button listener failed")
+
+    def _emit_button(self, device_id: str, button: str, result: ButtonHandleResult) -> None:
+        if result.dedup:
+            return
+        self._emit(
+            {
+                "device_id": device_id,
+                "kind": "button",
+                "name": button,
+                "outcome": (
+                    "unmapped"
+                    if result.unmapped
+                    else ("pushed" if result.pushed_page_id else "dispatched")
+                ),
+                "action": result.action_spec,
+                "page_id": result.pushed_page_id or result.step_page_id,
+            }
+        )
+
+    def _emit_touch(self, device_id: str, result: TouchHandleResult) -> None:
+        if result.outcome == "deduped":
+            return
+        gesture = result.gesture or "tap"
+        kind = (
+            "slide" if gesture == "slide" else ("swipe" if gesture.startswith("swipe") else "tap")
+        )
+        self._emit(
+            {
+                "device_id": device_id,
+                "kind": kind,
+                "name": gesture,
+                "outcome": result.outcome,
+                "action": result.action_spec,
+                "value": result.value,
+                "page_id": result.base.pushed_page_id or result.base.step_page_id,
+            }
+        )
 
     # ---- public API --------------------------------------------------
 
@@ -313,7 +378,19 @@ class ButtonService:
         button: str,
         event_id: int | None,
     ) -> ButtonHandleResult:
-        """Full path: resolve, dedup, dispatch, persist, push."""
+        """Full path: resolve, dedup, dispatch, persist, push, then notify
+        listeners (see :meth:`add_listener`)."""
+        result = self._handle_button(device_id=device_id, button=button, event_id=event_id)
+        self._emit_button(device_id, button, result)
+        return result
+
+    def _handle_button(
+        self,
+        *,
+        device_id: str,
+        button: str,
+        event_id: int | None,
+    ) -> ButtonHandleResult:
         now = self._clock()
         rotation = self._resolve_rotation(device_id)
         state = self._state.get(device_id) or DeviceRotationState(device_id=device_id)
@@ -656,6 +733,22 @@ class ButtonService:
         frame_digest: str,
         event_id: int | None = None,
     ) -> TouchHandleResult:
+        """Public touch entry point: :meth:`_handle_touch_stroke` plus the
+        listener notification (see :meth:`add_listener`)."""
+        result = self._handle_touch_stroke(
+            device_id=device_id, stroke=stroke, frame_digest=frame_digest, event_id=event_id
+        )
+        self._emit_touch(device_id, result)
+        return result
+
+    def _handle_touch_stroke(
+        self,
+        *,
+        device_id: str,
+        stroke: TouchStroke,
+        frame_digest: str,
+        event_id: int | None = None,
+    ) -> TouchHandleResult:
         """Resolve + dispatch a touch stroke (see ``_handle_touch``),
         then speculatively prewarm the rotation's adjacent pages so a
         follow-up tap's synchronous push skips its Playwright capture
@@ -860,6 +953,27 @@ class ButtonService:
         )
 
     def dispatch_touch_spec(
+        self,
+        *,
+        device_id: str,
+        spec: str | dict[str, Any],
+        value: int | None = None,
+        event_id: int | None = None,
+        region_box: dict[str, Any] | None = None,
+    ) -> TouchHandleResult:
+        """Public touch-v3 entry point: :meth:`_dispatch_touch_spec` plus the
+        listener notification (see :meth:`add_listener`)."""
+        result = self._dispatch_touch_spec(
+            device_id=device_id,
+            spec=spec,
+            value=value,
+            event_id=event_id,
+            region_box=region_box,
+        )
+        self._emit_touch(device_id, result)
+        return result
+
+    def _dispatch_touch_spec(
         self,
         *,
         device_id: str,

@@ -6,6 +6,28 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added
+
+- Home Assistant MQTT discovery now exposes lineups and device
+  operations. The hub device gains an *Automation* switch (pause every
+  scheduled push), a *Quiet hours* switch, a switch per lineup with
+  *Push now* / *Next* / *Previous* buttons, and a *Notify all displays*
+  entity. Each display gains a *Lineup* select, a *Hold* number, a
+  *Quiet hours override* switch, *In quiet hours* / *Online* / *Low
+  battery* binary sensors, a *Next change* sensor, a *Refresh now*
+  button, an *Input* event entity for physical buttons and touch
+  gestures, a per-display notify entity, a *Wake interval* number where
+  the kind carries one, a firmware *update* entity once the device
+  advertises OTA, and lazy *Firmware* / *Temperature* / *Humidity* /
+  *Uptime* / *Next wake* sensors.
+- **Settings → App → Automation**: a *Pause automation* toggle that
+  holds rotations, schedules, timed page refreshes, deck pre-renders and
+  home returns until resumed. Manual sends and button presses still go
+  through. Backs the HA *Automation* switch.
+- The button service notifies listeners after every handled button
+  press or touch gesture, and the deck store notifies listeners on every
+  change, so integrations can mirror state without polling.
+
 ### Changed
 
 - The panel-text language pickers (app default, per-device override, dev

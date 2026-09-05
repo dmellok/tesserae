@@ -81,6 +81,21 @@ Under the **Tesserae hub** device:
 - An **image** entity named *Last render*, the composition PNG of
   the most recent push (covers the legacy / virtual-panel case where
   no devices are bound).
+- A **switch** named *Automation*. ON means the scheduler fires as
+  normal; OFF holds every automated push (lineup rotations and
+  schedules, timed page refreshes, deck pre-renders, home returns)
+  until you turn it back on. Manual sends, physical buttons and HA
+  commands still go through. The same toggle lives in
+  **Settings → App → Automation**.
+- A **switch** named *Quiet hours*, the app-level quiet-hours toggle
+  (the window itself is set in **Settings → App → Quiet hours**).
+- One **switch** per lineup, mirroring its enabled flag. Lineups with
+  a bound display also get a *Push now* **button** (warm every page and
+  send the entry page), and lineups with more than one page get *Next*
+  and *Previous* **buttons** that step every bound display.
+- A **notify** entity named *Notify all displays*: call
+  `notify.send_message` on it and the text is rendered as a
+  black-on-white card onto every display.
 - Diagnostic **sensors** + **binary_sensors**: *Last push*, *Pushes
   today*, *Last error*, *Busy*.
 
@@ -92,10 +107,43 @@ to the hub via `via_device`):
 - **sensor** *Current dashboard*, the page assigned to it right now.
 - **sensor** *Last updated*, when it last received a frame.
 - **sensor** *Last seen*, when it last sent a heartbeat.
+- **sensor** *Next change*, when the next visible update is projected
+  to land (rotation step, schedule firing, page refresh).
 - **select** *Dashboard*, push one of the dashboards bound to *this*
   display to *only* this display.
+- **select** *Lineup*, which lineup the display follows. Picking one
+  binds the display to it and makes it live there; *(none)* unbinds
+  it from every lineup.
+- **number** *Hold* (minutes). Set it to hold the page currently on the
+  glass against the rotation for that long; 0 clears the hold. Counts
+  down as the hold runs.
+- **switch** *Quiet hours override*, the per-display quiet-hours
+  override. Turning it on without stored times copies the app-level
+  window.
+- **binary_sensor** *In quiet hours*, whether the display is inside
+  its effective quiet window right now.
+- **binary_sensor** *Online*, derived from the last heartbeat against
+  the display's wake interval (two missed intervals means offline).
+- **button** *Refresh now*, re-render whatever the display is showing
+  and force a repaint.
+- **event** *Input*, fires for physical buttons (`button`) and touch
+  gestures (`tap`, `swipe`, `slide`) with the button name, gesture,
+  action, slider value and the page landed on as attributes. Use it as
+  an automation trigger.
+- **notify**, `notify.send_message` renders the text onto this display
+  only.
+- Where the kind carries a sleep interval: **number** *Wake interval*
+  (seconds), bounded by the kind's schema. Changing it saves the
+  device config and republishes it, same as the device card.
+- Once the device has advertised OTA support: an **update** entity
+  showing installed vs latest firmware, with *Install* queueing the
+  device for its kind's newest release (the Firmware page's per-device
+  update button).
 - Lazily (when the device's heartbeat carries them): **Battery**,
-  **Signal**, **IP address**.
+  **Battery voltage**, **Signal**, **IP address**, **Firmware**,
+  **Temperature**, **Humidity**, **Uptime**, plus **Low battery**
+  (against the Settings → App threshold) and **Next wake** (the
+  server's wake prediction).
 
 ### Use cases
 
@@ -105,6 +153,21 @@ to the hub via `via_device`):
 - **Automations.** Trigger a re-render from an HA automation by
   calling the *Active dashboard* select. ("When the front door
   opens, switch the kitchen Inky to the `home_arrival` page.")
+- **Lineups on a schedule HA owns.** Turn the *Weekend* lineup switch
+  on Friday evening and off Sunday night, or flip *Automation* off
+  while guests are staying so nothing rotates overnight.
+- **Guest mode / focus mode.** Set *Hold* to 120 on the office display
+  when a calendar event starts, so the agenda page stays put through
+  the meeting.
+- **Physical buttons as HA triggers.** Trigger on the *Input* event
+  entity: a `swipe` on the hall panel toggles the porch light, a
+  `button` press named `refresh` re-runs a script.
+- **Notifications.** `notify.send_message` with "Bins tonight" onto
+  the kitchen display at 20:00; press *Refresh now* afterwards (or let
+  the next rotation step) to clear it.
+- **Fleet health.** Alert on *Online* going off or *Low battery*
+  turning on, and let the *Firmware* update entity show up on HA's
+  Settings page like any other device update.
 - **Diagnostics.** Use the *Busy* binary_sensor to gate other
   automations so HA waits for the current push to finish.
 
