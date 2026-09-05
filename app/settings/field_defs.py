@@ -100,10 +100,13 @@ APP_FIELDS: list[dict[str, Any]] = [
         "label": "Panel text language",
         "default": "system",
         "group": "location",
+        # Only the sentinel lives here. The language rows are appended at
+        # render time from what the loaded widgets actually ship (see
+        # app.locale_choices.available_locales, wired in
+        # index_routes._app_fields_with_locale_choices), so a widget adding
+        # strings/<tag>.json surfaces in the picker without a code change.
         "choices": [
             {"value": "system", "label": "System (host language)"},
-            {"value": "en", "label": "English"},
-            {"value": "fr", "label": "Français"},
         ],
         "help": (
             "Default language widgets render their panel text in, for every "

@@ -465,7 +465,10 @@ Translating a widget is a normal contribution to that widget: a PR
 adding `strings/<locale>.json` (bundled widgets) or a new catalog
 release (marketplace widgets, installed the normal way from Browse).
 There's no separate override mechanism, and no per-widget forking
-required to add a language.
+required to add a language. The language pickers (Settings → Server,
+Settings → Devices, and the dev preview) list whatever locales the
+installed widgets ship, plus English, so a new `strings/<tag>.json`
+becomes selectable as soon as the widget loads.
 
 To eyeball a translation without changing any settings, the dev preview
 surfaces (`/_test/widgets` and `/_test/preview`) carry a language picker;

@@ -389,12 +389,13 @@ def _build_app_field_groups() -> list[dict[str, Any]]:
     store = settings_store()
     app_raw = store.get_section("app")
     state = _values_for_core("app", APP_FIELDS, app_raw)
+    app_fields = _app_fields_with_locale_choices()
     endpoint = url_for("auth.settings_update", section_kind="app")
     network_ip = detect_local_ip()
 
     groups: list[dict[str, Any]] = []
     for spec in APP_FIELD_GROUPS:
-        group_fields = [f for f in APP_FIELDS if f.get("group") == spec["id"]]
+        group_fields = [f for f in app_fields if f.get("group") == spec["id"]]
         master_field = next(
             (f for f in group_fields if f.get("group_role") == "master"),
             None,
@@ -778,7 +779,7 @@ def _build_sections() -> list[dict[str, Any]]:
             "kind": "app",
             "title": "App",
             "blurb": "Where Tesserae lives on the network.",
-            "fields": APP_FIELDS,
+            "fields": _app_fields_with_locale_choices(),
             "state": _values_for_core("app", APP_FIELDS, app_raw),
             "endpoint": url_for("auth.settings_update", section_kind="app"),
             "meta": {"Network IP": detect_local_ip()},
@@ -1190,6 +1191,9 @@ def _build_sections() -> list[dict[str, Any]]:
                 # just one select).
                 "locale": (device.manifest.get("locale") or "" if is_instance else ""),
                 "locale_editable": is_instance,
+                # Same live language list the app-wide picker offers
+                # (app.locale_choices): whatever the loaded widgets ship.
+                "locale_choices": _locale_choices() if is_instance else [],
                 # Per-device button map (physical button wakes). The
                 # textarea shows the stored per-device override (empty
                 # when nothing is set); the "effective map" fold-out
@@ -2207,6 +2211,28 @@ _EMBEDDED_BROKER_FIELD_NAMES = frozenset(
 # them; the card's ``MQTT URL`` meta line still shows the effective
 # host:port so they can verify what's resolved.
 _HA_MANAGED_BROKER_FIELD_NAMES = frozenset({"host", "port", "username", "password"})
+
+
+def _locale_choices() -> list[dict[str, str]]:
+    """Language rows for the locale pickers: every tag a loaded widget
+    ships ``strings/<tag>.json`` for, plus English. See
+    ``app.locale_choices`` for why this isn't a static list."""
+    from app.locale_choices import available_locales
+
+    return available_locales(current_app.config.get("PLUGIN_REGISTRY"))
+
+
+def _app_fields_with_locale_choices() -> list[dict[str, Any]]:
+    """APP_FIELDS with the ``locale`` select's choices expanded from the
+    bare ``system`` sentinel to ``system`` + the live language list, so
+    a widget adding a translation surfaces in Settings without a code
+    change here (issue #279)."""
+    return [
+        {**f, "choices": [*f.get("choices", []), *_locale_choices()]}
+        if f.get("name") == "locale"
+        else f
+        for f in APP_FIELDS
+    ]
 
 
 def _broker_fields_with_client_id_hint() -> list[dict[str, Any]]:

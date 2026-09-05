@@ -8,6 +8,10 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Changed
 
+- The panel-text language pickers (app default, per-device override, dev
+  preview) now list every locale the installed widgets ship strings for,
+  plus English, instead of a fixed English / French pair. A widget adding
+  `strings/<tag>.json` is selectable as soon as it loads (#279).
 - The TRMNL X hardware profile and the tested matrix record the panel as
   confirmed on real hardware with the stock firmware (1872x1404 mono PNG).
 - The reTerminal Sticky hardware notes describe the partial refresh that

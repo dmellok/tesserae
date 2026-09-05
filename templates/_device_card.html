@@ -422,17 +422,14 @@
            placed on pages bound to this device render their panel text
            in this locale instead of the app-wide default -- the
            "German kitchen panel, English office panel" case. Blank =
-           inherit the app default. Only en/fr have real translations
-           today (calendar_day); picking anything else falls back to
-           each widget's own English text, which is still useful for
-           spotting layout issues before a translation exists. #}
+           inherit the app default. The option list is whatever the
+           loaded widgets ship strings for (app.locale_choices); a
+           widget with no translation for the pick falls back to its
+           own English text. #}
         {% if section.locale_editable %}
         {{ select_field(section.id ~ '-locale', 'locale', 'Panel text locale',
                         value=section.locale, blank_label='Use app default',
-                        options=[
-                          {'value': 'en', 'label': 'English'},
-                          {'value': 'fr', 'label': 'Français'}
-                        ],
+                        options=section.locale_choices,
                         help='Overrides the app-wide default for widgets rendered on this device. Only widgets that have shipped a translation for the picked language actually change; others keep their built-in English text.',
                         form=_combined_form_id) }}
         {% endif %}

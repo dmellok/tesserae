@@ -1892,7 +1892,7 @@ def test_render() -> str:
     # ``ctx.locale``, and a free-typed invalid tag would make
     # ``Intl.DateTimeFormat`` throw mid-render.
     locale_override = request.args.get("locale") or ""
-    if locale_override not in _PREVIEW_LOCALE_IDS:
+    if locale_override not in _preview_locale_ids():
         locale_override = ""
 
     # Per-widget content zoom from the gallery's zoom picker. Same
@@ -2038,11 +2038,20 @@ _PREVIEW_PANELS: Final[list[dict[str, Any]]] = [
 _PREVIEW_PANEL_IDS: Final[set[str]] = {p["id"] for p in _PREVIEW_PANELS}
 _DEFAULT_PREVIEW_PANEL_ID: Final[str] = "waveshare_e6_13_3"
 
-_PREVIEW_LOCALES: Final[list[dict[str, str]]] = [
-    {"id": "en", "label": "English"},
-    {"id": "fr", "label": "Français"},
-]
-_PREVIEW_LOCALE_IDS: Final[set[str]] = {loc["id"] for loc in _PREVIEW_LOCALES}
+
+def _preview_locales() -> list[dict[str, str]]:
+    """Language picker rows for the dev preview surfaces: every locale a
+    loaded widget ships strings for, plus English (app.locale_choices).
+    Computed per request rather than at import so a widget authored or
+    installed after startup shows up too."""
+    from app.locale_choices import available_locales
+
+    registry = current_app.config.get("PLUGIN_REGISTRY")
+    return [{"id": row["value"], "label": row["label"]} for row in available_locales(registry)]
+
+
+def _preview_locale_ids() -> set[str]:
+    return {loc["id"] for loc in _preview_locales()}
 
 
 # Multi-cell layout for the preview synthetic page. Spiral halving:
@@ -2162,7 +2171,7 @@ def _parse_preview_args() -> dict[str, Any]:
     theme_id = request.args.get("theme") or "light"
     style_id = request.args.get("style") or "standard"
     locale_id = request.args.get("locale") or ""
-    if locale_id not in _PREVIEW_LOCALE_IDS:
+    if locale_id not in _preview_locale_ids():
         locale_id = ""
     sample_mode = request.args.get("sample") == "1"
     panel_id = request.args.get("panel") or _DEFAULT_PREVIEW_PANEL_ID
@@ -2248,7 +2257,7 @@ def test_widget_preview() -> str:
         themes=_MATRIX_THEMES,
         styles=_MATRIX_STYLES,
         panels=_PREVIEW_PANELS,
-        locales=_PREVIEW_LOCALES,
+        locales=_preview_locales(),
         theme_id=parsed["theme_id"],
         style_id=parsed["style_id"],
         locale_id=parsed["locale_id"],
@@ -2325,5 +2334,5 @@ def test_widget_gallery() -> str:
         "widget_gallery.html",
         widgets=rows,
         size_dims=SIZE_DIMENSIONS,
-        locales=_PREVIEW_LOCALES,
+        locales=_preview_locales(),
     )
