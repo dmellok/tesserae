@@ -249,6 +249,43 @@ def _cycle_fires_on(rotation: Any, day_start: datetime) -> list[datetime]:
     return fires
 
 
+#: Ticks the 24h rail draws. A rail is a few hundred pixels wide, so past
+#: this the marks stop being separable and only cost DOM.
+MAX_RAIL_MARKS = 48
+
+
+def _thin_marks(marks: list[float]) -> list[float]:
+    """Reduce *marks* to at most :data:`MAX_RAIL_MARKS`, spread across the day.
+
+    The rail used to draw ``marks[:48]``. A 3-minute schedule projects ~480
+    fires, so the ticks ran out about two hours in and the lane read as "the
+    schedule stopped firing" -- while the ``refreshes today`` label beside it
+    still showed the full count, so the two disagreed (#166).
+
+    Taking every *n*th mark instead keeps the lane spanning the window it
+    covers, which is what the rail is for: the reader is judging *when* the
+    schedule fires and roughly how densely, not counting ticks. The count
+    label remains the honest total, and it is now consistent with a lane that
+    reaches the end of the day.
+
+    The first and last marks are always kept, so the lane starts and ends
+    where the schedule does.
+    """
+    if len(marks) <= MAX_RAIL_MARKS:
+        return marks
+    step = (len(marks) - 1) / (MAX_RAIL_MARKS - 1)
+    thinned = [marks[round(i * step)] for i in range(MAX_RAIL_MARKS)]
+    # ``round`` can land twice on the same index at the tail; de-duplicate
+    # while keeping order so two ticks never stack on one pixel.
+    seen: set[float] = set()
+    out: list[float] = []
+    for mark in thinned:
+        if mark not in seen:
+            seen.add(mark)
+            out.append(mark)
+    return out
+
+
 def _design_cards(
     *,
     nav_decks: list[Deck],
@@ -476,7 +513,7 @@ def _design_cards(
                 + (f" · last sent {_ago(last, now_ts)}" if _ago(last, now_ts) else ""),
                 "screens": [screen(s.page_id, None, showing, bool(s.conditions))],
                 "live_name": page_names.get(s.page_id) if showing else None,
-                "marks": marks[:48],
+                "marks": _thin_marks(marks),
                 "now_pct": round(now_pct, 2),
                 "fires_label": (
                     f"fires {s.fires_at.strftime('%H:%M')}"
