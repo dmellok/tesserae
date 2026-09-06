@@ -28,9 +28,11 @@ logger = logging.getLogger(__name__)
 # guarded only so a broken wheel degrades to "HEIC unsupported" rather
 # than failing app import.
 try:
-    import pillow_heif
+    # Imported from the defining module: pillow-heif 1.7 ships ``py.typed``
+    # and its package init does not re-export the function for mypy.
+    from pillow_heif.as_plugin import register_heif_opener
 
-    pillow_heif.register_heif_opener()
+    register_heif_opener()
 except Exception:
     logger.warning("pillow-heif unavailable; HEIC/HEIF image uploads will not decode")
 
