@@ -365,3 +365,103 @@ def test_webhook_refresh_delay_rejects_a_bool(stores: dict[str, Any]) -> None:
     pm = StubPushManager(latest=_latest())
     svc = _service(stores, pm)
     assert svc._webhook_refresh_delay_seconds() == 5.0
+
+
+# -- the live frame outranks stale position records ------------------------
+
+
+def _page_region(target: str) -> dict[str, Any]:
+    return {**_ha_region(), "tap": f"page:{target}"}
+
+
+def _deck_service(
+    stores: dict[str, Any], pm: StubPushManager, tmp_path: Path, *, current: str
+) -> tuple[ButtonService, Any]:
+    from app.state.deck_model import Deck, DeckPage
+    from app.state.deck_nav_store import DeckNavStore
+    from app.state.deck_store import DeckStore
+
+    decks = DeckStore(tmp_path / "decks.json")
+    decks.upsert(
+        Deck(
+            id="control",
+            name="Control",
+            advance="manual",
+            device_ids=["kitchen"],
+            pages=[DeckPage(page_id="morning"), DeckPage(page_id="lights")],
+        )
+    )
+    nav = DeckNavStore(tmp_path / "nav.json")
+    nav.set("kitchen", "control", current)
+    svc = ButtonService(
+        rotation_store=stores["rotation_store"],
+        state_store=stores["state_store"],
+        settings_store=stores["settings_store"],
+        page_store=stores["page_store"],
+        push_manager=pm,  # type: ignore[arg-type]
+        event_log=stores["event_log"],
+        deck_store=decks,
+        deck_nav_store=nav,
+        device_status=lambda: {},
+    )
+    return svc, nav
+
+
+def test_reconcile_prefers_live_frame_over_stale_deck_position(
+    stores: dict[str, Any], tmp_path: Path
+) -> None:
+    # The panel shows "lights" (its live frame) while the deck nav record
+    # still says "morning". Re-rendering the record's page would paint a
+    # different dashboard over the one the person is looking at.
+    pm = StubPushManager(latest=_latest(page_id="lights"))
+    svc, _nav = _deck_service(stores, pm, tmp_path, current="morning")
+    svc._run_reconcile("kitchen")
+    assert [c["page_id"] for c in pm.calls] == ["lights"]
+
+
+def test_reconcile_prefers_live_frame_over_rotation_step(stores: dict[str, Any]) -> None:
+    stores["rotation_store"].upsert(
+        Rotation(
+            id="rot",
+            name="Rot",
+            device_ids=["kitchen"],
+            steps=[RotationStep(page_id="morning", dwell_minutes=30)],
+        )
+    )
+    pm = StubPushManager(latest=_latest(page_id="lights"))
+    svc = _service(stores, pm)
+    svc._run_reconcile("kitchen")
+    assert [c["page_id"] for c in pm.calls] == ["lights"]
+
+
+def test_reconcile_falls_back_to_deck_position_without_a_page_frame(
+    stores: dict[str, Any], tmp_path: Path
+) -> None:
+    pm = StubPushManager(latest=_latest())  # image push: no page behind the frame
+    svc, _nav = _deck_service(stores, pm, tmp_path, current="morning")
+    svc._run_reconcile("kitchen")
+    assert [c["page_id"] for c in pm.calls] == ["morning"]
+
+
+def test_page_shortcut_onto_a_deck_page_records_the_position(
+    stores: dict[str, Any], tmp_path: Path
+) -> None:
+    pm = StubPushManager(latest=_latest(page_id="morning"), regions=[_page_region("lights")])
+    svc, nav = _deck_service(stores, pm, tmp_path, current="morning")
+    result = _tap(svc)
+    assert result.outcome == "dispatched"
+    assert [c["page_id"] for c in pm.calls] == ["lights"]
+    rec = nav.get("kitchen")
+    assert rec is not None and rec["deck_id"] == "control" and rec["page_id"] == "lights"
+
+
+def test_page_shortcut_outside_the_deck_leaves_the_position_alone(
+    stores: dict[str, Any], tmp_path: Path
+) -> None:
+    stores["page_store"].save(Page(id="guest", name="Guest", device_id="kitchen"))
+    pm = StubPushManager(latest=_latest(page_id="morning"), regions=[_page_region("guest")])
+    svc, nav = _deck_service(stores, pm, tmp_path, current="morning")
+    result = _tap(svc)
+    assert result.outcome == "dispatched"
+    rec = nav.get("kitchen")
+    assert rec is not None and rec["page_id"] == "morning"

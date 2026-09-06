@@ -1573,10 +1573,25 @@ class ButtonService:
             log.exception("touch reconcile push failed: device=%s page=%s", device_id, page_id)
 
     def _reconcile_page_id(self, device_id: str) -> str | None:
-        """The page the device is showing right now: its rotation's
-        current step, else its deck's current page, else the page of its
-        last-pushed frame. None when nothing resolves (image push, no
-        frame yet); the periodic schedule catches those up."""
+        """The page the device is showing right now: the page of its live
+        frame first, else its rotation's current step, else its deck's
+        current page. None when nothing resolves (image push, no frame
+        yet); the periodic schedule catches those up.
+
+        The live frame wins because it is the only record every path
+        that changes the panel writes through (scheduler advances, deck
+        promotions, ``page:`` shortcuts, device-reported deck paints),
+        and because the patch reconcile diffs against exactly that frame.
+        The deck nav record can lag it: a touch ``page:`` shortcut or a
+        device-local bundle nav moves the panel without moving the
+        record, and reconciling from the record then paints the stale
+        deck page over whatever the person is actually looking at."""
+        pusher = self._push_getter()
+        latest_fn = getattr(pusher, "latest_render_for", None) if pusher is not None else None
+        latest = latest_fn(device_id) if callable(latest_fn) else None
+        candidate = latest.get("page_id") if isinstance(latest, dict) else None
+        if isinstance(candidate, str) and candidate:
+            return candidate
         rotation = self._resolve_rotation(device_id)
         if rotation is not None and rotation.steps:
             state = self._state.get(device_id)
@@ -1589,11 +1604,21 @@ class ButtonService:
             deck_page = self._deck_current_page(deck, device_id)
             if deck_page:
                 return deck_page
-        pusher = self._push_getter()
-        latest_fn = getattr(pusher, "latest_render_for", None) if pusher is not None else None
-        latest = latest_fn(device_id) if callable(latest_fn) else None
-        candidate = latest.get("page_id") if isinstance(latest, dict) else None
-        return candidate if isinstance(candidate, str) and candidate else None
+        return None
+
+    def _note_deck_position(self, device_id: str, page_id: str) -> None:
+        """Record ``page_id`` as the device's deck position when it belongs
+        to the device's bound deck. A touch / button ``page:`` shortcut
+        that lands on a deck page is a navigation as far as the panel is
+        concerned, so the nav record (home-timeout idle clock, the
+        Lineups UI, the background refresh's idea of what is on glass)
+        has to follow it."""
+        if self._deck_nav is None:
+            return
+        deck = self._bound_deck(device_id)
+        if deck is None or page_id not in {p.page_id for p in deck.pages}:
+            return
+        self._deck_nav.set(device_id, deck.id, page_id)
 
     def _layout_unchanged(
         self, device_id: str, reported_digest: str, latest: dict[str, Any]
@@ -1837,6 +1862,8 @@ class ButtonService:
                         respect_quiet_hours=False,
                         source=origin,
                     )
+                    if push_result.status != "failed":
+                        self._note_deck_position(device_id, pushed_page_id)
                 except Exception:
                     log.exception(
                         "%s push failed: device=%s page=%s spec=%s",

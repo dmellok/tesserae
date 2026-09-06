@@ -42,6 +42,17 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **A touch action no longer repaints a different lineup page over the
+  one on glass.** The post-action reconcile resolved "the page the
+  device is showing" from the lineup's nav record before the live frame,
+  and that record lagged behind touch navigation: a `page:` shortcut
+  tapped on a dashboard's nav bar pushed the target page without
+  recording it as the device's lineup position. Tapping a control on the
+  page then re-rendered the stale position and patched it onto the panel,
+  so the panel showed one page while its touch regions still belonged to
+  another. The reconcile now starts from the page behind the device's
+  live frame, and a `page:` shortcut onto a lineup page records the
+  position.
 - **A lineup no longer re-promotes a pre-rendered frame that has gone
   stale.** When the background warms for a page keep failing, its cached
   frame kept being swapped onto the panel at every advance, so the
