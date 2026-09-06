@@ -33,6 +33,12 @@
         {% for p in pages %}
         <option value="{{ p.id }}" {% if p.id == s.page_id %}selected{% endif %}>{{ p.name }}</option>
         {% endfor %}
+        {# A dashboard that was deleted out from under the schedule keeps its
+           option, otherwise the browser preselects the first dashboard and a
+           save silently re-points the schedule. #}
+        {% if s.page_id and s.page_id not in (pages | map(attribute='id') | list) %}
+        <option value="{{ s.page_id }}" selected>{{ s.page_id }} (missing dashboard)</option>
+        {% endif %}
       </select>
     </div>
     <div class="field">

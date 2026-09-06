@@ -43,9 +43,11 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 ### Fixed
 
 - **Lineups remain visible after their displays are deleted.** Lineups whose
-  targets are all unavailable now appear in an **Unavailable displays** group
-  on the web, where they can still be edited or deleted. Existing Lineups are
-  preserved, including when device deletion also clears associated data.
+  targets are all gone now appear in an **Unavailable displays** group on the
+  Lineups page instead of disappearing, so they can still be edited, rebound
+  or deleted. The editors keep the stale display (and a wiped dashboard)
+  selected, so saving no longer silently unbinds the lineup or re-points it at
+  the first dashboard in the list.
 
 - **A touch action no longer repaints a different lineup page over the
   one on glass.** The post-action reconcile resolved "the page the

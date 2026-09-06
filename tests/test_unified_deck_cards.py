@@ -356,7 +356,45 @@ def test_deleted_display_lineup_remains_manageable(
     assert f'href="{edit_url}"' in body
     editor = client.get(edit_url)
     assert editor.status_code == 200
-    assert "Kobo lineup" in editor.get_data(as_text=True)
+    editor_html = editor.get_data(as_text=True)
+    assert "Kobo lineup" in editor_html
+    # The editors must keep the stale binding selectable: the deck editor's
+    # display select would otherwise fall back to "Choose a display" and a
+    # plain save would unbind the deck; the schedule form would preselect
+    # the first dashboard once the wiped page vanished from the list.
+    if intent in ("manual", "cycle"):
+        assert '<option value="kobo" selected>kobo (unavailable)</option>' in editor_html
+        saved = client.post(
+            "/decks/editor-save",
+            data={
+                "deck_id": "kobo-lineup",
+                "name": "Kobo lineup renamed",
+                "pages": "kitchen",
+                "device_ids": "kobo",
+                # Keep a cycle lineup on its timer so it stays a rotation.
+                "advance": "timer" if intent == "cycle" else "manual",
+            },
+        )
+    else:
+        if wipe_orphan:
+            assert (
+                '<option value="kitchen" selected>kitchen (missing dashboard)</option>'
+                in editor_html
+            )
+        saved = client.post(
+            "/schedules/kobo-lineup/update",
+            data={
+                "name": "Kobo lineup renamed",
+                "page_id": "kitchen",
+                "type": "daily",
+                "fires_at": "08:00",
+            },
+        )
+    assert saved.status_code == 302
+    after_save = app.config["DECK_STORE"].get(deck.id)
+    assert after_save.name == "Kobo lineup renamed"
+    assert after_save.device_ids == ["kobo"]
+    assert [dp.page_id for dp in after_save.pages] == ["kitchen"]
     delete_kind = {"manual": "decks", "cycle": "rotations"}.get(intent, "schedules")
     delete_url = f"/{delete_kind}/kobo-lineup/delete"
     assert f'action="{delete_url}"' in body

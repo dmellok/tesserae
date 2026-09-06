@@ -928,6 +928,17 @@ def editor(deck_id: str | None = None) -> str | Response:
             device_meta.append({"id": d.id, "name": d.display_name})
             if deck is not None and d.id in deck.device_ids and d.manifest.get("touch") is True:
                 touch_bound = True
+    # A binding to a display that has since been deleted still needs an
+    # option, or the select falls back to "Choose a display" and a plain
+    # save would silently unbind the deck. It stays selected (and labelled)
+    # until the user picks a live display.
+    if deck is not None:
+        known = {d["id"] for d in device_meta}
+        device_meta.extend(
+            {"id": did, "name": f"{did} (unavailable)"}
+            for did in deck.device_ids
+            if did not in known
+        )
 
     from app.deck_suggest import suggest_decks
 
