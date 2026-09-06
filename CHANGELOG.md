@@ -42,6 +42,11 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **Lineups remain visible after their displays are deleted.** Lineups whose
+  targets are all unavailable now appear in an **Unavailable displays** group
+  on the web, where they can still be edited or deleted. Existing Lineups are
+  preserved, including when device deletion also clears associated data.
+
 - **A touch action no longer repaints a different lineup page over the
   one on glass.** The post-action reconcile resolved "the page the
   device is showing" from the lineup's nav record before the live frame,
