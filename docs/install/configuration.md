@@ -48,7 +48,7 @@ tesserae [--dev] [--host HOST] [--port PORT] [--log-level LEVEL] [--reset-passwo
 | Variable | Default | What it does |
 | --- | --- | --- |
 | `TESSERAE_DATA_ROOT` | `<repo>/data` | Data directory: settings, pages, schedules, event log, render cache, backups. The Docker image keeps the default and expects a volume at `/app/data`. |
-| `TESSERAE_SECRET_KEY` | derived | 64 hex chars (32 bytes) used to encrypt stored secrets (API keys, broker passwords) at rest. Unset, a key is derived from the persisted session secret, which works fine; pin it explicitly if you rotate or template `settings.json`. |
+| `TESSERAE_SECRET_KEY` | derived | 64 hex chars (32 bytes) used to encrypt stored secrets (API keys, broker passwords) at rest. Unset, the key is derived from the persisted session secret: that survives a restart but **not** a recreated container or a restored data folder with a regenerated session secret, and stored secrets then read back empty while the rest of the settings stay intact. Pin it — see [Pin the secret key](docker.md#pin-the-secret-key-before-you-store-any-credentials). |
 
 ### Logging and behaviour
 
