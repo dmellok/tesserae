@@ -42,6 +42,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **Smart sync no longer starves a lineup on a short wake grid.** The
+  render-before-wake gate only opened on a tick that landed inside the
+  lead window, and the default 10 s lead is narrower than the 30 s tick.
+  A trusted panel waking every 5 minutes kept the same tick phase on
+  every wake, so a rotation could sit on one page for an hour while its
+  card said it was playing. The gate now opens on the last tick before
+  the window, and a rotation held by smart sync shows a *held* pill with
+  the reason instead of staying silent.
+
 - **Lineups remain visible after their displays are deleted.** Lineups whose
   targets are all gone now appear in an **Unavailable displays** group on the
   Lineups page instead of disappearing, so they can still be edited, rebound

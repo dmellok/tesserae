@@ -1788,6 +1788,14 @@ class Scheduler:
             if rotation.smart_sync and self._smart_sync_should_wait(
                 step.page_id, rotation.smart_sync_lead_s, now
             ):
+                # Surface the hold on the card. Only reached when a fire
+                # is actually due (same-window self-fires bail earlier),
+                # so the reason is never left over from a past window.
+                with self._lock:
+                    self._rotation_last_status[rotation.id] = "held"
+                    self._rotation_last_reason[rotation.id] = (
+                        "smart sync is waiting for a bound display to wake"
+                    )
                 continue
             out.append((rotation, step_index))
         out.sort(key=lambda pair: (-pair[0].priority, pair[0].id))
@@ -2156,10 +2164,20 @@ class Scheduler:
         # panel asks for it). Devices that have already woken (offset
         # past prediction) won't satisfy this and the fire waits for
         # the next prediction.
+        # The gate is consulted once per tick, so it has to open on the
+        # last tick *before* the lead window, not only on a tick that
+        # happens to land inside it. With the default 10 s lead and a 30 s
+        # tick the window is narrower than the tick period; a device on
+        # a wake grid that is a multiple of the tick (a 5-minute panel)
+        # keeps the same phase every cycle, so either every tick lands
+        # in the window or none does. Holding until the next look meant
+        # the next look came after the wake, by which time the prediction
+        # had rolled forward and the hold started over: the rotation sat
+        # on one step for an hour while the card said it was playing.
         now_ts = now.timestamp()
         soonest = min(trusted_predictions)
         lead_window_starts_at = soonest - lead_s
-        return now_ts < lead_window_starts_at
+        return now_ts + self._tick < lead_window_starts_at
 
     def _observe(self, now: datetime) -> None:
         """Maintain ``_first_seen``. Drop entries for ids no longer enabled
