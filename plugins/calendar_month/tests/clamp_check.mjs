@@ -1,6 +1,7 @@
 // Plain-node self-check (no test framework in this repo).
 // Run: node tests/clamp_check.mjs
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { clampScale, localizedFull, minimalMapFor, styleLabel } from "../client.js";
 
 assert.equal(clampScale(undefined, 1.0, 0.1, 5.0), 1.0, "missing falls back to default");
@@ -33,5 +34,22 @@ assert.equal(localizedFull(monday, "weekday", ""), "Monday", "no locale at all d
 assert.equal(minimalMapFor("weekday", "en").Tuesday, "Tu", "English gets the real disambiguation map");
 assert.deepEqual(minimalMapFor("weekday", "fr"), {}, "non-English gets {} -- styleLabel's generic slice, not English abbreviations");
 assert.deepEqual(minimalMapFor("month", "de"), {}, "same for months");
+
+// The "Week starts" label is opt-in (#283): the weekday column headers
+// already say which day the week starts on. Asserted against the source
+// because the label lives inside the render template literal, and the
+// property that matters is that it is gated at all -- an ungated one
+// reappears the moment someone edits that block.
+const clientSource = readFileSync(new URL("../client.js", import.meta.url), "utf8");
+assert.match(
+  clientSource,
+  /opts\.show_week_start === true/,
+  "the week-start label must read the show_week_start option",
+);
+assert.match(
+  clientSource,
+  /showWeekStart \? /,
+  "the week-start label must be gated on that option, not always rendered",
+);
 
 console.log("clamp_check.mjs: all assertions passed");
