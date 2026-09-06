@@ -35,12 +35,15 @@ gtfs_server = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(gtfs_server)
 
 
-def _feed(second_direction: str = "0", second_stop: bool = False) -> bytes:
+def _feed(
+    second_direction: str = "0", second_stop: bool = False, pad_header: bool = False
+) -> bytes:
     """A one-stop, two-trip GTFS zip with arrivals 4 and 9 minutes out.
 
     ``second_direction`` puts the two trips on opposite ``direction_id``s.
     ``second_stop`` moves the second trip to a different station, which is
-    what a two-stop board merges.
+    what a two-stop board merges. ``pad_header`` writes the stops.txt header
+    with a space around every name, the way some agencies export it.
     """
     now = datetime.now(UTC)
     first = now + timedelta(minutes=4)
@@ -48,9 +51,12 @@ def _feed(second_direction: str = "0", second_stop: bool = False) -> bytes:
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as zf:
         zf.writestr("agency.txt", "agency_id,agency_name,agency_timezone\nT,Test,UTC\n")
+        stops_header = "stop_id,stop_name,parent_station"
+        if pad_header:
+            stops_header = " stop_id , stop_name , parent_station "
         zf.writestr(
             "stops.txt",
-            "stop_id,stop_name,parent_station\n"
+            stops_header + "\n"
             "S1,Canal St,\n"
             "S1N,Canal St North,S1\n"
             "S2,Franklin St,\n"
@@ -732,20 +738,8 @@ def test_stop_finder_reports_a_bad_feed(client: FlaskClient) -> None:
 
 
 def test_padded_header_row_still_finds_the_stop() -> None:
-    """Transperth pads its stops.txt header ("location_type, parent_station,
-    stop_id, ..."). csv.DictReader keeps the padding in the keys, which used
-    to make every stop lookup miss and the build fail with "isn't in this
-    feed". The names are trimmed before rows are read."""
-    raw = _feed()
-    src = zipfile.ZipFile(io.BytesIO(raw))
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w") as zf:
-        for info in src.infolist():
-            data = src.read(info.filename)
-            if info.filename == "stops.txt":
-                header, _, rest = data.decode().partition("\n")
-                data = (", ".join(header.split(",")) + "\n" + rest).encode()
-            zf.writestr(info.filename, data)
-    table = gtfs_server._distil(buf.getvalue(), "S1")
-    assert "S1N" in set(table["stop_ids"])
+    """A stops.txt header padded with spaces still resolves the stop and
+    its child platforms; the names are trimmed before rows are read."""
+    table = gtfs_server._distil(_feed(pad_header=True), "S1")
+    assert "S1N" in table["stop_ids"]
     assert table["stop_name"] == "Canal St"
