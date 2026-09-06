@@ -6,6 +6,8 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.392.0], 2026-09-06
+
 ### Added
 
 - Startup warns while secrets are encrypted with the key derived from the
@@ -118,6 +120,11 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   or quiet hours, a scheduler tick that overran its interval, and a
   tick that has been stuck for five minutes each write a line, so a
   debug report of a frozen panel carries the reason.
+
+## [0.386.3], 2026-09-04
+
+### Fixed
+
 - **Pages pushed through the MCP bridge now carry their touch-v3 controls.**
   The bridge's push composed the page itself and handed the bytes to the
   image push path, which recorded the frame as an anonymous image. The
@@ -126,6 +133,8 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   as an empty spec and was never drawn; the post-action reconcile could not
   find the page either. The image push now records the page id when the
   caller knows it, and the bridge passes it.
+
+## [0.386.2], 2026-09-04
 
 ### Changed
 
