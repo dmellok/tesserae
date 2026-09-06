@@ -29,13 +29,14 @@ walks through password setup and the onboarding wizard.
 
 ## Pin the secret key before you store any credentials
 
-Stored secrets — API keys, broker passwords, the Home Assistant token —
+Stored secrets (API keys, broker passwords, the Home Assistant token)
 are encrypted at rest. Without `TESSERAE_SECRET_KEY` the key is derived
-from the persisted session secret, which survives an ordinary restart and
-**does not survive a recreated container or a data folder restored
-alongside a regenerated session secret**.
+from the persisted session secret in `settings.json`. That survives an
+ordinary restart and upgrade, but **it is lost whenever the session
+secret is regenerated**: a data folder restored without `settings.json`,
+or a container recreated without its data volume.
 
-When it does not survive, the secrets decrypt to an empty string while
+When that happens, the secrets decrypt to an empty string while
 every non-secret setting beside them is intact. The install looks
 configured and is not: the Home Assistant URL is still right, and every
 widget that needs the token reports the install as unconfigured. Nothing
@@ -60,9 +61,9 @@ services:
 ```
 
 Tesserae warns at startup while it is running on the derived key, and the
-warning carries a ready-to-paste line. Adding the key later is fine — any
-secret entered *after* it is pinned is safe; ones entered before are still
-tied to the session secret and want re-entering once.
+warning carries a ready-to-paste line. Adding the key later is fine: any
+secret entered *after* it is pinned is safe, while ones entered before are
+still tied to the session secret and want re-entering once.
 
 Treat it like any other secret: it decrypts the credentials in your data
 folder, so it does not belong in the same backup as them, and it does not

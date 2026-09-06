@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "Calendar, Month",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "kind": "widget",
   "description": "Month-grid view with tunable dashboard title/day-number/event text sizing, cell spacing, and a location toggle for text-display mode. Each feed's colour drives the bar / dot / stripe colour.",
   "icon": "ph-calendar",

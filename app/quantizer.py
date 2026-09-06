@@ -1229,6 +1229,12 @@ _LAB_TOE_SCALE = 1.0 / (3 * _LAB_DELTA**2)
 _LAB_TOE_OFFSET = 4.0 / 29.0
 
 
+#: Upper bound on the per-render LAB memo in :func:`_error_diffusion`.
+#: Dashboards fit in a few thousand entries; this keeps a noisy photo on a
+#: large panel from holding hundreds of MB of tuples for the render.
+_LAB_CACHE_MAX = 65536
+
+
 def _lab_of_rgb8(r8: int, g8: int, b8: int) -> tuple[float, float, float]:
     """Scalar sRGB (0-255 ints) -> CIE L*a*b*, matching :func:`_srgb_to_lab`.
 
@@ -1374,6 +1380,12 @@ def _error_diffusion(
                 key = (r8 << 16) | (g8 << 8) | b8
                 cached = lab_cache.get(key)
                 if cached is None:
+                    # Bounded: a photo's diffused values spread across far
+                    # more triples than a dashboard's, and an unbounded memo
+                    # on a large panel grows to one entry per pixel. Past the
+                    # cap, start over rather than keep every triple seen.
+                    if len(lab_cache) >= _LAB_CACHE_MAX:
+                        lab_cache.clear()
                     cached = _lab_of_rgb8(r8, g8, b8)
                     lab_cache[key] = cached
                 L0, A0, B0 = cached

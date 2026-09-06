@@ -226,6 +226,12 @@ The token comes from **Settings → System → Webhook** in Tesserae, see
   missing broker host or a wrong port). The App's **Configuration**
   tab is the right place to fix it; the in-app Settings pages won't
   let you change Ingress wiring.
+- **Tesserae embedded in an HA dashboard shows the login page.** The
+  session cookie is `SameSite=Lax`, so a browser does not send it to a
+  standalone Tesserae framed from a different origin (a Webpage card
+  pointing at `http://tesserae.local:8765`, say). Open Tesserae in its own
+  tab, or run it as the HA App so it is served through Ingress on HA's own
+  origin.
 - **Buttons fire but nothing pushes.** Check the *Last error* sensor
   on the hub device, push failures (broker offline, no device bound)
   surface there with the upstream error.

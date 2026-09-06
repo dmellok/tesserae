@@ -483,7 +483,9 @@ def create_app(
     # get migrated to ciphertext on the next save.
     from app.secret_box import SecretBox
 
-    secret_box = SecretBox.resolve(app.secret_key)
+    # The HA App has no environment block to put the key in, so it gets the
+    # note at info rather than a warning it cannot act on.
+    secret_box = SecretBox.resolve(app.secret_key, warn=not app.config.get("HA_INGRESS_MODE"))
     settings.set_secret_box(secret_box)
     app.config["SECRET_BOX"] = secret_box
 

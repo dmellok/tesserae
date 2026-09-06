@@ -8,6 +8,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- Startup warns while secrets are encrypted with the key derived from the
+  session secret, and the warning carries a ready-to-paste
+  `TESSERAE_SECRET_KEY=` line. The Docker install page gains a section on
+  pinning the key before storing credentials. The HA App gets the note at
+  info, since it has no environment block to put the key in.
+- The session cookie is pinned to `SameSite=Lax` and `HttpOnly` rather
+  than inherited from the browser's defaults.
+- **Calendar, Month** gains a *Show "Week starts" label* option, off by
+  default; the weekday headers already say which day leads.
 - Home Assistant MQTT discovery now exposes lineups and device
   operations. The hub device gains an *Automation* switch (pause every
   scheduled push), a *Quiet hours* switch, a switch per lineup with
@@ -42,6 +51,14 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- LAB and chroma-aware colour matching now see the diffused error, so a
+  flat patch dithers under them the way it always did under `rgb` instead
+  of collapsing to a single ink.
+- The Lineups 24h rail thins a dense schedule across the whole day instead
+  of drawing only its first 48 fires.
+- The rail's now-marker ticks in the configured app timezone rather than
+  the browser's, so it no longer jumps by the zone offset a minute after
+  the page loads.
 - **Smart sync no longer starves a lineup on a short wake grid.** The
   render-before-wake gate only opened on a tick that landed inside the
   lead window, and the default 10 s lead is narrower than the 30 s tick.

@@ -47,18 +47,15 @@ def test_the_attributes_reach_the_rendered_cookie(app: Flask, client: FlaskClien
     A session has to actually be written for Flask to emit Set-Cookie, so this
     drives a request that stores something in the session.
     """
-    with client.session_transaction() as sess:
-        sess["_probe"] = "1"
-    resp = client.get("/")
+    # First-run setup logs the operator in, which is the request that issues
+    # the session cookie; without it the app answers 302 and sets nothing.
+    resp = client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
     try:
         cookies = resp.headers.getlist("Set-Cookie")
     finally:
         resp.close()
     session_cookies = [c for c in cookies if c.startswith("session=")]
-    if not session_cookies:
-        # Nothing re-issued the cookie on this response; the config assertions
-        # above still hold and this one has nothing to inspect.
-        return
+    assert session_cookies, f"setup did not issue a session cookie: {cookies}"
     header = session_cookies[0]
     assert "SameSite=Lax" in header, header
     assert "HttpOnly" in header, header

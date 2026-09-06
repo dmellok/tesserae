@@ -72,11 +72,12 @@ def test_the_rendered_clock_matches_the_zone_it_reports(app: Flask) -> None:
 def test_the_page_ships_the_zone_to_the_client(app: Flask) -> None:
     """End to end: the template has to be able to read it."""
     client = app.test_client()
+    # Complete first-run setup so the page renders instead of redirecting.
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
     resp = client.get("/decks")
     try:
-        assert resp.status_code in (200, 302)
-        if resp.status_code == 200:
-            body = resp.get_data(as_text=True)
-            assert "tzName" in body, "the rail tick no longer carries a timezone"
+        assert resp.status_code == 200
+        body = resp.get_data(as_text=True)
+        assert "tzName" in body, "the rail tick no longer carries a timezone"
     finally:
         resp.close()

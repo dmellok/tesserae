@@ -147,7 +147,7 @@ class SecretBox:
         return cls(kdf.derive(session_secret))
 
     @classmethod
-    def resolve(cls, session_secret: bytes) -> SecretBox:
+    def resolve(cls, session_secret: bytes, *, warn: bool = True) -> SecretBox:
         """Apply the documented precedence: env first, session-secret
         derivation second.
 
@@ -162,17 +162,22 @@ class SecretBox:
 
         The warning carries a ready-to-paste key so acting on it is one copy
         rather than a trip to the docs to find out how to generate one.
+        ``warn=False`` drops it to info for installs that cannot set the
+        variable themselves (the HA App has no environment to edit).
         """
         from_env = cls.from_env()
         if from_env is not None:
             logger.info("SecretBox using %s", ENV_KEY)
             return from_env
-        logger.warning(
+        logger.log(
+            logging.WARNING if warn else logging.INFO,
             "%s is not set, so secrets are encrypted with a key derived from the "
-            "session secret. That key does not survive a recreated container or a "
-            "restored data folder, and stored secrets then read back empty while "
-            "the rest of the settings stay intact. Pin one now — add to your "
-            "compose environment:\n"
+            "session secret. That key is lost whenever the session secret is "
+            "regenerated (a data folder restored without settings.json, or a "
+            "container recreated without its data volume), and stored secrets "
+            "then read back empty while the rest of the settings stay intact. "
+            "Pin one now by setting this environment variable (for Docker, in "
+            "the compose environment block):\n"
             "    %s=%s",
             ENV_KEY,
             ENV_KEY,
