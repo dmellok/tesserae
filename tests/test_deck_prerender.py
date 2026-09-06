@@ -224,3 +224,20 @@ def test_warm_is_logged_as_warmed_not_pushed(wired) -> None:
         assert manager.warm_deck_page("p_b", "panel") is True
     rows = manager._event_log.list(type="push", source="deck_warm", limit=1)
     assert rows and rows[0].status == "warmed"
+
+
+def test_warm_render_failure_is_logged(wired, caplog) -> None:
+    """A render failure inside the warm is returned as a failed PushResult,
+    not raised, so it used to reach History only. The log line is what a
+    debug report of a "frozen" lineup needs."""
+    import logging
+
+    manager = wired
+    with (
+        patch("app.push.capture_composed", side_effect=RuntimeError("chromium went away")),
+        caplog.at_level(logging.WARNING, logger="app.push"),
+    ):
+        assert manager.warm_deck_page("p_b", "panel") is False
+    assert not manager.has_warm_deck_page("panel", "p_b")
+    assert "deck warm produced no frame page=p_b device=panel" in caplog.text
+    assert "chromium went away" in caplog.text

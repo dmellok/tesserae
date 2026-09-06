@@ -844,7 +844,7 @@ class PushManager:
         stamp: dict[str, dict[str, Any]] = {}
         with self._lock:
             try:
-                self._push_page_locked(
+                result = self._push_page_locked(
                     page_id,
                     device_ids={device_id},
                     source="deck_warm",
@@ -856,6 +856,18 @@ class PushManager:
                 return False
             info = stamp.get(device_id)
             if info is None:
+                # A render failure inside ``_push_page_locked`` is returned,
+                # not raised, and lands only as a History row. Say so in the
+                # log too: a warm that keeps missing leaves the lineup
+                # re-promoting the previous frame, which reads on the panel
+                # as "frozen" with nothing in a debug report to explain it.
+                logger.warning(
+                    "deck warm produced no frame page=%s device=%s (%s%s)",
+                    page_id,
+                    device_id,
+                    result.status,
+                    f": {result.error}" if result.error else "",
+                )
                 return False
             self._deck_renders.setdefault(device_id, {})[page_id] = info
         return True
@@ -3150,6 +3162,11 @@ class PushManager:
             error=error,
             duration_s=duration_s,
         )
+        if status == "failed":
+            # History has always carried this row; the container log did
+            # not, so a debug report of a panel that stopped repainting
+            # showed no render or publish error at all.
+            logger.warning("push failed: source=%s target=%s (%s)", source, target, error)
         return PushResult(
             status=status,
             page_id=target,

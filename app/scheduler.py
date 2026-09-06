@@ -32,6 +32,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, time, timedelta, tzinfo
 from functools import partial
+from time import monotonic
 from typing import TYPE_CHECKING, Any, Protocol
 
 from pydantic import ValidationError
@@ -421,6 +422,13 @@ class Scheduler:
         self._tick = tick_seconds
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
+        self._watchdog_thread: threading.Thread | None = None
+        # Liveness: monotonic start of the tick in progress (None between
+        # ticks) and when the watchdog last warned about it. A blocked
+        # tick thread otherwise looks exactly like an idle one, and the
+        # log of an install whose panels stopped repainting is silent.
+        self._tick_started_at: float | None = None
+        self._stuck_warned_at: float | None = None
         # schedule_id -> last fired POSIX timestamp
         self._last_fired: dict[str, float] = {}
         # schedule_id -> first observed POSIX timestamp. Cleared when a
@@ -473,6 +481,12 @@ class Scheduler:
         self._rotation_force_state: dict[str, tuple[datetime, int]] = {}
         self._lock = threading.Lock()
 
+    # A tick still running after this long is reported as stuck, then again
+    # every ``_STUCK_TICK_REPEAT_S`` while it stays that way.
+    _STUCK_TICK_WARN_S = 300.0
+    _STUCK_TICK_REPEAT_S = 900.0
+    _WATCHDOG_PERIOD_S = 60.0
+
     def start(self) -> None:
         if self._thread is not None:
             return
@@ -480,20 +494,76 @@ class Scheduler:
         thread = threading.Thread(target=self._run, name="tesserae-scheduler", daemon=True)
         thread.start()
         self._thread = thread
+        watchdog = threading.Thread(
+            target=self._watchdog, name="tesserae-scheduler-watchdog", daemon=True
+        )
+        watchdog.start()
+        self._watchdog_thread = watchdog
 
     def stop(self) -> None:
         self._stop.set()
         if self._thread is not None:
             self._thread.join(timeout=5)
             self._thread = None
+        if self._watchdog_thread is not None:
+            self._watchdog_thread.join(timeout=5)
+            self._watchdog_thread = None
 
     def _run(self) -> None:
         while not self._stop.is_set():
+            started = monotonic()
+            with self._lock:
+                self._tick_started_at = started
             try:
                 self._tick_once(datetime.now(UTC))
             except Exception:
                 logger.exception("scheduler tick crashed")
+            finally:
+                with self._lock:
+                    self._tick_started_at = None
+                    self._stuck_warned_at = None
+            self._note_tick_duration(monotonic() - started)
             self._stop.wait(self._tick)
+
+    def _note_tick_duration(self, elapsed_s: float) -> None:
+        """Warn when a tick overran its own interval. Every automated push
+        runs on this one thread, so a slow tick delays every lineup and
+        refresh behind it; the usual cause is a render or a widget fetch
+        that hung for its full timeout."""
+        if elapsed_s > self._tick:
+            logger.warning(
+                "scheduler tick took %.1fs (interval %ds); automated pushes ran late",
+                elapsed_s,
+                self._tick,
+            )
+
+    def _watchdog(self) -> None:
+        while not self._stop.wait(self._WATCHDOG_PERIOD_S):
+            self._check_stuck_tick(monotonic())
+
+    def _check_stuck_tick(self, now_mono: float) -> bool:
+        """Log (and return True) when the tick in progress has run past the
+        stuck threshold, repeating on a slower cadence while it stays
+        stuck. Pure apart from the log line so it can be tested without
+        the threads."""
+        with self._lock:
+            started = self._tick_started_at
+            warned = self._stuck_warned_at
+        if started is None:
+            return False
+        running_s = now_mono - started
+        if running_s < self._STUCK_TICK_WARN_S:
+            return False
+        if warned is not None and now_mono - warned < self._STUCK_TICK_REPEAT_S:
+            return False
+        with self._lock:
+            self._stuck_warned_at = now_mono
+        logger.warning(
+            "scheduler tick has been running for %.0fs; no lineup, schedule or page "
+            "refresh can fire until it returns (a render or widget fetch is probably hung)",
+            running_s,
+        )
+        return True
 
     def _timed_records(self) -> list[Schedule]:
         """Every timed (interval / daily) record the engine runs: schedule
@@ -1309,17 +1379,25 @@ class Scheduler:
                 if last_at < window_start:
                     base = self._deck_last_advance_window.get(key, last_at)
                     if window_start < base + min_hold_s:
+                        self._log_deck_skip(device_id, deck.id, target, "min-hold")
                         continue  # min-hold anti-flap
                 elif now.timestamp() < last_at + min_hold_s:
+                    self._log_deck_skip(device_id, deck.id, target, "min-hold")
                     continue  # min-hold anti-flap
             if rot.smart_sync and self._smart_sync_should_wait(target, rot.smart_sync_lead_s, now):
+                self._log_deck_skip(device_id, deck.id, target, "smart-sync wait")
                 continue
             pusher = self._push_factory()
             quiet_check = getattr(pusher, "device_in_quiet_hours", None)
             if callable(quiet_check) and quiet_check(device_id):
+                self._log_deck_skip(device_id, deck.id, target, "quiet hours")
                 continue
             promoter = getattr(pusher, "promote_deck_page", None)
-            promoted = callable(promoter) and promoter(device_id, target)
+            promoted = (
+                callable(promoter)
+                and not self._warm_frame_is_stale(pusher, deck, device_id, target, now)
+                and promoter(device_id, target)
+            )
             if not promoted:
                 result = pusher.push(
                     target, device_ids={device_id}, respect_quiet_hours=True, source="deck"
@@ -1393,6 +1471,57 @@ class Scheduler:
                     extra={"timer_advance_device": device_id, "page_id": target},
                 )
         return fired_any
+
+    @staticmethod
+    def _log_deck_skip(device_id: str, deck_id: str, target: str, reason: str) -> None:
+        """One line per skipped advance. Each skip leaves the panel on its
+        previous frame, and ``_fire_cycle`` still records the window as
+        handled, so without this the log of a panel that never moved on
+        reads as if nothing was ever due."""
+        logger.info(
+            "deck timer advance skipped: device=%s deck=%s -> %s (%s)",
+            device_id,
+            deck_id,
+            target,
+            reason,
+        )
+
+    @staticmethod
+    def _warm_frame_is_stale(
+        pusher: Any, deck: Deck, device_id: str, page_id: str, now: datetime
+    ) -> bool:
+        """True when the pre-warmed frame for ``page_id`` is older than twice
+        the page's warm cadence. A healthy warm is at most one cadence plus a
+        tick old when the advance comes round, so anything past that means
+        the background warms have been failing; promoting it would flip the
+        panel to a frame that is already hours stale, which is exactly what a
+        person sees as "the display is frozen". Pages with cadence 0 never
+        re-warm by design and are always promotable."""
+        render_for = getattr(pusher, "deck_render_for", None)
+        if not callable(render_for):
+            return False
+        info = render_for(device_id, page_id)
+        if not isinstance(info, dict):
+            return False
+        rendered = info.get("timestamp")
+        if not isinstance(rendered, (int, float)) or rendered <= 0:
+            return False
+        page = next((p for p in deck.pages if p.page_id == page_id), None)
+        cadence_min = page.effective_refresh_minutes(deck.refresh_interval_minutes) if page else 0
+        if cadence_min <= 0:
+            return False
+        age_s = now.timestamp() - float(rendered)
+        if age_s <= 2 * cadence_min * 60:
+            return False
+        logger.warning(
+            "deck frame for page=%s device=%s is %.0f min old (warm cadence %d min); "
+            "rendering live instead of promoting it",
+            page_id,
+            device_id,
+            age_s / 60,
+            cadence_min,
+        )
+        return True
 
     def _maybe_warm_decks(self, now: datetime) -> None:
         """Kick a background deck-warm pass unless one is already running, so a

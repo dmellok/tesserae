@@ -61,18 +61,30 @@ _CHROMIUM_SIDECAR: Final[Path] = (
 )
 
 
+CHROMIUM_ARGS: tuple[str, ...] = ("--disable-dev-shm-usage",)
+
+
 def _chromium_launch_kwargs() -> dict[str, Any]:
     """Resolve the Chromium binary in order: ``TESSERAE_CHROMIUM_PATH`` env
     var → ``data/core/.chromium`` sidecar (written by install.sh when
     Playwright has no prebuilt for the host's OS+arch) → empty (Playwright
-    uses its bundled binary)."""
+    uses its bundled binary).
+
+    ``--disable-dev-shm-usage`` moves Chromium's shared-memory files from
+    ``/dev/shm`` to ``/tmp``. Docker gives a container a 64 MB ``/dev/shm``
+    unless ``shm_size`` is set, and Chromium under that limit crashes or
+    hangs mid-render on larger dashboards, which surfaces as a server that
+    stops repainting with nothing in the log. Harmless outside Docker."""
     path = os.environ.get("TESSERAE_CHROMIUM_PATH", "").strip()
     if not path:
         try:
             path = _CHROMIUM_SIDECAR.read_text(encoding="utf-8").strip()
         except OSError:
             path = ""
-    return {"executable_path": path} if path else {}
+    kwargs: dict[str, Any] = {"args": list(CHROMIUM_ARGS)}
+    if path:
+        kwargs["executable_path"] = path
+    return kwargs
 
 
 def _strip_script_root(path: str) -> str:

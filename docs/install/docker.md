@@ -45,7 +45,9 @@ below if you're testing there.
 - **Tesserae**, installed from the repo at the tag.
 - **Playwright Chromium**, preinstalled from the
   [official Playwright Python base image](https://hub.docker.com/_/microsoft-playwright-python)
-  so the webpage renderer works without `playwright install`.
+  so the webpage renderer works without `playwright install`. Chromium
+  runs with `--disable-dev-shm-usage`, so Docker's default 64 MB
+  `/dev/shm` is enough and the compose file needs no `shm_size`.
 - **Waitress** as the WSGI server. Production-tuned by default; no
   nginx required for a single-user install.
 - **Non-root user** (`tesserae`, uid 1001) for defence in depth. This

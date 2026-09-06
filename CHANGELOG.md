@@ -42,6 +42,22 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **A lineup no longer re-promotes a pre-rendered frame that has gone
+  stale.** When the background warms for a page keep failing, its cached
+  frame kept being swapped onto the panel at every advance, so the
+  display flipped between dashboards that were all hours old. An
+  advance now renders the page live when the cached frame is older than
+  twice its warm cadence, and says so in the log.
+- **Chromium launches with `--disable-dev-shm-usage`.** Docker gives a
+  container a 64 MB `/dev/shm` unless `shm_size` is set, and Chromium
+  under that limit can crash or hang mid-render, which showed as panels
+  that stopped repainting with nothing in the log.
+- **Silent failure paths now log.** A failed push (with its render or
+  publish error, previously a History row only), a deck warm that
+  produces no frame, a lineup advance skipped for min-hold, smart-sync
+  or quiet hours, a scheduler tick that overran its interval, and a
+  tick that has been stuck for five minutes each write a line, so a
+  debug report of a frozen panel carries the reason.
 - **Pages pushed through the MCP bridge now carry their touch-v3 controls.**
   The bridge's push composed the page itself and handed the bytes to the
   image push path, which recorded the frame as an anonymous image. The
