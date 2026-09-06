@@ -152,7 +152,8 @@
     <li class="cf-row {% if not f.enabled %}is-disabled{% endif %}">
       <form method="post" action="{{ url_for('calendar_core_admin.update_colour', feed_id=f.id) }}" class="inline cf-colour">
         <input type="color" name="colour" value="{{ f.colour or '#0d8c7e' }}" class="cf-swatch cf-swatch--input"
-               title="Change colour" aria-label="Colour for {{ f.name }}"
+               title="{% if f.use_event_colours %}Feed colour, used where an event sets none{% else %}Change colour{% endif %}"
+               aria-label="Colour for {{ f.name }}"
                onchange="this.form.requestSubmit()">
       </form>
       <span class="cf-name">
@@ -200,6 +201,14 @@
         <button type="button" class="ghost" title="Credentials" onclick="document.getElementById('cf-auth-{{ f.id }}').hidden = !document.getElementById('cf-auth-{{ f.id }}').hidden">
           <i class="ph ph-lock-simple" aria-hidden="true"></i>
         </button>
+        {% endif %}
+        {% if f.source != 'ha' %}
+        <form method="post" action="{{ url_for('calendar_core_admin.toggle_event_colours', feed_id=f.id) }}" class="inline">
+          <button type="submit" class="ghost"
+                  title="{% if f.use_event_colours %}Using each event's own colour where it sets one. Click to use the feed colour for every event.{% else %}Using the feed colour for every event. Click to use each event's own colour where the calendar sets one.{% endif %}">
+            <i class="ph ph-{{ 'palette' if f.use_event_colours else 'drop-half' }}" aria-hidden="true"></i>
+          </button>
+        </form>
         {% endif %}
         <form method="post" action="{{ url_for('calendar_core_admin.toggle_feed', feed_id=f.id) }}" class="inline">
           <button type="submit" class="ghost" title="{{ 'Disable' if f.enabled else 'Enable' }}">
