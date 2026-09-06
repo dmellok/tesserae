@@ -4,6 +4,7 @@ noun: deck; kinds surface as By hand / Rotation / Schedule."""
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -308,6 +309,142 @@ def _register_display(app: Flask, client, device_id: str) -> None:
         data=_json.dumps({"device_id": device_id, "kind": "esp32_client"}),
     )
     assert resp.status_code == 201
+
+
+@pytest.mark.parametrize("intent", ["manual", "cycle", "daily", "interval"])
+@pytest.mark.parametrize("wipe_orphan", [False, True])
+def test_deleted_display_lineup_remains_manageable(
+    app: Flask, intent: str, wipe_orphan: bool
+) -> None:
+    """Deleting a display must not hide its retained Lineups from the web UI."""
+    from app.lineup_authoring import build_lineup
+
+    client = app.test_client()
+    _sign_in(client)
+    _register_display(app, client, "kobo")
+    pages = app.config["PAGE_STORE"]
+    pages.save(pages.get("kitchen").model_copy(update={"device_ids": ["kobo"]}))
+    deck = build_lineup(
+        intent=intent,
+        lineup_id="kobo-lineup",
+        name="Kobo lineup",
+        page_ids=["kitchen"],
+        device_ids=["kobo"],
+        fires_at="08:00",
+    ).model_copy(update={"enabled": False})
+    app.config["DECK_STORE"].upsert(deck)
+    before = client.get("/decks").get_data(as_text=True)
+    assert 'id="display-kobo"' in before
+    assert 'id="udeck-kobo-lineup"' in before
+
+    deleted = client.post(
+        "/settings/devices/kobo/delete", data={"wipe_orphan": "1"} if wipe_orphan else {}
+    )
+    assert deleted.status_code == 302
+    assert app.config["DEVICE_REGISTRY"].get("kobo") is None
+    body = client.get("/decks").get_data(as_text=True)
+    assert "Unavailable displays" in body
+    assert 'id="display-kobo"' not in body
+    assert body.count('id="udeck-kobo-lineup"') == 1
+    assert app.config["DECK_STORE"].get(deck.id) == deck
+
+    edit_url = (
+        "/decks/kobo-lineup/edit"
+        if intent in ("manual", "cycle")
+        else "/decks?sedit=kobo-lineup#schedule-form-card"
+    )
+    assert f'href="{edit_url}"' in body
+    editor = client.get(edit_url)
+    assert editor.status_code == 200
+    editor_html = editor.get_data(as_text=True)
+    assert "Kobo lineup" in editor_html
+    # The editors must keep the stale binding selectable: the deck editor's
+    # display select would otherwise fall back to "Choose a display" and a
+    # plain save would unbind the deck; the schedule form would preselect
+    # the first dashboard once the wiped page vanished from the list.
+    if intent in ("manual", "cycle"):
+        assert '<option value="kobo" selected>kobo (unavailable)</option>' in editor_html
+        saved = client.post(
+            "/decks/editor-save",
+            data={
+                "deck_id": "kobo-lineup",
+                "name": "Kobo lineup renamed",
+                "pages": "kitchen",
+                "device_ids": "kobo",
+                # Keep a cycle lineup on its timer so it stays a rotation.
+                "advance": "timer" if intent == "cycle" else "manual",
+            },
+        )
+    else:
+        if wipe_orphan:
+            assert (
+                '<option value="kitchen" selected>kitchen (missing dashboard)</option>'
+                in editor_html
+            )
+        saved = client.post(
+            "/schedules/kobo-lineup/update",
+            data={
+                "name": "Kobo lineup renamed",
+                "page_id": "kitchen",
+                "type": "daily",
+                "fires_at": "08:00",
+            },
+        )
+    assert saved.status_code == 302
+    after_save = app.config["DECK_STORE"].get(deck.id)
+    assert after_save.name == "Kobo lineup renamed"
+    assert after_save.device_ids == ["kobo"]
+    assert [dp.page_id for dp in after_save.pages] == ["kitchen"]
+    delete_kind = {"manual": "decks", "cycle": "rotations"}.get(intent, "schedules")
+    delete_url = f"/{delete_kind}/kobo-lineup/delete"
+    assert f'action="{delete_url}"' in body
+    assert client.post(delete_url).status_code == 302
+    assert app.config["DECK_STORE"].get(deck.id) is None
+    assert 'id="udeck-kobo-lineup"' not in client.get("/decks").get_data(as_text=True)
+
+
+def test_unavailable_group_preserves_shared_and_unassigned_lineups(app: Flask) -> None:
+    """Only Lineups with targets but no surviving display need the fallback."""
+    from app.lineup_authoring import build_lineup
+
+    client = app.test_client()
+    _sign_in(client)
+    _register_display(app, client, "panel_a")
+    _register_display(app, client, "panel_b")
+    pages = app.config["PAGE_STORE"]
+    pages.save(pages.get("kitchen").model_copy(update={"device_ids": ["deleted"]}))
+    specs = [
+        ("missing", "manual", ["deleted", "also-deleted"], "hall"),
+        ("partial", "cycle", ["panel_a", "deleted"], "hall"),
+        ("shared", "manual", ["panel_a", "panel_b"], "hall"),
+        ("inherited", "daily", [], "kitchen"),
+        ("unassigned", "manual", [], "hall"),
+    ]
+    for lineup_id, intent, device_ids, page_id in specs:
+        app.config["DECK_STORE"].upsert(
+            build_lineup(
+                intent=intent,
+                lineup_id=lineup_id,
+                name=lineup_id,
+                page_ids=[page_id],
+                device_ids=device_ids,
+                fires_at="08:00",
+            ).model_copy(update={"enabled": False})
+        )
+
+    body = client.get("/decks").get_data(as_text=True)
+    groups = re.findall(r'<section class="dk-group"[^>]*>.*?</section>', body, re.S)
+    unavailable = next(g for g in groups if "Unavailable displays" in g)
+    unassigned = next(g for g in groups if "Not on a display yet" in g)
+    panel_a = next(g for g in groups if 'id="display-panel_a"' in g)
+    panel_b = next(g for g in groups if 'id="display-panel_b"' in g)
+    assert set(re.findall(r'id="udeck-([^"]+)"', unavailable)) == {"missing", "inherited"}
+    assert set(re.findall(r'id="udeck-([^"]+)"', unassigned)) == {"unassigned"}
+    assert 'id="udeck-partial"' in panel_a
+    assert '<span class="dk-name">shared</span>' in panel_a
+    assert '<span class="dk-name">shared</span>' in panel_b
+    assert body.count('id="udeck-shared"') == 1
+    assert app.config["DECK_STORE"].get("partial").device_ids == ["panel_a", "deleted"]
 
 
 def test_unbound_rotation_spanning_displays_warns(app: Flask) -> None:
