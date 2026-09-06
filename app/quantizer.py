@@ -1211,6 +1211,45 @@ def _native_colour_mask(
     return flat
 
 
+#: sRGB transfer curve for the 256 integer channel values, precomputed.
+#: :func:`_srgb_to_lab` quantises to ``uint8`` before converting, so a table
+#: indexed by the rounded channel is exact rather than an approximation of it.
+_SRGB_LINEAR_8: tuple[float, ...] = tuple(
+    (v / 12.92) if (v := i / 255.0) <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4 for i in range(256)
+)
+
+#: D65 reference white, and the CIELAB toe constants, unpacked once so the
+#: per-pixel path does no attribute lookups.
+_LAB_REF_X = 0.95047
+_LAB_REF_Y = 1.00000
+_LAB_REF_Z = 1.08883
+_LAB_DELTA = 6.0 / 29.0
+_LAB_DELTA_CUBED = _LAB_DELTA**3
+_LAB_TOE_SCALE = 1.0 / (3 * _LAB_DELTA**2)
+_LAB_TOE_OFFSET = 4.0 / 29.0
+
+
+def _lab_of_rgb8(r8: int, g8: int, b8: int) -> tuple[float, float, float]:
+    """Scalar sRGB (0-255 ints) -> CIE L*a*b*, matching :func:`_srgb_to_lab`.
+
+    The vectorised version is the right tool for a whole image and the wrong
+    one for a single pixel: error diffusion has to re-read a pixel *after* its
+    neighbours have written into it, so the conversion has to happen inside
+    the sequential loop. Same constants and same piecewise curve, so a pixel
+    that never received any error converts to the identical triple.
+    """
+    lr = _SRGB_LINEAR_8[r8]
+    lg = _SRGB_LINEAR_8[g8]
+    lb = _SRGB_LINEAR_8[b8]
+    xn = (0.4124564 * lr + 0.3575761 * lg + 0.1804375 * lb) / _LAB_REF_X
+    yn = (0.2126729 * lr + 0.7151522 * lg + 0.0721750 * lb) / _LAB_REF_Y
+    zn = (0.0193339 * lr + 0.1191920 * lg + 0.9503041 * lb) / _LAB_REF_Z
+    fx = xn ** (1 / 3) if xn > _LAB_DELTA_CUBED else xn * _LAB_TOE_SCALE + _LAB_TOE_OFFSET
+    fy = yn ** (1 / 3) if yn > _LAB_DELTA_CUBED else yn * _LAB_TOE_SCALE + _LAB_TOE_OFFSET
+    fz = zn ** (1 / 3) if zn > _LAB_DELTA_CUBED else zn * _LAB_TOE_SCALE + _LAB_TOE_OFFSET
+    return (116.0 * fy - 16.0, 500.0 * (fx - fy), 200.0 * (fy - fz))
+
+
 def _error_diffusion(
     rgb: Image.Image,
     palette: np.ndarray,
@@ -1279,18 +1318,19 @@ def _error_diffusion(
     # Declare LAB buffers up-front so mypy sees one type per name;
     # the LAB branch guards indexing behind ``use_lab`` so the empty
     # placeholders are never touched at runtime.
-    buf_l = _array.array("f")
-    buf_a = _array.array("f")
-    buf_b_lab = _array.array("f")
     pal_L: list[float] = []
     pal_a: list[float] = []
     pal_b_lab: list[float] = []
+    # LAB of the pixel as it stands *now* is computed in the loop, not
+    # pre-computed per pixel here. A pre-pass reads the pristine image, and
+    # the whole point of error diffusion is that a pixel's value has moved by
+    # the time it is matched: judging it against its original coordinates
+    # ignores every neighbour's error and degrades to plain nearest-colour
+    # quantisation, which is issue #202. Only the palette is fixed, so only
+    # the palette is converted up front.
+    lab_cache: dict[int, tuple[float, float, float]] = {}
     if use_lab:
         pal_lab = _srgb_to_lab(np.asarray(palette, dtype=np.uint8))
-        src_lab = _srgb_to_lab(arr.astype(np.uint8))
-        buf_l = _array.array("f", src_lab[:, :, 0].ravel().tolist())
-        buf_a = _array.array("f", src_lab[:, :, 1].ravel().tolist())
-        buf_b_lab = _array.array("f", src_lab[:, :, 2].ravel().tolist())
         pal_L = [float(pal_lab[i, 0]) for i in range(pal_lab.shape[0])]
         pal_a = [float(pal_lab[i, 1]) for i in range(pal_lab.shape[0])]
         pal_b_lab = [float(pal_lab[i, 2]) for i in range(pal_lab.shape[0])]
@@ -1324,9 +1364,19 @@ def _error_diffusion(
                 # aware, 1.0 for plain LAB) biases towards preserving
                 # hue over lightness, so blues stay blue even at the
                 # cost of a lightness match.
-                L0 = buf_l[idx]
-                A0 = buf_a[idx]
-                B0 = buf_b_lab[idx]
+                # Clamp-and-round to the 0-255 grid `_srgb_to_lab` quantises
+                # to, then memoise: a dashboard frame is mostly flat colour,
+                # so the cache turns most pixels into a dict hit instead of a
+                # conversion.
+                r8 = 0 if r < 0.0 else (255 if r > 255.0 else int(r + 0.5))
+                g8 = 0 if g < 0.0 else (255 if g > 255.0 else int(g + 0.5))
+                b8 = 0 if b < 0.0 else (255 if b > 255.0 else int(b + 0.5))
+                key = (r8 << 16) | (g8 << 8) | b8
+                cached = lab_cache.get(key)
+                if cached is None:
+                    cached = _lab_of_rgb8(r8, g8, b8)
+                    lab_cache[key] = cached
+                L0, A0, B0 = cached
                 best_i = 0
                 dL = L0 - pal_L[0]
                 dA = A0 - pal_a[0]
