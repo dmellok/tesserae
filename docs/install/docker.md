@@ -27,6 +27,47 @@ That's it. Open `http://<host-ip>:8765` (or
 `http://tesserae.local:8765` once mDNS comes up), the first request
 walks through password setup and the onboarding wizard.
 
+## Pin the secret key before you store any credentials
+
+Stored secrets — API keys, broker passwords, the Home Assistant token —
+are encrypted at rest. Without `TESSERAE_SECRET_KEY` the key is derived
+from the persisted session secret, which survives an ordinary restart and
+**does not survive a recreated container or a data folder restored
+alongside a regenerated session secret**.
+
+When it does not survive, the secrets decrypt to an empty string while
+every non-secret setting beside them is intact. The install looks
+configured and is not: the Home Assistant URL is still right, and every
+widget that needs the token reports the install as unconfigured. Nothing
+warns you at the moment the credentials go, only the next time something
+tries to use one.
+
+Generate a key once and put it in the compose file before you enter
+anything worth keeping:
+
+```sh
+python3 -c "import secrets; print(secrets.token_hex(32))"
+```
+
+```yaml
+services:
+  tesserae:
+    image: ghcr.io/dmellok/tesserae:latest
+    environment:
+      TESSERAE_SECRET_KEY: "<the 64 hex chars from above>"
+    volumes:
+      - ./data:/app/data
+```
+
+Tesserae warns at startup while it is running on the derived key, and the
+warning carries a ready-to-paste line. Adding the key later is fine — any
+secret entered *after* it is pinned is safe; ones entered before are still
+tied to the session secret and want re-entering once.
+
+Treat it like any other secret: it decrypts the credentials in your data
+folder, so it does not belong in the same backup as them, and it does not
+belong in a public repo alongside your compose file.
+
 The default `docker-compose.yml` uses **host networking**, which is
 the right choice for a self-hosted Pi / mini-PC / NAS appliance:
 
