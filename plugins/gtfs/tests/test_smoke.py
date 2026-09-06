@@ -729,3 +729,23 @@ def test_stop_finder_reports_a_bad_feed(client: FlaskClient) -> None:
         resp = client.get("/plugins/gtfs/?feed_url=https://example.test/nope.zip")
     assert resp.status_code == 200
     assert "didn&#39;t return a GTFS zip" in resp.get_data(as_text=True)
+
+
+def test_padded_header_row_still_finds_the_stop() -> None:
+    """Transperth pads its stops.txt header ("location_type, parent_station,
+    stop_id, ..."). csv.DictReader keeps the padding in the keys, which used
+    to make every stop lookup miss and the build fail with "isn't in this
+    feed". The names are trimmed before rows are read."""
+    raw = _feed()
+    src = zipfile.ZipFile(io.BytesIO(raw))
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        for info in src.infolist():
+            data = src.read(info.filename)
+            if info.filename == "stops.txt":
+                header, _, rest = data.decode().partition("\n")
+                data = (", ".join(header.split(",")) + "\n" + rest).encode()
+            zf.writestr(info.filename, data)
+    table = gtfs_server._distil(buf.getvalue(), "S1")
+    assert "S1N" in set(table["stop_ids"])
+    assert table["stop_name"] == "Canal St"

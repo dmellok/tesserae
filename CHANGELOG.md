@@ -55,6 +55,10 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **GTFS / GTFS-RT** reads feeds whose CSV header row is padded with
+  spaces (`location_type, parent_station, stop_id, …`, as Transperth's
+  is). The padding used to survive into the column names, so every stop
+  lookup missed and the build failed with "isn't in this feed".
 - LAB and chroma-aware colour matching now see the diffused error, so a
   flat patch dithers under them the way it always did under `rgb` instead
   of collapsing to a single ink.
