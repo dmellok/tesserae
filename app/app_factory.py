@@ -451,6 +451,31 @@ def create_app(
         apply_ha_options(settings)
     app.secret_key = auth.secret_key(settings)
 
+    # Session cookie attributes, set rather than inherited (#251). Every
+    # state-changing admin POST rides this cookie, and the app carries no CSRF
+    # tokens, so what stops a cross-site submission today is the browser's own
+    # SameSite default. Relying on a default means the protection is whatever
+    # the operator's browser decided, which is not a property this app can
+    # state.
+    #
+    # ``Lax`` and not ``Strict``: Strict also withholds the cookie on a
+    # top-level GET arriving from another origin, so following a link to the
+    # dashboard from Home Assistant or a chat message would land the operator
+    # on a login page. Lax blocks the cross-site POST, which is the shape that
+    # matters here.
+    #
+    # ``Secure`` is deliberately NOT set. These installs are overwhelmingly
+    # plain HTTP on a LAN or a Pi, and a Secure cookie is simply not sent over
+    # HTTP -- pinning it would log every one of them out rather than protect
+    # anything. An operator terminating TLS in front can set it themselves.
+    # Assigned, not ``setdefault``: Flask ships ``SESSION_COOKIE_SAMESITE``
+    # already present and set to ``None``, so a setdefault silently leaves the
+    # attribute off the cookie -- which is the same "inherited a default"
+    # failure this block exists to close. An operator who wants ``Strict`` or
+    # ``Secure`` sets them after ``create_app`` returns.
+    app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+    app.config["SESSION_COOKIE_HTTPONLY"] = True
+
     # v0.49: at-rest encryption for manifest-declared ``secret: true``
     # fields. Resolve the SecretBox after ``auth.secret_key`` has run
     # (so the session secret is guaranteed to exist) and inject it
