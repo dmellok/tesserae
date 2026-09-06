@@ -1360,7 +1360,14 @@ def _rows(zf: zipfile.ZipFile, names: dict[str, str], member: str) -> Iterator[d
     if path is None:
         return
     with zf.open(path) as handle:
-        yield from csv.DictReader(io.TextIOWrapper(handle, encoding="utf-8-sig", newline=""))
+        reader = csv.DictReader(io.TextIOWrapper(handle, encoding="utf-8-sig", newline=""))
+        # Some agencies pad the header row ("location_type, parent_station,
+        # stop_id, ..." -- Transperth's feed does). DictReader keeps the
+        # padding in its keys, so every ``row.get("stop_id")`` misses and the
+        # stop is reported as not in the feed. Trim the names once, up front.
+        if reader.fieldnames:
+            reader.fieldnames = [name.strip() for name in reader.fieldnames]
+        yield from reader
 
 
 # ----------------------------------------------------------------------
