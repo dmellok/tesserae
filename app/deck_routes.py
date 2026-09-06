@@ -538,7 +538,17 @@ def _design_cards(
                 "cards": unbound,
             }
         )
-    return {"cards": cards, "groups": groups, "now_hhmm": now_tz.strftime("%H:%M")}
+    # The IANA name, not just the rendered time: the rail's now-marker ticks
+    # client-side, and a browser in a different zone from the configured one
+    # would otherwise recompute the mark against its own clock and jump by the
+    # offset a minute after load (#165, same class as #143 / #164 / #170).
+    tz_name = getattr(tz, "key", "") or ""
+    return {
+        "cards": cards,
+        "groups": groups,
+        "now_hhmm": now_tz.strftime("%H:%M"),
+        "now_tz_name": tz_name,
+    }
 
 
 @bp.get("")
@@ -628,6 +638,7 @@ def index() -> str:
         cards=design["cards"],
         groups=design["groups"],
         now_hhmm=design["now_hhmm"],
+        now_tz_name=design.get("now_tz_name", ""),
         # -- schedules forms ----------------------------------------------
         schedules=schedules,
         status=schedule_status,
