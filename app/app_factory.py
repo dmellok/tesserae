@@ -186,6 +186,19 @@ def _serve_render_thumbnail(renders_dir: Path, filename: str, width: int) -> Res
     return send_from_directory(thumbs_dir, thumb_name)
 
 
+def _resolve_app_timezone(app: Flask) -> tzinfo | None:
+    """The configured app timezone via the resolver the factory registers
+    under ``RESOLVE_TIMEZONE``; None (host-local) when it isn't wired."""
+    resolver = app.config.get("RESOLVE_TIMEZONE")
+    if not callable(resolver):
+        return None
+    try:
+        tz = resolver()
+    except Exception:
+        return None
+    return tz if isinstance(tz, tzinfo) else None
+
+
 def create_app(
     *,
     testing: bool = False,
@@ -897,6 +910,10 @@ def create_app(
         # Sticky heartbeat capabilities (overlay schema) so the post-HA
         # reconcile can pick patch delivery over a full re-push.
         device_status=lambda: app.config.get("DEVICE_STATUS") or {},
+        # Same Settings -> App -> Timezone the scheduler places its anchors
+        # in, so a hold that expires "at the anchor" agrees with the tick.
+        # Resolved lazily: the resolver is registered further down.
+        timezone_provider=lambda: _resolve_app_timezone(app),
     )
 
     # Docker bridge networking gives us an internal IP that LAN

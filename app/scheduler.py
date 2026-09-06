@@ -1323,6 +1323,11 @@ class Scheduler:
             if fired:
                 self._rotation_last_status[rotation.id] = "sent"
                 self._rotation_last_reason[rotation.id] = None
+            elif held and all(device_id in held for device_id in deck.device_ids):
+                # Every panel is mid-hold, so the lineup card should say
+                # "held" rather than keep showing the last successful send.
+                self._rotation_last_status[rotation.id] = "held"
+                self._rotation_last_reason[rotation.id] = "all devices manually held"
 
     def _fire_timed(self, schedule: Schedule, now: datetime) -> None:
         """Fire one due timed record. A record backed by a bound interval /
@@ -1358,6 +1363,10 @@ class Scheduler:
         fired_any = False
         for device_id in deck.device_ids:
             if held and device_id in held:
+                # A button / touch page-away still inside its hold. Say so:
+                # the tick records the window as handled either way, and a
+                # panel skipped in silence reads as a frozen display.
+                self._log_deck_skip(device_id, deck.id, target, "manual hold")
                 continue
             key = f"{deck.id}:{device_id}"
             with self._lock:

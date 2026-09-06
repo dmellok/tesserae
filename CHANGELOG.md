@@ -55,6 +55,14 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- A touch that rotated a lineup's page held the display until the
+  rotation's next daily anchor, and that anchor was placed in UTC rather
+  than the configured timezone, so an evening tap could pin a panel for
+  most of the next day. Touch holds now last one dwell window of the step
+  they landed on; button holds keep the anchor rule, placed in the app
+  timezone. The timer also logs a skipped display as `manual hold` and the
+  Lineups card shows **held** instead of the last successful send, so a
+  held panel no longer looks frozen.
 - **GTFS / GTFS-RT** reads feeds whose CSV header row is padded with
   spaces (`location_type, parent_station, stop_id, …`, as Transperth's
   is). The padding used to survive into the column names, so every stop

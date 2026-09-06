@@ -125,11 +125,21 @@ kitchen panel shouldn't get yanked back by the scheduler a minute
 later.
 
 The override expires at the rotation's next daily anchor (midnight
-local by default). If you'd rather set a different hold window,
-`settings.app.button_hold_seconds` overrides the anchor-based expiry
-with a fixed number of seconds. `page:<page_id>` shortcuts don't set
-an override; they're one-shot pushes that let the scheduler resume
-normally on the next timer wake.
+in the timezone from **Settings → App**, else the host's). A **touch**
+that rotates the page holds it for one dwell window of the step it
+landed on instead, then the lineup carries on; a tap is a lighter
+gesture than a button, and touch panels tend to run short-dwell
+lineups where a day-long hold reads as a frozen display. If you'd
+rather set a different hold window for both,
+`settings.app.button_hold_seconds` overrides the expiry with a fixed
+number of seconds. `page:<page_id>` shortcuts don't set an override;
+they're one-shot pushes that let the scheduler resume normally on the
+next timer wake.
+
+While a hold is active the lineup's timer skips that display and the
+log says so (`deck timer advance skipped: … (manual hold)`); the
+Lineups card shows **held**. Pressing **Play** on the lineup releases
+the hold.
 
 ## Duplicate presses are dropped
 

@@ -13,10 +13,12 @@ renderer, a browser pool, etc., none of which is on the tested path.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, tzinfo
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -125,6 +127,7 @@ def _wire(
     push_manager: StubPushManager,
     clock: FakeClock,
     event_log: EventLog | None = None,
+    timezone_provider: Callable[[], tzinfo | None] | None = None,
 ) -> ButtonService:
     return ButtonService(
         rotation_store=rotation_store,
@@ -134,7 +137,37 @@ def _wire(
         push_manager=push_manager,  # type: ignore[arg-type]
         clock=clock,
         event_log=event_log,
+        timezone_provider=timezone_provider,
     )
+
+
+def test_button_hold_expires_at_the_local_anchor(
+    rotation_store: RotationStore,
+    state_store: DeviceRotationStateStore,
+    settings_store: SettingsStore,
+    page_store: PageStore,
+    push_manager: StubPushManager,
+) -> None:
+    """The anchor is a local-time HH:MM, so the hold expires at the next
+    local anchor. Placing it in UTC put "midnight" at 20:00 for a US East
+    install, so a 22:48 press held the panel until the following evening."""
+    _seed_rotation(rotation_store)  # anchor 00:00
+    # 02:48 UTC on the 6th is 22:48 EDT on the 5th.
+    clock = FakeClock(datetime(2026, 9, 6, 2, 48, tzinfo=UTC))
+    svc = _wire(
+        rotation_store=rotation_store,
+        state_store=state_store,
+        settings_store=settings_store,
+        page_store=page_store,
+        push_manager=push_manager,
+        clock=clock,
+        timezone_provider=lambda: ZoneInfo("America/New_York"),
+    )
+    svc.handle_button(device_id="kitchen", button="right", event_id=1)
+    persisted = state_store.get("kitchen")
+    assert persisted is not None
+    # Next local midnight: 00:00 EDT on the 6th == 04:00 UTC, 72 minutes out.
+    assert persisted.override_until == datetime(2026, 9, 6, 4, 0, tzinfo=UTC)
 
 
 def _seed_rotation(rotation_store: RotationStore) -> Rotation:
