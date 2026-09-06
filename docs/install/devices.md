@@ -44,6 +44,26 @@ renderer, so two panels driven by the same renderer can differ. For TRMNL /
 1-bit panels the dither dropdown carries the full set: Floyd-Steinberg,
 Atkinson, Jarvis-Judice-Ninke, Stucki, Bayer 8×8, halftone, crosshatch, or none.
 
+### Ghosting after a pushed update
+
+A panel that repaints cleanly on its timed wake but leaves a faint ghost of
+the previous frame after a push — a webhook, a manual Send, a button action —
+is showing you the difference between the two delivery paths, not a fault.
+
+**Update delivery** on the device card defaults to *Auto*, which sends a small
+change as a partial-refresh patch on firmware that supports it. A partial
+refresh does not run the panel's full clearing waveform, so a high-contrast
+change can leave the old content faintly behind. A device that was asleep
+cannot apply a patch at all, so its next poll is served a whole frame and a
+full repaint — which is why the timed wake looks right and the pushed update
+does not.
+
+Set **Update delivery → Always full refresh** on that device. Every change
+then repaints the whole panel: slower and a visible flash, but no ghost.
+
+The setting is per device, so a panel used for high-contrast content can be
+pinned to full refresh while the rest stay on Auto.
+
 ## Compose a dashboard
 
 The page editor models a dashboard as **one page → one layout preset → one
