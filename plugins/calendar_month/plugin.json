@@ -70,6 +70,13 @@
       ]
     },
     {
+      "name": "show_week_start",
+      "type": "boolean",
+      "label": "Show \"Week starts\" label",
+      "default": false,
+      "help": "Off by default: the weekday column headers already show which day the week starts on. Worth turning on with a minimal or single-letter weekday style, where it is less obvious."
+    },
+    {
       "name": "title_scale",
       "type": "slider",
       "label": "Dashboard title size",
