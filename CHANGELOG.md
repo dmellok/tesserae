@@ -8,6 +8,11 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- Companion publishers can choose snapshot retention up to 365 days or explicitly
+  retain the latest snapshot until replacement or deletion. The optional
+  `personal_data_retention` capability enables Never; freshness stays independent
+  of expiry, and existing clients retain their chosen finite deadlines.
+
 - Home Assistant MQTT discovery now exposes lineups and device
   operations. The hub device gains an *Automation* switch (pause every
   scheduled push), a *Quiet hours* switch, a switch per lineup with

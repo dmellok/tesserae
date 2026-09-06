@@ -1313,6 +1313,7 @@ components:
               - offline_albums
               - personal_data_reminders
               - personal_data_health
+              - personal_data_retention
               - lineups
               - lineup_control
               - lineup_authoring
@@ -1400,7 +1401,9 @@ components:
           minimum: 60
         personal_data_max_ttl_seconds:
           description: >-
-            Maximum allowed difference between generated_at and expires_at.
+            Maximum finite difference between generated_at and expires_at (up to
+            365 days). Servers advertising personal_data_retention also accept
+            explicit null expires_at for user-selected indefinite retention.
             Required whenever any personal-data capability is advertised.
           type: integer
           minimum: 60
@@ -1575,9 +1578,14 @@ components:
           type: string
           format: date-time
         expires_at:
-          description: Required deletion deadline for raw snapshot values
+          description: >-
+            Deletion deadline, or explicit null to retain until replaced or
+            deleted. Null requires the personal_data_retention capability and
+            explicit user selection. Finite deadlines must be after generated_at
+            and within personal_data_max_ttl_seconds. Staleness remains independent.
           type: string
           format: date-time
+          nullable: true
         data:
           $ref: "#/components/schemas/RemindersData"
     RemindersData:
@@ -1644,10 +1652,13 @@ components:
           format: date-time
         expires_at:
           description: >-
-            Required deletion deadline for raw snapshot values. It must be later
-            than generated_at and conform to the server retention policy.
+            Deletion deadline, or explicit null to retain until replaced or
+            deleted. Null requires the personal_data_retention capability and
+            explicit user selection. Finite deadlines must be after generated_at
+            and within personal_data_max_ttl_seconds. Staleness remains independent.
           type: string
           format: date-time
+          nullable: true
         data:
           $ref: "#/components/schemas/RemindersFridgeData"
     RemindersFridgeData:
@@ -1711,10 +1722,13 @@ components:
           format: date-time
         expires_at:
           description: >-
-            Required deletion deadline. The server's advertised maximum remains
-            48 hours even though the content covers seven calendar dates.
+            Deletion deadline, or explicit null to retain until replaced or
+            deleted. Null requires the personal_data_retention capability and
+            explicit user selection. Finite deadlines must be after generated_at
+            and within personal_data_max_ttl_seconds. Staleness remains independent.
           type: string
           format: date-time
+          nullable: true
         data:
           $ref: "#/components/schemas/HealthSummaryData"
     HealthSummaryData:
@@ -2213,8 +2227,14 @@ components:
           type: string
           format: date-time
         expires_at:
+          description: >-
+            Deletion deadline, or explicit null to retain until replaced or
+            deleted. Null requires the personal_data_retention capability and
+            explicit user selection. Finite deadlines must be after generated_at
+            and within personal_data_max_ttl_seconds. Staleness remains independent.
           type: string
           format: date-time
+          nullable: true
     PersonalDataStatusResponse:
       type: object
       additionalProperties: false

@@ -1,11 +1,12 @@
 """Latest-only personal-data snapshots for the Companion bridge (#176).
 
-The iOS Companion publishes minimal, expiring Apple Reminders and Health
+The iOS Companion publishes minimal Apple Reminders and Health
 summaries; the server keeps only the *latest* snapshot per paired publisher and
 source, then renders it in a widget. No history: exactly one snapshot per
 ``(publisher_id, source_id)``, replaced on each accepted PUT and deleted on
 disable or expiry. The server never connects to iCloud or HealthKit, it only
-stores what each phone explicitly publishes, and drops it once expired.
+stores what each phone explicitly publishes, and drops it once expired. An
+explicit null deadline retains the latest snapshot until replaced or deleted.
 Contract: ``tests/companion/contract/app-v1.openapi.yaml``.
 
 Each stored record wraps the raw snapshot with the two epochs the API needs for
@@ -14,7 +15,7 @@ ordering and freshness, so this store never parses ISO timestamps itself::
     { "_format": 2, "publishers": {
         "companion_<digest>": { "name": "Kitchen iPhone", "sources": {
           "reminders": { "snapshot": {...}, "generated_epoch": float,
-            "expires_epoch": float, "stored_at": float }
+            "expires_epoch": float | None, "stored_at": float }
         }}
     }}
 
@@ -185,7 +186,7 @@ class PersonalDataSnapshotStore:
         *,
         snapshot: dict[str, Any],
         generated_epoch: float,
-        expires_epoch: float,
+        expires_epoch: float | None,
         publisher_id: str,
         publisher_name: str | None = None,
     ) -> None:

@@ -481,7 +481,7 @@ def validate_health_summary(
     active_timezone: str,
     snapshot_version: str,
     maximum_ttl_seconds: int,
-) -> tuple[dict[str, Any], float, float]:
+) -> tuple[dict[str, Any], float, float | None]:
     """Validate and return ``(snapshot, generated_epoch, expires_epoch)``."""
 
     snapshot = _object(body, _ENVELOPE_FIELDS, "snapshot")
@@ -491,10 +491,15 @@ def validate_health_summary(
         raise InvalidHealthSummary("source_id does not match the health.summary path")
 
     generated = _utc_instant(snapshot["generated_at"], "generated_at")
-    expires = _utc_instant(snapshot["expires_at"], "expires_at")
-    ttl_seconds = (expires - generated).total_seconds()
-    if not (0 < ttl_seconds <= maximum_ttl_seconds):
-        raise InvalidHealthSummary("expires_at exceeds the maximum retention window")
+    expires = (
+        _utc_instant(snapshot["expires_at"], "expires_at")
+        if snapshot["expires_at"] is not None
+        else None
+    )
+    if expires is not None:
+        ttl_seconds = (expires - generated).total_seconds()
+        if not (0 < ttl_seconds <= maximum_ttl_seconds):
+            raise InvalidHealthSummary("expires_at exceeds the maximum retention window")
 
     data = _object(snapshot["data"], _DATA_FIELDS, "data")
     time_zone = data["time_zone"]
@@ -537,4 +542,4 @@ def validate_health_summary(
     if data["workouts"] is not None:
         _validate_workouts(data["workouts"], expected_dates=expected_date_set, timezone=timezone)
 
-    return snapshot, generated.timestamp(), expires.timestamp()
+    return snapshot, generated.timestamp(), expires.timestamp() if expires is not None else None
