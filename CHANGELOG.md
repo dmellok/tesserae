@@ -6,6 +6,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Older x86-64 processors (before 2009, no SSE4.2) no longer get a bare
+  `Illegal instruction` from the Docker image: the entrypoint explains that
+  the bundled numpy needs x86-64-v2 and points at the fix. The image accepts a
+  `NUMPY_SPEC` build argument (`--build-arg NUMPY_SPEC='numpy<2.4'`) to pin the
+  last numpy line whose wheels run on those machines, and the install docs
+  carry the same note for a bare install.
+
 ### Added
 
 - Hardware kind `waveshare_esp32_driver_75` for Waveshare's E-Paper ESP32 Driver

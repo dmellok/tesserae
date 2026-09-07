@@ -128,6 +128,21 @@ session, it isn't loopback-exempt. The loopback bypass is only for
 `/compose/`, `/renders/`, and `/plugins/<id>/<asset>`, which the in-process
 Playwright renderer fetches without a session.
 
+## Older x86-64 processors
+
+numpy 2.4 and later publish x86-64 wheels built for x86-64-v2 (SSE4.2 and
+POPCNT, processors from 2009 on). On an older machine `python -m app.main`
+dies with `Illegal instruction` as soon as numpy loads. Pin the last line
+whose wheels still run there, inside the same virtualenv:
+
+```bash
+pip install 'numpy<2.4'
+```
+
+`grep -c sse4_2 /proc/cpuinfo` printing `0` is the tell. The Docker image
+has the same floor; see [Install via Docker](docker.md#limits) for the
+rebuild flag.
+
 ## Chromium for webpage rendering
 
 The **Send → Webpage** tab and the `webpage` widget screenshot pages with
