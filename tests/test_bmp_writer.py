@@ -136,6 +136,6 @@ def test_fixed_palette_rejects_out_of_range_index() -> None:
     import pytest
 
     pal = [(0, 0, 0), (255, 255, 255)]
-    img = _p_image(2, 1, pal + [(255, 0, 0)], [0, 2])
+    img = _p_image(2, 1, [*pal, (255, 0, 0)], [0, 2])
     with pytest.raises(ValueError):
         pack_indexed_bmp(img, palette=pal)
