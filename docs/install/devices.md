@@ -44,6 +44,25 @@ renderer, so two panels driven by the same renderer can differ. For TRMNL /
 1-bit panels the dither dropdown carries the full set: Floyd-Steinberg,
 Atkinson, Jarvis-Judice-Ninke, Stucki, Bayer 8×8, halftone, crosshatch, or none.
 
+### Update delivery
+
+**Update delivery** on the device card decides how a change reaches a panel
+that is already showing the same page. *Auto*, the default, sends a small
+change (a clock tick, a toggled switch) as a partial-refresh patch on firmware
+that supports it, so the panel repaints only the changed area with no full
+flash. A change too large to patch, or a device that was asleep when the patch
+was staged, gets a whole frame and a full repaint on its next poll instead.
+
+*Always full refresh* turns the patch path off for that device: every change
+mints a new frame and repaints the whole panel. It is slower and flashes, but
+it is the setting to reach for when small pushed updates look incomplete or
+ghosted. Ghosting that also shows up on timed refreshes, or that follows a
+touch, has a different cause: report it against the firmware rather than
+changing this setting.
+
+The setting is per device, so one panel can be pinned to full refresh while
+the rest stay on Auto.
+
 ## Compose a dashboard
 
 The page editor models a dashboard as **one page → one layout preset → one
