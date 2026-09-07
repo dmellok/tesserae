@@ -72,7 +72,11 @@ jobs:
         # -n auto fans the suite across the runner's vCPUs (pytest-xdist).
         # The suite is parallel-safe (tmp_path isolation, no shared ports).
         # Coverage deliberately does NOT run here, see the `coverage` job.
-        run: pytest -n auto -q
+        # --timeout / --durations: the suite runs in ~5 min locally but one
+        # worker occasionally goes silent for 70-100 min on the runner. A
+        # test that passes 15 min now fails with its stack, and the slowest
+        # tests are listed either way, so a stall names itself.
+        run: pytest -n auto -q --timeout=900 --durations=15
 
   coverage:
     name: coverage
@@ -102,7 +106,7 @@ jobs:
         # climbs.
         env:
           COVERAGE_CORE: sysmon
-        run: pytest -n auto -q --cov=app --cov-report=term-missing --cov-fail-under=80
+        run: pytest -n auto -q --timeout=900 --durations=15 --cov=app --cov-report=term-missing --cov-fail-under=80
 
   pytest-forward:
     name: pytest (forward-compat)
@@ -132,7 +136,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
       - name: pytest
-        run: pytest -n auto -q
+        run: pytest -n auto -q --timeout=900 --durations=15
 
   security:
     name: security scan

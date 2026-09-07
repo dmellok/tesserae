@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tesserae"
-version = "0.394.0"
+version = "0.394.1"
 description = "E-ink dashboard companion. Compose tile-based dashboards, render headless, push frames over MQTT."
 requires-python = ">=3.11"
 license = { text = "AGPL-3.0-or-later" }
@@ -77,6 +77,10 @@ dev = [
     # Parallel test execution (`pytest -n auto`), local and in CI. The suite
     # is tmp_path-isolated with no shared ports, so it's parallel-safe.
     "pytest-xdist>=3.5",
+    # Per-test wall-clock guard, CI only (`--timeout` on the ci.yml commands,
+    # never in addopts so a local debugger session is left alone). A stalled
+    # test fails with its stack instead of holding the runner for an hour.
+    "pytest-timeout>=2.3",
     "mypy>=1.9",
     # Pinned to a minor range: ruff ships new lint rules in minor bumps,
     # which would otherwise break CI on an unrelated upgrade. Bump
@@ -165,9 +169,10 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = "-ra --strict-markers --import-mode=importlib"
-# CI occasionally stalls for over an hour inside one test with no output. This
-# dumps the stalled test's traceback to stderr after 10 minutes without
-# killing the run, so the next stall names itself.
+# CI occasionally stalls for over an hour with no output. This dumps a
+# traceback to stderr after 10 minutes without killing the run. It did not
+# surface on the first stall it should have caught (2026-09-07, coverage job),
+# so ci.yml also passes --timeout and --durations; kept because it's free.
 faulthandler_timeout = 600
 filterwarnings = [
     "error",
