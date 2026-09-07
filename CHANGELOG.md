@@ -8,6 +8,11 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- Hardware kind `waveshare_esp32_driver_75` for Waveshare's E-Paper ESP32 Driver
+  Board carrying a 7.5" mono panel (V2, 800×480). Inherits `esp32_bw_client`
+  and the 48000-byte mono frame shared with the reTerminal E1001 and the XIAO
+  7.5" boards; firmware is the `waveshare-esp32-driver-75` build in
+  tesserae-device-firmware. Not yet confirmed on real hardware.
 - **Calendar Core** can use each event's own colour where the feed sets one.
   A per-feed toggle on the feed row opts in; RFC 7986 `COLOR` names and
   `X-APPLE-CALENDAR-COLOR` hex values are read, and an event with no colour of

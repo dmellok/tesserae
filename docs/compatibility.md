@@ -118,6 +118,7 @@ Runs the [Tesserae-native firmware](https://github.com/dmellok/tesserae-device-f
 | [Waveshare 4.2" B/W e-paper](https://www.waveshare.com/4.2inch-e-paper-module.htm) | 400×300 | `mono` | `esp32_bw_client` (inherit) | `waveshare_4_2_bw` |
 | [Waveshare 10.85" e-Paper HAT+ (G) (ESP32-S3 Zero)](https://www.waveshare.com/10.85inch-e-paper-hat-plus-g.htm) | 1360×480 | `bwry_4` | `esp32_client` (inherit) | `waveshare_1085g` |
 | [Waveshare 13.3" Spectra E6 (ESP32-S3)](https://www.waveshare.com/esp32-s3-epaper-13.3e6.htm) | 1200×1600 portrait | `waveshare_e6` | `esp32_client` (inherit) | `waveshare_133e6` |
+| [Waveshare E-Paper ESP32 Driver Board + 7.5" B/W](https://www.waveshare.com/e-paper-esp32-driver-board.htm) | 800×480 | `mono` | `esp32_bw_client` (inherit) | `waveshare_esp32_driver_75` |
 
 ### [Xteink](https://www.xteink.com/)
 
@@ -154,5 +155,5 @@ Honest status from the maintainer's own bench. Untested doesn't mean broken, it 
 | `pi_bin` | Pimoroni Inky Impression (Spectra 6 / Waveshare E6) | :material-check-circle: Tested | Fastest Pi path, packed buffer written straight to inky's _buf. |
 | `pi_png` | Pimoroni Inky Impression (via inky set_image) | :material-check-circle: Tested | Works on every inky-supported panel; quantises on the Pi each frame. |
 | `pico_bin` | - | :material-circle-outline: Not yet tested | - |
-| `trmnl_png` | Amazon Kindle Paperwhite 2 (jailbroken) via KOReader trmnl-display plugin + Seeed TRMNL 7.5" OG DIY Kit (XIAO 7.5" panel running the TRMNL firmware) | :material-check-circle: Tested | 1-bit greyscale PNG fitted to the panel + dithered server-side. The TRMNL X is supported but not yet confirmed here. |
+| `trmnl_png` | Amazon Kindle Paperwhite 2 (jailbroken) via KOReader trmnl-display plugin + Seeed TRMNL 7.5" OG DIY Kit (XIAO 7.5" panel running the TRMNL firmware) + TRMNL X (stock firmware, 1872x1404) | :material-check-circle: Tested | 1-bit greyscale PNG fitted to the panel + dithered server-side. |
 | `trmnl_png_color` | - | :material-circle-outline: Not yet tested | - |
