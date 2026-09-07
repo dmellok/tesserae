@@ -845,8 +845,8 @@ def _export_url(collection_url: str) -> str:
     return f"{collection_url}{sep}export"
 
 
-#: RFC 7986 ``COLOR`` is a CSS3 colour *name*, not a hex triple, and that is
-#: what Google Calendar writes for a per-event colour. Only the names CSS3
+#: RFC 7986 ``COLOR`` is a CSS3 colour *name*, not a hex triple, and is the
+#: form CalDAV servers such as Nextcloud and Baikal write. Only the names CSS3
 #: actually defines are accepted; anything else is treated as absent rather
 #: than guessed at, since a wrong colour is worse than the feed's own.
 _CSS3_COLOURS: dict[str, str] = {
@@ -1003,11 +1003,13 @@ _CSS3_COLOURS: dict[str, str] = {
 def _event_colour(comp: Any) -> str:
     """The event's own colour as ``#rrggbb``, or ``""`` when it declares none.
 
-    Two spellings reach us. RFC 7986 ``COLOR`` carries a CSS3 colour *name*,
-    which is what Google Calendar writes; ``X-APPLE-CALENDAR-COLOR`` carries
-    a hex triple, sometimes with an alpha byte, and is what Apple and several
-    CalDAV servers write. An unrecognised value returns ``""`` rather than a
-    guess: falling back to the feed's colour is right, and inventing one is
+    Two spellings reach us. RFC 7986 ``COLOR`` carries a CSS3 colour *name*
+    and is the interoperable form. ``X-APPLE-CALENDAR-COLOR`` carries a hex
+    triple, sometimes with an alpha byte; Apple defines it at calendar level,
+    but tools that inject colours into a feed sometimes stamp it on the event,
+    so a hex value found there is accepted too. Google Calendar's own export
+    carries neither (#222). An unrecognised value returns ``""`` rather than
+    a guess: falling back to the feed's colour is right, and inventing one is
     not.
     """
     named = str(comp.get("COLOR") or "").strip().lower()

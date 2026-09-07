@@ -45,7 +45,7 @@ class _Comp(dict):
 
 
 def test_an_rfc7986_colour_name_is_read() -> None:
-    """`COLOR` carries a CSS3 name, which is what Google Calendar writes."""
+    """`COLOR` carries a CSS3 name, the form Nextcloud and Baikal write."""
     assert server._event_colour(_Comp({"COLOR": "tomato"})) == "#ff6347"
 
 
@@ -54,7 +54,7 @@ def test_a_colour_name_is_case_insensitive() -> None:
 
 
 def test_an_apple_hex_colour_is_read() -> None:
-    """Apple and several CalDAV servers write a hex triple instead."""
+    """A hex triple, as some feed bridges stamp on the event."""
     assert server._event_colour(_Comp({"X-APPLE-CALENDAR-COLOR": "#1E90FF"})) == "#1e90ff"
 
 
