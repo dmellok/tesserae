@@ -32,6 +32,11 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **The Gallery widget's Scale option now does something.** Every choice
+  rendered as Fill: the client never read the option, and the shared
+  full-bleed rule crops to cover. Fit letterboxes, Stretch distorts, Center
+  shows native pixels, and Fit with blurred background paints a blurred copy
+  of the picture behind the letterboxed one. (#296)
 - **CircuitPython BMP frames have a fixed colour table per gamut.** The
   `circuitpython_bmp` renderer used to compact the table to the colours a
   page actually used, so a tri-colour page with no red on screen shipped as
