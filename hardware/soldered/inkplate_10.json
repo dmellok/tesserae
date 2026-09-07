@@ -5,19 +5,21 @@
   "vendor": "Soldered Electronics",
   "url": "https://soldered.com/product/inkplate-10/",
   "icon": "device-tablet",
-  "description": "9.7 inch E Ink panel (ED097OC1, 1200x825, 8-level grayscale) on an ESP32-WROVER with Wi-Fi, battery charger, RTC, microSD, three capacitive touchpads and a wake button. Speaks Tesserae's v1 REST device API from the tesserae.inkplate firmware and paints the esp32_gray_bin 4-bpp packed frame directly into its framebuffer (16 levels halved to the panel's 8).",
+  "description": "9.7 inch E Ink panel (1200x825, 16-level greyscale glass driven at the Inkplate library's 8 levels) on an ESP32-WROVER with Wi-Fi, battery charger, RTC, microSD, three capacitive touchpads and a wake button. Speaks Tesserae's v1 REST device API from the tesserae.inkplate firmware and paints the esp32_gray_bin 4-bpp packed frame directly into its framebuffer (16 levels halved to the 8 the firmware drives).",
   "protocol": "esp32_bw_client",
-  "renderers": ["esp32_gray_bin"],
+  "renderers": [
+    "esp32_gray_bin"
+  ],
   "panel": {
     "w": 1200,
     "h": 825,
     "orientation": "landscape",
-    "name": "9.7 inch E Ink ED097OC1, 8-level grayscale (1200x825)",
+    "name": "9.7 inch E Ink, 16-level greyscale driven at 8 levels (1200x825)",
     "gamut": "gray_16",
     "native_w": 1200,
     "native_h": 825
   },
   "refresh_floor_s": 30,
   "image_format": "bin",
-  "notes_md": "Wire format is exactly 495000 bytes (1200*825/2), row-major from the top-left of the landscape framebuffer, high nibble = left pixel, 0x0 = black .. 0xF = white. The firmware halves each nibble to the panel's 8 grey levels and does a full refresh (about 1.6 s). Register the device with the rotation that matches its mount (the firmware sends 270 for portrait with the USB connector at the bottom); adjust in Settings -> Devices if it lands upside down. The same firmware also accepts esp32_bw_bin (1-bpp) and esp32_gray2_bin (2-bpp) frames, detected by byte count, so the stock esp32_bw_client kind works as a mono fallback when this catalog entry is not installed."
+  "notes_md": "Verified on real hardware by the firmware author (partridgeworks/tesserae.inkplate), 2026-09. Inkplate 10 units have shipped with more than one 9.7 inch E Ink panel over the years; the firmware drives whichever is fitted through the Inkplate library, so no panel part number is pinned here.\n\nWire format is exactly 495000 bytes (1200*825/2), row-major from the top-left of the landscape framebuffer, high nibble = left pixel, 0x0 = black .. 0xF = white. The firmware halves each nibble to the panel's 8 grey levels and does a full refresh (about 1.6 s). Register the device with the rotation that matches its mount (the firmware sends 270 for portrait with the USB connector at the bottom); adjust in Settings -> Devices if it lands upside down. The same firmware also accepts esp32_bw_bin (1-bpp) and esp32_gray2_bin (2-bpp) frames, detected by byte count, so the stock esp32_bw_client kind works as a mono fallback when this catalog entry is not installed."
 }
