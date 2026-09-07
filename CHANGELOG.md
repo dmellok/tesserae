@@ -6,6 +6,27 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added
+
+- **Calendar Core** can use each event's own colour where the feed sets one.
+  A per-feed toggle on the feed row opts in; RFC 7986 `COLOR` names and
+  `X-APPLE-CALENDAR-COLOR` hex values are read, and an event with no colour of
+  its own keeps the feed colour. Off by default, so existing feeds render as
+  before. (#222)
+- `GET /api/mcp/appearance` serves the theme, style and font lists. (#257)
+
+### Changed
+
+- `/api/mcp/catalog` reports a count of themes, styles and fonts and points at
+  the appearance endpoint instead of inlining the lists, taking roughly a
+  sixth off every `list_widgets` read. (#257)
+- **tesserae-mcp 0.16.0.** `list_widgets(section="appearance")` fetches the
+  lists from the new endpoint, and the served tool docs point there. Upgrade
+  with `pipx upgrade tesserae-mcp`; an older bridge returns counts where the
+  docs promise lists.
+- The device setup guide gains an *Update delivery* section describing Auto
+  and Always full refresh.
+
 ## [0.392.0], 2026-09-06
 
 ### Added
