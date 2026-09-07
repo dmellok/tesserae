@@ -250,8 +250,9 @@ server URL.
    memory. An uncompressed BMP sidesteps it: `adafruit_imageload` reads
    it row by row with `file.read` / `seek`, so peak RAM is the
    framebuffer plus a small row buffer. Boards with headroom (ESP32-S3
-   etc.) should keep the default PNG, which is a few times smaller on the
-   wire (the server writes palette-mode BMP at 8 bits per pixel). The
+   etc.) should keep the default PNG, which is still smaller on the wire
+   (the BMP is packed at 1 bit per pixel for mono and 4 for every other
+   gamut, uncompressed). The
    value is resolved to a renderer by matching its file extension, so the
    `format` you declare is exactly the `format` field you'll get back
    from `/frame`. An unknown or absent value leaves the kind's default
@@ -1451,13 +1452,22 @@ whole inflated image in a contiguous buffer alongside the bitmap; on a
 Pico W class board that exhausts or fragments SRAM. The BMP has no
 `zlib` in the path, `adafruit_imageload` reads it row by row with
 `file.read` / `seek`, so peak RAM is the framebuffer plus a small row
-buffer. Trade-off: the server writes palette-mode BMP at 8 bits per
-pixel, so it's a few times larger on the wire than the PNG. The
-constraint on these boards is the decode buffer, not download size.
+buffer. Trade-off: the BMP is uncompressed, so it's larger on the wire
+than the PNG. The constraint on these boards is the decode buffer, not
+download size.
 
-The BMP is always uncompressed `BI_RGB`, bottom-up (Pillow's default),
-which is the form `adafruit_imageload` decodes; it rejects RLE-packed
-BMP.
+The BMP is always uncompressed `BI_RGB`, bottom-up, packed at 1 bit per
+pixel for `mono` and 4 bits per pixel for every other gamut, which is the
+form `adafruit_imageload` decodes; it rejects RLE-packed BMP. The colour
+table is the gamut's complete palette in a fixed order on every frame
+(`bwr_3` is always black, white, red; `biClrUsed` is 3), whatever the
+page happens to use, so the bit depth and table are a per-gamut constant.
+A client that allocates its `displayio.Bitmap` from the first frame's
+header and reuses it for later frames can rely on that: a tri-colour page
+with no red on screen is still a 4-bpp, 3-colour file. Because the table
+is exactly `biClrUsed` entries long, `adafruit_imageload` also sizes the
+bitmap at that many values, so a 3-colour frame lands in a 2-bit bitmap
+(half the RAM of a 16-value one).
 
 Reference: [`renderers/circuitpython_png/renderer.py`](https://github.com/dmellok/tesserae/blob/main/renderers/circuitpython_png/renderer.py),
 [`renderers/circuitpython_bmp/renderer.py`](https://github.com/dmellok/tesserae/blob/main/renderers/circuitpython_bmp/renderer.py).

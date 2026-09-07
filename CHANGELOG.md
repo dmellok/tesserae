@@ -30,6 +30,18 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   fix for PYSEC-2026-3552. The affected PKCS#7 API is not used here; the pin
   was the only reason the audit kept reporting it.
 
+### Fixed
+
+- **CircuitPython BMP frames have a fixed colour table per gamut.** The
+  `circuitpython_bmp` renderer used to compact the table to the colours a
+  page actually used, so a tri-colour page with no red on screen shipped as
+  a 2-colour 1-bpp file and the next frame with red in it no longer matched
+  a bitmap the client had sized from the earlier header. The table is now the
+  gamut's whole palette in a fixed order on every frame, with `biClrUsed`
+  set to its length, so bit depth and table are constant for a given gamut
+  and `adafruit_imageload` sizes a 3-colour frame's bitmap at 3 values
+  rather than 16. (#277)
+
 ## [0.392.0], 2026-09-06
 
 ### Added

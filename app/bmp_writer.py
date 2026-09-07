@@ -11,60 +11,95 @@ smallest *standard* BMP bit depth that fits its palette:
 * otherwise -> 8 bpp
 
 Output is uncompressed ``BI_RGB``, bottom-up, MSB-first within a byte, with a
-4-byte-aligned stride and a full ``2**bpp`` colour table, i.e. the exact shape
-``adafruit_imageload``'s indexed-BMP reader unpacks (its loop is generic over
+4-byte-aligned stride, i.e. the exact shape ``adafruit_imageload``'s
+indexed-BMP reader unpacks (its loop is generic over
 ``color_depth = 8 // pixels_per_byte``). 1 / 4 / 8 bpp are also what Pillow can
 read back, so the output round-trips for tests and stays portable to other
-clients. The palette is derived from the colours actually present, so the BMP
-is self-describing (the client reads its own colour table).
+clients.
+
+Two colour-table modes:
+
+* ``palette=`` given (the renderers): the table is that palette, verbatim and
+  complete, on every frame, with ``biClrUsed`` set to its length. The bit
+  depth and table are then a per-gamut constant, which a client that
+  allocates its ``displayio.Bitmap`` from the first frame's header and reuses
+  it for the next one depends on (discussion #277: a tri-colour page with no
+  red on screen used to ship as a 2-colour 1-bpp file, and the next frame
+  with red in it no longer fit the bitmap). A short table also lets
+  ``adafruit_imageload`` size the bitmap at ``len(palette)`` values, so a
+  3-colour frame lands in a 2-bit bitmap rather than a 4-bit one.
+* no ``palette``: the table is compacted to the colours actually present,
+  the pre-0.395 behaviour, kept for callers packing an arbitrary "P" image.
 """
 
 from __future__ import annotations
 
 import io
 import struct
+from collections.abc import Sequence
 
 import numpy as np
 from PIL import Image
 
 
-def pack_indexed_bmp(img: Image.Image) -> bytes:
+def pack_indexed_bmp(
+    img: Image.Image, *, palette: Sequence[tuple[int, int, int]] | None = None
+) -> bytes:
     """Pack a palette-mode image as a minimal-bit-depth uncompressed BMP.
 
-    Non-``P`` images fall back to Pillow's BMP writer (e.g. the rgb24/rgb16
-    full-colour passthrough, which isn't indexed)."""
+    ``palette`` fixes the colour table: it is written whole and in order on
+    every frame, and ``img``'s indices are taken as indices into it (the
+    quantiser produced them against the same palette). Without it the table
+    is compacted to the colours present. Non-``P`` images fall back to
+    Pillow's BMP writer (e.g. the rgb24/rgb16 full-colour passthrough, which
+    isn't indexed)."""
     if img.mode != "P":
         buf = io.BytesIO()
         img.convert("RGB").save(buf, format="BMP")
         return buf.getvalue()
 
     w, h = img.size
-    src_palette = list(img.getpalette() or [])
-    src_palette += [0] * (768 - len(src_palette))
     idx = np.frombuffer(img.tobytes(), dtype=np.uint8).reshape(h, w)
 
-    # Compact the palette to just the colours actually used, so a frame that
-    # touches 3 of a 6-colour gamut still packs at the smaller depth.
-    used = np.unique(idx)
-    palette = [(src_palette[i * 3], src_palette[i * 3 + 1], src_palette[i * 3 + 2]) for i in used]
-    colors = max(1, len(palette))
-    bpp = 1 if colors <= 2 else 4 if colors <= 16 else 8
-
-    # Remap the original indices to compact 0..colors-1 indices.
-    remap = np.zeros(256, dtype=np.uint8)
-    for new_i, old_i in enumerate(used):
-        remap[int(old_i)] = new_i
-    gidx = remap[idx]
+    if palette is not None:
+        table = [tuple(int(c) for c in rgb) for rgb in palette]
+        if not table:
+            raise ValueError("palette must have at least one colour")
+        colors = len(table)
+        bpp = 1 if colors <= 2 else 4 if colors <= 16 else 8
+        # Every index must name a table entry; anything past the end is a
+        # quantiser/palette mismatch, not something to paper over.
+        if int(idx.max()) >= colors:
+            raise ValueError(f"index {int(idx.max())} outside a {colors}-colour palette")
+        gidx = idx
+    else:
+        src_palette = list(img.getpalette() or [])
+        src_palette += [0] * (768 - len(src_palette))
+        # Compact the palette to just the colours actually used, so a frame
+        # that touches 3 of a 6-colour gamut still packs at the smaller depth.
+        used = np.unique(idx)
+        table = [(src_palette[i * 3], src_palette[i * 3 + 1], src_palette[i * 3 + 2]) for i in used]
+        colors = max(1, len(table))
+        bpp = 1 if colors <= 2 else 4 if colors <= 16 else 8
+        # Remap the original indices to compact 0..colors-1 indices.
+        remap = np.zeros(256, dtype=np.uint8)
+        for new_i, old_i in enumerate(used):
+            remap[int(old_i)] = new_i
+        gidx = remap[idx]
 
     stride = ((w * bpp + 31) // 32) * 4  # 4-byte aligned row size
     pixels = bytearray()
     for y in range(h - 1, -1, -1):  # BMP scanlines are bottom-up
         pixels += _pack_row(gidx[y], bpp, stride)
 
-    table_entries = 1 << bpp
+    # The table carries exactly ``colors`` entries and says so in biClrUsed.
+    # adafruit_imageload reads the palette as the biClrUsed entries that
+    # precede the pixel data and sizes its Bitmap from the same count, so a
+    # 3-colour table must not be padded out to the 16 a 4-bpp file could hold.
+    table_entries = colors
     color_table = bytearray()
     for i in range(table_entries):
-        r, g, b = palette[i] if i < len(palette) else (0, 0, 0)
+        r, g, b = table[i]
         color_table += bytes((b, g, r, 0))  # BMP colour table is BGRA
 
     pixel_offset = 14 + 40 + len(color_table)
@@ -81,7 +116,7 @@ def pack_indexed_bmp(img: Image.Image) -> bytes:
         len(pixels),
         2835,  # 72 DPI, x
         2835,  # 72 DPI, y
-        table_entries,
+        table_entries,  # biClrUsed
         0,  # important colours (0 = all)
     )
     return bytes(file_header) + info_header + bytes(color_table) + bytes(pixels)
