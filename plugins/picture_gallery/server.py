@@ -23,6 +23,7 @@ re-open every image on every render.
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import json
 import os
 import random
@@ -294,6 +295,18 @@ def _filter_by_orientation(
     return kept
 
 
+def _cursor_token(device_id: str) -> str:
+    """A filename-safe token for a device id.
+
+    A device id is operator-supplied and reaches this function as part of a
+    path, so it is hashed rather than sanitised: a substitution scheme has to
+    be audited for what it lets through, and a hex digest has nothing to let
+    through. Truncated to 12 chars, which is far past collision risk for the
+    number of panels one install drives.
+    """
+    return hashlib.sha256(device_id.encode("utf-8")).hexdigest()[:12]
+
+
 # ----- widget contract: fetch + choices ------------------------------
 
 
@@ -325,7 +338,19 @@ def fetch(
     mode = options.get("mode", "random")
     if mode == "sequential":
         suffix = f"_{orientation}" if orientation != "any" else ""
-        idx_file = data_dir / f".sequential_index_{folder_segment}{suffix}"
+        # The cursor is per device (#209). Keyed by folder and orientation
+        # alone it was global: two dashboards pointing at the same folder
+        # shared one position and each advanced it, so a panel woken between
+        # the other's renders skipped whatever they consumed. The composer
+        # supplies ``target_device_id`` to widgets that ask for it in their
+        # manifest, so each panel now walks the album at its own pace.
+        #
+        # No device id means no device to walk for: an unbound or
+        # virtual-panel render keeps the shared cursor it has always used,
+        # which is also what every existing album file is keyed as.
+        device_id = str(ctx.get("target_device_id") or "")
+        device_suffix = f"_{_cursor_token(device_id)}" if device_id else ""
+        idx_file = data_dir / f".sequential_index_{folder_segment}{suffix}{device_suffix}"
         try:
             current = int(idx_file.read_text(encoding="utf-8"))
         except (FileNotFoundError, ValueError):

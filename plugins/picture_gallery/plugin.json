@@ -3,7 +3,7 @@
   "name": "Picture, Gallery",
   "version": "0.1.1",
   "kind": "widget",
-  "description": "Folder-based image rotation, full bleed. Manage folders + uploads at Widgets \u2192 Gallery. Supports internal folders (uploaded to the appliance) and external pointers to any directory on the host. Optional orientation filter + random or sequential rotation.",
+  "description": "Folder-based image rotation, full bleed. Manage folders + uploads at Widgets → Gallery. Supports internal folders (uploaded to the appliance) and external pointers to any directory on the host. Optional orientation filter + random or sequential rotation.",
   "icon": "ph-images",
   "supports": {
     "sizes": [
@@ -109,6 +109,7 @@
   ],
   "render": {
     "dither": "floyd-steinberg",
-    "full_bleed": true
+    "full_bleed": true,
+    "per_device_id": true
   }
 }
