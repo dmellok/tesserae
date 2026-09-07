@@ -101,6 +101,8 @@ Runs the [Tesserae-native firmware](https://github.com/dmellok/tesserae-device-f
 
 | SKU | Panel | Gamut | Protocol / Renderer | Kind id |
 |---|---|---|---|---|
+| [Pimoroni Inky Frame 7.3" (Spectra 6)](https://shop.pimoroni.com/products/inky-frame-7-3) | 800×480 | `spectra_6` | `pico_bin_client` (inherit) | `pimoroni_inky_frame_73` |
+| [Pimoroni Inky Frame 7.3" (7-colour ACeP)](https://shop.pimoroni.com/products/inky-frame-7-3) | 800×480 | `inky_7colour` | `pico_bin_client` (inherit) | `pimoroni_inky_frame_73_acep` |
 | [Pimoroni Inky Impression 4"](https://shop.pimoroni.com/products/inky-impression) | 600×400 | `spectra_6` | `pi_bin_client` (inherit) | `pimoroni_inky_4` |
 | [Pimoroni Inky Impression 4" (ACeP, 640x400, legacy)](https://shop.pimoroni.com/products/inky-impression) | 640×400 | `acep_7colour` | `pi_bin_client` (inherit) | `pimoroni_inky_4_acep` |
 
