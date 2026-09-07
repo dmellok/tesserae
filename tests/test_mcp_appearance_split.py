@@ -80,3 +80,16 @@ def test_the_split_actually_shrinks_the_catalog(app: Flask) -> None:
 def test_the_endpoint_is_behind_the_same_gate(app: Flask) -> None:
     """A new route must not become a way around the experiment gate."""
     assert app.test_client().get("/api/mcp/appearance").status_code == 404
+
+
+def test_the_served_docs_point_at_the_appearance_read() -> None:
+    """The bridge tells the agent where theme / style / font ids come from
+    through the docs this server serves. Those docs must not promise the lists
+    in list_widgets().appearance, which now carries counts, and must name the
+    read that does return them."""
+    from app import mcp_docs
+
+    served = mcp_docs.DOC_SHAPE + "".join(mcp_docs.TOOL_DOCS.values()) + mcp_docs.INSTRUCTIONS
+    assert "list_widgets().appearance" not in served
+    assert 'list_widgets(section="appearance")' in mcp_docs.DOC_SHAPE
+    assert 'list_widgets(section="appearance")' in mcp_docs.TOOL_DOCS["list_widgets"]

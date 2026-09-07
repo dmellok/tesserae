@@ -22,7 +22,7 @@ DOCS_SCHEMA = 1
 DOC_SHAPE = """A canvas document is JSON:
 {
   "w": int, "h": int,                 # artboard size in px (match the target panel)
-  "theme": str, "style": str,         # appearance ids from list_widgets().appearance
+  "theme": str, "style": str,         # ids from list_widgets(section="appearance")
   "font": str, "bg": str,             # optional font id and background colour override
   "els": [ <element>, ... ],          # painted in list order: first = back, last = front
   "inputs": [ <config input>, ... ]   # optional; the settings this dashboard asks for
@@ -114,7 +114,7 @@ plus optional "opacity" (0-100) and "rotate" (degrees). By "kind":
                (class="ph ph-heart" -- ph-heart alone renders nothing), and a wrong slug renders a
                BLANK BOX with no error; render_report().icon_invalid names bad icon refs, check it
                whenever you placed icons.
-             - Fonts: any bundled font (the names in appearance.fonts from list_widgets) works in the
+             - Fonts: any bundled font (list_widgets(section="appearance").fonts) works in the
                sandbox by family name, e.g. `font-family: "Fira Code"` or `"Press Start 2P"`. Only
                fonts your code actually names are inlined, so there's a broad programming + pixel set
                available at no cost until used.
@@ -459,17 +459,21 @@ WIRE UP NAVIGATION / SCHEDULING (once the pages exist):
 TOOL_DOCS: dict[str, str] = {
     "list_widgets": """\
 List every widget that can be placed on a canvas (with its fragments), the
-available theme/style/font appearance options, the vendored code-element
-libraries (Chart.js, canvas-gauges, dayjs, qrcode, marked, chroma, SVG.js,
-Phosphor), and an icon-set descriptor. Search icon names with list_icons().
+vendored code-element libraries (Chart.js, canvas-gauges, dayjs, qrcode,
+marked, chroma, SVG.js, Phosphor), and descriptors for the icon set and the
+appearance options. Search icon names with list_icons().
 
 The whole catalog runs to ~95k characters, past the tool-result cap, so by
 default each widget is summarised to {key, name, desc, fragments} and the
-appearance/library blocks are returned in full (they are small and are what
-the summary can't replace). "desc" is the first sentence of the widget's
-description only. That is enough to answer "which widget do I want"; follow
-with get_widget_options(key) for one widget's full description and option
-schema, which is the call that actually matters before placing it.
+library block is returned in full. "desc" is the first sentence of the
+widget's description only. That is enough to answer "which widget do I want";
+follow with get_widget_options(key) for one widget's full description and
+option schema, which is the call that actually matters before placing it.
+
+The theme / style / font lists are not in the default response: "appearance"
+carries only a count of each. Call list_widgets(section="appearance") to get
+the full lists, and only when you are setting a page's theme, style or font;
+placing widgets never needs them.
 
 "section" narrows to one top-level block ("widgets", "appearance",
 "libraries", "icons"). "full" returns the unsummarised catalog for the rare
@@ -638,7 +642,8 @@ them in as normal elements — they stay individually editable).""",
 Measure how wide/tall text renders in a widget font, so a box fits its
 content (prevents clipping). "items" is a list of {text, font?, size?, weight?,
 max_width?}. Returns {items:[{text,width,height,fits}]} where "fits" is whether
-the text is within max_width. Font names come from list_widgets().appearance.""",
+the text is within max_width. Font names come from
+list_widgets(section="appearance").fonts.""",
     "describe_actions": """\
 The authoritative touch-action vocabulary for canvas elements, so you don't
 have to reverse-engineer it: the element fields (on_tap / on_swipe / on_slide /

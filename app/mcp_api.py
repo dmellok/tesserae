@@ -2359,7 +2359,7 @@ def measure_text() -> Response:
     ``{text, font?, size?, weight?, max_width?}`` or ``{items:[...]}`` batch.
     Returns ``{items:[{text,width,height,fits}]}`` where ``fits`` is whether the
     text is within ``max_width`` (null when none given). Fonts are the widget
-    fonts by family name (see the catalog's appearance.fonts)."""
+    fonts by family name (the ``fonts`` list from ``GET /appearance``)."""
     body = request.get_json(silent=True) or {}
     maybe_items = body.get("items")
     raw: list[Any] = maybe_items if isinstance(maybe_items, list) else [body]
