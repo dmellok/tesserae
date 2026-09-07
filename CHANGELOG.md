@@ -8,6 +8,11 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- The self-hosted relay container now sends an explicit `Content-Length` on
+  every response instead of chunked transfer encoding. ESP32 firmware reads a
+  sealed frame only when the response carries a length, so a remote panel
+  paired against a container relay stayed on "waiting for first frame" even
+  though pairing and heartbeats worked. Relay image `0.1.1`.
 - Older x86-64 processors (before 2009, no SSE4.2) no longer get a bare
   `Illegal instruction` from the Docker image: the entrypoint explains that
   the bundled numpy needs x86-64-v2 and points at the fix. The image accepts a

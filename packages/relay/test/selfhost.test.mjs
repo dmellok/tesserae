@@ -235,7 +235,19 @@ test("the http bridge preserves method, status, headers and a binary body", asyn
       headers: { authorization: `Bearer ${device_token}` },
     });
     assert.equal(res.status, 200);
+    // A fixed Content-Length, never chunked: the ESP32 firmware only reads a
+    // sealed frame when the headers carry its length.
+    assert.equal(res.headers.get("content-length"), String(sealed.length));
+    assert.equal(res.headers.get("transfer-encoding"), null);
     assert.deepEqual(new Uint8Array(await res.arrayBuffer()), sealed);
+
+    // A conditional hit is a bodyless 304 that still carries the ETag.
+    res = await fetch(`${base}/v1/i/${install_id}/d/panel1/frame`, {
+      headers: { authorization: `Bearer ${device_token}`, "if-none-match": '"cafe5678"' },
+    });
+    assert.equal(res.status, 304);
+    assert.equal(res.headers.get("etag"), '"cafe5678"');
+    assert.equal((await res.arrayBuffer()).byteLength, 0);
 
     // An unknown route still answers through the bridge rather than hanging.
     res = await fetch(`${base}/v1/nope`);
