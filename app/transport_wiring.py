@@ -80,6 +80,13 @@ def _current_browser_pool(app: Flask) -> BrowserPool | None:
     return pool if _truthy(app_section.get("keep_browser_warm", True)) else None
 
 
+def _under_pytest(app: Flask) -> bool:
+    """True when this app is being driven by the test suite, whether it was
+    built with ``testing=True`` or (to keep the auth gate) ``testing=False``
+    and then flagged. Same check the heartbeat uses."""
+    return bool(app.testing or app.config.get("TESTING") or os.environ.get("PYTEST_CURRENT_TEST"))
+
+
 def _truthy(value: object) -> bool:
     if isinstance(value, bool):
         return value
@@ -917,6 +924,10 @@ def _rebuild_transport(
             data_root=app.config["DATA_ROOT"],
             settings=settings,
             app=app,
+            # Under pytest the poller stays threadless (see the OpenDisplay
+            # poller for the same rule): every app-building test used to leave
+            # one of these loops running for the life of the worker.
+            run_async=not _under_pytest(app),
         )
         poller.start()
         app.config["RELAY_PAIRING_POLLER"] = poller

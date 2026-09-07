@@ -37,6 +37,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 from pydantic import ValidationError
 
+from app import background_loops
 from app.plugin_loader import PluginRegistry
 from app.push import PushManager, PushResult
 from app.scheduled_refresh import ScheduledPlacement, scheduled_placements
@@ -499,6 +500,7 @@ class Scheduler:
         )
         watchdog.start()
         self._watchdog_thread = watchdog
+        background_loops.track(self)
 
     def stop(self) -> None:
         self._stop.set()

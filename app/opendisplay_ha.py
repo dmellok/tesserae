@@ -26,6 +26,7 @@ from __future__ import annotations
 import contextlib
 import json
 import logging
+import os
 import shutil
 import threading
 import urllib.error
@@ -35,7 +36,7 @@ from typing import Any
 
 from flask import Flask
 
-from app import ha_telemetry
+from app import background_loops, ha_telemetry
 from app.device_loader import Device, DeviceRegistry
 
 logger = logging.getLogger(__name__)
@@ -311,6 +312,7 @@ class OpenDisplayHaTelemetryPoller:
             target=self._loop, name="opendisplay-ha-telemetry", daemon=True
         )
         self._thread.start()
+        background_loops.track(self)
 
     def stop(self) -> None:
         self._stop.set()
@@ -452,6 +454,10 @@ def register(app: Flask) -> None:
         devices=devices,
         settings=settings,
         interval_s=_configured_telemetry_interval(settings),
+        # Threadless under pytest, see transport_wiring._under_pytest.
+        run_async=not (
+            app.testing or app.config.get("TESTING") or os.environ.get("PYTEST_CURRENT_TEST")
+        ),
     )
     poller.start()
     app.config["OPENDISPLAY_HA_TELEMETRY_POLLER"] = poller

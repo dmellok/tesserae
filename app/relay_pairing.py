@@ -29,6 +29,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from app import background_loops
 from app.device_loader import Device, DeviceRegistry
 from app.device_service import create_instance
 from app.ota._codec import b64u_decode, b64u_encode
@@ -190,6 +191,7 @@ class RelayPairingPoller:
         if not self._run_async:
             return
         threading.Thread(target=self._loop, name="relay-pairing", daemon=True).start()
+        background_loops.track(self)
 
     def stop(self) -> None:
         self._stop.set()
