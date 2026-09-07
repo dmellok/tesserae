@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tesserae"
-version = "0.393.0"
+version = "0.394.0"
 description = "E-ink dashboard companion. Compose tile-based dashboards, render headless, push frames over MQTT."
 requires-python = ">=3.11"
 license = { text = "AGPL-3.0-or-later" }
@@ -54,7 +54,7 @@ dependencies = [
     # (HA tokens, plugin API keys, etc.). PyCA cryptography is the de
     # facto Python crypto library; Rust-backed primitives, well-audited,
     # available as a manylinux wheel so the Docker image stays slim.
-    "cryptography>=42,<50",
+    "cryptography>=42,<51",
     # Optional mDNS advertiser (Settings → opt-in): publishes
     # tesserae.local + an _http._tcp service so the appliance is
     # reachable by name without touching the host's hostname.
@@ -165,6 +165,10 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = "-ra --strict-markers --import-mode=importlib"
+# CI occasionally stalls for over an hour inside one test with no output. This
+# dumps the stalled test's traceback to stderr after 10 minutes without
+# killing the run, so the next stall names itself.
+faulthandler_timeout = 600
 filterwarnings = [
     "error",
     "ignore::DeprecationWarning:flask.*",

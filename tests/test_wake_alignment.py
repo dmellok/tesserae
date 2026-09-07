@@ -288,7 +288,9 @@ def test_status_aligns_next_poll_to_the_clock_grid(app: Flask) -> None:
     # The wake must land on a 15-minute UTC boundary (anchor 00:00).
     target = int(before) + poll
     assert abs(target % 900) <= 2 or 900 - (target % 900) <= 2
-    assert poll <= 900 + 2
+    # No bare ``poll <= 902`` here: within MIN_DELTA_S of a grid point the
+    # server skips to the next one, so the delta legitimately exceeds 900.
+    # ``_expected_grid_delta`` models that.
     assert _expected_grid_delta(900, before) - 2 <= poll <= _expected_grid_delta(900, before) + 2
     # And the same instant rides along as an absolute epoch for capable
     # firmware.

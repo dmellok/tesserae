@@ -26,6 +26,9 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   docs promise lists.
 - The device setup guide gains an *Update delivery* section describing Auto
   and Always full refresh.
+- The `cryptography` dependency now allows the 50.x series, which carries the
+  fix for PYSEC-2026-3552. The affected PKCS#7 API is not used here; the pin
+  was the only reason the audit kept reporting it.
 
 ## [0.392.0], 2026-09-06
 

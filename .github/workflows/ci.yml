@@ -154,10 +154,10 @@ jobs:
         run: bandit -r app -q --severity-level high --confidence-level high
       - name: pip-audit
         # Advisory. The pillow + cryptography advisories that motivated #142 are
-        # resolved (pins lifted to <13 / <50). What remains is a minor transitive
-        # advisory in click, which typer pins to <8.2 so it can't reach the fix
-        # yet. Kept non-blocking so an unresolvable transitive doesn't red main;
-        # promote to a hard gate once the runtime graph audits clean.
+        # resolved (pins lifted to <13 / <51). What remains is setuptools on the
+        # runner, a build tool rather than a runtime dependency. Kept
+        # non-blocking so an unresolvable transitive doesn't red main; promote
+        # to a hard gate once the runtime graph audits clean.
         continue-on-error: true
         run: pip-audit --progress-spinner off
 
@@ -189,9 +189,9 @@ jobs:
     # drop continue-on-error to make them required.
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
       - name: Install lint deps
         run: npm ci
@@ -214,7 +214,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Install uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v7
       - name: uv lock --check
         run: uv lock --check
 
