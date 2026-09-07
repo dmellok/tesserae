@@ -387,9 +387,11 @@ def _desc_summary(desc: str) -> str:
 
 @bp.get("/catalog")
 def catalog() -> Response:
-    """Every renderable widget (with its fragments) plus theme/style/font options,
-    the vendored code-element libraries, and the icon set, so the agent knows what
-    it can place, how to style the canvas, and what's in the code-element toolkit.
+    """Every renderable widget (with its fragments), the vendored code-element
+    libraries, and pointers to the icon set and the appearance options, so the
+    agent knows what it can place and what's in the code-element toolkit.
+    Theme / style / font lists are counted here and served in full by
+    ``GET /appearance``; the icon names by ``GET /icons?q=``.
 
     The per-widget ``sample`` payload is omitted here to keep the response small;
     fetch a widget's live data shape with ``POST /widgets/<key>/data`` instead.
@@ -407,10 +409,22 @@ def catalog() -> Response:
         }
         for w in widgets
     ]
+    appearance = _pr._appearance()
     return jsonify(
         {
             "widgets": lean,
-            "appearance": _pr._appearance(),
+            # Counts and an endpoint, not the lists (#257). Themes, styles and
+            # fonts are ~14% of every catalog read and are only needed when
+            # something is actually being restyled, which most builds never
+            # do. Same shape the icon set already uses here, for the same
+            # reason.
+            "appearance": {
+                "themes": len(appearance.get("themes") or []),
+                "styles": len(appearance.get("styles") or []),
+                "fonts": len(appearance.get("fonts") or []),
+                "endpoint": "/api/mcp/appearance",
+                "usage": "GET it before setting a page's theme / style / font; not needed to place widgets",
+            },
             "libraries": _LIBRARIES,
             "icons": {
                 "total": len(_phosphor_icons()),
@@ -423,6 +437,19 @@ def catalog() -> Response:
             },
         }
     )
+
+
+@bp.get("/appearance")
+def appearance() -> Response:
+    """Theme, style and font options for the canvas.
+
+    Split out of ``/catalog`` (#257): the lists are only needed when something
+    is being restyled, and riding along with every catalog read cost roughly
+    14% of it on builds that never touch a theme. The catalog still reports
+    how many of each exist and points here, so an agent that does need them
+    knows they are there.
+    """
+    return jsonify(_pr._appearance())
 
 
 @bp.get("/icons")
@@ -2332,7 +2359,7 @@ def measure_text() -> Response:
     ``{text, font?, size?, weight?, max_width?}`` or ``{items:[...]}`` batch.
     Returns ``{items:[{text,width,height,fits}]}`` where ``fits`` is whether the
     text is within ``max_width`` (null when none given). Fonts are the widget
-    fonts by family name (see the catalog's appearance.fonts)."""
+    fonts by family name (the ``fonts`` list from ``GET /appearance``)."""
     body = request.get_json(silent=True) or {}
     maybe_items = body.get("items")
     raw: list[Any] = maybe_items if isinstance(maybe_items, list) else [body]
