@@ -22,6 +22,12 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Changed
 
+- PicPak frames now get the "update available" chip on the Devices card and
+  the Firmware page. The update check (api.tesserae.ink) also follows
+  community firmware repos, starting with `picpak_client` mapped to
+  varanu5/picpak-tesserae-client. Such releases carry no OTA descriptor, so
+  the chip links the release for a web-flasher update rather than queueing
+  an over-the-air one.
 - `/api/mcp/catalog` reports a count of themes, styles and fonts and points at
   the appearance endpoint instead of inlining the lists, taking roughly a
   sixth off every `list_widgets` read. (#257)
