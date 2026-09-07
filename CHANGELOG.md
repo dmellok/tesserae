@@ -37,6 +37,19 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **Background loops can be stopped as a set.** The scheduler, the
+  relay-pairing poller, the OpenDisplay telemetry poller and HA discovery's
+  ticker register with a small registry when they start, and the transport
+  wiring keeps the two pollers threadless under the test suite. This is what
+  the intermittent hour-long CI stall was: each test that built an app left a
+  full set of these loops running, and the worker eventually wedged with a
+  hundred of them alive. The suite now stops them after every test and fails
+  the test that leaks one.
+- **Palette profiles no longer swap primaries on 7-colour ACeP panels.** A
+  profile emits its colours in Spectra 6 slot order and was applied to the
+  panel palette positionally, which on `inky_7colour` put the calibrated
+  yellow where the panel paints green and the blue where it paints red. The
+  override is now matched to the gamut's slots by colour. (#298)
 - **The Gallery widget's Scale option now does something.** Every choice
   rendered as Fill: the client never read the option, and the shared
   full-bleed rule crops to cover. Fit letterboxes, Stretch distorts, Center

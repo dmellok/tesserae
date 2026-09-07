@@ -1540,6 +1540,47 @@ _HALFTONE_16: np.ndarray = _make_halftone_matrix(16)
 _CROSSHATCH_8: np.ndarray = _make_crosshatch_matrix(8)
 
 
+# The slot order a palette profile emits (``PaletteColors.as_tuples``):
+# black, white, yellow, red, blue, green, then orange when the profile has
+# one. That happens to be the Spectra 6 / E6 nibble order, which is why
+# the override used to be applied positionally, and why it silently swapped
+# green with yellow and blue with red on ``inky_7colour`` panels, whose
+# nominal palette runs black, white, green, blue, red, yellow, orange
+# (pull request #298).
+_PROFILE_SLOT_ORDER: tuple[tuple[int, int, int], ...] = (
+    (0, 0, 0),
+    (255, 255, 255),
+    (255, 255, 0),
+    (255, 0, 0),
+    (0, 0, 255),
+    (0, 255, 0),
+    (255, 140, 0),
+)
+
+
+def align_palette_override(
+    override: tuple[tuple[int, int, int], ...],
+    nominal: tuple[tuple[int, int, int], ...],
+) -> tuple[tuple[int, int, int], ...]:
+    """Reorder a palette profile's colours into ``nominal``'s slot order.
+
+    ``override`` is in the profile's fixed slot order (see
+    ``_PROFILE_SLOT_ORDER``); ``nominal`` is the gamut's palette in wire
+    order. Each nominal colour is looked up by its pure value in the profile
+    order and the matching override entry is taken, so the calibrated red
+    lands on the slot the panel paints red, whatever that slot's index is.
+    A nominal colour the profile order does not know (a custom gamut) falls
+    back to the positional entry, which is the pre-#298 behaviour."""
+    out: list[tuple[int, int, int]] = []
+    for i, colour in enumerate(nominal):
+        try:
+            slot = _PROFILE_SLOT_ORDER.index(colour)
+        except ValueError:
+            slot = i
+        out.append(override[slot] if slot < len(override) else override[i])
+    return tuple(out)
+
+
 def pack_to_panel_bin(
     img: Image.Image,
     *,
@@ -1664,7 +1705,7 @@ def pack_to_panel_bin(
     )
     if calibrated_active:
         if palette_override is not None and len(palette_override) >= len(palette):
-            palette = palette_override[: len(palette)]
+            palette = align_palette_override(palette_override, palette)
         else:
             palette = _CALIBRATED_PALETTES[gamut]
     pal_arr = np.array(palette, dtype=np.float32)
