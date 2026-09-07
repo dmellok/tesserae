@@ -87,6 +87,17 @@ def _clamp_hours(raw: Any) -> int:
     return max(1, min(h, 2160))  # 1 hour … 90 days
 
 
+def _y_range(raw_min: Any, raw_max: Any) -> tuple[float | None, float | None]:
+    """Optional fixed bounds for the chart's value axis. Either side may be
+    blank (the axis follows the data on that side). An inverted pair, where
+    the minimum is not below the maximum, is dropped entirely rather than
+    handing the chart an axis it can't draw."""
+    lo, hi = _to_float(raw_min), _to_float(raw_max)
+    if lo is not None and hi is not None and lo >= hi:
+        return None, None
+    return lo, hi
+
+
 def _trend(values: list[float]) -> str:
     """up / down / flat from the window's first to last sample."""
     if len(values) < 2:
@@ -278,11 +289,14 @@ def fetch(
     # values are optional; the client falls back gracefully when they
     # aren't present.
     threshold = _to_float(options.get("threshold"))
+    y_min, y_max = _y_range(options.get("y_min"), options.get("y_max"))
     return {
         "title": title,
         "hours": hours,
         "items": items,
         "threshold": threshold,
+        "y_min": y_min,
+        "y_max": y_max,
         "show_profile": options.get("show_profile") is not False,
         "show_min_max": options.get("show_min_max") is not False,
     }

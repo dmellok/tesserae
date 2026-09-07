@@ -470,6 +470,11 @@ export function lineChart(canvas, opts) {
         },
         y: {
           display: opts.showY !== false,
+          // Fixed bounds when the caller supplies them (a pinned range
+          // keeps the same swing the same size from render to render);
+          // otherwise Chart.js fits the axis to the data.
+          ...(Number.isFinite(opts.yMin) ? { min: opts.yMin } : {}),
+          ...(Number.isFinite(opts.yMax) ? { max: opts.yMax } : {}),
           ticks: {
             color: t.textMuted,
             font: { family: t.fontFamily, weight: 700, size: 10 },

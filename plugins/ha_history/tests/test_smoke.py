@@ -187,6 +187,23 @@ def test_axis_labels_absent_without_timestamps(app: Flask, monkeypatch) -> None:
     assert item["times"] == []
 
 
+def test_y_range_passes_through_and_drops_inverted(app: Flask, monkeypatch) -> None:
+    hist, core = _mods(app)
+    series = [{"state": str(v)} for v in [10, 12, 11]]
+    with app.app_context():
+        monkeypatch.setattr(core, "get_states", lambda: _STATES)
+        monkeypatch.setattr(core, "history", lambda eid, hours=24: series)
+        base = {"entities": "sensor.temp"}
+        blank = hist.fetch(base, {}, ctx={})
+        pinned = hist.fetch({**base, "y_min": "0", "y_max": 40}, {}, ctx={})
+        one_side = hist.fetch({**base, "y_min": "", "y_max": "40"}, {}, ctx={})
+        inverted = hist.fetch({**base, "y_min": 40, "y_max": 0}, {}, ctx={})
+    assert blank["y_min"] is None and blank["y_max"] is None
+    assert pinned["y_min"] == 0.0 and pinned["y_max"] == 40.0
+    assert one_side["y_min"] is None and one_side["y_max"] == 40.0
+    assert inverted["y_min"] is None and inverted["y_max"] is None
+
+
 def test_composer_mounts_widget(client: FlaskClient) -> None:
     resp = client.get("/_test/render?plugin=ha_history&size=md")
     assert resp.status_code == 200

@@ -1,9 +1,9 @@
 {
   "tesserae_compat": "1.x",
   "name": "Home Assistant, History",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "kind": "widget",
-  "description": "A numeric Home Assistant sensor over time. Pairs the current value + trend arrow + min/max with a Chart.js line chart, optional threshold horizontal line, min/max marker dots + labels on the curve, and an averaged hourly-profile ghost overlay for long windows. Requires the Home Assistant Core plugin.",
+  "description": "A numeric Home Assistant sensor over time. Pairs the current value + trend arrow + min/max with a Chart.js line chart, optional threshold horizontal line, optional fixed y-axis range, min/max marker dots + labels on the curve, and an averaged hourly-profile ghost overlay for long windows. Requires the Home Assistant Core plugin.",
   "icon": "ph-chart-line",
   "supports": {
     "sizes": [
@@ -40,6 +40,20 @@
       "label": "Threshold (optional)",
       "default": "",
       "help": "Draws a horizontal dashed line at this value. Useful for 'too cold' / 'too high' / 'over budget' thresholds."
+    },
+    {
+      "name": "y_min",
+      "type": "number",
+      "label": "Y-axis minimum (optional)",
+      "default": "",
+      "help": "Fixes the bottom of the chart's value axis. Blank lets the axis follow the data, which can make the same swing look bigger or smaller from one render to the next."
+    },
+    {
+      "name": "y_max",
+      "type": "number",
+      "label": "Y-axis maximum (optional)",
+      "default": "",
+      "help": "Fixes the top of the chart's value axis. Blank lets the axis follow the data. Set both to pin the range, for example 0 to 40 for an outdoor temperature."
     },
     {
       "name": "show_min_max",

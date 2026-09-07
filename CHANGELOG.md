@@ -6,6 +6,14 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added
+
+- The Home Assistant History widget takes optional "Y-axis minimum" and
+  "Y-axis maximum" cell options that pin the chart's value axis. Blank keeps
+  the auto-fit range, and one side can be set on its own. The Sensor widget's
+  description and sparkline help now point at the History widget for a full
+  chart with labelled axes (#282).
+
 ### Fixed
 
 - The self-hosted relay container now sends an explicit `Content-Length` on

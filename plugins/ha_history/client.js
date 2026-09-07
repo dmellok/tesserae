@@ -211,6 +211,10 @@ export default function render(shadow, ctx) {
         markers,
         overlay,
         threshold,
+        // Optional fixed value-axis bounds from the cell options; the
+        // helper ignores anything that isn't a finite number.
+        yMin: data.y_min,
+        yMax: data.y_max,
       });
     }
   }
