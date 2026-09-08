@@ -1607,6 +1607,15 @@ def devices_delete(instance_id: str) -> Response:
             device_facts.forget(instance_id)
         except Exception:
             current_app.logger.exception("device_facts: forget failed for %s", instance_id)
+    # And the persisted last heartbeat, for the same reason.
+    status_snapshot = current_app.config.get("DEVICE_STATUS_SNAPSHOT")
+    if status_snapshot is not None:
+        try:
+            status_snapshot.forget(instance_id)
+        except Exception:
+            current_app.logger.exception(
+                "device_status snapshot: forget failed for %s", instance_id
+            )
     # And the live device_status cache so a stale "last seen" or
     # parsed-heartbeat block doesn't tail-render anywhere (events,
     # ha-discovery refresh callbacks, etc).

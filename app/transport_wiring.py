@@ -398,6 +398,15 @@ def record_status_heartbeat(
     elif prev_entry.get("can_stay_awake") is not None:
         entry["can_stay_awake"] = prev_entry["can_stay_awake"]
     status_cache[device.id] = entry
+    # Persist the merged heartbeat so a restart seeds the cache with the
+    # last known readings (the store skips steady beats itself). A parse
+    # error keeps the previous good snapshot.
+    snapshot = app.config.get("DEVICE_STATUS_SNAPSHOT")
+    if snapshot is not None and "error" not in parsed:
+        try:
+            snapshot.record(device.id, received_at=received_at, parsed=merged)
+        except Exception:
+            logger.exception("device_status snapshot: record failed for %s", device.id)
     # Persist the stable facts (fw version, OTA capability) so a restart
     # doesn't forget them until the device's next wake; write-on-change only.
     facts = app.config.get("DEVICE_FACTS")

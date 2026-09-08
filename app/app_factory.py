@@ -782,6 +782,17 @@ def create_app(
         _seed = {k: _fact[k] for k in ("overlay", "proto") if isinstance(_fact.get(k), dict)}
         if _seed and _dev_id not in status_cache:
             status_cache[_dev_id] = _seed
+    # Seed the last heartbeat itself (battery, signal, environment, with
+    # its original received_at) so the status strip, the Devices card
+    # tiles and per-device widget fetches show the last known readings
+    # right after a restart instead of nothing until the next heartbeat.
+    from app.state.device_status_snapshot import DeviceStatusSnapshotStore
+
+    app.config["DEVICE_STATUS_SNAPSHOT"] = DeviceStatusSnapshotStore(
+        data_root / "core" / "device_status.json"
+    )
+    for _dev_id, _snap in app.config["DEVICE_STATUS_SNAPSHOT"].all().items():
+        status_cache.setdefault(_dev_id, {}).update(_snap)
     app.config["PREVIEW_CACHE"] = {}
     app.config["RENDERS_DIR"] = renders_dir
     app.config["DEVICE_STATUS"] = status_cache

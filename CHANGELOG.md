@@ -35,6 +35,20 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- A device's last heartbeat now survives a server restart (#282). The battery,
+  signal, temperature and humidity readings the status strip widget and the
+  Devices card draw from lived only in memory, so after an upgrade they were
+  blank until the device next reported, and a frame fetched on a button wake
+  is rendered before that same wake's heartbeat lands. The last merged
+  heartbeat is kept in `data/core/device_status.json` and seeds the cache at
+  boot with its original timestamp, so the Devices card still shows the
+  reading's real age.
+- Min / max labels on the History widget's chart stay inside the canvas
+  (#282). A maximum sitting on the top gridline lost its label off the top
+  edge, and a marker at either end of the series lost half of it off the
+  side. The chart now reserves room above the plot for the max label and
+  keeps both labels within the drawing area, flipping a label to the other
+  side of its point when it cannot fit.
 - The self-hosted relay container now sends an explicit `Content-Length` on
   every response instead of chunked transfer encoding. ESP32 firmware reads a
   sealed frame only when the response carries a length, so a remote panel
