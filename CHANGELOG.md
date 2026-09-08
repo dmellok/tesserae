@@ -43,6 +43,12 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   heartbeat is kept in `data/core/device_status.json` and seeds the cache at
   boot with its original timestamp, so the Devices card still shows the
   reading's real age.
+- The History widget's low and high now always bracket its current value
+  (#282). The current reading comes from the live state while low and high
+  came from the history samples, which ha_core caches for longer, so a fresh
+  reading could sit below the window's low. A live state newer than the last
+  sample now joins the series as its final point, so the chart also ends where
+  the headline says. `ha_history` 0.8.1.
 - Min / max labels on the History widget's chart stay inside the canvas
   (#282). A maximum sitting on the top gridline lost its label off the top
   edge, and a marker at either end of the series lost half of it off the

@@ -222,6 +222,25 @@ def _series_for(
         if value is None:
             continue
         pairs.append((s.get("last_changed") or s.get("last_updated"), value))
+    # The live state can be newer than the last history sample (history is
+    # cached for a couple of minutes, states only for seconds, and HA's
+    # history endpoint returns significant changes only), which left the
+    # headline reading outside the window's own low / high (#282). Fold it
+    # in as the final point when it is newer than the last sample, so low
+    # and high always bracket the current value and the chart ends where
+    # the headline says it does. Only with timestamps on both sides: a
+    # point of unknown age can't be placed on the time axis.
+    if current_f is not None and pairs:
+        state_stamp = st.get("last_changed") or st.get("last_updated")
+        state_dt = _parse_dt(state_stamp)
+        last_dt = _parse_dt(pairs[-1][0])
+        if (
+            state_dt is not None
+            and last_dt is not None
+            and state_dt >= last_dt
+            and pairs[-1][1] != current_f
+        ):
+            pairs.append((state_stamp, current_f))
     values = [v for _, v in pairs]
     if len(values) < 2:
         return {

@@ -223,3 +223,62 @@ def test_value_style_passes_through_and_falls_back(app: Flask, monkeypatch) -> N
     assert blank["value_style"] == "legend"
     assert headline["value_style"] == "headline"
     assert junk["value_style"] == "legend"
+
+
+def test_live_state_newer_than_history_becomes_the_last_point(app: Flask, monkeypatch) -> None:
+    """#282: history is cached longer than states, so the live reading can
+    sit outside the window's own low / high (current 65.8, low 65.9). A
+    newer live state joins the series as its last point, so low and high
+    bracket the headline and the chart ends where the headline says."""
+    hist, core = _mods(app)
+    samples = _stamped([66.5, 66.2, 65.9], "2026-09-08T00:00:00+00:00", 60)
+    states = [
+        {
+            "entity_id": "sensor.temp",
+            "state": "65.8",
+            "last_changed": "2026-09-08T02:30:00+00:00",
+            "attributes": {"friendly_name": "Outside", "unit_of_measurement": "°F"},
+        }
+    ]
+    with app.app_context():
+        app.config["SETTINGS_STORE"].patch_section("app", {"timezone": "UTC"})
+        monkeypatch.setattr(core, "get_states", lambda: states)
+        monkeypatch.setattr(core, "history", lambda eid, hours=24: samples)
+        item = hist.fetch(
+            {"entities": "sensor.temp", "hours": 12, "number_format": "0.0"}, {}, ctx={}
+        )["items"][0]
+
+    assert item["values"] == [66.5, 66.2, 65.9, 65.8]
+    assert item["times"] == ["00:00", "01:00", "02:00", "02:30"]
+    assert item["current"] == "65.8"
+    assert item["min"] == "65.8" and item["min_idx"] == 3
+    assert item["max"] == "66.5"
+
+
+def test_live_state_matching_or_older_than_history_is_not_duplicated(
+    app: Flask, monkeypatch
+) -> None:
+    hist, core = _mods(app)
+    samples = _stamped([10.0, 11.0, 12.0], "2026-09-08T00:00:00+00:00", 60)
+
+    def state(value: str, stamp: str) -> list[dict]:
+        return [
+            {
+                "entity_id": "sensor.temp",
+                "state": value,
+                "last_changed": stamp,
+                "attributes": {"unit_of_measurement": "°C"},
+            }
+        ]
+
+    with app.app_context():
+        app.config["SETTINGS_STORE"].patch_section("app", {"timezone": "UTC"})
+        monkeypatch.setattr(core, "history", lambda eid, hours=24: samples)
+        monkeypatch.setattr(core, "get_states", lambda: state("12.0", "2026-09-08T02:00:00+00:00"))
+        same = hist.fetch({"entities": "sensor.temp", "hours": 12}, {}, ctx={})["items"][0]
+        monkeypatch.setattr(core, "get_states", lambda: state("9.0", "2026-09-07T23:00:00+00:00"))
+        older = hist.fetch({"entities": "sensor.temp", "hours": 12}, {}, ctx={})["items"][0]
+
+    assert same["values"] == [10.0, 11.0, 12.0]
+    assert older["values"] == [10.0, 11.0, 12.0]
+    assert older["min"] == "10"
