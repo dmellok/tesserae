@@ -8,6 +8,11 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- The History widget gains a "Current value" option (#282). "Large headline
+  above the chart" draws the single-sensor reading in display type with the
+  trend arrow and low / high beside it, so a weather panel shows the value at a
+  glance with the history underneath for context. The default keeps the value
+  in the legend strip under the chart. `ha_history` 0.8.0.
 - Quiet hours can be limited to chosen weekdays and can mark whole days quiet
   (#299). Both the app-level window and a device's override gain a "Window
   applies on" weekday picker and a "Quiet all day" picker, so an office panel

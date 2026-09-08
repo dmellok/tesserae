@@ -31,21 +31,33 @@ function escapeHtml(s) {
 // ``title`` is the cell's own Title option; the server falls it back to
 // the entity's friendly name when the user left it blank, so this heading
 // honours a custom title instead of always printing the entity name.
-function renderSingle(item, hours, title) {
+// ``valueStyle`` picks where the current reading goes: "legend" keeps it
+// in the strip under the chart; "headline" draws it large above the chart
+// with the trend arrow and low / high beside it, for the weather-style
+// "value at a glance, history for context" card (issue #282).
+function renderSingle(item, hours, title, valueStyle) {
   const trendAccent = TREND_ACCENT[item.trend] || TREND_ACCENT.flat;
   const trendPh = TREND_ICON[item.trend] || TREND_ICON.flat;
-  return `
-    <div class="w-title">
-      <i class="ph-bold ph-chart-line-up" style="color:${trendAccent}"></i>
-      <h3>${escapeHtml(title || item.name)}</h3>
-      <span class="w-title-meta">${hours}H</span>
-    </div>
-    <div class="w-body" style="gap:var(--space-2)">
+  const headline = valueStyle === "headline";
+  const chart = `
       <div style="flex:1 1 auto;min-height:0;position:relative">
         ${Array.isArray(item.values) && item.values.length
           ? '<canvas></canvas>'
           : '<p class="u-muted">No samples in the window.</p>'}
+      </div>`;
+  const lowHigh = `
+        <span class="chart-key"><span class="u-label">Low</span> ${escapeHtml(item.min || "-")}</span>
+        <span class="chart-key"><span class="u-label">High</span> ${escapeHtml(item.max || "-")}</span>`;
+  const body = headline
+    ? `
+      <div class="hist-headline">
+        <span class="hist-headline-v">${escapeHtml(item.current)}${item.unit ? `<small> ${escapeHtml(item.unit)}</small>` : ""}
+          <i class="ph-bold ${trendPh}" style="color:${trendAccent}"></i></span>
+        <span class="hist-headline-lohi">${lowHigh}</span>
       </div>
+      ${chart}`
+    : `
+      ${chart}
       <div class="chart-legend">
         <span class="chart-key u-spread" style="gap:var(--space-3)">
           <span style="font-weight:var(--fw-black);font-size:var(--fs-lead);color:var(--text-primary)">
@@ -53,9 +65,22 @@ function renderSingle(item, hours, title) {
           </span>
           <i class="ph-bold ${trendPh}" style="color:${trendAccent};font-size:1em"></i>
         </span>
-        <span class="chart-key"><span class="u-label">Low</span> ${escapeHtml(item.min || "-")}</span>
-        <span class="chart-key"><span class="u-label">High</span> ${escapeHtml(item.max || "-")}</span>
-      </div>
+        ${lowHigh}
+      </div>`;
+  return `
+    <style>
+      .hist-headline { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); flex: 0 0 auto; }
+      .hist-headline-v { font-size: var(--fs-display); font-weight: var(--fw-black); line-height: var(--lh-tight); color: var(--text-primary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+      .hist-headline-v small { font-size: .45em; color: var(--text-muted); font-weight: var(--fw-bold); }
+      .hist-headline-v i { font-size: .5em; vertical-align: .3em; }
+      .hist-headline-lohi { display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-1); }
+    </style>
+    <div class="w-title">
+      <i class="ph-bold ph-chart-line-up" style="color:${trendAccent}"></i>
+      <h3>${escapeHtml(title || item.name)}</h3>
+      <span class="w-title-meta">${hours}H</span>
+    </div>
+    <div class="w-body" style="gap:var(--space-2)">${body}
     </div>`;
 }
 
@@ -141,7 +166,7 @@ export default function render(shadow, ctx) {
       ? '<div class="w-body"><div style="flex:1 1 auto;min-height:0;position:relative"><canvas></canvas></div></div>'
       : '<div class="w-body"><p class="u-muted">No chart for this selection.</p></div>';
   } else {
-    body = single ? renderSingle(items[0], hours, title) : renderMulti(items, title, hours);
+    body = single ? renderSingle(items[0], hours, title, data.value_style) : renderMulti(items, title, hours);
   }
   shadow.innerHTML = `
     ${css}

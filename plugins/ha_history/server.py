@@ -98,6 +98,17 @@ def _y_range(raw_min: Any, raw_max: Any) -> tuple[float | None, float | None]:
     return lo, hi
 
 
+def _value_style(raw: Any) -> str:
+    """Where the single-sensor current reading is drawn.
+
+    ``legend`` (default) keeps it in the strip under the chart; ``headline``
+    puts it in large type above the chart. Anything else falls back to the
+    default so an old or hand-edited option never blanks the value.
+    """
+    style = str(raw or "").strip().lower()
+    return style if style in ("legend", "headline") else "legend"
+
+
 def _trend(values: list[float]) -> str:
     """up / down / flat from the window's first to last sample."""
     if len(values) < 2:
@@ -297,6 +308,7 @@ def fetch(
         "threshold": threshold,
         "y_min": y_min,
         "y_max": y_max,
+        "value_style": _value_style(options.get("value_style")),
         "show_profile": options.get("show_profile") is not False,
         "show_min_max": options.get("show_min_max") is not False,
     }

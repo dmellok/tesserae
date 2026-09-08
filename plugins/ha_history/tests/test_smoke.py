@@ -208,3 +208,18 @@ def test_composer_mounts_widget(client: FlaskClient) -> None:
     resp = client.get("/_test/render?plugin=ha_history&size=md")
     assert resp.status_code == 200
     assert 'data-plugin="ha_history"' in resp.get_data(as_text=True)
+
+
+def test_value_style_passes_through_and_falls_back(app: Flask, monkeypatch) -> None:
+    hist, core = _mods(app)
+    series = [{"state": str(v)} for v in [10, 12, 11]]
+    with app.app_context():
+        monkeypatch.setattr(core, "get_states", lambda: _STATES)
+        monkeypatch.setattr(core, "history", lambda eid, hours=24: series)
+        base = {"entities": "sensor.temp"}
+        blank = hist.fetch(base, {}, ctx={})
+        headline = hist.fetch({**base, "value_style": "headline"}, {}, ctx={})
+        junk = hist.fetch({**base, "value_style": "huge"}, {}, ctx={})
+    assert blank["value_style"] == "legend"
+    assert headline["value_style"] == "headline"
+    assert junk["value_style"] == "legend"
