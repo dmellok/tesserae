@@ -59,8 +59,11 @@ LEAD_MAX_S = 120
 
 # How far ahead to search for a grid point before giving up (quiet hours
 # can swallow points; a misconfigured window shouldn't hang the search
-# or strand the device). Callers fall back to the plain interval.
-HORIZON_S = 48 * 3600
+# or strand the device). Callers fall back to the plain interval. Long
+# enough to clear a weekend that is quiet all day plus the Friday
+# evening before it (#299).
+HORIZON_S = 5 * 24 * 3600
+_TIMES_SEARCH_DAYS = 6
 
 _HHMM_RE = re.compile(r"^([01]?\d|2[0-3]):([0-5]\d)$")
 
@@ -181,7 +184,7 @@ def next_aligned_wake_epoch(
         parsed = [hm for hm in (parse_hhmm(t) for t in alignment.times) if hm is not None]
         if not parsed:
             return None
-        for day_offset in range(3):  # today, tomorrow, day after (quiet skips)
+        for day_offset in range(_TIMES_SEARCH_DAYS):  # today onward (quiet days skip)
             day = now_dt + timedelta(days=day_offset)
             for hour, minute in sorted(parsed):
                 grid = _local_day_time(day, hour, minute, tz)

@@ -72,10 +72,23 @@ def _set_device_quiet_override(app: Flask, device_id: str, enabled: bool) -> str
     stored = manifest.get("quiet_hours") if isinstance(manifest, dict) else None
     start = str((stored or {}).get("start") or "")
     end = str((stored or {}).get("end") or "")
+    days: list[str] | None = None
+    all_day: list[str] | None = None
+    sleep: bool | None = None
     if enabled and not (start and end):
+        from app.quiet_hours import ALL_DAYS, NO_DAYS, days_to_keys, parse_days
+
         app_section = app.config["SETTINGS_STORE"].get_section("app") or {}
         start = str(app_section.get("quiet_hours_start") or "22:00")
         end = str(app_section.get("quiet_hours_end") or "07:00")
+        # Copy the whole app window, weekdays included, so the override
+        # starts out identical and the person then adjusts from there.
+        if not stored or "days" not in stored:
+            days = days_to_keys(parse_days(app_section.get("quiet_hours_days"), ALL_DAYS))
+        if not stored or "all_day" not in stored:
+            all_day = days_to_keys(parse_days(app_section.get("quiet_hours_all_day"), NO_DAYS))
+        if not stored or "sleep" not in stored:
+            sleep = bool(app_section.get("quiet_hours_sleep"))
     result = device_service.update_instance_quiet_hours(
         devices=devices,
         renderers=app.config["RENDERER_REGISTRY"],
@@ -84,6 +97,9 @@ def _set_device_quiet_override(app: Flask, device_id: str, enabled: bool) -> str
         enabled=enabled,
         start=start,
         end=end,
+        days=days,
+        all_day=all_day,
+        sleep=sleep,
     )
     return None if result.ok else (result.error or "Couldn't save quiet hours.")
 

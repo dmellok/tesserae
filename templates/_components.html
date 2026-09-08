@@ -139,6 +139,28 @@ macro here instead.
 </div>
 {%- endmacro -%}
 
+{%- macro days_field(field_id, name, label, value=None, help=None, form=None) -%}
+{#- Weekday picker: seven toggle chips sharing one checkbox name, so the
+    handler reads ``getlist(name)``. The hidden ``<name>__present`` input
+    lets the handler tell "every day unticked" from "picker not on this
+    form". ``value`` is a list of ``mon``..``sun`` keys or one
+    comma-separated string. -#}
+{%- set sel = (value if (value is not string and value is iterable) else ((value.split(',') if value else []))) | map('trim') | map('lower') | list -%}
+<div class="field field--days">
+  <label>{{ label }}{{ info_pop(help) }}</label>
+  <div class="days-picker" role="group" aria-label="{{ label }}">
+    <input type="hidden" name="{{ name }}__present" value="1" {% if form %}form="{{ form }}"{% endif %}>
+    {% for key, day in [('mon', 'Mon'), ('tue', 'Tue'), ('wed', 'Wed'), ('thu', 'Thu'), ('fri', 'Fri'), ('sat', 'Sat'), ('sun', 'Sun')] %}
+    <label class="days-chip" for="{{ field_id }}-{{ key }}">
+      <input type="checkbox" id="{{ field_id }}-{{ key }}" name="{{ name }}" value="{{ key }}"
+             {% if form %}form="{{ form }}"{% endif %}
+             {% if key in sel %}checked{% endif %}>
+      <span>{{ day }}</span>
+    </label>
+    {% endfor %}
+  </div>
+</div>
+{%- endmacro -%}
 {%- macro select_field(field_id, name, label, value='', options=[], help=None, blank_label=None, form=None) -%}
 {#- options: list of {value, label} dicts (optionally with {group}) OR
     (value, label) tuples. Consecutive options sharing the same non-empty
@@ -581,6 +603,9 @@ macro here instead.
     {% endif %}
   {% elif ftype == 'color' %}
     {{ color_input(field_id, name, label, value=value or spec.get('default', '#000000'), help=help_text) }}
+  {% elif ftype == 'days' %}
+    {{ days_field(field_id, name, label, value=value if value is not none else spec.get('default', []),
+                  help=help_text, form=form) }}
   {% elif ftype == 'time' %}
     {{ text_input(field_id, name, label, value=value or spec.get('default', ''),
                   placeholder=spec.get('placeholder', 'HH:MM'),

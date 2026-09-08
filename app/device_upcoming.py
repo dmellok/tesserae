@@ -57,7 +57,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, time, timedelta, tzinfo
 
-from app.quiet_hours import QuietHoursWindow, is_in_window
+from app.quiet_hours import QuietHoursWindow, is_in_window, quiet_ends_at
 from app.scheduler import compute_step_window
 from app.state.rotation_model import Rotation
 from app.state.schedule_model import Schedule
@@ -261,9 +261,8 @@ def _quiet_ends_after(inputs: ProjectionInputs, moment: datetime) -> datetime | 
     window = inputs.quiet_window
     if window is None:
         return None
-    end = (datetime.combine(datetime(2000, 1, 1).date(), window.end) + timedelta(minutes=1)).time()
-    resumed = _next_local_time_on_days(moment, end, tuple(range(7)), inputs.tz)
-    if resumed is None or _is_quiet(inputs, resumed):
+    resumed = quiet_ends_at(window, moment, inputs.tz)
+    if resumed is None or resumed <= moment:
         return None
     return resumed
 

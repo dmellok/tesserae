@@ -1392,3 +1392,85 @@ def test_non_settings_page_does_not_highlight_settings(app_with_gate: Flask) -> 
     settings_link = re.search(r'<a href="/settings"[^>]*>', body)
     assert settings_link is not None
     assert "is-active" not in settings_link.group(0)
+
+
+def test_update_quiet_hours_persists_days_all_day_and_sleep(
+    app_with_gate: Flask, tmp_path: Path
+) -> None:
+    """The weekday pickers post one value per ticked day plus a marker
+    input (#299); the handler stores them alongside the times."""
+    client = app_with_gate.test_client()
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+    client.post(
+        "/settings/devices/add",
+        data={"id": "esp32_lab", "kind": "esp32_client", "panel_preset": "inky_7_3"},
+    )
+    resp = client.post(
+        "/settings/devices/esp32_lab/save",
+        data={
+            "quiet_hours_enabled": "on",
+            "quiet_hours_start": "20:00",
+            "quiet_hours_end": "08:00",
+            "quiet_hours_days__present": "1",
+            "quiet_hours_days": ["mon", "tue", "wed", "thu", "fri"],
+            "quiet_hours_all_day": ["sat", "sun"],
+            "quiet_hours_sleep": "on",
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    dev = app_with_gate.config["DEVICE_REGISTRY"].get("esp32_lab")
+    assert dev is not None
+    assert dev.manifest.get("quiet_hours") == {
+        "enabled": True,
+        "start": "20:00",
+        "end": "08:00",
+        "days": ["mon", "tue", "wed", "thu", "fri"],
+        "all_day": ["sat", "sun"],
+        "sleep": True,
+    }
+    # A later post without the pickers (the times only) keeps them.
+    client.post(
+        "/settings/devices/esp32_lab/quiet-hours",
+        data={
+            "quiet_hours_enabled": "on",
+            "quiet_hours_start": "21:00",
+            "quiet_hours_end": "08:00",
+        },
+    )
+    dev = app_with_gate.config["DEVICE_REGISTRY"].get("esp32_lab")
+    assert dev is not None
+    qh = dev.manifest.get("quiet_hours") or {}
+    assert qh["start"] == "21:00" and qh["all_day"] == ["sat", "sun"] and qh["sleep"] is True
+
+
+def test_quiet_hours_weekday_pickers_render_on_both_layers(
+    app_with_gate: Flask, tmp_path: Path
+) -> None:
+    """The app-level Quiet hours group and a device card both render the
+    weekday pickers (#299), with the stored days pre-ticked."""
+    client = app_with_gate.test_client()
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+    client.post(
+        "/settings/devices/add",
+        data={"id": "esp32_lab", "kind": "esp32_client", "panel_preset": "inky_7_3"},
+    )
+    client.post(
+        "/settings/devices/esp32_lab/quiet-hours",
+        data={
+            "quiet_hours_enabled": "on",
+            "quiet_hours_start": "20:00",
+            "quiet_hours_end": "08:00",
+            "quiet_hours_days__present": "1",
+            "quiet_hours_all_day": ["sat"],
+        },
+    )
+    server = client.get("/settings/server").get_data(as_text=True)
+    assert 'name="quiet_hours_days"' in server and 'name="quiet_hours_all_day"' in server
+    assert 'name="quiet_hours_sleep"' in server
+    devices = client.get("/settings/devices").get_data(as_text=True)
+    assert "days-picker" in devices
+    import re
+
+    assert re.search(r'name="quiet_hours_all_day" value="sat"[^>]*\bchecked', devices)
+    assert not re.search(r'name="quiet_hours_all_day" value="mon"[^>]*\bchecked', devices)

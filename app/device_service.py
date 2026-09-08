@@ -1075,15 +1075,23 @@ def update_instance_quiet_hours(
     enabled: bool,
     start: str | None,
     end: str | None,
+    days: list[str] | None = None,
+    all_day: list[str] | None = None,
+    sleep: bool | None = None,
 ) -> InstanceResult:
     """Patch a registered instance's ``quiet_hours`` block on disk and
-    hot-reload it in place. Empty or invalid times disable the
-    override (the helper resolver treats both as "no window").
+    hot-reload it in place. Empty or invalid times disable the timed
+    part of the override (the helper resolver treats both as "no
+    window"); all-day days still count.
 
     The block on disk is the shape :mod:`app.quiet_hours` reads:
-    ``{enabled: bool, start: 'HH:MM', end: 'HH:MM'}``. When the user
-    clears every field we drop the block entirely so the device falls
-    back to the app-level setting on next reload."""
+    ``{enabled: bool, start: 'HH:MM', end: 'HH:MM', days: [...],
+    all_day: [...], sleep: bool}``. ``days``, ``all_day`` and ``sleep``
+    passed as ``None`` keep whatever the block already holds, so a
+    caller that only knows about the times (the Home Assistant switch)
+    never wipes the weekday choice. When the user clears every field we
+    drop the block entirely so the device falls back to the app-level
+    setting on next reload."""
     device = devices.get(instance_id)
     if device is None or device.kind_of is None:
         return InstanceResult(None, f"Unknown device {instance_id!r}.")
@@ -1096,16 +1104,29 @@ def update_instance_quiet_hours(
 
     clean_start = (start or "").strip()
     clean_end = (end or "").strip()
-    if not enabled and not clean_start and not clean_end:
+    previous = raw.get("quiet_hours") if isinstance(raw.get("quiet_hours"), dict) else {}
+    keep_days = previous.get("days") if days is None else days
+    keep_all_day = previous.get("all_day") if all_day is None else all_day
+    keep_sleep = previous.get("sleep") if sleep is None else sleep
+    if not enabled and not clean_start and not clean_end and not keep_all_day:
         # Fully cleared, drop the block entirely so the next reload
         # sees a manifest with no override and uses the app setting.
         raw.pop("quiet_hours", None)
     else:
-        raw["quiet_hours"] = {
+        from app.quiet_hours import ALL_DAYS, NO_DAYS, days_to_keys, parse_days
+
+        block: dict[str, Any] = {
             "enabled": bool(enabled),
             "start": clean_start,
             "end": clean_end,
         }
+        if keep_days is not None:
+            block["days"] = days_to_keys(parse_days(keep_days, ALL_DAYS))
+        if keep_all_day is not None:
+            block["all_day"] = days_to_keys(parse_days(keep_all_day, NO_DAYS))
+        if keep_sleep is not None:
+            block["sleep"] = bool(keep_sleep)
+        raw["quiet_hours"] = block
     inst_file.write_text(json.dumps(raw, indent=2) + "\n", encoding="utf-8")
 
     devices.devices.pop(instance_id, None)

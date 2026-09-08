@@ -13,7 +13,7 @@ Covers the four interesting cases:
 
 from __future__ import annotations
 
-from datetime import datetime, time
+from datetime import UTC, datetime, time, timedelta
 from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 
@@ -289,3 +289,110 @@ def test_push_with_respect_quiet_hours_skips_when_all_devices_quiet(
 
     assert result.status == "quiet"
     assert "quiet" in (result.error or "").lower()
+
+
+# ----- weekday windows, all-day days, sleep-through (#299) -----------
+
+from app.quiet_hours import ALL_DAYS, NO_DAYS, days_to_keys, parse_days, quiet_ends_at  # noqa: E402
+
+# 2026-09-07 is a Monday.
+_MON = datetime(2026, 9, 7, tzinfo=UTC)
+
+
+def _on(day_offset: int, hh: int, mm: int = 0) -> datetime:
+    return _MON.replace(hour=hh, minute=mm) + timedelta(days=day_offset)
+
+
+_OFFICE = {
+    "quiet_hours_enabled": True,
+    "quiet_hours_start": "20:00",
+    "quiet_hours_end": "08:00",
+    "quiet_hours_days": ["mon", "tue", "wed", "thu", "fri"],
+    "quiet_hours_all_day": ["sat", "sun"],
+    "quiet_hours_sleep": True,
+}
+
+
+def test_parse_days_accepts_keys_numbers_and_comma_strings() -> None:
+    assert parse_days(["mon", "Fri", "sunday"], NO_DAYS) == frozenset({0, 4, 6})
+    assert parse_days("sat,sun", NO_DAYS) == frozenset({5, 6})
+    assert parse_days([1, 2, 9, "junk"], NO_DAYS) == frozenset({1, 2})
+    assert parse_days(None, ALL_DAYS) == ALL_DAYS
+    # Present but empty is literal: every day unticked.
+    assert parse_days([], ALL_DAYS) == NO_DAYS
+    assert days_to_keys({6, 0, 4}) == ["mon", "fri", "sun"]
+
+
+def test_resolve_reads_days_all_day_and_sleep_from_the_app_layer() -> None:
+    window = resolve_quiet_hours(_OFFICE, _device(None))
+    assert window is not None
+    assert window.days == frozenset({0, 1, 2, 3, 4})
+    assert window.all_day == frozenset({5, 6})
+    assert window.sleep_through is True
+
+
+def test_resolve_defaults_to_every_day_and_no_sleep_for_old_settings() -> None:
+    app = {"quiet_hours_enabled": True, "quiet_hours_start": "22:00", "quiet_hours_end": "07:00"}
+    window = resolve_quiet_hours(app, _device(None))
+    assert window == QuietHoursWindow(time(22, 0), time(7, 0))
+    assert window.days == ALL_DAYS and window.all_day == NO_DAYS and not window.sleep_through
+
+
+def test_resolve_keeps_all_day_days_when_the_times_are_blank() -> None:
+    """A weekend-only office leaves the nightly window empty; the
+    all-day days must still count rather than the whole thing vanishing."""
+    app = {"quiet_hours_enabled": True, "quiet_hours_all_day": ["sat", "sun"]}
+    window = resolve_quiet_hours(app, _device(None))
+    assert window is not None
+    assert window.days == NO_DAYS and window.all_day == frozenset({5, 6})
+    assert is_in_window(window, _on(5, 12), UTC)  # Saturday noon
+    assert not is_in_window(window, _on(0, 3), UTC)  # Monday 03:00
+
+
+def test_resolve_device_override_carries_its_own_days() -> None:
+    dev = _device(
+        {
+            "enabled": True,
+            "start": "21:00",
+            "end": "06:00",
+            "days": "fri",
+            "all_day": [],
+            "sleep": True,
+        }
+    )
+    window = resolve_quiet_hours(_OFFICE, dev)
+    assert window == QuietHoursWindow(time(21, 0), time(6, 0), frozenset({4}), NO_DAYS, True)
+
+
+def test_is_in_window_judges_each_day_by_its_own_clock() -> None:
+    window = resolve_quiet_hours(_OFFICE, _device(None))
+    assert window is not None
+    assert is_in_window(window, _on(0, 6), UTC)  # Monday 06:00, morning side
+    assert not is_in_window(window, _on(0, 12), UTC)  # Monday noon
+    assert is_in_window(window, _on(4, 21), UTC)  # Friday 21:00, evening side
+    assert is_in_window(window, _on(5, 12), UTC)  # Saturday, all day
+    assert is_in_window(window, _on(6, 15), UTC)  # Sunday, all day
+    assert not is_in_window(window, _on(2, 8, 1), UTC)  # Wednesday just past end
+
+
+def test_quiet_ends_at_walks_a_weekend_to_monday_morning() -> None:
+    window = resolve_quiet_hours(_OFFICE, _device(None))
+    assert window is not None
+    assert quiet_ends_at(window, _on(4, 21), UTC) == _on(7, 8, 1)  # Fri 21:00 -> Mon 08:01
+    assert quiet_ends_at(window, _on(5, 12), UTC) == _on(7, 8, 1)  # Saturday noon
+    assert quiet_ends_at(window, _on(1, 6), UTC) == _on(1, 8, 1)  # Tuesday 06:00 -> 08:01
+    # Already outside: hands back the moment itself.
+    assert quiet_ends_at(window, _on(2, 12), UTC) == _on(2, 12)
+
+
+def test_quiet_ends_at_is_none_when_every_day_is_quiet() -> None:
+    window = QuietHoursWindow(time(0, 0), time(0, 0), NO_DAYS, ALL_DAYS)
+    assert quiet_ends_at(window, _on(0, 12), UTC) is None
+
+
+def test_quiet_ends_at_resolves_in_the_given_zone() -> None:
+    melbourne = ZoneInfo("Australia/Melbourne")
+    window = QuietHoursWindow(time(22, 0), time(7, 0))
+    # 2026-09-07 13:00 UTC = 23:00 Melbourne (AEST, UTC+10): inside.
+    ends = quiet_ends_at(window, datetime(2026, 9, 7, 13, 0, tzinfo=UTC), melbourne)
+    assert ends == datetime(2026, 9, 8, 7, 1, tzinfo=melbourne).astimezone(UTC)

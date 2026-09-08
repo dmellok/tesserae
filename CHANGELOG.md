@@ -8,6 +8,20 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- Quiet hours can be limited to chosen weekdays and can mark whole days quiet
+  (#299). Both the app-level window and a device's override gain a "Window
+  applies on" weekday picker and a "Quiet all day" picker, so an office panel
+  can be quiet overnight on weekdays and all weekend. Each day is judged by its
+  own clock: on a ticked day an overnight window covers that morning up to
+  the end time and that evening from the start time. Existing settings keep
+  their meaning: every day, no all-day days.
+- "Sleep through quiet hours", off by default, tells battery panels to sleep
+  until the quiet window ends instead of waking on their interval inside it.
+  The REST status response stretches `next_poll_s` (and `wake_at`) to the end
+  of the window, capped at six days; always-on panels are unaffected. Wake
+  alignment now searches five days ahead so a quiet weekend does not push an
+  aligned device back onto its plain interval.
+
 - The Home Assistant History widget takes optional "Y-axis minimum" and
   "Y-axis maximum" cell options that pin the chart's value axis. Blank keeps
   the auto-fit range, and one side can be set on its own. The Sensor widget's

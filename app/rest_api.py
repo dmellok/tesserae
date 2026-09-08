@@ -705,7 +705,57 @@ def _aligned_wake_epoch(device: Device, alignment: Any, configured: int) -> floa
     )
 
 
+# Sleep-through quiet hours (#299): wake this long after the window opens
+# so the first poll lands on the far side of it even if the clocks
+# disagree by a few seconds, and never ask for more than this in one go
+# (the firmware's own ceiling is seven days).
+_QUIET_SLEEP_MARGIN_S = 30
+_QUIET_SLEEP_MAX_S = 6 * 24 * 3600
+
+
+def _quiet_sleep_through_s(device: Device) -> int | None:
+    """Seconds until this device's quiet window opens, when it is inside
+    the window now and its effective quiet-hours layer asked it to sleep
+    through. ``None`` otherwise, and for always-on panels: those never
+    sleep, so the saving does not exist and holding their polls would
+    only delay a manual push."""
+    if _device_awake_poll_s(device) is not None:
+        return None
+    from datetime import UTC, datetime
+
+    from app.quiet_hours import quiet_ends_at, resolve_quiet_hours
+    from app.tz_resolve import app_timezone
+
+    window = resolve_quiet_hours(_settings().get_section("app") or {}, device)
+    if window is None or not window.sleep_through:
+        return None
+    now = datetime.now(UTC)
+    ends = quiet_ends_at(window, now, app_timezone())
+    if ends is None or ends <= now:
+        return None
+    return min(int((ends - now).total_seconds()) + _QUIET_SLEEP_MARGIN_S, _QUIET_SLEEP_MAX_S)
+
+
 def _next_poll_decision(device: Device) -> tuple[int, int | None]:
+    """:func:`_next_poll_decision_inner` with the sleep-through quiet
+    hours stretch applied on top (#299). A device inside a quiet window it
+    asked to sleep through gets the later of its normal wake and the
+    window's end; the absolute instant goes out with it so capable
+    firmware sleeps to the wall clock over a multi-day hold rather than
+    accumulating timer drift. Any fault in the quiet math falls back to
+    the normal decision rather than stranding the device."""
+    result, wake_at = _next_poll_decision_inner(device)
+    try:
+        through = _quiet_sleep_through_s(device)
+    except Exception:
+        logger.exception("rest: quiet-hours sleep-through failed for device=%s", device.id)
+        through = None
+    if through is not None and through > result:
+        return through, int(time.time()) + through
+    return result, wake_at
+
+
+def _next_poll_decision_inner(device: Device) -> tuple[int, int | None]:
     """How many seconds until the firmware should poll again, plus the
     absolute wake instant (epoch) when wake alignment issued it.
 
