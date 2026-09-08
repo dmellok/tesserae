@@ -35,6 +35,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- Installing or removing a widget from Browse no longer shows "Install failed:
+  network error" under the success message. The success branch throws while
+  adding the topbar "Restart required" button (the topbar holds two theme
+  toggles and it picked the drawer's, which isn't a direct child), and the
+  request's error handler reported that as a network failure. The install had
+  succeeded, but the restart button only appeared after a reload. The button
+  now targets the topbar's own toggle, and the network-error message is
+  reserved for a failed request.
+
 - A device's last heartbeat now survives a server restart (#282). The battery,
   signal, temperature and humidity readings the status strip widget and the
   Devices card draw from lived only in memory, so after an upgrade they were
