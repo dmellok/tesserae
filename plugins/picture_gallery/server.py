@@ -23,6 +23,7 @@ re-open every image on every render.
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import json
 import os
 import random
@@ -294,6 +295,33 @@ def _filter_by_orientation(
     return kept
 
 
+# Mirrors ``DEVICE_ID_RE`` in app/device_service.py: registry ids are lower
+# case, start with a letter, and carry only letters, digits, ``_`` and ``-``.
+_DEVICE_TOKEN_RE = re.compile(r"^[a-z][a-z0-9_-]{1,31}$")
+
+
+def _cursor_token(device_id: str) -> str:
+    """A filename-safe token for a device id.
+
+    A registry id already satisfies the regex above, and it is used as-is so
+    the cursor file names the panel it belongs to: an operator who wants one
+    panel to restart its album can delete ``.sequential_index_<folder>_<id>``.
+    Anything else lands in a path without having been validated, so it is
+    hashed rather than sanitised: a substitution scheme has to be audited for
+    what it lets through, and a hex digest has nothing to let through.
+    """
+    if _DEVICE_TOKEN_RE.match(device_id):
+        return device_id
+    return hashlib.sha256(device_id.encode("utf-8")).hexdigest()[:12]
+
+
+def _read_cursor(path: Path) -> int | None:
+    try:
+        return int(path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, ValueError):
+        return None
+
+
 # ----- widget contract: fetch + choices ------------------------------
 
 
@@ -325,10 +353,40 @@ def fetch(
     mode = options.get("mode", "random")
     if mode == "sequential":
         suffix = f"_{orientation}" if orientation != "any" else ""
-        idx_file = data_dir / f".sequential_index_{folder_segment}{suffix}"
-        try:
-            current = int(idx_file.read_text(encoding="utf-8"))
-        except (FileNotFoundError, ValueError):
+        # The cursor is per device (#209). Keyed by folder and orientation
+        # alone it was global: two dashboards pointing at the same folder
+        # shared one position and each advanced it, so a panel woken between
+        # the other's renders skipped whatever they consumed. The composer
+        # supplies ``target_device_id`` because plugin.json declares
+        # ``render.per_device_id``, so each panel walks the album at its own
+        # pace.
+        #
+        # That manifest flag is not a "hand me the device id" switch. It
+        # makes the push pipeline (``_page_needs_per_device_render`` in
+        # app/push.py) compose and capture every page carrying this widget
+        # once per bound device instead of once per panel group, in every
+        # mode: a page bound to three same-size panels renders three times,
+        # every other widget on it fetches three times, and same-panel
+        # devices in random mode no longer share a photo. Accepted here
+        # because the fan-out is the mechanism the fix needs; copy the flag
+        # into another manifest only if that cost is wanted.
+        #
+        # No device id means no device to walk for: an unbound or
+        # virtual-panel render keeps the shared cursor it has always used,
+        # which is also what every album file written before this change is
+        # keyed as. A device's first render seeds from that shared file, so
+        # upgrading carries on from where the album was rather than
+        # restarting it at the first photo.
+        shared_file = data_dir / f".sequential_index_{folder_segment}{suffix}"
+        device_id = str(ctx.get("target_device_id") or "")
+        if device_id:
+            idx_file = shared_file.with_name(f"{shared_file.name}_{_cursor_token(device_id)}")
+        else:
+            idx_file = shared_file
+        current = _read_cursor(idx_file)
+        if current is None and idx_file != shared_file:
+            current = _read_cursor(shared_file)
+        if current is None:
             current = -1
         next_idx = (current + 1) % len(images)
         # Only a render headed for a panel moves the album on. Opening the
