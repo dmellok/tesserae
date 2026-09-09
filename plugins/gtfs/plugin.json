@@ -1,9 +1,9 @@
 {
   "tesserae_compat": "1.x",
   "name": "GTFS / GTFS-RT",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "kind": "widget",
-  "description": "Approaching vehicles at a stop (or two), from any GTFS feed. Presets for the NYC Subway and BART, live times and delays from GTFS-RT, service alerts, and an optional split-by-direction board.",
+  "description": "Approaching vehicles at a stop (or two), from any GTFS feed. Presets for the NYC Subway and BART, live times and delays from GTFS-RT TripUpdates, service alerts, vehicle positions, and an optional split-by-direction board.",
   "icon": "ph-bus",
   "supports": {
     "sizes": [
@@ -19,7 +19,7 @@
       "type": "select",
       "label": "Feed preset",
       "default": "custom",
-      "help": "Pick a known agency feed and the three URL fields below are ignored — the preset supplies the static feed, the matching realtime feed and the alerts feed. The MTA publishes one realtime feed per line group, so pick the group your station is on.",
+      "help": "Pick a known agency feed and the URL fields below are ignored — the preset supplies the static feed, the matching realtime feed and the alerts feed. The MTA publishes one realtime feed per line group, so pick the group your station is on.",
       "choices": [
         {
           "value": "custom",
@@ -261,6 +261,27 @@
       }
     },
     {
+      "name": "vehicles_url",
+      "type": "string",
+      "label": "GTFS-RT VehiclePositions URL",
+      "default": "",
+      "help": "Optional. Protobuf VehiclePositions feed, for agencies that publish vehicles separately from TripUpdates (most do; the MTA bundles them). Turn on 'Show stops away' below to see it: stops out when the feed counts them, straight-line distance from the stop when it only reports coordinates. Blank and locked while a preset is selected.",
+      "fill_from": {
+        "option": "preset",
+        "map": {
+          "bart": "",
+          "mta_ace": "",
+          "mta_bdfm": "",
+          "mta_g": "",
+          "mta_jz": "",
+          "mta_nqrw": "",
+          "mta_l": "",
+          "mta_123456": "",
+          "mta_sir": ""
+        }
+      }
+    },
+    {
       "name": "title",
       "type": "string",
       "label": "Title",
@@ -293,7 +314,24 @@
       "type": "boolean",
       "label": "Show stops away",
       "default": false,
-      "help": "Show how many stops out each vehicle is, from the realtime feed's vehicle positions. The platform-sign metric; on a board where everything is a stop or two away it's mostly noise, so it's off by default."
+      "help": "Show how far out each vehicle is, from the realtime feed's vehicle positions: 'N stops' when the feed reports a stop sequence, '1.4 km' from the stop when it only reports coordinates. Needs a VehiclePositions URL above, unless the TripUpdates feed already carries vehicles (the MTA's does). The platform-sign metric; on a board where everything is a stop or two away it's mostly noise, so it's off by default."
+    },
+    {
+      "name": "distance_units",
+      "type": "select",
+      "label": "Distance units",
+      "default": "metric",
+      "help": "How the distance-away chip reads when the vehicle feed only gives coordinates.",
+      "choices": [
+        {
+          "value": "metric",
+          "label": "Metric (km / m)"
+        },
+        {
+          "value": "imperial",
+          "label": "Imperial (mi / ft)"
+        }
+      ]
     }
   ],
   "render": {

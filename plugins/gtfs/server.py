@@ -13,7 +13,9 @@ Two very different upstreams behind one ``fetch()``:
 * **GTFS-RT** is a small protobuf fetched inline on every render with a
   20-second cache. Decoded by hand (see ``_pb_fields``); pulling in
   ``gtfs-realtime-bindings`` + ``protobuf`` for four field numbers isn't
-  worth the dependency.
+  worth the dependency. TripUpdates, ServiceAlerts and VehiclePositions
+  are each their own URL: some agencies bundle vehicles into the trip
+  feed (the MTA), most publish them separately.
 """
 
 from __future__ import annotations
@@ -23,7 +25,9 @@ import csv
 import hashlib
 import io
 import json
+import math
 import re
+import struct
 import threading
 import time
 import urllib.request
@@ -47,6 +51,9 @@ BUILD_RETRY_S = 600
 # generous timeout here costs the dashboard nothing.
 GTFS_TIMEOUT_S = 120
 RT_TIMEOUT_S = 8
+# A vehicle report older than this is a ghost — a bus whose radio dropped
+# out still sits in some feeds for an hour — so it earns no distance.
+VEHICLE_MAX_AGE_S = 600
 # How long a render waits on a fresh build before giving up and painting the
 # loading state. Small feeds (and the test suite) finish inside this and
 # return data on the very first render; MTA-sized ones don't.
@@ -95,6 +102,8 @@ PRESETS: dict[str, dict[str, str]] = {
         # https here skips the hop.
         "rt_url": "https://api.bart.gov/gtfsrt/tripupdate.aspx",
         "alerts_url": "https://api.bart.gov/gtfsrt/alerts.aspx",
+        # BART publishes no VehiclePositions feed.
+        "vehicles_url": "",
     },
 }
 
@@ -105,6 +114,8 @@ PRESETS.update(
             "gtfs_url": _MTA_STATIC,
             "rt_url": _MTA_RT + path,
             "alerts_url": _MTA_ALERTS,
+            # The MTA ships VehiclePosition entities inside the trip feed.
+            "vehicles_url": "",
         }
         for key, label, path in (
             ("mta_ace", "A/C/E, Rockaway Shuttle", "gtfs-ace"),
@@ -120,12 +131,14 @@ PRESETS.update(
 )
 
 
-def _preset_urls(preset: str, gtfs_url: str, rt_url: str, alerts_url: str) -> tuple[str, str, str]:
-    """A chosen preset supplies all three URLs; "custom" leaves them alone."""
+def _preset_urls(
+    preset: str, gtfs_url: str, rt_url: str, alerts_url: str, vehicles_url: str = ""
+) -> tuple[str, str, str, str]:
+    """A chosen preset supplies all four URLs; "custom" leaves them alone."""
     spec = PRESETS.get(preset)
     if spec is None:
-        return gtfs_url, rt_url, alerts_url
-    return spec["gtfs_url"], spec["rt_url"], spec["alerts_url"]
+        return gtfs_url, rt_url, alerts_url, vehicles_url
+    return spec["gtfs_url"], spec["rt_url"], spec["alerts_url"], spec.get("vehicles_url", "")
 
 
 def fetch(
@@ -136,12 +149,13 @@ def fetch(
     stop_opt = str(options.get("stop_id") or "").strip()
     rt_url = str(options.get("rt_url") or "").strip()
     alerts_url = str(options.get("alerts_url") or "").strip()
+    vehicles_url = str(options.get("vehicles_url") or "").strip()
     direction = str(options.get("direction") or "any").strip()
     # NB: not "label" — the host overwrites that option with the app-level
     # Settings location name, which would title a transit board with a city.
     title = str(options.get("title") or "").strip()
-    gtfs_url, rt_url, alerts_url = _preset_urls(
-        str(options.get("preset") or "custom").strip(), gtfs_url, rt_url, alerts_url
+    gtfs_url, rt_url, alerts_url, vehicles_url = _preset_urls(
+        str(options.get("preset") or "custom").strip(), gtfs_url, rt_url, alerts_url, vehicles_url
     )
     # A second preset contributes only its realtime feed: the MTA splits
     # realtime by line group, so a board covering both an A/C/E platform and
@@ -151,6 +165,11 @@ def fetch(
     rt_urls = [u.strip() for u in rt_url.split(",") if u.strip()]
     if extra and extra["rt_url"] not in rt_urls:
         rt_urls.append(extra["rt_url"])
+    # Most agencies publish VehiclePositions as a third feed beside
+    # TripUpdates and ServiceAlerts (the MTA folds it into the trip feed,
+    # which ``_realtime`` already reads). Its own field, since a single
+    # comma-separated realtime field can't say which URL is which.
+    vehicle_urls = [u.strip() for u in vehicles_url.split(",") if u.strip()]
     if not gtfs_url:
         return {"error": "Pick a feed preset, or set a GTFS feed URL, in the cell editor."}
     if gtfs_url.startswith("demo:"):
@@ -192,6 +211,11 @@ def fetch(
     err_path = data_dir / f"err_{key}.json"
 
     table, fresh = _read_cache(tt_path, TIMETABLE_TTL_S)
+    # A distillate from before stop coordinates were kept still paints, but
+    # goes stale so the next build picks them up; the distance-away chip
+    # needs them.
+    if table is not None and "stop_coords" not in table:
+        fresh = False
     # A failed build must not re-download a 100 MB feed on every refresh tick,
     # so failures park in their own file for BUILD_RETRY_S before another
     # attempt. Separate from tt_path deliberately: a build that fails while a
@@ -228,22 +252,29 @@ def fetch(
     note = ""
     stop_ids = set(table.get("stop_ids") or [])
     feed_age_s = None
+    bundle: dict[str, Any] = {}
     if rt_urls:
         bundle, note = _realtime_all(rt_urls, data_dir, key, stop_ids)
-        rt = bundle.get("times") or {}
-        canceled = set(bundle.get("canceled") or [])
-        if rt or canceled:
-            live = _apply_realtime(
-                arrivals,
-                rt,
-                now,
-                canceled,
-                bundle.get("tracks") or {},
-                bundle.get("vehicles") or {},
-            )
         stamp = bundle.get("stamp")
         if stamp:
             feed_age_s = max(0, int(now.timestamp() - int(stamp)))
+    vehicles: dict[str, Any] = dict(bundle.get("vehicles") or {})
+    for url in vehicle_urls:
+        # A vehicle feed only decorates rows; a dead one is not worth a note
+        # on a board whose predictions are otherwise live.
+        vehicles.update(_vehicles(url, data_dir, f"{key}_{_url_key(url)}"))
+    rt = bundle.get("times") or {}
+    canceled = set(bundle.get("canceled") or [])
+    if rt or canceled or vehicles:
+        live = _apply_realtime(
+            arrivals,
+            rt,
+            now,
+            canceled,
+            bundle.get("tracks") or {},
+            vehicles,
+            table.get("stop_coords") or {},
+        )
     if alerts_url:
         routes = {a["route_id"] for a in arrivals}
         found = _alerts(alerts_url, data_dir, key, stop_ids, routes)
@@ -825,8 +856,8 @@ def _realtime(url: str, data_dir: Path, key: str, stop_ids: set[str]) -> tuple[d
     """Return ``(realtime_bundle, note)`` for this stop.
 
     The bundle carries ``times`` / ``canceled`` / ``tracks`` / ``vehicles``
-    (trip -> the stop_sequence it's currently at) / ``stamp`` (the feed's own
-    header timestamp). Errors are non-fatal: the scheduled board is still
+    (trip -> where it is, see ``_decode_vehicles``) / ``stamp`` (the feed's
+    own header timestamp). Errors are non-fatal: the scheduled board is still
     worth painting, so a dead RT feed comes back as a note instead of an
     error.
     """
@@ -859,13 +890,35 @@ def _realtime(url: str, data_dir: Path, key: str, stop_ids: set[str]) -> tuple[d
     return bundle, ""
 
 
+def _vehicles(url: str, data_dir: Path, key: str) -> dict[str, Any]:
+    """Vehicle reports from a standalone VehiclePositions feed.
+
+    Same 20-second cache as the trip feed. Failure is silent: the reports
+    only add a "2 stops" / "1.4 km" chip to rows the timetable and trip feed
+    already paint, so there is nothing to warn about when they are missing.
+    """
+    cache = data_dir / f"vp_{key}.json"
+    cached, fresh = _read_cache(cache, RT_TTL_S)
+    if cached is not None and fresh:
+        return cached.get("vehicles") or {}
+    try:
+        body = _download(url, RT_TIMEOUT_S)
+        vehicles: dict[str, Any] = _decode_vehicles(body)
+    except Exception:
+        return (cached or {}).get("vehicles") or {}
+    with contextlib.suppress(OSError):
+        _write_json(cache, {"vehicles": vehicles, "stamp": _feed_stamp(body)})
+    return vehicles
+
+
 def _apply_realtime(
     arrivals: list[dict[str, Any]],
     rt: dict[str, int],
     now: datetime,
     canceled: set[str] | None = None,
     tracks: dict[str, str] | None = None,
-    vehicles: dict[str, int] | None = None,
+    vehicles: dict[str, Any] | None = None,
+    stop_coords: dict[str, Any] | None = None,
 ) -> bool:
     """Overlay RT predictions onto scheduled arrivals in place."""
     live = False
@@ -887,17 +940,6 @@ def _apply_realtime(
             a["live"] = True
             if tracks:
                 a["track"] = tracks.get(f"{candidate}|{a['stop_id']}", "")
-            if vehicles:
-                at_seq = vehicles.get(candidate)
-                seq = a.get("seq") or 0
-                # Both sequences come from the same trip, so the difference is
-                # the number of stops still to go. Negative means the feed has
-                # the train already past us; treat that as "no idea" rather
-                # than showing a nonsense countdown.
-                if at_seq is not None and seq:
-                    away = seq - at_seq
-                    if 0 <= away <= 25:
-                        a["stops_away"] = away
             # Signed whole minutes against the timetable: positive is late.
             # Rounded, not floored, so a 90-second delay reads as 2 rather
             # than 1 and the board doesn't under-report lateness.
@@ -906,7 +948,69 @@ def _apply_realtime(
                 a["delay"] = round((epoch - sched_epoch) / 60)
             live = True
             break
+        # Where the vehicle is comes from its own report, which may exist
+        # without a prediction for our stop (a vehicles-only setup, or a
+        # trip the trip feed hasn't picked up yet).
+        if vehicles and _apply_vehicle(a, vehicles, stop_coords or {}, now):
+            live = True
     return live
+
+
+def _apply_vehicle(
+    a: dict[str, Any], vehicles: dict[str, Any], stop_coords: dict[str, Any], now: datetime
+) -> bool:
+    """Decorate one row with how far out its vehicle is.
+
+    Preferred: ``stops_away``, from the report's current_stop_sequence
+    against the trip's sequence at our stop. Fallback: ``distance_m``, the
+    straight-line distance from the reported position to the stop, for
+    feeds that publish coordinates and nothing else (Adelaide Metro, many
+    bus agencies). Straight-line is honest about what it is: the chip says
+    "1.4 km", not "4 min".
+    """
+    report = None
+    for candidate in _trip_keys(a["trip_id"]):
+        report = vehicles.get(candidate)
+        if report is not None:
+            break
+    if report is None:
+        return False
+    # Bundles cached before positions were kept hold a bare sequence.
+    if isinstance(report, int):
+        report = {"seq": report}
+    if not isinstance(report, dict):
+        return False
+    at_seq = report.get("seq")
+    seq = a.get("seq") or 0
+    # Both sequences come from the same trip, so the difference is the
+    # number of stops still to go. Negative means the feed has the vehicle
+    # already past us; treat that as "no idea" rather than showing a
+    # nonsense countdown.
+    if at_seq is not None and seq:
+        away = int(seq) - int(at_seq)
+        if 0 <= away <= 25:
+            a["stops_away"] = away
+            a["live"] = True
+            return True
+    lat, lon = report.get("lat"), report.get("lon")
+    coords = stop_coords.get(a.get("stop_id") or "")
+    if lat is None or lon is None or not coords:
+        return False
+    stamp = report.get("ts")
+    if stamp and now.timestamp() - int(stamp) > VEHICLE_MAX_AGE_S:
+        return False
+    a["distance_m"] = int(_haversine_m(float(lat), float(lon), float(coords[0]), float(coords[1])))
+    a["live"] = True
+    return True
+
+
+def _haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Great-circle distance in metres; plenty for a "how far out" chip."""
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dphi = p2 - p1
+    dlam = math.radians(lon2 - lon1)
+    h = math.sin(dphi / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dlam / 2) ** 2
+    return 2 * 6371000.0 * math.asin(math.sqrt(h))
 
 
 def _trip_keys(trip_id: str) -> tuple[str, ...]:
@@ -937,7 +1041,8 @@ _SCHEDULE_REL_CANCELED = 3
 _STU_ARRIVAL, _STU_DEPARTURE, _STU_STOP_ID, _STU_NYCT = 2, 3, 4, 1001
 _NYCT_SCHEDULED_TRACK, _NYCT_ACTUAL_TRACK = 1, 2
 _EVENT_TIME = 2
-_VP_TRIP, _VP_CURRENT_STOP_SEQUENCE = 1, 3
+_VP_TRIP, _VP_POSITION, _VP_CURRENT_STOP_SEQUENCE, _VP_TIMESTAMP = 1, 2, 3, 5
+_POS_LAT, _POS_LON = 1, 2
 _ALERT_INFORMED, _ALERT_HEADER = 5, 10
 _SELECTOR_ROUTE_ID, _SELECTOR_STOP_ID = 2, 5
 _TRANSLATION, _TRANSLATION_TEXT = 1, 1
@@ -971,6 +1076,17 @@ def _num(buf: bytes | None, field: int) -> int | None:
     for got, _wire, value in _pb_fields(buf):
         if got == field and isinstance(value, int):
             return value
+    return None
+
+
+def _f32(buf: bytes | None, field: int) -> float | None:
+    """The first 32-bit float at ``field`` (protobuf ``float``, wire type 5)."""
+    if buf is None:
+        return None
+    for got, wire, value in _pb_fields(buf):
+        if got == field and wire == 5 and isinstance(value, int):
+            (out,) = struct.unpack("<f", value.to_bytes(4, "little"))
+            return round(float(out), 6)
     return None
 
 
@@ -1026,20 +1142,34 @@ def _decode_trip_updates(
     return out
 
 
-def _decode_vehicles(body: bytes) -> dict[str, int]:
-    """``trip_id -> the stop_sequence the vehicle is currently at``.
+def _decode_vehicles(body: bytes) -> dict[str, dict[str, Any]]:
+    """``trip_id -> {"seq", "lat", "lon", "ts"}``, each key only when present.
 
-    Same response as the trip updates, different entity type. Comparing this
+    VehiclePosition entities, whether they share a FeedMessage with the trip
+    updates or arrive in their own feed. ``seq`` (current_stop_sequence)
     against the trip's sequence at our stop is what turns a countdown into
-    "three stops away".
+    "three stops away"; feeds that only publish coordinates fall back to a
+    distance from the stop instead.
     """
-    out: dict[str, int] = {}
+    out: dict[str, dict[str, Any]] = {}
     for entity in _subs(body, _FEED_ENTITY):
         for vehicle in _subs(entity, _ENTITY_VEHICLE):
             trip_id = _text(_sub(vehicle, _VP_TRIP), _TRIP_ID)
+            if not trip_id:
+                continue
+            report: dict[str, Any] = {}
             seq = _num(vehicle, _VP_CURRENT_STOP_SEQUENCE)
-            if trip_id and seq is not None:
-                out[trip_id] = int(seq)
+            if seq is not None:
+                report["seq"] = int(seq)
+            pos = _sub(vehicle, _VP_POSITION)
+            lat, lon = _f32(pos, _POS_LAT), _f32(pos, _POS_LON)
+            if lat is not None and lon is not None:
+                report["lat"], report["lon"] = lat, lon
+            stamp = _num(vehicle, _VP_TIMESTAMP)
+            if stamp:
+                report["ts"] = int(stamp)
+            if report:
+                out[trip_id] = report
     return out
 
 
@@ -1238,6 +1368,7 @@ def _distil(raw: bytes, stop_opt: str) -> dict[str, Any]:
 
         stop_ids: set[str] = set()
         stop_name = ""
+        stop_coords: dict[str, list[float]] = {}
         station_of: dict[str, str] = {}
         names_by_id: dict[str, str] = {}
         for row in _rows(zf, names, "stops.txt"):
@@ -1249,6 +1380,13 @@ def _distil(raw: bytes, stop_opt: str) -> dict[str, Any]:
                 names_by_id[sid] = row.get("stop_name", "")
                 if not stop_name or sid in wanted:
                     stop_name = row.get("stop_name", "") or stop_name
+                # Kept so a VehiclePositions report with only coordinates
+                # can still say how far out the vehicle is.
+                with contextlib.suppress(ValueError):
+                    stop_coords[sid] = [
+                        round(float(row.get("stop_lat", "")), 6),
+                        round(float(row.get("stop_lon", "")), 6),
+                    ]
         if not stop_ids:
             raise _StopNotFound(f"Stop '{stop_opt}' isn't in this feed.")
 
@@ -1344,6 +1482,7 @@ def _distil(raw: bytes, stop_opt: str) -> dict[str, Any]:
         "built": time.time(),
         "stop_name": stop_name,
         "stop_names": platform_names,
+        "stop_coords": stop_coords,
         "stop_ids": sorted(stop_ids),
         "tz": tz or "UTC",
         "routes": {k: v for k, v in routes.items() if k in used_routes},

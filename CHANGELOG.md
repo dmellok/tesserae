@@ -8,6 +8,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- The GTFS widget gains a "GTFS-RT VehiclePositions URL" field, for agencies
+  that publish vehicle positions as their own feed beside TripUpdates and
+  ServiceAlerts. With "Show stops away" on, a row reads "2 stops" when the
+  feed reports a stop sequence, and falls back to the straight-line distance
+  from the stop ("1.4 km", or miles via the new "Distance units" option) when
+  the feed only carries coordinates, which is all some agencies publish.
+  Reports older than ten minutes are ignored. `gtfs` 0.12.0.
 - The History widget gains a "Current value" option (#282). "Large headline
   above the chart" draws the single-sensor reading in display type with the
   trend arrow and low / high beside it, so a weather panel shows the value at a
