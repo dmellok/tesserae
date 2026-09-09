@@ -1,0 +1,25 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "remarkable_2",
+  "name": "reMarkable 2",
+  "vendor": "reMarkable",
+  "url": "https://remarkable.com/products/remarkable-2",
+  "icon": "device-tablet",
+  "description": "10.3 inch monochrome E Ink Carta tablet, 1404x1872 portrait, 226 ppi, 16-level greyscale, no front light. Runs the tesserae-remarkable AppLoad app (https://github.com/partridgeworks/tesserae.remarkable), which speaks the v1 REST device API and paints the 4-bpp 16-grey buffer from esp32_gray_bin, dithered server-side, through the tablet's own display stack. The tablet deep-sleeps between polls and wakes on its RTC.",
+  "protocol": "esp32_client",
+  "renderers": [
+    "esp32_gray_bin"
+  ],
+  "panel": {
+    "w": 1404,
+    "h": 1872,
+    "orientation": "portrait",
+    "name": "10.3 inch monochrome E Ink (1404x1872, 16 greys)",
+    "gamut": "gray_16",
+    "native_w": 1404,
+    "native_h": 1872
+  },
+  "refresh_floor_s": 30,
+  "image_format": "bin",
+  "notes_md": "Client app and install guide: https://github.com/partridgeworks/tesserae.remarkable. Needs Developer Mode plus the XOVI/AppLoad runtime on the tablet. Wire format is exactly 1314144 bytes (1404*1872/2), row-major from the top-left of the portrait panel, high nibble = left pixel, 0x0 = black .. 0xF = white; the client unpacks it to an 8-bit grey image. Pick the dither on the device card: Floyd-Steinberg suits photos, none suits flat UI. Pairs by zero-touch discover (Wi-Fi MAC) or a 6-digit code typed into the app's Settings. Advertises `can_stay_awake` only while charging, so `always_on` is offered when it is honest."
+}

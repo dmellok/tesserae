@@ -115,6 +115,16 @@ Open-hardware e-paper picture frames (ESP32-C6, NiMH cells) that run the [Tesser
 | [Pimoroni Inky Impression 4"](https://shop.pimoroni.com/products/inky-impression) | 600×400 | `spectra_6` | `pi_bin_client` (inherit) | `pimoroni_inky_4` |
 | [Pimoroni Inky Impression 4" (ACeP, 640x400, legacy)](https://shop.pimoroni.com/products/inky-impression) | 640×400 | `acep_7colour` | `pi_bin_client` (inherit) | `pimoroni_inky_4_acep` |
 
+### [reMarkable](https://remarkable.com/)
+
+E-ink writing tablets running the [tesserae.remarkable](https://github.com/partridgeworks/tesserae.remarkable) client, an AppLoad app that lives inside the tablet's own interface (Developer Mode plus the XOVI/AppLoad runtime required). It speaks the v1 REST device API, paints the server-dithered frame through the tablet's display stack, and deep-sleeps between polls on an RTC alarm. The reMarkable 2 is confirmed on hardware; the reMarkable 1 and Paper Pro entries are built but not yet confirmed.
+
+| SKU | Panel | Gamut | Protocol / Renderer | Kind id |
+|---|---|---|---|---|
+| [reMarkable Paper Pro](https://remarkable.com/products/remarkable-paper/pro) | 1620×2160 portrait | `rgb24` | `esp32_client` <br> `circuitpython_png` | `remarkable_paper_pro` |
+| [reMarkable 1](https://remarkable.com) | 1404×1872 portrait | `gray_16` | `esp32_client` <br> `esp32_gray_bin` | `remarkable_1` |
+| [reMarkable 2](https://remarkable.com/products/remarkable-2) | 1404×1872 portrait | `gray_16` | `esp32_client` <br> `esp32_gray_bin` | `remarkable_2` |
+
 ### [TRMNL](https://usetrmnl.com/)
 
 | SKU | Panel | Gamut | Protocol / Renderer | Kind id |

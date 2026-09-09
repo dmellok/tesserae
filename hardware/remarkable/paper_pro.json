@@ -1,0 +1,25 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "remarkable_paper_pro",
+  "name": "reMarkable Paper Pro",
+  "vendor": "reMarkable",
+  "url": "https://remarkable.com/products/remarkable-paper/pro",
+  "icon": "device-tablet",
+  "description": "11.8 inch Canvas Color e-paper tablet (E Ink Gallery 3 class), 1620x2160 portrait, 229 ppi, colour, with a front light. Runs the tesserae-remarkable AppLoad app (https://github.com/partridgeworks/tesserae.remarkable), which speaks the v1 REST device API and paints a full-colour PNG (circuitpython_png with the rgb24 gamut, no server-side quantisation) through the tablet's own colour pipeline.",
+  "protocol": "esp32_client",
+  "renderers": [
+    "circuitpython_png"
+  ],
+  "panel": {
+    "w": 1620,
+    "h": 2160,
+    "orientation": "portrait",
+    "name": "11.8 inch Canvas Color (1620x2160)",
+    "gamut": "rgb24",
+    "native_w": 1620,
+    "native_h": 2160
+  },
+  "refresh_floor_s": 60,
+  "image_format": "png",
+  "notes_md": "Client app and install guide: https://github.com/partridgeworks/tesserae.remarkable. Needs Developer Mode plus the XOVI/AppLoad runtime. The panel reproduces a limited, muted colour set, so dashboards with strong flat colours read best; the client can optionally dither to a six-colour palette on the device. Not yet confirmed on hardware by the app author (the reMarkable 2 is). Pairs by zero-touch discover (Wi-Fi MAC) or a 6-digit code typed into the app's Settings."
+}
