@@ -20,6 +20,9 @@ def test_tools_register() -> None:
     names = {t.name for t in tools}
     assert names == {
         "list_widgets",
+        "add_font",
+        "list_fonts",
+        "delete_font",
         "list_icons",
         "list_services",
         "get_widget_options",

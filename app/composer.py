@@ -372,18 +372,93 @@ def _resolved_options(plugin_id: str, raw: dict[str, Any]) -> dict[str, Any]:
     return merged
 
 
+def _data_root_or_none() -> Path | None:
+    """The app's data root, or None outside an app context (unit tests that
+    call the pure helpers directly)."""
+    try:
+        root = current_app.config.get("DATA_ROOT")
+    except RuntimeError:
+        return None
+    return Path(root) if root else None
+
+
+def _cached_font(font_id: str) -> Font | None:
+    """A cached webfont (app/font_cache.py) as the same ``Font`` shape the
+    bundled plugins produce, so the page / cell font pickers and the page CSS
+    treat it like any other family. ``files`` carries the upright latin faces
+    (the ``@font-face`` for every face, italics and other subsets included,
+    comes from font_cache.all_font_face_css)."""
+    from app import font_cache
+
+    data_root = _data_root_or_none()
+    if data_root is None:
+        return None
+    cached = font_cache.get(data_root, font_id)
+    if cached is None:
+        return None
+    files = {
+        str(f.weight): font_cache.local_url(cached.slug, f.file)
+        for f in cached.faces
+        if f.style == "normal" and f.subset == "latin"
+    } or {str(f.weight): font_cache.local_url(cached.slug, f.file) for f in cached.faces}
+    return Font(
+        id=cached.slug,
+        name=cached.family,
+        category="",
+        weights=tuple(cached.weights),
+        files=files,
+        plugin_id="font_cache",
+    )
+
+
 def _resolve_font(font_id: str | None, registry: PluginRegistry) -> Font | None:
+    """The bundled font for ``font_id``, else a cached webfont by slug or
+    family name, else the default. A cached family that has since been deleted
+    therefore degrades to the default font rather than failing the render."""
     if font_id:
         font = registry.get_font(font_id)
         if font is not None:
             return font
+        cached = _cached_font(font_id)
+        if cached is not None:
+            return cached
     return registry.get_font("default")
+
+
+def _cached_code_fonts() -> list[dict[str, str]]:
+    """Cached families for the code element sandbox's autolibs list: the
+    same ``{id, name}`` shape as the bundled entries, resolved by the same
+    ``/fonts/face/<id>.css`` endpoint."""
+    from app import font_cache
+
+    data_root = _data_root_or_none()
+    if data_root is None:
+        return []
+    return [{"id": f.slug, "name": f.family} for f in font_cache.list_fonts(data_root)]
 
 
 # Self-contained (data: URL) @font-face CSS per font, cached. Built from the
 # font plugin's woff2 on disk. Used by the code element sandbox, which has no
 # network and a ``font-src data:`` CSP, so file-URL @font-face won't load there.
 _FONT_FACE_DATAURI_CACHE: dict[str, str] = {}
+# Same for cached webfonts, keyed by the cache manifest's mtime so a re-cache
+# (new weight added) is picked up without a restart.
+_CACHED_FACE_DATAURI: dict[str, tuple[float, str]] = {}
+
+
+def _cached_face_datauri(font_id: str) -> Any:
+    from app import font_cache
+
+    data_root = _data_root_or_none()
+    cached = font_cache.get(data_root, font_id) if data_root is not None else None
+    if cached is None or data_root is None:
+        abort(404)
+    stamp = font_cache.mtime(data_root, cached.slug)
+    hit = _CACHED_FACE_DATAURI.get(cached.slug)
+    if hit is None or hit[0] != stamp:
+        hit = (stamp, font_cache.font_face_css_datauri(data_root, cached))
+        _CACHED_FACE_DATAURI[cached.slug] = hit
+    return current_app.response_class(hit[1], mimetype="text/css")
 
 
 @bp.get("/fonts/face/<font_id>.css")
@@ -395,8 +470,11 @@ def font_face_datauri(font_id: str) -> Any:
     if css is None:
         reg = current_app.config["PLUGIN_REGISTRY"]
         font = reg.fonts.get(font_id)
-        plugin = reg.get(font.plugin_id) if font is not None else None
-        if font is None or plugin is None:
+        if font is None:
+            # Not a bundled id: a cached webfont's slug (app/font_cache.py).
+            return _cached_face_datauri(font_id)
+        plugin = reg.get(font.plugin_id)
+        if plugin is None:
             abort(404)
         entry = next((f for f in plugin.manifest.get("fonts", []) if f.get("id") == font_id), None)
         if entry is None:
@@ -415,6 +493,20 @@ def font_face_datauri(font_id: str) -> Any:
         css = "\n".join(rules)
         _FONT_FACE_DATAURI_CACHE[font_id] = css
     return current_app.response_class(css, mimetype="text/css")
+
+
+def _all_font_face_css(registry: PluginRegistry) -> str:
+    """Bundled ``@font-face`` rules plus one per cached webfont face, so a page
+    or cell ``font`` naming a cached family resolves in the page CSS (served
+    from the local origin; the renderer fetches it over loopback)."""
+    from app import font_cache
+
+    css = _font_face_css(registry.fonts)
+    data_root = _data_root_or_none()
+    if data_root is None:
+        return css
+    extra = font_cache.all_font_face_css(data_root)
+    return f"{css}\n{extra}" if extra else css
 
 
 def _font_face_css(fonts: dict[str, Font]) -> str:
@@ -955,7 +1047,7 @@ def _hydrate_page(
         **page_dict,
         "cells": cells_out,
         "font_family": page_font_family,
-        "font_face_css": _font_face_css(registry.fonts),
+        "font_face_css": _all_font_face_css(registry),
         "corner_radius": corner_radius,
         "locale": locale,
     }
@@ -1357,8 +1449,9 @@ def _render_canvas(
         bg=layout.bg or "",
         bg_image=layout.bg_image or "",
         bg_fit=layout.bg_fit or "cover",
-        font_face_css=_font_face_css(registry.fonts),
-        code_fonts=[{"id": f.id, "name": f.name} for f in registry.fonts.values()],
+        font_face_css=_all_font_face_css(registry),
+        code_fonts=[{"id": f.id, "name": f.name} for f in registry.fonts.values()]
+        + _cached_code_fonts(),
         device_draws_touch=not preview and device_draws_touch_primitives(target_device_id),
     )
 
@@ -1372,7 +1465,7 @@ def compose_measure() -> str:
     Path is static under ``/compose/`` so it wins over ``/compose/<page_id>`` and
     skips the login gate like the other composer render targets."""
     registry = current_app.config["PLUGIN_REGISTRY"]
-    return render_template("panels_measure.html", font_face_css=_font_face_css(registry.fonts))
+    return render_template("panels_measure.html", font_face_css=_all_font_face_css(registry))
 
 
 @bp.get("/compose/_overlay_atlas")
@@ -1401,7 +1494,7 @@ def compose_overlay_atlas() -> str:
     spans = "".join(f'<span data-ch="{escape(ch)}">{escape(ch)}</span>' for ch in chars)
     return (
         "<!doctype html><html><head><meta charset='utf-8'><style>"
-        f"{_font_face_css(registry.fonts)}"
+        f"{_all_font_face_css(registry)}"
         "body{margin:0;background:#fff}"
         "#strip{display:flex;align-items:flex-start;font-family:'Inter',sans-serif;"
         f"font-size:{px}px;font-weight:{weight};line-height:1.2;white-space:pre;color:#000}}"

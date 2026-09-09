@@ -25,6 +25,7 @@ import queue
 import time
 import uuid
 from collections.abc import Iterator
+from pathlib import Path
 from typing import Any
 
 from flask import (
@@ -660,11 +661,21 @@ def _appearance() -> dict[str, Any]:
         build_registry(user_themes=user_themes, community_themes=community_themes),
         disabled_ids=disabled,
     )
-    fonts = [
+    fonts: list[dict[str, Any]] = [
         {"id": f.id, "name": f.name}
         for f in sorted(_registry().fonts.values(), key=lambda x: x.name.lower())
     ]
-    return {"themes": themes, "styles": _MATRIX_STYLES, "fonts": fonts}
+    # Cached webfonts (app/font_cache.py) sit in the same list so every font
+    # picker offers them; "source" tells them apart, and "cached_fonts" carries
+    # the full records (weights, styles, origin) for the MCP surface.
+    from app import font_cache
+
+    cached = [c.record() for c in font_cache.list_fonts(Path(current_app.config["DATA_ROOT"]))]
+    fonts += [
+        {"id": c["id"], "name": c["name"], "source": "cached", "weights": c["weights"]}
+        for c in cached
+    ]
+    return {"themes": themes, "styles": _MATRIX_STYLES, "fonts": fonts, "cached_fonts": cached}
 
 
 @bp.get("/catalog.json")

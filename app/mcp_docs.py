@@ -23,7 +23,7 @@ DOC_SHAPE = """A canvas document is JSON:
 {
   "w": int, "h": int,                 # artboard size in px (match the target panel)
   "theme": str, "style": str,         # ids from list_widgets(section="appearance")
-  "font": str, "bg": str,             # optional font id and background colour override
+  "font": str, "bg": str,             # optional font id (bundled, or a webfont cached with add_font) and background colour override
   "els": [ <element>, ... ],          # painted in list order: first = back, last = front
   "inputs": [ <config input>, ... ]   # optional; the settings this dashboard asks for
 }
@@ -117,7 +117,12 @@ plus optional "opacity" (0-100) and "rotate" (degrees). By "kind":
              - Fonts: any bundled font (list_widgets(section="appearance").fonts) works in the
                sandbox by family name, e.g. `font-family: "Fira Code"` or `"Press Start 2P"`. Only
                fonts your code actually names are inlined, so there's a broad programming + pixel set
-               available at no cost until used.
+               available at no cost until used. Any OTHER webfont: cache it once with
+               add_font("Shippori Mincho", weights=[400,700]) (Google Fonts by name, or url= for a
+               direct .woff2) and then name it the same way; it is inlined from the server's cache,
+               never fetched at render time. A <link> or @import to fonts.googleapis.com is blocked
+               by the sandbox and silently falls back. Always write a fallback stack after the
+               family (`'Shippori Mincho', serif`): that is what renders if the cache entry is gone.
            Every one of those is chosen by matching your code, so render_report().injected_libs
            reports what got inlined and the token that triggered it -- check it if an element
            renders styled in a way you didn't author. To take no ambient CSS or JS at all (an
@@ -457,6 +462,25 @@ WIRE UP NAVIGATION / SCHEDULING (once the pages exist):
 # the bridge appends DOC_SHAPE to those two itself, so it is written once.
 
 TOOL_DOCS: dict[str, str] = {
+    "add_font": """\
+Cache a webfont on the server so pages and code elements can use it by name
+with no network at render time. family + weights (default [400, 700]) +
+styles (default ["normal"]) fetches it from Google Fonts once; family + url
+stores one face from a direct .woff2 / .ttf / .otf URL (repeat per weight).
+Only the latin subset is kept unless "subsets" says otherwise, which keeps a
+CJK family like Shippori Mincho small. Returns {id, name, weights, styles,
+bytes, usage}. Afterwards `font-family: 'Shippori Mincho', serif` in a code
+element's CSS renders the cached face (autolibs inlines it like a bundled
+font), and "font": "<id>" on the page sets it canvas-wide. Keep the fallback
+stack: a deleted cache entry degrades to it rather than failing. A <link>
+or @import to a font CDN never works in the sandbox; this is the way.""",
+    "list_fonts": """\
+The cached webfonts (id, name, weights, styles, subsets, bytes). Bundled
+families are in list_widgets(section="appearance").fonts, where cached ones
+also appear with "source": "cached".""",
+    "delete_font": """\
+Remove a cached webfont by id or family name. Pages that named it fall back
+to the default font; code elements to their CSS fallback stack.""",
     "list_widgets": """\
 List every widget that can be placed on a canvas (with its fragments), the
 vendored code-element libraries (Chart.js, canvas-gauges, dayjs, qrcode,

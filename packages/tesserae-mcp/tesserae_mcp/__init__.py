@@ -23,7 +23,7 @@ import urllib.error
 import urllib.request
 from typing import Any
 
-__version__ = "0.16.0"
+__version__ = "0.17.0"
 
 _BASE = os.environ.get("TESSERAE_URL", "http://127.0.0.1:8765").rstrip("/")
 _TOKEN = os.environ.get("TESSERAE_MCP_TOKEN", "").strip()
@@ -44,7 +44,7 @@ _DOC_SHAPE = """A canvas document is JSON:
 {
   "w": int, "h": int,                 # artboard size in px (match the target panel)
   "theme": str, "style": str,         # ids from list_widgets(section="appearance")
-  "font": str, "bg": str,             # optional font id and background colour override
+  "font": str, "bg": str,             # optional font id (bundled, or a webfont cached with add_font) and background colour override
   "els": [ <element>, ... ]           # painted in list order: first = back, last = front
 }
 Elements may sit partly off the panel (it clips at the edge). Each element has a
@@ -660,6 +660,49 @@ def build_server() -> Any:
             return {section: out.get(section)}
         return _summarise_catalog(out)
 
+    def add_font(
+        family: str,
+        weights: list[int] | None = None,
+        styles: list[str] | None = None,
+        subsets: list[str] | None = None,
+        url: str = "",
+        weight: int = 400,
+        style: str = "normal",
+    ) -> Any:
+        """Cache a webfont on the server so pages and code elements can use it by name
+        with no network at render time. family + weights (default [400, 700]) +
+        styles (default ["normal"]) fetches it from Google Fonts once; family + url
+        stores one face from a direct .woff2 / .ttf / .otf URL (repeat per weight).
+        Only the latin subset is kept unless "subsets" says otherwise, which keeps a
+        CJK family like Shippori Mincho small. Returns {id, name, weights, styles,
+        bytes, usage}. Afterwards `font-family: 'Shippori Mincho', serif` in a code
+        element's CSS renders the cached face (autolibs inlines it like a bundled
+        font), and "font": "<id>" on the page sets it canvas-wide. Keep the fallback
+        stack: a deleted cache entry degrades to it rather than failing. A <link>
+        or @import to a font CDN never works in the sandbox; this is the way."""
+        body: dict[str, Any] = {"family": family}
+        if url:
+            body.update({"url": url, "weight": weight, "style": style})
+        else:
+            if weights is not None:
+                body["weights"] = weights
+            if styles is not None:
+                body["styles"] = styles
+            if subsets is not None:
+                body["subsets"] = subsets
+        return _json("POST", "/fonts", body)
+
+    def list_fonts() -> Any:
+        """The cached webfonts (id, name, weights, styles, subsets, bytes). Bundled
+        families are in list_widgets(section="appearance").fonts, where cached ones
+        also appear with "source": "cached"."""
+        return _json("GET", "/fonts")
+
+    def delete_font(font: str) -> Any:
+        """Remove a cached webfont by id or family name. Pages that named it fall back
+        to the default font; code elements to their CSS fallback stack."""
+        return _json("DELETE", f"/fonts/{font}")
+
     def list_icons(q: str = "", limit: int = 100) -> Any:
         """Search the vendored Phosphor icon set (all six weights) by case-insensitive
         substring, so you pick a real slug instead of guessing. The query is
@@ -1127,6 +1170,9 @@ def build_server() -> Any:
     mcp = FastMCP("tesserae", instructions=instructions + _upgrade_note(docs.get("bridge")))
     for fn in (
         list_widgets,
+        add_font,
+        list_fonts,
+        delete_font,
         list_icons,
         list_services,
         get_widget_options,

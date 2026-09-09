@@ -1243,6 +1243,68 @@ def delete_page_asset(page_id: str, name: str) -> Response:
     return jsonify({"ok": True, "name": name})
 
 
+@bp.get("/fonts")
+def list_fonts() -> Response:
+    """The cached webfonts (app/font_cache.py): ``{fonts: [{id, name, weights,
+    styles, subsets, bytes, origin}]}``. Bundled families are listed by
+    ``/appearance`` alongside these; a page's ``font`` or a code element's
+    ``font-family`` can name either."""
+    from app import font_cache as _fc
+
+    return jsonify({"fonts": [f.record() for f in _fc.list_fonts(_data_root())]})
+
+
+@bp.post("/fonts")
+def add_font() -> Response:
+    """Cache a webfont once so renders can use it offline. Body: ``{family,
+    weights?, styles?, subsets?}`` fetches the family from Google Fonts
+    (weights default [400, 700], styles ["normal"], subsets ["latin"]); ``{family,
+    url, weight?, style?}`` stores one face from a direct .woff2 / .ttf / .otf
+    URL instead. Returns the font record. Re-caching adds or replaces faces."""
+    from app import font_cache as _fc
+
+    body = request.get_json(silent=True) or {}
+    family = str(body.get("family") or "").strip()
+    if not family:
+        return _err(422, "provide a 'family' name")
+    try:
+        if str(body.get("url") or "").strip():
+            font = _fc.cache_font_url(
+                _data_root(),
+                family,
+                str(body["url"]),
+                weight=body.get("weight", 400),
+                style=body.get("style", "normal"),
+            )
+        else:
+            font = _fc.cache_google_font(
+                _data_root(),
+                family,
+                weights=body.get("weights"),
+                styles=body.get("styles"),
+                subsets=body.get("subsets"),
+            )
+    except _fc.FontCacheError as err:
+        return _err(422, str(err))
+    rec = font.record()
+    rec["usage"] = (
+        f"font-family: '{font.family}' in a code element's CSS, or \"font\": "
+        f'"{font.slug}" on the page; the fallback stack still applies if the cache is cleared'
+    )
+    return jsonify(rec)
+
+
+@bp.delete("/fonts/<font_id>")
+def delete_font(font_id: str) -> Response:
+    """Remove a cached webfont (by id or family name). Pages that named it fall
+    back to the default font; code elements to their CSS fallback stack."""
+    from app import font_cache as _fc
+
+    if not _fc.delete_font(_data_root(), font_id):
+        return _err(404, f"no cached font {font_id!r}")
+    return jsonify({"ok": True, "id": font_id})
+
+
 @bp.get("/pages/<page_id>/canvas")
 def get_canvas(page_id: str) -> Response:
     """The full canvas document (artboard size, appearance, and every element),

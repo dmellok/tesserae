@@ -98,6 +98,11 @@ _LOOPBACK_PATHS: Final[tuple[str, ...]] = (
     # rendering a canvas, same as /plugins/<id>/client.js. Exposes only the
     # already-installed font files, nothing sensitive.
     "/fonts/face/",
+    # Cached webfont files (app/font_cache.py): the page CSS references them by
+    # same-origin URL and the renderer fetches them over loopback while
+    # composing, same as /page-assets. Font bytes only, content-addressed by
+    # family slug and face name.
+    "/page-fonts/",
     # Per-dashboard cached images. The loopback renderer loads them while
     # composing a canvas; the authed editor preview loads them too. Only images
     # the admin cached into a dashboard's own folder are reachable here.

@@ -8,6 +8,17 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- Any webfont in canvas pages and code elements, cached server-side. A new
+  `add_font` MCP tool (`POST /api/mcp/fonts`) fetches a Google Fonts family by
+  name at chosen weights and styles, or one face from a direct .woff2 / .ttf
+  URL, once at author time; only the latin subset is kept unless asked
+  otherwise, so a CJK family stays small. Cached families then work exactly
+  like the bundled ones: autolibs inlines the face into a code element's
+  sandbox when its CSS names the family, the page `font` field accepts the
+  cached id, and the appearance catalog lists them with `source: "cached"`.
+  Renders never touch the network; a missing cache entry degrades to the
+  author's fallback stack. `list_fonts` and `delete_font` complete the set,
+  and files are served from `/page-fonts/<id>/<file>` on the local origin.
 - Hardware catalog entries for the paperlesspaper OpenPaper 7 (7.3" Spectra 6,
   800x480) and OpenPaper L (13.3" Spectra 6, 1200x1600) picture frames, both
   ESP32-C6 boards running the Tesserae device firmware over the existing

@@ -1305,6 +1305,26 @@ def create_app(
         resp.headers["Access-Control-Allow-Origin"] = "*"
         return resp
 
+    @app.get("/page-fonts/<slug>/<name>")
+    def page_font_file(slug: str, name: str) -> Response:
+        """A cached webfont face (app/font_cache.py). Fetched over loopback by
+        the renderer while composing a page, and by the editor preview. Slug and
+        name are validated against the cache's own charsets; anything else 404s."""
+        from app import font_cache as _fc
+
+        if not _fc._FILE_RE.match(name) or name.startswith(".") or name.endswith(".json"):
+            abort(404)
+        try:
+            directory = _fc.font_dir(data_root, slug)
+        except _fc.FontCacheError:
+            abort(404)
+        if not (directory / name).is_file():
+            abort(404)
+        resp: Response = send_from_directory(directory, name)
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        resp.headers["Cache-Control"] = "public, max-age=86400"
+        return resp
+
     @app.get("/page-assets/<page_id>/<name>")
     def page_asset(page_id: str, name: str) -> Response:
         # A dashboard's cached images (issue: per-dashboard asset catalog).
