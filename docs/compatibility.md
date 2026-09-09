@@ -103,7 +103,7 @@ Open-hardware e-paper picture frames (ESP32-C6, NiMH cells) that run the [Tesser
 
 | SKU | Panel | Gamut | Protocol / Renderer | Kind id |
 |---|---|---|---|---|
-| [paperlesspaper OpenPaper 7](https://paperlesspaper.de/en/buy-7-inch-epaper-picture-frame) | 800×480 | `spectra_6` | `esp32_client` (inherit) | `paperlesspaper_openpaper_7` |
+| [paperlesspaper OpenPaper 7](https://paperlesspaper.de/en/buy-7-inch-epaper-picture-frame) | 480×800 portrait | `spectra_6` | `esp32_client` (inherit) | `paperlesspaper_openpaper_7` |
 | [paperlesspaper OpenPaper L](https://paperlesspaper.de/en) | 1200×1600 portrait | `waveshare_e6` | `esp32_client` (inherit) | `paperlesspaper_openpaper_l` |
 
 ### [Pimoroni](https://shop.pimoroni.com/)

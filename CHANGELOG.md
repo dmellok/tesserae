@@ -15,6 +15,10 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   not yet confirmed on hardware.
 - The OpenPaper 7 entry and the tested matrix now record the on-hardware
   confirmation.
+- The OpenPaper 7 kind composes portrait (480x800) by default, matching the
+  frame standing upright; the renderer rotates onto the panel's 800x480 native
+  stride when packing. Switch to `portrait_flipped` per display if it lands
+  upside down.
 - The GTFS widget gains a "GTFS-RT VehiclePositions URL" field, for agencies
   that publish vehicle positions as their own feed beside TripUpdates and
   ServiceAlerts. With "Show stops away" on, a row reads "2 stops" when the

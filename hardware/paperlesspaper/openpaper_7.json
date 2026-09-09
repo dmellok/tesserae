@@ -5,13 +5,13 @@
   "vendor": "paperlesspaper",
   "url": "https://paperlesspaper.de/en/buy-7-inch-epaper-picture-frame",
   "icon": "device-tablet",
-  "description": "7.3 inch 6-colour Spectra 6 ePaper picture frame from paperlesspaper (Germany), open hardware: ESP32-C6 (4 MB flash, no PSRAM), 4 x AAA NiMH cells, CP2102N USB-C serial. 800x480 landscape-native panel, single controller. Speaks Tesserae's v1 REST device API and paints a 4-bpp Spectra 6 buffer (192000 bytes) produced by the esp32_bin renderer. Pair with the tesserae-device-firmware ESP-IDF build (env paperlesspaper-openpaper-7, boards/paperlesspaper_openpaper_7.h).",
+  "description": "7.3 inch 6-colour Spectra 6 ePaper picture frame from paperlesspaper (Germany), open hardware: ESP32-C6 (4 MB flash, no PSRAM), 4 x AAA NiMH cells, CP2102N USB-C serial. 800x480 landscape-native panel, single controller, composed portrait (480x800) by default since the frame stands upright; the renderer rotates onto the native stride at pack time. Speaks Tesserae's v1 REST device API and paints a 4-bpp Spectra 6 buffer (192000 bytes) produced by the esp32_bin renderer. Pair with the tesserae-device-firmware ESP-IDF build (env paperlesspaper-openpaper-7, boards/paperlesspaper_openpaper_7.h).",
   "protocol": "esp32_client",
   "panel": {
-    "w": 800,
-    "h": 480,
-    "orientation": "landscape",
-    "name": "7.3 inch Spectra 6 ePaper (800x480)",
+    "w": 480,
+    "h": 800,
+    "orientation": "portrait",
+    "name": "7.3 inch Spectra 6 ePaper (800x480 native, portrait mount)",
     "gamut": "spectra_6",
     "native_w": 800,
     "native_h": 480
@@ -21,5 +21,5 @@
   },
   "refresh_floor_s": 60,
   "image_format": "bin",
-  "notes_md": "Confirmed on real hardware running tesserae-device-firmware (2026-09-09). Runs the Tesserae firmware in place of the vendor's cloud firmware. Flashing it overwrites the SPIFFS region that holds the frame's paperlesspaper cloud certificate, so back that region up first (`esptool.py --chip esp32c6 read_flash 0x3B0000 0x40000 openpaper-spiffs.bin`) if you may want the vendor cloud back. Palette nibbles match the firmware's EPD_COL_* constants byte-for-byte (black=0x0, white=0x1, yellow=0x2, red=0x3, blue=0x5, green=0x6). The big button is a hardware reset, which the firmware treats as a wake-and-repaint; the small one is the BOOT button for flashing. The battery reads through a divider the ADC under-samples, so the reported voltage is calibrated from the vendor's figure until a bench pass confirms it."
+  "notes_md": "Confirmed on real hardware running tesserae-device-firmware (2026-09-09). Runs the Tesserae firmware in place of the vendor's cloud firmware. Flashing it overwrites the SPIFFS region that holds the frame's paperlesspaper cloud certificate, so back that region up first (`esptool.py --chip esp32c6 read_flash 0x3B0000 0x40000 openpaper-spiffs.bin`) if you may want the vendor cloud back. Palette nibbles match the firmware's EPD_COL_* constants byte-for-byte (black=0x0, white=0x1, yellow=0x2, red=0x3, blue=0x5, green=0x6). The big button is a hardware reset, which the firmware treats as a wake-and-repaint; the small one is the BOOT button for flashing. The battery reads through a divider the ADC under-samples, so the reported voltage is calibrated from the vendor's figure until a bench pass confirms it. Composition is 480x800 portrait while `native_w`/`native_h` stay 800x480: the firmware reads 400-byte landscape rows and does not transpose, so `esp32_bin` rotates the portrait composition 90 degrees CW on pack, the same arrangement as the M5Paper S3 and Xteink X4 entries. If a unit paints upside down, switch the display to `portrait_flipped` in Settings -> Devices; that is the expected correction and needs no code change."
 }
