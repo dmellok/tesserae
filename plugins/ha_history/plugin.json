@@ -1,9 +1,9 @@
 {
   "tesserae_compat": "1.x",
   "name": "Home Assistant, History",
-  "version": "0.6.0",
+  "version": "0.8.1",
   "kind": "widget",
-  "description": "A numeric Home Assistant sensor over time. Pairs the current value + trend arrow + min/max with a Chart.js line chart, optional threshold horizontal line, min/max marker dots + labels on the curve, and an averaged hourly-profile ghost overlay for long windows. Requires the Home Assistant Core plugin.",
+  "description": "A numeric Home Assistant sensor over time. Pairs the current value + trend arrow + min/max (in the legend strip, or as a large headline above the chart) with a Chart.js line chart, optional threshold horizontal line, optional fixed y-axis range, min/max marker dots + labels on the curve, and an averaged hourly-profile ghost overlay for long windows. Requires the Home Assistant Core plugin.",
   "icon": "ph-chart-line",
   "supports": {
     "sizes": [
@@ -35,11 +35,36 @@
       "help": "How the current / min / max values are shown. Blank rounds to 2 decimals and trims trailing zeros (21.00 → 21). Use 0 for whole numbers, 0.0 for one decimal, 0.00 for two, and so on."
     },
     {
+      "name": "value_style",
+      "type": "select",
+      "label": "Current value",
+      "default": "legend",
+      "choices": [
+        { "value": "legend", "label": "In the legend strip under the chart" },
+        { "value": "headline", "label": "Large headline above the chart" }
+      ],
+      "help": "Where the single-sensor current reading goes. Headline puts it in large type above the chart, with the trend arrow and low / high beside it, for a reading you want at a glance plus the history for context."
+    },
+    {
       "name": "threshold",
       "type": "number",
       "label": "Threshold (optional)",
       "default": "",
       "help": "Draws a horizontal dashed line at this value. Useful for 'too cold' / 'too high' / 'over budget' thresholds."
+    },
+    {
+      "name": "y_min",
+      "type": "number",
+      "label": "Y-axis minimum (optional)",
+      "default": "",
+      "help": "Fixes the bottom of the chart's value axis. Blank lets the axis follow the data, which can make the same swing look bigger or smaller from one render to the next."
+    },
+    {
+      "name": "y_max",
+      "type": "number",
+      "label": "Y-axis maximum (optional)",
+      "default": "",
+      "help": "Fixes the top of the chart's value axis. Blank lets the axis follow the data. Set both to pin the range, for example 0 to 40 for an outdoor temperature."
     },
     {
       "name": "show_min_max",

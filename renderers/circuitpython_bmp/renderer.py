@@ -34,6 +34,12 @@ mono and 4 bpp for the tri-colour / 4-grey / Spectra 6 / 7-colour gamuts,
 so it's 2-8x smaller than a naive 8-bit BMP while still decoding on the
 same ``adafruit_imageload`` path (its unpacker is generic over bit depth).
 
+The colour table is the gamut's whole palette on every frame, whatever
+the page happens to use, so bit depth and table are a per-gamut constant
+(discussion #277). A client that sizes its ``displayio.Bitmap`` from the
+first frame and reuses it can rely on the next frame fitting; a
+tri-colour page with no red on it must not arrive as a 2-colour file.
+
 Same per-device settings as ``circuitpython_png``: a dither-mode select
 and a pre-dither contrast slider. It shares that renderer's palette
 handling too, nominal palette per gamut, with the profile's edge knobs
@@ -45,7 +51,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.bmp_writer import pack_indexed_bmp
-from app.quantizer import circuitpython_indexed_image
+from app.quantizer import circuitpython_indexed_image, palette_for_circuitpython_gamut
 from app.state.page_store import Panel
 
 
@@ -89,7 +95,8 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
         settings=settings,
         native_size=_declared_native_size(panel),
     )
-    return pack_indexed_bmp(img)
+    # Same palette the quantiser mapped to, written whole: see module doc.
+    return pack_indexed_bmp(img, palette=palette_for_circuitpython_gamut(panel.gamut))
 
 
 def payload(digest: str, base_url: str, *, settings: dict[str, Any]) -> dict[str, Any]:

@@ -1,0 +1,25 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "waveshare_esp32_driver_75",
+  "name": "Waveshare E-Paper ESP32 Driver Board + 7.5\" B/W",
+  "vendor": "Waveshare",
+  "url": "https://www.waveshare.com/e-paper-esp32-driver-board.htm",
+  "icon": "device-tablet",
+  "description": "Waveshare's universal E-Paper ESP32 Driver Board (classic ESP32-WROOM-32, 4 MB flash, no PSRAM) carrying a 7.5 inch monochrome panel (7.5inch e-Paper V2, 800x480). Speaks Tesserae's v1 REST device API and paints a raw 1-bpp mono buffer (48000 bytes) produced by the esp32_bw_bin renderer; byte-identical wire contract to the Seeed reTerminal E1001 and the XIAO 7.5 inch boards. Distinct kind because the classic-ESP32 firmware image has its own OTA lineage. No battery telemetry (the board has no divider to an ADC pin) and no user buttons beyond EN and BOOT.",
+  "protocol": "esp32_bw_client",
+  "panel": {
+    "w": 800,
+    "h": 480,
+    "orientation": "landscape",
+    "name": "7.5 inch monochrome ePaper (800x480)",
+    "gamut": "mono",
+    "native_w": 800,
+    "native_h": 480
+  },
+  "protocol_config": {
+    "model_header": "Waveshare_ESP32_Driver_75"
+  },
+  "refresh_floor_s": 60,
+  "image_format": "bin",
+  "notes_md": "Firmware support is in tesserae-device-firmware from v1.32.0 as the `waveshare-esp32-driver-75` build; community bring-up, not yet confirmed on real hardware. Wire format is exactly 48000 bytes (800*480/8), MSB=leftmost pixel, bit-set=white, bit-clear=black; no header, no padding, no checksum. Frame is byte-identical to the `xiao_epaper_75`, `xiao_epaper_panel_75_c3` and `seeed_reterminal_e1001` targets. Default device ids look like `waveshare_esp32_driver_75_<mac-suffix>` (model string `Waveshare_ESP32_Driver_75`). OTA-capable; descriptors are signed for this kind id.\n\n**Board switches.** Waveshare's wiki says DIP switch 1 (Display Config) must sit at the 0.47R \"B\" position for the 7.5 inch panel; the 3R \"A\" position is for the small panels and gives a faint or blank image. Switch 2 powers the USB-UART bridge and must be ON to flash or to see the serial console.\n\n**Panel fit.** The firmware drives the 7.5 inch V2 (UC8179, 800x480). Waveshare's older 7.5 inch V1 (640x384) and the tri-colour (B) and (C) panels are not this kind.\n\n**No battery reporting.** The board's 5V pin accepts 3.6-5.5 V so it can run from a cell, but nothing on the board measures it, so the firmware omits `battery_pct` and the server shows no battery UI for this kind.\n\n**No buttons.** EN and BOOT only, so no button-report mappings, no page-turn bindings and no Bluetooth setup path; Wi-Fi provisioning is the captive portal."
+}

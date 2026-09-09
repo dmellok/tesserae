@@ -1167,6 +1167,55 @@
   background: var(--dx-border-faint);
   margin: 18px 0;
 }
+/* Weekday picker (quiet hours, #299): seven toggle chips backed by
+   checkboxes so the form posts one value per ticked day. */
+.days-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.days-chip {
+  position: relative;
+  display: inline-flex;
+}
+.days-chip input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.days-chip span {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: var(--t-radius-pill);
+  background: var(--t-surface-soft);
+  color: var(--t-fg-soft);
+  font-size: var(--t-size-sm);
+  font-weight: 600;
+  border: 1px solid transparent;
+  cursor: pointer;
+  user-select: none;
+  transition: background 120ms ease, color 120ms ease;
+}
+.days-chip:hover span {
+  color: var(--t-fg);
+  background: var(--t-surface-sunk);
+}
+.days-chip input:checked + span {
+  color: var(--t-accent);
+  background: var(--t-accent-soft);
+  border-color: color-mix(in oklab, var(--t-accent) 35%, transparent);
+}
+.days-chip input:focus-visible + span {
+  outline: 2px solid var(--t-accent);
+  outline-offset: 2px;
+}
+.days-chip input:disabled + span {
+  cursor: default;
+  opacity: 0.6;
+}
+
 .dx-quiet-hours .field-grid,
 .dx-quiet-hours .dx-field-grid {
   transition: opacity 120ms ease;

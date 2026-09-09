@@ -7,6 +7,8 @@ had. Every assertion about another gamut here exists to prove the change
 is inert outside ``bwry_4``.
 """
 
+from itertools import pairwise
+
 import pytest
 from PIL import Image
 
@@ -214,22 +216,23 @@ def test_no_bundled_profile_selects_lab_matching():
         assert p.dither.color_match == "rgb", f"{p.slug} selects {p.dither.color_match}"
 
 
-def test_lab_matching_still_loses_dither_feedback():
-    """Regression guard documenting a PRE-EXISTING upstream bug, not a
-    BWRY one: ``_error_diffusion`` builds its LAB buffers once from the
-    original image and never writes diffused error back into them, while
-    the LAB branch reads those stale buffers to pick the nearest ink.
-    Every pixel is judged against its pristine value, so error diffusion
-    is ignored and the result is plain nearest-colour quantisation.
+def test_lab_matching_keeps_dither_feedback():
+    """The inverted tripwire (#202). It used to assert the bug.
 
-    ``_error_diffusion`` never sees a gamut and is shared by atkinson /
-    jarvis / stucki (floyd-steinberg detours into it when LAB is
-    selected), so this affects every gamut and every error-diffusion
-    dither, under both ``lab`` and ``chroma-aware``.
+    ``_error_diffusion`` built its LAB buffers once from the original image
+    and never wrote diffused error back into them, while the LAB branch read
+    those stale buffers to pick the nearest ink. Every pixel was judged
+    against its pristine value, so error diffusion was ignored and the result
+    was plain nearest-colour quantisation: a flat patch came back as a single
+    ink, on every gamut and every error-diffusion dither.
 
-    Signature: a flat patch must dither into a MIX of inks. Under LAB it
-    collapses to a single ink. If this test starts failing, the upstream
-    bug was fixed and a LAB preset becomes worth reconsidering."""
+    The LAB coordinates are now derived from the pixel as it stands when it is
+    matched, so a flat patch dithers under ``lab`` and ``chroma-aware`` the
+    way it always did under ``rgb``.
+
+    Signature: a flat patch must dither into a MIX of inks under every
+    combination. One ink means the feedback has been lost again.
+    """
     from collections import Counter
 
     palette = ((36, 37, 34), (236, 233, 223), (222, 180, 40), (188, 66, 72))
@@ -251,14 +254,40 @@ def test_lab_matching_still_loses_dither_feedback():
         return len(Counter(idx))
 
     # Every error-diffusion dither routes through the same function, so
-    # every one of them loses the feedback.
+    # fixing it there fixes every one of them.
     for dither in ("floyd-steinberg", "atkinson", "jarvis", "stucki"):
         assert ink_count("rgb", dither) > 1, f"{dither}+rgb should mix inks"
         for match in ("lab", "chroma-aware"):
-            assert ink_count(match, dither) == 1, (
-                f"{dither}+{match} no longer collapses — upstream bug may be fixed, "
-                "in which case a LAB preset is worth reconsidering"
+            assert ink_count(match, dither) > 1, (
+                f"{dither}+{match} collapsed to one ink: the LAB match is reading "
+                "a pixel value that predates its neighbours' diffused error again"
             )
+
+
+def test_lab_matching_produces_an_alternating_pattern_not_just_two_inks():
+    """Counting inks alone would pass on a frame split into two solid halves.
+
+    A flat patch under a working error diffusion alternates, so consecutive
+    pixels differ far more often than not. This is what separates "the dither
+    ran" from "two inks appear somewhere in the frame".
+    """
+    palette = ((36, 37, 34), (236, 233, 223), (222, 180, 40), (188, 66, 72))
+    flat = Image.new("RGB", (40, 40), (128, 128, 128))
+    payload = pack_to_panel_bin(
+        flat,
+        width=40,
+        height=40,
+        gamut="bwry_4",
+        dither="floyd-steinberg",
+        color_match="lab",
+        palette_override=palette,
+    )
+    idx = []
+    for byte in payload:
+        idx += [(byte >> 6) & 3, (byte >> 4) & 3, (byte >> 2) & 3, byte & 3]
+    row = idx[:40]
+    transitions = sum(1 for a, b in pairwise(row) if a != b)
+    assert transitions > 20, f"only {transitions} ink changes across a 40px flat row"
 
 
 def test_bwry_profile_palette_slices_to_the_four_inks():

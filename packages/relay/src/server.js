@@ -108,8 +108,22 @@ async function handle(req, res, env, maxBody) {
   response.headers.forEach((value, key) => {
     headers[key] = value;
   });
-  res.writeHead(response.status, headers);
-  res.end(payload);
+  // Always send an explicit Content-Length. Without one Node falls back to
+  // chunked transfer encoding, and the ESP32 firmware reads a sealed frame
+  // only when the response headers carry a length (esp_http_client's
+  // fetch_headers returns -1 for chunked bodies), so a chunked 200 looked to
+  // a panel like an empty mailbox and it never painted. The Worker runtime
+  // sets the header itself, which is why the hosted relay never showed this.
+  const bodyless = response.status === 204 || response.status === 304 || req.method === "HEAD";
+  if (bodyless) {
+    delete headers["content-length"];
+    res.writeHead(response.status, headers);
+    res.end();
+  } else {
+    headers["content-length"] = String(payload.length);
+    res.writeHead(response.status, headers);
+    res.end(payload);
+  }
 
   // One line per request. Without it a refusal is invisible from the outside:
   // an operator sees only the status their Tesserae install reports and has

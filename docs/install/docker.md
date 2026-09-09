@@ -27,6 +27,48 @@ That's it. Open `http://<host-ip>:8765` (or
 `http://tesserae.local:8765` once mDNS comes up), the first request
 walks through password setup and the onboarding wizard.
 
+## Pin the secret key before you store any credentials
+
+Stored secrets (API keys, broker passwords, the Home Assistant token)
+are encrypted at rest. Without `TESSERAE_SECRET_KEY` the key is derived
+from the persisted session secret in `settings.json`. That survives an
+ordinary restart and upgrade, but **it is lost whenever the session
+secret is regenerated**: a data folder restored without `settings.json`,
+or a container recreated without its data volume.
+
+When that happens, the secrets decrypt to an empty string while
+every non-secret setting beside them is intact. The install looks
+configured and is not: the Home Assistant URL is still right, and every
+widget that needs the token reports the install as unconfigured. Nothing
+warns you at the moment the credentials go, only the next time something
+tries to use one.
+
+Generate a key once and put it in the compose file before you enter
+anything worth keeping:
+
+```sh
+python3 -c "import secrets; print(secrets.token_hex(32))"
+```
+
+```yaml
+services:
+  tesserae:
+    image: ghcr.io/dmellok/tesserae:latest
+    environment:
+      TESSERAE_SECRET_KEY: "<the 64 hex chars from above>"
+    volumes:
+      - ./data:/app/data
+```
+
+Tesserae warns at startup while it is running on the derived key, and the
+warning carries a ready-to-paste line. Adding the key later is fine: any
+secret entered *after* it is pinned is safe, while ones entered before are
+still tied to the session secret and want re-entering once.
+
+Treat it like any other secret: it decrypts the credentials in your data
+folder, so it does not belong in the same backup as them, and it does not
+belong in a public repo alongside your compose file.
+
 The default `docker-compose.yml` uses **host networking**, which is
 the right choice for a self-hosted Pi / mini-PC / NAS appliance:
 
@@ -227,6 +269,19 @@ Both still work under Docker. Snapshotting `./data` with your normal backup tool
 - **mDNS needs host networking.** See above.
 - **arm/v7 is not built.** Pi 3 and below would need a different
   Playwright story; not currently in scope.
+- **x86-64 CPUs from before 2009 need a rebuild.** numpy 2.4 and later
+  ship wheels built for x86-64-v2 (SSE4.2, POPCNT), so on an older
+  processor the container exits at startup with `Illegal instruction`
+  (the entrypoint prints an explanation). Build the image yourself with
+  the last numpy line that still runs there:
+
+  ```bash
+  git clone https://github.com/dmellok/tesserae && cd tesserae
+  docker build --build-arg NUMPY_SPEC='numpy<2.4' -t tesserae .
+  ```
+
+  then point your compose file's `image:` at `tesserae`. Check with
+  `grep -c sse4_2 /proc/cpuinfo`; `0` means this applies to you.
 - **The image is ~970 MB to pull**, ~2.5 GB on disk uncompressed.
   Most of that is Chromium and its sandboxes. There's no smaller
   Tesserae image plan, the renderer fundamentally needs a real

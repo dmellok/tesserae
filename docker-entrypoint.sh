@@ -18,6 +18,28 @@
 # first time); already-correct case works (chown is a no-op).
 set -e
 
+# Fail with a message instead of a bare "Illegal instruction". numpy's x86-64
+# wheels need a 2009-or-newer CPU (x86-64-v2: SSE4.2, POPCNT) from 2.4 on, and
+# a SIGILL at import is all an older machine gets. Exit status 132 is SIGILL.
+status=0
+python -c 'import numpy' >/dev/null 2>&1 || status=$?
+if [ "$status" != "0" ]; then
+    if [ "$status" = "132" ]; then
+        cat >&2 <<'MSG'
+Tesserae: numpy cannot run on this CPU (illegal instruction at import).
+The bundled numpy needs an x86-64-v2 processor (SSE4.2 and POPCNT, CPUs from
+2009 on). Rebuild the image with the last numpy line that runs on older CPUs:
+
+    docker build --build-arg NUMPY_SPEC='numpy<2.4' -t tesserae .
+
+See docs: Install via Docker -> Limits.
+MSG
+        exit 132
+    fi
+    echo "Tesserae: numpy failed to import (exit $status); the image is broken." >&2
+    exit "$status"
+fi
+
 if [ "$(id -u)" = "0" ]; then
     # Only the directory itself needs an unconditional chown so pwuser
     # can write inside it. Anything already owned correctly is skipped

@@ -16,6 +16,12 @@ speaks Tesserae's REST device API directly and paints frames the
   varanu5's write-up of what works, the BWRY palette order, the
   2-bpp packing layout, and the vertical-scan flip requirement.
 
+- **Update check**: with online features on, Settings → Devices and the
+  Firmware page compare the version a PicPak reports against the newest
+  release of that repo (via api.tesserae.ink) and show an "update available"
+  chip that links the release. Updates are applied with the web flasher
+  below, not over the air.
+
 The firmware is not part of the Tesserae repo; it lives with its
 author. The quickest way on is the browser flasher below; otherwise
 build and flash from the repo per its README. Either way, pair the

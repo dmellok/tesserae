@@ -76,6 +76,15 @@ RUN apt-get update \
 COPY --from=dependency-manifest /tmp/requirements.txt /tmp/requirements.txt
 RUN pip install -r /tmp/requirements.txt
 
+# Escape hatch for x86-64 CPUs older than 2009 (no SSE4.2 / POPCNT). numpy 2.4
+# raised its wheel baseline to x86-64-v2, so on those machines the stock image
+# dies with "Illegal instruction" the moment numpy loads. Rebuild with
+#   docker build --build-arg NUMPY_SPEC='numpy<2.4' .
+# to pin the last line whose wheels still run there. Empty by default so the
+# published image and its dependency layer are unchanged.
+ARG NUMPY_SPEC=""
+RUN if [ -n "$NUMPY_SPEC" ]; then pip install "$NUMPY_SPEC"; fi
+
 # Copy the whole source tree after the stable layers. Tesserae's loaders
 # resolve plugins/, renderers/, devices/, hardware/, templates/, and
 # static/ from REPO_ROOT, so the install needs to leave the source tree

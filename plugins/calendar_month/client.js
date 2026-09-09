@@ -143,6 +143,12 @@ export default function render(shadow, ctx) {
   const monthDate = new Date(data.year || 2026, (data.month || 1) - 1, 1);
   const monthName = localizedFull(monthDate, "month", locale).toUpperCase();
   const year = data.year || "";
+  // Off by default (#283): the weekday column headers already say which day
+  // the week starts on, so the label restated it and cost a line of header on
+  // a panel where space is the scarce thing. Kept as an option rather than
+  // deleted, because a minimal or single-letter weekday style makes it much
+  // less obvious at a glance.
+  const showWeekStart = opts.show_week_start === true;
   const weekStartLabel = (data.week_start === "sunday")
     ? t("week_start_sunday", "Week starts Sun")
     : t("week_start_monday", "Week starts Mon");
@@ -269,7 +275,7 @@ export default function render(shadow, ctx) {
         <div class="cal-head">
           <div class="cal-head-row">
             <span class="cal-head-title">${escapeHtml(monthName)} <span class="num">${escapeHtml(String(year))}</span></span>
-            <span class="cal-head-meta">${escapeHtml(weekStartLabel)}</span>
+            ${showWeekStart ? `<span class="cal-head-meta">${escapeHtml(weekStartLabel)}</span>` : ""}
           </div>
           <div class="cal-head-rule"></div>
         </div>

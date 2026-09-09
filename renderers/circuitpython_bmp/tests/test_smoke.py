@@ -97,6 +97,28 @@ def test_circuitpython_bmp_bwr_3_uses_tricolour_palette(circuitpython_bmp, compo
     assert _colors_used(out) <= set(BWR_3_PALETTE)
 
 
+def test_circuitpython_bmp_bwr_3_table_is_constant_per_gamut(circuitpython_bmp) -> None:
+    # Discussion #277: the file's bit depth and colour table depend on the
+    # gamut, never on the page. An all-white page and a page with red on it
+    # must both be 4-bpp with the same three-entry table, so a client that
+    # allocated its bitmap from one frame's header can reuse it for the next.
+    def _png(colour: tuple[int, int, int]) -> bytes:
+        buf = io.BytesIO()
+        Image.new("RGB", (40, 20), colour).save(buf, format="PNG")
+        return buf.getvalue()
+
+    panel = Panel(w=40, h=20, gamut="bwr_3")
+    settings = circuitpython_bmp.settings_defaults()
+    white = circuitpython_bmp.transform(_png((255, 255, 255)), panel=panel, settings=settings)
+    red = circuitpython_bmp.transform(_png((255, 0, 0)), panel=panel, settings=settings)
+    for artifact in (white, red):
+        assert int.from_bytes(artifact[28:30], "little") == 4  # bpp
+        assert int.from_bytes(artifact[46:50], "little") == 3  # biClrUsed
+        assert artifact[54:66] == bytes((0, 0, 0, 0, 255, 255, 255, 0, 0, 0, 255, 0))
+    assert set(Image.open(io.BytesIO(white)).getdata()) == {1}
+    assert set(Image.open(io.BytesIO(red)).getdata()) == {2}
+
+
 def test_circuitpython_bmp_matches_png_pixels(circuitpython_bmp, composition_png) -> None:
     # BMP and PNG share the pixel pipeline (circuitpython_indexed_image);
     # only the container differs. The decoded pixels must be identical so

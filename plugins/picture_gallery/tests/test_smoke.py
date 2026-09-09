@@ -167,6 +167,23 @@ def test_a_preview_does_not_consume_a_photo(app: Flask) -> None:
     assert next_paint == previews[0], "the panel gets the photo the preview promised"
 
 
+def test_client_maps_every_scale_choice_to_an_object_fit() -> None:
+    # Issue #296: the Scale dropdown was declared in plugin.json but the
+    # client never read it, so every choice rendered as Fill (the shared
+    # .is-bleed cover rule). Keep the manifest choices and the client's
+    # object-fit table in step.
+    import json
+
+    root = Path(__file__).resolve().parents[1]
+    manifest = json.loads((root / "plugin.json").read_text(encoding="utf-8"))
+    scale = next(o for o in manifest["cell_options"] if o["name"] == "scale")
+    client = (root / "client.js").read_text(encoding="utf-8")
+    for choice in scale["choices"]:
+        assert f'{choice["value"]}: "' in client, choice["value"]
+    assert "opts.scale" in client
+    assert "object-fit:${objectFit}" in client
+
+
 def test_two_devices_walk_the_album_independently(app: Flask) -> None:
     """The half of #209 the preview guard does not cover.
 

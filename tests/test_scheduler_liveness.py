@@ -95,6 +95,27 @@ def test_frame_without_timestamp_is_promoted(wiring) -> None:
 # -- skipped advances are visible -----------------------------------------
 
 
+def test_manual_hold_skip_is_logged_and_card_reads_held(wiring, caplog) -> None:
+    """A panel inside a button / touch hold is skipped by the timer. That
+    used to be silent, so a held panel looked frozen: no advance line, no
+    skip line, and the card still showing the last send."""
+    scheduler, push, store = wiring
+    store.upsert(_deck())
+    held_state = MagicMock(
+        device_id="panel", rotation_id="d1", override_until=datetime(2026, 6, 16, 0, 0, tzinfo=UTC)
+    )
+    state_store = MagicMock()
+    state_store.all.return_value = {"panel": held_state}
+    scheduler._rotation_state_store = state_store
+    with caplog.at_level(logging.INFO, logger="app.scheduler"):
+        scheduler._tick_once(T0)
+    assert "deck timer advance skipped: device=panel deck=d1 -> a (manual hold)" in caplog.text
+    push.push.assert_not_called()
+    push.promote_deck_page.assert_not_called()
+    assert scheduler._rotation_last_status["d1"] == "held"
+    assert scheduler._rotation_last_reason["d1"] == "all devices manually held"
+
+
 def test_quiet_hours_skip_is_logged(wiring, caplog) -> None:
     scheduler, push, store = wiring
     push.device_in_quiet_hours.return_value = True

@@ -274,6 +274,45 @@ APP_FIELDS: list[dict[str, Any]] = [
         ),
     },
     {
+        "name": "quiet_hours_days",
+        "type": "days",
+        "label": "Window applies on",
+        "default": ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
+        "group": "quiet_hours",
+        "group_role": "dependent",
+        "help": (
+            "Weekdays the start/end window is in force. Each day is judged by its "
+            "own clock: on a ticked day an overnight window covers that morning up "
+            "to the end time and that evening from the start time."
+        ),
+    },
+    {
+        "name": "quiet_hours_all_day",
+        "type": "days",
+        "label": "Quiet all day",
+        "default": [],
+        "group": "quiet_hours",
+        "group_role": "dependent",
+        "help": (
+            "Weekdays that are quiet from midnight to midnight regardless of the "
+            "window, for example the weekend in an office that is closed."
+        ),
+    },
+    {
+        "name": "quiet_hours_sleep",
+        "type": "switch",
+        "label": "Sleep through quiet hours",
+        "default": False,
+        "group": "quiet_hours",
+        "group_role": "dependent",
+        "help": (
+            "Tell battery panels to sleep until the quiet window ends instead of "
+            "waking on their usual interval inside it. Saves the wakes that would "
+            "have found nothing new, at the cost that a manual push during the "
+            "window is not seen until it ends. Devices that never sleep are unaffected."
+        ),
+    },
+    {
         "name": "low_battery_overlay",
         "type": "switch",
         "label": "Low-battery overlay on device pushes",
@@ -385,7 +424,7 @@ APP_FIELD_GROUPS: list[dict[str, Any]] = [
     {
         "id": "quiet_hours",
         "title": "Quiet hours",
-        "description": "Pause automated pushes during a nightly window. Devices can override.",
+        "description": "Pause automated pushes during a nightly window, on the days you pick. Devices can override.",
         "icon": "moon",
         "master": "quiet_hours_enabled",
     },

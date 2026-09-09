@@ -262,7 +262,7 @@ and renders it read-only (still submitted, so the value survives a save).
 ```
 
 The `gtfs` widget uses this for its feed presets: pick "NYC Subway (A/C/E)"
-and the three URL fields below fill in and lock, so a cell can't end up
+and the URL fields below fill in and lock, so a cell can't end up
 pairing one agency's timetable with another's realtime feed. Resolution is
 server-side, so the fields update when the page reloads after a save, not
 the instant the select changes. A widget whose behaviour depends on the

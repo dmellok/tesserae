@@ -326,6 +326,14 @@ def values_from_form(fields: list[dict[str, Any]]) -> dict[str, Any]:
             # Unchecked checkboxes are absent from the form, present ones
             # send "on", bare presence is what we use.
             values[name] = field["name"] in request.form
+        elif field.get("type") == "days":
+            # A weekday picker submits one checkbox per ticked day plus a
+            # marker input so "nothing ticked" is distinguishable from "the
+            # form never carried the picker".
+            if f"{name}__present" in request.form:
+                values[name] = [d for d in request.form.getlist(name) if d]
+            else:
+                values[name] = list(field.get("default") or [])
         else:
             values[name] = coerce_form_value(field, request.form.get(name))
     return values

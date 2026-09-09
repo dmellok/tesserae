@@ -358,3 +358,35 @@ def test_an_unparseable_version_says_nothing(monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.setattr(bridge, "_request", _fake_request(200, payload))
 
     assert "BRIDGE OUT OF DATE" not in (bridge.build_server().instructions or "")
+
+
+def test_the_appearance_section_is_its_own_read(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The catalog carries only counts for themes / styles / fonts (#257), so
+    list_widgets(section="appearance") must fetch the lists from /appearance
+    rather than hand the agent an integer where the docs promise a list."""
+    from typing import Any
+
+    calls: list[str] = []
+
+    def fake_request(method: str, path: str, body: Any = None) -> tuple[int, bytes, str]:
+        calls.append(path)
+        if path == "/appearance":
+            return (
+                200,
+                b'{"themes":[{"id":"a"}],"styles":[],"fonts":[{"id":"f"}]}',
+                "application/json",
+            )
+        return (
+            200,
+            b'{"widgets":[],"appearance":{"themes":1,"styles":0,"fonts":1}}',
+            "application/json",
+        )
+
+    # Build first: registration fetches /instructions, which is not the read
+    # under test here.
+    tool = bridge.build_server()._tool_manager.get_tool("list_widgets")
+    monkeypatch.setattr(bridge, "_request", fake_request)
+    out = tool.fn(section="appearance")
+    assert calls == ["/appearance"]
+    assert out["appearance"]["themes"] == [{"id": "a"}]
+    assert out["appearance"]["fonts"] == [{"id": "f"}]

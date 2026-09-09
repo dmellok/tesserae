@@ -1133,8 +1133,12 @@
     btn.textContent = "Installing…";
     var form = new FormData();
     form.append("catalog_id", item.id);
-    post(root.getAttribute("data-install-url"), form)
-      .then(function (r) {
+    // The failure handler is the second argument, not a trailing
+    // .catch: a .catch would also swallow anything the success branch
+    // throws while re-rendering and report a finished install as a
+    // "network error" on top of the success toast.
+    post(root.getAttribute("data-install-url"), form).then(
+      function (r) {
         delete state.pending[item.id];
         if (!r.ok) {
           flash(r.body.message || "Install failed.", "error");
@@ -1148,12 +1152,13 @@
         flash(r.body.message, "ok");
         showRestartAffordance();
         render();
-      })
-      .catch(function () {
+      },
+      function () {
         delete state.pending[item.id];
         flash("Install failed: network error.", "error");
         render();
-      });
+      }
+    );
     render();
   }
 
@@ -1174,8 +1179,8 @@
     var form = new FormData();
     form.append("catalog_id", item.id);
     if (deleteData) form.append("delete_data", "1");
-    post(root.getAttribute("data-uninstall-url"), form)
-      .then(function (r) {
+    post(root.getAttribute("data-uninstall-url"), form).then(
+      function (r) {
         delete state.pending[item.id];
         if (!r.ok) {
           flash(r.body.message || "Uninstall failed.", "error");
@@ -1189,12 +1194,13 @@
         flash(r.body.message, "ok");
         showRestartAffordance();
         render();
-      })
-      .catch(function () {
+      },
+      function () {
         delete state.pending[item.id];
         flash("Uninstall failed: network error.", "error");
         render();
-      });
+      }
+    );
     render();
   }
 
@@ -1205,8 +1211,11 @@
   function showRestartAffordance() {
     if (document.querySelector(".topbar-restart-form")) return;
     var bar = document.querySelector(".topbar");
-    var toggle = bar ? bar.querySelector("[data-theme-toggle]") : null;
-    if (!bar || !toggle) return;
+    if (!bar) return;
+    // The topbar holds two theme toggles: its own, a direct child, and
+    // the drawer's, nested inside the nav. insertBefore needs the direct
+    // child; handed the drawer one it throws NotFoundError.
+    var toggle = bar.querySelector(":scope > [data-theme-toggle]");
     var form = el(
       "form",
       {
@@ -1231,7 +1240,8 @@
         ),
       ]
     );
-    bar.insertBefore(form, toggle);
+    if (toggle) bar.insertBefore(form, toggle);
+    else bar.appendChild(form);
     if (typeof window.tesseraeBindRestartForms === "function") {
       window.tesseraeBindRestartForms();
     }

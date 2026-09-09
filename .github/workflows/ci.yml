@@ -72,7 +72,11 @@ jobs:
         # -n auto fans the suite across the runner's vCPUs (pytest-xdist).
         # The suite is parallel-safe (tmp_path isolation, no shared ports).
         # Coverage deliberately does NOT run here, see the `coverage` job.
-        run: pytest -n auto -q
+        # --timeout / --durations: the suite runs in ~5 min locally but one
+        # worker occasionally goes silent for 70-100 min on the runner. A
+        # test that passes 15 min now fails with its stack, and the slowest
+        # tests are listed either way, so a stall names itself.
+        run: pytest -n auto -q --timeout=900 --durations=15
 
   coverage:
     name: coverage
@@ -102,7 +106,7 @@ jobs:
         # climbs.
         env:
           COVERAGE_CORE: sysmon
-        run: pytest -n auto -q --cov=app --cov-report=term-missing --cov-fail-under=80
+        run: pytest -n auto -q --timeout=900 --durations=15 --cov=app --cov-report=term-missing --cov-fail-under=80
 
   pytest-forward:
     name: pytest (forward-compat)
@@ -132,7 +136,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
       - name: pytest
-        run: pytest -n auto -q
+        run: pytest -n auto -q --timeout=900 --durations=15
 
   security:
     name: security scan
@@ -154,10 +158,10 @@ jobs:
         run: bandit -r app -q --severity-level high --confidence-level high
       - name: pip-audit
         # Advisory. The pillow + cryptography advisories that motivated #142 are
-        # resolved (pins lifted to <13 / <50). What remains is a minor transitive
-        # advisory in click, which typer pins to <8.2 so it can't reach the fix
-        # yet. Kept non-blocking so an unresolvable transitive doesn't red main;
-        # promote to a hard gate once the runtime graph audits clean.
+        # resolved (pins lifted to <13 / <51). What remains is setuptools on the
+        # runner, a build tool rather than a runtime dependency. Kept
+        # non-blocking so an unresolvable transitive doesn't red main; promote
+        # to a hard gate once the runtime graph audits clean.
         continue-on-error: true
         run: pip-audit --progress-spinner off
 
@@ -189,9 +193,9 @@ jobs:
     # drop continue-on-error to make them required.
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
       - name: Install lint deps
         run: npm ci
@@ -214,7 +218,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Install uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v7
       - name: uv lock --check
         run: uv lock --check
 

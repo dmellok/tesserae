@@ -1085,3 +1085,37 @@ def test_ee05_bwry_manifest_pads_hidden_columns(registries_with_catalog) -> None
     assert row[0] == 0x55
     assert row[1] == 0x5F
     assert row[2:] == b"\xff" * (128 // 4 - 2)
+
+
+def test_update_quiet_hours_all_day_survives_blank_times(registries) -> None:
+    """A weekend-only override (#299) has no start/end; the block must
+    stay rather than being treated as fully cleared."""
+    devices, renderers, data_root = registries
+    device_service.create_instance(
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="hallway",
+        kind_id="esp32_client",
+    )
+    result = device_service.update_instance_quiet_hours(
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="hallway",
+        enabled=True,
+        start="",
+        end="",
+        days=[],
+        all_day=["sat", "sun"],
+        sleep=False,
+    )
+    assert result.ok and result.device is not None
+    assert result.device.manifest.get("quiet_hours") == {
+        "enabled": True,
+        "start": "",
+        "end": "",
+        "days": [],
+        "all_day": ["sat", "sun"],
+        "sleep": False,
+    }

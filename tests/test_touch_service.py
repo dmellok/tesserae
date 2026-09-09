@@ -266,6 +266,26 @@ def test_swipe_dispatches_rotation_step(stores: dict[str, Any]) -> None:
     assert persisted is not None and persisted.step_index == 1
 
 
+def test_touch_rotate_holds_for_one_dwell_window(stores: dict[str, Any]) -> None:
+    """A tap or swipe that rotates the page is a lighter gesture than a
+    button press: it holds the display for one dwell window of the step it
+    landed on, not until the rotation's next daily anchor. Held that long,
+    a touch on a short-dwell lineup looked like a frozen display."""
+    _seed_rotation(stores)  # 30-minute steps
+    clock = FakeClock(datetime(2026, 9, 6, 2, 48, tzinfo=UTC))
+    pm = TouchStubPushManager(latest=_latest(), regions=[_tap_region()])
+    svc = _service(stores, pm, clock)
+    result = svc.handle_touch(
+        device_id="kitchen",
+        stroke=TouchStroke(x0=50, y0=250, x1=50, y1=20),
+        frame_digest="art123",
+    )
+    assert result.action_spec == "rotate_next"
+    persisted = stores["state_store"].get("kitchen")
+    assert persisted is not None
+    assert persisted.override_until == clock() + timedelta(minutes=30)
+
+
 def test_swipe_starting_outside_zone_falls_back_to_end_point(stores: dict[str, Any]) -> None:
     """A swipe that starts just outside a small zone but moves INTO it still
     fires: hit-testing falls back to the stroke's end point (issue #49

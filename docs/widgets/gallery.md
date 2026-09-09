@@ -244,7 +244,7 @@ The **36 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     ![ha_history](../screenshots/widgets/ha_history.png)
 
-    A numeric Home Assistant sensor over time. Pairs the current value + trend arrow + min/max with a Chart.js line chart, optional threshold horizontal line, min/max marker dots + labels on the curve, and an averaged hourly-profile ghost overlay for long windows. Requires the Home Assistant Core plugin.
+    A numeric Home Assistant sensor over time. Pairs the current value + trend arrow + min/max with a Chart.js line chart, optional threshold horizontal line, optional fixed y-axis range, min/max marker dots + labels on the curve, and an averaged hourly-profile ghost overlay for long windows. Requires the Home Assistant Core plugin.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
 
@@ -284,7 +284,7 @@ The **36 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     ![ha_sensor](../screenshots/widgets/ha_sensor.png)
 
-    One or more Home Assistant entities as bold value blocks. A single entity fills the cell as a hero number with a trend arrow + 24h sparkline beneath; several lay out as a list with per-row trend + hairline sparkline. Lead glyph picks up the device-class (temperature → thermometer, CO₂ → wind, current → wave-sine, money → coin, etc.). Requires the Home Assistant Core plugin.
+    One or more Home Assistant entities as bold value blocks. A single entity fills the cell as a hero number with a trend arrow + 24h sparkline beneath; several lay out as a list with per-row trend + hairline sparkline. Lead glyph picks up the device-class (temperature → thermometer, CO₂ → wind, current → wave-sine, money → coin, etc.). For a full chart with labelled axes use the Home Assistant, History widget. Requires the Home Assistant Core plugin.
 
     **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** -
 
@@ -378,7 +378,7 @@ The **36 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     ![webpage](../screenshots/widgets/webpage.png)
 
-    Embed an external URL in a cell. The composer captures whatever the iframe renders, handy for status pages, public dashboards, or any site that doesn't deny embedding. A URL that points straight at an image (PNG, GIF, JPEG, WebP, SVG) is drawn as an image and scaled to the cell rather than embedded, so tall charts keep their bottom edge. Same headless-render path as the Send tab is used when the panel renders. Pages that fetch their data with JavaScript get a short settle delay after load so the content is captured, not a blank frame; raise it for slow pages. Sites that set X-Frame-Options:DENY or strict CSP cannot be embedded.
+    Embed an external URL in a cell. The composer captures whatever the iframe renders, handy for status pages, public dashboards, or any site that doesn't deny embedding. A URL that points straight at an image (PNG, GIF, JPEG, WebP, SVG) is drawn as an image and scaled to the cell rather than embedded, so tall charts keep their bottom edge. Same headless-render path as the Send tab is used when the panel renders. Pages that fetch their data with JavaScript get a short settle delay after load so the content is captured, not a blank frame; raise it for slow pages. Sites that set X-Frame-Options:DENY or strict CSP cannot be embedded. A page behind header-based auth (bearer token, API key) can be reached by setting Request headers; the server attaches them when the panel renders, scoped to that URL's own origin only.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
 

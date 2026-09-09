@@ -18,6 +18,9 @@ import pytest
 from ._schema import FIXTURES_DIR, SPEC, schema_for
 
 CASES = {
+    "capabilities-personal-data-retention.json": "Capabilities",
+    "personal-data-reminders-never.json": "PersonalDataSnapshot",
+    "personal-data-status-never.json": "PersonalDataSourceStatus",
     "capabilities.json": "Capabilities",
     "capabilities-previews.json": "Capabilities",
     "capabilities-extended.json": "Capabilities",

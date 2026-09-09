@@ -87,6 +87,7 @@ nav:
   - Install via LXC: install/lxc.md
   - Configuration reference: install/configuration.md
   - Home Assistant integration: install/home-assistant.md
+  - Companion snapshot retention: integrations/companion-data-retention.md
   - Spotify widget on Home Assistant: install/spotify-home-assistant.md
   - Install a client: install/clients.md
   - Set up a device: install/devices.md

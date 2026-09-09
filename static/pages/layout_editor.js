@@ -32,11 +32,15 @@
     const storageKey = `tesserae:custom-layout-open:${pageId}`;
     try {
       if (sessionStorage.getItem(storageKey) === "1") details.open = true;
-    } catch {}
+    } catch {
+        /* best effort */
+      }
     details.addEventListener("toggle", () => {
       try {
         sessionStorage.setItem(storageKey, details.open ? "1" : "0");
-      } catch {}
+      } catch {
+        /* best effort */
+      }
     });
   }
 
@@ -75,10 +79,6 @@
 
   function clamp(v, lo, hi) {
     return Math.max(lo, Math.min(hi, v));
-  }
-
-  function rangesOverlap(a0, a1, b0, b1) {
-    return a0 < b1 && b0 < a1;
   }
 
   // Per-cell edge drag. Each cell renders its own 4 edge handles (top
@@ -340,7 +340,9 @@
     document.querySelectorAll(".preview-frame iframe").forEach((iframe) => {
       try {
         iframe.contentWindow.postMessage(msg, location.origin);
-      } catch {}
+      } catch {
+        /* best effort */
+      }
     });
   }
 
@@ -354,7 +356,9 @@
     // is the handle itself (the pointerdown target).
     const handleEl = evDown.currentTarget;
     if (handleEl && handleEl.setPointerCapture) {
-      try { handleEl.setPointerCapture(evDown.pointerId); } catch {}
+      try { handleEl.setPointerCapture(evDown.pointerId); } catch {
+        /* best effort */
+      }
     }
     const rect = board.getBoundingClientRect();
     const [lo, hi] = edgeLimits(edge);
@@ -710,7 +714,9 @@
           rows: snapState.rows,
         }),
       );
-    } catch {}
+    } catch {
+        /* best effort */
+      }
   }
 
   function restoreSnap() {
@@ -721,7 +727,9 @@
       if (typeof saved.enabled === "boolean") snapState.enabled = saved.enabled;
       if (Number.isFinite(saved.cols)) snapState.cols = saved.cols;
       if (Number.isFinite(saved.rows)) snapState.rows = saved.rows;
-    } catch {}
+    } catch {
+        /* best effort */
+      }
   }
 
   restoreSnap();

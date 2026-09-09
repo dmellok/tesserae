@@ -67,6 +67,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta, tzinfo
 from typing import Any
 
+from app import background_loops
 from app.device_loader import DeviceRegistry
 from app.push import PushManager, PushResult
 from app.state.page_store import PageStore
@@ -966,6 +967,7 @@ class HomeAssistantDiscovery:
                 target=self._tick_loop, name="ha-discovery-ticker", daemon=True
             )
             self._ticker.start()
+            background_loops.track(self)
 
     def stop(self) -> None:
         with self._lock:

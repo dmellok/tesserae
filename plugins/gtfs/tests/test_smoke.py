@@ -12,6 +12,7 @@ import importlib.util
 import io
 import json
 import re
+import struct
 import time
 import zipfile
 from datetime import UTC, datetime, timedelta
@@ -35,12 +36,15 @@ gtfs_server = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(gtfs_server)
 
 
-def _feed(second_direction: str = "0", second_stop: bool = False) -> bytes:
+def _feed(
+    second_direction: str = "0", second_stop: bool = False, pad_header: bool = False
+) -> bytes:
     """A one-stop, two-trip GTFS zip with arrivals 4 and 9 minutes out.
 
     ``second_direction`` puts the two trips on opposite ``direction_id``s.
     ``second_stop`` moves the second trip to a different station, which is
-    what a two-stop board merges.
+    what a two-stop board merges. ``pad_header`` writes the stops.txt header
+    with a space around every name, the way some agencies export it.
     """
     now = datetime.now(UTC)
     first = now + timedelta(minutes=4)
@@ -48,13 +52,16 @@ def _feed(second_direction: str = "0", second_stop: bool = False) -> bytes:
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as zf:
         zf.writestr("agency.txt", "agency_id,agency_name,agency_timezone\nT,Test,UTC\n")
+        stops_header = "stop_id,stop_name,parent_station,stop_lat,stop_lon"
+        if pad_header:
+            stops_header = " stop_id , stop_name , parent_station , stop_lat , stop_lon "
         zf.writestr(
             "stops.txt",
-            "stop_id,stop_name,parent_station\n"
-            "S1,Canal St,\n"
-            "S1N,Canal St North,S1\n"
-            "S2,Franklin St,\n"
-            "S2N,Franklin St North,S2\n",
+            stops_header + "\n"
+            "S1,Canal St,,40.7185,-74.0007\n"
+            "S1N,Canal St North,S1,40.7185,-74.0007\n"
+            "S2,Franklin St,,40.7193,-74.0067\n"
+            "S2N,Franklin St North,S2,40.7193,-74.0067\n",
         )
         zf.writestr(
             "routes.txt",
@@ -143,6 +150,19 @@ def _str(field: int, text: str) -> bytes:
 
 def _int(field: int, value: int) -> bytes:
     return _tag(field, 0) + _varint(value)
+
+
+def _f32(field: int, value: float) -> bytes:
+    return _tag(field, 5) + struct.pack("<f", value)
+
+
+def _vehicle(trip_id: str, lat: float, lon: float, ts: int | None = None) -> bytes:
+    """A VehiclePosition entity with a position but no stop sequence — the
+    shape Adelaide Metro and many bus agencies publish."""
+    body = _msg(1, _str(1, trip_id)) + _msg(2, _f32(1, lat) + _f32(2, lon))
+    if ts is not None:
+        body += _int(5, ts)
+    return _msg(4, body)
 
 
 def _trip_update(trip_id: str, stop_id: str, epoch: int, canceled: bool = False) -> bytes:
@@ -374,7 +394,7 @@ def test_feed_stamp_is_read_from_the_header() -> None:
 def test_vehicle_positions_give_stops_away() -> None:
     # FeedEntity.vehicle=4, VehiclePosition{trip=1, current_stop_sequence=3}
     feed = _msg(2, _msg(4, _msg(1, _str(1, "T1")) + _int(3, 7)))
-    assert gtfs_server._decode_vehicles(feed) == {"T1": 7}
+    assert gtfs_server._decode_vehicles(feed) == {"T1": {"seq": 7}}
 
     now = datetime.now(UTC)
     arrivals = [{"trip_id": "T1", "stop_id": "S1N", "minutes": 9, "seq": 10, "live": False}]
@@ -387,6 +407,92 @@ def test_vehicle_positions_give_stops_away() -> None:
         {"T1": 7},
     )
     assert arrivals[0]["stops_away"] == 3
+
+
+def test_vehicle_with_only_coordinates_gives_distance_to_the_stop() -> None:
+    """Adelaide Metro's VehiclePositions carry a trip and a lat/lon, no
+    current_stop_sequence, so the chip falls back to how far away it is."""
+    # ~1.1 km north of Canal St North.
+    feed = _msg(2, _vehicle("T1", 40.7285, -74.0007))
+    decoded = gtfs_server._decode_vehicles(feed)
+    assert decoded["T1"]["lat"] == pytest.approx(40.7285, abs=1e-4)
+    assert decoded["T1"]["lon"] == pytest.approx(-74.0007, abs=1e-4)
+    assert "seq" not in decoded["T1"]
+
+    now = datetime.now(UTC)
+    arrivals = [{"trip_id": "T1", "stop_id": "S1N", "minutes": 9, "seq": 10, "live": False}]
+    live = gtfs_server._apply_realtime(
+        arrivals, {}, now, None, None, decoded, {"S1N": [40.7185, -74.0007]}
+    )
+    assert live
+    assert arrivals[0]["live"]
+    assert 1050 <= arrivals[0]["distance_m"] <= 1170
+    assert "stops_away" not in arrivals[0]
+
+
+def test_stop_sequence_beats_distance_when_both_are_reported() -> None:
+    now = datetime.now(UTC)
+    arrivals = [{"trip_id": "T1", "stop_id": "S1N", "minutes": 9, "seq": 10, "live": False}]
+    gtfs_server._apply_realtime(
+        arrivals,
+        {},
+        now,
+        None,
+        None,
+        {"T1": {"seq": 8, "lat": 40.7285, "lon": -74.0007}},
+        {"S1N": [40.7185, -74.0007]},
+    )
+    assert arrivals[0]["stops_away"] == 2
+    assert "distance_m" not in arrivals[0]
+
+
+def test_stale_vehicle_report_earns_no_distance() -> None:
+    """A bus whose radio dropped out an hour ago still sits in some feeds;
+    its last known position says nothing about where it is now."""
+    now = datetime.now(UTC)
+    old = int(now.timestamp()) - gtfs_server.VEHICLE_MAX_AGE_S - 60
+    arrivals = [{"trip_id": "T1", "stop_id": "S1N", "minutes": 9, "seq": 10, "live": False}]
+    gtfs_server._apply_realtime(
+        arrivals,
+        {},
+        now,
+        None,
+        None,
+        {"T1": {"lat": 40.7285, "lon": -74.0007, "ts": old}},
+        {"S1N": [40.7185, -74.0007]},
+    )
+    assert "distance_m" not in arrivals[0]
+    assert not arrivals[0]["live"]
+
+
+def test_distillate_keeps_stop_coordinates() -> None:
+    table = gtfs_server._distil(_feed(), "S1")
+    assert table["stop_coords"]["S1N"] == [40.7185, -74.0007]
+
+
+def test_separate_vehicle_feed_lands_on_the_board(client: FlaskClient) -> None:
+    """End to end: a standalone VehiclePositions URL beside the static zip,
+    the way most agencies publish it, decorates the row it belongs to."""
+    zip_body = _feed()
+    vp_body = _msg(2, _vehicle("T1", 40.7285, -74.0007, int(time.time())))
+
+    def open_(_self: object, req: object, *a: object, **kw: object) -> _FakeResp:
+        url = getattr(req, "full_url", str(req))
+        return _FakeResp(vp_body if "vehicle_positions" in url else zip_body)
+
+    opts = json.dumps(
+        {
+            "gtfs_url": "https://example.test/gtfs.zip",
+            "stop_id": "S1",
+            "vehicles_url": "https://example.test/vehicle_positions",
+            "show_stops_away": True,
+        }
+    )
+    with patch(_OPEN, autospec=True, side_effect=open_):
+        resp = client.get(f"/_test/render?plugin=gtfs&size=md&opts={quote(opts)}")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert '"distance_m": 1' in body or '"distance_m":1' in body
 
 
 def test_stops_away_ignores_a_vehicle_already_past_us() -> None:
@@ -494,16 +600,22 @@ def test_direction_filter_keeps_one_direction(client: FlaskClient) -> None:
 def test_preset_supplies_all_three_urls() -> None:
     """A preset overrides the URL fields, so a half-filled cell can't end up
     pairing one agency's timetable with another's realtime feed."""
-    gtfs, rt, alerts = gtfs_server._preset_urls("mta_ace", "https://stale.example/old.zip", "", "")
+    gtfs, rt, alerts, vehicles = gtfs_server._preset_urls(
+        "mta_ace", "https://stale.example/old.zip", "", "", "https://stale.example/vp"
+    )
     assert gtfs.endswith("gtfs_subway.zip")
     assert rt.endswith("nyct%2Fgtfs-ace")
     assert "subway-alerts" in alerts
+    # The MTA folds vehicles into the trip feed, so the preset blanks the
+    # separate URL rather than leaving a stale custom one behind.
+    assert vehicles == ""
 
     # "custom" leaves the user's own URLs untouched.
-    assert gtfs_server._preset_urls("custom", "https://x.test/a.zip", "b", "c") == (
+    assert gtfs_server._preset_urls("custom", "https://x.test/a.zip", "b", "c", "d") == (
         "https://x.test/a.zip",
         "b",
         "c",
+        "d",
     )
 
 
@@ -670,6 +782,7 @@ def test_cell_editor_shows_stops_and_locks_preset_urls(client: FlaskClient) -> N
         ("opt_gtfs_url", "rrgtfsfeeds"),
         ("opt_rt_url", "gtfs-ace"),
         ("opt_alerts_url", "subway-alerts"),
+        ("opt_vehicles_url", 'value=""'),
     ):
         tag = re.search(rf'<input[^>]*name="{field}"[^>]*>', html, re.S)
         assert tag is not None, field
@@ -729,3 +842,11 @@ def test_stop_finder_reports_a_bad_feed(client: FlaskClient) -> None:
         resp = client.get("/plugins/gtfs/?feed_url=https://example.test/nope.zip")
     assert resp.status_code == 200
     assert "didn&#39;t return a GTFS zip" in resp.get_data(as_text=True)
+
+
+def test_padded_header_row_still_finds_the_stop() -> None:
+    """A stops.txt header padded with spaces still resolves the stop and
+    its child platforms; the names are trimmed before rows are read."""
+    table = gtfs_server._distil(_feed(pad_header=True), "S1")
+    assert "S1N" in table["stop_ids"]
+    assert table["stop_name"] == "Canal St"

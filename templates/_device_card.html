@@ -7,7 +7,7 @@
    ``section.kind == 'device'``. #}
 
 {% from "_components.html" import auto_field, button, info_pop, number_input,
-    select_field, slider, switch, text_input with context %}
+    select_field, slider, switch, text_input, days_field with context %}
 
 {# Expanded state is remembered across the combined save redirect via
    ``?opened=<device_id>`` (v0.68), and while the orientation-calibrate
@@ -464,6 +464,20 @@
             {{ text_input(section.id ~ '-qh-end', 'quiet_hours_end', 'End',
                           value=section.quiet_hours.get('end', ''),
                           placeholder='HH:MM', type='time', form=_combined_form_id) }}
+          </div>
+          <div data-dep-target>
+            {{ days_field(section.id ~ '-qh-days', 'quiet_hours_days', 'Window applies on',
+                          value=section.quiet_hours.get('days', ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']),
+                          help='Weekdays the start/end window is in force, each judged by its own clock: on a ticked day an overnight window covers that morning up to End and that evening from Start.',
+                          form=_combined_form_id) }}
+            {{ days_field(section.id ~ '-qh-all-day', 'quiet_hours_all_day', 'Quiet all day',
+                          value=section.quiet_hours.get('all_day', []),
+                          help='Weekdays that are quiet from midnight to midnight regardless of the window.',
+                          form=_combined_form_id) }}
+            {{ switch(section.id ~ '-qh-sleep', 'quiet_hours_sleep', 'Sleep through quiet hours',
+                      checked=section.quiet_hours.get('sleep', False),
+                      help='Sleep until the window ends instead of waking on the usual interval inside it. A manual push during the window is not seen until it ends.',
+                      form=_combined_form_id) }}
           </div>
         </div>
         {% endif %}

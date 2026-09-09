@@ -89,14 +89,31 @@ function delayChip(a, compact = false) {
   return `<span class="gt-delay" style="color:var(--accent-${slot})">${escapeHtml(text)}</span>`;
 }
 
-// How many stops out the vehicle is, from the realtime feed's own position
-// report. Opt-in: it's the platform-sign metric, but it's noise on a board
-// where everything is one or two stops away.
-function stopsChip(a, show) {
-  if (!show || !Number.isFinite(Number(a.stops_away))) return "";
-  const n = Number(a.stops_away);
-  const text = n === 0 ? "here" : n === 1 ? "1 stop" : `${n} stops`;
-  return `<span class="gt-stops">${escapeHtml(text)}</span>`;
+// How far out the vehicle is, from the realtime feed's own position
+// report: stops away when the feed counts them, straight-line distance when
+// it only publishes coordinates. Opt-in: it's the platform-sign metric, but
+// it's noise on a board where everything is one or two stops away.
+function stopsChip(a, show, units) {
+  if (!show) return "";
+  let text = "";
+  if (Number.isFinite(Number(a.stops_away))) {
+    const n = Number(a.stops_away);
+    text = n === 0 ? "here" : n === 1 ? "1 stop" : `${n} stops`;
+  } else if (Number.isFinite(Number(a.distance_m))) {
+    text = fmtDistance(Number(a.distance_m), units);
+  }
+  return text ? `<span class="gt-stops">${escapeHtml(text)}</span>` : "";
+}
+
+function fmtDistance(metres, units) {
+  if (units === "imperial") {
+    const miles = metres / 1609.344;
+    if (miles < 0.1) return `${Math.round(metres / 0.3048 / 10) * 10} ft`;
+    return `${miles < 10 ? miles.toFixed(1) : Math.round(miles)} mi`;
+  }
+  if (metres < 1000) return `${Math.round(metres / 10) * 10} m`;
+  const km = metres / 1000;
+  return `${km < 10 ? km.toFixed(1) : Math.round(km)} km`;
 }
 
 // Which station this train leaves from. Only meaningful — and only shown —
@@ -475,7 +492,7 @@ function rowsBlock(arrivals, opts) {
         ${routeBadge(a)}
         <div class="gt-lead">
           <span class="gt-sign">${escapeHtml(a.headsign || a.route || "")}</span>
-          <span class="gt-when">${escapeHtml(a.time || "")} ${liveDot(a)} ${originChip(a, opts.showOrigin)} ${delayChip(a, opts.showOrigin)} ${stopsChip(a, opts.showStops)} ${trackChip(a, opts.showTrack)}</span>
+          <span class="gt-when">${escapeHtml(a.time || "")} ${liveDot(a)} ${originChip(a, opts.showOrigin)} ${delayChip(a, opts.showOrigin)} ${stopsChip(a, opts.showStops, opts.distanceUnits)} ${trackChip(a, opts.showTrack)}</span>
         </div>
         <div class="gt-min" style="background:var(--accent-${slot}-soft);color:var(--accent-${slot})">
           <span class="v">${escapeHtml(fmtMinutes(a.minutes))}</span>
@@ -526,6 +543,7 @@ export default function render(shadow, ctx) {
   const opts = {
     showTrack: Boolean(cellOpts.show_track),
     showStops: Boolean(cellOpts.show_stops_away),
+    distanceUnits: cellOpts.distance_units === "imperial" ? "imperial" : "metric",
     // Two stops on the board makes "which stop" load-bearing; one makes it
     // noise, so it turns itself on from the data rather than an option.
     showOrigin: new Set(all.map((a) => a.stop_name).filter(Boolean)).size > 1,

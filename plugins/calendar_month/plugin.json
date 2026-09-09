@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "Calendar, Month",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "kind": "widget",
   "description": "Month-grid view with tunable dashboard title/day-number/event text sizing, cell spacing, and a location toggle for text-display mode. Each feed's colour drives the bar / dot / stripe colour.",
   "icon": "ph-calendar",
@@ -68,6 +68,13 @@
         {"value": "short", "label": "Short (Mon, Tue)"},
         {"value": "minimal", "label": "Minimal (M, Tu)"}
       ]
+    },
+    {
+      "name": "show_week_start",
+      "type": "boolean",
+      "label": "Show \"Week starts\" label",
+      "default": false,
+      "help": "Off by default: the weekday column headers already show which day the week starts on. Worth turning on with a minimal or single-letter weekday style, where it is less obvious."
     },
     {
       "name": "title_scale",

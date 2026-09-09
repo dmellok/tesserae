@@ -34,7 +34,7 @@ import time
 import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, tzinfo
 from typing import Any
 
 from app.button_actions import (
@@ -236,11 +236,16 @@ class ButtonService:
         deck_nav_store: DeckNavStore | None = None,
         devices: DeviceRegistry | None = None,
         device_status: Callable[[], dict[str, Any]] | None = None,
+        timezone_provider: Callable[[], tzinfo | None] | None = None,
     ) -> None:
         self._rotations = rotation_store
         self._state = state_store
         self._settings = settings_store
         self._pages = page_store
+        # Settings -> App -> Timezone, read at each call so a change picks up
+        # live. None (or a provider returning None) means host-local. Only
+        # used to place a rotation's daily anchor when a hold expires.
+        self._tz_provider = timezone_provider
         # Optional Decks wiring: when both are present, a button that maps to a
         # deck-graph link on the device's current page navigates the deck
         # (promoting a pre-warmed frame) instead of the rotation.
@@ -1810,7 +1815,9 @@ class ButtonService:
             and (rotation_changed or result.force_refresh)
         )
         override_until = (
-            self._compute_hold_until(rotation, now) if wants_hold else state.override_until
+            self._compute_hold_until(rotation, now, origin=origin, step_index=result.new_step_index)
+            if wants_hold
+            else state.override_until
         )
 
         new_state = state.model_copy(
@@ -2296,15 +2303,32 @@ class ButtonService:
         thread = threading.Thread(target=_fire, daemon=True, name="button-webhook")
         thread.start()
 
-    def _compute_hold_until(self, rotation: Rotation | None, now: datetime) -> datetime:
+    def _compute_hold_until(
+        self,
+        rotation: Rotation | None,
+        now: datetime,
+        *,
+        origin: str = "button",
+        step_index: int | None = None,
+    ) -> datetime:
         """When should the manual override expire?
 
-        Default is the rotation's next daily anchor: pressing a button
-        holds the display through the rest of the day, then the
-        scheduler resumes at midnight (or whatever the rotation's
-        ``anchor`` is). Rotations without a usable anchor and devices
-        with no rotation bound fall back to a fixed window from
-        settings (``app.button_hold_seconds``, default 3600s).
+        A physical button press holds the display until the rotation's
+        next daily anchor: pressing "next" on a kitchen panel shouldn't get
+        yanked back by the scheduler a minute later, and a button is a
+        deliberate act. The anchor is a local-time "HH:MM", so it is placed
+        in the configured timezone (Settings -> App -> Timezone, else the
+        host's); computing it in UTC put "midnight" at 8 pm for a US East
+        install and turned an evening press into a hold lasting most of
+        the next day.
+
+        A touch (``origin="touch"``) is a much lighter gesture, and touch
+        panels usually run short-dwell lineups, so a tap that rotates the
+        page holds it for one dwell window of the step it landed on, then
+        the lineup carries on. Rotations without a usable anchor and
+        devices with no rotation bound fall back to a fixed window from
+        settings (``app.button_hold_seconds``, default 3600s), and that
+        setting overrides every rule above when set.
         """
         try:
             override = self._settings.get_section("app").get("button_hold_seconds")
@@ -2314,17 +2338,24 @@ class ButtonService:
             return now + timedelta(seconds=float(override))
         if rotation is None:
             return now + timedelta(seconds=_FALLBACK_HOLD_SECONDS)
-        # Rotation anchors are local-time "HH:MM". Without threading a
-        # tz through here, use UTC "next anchor" as a conservative
-        # approximation: it's always <= 24h out. The scheduler already
-        # snaps to the local anchor separately, so a slight offset in
-        # the hold expiry just gives the user a hair more manual time
-        # than requested, never less.
+        if origin == "touch":
+            idx = step_index if step_index is not None else 0
+            if 0 <= idx < len(rotation.steps):
+                dwell_s = max(60, int(rotation.steps[idx].dwell_minutes) * 60)
+                return now + timedelta(seconds=dwell_s)
+            return now + timedelta(seconds=_FALLBACK_HOLD_SECONDS)
         try:
             hh, mm = (int(x) for x in rotation.anchor.split(":", 1))
         except Exception:
             return now + timedelta(seconds=_FALLBACK_HOLD_SECONDS)
-        anchor_today = now.replace(hour=hh, minute=mm, second=0, microsecond=0)
-        if anchor_today <= now:
+        tz: tzinfo | None = None
+        if self._tz_provider is not None:
+            try:
+                tz = self._tz_provider()
+            except Exception:
+                tz = None
+        local_now = now.astimezone(tz) if tz is not None else now.astimezone()
+        anchor_today = local_now.replace(hour=hh, minute=mm, second=0, microsecond=0)
+        if anchor_today <= local_now:
             anchor_today = anchor_today + timedelta(days=1)
-        return anchor_today
+        return anchor_today.astimezone(UTC)

@@ -191,14 +191,33 @@
         .forEach((wash) => wash.classList.add('do-push'));
     }
     // Tick the now marks each minute so the rails stay honest.
-    const tick = () => {
+    //
+    // In the configured timezone, not the browser's. The server anchors
+    // now_pct to settings.app.timezone; a browser somewhere else recomputing
+    // from its own clock made the marker jump by the offset a minute after
+    // load, which is the bug #143 / #164 / #170 fixed server-side arriving
+    // again from the client (#165). An empty name means the server could not
+    // resolve one, and the browser's clock is then the best guess available.
+    const tzName = {{ now_tz_name | tojson }};
+    const hhmmParts = () => {
       const now = new Date();
-      const pct = ((now.getHours() * 60 + now.getMinutes()) / 1440) * 100;
+      if (!tzName) return [now.getHours(), now.getMinutes()];
+      const parts = new Intl.DateTimeFormat('en-GB', {
+        timeZone: tzName, hour: '2-digit', minute: '2-digit', hour12: false,
+      }).formatToParts(now);
+      const get = (t) => Number(parts.find((p) => p.type === t)?.value ?? 0);
+      return [get('hour') % 24, get('minute')];
+    };
+    const tick = () => {
+      const [hh, mm] = hhmmParts();
+      const pct = ((hh * 60 + mm) / 1440) * 100;
       document.querySelectorAll('[data-now-mark]').forEach((m) => { m.style.left = pct + '%'; });
-      const label = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+      const label = String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0');
       document.querySelectorAll('[data-now-label]').forEach((l) => { l.textContent = label; });
     };
-    setInterval(tick, 60000);
+    // Land on the minute rather than 60s after load, so the marker moves when
+    // the clock does instead of on an offset of whenever the page opened.
+    setTimeout(() => { tick(); setInterval(tick, 60000); }, (60 - new Date().getSeconds()) * 1000);
     // A click anywhere outside an open ⋯ menu closes it.
     document.addEventListener('click', (e) => {
       document.querySelectorAll('details.dk-more[open]').forEach((d) => {

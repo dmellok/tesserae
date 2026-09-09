@@ -186,6 +186,19 @@ def _serve_render_thumbnail(renders_dir: Path, filename: str, width: int) -> Res
     return send_from_directory(thumbs_dir, thumb_name)
 
 
+def _resolve_app_timezone(app: Flask) -> tzinfo | None:
+    """The configured app timezone via the resolver the factory registers
+    under ``RESOLVE_TIMEZONE``; None (host-local) when it isn't wired."""
+    resolver = app.config.get("RESOLVE_TIMEZONE")
+    if not callable(resolver):
+        return None
+    try:
+        tz = resolver()
+    except Exception:
+        return None
+    return tz if isinstance(tz, tzinfo) else None
+
+
 def create_app(
     *,
     testing: bool = False,
@@ -451,6 +464,31 @@ def create_app(
         apply_ha_options(settings)
     app.secret_key = auth.secret_key(settings)
 
+    # Session cookie attributes, set rather than inherited (#251). Every
+    # state-changing admin POST rides this cookie, and the app carries no CSRF
+    # tokens, so what stops a cross-site submission today is the browser's own
+    # SameSite default. Relying on a default means the protection is whatever
+    # the operator's browser decided, which is not a property this app can
+    # state.
+    #
+    # ``Lax`` and not ``Strict``: Strict also withholds the cookie on a
+    # top-level GET arriving from another origin, so following a link to the
+    # dashboard from Home Assistant or a chat message would land the operator
+    # on a login page. Lax blocks the cross-site POST, which is the shape that
+    # matters here.
+    #
+    # ``Secure`` is deliberately NOT set. These installs are overwhelmingly
+    # plain HTTP on a LAN or a Pi, and a Secure cookie is simply not sent over
+    # HTTP -- pinning it would log every one of them out rather than protect
+    # anything. An operator terminating TLS in front can set it themselves.
+    # Assigned, not ``setdefault``: Flask ships ``SESSION_COOKIE_SAMESITE``
+    # already present and set to ``None``, so a setdefault silently leaves the
+    # attribute off the cookie -- which is the same "inherited a default"
+    # failure this block exists to close. An operator who wants ``Strict`` or
+    # ``Secure`` sets them after ``create_app`` returns.
+    app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+    app.config["SESSION_COOKIE_HTTPONLY"] = True
+
     # v0.49: at-rest encryption for manifest-declared ``secret: true``
     # fields. Resolve the SecretBox after ``auth.secret_key`` has run
     # (so the session secret is guaranteed to exist) and inject it
@@ -458,7 +496,9 @@ def create_app(
     # get migrated to ciphertext on the next save.
     from app.secret_box import SecretBox
 
-    secret_box = SecretBox.resolve(app.secret_key)
+    # The HA App has no environment block to put the key in, so it gets the
+    # note at info rather than a warning it cannot act on.
+    secret_box = SecretBox.resolve(app.secret_key, warn=not app.config.get("HA_INGRESS_MODE"))
     settings.set_secret_box(secret_box)
     app.config["SECRET_BOX"] = secret_box
 
@@ -742,6 +782,17 @@ def create_app(
         _seed = {k: _fact[k] for k in ("overlay", "proto") if isinstance(_fact.get(k), dict)}
         if _seed and _dev_id not in status_cache:
             status_cache[_dev_id] = _seed
+    # Seed the last heartbeat itself (battery, signal, environment, with
+    # its original received_at) so the status strip, the Devices card
+    # tiles and per-device widget fetches show the last known readings
+    # right after a restart instead of nothing until the next heartbeat.
+    from app.state.device_status_snapshot import DeviceStatusSnapshotStore
+
+    app.config["DEVICE_STATUS_SNAPSHOT"] = DeviceStatusSnapshotStore(
+        data_root / "core" / "device_status.json"
+    )
+    for _dev_id, _snap in app.config["DEVICE_STATUS_SNAPSHOT"].all().items():
+        status_cache.setdefault(_dev_id, {}).update(_snap)
     app.config["PREVIEW_CACHE"] = {}
     app.config["RENDERS_DIR"] = renders_dir
     app.config["DEVICE_STATUS"] = status_cache
@@ -870,6 +921,10 @@ def create_app(
         # Sticky heartbeat capabilities (overlay schema) so the post-HA
         # reconcile can pick patch delivery over a full re-push.
         device_status=lambda: app.config.get("DEVICE_STATUS") or {},
+        # Same Settings -> App -> Timezone the scheduler places its anchors
+        # in, so a hold that expires "at the anchor" agrees with the tick.
+        # Resolved lazily: the resolver is registered further down.
+        timezone_provider=lambda: _resolve_app_timezone(app),
     )
 
     # Docker bridge networking gives us an internal IP that LAN

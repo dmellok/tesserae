@@ -396,7 +396,14 @@ export function lineChart(canvas, opts) {
   } : null;
 
   // Marker-label plugin, draws a small label next to each marker
-  // (e.g. "12.5" beside the min point).
+  // (e.g. "12.5" beside the min point). Labels are kept inside the
+  // canvas: a max sitting on the top gridline used to lose its label
+  // off the top edge, and a marker at either end of the series lost
+  // half of it off the side (#282). A label that can't fit on its
+  // requested side flips to the other one.
+  const MARKER_LABEL_H = 14;
+  const MARKER_LABEL_GAP = 8;
+  const hasAboveMarker = markers.some((m) => m.position === "above" && m.label);
   const markerLabelPlugin = markers.length > 0 ? {
     id: "tess_markers",
     afterDatasetsDraw(chart) {
@@ -404,6 +411,8 @@ export function lineChart(canvas, opts) {
       const yScale = scales.y;
       const xScale = scales.x;
       if (!yScale || !xScale) return;
+      const cw = chart.width || canvas.clientWidth || 0;
+      const chh = chart.height || canvas.clientHeight || 0;
       ctx.save();
       ctx.font = `800 11px ${t.fontFamily}`;
       ctx.textBaseline = "middle";
@@ -415,9 +424,15 @@ export function lineChart(canvas, opts) {
         const label = String(m.label);
         const pad = 4;
         const tw = ctx.measureText(label).width + pad * 2;
-        const th = 14;
-        const bx = x - tw / 2;
-        const by = placeAbove ? y - th - 8 : y + 10;
+        const th = MARKER_LABEL_H;
+        const above = y - th - MARKER_LABEL_GAP;
+        const below = y + MARKER_LABEL_GAP + 2;
+        let by = placeAbove ? above : below;
+        if (placeAbove && by < 0 && below + th <= chh) by = below;
+        else if (!placeAbove && chh > 0 && by + th > chh && above >= 0) by = above;
+        by = Math.max(0, chh > 0 ? Math.min(by, chh - th) : by);
+        let bx = x - tw / 2;
+        if (cw > 0) bx = Math.max(0, Math.min(bx, cw - tw));
         ctx.fillStyle = m.color || color;
         ctx.fillRect(bx, by, tw, th);
         ctx.fillStyle = t.surface;
@@ -439,6 +454,10 @@ export function lineChart(canvas, opts) {
       animation: false,
       responsive: true,
       maintainAspectRatio: false,
+      // Room above the plot for a max marker's label, so a reading on
+      // the top gridline keeps its label instead of losing it off the
+      // canvas edge.
+      layout: { padding: { top: hasAboveMarker ? MARKER_LABEL_H + MARKER_LABEL_GAP : 0 } },
       scales: {
         x: {
           ticks: {
@@ -470,6 +489,11 @@ export function lineChart(canvas, opts) {
         },
         y: {
           display: opts.showY !== false,
+          // Fixed bounds when the caller supplies them (a pinned range
+          // keeps the same swing the same size from render to render);
+          // otherwise Chart.js fits the axis to the data.
+          ...(Number.isFinite(opts.yMin) ? { min: opts.yMin } : {}),
+          ...(Number.isFinite(opts.yMax) ? { max: opts.yMax } : {}),
           ticks: {
             color: t.textMuted,
             font: { family: t.fontFamily, weight: 700, size: 10 },

@@ -87,6 +87,28 @@ def _clamp_hours(raw: Any) -> int:
     return max(1, min(h, 2160))  # 1 hour … 90 days
 
 
+def _y_range(raw_min: Any, raw_max: Any) -> tuple[float | None, float | None]:
+    """Optional fixed bounds for the chart's value axis. Either side may be
+    blank (the axis follows the data on that side). An inverted pair, where
+    the minimum is not below the maximum, is dropped entirely rather than
+    handing the chart an axis it can't draw."""
+    lo, hi = _to_float(raw_min), _to_float(raw_max)
+    if lo is not None and hi is not None and lo >= hi:
+        return None, None
+    return lo, hi
+
+
+def _value_style(raw: Any) -> str:
+    """Where the single-sensor current reading is drawn.
+
+    ``legend`` (default) keeps it in the strip under the chart; ``headline``
+    puts it in large type above the chart. Anything else falls back to the
+    default so an old or hand-edited option never blanks the value.
+    """
+    style = str(raw or "").strip().lower()
+    return style if style in ("legend", "headline") else "legend"
+
+
 def _trend(values: list[float]) -> str:
     """up / down / flat from the window's first to last sample."""
     if len(values) < 2:
@@ -200,6 +222,25 @@ def _series_for(
         if value is None:
             continue
         pairs.append((s.get("last_changed") or s.get("last_updated"), value))
+    # The live state can be newer than the last history sample (history is
+    # cached for a couple of minutes, states only for seconds, and HA's
+    # history endpoint returns significant changes only), which left the
+    # headline reading outside the window's own low / high (#282). Fold it
+    # in as the final point when it is newer than the last sample, so low
+    # and high always bracket the current value and the chart ends where
+    # the headline says it does. Only with timestamps on both sides: a
+    # point of unknown age can't be placed on the time axis.
+    if current_f is not None and pairs:
+        state_stamp = st.get("last_changed") or st.get("last_updated")
+        state_dt = _parse_dt(state_stamp)
+        last_dt = _parse_dt(pairs[-1][0])
+        if (
+            state_dt is not None
+            and last_dt is not None
+            and state_dt >= last_dt
+            and pairs[-1][1] != current_f
+        ):
+            pairs.append((state_stamp, current_f))
     values = [v for _, v in pairs]
     if len(values) < 2:
         return {
@@ -278,11 +319,15 @@ def fetch(
     # values are optional; the client falls back gracefully when they
     # aren't present.
     threshold = _to_float(options.get("threshold"))
+    y_min, y_max = _y_range(options.get("y_min"), options.get("y_max"))
     return {
         "title": title,
         "hours": hours,
         "items": items,
         "threshold": threshold,
+        "y_min": y_min,
+        "y_max": y_max,
+        "value_style": _value_style(options.get("value_style")),
         "show_profile": options.get("show_profile") is not False,
         "show_min_max": options.get("show_min_max") is not False,
     }

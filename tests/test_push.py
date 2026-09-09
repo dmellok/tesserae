@@ -789,12 +789,16 @@ def test_multi_device_page_renders_once_per_panel_and_routes(
         result = manager.push("multi")
 
     assert result.status == "sent"
+    # Only count captures of this page: the patch is module-wide, so a daemon
+    # thread left behind by an earlier test in the same worker (touch prewarm)
+    # can capture some other page inside this window.
+    calls = [c for c in rtp.call_args_list if "/compose/multi?" in c.args[0].render.url]
     # Rendered once per distinct panel, not once per device.
-    assert rtp.call_count == 2
-    sizes = {(c.args[0].render.viewport_w, c.args[0].render.viewport_h) for c in rtp.call_args_list}
+    assert len(calls) == 2
+    sizes = {(c.args[0].render.viewport_w, c.args[0].render.viewport_h) for c in calls}
     assert sizes == {(800, 480), (480, 800)}
     # Each render fetched the composer at its own panel override.
-    urls = [c.args[0].render.url for c in rtp.call_args_list]
+    urls = [c.args[0].render.url for c in calls]
     assert any("w=800&h=480" in u for u in urls)
     assert any("w=480&h=800" in u for u in urls)
 

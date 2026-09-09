@@ -249,6 +249,43 @@ def _cycle_fires_on(rotation: Any, day_start: datetime) -> list[datetime]:
     return fires
 
 
+#: Ticks the 24h rail draws. A rail is a few hundred pixels wide, so past
+#: this the marks stop being separable and only cost DOM.
+MAX_RAIL_MARKS = 48
+
+
+def _thin_marks(marks: list[float]) -> list[float]:
+    """Reduce *marks* to at most :data:`MAX_RAIL_MARKS`, spread across the day.
+
+    The rail used to draw ``marks[:48]``. A 3-minute schedule projects ~480
+    fires, so the ticks ran out about two hours in and the lane read as "the
+    schedule stopped firing" -- while the ``refreshes today`` label beside it
+    still showed the full count, so the two disagreed (#166).
+
+    Taking every *n*th mark instead keeps the lane spanning the window it
+    covers, which is what the rail is for: the reader is judging *when* the
+    schedule fires and roughly how densely, not counting ticks. The count
+    label remains the honest total, and it is now consistent with a lane that
+    reaches the end of the day.
+
+    The first and last marks are always kept, so the lane starts and ends
+    where the schedule does.
+    """
+    if len(marks) <= MAX_RAIL_MARKS:
+        return marks
+    step = (len(marks) - 1) / (MAX_RAIL_MARKS - 1)
+    thinned = [marks[round(i * step)] for i in range(MAX_RAIL_MARKS)]
+    # ``round`` can land twice on the same index at the tail; de-duplicate
+    # while keeping order so two ticks never stack on one pixel.
+    seen: set[float] = set()
+    out: list[float] = []
+    for mark in thinned:
+        if mark not in seen:
+            seen.add(mark)
+            out.append(mark)
+    return out
+
+
 def _design_cards(
     *,
     nav_decks: list[Deck],
@@ -476,7 +513,7 @@ def _design_cards(
                 + (f" · last sent {_ago(last, now_ts)}" if _ago(last, now_ts) else ""),
                 "screens": [screen(s.page_id, None, showing, bool(s.conditions))],
                 "live_name": page_names.get(s.page_id) if showing else None,
-                "marks": marks[:48],
+                "marks": _thin_marks(marks),
                 "now_pct": round(now_pct, 2),
                 "fires_label": (
                     f"fires {s.fires_at.strftime('%H:%M')}"
@@ -500,8 +537,9 @@ def _design_cards(
 
     # One section per display, in registry order; a card targeting several
     # displays appears under each. Displays with nothing lined up are
-    # omitted entirely. Cards with no resolvable display land in a trailing
-    # "not on a display yet" group.
+    # omitted entirely. Empty bindings and bindings to missing displays
+    # get separate trailing groups, so retained Lineups remain manageable
+    # after their last display is deleted.
     groups: list[dict[str, Any]] = []
 
     def refresh_total(group_cards: list[dict[str, Any]]) -> int | None:
@@ -538,7 +576,34 @@ def _design_cards(
                 "cards": unbound,
             }
         )
-    return {"cards": cards, "groups": groups, "now_hhmm": now_tz.strftime("%H:%M")}
+    unavailable = [
+        c
+        for c in cards
+        if c["device_ids"] and not any(did in device_names for did in c["device_ids"])
+    ]
+    if unavailable:
+        groups.append(
+            {
+                "id": "",
+                "name": "Unavailable displays",
+                "icon": "warning-circle",
+                "showing": None,
+                "thumb": "",
+                "refreshes_today": None,
+                "cards": unavailable,
+            }
+        )
+    # The IANA name, not just the rendered time: the rail's now-marker ticks
+    # client-side, and a browser in a different zone from the configured one
+    # would otherwise recompute the mark against its own clock and jump by the
+    # offset a minute after load (#165, same class as #143 / #164 / #170).
+    tz_name = getattr(tz, "key", "") or ""
+    return {
+        "cards": cards,
+        "groups": groups,
+        "now_hhmm": now_tz.strftime("%H:%M"),
+        "now_tz_name": tz_name,
+    }
 
 
 @bp.get("")
@@ -628,6 +693,7 @@ def index() -> str:
         cards=design["cards"],
         groups=design["groups"],
         now_hhmm=design["now_hhmm"],
+        now_tz_name=design.get("now_tz_name", ""),
         # -- schedules forms ----------------------------------------------
         schedules=schedules,
         status=schedule_status,
@@ -910,6 +976,17 @@ def editor(deck_id: str | None = None) -> str | Response:
             device_meta.append({"id": d.id, "name": d.display_name})
             if deck is not None and d.id in deck.device_ids and d.manifest.get("touch") is True:
                 touch_bound = True
+    # A binding to a display that has since been deleted still needs an
+    # option, or the select falls back to "Choose a display" and a plain
+    # save would silently unbind the deck. It stays selected (and labelled)
+    # until the user picks a live display.
+    if deck is not None:
+        known = {d["id"] for d in device_meta}
+        device_meta.extend(
+            {"id": did, "name": f"{did} (unavailable)"}
+            for did in deck.device_ids
+            if did not in known
+        )
 
     from app.deck_suggest import suggest_decks
 

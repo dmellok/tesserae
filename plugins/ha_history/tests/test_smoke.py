@@ -187,7 +187,98 @@ def test_axis_labels_absent_without_timestamps(app: Flask, monkeypatch) -> None:
     assert item["times"] == []
 
 
+def test_y_range_passes_through_and_drops_inverted(app: Flask, monkeypatch) -> None:
+    hist, core = _mods(app)
+    series = [{"state": str(v)} for v in [10, 12, 11]]
+    with app.app_context():
+        monkeypatch.setattr(core, "get_states", lambda: _STATES)
+        monkeypatch.setattr(core, "history", lambda eid, hours=24: series)
+        base = {"entities": "sensor.temp"}
+        blank = hist.fetch(base, {}, ctx={})
+        pinned = hist.fetch({**base, "y_min": "0", "y_max": 40}, {}, ctx={})
+        one_side = hist.fetch({**base, "y_min": "", "y_max": "40"}, {}, ctx={})
+        inverted = hist.fetch({**base, "y_min": 40, "y_max": 0}, {}, ctx={})
+    assert blank["y_min"] is None and blank["y_max"] is None
+    assert pinned["y_min"] == 0.0 and pinned["y_max"] == 40.0
+    assert one_side["y_min"] is None and one_side["y_max"] == 40.0
+    assert inverted["y_min"] is None and inverted["y_max"] is None
+
+
 def test_composer_mounts_widget(client: FlaskClient) -> None:
     resp = client.get("/_test/render?plugin=ha_history&size=md")
     assert resp.status_code == 200
     assert 'data-plugin="ha_history"' in resp.get_data(as_text=True)
+
+
+def test_value_style_passes_through_and_falls_back(app: Flask, monkeypatch) -> None:
+    hist, core = _mods(app)
+    series = [{"state": str(v)} for v in [10, 12, 11]]
+    with app.app_context():
+        monkeypatch.setattr(core, "get_states", lambda: _STATES)
+        monkeypatch.setattr(core, "history", lambda eid, hours=24: series)
+        base = {"entities": "sensor.temp"}
+        blank = hist.fetch(base, {}, ctx={})
+        headline = hist.fetch({**base, "value_style": "headline"}, {}, ctx={})
+        junk = hist.fetch({**base, "value_style": "huge"}, {}, ctx={})
+    assert blank["value_style"] == "legend"
+    assert headline["value_style"] == "headline"
+    assert junk["value_style"] == "legend"
+
+
+def test_live_state_newer_than_history_becomes_the_last_point(app: Flask, monkeypatch) -> None:
+    """#282: history is cached longer than states, so the live reading can
+    sit outside the window's own low / high (current 65.8, low 65.9). A
+    newer live state joins the series as its last point, so low and high
+    bracket the headline and the chart ends where the headline says."""
+    hist, core = _mods(app)
+    samples = _stamped([66.5, 66.2, 65.9], "2026-09-08T00:00:00+00:00", 60)
+    states = [
+        {
+            "entity_id": "sensor.temp",
+            "state": "65.8",
+            "last_changed": "2026-09-08T02:30:00+00:00",
+            "attributes": {"friendly_name": "Outside", "unit_of_measurement": "°F"},
+        }
+    ]
+    with app.app_context():
+        app.config["SETTINGS_STORE"].patch_section("app", {"timezone": "UTC"})
+        monkeypatch.setattr(core, "get_states", lambda: states)
+        monkeypatch.setattr(core, "history", lambda eid, hours=24: samples)
+        item = hist.fetch(
+            {"entities": "sensor.temp", "hours": 12, "number_format": "0.0"}, {}, ctx={}
+        )["items"][0]
+
+    assert item["values"] == [66.5, 66.2, 65.9, 65.8]
+    assert item["times"] == ["00:00", "01:00", "02:00", "02:30"]
+    assert item["current"] == "65.8"
+    assert item["min"] == "65.8" and item["min_idx"] == 3
+    assert item["max"] == "66.5"
+
+
+def test_live_state_matching_or_older_than_history_is_not_duplicated(
+    app: Flask, monkeypatch
+) -> None:
+    hist, core = _mods(app)
+    samples = _stamped([10.0, 11.0, 12.0], "2026-09-08T00:00:00+00:00", 60)
+
+    def state(value: str, stamp: str) -> list[dict]:
+        return [
+            {
+                "entity_id": "sensor.temp",
+                "state": value,
+                "last_changed": stamp,
+                "attributes": {"unit_of_measurement": "°C"},
+            }
+        ]
+
+    with app.app_context():
+        app.config["SETTINGS_STORE"].patch_section("app", {"timezone": "UTC"})
+        monkeypatch.setattr(core, "history", lambda eid, hours=24: samples)
+        monkeypatch.setattr(core, "get_states", lambda: state("12.0", "2026-09-08T02:00:00+00:00"))
+        same = hist.fetch({"entities": "sensor.temp", "hours": 12}, {}, ctx={})["items"][0]
+        monkeypatch.setattr(core, "get_states", lambda: state("9.0", "2026-09-07T23:00:00+00:00"))
+        older = hist.fetch({"entities": "sensor.temp", "hours": 12}, {}, ctx={})["items"][0]
+
+    assert same["values"] == [10.0, 11.0, 12.0]
+    assert older["values"] == [10.0, 11.0, 12.0]
+    assert older["min"] == "10"

@@ -80,6 +80,13 @@ def _current_browser_pool(app: Flask) -> BrowserPool | None:
     return pool if _truthy(app_section.get("keep_browser_warm", True)) else None
 
 
+def _under_pytest(app: Flask) -> bool:
+    """True when this app is being driven by the test suite, whether it was
+    built with ``testing=True`` or (to keep the auth gate) ``testing=False``
+    and then flagged. Same check the heartbeat uses."""
+    return bool(app.testing or app.config.get("TESTING") or os.environ.get("PYTEST_CURRENT_TEST"))
+
+
 def _truthy(value: object) -> bool:
     if isinstance(value, bool):
         return value
@@ -391,6 +398,15 @@ def record_status_heartbeat(
     elif prev_entry.get("can_stay_awake") is not None:
         entry["can_stay_awake"] = prev_entry["can_stay_awake"]
     status_cache[device.id] = entry
+    # Persist the merged heartbeat so a restart seeds the cache with the
+    # last known readings (the store skips steady beats itself). A parse
+    # error keeps the previous good snapshot.
+    snapshot = app.config.get("DEVICE_STATUS_SNAPSHOT")
+    if snapshot is not None and "error" not in parsed:
+        try:
+            snapshot.record(device.id, received_at=received_at, parsed=merged)
+        except Exception:
+            logger.exception("device_status snapshot: record failed for %s", device.id)
     # Persist the stable facts (fw version, OTA capability) so a restart
     # doesn't forget them until the device's next wake; write-on-change only.
     facts = app.config.get("DEVICE_FACTS")
@@ -917,6 +933,10 @@ def _rebuild_transport(
             data_root=app.config["DATA_ROOT"],
             settings=settings,
             app=app,
+            # Under pytest the poller stays threadless (see the OpenDisplay
+            # poller for the same rule): every app-building test used to leave
+            # one of these loops running for the life of the worker.
+            run_async=not _under_pytest(app),
         )
         poller.start()
         app.config["RELAY_PAIRING_POLLER"] = poller

@@ -130,6 +130,7 @@ def test_capabilities_probe_is_unauthenticated_and_valid(app: Flask) -> None:
         "image_framing",
         "personal_data_reminders",
         "personal_data_health",
+        "personal_data_retention",
         "lineups",
         "lineup_control",
         "lineup_authoring",

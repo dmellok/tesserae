@@ -89,3 +89,53 @@ def test_rgb_passthrough_falls_back_to_24bit() -> None:
     assert data[:2] == b"BM"
     out = Image.open(io.BytesIO(data)).convert("RGB")
     assert out.size == (10, 8) and out.getpixel((0, 0)) == (12, 34, 56)
+
+
+def _clr_used(data: bytes) -> int:
+    return int.from_bytes(data[46:50], "little")
+
+
+def _pixel_offset(data: bytes) -> int:
+    return int.from_bytes(data[10:14], "little")
+
+
+def test_fixed_palette_is_written_whole_whatever_the_frame_uses() -> None:
+    # Discussion #277: a tri-colour frame with no red on it must still ship
+    # as a 4-bpp file with the full 3-entry table, so a client that sized its
+    # bitmap from an earlier frame's header can reuse it for this one.
+    pal = [(0, 0, 0), (255, 255, 255), (255, 0, 0)]
+    img = _p_image(16, 4, pal, [i % 2 for i in range(16 * 4)])  # black + white only
+    data = pack_indexed_bmp(img, palette=pal)
+    assert _bpp(data) == 4 and _compression(data) == 0
+    assert _clr_used(data) == 3
+    # Exactly three BGRA entries between the headers and the pixel data.
+    assert _pixel_offset(data) == 14 + 40 + 3 * 4
+    assert data[54:66] == bytes((0, 0, 0, 0, 255, 255, 255, 0, 0, 0, 255, 0))
+    out = Image.open(io.BytesIO(data))
+    assert list(out.convert("RGB").getdata()) == list(img.convert("RGB").getdata())
+    assert out.getpalette()[:9] == [0, 0, 0, 255, 255, 255, 255, 0, 0]
+
+
+def test_fixed_palette_keeps_index_order() -> None:
+    # Indices are taken as-is against the given palette (no compaction).
+    pal = [(0, 0, 0), (255, 255, 255), (255, 0, 0)]
+    img = _p_image(4, 1, pal, [2, 2, 0, 1])
+    data = pack_indexed_bmp(img, palette=pal)
+    out = Image.open(io.BytesIO(data))
+    assert list(out.getdata()) == [2, 2, 0, 1]
+
+
+def test_fixed_mono_palette_packs_1bpp() -> None:
+    pal = [(0, 0, 0), (255, 255, 255)]
+    img = _p_image(8, 1, pal, [1] * 8)  # all white
+    data = pack_indexed_bmp(img, palette=pal)
+    assert _bpp(data) == 1 and _clr_used(data) == 2
+
+
+def test_fixed_palette_rejects_out_of_range_index() -> None:
+    import pytest
+
+    pal = [(0, 0, 0), (255, 255, 255)]
+    img = _p_image(2, 1, [*pal, (255, 0, 0)], [0, 2])
+    with pytest.raises(ValueError):
+        pack_indexed_bmp(img, palette=pal)

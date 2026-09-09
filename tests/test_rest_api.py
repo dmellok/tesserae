@@ -2349,6 +2349,65 @@ def test_next_poll_s_never_exceeds_the_configured_interval(app: Flask) -> None:
     assert _poll_after_status(app, client, token) == 300
 
 
+def _quiet_now_settings(app: Flask, *, sleep: bool) -> None:
+    """App-level quiet hours (UTC) that started an hour ago and end two
+    hours from now, so the test device is inside the window right now."""
+    from datetime import UTC, datetime, timedelta
+
+    now = datetime.now(UTC).replace(second=0, microsecond=0)
+    start = now - timedelta(hours=1)
+    end = now + timedelta(hours=2)
+    app.config["SETTINGS_STORE"].patch_section(
+        "app",
+        {
+            "timezone": "UTC",
+            "quiet_hours_enabled": True,
+            "quiet_hours_start": start.strftime("%H:%M"),
+            "quiet_hours_end": end.strftime("%H:%M"),
+            "quiet_hours_sleep": sleep,
+        },
+    )
+
+
+def test_next_poll_s_sleeps_through_quiet_hours_when_asked(app: Flask) -> None:
+    """#299: inside a quiet window with sleep-through on, the wake is
+    pushed to a minute past the window's end plus the margin, well past
+    the 300 s configured interval."""
+    client, token = _paired_client(app)
+    _set_sleep_interval(app, "poll_panel", 300)
+    _quiet_now_settings(app, sleep=True)
+
+    poll = _poll_after_status(app, client, token)
+    assert 7200 <= poll <= 7320  # ~2 h to end, +1 min inclusive end, +30 s margin
+
+
+def test_next_poll_s_keeps_the_interval_inside_quiet_hours_by_default(app: Flask) -> None:
+    """Quiet hours alone only filter automation; the panel still wakes on
+    its interval unless sleep-through is switched on."""
+    client, token = _paired_client(app)
+    _set_sleep_interval(app, "poll_panel", 300)
+    _quiet_now_settings(app, sleep=False)
+
+    assert _poll_after_status(app, client, token) == 300
+
+
+def test_next_poll_s_ignores_sleep_through_when_quiet_never_ends(app: Flask) -> None:
+    """Every day quiet all day has no end to sleep to; the device keeps
+    its interval rather than being told to sleep for the maximum."""
+    client, token = _paired_client(app)
+    _set_sleep_interval(app, "poll_panel", 300)
+    app.config["SETTINGS_STORE"].patch_section(
+        "app",
+        {
+            "timezone": "UTC",
+            "quiet_hours_enabled": True,
+            "quiet_hours_all_day": ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
+            "quiet_hours_sleep": True,
+        },
+    )
+    assert _poll_after_status(app, client, token) == 300
+
+
 def test_next_poll_s_ignores_estimated_events(app: Flask) -> None:
     """An ``estimated`` projection is the engine guessing at an unanchored
     cadence; waking early for one trades a real wake for a maybe."""

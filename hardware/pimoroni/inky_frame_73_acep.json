@@ -1,0 +1,22 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "pimoroni_inky_frame_73_acep",
+  "name": "Pimoroni Inky Frame 7.3\" (7-colour ACeP)",
+  "vendor": "Pimoroni",
+  "url": "https://shop.pimoroni.com/products/inky-frame-7-3",
+  "icon": "monitor",
+  "description": "7.3 inch 800x480 Inky Frame (Pico W / Pico 2 W aboard) with the original 7-colour ACeP panel (AC073TC1A), the revision sold before September 2025. Driven by the tesserae-inkyframe Pico SDK firmware over the REST device API: the pico_bin renderer's landscape 4-bpp buffer streams straight into the panel. Units shipped from September 2025 have a Spectra 6 panel; use pimoroni_inky_frame_73 for those.",
+  "protocol": "pico_bin_client",
+  "panel": {
+    "w": 800,
+    "h": 480,
+    "orientation": "landscape",
+    "name": "Inky Frame 7.3\" (7-colour ACeP, 800x480)",
+    "gamut": "inky_7colour",
+    "native_w": 800,
+    "native_h": 480
+  },
+  "refresh_floor_s": 30,
+  "image_format": "bin",
+  "notes_md": "Community firmware by [partridgeworks/tesserae.inkyframe](https://github.com/partridgeworks/tesserae.inkyframe), confirmed on real hardware by the author. Full refresh takes about 30 s. The firmware announces this kind on `/discover`; if the entry is missing it falls back to the stock `pico_bin_client` kind, whose 1600x1200 default panel produces frames the firmware refuses, so install this file before clicking Register."
+}

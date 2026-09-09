@@ -566,6 +566,69 @@ def test_rotation_smart_sync_skips_intermediate_steps(tmp_path: Path) -> None:
     assert push.push.call_args.args[0] == "d"
 
 
+def test_rotation_smart_sync_lead_narrower_than_tick_still_fires(tmp_path: Path) -> None:
+    """Regression: a trusted panel on a 5-minute wake grid, a 15-minute
+    dwell, the default 10 s lead and the 30 s tick. The lead window is
+    narrower than the tick period and 300 s is a multiple of 30 s, so the
+    ticks keep the same phase relative to every wake; with this phase none
+    of them lands inside the window. The gate must open on the last tick
+    before the window instead of waiting for a tick inside it, otherwise
+    the rotation never advances while the card says it is playing."""
+    base = datetime(2026, 6, 15, 0, 0, tzinfo=UTC).timestamp()
+    entries = {"esp": {"is_trusted": True, "predicted_next_wake_at": base + 300}}
+    scheduler, push, store = _smart_wiring(
+        tmp_path,
+        device_ids={"a": ["esp"], "b": ["esp"]},
+        telemetry=_FakeTelemetry(entries),
+    )
+    r = _rot(anchor="00:00", steps=_steps(("a", 15), ("b", 15))).model_copy(
+        update={"smart_sync": True, "smart_sync_lead_s": 10}
+    )
+    store.upsert(r)
+
+    fires: list[tuple[str, float]] = []
+    predicted = base + 300
+    t = base + 7  # tick phase 7 s past the grid: outside every 10 s window
+    while t < base + 20 * 60:
+        # The panel checks in ~3 s after each wake and the prediction
+        # rolls forward to the next grid point.
+        while t >= predicted + 3:
+            predicted += 300
+        entries["esp"]["predicted_next_wake_at"] = predicted
+        before = push.push.call_count
+        scheduler._tick_once(datetime.fromtimestamp(t, UTC))
+        if push.push.call_count > before:
+            fires.append((push.push.call_args.args[0], t))
+        t += 30
+
+    assert [page for page, _ in fires] == ["a", "b"]
+    # Step "b" is due at 00:15 and must be rendered before the 00:20 wake,
+    # not held past it.
+    _, fired_b = fires[1]
+    assert base + 15 * 60 <= fired_b < base + 20 * 60
+
+
+def test_rotation_smart_sync_hold_is_visible(tmp_path: Path) -> None:
+    """A due step held by smart sync records a held status with the reason,
+    so the card shows a pill instead of "playing" with nothing happening."""
+    now = datetime(2026, 6, 15, 0, 0, tzinfo=UTC)
+    scheduler, push, store = _smart_wiring(
+        tmp_path,
+        device_ids={"a": ["esp"], "b": ["esp"]},
+        telemetry=_FakeTelemetry(
+            {"esp": {"is_trusted": True, "predicted_next_wake_at": now.timestamp() + 3600}}
+        ),
+    )
+    r = _rot(steps=_steps(("a", 30), ("b", 30))).model_copy(
+        update={"smart_sync": True, "smart_sync_lead_s": 10}
+    )
+    store.upsert(r)
+    scheduler._tick_once(now)
+    assert push.push.call_count == 0
+    assert scheduler._rotation_last_status[r.id] == "held"
+    assert "smart sync" in (scheduler._rotation_last_reason[r.id] or "")
+
+
 # -- rejoin pass (discussion #140: paged-away devices come back) -----------
 
 

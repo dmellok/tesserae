@@ -8,6 +8,163 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- The GTFS widget gains a "GTFS-RT VehiclePositions URL" field, for agencies
+  that publish vehicle positions as their own feed beside TripUpdates and
+  ServiceAlerts. With "Show stops away" on, a row reads "2 stops" when the
+  feed reports a stop sequence, and falls back to the straight-line distance
+  from the stop ("1.4 km", or miles via the new "Distance units" option) when
+  the feed only carries coordinates, which is all some agencies publish.
+  Reports older than ten minutes are ignored. `gtfs` 0.12.0.
+- The History widget gains a "Current value" option (#282). "Large headline
+  above the chart" draws the single-sensor reading in display type with the
+  trend arrow and low / high beside it, so a weather panel shows the value at a
+  glance with the history underneath for context. The default keeps the value
+  in the legend strip under the chart. `ha_history` 0.8.0.
+- Quiet hours can be limited to chosen weekdays and can mark whole days quiet
+  (#299). Both the app-level window and a device's override gain a "Window
+  applies on" weekday picker and a "Quiet all day" picker, so an office panel
+  can be quiet overnight on weekdays and all weekend. Each day is judged by its
+  own clock: on a ticked day an overnight window covers that morning up to
+  the end time and that evening from the start time. Existing settings keep
+  their meaning: every day, no all-day days.
+- "Sleep through quiet hours", off by default, tells battery panels to sleep
+  until the quiet window ends instead of waking on their interval inside it.
+  The REST status response stretches `next_poll_s` (and `wake_at`) to the end
+  of the window, capped at six days; always-on panels are unaffected. Wake
+  alignment now searches five days ahead so a quiet weekend does not push an
+  aligned device back onto its plain interval.
+
+- The Home Assistant History widget takes optional "Y-axis minimum" and
+  "Y-axis maximum" cell options that pin the chart's value axis. Blank keeps
+  the auto-fit range, and one side can be set on its own. The Sensor widget's
+  description and sparkline help now point at the History widget for a full
+  chart with labelled axes (#282).
+
+### Fixed
+
+- Installing or removing a widget from Browse no longer shows "Install failed:
+  network error" under the success message. The success branch throws while
+  adding the topbar "Restart required" button (the topbar holds two theme
+  toggles and it picked the drawer's, which isn't a direct child), and the
+  request's error handler reported that as a network failure. The install had
+  succeeded, but the restart button only appeared after a reload. The button
+  now targets the topbar's own toggle, and the network-error message is
+  reserved for a failed request.
+
+- A device's last heartbeat now survives a server restart (#282). The battery,
+  signal, temperature and humidity readings the status strip widget and the
+  Devices card draw from lived only in memory, so after an upgrade they were
+  blank until the device next reported, and a frame fetched on a button wake
+  is rendered before that same wake's heartbeat lands. The last merged
+  heartbeat is kept in `data/core/device_status.json` and seeds the cache at
+  boot with its original timestamp, so the Devices card still shows the
+  reading's real age.
+- The History widget's low and high now always bracket its current value
+  (#282). The current reading comes from the live state while low and high
+  came from the history samples, which ha_core caches for longer, so a fresh
+  reading could sit below the window's low. A live state newer than the last
+  sample now joins the series as its final point, so the chart also ends where
+  the headline says. `ha_history` 0.8.1.
+- Min / max labels on the History widget's chart stay inside the canvas
+  (#282). A maximum sitting on the top gridline lost its label off the top
+  edge, and a marker at either end of the series lost half of it off the
+  side. The chart now reserves room above the plot for the max label and
+  keeps both labels within the drawing area, flipping a label to the other
+  side of its point when it cannot fit.
+- The self-hosted relay container now sends an explicit `Content-Length` on
+  every response instead of chunked transfer encoding. ESP32 firmware reads a
+  sealed frame only when the response carries a length, so a remote panel
+  paired against a container relay stayed on "waiting for first frame" even
+  though pairing and heartbeats worked. Relay image `0.1.1`.
+- Older x86-64 processors (before 2009, no SSE4.2) no longer get a bare
+  `Illegal instruction` from the Docker image: the entrypoint explains that
+  the bundled numpy needs x86-64-v2 and points at the fix. The image accepts a
+  `NUMPY_SPEC` build argument (`--build-arg NUMPY_SPEC='numpy<2.4'`) to pin the
+  last numpy line whose wheels run on those machines, and the install docs
+  carry the same note for a bare install.
+
+### Added
+
+- Hardware kind `waveshare_esp32_driver_75` for Waveshare's E-Paper ESP32 Driver
+  Board carrying a 7.5" mono panel (V2, 800×480). Inherits `esp32_bw_client`
+  and the 48000-byte mono frame shared with the reTerminal E1001 and the XIAO
+  7.5" boards; firmware is the `waveshare-esp32-driver-75` build in
+  tesserae-device-firmware. Not yet confirmed on real hardware.
+- **Calendar Core** can use each event's own colour where the feed sets one.
+  A per-feed toggle on the feed row opts in; RFC 7986 `COLOR` names and
+  `X-APPLE-CALENDAR-COLOR` hex values are read, and an event with no colour of
+  its own keeps the feed colour. Off by default, so existing feeds render as
+  before. (#222)
+- `GET /api/mcp/appearance` serves the theme, style and font lists. (#257)
+
+### Changed
+
+- PicPak frames now get the "update available" chip on the Devices card and
+  the Firmware page. The update check (api.tesserae.ink) also follows
+  community firmware repos, starting with `picpak_client` mapped to
+  varanu5/picpak-tesserae-client. Such releases carry no OTA descriptor, so
+  the chip links the release for a web-flasher update rather than queueing
+  an over-the-air one.
+- `/api/mcp/catalog` reports a count of themes, styles and fonts and points at
+  the appearance endpoint instead of inlining the lists, taking roughly a
+  sixth off every `list_widgets` read. (#257)
+- **tesserae-mcp 0.16.0.** `list_widgets(section="appearance")` fetches the
+  lists from the new endpoint, and the served tool docs point there. Upgrade
+  with `pipx upgrade tesserae-mcp`; an older bridge returns counts where the
+  docs promise lists.
+- The device setup guide gains an *Update delivery* section describing Auto
+  and Always full refresh.
+- The `cryptography` dependency now allows the 50.x series, which carries the
+  fix for PYSEC-2026-3552. The affected PKCS#7 API is not used here; the pin
+  was the only reason the audit kept reporting it.
+
+### Fixed
+
+- **Background loops can be stopped as a set.** The scheduler, the
+  relay-pairing poller, the OpenDisplay telemetry poller and HA discovery's
+  ticker register with a small registry when they start, and the transport
+  wiring keeps the two pollers threadless under the test suite. This is what
+  the intermittent hour-long CI stall was: each test that built an app left a
+  full set of these loops running, and the worker eventually wedged with a
+  hundred of them alive. The suite now stops them after every test and fails
+  the test that leaks one.
+- **Palette profiles no longer swap primaries on 7-colour ACeP panels.** A
+  profile emits its colours in Spectra 6 slot order and was applied to the
+  panel palette positionally, which on `inky_7colour` put the calibrated
+  yellow where the panel paints green and the blue where it paints red. The
+  override is now matched to the gamut's slots by colour. (#298)
+- **The Gallery widget's Scale option now does something.** Every choice
+  rendered as Fill: the client never read the option, and the shared
+  full-bleed rule crops to cover. Fit letterboxes, Stretch distorts, Center
+  shows native pixels, and Fit with blurred background paints a blurred copy
+  of the picture behind the letterboxed one. (#296)
+- **CircuitPython BMP frames have a fixed colour table per gamut.** The
+  `circuitpython_bmp` renderer used to compact the table to the colours a
+  page actually used, so a tri-colour page with no red on screen shipped as
+  a 2-colour 1-bpp file and the next frame with red in it no longer matched
+  a bitmap the client had sized from the earlier header. The table is now the
+  gamut's whole palette in a fixed order on every frame, with `biClrUsed`
+  set to its length, so bit depth and table are constant for a given gamut
+  and `adafruit_imageload` sizes a 3-colour frame's bitmap at 3 values
+  rather than 16. (#277)
+
+## [0.392.0], 2026-09-06
+
+### Added
+
+- Startup warns while secrets are encrypted with the key derived from the
+  session secret, and the warning carries a ready-to-paste
+  `TESSERAE_SECRET_KEY=` line. The Docker install page gains a section on
+  pinning the key before storing credentials. The HA App gets the note at
+  info, since it has no environment block to put the key in.
+- The session cookie is pinned to `SameSite=Lax` and `HttpOnly` rather
+  than inherited from the browser's defaults.
+- **Calendar, Month** gains a *Show "Week starts" label* option, off by
+  default; the weekday headers already say which day leads.
+- Companion publishers can choose snapshot retention up to 365 days or explicitly
+  retain the latest snapshot until replacement or deletion. The optional
+  `personal_data_retention` capability enables Never; freshness stays independent
+  of expiry, and existing clients retain their chosen finite deadlines.
 - Home Assistant MQTT discovery now exposes lineups and device
   operations. The hub device gains an *Automation* switch (pause every
   scheduled push), a *Quiet hours* switch, a switch per lineup with
@@ -42,6 +199,42 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- A touch that rotated a lineup's page held the display until the
+  rotation's next daily anchor, and that anchor was placed in UTC rather
+  than the configured timezone, so an evening tap could pin a panel for
+  most of the next day. Touch holds now last one dwell window of the step
+  they landed on; button holds keep the anchor rule, placed in the app
+  timezone. The timer also logs a skipped display as `manual hold` and the
+  Lineups card shows **held** instead of the last successful send, so a
+  held panel no longer looks frozen.
+- **GTFS / GTFS-RT** reads feeds whose CSV header row is padded with
+  spaces (`location_type, parent_station, stop_id, …`, as Transperth's
+  is). The padding used to survive into the column names, so every stop
+  lookup missed and the build failed with "isn't in this feed".
+- LAB and chroma-aware colour matching now see the diffused error, so a
+  flat patch dithers under them the way it always did under `rgb` instead
+  of collapsing to a single ink.
+- The Lineups 24h rail thins a dense schedule across the whole day instead
+  of drawing only its first 48 fires.
+- The rail's now-marker ticks in the configured app timezone rather than
+  the browser's, so it no longer jumps by the zone offset a minute after
+  the page loads.
+- **Smart sync no longer starves a lineup on a short wake grid.** The
+  render-before-wake gate only opened on a tick that landed inside the
+  lead window, and the default 10 s lead is narrower than the 30 s tick.
+  A trusted panel waking every 5 minutes kept the same tick phase on
+  every wake, so a rotation could sit on one page for an hour while its
+  card said it was playing. The gate now opens on the last tick before
+  the window, and a rotation held by smart sync shows a *held* pill with
+  the reason instead of staying silent.
+
+- **Lineups remain visible after their displays are deleted.** Lineups whose
+  targets are all gone now appear in an **Unavailable displays** group on the
+  Lineups page instead of disappearing, so they can still be edited, rebound
+  or deleted. The editors keep the stale display (and a wiped dashboard)
+  selected, so saving no longer silently unbinds the lineup or re-points it at
+  the first dashboard in the list.
+
 - **A touch action no longer repaints a different lineup page over the
   one on glass.** The post-action reconcile resolved "the page the
   device is showing" from the lineup's nav record before the live frame,
@@ -69,6 +262,11 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   or quiet hours, a scheduler tick that overran its interval, and a
   tick that has been stuck for five minutes each write a line, so a
   debug report of a frozen panel carries the reason.
+
+## [0.386.3], 2026-09-04
+
+### Fixed
+
 - **Pages pushed through the MCP bridge now carry their touch-v3 controls.**
   The bridge's push composed the page itself and handed the bytes to the
   image push path, which recorded the frame as an anonymous image. The
@@ -77,6 +275,8 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   as an empty spec and was never drawn; the post-action reconcile could not
   find the page either. The image push now records the page id when the
   caller knows it, and the bridge passes it.
+
+## [0.386.2], 2026-09-04
 
 ### Changed
 

@@ -196,13 +196,14 @@ def test_capabilities_advertise_personal_data(app: Flask) -> None:
     jsonschema.validate(body, schema_for("Capabilities"), format_checker=_FMT)
     assert "personal_data_reminders" in body["features"]
     assert "personal_data_health" in body["features"]
+    assert "personal_data_retention" in body["features"]
     assert body["personal_data"]["sources"] == [
         "reminders",
         "reminders.fridge",
         "health.summary",
     ]
     assert body["limits"]["personal_data_stale_after_seconds"] == 86400
-    assert body["limits"]["personal_data_max_ttl_seconds"] == 172800
+    assert body["limits"]["personal_data_max_ttl_seconds"] == 31_536_000
 
 
 def test_put_then_status_round_trip(app: Flask) -> None:
@@ -381,7 +382,7 @@ def test_health_validation_enforces_ttl_window_and_request_size(app: Flask) -> N
     token = _token(app)
     now = datetime.now(UTC).replace(microsecond=0)
 
-    too_long = _put_health(app, token, _health_snapshot(now, ttl_hours=49))
+    too_long = _put_health(app, token, _health_snapshot(now, ttl_hours=365 * 24 + 1))
     assert too_long.status_code == 400
     assert too_long.get_json()["error"]["code"] == "invalid_snapshot"
 
@@ -625,8 +626,8 @@ def test_validation_and_unknown_source(app: Flask) -> None:
     assert r.status_code == 400
     assert r.get_json()["error"]["message"] == "item due_date is required"
 
-    # ttl beyond the 48h max.
-    r = _put(app, token, _snapshot(now, ttl_hours=72))
+    # TTL beyond the advertised 365-day maximum.
+    r = _put(app, token, _snapshot(now, ttl_hours=366 * 24))
     assert r.status_code == 400 and r.get_json()["error"]["code"] == "invalid_snapshot"
 
     # unknown source id.
@@ -765,3 +766,68 @@ def test_delete_is_idempotent(app: Flask) -> None:
 def test_unauthenticated_is_rejected(app: Flask) -> None:
     r = app.test_client().get("/api/app/v1/personal-data/status")
     assert r.status_code == 401
+
+
+@pytest.mark.parametrize("source", ["reminders", "reminders.fridge", "health.summary"])
+@pytest.mark.parametrize("days", [7, 30, 90, 365, None])
+def test_configurable_retention_survives_two_days_and_deletes(
+    app: Flask, source: str, days: int | None
+) -> None:
+    token = _token(app)
+    now = datetime.now(UTC).replace(microsecond=0)
+    generated = now - timedelta(days=3)
+    factories = {
+        "reminders": _multi_list_snapshot,
+        "reminders.fridge": _snapshot,
+        "health.summary": _health_snapshot,
+    }
+    snapshot = factories[source](generated)
+    snapshot["expires_at"] = _iso(generated + timedelta(days=days)) if days else None
+    client = app.test_client()
+    url = f"/api/app/v1/personal-data/{source}"
+    response = client.put(url, json=snapshot, headers=_auth(token))
+    assert response.status_code == 200, response.get_data(as_text=True)
+    status = response.get_json()
+    jsonschema.validate(status, schema_for("PersonalDataSourceStatus"), format_checker=_FMT)
+    assert status["state"] == "stale"  # age is honest, values remain usable
+    assert status["expires_at"] == snapshot["expires_at"]
+    store = app.config["PERSONAL_DATA_STORE"]
+    assert store.get(source)["snapshot"] == snapshot
+    listing = client.get("/api/app/v1/personal-data/status", headers=_auth(token)).get_json()
+    assert listing["sources"] == [status]
+    # Restart/reload retains the selected policy; finite snapshots still redact.
+    from app.state.personal_data_store import PersonalDataSnapshotStore
+
+    reloaded = PersonalDataSnapshotStore(store._path)
+    assert reloaded.get(source)["snapshot"] == snapshot
+    reloaded.redact_expired((generated + timedelta(days=366)).timestamp())
+    assert ("snapshot" in reloaded.get(source)) is (days is None)
+    assert client.delete(url, headers=_auth(token)).status_code == 204
+    assert store.get(source) is None
+
+
+@pytest.mark.parametrize("source", ["reminders", "reminders.fridge", "health.summary"])
+def test_retention_can_be_shortened_and_missing_deadline_is_rejected(
+    app: Flask, source: str
+) -> None:
+    token = _token(app)
+    now = datetime.now(UTC).replace(microsecond=0)
+    factories = {
+        "reminders": _multi_list_snapshot,
+        "reminders.fridge": _snapshot,
+        "health.summary": _health_snapshot,
+    }
+    client = app.test_client()
+    url = f"/api/app/v1/personal-data/{source}"
+    snapshot = factories[source](now)
+    del snapshot["expires_at"]
+    assert client.put(url, json=snapshot, headers=_auth(token)).status_code == 400
+    snapshot["expires_at"] = None
+    assert client.put(url, json=snapshot, headers=_auth(token)).status_code == 200
+    replacement = factories[source](now + timedelta(seconds=1), ttl_hours=24)
+    response = client.put(url, json=replacement, headers=_auth(token))
+    assert response.status_code == 200
+    assert response.get_json()["expires_at"] == replacement["expires_at"]
+    store = app.config["PERSONAL_DATA_STORE"]
+    store.redact_expired((now + timedelta(days=2)).timestamp())
+    assert "snapshot" not in store.get(source)

@@ -288,7 +288,9 @@ def test_status_aligns_next_poll_to_the_clock_grid(app: Flask) -> None:
     # The wake must land on a 15-minute UTC boundary (anchor 00:00).
     target = int(before) + poll
     assert abs(target % 900) <= 2 or 900 - (target % 900) <= 2
-    assert poll <= 900 + 2
+    # No bare ``poll <= 902`` here: within MIN_DELTA_S of a grid point the
+    # server skips to the next one, so the delta legitimately exceeds 900.
+    # ``_expected_grid_delta`` models that.
     assert _expected_grid_delta(900, before) - 2 <= poll <= _expected_grid_delta(900, before) + 2
     # And the same instant rides along as an absolute epoch for capable
     # firmware.
@@ -472,3 +474,28 @@ def test_wake_align_form_renders_on_the_devices_page(ui_app: Flask) -> None:
     body = client.get("/settings/devices").get_data(as_text=True)
     assert 'name="wake_align_mode"' in body
     assert "Synchronized wake" in body
+
+
+def test_interval_mode_clears_a_quiet_weekend_to_monday() -> None:
+    """A weekday-night window plus all-day weekend days (#299) swallow
+    every grid point from Friday evening to Monday morning; the search
+    horizon has to reach past that instead of giving up."""
+    from app.quiet_hours import resolve_quiet_hours
+
+    quiet = resolve_quiet_hours(
+        {
+            "quiet_hours_enabled": True,
+            "quiet_hours_start": "20:00",
+            "quiet_hours_end": "08:00",
+            "quiet_hours_days": ["mon", "tue", "wed", "thu", "fri"],
+            "quiet_hours_all_day": ["sat", "sun"],
+        },
+        None,
+    )
+    alignment = wa.WakeAlignment(mode="interval")
+    friday_evening = datetime(2026, 9, 11, 21, 0, tzinfo=UTC).timestamp()
+    got = wa.next_aligned_wake_epoch(
+        alignment, now=friday_evening, tz=UTC, interval_s=3600, quiet=quiet
+    )
+    # Monday 08:00 is still inside the window (end is inclusive); 09:00 is first out.
+    assert got == datetime(2026, 9, 14, 9, 0, tzinfo=UTC).timestamp()

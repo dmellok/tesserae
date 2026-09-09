@@ -69,6 +69,43 @@ def _clear_ephemeral_env(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv(var, raising=False)
 
 
+@pytest.fixture(autouse=True)
+def _stop_background_loops() -> Any:
+    """Stop every tracked background loop after each test and fail the test
+    that leaked one.
+
+    Apps built with ``create_app(testing=False)`` start the scheduler, and a
+    transport rebuild used to start the relay-pairing and OpenDisplay pollers
+    with their threads on. Nothing stopped them, so each xdist worker piled up
+    a full set of loops per app-building test until it wedged inside a
+    ``Thread.start()``: the intermittent hour-long CI stall. Stopping them here
+    keeps the worker clean; failing on a survivor keeps it that way."""
+    yield
+    import threading
+    import time
+
+    from app import background_loops
+
+    background_loops.stop_all()
+    deadline = time.monotonic() + 3.0
+    alive: list[threading.Thread] = []
+    while time.monotonic() < deadline:
+        alive = [
+            t
+            for t in threading.enumerate()
+            if t.name in background_loops.LOOP_THREAD_NAMES and t.is_alive()
+        ]
+        if not alive:
+            break
+        time.sleep(0.05)
+    if alive:
+        pytest.fail(
+            "background loop threads still running after the test: "
+            + ", ".join(sorted(t.name for t in alive))
+            + " (start them with run_async=False, or stop() them in the fixture)"
+        )
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _block_live_api() -> Any:
     """Refuse live api.tesserae.ink traffic for the whole session.
