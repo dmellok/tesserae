@@ -213,13 +213,16 @@ def editor(canvas_id: str) -> str:
     _guard()
     if _get_canvas(canvas_id) is None:
         abort(404)
-    from app.composer import _font_face_css
+    from app.composer import _all_font_face_css, _cached_code_fonts
 
     return render_template(
         "panels_editor.html",
         canvas_id=canvas_id,
-        font_face_css=_font_face_css(_registry().fonts),
-        code_fonts=[{"id": f.id, "name": f.name} for f in _registry().fonts.values()],
+        # Bundled + cached webfonts, same lists the /compose render uses, so
+        # the editor preview paints the same faces a device push does.
+        font_face_css=_all_font_face_css(_registry()),
+        code_fonts=[{"id": f.id, "name": f.name} for f in _registry().fonts.values()]
+        + _cached_code_fonts(),
         templates_enabled=experiments.is_enabled("templates"),
         # The agent pipeline rail. Only handed a stream URL when the MCP
         # surface is on, so with no agent to watch the editor doesn't open a

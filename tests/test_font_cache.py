@@ -279,3 +279,19 @@ def test_canvas_page_uses_cached_font_and_degrades_without_it(app: Flask) -> Non
     assert '"name": "Shippori Mincho"' not in html
     # The page font falls back to the default bundled family, not a broken ref.
     assert "font-family: 'Shippori Mincho'" not in html.split("<body", 1)[0]
+
+
+def test_editor_preview_sees_cached_fonts(app: Flask) -> None:
+    """The in-browser editor renders code elements through the same sandbox
+    list; a cached family missing there painted the fallback in the preview
+    while the device push had the real face."""
+    client = app.test_client()
+    _sign_in(client)
+    with patch.object(font_cache, "fetch_bytes", side_effect=_fake_fetch):
+        client.post("/api/mcp/fonts", json={"family": "Shippori Mincho"})
+    page_id = client.post("/api/mcp/pages", json={"name": "Type", "w": 800, "h": 480}).get_json()[
+        "id"
+    ]
+    html = client.get(f"/pages/canvas/c/{page_id}").get_data(as_text=True)
+    assert '"name": "Shippori Mincho", "url": "/fonts/face/shippori_mincho.css"' in html
+    assert "/page-fonts/shippori_mincho/400.woff2" in html

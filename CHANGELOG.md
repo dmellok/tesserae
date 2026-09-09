@@ -6,6 +6,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed
+
+- The canvas editor's in-browser preview now paints cached webfonts. It built
+  its own font list from the bundled set, so a code element naming a cached
+  family showed the fallback in the editor while the device push had the real
+  face.
+
 ### Added
 
 - Any webfont in canvas pages and code elements, cached server-side. A new
