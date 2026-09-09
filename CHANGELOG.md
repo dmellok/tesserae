@@ -42,6 +42,17 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- The Gallery's sequential rotation keeps a cursor per device (#209). Two
+  panels showing the same folder used to share one position and advance it
+  for each other, so a panel woken between the other's renders skipped
+  photos. Each panel now walks the album at its own pace; the first render
+  after upgrading carries on from the album's current position rather than
+  restarting at the first photo, and a render with no device bound keeps the
+  shared cursor it always had. The cursor file is named after the device, so
+  deleting `.sequential_index_<folder>_<device>` restarts that one panel.
+  Because the widget now declares `render.per_device_id`, a page carrying it
+  is composed and captured once per bound device rather than once per panel
+  group, in random mode as well. `picture_gallery` 0.1.3.
 - Installing or removing a widget from Browse no longer shows "Install failed:
   network error" under the success message. The success branch throws while
   adding the topbar "Restart required" button (the topbar holds two theme

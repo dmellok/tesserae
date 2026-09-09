@@ -191,18 +191,20 @@ def test_two_devices_walk_the_album_independently(app: Flask) -> None:
     dashboards pointing at one folder shared a position and each advanced it,
     so a panel woken between the other's renders skipped whatever they
     consumed. Each device now has its own cursor.
+
+    Asserted as the literal interleaved sequence: under the shared cursor
+    kitchen, hallway, hallway, kitchen gave a, b, c, a.
     """
     server = _load_server()
     plugin = app.config["PLUGIN_REGISTRY"].get("picture_gallery")
     for name in ("a.jpg", "b.jpg", "c.jpg"):
         _seed_image(plugin.data_dir, name)
 
-    kitchen = [_sequential(server, plugin, preview=False, device="kitchen") for _ in range(3)]
-    hallway = [_sequential(server, plugin, preview=False, device="hallway") for _ in range(3)]
-
-    assert sorted(kitchen) == ["a.jpg", "b.jpg", "c.jpg"]
-    assert sorted(hallway) == ["a.jpg", "b.jpg", "c.jpg"]
-    assert kitchen == hallway, "each panel walks the same album from its own position"
+    seen = [
+        _sequential(server, plugin, preview=False, device=device)
+        for device in ("kitchen", "hallway", "hallway", "kitchen")
+    ]
+    assert seen == ["a.jpg", "a.jpg", "b.jpg", "b.jpg"]
 
 
 def test_one_devices_paints_do_not_move_another_devices_position(app: Flask) -> None:
@@ -228,11 +230,18 @@ def test_one_devices_paints_do_not_move_another_devices_position(app: Flask) -> 
     )
 
 
+def _cursor_files(plugin) -> list[str]:
+    return sorted(
+        p.name for p in plugin.data_dir.iterdir() if p.name.startswith(".sequential_index")
+    )
+
+
 def test_a_render_with_no_device_keeps_the_shared_cursor(app: Flask) -> None:
     """An unbound or virtual-panel render has no device to walk for.
 
-    It keeps the folder-scoped file every existing album already uses, so
-    upgrading does not reset anyone's position to the start of the album.
+    It keeps the folder-scoped file every album written before the
+    per-device cursor already uses, and a device render writes a second
+    file named after the device rather than touching the shared one.
     """
     server = _load_server()
     plugin = app.config["PLUGIN_REGISTRY"].get("picture_gallery")
@@ -240,38 +249,55 @@ def test_a_render_with_no_device_keeps_the_shared_cursor(app: Flask) -> None:
         _seed_image(plugin.data_dir, name)
 
     _sequential(server, plugin, preview=False)
-    unbound = sorted(
-        p.name for p in plugin.data_dir.iterdir() if p.name.startswith(".sequential_index")
-    )
+    unbound = _cursor_files(plugin)
     assert len(unbound) == 1, f"expected one cursor file, got {unbound}"
 
-    # The same render with a device writes a second, differently-named file:
-    # that difference is what "the unbound render kept the old name" means.
     _sequential(server, plugin, preview=False, device="kitchen")
-    with_device = sorted(
-        p.name for p in plugin.data_dir.iterdir() if p.name.startswith(".sequential_index")
+    with_device = _cursor_files(plugin)
+    assert with_device == [unbound[0], f"{unbound[0]}_kitchen"], (
+        "a device render writes its own, readable cursor beside the shared one"
     )
-    assert len(with_device) == 2, (
-        f"a device render should not reuse the shared cursor: {with_device}"
+    assert (plugin.data_dir / unbound[0]).read_text(encoding="utf-8") == "0", (
+        "the device render must not move the shared cursor"
     )
-    assert unbound[0] in with_device, "the pre-existing folder-scoped cursor was renamed or removed"
+
+
+def test_a_devices_first_render_continues_from_the_shared_cursor(app: Flask) -> None:
+    """Binding is the delivery model, so after the upgrade every real push
+    arrives with a device id and opens a fresh per-device file. It seeds
+    from the shared cursor instead of restarting the album at photo 0."""
+    server = _load_server()
+    plugin = app.config["PLUGIN_REGISTRY"].get("picture_gallery")
+    for name in ("a.jpg", "b.jpg", "c.jpg"):
+        _seed_image(plugin.data_dir, name)
+
+    before_upgrade = [_sequential(server, plugin, preview=False) for _ in range(2)]
+    assert before_upgrade == ["a.jpg", "b.jpg"]
+
+    assert _sequential(server, plugin, preview=False, device="kitchen") == "c.jpg"
+    assert _sequential(server, plugin, preview=False, device="hallway") == "c.jpg", (
+        "each device seeds from the shared position, not from another device"
+    )
+    assert _sequential(server, plugin, preview=False, device="kitchen") == "a.jpg"
 
 
 def test_a_device_id_never_reaches_the_filename_raw(app: Flask) -> None:
-    """The cursor path carries an operator-supplied id, so it is hashed.
-
-    A separator or a traversal segment in a device id must not be able to
-    steer the write out of the widget's data dir.
-    """
+    """A registry id (``DEVICE_ID_RE``) is used as-is so the file names its
+    panel. Anything else is hashed: a separator or a traversal segment in a
+    device id must not be able to steer the write out of the widget's data
+    dir."""
     server = _load_server()
     plugin = app.config["PLUGIN_REGISTRY"].get("picture_gallery")
     _seed_image(plugin.data_dir, "a.jpg")
 
     _sequential(server, plugin, preview=False, device="../../etc/passwd")
+    _sequential(server, plugin, preview=False, device="Kitchen Panel")
 
     written = [p for p in plugin.data_dir.iterdir() if p.name.startswith(".sequential_index_")]
-    assert written, "the render wrote a cursor somewhere"
+    assert len(written) == 2, "each render wrote its own cursor"
     for path in written:
         assert ".." not in path.name
         assert "/" not in path.name
+        assert " " not in path.name
+        assert "passwd" not in path.name and "Kitchen" not in path.name
         assert path.parent == plugin.data_dir
