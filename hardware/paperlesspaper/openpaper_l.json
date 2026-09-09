@@ -1,0 +1,25 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "paperlesspaper_openpaper_l",
+  "name": "paperlesspaper OpenPaper L",
+  "vendor": "paperlesspaper",
+  "url": "https://paperlesspaper.de/en",
+  "icon": "device-tablet",
+  "description": "13.3 inch 6-colour Spectra 6 ePaper picture frame from paperlesspaper (Germany): ESP32-C6 (4 MB flash, no PSRAM), 4 x AA NiMH cells, CP2102N USB-C serial. 1200x1600 portrait-native E Ink EL133UF3 panel on two controllers. Speaks Tesserae's v1 REST device API; the esp32_bin renderer packs the same 4-bpp 960000-byte frame as the Waveshare 13.3E6, which the firmware streams into the panel controllers in row blocks because it cannot hold the frame in RAM. Pair with the tesserae-device-firmware ESP-IDF build (env paperlesspaper-openpaper-l, boards/paperlesspaper_openpaper_l.h).",
+  "protocol": "esp32_client",
+  "panel": {
+    "w": 1200,
+    "h": 1600,
+    "orientation": "portrait",
+    "name": "13.3 inch Spectra 6 ePaper (1200x1600)",
+    "gamut": "waveshare_e6",
+    "native_w": 1200,
+    "native_h": 1600
+  },
+  "protocol_config": {
+    "model_header": "OpenPaper_L"
+  },
+  "refresh_floor_s": 60,
+  "image_format": "bin",
+  "notes_md": "Not yet confirmed on real hardware: the firmware target was written from the vendor's open firmware without an L on the bench, so it ships as an experimental build. Same flash-backup caveat as the OpenPaper 7 (the vendor cloud certificate lives in a SPIFFS region the Tesserae layout overwrites). Frames are the Waveshare 13.3E6 layout: 1600 rows of 600 packed bytes, left half first. Features that need a frame in device RAM (always-on mode, the cloud relay, the SD deck cache) are not available on this board."
+}

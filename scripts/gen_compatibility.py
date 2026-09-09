@@ -33,6 +33,7 @@ OUT = REPO_ROOT / "docs" / "compatibility.md"
 VENDOR_ORDER: list[tuple[str, str]] = [
     ("seeed", "Seeed Studio"),
     ("m5stack", "M5Stack"),
+    ("paperlesspaper", "paperlesspaper"),
     ("pimoroni", "Pimoroni"),
     ("trmnl", "TRMNL"),
     ("waveshare", "Waveshare"),
@@ -61,6 +62,7 @@ AFFILIATE_DISCLOSURE = (
 VENDOR_URL: dict[str, str] = {
     "seeed": "https://www.seeedstudio.com/",
     "m5stack": "https://m5stack.com/",
+    "paperlesspaper": "https://paperlesspaper.de/en",
     "pimoroni": "https://shop.pimoroni.com/",
     "trmnl": "https://usetrmnl.com/",
     "waveshare": "https://www.waveshare.com/",
@@ -89,6 +91,16 @@ VENDOR_INTRO: dict[str, str] = {
         "table in the firmware, so greyscale tuning is a build-time edit rather "
         "than a vendor LUT. That also means no partial refresh yet, and so no "
         "tap echo or on-device touch widgets on this SKU."
+    ),
+    "paperlesspaper": (
+        "Open-hardware e-paper picture frames (ESP32-C6, NiMH cells) that run "
+        "the [Tesserae-native firmware](https://github.com/dmellok/tesserae-device-firmware) "
+        "in place of the vendor's cloud firmware; flash from "
+        "[tesserae.ink/flash](https://tesserae.ink/flash). Flashing overwrites "
+        "the region that holds the frame's vendor cloud certificate, so back "
+        "up the flash first if you may want the vendor service back. The "
+        "OpenPaper 7 is on the bench; the OpenPaper L build has not met its "
+        "hardware yet."
     ),
     "xteink": (
         "E-readers rather than dedicated dashboard panels. These run "

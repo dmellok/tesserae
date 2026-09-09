@@ -97,6 +97,15 @@ Runs the [Tesserae-native firmware](https://github.com/dmellok/tesserae-device-f
 |---|---|---|---|---|
 | [M5Stack PaperS3](https://docs.m5stack.com/en/core/PaperS3) | 540×960 portrait | `gray_16` | `esp32_client` <br> `esp32_gray_bin` | `m5stack_papers3` |
 
+### [paperlesspaper](https://paperlesspaper.de/en)
+
+Open-hardware e-paper picture frames (ESP32-C6, NiMH cells) that run the [Tesserae-native firmware](https://github.com/dmellok/tesserae-device-firmware) in place of the vendor's cloud firmware; flash from [tesserae.ink/flash](https://tesserae.ink/flash). Flashing overwrites the region that holds the frame's vendor cloud certificate, so back up the flash first if you may want the vendor service back. The OpenPaper 7 is on the bench; the OpenPaper L build has not met its hardware yet.
+
+| SKU | Panel | Gamut | Protocol / Renderer | Kind id |
+|---|---|---|---|---|
+| [paperlesspaper OpenPaper 7](https://paperlesspaper.de/en/buy-7-inch-epaper-picture-frame) | 800×480 | `spectra_6` | `esp32_client` (inherit) | `paperlesspaper_openpaper_7` |
+| [paperlesspaper OpenPaper L](https://paperlesspaper.de/en) | 1200×1600 portrait | `waveshare_e6` | `esp32_client` (inherit) | `paperlesspaper_openpaper_l` |
+
 ### [Pimoroni](https://shop.pimoroni.com/)
 
 | SKU | Panel | Gamut | Protocol / Renderer | Kind id |
@@ -141,6 +150,12 @@ Hardware supported by community-authored firmware. Each SKU below links to the f
 | SKU | Panel | Gamut | Protocol / Renderer | Kind id |
 |---|---|---|---|---|
 | [PicPak 4.2" BWRY e-paper frame](https://github.com/varanu5/picpak-tesserae-client) | 400×300 | `bwry_4` | `picpak_client` <br> `esp32_bin` | `picpak_4_2` |
+
+### Soldered
+
+| SKU | Panel | Gamut | Protocol / Renderer | Kind id |
+|---|---|---|---|---|
+| [Soldered Inkplate 10](https://soldered.com/product/inkplate-10/) | 1200×825 | `gray_16` | `esp32_bw_client` <br> `esp32_gray_bin` | `soldered_inkplate_10` |
 
 ## What's been tested on real hardware
 

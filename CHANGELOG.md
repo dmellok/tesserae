@@ -8,6 +8,11 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- Hardware catalog entries for the paperlesspaper OpenPaper 7 (7.3" Spectra 6,
+  800x480) and OpenPaper L (13.3" Spectra 6, 1200x1600) picture frames, both
+  ESP32-C6 boards running the Tesserae device firmware over the existing
+  `esp32_client` protocol and `esp32_bin` renderer. The L entry is marked as
+  not yet confirmed on hardware.
 - The GTFS widget gains a "GTFS-RT VehiclePositions URL" field, for agencies
   that publish vehicle positions as their own feed beside TripUpdates and
   ServiceAlerts. With "Show stops away" on, a row reads "2 stops" when the

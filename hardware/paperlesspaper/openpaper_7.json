@@ -1,0 +1,25 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "paperlesspaper_openpaper_7",
+  "name": "paperlesspaper OpenPaper 7",
+  "vendor": "paperlesspaper",
+  "url": "https://paperlesspaper.de/en/buy-7-inch-epaper-picture-frame",
+  "icon": "device-tablet",
+  "description": "7.3 inch 6-colour Spectra 6 ePaper picture frame from paperlesspaper (Germany), open hardware: ESP32-C6 (4 MB flash, no PSRAM), 4 x AAA NiMH cells, CP2102N USB-C serial. 800x480 landscape-native panel, single controller. Speaks Tesserae's v1 REST device API and paints a 4-bpp Spectra 6 buffer (192000 bytes) produced by the esp32_bin renderer. Pair with the tesserae-device-firmware ESP-IDF build (env paperlesspaper-openpaper-7, boards/paperlesspaper_openpaper_7.h).",
+  "protocol": "esp32_client",
+  "panel": {
+    "w": 800,
+    "h": 480,
+    "orientation": "landscape",
+    "name": "7.3 inch Spectra 6 ePaper (800x480)",
+    "gamut": "spectra_6",
+    "native_w": 800,
+    "native_h": 480
+  },
+  "protocol_config": {
+    "model_header": "OpenPaper_7"
+  },
+  "refresh_floor_s": 60,
+  "image_format": "bin",
+  "notes_md": "Runs the Tesserae firmware in place of the vendor's cloud firmware. Flashing it overwrites the SPIFFS region that holds the frame's paperlesspaper cloud certificate, so back that region up first (`esptool.py --chip esp32c6 read_flash 0x3B0000 0x40000 openpaper-spiffs.bin`) if you may want the vendor cloud back. Palette nibbles match the firmware's EPD_COL_* constants byte-for-byte (black=0x0, white=0x1, yellow=0x2, red=0x3, blue=0x5, green=0x6). The big button is a hardware reset, which the firmware treats as a wake-and-repaint; the small one is the BOOT button for flashing. The battery reads through a divider the ADC under-samples, so the reported voltage is calibrated from the vendor's figure until a bench pass confirms it."
+}
