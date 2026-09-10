@@ -122,13 +122,27 @@ def test_expand_events_cached_keeps_all_day_event_past_utc_midnight(cc: Any) -> 
     used to compare an all-day event's bare "YYYY-MM-DD" date string
     against the query window's full UTC datetime string, which silently
     dropped today's all-day event once that UTC rollover happened."""
-    from datetime import UTC, datetime, timedelta
+    from datetime import UTC, datetime, time, timedelta
 
+    # Relative to today: the cached path only serves windows inside the
+    # warm window around now, so a pinned date silently ages out of it and
+    # the test falls through to a fresh expansion of the empty blob.
+    today = datetime.now(UTC).date()
+    tomorrow = today + timedelta(days=1)
     cc._EXPANSION_CACHE["feed1"] = (
         1.0,
-        [{"summary": "Conference", "start": "2026-08-10", "end": "2026-08-11", "all_day": True}],
+        [
+            {
+                "summary": "Conference",
+                "start": today.isoformat(),
+                "end": tomorrow.isoformat(),
+                "all_day": True,
+            }
+        ],
     )
-    start = datetime(2026, 8, 11, 1, 0, tzinfo=UTC)  # 8/10 20:00 America/New_York
+    # 01:00 UTC on the next calendar day: 20:00 the same local evening in
+    # America/New_York, the all-day event's own date.
+    start = datetime.combine(tomorrow, time(1, 0), tzinfo=UTC)
     end = start + timedelta(hours=24)
     out = cc._expand_events_cached("feed1", 1.0, b"", start, end)
     assert [e["summary"] for e in out] == ["Conference"]
