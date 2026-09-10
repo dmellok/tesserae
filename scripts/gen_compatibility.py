@@ -93,7 +93,7 @@ VENDOR_INTRO: dict[str, str] = {
         "table in the firmware, so greyscale tuning is a build-time edit rather "
         "than a vendor LUT. That also means no partial refresh yet, and so no "
         "tap echo or on-device touch widgets on this SKU. The original M5Paper "
-        "shares the same 4.7\" glass but reaches it through an IT8951 controller "
+        'shares the same 4.7" glass but reaches it through an IT8951 controller '
         "on the classic ESP32-D0WDQ6-V3, so it reuses the reTerminal E1003's "
         "greyscale driver unchanged; both M5Paper SKUs consume the identical "
         "259200-byte frame."
