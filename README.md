@@ -169,8 +169,13 @@ The link goes to M5's documentation rather than their store: M5 have marked
 the PaperS3 end of life and it is sold out, so this entry is for people who
 already own one.
 
+The original **M5Paper** (pre-S3, classic ESP32-D0WDQ6-V3) drives the same
+4.7" glass through an IT8951 controller over SPI, so it reuses the reTerminal
+E1003's greyscale driver. Also discontinued; this entry is for existing owners.
+
 | Model | Panel | Client | Status |
 |---|---|---|---|
+| [M5Paper](https://docs.m5stack.com/en/core/m5paper) | 4.7" mono, 16-level grey, 960×540 (IT8951) | [tesserae-device-firmware](https://github.com/dmellok/tesserae-device-firmware) | ✅ |
 | [PaperS3](https://docs.m5stack.com/en/core/PaperS3) | 4.7" mono, 16-level grey, 960×540 | [tesserae-device-firmware](https://github.com/dmellok/tesserae-device-firmware) | TBD |
 
 ### Pimoroni Inky

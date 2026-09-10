@@ -24,6 +24,19 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- Hardware catalog entry for the original M5Stack M5Paper (pre-S3), the 4.7"
+  960x540 16-level greyscale handheld on the classic ESP32-D0WDQ6-V3. Unlike
+  the PaperS3 its glass is driven through an IT8951 controller over SPI, so it
+  reuses the reTerminal E1003's `esp32_gray_bin` wire format at the PaperS3's
+  geometry over the existing `esp32_client` protocol. Marked
+  `auto_select: false` -- an M5Paper and a PaperS3 report the same model,
+  gamut and scan on the wire, so relay pairing can't tell them apart and this
+  kind is only ever set explicitly. Verified end-to-end on hardware
+  2026-09-10: dashboard frame, battery telemetry, the three side buttons, the
+  SHT30 sensor, and touch. `touch: true` with a `touch_enabled` /
+  `touch_linger_s` form; the GT911 reports in composition space so taps
+  hit-test directly, and it needs Stay awake because the classic ESP32 can't
+  wake from deep sleep on the touch controller.
 - Timed lineups take a display of their own. The setup wizard's "set time"
   and "keep fresh" modes now ask which display to send to, defaulting to
   every display the dashboard is on, so a dashboard shared by several

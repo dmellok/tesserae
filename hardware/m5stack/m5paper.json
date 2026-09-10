@@ -1,0 +1,43 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "m5stack_m5paper",
+  "name": "M5Stack M5Paper",
+  "vendor": "M5Stack",
+  "url": "https://docs.m5stack.com/en/core/m5paper",
+  "icon": "device-tablet",
+  "description": "4.7 inch touch ePaper handheld with 16-level greyscale, the original ESP32-D0WDQ6-V3 (classic dual-core, external PSRAM), IT8951 e-paper controller over SPI, 1150 mAh battery, 960x540 native landscape scan mounted portrait. The pre-S3 sibling of the M5Stack PaperS3: same 4.7\" ED047TC1 glass, but an IT8951 timing controller sits between the MCU and the panel instead of a raw parallel bus. Pairs with the tesserae-device-firmware ESP-IDF build (unified firmware) and speaks Tesserae's v1 REST device API. Server-side pack via esp32_gray_bin produces a raw 4-bpp linear greyscale buffer (259200 bytes) the firmware streams straight into the IT8951's image buffer.",
+  "protocol": "esp32_client",
+  "renderers": [
+    "esp32_gray_bin"
+  ],
+  "panel": {
+    "w": 540,
+    "h": 960,
+    "orientation": "portrait",
+    "name": "4.7 inch ePaper (16-level greyscale, IT8951 controller, 960x540 scan, portrait mount)",
+    "gamut": "gray_16",
+    "native_w": 960,
+    "native_h": 540
+  },
+  "refresh_floor_s": 60,
+  "image_format": "bin",
+  "touch": true,
+  "auto_select": false,
+  "config_schema_extends": {
+    "touch_enabled": {
+      "type": "boolean",
+      "label": "Touch input",
+      "default": false,
+      "help": "Dispatch taps against the dashboard's touch regions. On the M5Paper this needs Stay awake on: the classic ESP32 cannot wake from deep sleep on the touch controller, so a tap only registers while the panel is already awake and polling."
+    },
+    "touch_linger_s": {
+      "type": "int",
+      "label": "Touch linger",
+      "default": 30,
+      "min": 0,
+      "max": 60,
+      "help": "Seconds to stay awake after a touch so follow-up taps skip the deep-sleep wake latency. Ignored while Stay awake is on (the panel never sleeps). Only applies when touch input is enabled."
+    }
+  },
+  "notes_md": "**Verified end-to-end on hardware 2026-09-10** running tesserae-device-firmware (env `m5stack-m5paper`): a live dashboard frame over the v1 REST device API (readable, unmirrored, upright at the server's default rotation), battery telemetry, the three side buttons, the SHT30 sensor, and GT911 touch dispatch. Pin map from M5Stack's M5GFX / M5Unified / M5EPD, cross-checked. Flash `m5stack-m5paper-selftest` first for a driver-only grey ramp when bringing up a new unit.\n\n**This is the original M5Paper (SKU K097 / v1.1), not the PaperS3.** The classic ESP32-D0WDQ6-V3 reaches the same 4.7\" ED047TC1 glass through an **IT8951 controller over SPI**, where the PaperS3 (`m5stack_papers3`) is an ESP32-S3 that bit-bangs the bare panel. Same glass, same 259200-byte wire format, different everything in between. The two SKUs also report the same relay model (`esp32_client`), gamut (`gray_16`) and 960x540 scan at pairing, so nothing on the relay wire tells them apart -- hence `auto_select: false`: relay pairing never infers this kind, an ambiguous report stays on `m5stack_papers3`, and an M5Paper is pinned here by the operator or by the firmware declaring `TESSERAE_DEVICE_KIND`.\n\nWire format: exactly 259200 bytes (960*540/2), row-major, top-left origin, no mirror. Per byte, high nibble = LEFT pixel, low nibble = RIGHT; 0x0 = black, 0xF = white, linear 16-level greyscale. Identical in shape to `seeed_reterminal_e1003` and `m5stack_papers3`, so this panel needs no new renderer or packer. The ED047TC1 is not left-right mirrored (unlike the E1003's ED103TC2), so the firmware streams rows straight through.\n\n**Composition is 540x960 portrait while `native_w`/`native_h` are 960x540** -- those are the row stride the firmware reads. The firmware does not transpose, so `esp32_gray_bin` rotates the portrait composition 90 degrees CW and packs 480-byte landscape rows.\n\nThe GT911 digitiser reports in the 540x960 composition space (the firmware maps its 90-degree-rotated axes onto it), so a tap hit-tests directly against the dashboard's regions. `touch_enabled` is off by default and needs Stay awake: the classic ESP32 can't wake from deep sleep on the touch INT (the same ext1 limit that caps the side buttons), so a tap only registers while the panel is awake and polling. The on-board SHT30 fills `temperature_c` / `humidity_pct` each heartbeat; the BM8563 RTC stays unused. Deep-sleep touch/button wake and the microSD deck cache are the remaining follow-ups."
+}
