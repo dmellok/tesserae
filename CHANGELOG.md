@@ -19,6 +19,10 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- Hardware catalog entries for the reMarkable 2, reMarkable 1 and reMarkable
+  Paper Pro, driven by the community tesserae.remarkable AppLoad client over
+  the v1 REST device API. The reMarkable 2 is confirmed on hardware; the
+  other two are built from the same code paths and await confirmation.
 - Any webfont in canvas pages and code elements, cached server-side. A new
   `add_font` MCP tool (`POST /api/mcp/fonts`) fetches a Google Fonts family by
   name at chosen weights and styles, or one face from a direct .woff2 / .ttf

@@ -213,6 +213,9 @@ Community-authored clients, contributed and maintained by their authors (not in 
 | Panel | Resolution | Client | Status |
 |---|---|---|---|
 | [PicPak 4.2" BWRY](https://docs.tesserae.ink/hardware/picpak/) | 400×300 (4-colour BWRY) | [picpak-tesserae-client](https://github.com/varanu5/picpak-tesserae-client) by [@varanu5](https://github.com/varanu5) | ✅ |
+| [reMarkable 2](https://remarkable.com/products/remarkable-2) | 1404×1872 (10.3" 16-level grey) | [tesserae.remarkable](https://github.com/partridgeworks/tesserae.remarkable) by [@partridgeworks](https://github.com/partridgeworks) | ✅ |
+| [reMarkable 1](https://remarkable.com) | 1404×1872 (10.3" 16-level grey) | [tesserae.remarkable](https://github.com/partridgeworks/tesserae.remarkable) by [@partridgeworks](https://github.com/partridgeworks) | TBD |
+| [reMarkable Paper Pro](https://remarkable.com/products/remarkable-paper/pro) | 1620×2160 (11.8" colour) | [tesserae.remarkable](https://github.com/partridgeworks/tesserae.remarkable) by [@partridgeworks](https://github.com/partridgeworks) | TBD |
 
 ### TRMNL-compatible (HTTP pull)
 
