@@ -178,6 +178,22 @@ def test_failed_push_does_not_record_last_fired(
     assert [s.id for s in scheduler.find_due(later)] == ["a"]
 
 
+def test_no_change_push_records_last_fired(
+    scheduler: Scheduler, store: ScheduleStore, push_manager
+) -> None:
+    """A render that matches the frame already on the panel is a
+    successful fire: the interval gate must re-arm, or a stable page
+    re-renders on every tick."""
+    push_manager.push.return_value = PushResult(status="no_change", page_id="home")
+    store.upsert(Schedule(id="a", name="A", page_id="home", type="interval", interval_minutes=30))
+    now = datetime(2026, 6, 1, 10, tzinfo=UTC)
+    scheduler.run_due_once(now)
+    assert push_manager.push.call_count == 1
+    assert scheduler.find_due(now + timedelta(seconds=30)) == []
+    assert scheduler.find_due(now + timedelta(minutes=29)) == []
+    assert [s.id for s in scheduler.find_due(now + timedelta(minutes=30))] == ["a"]
+
+
 def test_status_snapshot_contains_first_seen(scheduler: Scheduler, store: ScheduleStore) -> None:
     store.upsert(Schedule(id="a", name="A", page_id="home", type="interval", interval_minutes=15))
     scheduler.find_due(datetime(2026, 6, 1, 10, tzinfo=UTC))

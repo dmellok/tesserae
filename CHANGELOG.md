@@ -8,6 +8,10 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- Interval schedules whose page renders unchanged no longer re-fire every
+  scheduler tick. A `no_change` push never recorded the fire, so a stable page
+  paid a full render every 30 seconds and filled the History view; it now
+  re-arms the interval like a sent push does.
 - The canvas editor's in-browser preview now paints cached webfonts. It built
   its own font list from the bundled set, so a code element naming a cached
   family showed the fallback in the editor while the device push had the real

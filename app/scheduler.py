@@ -2270,8 +2270,10 @@ class Scheduler:
         # honoured. Treating it like a sent fire stops us from re-
         # attempting (and re-logging) on every tick through the quiet
         # window. The interval / daily gate then naturally re-arms for
-        # the next slot.
-        if result.status in ("sent", "quiet"):
+        # the next slot. ``no_change`` counts too: the page rendered and
+        # the panel already shows that frame, so the schedule did its
+        # job; without this a stable page re-renders every tick.
+        if result.status in ("sent", "quiet", "no_change"):
             with self._lock:
                 self._last_fired[schedule.id] = now.timestamp()
         with self._lock:
