@@ -19,6 +19,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- Timed lineups take a display of their own. The setup wizard's "set time"
+  and "keep fresh" modes now ask which display to send to, defaulting to
+  every display the dashboard is on, so a dashboard shared by several
+  panels can be scheduled for just one of them. The full schedule form
+  gains the same picker, schedules carry `device_ids` through the
+  Lineups view and the MCP schedule API, and the scheduler already
+  honoured a bound timed lineup (discussion #300).
 - Hardware catalog entries for the reMarkable 2, reMarkable 1 and reMarkable
   Paper Pro, driven by the community tesserae.remarkable AppLoad client over
   the v1 REST device API. The reMarkable 2 is confirmed on hardware; the

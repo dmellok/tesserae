@@ -651,6 +651,10 @@ def index() -> str:
     schedule_status = scheduler.status()
     devices = current_app.config.get("DEVICE_REGISTRY")
     instances = [d for d in (devices.all() if devices is not None else []) if d.kind_of is not None]
+    # The wizard's escape hatch carries the chosen display too (#300); an
+    # unknown id degrades to "every display the dashboard is on".
+    wz_device = request.args.get("wz_device", "").strip()
+    prefill_device_ids = [wz_device] if any(d.id == wz_device for d in instances) else []
     graphs = {d.id: _graph_json(d.pages) for d in decks}
     # Suggested decks derived from page:<id> tap/swipe links across pages, so a
     # user who wired navigation in the canvas editor can create the deck in one
@@ -703,6 +707,7 @@ def index() -> str:
         prefill_page=request.args.get("prefill_page", ""),
         prefill_type=prefill_type,
         prefill_interval=prefill_interval,
+        prefill_device_ids=prefill_device_ids,
         prefill_fires_at_dt=prefill_fires_at_dt,
         prefill_name=prefill_name,
         show_migration_notice=migration_notice_visible(),

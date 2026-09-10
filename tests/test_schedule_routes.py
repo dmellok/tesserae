@@ -58,6 +58,33 @@ def test_create_persists_and_lists(app: Flask) -> None:
     assert "every 15 min" in body
 
 
+def test_display_picker_narrows_and_clears(app: Flask) -> None:
+    """The full form's display picker (discussion #300) writes the chosen
+    displays onto the deck record; saving with none ticked goes back to
+    every display the dashboard is on."""
+    client = app.test_client()
+    _sign_in(client)
+    base = {
+        "name": "One sticky",
+        "page_id": "home",
+        "type": "interval",
+        "interval_minutes": "15",
+        "priority": "0",
+        "enabled": "on",
+    }
+    client.post("/schedules/new", data={**base, "device_ids": ["sticky_1", "sticky_2"]})
+    decks = app.config["DECK_STORE"]
+    (deck,) = decks.all()
+    assert deck.device_ids == ["sticky_1", "sticky_2"]
+    assert app.config["SCHEDULE_STORE"].get(deck.id).device_ids == ["sticky_1", "sticky_2"]
+    # A form that never carried the picker leaves the bindings alone.
+    client.post(f"/schedules/{deck.id}/update", data=base)
+    assert decks.get(deck.id).device_ids == ["sticky_1", "sticky_2"]
+    # The picker with nothing ticked is an explicit "every display".
+    client.post(f"/schedules/{deck.id}/update", data={**base, "device_ids_present": "1"})
+    assert decks.get(deck.id).device_ids == []
+
+
 def test_duplicate_name_uniquifies_id(app: Flask, tmp_path: Path) -> None:
     """User never enters an id; submitting the same name twice produces
     'x' and 'x_2', not an error."""

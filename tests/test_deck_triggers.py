@@ -14,7 +14,7 @@ import pytest
 from pydantic import ValidationError
 
 from app.scheduler import Scheduler, _deck_to_rotation
-from app.state.deck_migration import rotation_to_deck, schedule_to_deck
+from app.state.deck_migration import deck_to_schedule, rotation_to_deck, schedule_to_deck
 from app.state.deck_model import Deck, DeckPage
 from app.state.deck_store import DeckStore
 from app.state.rotation_model import Rotation, RotationStep
@@ -327,6 +327,23 @@ def test_interval_schedule_maps_to_interval_deck() -> None:
     assert deck.device_ids == [] and deck.page_ids == ["dash"]
     assert deck.advance_min_hold_minutes == 0
     assert deck.refresh_interval_minutes == 0
+
+
+def test_schedule_device_ids_ride_through_the_deck() -> None:
+    """A schedule narrowed to some displays (discussion #300) keeps them on
+    the deck, so the engine's bound-timed path targets those panels; the
+    projection back to a Schedule shows the same displays."""
+    schedule = Schedule(
+        id="one_sticky",
+        name="One sticky",
+        page_id="dash",
+        device_ids=["sticky_1"],
+        type="interval",
+        interval_minutes=30,
+    )
+    deck = schedule_to_deck(schedule)
+    assert deck.device_ids == ["sticky_1"]
+    assert deck_to_schedule(deck).device_ids == ["sticky_1"]
 
 
 def test_daily_schedule_maps_to_daily_deck() -> None:

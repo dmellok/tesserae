@@ -16,7 +16,33 @@
 </div>
 {% endmacro %}
 
-{% macro schedule_form(s, edit_mode, pages) %}
+{# Display picker (discussion #300): none ticked keeps the classic delivery
+   to every display the dashboard is bound to. Same chip styling as the
+   day picker. #}
+{% macro display_picker(name, selected, devices) %}
+<div class="dow-picker">
+  {# The marker tells the server this form carried the picker, so none
+     ticked means "clear", while a form without it leaves bindings alone. #}
+  <input type="hidden" name="{{ name }}_present" value="1">
+  {% for d in devices %}
+  <label class="dow-chip">
+    <input type="checkbox" name="{{ name }}" value="{{ d.id }}" {% if d.id in selected %}checked{% endif %}>
+    <span>{{ d.display_name }}</span>
+  </label>
+  {% endfor %}
+  {# A display that was deleted keeps its chip, ticked, so a plain save
+     doesn't silently unbind the schedule (same rule as the deck editor). #}
+  {% set known = devices | map(attribute='id') | list %}
+  {% for did in selected if did not in known %}
+  <label class="dow-chip">
+    <input type="checkbox" name="{{ name }}" value="{{ did }}" checked>
+    <span>{{ did }} (unavailable)</span>
+  </label>
+  {% endfor %}
+</div>
+{% endmacro %}
+
+{% macro schedule_form(s, edit_mode, pages, devices=[]) %}
 <form method="post" class="form schedule-form"
       action="{{ url_for('schedules.update', schedule_id=s.id) if edit_mode else url_for('schedules.create') }}">
   {# Row 1, what fires, which dashboard, how often. #}
@@ -88,6 +114,14 @@
     {{ day_picker('days_of_week', s.days_of_week) }}
   </div>
 
+  {% if devices or s.device_ids %}
+  <div class="field">
+    <label>Displays</label>
+    {{ display_picker('device_ids', s.device_ids or [], devices) }}
+    <p class="field-help">Leave all unticked to send to every display this dashboard is on.</p>
+  </div>
+  {% endif %}
+
   {# Smart sync (issue #10), only meaningful for interval schedules.
      Hidden via the data-interval-only switch the existing form already
      uses for the interval-only blocks above. #}
@@ -157,14 +191,14 @@
   {% if schedule_edit_id %}
     {% set editing = (schedules | selectattr('id', 'equalto', schedule_edit_id) | list | first) %}
     {% if editing %}
-      {{ schedule_form(editing, true, pages) }}
+      {{ schedule_form(editing, true, pages, devices) }}
     {% else %}
       <p class="lede">No schedule with that id.</p>
     {% endif %}
   {% else %}
     {# The wizard (#167) can preseed type / cadence / time via wz_* params. #}
-    {% set blank = {'id': '', 'name': (prefill_name or ''), 'page_id': (prefill_page or ''), 'enabled': true, 'type': (prefill_type or 'interval'), 'interval_minutes': (prefill_interval or 30), 'fires_at': (prefill_fires_at_dt or none), 'time_of_day_start': '', 'time_of_day_end': '', 'priority': 0, 'days_of_week': [0,1,2,3,4,5,6], 'smart_sync': false, 'smart_sync_lead_s': 10} %}
-    {{ schedule_form(blank, false, pages) }}
+    {% set blank = {'id': '', 'name': (prefill_name or ''), 'page_id': (prefill_page or ''), 'enabled': true, 'type': (prefill_type or 'interval'), 'interval_minutes': (prefill_interval or 30), 'fires_at': (prefill_fires_at_dt or none), 'device_ids': (prefill_device_ids or []), 'time_of_day_start': '', 'time_of_day_end': '', 'priority': 0, 'days_of_week': [0,1,2,3,4,5,6], 'smart_sync': false, 'smart_sync_lead_s': 10} %}
+    {{ schedule_form(blank, false, pages, devices) }}
   {% endif %}
 </section>
 

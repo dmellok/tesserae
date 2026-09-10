@@ -38,6 +38,12 @@ class Schedule(BaseModel):
     page_id: str = Field(min_length=1)
     enabled: bool = True
 
+    # Displays this schedule sends to. Empty (the default) means every
+    # display the dashboard is bound to; set, it narrows delivery to these
+    # displays, so a dashboard shared by several panels can be scheduled
+    # for just one of them (discussion #300).
+    device_ids: list[str] = Field(default_factory=list)
+
     type: Literal["interval", "daily"]
 
     # interval-only

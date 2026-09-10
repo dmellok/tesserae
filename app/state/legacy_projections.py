@@ -131,6 +131,11 @@ class ScheduleProjection:
         update: dict[str, Any] = {
             "name": schedule.name,
             "enabled": schedule.enabled,
+            # Unlike the cycle form, the schedule form carries an explicit
+            # display picker, so an empty list is the operator choosing
+            # "every display the dashboard is on", not a form that never
+            # asked.
+            "device_ids": list(schedule.device_ids),
             "pages": [DeckPage(page_id=schedule.page_id, conditions=list(schedule.conditions))],
             "advance_trigger": "interval" if schedule.type == "interval" else "daily",
             "advance_interval_minutes": schedule.interval_minutes or 30,

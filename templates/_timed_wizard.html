@@ -144,7 +144,7 @@
           {% if devices|length > 1 %}<option value="">Choose a display…</option>{% endif %}
           {% for d in devices %}<option value="{{ d.id }}">{{ d.display_name }}</option>{% endfor %}
         </select>
-        <p class="wizard-help">The whole set plays on this display. Dashboards not yet
+        <p class="wizard-help" data-wizard-display-help>The whole set plays on this display. Dashboards not yet
           on any display are bound to it when you create.</p>
       </div>
 

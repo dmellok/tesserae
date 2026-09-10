@@ -143,6 +143,11 @@ def _parse_form(form: dict[str, Any], *, existing_id: str | None = None) -> Sche
         "page_id": (form.get("page_id") or "").strip(),
         "enabled": form.get("enabled") in ("on", "true", "1"),
         "type": schedule_type,
+        # Display picker (discussion #300): none ticked keeps the classic
+        # delivery to every display the dashboard is bound to.
+        "device_ids": [
+            d for d in (form.getlist("device_ids") if hasattr(form, "getlist") else []) if d
+        ],
         "days_of_week": _parse_dow(
             form.getlist("days_of_week") if hasattr(form, "getlist") else []
         ),
@@ -535,6 +540,11 @@ def update(schedule_id: str) -> Response:
     # Don't let the user rename the id via this endpoint; force-pin to
     # the URL's schedule_id so a typo can't fork into a second record.
     schedule = schedule.model_copy(update={"id": schedule_id})
+    # Unticked checkboxes submit nothing, so the picker sends a marker to
+    # tell "cleared" apart from "never asked": a form without it (an older
+    # form, an API caller) leaves the display bindings as they were.
+    if not request.form.get("device_ids_present") and not schedule.device_ids:
+        schedule = schedule.model_copy(update={"device_ids": list(existing.device_ids)})
     _store().upsert(schedule)
     flash(f"Schedule {schedule.name!r} updated.", "ok")
     return redirect(url_for("schedules.index"))

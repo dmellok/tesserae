@@ -76,8 +76,9 @@ def schedule_to_deck(schedule: Schedule, *, legacy: bool = True) -> Deck:
     last-fired cooldown and the wrap-around time-of-day window; ``daily``
     keeps the once-per-local-day fire with the backfill guard. Conditions
     move to the single page; ``fallback_page_id`` becomes the whole-deck
-    fallback. ``device_ids`` stays empty, which the engine fires
-    schedule-style (one push to the page's own bound devices).
+    fallback. ``device_ids`` carries over; empty, the engine fires
+    schedule-style (one push to the page's own bound devices), set, it
+    sends to those displays only.
     ``advance_min_hold_minutes`` is 0 because schedules never had a min-hold
     gate; a nonzero default would delay the fallback flip by that long.
     """
@@ -85,7 +86,7 @@ def schedule_to_deck(schedule: Schedule, *, legacy: bool = True) -> Deck:
         id=schedule.id,
         name=schedule.name,
         enabled=schedule.enabled,
-        device_ids=[],
+        device_ids=list(schedule.device_ids),
         pages=[DeckPage(page_id=schedule.page_id, conditions=list(schedule.conditions))],
         advance="timer",
         advance_trigger="interval" if schedule.type == "interval" else "daily",
@@ -151,6 +152,7 @@ def deck_to_schedule(deck: Deck) -> Schedule:
         name=deck.name,
         enabled=deck.enabled,
         page_id=deck.pages[0].page_id,
+        device_ids=list(deck.device_ids),
         type="interval" if deck.advance_trigger == "interval" else "daily",
         interval_minutes=(
             deck.advance_interval_minutes if deck.advance_trigger == "interval" else None

@@ -40,6 +40,48 @@
     return bound.length === 0 || bound.includes(state.device);
   };
 
+  // Single-dashboard modes (discussion #300): the display is a choice too,
+  // never only inferred from the dashboard. "Every display it's on" keeps
+  // the dashboard's own bindings (the record stays unbound); a specific
+  // display narrows the send to that one panel.
+  const ALL_BOUND = '__all__';
+  const single = () => state.mode === 'daily' || state.mode === 'interval';
+  const knownIds = deviceOptions.map((o) => o.value);
+  const boundOf = (dashId) => {
+    const d = DASHBOARDS.find((x) => x.id === dashId);
+    return ((d && d.devices) || []).filter((id) => knownIds.includes(id));
+  };
+  const defaultDeviceFor = (dashId) => {
+    const bound = boundOf(dashId);
+    if (bound.length === 1) return bound[0];
+    if (bound.length > 1) return ALL_BOUND;
+    return deviceOptions.length === 1 ? deviceOptions[0].value : '';
+  };
+  // The "every display" option only exists in single modes, and only when
+  // the dashboard is on more than one display (on one, it IS that display).
+  const syncDisplayOptions = () => {
+    if (!deviceSel) return;
+    const existing = deviceSel.querySelector('option[value="' + ALL_BOUND + '"]');
+    const bound = single() ? boundOf(state.dash) : [];
+    if (bound.length > 1) {
+      const opt = existing || document.createElement('option');
+      opt.value = ALL_BOUND;
+      opt.textContent = 'Every display it\u2019s on (' + bound.length + ')';
+      if (!existing) {
+        const anchor = deviceSel.querySelector('option[value=""]');
+        deviceSel.insertBefore(opt, anchor ? anchor.nextSibling : deviceSel.firstChild);
+      }
+    } else if (existing) {
+      existing.remove();
+      if (state.device === ALL_BOUND) state.device = defaultDeviceFor(state.dash);
+    }
+    deviceSel.value = state.device;
+  };
+  const displayOk = () => deviceOptions.length === 0 || Boolean(state.device);
+  const displayLabel = () => (state.device === ALL_BOUND
+    ? 'Every display it\u2019s on'
+    : deviceName(state.device));
+
   const URLS = {
     // One create for all four intents (#204). The per-store URLs are still
     // read by the "advanced" hand-off links, not by this wizard's submit.
@@ -102,6 +144,7 @@
     summary: $('[data-wizard-summary]'),
     plain: $('[data-wizard-plain]'),
     escape: $('[data-wizard-escape]'),
+    displayHelp: $('[data-wizard-display-help]'),
     advanced: $('[data-wizard-advanced]'),
     doneTitle: $('[data-wizard-done-title]'),
     doneBody: $('[data-wizard-done-body]'),
@@ -151,8 +194,10 @@
     if (state.pending) return false;
     if (state.step === 0) return Boolean(state.mode);
     if (state.step === 1) {
-      if (state.mode === 'daily') return Boolean(state.dash) && Boolean(state.time);
-      if (state.mode === 'interval') return Boolean(state.dash) && Number(state.interval) >= 1;
+      if (state.mode === 'daily') return Boolean(state.dash) && Boolean(state.time) && displayOk();
+      if (state.mode === 'interval') {
+        return Boolean(state.dash) && Number(state.interval) >= 1 && displayOk();
+      }
       return (!scoped() || Boolean(state.device)) && state.picks.length >= 2;
     }
     return true;
@@ -299,10 +344,12 @@
     if (state.mode === 'daily') {
       rows.push(['Behaviour', 'One dashboard, once a day']);
       rows.push(['Dashboard', nameOf(state.dash)]);
+      if (state.device) rows.push(['Display', displayLabel()]);
       rows.push(['When', 'Every day at ' + prettyTime()]);
     } else if (state.mode === 'interval') {
       rows.push(['Behaviour', 'One dashboard, kept fresh']);
       rows.push(['Dashboard', nameOf(state.dash)]);
+      if (state.device) rows.push(['Display', displayLabel()]);
       rows.push(['When', 'Every ' + state.interval + ' minutes']);
     } else if (state.mode === 'cycle') {
       rows.push(['Behaviour', 'Timed rotation']);
@@ -347,6 +394,7 @@
       if (state.name.trim()) params.set('wz_name', state.name.trim());
       params.set('prefill_page', state.dash);
       params.set('wz_type', state.mode);
+      if (state.device && state.device !== ALL_BOUND) params.set('wz_device', state.device);
       if (state.mode === 'daily') params.set('wz_time', state.time);
       else params.set('wz_interval', String(state.interval));
       el.advanced.href = URLS.fullForm + '?' + params.toString() + '#timed';
@@ -414,11 +462,17 @@
       }[state.mode] || ['', ''];
       el.configTitle.textContent = titles[0];
       el.configSub.textContent = titles[1];
+      if (single()) syncDisplayOptions();
+      if (el.displayHelp) {
+        el.displayHelp.textContent = single()
+          ? 'Sends to this display only. \u201cEvery display\u201d keeps the dashboard\u2019s own bindings.'
+          : 'The whole set plays on this display. Dashboards not yet on any display are bound to it when you create.';
+      }
       const show = {
-        single: state.mode === 'daily' || state.mode === 'interval',
+        single: single(),
         time: state.mode === 'daily',
         interval: state.mode === 'interval',
-        display: scoped(),
+        display: deviceOptions.length > 0,
         multi: state.mode === 'cycle' || state.mode === 'deck',
         durations: state.mode === 'cycle',
         deckinfo: state.mode === 'deck',
@@ -466,7 +520,7 @@
     // for the by-hand intent.
     const url = URLS.lineup;
     body.set('intent', state.mode === 'deck' ? 'manual' : state.mode);
-    if (state.device) body.append('device_ids', state.device);
+    if (state.device && state.device !== ALL_BOUND) body.append('device_ids', state.device);
     if (state.mode === 'cycle' || state.mode === 'deck') {
       state.picks.forEach((id) => {
         body.append('page_ids', id);
@@ -539,10 +593,15 @@
     if (createdUrl && !state.handed) window.location.assign(createdUrl);
   });
 
+  const seedDisplay = () => {
+    if (single()) state.device = defaultDeviceFor(state.dash);
+    else if (state.device === ALL_BOUND) state.device = '';
+  };
   el.choices.forEach((c) => {
     c.addEventListener('click', () => {
       state.mode = c.dataset.wizardMode;
       state.error = '';
+      seedDisplay();
       render(false);
     });
   });
@@ -555,14 +614,26 @@
     const delta = e.key === 'ArrowDown' || e.key === 'ArrowRight' ? 1 : -1;
     const next = ((current < 0 ? 0 : current) + delta + el.choices.length) % el.choices.length;
     state.mode = el.choices[next].dataset.wizardMode;
+    seedDisplay();
     render(false);
     el.choices[next].focus();
   });
 
-  el.dash.addEventListener('change', () => { state.dash = el.dash.value; });
+  el.dash.addEventListener('change', () => {
+    state.dash = el.dash.value;
+    if (single()) {
+      state.device = defaultDeviceFor(state.dash);
+      syncDisplayOptions();
+      el.forward.disabled = !valid();
+    }
+  });
   if (deviceSel) {
     deviceSel.addEventListener('change', () => {
       state.device = deviceSel.value;
+      if (single()) {
+        el.forward.disabled = !valid();
+        return;
+      }
       // Picks that don't belong to the newly chosen display drop out; their
       // minutes are remembered in state.mins if they're re-added.
       state.picks = state.picks.filter((id) => {

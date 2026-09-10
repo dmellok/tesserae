@@ -192,6 +192,23 @@ def test_an_unassigned_dashboard_binds_to_the_display(app: Flask) -> None:
     assert pages.get("weather").device_ids == ["other"]
 
 
+def test_single_dashboard_intents_take_a_display(app: Flask) -> None:
+    """A dashboard on several displays can be scheduled for just one of
+    them (discussion #300): the display is a choice, not inferred."""
+    client = app.test_client()
+    _sign_in(client)
+    _seed_page(app, "pantry", device_ids=["sticky_1", "sticky_2"])
+    _create(client, intent="interval", name="Fresh", page_ids=["pantry"], device_ids=["sticky_1"])
+    _create(client, intent="daily", name="Daily", page_ids=["pantry"], fires_at="07:30")
+    stored = {d.name: d for d in app.config["DECK_STORE"].all()}
+    assert stored["Fresh"].device_ids == ["sticky_1"]
+    # No display chosen keeps the classic delivery to every bound display.
+    assert stored["Daily"].device_ids == []
+    # The schedule view of the same record shows the choice too.
+    schedules = {s.name: s for s in app.config["SCHEDULE_STORE"].all()}
+    assert schedules["Fresh"].device_ids == ["sticky_1"]
+
+
 def test_a_bad_intent_answers_with_json(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
