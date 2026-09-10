@@ -35,6 +35,7 @@ VENDOR_ORDER: list[tuple[str, str]] = [
     ("m5stack", "M5Stack"),
     ("paperlesspaper", "paperlesspaper"),
     ("pimoroni", "Pimoroni"),
+    ("remarkable", "reMarkable"),
     ("trmnl", "TRMNL"),
     ("waveshare", "Waveshare"),
     ("xteink", "Xteink"),
@@ -64,6 +65,7 @@ VENDOR_URL: dict[str, str] = {
     "m5stack": "https://m5stack.com/",
     "paperlesspaper": "https://paperlesspaper.de/en",
     "pimoroni": "https://shop.pimoroni.com/",
+    "remarkable": "https://remarkable.com/",
     "trmnl": "https://usetrmnl.com/",
     "waveshare": "https://www.waveshare.com/",
     "xteink": "https://www.xteink.com/",
@@ -101,6 +103,16 @@ VENDOR_INTRO: dict[str, str] = {
         "up the flash first if you may want the vendor service back. The "
         "OpenPaper 7 is on the bench; the OpenPaper L build has not met its "
         "hardware yet."
+    ),
+    "remarkable": (
+        "E-ink writing tablets running the "
+        "[tesserae.remarkable](https://github.com/partridgeworks/tesserae.remarkable) "
+        "client, an AppLoad app that lives inside the tablet's own interface "
+        "(Developer Mode plus the XOVI/AppLoad runtime required). It speaks the "
+        "v1 REST device API, paints the server-dithered frame through the "
+        "tablet's display stack, and deep-sleeps between polls on an RTC "
+        "alarm. The reMarkable 2 is confirmed on hardware; the reMarkable 1 "
+        "and Paper Pro entries are built but not yet confirmed."
     ),
     "xteink": (
         "E-readers rather than dedicated dashboard panels. These run "

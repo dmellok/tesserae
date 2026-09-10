@@ -1,0 +1,25 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "remarkable_1",
+  "name": "reMarkable 1",
+  "vendor": "reMarkable",
+  "url": "https://remarkable.com",
+  "icon": "device-tablet",
+  "description": "10.3 inch monochrome E Ink Carta tablet, 1404x1872 portrait, 226 ppi, 16-level greyscale, three physical buttons, no front light. Runs the tesserae-remarkable AppLoad app (https://github.com/partridgeworks/tesserae.remarkable) over the v1 REST device API and paints the 4-bpp 16-grey buffer from esp32_gray_bin, dithered server-side.",
+  "protocol": "esp32_client",
+  "renderers": [
+    "esp32_gray_bin"
+  ],
+  "panel": {
+    "w": 1404,
+    "h": 1872,
+    "orientation": "portrait",
+    "name": "10.3 inch monochrome E Ink (1404x1872, 16 greys)",
+    "gamut": "gray_16",
+    "native_w": 1404,
+    "native_h": 1872
+  },
+  "refresh_floor_s": 30,
+  "image_format": "bin",
+  "notes_md": "Client app and install guide: https://github.com/partridgeworks/tesserae.remarkable. Same panel and wire format as the reMarkable 2 entry (1314144 bytes, high nibble = left pixel, 0x0 black .. 0xF white). Not yet confirmed on hardware by the app author; the app installs on it through the same AppLoad runtime. The physical buttons are not reported to Tesserae yet."
+}
