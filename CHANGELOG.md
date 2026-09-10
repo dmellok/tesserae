@@ -8,6 +8,11 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- The Location picker on the weather, sky, and sunrise widgets now accepts a
+  pasted `lat, lon` pair. It only ever asked the city name search, which
+  returned "No matches." for coordinates, so a spot with no nearby town could
+  not be saved from the editor (#302). The pair is offered as a pick, Enter
+  takes it, and the Label auto-fills with the coordinates.
 - Interval schedules whose page renders unchanged no longer re-fire every
   scheduler tick. A `no_change` push never recorded the fire, so a stable page
   paid a full render every 30 seconds and filled the History view; it now

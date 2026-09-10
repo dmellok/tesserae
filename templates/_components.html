@@ -330,7 +330,7 @@ macro here instead.
     <input type="text" id="{{ field_id }}-display"
            class="location-search-display" data-location-display
            value="{{ display_str }}"
-           placeholder="Search a city…"
+           placeholder="Search a city, or paste lat, lon…"
            autocomplete="off" spellcheck="false">
     {% if is_dict %}
     <button type="button" class="location-search-clear" data-location-clear
@@ -349,9 +349,12 @@ macro here instead.
       <span class="location-search-pill-name">
         {{ value.name }}{% if value.admin1 and value.admin1 != value.name %}, {{ value.admin1 }}{% endif %}{% if value.country %}, {{ value.country }}{% endif %}
       </span>
+      {%- set coords_str = '%.4f, %.4f'|format(value.latitude, value.longitude) -%}
+      {%- if coords_str != value.name %}
       <span class="location-search-pill-coords">
-        {{ '%.4f'|format(value.latitude) }}, {{ '%.4f'|format(value.longitude) }}
+        {{ coords_str }}
       </span>
+      {%- endif %}
     </div>
   </div>
   {%- endif -%}

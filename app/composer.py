@@ -18,6 +18,7 @@ import base64
 import hashlib
 import json
 import logging
+import re
 import time
 from pathlib import Path
 from typing import Any, Final
@@ -154,10 +155,11 @@ _GEOCODE_TIMEOUT_S: Final[float] = 5.0
 
 
 def _parse_lat_lon(text: str) -> dict[str, Any] | None:
-    """Parse a literal ``"lat,lon"`` pair (``"-37.65, 145.09"``) into a
-    location dict without touching the network. Returns ``None`` when the
-    string isn't two in-range numbers."""
-    parts = text.split(",")
+    """Parse a literal ``"lat,lon"`` pair (``"-37.65, 145.09"``, or
+    whitespace-separated ``"-37.65 145.09"``) into a location dict without
+    touching the network. Returns ``None`` when the string isn't two
+    in-range numbers. The editor's picker accepts the same shape (#302)."""
+    parts = re.split(r"[,\s]+", text.strip())
     if len(parts) != 2:
         return None
     try:

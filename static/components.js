@@ -521,10 +521,13 @@
         const parts = [loc.name];
         if (loc.admin1 && loc.admin1 !== loc.name) parts.push(loc.admin1);
         if (loc.country) parts.push(loc.country);
-        const coords =
+        let coords =
           typeof loc.latitude === "number" && typeof loc.longitude === "number"
             ? loc.latitude.toFixed(4) + ", " + loc.longitude.toFixed(4)
             : "";
+        // A coordinate pick (issue #302) names itself after its coords;
+        // showing them twice in the pill reads as a glitch.
+        if (coords === loc.name) coords = "";
         pill.innerHTML =
           '<i class="ph-bold ph-map-pin location-search-pill-icon" aria-hidden="true"></i>' +
           '<div class="location-search-pill-body">' +
@@ -622,6 +625,15 @@
         }
         if (query === lastQuery) return;
         lastQuery = query;
+        // A pasted "lat, lon" pair (issue #302) never matches the name
+        // search, so offer it straight as a pick, no network round trip.
+        // Mirrors ``_parse_lat_lon`` in app/composer.py, which accepts
+        // the same shape for string locations set over MCP.
+        const coords = _coordsResult(query);
+        if (coords) {
+          renderResults([coords]);
+          return;
+        }
         try {
           const url = new URL("https://geocoding-api.open-meteo.com/v1/search");
           url.searchParams.set("name", query);
@@ -634,56 +646,7 @@
             return;
           }
           const data = await resp.json();
-          const list = (data && data.results) || [];
-          if (!list.length) {
-            results.innerHTML =
-              '<li class="location-search-empty">No matches.</li>';
-            results.hidden = false;
-            return;
-          }
-          results.innerHTML = list
-            .map((r, i) => {
-              // Use index-based id so we can read the chosen result back
-              // out of ``list`` on click without re-parsing.
-              const parts = [r.name];
-              if (r.admin1 && r.admin1 !== r.name) parts.push(r.admin1);
-              if (r.country) parts.push(r.country);
-              const label = parts.join(", ");
-              return (
-                '<li class="location-search-result" tabindex="0" data-idx="' +
-                i +
-                '">' +
-                '<i class="ph ph-map-pin" aria-hidden="true"></i>' +
-                '<span class="location-search-result-label">' +
-                _escapeHtml(label) +
-                "</span>" +
-                "</li>"
-              );
-            })
-            .join("");
-          results.hidden = false;
-          // Pre-bind click handlers, scoped to this batch of results so
-          // a stale list doesn't fire selectResult against the wrong list.
-          results.querySelectorAll("[data-idx]").forEach((row) => {
-            row.addEventListener("click", () => {
-              const i = parseInt(row.dataset.idx || "0", 10);
-              const r = list[i];
-              if (!r) return;
-              selectResult({
-                name: r.name,
-                country: r.country || "",
-                admin1: r.admin1 || "",
-                latitude: r.latitude,
-                longitude: r.longitude,
-              });
-            });
-            row.addEventListener("keydown", (ev) => {
-              if (ev.key === "Enter") {
-                ev.preventDefault();
-                row.click();
-              }
-            });
-          });
+          renderResults((data && data.results) || []);
         } catch (err) {
           // Network-level fail: silently hide rather than show a
           // confusing error. The user just keeps typing.
@@ -692,10 +655,93 @@
         }
       }
 
+      // Paint a batch of results (Open-Meteo rows, or the single
+      // synthetic coordinate row). Each row may carry ``_label`` /
+      // ``_icon`` presentation overrides, which selection strips.
+      function renderResults(list) {
+        if (!list.length) {
+          results.innerHTML =
+            '<li class="location-search-empty">No matches.</li>';
+          results.hidden = false;
+          return;
+        }
+        results.innerHTML = list
+          .map((r, i) => {
+            // Use index-based id so we can read the chosen result back
+            // out of ``list`` on click without re-parsing.
+            const parts = [r.name];
+            if (r.admin1 && r.admin1 !== r.name) parts.push(r.admin1);
+            if (r.country) parts.push(r.country);
+            const label = r._label || parts.join(", ");
+            const icon = r._icon || "ph-map-pin";
+            return (
+              '<li class="location-search-result" tabindex="0" data-idx="' +
+              i +
+              '">' +
+              '<i class="ph ' +
+              icon +
+              '" aria-hidden="true"></i>' +
+              '<span class="location-search-result-label">' +
+              _escapeHtml(label) +
+              "</span>" +
+              "</li>"
+            );
+          })
+          .join("");
+        results.hidden = false;
+        // Pre-bind click handlers, scoped to this batch of results so
+        // a stale list doesn't fire selectResult against the wrong list.
+        results.querySelectorAll("[data-idx]").forEach((row) => {
+          row.addEventListener("click", () => {
+            const i = parseInt(row.dataset.idx || "0", 10);
+            const r = list[i];
+            if (!r) return;
+            selectResult({
+              name: r.name,
+              country: r.country || "",
+              admin1: r.admin1 || "",
+              latitude: r.latitude,
+              longitude: r.longitude,
+            });
+          });
+          row.addEventListener("keydown", (ev) => {
+            if (ev.key === "Enter") {
+              ev.preventDefault();
+              row.click();
+            }
+          });
+        });
+      }
+
       display.addEventListener("input", () => {
         clearTimeout(timer);
         const q = display.value.trim();
         timer = setTimeout(() => search(q), 300);
+      });
+
+      display.addEventListener("keydown", (ev) => {
+        if (ev.key !== "Enter") return;
+        // Paste-then-Enter inside the debounce window: pick the pair
+        // straight away rather than submitting the form around it.
+        const coords = _coordsResult(display.value.trim());
+        if (coords) {
+          ev.preventDefault();
+          clearTimeout(timer);
+          selectResult({
+            name: coords.name,
+            country: "",
+            admin1: "",
+            latitude: coords.latitude,
+            longitude: coords.longitude,
+          });
+          return;
+        }
+        // Otherwise Enter takes the top visible suggestion.
+        const first = results.hidden ? null : results.querySelector("[data-idx]");
+        if (first) {
+          ev.preventDefault();
+          first.click();
+        }
       });
 
       display.addEventListener("blur", () => {
@@ -712,6 +758,27 @@
         clearBtn.addEventListener("click", clearLocation);
       }
     });
+  }
+
+  // ``"-37.85, 144.94"`` (comma or whitespace separated, in range) as a
+  // synthetic search result named after its own coordinates; null for
+  // anything else so the caller falls through to the name search.
+  function _coordsResult(text) {
+    const m = /^\s*([+-]?\d+(?:\.\d+)?)\s*(?:,|\s)\s*([+-]?\d+(?:\.\d+)?)\s*$/.exec(
+      text || ""
+    );
+    if (!m) return null;
+    const lat = parseFloat(m[1]);
+    const lon = parseFloat(m[2]);
+    if (!(lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180)) return null;
+    const name = lat.toFixed(4) + ", " + lon.toFixed(4);
+    return {
+      name: name,
+      latitude: lat,
+      longitude: lon,
+      _label: "Use coordinates " + name,
+      _icon: "ph-crosshair",
+    };
   }
 
   function _escapeHtml(s) {

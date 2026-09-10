@@ -257,3 +257,19 @@ def test_location_search_macro_value_attribute_survives_html_parse() -> None:
     # whole point of the test is that this round-trips clean.
     parsed_back = json.loads(found["value"])
     assert parsed_back == saved_loc
+
+
+def test_parse_lat_lon_accepts_comma_or_whitespace_pairs() -> None:
+    """Issue #302 companion: the editor picker and the string-location
+    path over MCP agree on what a coordinate pair looks like. Comma,
+    comma-space, and bare-space separators all parse; out-of-range or
+    three-part strings fall through to the name search (``None``)."""
+    from app.composer import _parse_lat_lon
+
+    want = {"latitude": -37.85079727704507, "longitude": 144.93620377089385, "name": ""}
+    assert _parse_lat_lon("-37.85079727704507, 144.93620377089385") == want
+    assert _parse_lat_lon("-37.85079727704507,144.93620377089385") == want
+    assert _parse_lat_lon("-37.85079727704507 144.93620377089385") == want
+    assert _parse_lat_lon("Paris, FR") is None
+    assert _parse_lat_lon("91, 10") is None
+    assert _parse_lat_lon("1, 2, 3") is None
