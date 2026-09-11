@@ -20,6 +20,7 @@ widget's key first, then an app-level setting, then ``FAL_KEY`` in the env.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import io
 import os
@@ -235,7 +236,11 @@ def generate(
     try:
         payload = _fal_request(model, body, api_key)
     except urllib.error.HTTPError as err:
-        detail = err.read().decode("utf-8", "replace")[:200].strip()
+        try:
+            detail = err.read().decode("utf-8", "replace")[:200].strip()
+        finally:
+            with contextlib.suppress(Exception):
+                err.close()
         raise FalError(f"fal.ai returned {err.code}: {detail}") from err
     except urllib.error.URLError as err:
         raise FalError(f"cannot reach fal.ai: {err.reason}") from err

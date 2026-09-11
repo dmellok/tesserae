@@ -19,6 +19,8 @@ and a single PUT is the whole of it.
 
 from __future__ import annotations
 
+import contextlib
+
 import logging
 import urllib.error
 import urllib.parse
@@ -113,6 +115,8 @@ def put_event(
         with opener.open(request, timeout=timeout) as resp:
             status = getattr(resp, "status", 0) or resp.getcode()
     except urllib.error.HTTPError as err:
+        with contextlib.suppress(Exception):
+            err.close()
         if err.code == 401:
             raise CalDavWriteError("The calendar rejected the credentials on this feed.") from err
         if err.code == 403:

@@ -216,6 +216,8 @@ class Updater:
                         html = f"https://github.com/{repo}/releases/tag/{tag}"
         except urllib.error.HTTPError as err:
             err_msg = f"HTTP {err.code} {err.reason}"
+            with contextlib.suppress(Exception):
+                err.close()
         except (urllib.error.URLError, json.JSONDecodeError, OSError) as err:
             err_msg = str(err)
 

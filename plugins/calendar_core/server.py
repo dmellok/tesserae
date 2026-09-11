@@ -270,6 +270,9 @@ def _http_get(
             blob = decode_content_encoding(blob, str(resp.headers.get("Content-Encoding", "")))
         return blob
     except Exception as err:
+        if isinstance(err, urllib.error.HTTPError):
+            with contextlib.suppress(Exception):
+                err.close()
         if error_out is not None:
             error_out.append(_describe_fetch_error(err))
         return None
@@ -612,6 +615,9 @@ def _fetch_ha_events(
     try:
         data = core.request_json(path, timeout=HTTP_TIMEOUT_S)
     except Exception as err:
+        if isinstance(err, urllib.error.HTTPError):
+            with contextlib.suppress(Exception):
+                err.close()
         # A RuntimeError is ha_core's own "not configured / token
         # unreadable" guidance; keep its wording, it says what to fix.
         msg = str(err) if isinstance(err, RuntimeError) else _describe_fetch_error(err)
@@ -1301,6 +1307,9 @@ def _caldav_report(
             raw = resp.read()
             raw = decode_content_encoding(raw, str(resp.headers.get("Content-Encoding", "")))
     except Exception as err:
+        if isinstance(err, urllib.error.HTTPError):
+            with contextlib.suppress(Exception):
+                err.close()
         if error_out is not None:
             error_out.append(_describe_fetch_error(err))
         return None
