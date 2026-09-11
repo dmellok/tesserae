@@ -1556,7 +1556,13 @@ the next poll earlier.
   against the next projected content change**. If a bound schedule or
   rotation step is due in 2 minutes and the configured interval is 15,
   you're told to come back in about 2 minutes, so you see the change on
-  the wake it happens rather than up to 15 minutes later.
+  the wake it happens rather than up to 15 minutes later. A margin of
+  70 s is added on top: the scheduler fires on a 30 s tick and each fire
+  renders in turn, so a poll landing exactly on the target would collect
+  the previous frame. A change the next tick is about to fire (its target
+  has just passed) is reported as due now, so a device that arrives a
+  moment early is told to poll again after the margin rather than sleep
+  its whole interval on the old frame.
 - The configured interval remains the ceiling. It's never extended,
   because manual Send, webhooks, Home Assistant events and data-change
   refreshes have no schedule to project, and a device sleeping past its
@@ -1571,7 +1577,8 @@ the next poll earlier.
   zero. A widget's `fetch()` may return `next_change_at` (ISO 8601 or a
   unix timestamp) meaning "what I just produced becomes wrong then". The
   soonest such value across the page feeds `next_poll_s` alongside the
-  schedule projection, under the same ceiling, floor and margin. Nothing
+  schedule projection, under the same ceiling and floor, with a shorter
+  20 s margin (there is no tick to clear, only the render). Nothing
   changes for a widget that doesn't return it.
 - **The frame is re-rendered when that moment has passed.** Waking at the
   right instant would otherwise achieve nothing, because `/frame` returns

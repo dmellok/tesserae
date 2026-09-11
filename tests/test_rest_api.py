@@ -2329,13 +2329,14 @@ def _set_sleep_interval(app: Flask, device_id: str, seconds: int) -> None:
 
 def test_next_poll_s_pulls_forward_to_a_projected_content_change(app: Flask) -> None:
     """#241: a dashboard change 120 s out beats the 900 s configured grid,
-    plus the render margin so the client doesn't race the compose."""
+    plus the scheduler margin so the client doesn't race the tick and the
+    compose."""
     client, token = _paired_client(app)
     _set_sleep_interval(app, "poll_panel", 900)
     app.config["SCHEDULER"] = _StubScheduler([_StubEvent(in_seconds=120)])
 
     poll = _poll_after_status(app, client, token)
-    assert 130 <= poll <= 141  # 120 + 20 margin, minus a second of test latency
+    assert 188 <= poll <= 190  # 120 + 70 margin, minus a second or two of test latency
 
 
 def test_next_poll_s_never_exceeds_the_configured_interval(app: Flask) -> None:
@@ -2431,18 +2432,44 @@ def test_next_poll_s_takes_the_first_wake_worthy_event(app: Flask) -> None:
         ],
     )
 
-    assert 210 <= _poll_after_status(app, client, token) <= 221
+    assert 268 <= _poll_after_status(app, client, token) <= 270  # 200 + 70 margin
 
 
 def test_next_poll_s_floors_an_imminent_change(app: Flask) -> None:
-    """A change one second away lands at the render margin, never below
+    """A change one second away lands at the scheduler margin, never below
     the content floor."""
     client, token = _paired_client(app)
     _set_sleep_interval(app, "poll_panel", 900)
     app.config["SCHEDULER"] = _StubScheduler([_StubEvent(in_seconds=1)])
 
     poll = _poll_after_status(app, client, token)
-    assert 20 <= poll <= 21  # ~1 s out + 20 s render margin
+    assert 70 <= poll <= 71  # ~1 s out + 70 s scheduler margin
+
+
+def test_next_poll_s_retries_a_change_the_next_tick_will_fire(app: Flask) -> None:
+    """A daily lineup whose target has just passed but which the 30 s tick
+    has not fired yet is projected at "now", which lands here a fraction of
+    a second in the past once ``scheduled_at`` is truncated to the second.
+    It used to be skipped as stale, so a device that polled a moment before
+    the tick (its own wake was projected from the same target) was told to
+    sleep its whole interval on the old frame. It is imminent: poll again
+    after the margin."""
+    client, token = _paired_client(app)
+    _set_sleep_interval(app, "poll_panel", 21600)
+    app.config["SCHEDULER"] = _StubScheduler([_StubEvent(in_seconds=-0.5)])
+
+    poll = _poll_after_status(app, client, token)
+    assert 69 <= poll <= 70  # overdue clamps to 0 + 70 s scheduler margin
+
+
+def test_next_poll_s_still_ignores_a_stale_projection(app: Flask) -> None:
+    """Overdue by more than a tick is not "about to fire", it is a
+    projection the engine has moved past; the configured interval stands."""
+    client, token = _paired_client(app)
+    _set_sleep_interval(app, "poll_panel", 900)
+    app.config["SCHEDULER"] = _StubScheduler([_StubEvent(in_seconds=-120)])
+
+    assert _poll_after_status(app, client, token) == 900
 
 
 def test_next_poll_s_floor_never_slows_a_hot_polling_panel(app: Flask) -> None:
@@ -2472,23 +2499,25 @@ def test_next_poll_s_floor_does_not_hold_back_an_always_on_panel(app: Flask) -> 
     deliver."""
     client, token = _paired_client(app)
     _set_always_on(app, "poll_panel", 60)
-    app.config["SCHEDULER"] = _StubScheduler([_StubEvent(in_seconds=1)])
+    app.config["SCHEDULER"] = None
+    _set_widget_change(app, "poll_panel", time.time() + 1)
 
     poll = _poll_after_status(app, client, token)
-    # An imminent change resolves to the render margin (~20 s). The old floor
-    # would have rounded that up to 30; the awake floor leaves it alone.
+    # An imminent widget change resolves to the render margin (~20 s). The
+    # old floor would have rounded that up to 30; the awake floor leaves it
+    # alone.
     assert AWAKE_POLL_MIN_S <= poll < 30
 
 
 def test_next_poll_s_still_pulls_forward_for_an_always_on_panel(app: Flask) -> None:
     """Pull-forward survives the floor change: a change 25 s out beats the
-    60 s awake cadence rather than being rounded up to it."""
+    120 s awake cadence rather than being rounded up to it."""
     client, token = _paired_client(app)
-    _set_always_on(app, "poll_panel", 60)
+    _set_always_on(app, "poll_panel", 120)
     app.config["SCHEDULER"] = _StubScheduler([_StubEvent(in_seconds=25)])
 
     poll = _poll_after_status(app, client, token)
-    assert 35 <= poll <= 46  # 25 + 20 margin, capped by the 60 s cadence
+    assert 94 <= poll <= 95  # 25 + 70 margin, under the 120 s cadence
 
 
 def test_next_poll_s_falls_back_when_the_projection_raises(app: Flask) -> None:
@@ -2568,7 +2597,7 @@ def test_schedule_still_wins_when_it_is_sooner(app: Flask) -> None:
     app.config["SCHEDULER"] = _StubScheduler([_StubEvent(in_seconds=100)])
     _set_widget_change(app, "poll_panel", time.time() + 2000)
 
-    assert 110 <= _poll_after_status(app, client, token) <= 121
+    assert 169 <= _poll_after_status(app, client, token) <= 171
 
 
 def test_a_broken_projection_does_not_lose_the_widget_hint(app: Flask) -> None:
