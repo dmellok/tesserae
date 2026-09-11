@@ -61,7 +61,7 @@ function fmtTemp(v) {
 // name from ``d.date`` (the legacy ISO-date field, already present)
 // rather than a hand-rolled table — same idiom calendar_day/_week/
 // _month use for weekday names.
-function dayLabel(d, i, locale, t) {
+export function dayLabel(d, i, locale, t) {
   if (i === 0) return t("day_today", "Today");
   if (i === 1) return t("day_tomorrow", "Tom");
   const [y, m, dd] = String(d.date || "").split("-").map(Number);
