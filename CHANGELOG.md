@@ -24,6 +24,11 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- The weather_now widget's panel text (the title, "feels", the metric-strip
+  labels, the WMO condition text, and the empty states) is now available in
+  French, following the same `locales` contract (`ctx.t()` +
+  `strings/<locale>.json`, docs/widgets.md#locales-strings) as the
+  calendar_* widget family.
 - The Dashboards page has Active and Archived tabs. Archive parks a dashboard
   you're not using without deleting it: it keeps its layout, device links,
   and history, but leaves the "go to page" and lineup pickers, drops its
