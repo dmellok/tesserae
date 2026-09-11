@@ -5,6 +5,7 @@
   "kind": "widget",
   "description": "Current conditions plus feels-like, humidity, wind, UV and sun times. Data from Open-Meteo (no API key required).",
   "icon": "ph-cloud-sun",
+  "locales": ["en", "fr"],
   "supports": {
     "sizes": [
       "xs",

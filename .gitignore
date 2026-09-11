@@ -31,6 +31,9 @@ static/dist/
 .vscode/
 *.swp
 
+# CodeGraph local index (per-machine dev tooling, never for committing)
+.codegraph/
+
 # Working notes / build prompts for downstream projects
 notes/
 PROMPTS/
