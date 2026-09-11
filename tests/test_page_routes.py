@@ -1901,3 +1901,140 @@ def test_group_pages_lists_a_repeated_binding_once() -> None:
     groups = _group_pages_for_index([page], registry)
     assert [d.id for d, _ in groups] == ["kitchen"]
     assert [p.id for p in groups[0][1]] == ["d"]
+
+
+# -- archive ------------------------------------------------------
+
+
+def _add_lineup(app: Flask, deck_id: str, name: str, page_ids: list[str]) -> None:
+    """Store a manual lineup referencing ``page_ids`` so the archive guard
+    has something to trip over."""
+    from app.state.deck_model import Deck, DeckPage
+
+    app.config["DECK_STORE"].upsert(
+        Deck(id=deck_id, name=name, pages=[DeckPage(page_id=pid) for pid in page_ids])
+    )
+
+
+def test_archive_moves_page_to_the_archived_tab(app: Flask, tmp_path: Path) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    pid = _new(client, name="Old kitchen board")
+    resp = client.post(f"/pages/{pid}/archive")
+    assert resp.status_code in (302, 303)
+    assert _store(tmp_path).get(pid).archived is True
+
+    active = client.get("/pages").get_data(as_text=True)
+    assert f"/pages/{pid}" not in active
+    archived = client.get("/pages?tab=archived").get_data(as_text=True)
+    assert f"/pages/{pid}" in archived
+    assert "Restore" in archived
+
+
+def test_tab_strip_counts_active_and_archived(app: Flask, tmp_path: Path) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    a = _new(client, name="A")
+    _new(client, name="B")
+    client.post(f"/pages/{a}/archive")
+    html = client.get("/pages").get_data(as_text=True)
+    assert 'href="/pages?tab=archived"' in html
+    # One active, one archived: both count pills render.
+    assert html.count('<span class="dx-count-pill">1</span>') == 2
+
+
+def test_archive_refused_while_page_is_in_a_lineup(app: Flask, tmp_path: Path) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    pid = _new(client, name="Morning briefing")
+    _add_lineup(app, "hall", "Hall lineup", [pid])
+    resp = client.post(f"/pages/{pid}/archive", follow_redirects=True)
+    assert _store(tmp_path).get(pid).archived is False
+    html = resp.get_data(as_text=True)
+    assert "Hall lineup" in html
+    assert "Remove it from the lineup first" in html
+
+
+def test_active_row_disables_archive_for_lineup_members(app: Flask, tmp_path: Path) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    pid = _new(client, name="Morning briefing")
+    _add_lineup(app, "hall", "Hall lineup", [pid])
+    html = client.get("/pages").get_data(as_text=True)
+    assert f'action="/pages/{pid}/archive"' in html
+    assert "In lineup: Hall lineup" in html
+    assert "1 lineup" in html
+
+
+def test_unarchive_restores_the_page(app: Flask, tmp_path: Path) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    pid = _new(client, name="Parked")
+    client.post(f"/pages/{pid}/archive")
+    client.post(f"/pages/{pid}/unarchive")
+    assert _store(tmp_path).get(pid).archived is False
+    assert f"/pages/{pid}" in client.get("/pages").get_data(as_text=True)
+
+
+def test_bulk_archive_skips_lineup_members(app: Flask, tmp_path: Path) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    a = _new(client, name="A")
+    b = _new(client, name="B")
+    c = _new(client, name="C")
+    _add_lineup(app, "hall", "Hall lineup", [b])
+    resp = client.post("/pages/bulk/archive", data={"page_ids": [a, b]}, follow_redirects=True)
+    store = _store(tmp_path)
+    assert store.get(a).archived is True
+    assert store.get(b).archived is False
+    assert store.get(c).archived is False
+    html = resp.get_data(as_text=True)
+    assert "Archived 1 dashboard." in html
+    assert "Skipped 1 still in a lineup" in html
+
+
+def test_bulk_unarchive_restores_only_selected(app: Flask, tmp_path: Path) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    a = _new(client, name="A")
+    b = _new(client, name="B")
+    client.post("/pages/bulk/archive", data={"page_ids": [a, b]})
+    client.post("/pages/bulk/unarchive", data={"page_ids": [a]})
+    store = _store(tmp_path)
+    assert store.get(a).archived is False
+    assert store.get(b).archived is True
+
+
+def test_archived_pages_leave_the_go_to_page_picker(app: Flask, tmp_path: Path) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    keep = _new(client, name="Keep")
+    park = _new(client, name="Park")
+    client.post(f"/pages/{park}/archive")
+    ids = {row["id"] for row in client.get("/pages/dashboards.json").get_json()["pages"]}
+    assert keep in ids
+    assert park not in ids
+
+
+def test_duplicate_of_an_archived_page_is_active(app: Flask, tmp_path: Path) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    pid = _new(client, name="Parked")
+    client.post(f"/pages/{pid}/archive")
+    resp = client.post(f"/pages/{pid}/duplicate", follow_redirects=False)
+    new_id = resp.headers["Location"].rstrip("/").rsplit("/", 1)[-1]
+    store = _store(tmp_path)
+    assert store.get(new_id).archived is False
+    assert store.get(pid).archived is True
+
+
+def test_archived_flag_round_trips_through_pages_json(tmp_path: Path) -> None:
+    from app.state.page_store import Page
+
+    store = PageStore(tmp_path / "pages.json")
+    store.save(Page(id="a", name="A", archived=True))
+    store.save(Page(id="b", name="B"))
+    reloaded = PageStore(tmp_path / "pages.json")
+    assert reloaded.get("a").archived is True
+    assert [p.id for p in reloaded.list_active()] == ["b"]
+    assert {p.id for p in reloaded.list()} == {"a", "b"}

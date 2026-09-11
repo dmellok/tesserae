@@ -2658,7 +2658,7 @@ def mcp_suggest_decks() -> Response:
     (the navigation you authored in the canvas), each a ready-to-create Deck."""
     from app.deck_suggest import suggest_decks
 
-    pages = current_app.config["PAGE_STORE"].list()
+    pages = current_app.config["PAGE_STORE"].list_active()
     decks = current_app.config["DECK_STORE"].all()
     suggestions = [
         d.model_dump(mode="json", exclude_none=True) for d in suggest_decks(pages, decks)

@@ -2718,6 +2718,17 @@ form[data-dirty] .dx-inline-save { display: none; }
   border-color: var(--t-border-strong);
   color: var(--t-fg);
 }
+/* A ghost action that can't run right now (Archive on a lineup member)
+   stays in the row so the strip keeps its width, and explains itself
+   through its tooltip rather than vanishing. */
+.dx-btn-ghost-sm:disabled,
+.dx-btn-ghost-sm:disabled:hover {
+  opacity: 0.45;
+  cursor: not-allowed;
+  background: transparent;
+  border-color: var(--t-border);
+  color: var(--t-fg-soft);
+}
 
 /* ---------- Mobile collapse for Discovered rows ------------------- */
 @media (max-width: 640px) {

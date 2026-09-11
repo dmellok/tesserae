@@ -620,7 +620,9 @@ def index() -> str:
         migration_notice_visible,
     )
 
-    pages = _pages().list()
+    # Archived dashboards stay out of the new-record pickers; a lineup member
+    # can't be archived, so existing records never lose a page here.
+    pages = _pages().list_active()
     # Pure timer decks render as rotation / schedule rows (they ARE the
     # decommissioned rotations and schedules); cards show the navigable
     # decks (manual and both modes).
@@ -948,7 +950,10 @@ def editor(deck_id: str | None = None) -> str | Response:
             flash(f"No deck with id {deck_id!r}.", "error")
             return redirect(url_for("decks.index"))
 
-    pages = _pages().list()
+    # The page library offers working dashboards only. Members are kept
+    # regardless so an existing lineup always renders its own pages.
+    current_members = set(deck.page_ids) if deck is not None else set()
+    pages = [p for p in _pages().list() if not p.archived or p.id in current_members]
     from app.composer import page_preview_token, preview_dims
 
     devices_reg = current_app.config.get("DEVICE_REGISTRY")

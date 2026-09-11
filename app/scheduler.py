@@ -973,6 +973,7 @@ class Scheduler:
             p
             for p in pages
             if getattr(p, "refresh_minutes", 0) > 0
+            and not getattr(p, "archived", False)
             and now.timestamp() - self._page_last_refresh.get(p.id, 0.0) >= p.refresh_minutes * 60
         ]
         if not due:

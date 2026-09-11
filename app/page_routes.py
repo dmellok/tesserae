@@ -98,7 +98,7 @@ def dashboards_json() -> Response:
     touch-action picker."""
     rows = [
         {"id": p.id, "name": p.name or p.id, "kind": p.layout_kind or "grid"}
-        for p in _store().list()
+        for p in _store().list_active()
     ]
     rows.sort(key=lambda r: str(r["name"]).lower())
     return jsonify({"pages": rows})
@@ -792,9 +792,40 @@ def _humanise_age(seconds: float) -> str:
     return f"{int(seconds / (365 * 86400))} years ago"
 
 
+def _lineups_by_page() -> dict[str, list[str]]:
+    """Lineup names keyed by every page id they reference: members and the
+    advance fallback. Timer lineups (the migrated schedules and rotations)
+    count too, since they push their pages just the same. An archived
+    dashboard would be a member a lineup can no longer offer, so the
+    Archive action is refused for anything listed here."""
+    deck_store = current_app.config.get("DECK_STORE")
+    if deck_store is None:
+        return {}
+    try:
+        decks = deck_store.all()
+    except Exception:
+        current_app.logger.exception("deck store: listing lineups for the archive guard failed")
+        return {}
+    out: dict[str, list[str]] = {}
+    for deck in decks:
+        referenced = list(deck.page_ids)
+        fallback = getattr(deck, "advance_fallback_page_id", None)
+        if fallback:
+            referenced.append(fallback)
+        for pid in dict.fromkeys(referenced):
+            names = out.setdefault(pid, [])
+            if deck.name not in names:
+                names.append(deck.name)
+    return out
+
+
 @bp.get("")
 def index() -> str:
-    pages = _store().list()
+    tab = "archived" if request.args.get("tab") == "archived" else "active"
+    all_pages = _store().list()
+    archived_count = sum(1 for p in all_pages if p.archived)
+    active_count = len(all_pages) - archived_count
+    pages = [p for p in all_pages if p.archived == (tab == "archived")]
     devices = _devices()
     settings = _settings_store()
     # Resolve each page's panel so the list can show its size (a page
@@ -846,6 +877,10 @@ def index() -> str:
     return render_template(
         "pages_list.html",
         pages=pages,
+        tab=tab,
+        active_count=active_count,
+        archived_count=archived_count,
+        page_lineups=_lineups_by_page() if tab == "active" else {},
         page_dims=page_dims,
         page_devices=page_devices,
         page_groups=page_groups,
@@ -1031,6 +1066,98 @@ def bulk_delete() -> Response:
     return redirect(url_for("pages.index"))
 
 
+def _archive_one(page_id: str, lineups: dict[str, list[str]]) -> tuple[bool, str | None]:
+    """Park one dashboard. Returns ``(archived, reason)``: ``reason`` is the
+    user-facing text when nothing changed (unknown id, or in a lineup)."""
+    page = _store().get(page_id)
+    if page is None:
+        return False, f"No page with id {page_id!r}."
+    names = lineups.get(page_id)
+    if names:
+        listed = ", ".join(f"'{n}'" for n in names)
+        return False, (
+            f"'{page.name}' is in the lineup {listed}. Remove it from the lineup first."
+            if len(names) == 1
+            else f"'{page.name}' is in the lineups {listed}. Remove it from them first."
+        )
+    if page.archived:
+        return False, None
+    _store().save(page.model_copy(update={"archived": True}))
+    return True, None
+
+
+@bp.post("/<page_id>/archive")
+def archive(page_id: str) -> Response:
+    """Move a dashboard to the Archived tab. Refused while any lineup
+    references it, since the lineup would otherwise show a page the
+    pickers no longer offer."""
+    ok, reason = _archive_one(page_id, _lineups_by_page())
+    if ok:
+        page = _store().get(page_id)
+        flash(f"Archived '{page.name if page else page_id}'.", "ok")
+    elif reason:
+        flash(reason, "error")
+    return redirect(url_for("pages.index"))
+
+
+@bp.post("/<page_id>/unarchive")
+def unarchive(page_id: str) -> Response:
+    """Bring an archived dashboard back to the working list."""
+    page = _store().get(page_id)
+    if page is None:
+        flash(f"No page with id {page_id!r}.", "error")
+        return redirect(url_for("pages.index", tab="archived"))
+    if page.archived:
+        _store().save(page.model_copy(update={"archived": False}))
+    flash(f"Restored '{page.name}'.", "ok")
+    return redirect(url_for("pages.index"))
+
+
+@bp.post("/bulk/archive")
+def bulk_archive() -> Response:
+    """Archive several dashboards at once. Members of a lineup are skipped
+    and counted, the rest are archived; the flash reports both."""
+    ids = [i.strip() for i in request.form.getlist("page_ids") if i.strip()]
+    lineups = _lineups_by_page()
+    archived = 0
+    skipped = 0
+    for pid in ids:
+        ok, _reason = _archive_one(pid, lineups)
+        if ok:
+            archived += 1
+        elif pid in lineups:
+            skipped += 1
+    parts: list[str] = []
+    if archived:
+        parts.append(f"Archived {archived} dashboard{'s' if archived != 1 else ''}.")
+    if skipped:
+        parts.append(
+            f"Skipped {skipped} still in a lineup; remove {'it' if skipped == 1 else 'them'} "
+            "from the lineup first."
+        )
+    if not parts:
+        parts.append("No dashboards archived.")
+    flash(" ".join(parts), "ok" if archived else "error")
+    return redirect(url_for("pages.index"))
+
+
+@bp.post("/bulk/unarchive")
+def bulk_unarchive() -> Response:
+    """Restore several archived dashboards at once."""
+    ids = [i.strip() for i in request.form.getlist("page_ids") if i.strip()]
+    restored = 0
+    for pid in ids:
+        page = _store().get(pid)
+        if page is not None and page.archived:
+            _store().save(page.model_copy(update={"archived": False}))
+            restored += 1
+    if restored:
+        flash(f"Restored {restored} dashboard{'s' if restored != 1 else ''}.", "ok")
+    else:
+        flash("No dashboards restored.", "error")
+    return redirect(url_for("pages.index"))
+
+
 @bp.post("/<page_id>/duplicate")
 def duplicate(page_id: str) -> Response:
     """Clone an existing dashboard into a new one and drop the user into
@@ -1051,7 +1178,11 @@ def duplicate(page_id: str) -> Response:
     # Fresh cell ids so the copy is independent: a cell-level update on
     # the copy must never reach into the source's pages.json entry.
     new_cells = [c.model_copy(update={"id": uuid.uuid4().hex[:8]}) for c in src.cells]
-    copy = src.model_copy(update={"id": new_id, "name": new_name, "cells": new_cells})
+    # A copy is a fresh start, so it lands in the working list even when the
+    # source is archived (duplicating is the way to pick a parked design up).
+    copy = src.model_copy(
+        update={"id": new_id, "name": new_name, "cells": new_cells, "archived": False}
+    )
     _store().save(copy)
     flash(f"Duplicated as {new_name!r}.", "ok")
     return redirect(url_for("pages.edit", page_id=new_id))

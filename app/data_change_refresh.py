@@ -251,7 +251,7 @@ class DataChangeRefreshCoordinator:
             self._pending.clear()
             self._timer = None
         try:
-            pages = self._page_store.list()
+            pages = self._page_store.list_active()
             page_ids = matching_page_ids(pages, self._plugin_registry(), events)
             if page_ids:
                 self._refresh_pages(page_ids)

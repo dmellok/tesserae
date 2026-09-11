@@ -24,6 +24,14 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- The Dashboards page has Active and Archived tabs. Archive parks a dashboard
+  you're not using without deleting it: it keeps its layout, device links,
+  and history, but leaves the "go to page" and lineup pickers, drops its
+  Home Assistant entities, and skips the background refresh passes. Restore
+  brings it back; Duplicate on an archived dashboard makes a working copy.
+  Only a dashboard no lineup references can be archived, so the button is
+  disabled on lineup members with the lineup named in its tooltip, and bulk
+  archive skips them and says so.
 - Hardware catalog entry for the original M5Stack M5Paper (pre-S3), the 4.7"
   960x540 16-level greyscale handheld on the classic ESP32-D0WDQ6-V3. Unlike
   the PaperS3 its glass is driven through an IT8951 controller over SPI, so it

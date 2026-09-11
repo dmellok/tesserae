@@ -829,7 +829,9 @@ class HomeAssistantDiscovery:
         return f"{kind} · {w}×{h}" if w and h else str(kind)
 
     def _pages_for_device(self, device_id: str) -> list[Any]:
-        return [p for p in self._page_store.list() if device_id in getattr(p, "device_ids", [])]
+        return [
+            p for p in self._page_store.list_active() if device_id in getattr(p, "device_ids", [])
+        ]
 
     @staticmethod
     def _device_id_for_renderer(renderer_id: str) -> str | None:
@@ -845,7 +847,7 @@ class HomeAssistantDiscovery:
     def _resolve_page_name(self, name: str, device_id: str | None = None) -> str | None:
         """Map a dashboard name (what a select sends) back to a page id.
         Restricted to a device's bound pages when ``device_id`` is set."""
-        pages = self._pages_for_device(device_id) if device_id else self._page_store.list()
+        pages = self._pages_for_device(device_id) if device_id else self._page_store.list_active()
         for page in pages:
             if page.name == name:
                 return str(page.id)
@@ -1776,7 +1778,7 @@ class HomeAssistantDiscovery:
         import time
 
         live_device_ids = {d.id for d in self._bindable_devices()}
-        live_page_ids = {p.id for p in self._page_store.list()}
+        live_page_ids = {p.id for p in self._page_store.list_active()}
         live_deck_ids = {str(d.id) for d in self._decks()}
         to_blank: set[str] = set()
 
@@ -1845,7 +1847,9 @@ class HomeAssistantDiscovery:
             logger.info("HA discovery: cleared %d stale retained config(s)", len(to_blank))
 
     def _publish_entity_configs(self) -> None:
-        pages = self._page_store.list()
+        # Archived dashboards drop their button and leave the select options;
+        # the blank-what-we-no-longer-see pass below retires them on the broker.
+        pages = self._page_store.list_active()
         decks = self._decks()
         base = self._base_url()
 

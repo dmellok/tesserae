@@ -957,7 +957,7 @@ def pages_list() -> Response:
     _guard()
     rows = [
         {"id": p.id, "name": p.name or p.id, "kind": p.layout_kind or "grid"}
-        for p in _pages().list()
+        for p in _pages().list_active()
     ]
     rows.sort(key=lambda r: str(r["name"]).lower())
     return jsonify({"pages": rows})

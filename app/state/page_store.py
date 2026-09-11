@@ -256,6 +256,12 @@ class Page(BaseModel):
     # written before this shipped; exclude_none keeps them absent.
     updated_at: str | None = None
     updated_by: str | None = None
+    # Parked, not deleted. An archived dashboard keeps everything (cells,
+    # bindings, history) but leaves the working list for the Archived tab,
+    # drops out of the page pickers, and skips the background refresh
+    # passes. Only a dashboard that no lineup references can be archived,
+    # so a lineup never has to resolve a member that is out of service.
+    archived: bool = False
 
     @model_validator(mode="before")
     @classmethod
@@ -372,6 +378,15 @@ class PageStore:
     def get(self, page_id: str) -> Page | None:
         with self._lock:
             return self._pages.get(page_id)
+
+    def list_active(self) -> list[Page]:
+        """Every page that is not archived: what the pickers, the lineup
+        library, and the refresh passes see. ``list()`` stays the full set
+        for anything that resolves an id it already holds (history names,
+        lineup members, cleanup). Defined above ``list`` so the annotation
+        still names the builtin, not the method."""
+        with self._lock:
+            return [p for p in self._pages.values() if not p.archived]
 
     def list(self) -> list[Page]:
         with self._lock:

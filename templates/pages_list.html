@@ -11,9 +11,37 @@
    the saved list so the page reads as one surface, no gap chasing
    between sibling section cards. Saved dashboards group under their
    bound device and sort alphabetically within each group. #}
-{% call section_card(icon='squares-four', title='Dashboards',
-                     description='Create a new dashboard, then drop into the composer to lay it out. Saved dashboards group under the device they target.',
-                     meta={'label': 'TOTAL', 'value': pages|length}) %}
+{# Active / Archived tabs. Archiving parks a dashboard without deleting
+   it: it keeps its layout, bindings, and history, but leaves the pickers
+   and the background refresh passes. Only a dashboard no lineup references
+   can be archived, so the Archive button is disabled on lineup members
+   and names the lineup in its tooltip. #}
+{% set archived_tab = (tab == 'archived') %}
+<nav class="dx-filter-strip" role="tablist" aria-label="Dashboard list">
+  <a href="{{ url_for('pages.index') }}" role="tab" aria-selected="{{ 'false' if archived_tab else 'true' }}"
+     class="dx-filter-chip{% if not archived_tab %} is-active{% endif %}" title="Dashboards in use">
+    <i class="ph ph-squares-four" aria-hidden="true"></i><span>Active</span>
+    <span class="dx-count-pill">{{ active_count }}</span>
+  </a>
+  <a href="{{ url_for('pages.index', tab='archived') }}" role="tab" aria-selected="{{ 'true' if archived_tab else 'false' }}"
+     class="dx-filter-chip{% if archived_tab %} is-active{% endif %}" title="Dashboards you've parked but not deleted">
+    <i class="ph ph-archive" aria-hidden="true"></i><span>Archived</span>
+    <span class="dx-count-pill">{{ archived_count }}</span>
+  </a>
+</nav>
+
+{% if archived_tab %}
+{% set _card_title = 'Archived dashboards' %}
+{% set _card_desc = "Parked dashboards. They keep their layout and device links but don't appear in pickers or refresh in the background. Restore one to bring it back, or duplicate it for a fresh copy." %}
+{% set _card_meta = {'label': 'ARCHIVED', 'value': pages|length} %}
+{% else %}
+{% set _card_title = 'Dashboards' %}
+{% set _card_desc = 'Create a new dashboard, then drop into the composer to lay it out. Saved dashboards group under the device they target.' %}
+{% set _card_meta = {'label': 'TOTAL', 'value': pages|length} %}
+{% endif %}
+{% call section_card(icon='archive' if archived_tab else 'squares-four', title=_card_title,
+                     description=_card_desc, meta=_card_meta) %}
+  {% if not archived_tab %}
   <form method="post" action="{{ url_for('pages.create') }}" class="dx-pair-row dx-dashboard-create">
     <div class="dx-pair-input">
       <input type="text" name="name" class="dx-input" placeholder="e.g. Home dashboard"
@@ -34,8 +62,15 @@
       </button>
     </div>
   </form>
+  {% endif %}
 
-  {% if not pages %}
+  {% if not pages and archived_tab %}
+  <div class="dx-empty">
+    <div class="dx-empty-icon"><i class="ph ph-archive" aria-hidden="true"></i></div>
+    <p class="dx-empty-title">Nothing archived</p>
+    <p class="dx-empty-help">Archive a dashboard from the Active tab to park it here without deleting it. Dashboards in a lineup can't be archived until they leave it.</p>
+  </div>
+  {% elif not pages %}
   <div class="dx-empty">
     <div class="dx-empty-icon"><i class="ph ph-cube" aria-hidden="true"></i></div>
     <p class="dx-empty-title">No dashboards yet</p>
@@ -66,7 +101,7 @@
       {% set pv_h = _cv.h if _cv else (d.h if d else 0) %}
       <li class="dx-inset-row dx-dashboard-row"{% if pv_w and pv_h %} data-preview-src="{{ url_for('composer.compose', page_id=page.id) }}" data-preview-png="{{ url_for('composer.compose_preview', page_id=page.id) }}?v={{ page_preview_tokens.get(page.id, '') }}" data-preview-w="{{ pv_w }}" data-preview-h="{{ pv_h }}"{% endif %}>
         <input type="checkbox" class="dx-dash-select" value="{{ page.id }}"
-               aria-label="Select {{ page.name }}" title="Select for bulk push / delete">
+               aria-label="Select {{ page.name }}" title="{{ 'Select for bulk restore / delete' if archived_tab else 'Select for bulk push / archive / delete' }}">
         <a class="dx-dashboard-main" href="{{ url_for('pages.edit', page_id=page.id) }}">
           <span class="dx-section-icon dx-dashboard-icon" aria-hidden="true">
             <i class="ph ph-{{ page.icon or 'cube' }}"></i>
@@ -80,6 +115,9 @@
                  the whole point is that whoever inherits it can change the
                  parts meant to be changed without opening the composer. #}
               {% if page.layout_kind == 'canvas' and page.canvas and page.canvas.inputs %}<span class="dx-pill" title="This dashboard has its own settings page"><i class="ph ph-sliders-horizontal" aria-hidden="true"></i> {{ page.canvas.inputs|length }} setting{{ '' if page.canvas.inputs|length == 1 else 's' }}</span>{% endif %}
+              {% set _lineups = page_lineups.get(page.id) or [] %}
+              {% if _lineups %}<span class="dx-pill" title="In lineup{{ '' if _lineups|length == 1 else 's' }}: {{ _lineups|join(', ') }}"><i class="ph ph-cards-three" aria-hidden="true"></i> {{ _lineups|length }} lineup{{ '' if _lineups|length == 1 else 's' }}</span>{% endif %}
+              {% if archived_tab %}<span class="dx-pill" title="Archived: not offered in pickers and not refreshed in the background"><i class="ph ph-archive" aria-hidden="true"></i> Archived</span>{% endif %}
             </div>
             <div class="dx-meta-strip">
               <span><span class="dx-meta-k">Size</span><code>{% if d %}{{ d.w }}×{{ d.h }}{% else %}—{% endif %}</code></span>
@@ -92,6 +130,7 @@
             </div>
           </div>
         </a>
+        {% if not archived_tab %}
         <form method="post" action="{{ url_for('pages.update', page_id=page.id) }}"
               class="dx-updates-ctl" title="How often this page's content re-renders while it's on a panel. Delivery respects quiet hours; battery panels pick changes up at their next wake.">
           <span class="dx-meta-k">Updates</span>
@@ -123,10 +162,18 @@
                   {% if not is_custom %}hidden{% endif %}>Set</button>
           <noscript><button type="submit" class="ghost">Set</button></noscript>
         </form>
+        {% endif %}
         <div class="dx-discovered-actions">
           <a class="dx-btn-primary-sm" href="{{ url_for('pages.edit', page_id=page.id) }}">
             <i class="ph ph-pencil-simple" aria-hidden="true"></i><span>Edit</span>
           </a>
+          {% if archived_tab %}
+          <form method="post" action="{{ url_for('pages.unarchive', page_id=page.id) }}" class="form form--inline">
+            <button type="submit" class="dx-btn-ghost-sm dx-btn-push" title="Restore this dashboard to the Active list">
+              <i class="ph ph-arrow-counter-clockwise" aria-hidden="true"></i><span>Restore</span>
+            </button>
+          </form>
+          {% else %}
           <form method="post" action="{{ url_for('send.send_page') }}" class="form form--inline">
             <input type="hidden" name="page_id" value="{{ page.id }}">
             <input type="hidden" name="return_to" value="dashboards">
@@ -147,6 +194,7 @@
               <span>Push{% if _link_count > 1 %} to {{ _link_count }}{% endif %}</span>
             </button>
           </form>
+          {% endif %}
           {# A fixed-width slot rendered on EVERY row, not a button that appears
              only where it applies. The actions strip is right-anchored (the row's
              main link takes the free space), so anything conditional in here
@@ -163,10 +211,21 @@
             {% endif %}
           </span>
           <form method="post" action="{{ url_for('pages.duplicate', page_id=page.id) }}" class="form form--inline">
-            <button type="submit" class="dx-btn-ghost-sm dx-btn-icon-only" title="Duplicate dashboard" aria-label="Duplicate">
+            <button type="submit" class="dx-btn-ghost-sm dx-btn-icon-only" title="Duplicate dashboard{% if archived_tab %} (the copy goes to the Active list){% endif %}" aria-label="Duplicate">
               <i class="ph ph-copy" aria-hidden="true"></i>
             </button>
           </form>
+          {% if not archived_tab %}
+          {# Archive is a per-row form like Delete. A lineup member gets the
+             button disabled with the lineup named in the tooltip, rather than
+             a post that only comes back with an error flash. #}
+          <form method="post" action="{{ url_for('pages.archive', page_id=page.id) }}" class="form form--inline">
+            <button type="submit" class="dx-btn-ghost-sm dx-btn-icon-only" aria-label="Archive"
+                    {% if _lineups %}disabled title="In lineup{{ '' if _lineups|length == 1 else 's' }}: {{ _lineups|join(', ') }}. Remove it from the lineup first."{% else %}title="Archive dashboard (keeps it, hides it from pickers)"{% endif %}>
+              <i class="ph ph-archive" aria-hidden="true"></i>
+            </button>
+          </form>
+          {% endif %}
           <form method="post" action="{{ url_for('pages.delete', page_id=page.id) }}" class="form form--inline"
                 onsubmit="return confirm('Delete this dashboard?');">
             <button type="submit" class="dx-btn-ghost-sm dx-btn-icon-only" title="Delete dashboard" aria-label="Delete">
@@ -188,9 +247,18 @@
 <div id="dx-bulk-bar" hidden>
   <span id="dx-bulk-count" class="dx-bulk-count">0 selected</span>
   <div class="dx-bulk-actions">
+    {% if archived_tab %}
+    <form method="post" action="{{ url_for('pages.bulk_unarchive') }}" id="dx-bulk-unarchive-form" class="form form--inline">
+      <button type="submit" class="dx-btn-primary-sm"><i class="ph ph-arrow-counter-clockwise" aria-hidden="true"></i><span>Restore selected</span></button>
+    </form>
+    {% else %}
     <form method="post" action="{{ url_for('send.send_pages') }}" id="dx-bulk-push-form" class="form form--inline">
       <button type="submit" class="dx-btn-primary-sm"><i class="ph ph-paper-plane-tilt" aria-hidden="true"></i><span>Push selected</span></button>
     </form>
+    <form method="post" action="{{ url_for('pages.bulk_archive') }}" id="dx-bulk-archive-form" class="form form--inline">
+      <button type="submit" class="dx-btn-ghost-sm dx-btn-push" title="Archive the selected dashboards. Any still in a lineup is skipped."><i class="ph ph-archive" aria-hidden="true"></i><span>Archive selected</span></button>
+    </form>
+    {% endif %}
     <form method="post" action="{{ url_for('pages.bulk_delete') }}" id="dx-bulk-delete-form" class="form form--inline"
           onsubmit="return confirm('Delete the selected dashboards? This cannot be undone.');">
       <button type="submit" class="dx-btn-ghost-sm dx-btn-push"><i class="ph ph-trash" aria-hidden="true"></i><span>Delete selected</span></button>
@@ -373,6 +441,8 @@
     if (!boxes.length || !bar) return;
     const pushForm = document.getElementById('dx-bulk-push-form');
     const delForm = document.getElementById('dx-bulk-delete-form');
+    const archiveForm = document.getElementById('dx-bulk-archive-form');
+    const restoreForm = document.getElementById('dx-bulk-unarchive-form');
     const clearBtn = document.getElementById('dx-bulk-clear');
 
     function selected() { return boxes.filter(function (b) { return b.checked; }); }
@@ -392,6 +462,8 @@
     boxes.forEach(function (b) { b.addEventListener('change', sync); });
     if (pushForm) pushForm.addEventListener('submit', function () { inject(pushForm); });
     if (delForm) delForm.addEventListener('submit', function () { inject(delForm); });
+    if (archiveForm) archiveForm.addEventListener('submit', function () { inject(archiveForm); });
+    if (restoreForm) restoreForm.addEventListener('submit', function () { inject(restoreForm); });
     if (clearBtn) clearBtn.addEventListener('click', function () {
       boxes.forEach(function (b) { b.checked = false; });
       sync();
