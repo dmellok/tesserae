@@ -133,6 +133,34 @@ const PRESETS = {
 
 const FALLBACK = PRESETS.cloudy_day;
 
+// WMO weather code → strings/<locale>.json key, mirrors server.py's
+// _WMO table 1:1 so a translated condition matches the exact English
+// text (``data.cond``) it replaces rather than a coarser icon-grouped
+// approximation. Keep in sync if server.py's _WMO table changes.
+const COND_KEY_BY_CODE = {
+  0: "cond_sunny",
+  1: "cond_mostly_clear",
+  2: "cond_partly_cloudy",
+  3: "cond_cloudy",
+  45: "cond_fog",
+  48: "cond_fog",
+  51: "cond_drizzle",
+  53: "cond_drizzle",
+  55: "cond_drizzle",
+  61: "cond_rain",
+  63: "cond_rain",
+  65: "cond_rain_heavy",
+  71: "cond_snow",
+  73: "cond_snow",
+  75: "cond_snow_heavy",
+  80: "cond_showers",
+  81: "cond_showers",
+  82: "cond_showers",
+  95: "cond_storm",
+  96: "cond_storm",
+  99: "cond_storm",
+};
+
 // --- scene builders -------------------------------------------------
 // Each returns an HTML fragment that renders inside .scene (absolutely
 // positioned behind the .content layer). Use inline SVG + CSS shapes
@@ -284,11 +312,12 @@ function sceneStorm() {
 
 export default function render(shadow, ctx) {
   const data = ctx?.data ?? {};
+  const t = ctx?.t || ((key, fallback) => fallback ?? key);
   if (data.error) {
     shadow.innerHTML = `
       <link rel="stylesheet" href="/static/style/spectra-widgets.css">
       <div class="w">
-        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>Weather</h3></div>
+        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>${escapeHtml(t("weather", "Weather"))}</h3></div>
         <div class="w-body"><p class="u-muted">${escapeHtml(data.error)}</p></div>
       </div>`;
     return;
@@ -297,7 +326,8 @@ export default function render(shadow, ctx) {
   const presetName = PRESETS[data.preset] ? data.preset : "cloudy_day";
   const preset = PRESETS[presetName] || FALLBACK;
   const temp = fmtTemp(data.temp);
-  const cond = data.cond || "";
+  const condKey = COND_KEY_BY_CODE[data.code];
+  const cond = condKey ? t(condKey, data.cond || "") : (data.cond || "");
   const label = data.label || "";
   const time = fmtTime();
   const date = fmtDate();
