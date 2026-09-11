@@ -24,6 +24,10 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- The weather_hourly widget's panel text (the icon-strip tooltips, the
+  Temperature/Rain %/Now legend, and the NOW chip) is now available in
+  French, following the same `locales` contract as weather_now and the
+  calendar_* widget family.
 - The Dashboards page has Active and Archived tabs. Archive parks a dashboard
   you're not using without deleting it: it keeps its layout, device links,
   and history, but leaves the "go to page" and lineup pickers, drops its

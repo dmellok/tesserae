@@ -1,0 +1,18 @@
+{
+  "hourly": "Hourly",
+  "legend_temperature": "Temperature",
+  "legend_rain": "Rain %",
+  "legend_now": "Now",
+  "now_suffix": "NOW",
+  "no_hourly_data": "No hourly data.",
+  "cond_clear": "Clear",
+  "cond_overcast": "Overcast",
+  "cond_partly_cloudy": "Partly cloudy",
+  "cond_drizzle": "Drizzle",
+  "cond_rain": "Rain",
+  "cond_rain_heavy": "Heavy rain",
+  "cond_showers": "Showers",
+  "cond_snow": "Snow",
+  "cond_thunderstorm": "Thunderstorm",
+  "cond_fog": "Fog"
+}
