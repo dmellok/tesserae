@@ -145,9 +145,7 @@ def _cell_dataset(html: str, attr: str) -> str:
     return html[start:end]
 
 
-def test_weather_forecast_receives_its_real_french_strings(
-    client: FlaskClient, app: Flask
-) -> None:
+def test_weather_forecast_receives_its_real_french_strings(client: FlaskClient, app: Flask) -> None:
     """No location is configured for this cell, so server.py's fetch()
     returns its friendly {"error": ...} payload without touching the
     network -- the render still carries the widget's full resolved
