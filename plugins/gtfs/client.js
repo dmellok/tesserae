@@ -28,6 +28,9 @@ const MODE_PH = {
 
 // How many arrivals each size shows. xs/sm are hero-only by definition;
 // md and lg are the list sizes.
+// Floors, not caps: the list grows past these when the cell has the height
+// for more rows (see rowsThatFit), so a cell zoomed out to 0.25 fills with
+// departures instead of stretching six rows across the gaps.
 const ROWS_BY_SIZE = { xs: 1, sm: 1, md: 3, lg: 6 };
 
 // Feed-age thresholds. MTA republishes about every 30s, so a couple of
@@ -35,6 +38,13 @@ const ROWS_BY_SIZE = { xs: 1, sm: 1, md: 3, lg: 6 };
 // Split columns are narrower but no shorter, so each holds more than half
 // of what the single-column board shows.
 const SPLIT_ROWS_PER_COLUMN = 5;
+
+// Natural row height in body ems, from the row's own padding + the sign,
+// when and minutes lines at --lh-body. Measuring instead would need the
+// shell's stylesheet applied, which a shadow <link> doesn't guarantee
+// synchronously, so the arithmetic mirrors STYLE below.
+const ROW_EM = { md: 3.4, lg: 3.7 };
+const ROW_GAP_EM = 0.25;
 
 const AGE_SHOWN_AFTER_S = 120;
 const STALE_AFTER_S = 300;
@@ -465,6 +475,36 @@ function heroBlock(arrivals, size, walk = 0, opts = {}) {
     </div>`;
 }
 
+// How many list rows the cell can hold at its natural row height. Mirrors
+// the shell metrics in spectra-widgets.css: --w-font-base clamp(14px,
+// 7cqmin, 28px), --pad clamp(0.9em, 9cqmin, 1.4em), a --space-4 gap between
+// shell children, and the title bar locked at the zoom=1 font size.
+function rowsThatFit(shadow, ctx, size, { title = true, alert = false, colHead = false } = {}) {
+  const w = Number(ctx?.cell?.w) || 0;
+  const h = Number(ctx?.cell?.h) || 0;
+  if (!w || !h) return 0;
+  const clamp = (lo, v, hi) => Math.min(hi, Math.max(lo, v));
+  const cqmin = Math.min(w, h);
+  const base = clamp(14, 0.07 * cqmin, 28);
+  const pad = clamp(0.9 * base, 0.09 * cqmin, 1.4 * base);
+  let zoom = 1;
+  try {
+    const raw = getComputedStyle(shadow.host).getPropertyValue("--c-zoom");
+    zoom = Number.parseFloat(raw) || 1;
+  } catch { /* no host, no zoom */ }
+  // Title font is clamp(14px, 7cqmin * zoom, 28px) / zoom; 1.5em min-height
+  // plus up to a --space-2 rule pad and a 5px rule underneath.
+  const titleFont = clamp(14, 0.07 * cqmin * zoom, 28) / zoom;
+  const titleH = title ? 2 * titleFont + 5 + base : 0;
+  // A two-line alert strip at --fs-label: padding + text + shell gap.
+  const alertH = alert ? 3.2 * base + base : 0;
+  const colHeadH = colHead ? 1.6 * base : 0;
+  const available = h - 2 * pad - titleH - alertH - colHeadH;
+  const rowH = (ROW_EM[size] ?? ROW_EM.md) * base;
+  const gap = ROW_GAP_EM * base;
+  return Math.max(0, Math.floor((available + gap) / (rowH + gap)));
+}
+
 function rowsBlock(arrivals, opts) {
   // No per-row mode glyph: every row at a given stop is the same vehicle
   // type, so it repeats without saying anything. The mode still reads from
@@ -558,8 +598,13 @@ export default function render(shadow, ctx) {
   }
 
   // The hero sizes still read arrivals 2-3 for the "then" strip, so only
-  // the list sizes cut the array down.
-  const arrivals = (size === "xs" || size === "sm") ? all : all.slice(0, ROWS_BY_SIZE[size] ?? 3);
+  // the list sizes cut the array down: to the size's floor, or to as many
+  // rows as the cell's height actually holds when that's more.
+  const listRows = Math.max(
+    ROWS_BY_SIZE[size] ?? 3,
+    rowsThatFit(shadow, ctx, size, { alert: size === "lg" && Boolean(data.note) }),
+  );
+  const arrivals = (size === "xs" || size === "sm") ? all : all.slice(0, listRows);
 
   if (!arrivals.length) {
     shadow.innerHTML = shell(`
@@ -586,7 +631,7 @@ export default function render(shadow, ctx) {
   }
   if (frag === "list") {
     shadow.innerHTML = shell(
-      `<div class="w-body list-body gt-rows">${rowsBlock(all.slice(0, 4), opts)}</div>`,
+      `<div class="w-body list-body gt-rows">${rowsBlock(all.slice(0, Math.max(4, rowsThatFit(shadow, ctx, "md", { title: false }))), opts)}</div>`,
       "md",
     );
     return;
@@ -595,7 +640,11 @@ export default function render(shadow, ctx) {
   // Split is opt-in and only earns its keep where there's width for two
   // columns; at md it would halve the row width for no gain.
   const wantSplit = cellOpts.layout === "split" && size === "lg";
-  const split = wantSplit ? splitBlock(all, opts, SPLIT_ROWS_PER_COLUMN) : "";
+  const perColumn = Math.max(
+    SPLIT_ROWS_PER_COLUMN,
+    rowsThatFit(shadow, ctx, size, { alert: Boolean(data.note), colHead: true }),
+  );
+  const split = wantSplit ? splitBlock(all, opts, perColumn) : "";
 
   const body = (size === "xs" || size === "sm")
     ? `<div class="w-body stat-body">${heroBlock(arrivals, size, walk, opts)}</div>`

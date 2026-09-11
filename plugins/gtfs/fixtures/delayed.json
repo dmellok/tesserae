@@ -2,11 +2,113 @@
   "stop": "Canal St",
   "note": "Delays northbound",
   "arrivals": [
-    {"in": 2,  "route": "A", "headsign": "Inwood-207 St",       "delay": 6,  "live": true,  "color": "#0039A6", "text_color": "#FFFFFF"},
-    {"in": 9,  "route": "C", "headsign": "168 St",              "delay": 14, "live": true,  "color": "#0039A6", "text_color": "#FFFFFF"},
-    {"in": 16, "route": "E", "headsign": "World Trade Center",  "delay": 21, "live": true,  "color": "#0039A6", "text_color": "#FFFFFF"},
-    {"in": 24, "route": "A", "headsign": "Far Rockaway-Mott Av","delay": 11, "live": true,  "color": "#0039A6", "text_color": "#FFFFFF"},
-    {"in": 31, "route": "C", "headsign": "Euclid Av",           "delay": 8,  "live": true,  "color": "#0039A6", "text_color": "#FFFFFF"},
-    {"in": 38, "route": "E", "headsign": "Jamaica Center",      "delay": 17, "live": true,  "color": "#0039A6", "text_color": "#FFFFFF"}
+    {
+      "in": 2,
+      "route": "A",
+      "headsign": "Inwood-207 St",
+      "delay": 6,
+      "live": true,
+      "color": "#0039A6",
+      "text_color": "#FFFFFF"
+    },
+    {
+      "in": 9,
+      "route": "C",
+      "headsign": "168 St",
+      "delay": 14,
+      "live": true,
+      "color": "#0039A6",
+      "text_color": "#FFFFFF"
+    },
+    {
+      "in": 16,
+      "route": "E",
+      "headsign": "World Trade Center",
+      "delay": 21,
+      "live": true,
+      "color": "#0039A6",
+      "text_color": "#FFFFFF"
+    },
+    {
+      "in": 24,
+      "route": "A",
+      "headsign": "Far Rockaway-Mott Av",
+      "delay": 11,
+      "live": true,
+      "color": "#0039A6",
+      "text_color": "#FFFFFF"
+    },
+    {
+      "in": 31,
+      "route": "C",
+      "headsign": "Euclid Av",
+      "delay": 8,
+      "live": true,
+      "color": "#0039A6",
+      "text_color": "#FFFFFF"
+    },
+    {
+      "in": 38,
+      "route": "E",
+      "headsign": "Jamaica Center",
+      "delay": 17,
+      "live": true,
+      "color": "#0039A6",
+      "text_color": "#FFFFFF"
+    },
+    {
+      "in": 43,
+      "route": "A",
+      "headsign": "Inwood-207 St",
+      "delay": 9,
+      "live": true,
+      "color": "#0039A6",
+      "text_color": "#FFFFFF"
+    },
+    {
+      "in": 47,
+      "route": "C",
+      "headsign": "168 St",
+      "delay": 4,
+      "live": true,
+      "color": "#0039A6",
+      "text_color": "#FFFFFF"
+    },
+    {
+      "in": 52,
+      "route": "E",
+      "headsign": "World Trade Center",
+      "delay": 12,
+      "live": true,
+      "color": "#0039A6",
+      "text_color": "#FFFFFF"
+    },
+    {
+      "in": 56,
+      "route": "A",
+      "headsign": "Far Rockaway-Mott Av",
+      "delay": 0,
+      "live": true,
+      "color": "#0039A6",
+      "text_color": "#FFFFFF"
+    },
+    {
+      "in": 61,
+      "route": "C",
+      "headsign": "Euclid Av",
+      "delay": 6,
+      "live": true,
+      "color": "#0039A6",
+      "text_color": "#FFFFFF"
+    },
+    {
+      "in": 66,
+      "route": "E",
+      "headsign": "Jamaica Center",
+      "delay": 3,
+      "live": true,
+      "color": "#0039A6",
+      "text_color": "#FFFFFF"
+    }
   ]
 }
