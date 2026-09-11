@@ -1367,7 +1367,7 @@ def _apply_cell_form(cell: Cell, form: Any, panel: Any) -> Cell:
             "options": options,
             "update_on_change": update_on_change,
             "update_schedule": update_schedule,
-            "zoom": _coerce_float(form.get("zoom"), cell.zoom, lo=0.5, hi=3.0),
+            "zoom": _coerce_float(form.get("zoom"), cell.zoom, lo=0.25, hi=3.0),
             "padding_override": _padding_override_from_form(form, cell.padding_override),
             "dither": _dither_override_from_form(form, cell.dither),
             **_touch_from_form(form, cell),

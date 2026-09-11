@@ -130,9 +130,9 @@ class Cell(BaseModel):
     # Per-cell content zoom. Inverse-sized at render time: the widget
     # paints into a 1/zoom virtual container that's transform-scaled back
     # up to the cell box, so text/icons grow without breaking layout. The
-    # slider in the editor exposes 0.5–2.0; the wider 0.5–3.0 envelope is
+    # slider in the editor exposes 0.25–2.0; the wider 0.25–3.0 envelope is
     # the explicit-JSON safety net.
-    zoom: float = Field(default=1.0, ge=0.5, le=3.0)
+    zoom: float = Field(default=1.0, ge=0.25, le=3.0)
     # v0.71.x per-cell padding override (r/eink launch feedback). None
     # means "inherit the page-level gap"; an integer means "use this
     # value on all four inner edges", ignoring the gap and the

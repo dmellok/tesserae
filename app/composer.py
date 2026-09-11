@@ -1991,13 +1991,13 @@ def test_render() -> str:
         locale_override = ""
 
     # Per-widget content zoom from the gallery's zoom picker. Same
-    # 0.5–3.0 clamp the Cell model enforces; out-of-range or unparseable
+    # 0.25–3.0 clamp the Cell model enforces; out-of-range or unparseable
     # values silently fall back to 1.0.
     try:
         zoom_val = float(request.args.get("zoom") or "1")
     except ValueError:
         zoom_val = 1.0
-    zoom_val = max(0.5, min(3.0, zoom_val))
+    zoom_val = max(0.25, min(3.0, zoom_val))
 
     # ?opts=<json> lets the dev widget-preview page inject cell options
     # (place label, units, API key, etc.) so the preview reflects what a

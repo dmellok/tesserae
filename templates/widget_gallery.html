@@ -617,13 +617,14 @@ Not linked from the main nav, visit /_test/widgets directly. #}
         <span class="widget-id">{{ w.id }}</span>
         {% if w.version %}<span class="widget-version">v{{ w.version }}</span>{% endif %}
         <div class="widget-controls">
-          {# Per-widget zoom, same 0.5–3.0 clamp the Cell model enforces.
+          {# Per-widget zoom, same 0.25–3.0 clamp the Cell model enforces.
              Server reads ?zoom=N and stuffs it into cell.zoom so the
              cell-content scales without re-rendering at a different size. #}
           <label class="widget-pill" title="Content zoom">
             <i class="ph ph-magnifying-glass-plus" aria-hidden="true"></i>
             <span class="visually-hidden">Zoom</span>
             <select data-widget-zoom data-widget-id="{{ w.id }}">
+              <option value="0.25">25%</option>
               <option value="0.5">50%</option>
               <option value="0.75">75%</option>
               <option value="1" selected>100%</option>
@@ -938,7 +939,7 @@ Not linked from the main nav, visit /_test/widgets directly. #}
       });
     }
 
-    // Per-widget zoom pickers. Server clamps 0.5–3.0; iframe rewrites
+    // Per-widget zoom pickers. Server clamps 0.25–3.0; iframe rewrites
     // when the value changes.
     zoomPickers.forEach((picker) => {
       picker.addEventListener("change", () => {
