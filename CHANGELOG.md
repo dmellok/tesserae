@@ -24,6 +24,10 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- The week calendar widget has a "Show daily event counts" toggle, so the
+  per-day count chip under each date can be turned off to save header
+  height. Event locations, when shown, now wrap to as many whole lines as
+  fit inside the block instead of being cut to one ellipsised line.
 - The Dashboards page has Active and Archived tabs. Archive parks a dashboard
   you're not using without deleting it: it keeps its layout, device links,
   and history, but leaves the "go to page" and lineup pickers, drops its

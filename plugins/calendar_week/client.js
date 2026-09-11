@@ -3,7 +3,8 @@
 // number with today picked out via an inverse accent-1 chip and
 // weekend columns tinted to read distinct from weekdays. Each
 // column head also carries a small event-count chip so a glance
-// answers "which day is the busiest?" without scrolling the lane.
+// answers "which day is the busiest?" without scrolling the lane
+// (show_day_counts turns the chip off to win back header height).
 //
 // Same per-text-type sizing/spacing/label controls as calendar_day /
 // calendar_three / calendar_schedule: event title/location scale,
@@ -11,7 +12,8 @@
 // configurable day_start_hour/day_end_hour (or "always show the whole
 // day"), a show_location toggle + rendering (absent from the bundled
 // widget), and date_label_style (short/minimal weekday+month
-// abbreviations).
+// abbreviations). Location text wraps to as many whole lines as the
+// block has room for (fitLocations), rather than one ellipsised line.
 
 const MONTH_FULL = [
   "January", "February", "March", "April", "May", "June",
@@ -235,6 +237,7 @@ export default function render(shadow, ctx) {
   const axisScale = clampScale(opts.axis_label_scale, 1.0, 0.01, 10.0);
   const dashTitleScale = clampScale(opts.title_scale, 1.0, 0.01, 10.0);
   const showLocations = opts.show_location === true;
+  const showCounts = opts.show_day_counts !== false;
   const labelStyle = ["short", "minimal", "full"].includes(opts.date_label_style) ? opts.date_label_style : "short";
   const startHour = clampScale(opts.day_start_hour, -1, -1, 24);
   const endHour = clampScale(opts.day_end_hour, -1, -1, 24);
@@ -271,7 +274,7 @@ export default function render(shadow, ctx) {
       <div class="${classes.join(" ")}">
         <span class="tt-col-dow">${escapeHtml(name)}</span>
         <span class="tt-col-day">${escapeHtml(String(d.day || ""))}</span>
-        ${count > 0 ? `<span class="tt-col-count" title="${count} ${noun}">${count}</span>` : ""}
+        ${showCounts && count > 0 ? `<span class="tt-col-count" title="${count} ${noun}">${count}</span>` : ""}
       </div>`;
   }).join("");
 
@@ -428,20 +431,27 @@ export default function render(shadow, ctx) {
     .tt-event.is-tiny .tt-name { display: none; }
     .tt-event.is-tiny { padding-top: 0; padding-bottom: 0; }
 
-    /* Location row, off by default (show_location cell option). */
+    /* Location row, off by default (show_location cell option). Wraps
+       under the title; fitLocations() sets --tt-loc-lines to however
+       many whole lines fit below the title so the clip lands on a line
+       boundary instead of slicing through glyphs. */
     .tt-event .tt-loc {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.2em;
+      display: -webkit-box;
+      -webkit-line-clamp: var(--tt-loc-lines, 1);
+      line-clamp: var(--tt-loc-lines, 1);
+      -webkit-box-orient: vertical;
       font-size: calc(var(--fs-caption) * 0.75 * var(--tt-loc-scale, 1));
+      line-height: 1.1;
       font-weight: var(--fw-bold);
       color: var(--text-muted);
-      white-space: nowrap;
+      white-space: normal;
       overflow: hidden;
-      text-overflow: ellipsis;
+      word-break: break-word;
+      hyphens: auto;
       max-width: 100%;
     }
-    .tt-event .tt-loc .ph-bold { font-size: 0.9em; flex: 0 0 auto; }
+    .tt-event .tt-loc.is-clipped { display: none; }
+    .tt-event .tt-loc .ph-bold { font-size: 0.9em; margin-right: 0.2em; vertical-align: -0.05em; }
 
     [data-hide-labels="true"] .tt-event .tt-name { display: none; }
     [data-hide-labels="true"] .tt-event .tt-loc { display: none; }
@@ -485,4 +495,52 @@ export default function render(shadow, ctx) {
         </div>
       </div>
     </div>`;
+
+  if (showLocations) scheduleFitLocations(shadow);
+}
+
+// The shared stylesheet is a <link> inside the shadow root, and Chrome
+// applies it a tick after innerHTML even when it's cached; measuring
+// before that sees content-height blocks instead of the positioned
+// ones. Fit once the sheet is in, and again once webfonts settle since
+// a font swap can change how many lines the title takes.
+function scheduleFitLocations(shadow) {
+  const run = () => fitLocations(shadow);
+  const link = shadow.querySelector('link[rel="stylesheet"]');
+  if (link && !link.sheet) link.addEventListener("load", run, { once: true });
+  else run();
+  if (typeof document !== "undefined" && document.fonts?.ready) document.fonts.ready.then(run);
+}
+
+// Measures each event block after layout and clamps its location text
+// to the whole lines that fit under the title. A block too short for
+// even one line hides the location rather than showing a sliver of
+// letter-tops. Skipped (leaving the one-line default) when the shadow
+// root isn't laid out yet, e.g. a detached host, so nothing breaks.
+// Idempotent: a re-run clears the previous pass first.
+export function fitLocations(shadow) {
+  const blocks = shadow.querySelectorAll(".tt-event");
+  for (const block of blocks) {
+    const loc = block.querySelector(".tt-loc");
+    if (!loc) continue;
+    loc.classList.remove("is-clipped");
+    loc.style.removeProperty("--tt-loc-lines");
+    const blockH = block.clientHeight;
+    if (!blockH) continue;
+    const cs = getComputedStyle(block);
+    const pad = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+    const name = block.querySelector(".tt-name");
+    const nameH = name ? name.offsetHeight : 0;
+    // With the clamp reset to its one-line default, the location's own
+    // height *is* one line, in the same layout units as the block
+    // (computed line-height and clientHeight disagree under CSS zoom).
+    const lineH = loc.offsetHeight;
+    if (!lineH) continue;
+    const lines = Math.floor((blockH - pad - nameH) / lineH);
+    if (lines < 1) {
+      loc.classList.add("is-clipped");
+    } else {
+      loc.style.setProperty("--tt-loc-lines", String(lines));
+    }
+  }
 }

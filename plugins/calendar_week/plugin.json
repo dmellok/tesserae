@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "Calendar, Week",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "kind": "widget",
   "description": "Seven-day strip timetable with tunable event text sizing/spacing, configurable visible hour range, and a location toggle. Each event's colour comes from its feed (Widgets → Calendar Feeds).",
   "icon": "ph-calendar",
@@ -75,7 +75,14 @@
       "type": "boolean",
       "label": "Show event locations",
       "default": false,
-      "help": "Off by default: seven narrow columns rarely have room for a location line."
+      "help": "Off by default: seven narrow columns rarely have room for a location line. When on, the location wraps to as many lines as fit under the title."
+    },
+    {
+      "name": "show_day_counts",
+      "type": "boolean",
+      "label": "Show daily event counts",
+      "default": true,
+      "help": "The small per-day count chip under each date. Turn off to save header height."
     },
     {
       "name": "date_label_style",
