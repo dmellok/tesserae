@@ -20,7 +20,6 @@ and a single PUT is the whole of it.
 from __future__ import annotations
 
 import contextlib
-
 import logging
 import urllib.error
 import urllib.parse
