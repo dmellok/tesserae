@@ -3,7 +3,7 @@
   "legend_temperature": "Température",
   "legend_rain": "Pluie %",
   "legend_now": "Maintenant",
-  "now_suffix": "ACTUEL",
+  "now_suffix": "MAINTENANT",
   "no_hourly_data": "Aucune donnée horaire.",
   "cond_clear": "Dégagé",
   "cond_overcast": "Couvert",
