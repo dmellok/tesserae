@@ -52,15 +52,34 @@ function fmtTemp(v) {
   return Math.round(Number(v)) + "°";
 }
 
+// Row label for one forecast day. server.py's ``day`` field already
+// carries "Today" / "Tom" / a 3-letter weekday for index 0/1/2+ (see
+// its DAY_NAMES table), but that text is baked in English at fetch
+// time. Reproduce the same index-based rule client-side instead of
+// translating the server string: index 0/1 are relative-day words
+// (ctx.t()), index 2+ asks Intl for the locale's real short weekday
+// name from ``d.date`` (the legacy ISO-date field, already present)
+// rather than a hand-rolled table — same idiom calendar_day/_week/
+// _month use for weekday names.
+export function dayLabel(d, i, locale, t) {
+  if (i === 0) return t("day_today", "Today");
+  if (i === 1) return t("day_tomorrow", "Tom");
+  const [y, m, dd] = String(d.date || "").split("-").map(Number);
+  if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(dd)) return "";
+  return new Intl.DateTimeFormat(locale, { weekday: "short" }).format(new Date(y, m - 1, dd));
+}
+
 export default function render(shadow, ctx) {
   const data = ctx?.data ?? {};
+  const locale = ctx?.locale || "en";
+  const t = ctx?.t || ((key, fallback) => fallback ?? key);
   const css = `<link rel="stylesheet" href="/static/style/spectra-widgets.css">`;
 
   if (data.error) {
     shadow.innerHTML = `
       ${css}
       <div class="w" data-widget="weather_forecast">
-        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>Forecast</h3></div>
+        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>${escapeHtml(t("forecast", "Forecast"))}</h3></div>
         <div class="w-body"><p class="u-muted">${escapeHtml(data.error)}</p></div>
       </div>`;
     return;
@@ -78,11 +97,11 @@ export default function render(shadow, ctx) {
   const weekMin = allLos.length ? Math.min(...allLos) : 0;
   const weekSpan = Math.max(1, weekMax - weekMin);
 
-  const rows = days.map((d) => {
+  const rows = days.map((d, i) => {
     const ph = PH_BY_NAME[d.icon] || "ph-cloud";
     const accent = COND_ACCENT[d.icon] || "var(--accent-5)";
     const isToday = d.today;
-    const dayText = d.day || (typeof d.weekday === "number" ? "" : d.weekday) || "";
+    const dayText = dayLabel(d, i, locale, t);
     const hi = Number(d.hi ?? d.high);
     const lo = Number(d.lo ?? d.low);
     const left = Number.isFinite(lo) ? ((lo - weekMin) / weekSpan) * 100 : 0;
@@ -98,7 +117,7 @@ export default function render(shadow, ctx) {
     // "65%") without shifting the icon column.
     const rainBlock = rainPct == null
       ? '<span class="wxf-rain wxf-rain--unknown" aria-hidden="true"></span>'
-      : `<span class="wxf-rain ${rainPct >= 40 ? "is-wet" : ""}" title="Chance of precipitation">
+      : `<span class="wxf-rain ${rainPct >= 40 ? "is-wet" : ""}" title="${escapeHtml(t("precip_chance", "Chance of precipitation"))}">
            <span class="wxf-rain-val">${rainPct.toFixed(0)}%</span>
            <i class="ph-bold ph-drop"></i>
          </span>`;
@@ -119,7 +138,7 @@ export default function render(shadow, ctx) {
   const titleBar = `
     <div class="w-title">
       <i class="ph-bold ph-calendar" style="color:var(--accent-4)"></i>
-      <h3>${escapeHtml(label || "Forecast")}</h3>
+      <h3>${escapeHtml(label || t("forecast", "Forecast"))}</h3>
       ${data.rangeHi != null && data.rangeLo != null
         ? `<span class="w-title-meta">${escapeHtml(fmtTemp(data.rangeHi))} / ${escapeHtml(fmtTemp(data.rangeLo))}</span>`
         : ""}
@@ -302,7 +321,7 @@ export default function render(shadow, ctx) {
       ${css}
       <style>${layout}.w-body{padding:var(--space-2)}.wxf-rows{flex:1;min-height:0}</style>
       <div class="w" data-widget="weather_forecast"><div class="w-body">
-        <div class="wxf-rows">${rows || '<p class="u-muted">No forecast.</p>'}</div>
+        <div class="wxf-rows">${rows || `<p class="u-muted">${escapeHtml(t("no_forecast", "No forecast."))}</p>`}</div>
       </div></div>`;
     return;
   }
@@ -311,7 +330,7 @@ export default function render(shadow, ctx) {
       ${css}
       <style>${layout}.w-body{padding:var(--space-2)}.wxf-chart{flex:1;min-height:0;height:100%;position:relative}</style>
       <div class="w" data-widget="weather_forecast"><div class="w-body">
-        <div class="wxf-chart">${chartReady ? '<canvas></canvas>' : '<p class="u-muted">No chart data</p>'}</div>
+        <div class="wxf-chart">${chartReady ? '<canvas></canvas>' : `<p class="u-muted">${escapeHtml(t("no_chart_data", "No chart data"))}</p>`}</div>
       </div></div>`;
   } else {
     shadow.innerHTML = `
@@ -320,7 +339,7 @@ export default function render(shadow, ctx) {
       <div class="w" data-widget="weather_forecast">
         ${titleBar}
         <div class="w-body wxf-body">
-          <div class="wxf-rows">${rows || '<p class="u-muted">No forecast.</p>'}</div>
+          <div class="wxf-rows">${rows || `<p class="u-muted">${escapeHtml(t("no_forecast", "No forecast."))}</p>`}</div>
           <div class="wxf-chart">
             ${chartReady ? '<canvas></canvas>' : ""}
           </div>
