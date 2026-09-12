@@ -227,9 +227,12 @@ def test_papermono_is_its_own_kind_sharing_the_sticky_wire_contract(
     assert papermono.manifest["_catalog_entry"]["auto_select"] is False
     assert papermono.id < sticky.id and papermono.id < "xteink_x4_gray"
 
-    # Touch is not wired on this board yet; the Sticky's is.
-    assert papermono.manifest.get("touch") is not True
+    # Both carry a touch digitiser and expose the same runtime touch knobs.
+    assert papermono.manifest.get("touch") is True
     assert sticky.manifest.get("touch") is True
+    ext = papermono.manifest["config_schema"]
+    assert {"touch_enabled", "touch_linger_s", "frontlight_pct", "beep_enabled"} <= set(ext)
+    assert (ext["frontlight_pct"]["min"], ext["frontlight_pct"]["max"]) == (0, 100)
 
 
 def test_discover_validates_schema(tmp_path: Path, hardware_schema_path: Path) -> None:

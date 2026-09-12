@@ -21,10 +21,32 @@
   },
   "refresh_floor_s": 60,
   "image_format": "bin",
-  "touch": false,
+  "touch": true,
   "auto_select": false,
   "notes_md": "**Verified on real hardware 2026-09-12** running tesserae-device-firmware (env `m5stack-papermono`): the four-grey selftest ramp, the captive portal, discover and register, and a live 480x800 dashboard frame over the v1 REST device API (upright, unmirrored, correct greys), plus battery telemetry from the M5PM1 PMIC. The panel is the reTerminal Sticky's controller family (SSD1677, 800x480 scan, portrait mount) so the driver and the wire format carry over; the first pass painted static until the firmware selected this glass's own four-grey OTP waveform, and its panel reset and 3.3 V enable are outputs of an M5IOE1 I2C expander rather than MCU GPIOs. Flash the `m5stack-papermono-selftest` build first on a new unit: four grey bands, black at the top, white at the bottom, with a white square top-left.\n\nWire format is exactly 96000 bytes, 4 pixels per byte MSB first (bits 7-6 = leftmost pixel), 2-bit value 0b00 = black, 0b11 = white, linear 4-level grey; no header, no padding, no checksum. **`native_w`/`native_h` are 480x800, matching the composition, not the controller's 800x480 scan**: these fields mean the row stride the *firmware* reads, and this firmware transposes on the device like the Sticky's. `orientation` is `portrait`, confirmed on the unit: the selftest's corner wedge painted top-left with black first.\n\n**Pro and Lite share this kind.** The PaperMono Lite drops the SX1262 LoRa radio and the ST25R3916 NFC reader and is otherwise the same board, and this firmware drives neither radio, so one image and one OTA lineage cover both.\n\nWired on the device: the two side keys (previous / next dashboard, both wake the panel from deep sleep), the buzzer (the `beep_*` settings below), battery telemetry via the PMIC; both keys repaint the panel on the bench, the buzzer is wired but not yet exercised. Not wired yet: the FT6336G touch controller (a different register map from the Goodix driver the other touch panels use), the expander-gated microSD slot for the deck cache, the frontlight, and the RGB LED, so `touch` is false and there is no overlay support until the partial-refresh path is confirmed on this glass.\n\n`auto_select: false` because this SKU is indistinguishable on the wire from `seeed_reterminal_sticky` and `xteink_x4_gray`: same protocol, same gamut, same 480x800 geometry, same 96000 bytes. A device running this firmware names its own kind at register and discover, so nothing is lost there, but relay pairing infers a SKU from the wire signature, and this id sorts ahead of both siblings in that tie-break. Without this flag a Sticky or an X4 pairing over a relay would be relabelled a PaperMono and pinned to the wrong OTA lineage.",
   "config_schema_extends": {
+    "touch_enabled": {
+      "type": "boolean",
+      "label": "Touch input",
+      "default": false,
+      "help": "Wake on touch and dispatch taps/swipes against the dashboard's touch regions. Keeps the touch controller powered through deep sleep (its own low-power monitor mode, a fraction of a milliamp), so battery life shortens a little; the panel stays on battery-friendly full sleep with it off."
+    },
+    "touch_linger_s": {
+      "type": "int",
+      "label": "Touch linger",
+      "default": 30,
+      "min": 0,
+      "max": 60,
+      "help": "Seconds to stay awake after a touch interaction so follow-up taps skip the deep-sleep wake latency (boot + WiFi). 0 sleeps immediately. Only applies while touch input is enabled."
+    },
+    "frontlight_pct": {
+      "type": "int",
+      "label": "Frontlight",
+      "default": 0,
+      "min": 0,
+      "max": 100,
+      "help": "Brightness of the panel's built-in frontlight, as a percentage. 0 is off. The power-management chip keeps the light running while the panel sleeps, so a lit panel is a steady draw on the battery (M5Stack measures roughly 30 mA at 50 percent); best on USB power."
+    },
     "beep_enabled": {
       "type": "boolean",
       "label": "Beep on interaction",

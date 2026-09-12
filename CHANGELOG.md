@@ -17,6 +17,10 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   indistinguishable on the relay wire from the Sticky and the Xteink X4
   gray build. Confirmed on real hardware the same day (portal, register,
   dashboard frame, battery telemetry) and added to the test matrix.
+  The kind now also declares touch (FT6336G) with the usual `touch_enabled`
+  / `touch_linger_s` knobs, and a `frontlight_pct` setting (0-100) for the
+  panel's built-in frontlight, which the firmware hands to the board's
+  power-management chip.
 - Every bundled widget now translates its panel text. The 28 widgets that
   still painted hardcoded English (the Home Assistant set, clocks, countdown,
   year progress, todo, news, pictures, transit, status) moved their labels,
