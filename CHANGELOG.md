@@ -17,7 +17,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   poll path skipped it as stale and sent the device to sleep for its whole
   interval on the old frame. The scheduler margin is now 70 s, and a change
   overdue by less than a tick means "poll again after the margin".
-
+- The Jarvis-Judice-Ninke and Stucki dithers no longer flood flat regions
+  of a colour panel with a single colour. The numpy error-diffusion loop
+  never bounded the value a pixel accumulated from its neighbours, so a
+  field the palette cannot reach banked the same residual on every pixel
+  and the wide kernels carried it into the next region as a solid swathe.
+  The diffused value is now clamped to 0-255 before matching, as Pillow's
+  Floyd-Steinberg does. Atkinson shifts imperceptibly.
 - The Location picker on the weather, sky, and sunrise widgets now accepts a
   pasted `lat, lon` pair. It only ever asked the city name search, which
   returned "No matches." for coordinates, so a spot with no nearby town could

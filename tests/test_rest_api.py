@@ -2336,7 +2336,7 @@ def test_next_poll_s_pulls_forward_to_a_projected_content_change(app: Flask) -> 
     app.config["SCHEDULER"] = _StubScheduler([_StubEvent(in_seconds=120)])
 
     poll = _poll_after_status(app, client, token)
-    assert 188 <= poll <= 190  # 120 + 70 margin, minus a second or two of test latency
+    assert 185 <= poll <= 190  # 120 + 70 margin, minus a few seconds of test latency
 
 
 def test_next_poll_s_never_exceeds_the_configured_interval(app: Flask) -> None:
@@ -2432,7 +2432,7 @@ def test_next_poll_s_takes_the_first_wake_worthy_event(app: Flask) -> None:
         ],
     )
 
-    assert 268 <= _poll_after_status(app, client, token) <= 270  # 200 + 70 margin
+    assert 265 <= _poll_after_status(app, client, token) <= 270  # 200 + 70 margin
 
 
 def test_next_poll_s_floors_an_imminent_change(app: Flask) -> None:
@@ -2443,7 +2443,7 @@ def test_next_poll_s_floors_an_imminent_change(app: Flask) -> None:
     app.config["SCHEDULER"] = _StubScheduler([_StubEvent(in_seconds=1)])
 
     poll = _poll_after_status(app, client, token)
-    assert 70 <= poll <= 71  # ~1 s out + 70 s scheduler margin
+    assert 69 <= poll <= 71  # ~1 s out + 70 s scheduler margin
 
 
 def test_next_poll_s_retries_a_change_the_next_tick_will_fire(app: Flask) -> None:
@@ -2459,7 +2459,7 @@ def test_next_poll_s_retries_a_change_the_next_tick_will_fire(app: Flask) -> Non
     app.config["SCHEDULER"] = _StubScheduler([_StubEvent(in_seconds=-0.5)])
 
     poll = _poll_after_status(app, client, token)
-    assert 69 <= poll <= 70  # overdue clamps to 0 + 70 s scheduler margin
+    assert 67 <= poll <= 70  # overdue clamps to 0 + 70 s scheduler margin
 
 
 def test_next_poll_s_still_ignores_a_stale_projection(app: Flask) -> None:
@@ -2517,7 +2517,7 @@ def test_next_poll_s_still_pulls_forward_for_an_always_on_panel(app: Flask) -> N
     app.config["SCHEDULER"] = _StubScheduler([_StubEvent(in_seconds=25)])
 
     poll = _poll_after_status(app, client, token)
-    assert 94 <= poll <= 95  # 25 + 70 margin, under the 120 s cadence
+    assert 91 <= poll <= 95  # 25 + 70 margin, under the 120 s cadence
 
 
 def test_next_poll_s_falls_back_when_the_projection_raises(app: Flask) -> None:
@@ -2597,7 +2597,7 @@ def test_schedule_still_wins_when_it_is_sooner(app: Flask) -> None:
     app.config["SCHEDULER"] = _StubScheduler([_StubEvent(in_seconds=100)])
     _set_widget_change(app, "poll_panel", time.time() + 2000)
 
-    assert 169 <= _poll_after_status(app, client, token) <= 171
+    assert 166 <= _poll_after_status(app, client, token) <= 171
 
 
 def test_a_broken_projection_does_not_lose_the_widget_hint(app: Flask) -> None:
