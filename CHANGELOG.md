@@ -15,8 +15,8 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   firmware transposes), paired with the `m5stack-papermono` target in
   tesserae-device-firmware. `auto_select: false` because it is
   indistinguishable on the relay wire from the Sticky and the Xteink X4
-  gray build. Built from M5Stack's published pin map; not yet verified on
-  hardware, and listed as such in the compatibility matrix.
+  gray build. Confirmed on real hardware the same day (portal, register,
+  dashboard frame, battery telemetry) and added to the test matrix.
 - Every bundled widget now translates its panel text. The 28 widgets that
   still painted hardcoded English (the Home Assistant set, clocks, countdown,
   year progress, todo, news, pictures, transit, status) moved their labels,
