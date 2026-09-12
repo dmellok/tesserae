@@ -1,0 +1,18 @@
+{
+  "hourly": "Horaire",
+  "legend_temperature": "Température",
+  "legend_rain": "Pluie %",
+  "legend_now": "Maintenant",
+  "now_suffix": "ACTUEL",
+  "no_hourly_data": "Aucune donnée horaire.",
+  "cond_clear": "Dégagé",
+  "cond_overcast": "Couvert",
+  "cond_partly_cloudy": "Partiellement nuageux",
+  "cond_drizzle": "Bruine",
+  "cond_rain": "Pluie",
+  "cond_rain_heavy": "Pluie forte",
+  "cond_showers": "Averses",
+  "cond_snow": "Neige",
+  "cond_thunderstorm": "Orage",
+  "cond_fog": "Brouillard"
+}

@@ -38,6 +38,27 @@ const COND_ACCENT = {
   fog: "var(--text-muted)",
 };
 
+// Semantic icon name → strings/<locale>.json key for the icon strip's
+// tooltip (title attr). server.py's _icon_name() only exposes the
+// coarse icon name in the structured hoursArr (not the WMO code), so
+// this is icon-grained rather than per-code like weather_now's
+// COND_KEY_BY_CODE — sun/moon share "Clear", partly/partly-night share
+// "Partly cloudy". Same vocabulary as weather_now for consistency.
+const ICON_COND_KEY = {
+  sun: "cond_clear",
+  moon: "cond_clear",
+  cloud: "cond_overcast",
+  partly: "cond_partly_cloudy",
+  "partly-night": "cond_partly_cloudy",
+  drizzle: "cond_drizzle",
+  rain: "cond_rain",
+  "rain-heavy": "cond_rain_heavy",
+  showers: "cond_showers",
+  snow: "cond_snow",
+  storm: "cond_thunderstorm",
+  fog: "cond_fog",
+};
+
 function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
@@ -134,13 +155,14 @@ function nightBandsPlugin(nightFlags, color) {
 
 export default function render(shadow, ctx) {
   const data = ctx?.data ?? {};
+  const t = ctx?.t || ((key, fallback) => fallback ?? key);
   const css = `<link rel="stylesheet" href="/static/style/spectra-widgets.css">`;
 
   if (data.error) {
     shadow.innerHTML = `
       ${css}
       <div class="w" data-widget="weather_hourly">
-        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>Hourly</h3></div>
+        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>${escapeHtml(t("hourly", "Hourly"))}</h3></div>
         <div class="w-body"><p class="u-muted">${escapeHtml(data.error)}</p></div>
       </div>`;
     return;
@@ -202,7 +224,9 @@ export default function render(shadow, ctx) {
           const ph = PH_BY_NAME[name] || "ph-cloud";
           const accent = COND_ACCENT[name] || "var(--text-secondary)";
           const isNow = i === 0;
-          return `<i class="ph-bold ${ph}" style="color:${isNow ? "var(--accent-1)" : accent}" title="${escapeHtml(name)}"></i>`;
+          const condKey = ICON_COND_KEY[name];
+          const condLabel = condKey ? t(condKey, name) : name;
+          return `<i class="ph-bold ${ph}" style="color:${isNow ? "var(--accent-1)" : accent}" title="${escapeHtml(condLabel)}"></i>`;
         }).join("")}
       </div>`
     : "";
@@ -211,9 +235,9 @@ export default function render(shadow, ctx) {
   const legend = showLegend
     ? `
       <div class="hr-legend">
-        <span class="hr-key"><span class="dot dot--temp"></span>Temperature</span>
-        ${hasRain ? '<span class="hr-key"><span class="dot dot--rain"></span>Rain %</span>' : ""}
-        <span class="hr-key"><i class="ph-bold ph-circle-fill hr-now-dot"></i>Now</span>
+        <span class="hr-key"><span class="dot dot--temp"></span>${escapeHtml(t("legend_temperature", "Temperature"))}</span>
+        ${hasRain ? `<span class="hr-key"><span class="dot dot--rain"></span>${escapeHtml(t("legend_rain", "Rain %"))}</span>` : ""}
+        <span class="hr-key"><i class="ph-bold ph-circle-fill hr-now-dot"></i>${escapeHtml(t("legend_now", "Now"))}</span>
       </div>`
     : "";
 
@@ -292,7 +316,7 @@ export default function render(shadow, ctx) {
   const rangeChip = (hi != null || lo != null || now != null)
     ? `
       <span class="hr-range">
-        ${now != null ? `<span class="now">${escapeHtml(fmtTemp(now))} NOW</span>` : ""}
+        ${now != null ? `<span class="now">${escapeHtml(fmtTemp(now))} ${escapeHtml(t("now_suffix", "NOW"))}</span>` : ""}
         ${hi != null && lo != null ? `<span class="sep">·</span><span class="hi">${escapeHtml(fmtTemp(hi))}</span><span class="sep">/</span><span class="lo">${escapeHtml(fmtTemp(lo))}</span>` : ""}
       </span>`
     : "";
@@ -316,7 +340,7 @@ export default function render(shadow, ctx) {
       ${css}
       <style>${layout}.hr-body{padding:var(--space-2)}.hr-chart{flex:1;min-height:0;height:100%;position:relative}</style>
       <div class="w" data-widget="weather_hourly"><div class="w-body hr-body">
-        <div class="hr-chart">${hasData ? '<canvas></canvas>' : '<p class="u-muted">No hourly data.</p>'}</div>
+        <div class="hr-chart">${hasData ? '<canvas></canvas>' : `<p class="u-muted">${escapeHtml(t("no_hourly_data", "No hourly data."))}</p>`}</div>
       </div></div>`;
   } else {
     shadow.innerHTML = `
@@ -325,13 +349,13 @@ export default function render(shadow, ctx) {
       <div class="w" data-widget="weather_hourly">
         <div class="w-title">
           <i class="ph-bold ph-clock" style="color:var(--accent-4)"></i>
-          <h3>${escapeHtml(label || "Hourly")}</h3>
+          <h3>${escapeHtml(label || t("hourly", "Hourly"))}</h3>
           ${rangeChip}
         </div>
         <div class="w-body hr-body">
           ${iconStrip}
           <div class="hr-chart">
-            ${hasData ? '<canvas></canvas>' : '<p class="u-muted">No hourly data.</p>'}
+            ${hasData ? '<canvas></canvas>' : `<p class="u-muted">${escapeHtml(t("no_hourly_data", "No hourly data."))}</p>`}
           </div>
           ${legend}
         </div>
@@ -341,7 +365,7 @@ export default function render(shadow, ctx) {
   if (!hasData) return;
   const canvas = shadow.querySelector("canvas");
   if (!canvas || !window.Chart) return;
-  const t = tokens(shadow.host);
+  const tok = tokens(shadow.host);
 
   // Warm-to-cool vertical gradient for both the line stroke and the
   // area fill. The gradient mirrors actual temperature intuition: the
@@ -353,11 +377,11 @@ export default function render(shadow, ctx) {
     return (ctxArg) => {
       const chart = ctxArg.chart;
       const area = chart.chartArea;
-      if (!area) return withAlpha(t.accent1, alpha);
+      if (!area) return withAlpha(tok.accent1, alpha);
       const g = chart.ctx.createLinearGradient(0, area.top, 0, area.bottom);
-      g.addColorStop(0, withAlpha(t.accent1, alpha));
-      g.addColorStop(0.55, withAlpha(t.accent2, alpha));
-      g.addColorStop(1, withAlpha(t.accent5, alpha));
+      g.addColorStop(0, withAlpha(tok.accent1, alpha));
+      g.addColorStop(0.55, withAlpha(tok.accent2, alpha));
+      g.addColorStop(1, withAlpha(tok.accent5, alpha));
       return g;
     };
   }
@@ -368,7 +392,7 @@ export default function render(shadow, ctx) {
       type: "bar",
       label: "Rain",
       data: rainValues,
-      backgroundColor: withAlpha(t.accent4, 0.35),
+      backgroundColor: withAlpha(tok.accent4, 0.35),
       borderWidth: 0,
       borderRadius: 0,
       categoryPercentage: 0.95,
@@ -396,10 +420,10 @@ export default function render(shadow, ctx) {
   // every other point (matches existing widget behaviour).
   datasets[datasets.length - 1].pointRadius = values.map((_, i) => (i === 0 ? 5 : 0));
   datasets[datasets.length - 1].pointBackgroundColor = values.map((_, i) =>
-    i === 0 ? t.accent1 : "transparent"
+    i === 0 ? tok.accent1 : "transparent"
   );
   datasets[datasets.length - 1].pointBorderColor = values.map((_, i) =>
-    i === 0 ? t.accent1 : "transparent"
+    i === 0 ? tok.accent1 : "transparent"
   );
 
   // Axis tick size, clamp against cqmin so wide cells get legible 16-
@@ -420,8 +444,8 @@ export default function render(shadow, ctx) {
       scales: {
         x: {
           ticks: {
-            color: t.textSecondary,
-            font: { family: t.fontFamily, weight: 700, size: tickFontSize },
+            color: tok.textSecondary,
+            font: { family: tok.fontFamily, weight: 700, size: tickFontSize },
             autoSkip: true,
             maxRotation: 0,
             autoSkipPadding: 8,
@@ -453,7 +477,7 @@ export default function render(shadow, ctx) {
       },
     },
     plugins: [
-      nightBandsPlugin(nightFlags, withAlpha(t.textPrimary, 0.07)),
+      nightBandsPlugin(nightFlags, withAlpha(tok.textPrimary, 0.07)),
     ],
   });
   canvas._chart = chart;
