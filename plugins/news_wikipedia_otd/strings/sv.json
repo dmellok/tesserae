@@ -1,0 +1,16 @@
+{
+  "kind_events": "HÄNDELSER",
+  "kind_births": "FÖDDA",
+  "kind_deaths": "AVLIDNA",
+  "kind_holidays": "HÖGTIDER",
+  "kind_selected": "UTVALDA",
+  "kind_all": "ALLA",
+  "era_antiquity": "Antiken",
+  "era_medieval": "Medeltiden",
+  "era_renaissance": "Renässansen",
+  "era_industrial": "Industrialismen",
+  "era_modern": "Modern tid",
+  "on_this_day": "Denna dag",
+  "on": "Den",
+  "nothing_recorded": "Inget noterat."
+}

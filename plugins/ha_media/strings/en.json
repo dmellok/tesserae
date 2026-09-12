@@ -1,0 +1,8 @@
+{
+  "state_playing": "playing",
+  "state_paused": "paused",
+  "state_idle": "idle",
+  "state_off": "off",
+  "state_unavailable": "unavailable",
+  "media": "Media"
+}

@@ -1,0 +1,16 @@
+{
+  "energy": "Energija",
+  "home": "Namai",
+  "solar": "Saulė",
+  "battery": "Baterija",
+  "grid": "Tinklas",
+  "house": "Namas",
+  "charge": "Įkrova",
+  "export": "Eksportas",
+  "kwh_today": "{n} kWh šiandien",
+  "today": "Šiandien",
+  "yesterday": "Vakar",
+  "no_history": "Istorijos nėra.",
+  "no_stats": "Statistikos nėra.",
+  "no_flow": "NĖRA SRAUTO"
+}

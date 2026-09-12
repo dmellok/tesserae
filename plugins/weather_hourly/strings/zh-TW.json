@@ -1,0 +1,18 @@
+{
+  "hourly": "逐時",
+  "legend_temperature": "氣溫",
+  "legend_rain": "降雨 %",
+  "legend_now": "現在",
+  "now_suffix": "現在",
+  "no_hourly_data": "沒有逐時資料。",
+  "cond_clear": "晴",
+  "cond_overcast": "陰",
+  "cond_partly_cloudy": "局部多雲",
+  "cond_drizzle": "毛毛雨",
+  "cond_rain": "雨",
+  "cond_rain_heavy": "大雨",
+  "cond_showers": "陣雨",
+  "cond_snow": "雪",
+  "cond_thunderstorm": "雷雨",
+  "cond_fog": "霧"
+}

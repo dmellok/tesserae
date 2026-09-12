@@ -1,0 +1,16 @@
+{
+  "kind_events": "事件",
+  "kind_births": "出生",
+  "kind_deaths": "逝世",
+  "kind_holidays": "节日",
+  "kind_selected": "精选",
+  "kind_all": "全部",
+  "era_antiquity": "古代",
+  "era_medieval": "中世纪",
+  "era_renaissance": "文艺复兴",
+  "era_industrial": "工业时代",
+  "era_modern": "现代",
+  "on_this_day": "历史上的今天",
+  "on": "于",
+  "nothing_recorded": "暂无记录。"
+}

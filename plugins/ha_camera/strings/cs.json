@@ -1,0 +1,11 @@
+{
+  "just_now": "právě teď",
+  "minutes_ago": "před {n} min",
+  "hours_ago": "před {n} h",
+  "days_ago": "před {n} d",
+  "motion": "pohyb",
+  "motion_upper": "POHYB",
+  "camera": "Kamera",
+  "no_signal": "bez signálu",
+  "cameras": "Kamery"
+}

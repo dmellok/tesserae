@@ -1,0 +1,11 @@
+{
+  "just_now": "nettopp",
+  "minutes_ago": "{n}m siden",
+  "hours_ago": "{n}t siden",
+  "days_ago": "{n}d siden",
+  "motion": "bevegelse",
+  "motion_upper": "BEVEGELSE",
+  "camera": "Kamera",
+  "no_signal": "ingen signal",
+  "cameras": "Kameraer"
+}

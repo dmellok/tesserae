@@ -1,0 +1,17 @@
+{
+  "just_now": "nyss",
+  "minutes_abbr": "min",
+  "hours_abbr": "h",
+  "days_abbr": "d",
+  "state_locked": "låst",
+  "state_unlocked": "olåst",
+  "state_open": "öppen",
+  "state_closed": "stängd",
+  "secured": "säkrad",
+  "locks": "Lås",
+  "doors_and_locks": "Dörrar & lås",
+  "all_clear": "Allt lugnt.",
+  "open_since": "öppen sedan",
+  "open_count_suffix": "ÖPPNA",
+  "all_secured": "ALLT SÄKRAT"
+}

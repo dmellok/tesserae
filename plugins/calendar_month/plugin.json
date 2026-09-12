@@ -5,7 +5,7 @@
   "kind": "widget",
   "description": "Month-grid view with tunable dashboard title/day-number/event text sizing, cell spacing, and a location toggle for text-display mode. Each feed's colour drives the bar / dot / stripe colour.",
   "icon": "ph-calendar",
-  "locales": ["en", "fr"],
+  "locales": ["en", "cs", "de", "es", "fr", "it", "lt", "nb", "nl", "pl", "pt", "sk", "sv", "zh-CN", "zh-TW"],
   "supports": {
     "sizes": [
       "md",

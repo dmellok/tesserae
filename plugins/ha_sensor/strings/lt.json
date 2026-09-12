@@ -1,0 +1,10 @@
+{
+  "trend_up": "kyla",
+  "trend_down": "krenta",
+  "trend_flat": "stabilu",
+  "vs_24h_ago": "lyginant su prieš 24 val.",
+  "vs_24h": "per 24 val.",
+  "sensors": "Jutikliai",
+  "no_sensors_selected": "Nepasirinkta jutiklių.",
+  "no_history": "Istorijos nėra."
+}

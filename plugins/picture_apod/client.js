@@ -10,6 +10,7 @@ function escapeHtml(s) {
 }
 
 export default function render(shadow, ctx) {
+  const t = ctx?.t || ((key, fallback) => fallback ?? key);
   const data = ctx?.data ?? {};
   const opts = ctx?.cell?.options || {};
   const showCaption = opts.show_caption !== false;
@@ -19,7 +20,7 @@ export default function render(shadow, ctx) {
     shadow.innerHTML = `
       ${css}
       <div class="w" data-widget="picture_apod">
-        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>APOD</h3></div>
+        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>${t("apod", "APOD")}</h3></div>
         <div class="w-body"><p class="u-muted">${escapeHtml(data.error)}</p></div>
       </div>`;
     return;
@@ -29,7 +30,7 @@ export default function render(shadow, ctx) {
     shadow.innerHTML = `
       ${css}
       <div class="w is-bleed" data-widget="picture_apod">
-        <div class="bleed-empty">No picture today.</div>
+        <div class="bleed-empty">${t("no_picture_today", "No picture today.")}</div>
       </div>`;
     return;
   }

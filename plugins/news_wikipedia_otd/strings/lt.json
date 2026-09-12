@@ -1,0 +1,16 @@
+{
+  "kind_events": "ĮVYKIAI",
+  "kind_births": "GIMĖ",
+  "kind_deaths": "MIRĖ",
+  "kind_holidays": "ŠVENTĖS",
+  "kind_selected": "ATRINKTI",
+  "kind_all": "VISI",
+  "era_antiquity": "Antika",
+  "era_medieval": "Viduramžiai",
+  "era_renaissance": "Renesansas",
+  "era_industrial": "Pramoninė",
+  "era_modern": "Moderni",
+  "on_this_day": "Šią dieną",
+  "on": "Šiandien",
+  "nothing_recorded": "Nieko neužfiksuota."
+}

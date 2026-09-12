@@ -1,0 +1,8 @@
+{
+  "state_playing": "prehráva",
+  "state_paused": "pozastavené",
+  "state_idle": "nečinné",
+  "state_off": "vyp.",
+  "state_unavailable": "nedostupné",
+  "media": "Médiá"
+}

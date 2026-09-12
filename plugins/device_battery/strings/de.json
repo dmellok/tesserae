@@ -1,0 +1,14 @@
+{
+  "just_now": "gerade eben",
+  "minutes_ago": "vor {n} min",
+  "hours_ago": "vor {n} h",
+  "days_ago": "vor {n} T",
+  "today": "heute",
+  "tomorrow": "morgen",
+  "in_n_days": "in {n} Tagen",
+  "in_n_weeks": "in {n} Wochen",
+  "in_n_months": "in {n} Monaten",
+  "device_batteries": "Geräteakkus",
+  "no_devices": "Noch keine Geräte mit Akkustatus registriert.",
+  "n_of_total": "{n} von {total}"
+}

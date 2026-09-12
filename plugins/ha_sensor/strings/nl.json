@@ -1,0 +1,10 @@
+{
+  "trend_up": "stijgt",
+  "trend_down": "daalt",
+  "trend_flat": "stabiel",
+  "vs_24h_ago": "t.o.v. 24u geleden",
+  "vs_24h": "t.o.v. 24u",
+  "sensors": "Sensoren",
+  "no_sensors_selected": "Geen sensoren geselecteerd.",
+  "no_history": "Geen geschiedenis."
+}

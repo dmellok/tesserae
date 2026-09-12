@@ -6,14 +6,41 @@
 // the events on a relative year axis so the day's history reads
 // as a temporal shape.
 
-const KIND_LABEL = {
-  events: "EVENTS",
-  births: "BIRTHS",
-  deaths: "DEATHS",
-  holidays: "HOLIDAYS",
-  selected: "SELECTED",
-  all: "ALL",
-};
+// Kind id (server enum) → title-bar meta chip. Unknown ids fall back
+// to the raw id uppercased, as before.
+function kindLabelFor(kind, t) {
+  switch (kind) {
+    case "events": return t("kind_events", "EVENTS");
+    case "births": return t("kind_births", "BIRTHS");
+    case "deaths": return t("kind_deaths", "DEATHS");
+    case "holidays": return t("kind_holidays", "HOLIDAYS");
+    case "selected": return t("kind_selected", "SELECTED");
+    case "all": return t("kind_all", "ALL");
+    default: return String(kind).toUpperCase();
+  }
+}
+
+// server.py sends today's date as "<day> <English month>" (its own UTC
+// day, which is the day it fetched events for). Parse that stable shape
+// back into a date and re-format it with the active locale; anything
+// else is passed through untouched.
+const EN_MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+function localizeDate(label, locale) {
+  const m = typeof label === "string" ? label.match(/^(\d{1,2}) ([A-Za-z]+)$/) : null;
+  if (!m) return label || "";
+  // The server's own "12 September" is already the English form; only
+  // other locales need Intl to reorder and translate the month.
+  if (!locale || String(locale).toLowerCase().startsWith("en")) return label;
+  const month = EN_MONTHS.indexOf(m[2]);
+  if (month < 0) return label;
+  // 2024 is a leap year so 29 February round-trips.
+  const d = new Date(2024, month, parseInt(m[1], 10));
+  try {
+    return new Intl.DateTimeFormat(locale || "en", { day: "numeric", month: "long" }).format(d);
+  } catch {
+    return label;
+  }
+}
 
 const KIND_ACCENT = {
   events: "var(--accent-5)",
@@ -39,13 +66,13 @@ function escapeHtml(s) {
 
 // Era → glyph by year. Five broad bands keyed to recognisable
 // historical periods.
-function eraGlyph(year) {
+function eraGlyph(year, t) {
   if (!Number.isFinite(year)) return { icon: "ph-clock-counter-clockwise", label: "" };
-  if (year < 500) return { icon: "ph-buildings", label: "Antiquity" };
-  if (year < 1500) return { icon: "ph-castle-turret", label: "Medieval" };
-  if (year < 1800) return { icon: "ph-scroll", label: "Renaissance" };
-  if (year < 1900) return { icon: "ph-factory", label: "Industrial" };
-  return { icon: "ph-broadcast", label: "Modern" };
+  if (year < 500) return { icon: "ph-buildings", label: t("era_antiquity", "Antiquity") };
+  if (year < 1500) return { icon: "ph-castle-turret", label: t("era_medieval", "Medieval") };
+  if (year < 1800) return { icon: "ph-scroll", label: t("era_renaissance", "Renaissance") };
+  if (year < 1900) return { icon: "ph-factory", label: t("era_industrial", "Industrial") };
+  return { icon: "ph-broadcast", label: t("era_modern", "Modern") };
 }
 
 // Year-timeline strip, HTML/CSS rather than SVG so the labels stay
@@ -82,6 +109,8 @@ function timelineHtml(items, accent) {
 }
 
 export default function render(shadow, ctx) {
+  const t = ctx?.t || ((key, fallback) => fallback ?? key);
+  const locale = ctx?.locale || "en";
   const data = ctx?.data ?? {};
   const css = `<link rel="stylesheet" href="/static/style/spectra-widgets.css">`;
 
@@ -89,7 +118,7 @@ export default function render(shadow, ctx) {
     shadow.innerHTML = `
       ${css}
       <div class="w" data-widget="news_wikipedia_otd">
-        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>On This Day</h3></div>
+        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>${escapeHtml(t("on_this_day", "On This Day"))}</h3></div>
         <div class="w-body"><p class="u-muted">${escapeHtml(data.error)}</p></div>
       </div>`;
     return;
@@ -97,8 +126,9 @@ export default function render(shadow, ctx) {
 
   const items = Array.isArray(data.items) ? data.items : [];
   const kind = data.kind || "events";
-  const dateLabel = data.date || "";
-  const kindLabel = KIND_LABEL[kind] || String(kind).toUpperCase();
+  const dateLabel = localizeDate(data.date, locale);
+  const kindLabel = kindLabelFor(kind, t);
+  const onDate = `${escapeHtml(t("on", "On"))} ${escapeHtml(dateLabel)}`;
   const accent = KIND_ACCENT[kind] || "var(--accent-5)";
 
   if (items.length === 0) {
@@ -107,9 +137,9 @@ export default function render(shadow, ctx) {
       <div class="w" data-widget="news_wikipedia_otd">
         <div class="w-title">
           <i class="ph-bold ph-clock-counter-clockwise" style="color:${accent}"></i>
-          <h3>On ${escapeHtml(dateLabel)}</h3>
+          <h3>${onDate}</h3>
         </div>
-        <div class="w-body"><p class="u-muted">Nothing recorded.</p></div>
+        <div class="w-body"><p class="u-muted">${escapeHtml(t("nothing_recorded", "Nothing recorded."))}</p></div>
       </div>`;
     return;
   }
@@ -117,7 +147,7 @@ export default function render(shadow, ctx) {
   const titlePh = KIND_PH[kind] || "ph-clock-counter-clockwise";
 
   const rows = items.map((it, i) => {
-    const era = eraGlyph(Number(it.year));
+    const era = eraGlyph(Number(it.year), t);
     const thumb = it.thumb
       ? `<img class="otd-thumb" src="${escapeHtml(it.thumb)}" alt="" loading="lazy"/>`
       : "";
@@ -245,7 +275,7 @@ export default function render(shadow, ctx) {
     <div class="w" data-widget="news_wikipedia_otd">
       <div class="w-title">
         <i class="ph-bold ${titlePh}" style="color:${accent}"></i>
-        <h3>On ${escapeHtml(dateLabel)}</h3>
+        <h3>${onDate}</h3>
         <span class="w-title-meta">${escapeHtml(kindLabel)}</span>
       </div>
       <div class="w-body" style="gap:0">

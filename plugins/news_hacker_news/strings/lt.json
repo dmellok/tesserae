@@ -1,0 +1,19 @@
+{
+  "feed_top": "Populiarūs",
+  "feed_new": "Nauji",
+  "feed_best": "Geriausi",
+  "feed_show": "Show",
+  "feed_ask": "Ask",
+  "now": "dabar",
+  "minutes_abbr": "min",
+  "hours_abbr": "val.",
+  "days_abbr": "d.",
+  "weeks_abbr": "sav.",
+  "type_show": "SHOW",
+  "type_ask": "ASK",
+  "type_tell": "TELL",
+  "type_launch": "LAUNCH",
+  "type_job": "JOB",
+  "hacker_news": "Hacker News",
+  "no_stories": "Naujienų nėra."
+}

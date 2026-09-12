@@ -1,0 +1,9 @@
+{
+  "no_samples_in_window": "Keine Werte im Zeitraum.",
+  "low": "Min",
+  "high": "Max",
+  "hours_abbr": "h",
+  "history": "Verlauf",
+  "no_sensors_selected": "Keine Sensoren ausgewählt.",
+  "no_chart_for_selection": "Kein Diagramm für diese Auswahl."
+}

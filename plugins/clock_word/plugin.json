@@ -3,6 +3,7 @@
   "name": "Clock, Word",
   "version": "0.1.1",
   "kind": "widget",
+  "locales": ["en", "cs", "de", "es", "fr", "it", "lt", "nb", "nl", "pl", "pt", "sk", "sv", "zh-CN", "zh-TW"],
   "description": "Word clock, reads the time as English text, rounded to the nearest five minutes ('Twenty past three'). Pure client-side, ticks every 30 seconds.",
   "icon": "ph-text-aa",
   "supports": { "sizes": ["xs", "sm", "md", "lg"] },

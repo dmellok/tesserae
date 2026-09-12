@@ -1,0 +1,18 @@
+{
+  "hourly": "Timvis",
+  "legend_temperature": "Temperatur",
+  "legend_rain": "Regn %",
+  "legend_now": "Nu",
+  "now_suffix": "NU",
+  "no_hourly_data": "Inga timdata.",
+  "cond_clear": "Klart",
+  "cond_overcast": "Mulet",
+  "cond_partly_cloudy": "Halvklart",
+  "cond_drizzle": "Duggregn",
+  "cond_rain": "Regn",
+  "cond_rain_heavy": "Kraftigt regn",
+  "cond_showers": "Skurar",
+  "cond_snow": "Snö",
+  "cond_thunderstorm": "Åska",
+  "cond_fog": "Dimma"
+}

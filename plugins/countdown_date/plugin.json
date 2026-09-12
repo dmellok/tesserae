@@ -3,6 +3,7 @@
   "name": "Countdown, Date",
   "version": "0.1.0",
   "kind": "widget",
+  "locales": ["en", "cs", "de", "es", "fr", "it", "lt", "nb", "nl", "pl", "pt", "sk", "sv", "zh-CN", "zh-TW"],
   "description": "Days remaining until a target date. Glanceable single-number hero with an optional label. Pure client-side, no network.",
   "icon": "ph-calendar-blank",
   "supports": { "sizes": ["xs", "sm", "md", "lg"] },

@@ -1,0 +1,16 @@
+{
+  "kind_events": "EVENTI",
+  "kind_births": "NASCITE",
+  "kind_deaths": "MORTI",
+  "kind_holidays": "FESTIVITÀ",
+  "kind_selected": "SELEZIONATI",
+  "kind_all": "TUTTI",
+  "era_antiquity": "Antichità",
+  "era_medieval": "Medioevo",
+  "era_renaissance": "Rinascimento",
+  "era_industrial": "Industriale",
+  "era_modern": "Moderna",
+  "on_this_day": "Accadde oggi",
+  "on": "Il",
+  "nothing_recorded": "Niente di registrato."
+}

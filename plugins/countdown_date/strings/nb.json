@@ -1,0 +1,12 @@
+{
+  "hour": "time",
+  "hours": "timer",
+  "day": "dag",
+  "days": "dager",
+  "unit_ago": "{unit} siden",
+  "unit_to_go": "{unit} igjen",
+  "countdown": "Nedtelling",
+  "set_target_date": "Angi en måldato i cellevalgene.",
+  "date_has_passed": "Datoen er passert.",
+  "today": "I dag"
+}

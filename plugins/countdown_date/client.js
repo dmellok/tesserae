@@ -57,20 +57,26 @@ function wholeHoursBetween(target, now) {
   return Math.floor((target - now) / 3600000);
 }
 
-function formatBigNumber(n) {
-  const abs = Math.abs(n);
-  if (abs >= 1000) return abs.toLocaleString();
-  return String(abs);
+function formatBigNumber(n, locale) {
+  return new Intl.NumberFormat(locale).format(Math.abs(n));
 }
 
-function suffixFor(unit, value, isPast) {
-  const plural = Math.abs(value) === 1 ? "" : "s";
-  if (isPast) return `${unit}${plural} ago`;
-  return `${unit}${plural} to go`;
+// "days to go" / "hours ago" style suffix. The unit noun and the
+// surrounding phrase are separate strings so a locale can inflect the
+// noun and reorder the phrase independently.
+function suffixFor(unit, value, isPast, t) {
+  const one = Math.abs(value) === 1;
+  const noun = unit === "hour"
+    ? (one ? t("hour", "hour") : t("hours", "hours"))
+    : (one ? t("day", "day") : t("days", "days"));
+  const phrase = isPast ? t("unit_ago", "{unit} ago") : t("unit_to_go", "{unit} to go");
+  return phrase.replace("{unit}", noun);
 }
 
 export default function render(shadow, ctx) {
   const opts = ctx?.cell?.options || {};
+  const t = ctx?.t || ((key, fallback) => fallback ?? key);
+  const locale = ctx?.locale || "en";
   const target = parseTargetDate(opts.target_date);
   const accent = ACCENTS[opts.accent] || ACCENTS.terracotta;
   const labelText = (opts.label || "").trim();
@@ -87,9 +93,9 @@ export default function render(shadow, ctx) {
       <div class="w" data-widget="countdown_date">
         <div class="w-title">
           <i class="ph-bold ph-calendar-blank" style="color:${accent}"></i>
-          <h3>Countdown</h3>
+          <h3>${escapeHtml(t("countdown", "Countdown"))}</h3>
         </div>
-        <div class="w-body"><p class="u-muted">Set a target date in cell options.</p></div>
+        <div class="w-body"><p class="u-muted">${escapeHtml(t("set_target_date", "Set a target date in cell options."))}</p></div>
       </div>`;
     return;
   }
@@ -102,9 +108,9 @@ export default function render(shadow, ctx) {
       <div class="w" data-widget="countdown_date">
         <div class="w-title">
           <i class="ph-bold ph-calendar-check" style="color:${accent}"></i>
-          <h3>${escapeHtml(labelText || "Countdown")}</h3>
+          <h3>${escapeHtml(labelText || t("countdown", "Countdown"))}</h3>
         </div>
-        <div class="w-body"><p class="u-muted">Date has passed.</p></div>
+        <div class="w-body"><p class="u-muted">${escapeHtml(t("date_has_passed", "Date has passed."))}</p></div>
       </div>`;
     return;
   }
@@ -118,16 +124,16 @@ export default function render(shadow, ctx) {
   let kicker;
   if (!isPast && days === 0 && showHoursUnderDay) {
     const hours = Math.max(0, wholeHoursBetween(target, now));
-    heroNumber = formatBigNumber(hours);
-    heroSuffix = suffixFor("hour", hours, false);
-    kicker = "today";
+    heroNumber = formatBigNumber(hours, locale);
+    heroSuffix = suffixFor("hour", hours, false, t);
+    kicker = t("today", "Today");
   } else if (!isPast && days === 0) {
-    heroNumber = "Today";
+    heroNumber = t("today", "Today");
     heroSuffix = "";
     kicker = "";
   } else {
-    heroNumber = formatBigNumber(days);
-    heroSuffix = suffixFor("day", days, isPast);
+    heroNumber = formatBigNumber(days, locale);
+    heroSuffix = suffixFor("day", days, isPast, t);
     kicker = "";
   }
 
@@ -243,12 +249,12 @@ export default function render(shadow, ctx) {
   // the date is in the current year (the lead-up reads as "this year by
   // default") and tack it on for further-out dates.
   const sameYear = target.getFullYear() === now.getFullYear();
-  const targetLabel = target.toLocaleDateString(undefined, {
+  const targetLabel = new Intl.DateTimeFormat(locale, {
     weekday: "long",
     day: "numeric",
     month: "long",
     ...(sameYear ? {} : { year: "numeric" }),
-  });
+  }).format(target);
   const progressEl = `
     <div class="cd-progress" aria-hidden="true"><span></span></div>
     <div class="cd-meta">

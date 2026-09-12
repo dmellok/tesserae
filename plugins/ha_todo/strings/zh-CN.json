@@ -1,0 +1,16 @@
+{
+  "yesterday": "昨天",
+  "day_abbr": "天",
+  "late": "逾期",
+  "today": "今天",
+  "tomorrow": "明天",
+  "priority_high": "高",
+  "priority_medium": "中",
+  "priority_low": "低",
+  "todo": "待办",
+  "all_done": "全部完成。",
+  "priority": "优先级",
+  "overdue": "逾期",
+  "to_do": "待办",
+  "done": "已完成"
+}

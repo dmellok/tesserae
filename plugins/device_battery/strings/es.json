@@ -1,0 +1,14 @@
+{
+  "just_now": "ahora mismo",
+  "minutes_ago": "hace {n}m",
+  "hours_ago": "hace {n}h",
+  "days_ago": "hace {n}d",
+  "today": "hoy",
+  "tomorrow": "mañana",
+  "in_n_days": "en {n} días",
+  "in_n_weeks": "en {n} semanas",
+  "in_n_months": "en {n} meses",
+  "device_batteries": "Baterías de dispositivos",
+  "no_devices": "Aún no hay dispositivos que informen batería.",
+  "n_of_total": "{n} de {total}"
+}

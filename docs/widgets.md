@@ -470,6 +470,14 @@ Settings → Devices, and the dev preview) list whatever locales the
 installed widgets ship, plus English, so a new `strings/<tag>.json`
 becomes selectable as soon as the widget loads.
 
+Every bundled widget ships on this contract. The bundled set carries
+English, Czech, Dutch, French, German, Italian, Lithuanian, Norwegian
+Bokmål, Polish, Portuguese, Slovak, Spanish, Swedish, and Chinese
+(Simplified `zh-CN` and Traditional `zh-TW`), chosen from where installs
+report from; a wording fix in any of them is a one-file PR against
+`plugins/<id>/strings/<tag>.json`, and `tests/test_widget_i18n_contract.py`
+keeps every translation's key set aligned with the English file.
+
 To eyeball a translation without changing any settings, the dev preview
 surfaces (`/_test/widgets` and `/_test/preview`) carry a language picker;
 it just adds `?locale=<tag>` to the render, which is also handy on a raw

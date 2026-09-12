@@ -1,0 +1,15 @@
+{
+  "weather": "Orai",
+  "cond_sunny": "Saulėta",
+  "cond_mostly_clear": "Beveik giedra",
+  "cond_partly_cloudy": "Mažai debesuota",
+  "cond_cloudy": "Debesuota",
+  "cond_fog": "Rūkas",
+  "cond_drizzle": "Dulksna",
+  "cond_rain": "Lietus",
+  "cond_rain_heavy": "Smarkus lietus",
+  "cond_snow": "Sniegas",
+  "cond_snow_heavy": "Smarkus sniegas",
+  "cond_showers": "Trumpas lietus",
+  "cond_storm": "Audra"
+}

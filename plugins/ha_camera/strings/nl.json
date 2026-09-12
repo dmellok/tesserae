@@ -1,0 +1,11 @@
+{
+  "just_now": "zojuist",
+  "minutes_ago": "{n}m geleden",
+  "hours_ago": "{n}u geleden",
+  "days_ago": "{n}d geleden",
+  "motion": "beweging",
+  "motion_upper": "BEWEGING",
+  "camera": "Camera",
+  "no_signal": "geen signaal",
+  "cameras": "Camera's"
+}

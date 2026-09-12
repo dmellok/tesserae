@@ -1,0 +1,18 @@
+{
+  "hourly": "Po hodinách",
+  "legend_temperature": "Teplota",
+  "legend_rain": "Déšť %",
+  "legend_now": "Teď",
+  "now_suffix": "TEĎ",
+  "no_hourly_data": "Žádná hodinová data.",
+  "cond_clear": "Jasno",
+  "cond_overcast": "Zataženo",
+  "cond_partly_cloudy": "Polojasno",
+  "cond_drizzle": "Mrholení",
+  "cond_rain": "Déšť",
+  "cond_rain_heavy": "Silný déšť",
+  "cond_showers": "Přeháňky",
+  "cond_snow": "Sněžení",
+  "cond_thunderstorm": "Bouřka",
+  "cond_fog": "Mlha"
+}

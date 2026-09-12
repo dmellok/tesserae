@@ -1,0 +1,16 @@
+{
+  "not_found": "introuvable",
+  "mode_off": "arrêt",
+  "mode_heat": "chauffage",
+  "mode_cool": "clim",
+  "mode_heat_cool": "chaud/froid",
+  "mode_auto": "auto",
+  "mode_dry": "sec",
+  "mode_fan_only": "ventil.",
+  "humidity_tip_target": "humidité {h}% (cible {t}%)",
+  "humidity_tip": "humidité {h}%",
+  "target": "Cible",
+  "climate": "Thermostat",
+  "no_entities_selected": "Aucune entité sélectionnée.",
+  "zones": "ZONES"
+}

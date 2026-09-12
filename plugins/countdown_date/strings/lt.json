@@ -1,0 +1,12 @@
+{
+  "hour": "valanda",
+  "hours": "valandos",
+  "day": "diena",
+  "days": "dienos",
+  "unit_ago": "{unit} praėjo",
+  "unit_to_go": "{unit} liko",
+  "countdown": "Atskaita",
+  "set_target_date": "Nustatykite datą langelio nustatymuose.",
+  "date_has_passed": "Data jau praėjo.",
+  "today": "Šiandien"
+}

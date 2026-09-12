@@ -1,0 +1,9 @@
+{
+  "no_samples_in_window": "Brak próbek w tym oknie.",
+  "low": "Min",
+  "high": "Maks",
+  "hours_abbr": "h",
+  "history": "Historia",
+  "no_sensors_selected": "Nie wybrano czujników.",
+  "no_chart_for_selection": "Brak wykresu dla tego wyboru."
+}

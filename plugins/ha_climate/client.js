@@ -48,6 +48,25 @@ function modeAccent(mode) {
   return MODE_ACCENT[mode] || "var(--text-secondary)";
 }
 
+// HA hvac mode id -> panel label. server.py sends mode_label as the id
+// with underscores spaced out ("heat_cool" -> "heat cool"); the id is
+// stable, so a locale can swap the word while the English fallback stays
+// exactly what the server would have painted. An entity that wasn't
+// found carries no mode at all and is flagged unavailable.
+function modeLabelFor(item, t) {
+  if (!item.mode && item.unavailable) return t("not_found", "not found");
+  const labels = {
+    off: t("mode_off", "off"),
+    heat: t("mode_heat", "heat"),
+    cool: t("mode_cool", "cool"),
+    heat_cool: t("mode_heat_cool", "heat cool"),
+    auto: t("mode_auto", "auto"),
+    dry: t("mode_dry", "dry"),
+    fan_only: t("mode_fan_only", "fan only"),
+  };
+  return labels[item.mode] || item.mode_label || "";
+}
+
 function tempStr(v, unit) {
   if (v == null || v === "") return "-";
   return `${escapeHtml(v)}${unit ? escapeHtml(unit) : "°"}`;
@@ -80,7 +99,8 @@ function polarSvg(cx, cy, angleDeg, radius) {
 // crosses the arc. Setpoint range (target_low → target_high) shown as
 // a translucent band on the arc when both are present. Centre carries
 // the current temp number + mode label.
-function thermostatDial(item, opts = {}) {
+function thermostatDial(item, opts, t) {
+  opts = opts || {};
   const { min, max } = tempBounds(item);
   const range = max - min;
   const accent = modeAccent(item.mode);
@@ -185,7 +205,7 @@ function thermostatDial(item, opts = {}) {
   const fontTemp = big ? 56 : 44;
   const fontLabel = big ? 13 : 11;
   const fontUnit = big ? 22 : 18;
-  const modeLabel = (item.mode_label || "").toUpperCase();
+  const modeLabel = modeLabelFor(item, t).toUpperCase();
   const currentLabel = Number.isFinite(currentT) ? Math.round(currentT) : "-";
   const unitTxt = item.unit || "°";
 
@@ -217,10 +237,12 @@ function thermostatDial(item, opts = {}) {
     </svg>`;
 }
 
-function humidityChip(item) {
+function humidityChip(item, t) {
   if (!item.humidity) return "";
   const target = item.humidity_target;
-  const tip = target ? `humidity ${item.humidity}% (target ${target}%)` : `humidity ${item.humidity}%`;
+  const tip = target
+    ? t("humidity_tip_target", "humidity {h}% (target {t}%)").replace("{h}", String(item.humidity)).replace("{t}", String(target))
+    : t("humidity_tip", "humidity {h}%").replace("{h}", String(item.humidity));
   return `
     <span class="climate-humidity" title="${escapeHtml(tip)}">
       <i class="ph-bold ph-drop" style="color:var(--accent-4)"></i>
@@ -237,34 +259,35 @@ function actionChip(item, accent) {
     </span>`;
 }
 
-function modePill(item, accent) {
+function modePill(item, accent, t) {
   const muted = item.unavailable;
-  if (!item.mode_label) return "";
-  return `<span class="pill" style="background:${muted ? "var(--text-muted)" : accent}">${escapeHtml(item.mode_label)}</span>`;
+  const label = modeLabelFor(item, t);
+  if (!label) return "";
+  return `<span class="pill" style="background:${muted ? "var(--text-muted)" : accent}">${escapeHtml(label)}</span>`;
 }
 
 // Big-dial layout for a single entity. Dial on the left, chips
 // (mode pill, action, humidity) on the right + target sub-text.
-function renderHero(item) {
+function renderHero(item, t) {
   const accent = modeAccent(item.mode);
   const muted = item.unavailable;
   const color = muted ? "var(--text-muted)" : accent;
   const subBits = [];
-  if (item.target) subBits.push(`Target ${tempStr(item.target, item.unit)}`);
+  if (item.target) subBits.push(`${escapeHtml(t("target", "Target"))} ${tempStr(item.target, item.unit)}`);
   else if (item.target_low && item.target_high) {
     subBits.push(`${tempStr(item.target_low, item.unit)}–${tempStr(item.target_high, item.unit)}`);
   }
-  if (!subBits.length) subBits.push(escapeHtml(item.mode_label || ""));
+  if (!subBits.length) subBits.push(escapeHtml(modeLabelFor(item, t)));
   return `
     <div class="climate-hero">
-      <div class="climate-dial-wrap">${thermostatDial(item, { size: "big" })}</div>
+      <div class="climate-dial-wrap">${thermostatDial(item, { size: "big" }, t)}</div>
       <div class="climate-hero-text">
         <span class="climate-name">${escapeHtml(item.name)}</span>
         <span class="climate-target">${subBits.join(" · ")}</span>
         <div class="climate-chip-row">
-          ${modePill(item, color)}
+          ${modePill(item, color, t)}
           ${actionChip(item, color)}
-          ${humidityChip(item)}
+          ${humidityChip(item, t)}
         </div>
       </div>
     </div>`;
@@ -273,11 +296,11 @@ function renderHero(item) {
 // Compact dial tile for multi-entity grid view. Name above the dial,
 // humidity + action drop below as small text. Sized to slot into a
 // `repeat(auto-fit, minmax(120px, 1fr))` grid.
-function renderTile(item) {
+function renderTile(item, t) {
   const accent = modeAccent(item.mode);
   const muted = item.unavailable;
   const color = muted ? "var(--text-muted)" : accent;
-  const tip = item.target ? `Target ${tempStr(item.target, item.unit)}` : "";
+  const tip = item.target ? `${t("target", "Target")} ${tempStr(item.target, item.unit)}` : "";
   const humBit = item.humidity
     ? `<span class="climate-tile-hum"><i class="ph-bold ph-drop" style="color:var(--accent-4)"></i>${escapeHtml(item.humidity)}%</span>`
     : "";
@@ -290,7 +313,7 @@ function renderTile(item) {
         <span class="climate-tile-name" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</span>
         ${humBit}
       </div>
-      <div class="climate-tile-dial">${thermostatDial(item, { size: "compact" })}</div>
+      <div class="climate-tile-dial">${thermostatDial(item, { size: "compact" }, t)}</div>
       <div class="climate-tile-meta">
         ${tip ? `<small class="climate-tile-target">${escapeHtml(tip)}</small>` : ""}
         ${actionBit}
@@ -300,13 +323,14 @@ function renderTile(item) {
 
 export default function render(shadow, ctx) {
   const data = ctx?.data ?? {};
+  const t = ctx?.t || ((key, fallback) => fallback ?? key);
   const css = `<link rel="stylesheet" href="/static/style/spectra-widgets.css">`;
 
   if (data.error) {
     shadow.innerHTML = `
       ${css}
       <div class="w" data-widget="ha_climate">
-        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>Climate</h3></div>
+        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>${escapeHtml(t("climate", "Climate"))}</h3></div>
         <div class="w-body"><p class="u-muted">${escapeHtml(data.error)}</p></div>
       </div>`;
     return;
@@ -316,8 +340,8 @@ export default function render(shadow, ctx) {
     shadow.innerHTML = `
       ${css}
       <div class="w" data-widget="ha_climate">
-        <div class="w-title"><i class="ph-bold ph-thermometer-simple"></i><h3>${escapeHtml(data.title || "Climate")}</h3></div>
-        <div class="w-body"><p class="u-muted">No entities selected.</p></div>
+        <div class="w-title"><i class="ph-bold ph-thermometer-simple"></i><h3>${escapeHtml(data.title || t("climate", "Climate"))}</h3></div>
+        <div class="w-body"><p class="u-muted">${escapeHtml(t("no_entities_selected", "No entities selected."))}</p></div>
       </div>`;
     return;
   }
@@ -326,7 +350,7 @@ export default function render(shadow, ctx) {
   const isMulti = items.length > 1;
   const primary = items[0];
 
-  const title = data.title || (isMulti ? "Climate" : primary.name);
+  const title = data.title || (isMulti ? t("climate", "Climate") : primary.name);
   const heroAccent = modeAccent(primary.mode);
 
   const layout = `
@@ -505,13 +529,13 @@ export default function render(shadow, ctx) {
     shadow.innerHTML = `
       ${css}
       <style>.climate-frag-dial { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }</style>
-      <div class="w" data-widget="ha_climate"><div class="w-body"><div class="climate-frag-dial">${thermostatDial(primary, { size: "big" })}</div></div></div>`;
+      <div class="w" data-widget="ha_climate"><div class="w-body"><div class="climate-frag-dial">${thermostatDial(primary, { size: "big" }, t)}</div></div></div>`;
     return;
   }
   if (frag === "chips") {
     const color = primary.unavailable ? "var(--text-muted)" : heroAccent;
     const subBits = [];
-    if (primary.target) subBits.push(`Target ${tempStr(primary.target, primary.unit)}`);
+    if (primary.target) subBits.push(`${escapeHtml(t("target", "Target"))} ${tempStr(primary.target, primary.unit)}`);
     else if (primary.target_low && primary.target_high) {
       subBits.push(`${tempStr(primary.target_low, primary.unit)}–${tempStr(primary.target_high, primary.unit)}`);
     }
@@ -524,9 +548,9 @@ export default function render(shadow, ctx) {
         <span class="climate-name">${escapeHtml(primary.name)}</span>
         ${subBits.length ? `<span class="climate-target">${subBits.join(" · ")}</span>` : ""}
         <div class="climate-chip-row">
-          ${modePill(primary, color)}
+          ${modePill(primary, color, t)}
           ${actionChip(primary, color)}
-          ${humidityChip(primary)}
+          ${humidityChip(primary, t)}
         </div>
       </div></div></div>`;
     return;
@@ -534,7 +558,7 @@ export default function render(shadow, ctx) {
 
   // Title-bar icon picks up the primary entity's mode accent.
   const body = isMulti
-    ? `<div class="climate-grid">${items.map(renderTile).join("")}</div>`
+    ? `<div class="climate-grid">${items.map((it) => renderTile(it, t)).join("")}</div>`
     : renderHero(primary);
 
   shadow.innerHTML = `
@@ -544,7 +568,7 @@ export default function render(shadow, ctx) {
       <div class="w-title">
         <i class="ph-bold ph-thermometer-simple" style="color:${heroAccent}"></i>
         <h3>${escapeHtml(title)}</h3>
-        ${isMulti ? `<span class="w-title-meta">${items.length} ZONES</span>` : ""}
+        ${isMulti ? `<span class="w-title-meta">${items.length} ${escapeHtml(t("zones", "ZONES"))}</span>` : ""}
       </div>
       <div class="w-body">${body}</div>
     </div>`;

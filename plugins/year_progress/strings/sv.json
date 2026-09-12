@@ -1,0 +1,14 @@
+{
+  "week_n_of_total": "Vecka {n} av {total}",
+  "day_left": "{n} dag kvar",
+  "days_left": "{n} dagar kvar",
+  "life_in_weeks": "Livet i veckor",
+  "set_birth_year": "Ange ett födelseår i cellinställningarna.",
+  "year_n_of_total": "År {n} av {total}",
+  "week_lived": "{n} vecka levd",
+  "weeks_lived": "{n} veckor levda",
+  "week_to_go": "{n} vecka kvar",
+  "weeks_to_go": "{n} veckor kvar",
+  "through_the_year": "av året",
+  "of_expected_life": "av förväntad livstid"
+}

@@ -86,6 +86,7 @@ function imageMarkup(url, fitOpt) {
 }
 
 export default async function render(shadow, ctx) {
+  const t = ctx?.t || ((key, fallback) => fallback ?? key);
   const opts = ctx?.cell?.options || {};
   const url = String(opts.url || "").trim();
   const scaleOpt = String(opts.scale || "fit");
@@ -96,8 +97,8 @@ export default async function render(shadow, ctx) {
     shadow.innerHTML = `
       ${css}
       <div class="w" data-widget="webpage">
-        <div class="w-title"><i class="ph-bold ph-globe" style="color:var(--text-muted)"></i><h3>Webpage</h3></div>
-        <div class="w-body"><p class="u-muted">Set a URL in the cell options (must start with http/https).</p></div>
+        <div class="w-title"><i class="ph-bold ph-globe" style="color:var(--text-muted)"></i><h3>${t("webpage", "Webpage")}</h3></div>
+        <div class="w-body"><p class="u-muted">${t("set_a_url", "Set a URL in the cell options (must start with http/https).")}</p></div>
       </div>`;
     return;
   }

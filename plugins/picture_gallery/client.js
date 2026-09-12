@@ -23,6 +23,7 @@ const OBJECT_FIT = {
 };
 
 export default function render(shadow, ctx) {
+  const t = ctx?.t || ((key, fallback) => fallback ?? key);
   const data = ctx?.data ?? {};
   const opts = ctx?.cell?.options || {};
   const showFilename = opts.show_filename === true; // default false
@@ -34,7 +35,7 @@ export default function render(shadow, ctx) {
     shadow.innerHTML = `
       ${css}
       <div class="w" data-widget="picture_gallery">
-        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>Gallery</h3></div>
+        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>${t("gallery", "Gallery")}</h3></div>
         <div class="w-body"><p class="u-muted">${escapeHtml(data.error)}</p></div>
       </div>`;
     return;
@@ -44,7 +45,7 @@ export default function render(shadow, ctx) {
     shadow.innerHTML = `
       ${css}
       <div class="w is-bleed" data-widget="picture_gallery">
-        <div class="bleed-empty">No images.</div>
+        <div class="bleed-empty">${t("no_images", "No images.")}</div>
       </div>`;
     return;
   }

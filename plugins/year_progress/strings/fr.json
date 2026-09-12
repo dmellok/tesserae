@@ -1,0 +1,14 @@
+{
+  "week_n_of_total": "Semaine {n} sur {total}",
+  "day_left": "{n} jour restant",
+  "days_left": "{n} jours restants",
+  "life_in_weeks": "Vie en semaines",
+  "set_birth_year": "Indiquez une année de naissance dans les options de la cellule.",
+  "year_n_of_total": "Année {n} sur {total}",
+  "week_lived": "{n} semaine vécue",
+  "weeks_lived": "{n} semaines vécues",
+  "week_to_go": "{n} semaine restante",
+  "weeks_to_go": "{n} semaines restantes",
+  "through_the_year": "de l'année",
+  "of_expected_life": "de l'espérance de vie"
+}

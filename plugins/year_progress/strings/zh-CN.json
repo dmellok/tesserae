@@ -1,0 +1,14 @@
+{
+  "week_n_of_total": "第 {n} 周，共 {total} 周",
+  "day_left": "还剩 {n} 天",
+  "days_left": "还剩 {n} 天",
+  "life_in_weeks": "人生周数",
+  "set_birth_year": "请在单元格选项中设置出生年份。",
+  "year_n_of_total": "第 {n} 年，共 {total} 年",
+  "week_lived": "已度过 {n} 周",
+  "weeks_lived": "已度过 {n} 周",
+  "week_to_go": "还剩 {n} 周",
+  "weeks_to_go": "还剩 {n} 周",
+  "through_the_year": "本年已过",
+  "of_expected_life": "预期寿命已过"
+}

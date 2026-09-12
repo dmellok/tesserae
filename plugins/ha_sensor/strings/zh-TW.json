@@ -1,0 +1,10 @@
+{
+  "trend_up": "上升",
+  "trend_down": "下降",
+  "trend_flat": "持平",
+  "vs_24h_ago": "較24小時前",
+  "vs_24h": "較24小時前",
+  "sensors": "感測器",
+  "no_sensors_selected": "未選擇感測器。",
+  "no_history": "沒有歷史紀錄。"
+}

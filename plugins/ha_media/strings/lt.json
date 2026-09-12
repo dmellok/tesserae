@@ -1,0 +1,8 @@
+{
+  "state_playing": "groja",
+  "state_paused": "pristabdyta",
+  "state_idle": "laukia",
+  "state_off": "išjungta",
+  "state_unavailable": "nepasiekiama",
+  "media": "Medija"
+}

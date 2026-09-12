@@ -1,0 +1,16 @@
+{
+  "not_found": "nerasta",
+  "mode_off": "išjungta",
+  "mode_heat": "šildymas",
+  "mode_cool": "vėsinimas",
+  "mode_heat_cool": "šild./vės.",
+  "mode_auto": "auto",
+  "mode_dry": "sausinimas",
+  "mode_fan_only": "tik vent.",
+  "humidity_tip_target": "drėgmė {h}% (tikslas {t}%)",
+  "humidity_tip": "drėgmė {h}%",
+  "target": "Tikslas",
+  "climate": "Klimatas",
+  "no_entities_selected": "Nepasirinkta objektų.",
+  "zones": "ZONOS"
+}

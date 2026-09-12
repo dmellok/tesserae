@@ -20,10 +20,10 @@ function stateAccent(state) {
   return "var(--accent-5)";
 }
 
-function stateLabel(state) {
+function stateLabel(state, t) {
   if (!state) return "-";
-  if (state === "not_home") return "Away";
-  if (state === "home") return "Home";
+  if (state === "not_home") return t("away", "Away");
+  if (state === "home") return t("home", "Home");
   return state;
 }
 
@@ -72,6 +72,7 @@ function initials(name) {
 }
 
 export default function render(shadow, ctx) {
+  const t = ctx?.t || ((key, fallback) => fallback ?? key);
   const data = ctx?.data ?? {};
   const css = `<link rel="stylesheet" href="/static/style/spectra-widgets.css">`;
 
@@ -79,14 +80,14 @@ export default function render(shadow, ctx) {
     shadow.innerHTML = `
       ${css}
       <div class="w" data-widget="ha_zones">
-        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>Zones</h3></div>
+        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>${escapeHtml(t("zones", "Zones"))}</h3></div>
         <div class="w-body"><p class="u-muted">${escapeHtml(data.error)}</p></div>
       </div>`;
     return;
   }
 
   const items = Array.isArray(data.items) ? data.items : [];
-  const place = data.label || "Zones";
+  const place = data.label || t("zones", "Zones");
   const summary = data.summary || {};
   const home = summary.home ?? items.filter((i) => i.state === "home").length;
   const total = summary.total ?? items.length;
@@ -96,7 +97,7 @@ export default function render(shadow, ctx) {
       ${css}
       <div class="w" data-widget="ha_zones">
         <div class="w-title"><i class="ph-bold ph-users-three"></i><h3>${escapeHtml(place)}</h3></div>
-        <div class="w-body"><p class="u-muted">No people tracked.</p></div>
+        <div class="w-body"><p class="u-muted">${escapeHtml(t("no_people_tracked", "No people tracked."))}</p></div>
       </div>`;
     return;
   }
@@ -117,7 +118,7 @@ export default function render(shadow, ctx) {
         </div>
         <span class="zone-state" style="color:${accent}">
           <i class="ph-bold ${zPh}" style="font-size:.95em"></i>
-          ${escapeHtml(stateLabel(it.state))}
+          ${escapeHtml(stateLabel(it.state, t))}
         </span>
       </div>`;
   }).join("");
@@ -196,7 +197,7 @@ export default function render(shadow, ctx) {
       </style>
       <div class="w" data-widget="ha_zones"><div class="w-body zones-count">
         <span class="n">${home}<small>/${total}</small></span>
-        <span class="l">Home</span>
+        <span class="l">${escapeHtml(t("home", "Home"))}</span>
       </div></div>`;
     return;
   }
@@ -208,7 +209,7 @@ export default function render(shadow, ctx) {
       <div class="w-title">
         <i class="ph-bold ph-users-three" style="color:var(--accent-3)"></i>
         <h3>${escapeHtml(place)}</h3>
-        <span class="w-title-meta">${home}/${total} HOME</span>
+        <span class="w-title-meta">${home}/${total} ${escapeHtml(t("home_meta", "HOME"))}</span>
       </div>
       <div class="w-body list-body">${rows}</div>
     </div>`;

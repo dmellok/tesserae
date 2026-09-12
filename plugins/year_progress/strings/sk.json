@@ -1,0 +1,14 @@
+{
+  "week_n_of_total": "Týždeň {n} z {total}",
+  "day_left": "Zostáva {n} deň",
+  "days_left": "Zostáva {n} dní",
+  "life_in_weeks": "Život v týždňoch",
+  "set_birth_year": "Nastavte rok narodenia v možnostiach bunky.",
+  "year_n_of_total": "Rok {n} z {total}",
+  "week_lived": "{n} prežitý týždeň",
+  "weeks_lived": "{n} prežitých týždňov",
+  "week_to_go": "zostáva {n} týždeň",
+  "weeks_to_go": "zostáva {n} týždňov",
+  "through_the_year": "roka uplynulo",
+  "of_expected_life": "očakávaného života"
+}

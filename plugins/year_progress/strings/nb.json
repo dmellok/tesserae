@@ -1,0 +1,14 @@
+{
+  "week_n_of_total": "Uke {n} av {total}",
+  "day_left": "{n} dag igjen",
+  "days_left": "{n} dager igjen",
+  "life_in_weeks": "Livet i uker",
+  "set_birth_year": "Angi fødselsår i cellevalgene.",
+  "year_n_of_total": "År {n} av {total}",
+  "week_lived": "{n} uke levd",
+  "weeks_lived": "{n} uker levd",
+  "week_to_go": "{n} uke igjen",
+  "weeks_to_go": "{n} uker igjen",
+  "through_the_year": "av året",
+  "of_expected_life": "av forventet levetid"
+}

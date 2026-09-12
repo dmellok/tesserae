@@ -1,0 +1,17 @@
+{
+  "just_now": "ką tik",
+  "minutes_abbr": "min",
+  "hours_abbr": "val.",
+  "days_abbr": "d.",
+  "state_locked": "užrakinta",
+  "state_unlocked": "atrakinta",
+  "state_open": "atidaryta",
+  "state_closed": "uždaryta",
+  "secured": "apsaugota",
+  "locks": "Spynos",
+  "doors_and_locks": "Durys ir spynos",
+  "all_clear": "Viskas gerai.",
+  "open_since": "atidaryta nuo",
+  "open_count_suffix": "ATIDARYTA",
+  "all_secured": "VISKAS UŽRAKINTA"
+}

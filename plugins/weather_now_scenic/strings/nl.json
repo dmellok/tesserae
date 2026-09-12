@@ -1,0 +1,15 @@
+{
+  "weather": "Weer",
+  "cond_sunny": "Zonnig",
+  "cond_mostly_clear": "Licht bewolkt",
+  "cond_partly_cloudy": "Half bewolkt",
+  "cond_cloudy": "Bewolkt",
+  "cond_fog": "Mist",
+  "cond_drizzle": "Motregen",
+  "cond_rain": "Regen",
+  "cond_rain_heavy": "Zware regen",
+  "cond_snow": "Sneeuw",
+  "cond_snow_heavy": "Hevige sneeuw",
+  "cond_showers": "Buien",
+  "cond_storm": "Onweer"
+}

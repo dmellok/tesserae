@@ -1,0 +1,15 @@
+{
+  "weather": "Tempo",
+  "cond_sunny": "Sol",
+  "cond_mostly_clear": "Quase limpo",
+  "cond_partly_cloudy": "Pouco nublado",
+  "cond_cloudy": "Nublado",
+  "cond_fog": "Nevoeiro",
+  "cond_drizzle": "Chuvisco",
+  "cond_rain": "Chuva",
+  "cond_rain_heavy": "Chuva forte",
+  "cond_snow": "Neve",
+  "cond_snow_heavy": "Neve forte",
+  "cond_showers": "Aguaceiros",
+  "cond_storm": "Tempestade"
+}

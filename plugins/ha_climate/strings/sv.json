@@ -1,0 +1,16 @@
+{
+  "not_found": "hittades inte",
+  "mode_off": "av",
+  "mode_heat": "värme",
+  "mode_cool": "kyla",
+  "mode_heat_cool": "värme/kyla",
+  "mode_auto": "auto",
+  "mode_dry": "torr",
+  "mode_fan_only": "fläkt",
+  "humidity_tip_target": "luftfuktighet {h}% (mål {t}%)",
+  "humidity_tip": "luftfuktighet {h}%",
+  "target": "Mål",
+  "climate": "Klimat",
+  "no_entities_selected": "Inga entiteter valda.",
+  "zones": "ZONER"
+}

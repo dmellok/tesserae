@@ -1,0 +1,8 @@
+{
+  "forecast": "Verwachting",
+  "no_forecast": "Geen verwachting.",
+  "no_chart_data": "Geen grafiekdata",
+  "precip_chance": "Kans op neerslag",
+  "day_today": "Vandaag",
+  "day_tomorrow": "Morgen"
+}

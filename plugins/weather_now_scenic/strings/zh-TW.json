@@ -1,0 +1,15 @@
+{
+  "weather": "天氣",
+  "cond_sunny": "晴",
+  "cond_mostly_clear": "晴時多雲",
+  "cond_partly_cloudy": "局部多雲",
+  "cond_cloudy": "多雲",
+  "cond_fog": "霧",
+  "cond_drizzle": "毛毛雨",
+  "cond_rain": "雨",
+  "cond_rain_heavy": "大雨",
+  "cond_snow": "雪",
+  "cond_snow_heavy": "大雪",
+  "cond_showers": "陣雨",
+  "cond_storm": "暴風雨"
+}

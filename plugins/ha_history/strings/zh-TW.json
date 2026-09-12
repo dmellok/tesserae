@@ -1,0 +1,9 @@
+{
+  "no_samples_in_window": "此期間沒有樣本。",
+  "low": "最低",
+  "high": "最高",
+  "hours_abbr": "小時",
+  "history": "歷史",
+  "no_sensors_selected": "未選擇感測器。",
+  "no_chart_for_selection": "此選擇沒有圖表。"
+}

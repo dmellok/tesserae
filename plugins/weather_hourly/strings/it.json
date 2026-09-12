@@ -1,0 +1,18 @@
+{
+  "hourly": "Ogni ora",
+  "legend_temperature": "Temperatura",
+  "legend_rain": "Pioggia %",
+  "legend_now": "Ora",
+  "now_suffix": "ORA",
+  "no_hourly_data": "Nessun dato orario.",
+  "cond_clear": "Sereno",
+  "cond_overcast": "Coperto",
+  "cond_partly_cloudy": "Parz. nuvoloso",
+  "cond_drizzle": "Pioviggine",
+  "cond_rain": "Pioggia",
+  "cond_rain_heavy": "Pioggia forte",
+  "cond_showers": "Rovesci",
+  "cond_snow": "Neve",
+  "cond_thunderstorm": "Temporale",
+  "cond_fog": "Nebbia"
+}

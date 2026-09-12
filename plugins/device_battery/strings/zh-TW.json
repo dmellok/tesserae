@@ -1,0 +1,14 @@
+{
+  "just_now": "剛剛",
+  "minutes_ago": "{n}分鐘前",
+  "hours_ago": "{n}小時前",
+  "days_ago": "{n}天前",
+  "today": "今天",
+  "tomorrow": "明天",
+  "in_n_days": "{n}天後",
+  "in_n_weeks": "{n}週後",
+  "in_n_months": "{n}個月後",
+  "device_batteries": "裝置電池",
+  "no_devices": "尚未有回報電池的裝置。",
+  "n_of_total": "{n}/{total}"
+}

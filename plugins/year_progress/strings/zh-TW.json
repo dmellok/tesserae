@@ -1,0 +1,14 @@
+{
+  "week_n_of_total": "第 {n}/{total} 週",
+  "day_left": "剩 {n} 天",
+  "days_left": "剩 {n} 天",
+  "life_in_weeks": "人生週數",
+  "set_birth_year": "請在儲存格選項中設定出生年份。",
+  "year_n_of_total": "第 {n}/{total} 年",
+  "week_lived": "已過 {n} 週",
+  "weeks_lived": "已過 {n} 週",
+  "week_to_go": "還有 {n} 週",
+  "weeks_to_go": "還有 {n} 週",
+  "through_the_year": "今年已過",
+  "of_expected_life": "預期壽命已過"
+}

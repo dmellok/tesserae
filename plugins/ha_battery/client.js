@@ -78,15 +78,15 @@ function batterySvg(level, color) {
     </svg>`;
 }
 
-function statusPill(item) {
+function statusPill(item, t) {
   if (item.critical) {
     return `<span class="bat-pill bat-critical">
-      <i class="ph-bold ph-warning" style="font-size:.9em"></i>CRITICAL
+      <i class="ph-bold ph-warning" style="font-size:.9em"></i>${escapeHtml(t("critical", "CRITICAL"))}
     </span>`;
   }
   if (item.low) {
     return `<span class="bat-pill bat-low">
-      <i class="ph-bold ph-warning-circle" style="font-size:.9em"></i>LOW
+      <i class="ph-bold ph-warning-circle" style="font-size:.9em"></i>${escapeHtml(t("low", "LOW"))}
     </span>`;
   }
   return "";
@@ -94,13 +94,14 @@ function statusPill(item) {
 
 export default function render(shadow, ctx) {
   const data = ctx?.data ?? {};
+  const t = ctx?.t || ((key, fallback) => fallback ?? key);
   const css = `<link rel="stylesheet" href="/static/style/spectra-widgets.css">`;
 
   if (data.error) {
     shadow.innerHTML = `
       ${css}
       <div class="w" data-widget="ha_battery">
-        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>Batteries</h3></div>
+        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>${escapeHtml(t("batteries", "Batteries"))}</h3></div>
         <div class="w-body"><p class="u-muted">${escapeHtml(data.error)}</p></div>
       </div>`;
     return;
@@ -108,13 +109,16 @@ export default function render(shadow, ctx) {
 
   const items = Array.isArray(data.items) ? data.items : [];
   const summary = data.summary || {};
-  const title = data.label || "Batteries";
+  // server.py fills "Batteries" in when the label option is blank, so the
+  // stock label is the one case that goes through t(); anything else was
+  // typed by the user and stays as-is.
+  const title = data.label && data.label !== "Batteries" ? data.label : t("batteries", "Batteries");
 
   let meta = "";
   if (summary.critical > 0) {
-    meta = `<span class="w-title-meta" style="color:var(--accent-1)">${summary.critical} CRITICAL</span>`;
+    meta = `<span class="w-title-meta" style="color:var(--accent-1)">${summary.critical} ${escapeHtml(t("critical", "CRITICAL"))}</span>`;
   } else if (summary.low > 0) {
-    meta = `<span class="w-title-meta" style="color:var(--accent-2)">${summary.low} LOW</span>`;
+    meta = `<span class="w-title-meta" style="color:var(--accent-2)">${summary.low} ${escapeHtml(t("low", "LOW"))}</span>`;
   } else if (summary.shown != null && summary.count != null) {
     meta = `<span class="w-title-meta">${summary.shown}/${summary.count}</span>`;
   }
@@ -129,7 +133,7 @@ export default function render(shadow, ctx) {
         <div class="list-lead bat-row-lead">
           <i class="ph-bold ${devPh}" style="color:var(--text-secondary)"></i>
           <span class="list-title bat-name">${escapeHtml(it.name)}</span>
-          ${statusPill(it)}
+          ${statusPill(it, t)}
         </div>
         <div class="bat-meta" style="color:${accent}">
           <span class="bat-svg-wrap" style="color:${accent}">${batSvg}</span>
@@ -220,6 +224,6 @@ export default function render(shadow, ctx) {
         <h3>${escapeHtml(title)}</h3>
         ${meta}
       </div>
-      <div class="w-body list-body">${rows || '<p class="u-muted">No batteries.</p>'}</div>
+      <div class="w-body list-body">${rows || `<p class="u-muted">${escapeHtml(t("no_batteries", "No batteries."))}</p>`}</div>
     </div>`;
 }

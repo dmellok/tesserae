@@ -1,0 +1,17 @@
+{
+  "just_now": "právě teď",
+  "minutes_abbr": "min",
+  "hours_abbr": "h",
+  "days_abbr": "d",
+  "state_locked": "zamčeno",
+  "state_unlocked": "odemčeno",
+  "state_open": "otevřeno",
+  "state_closed": "zavřeno",
+  "secured": "zajištěno",
+  "locks": "Zámky",
+  "doors_and_locks": "Dveře a zámky",
+  "all_clear": "Vše v pořádku.",
+  "open_since": "otevřeno od",
+  "open_count_suffix": "OTEVŘENO",
+  "all_secured": "VŠE ZAJIŠTĚNO"
+}

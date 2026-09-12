@@ -32,6 +32,13 @@ function trendAccent(t) {
   return TREND_ACCENT[t] || "var(--text-muted)";
 }
 
+// Trend id (up / down / flat) → the word the tooltip prints.
+function trendWord(trend, t) {
+  if (trend === "up") return t("trend_up", "up");
+  if (trend === "down") return t("trend_down", "down");
+  return t("trend_flat", "flat");
+}
+
 function sensorAccent(icon) {
   // Pick a coherent accent per sensor category. Tracks the expanded
   // device-class set in the server's _DEVICE_CLASS_ICONS table.
@@ -104,14 +111,14 @@ function sparklineSvg(series, color, opts = {}) {
     </svg>`;
 }
 
-function renderStat(item, title, showTitle) {
+function renderStat(item, title, showTitle, t) {
   const accent = sensorAccent(item.icon);
   const muted = item.unavailable;
   const color = muted ? "var(--text-muted)" : accent;
   const ph = `ph-${item.icon || "gauge"}`;
   const trend = item.trend;
   const trendBit = trend && trendIcon(trend)
-    ? `<i class="ph-bold ${trendIcon(trend)}" style="color:${trendAccent(trend)};font-size:.6em;margin-left:.25em;vertical-align:.15em" title="${trend} vs 24h ago"></i>`
+    ? `<i class="ph-bold ${trendIcon(trend)}" style="color:${trendAccent(trend)};font-size:.6em;margin-left:.25em;vertical-align:.15em" title="${escapeHtml(trendWord(trend, t))} ${escapeHtml(t("vs_24h_ago", "vs 24h ago"))}"></i>`
     : "";
   const spark = Array.isArray(item.sparkline) && item.sparkline.length >= 2
     ? `<div class="sensor-spark">${sparklineSvg(item.sparkline, color, { w: 200, h: 36, fill: true, strokeWidth: 2.4 })}</div>`
@@ -134,14 +141,14 @@ function renderStat(item, title, showTitle) {
     </div>`;
 }
 
-function renderList(items, title, showTitle, showNames) {
+function renderList(items, title, showTitle, showNames, t) {
   const rows = items.map((it, i) => {
     const accent = it.unavailable ? "var(--text-muted)" : sensorAccent(it.icon);
     const ph = `ph-${it.icon || "gauge"}`;
     const unit = it.unit ? `<span class="u-muted" style="font-weight:var(--fw-semi)"> ${escapeHtml(it.unit)}</span>` : "";
     const trend = it.trend;
     const trendBit = trend && trendIcon(trend)
-      ? `<i class="ph-bold ${trendIcon(trend)} sensor-trend" style="color:${trendAccent(trend)}" title="${trend} vs 24h"></i>`
+      ? `<i class="ph-bold ${trendIcon(trend)} sensor-trend" style="color:${trendAccent(trend)}" title="${escapeHtml(trendWord(trend, t))} ${escapeHtml(t("vs_24h", "vs 24h"))}"></i>`
       : "";
     const spark = Array.isArray(it.sparkline) && it.sparkline.length >= 2
       ? `<span class="sensor-row-spark">${sparklineSvg(it.sparkline, accent, { w: 64, h: 16, strokeWidth: 1.5 })}</span>`
@@ -173,27 +180,28 @@ function renderList(items, title, showTitle, showNames) {
 
 export default function render(shadow, ctx) {
   const data = ctx?.data ?? {};
+  const t = ctx?.t || ((key, fallback) => fallback ?? key);
   const css = `<link rel="stylesheet" href="/static/style/spectra-widgets.css">`;
 
   if (data.error) {
     shadow.innerHTML = `
       ${css}
       <div class="w" data-widget="ha_sensor">
-        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>Sensors</h3></div>
+        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>${escapeHtml(t("sensors", "Sensors"))}</h3></div>
         <div class="w-body"><p class="u-muted">${escapeHtml(data.error)}</p></div>
       </div>`;
     return;
   }
 
   const items = Array.isArray(data.items) ? data.items : [];
-  const title = data.title || (items.length === 1 ? items[0].name : "Sensors");
+  const title = data.title || (items.length === 1 ? items[0].name : t("sensors", "Sensors"));
 
   if (data.empty || items.length === 0) {
     shadow.innerHTML = `
       ${css}
       <div class="w" data-widget="ha_sensor">
         <div class="w-title"><i class="ph-bold ph-gauge"></i><h3>${escapeHtml(title)}</h3></div>
-        <div class="w-body"><p class="u-muted">No sensors selected.</p></div>
+        <div class="w-body"><p class="u-muted">${escapeHtml(t("no_sensors_selected", "No sensors selected."))}</p></div>
       </div>`;
     return;
   }
@@ -282,7 +290,7 @@ export default function render(shadow, ctx) {
     const accent = lead.unavailable ? "var(--text-muted)" : sensorAccent(lead.icon);
     const spark = Array.isArray(lead.sparkline) && lead.sparkline.length >= 2
       ? sparklineSvg(lead.sparkline, accent, { w: 200, h: 60, fill: true, strokeWidth: 2.4 })
-      : '<p class="u-muted">No history.</p>';
+      : `<p class="u-muted">${escapeHtml(t("no_history", "No history."))}</p>`;
     shadow.innerHTML = `
       ${css}
       <style>.sensor-frag-spark { height: 100%; width: 100%; display: flex; align-items: stretch; }</style>
@@ -295,8 +303,8 @@ export default function render(shadow, ctx) {
   const showTitle = data.show_title !== false;
   const showNames = data.show_names !== false;
   const body = items.length === 1
-    ? renderStat(items[0], title, showTitle)
-    : renderList(items, title, showTitle, showNames);
+    ? renderStat(items[0], title, showTitle, t)
+    : renderList(items, title, showTitle, showNames, t);
   shadow.innerHTML = `
     ${css}
     <style>${layout}</style>

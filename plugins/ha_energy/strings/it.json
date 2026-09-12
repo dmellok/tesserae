@@ -1,0 +1,16 @@
+{
+  "energy": "Energia",
+  "home": "Casa",
+  "solar": "Solare",
+  "battery": "Batteria",
+  "grid": "Rete",
+  "house": "Casa",
+  "charge": "Carica",
+  "export": "Immessa",
+  "kwh_today": "{n} kWh oggi",
+  "today": "Oggi",
+  "yesterday": "Ieri",
+  "no_history": "Nessuno storico.",
+  "no_stats": "Nessuna statistica.",
+  "no_flow": "NESSUN FLUSSO"
+}

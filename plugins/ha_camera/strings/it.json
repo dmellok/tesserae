@@ -1,0 +1,11 @@
+{
+  "just_now": "adesso",
+  "minutes_ago": "{n}m fa",
+  "hours_ago": "{n}h fa",
+  "days_ago": "{n}g fa",
+  "motion": "movimento",
+  "motion_upper": "MOVIMENTO",
+  "camera": "Telecamera",
+  "no_signal": "nessun segnale",
+  "cameras": "Telecamere"
+}

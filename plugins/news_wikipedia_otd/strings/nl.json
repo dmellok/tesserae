@@ -1,0 +1,16 @@
+{
+  "kind_events": "GEBEURTENISSEN",
+  "kind_births": "GEBOREN",
+  "kind_deaths": "OVERLEDEN",
+  "kind_holidays": "FEESTDAGEN",
+  "kind_selected": "SELECTIE",
+  "kind_all": "ALLES",
+  "era_antiquity": "Oudheid",
+  "era_medieval": "Middeleeuwen",
+  "era_renaissance": "Renaissance",
+  "era_industrial": "Industrieel",
+  "era_modern": "Modern",
+  "on_this_day": "Op deze dag",
+  "on": "Op",
+  "nothing_recorded": "Niets vastgelegd."
+}

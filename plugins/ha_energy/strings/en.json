@@ -1,0 +1,16 @@
+{
+  "energy": "Energy",
+  "home": "Home",
+  "solar": "Solar",
+  "battery": "Battery",
+  "grid": "Grid",
+  "house": "House",
+  "charge": "Charge",
+  "export": "Export",
+  "kwh_today": "{n} kWh today",
+  "today": "Today",
+  "yesterday": "Yesterday",
+  "no_history": "No history.",
+  "no_stats": "No stats.",
+  "no_flow": "NO FLOW"
+}

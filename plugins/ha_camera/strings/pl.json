@@ -1,0 +1,11 @@
+{
+  "just_now": "przed chwilą",
+  "minutes_ago": "{n} min temu",
+  "hours_ago": "{n} h temu",
+  "days_ago": "{n} d temu",
+  "motion": "ruch",
+  "motion_upper": "RUCH",
+  "camera": "Kamera",
+  "no_signal": "brak sygnału",
+  "cameras": "Kamery"
+}

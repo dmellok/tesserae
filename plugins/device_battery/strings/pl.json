@@ -1,0 +1,14 @@
+{
+  "just_now": "przed chwilą",
+  "minutes_ago": "{n} min temu",
+  "hours_ago": "{n} h temu",
+  "days_ago": "{n} d temu",
+  "today": "dziś",
+  "tomorrow": "jutro",
+  "in_n_days": "za {n} dni",
+  "in_n_weeks": "za {n} tyg.",
+  "in_n_months": "za {n} mies.",
+  "device_batteries": "Baterie urządzeń",
+  "no_devices": "Brak urządzeń zgłaszających stan baterii.",
+  "n_of_total": "{n} z {total}"
+}

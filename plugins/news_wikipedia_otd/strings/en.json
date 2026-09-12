@@ -1,0 +1,16 @@
+{
+  "kind_events": "EVENTS",
+  "kind_births": "BIRTHS",
+  "kind_deaths": "DEATHS",
+  "kind_holidays": "HOLIDAYS",
+  "kind_selected": "SELECTED",
+  "kind_all": "ALL",
+  "era_antiquity": "Antiquity",
+  "era_medieval": "Medieval",
+  "era_renaissance": "Renaissance",
+  "era_industrial": "Industrial",
+  "era_modern": "Modern",
+  "on_this_day": "On This Day",
+  "on": "On",
+  "nothing_recorded": "Nothing recorded."
+}

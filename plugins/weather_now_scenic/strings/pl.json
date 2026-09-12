@@ -1,0 +1,15 @@
+{
+  "weather": "Pogoda",
+  "cond_sunny": "Słonecznie",
+  "cond_mostly_clear": "Prawie bezchmurnie",
+  "cond_partly_cloudy": "Częściowo pochmurno",
+  "cond_cloudy": "Pochmurno",
+  "cond_fog": "Mgła",
+  "cond_drizzle": "Mżawka",
+  "cond_rain": "Deszcz",
+  "cond_rain_heavy": "Ulewa",
+  "cond_snow": "Śnieg",
+  "cond_snow_heavy": "Śnieżyca",
+  "cond_showers": "Przelotne opady",
+  "cond_storm": "Burza"
+}

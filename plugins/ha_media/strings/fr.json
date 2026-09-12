@@ -1,0 +1,8 @@
+{
+  "state_playing": "lecture",
+  "state_paused": "pause",
+  "state_idle": "inactif",
+  "state_off": "éteint",
+  "state_unavailable": "indisponible",
+  "media": "Média"
+}

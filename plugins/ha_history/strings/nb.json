@@ -1,0 +1,9 @@
+{
+  "no_samples_in_window": "Ingen målinger i perioden.",
+  "low": "Lav",
+  "high": "Høy",
+  "hours_abbr": "T",
+  "history": "Historikk",
+  "no_sensors_selected": "Ingen sensorer valgt.",
+  "no_chart_for_selection": "Ingen graf for dette utvalget."
+}

@@ -1,0 +1,18 @@
+{
+  "hourly": "Time for time",
+  "legend_temperature": "Temperatur",
+  "legend_rain": "Regn %",
+  "legend_now": "Nå",
+  "now_suffix": "NÅ",
+  "no_hourly_data": "Ingen timedata.",
+  "cond_clear": "Klarvær",
+  "cond_overcast": "Skyet",
+  "cond_partly_cloudy": "Delvis skyet",
+  "cond_drizzle": "Yr",
+  "cond_rain": "Regn",
+  "cond_rain_heavy": "Kraftig regn",
+  "cond_showers": "Regnbyger",
+  "cond_snow": "Snø",
+  "cond_thunderstorm": "Tordenvær",
+  "cond_fog": "Tåke"
+}

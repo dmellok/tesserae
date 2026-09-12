@@ -1,0 +1,9 @@
+{
+  "minutes_abbr": "m",
+  "hours_abbr": "t",
+  "days_abbr": "d",
+  "weeks_abbr": "u",
+  "months_abbr": "mnd",
+  "feed": "Nyheter",
+  "no_items": "Ingen saker."
+}

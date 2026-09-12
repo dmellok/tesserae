@@ -6,40 +6,48 @@
 // afternoon / evening / night". Pulse-dot for seconds is just a
 // static --accent-4 indicator since the spec forbids animation.
 
-// Phrasing tokens kept lowercase here, the renderer capitalises the
-// first letter of the assembled sentence (see spelledTime) so the
-// output reads "Twenty past three" rather than the mixed
-// "twenty past Three" the old MIN_WORDS-uppercase + HOUR_WORD-titlecase
-// combination produced.
-const MIN_WORDS = {
-  0: ["", "o'clock"],
-  5: ["five past", ""],
-  10: ["ten past", ""],
-  15: ["quarter past", ""],
-  20: ["twenty past", ""],
-  25: ["twenty-five past", ""],
-  30: ["half past", ""],
-  35: ["twenty-five to", ""],
-  40: ["twenty to", ""],
-  45: ["quarter to", ""],
-  50: ["ten to", ""],
-  55: ["five to", ""],
-};
+// Phrasing lives behind ctx.t() so a translator can localise the
+// whole sentence. Each five-minute step is a template with a {hour}
+// slot; the spelled hour word (already shifted to the next hour for
+// the "to" half) is substituted in, so a locale that says the hour
+// first ("trois heures cinq") just moves the slot. Tokens stay
+// lowercase, spelledTime() capitalises the first letter of the
+// assembled sentence so it reads "Twenty past three".
+function stepTemplates(t) {
+  return {
+    0: t("w_oclock", "{hour} o'clock"),
+    5: t("w_five_past", "five past {hour}"),
+    10: t("w_ten_past", "ten past {hour}"),
+    15: t("w_quarter_past", "quarter past {hour}"),
+    20: t("w_twenty_past", "twenty past {hour}"),
+    25: t("w_twenty_five_past", "twenty-five past {hour}"),
+    30: t("w_half_past", "half past {hour}"),
+    35: t("w_twenty_five_to", "twenty-five to {hour}"),
+    40: t("w_twenty_to", "twenty to {hour}"),
+    45: t("w_quarter_to", "quarter to {hour}"),
+    50: t("w_ten_to", "ten to {hour}"),
+    55: t("w_five_to", "five to {hour}"),
+  };
+}
 
-const HOUR_WORD = [
-  "twelve", "one", "two", "three", "four", "five",
-  "six", "seven", "eight", "nine", "ten", "eleven",
-];
+function hourWords(t) {
+  return [
+    t("w_twelve", "twelve"), t("w_one", "one"), t("w_two", "two"),
+    t("w_three", "three"), t("w_four", "four"), t("w_five", "five"),
+    t("w_six", "six"), t("w_seven", "seven"), t("w_eight", "eight"),
+    t("w_nine", "nine"), t("w_ten", "ten"), t("w_eleven", "eleven"),
+  ];
+}
 
 // Phase-of-day table. Each phase has a label, an icon, and an accent
 // token + tint mix percent for the background tone. Boundaries are
 // the canonical solar transitions: dawn 5, noon 12, dusk 17, night 21.
 const PHASES = [
-  { from: 0,  to: 5,  key: "night",     label: "Night",     icon: "ph-moon-stars", accent: "var(--accent-5)", tint: 10 },
-  { from: 5,  to: 12, key: "morning",   label: "Morning",   icon: "ph-sun-horizon", accent: "var(--accent-2)", tint: 8 },
-  { from: 12, to: 17, key: "afternoon", label: "Afternoon", icon: "ph-sun",         accent: "var(--accent-3)", tint: 7 },
-  { from: 17, to: 21, key: "evening",   label: "Evening",   icon: "ph-sun-horizon", accent: "var(--accent-1)", tint: 9 },
-  { from: 21, to: 24, key: "night",     label: "Night",     icon: "ph-moon",        accent: "var(--accent-5)", tint: 10 },
+  { from: 0,  to: 5,  key: "night",     icon: "ph-moon-stars", accent: "var(--accent-5)", tint: 10 },
+  { from: 5,  to: 12, key: "morning",   icon: "ph-sun-horizon", accent: "var(--accent-2)", tint: 8 },
+  { from: 12, to: 17, key: "afternoon", icon: "ph-sun",         accent: "var(--accent-3)", tint: 7 },
+  { from: 17, to: 21, key: "evening",   icon: "ph-sun-horizon", accent: "var(--accent-1)", tint: 9 },
+  { from: 21, to: 24, key: "night",     icon: "ph-moon",        accent: "var(--accent-5)", tint: 10 },
 ];
 
 function phaseFor(hour) {
@@ -52,29 +60,48 @@ function escapeHtml(s) {
   }[c]));
 }
 
-function spelledTime(date) {
+function spelledTime(date, t) {
   const h = date.getHours() % 12;
   const m = date.getMinutes();
   const step = Math.floor(m / 5) * 5;
   const isTo = step > 30;
   const hourIdx = isTo ? (h + 1) % 12 : h;
-  const [prefix, suffix] = MIN_WORDS[step] || ["", ""];
-  const hour = HOUR_WORD[hourIdx];
-  // All tokens are lowercase, capitalise the very first letter of the
-  // joined sentence so the output reads "Twenty past three" rather
-  // than the inconsistent "twenty past Three".
-  const sentence = [prefix, hour, suffix].filter(Boolean).join(" ").trim();
+  const template = stepTemplates(t)[step] || "{hour}";
+  const words = hourWords(t);
+  const hour = words[hourIdx];
+  // Templates may also use {this} (the hour just gone) and {next}
+  // (the hour to come) regardless of the step: languages that tell
+  // 3:30 as "half four" (German, Dutch, Norwegian, Swedish, Czech)
+  // write "halb {next}" for the 30 step, where {hour} would still be
+  // "three".
+  const thisHour = words[h];
+  const nextHour = words[(h + 1) % 12];
+  // Capitalise the very first letter of the assembled sentence so
+  // the output reads "Twenty past three" rather than "twenty past
+  // three".
+  const sentence = template
+    .replace("{hour}", hour)
+    .replace("{this}", thisHour)
+    .replace("{next}", nextHour)
+    .trim();
   return sentence ? sentence.charAt(0).toUpperCase() + sentence.slice(1) : "";
 }
 
 export default function render(shadow, ctx) {
   const opts = ctx?.cell?.options || {};
+  const t = ctx?.t || ((key, fallback) => fallback ?? key);
   const showDot = opts.show_seconds_dot !== false;
   const showTone = opts.show_tone !== false;
   const showPhaseBadge = opts.show_phase_badge !== false;
   const now = new Date();
-  const text = spelledTime(now);
+  const text = spelledTime(now, t);
   const phase = phaseFor(now.getHours());
+  const PHASE_LABELS = {
+    night: t("night", "Night"),
+    morning: t("morning", "Morning"),
+    afternoon: t("afternoon", "Afternoon"),
+    evening: t("evening", "Evening"),
+  };
 
   // Day/night tone, a soft radial gradient anchored at top-left
   // (where the sun would sit for that phase) that tracks the phase
@@ -91,7 +118,7 @@ export default function render(shadow, ctx) {
     ? `
       <div class="phase-badge">
         <i class="ph-bold ${phase.icon}" style="color:${phase.accent}"></i>
-        <span>${escapeHtml(phase.label)}</span>
+        <span>${escapeHtml(PHASE_LABELS[phase.key] || phase.key)}</span>
       </div>`
     : "";
 

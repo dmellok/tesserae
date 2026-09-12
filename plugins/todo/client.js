@@ -12,9 +12,10 @@ function escapeHtml(s) {
 
 export default function render(shadow, ctx) {
   const data = ctx?.data ?? {};
+  const t = ctx?.t || ((key, fallback) => fallback ?? key);
   const css = `<link rel="stylesheet" href="/static/style/spectra-widgets.css">`;
 
-  const listName = data.list_name || "To-do";
+  const listName = data.list_name || t("todo", "To-do");
 
   if (data.empty) {
     shadow.innerHTML = `
@@ -23,7 +24,7 @@ export default function render(shadow, ctx) {
         <div class="w-title"><i class="ph-bold ph-list-checks" style="color:var(--accent-3)"></i><h3>${escapeHtml(listName)}</h3></div>
         <div class="w-body" style="justify-content:center;align-items:center">
           <i class="ph-bold ph-check-circle" style="color:var(--accent-3);font-size:3em"></i>
-          <p class="u-muted">All done.</p>
+          <p class="u-muted">${escapeHtml(t("all_done", "All done."))}</p>
         </div>
       </div>`;
     return;
@@ -54,9 +55,12 @@ export default function render(shadow, ctx) {
   // Completion bar, overall progress through the list. Reads as a
   // calm horizontal rule with a moss accent fill so a "you're 60%
   // through this list" sense lands before you scan the row text.
+  const progressTitle = t("n_of_total_done", "{done} of {total} done")
+    .replace("{done}", String(completed))
+    .replace("{total}", String(total));
   const progressBar = total > 0
     ? `
-      <div class="todo-progress" title="${completed} of ${total} done">
+      <div class="todo-progress" title="${escapeHtml(progressTitle)}">
         <div class="todo-progress-track">
           <div class="todo-progress-fill" style="width:${completionPct.toFixed(1)}%"></div>
         </div>
@@ -105,7 +109,7 @@ export default function render(shadow, ctx) {
       <div class="w-title">
         <i class="ph-bold ph-list-checks" style="color:${active > 0 ? "var(--accent-4)" : "var(--accent-3)"}"></i>
         <h3>${escapeHtml(listName)}</h3>
-        <span class="w-title-meta">${active} TO DO${completed > 0 ? ` · ${completed} DONE` : ""}</span>
+        <span class="w-title-meta">${active} ${escapeHtml(t("to_do", "TO DO"))}${completed > 0 ? ` · ${completed} ${escapeHtml(t("done", "DONE"))}` : ""}</span>
       </div>
       ${progressBar}
       <div class="w-body list-body">${rows}</div>

@@ -1,0 +1,10 @@
+{
+  "trend_up": "rośnie",
+  "trend_down": "spada",
+  "trend_flat": "stabilnie",
+  "vs_24h_ago": "vs 24h temu",
+  "vs_24h": "vs 24h",
+  "sensors": "Czujniki",
+  "no_sensors_selected": "Nie wybrano czujników.",
+  "no_history": "Brak historii."
+}

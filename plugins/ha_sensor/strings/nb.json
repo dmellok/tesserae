@@ -1,0 +1,10 @@
+{
+  "trend_up": "opp",
+  "trend_down": "ned",
+  "trend_flat": "flat",
+  "vs_24h_ago": "mot 24t siden",
+  "vs_24h": "mot 24t",
+  "sensors": "Sensorer",
+  "no_sensors_selected": "Ingen sensorer valgt.",
+  "no_history": "Ingen historikk."
+}

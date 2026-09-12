@@ -1,0 +1,14 @@
+{
+  "just_now": "nettopp",
+  "minutes_ago": "{n}m siden",
+  "hours_ago": "{n}t siden",
+  "days_ago": "{n}d siden",
+  "today": "i dag",
+  "tomorrow": "i morgen",
+  "in_n_days": "om {n} dager",
+  "in_n_weeks": "om {n} uker",
+  "in_n_months": "om {n} mnd",
+  "device_batteries": "Enhetsbatterier",
+  "no_devices": "Ingen enheter med batterirapportering registrert ennå.",
+  "n_of_total": "{n} av {total}"
+}

@@ -1,0 +1,14 @@
+{
+  "week_n_of_total": "Week {n} of {total}",
+  "day_left": "{n} day left",
+  "days_left": "{n} days left",
+  "life_in_weeks": "Life in weeks",
+  "set_birth_year": "Set a birth year in cell options.",
+  "year_n_of_total": "Year {n} of {total}",
+  "week_lived": "{n} week lived",
+  "weeks_lived": "{n} weeks lived",
+  "week_to_go": "{n} week to go",
+  "weeks_to_go": "{n} weeks to go",
+  "through_the_year": "through the year",
+  "of_expected_life": "of expected life"
+}

@@ -1,0 +1,15 @@
+{
+  "weather": "Vær",
+  "cond_sunny": "Sol",
+  "cond_mostly_clear": "Lettskyet",
+  "cond_partly_cloudy": "Delvis skyet",
+  "cond_cloudy": "Skyet",
+  "cond_fog": "Tåke",
+  "cond_drizzle": "Yr",
+  "cond_rain": "Regn",
+  "cond_rain_heavy": "Kraftig regn",
+  "cond_snow": "Snø",
+  "cond_snow_heavy": "Kraftig snø",
+  "cond_showers": "Regnbyger",
+  "cond_storm": "Uvær"
+}

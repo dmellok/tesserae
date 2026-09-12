@@ -1,0 +1,10 @@
+{
+  "trend_up": "rastie",
+  "trend_down": "klesá",
+  "trend_flat": "stabilné",
+  "vs_24h_ago": "oproti stavu pred 24h",
+  "vs_24h": "za 24h",
+  "sensors": "Senzory",
+  "no_sensors_selected": "Nie sú vybrané žiadne senzory.",
+  "no_history": "Žiadna história."
+}

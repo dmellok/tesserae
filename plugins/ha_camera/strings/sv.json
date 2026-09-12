@@ -1,0 +1,11 @@
+{
+  "just_now": "nyss",
+  "minutes_ago": "{n} min sedan",
+  "hours_ago": "{n} h sedan",
+  "days_ago": "{n} d sedan",
+  "motion": "rörelse",
+  "motion_upper": "RÖRELSE",
+  "camera": "Kamera",
+  "no_signal": "ingen signal",
+  "cameras": "Kameror"
+}

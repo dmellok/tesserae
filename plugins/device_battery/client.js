@@ -22,25 +22,29 @@ function tone(pct) {
   return "ok";
 }
 
-function fmtAgo(seconds) {
+function fmtAgo(seconds, t) {
   if (!Number.isFinite(seconds)) return "";
-  if (seconds < 60) return "just now";
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-  return `${Math.floor(seconds / 86400)}d ago`;
+  if (seconds < 60) return t("just_now", "just now");
+  if (seconds < 3600) return t("minutes_ago", "{n}m ago").replace("{n}", String(Math.floor(seconds / 60)));
+  if (seconds < 86400) return t("hours_ago", "{n}h ago").replace("{n}", String(Math.floor(seconds / 3600)));
+  return t("days_ago", "{n}d ago").replace("{n}", String(Math.floor(seconds / 86400)));
 }
 
-function fmtDays(d) {
+// Whole "days to empty" phrase. Counts are always 2 or more by the
+// time a branch is reached (under two days reads today / tomorrow),
+// so plural forms are enough.
+function fmtDays(d, t) {
   if (!Number.isFinite(d) || d <= 0) return "";
-  if (d < 1) return "today";
-  if (d < 2) return "tomorrow";
-  if (d < 14) return `${Math.round(d)} days`;
-  if (d < 60) return `${Math.round(d / 7)} weeks`;
-  return `${Math.round(d / 30)} months`;
+  if (d < 1) return t("today", "today");
+  if (d < 2) return t("tomorrow", "tomorrow");
+  if (d < 14) return t("in_n_days", "in {n} days").replace("{n}", String(Math.round(d)));
+  if (d < 60) return t("in_n_weeks", "in {n} weeks").replace("{n}", String(Math.round(d / 7)));
+  return t("in_n_months", "in {n} months").replace("{n}", String(Math.round(d / 30)));
 }
 
 export default function render(shadow, ctx) {
   const data = ctx?.data ?? {};
+  const t = ctx?.t || ((key, fallback) => fallback ?? key);
   const css = '<link rel="stylesheet" href="/static/style/spectra-widgets.css">';
 
   const devices = Array.isArray(data.devices) ? data.devices : [];
@@ -51,28 +55,28 @@ export default function render(shadow, ctx) {
       <div class="w" data-widget="device_battery">
         <div class="w-title">
           <i class="ph-bold ph-battery-charging" style="color:var(--accent-2)"></i>
-          <h3>Device Batteries</h3>
+          <h3>${escapeHtml(t("device_batteries", "Device Batteries"))}</h3>
         </div>
-        <div class="w-body"><p class="u-muted">No battery-reporting devices registered yet.</p></div>
+        <div class="w-body"><p class="u-muted">${escapeHtml(t("no_devices", "No battery-reporting devices registered yet."))}</p></div>
       </div>`;
     return;
   }
 
   const rows = devices.map((d) => {
-    const t = tone(d.pct);
+    const rowTone = tone(d.pct);
     const accent =
-      t === "critical" ? "var(--accent-1)"
-        : t === "low" ? "var(--accent-2)"
+      rowTone === "critical" ? "var(--accent-1)"
+        : rowTone === "low" ? "var(--accent-2)"
         : "var(--accent-5)";
-    const prediction =
-      Number.isFinite(d.days_to_empty)
-        ? `<span class="db-predict">in ${escapeHtml(fmtDays(d.days_to_empty))}</span>`
-        : "";
+    const predictText = Number.isFinite(d.days_to_empty) ? fmtDays(d.days_to_empty, t) : "";
+    const prediction = predictText
+      ? `<span class="db-predict">${escapeHtml(predictText)}</span>`
+      : "";
     const ago = d.seconds_ago != null
-      ? `<span class="db-ago">${escapeHtml(fmtAgo(d.seconds_ago))}</span>`
+      ? `<span class="db-ago">${escapeHtml(fmtAgo(d.seconds_ago, t))}</span>`
       : "";
     return `
-      <div class="db-row" data-tone="${t}">
+      <div class="db-row" data-tone="${rowTone}">
         <div class="db-head">
           <span class="db-name">${escapeHtml(d.name || d.device_id || "")}</span>
           <span class="db-pct" style="color:${accent}">${escapeHtml(String(d.pct))}<small>%</small></span>
@@ -161,8 +165,8 @@ export default function render(shadow, ctx) {
     <div class="w" data-widget="device_battery">
       <div class="w-title">
         <i class="ph-bold ph-battery-charging" style="color:var(--accent-2)"></i>
-        <h3>Device Batteries</h3>
-        ${data.total_devices > devices.length ? `<span class="w-title-meta">${devices.length} of ${data.total_devices}</span>` : ""}
+        <h3>${escapeHtml(t("device_batteries", "Device Batteries"))}</h3>
+        ${data.total_devices > devices.length ? `<span class="w-title-meta">${escapeHtml(t("n_of_total", "{n} of {total}").replace("{n}", String(devices.length)).replace("{total}", String(data.total_devices)))}</span>` : ""}
       </div>
       <div class="w-body">
         <div class="db-list">${rows}</div>

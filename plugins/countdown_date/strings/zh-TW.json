@@ -1,0 +1,12 @@
+{
+  "hour": "小時",
+  "hours": "小時",
+  "day": "天",
+  "days": "天",
+  "unit_ago": "{unit}前",
+  "unit_to_go": "{unit}後",
+  "countdown": "倒數",
+  "set_target_date": "請在儲存格選項中設定目標日期。",
+  "date_has_passed": "日期已過。",
+  "today": "今天"
+}

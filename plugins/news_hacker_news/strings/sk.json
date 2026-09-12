@@ -1,0 +1,19 @@
+{
+  "feed_top": "Top",
+  "feed_new": "Nové",
+  "feed_best": "Najlepšie",
+  "feed_show": "Show",
+  "feed_ask": "Ask",
+  "now": "teraz",
+  "minutes_abbr": "m",
+  "hours_abbr": "h",
+  "days_abbr": "d",
+  "weeks_abbr": "t",
+  "type_show": "SHOW",
+  "type_ask": "ASK",
+  "type_tell": "TELL",
+  "type_launch": "LAUNCH",
+  "type_job": "PRÁCA",
+  "hacker_news": "Hacker News",
+  "no_stories": "Žiadne príspevky."
+}

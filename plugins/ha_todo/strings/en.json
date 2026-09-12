@@ -1,0 +1,16 @@
+{
+  "yesterday": "yesterday",
+  "day_abbr": "d",
+  "late": "late",
+  "today": "today",
+  "tomorrow": "tomorrow",
+  "priority_high": "high",
+  "priority_medium": "medium",
+  "priority_low": "low",
+  "todo": "To-do",
+  "all_done": "All done.",
+  "priority": "priority",
+  "overdue": "OVERDUE",
+  "to_do": "TO DO",
+  "done": "DONE"
+}

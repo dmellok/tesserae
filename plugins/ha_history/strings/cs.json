@@ -1,0 +1,9 @@
+{
+  "no_samples_in_window": "V daném okně žádné vzorky.",
+  "low": "Min",
+  "high": "Max",
+  "hours_abbr": "h",
+  "history": "Historie",
+  "no_sensors_selected": "Nejsou vybrány žádné senzory.",
+  "no_chart_for_selection": "Pro tento výběr žádný graf."
+}

@@ -1,0 +1,14 @@
+{
+  "dashboard": "Pulpit",
+  "wifi_excellent": "Doskonały",
+  "wifi_good": "Dobry",
+  "wifi_fair": "Średni",
+  "wifi_weak": "Słaby",
+  "available": "dostępne",
+  "firmware": "Firmware",
+  "temperature": "Temperatura",
+  "degrees": "stopni",
+  "rh": "RH",
+  "humidity": "Wilgotność",
+  "percent": "procent"
+}

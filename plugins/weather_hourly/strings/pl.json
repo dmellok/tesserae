@@ -1,0 +1,18 @@
+{
+  "hourly": "Godzinowa",
+  "legend_temperature": "Temperatura",
+  "legend_rain": "Deszcz %",
+  "legend_now": "Teraz",
+  "now_suffix": "TERAZ",
+  "no_hourly_data": "Brak danych godzinowych.",
+  "cond_clear": "Bezchmurnie",
+  "cond_overcast": "Pochmurno",
+  "cond_partly_cloudy": "Częściowo pochmurno",
+  "cond_drizzle": "Mżawka",
+  "cond_rain": "Deszcz",
+  "cond_rain_heavy": "Ulewa",
+  "cond_showers": "Przelotne opady",
+  "cond_snow": "Śnieg",
+  "cond_thunderstorm": "Burza",
+  "cond_fog": "Mgła"
+}

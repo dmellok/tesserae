@@ -1,0 +1,10 @@
+{
+  "trend_up": "upp",
+  "trend_down": "ner",
+  "trend_flat": "oförändrad",
+  "vs_24h_ago": "vs 24h sedan",
+  "vs_24h": "vs 24h",
+  "sensors": "Sensorer",
+  "no_sensors_selected": "Inga sensorer valda.",
+  "no_history": "Ingen historik."
+}

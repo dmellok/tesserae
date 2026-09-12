@@ -1,0 +1,16 @@
+{
+  "not_found": "未找到",
+  "mode_off": "关闭",
+  "mode_heat": "制热",
+  "mode_cool": "制冷",
+  "mode_heat_cool": "冷暖",
+  "mode_auto": "自动",
+  "mode_dry": "除湿",
+  "mode_fan_only": "送风",
+  "humidity_tip_target": "湿度 {h}%（目标 {t}%）",
+  "humidity_tip": "湿度 {h}%",
+  "target": "目标",
+  "climate": "温控",
+  "no_entities_selected": "未选择实体。",
+  "zones": "个区域"
+}

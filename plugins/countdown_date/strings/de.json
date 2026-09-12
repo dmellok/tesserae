@@ -1,0 +1,12 @@
+{
+  "hour": "Stunde",
+  "hours": "Stunden",
+  "day": "Tag",
+  "days": "Tage",
+  "unit_ago": "{unit} her",
+  "unit_to_go": "{unit} übrig",
+  "countdown": "Countdown",
+  "set_target_date": "Zieldatum in den Zellenoptionen setzen.",
+  "date_has_passed": "Datum ist vorbei.",
+  "today": "Heute"
+}

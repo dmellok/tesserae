@@ -1,0 +1,16 @@
+{
+  "energy": "Energia",
+  "home": "Dom",
+  "solar": "PV",
+  "battery": "Bateria",
+  "grid": "Sieć",
+  "house": "Dom",
+  "charge": "Ładowanie",
+  "export": "Eksport",
+  "kwh_today": "{n} kWh dziś",
+  "today": "Dziś",
+  "yesterday": "Wczoraj",
+  "no_history": "Brak historii.",
+  "no_stats": "Brak statystyk.",
+  "no_flow": "BRAK PRZEPŁYWU"
+}

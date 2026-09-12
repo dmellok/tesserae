@@ -1,0 +1,14 @@
+{
+  "just_now": "právě teď",
+  "minutes_ago": "před {n} min",
+  "hours_ago": "před {n} h",
+  "days_ago": "před {n} d",
+  "today": "dnes",
+  "tomorrow": "zítra",
+  "in_n_days": "za {n} dní",
+  "in_n_weeks": "za {n} týdnů",
+  "in_n_months": "za {n} měsíců",
+  "device_batteries": "Baterie zařízení",
+  "no_devices": "Zatím žádná zařízení hlásící stav baterie.",
+  "n_of_total": "{n} z {total}"
+}

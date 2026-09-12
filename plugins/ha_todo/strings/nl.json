@@ -1,0 +1,16 @@
+{
+  "yesterday": "gisteren",
+  "day_abbr": "d",
+  "late": "te laat",
+  "today": "vandaag",
+  "tomorrow": "morgen",
+  "priority_high": "hoog",
+  "priority_medium": "gemiddeld",
+  "priority_low": "laag",
+  "todo": "Taken",
+  "all_done": "Alles gedaan.",
+  "priority": "prioriteit",
+  "overdue": "TE LAAT",
+  "to_do": "TE DOEN",
+  "done": "GEDAAN"
+}

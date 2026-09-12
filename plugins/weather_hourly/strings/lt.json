@@ -1,0 +1,18 @@
+{
+  "hourly": "Valandinė",
+  "legend_temperature": "Temperatūra",
+  "legend_rain": "Lietus %",
+  "legend_now": "Dabar",
+  "now_suffix": "DABAR",
+  "no_hourly_data": "Valandinių duomenų nėra.",
+  "cond_clear": "Giedra",
+  "cond_overcast": "Debesuota",
+  "cond_partly_cloudy": "Mažai debesuota",
+  "cond_drizzle": "Dulksna",
+  "cond_rain": "Lietus",
+  "cond_rain_heavy": "Smarkus lietus",
+  "cond_showers": "Trumpas lietus",
+  "cond_snow": "Sniegas",
+  "cond_thunderstorm": "Perkūnija",
+  "cond_fog": "Rūkas"
+}

@@ -6,6 +6,20 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added
+
+- Every bundled widget now translates its panel text. The 28 widgets that
+  still painted hardcoded English (the Home Assistant set, clocks, countdown,
+  year progress, todo, news, pictures, transit, status) moved their labels,
+  empty states, legends and status words behind the widget `ctx.t()` contract
+  with a generated `strings/en.json`, and the whole bundled set ships
+  Czech, Dutch, French, German, Italian, Lithuanian, Norwegian Bokmål, Polish,
+  Portuguese, Slovak, Spanish, Swedish, and Chinese (Simplified and
+  Traditional). The set follows where installs actually report from; the
+  language pickers list all of them automatically. A repo-wide test now
+  pins every widget's locales to its shipped files, the English key set to
+  every translation, and each literal `t()` call to its English text.
+
 ### Fixed
 
 - A sleeping REST device woken for a daily lineup no longer collects the

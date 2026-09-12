@@ -1,0 +1,16 @@
+{
+  "energy": "Energie",
+  "home": "Thuis",
+  "solar": "Zon",
+  "battery": "Batterij",
+  "grid": "Net",
+  "house": "Huis",
+  "charge": "Laden",
+  "export": "Terug",
+  "kwh_today": "{n} kWh vandaag",
+  "today": "Vandaag",
+  "yesterday": "Gisteren",
+  "no_history": "Geen geschiedenis.",
+  "no_stats": "Geen statistieken.",
+  "no_flow": "GEEN FLOW"
+}

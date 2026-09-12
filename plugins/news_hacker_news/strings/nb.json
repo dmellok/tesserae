@@ -1,0 +1,19 @@
+{
+  "feed_top": "Topp",
+  "feed_new": "Nye",
+  "feed_best": "Beste",
+  "feed_show": "Show",
+  "feed_ask": "Ask",
+  "now": "nå",
+  "minutes_abbr": "m",
+  "hours_abbr": "t",
+  "days_abbr": "d",
+  "weeks_abbr": "u",
+  "type_show": "SHOW",
+  "type_ask": "ASK",
+  "type_tell": "TELL",
+  "type_launch": "LAUNCH",
+  "type_job": "JOBB",
+  "hacker_news": "Hacker News",
+  "no_stories": "Ingen saker."
+}

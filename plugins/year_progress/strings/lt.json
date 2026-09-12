@@ -1,0 +1,14 @@
+{
+  "week_n_of_total": "Savaitė {n} iš {total}",
+  "day_left": "liko {n} diena",
+  "days_left": "liko {n} dienos",
+  "life_in_weeks": "Gyvenimas savaitėmis",
+  "set_birth_year": "Nurodykite gimimo metus langelio nustatymuose.",
+  "year_n_of_total": "Metai {n} iš {total}",
+  "week_lived": "nugyventa {n} sav.",
+  "weeks_lived": "nugyventa {n} sav.",
+  "week_to_go": "liko {n} sav.",
+  "weeks_to_go": "liko {n} sav.",
+  "through_the_year": "metų praėjo",
+  "of_expected_life": "tikėtino gyvenimo"
+}

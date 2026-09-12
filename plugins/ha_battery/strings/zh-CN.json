@@ -1,0 +1,6 @@
+{
+  "critical": "电量极低",
+  "low": "电量低",
+  "batteries": "电池",
+  "no_batteries": "暂无电池。"
+}

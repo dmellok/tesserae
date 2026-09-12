@@ -1,0 +1,14 @@
+{
+  "week_n_of_total": "Tydzień {n} z {total}",
+  "day_left": "{n} dzień do końca",
+  "days_left": "{n} dni do końca",
+  "life_in_weeks": "Życie w tygodniach",
+  "set_birth_year": "Ustaw rok urodzenia w opcjach komórki.",
+  "year_n_of_total": "Rok {n} z {total}",
+  "week_lived": "{n} tydzień przeżyty",
+  "weeks_lived": "{n} tygodni przeżytych",
+  "week_to_go": "{n} tydzień do końca",
+  "weeks_to_go": "{n} tygodni do końca",
+  "through_the_year": "roku minęło",
+  "of_expected_life": "oczekiwanego życia"
+}

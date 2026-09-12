@@ -1,0 +1,8 @@
+{
+  "state_playing": "speelt",
+  "state_paused": "gepauzeerd",
+  "state_idle": "inactief",
+  "state_off": "uit",
+  "state_unavailable": "niet beschikbaar",
+  "media": "Media"
+}

@@ -1,0 +1,14 @@
+{
+  "just_now": "nyss",
+  "minutes_ago": "{n} min sedan",
+  "hours_ago": "{n} h sedan",
+  "days_ago": "{n} d sedan",
+  "today": "idag",
+  "tomorrow": "imorgon",
+  "in_n_days": "om {n} dagar",
+  "in_n_weeks": "om {n} veckor",
+  "in_n_months": "om {n} månader",
+  "device_batteries": "Enhetsbatterier",
+  "no_devices": "Inga enheter som rapporterar batteri ännu.",
+  "n_of_total": "{n} av {total}"
+}

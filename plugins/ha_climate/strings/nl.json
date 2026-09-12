@@ -1,0 +1,16 @@
+{
+  "not_found": "niet gevonden",
+  "mode_off": "uit",
+  "mode_heat": "verwarmen",
+  "mode_cool": "koelen",
+  "mode_heat_cool": "verw/koel",
+  "mode_auto": "auto",
+  "mode_dry": "drogen",
+  "mode_fan_only": "ventilator",
+  "humidity_tip_target": "vochtigheid {h}% (doel {t}%)",
+  "humidity_tip": "vochtigheid {h}%",
+  "target": "Doel",
+  "climate": "Klimaat",
+  "no_entities_selected": "Geen entiteiten geselecteerd.",
+  "zones": "ZONES"
+}

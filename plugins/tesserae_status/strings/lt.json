@@ -1,0 +1,14 @@
+{
+  "dashboard": "Skydelis",
+  "wifi_excellent": "Puikus",
+  "wifi_good": "Geras",
+  "wifi_fair": "Vidutinis",
+  "wifi_weak": "Silpnas",
+  "available": "galima",
+  "firmware": "Mikroprograma",
+  "temperature": "Temperatūra",
+  "degrees": "laipsniai",
+  "rh": "drėgmė",
+  "humidity": "Drėgmė",
+  "percent": "procentų"
+}

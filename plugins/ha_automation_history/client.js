@@ -8,9 +8,10 @@
 
 export default function render(shadow, ctx) {
   const data = (ctx && ctx.data) || {};
+  const t = ctx?.t || ((key, fallback) => fallback ?? key);
   const o = (ctx.cell && ctx.cell.options) || {};
   const fragment = (ctx.cell && ctx.cell.fragment) || ctx.fragment || "full";
-  const title = (o.title && o.title.trim()) || data.title || "Automations";
+  const title = (o.title && o.title.trim()) || data.title || t("automations", "Automations");
 
   // ---- helpers ------------------------------------------------------------
   const num = (n) => typeof n === "number" && isFinite(n);
@@ -20,10 +21,10 @@ export default function render(shadow, ctx) {
     );
   function ago(sec) {
     if (!num(sec)) return "—";
-    if (sec < 45) return "now";
-    if (sec < 3600) return Math.round(sec / 60) + "m";
-    if (sec < 86400) return Math.round(sec / 3600) + "h";
-    return Math.round(sec / 86400) + "d";
+    if (sec < 45) return t("now", "now");
+    if (sec < 3600) return Math.round(sec / 60) + t("minute_abbr", "m");
+    if (sec < 86400) return Math.round(sec / 3600) + t("hour_abbr", "h");
+    return Math.round(sec / 86400) + t("day_abbr", "d");
   }
   const count = (n) => (num(n) ? String(n) : "0");
 
@@ -117,9 +118,11 @@ export default function render(shadow, ctx) {
     shadow.innerHTML = `${css}
       <div class="w" data-widget="ha_automation_history">
         <div class="w-title"><i class="ph-bold ph-lightning-slash"></i><h3>${esc(title)}</h3></div>
-        <div class="w-body"><p class="u-muted">No automations found${
-          data.tracked_all === false ? " for your selection" : ""
-        }.</p></div>
+        <div class="w-body"><p class="u-muted">${esc(
+          data.tracked_all === false
+            ? t("no_automations_selection", "No automations found for your selection.")
+            : t("no_automations", "No automations found.")
+        )}</p></div>
       </div>`;
     return;
   }
@@ -132,9 +135,9 @@ export default function render(shadow, ctx) {
       <div class="w" data-widget="ha_automation_history">
         <div class="ah-bar">
           <i class="ph-bold ph-lightning logo"></i>
-          <span class="stat"><b>${count(data.total_24h)}</b><small>fired · 24h</small></span>
+          <span class="stat"><b>${count(data.total_24h)}</b><small>${esc(t("fired_24h", "fired · 24h"))}</small></span>
           <span class="sep">·</span>
-          <span class="stat"><b>${count(data.total_1h)}</b><small>1h</small></span>
+          <span class="stat"><b>${count(data.total_1h)}</b><small>${esc(t("one_hour_abbr", "1h"))}</small></span>
           ${stale}
         </div>
       </div>`;
@@ -147,28 +150,28 @@ export default function render(shadow, ctx) {
   const rankTiles =
     (most
       ? `<div class="tile most">
-           <div class="lab"><i class="ph-bold ph-trophy"></i>Most fired · 7d</div>
+           <div class="lab"><i class="ph-bold ph-trophy"></i>${esc(t("most_fired_7d", "Most fired · 7d"))}</div>
            <div class="nm">${esc(most.name)}</div>
-           <div class="ct">${count(most.c7)} triggers</div>
+           <div class="ct">${count(most.c7)} ${esc(most.c7 === 1 ? t("trigger", "trigger") : t("triggers", "triggers"))}</div>
          </div>`
       : `<div class="tile most">
-           <div class="lab"><i class="ph-bold ph-moon"></i>This week</div>
-           <div class="nm">No triggers</div>
-           <div class="ct">quiet week</div>
+           <div class="lab"><i class="ph-bold ph-moon"></i>${esc(t("this_week", "This week"))}</div>
+           <div class="nm">${esc(t("no_triggers", "No triggers"))}</div>
+           <div class="ct">${esc(t("quiet_week", "quiet week"))}</div>
          </div>`) +
     (least
       ? `<div class="tile least">
-           <div class="lab"><i class="ph-bold ph-arrow-down"></i>Least fired · 7d</div>
+           <div class="lab"><i class="ph-bold ph-arrow-down"></i>${esc(t("least_fired_7d", "Least fired · 7d"))}</div>
            <div class="nm">${esc(least.name)}</div>
-           <div class="ct">${count(least.c7)} triggers</div>
+           <div class="ct">${count(least.c7)} ${esc(least.c7 === 1 ? t("trigger", "trigger") : t("triggers", "triggers"))}</div>
          </div>`
       : "");
 
   const totals = `
     <div class="ah-totals">
-      <div class="cell"><div class="n">${count(data.total_1h)}</div><div class="l">1 hour</div></div>
-      <div class="cell"><div class="n">${count(data.total_24h)}</div><div class="l">24 hours</div></div>
-      <div class="cell"><div class="n">${count(data.total_7d)}</div><div class="l">7 days</div></div>
+      <div class="cell"><div class="n">${count(data.total_1h)}</div><div class="l">${esc(t("one_hour", "1 hour"))}</div></div>
+      <div class="cell"><div class="n">${count(data.total_24h)}</div><div class="l">${esc(t("twenty_four_hours", "24 hours"))}</div></div>
+      <div class="cell"><div class="n">${count(data.total_7d)}</div><div class="l">${esc(t("seven_days", "7 days"))}</div></div>
     </div>`;
 
   const feed = Array.isArray(data.recent) ? data.recent : [];
@@ -190,15 +193,17 @@ export default function render(shadow, ctx) {
     .join("");
   const recent = `
     <div class="ah-recent">
-      <div class="subhead">Recently active</div>
+      <div class="subhead">${esc(t("recently_active", "Recently active"))}</div>
       <div class="list-body">${
-        rows || `<p class="u-muted">Nothing in the last ${esc(data.window_days || 7)} days.</p>`
+        rows || `<p class="u-muted">${esc(
+          t("nothing_in_last_days", "Nothing in the last {n} days.").replace("{n}", String(data.window_days || 7))
+        )}</p>`
       }</div>
     </div>`;
 
   const stale = num(data.stale_count) && data.stale_count > 0
-    ? `<span class="stale"><i class="ph-bold ph-warning"></i> ${data.stale_count} stale</span>` : "";
-  const meta = `<span class="w-title-meta">${stale}<span class="win">${esc(data.window_days || 7)}d</span></span>`;
+    ? `<span class="stale"><i class="ph-bold ph-warning"></i> ${data.stale_count} ${esc(t("stale", "stale"))}</span>` : "";
+  const meta = `<span class="w-title-meta">${stale}<span class="win">${esc(data.window_days || 7)}${esc(t("day_abbr", "d"))}</span></span>`;
 
   shadow.innerHTML = `${css}<style>${layout}</style>
     <div class="w" data-widget="ha_automation_history">

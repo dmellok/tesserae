@@ -1,0 +1,16 @@
+{
+  "energy": "能源",
+  "home": "住家",
+  "solar": "太陽能",
+  "battery": "電池",
+  "grid": "電網",
+  "house": "家用",
+  "charge": "充電",
+  "export": "輸出",
+  "kwh_today": "今天 {n} kWh",
+  "today": "今天",
+  "yesterday": "昨天",
+  "no_history": "沒有歷史紀錄。",
+  "no_stats": "沒有統計資料。",
+  "no_flow": "無流量"
+}

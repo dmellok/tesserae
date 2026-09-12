@@ -25,39 +25,42 @@ function parseDue(iso) {
 // Categorise the due-date relative to today. "Today" is a same-day
 // match; "tomorrow" is +1; "soon" is 2–7 days; "later" is anything
 // beyond. Negative deltas (in the past) bucket as "overdue".
-function dueProximity(iso) {
+function dueProximity(iso, t, locale) {
   const d = parseDue(iso);
   if (!d) return null;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const days = Math.round((d.getTime() - today.getTime()) / 86_400_000);
-  if (days < 0) return { key: "overdue", days, color: "var(--accent-1)", label: days === -1 ? "yesterday" : `${-days}d late` };
-  if (days === 0) return { key: "today", days, color: "var(--accent-2)", label: "today" };
-  if (days === 1) return { key: "tomorrow", days, color: "var(--accent-3)", label: "tomorrow" };
-  if (days <= 7) return { key: "soon", days, color: "var(--accent-5)", label: `${days}d` };
-  return { key: "later", days, color: "var(--text-muted)", label: formatLater(d) };
+  if (days < 0) return { key: "overdue", days, color: "var(--accent-1)", label: days === -1 ? t("yesterday", "yesterday") : `${-days}${t("day_abbr", "d")} ${t("late", "late")}` };
+  if (days === 0) return { key: "today", days, color: "var(--accent-2)", label: t("today", "today") };
+  if (days === 1) return { key: "tomorrow", days, color: "var(--accent-3)", label: t("tomorrow", "tomorrow") };
+  if (days <= 7) return { key: "soon", days, color: "var(--accent-5)", label: `${days}${t("day_abbr", "d")}` };
+  return { key: "later", days, color: "var(--text-muted)", label: formatLater(d, locale) };
 }
 
-function formatLater(d) {
+function formatLater(d, locale) {
   const today = new Date();
   const sameYear = d.getFullYear() === today.getFullYear();
-  return sameYear
-    ? `${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`
-    : `${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}/${String(d.getFullYear()).slice(2)}`;
+  const opts = sameYear
+    ? { month: "2-digit", day: "2-digit" }
+    : { month: "2-digit", day: "2-digit", year: "2-digit" };
+  return new Intl.DateTimeFormat(locale || "en", opts).format(d);
 }
 
 // iCal priority 0-9. 0 = none, 1-4 = high (terracotta), 5 = medium
 // (ochre), 6-9 = low (muted). Returns null when there's no priority
 // to render.
-function priorityDot(priority) {
+function priorityDot(priority, t) {
   if (!Number.isFinite(priority) || priority === 0) return null;
-  if (priority >= 1 && priority <= 4) return { color: "var(--accent-1)", label: "high" };
-  if (priority === 5) return { color: "var(--accent-2)", label: "medium" };
-  if (priority >= 6 && priority <= 9) return { color: "var(--text-muted)", label: "low" };
+  if (priority >= 1 && priority <= 4) return { color: "var(--accent-1)", label: t("priority_high", "high") };
+  if (priority === 5) return { color: "var(--accent-2)", label: t("priority_medium", "medium") };
+  if (priority >= 6 && priority <= 9) return { color: "var(--text-muted)", label: t("priority_low", "low") };
   return null;
 }
 
 export default function render(shadow, ctx) {
+  const t = ctx?.t || ((key, fallback) => fallback ?? key);
+  const locale = ctx?.locale || "en";
   const data = ctx?.data ?? {};
   const css = `<link rel="stylesheet" href="/static/style/spectra-widgets.css">`;
 
@@ -65,14 +68,14 @@ export default function render(shadow, ctx) {
     shadow.innerHTML = `
       ${css}
       <div class="w" data-widget="ha_todo">
-        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>To-do</h3></div>
+        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>${escapeHtml(t("todo", "To-do"))}</h3></div>
         <div class="w-body"><p class="u-muted">${escapeHtml(data.error)}</p></div>
       </div>`;
     return;
   }
 
   const items = Array.isArray(data.items) ? data.items : [];
-  const title = data.title || "To-do";
+  const title = data.title || t("todo", "To-do");
   const pending = data.needs_action_count ?? items.filter((i) => i.status !== "completed").length;
   const completed = data.completed_count ?? items.filter((i) => i.status === "completed").length;
 
@@ -80,7 +83,7 @@ export default function render(shadow, ctx) {
   // actually past its date.
   const overdueCount = items.filter((it) => {
     if (it.status === "completed") return false;
-    const p = dueProximity(it.due);
+    const p = dueProximity(it.due, t, locale);
     return p?.key === "overdue";
   }).length;
 
@@ -91,7 +94,7 @@ export default function render(shadow, ctx) {
         <div class="w-title"><i class="ph-bold ph-list-checks"></i><h3>${escapeHtml(title)}</h3></div>
         <div class="w-body" style="justify-content:center;align-items:center">
           <i class="ph-bold ph-check-circle" style="color:var(--accent-3);font-size:3em"></i>
-          <p class="u-muted">All done.</p>
+          <p class="u-muted">${escapeHtml(t("all_done", "All done."))}</p>
         </div>
       </div>`;
     return;
@@ -104,16 +107,16 @@ export default function render(shadow, ctx) {
     const titleStyle = done
       ? "color:var(--text-muted);text-decoration:line-through"
       : "";
-    const proximity = !done ? dueProximity(it.due) : null;
+    const proximity = !done ? dueProximity(it.due, t, locale) : null;
     const dueChip = proximity
       ? `<span class="todo-due todo-due--${proximity.key}" style="color:${proximity.color};background:color-mix(in oklab, ${proximity.color} 14%, var(--surface))">
           ${proximity.key === "overdue" ? '<i class="ph-bold ph-warning" style="font-size:.85em"></i>' : ""}
           ${escapeHtml(proximity.label)}
         </span>`
       : "";
-    const dot = !done ? priorityDot(it.priority) : null;
+    const dot = !done ? priorityDot(it.priority, t) : null;
     const dotSpan = dot
-      ? `<span class="todo-priority" style="background:${dot.color}" title="priority: ${dot.label}"></span>`
+      ? `<span class="todo-priority" style="background:${dot.color}" title="${escapeHtml(t("priority", "priority"))}: ${escapeHtml(dot.label)}"></span>`
       : "";
     return `
       <div class="todo-row ${i % 2 ? "is-zebra" : ""}${proximity?.key === "overdue" ? " is-overdue" : ""}">
@@ -128,8 +131,8 @@ export default function render(shadow, ctx) {
 
   const titleAccent = overdueCount > 0 ? "var(--accent-1)" : pending > 0 ? "var(--accent-4)" : "var(--accent-3)";
   const meta = overdueCount > 0
-    ? `<span class="w-title-meta" style="color:var(--accent-1)"><i class="ph-bold ph-warning" style="margin-right:.2em"></i>${overdueCount} OVERDUE</span>`
-    : `<span class="w-title-meta">${pending} TO DO${completed > 0 ? ` · ${completed} DONE` : ""}</span>`;
+    ? `<span class="w-title-meta" style="color:var(--accent-1)"><i class="ph-bold ph-warning" style="margin-right:.2em"></i>${overdueCount} ${escapeHtml(t("overdue", "OVERDUE"))}</span>`
+    : `<span class="w-title-meta">${pending} ${escapeHtml(t("to_do", "TO DO"))}${completed > 0 ? ` · ${completed} ${escapeHtml(t("done", "DONE"))}` : ""}</span>`;
 
   const layout = `
     .todo-row {

@@ -177,6 +177,7 @@ function sunArcSvg({ riseMin, setMin, nowMin, isDay, opts }) {
 export default function render(shadow, ctx) {
   const data = ctx?.data ?? {};
   const opts = ctx?.cell?.options || {};
+  const t = ctx?.t || ((key, fallback) => fallback ?? key);
   const showTwilight = opts.show_twilight !== false;
   const showGolden = opts.show_golden !== false;
   const showArc = opts.show_arc !== false;
@@ -186,13 +187,13 @@ export default function render(shadow, ctx) {
     shadow.innerHTML = `
       ${css}
       <div class="w" data-widget="clock_sunrise_sunset">
-        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>Sun</h3></div>
+        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>${escapeHtml(t("sun", "Sun"))}</h3></div>
         <div class="w-body"><p class="u-muted">${escapeHtml(data.error)}</p></div>
       </div>`;
     return;
   }
 
-  const label = data.label || "Sun";
+  const label = data.label || t("sun", "Sun");
   const sunrise = hhmmFromIso(data.sunrise);
   const sunset = hhmmFromIso(data.sunset);
   const daylight = fmtDaylight(data.daylight_seconds);
@@ -255,18 +256,18 @@ export default function render(shadow, ctx) {
         <div class="status-hero">
           <i class="ph-bold ${heroIcon}" style="color:${heroAccent}"></i>
           <div class="lockup">
-            <span class="status-state">${daylight ? `${daylight.h}<small style="font-size:.5em;color:var(--text-secondary)"> H </small>${daylight.m}<small style="font-size:.5em;color:var(--text-secondary)"> M</small>` : "-"}</span>
-            <span class="status-sub">Daylight</span>
+            <span class="status-state">${daylight ? `${daylight.h}<small style="font-size:.5em;color:var(--text-secondary)"> ${escapeHtml(t("hours_abbr", "H"))} </small>${daylight.m}<small style="font-size:.5em;color:var(--text-secondary)"> ${escapeHtml(t("minutes_abbr", "M"))}</small>` : "-"}</span>
+            <span class="status-sub">${escapeHtml(t("daylight", "Daylight"))}</span>
           </div>
         </div>
         ${arcBlock}
         <div class="status-grid">
           <div class="status-cell">
-            <span class="u-label">Sunrise</span>
+            <span class="u-label">${escapeHtml(t("sunrise", "Sunrise"))}</span>
             <span class="v" style="color:var(--accent-2)">${escapeHtml(sunrise)}</span>
           </div>
           <div class="status-cell">
-            <span class="u-label">Sunset</span>
+            <span class="u-label">${escapeHtml(t("sunset", "Sunset"))}</span>
             <span class="v" style="color:var(--accent-1)">${escapeHtml(sunset)}</span>
           </div>
         </div>

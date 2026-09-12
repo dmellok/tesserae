@@ -3,6 +3,7 @@
   "name": "Home Assistant, Automation History",
   "version": "0.1.0",
   "kind": "widget",
+  "locales": ["en", "cs", "de", "es", "fr", "it", "lt", "nb", "nl", "pl", "pt", "sk", "sv", "zh-CN", "zh-TW"],
   "description": "Which Home Assistant automations fired, when, and how often. Ranks the most- vs least-fired automation this week, streams a most-recent-first trigger feed, tallies 1h / 24h / 7d trigger counts, and flags any tracked automation that hasn't fired within an expected cadence. Reads automation.* logbook history via the Home Assistant Core plugin.",
   "icon": "ph-lightning",
   "supports": {

@@ -1,0 +1,14 @@
+{
+  "dashboard": "Dashboard",
+  "wifi_excellent": "Uitstekend",
+  "wifi_good": "Goed",
+  "wifi_fair": "Matig",
+  "wifi_weak": "Zwak",
+  "available": "beschikbaar",
+  "firmware": "Firmware",
+  "temperature": "Temperatuur",
+  "degrees": "graden",
+  "rh": "RV",
+  "humidity": "Luchtvochtigheid",
+  "percent": "procent"
+}

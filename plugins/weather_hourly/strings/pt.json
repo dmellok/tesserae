@@ -1,0 +1,18 @@
+{
+  "hourly": "Por hora",
+  "legend_temperature": "Temperatura",
+  "legend_rain": "Chuva %",
+  "legend_now": "Agora",
+  "now_suffix": "AGORA",
+  "no_hourly_data": "Sem dados horários.",
+  "cond_clear": "Céu limpo",
+  "cond_overcast": "Encoberto",
+  "cond_partly_cloudy": "Pouco nublado",
+  "cond_drizzle": "Chuvisco",
+  "cond_rain": "Chuva",
+  "cond_rain_heavy": "Chuva forte",
+  "cond_showers": "Aguaceiros",
+  "cond_snow": "Neve",
+  "cond_thunderstorm": "Trovoada",
+  "cond_fog": "Nevoeiro"
+}

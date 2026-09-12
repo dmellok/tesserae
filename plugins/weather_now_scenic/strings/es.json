@@ -1,0 +1,15 @@
+{
+  "weather": "Clima",
+  "cond_sunny": "Soleado",
+  "cond_mostly_clear": "Casi despejado",
+  "cond_partly_cloudy": "Algo nublado",
+  "cond_cloudy": "Nublado",
+  "cond_fog": "Niebla",
+  "cond_drizzle": "Llovizna",
+  "cond_rain": "Lluvia",
+  "cond_rain_heavy": "Lluvia fuerte",
+  "cond_snow": "Nieve",
+  "cond_snow_heavy": "Nevada fuerte",
+  "cond_showers": "Chubascos",
+  "cond_storm": "Tormenta"
+}

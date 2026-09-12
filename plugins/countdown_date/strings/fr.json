@@ -1,0 +1,12 @@
+{
+  "hour": "heure",
+  "hours": "heures",
+  "day": "jour",
+  "days": "jours",
+  "unit_ago": "il y a {unit}",
+  "unit_to_go": "{unit} à attendre",
+  "countdown": "Compte à rebours",
+  "set_target_date": "Indiquez une date cible dans les options de la cellule.",
+  "date_has_passed": "Date passée.",
+  "today": "Aujourd'hui"
+}

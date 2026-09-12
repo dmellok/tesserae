@@ -1,0 +1,15 @@
+{
+  "weather": "Väder",
+  "cond_sunny": "Soligt",
+  "cond_mostly_clear": "Mest klart",
+  "cond_partly_cloudy": "Halvklart",
+  "cond_cloudy": "Molnigt",
+  "cond_fog": "Dimma",
+  "cond_drizzle": "Duggregn",
+  "cond_rain": "Regn",
+  "cond_rain_heavy": "Kraftigt regn",
+  "cond_snow": "Snö",
+  "cond_snow_heavy": "Kraftigt snöfall",
+  "cond_showers": "Skurar",
+  "cond_storm": "Åska"
+}

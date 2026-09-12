@@ -1,0 +1,11 @@
+{
+  "just_now": "刚刚",
+  "minutes_ago": "{n}分钟前",
+  "hours_ago": "{n}小时前",
+  "days_ago": "{n}天前",
+  "motion": "移动侦测",
+  "motion_upper": "移动侦测",
+  "camera": "摄像头",
+  "no_signal": "无信号",
+  "cameras": "摄像头"
+}

@@ -1,0 +1,16 @@
+{
+  "energy": "Energia",
+  "home": "Domov",
+  "solar": "Solár",
+  "battery": "Batéria",
+  "grid": "Sieť",
+  "house": "Dom",
+  "charge": "Nabíjanie",
+  "export": "Export",
+  "kwh_today": "{n} kWh dnes",
+  "today": "Dnes",
+  "yesterday": "Včera",
+  "no_history": "Žiadna história.",
+  "no_stats": "Žiadne štatistiky.",
+  "no_flow": "BEZ TOKU"
+}

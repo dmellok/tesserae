@@ -1,0 +1,18 @@
+{
+  "hourly": "Stündlich",
+  "legend_temperature": "Temperatur",
+  "legend_rain": "Regen %",
+  "legend_now": "Jetzt",
+  "now_suffix": "JETZT",
+  "no_hourly_data": "Keine Stundenwerte.",
+  "cond_clear": "Klar",
+  "cond_overcast": "Bedeckt",
+  "cond_partly_cloudy": "Wolkig",
+  "cond_drizzle": "Nieselregen",
+  "cond_rain": "Regen",
+  "cond_rain_heavy": "Starkregen",
+  "cond_showers": "Schauer",
+  "cond_snow": "Schnee",
+  "cond_thunderstorm": "Gewitter",
+  "cond_fog": "Nebel"
+}

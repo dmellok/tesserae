@@ -3,6 +3,7 @@
   "name": "Home Assistant, History",
   "version": "0.8.1",
   "kind": "widget",
+  "locales": ["en", "cs", "de", "es", "fr", "it", "lt", "nb", "nl", "pl", "pt", "sk", "sv", "zh-CN", "zh-TW"],
   "description": "A numeric Home Assistant sensor over time. Pairs the current value + trend arrow + min/max (in the legend strip, or as a large headline above the chart) with a Chart.js line chart, optional threshold horizontal line, optional fixed y-axis range, min/max marker dots + labels on the curve, and an averaged hourly-profile ghost overlay for long windows. Requires the Home Assistant Core plugin.",
   "icon": "ph-chart-line",
   "supports": {

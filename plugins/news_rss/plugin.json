@@ -3,6 +3,7 @@
   "name": "News, RSS / Atom",
   "version": "0.3.0",
   "kind": "widget",
+  "locales": ["en", "cs", "de", "es", "fr", "it", "lt", "nb", "nl", "pl", "pt", "sk", "sv", "zh-CN", "zh-TW"],
   "description": "Latest N headlines from any RSS 2.0 or Atom 1.0 feed. Paste a feed URL; the widget parses both formats with the stdlib XML parser (no extra deps).",
   "icon": "ph-rss",
   "supports": {

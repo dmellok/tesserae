@@ -1,0 +1,14 @@
+{
+  "dashboard": "Painel",
+  "wifi_excellent": "Excelente",
+  "wifi_good": "Boa",
+  "wifi_fair": "Razoável",
+  "wifi_weak": "Fraca",
+  "available": "disponível",
+  "firmware": "Firmware",
+  "temperature": "Temperatura",
+  "degrees": "graus",
+  "rh": "HR",
+  "humidity": "Humidade",
+  "percent": "por cento"
+}

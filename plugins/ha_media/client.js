@@ -37,6 +37,20 @@ function stateAccent(s) {
   return STATE_ACCENT[(s || "").toLowerCase()] || "var(--text-secondary)";
 }
 
+// server.py collapses the player's state to a closed vocabulary
+// (playing / paused / idle / off / unavailable), so each id names a
+// translated slot; anything else passes through as data.
+function stateLabel(s, t) {
+  switch ((s || "").toLowerCase()) {
+    case "playing": return t("state_playing", "playing");
+    case "paused": return t("state_paused", "paused");
+    case "idle": return t("state_idle", "idle");
+    case "off": return t("state_off", "off");
+    case "unavailable": return t("state_unavailable", "unavailable");
+    default: return s || "";
+  }
+}
+
 function fmtMmSs(seconds) {
   if (typeof seconds !== "number" || !Number.isFinite(seconds) || seconds < 0) return "";
   const total = Math.floor(seconds);
@@ -112,20 +126,22 @@ export default function render(shadow, ctx) {
   const showProgress = opts.show_progress !== false;
   const showBleed = opts.show_art_bleed !== false;
   const showWaveform = opts.show_waveform !== false;
+  const t = ctx?.t || ((key, fallback) => fallback ?? key);
   const css = `<link rel="stylesheet" href="/static/style/spectra-widgets.css">`;
 
   if (data.error) {
     shadow.innerHTML = `
       ${css}
       <div class="w" data-widget="ha_media">
-        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>Media</h3></div>
+        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>${escapeHtml(t("media", "Media"))}</h3></div>
         <div class="w-body"><p class="u-muted">${escapeHtml(data.error)}</p></div>
       </div>`;
     return;
   }
 
-  const name = data.name || "Media";
+  const name = data.name || t("media", "Media");
   const state = data.state || "";
+  const stateText = stateLabel(state, t);
   const title = data.title || "";
   const artist = data.artist || "";
   const album = data.album || "";
@@ -138,7 +154,7 @@ export default function render(shadow, ctx) {
   const metaTitle = isPlaying && title ? title : name;
   const metaSubBits = isPlaying
     ? [artist, album].filter(Boolean)
-    : [source || state || "idle"];
+    : [source || stateText || t("state_idle", "idle")];
   const metaSub = metaSubBits.join(" · ");
 
   const heroBody = art
@@ -245,7 +261,7 @@ export default function render(shadow, ctx) {
       <div class="w-title">
         <i class="ph-bold ${ph}" style="color:${accent}"></i>
         <h3>${escapeHtml(name)}</h3>
-        ${state ? `<span class="w-title-meta" style="color:${accent}">${escapeHtml(state)}</span>` : ""}
+        ${state ? `<span class="w-title-meta" style="color:${accent}">${escapeHtml(stateText)}</span>` : ""}
       </div>
       <div class="w-body img-body">
         <div class="img-hero">${heroBody}</div>

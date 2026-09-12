@@ -1,0 +1,12 @@
+{
+  "hour": "hodina",
+  "hours": "hodín",
+  "day": "deň",
+  "days": "dní",
+  "unit_ago": "{unit} späť",
+  "unit_to_go": "{unit} zostáva",
+  "countdown": "Odpočet",
+  "set_target_date": "Nastavte cieľový dátum v možnostiach bunky.",
+  "date_has_passed": "Dátum už prešiel.",
+  "today": "Dnes"
+}

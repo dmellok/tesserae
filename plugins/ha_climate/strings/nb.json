@@ -1,0 +1,16 @@
+{
+  "not_found": "ikke funnet",
+  "mode_off": "av",
+  "mode_heat": "varme",
+  "mode_cool": "kjøling",
+  "mode_heat_cool": "varme/kjøl",
+  "mode_auto": "auto",
+  "mode_dry": "tørking",
+  "mode_fan_only": "kun vifte",
+  "humidity_tip_target": "fuktighet {h}% (mål {t}%)",
+  "humidity_tip": "fuktighet {h}%",
+  "target": "Mål",
+  "climate": "Klima",
+  "no_entities_selected": "Ingen entiteter valgt.",
+  "zones": "SONER"
+}

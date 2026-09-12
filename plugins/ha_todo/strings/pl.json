@@ -1,0 +1,16 @@
+{
+  "yesterday": "wczoraj",
+  "day_abbr": "d",
+  "late": "po terminie",
+  "today": "dziś",
+  "tomorrow": "jutro",
+  "priority_high": "wysoki",
+  "priority_medium": "średni",
+  "priority_low": "niski",
+  "todo": "Zadania",
+  "all_done": "Wszystko zrobione.",
+  "priority": "priorytet",
+  "overdue": "PO TERMINIE",
+  "to_do": "POZOSTAŁO",
+  "done": "ZROBIONE"
+}

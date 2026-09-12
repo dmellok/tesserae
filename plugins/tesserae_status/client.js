@@ -28,11 +28,17 @@ const RED_DARK_BG = "#E0663F";
 const LUM_THRESHOLD = 0.42;
 
 export default function render(shadow, ctx) {
+  const t = ctx?.t || ((key, fallback) => fallback ?? key);
+  const locale = ctx?.locale || "en";
   const data = (ctx && ctx.data) || {};
+  // t / locale ride on state so the update-check repaint (applyUpdateResult)
+  // paints with the same strings as the first pass.
   const state = {
     latestVersion: null,
     latestUrl: null,
     updateAvailable: false,
+    t,
+    locale,
   };
   paint(shadow, data, state);
   wireClock(shadow, data, state);
@@ -55,7 +61,7 @@ function paint(shadow, data, state) {
     <link rel="stylesheet" href="/static/style/spectra-widgets.css">
     ${styles(bg, fg, red, mode)}
     <div class="frame" data-mode="${mode}" data-chipmode="${chipMode}">
-      ${identityHtml(data, chipMode)}
+      ${identityHtml(data, chipMode, state.t)}
       <span class="rule" aria-hidden="true"></span>
       <div class="chips" role="list">
         ${chips.map((c) => chipHtml(c, chipMode)).join("")}
@@ -69,8 +75,8 @@ function normaliseChipMode(value) {
   return v === "icon-only" || v === "text-only" ? v : "icon-text";
 }
 
-function identityHtml(data, chipMode) {
-  const name = String(data.dashboardName || data.page_name || "Dashboard").trim();
+function identityHtml(data, chipMode, t) {
+  const name = String(data.dashboardName || data.page_name || t("dashboard", "Dashboard")).trim();
   const iconEnabled = data.leadingIcon !== false && chipMode !== "text-only";
   // Inherit the dashboard's page-level icon (Settings → dashboard icon
   // picker) when available. ``page_icon`` arrives without the ``ph-``
@@ -90,7 +96,26 @@ function identityHtml(data, chipMode) {
   `;
 }
 
+// server.py sends the Wi-Fi strength as an English word; the lowercase
+// form is the stable id, the word itself is the t() fallback. Anything
+// else passes through untouched.
+function wifiLabelText(label, t) {
+  switch (String(label).toLowerCase()) {
+    case "excellent":
+      return t("wifi_excellent", "Excellent");
+    case "good":
+      return t("wifi_good", "Good");
+    case "fair":
+      return t("wifi_fair", "Fair");
+    case "weak":
+      return t("wifi_weak", "Weak");
+    default:
+      return String(label);
+  }
+}
+
 function buildChips(data, state) {
+  const t = state.t || ((key, fallback) => fallback ?? key);
   const chips = [];
   // Always-on ambient stats (in order): time, environment, battery,
   // wifi, broker. Temperature and humidity share one compact cluster
@@ -99,11 +124,11 @@ function buildChips(data, state) {
     chips.push({
       key: "time",
       icon: "ph-clock",
-      value: formatTime(new Date(), data.time_format || "24h"),
+      value: formatTime(new Date(), data.time_format || "24h", state.locale),
       live: "time",
     });
   }
-  const environment = environmentMetrics(data);
+  const environment = environmentMetrics(data, t);
   if (environment.length > 0) {
     chips.push({
       key: "environment",
@@ -122,7 +147,7 @@ function buildChips(data, state) {
     chips.push({
       key: "wifi",
       icon: wifiIcon(data.wifi_label),
-      value: String(data.wifi_label),
+      value: wifiLabelText(data.wifi_label, t),
     });
   }
   if (data.show_broker && data.broker_available) {
@@ -141,7 +166,7 @@ function buildChips(data, state) {
       key: "version",
       icon: "ph-download-simple",
       value: `v${String(state.latestVersion).replace(/^v/, "")}`,
-      updateSub: "available",
+      updateSub: t("available", "available"),
       isUpdate: true,
     });
   }
@@ -150,15 +175,15 @@ function buildChips(data, state) {
     chips.push({
       key: "firmware",
       icon: "ph-download-simple",
-      value: "Firmware",
-      updateSub: `${n} available`,
+      value: t("firmware", "Firmware"),
+      updateSub: `${n} ${t("available", "available")}`,
       isUpdate: true,
     });
   }
   return chips;
 }
 
-function environmentMetrics(data) {
+function environmentMetrics(data, t) {
   const metrics = [];
   const imperial = String(data.units || "metric").toLowerCase() === "imperial";
   if (data.show_temperature && Number.isFinite(data.temperature_c)) {
@@ -170,7 +195,7 @@ function environmentMetrics(data) {
       key: "temperature",
       icon: "ph-thermometer-simple",
       value: `${Math.round(temperature)}°${unit}`,
-      label: `Temperature ${Math.round(temperature)} degrees ${unit}`,
+      label: `${t("temperature", "Temperature")} ${Math.round(temperature)} ${t("degrees", "degrees")} ${unit}`,
     });
   }
   if (data.show_humidity && Number.isFinite(data.humidity_pct)) {
@@ -179,8 +204,8 @@ function environmentMetrics(data) {
       key: "humidity",
       icon: "ph-drop",
       value: `${humidity}%`,
-      textOnlyValue: `${humidity}% RH`,
-      label: `Humidity ${humidity} percent`,
+      textOnlyValue: `${humidity}% ${t("rh", "RH")}`,
+      label: `${t("humidity", "Humidity")} ${humidity} ${t("percent", "percent")}`,
     });
   }
   return metrics;
@@ -278,15 +303,23 @@ function wifiIcon(label) {
   }
 }
 
-function formatTime(d, format) {
-  const h24 = d.getHours();
-  const m = String(d.getMinutes()).padStart(2, "0");
-  if (String(format).toLowerCase() === "12h") {
-    const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
-    const suffix = h24 < 12 ? "am" : "pm";
-    return `${h12}:${m}${suffix}`;
+// The 12h / 24h choice is the user's; the digits, separator and day-period
+// marker come from the locale's own data.
+function formatTime(d, format, locale = "en") {
+  const twelve = String(format).toLowerCase() === "12h";
+  try {
+    return new Intl.DateTimeFormat(locale, twelve
+      ? { hour: "numeric", minute: "2-digit", hour12: true }
+      : { hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(d);
+  } catch {
+    const h24 = d.getHours();
+    const m = String(d.getMinutes()).padStart(2, "0");
+    if (twelve) {
+      const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+      return `${h12}:${m}${h24 < 12 ? "am" : "pm"}`;
+    }
+    return `${String(h24).padStart(2, "0")}:${m}`;
   }
-  return `${String(h24).padStart(2, "0")}:${m}`;
 }
 
 function wireClock(shadow, data, state) {
@@ -294,7 +327,7 @@ function wireClock(shadow, data, state) {
   const el = shadow.querySelector('[data-kind="time"] .chip-value');
   if (!el || !data.show_time) return;
   setInterval(() => {
-    el.textContent = formatTime(new Date(), data.time_format || "24h");
+    el.textContent = formatTime(new Date(), data.time_format || "24h", state.locale);
   }, 30 * 1000);
 }
 

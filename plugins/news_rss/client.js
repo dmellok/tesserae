@@ -10,16 +10,16 @@ function escapeHtml(s) {
   }[c]));
 }
 
-function fmtPublished(iso) {
+function fmtPublished(iso, t) {
   if (typeof iso !== "string" || !iso) return "";
-  const t = Date.parse(iso);
-  if (!Number.isFinite(t)) return iso;
-  const secs = Math.max(0, (Date.now() - t) / 1000);
-  if (secs < 3600) return `${Math.max(1, Math.floor(secs / 60))}m`;
-  if (secs < 86400) return `${Math.floor(secs / 3600)}h`;
-  if (secs < 604800) return `${Math.floor(secs / 86400)}d`;
-  if (secs < 2592000) return `${Math.floor(secs / 604800)}w`;
-  return `${Math.floor(secs / 2592000)}mo`;
+  const ts = Date.parse(iso);
+  if (!Number.isFinite(ts)) return iso;
+  const secs = Math.max(0, (Date.now() - ts) / 1000);
+  if (secs < 3600) return `${Math.max(1, Math.floor(secs / 60))}${t("minutes_abbr", "m")}`;
+  if (secs < 86400) return `${Math.floor(secs / 3600)}${t("hours_abbr", "h")}`;
+  if (secs < 604800) return `${Math.floor(secs / 86400)}${t("days_abbr", "d")}`;
+  if (secs < 2592000) return `${Math.floor(secs / 604800)}${t("weeks_abbr", "w")}`;
+  return `${Math.floor(secs / 2592000)}${t("months_abbr", "mo")}`;
 }
 
 function hostOf(url) {
@@ -56,6 +56,7 @@ function hostColor(host) {
 }
 
 export default function render(shadow, ctx) {
+  const t = ctx?.t || ((key, fallback) => fallback ?? key);
   const data = ctx?.data ?? {};
   const opts = ctx?.cell?.options ?? {};
   const css = `<link rel="stylesheet" href="/static/style/spectra-widgets.css">`;
@@ -64,14 +65,14 @@ export default function render(shadow, ctx) {
     shadow.innerHTML = `
       ${css}
       <div class="w" data-widget="news_rss">
-        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>Feed</h3></div>
+        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>${escapeHtml(t("feed", "Feed"))}</h3></div>
         <div class="w-body"><p class="u-muted">${escapeHtml(data.error)}</p></div>
       </div>`;
     return;
   }
 
   const items = Array.isArray(data.items) ? data.items : [];
-  const title = data.feed_title || "Feed";
+  const title = data.feed_title || t("feed", "Feed");
 
   if (items.length === 0) {
     shadow.innerHTML = `
@@ -81,7 +82,7 @@ export default function render(shadow, ctx) {
           <i class="ph-bold ph-rss" style="color:var(--accent-2)"></i>
           <h3>${escapeHtml(title)}</h3>
         </div>
-        <div class="w-body"><p class="u-muted">No items.</p></div>
+        <div class="w-body"><p class="u-muted">${escapeHtml(t("no_items", "No items."))}</p></div>
       </div>`;
     return;
   }
@@ -97,7 +98,7 @@ export default function render(shadow, ctx) {
     const initial = (host.match(/[a-z]/i) || ["?"])[0].toUpperCase();
     const color = host ? hostColor(host) : "var(--accent-2)";
     const ph = sourceIcon(it.url);
-    const ago = fmtPublished(it.published);
+    const ago = fmtPublished(it.published, t);
     const excerpt = excerptLines > 0 && it.excerpt
       ? `<p class="rss-excerpt" style="-webkit-line-clamp:${excerptLines};line-clamp:${excerptLines}">${escapeHtml(it.excerpt)}</p>`
       : "";

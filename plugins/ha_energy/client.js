@@ -139,19 +139,35 @@ function decomposeFlows({ solar, grid, battery, house }) {
 
 export default function render(shadow, ctx) {
   const data = ctx?.data ?? {};
+  const t = ctx?.t || ((key, fallback) => fallback ?? key);
   const css = `<link rel="stylesheet" href="/static/style/spectra-widgets.css">`;
 
   if (data.error) {
     shadow.innerHTML = `
       ${css}
       <div class="w" data-widget="ha_energy">
-        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>Energy</h3></div>
+        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>${escapeHtml(t("energy", "Energy"))}</h3></div>
         <div class="w-body"><p class="u-muted">${escapeHtml(data.error)}</p></div>
       </div>`;
     return;
   }
 
-  const place = data.place || data.label || "Energy";
+  // server.py fills "Home" in when the place label option is blank, so
+  // the stock label is the one case that goes through t(); anything else
+  // was typed by the user and stays as-is.
+  const rawPlace = data.place || data.label || "";
+  const place = rawPlace === "Home" ? t("home", "Home") : (rawPlace || t("energy", "Energy"));
+
+  // Sankey rail ids stay English (they key the colour + icon tables and
+  // the flow triples); this map is only what gets painted for each rail.
+  const RAIL_LABELS = {
+    Solar: t("solar", "Solar"),
+    Battery: t("battery", "Battery"),
+    Grid: t("grid", "Grid"),
+    House: t("house", "House"),
+    Charge: t("charge", "Charge"),
+    Export: t("export", "Export"),
+  };
   const flow = data.flow || "mixed";
   const sunPhase = sunGlyph(data.hour);
 
@@ -297,7 +313,7 @@ export default function render(shadow, ctx) {
     chips.push(`<span class="energy-soc"><i class="ph-bold ph-battery-charging"></i>${Math.round(Number(soc))}%</span>`);
   }
   if (data.solar_today_kwh != null) {
-    chips.push(`<span class="energy-today-chip"><i class="ph-bold ph-sun"></i>${Number(data.solar_today_kwh).toFixed(1)} kWh today</span>`);
+    chips.push(`<span class="energy-today-chip"><i class="ph-bold ph-sun"></i>${escapeHtml(t("kwh_today", "{n} kWh today").replace("{n}", Number(data.solar_today_kwh).toFixed(1)))}</span>`);
   }
 
   // Build the per-rail legend below the Sankey so users can read the
@@ -317,15 +333,15 @@ export default function render(shadow, ctx) {
       const meta = RAIL_META[k];
       return `
         <div class="energy-rail-key" style="border-left:3px solid ${meta.color}">
-          <span class="energy-rail-key-name" style="color:${meta.color}"><i class="ph-bold ${meta.icon}"></i>${k}</span>
+          <span class="energy-rail-key-name" style="color:${meta.color}"><i class="ph-bold ${meta.icon}"></i>${escapeHtml(RAIL_LABELS[k] || k)}</span>
           <span class="energy-rail-key-value">${escapeHtml(fmtW(railTotals[k]))}</span>
         </div>`;
     }).join("");
 
   const sparkBlock = compSparkline ? `
     <div class="energy-spark-legend">
-      <span class="energy-spark-key"><span class="key-line" style="background:${accent}"></span>Today</span>
-      <span class="energy-spark-key is-ghost"><span class="key-line"></span>Yesterday</span>
+      <span class="energy-spark-key"><span class="key-line" style="background:${accent}"></span>${escapeHtml(t("today", "Today"))}</span>
+      <span class="energy-spark-key is-ghost"><span class="key-line"></span>${escapeHtml(t("yesterday", "Yesterday"))}</span>
     </div>
     <div class="energy-spark-wrap">${compSparkline}</div>` : "";
 
@@ -338,10 +354,10 @@ export default function render(shadow, ctx) {
   if (frag === "sankey") {
     inner = `<div class="w-body"><div class="energy-sankey" style="flex:1 1 auto;height:100%"><canvas></canvas></div></div>`;
   } else if (frag === "trend") {
-    inner = `<div class="w-body">${sparkBlock || '<p class="u-muted">No history.</p>'}</div>`;
+    inner = `<div class="w-body">${sparkBlock || `<p class="u-muted">${escapeHtml(t("no_history", "No history."))}</p>`}</div>`;
   } else if (frag === "stats") {
     inner = `<div class="w-body" style="justify-content:center;align-items:center">${
-      chips.length ? `<div class="energy-chips">${chips.join("")}</div>` : '<p class="u-muted">No stats.</p>'
+      chips.length ? `<div class="energy-chips">${chips.join("")}</div>` : `<p class="u-muted">${escapeHtml(t("no_stats", "No stats."))}</p>`
     }</div>`;
   } else {
     inner = `
@@ -366,18 +382,18 @@ export default function render(shadow, ctx) {
     <div class="w" data-widget="ha_energy">${inner}</div>`;
 
   const sankeyCanvas = shadow.querySelector(".energy-sankey canvas");
-  const t = tokens(shadow.host);
+  const tok = tokens(shadow.host);
 
   // Map rail names → resolved hex/rgb colours for the chart. Chart.js
   // can't read CSS vars from the canvas, so we resolve via the token
   // probe.
   const colors = {
-    Solar: t.accent2,
-    Battery: t.accent3,
-    Grid: t.accent5,
-    House: t.textSecondary,
-    Charge: t.accent3,
-    Export: t.accent5,
+    Solar: tok.accent2,
+    Battery: tok.accent3,
+    Grid: tok.accent5,
+    House: tok.textSecondary,
+    Charge: tok.accent3,
+    Export: tok.accent5,
   };
 
   if (!sankeyCanvas) {
@@ -390,9 +406,10 @@ export default function render(shadow, ctx) {
     // and a ~280px canvas the three right-side ribbons share ~40px
     // of band height between them, sitting in airy negative space.
     sankey(sankeyCanvas, {
-      tokens: t,
+      tokens: tok,
       flows,
       colors,
+      labels: RAIL_LABELS,
       colorMode: "gradient",
       nodePadding: 120,
       labelSize: 12,
@@ -403,10 +420,10 @@ export default function render(shadow, ctx) {
     const ctx2d = sankeyCanvas.getContext("2d");
     sankeyCanvas.width = sankeyCanvas.offsetWidth;
     sankeyCanvas.height = sankeyCanvas.offsetHeight;
-    ctx2d.fillStyle = t.textMuted;
-    ctx2d.font = `700 14px ${t.fontFamily}`;
+    ctx2d.fillStyle = tok.textMuted;
+    ctx2d.font = `700 14px ${tok.fontFamily}`;
     ctx2d.textAlign = "center";
     ctx2d.textBaseline = "middle";
-    ctx2d.fillText("NO FLOW", sankeyCanvas.width / 2, sankeyCanvas.height / 2);
+    ctx2d.fillText(t("no_flow", "NO FLOW"), sankeyCanvas.width / 2, sankeyCanvas.height / 2);
   }
 }

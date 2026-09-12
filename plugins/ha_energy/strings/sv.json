@@ -1,0 +1,16 @@
+{
+  "energy": "Energi",
+  "home": "Hemma",
+  "solar": "Sol",
+  "battery": "Batteri",
+  "grid": "Nät",
+  "house": "Hus",
+  "charge": "Laddning",
+  "export": "Export",
+  "kwh_today": "{n} kWh idag",
+  "today": "Idag",
+  "yesterday": "Igår",
+  "no_history": "Ingen historik.",
+  "no_stats": "Ingen statistik.",
+  "no_flow": "INGET FLÖDE"
+}

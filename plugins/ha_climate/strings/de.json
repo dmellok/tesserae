@@ -1,0 +1,16 @@
+{
+  "not_found": "nicht gefunden",
+  "mode_off": "aus",
+  "mode_heat": "heizen",
+  "mode_cool": "kühlen",
+  "mode_heat_cool": "heizen/kühlen",
+  "mode_auto": "auto",
+  "mode_dry": "trocknen",
+  "mode_fan_only": "nur Lüfter",
+  "humidity_tip_target": "Luftfeuchte {h}% (Ziel {t}%)",
+  "humidity_tip": "Luftfeuchte {h}%",
+  "target": "Ziel",
+  "climate": "Klima",
+  "no_entities_selected": "Keine Entitäten ausgewählt.",
+  "zones": "ZONEN"
+}

@@ -1,0 +1,14 @@
+{
+  "just_now": "ką tik",
+  "minutes_ago": "prieš {n} min",
+  "hours_ago": "prieš {n} val.",
+  "days_ago": "prieš {n} d.",
+  "today": "šiandien",
+  "tomorrow": "rytoj",
+  "in_n_days": "po {n} d.",
+  "in_n_weeks": "po {n} sav.",
+  "in_n_months": "po {n} mėn.",
+  "device_batteries": "Įrenginių baterijos",
+  "no_devices": "Dar nėra įrenginių, pranešančių apie bateriją.",
+  "n_of_total": "{n} iš {total}"
+}

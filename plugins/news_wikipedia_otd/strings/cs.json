@@ -1,0 +1,16 @@
+{
+  "kind_events": "UDÁLOSTI",
+  "kind_births": "NAROZENÍ",
+  "kind_deaths": "ÚMRTÍ",
+  "kind_holidays": "SVÁTKY",
+  "kind_selected": "VYBRANÉ",
+  "kind_all": "VŠE",
+  "era_antiquity": "Starověk",
+  "era_medieval": "Středověk",
+  "era_renaissance": "Renesance",
+  "era_industrial": "Průmyslová éra",
+  "era_modern": "Moderní",
+  "on_this_day": "V tento den",
+  "on": "Dne",
+  "nothing_recorded": "Žádné záznamy."
+}

@@ -3,6 +3,7 @@
   "name": "Device Batteries",
   "version": "0.1.0",
   "kind": "widget",
+  "locales": ["en", "cs", "de", "es", "fr", "it", "lt", "nb", "nl", "pl", "pt", "sk", "sv", "zh-CN", "zh-TW"],
   "description": "Battery level for every registered device that reports a battery_pct heartbeat (ESP32-S3, PhotoPainter, etc). Sorted lowest-first so the panel that needs charging surfaces to the top. Predicts days-to-empty from the last seven days of history, when available.",
   "icon": "ph-battery-charging",
   "supports": { "sizes": ["xs", "sm", "md", "lg"] },

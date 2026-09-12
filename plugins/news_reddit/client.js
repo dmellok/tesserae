@@ -18,14 +18,14 @@ function fmtScore(n) {
   return String(v);
 }
 
-function fmtAgo(epochSec) {
+function fmtAgo(epochSec, t) {
   if (!Number.isFinite(epochSec) || epochSec <= 0) return "";
   const secs = Math.max(0, Date.now() / 1000 - epochSec);
-  if (secs < 60) return "now";
-  if (secs < 3600) return `${Math.floor(secs / 60)}m`;
-  if (secs < 86400) return `${Math.floor(secs / 3600)}h`;
-  if (secs < 604800) return `${Math.floor(secs / 86400)}d`;
-  return `${Math.floor(secs / 604800)}w`;
+  if (secs < 60) return t("now", "now");
+  if (secs < 3600) return `${Math.floor(secs / 60)}${t("minutes_abbr", "m")}`;
+  if (secs < 86400) return `${Math.floor(secs / 3600)}${t("hours_abbr", "h")}`;
+  if (secs < 604800) return `${Math.floor(secs / 86400)}${t("days_abbr", "d")}`;
+  return `${Math.floor(secs / 604800)}${t("weeks_abbr", "w")}`;
 }
 
 // Post-type / source glyph. self-posts → text-post, image → image,
@@ -43,6 +43,17 @@ function postTypeIcon(url, isSelf) {
   return "ph-link";
 }
 
+// Sort id (server-validated to top / hot / new) → the title-bar meta
+// chip. Unknown ids fall back to the raw id uppercased, as before.
+function sortLabelFor(sort, t) {
+  switch (sort) {
+    case "top": return t("sort_top", "TOP");
+    case "hot": return t("sort_hot", "HOT");
+    case "new": return t("sort_new", "NEW");
+    default: return sort ? String(sort).toUpperCase() : t("sort_top", "TOP");
+  }
+}
+
 // Hash a subreddit name → one of the six accent tokens. Stable
 // across renders so the stripe colour stays put per subreddit.
 function subColor(sub) {
@@ -54,6 +65,7 @@ function subColor(sub) {
 }
 
 export default function render(shadow, ctx) {
+  const t = ctx?.t || ((key, fallback) => fallback ?? key);
   const data = ctx?.data ?? {};
   const css = `<link rel="stylesheet" href="/static/style/spectra-widgets.css">`;
 
@@ -61,7 +73,7 @@ export default function render(shadow, ctx) {
     shadow.innerHTML = `
       ${css}
       <div class="w" data-widget="news_reddit">
-        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>Reddit</h3></div>
+        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>${escapeHtml(t("reddit", "Reddit"))}</h3></div>
         <div class="w-body"><p class="u-muted">${escapeHtml(data.error)}</p></div>
       </div>`;
     return;
@@ -69,7 +81,7 @@ export default function render(shadow, ctx) {
 
   const posts = Array.isArray(data.posts) ? data.posts : [];
   const sub = data.subreddit || "reddit";
-  const sort = data.sort ? String(data.sort).toUpperCase() : "TOP";
+  const sort = sortLabelFor(data.sort, t);
   const accent = subColor(sub);
 
   if (posts.length === 0) {
@@ -80,14 +92,14 @@ export default function render(shadow, ctx) {
           <i class="ph-bold ph-reddit-logo" style="color:${accent}"></i>
           <h3>r/${escapeHtml(sub)}</h3>
         </div>
-        <div class="w-body"><p class="u-muted">No posts.</p></div>
+        <div class="w-body"><p class="u-muted">${escapeHtml(t("no_posts", "No posts."))}</p></div>
       </div>`;
     return;
   }
 
   const rows = posts.map((p, i) => {
     const ph = postTypeIcon(p.url, p.is_self);
-    const ago = fmtAgo(p.time);
+    const ago = fmtAgo(p.time, t);
     const scoreLine = p.score != null
       ? `<span class="rd-score"><i class="ph-bold ph-arrow-fat-up"></i>${escapeHtml(fmtScore(p.score))}</span>`
       : "";

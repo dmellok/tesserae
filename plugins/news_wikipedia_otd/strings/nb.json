@@ -1,0 +1,16 @@
+{
+  "kind_events": "HENDELSER",
+  "kind_births": "FØDSLER",
+  "kind_deaths": "DØDSFALL",
+  "kind_holidays": "HØYTIDER",
+  "kind_selected": "UTVALGTE",
+  "kind_all": "ALLE",
+  "era_antiquity": "Antikken",
+  "era_medieval": "Middelalderen",
+  "era_renaissance": "Renessansen",
+  "era_industrial": "Industritiden",
+  "era_modern": "Moderne",
+  "on_this_day": "På denne dagen",
+  "on": "Den",
+  "nothing_recorded": "Ingenting registrert."
+}

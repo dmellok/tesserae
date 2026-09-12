@@ -1,0 +1,8 @@
+{
+  "state_playing": "播放中",
+  "state_paused": "已暫停",
+  "state_idle": "閒置",
+  "state_off": "關閉",
+  "state_unavailable": "無法使用",
+  "media": "媒體"
+}

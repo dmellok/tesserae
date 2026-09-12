@@ -1,0 +1,16 @@
+{
+  "not_found": "não encontrado",
+  "mode_off": "desligado",
+  "mode_heat": "aquecer",
+  "mode_cool": "arrefecer",
+  "mode_heat_cool": "quente/frio",
+  "mode_auto": "auto",
+  "mode_dry": "secar",
+  "mode_fan_only": "só ventilar",
+  "humidity_tip_target": "humidade {h}% (alvo {t}%)",
+  "humidity_tip": "humidade {h}%",
+  "target": "Alvo",
+  "climate": "Clima",
+  "no_entities_selected": "Sem entidades selecionadas.",
+  "zones": "ZONAS"
+}

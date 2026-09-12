@@ -1,0 +1,12 @@
+{
+  "hour": "uur",
+  "hours": "uur",
+  "day": "dag",
+  "days": "dagen",
+  "unit_ago": "{unit} geleden",
+  "unit_to_go": "{unit} te gaan",
+  "countdown": "Aftellen",
+  "set_target_date": "Stel een datum in bij de celopties.",
+  "date_has_passed": "Datum is voorbij.",
+  "today": "Vandaag"
+}

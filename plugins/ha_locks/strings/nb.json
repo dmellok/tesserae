@@ -1,0 +1,17 @@
+{
+  "just_now": "nettopp",
+  "minutes_abbr": "m",
+  "hours_abbr": "t",
+  "days_abbr": "d",
+  "state_locked": "låst",
+  "state_unlocked": "ulåst",
+  "state_open": "åpen",
+  "state_closed": "lukket",
+  "secured": "sikret",
+  "locks": "Låser",
+  "doors_and_locks": "Dører og låser",
+  "all_clear": "Alt i orden.",
+  "open_since": "åpen siden",
+  "open_count_suffix": "ÅPNE",
+  "all_secured": "ALT SIKRET"
+}

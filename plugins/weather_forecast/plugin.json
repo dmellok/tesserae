@@ -5,7 +5,7 @@
   "kind": "widget",
   "description": "5-day forecast as a row of theme-aware cards: day name, condition icon, high / low temps, and rain probability. Data from Open-Meteo (no API key).",
   "icon": "ph-calendar-dots",
-  "locales": ["en", "fr"],
+  "locales": ["en", "cs", "de", "es", "fr", "it", "lt", "nb", "nl", "pl", "pt", "sk", "sv", "zh-CN", "zh-TW"],
   "supports": {
     "sizes": [
       "sm",

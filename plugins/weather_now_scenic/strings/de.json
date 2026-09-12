@@ -1,0 +1,15 @@
+{
+  "weather": "Wetter",
+  "cond_sunny": "Sonnig",
+  "cond_mostly_clear": "Meist klar",
+  "cond_partly_cloudy": "Wolkig",
+  "cond_cloudy": "Bewölkt",
+  "cond_fog": "Nebel",
+  "cond_drizzle": "Nieselregen",
+  "cond_rain": "Regen",
+  "cond_rain_heavy": "Starkregen",
+  "cond_snow": "Schnee",
+  "cond_snow_heavy": "Starker Schneefall",
+  "cond_showers": "Schauer",
+  "cond_storm": "Gewitter"
+}

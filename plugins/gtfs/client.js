@@ -63,9 +63,9 @@ function urgency(minutes) {
   return 3;
 }
 
-function fmtMinutes(m) {
+function fmtMinutes(m, t) {
   if (!Number.isFinite(m)) return "-";
-  return m <= 0 ? "now" : String(m);
+  return m <= 0 ? t("now", "now") : String(m);
 }
 
 // Route chip. route_color / route_text_color are part of the data (the
@@ -87,7 +87,7 @@ function routeBadge(a) {
 // Lateness against the timetable, when an RT feed gave us one. Late is the
 // alert slot, early the positive one; on-time says nothing at all rather
 // than adding a chip to every row.
-function delayChip(a, compact = false) {
+function delayChip(a, t, compact = false) {
   const d = Number(a.delay);
   if (!Number.isFinite(d) || d === 0) return "";
   const slot = d > 0 ? 1 : 3;
@@ -95,7 +95,7 @@ function delayChip(a, compact = false) {
   // fact without pushing the line past the row and clipping mid-word.
   const text = compact
     ? `${d > 0 ? "+" : "−"}${Math.abs(d)}`
-    : (d > 0 ? `${d} min late` : `${-d} min early`);
+    : (d > 0 ? `${d} ${t("min_late", "min late")}` : `${-d} ${t("min_early", "min early")}`);
   return `<span class="gt-delay" style="color:var(--accent-${slot})">${escapeHtml(text)}</span>`;
 }
 
@@ -103,12 +103,14 @@ function delayChip(a, compact = false) {
 // report: stops away when the feed counts them, straight-line distance when
 // it only publishes coordinates. Opt-in: it's the platform-sign metric, but
 // it's noise on a board where everything is one or two stops away.
-function stopsChip(a, show, units) {
+function stopsChip(a, show, units, t) {
   if (!show) return "";
   let text = "";
   if (Number.isFinite(Number(a.stops_away))) {
     const n = Number(a.stops_away);
-    text = n === 0 ? "here" : n === 1 ? "1 stop" : `${n} stops`;
+    text = n === 0
+      ? t("here", "here")
+      : `${n} ${n === 1 ? t("stop", "stop") : t("stops", "stops")}`;
   } else if (Number.isFinite(Number(a.distance_m))) {
     text = fmtDistance(Number(a.distance_m), units);
   }
@@ -135,15 +137,23 @@ function originChip(a, show) {
 
 // Track / platform, when the feed publishes one and the cell asked for it.
 // NYCT ships this as a GTFS-RT extension; commuter rail feeds carry it too.
-function trackChip(a, show) {
+function trackChip(a, show, t) {
   if (!show || !a.track) return "";
-  return `<span class="gt-track">Trk ${escapeHtml(a.track)}</span>`;
+  return `<span class="gt-track">${t("track_abbr", "Trk")} ${escapeHtml(a.track)}</span>`;
 }
 
-function liveDot(a) {
+function liveDot(a, t) {
   return a.live
-    ? '<i class="ph-bold ph-broadcast gt-live" title="Live"></i>'
+    ? `<i class="ph-bold ph-broadcast gt-live" title="${t("live", "Live")}"></i>`
     : "";
+}
+
+// server.py's own feed note is a fixed English sentence, so the sentence is
+// the stable id; a service alert is agency prose and passes through as data.
+function noteText(note, t) {
+  return note === "Live feed unavailable"
+    ? t("live_feed_unavailable", "Live feed unavailable")
+    : String(note ?? "");
 }
 
 // The size class rides on ``.w`` itself: ``.w-body`` has to stay a direct
@@ -383,7 +393,7 @@ const STYLE = `
   .size-lg .gt-route { font-size: 1.15em; }
 `;
 
-function titleBar(data, size, hasAlertStrip = false) {
+function titleBar(data, size, hasAlertStrip, t) {
   // A feed note ("Delays northbound", "Live feed unavailable") outranks the
   // live badge: it's the thing the reader needs, and the badge is still
   // implied by the per-row live dots.
@@ -394,30 +404,31 @@ function titleBar(data, size, hasAlertStrip = false) {
   const stale = Number.isFinite(age) && age >= STALE_AFTER_S;
   const dot = data.live && !stale ? '<i class="ph-bold ph-broadcast gt-live"></i> ' : "";
   const aged = Number.isFinite(age) && age >= AGE_SHOWN_AFTER_S
-    ? `${Math.round(age / 60)} min old`
+    ? `${Math.round(age / 60)} ${t("min_old", "min old")}`
     : "";
   // Countdowns are frozen at render time and an e-ink panel can hold a frame
   // for minutes, so the board says when it was drawn. The clock times in each
   // row stay true; the "N min" figures don't.
-  const asOf = data.now ? `as of ${escapeHtml(data.now)}` : "";
+  const asOf = data.now ? `${t("as_of", "as of")} ${escapeHtml(data.now)}` : "";
   const meta = data.note && !hasAlertStrip
-    ? `${dot}${escapeHtml(data.note)}`
+    ? `${dot}${escapeHtml(noteText(data.note, t))}`
     : (stale
-      ? `<span class="gt-stale">${escapeHtml(aged || "not updating")}</span>`
+      ? `<span class="gt-stale">${escapeHtml(aged || t("not_updating", "not updating"))}</span>`
       : (data.live
-        ? `${dot}Live${aged ? ` · ${aged}` : ""}${asOf ? ` · ${asOf}` : ""}`
+        ? `${dot}${t("live", "Live")}${aged ? ` · ${aged}` : ""}${asOf ? ` · ${asOf}` : ""}`
         : asOf));
   const live = meta ? `<span class="w-title-meta">${meta}</span>` : "";
   const icon = MODE_PH[(data.arrivals || [])[0]?.mode] || "ph-bus";
   return `
     <div class="w-title">
       <i class="ph-bold ${icon}" style="color:var(--accent-4)"></i>
-      <h3>${escapeHtml(data.label || data.stop || "Departures")}</h3>
+      <h3>${escapeHtml(data.label || data.stop || t("departures", "Departures"))}</h3>
       ${size === "xs" ? "" : live}
     </div>`;
 }
 
 function heroBlock(arrivals, size, walk = 0, opts = {}) {
+  const t = opts.t || ((key, fallback) => fallback ?? key);
   // The hero is "the one you'll actually catch", so a cancelled trip never
   // claims it; it still shows in the "then" strip below.
   const next = arrivals.find((a) => !a.canceled) || arrivals[0];
@@ -431,18 +442,18 @@ function heroBlock(arrivals, size, walk = 0, opts = {}) {
     : `<div class="gt-hero-line">
          ${routeBadge(next)}
          <span class="gt-hero-sign">${escapeHtml(next.headsign || "")}</span>
-         ${liveDot(next)}
+         ${liveDot(next, t)}
        </div>
-       ${walk > 0 ? `<div class="gt-hero-delay u-muted">arrives ${escapeHtml(next.time || "")}</div>` : ""}
+       ${walk > 0 ? `<div class="gt-hero-delay u-muted">${t("arrives", "arrives")} ${escapeHtml(next.time || "")}</div>` : ""}
        ${(() => {
          const extra = [
            originChip(next, opts.showOrigin),
-           stopsChip(next, opts.showStops),
-           trackChip(next, opts.showTrack),
+           stopsChip(next, opts.showStops, opts.distanceUnits, t),
+           trackChip(next, opts.showTrack, t),
          ].filter(Boolean).join(" ");
          return extra ? `<div class="gt-hero-extra">${extra}</div>` : "";
        })()}
-       ${delayChip(next) ? `<div class="gt-hero-delay">${delayChip(next)}</div>` : ""}`;
+       ${delayChip(next, t) ? `<div class="gt-hero-delay">${delayChip(next, t)}</div>` : ""}`;
   // At sm there's room for a one-line "then 12 · 24" look-ahead; at xs
   // the single number is the whole widget.
   const then = size === "xs"
@@ -452,9 +463,9 @@ function heroBlock(arrivals, size, walk = 0, opts = {}) {
         .filter((a) => a !== next && Number.isFinite(a.minutes))
         .slice(0, 2);
       return rest.length
-        ? `<div class="gt-then">then ${rest
-            .map((a) => escapeHtml(a.canceled ? "✕" : fmtMinutes(a.minutes)))
-            .join(" · ")} min</div>`
+        ? `<div class="gt-then">${t("then", "then")} ${rest
+            .map((a) => escapeHtml(a.canceled ? "✕" : fmtMinutes(a.minutes, t)))
+            .join(" · ")} ${t("min", "min")}</div>`
         : "";
     })();
   return `
@@ -462,11 +473,11 @@ function heroBlock(arrivals, size, walk = 0, opts = {}) {
       <div class="gt-hero-top">
         <i class="ph-bold ${icon} gt-hero-icon" style="color:var(--accent-${slot})"></i>
         <div>
-          <div class="gt-hero-min" style="color:var(--accent-${slot})">${escapeHtml(fmtMinutes(shown))}</div>
+          <div class="gt-hero-min" style="color:var(--accent-${slot})">${escapeHtml(fmtMinutes(shown, t))}</div>
           <div class="gt-hero-unit">${
             walk > 0
-              ? (shown > 0 ? "min to leave" : "leave now")
-              : (shown > 0 ? "min" : "arriving")
+              ? (shown > 0 ? t("min_to_leave", "min to leave") : t("leave_now", "leave now"))
+              : (shown > 0 ? t("min", "min") : t("arriving", "arriving"))
           }</div>
         </div>
       </div>
@@ -506,6 +517,7 @@ function rowsThatFit(shadow, ctx, size, { title = true, alert = false, colHead =
 }
 
 function rowsBlock(arrivals, opts) {
+  const t = opts.t || ((key, fallback) => fallback ?? key);
   // No per-row mode glyph: every row at a given stop is the same vehicle
   // type, so it repeats without saying anything. The mode still reads from
   // the title bar's lead icon (and the hero at xs/sm).
@@ -523,7 +535,7 @@ function rowsBlock(arrivals, opts) {
             <span class="gt-when">${escapeHtml(a.time || "")}</span>
           </div>
           <div class="gt-min" style="background:var(--accent-1-soft);color:var(--accent-1)">
-            <span class="u">Cancelled</span>
+            <span class="u">${t("cancelled", "Cancelled")}</span>
           </div>
         </div>`;
     }
@@ -532,11 +544,11 @@ function rowsBlock(arrivals, opts) {
         ${routeBadge(a)}
         <div class="gt-lead">
           <span class="gt-sign">${escapeHtml(a.headsign || a.route || "")}</span>
-          <span class="gt-when">${escapeHtml(a.time || "")} ${liveDot(a)} ${originChip(a, opts.showOrigin)} ${delayChip(a, opts.showOrigin)} ${stopsChip(a, opts.showStops, opts.distanceUnits)} ${trackChip(a, opts.showTrack)}</span>
+          <span class="gt-when">${escapeHtml(a.time || "")} ${liveDot(a, t)} ${originChip(a, opts.showOrigin)} ${delayChip(a, t, opts.showOrigin)} ${stopsChip(a, opts.showStops, opts.distanceUnits, t)} ${trackChip(a, opts.showTrack, t)}</span>
         </div>
         <div class="gt-min" style="background:var(--accent-${slot}-soft);color:var(--accent-${slot})">
-          <span class="v">${escapeHtml(fmtMinutes(a.minutes))}</span>
-          ${a.minutes > 0 ? '<span class="u">min</span>' : ""}
+          <span class="v">${escapeHtml(fmtMinutes(a.minutes, t))}</span>
+          ${a.minutes > 0 ? `<span class="u">${t("min", "min")}</span>` : ""}
         </div>
       </div>`;
   }).join("");
@@ -546,6 +558,7 @@ function rowsBlock(arrivals, opts) {
 // column, headed by where those trains go. On a big lobby cell that beats
 // one column where half the rows are the wrong way for the reader.
 function splitBlock(arrivals, opts, perColumn) {
+  const t = opts.t || ((key, fallback) => fallback ?? key);
   const groups = new Map();
   for (const a of arrivals) {
     const key = String(a.direction ?? "");
@@ -568,7 +581,7 @@ function splitBlock(arrivals, opts, perColumn) {
       .join(" · ");
     return `
       <div class="gt-col">
-        <div class="gt-col-head">${escapeHtml(heading ? `to ${heading}` : "")}</div>
+        <div class="gt-col-head">${escapeHtml(heading ? `${t("to", "to")} ${heading}` : "")}</div>
         <div class="list-body gt-rows">${rowsBlock(list.slice(0, perColumn), opts)}</div>
       </div>`;
   });
@@ -576,11 +589,13 @@ function splitBlock(arrivals, opts, perColumn) {
 }
 
 export default function render(shadow, ctx) {
+  const t = ctx?.t || ((key, fallback) => fallback ?? key);
   const data = ctx?.data ?? {};
   const size = ctx?.cell?.size || "md";
   const cellOpts = ctx?.cell?.options || {};
   const all = Array.isArray(data.arrivals) ? data.arrivals : [];
   const opts = {
+    t,
     showTrack: Boolean(cellOpts.show_track),
     showStops: Boolean(cellOpts.show_stops_away),
     distanceUnits: cellOpts.distance_units === "imperial" ? "imperial" : "metric",
@@ -592,7 +607,7 @@ export default function render(shadow, ctx) {
 
   if (data.error) {
     shadow.innerHTML = shell(`
-      <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>Departures</h3></div>
+      <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>${t("departures", "Departures")}</h3></div>
       <div class="w-body"><p class="u-muted">${escapeHtml(data.error)}</p></div>`);
     return;
   }
@@ -608,11 +623,11 @@ export default function render(shadow, ctx) {
 
   if (!arrivals.length) {
     shadow.innerHTML = shell(`
-      ${size === "xs" ? "" : titleBar(data, size)}
+      ${size === "xs" ? "" : titleBar(data, size, false, t)}
       <div class="w-body stat-body">
         <div class="gt-hero">
           <i class="ph-bold ph-clock gt-hero-icon" style="color:var(--text-muted)"></i>
-          <p class="u-muted">Nothing approaching</p>
+          <p class="u-muted">${t("nothing_approaching", "Nothing approaching")}</p>
         </div>
       </div>`, size);
     return;
@@ -653,11 +668,11 @@ export default function render(shadow, ctx) {
   // At lg an alert has room to be read in full rather than truncated into
   // the title bar, which is where it goes at every other size.
   const alert = size === "lg" && data.note
-    ? `<div class="gt-alert"><i class="ph-bold ph-warning-circle"></i>${escapeHtml(data.note)}</div>`
+    ? `<div class="gt-alert"><i class="ph-bold ph-warning-circle"></i>${escapeHtml(noteText(data.note, t))}</div>`
     : "";
 
   shadow.innerHTML = shell(`
-    ${size === "xs" ? "" : titleBar(data, size, Boolean(alert))}
+    ${size === "xs" ? "" : titleBar(data, size, Boolean(alert), t)}
     ${body}
     ${alert}`, size);
 }

@@ -1,0 +1,14 @@
+{
+  "just_now": "刚刚",
+  "minutes_ago": "{n}分钟前",
+  "hours_ago": "{n}小时前",
+  "days_ago": "{n}天前",
+  "today": "今天",
+  "tomorrow": "明天",
+  "in_n_days": "{n}天后",
+  "in_n_weeks": "{n}周后",
+  "in_n_months": "{n}个月后",
+  "device_batteries": "设备电量",
+  "no_devices": "尚未注册上报电量的设备。",
+  "n_of_total": "{n}/{total}"
+}

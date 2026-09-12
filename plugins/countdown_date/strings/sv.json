@@ -1,0 +1,12 @@
+{
+  "hour": "timme",
+  "hours": "timmar",
+  "day": "dag",
+  "days": "dagar",
+  "unit_ago": "{unit} sedan",
+  "unit_to_go": "{unit} kvar",
+  "countdown": "Nedräkning",
+  "set_target_date": "Ange ett måldatum i cellinställningarna.",
+  "date_has_passed": "Datumet har passerat.",
+  "today": "Idag"
+}

@@ -1,0 +1,14 @@
+{
+  "dashboard": "Dashboard",
+  "wifi_excellent": "Ottimo",
+  "wifi_good": "Buono",
+  "wifi_fair": "Discreto",
+  "wifi_weak": "Debole",
+  "available": "disponibile",
+  "firmware": "Firmware",
+  "temperature": "Temperatura",
+  "degrees": "gradi",
+  "rh": "UR",
+  "humidity": "Umidità",
+  "percent": "percento"
+}

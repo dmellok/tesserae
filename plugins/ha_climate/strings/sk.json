@@ -1,0 +1,16 @@
+{
+  "not_found": "nenájdené",
+  "mode_off": "vyp.",
+  "mode_heat": "kúrenie",
+  "mode_cool": "chladenie",
+  "mode_heat_cool": "kúr./chlad.",
+  "mode_auto": "auto",
+  "mode_dry": "sušenie",
+  "mode_fan_only": "ventilátor",
+  "humidity_tip_target": "vlhkosť {h}% (cieľ {t}%)",
+  "humidity_tip": "vlhkosť {h}%",
+  "target": "Cieľ",
+  "climate": "Klíma",
+  "no_entities_selected": "Nie sú vybrané žiadne entity.",
+  "zones": "ZÓNY"
+}

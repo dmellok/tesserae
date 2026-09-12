@@ -1,0 +1,17 @@
+{
+  "just_now": "刚刚",
+  "minutes_abbr": "分钟",
+  "hours_abbr": "小时",
+  "days_abbr": "天",
+  "state_locked": "已锁定",
+  "state_unlocked": "已解锁",
+  "state_open": "已打开",
+  "state_closed": "已关闭",
+  "secured": "安全",
+  "locks": "门锁",
+  "doors_and_locks": "门与锁",
+  "all_clear": "一切正常。",
+  "open_since": "打开于",
+  "open_count_suffix": "处打开",
+  "all_secured": "全部安全"
+}

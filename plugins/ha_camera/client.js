@@ -21,15 +21,15 @@ function stateAccent(s) {
   return STATE_ACCENT[(s || "").toLowerCase()] || "var(--text-secondary)";
 }
 
-function fmtAgo(iso) {
+function fmtAgo(iso, t) {
   if (!iso) return "";
-  const t = Date.parse(iso);
-  if (!Number.isFinite(t)) return "";
-  const secs = Math.max(0, (Date.now() - t) / 1000);
-  if (secs < 60) return "just now";
-  if (secs < 3600) return `${Math.floor(secs / 60)}m ago`;
-  if (secs < 86400) return `${Math.floor(secs / 3600)}h ago`;
-  return `${Math.floor(secs / 86400)}d ago`;
+  const ts = Date.parse(iso);
+  if (!Number.isFinite(ts)) return "";
+  const secs = Math.max(0, (Date.now() - ts) / 1000);
+  if (secs < 60) return t("just_now", "just now");
+  if (secs < 3600) return t("minutes_ago", "{n}m ago").replace("{n}", String(Math.floor(secs / 60)));
+  if (secs < 86400) return t("hours_ago", "{n}h ago").replace("{n}", String(Math.floor(secs / 3600)));
+  return t("days_ago", "{n}d ago").replace("{n}", String(Math.floor(secs / 86400)));
 }
 
 function tileImage(cam) {
@@ -38,20 +38,21 @@ function tileImage(cam) {
     : `<div class="cam-empty"><i class="ph-bold ph-video-camera-slash"></i></div>`;
 }
 
-function tile(cam, opts = {}) {
+function tile(cam, opts, t) {
+  opts = opts || {};
   const accent = stateAccent(cam.state);
   const motion = cam.motion === true;
-  const ago = fmtAgo(cam.last_updated || cam.last_changed);
+  const ago = fmtAgo(cam.last_updated || cam.last_changed, t);
   const showName = opts.showName !== false;
   const subBits = [];
   if (cam.state) subBits.push(cam.state);
-  if (motion) subBits.push("motion");
+  if (motion) subBits.push(t("motion", "motion"));
   const sub = subBits.join(" · ");
   return `
     <div class="cam-tile">
       ${tileImage(cam)}
       ${ago ? `<span class="cam-ts" title="${escapeHtml(cam.last_updated || "")}"><i class="ph-bold ph-clock" style="font-size:.85em"></i>${escapeHtml(ago)}</span>` : ""}
-      ${motion ? `<span class="cam-motion-pip"><i class="ph-bold ph-circle-notch"></i>MOTION</span>` : ""}
+      ${motion ? `<span class="cam-motion-pip"><i class="ph-bold ph-circle-notch"></i>${escapeHtml(t("motion_upper", "MOTION"))}</span>` : ""}
       <div class="cam-overlay">
         ${showName ? `<span class="cam-name">${escapeHtml(cam.name || "")}</span>` : ""}
         ${sub ? `<span class="cam-sub" style="color:${accent === "var(--text-secondary)" ? "rgba(255,255,255,0.85)" : accent}">${escapeHtml(sub)}</span>` : ""}
@@ -61,15 +62,20 @@ function tile(cam, opts = {}) {
 
 export default function render(shadow, ctx) {
   const data = ctx?.data ?? {};
+  const t = ctx?.t || ((key, fallback) => fallback ?? key);
   const opts = ctx?.cell?.options || {};
   const fullBleed = opts.full_bleed === true;
   const css = `<link rel="stylesheet" href="/static/style/spectra-widgets.css">`;
+  // server.py fills "Camera" in when the label option is blank, so the
+  // stock label is the one case that goes through t(); anything else was
+  // typed by the user and stays as-is.
+  const label = data.label === "Camera" ? t("camera", "Camera") : (data.label || "");
 
   if (data.error) {
     shadow.innerHTML = `
       ${css}
       <div class="w" data-widget="ha_camera">
-        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>Camera</h3></div>
+        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>${escapeHtml(t("camera", "Camera"))}</h3></div>
         <div class="w-body"><p class="u-muted">${escapeHtml(data.error)}</p></div>
       </div>`;
     return;
@@ -181,12 +187,12 @@ export default function render(shadow, ctx) {
   // back to the framed grid if multiple cameras are configured.
   if (fullBleed && !isGrid) {
     const cam = items[0] || data;
-    const name = cam.name || data.label || "Camera";
+    const name = cam.name || label || t("camera", "Camera");
     const state = cam.state || "";
     const motion = cam.motion === true;
     const accent = stateAccent(state);
-    const sub = [state, motion ? "motion" : ""].filter(Boolean).join(" · ") || "no signal";
-    const ago = fmtAgo(cam.last_updated || cam.last_changed);
+    const sub = [state, motion ? t("motion", "motion") : ""].filter(Boolean).join(" · ") || t("no_signal", "no signal");
+    const ago = fmtAgo(cam.last_updated || cam.last_changed, t);
     if (cam.image_url) {
       shadow.innerHTML = `
         ${css}
@@ -194,7 +200,7 @@ export default function render(shadow, ctx) {
         <div class="w is-bleed" data-widget="ha_camera">
           <img src="${escapeHtml(cam.image_url)}" alt="${escapeHtml(name)}">
           ${ago ? `<span class="cam-ts" title="${escapeHtml(cam.last_updated || "")}"><i class="ph-bold ph-clock" style="font-size:.85em"></i>${escapeHtml(ago)}</span>` : ""}
-          ${motion ? `<span class="cam-motion-pip"><i class="ph-bold ph-circle-notch"></i>MOTION</span>` : ""}
+          ${motion ? `<span class="cam-motion-pip"><i class="ph-bold ph-circle-notch"></i>${escapeHtml(t("motion_upper", "MOTION"))}</span>` : ""}
           <div class="img-overlay">
             <span class="title">${escapeHtml(name)}</span>
             <span class="sub" style="color:${accent === "var(--text-secondary)" ? "rgba(255,255,255,0.85)" : accent}">${escapeHtml(sub)}</span>
@@ -219,9 +225,9 @@ export default function render(shadow, ctx) {
   // without you having to scan every tile.
   if (isGrid) {
     const motionCount = items.filter((c) => c.motion === true).length;
-    const title = data.label || "Cameras";
+    const title = label || t("cameras", "Cameras");
     const meta = motionCount > 0
-      ? `<span class="w-title-meta" style="color:var(--accent-1)">${motionCount} MOTION</span>`
+      ? `<span class="w-title-meta" style="color:var(--accent-1)">${motionCount} ${escapeHtml(t("motion_upper", "MOTION"))}</span>`
       : `<span class="w-title-meta">${items.length}</span>`;
     shadow.innerHTML = `
       ${css}
@@ -233,7 +239,7 @@ export default function render(shadow, ctx) {
           ${meta}
         </div>
         <div class="w-body" style="padding:var(--space-2)">
-          <div class="cam-grid">${items.map((c) => tile(c, { showName: true })).join("")}</div>
+          <div class="cam-grid">${items.map((c) => tile(c, { showName: true }, t)).join("")}</div>
         </div>
       </div>`;
     return;
@@ -243,14 +249,14 @@ export default function render(shadow, ctx) {
   // layout but add the corner timestamp + a motion pip so it matches
   // the grid tiles' affordances.
   const cam = items[0] || data;
-  const name = cam.name || data.label || "Camera";
+  const name = cam.name || label || t("camera", "Camera");
   const url = cam.image_url || "";
   const state = cam.state || "";
   const motion = cam.motion === true;
   const accent = stateAccent(state);
-  const subBits = [state, motion ? "motion" : ""].filter(Boolean);
-  const sub = subBits.length ? subBits.join(" · ") : "no signal";
-  const ago = fmtAgo(cam.last_updated || cam.last_changed);
+  const subBits = [state, motion ? t("motion", "motion") : ""].filter(Boolean);
+  const sub = subBits.length ? subBits.join(" · ") : t("no_signal", "no signal");
+  const ago = fmtAgo(cam.last_updated || cam.last_changed, t);
 
   const heroBody = url
     ? `<img src="${escapeHtml(url)}" alt="${escapeHtml(name)}">`
@@ -263,13 +269,13 @@ export default function render(shadow, ctx) {
       <div class="w-title">
         <i class="ph-bold ph-video-camera" style="color:${accent}"></i>
         <h3>${escapeHtml(name)}</h3>
-        ${motion ? `<span class="w-title-meta" style="color:var(--accent-1)">MOTION</span>` : ""}
+        ${motion ? `<span class="w-title-meta" style="color:var(--accent-1)">${escapeHtml(t("motion_upper", "MOTION"))}</span>` : ""}
       </div>
       <div class="w-body img-body">
         <div class="img-hero" style="position:relative">
           ${heroBody}
           ${ago && url ? `<span class="cam-ts" title="${escapeHtml(cam.last_updated || "")}"><i class="ph-bold ph-clock" style="font-size:.85em"></i>${escapeHtml(ago)}</span>` : ""}
-          ${motion && url ? `<span class="cam-motion-pip"><i class="ph-bold ph-circle-notch"></i>MOTION</span>` : ""}
+          ${motion && url ? `<span class="cam-motion-pip"><i class="ph-bold ph-circle-notch"></i>${escapeHtml(t("motion_upper", "MOTION"))}</span>` : ""}
         </div>
         <div class="img-meta">
           <span class="sub" style="color:${accent}">${escapeHtml(sub)}</span>

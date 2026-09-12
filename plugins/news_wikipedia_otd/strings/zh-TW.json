@@ -1,0 +1,16 @@
+{
+  "kind_events": "大事",
+  "kind_births": "出生",
+  "kind_deaths": "逝世",
+  "kind_holidays": "節日",
+  "kind_selected": "精選",
+  "kind_all": "全部",
+  "era_antiquity": "古代",
+  "era_medieval": "中世紀",
+  "era_renaissance": "文藝復興",
+  "era_industrial": "工業時代",
+  "era_modern": "現代",
+  "on_this_day": "歷史上的今天",
+  "on": "於",
+  "nothing_recorded": "沒有紀錄。"
+}

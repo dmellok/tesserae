@@ -35,7 +35,7 @@ function escapeHtml(s) {
 // in the strip under the chart; "headline" draws it large above the chart
 // with the trend arrow and low / high beside it, for the weather-style
 // "value at a glance, history for context" card (issue #282).
-function renderSingle(item, hours, title, valueStyle) {
+function renderSingle(item, hours, title, valueStyle, t) {
   const trendAccent = TREND_ACCENT[item.trend] || TREND_ACCENT.flat;
   const trendPh = TREND_ICON[item.trend] || TREND_ICON.flat;
   const headline = valueStyle === "headline";
@@ -43,11 +43,11 @@ function renderSingle(item, hours, title, valueStyle) {
       <div style="flex:1 1 auto;min-height:0;position:relative">
         ${Array.isArray(item.values) && item.values.length
           ? '<canvas></canvas>'
-          : '<p class="u-muted">No samples in the window.</p>'}
+          : `<p class="u-muted">${escapeHtml(t("no_samples_in_window", "No samples in the window."))}</p>`}
       </div>`;
   const lowHigh = `
-        <span class="chart-key"><span class="u-label">Low</span> ${escapeHtml(item.min || "-")}</span>
-        <span class="chart-key"><span class="u-label">High</span> ${escapeHtml(item.max || "-")}</span>`;
+        <span class="chart-key"><span class="u-label">${escapeHtml(t("low", "Low"))}</span> ${escapeHtml(item.min || "-")}</span>
+        <span class="chart-key"><span class="u-label">${escapeHtml(t("high", "High"))}</span> ${escapeHtml(item.max || "-")}</span>`;
   const body = headline
     ? `
       <div class="hist-headline">
@@ -78,13 +78,13 @@ function renderSingle(item, hours, title, valueStyle) {
     <div class="w-title">
       <i class="ph-bold ph-chart-line-up" style="color:${trendAccent}"></i>
       <h3>${escapeHtml(title || item.name)}</h3>
-      <span class="w-title-meta">${hours}H</span>
+      <span class="w-title-meta">${hours}${escapeHtml(t("hours_abbr", "H"))}</span>
     </div>
     <div class="w-body" style="gap:var(--space-2)">${body}
     </div>`;
 }
 
-function renderMulti(items, title, hours) {
+function renderMulti(items, title, hours, t) {
   const rows = items.map((it, i) => {
     const accent = TREND_ACCENT[it.trend] || TREND_ACCENT.flat;
     const ph = TREND_ICON[it.trend] || TREND_ICON.flat;
@@ -102,27 +102,31 @@ function renderMulti(items, title, hours) {
     <div class="w-title">
       <i class="ph-bold ph-chart-line-up" style="color:var(--accent-3)"></i>
       <h3>${escapeHtml(title)}</h3>
-      <span class="w-title-meta">${hours}H</span>
+      <span class="w-title-meta">${hours}${escapeHtml(t("hours_abbr", "H"))}</span>
     </div>
     <div class="w-body list-body">${rows}</div>`;
 }
 
 export default function render(shadow, ctx) {
   const data = ctx?.data ?? {};
+  const t = ctx?.t || ((key, fallback) => fallback ?? key);
   const css = `<link rel="stylesheet" href="/static/style/spectra-widgets.css">`;
+  // server.py sends "History" verbatim for a multi-sensor cell with no
+  // Title option (and the entity's friendly name for a single one), so
+  // only that exact default gets translated; a typed title is the user's.
+  const title = data.title && data.title !== "History" ? data.title : t("history", "History");
 
   if (data.error) {
     shadow.innerHTML = `
       ${css}
       <div class="w" data-widget="ha_history">
-        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>History</h3></div>
+        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>${escapeHtml(title)}</h3></div>
         <div class="w-body"><p class="u-muted">${escapeHtml(data.error)}</p></div>
       </div>`;
     return;
   }
 
   const items = Array.isArray(data.items) ? data.items : [];
-  const title = data.title || "History";
   const hours = data.hours || 24;
 
   if (data.empty || items.length === 0) {
@@ -130,7 +134,7 @@ export default function render(shadow, ctx) {
       ${css}
       <div class="w" data-widget="ha_history">
         <div class="w-title"><i class="ph-bold ph-chart-line-up"></i><h3>${escapeHtml(title)}</h3></div>
-        <div class="w-body"><p class="u-muted">No sensors selected.</p></div>
+        <div class="w-body"><p class="u-muted">${escapeHtml(t("no_sensors_selected", "No sensors selected."))}</p></div>
       </div>`;
     return;
   }
@@ -155,7 +159,7 @@ export default function render(shadow, ctx) {
       </style>
       <div class="w" data-widget="ha_history"><div class="w-body hist-frag-value">
         <span class="v">${escapeHtml(it.current)}${it.unit ? `<small> ${escapeHtml(it.unit)}</small>` : ""} <i class="ph-bold ${ph}" style="color:${accent};font-size:.42em;vertical-align:.35em"></i></span>
-        <span class="lo-hi"><span>Low ${escapeHtml(it.min || "-")}</span><span>High ${escapeHtml(it.max || "-")}</span></span>
+        <span class="lo-hi"><span>${escapeHtml(t("low", "Low"))} ${escapeHtml(it.min || "-")}</span><span>${escapeHtml(t("high", "High"))} ${escapeHtml(it.max || "-")}</span></span>
       </div></div>`;
     return;
   }
@@ -164,9 +168,9 @@ export default function render(shadow, ctx) {
   if (frag === "chart") {
     body = single && Array.isArray(items[0].values) && items[0].values.length
       ? '<div class="w-body"><div style="flex:1 1 auto;min-height:0;position:relative"><canvas></canvas></div></div>'
-      : '<div class="w-body"><p class="u-muted">No chart for this selection.</p></div>';
+      : `<div class="w-body"><p class="u-muted">${escapeHtml(t("no_chart_for_selection", "No chart for this selection."))}</p></div>`;
   } else {
-    body = single ? renderSingle(items[0], hours, title, data.value_style) : renderMulti(items, title, hours);
+    body = single ? renderSingle(items[0], hours, title, data.value_style, t) : renderMulti(items, title, hours, t);
   }
   shadow.innerHTML = `
     ${css}
@@ -176,8 +180,8 @@ export default function render(shadow, ctx) {
     const item = items[0];
     const canvas = shadow.querySelector("canvas");
     if (canvas && Array.isArray(item.values) && item.values.length >= 2) {
-      const t = tokens(shadow.host);
-      const accent = t[TREND_ACCENT_TOKEN[item.trend] || "accent3"];
+      const tok = tokens(shadow.host);
+      const accent = tok[TREND_ACCENT_TOKEN[item.trend] || "accent3"];
 
       // Min/max point markers, only on if the user hasn't disabled
       // them via cell options. Min pip in slate, max in ochre, so
@@ -186,7 +190,7 @@ export default function render(shadow, ctx) {
       if (data.show_min_max !== false && Number.isFinite(item.min_idx)) {
         markers.push({
           index: item.min_idx,
-          color: t.accent5,
+          color: tok.accent5,
           label: item.min,
           position: "below",
           radius: 5,
@@ -195,7 +199,7 @@ export default function render(shadow, ctx) {
       if (data.show_min_max !== false && Number.isFinite(item.max_idx) && item.max_idx !== item.min_idx) {
         markers.push({
           index: item.max_idx,
-          color: t.accent2,
+          color: tok.accent2,
           label: item.max,
           position: "above",
           radius: 5,
@@ -210,14 +214,14 @@ export default function render(shadow, ctx) {
       if (data.show_profile !== false && Array.isArray(item.hourly_profile) && item.hourly_profile.some((v) => v != null)) {
         const stretched = stretchProfile(item.hourly_profile, item.values.length);
         if (stretched) {
-          overlay = { values: stretched, color: t.textMuted };
+          overlay = { values: stretched, color: tok.textMuted };
         }
       }
 
       const threshold = Number.isFinite(data.threshold) ? {
         value: data.threshold,
         label: `${formatThresholdLabel(data.threshold)}${item.unit ? " " + item.unit : ""}`,
-        color: t.accent1,
+        color: tok.accent1,
       } : null;
 
       // Clock times / dates from the server (one per plotted point, in the
@@ -229,7 +233,7 @@ export default function render(shadow, ctx) {
         : item.values.map((_, i) => `${i + 1}`);
 
       lineChart(canvas, {
-        tokens: t,
+        tokens: tok,
         labels: axis,
         values: item.values,
         color: accent,

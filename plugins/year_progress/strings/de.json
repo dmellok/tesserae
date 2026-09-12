@@ -1,0 +1,14 @@
+{
+  "week_n_of_total": "Woche {n} von {total}",
+  "day_left": "noch {n} Tag",
+  "days_left": "noch {n} Tage",
+  "life_in_weeks": "Leben in Wochen",
+  "set_birth_year": "Geburtsjahr in den Zellenoptionen setzen.",
+  "year_n_of_total": "Jahr {n} von {total}",
+  "week_lived": "{n} Woche gelebt",
+  "weeks_lived": "{n} Wochen gelebt",
+  "week_to_go": "noch {n} Woche",
+  "weeks_to_go": "noch {n} Wochen",
+  "through_the_year": "des Jahres",
+  "of_expected_life": "der Lebenserwartung"
+}

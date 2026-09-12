@@ -1,0 +1,16 @@
+{
+  "yesterday": "vakar",
+  "day_abbr": "d.",
+  "late": "vėluoja",
+  "today": "šiandien",
+  "tomorrow": "rytoj",
+  "priority_high": "aukštas",
+  "priority_medium": "vidutinis",
+  "priority_low": "žemas",
+  "todo": "Darbai",
+  "all_done": "Viskas atlikta.",
+  "priority": "prioritetas",
+  "overdue": "VĖLUOJA",
+  "to_do": "LIKO",
+  "done": "ATLIKTA"
+}

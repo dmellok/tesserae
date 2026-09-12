@@ -1,0 +1,16 @@
+{
+  "not_found": "non trovato",
+  "mode_off": "spento",
+  "mode_heat": "caldo",
+  "mode_cool": "freddo",
+  "mode_heat_cool": "caldo/freddo",
+  "mode_auto": "auto",
+  "mode_dry": "deumidifica",
+  "mode_fan_only": "solo ventola",
+  "humidity_tip_target": "umidità {h}% (target {t}%)",
+  "humidity_tip": "umidità {h}%",
+  "target": "Target",
+  "climate": "Clima",
+  "no_entities_selected": "Nessuna entità selezionata.",
+  "zones": "ZONE"
+}

@@ -6,13 +6,16 @@
 // the feed's max), and comments + age beneath. Source-host glyph
 // leads each row so the feed's palette stays varied.
 
-const FEED_LABELS = {
-  top: "Top",
-  new: "New",
-  best: "Best",
-  show: "Show",
-  ask: "Ask",
-};
+function feedLabelFor(feed, t) {
+  switch (feed) {
+    case "top": return t("feed_top", "Top");
+    case "new": return t("feed_new", "New");
+    case "best": return t("feed_best", "Best");
+    case "show": return t("feed_show", "Show");
+    case "ask": return t("feed_ask", "Ask");
+    default: return t("feed_top", "Top");
+  }
+}
 
 function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({
@@ -27,14 +30,14 @@ function fmtScore(n) {
   return String(v);
 }
 
-function fmtAgo(epochSec) {
+function fmtAgo(epochSec, t) {
   if (!Number.isFinite(epochSec) || epochSec <= 0) return "";
   const secs = Math.max(0, Date.now() / 1000 - epochSec);
-  if (secs < 60) return "now";
-  if (secs < 3600) return `${Math.floor(secs / 60)}m`;
-  if (secs < 86400) return `${Math.floor(secs / 3600)}h`;
-  if (secs < 604800) return `${Math.floor(secs / 86400)}d`;
-  return `${Math.floor(secs / 604800)}w`;
+  if (secs < 60) return t("now", "now");
+  if (secs < 3600) return `${Math.floor(secs / 60)}${t("minutes_abbr", "m")}`;
+  if (secs < 86400) return `${Math.floor(secs / 3600)}${t("hours_abbr", "h")}`;
+  if (secs < 604800) return `${Math.floor(secs / 86400)}${t("days_abbr", "d")}`;
+  return `${Math.floor(secs / 604800)}${t("weeks_abbr", "w")}`;
 }
 
 function sourceIcon(url) {
@@ -52,14 +55,14 @@ function sourceIcon(url) {
 // Story-type from the title prefix. HN's API doesn't ship a type
 // field for the top stories endpoint; the prefix convention is how
 // the site itself categorises them.
-function storyType(title) {
+function storyType(title, t) {
   if (typeof title !== "string") return null;
-  if (/^show hn:?/i.test(title)) return { label: "SHOW", color: "var(--accent-3)" };
-  if (/^ask hn:?/i.test(title)) return { label: "ASK", color: "var(--accent-5)" };
-  if (/^tell hn:?/i.test(title)) return { label: "TELL", color: "var(--accent-4)" };
-  if (/^launch hn:?/i.test(title)) return { label: "LAUNCH", color: "var(--accent-2)" };
+  if (/^show hn:?/i.test(title)) return { label: t("type_show", "SHOW"), color: "var(--accent-3)" };
+  if (/^ask hn:?/i.test(title)) return { label: t("type_ask", "ASK"), color: "var(--accent-5)" };
+  if (/^tell hn:?/i.test(title)) return { label: t("type_tell", "TELL"), color: "var(--accent-4)" };
+  if (/^launch hn:?/i.test(title)) return { label: t("type_launch", "LAUNCH"), color: "var(--accent-2)" };
   // Pure-domain hire posts are typically titled like a company name + month/year.
-  if (/^[A-Z][A-Za-z0-9 .&-]+\s+\(YC\b/.test(title) && /hiring/i.test(title)) return { label: "JOB", color: "var(--accent-6)" };
+  if (/^[A-Z][A-Za-z0-9 .&-]+\s+\(YC\b/.test(title) && /hiring/i.test(title)) return { label: t("type_job", "JOB"), color: "var(--accent-6)" };
   return null;
 }
 
@@ -71,21 +74,23 @@ function cleanTitle(title, type) {
 }
 
 export default function render(shadow, ctx) {
+  const t = ctx?.t || ((key, fallback) => fallback ?? key);
   const data = ctx?.data ?? {};
   const css = `<link rel="stylesheet" href="/static/style/spectra-widgets.css">`;
+  const heading = escapeHtml(t("hacker_news", "Hacker News"));
 
   if (data.error) {
     shadow.innerHTML = `
       ${css}
       <div class="w" data-widget="news_hacker_news">
-        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>Hacker News</h3></div>
+        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>${heading}</h3></div>
         <div class="w-body"><p class="u-muted">${escapeHtml(data.error)}</p></div>
       </div>`;
     return;
   }
 
   const stories = Array.isArray(data.stories) ? data.stories : [];
-  const feedLabel = FEED_LABELS[data.feed] || "Top";
+  const feedLabel = feedLabelFor(data.feed, t);
 
   if (stories.length === 0) {
     shadow.innerHTML = `
@@ -93,10 +98,10 @@ export default function render(shadow, ctx) {
       <div class="w" data-widget="news_hacker_news">
         <div class="w-title">
           <i class="ph-bold ph-newspaper-clipping" style="color:var(--accent-5)"></i>
-          <h3>Hacker News</h3>
+          <h3>${heading}</h3>
           <span class="w-title-meta">${escapeHtml(feedLabel)}</span>
         </div>
-        <div class="w-body"><p class="u-muted">No stories.</p></div>
+        <div class="w-body"><p class="u-muted">${escapeHtml(t("no_stories", "No stories."))}</p></div>
       </div>`;
     return;
   }
@@ -107,15 +112,15 @@ export default function render(shadow, ctx) {
   const maxScore = Math.max(1, ...stories.map((s) => Number(s.score) || 0));
 
   const rows = stories.map((s, i) => {
-    const type = storyType(s.title);
+    const type = storyType(s.title, t);
     const title = cleanTitle(s.title, type);
     const ph = sourceIcon(s.url);
-    const ago = fmtAgo(s.time);
+    const ago = fmtAgo(s.time, t);
     const score = Number(s.score) || 0;
     const scorePct = (score / maxScore) * 100;
     const scoreColor = i === 0 ? "var(--accent-1)" : "var(--accent-2)";
     const typeChip = type
-      ? `<span class="hn-type" style="color:${type.color};background:color-mix(in oklab, ${type.color} 14%, var(--surface))">${type.label}</span>`
+      ? `<span class="hn-type" style="color:${type.color};background:color-mix(in oklab, ${type.color} 14%, var(--surface))">${escapeHtml(type.label)}</span>`
       : "";
     const subBits = [];
     if (s.comments != null) subBits.push(`<span class="hn-sub-item"><i class="ph-bold ph-chat-circle"></i>${escapeHtml(fmtScore(s.comments))}</span>`);
@@ -237,7 +242,7 @@ export default function render(shadow, ctx) {
     <div class="w" data-widget="news_hacker_news">
       <div class="w-title">
         <i class="ph-bold ph-flame" style="color:var(--accent-1)"></i>
-        <h3>Hacker News</h3>
+        <h3>${heading}</h3>
         <span class="w-title-meta">${escapeHtml(feedLabel)}</span>
       </div>
       <div class="w-body list-body">${rows}</div>

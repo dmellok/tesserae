@@ -54,20 +54,25 @@ function swatchFor(light) {
 
 export default function render(shadow, ctx) {
   const data = ctx?.data ?? {};
+  const t = ctx?.t || ((key, fallback) => fallback ?? key);
   const css = `<link rel="stylesheet" href="/static/style/spectra-widgets.css">`;
 
   if (data.error) {
     shadow.innerHTML = `
       ${css}
       <div class="w" data-widget="ha_lights">
-        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>Lights</h3></div>
+        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>${escapeHtml(t("lights", "Lights"))}</h3></div>
         <div class="w-body"><p class="u-muted">${escapeHtml(data.error)}</p></div>
       </div>`;
     return;
   }
 
   const lights = Array.isArray(data.lights) ? data.lights : [];
-  const place = data.place || "Lights";
+  // server.py sends "Home" verbatim when the cell has no Label option, so
+  // only that exact default gets translated; a typed label is the user's.
+  const place = data.place
+    ? (data.place === "Home" ? t("home", "Home") : data.place)
+    : t("lights", "Lights");
   const onCount = data.on_count ?? 0;
   const total = data.total ?? lights.length;
 
@@ -76,7 +81,7 @@ export default function render(shadow, ctx) {
       ${css}
       <div class="w" data-widget="ha_lights">
         <div class="w-title"><i class="ph-bold ph-lightbulb"></i><h3>${escapeHtml(place)}</h3></div>
-        <div class="w-body"><p class="u-muted">No lights selected.</p></div>
+        <div class="w-body"><p class="u-muted">${escapeHtml(t("no_lights_selected", "No lights selected."))}</p></div>
       </div>`;
     return;
   }
@@ -100,8 +105,8 @@ export default function render(shadow, ctx) {
         <span class="bri-fill" style="width:${brightnessPct != null ? brightnessPct : 100}%;background:${swatchColor}"></span>
       </span>` : `<span class="bri-wrap is-off"><span class="bri-track"></span></span>`;
     const valueText = isOn
-      ? (brightnessPct != null ? `${brightnessPct}%` : "ON")
-      : "off";
+      ? (brightnessPct != null ? `${brightnessPct}%` : t("on", "ON"))
+      : t("off", "off");
     const swatchDot = isOn && (Array.isArray(l.hs_color) || Number.isFinite(l.color_temp_kelvin))
       ? `<span class="bri-swatch" style="background:${swatchColor}" title="${Number.isFinite(l.color_temp_kelvin) ? `${l.color_temp_kelvin}K` : "RGB"}"></span>`
       : "";
@@ -115,7 +120,7 @@ export default function render(shadow, ctx) {
         <div class="light-meta">
           ${swatchDot}
           ${brightnessBar}
-          <span class="bri-value" style="color:${accent}">${valueText}</span>
+          <span class="bri-value" style="color:${accent}">${escapeHtml(valueText)}</span>
         </div>
       </div>`;
   }).join("");
@@ -205,7 +210,7 @@ export default function render(shadow, ctx) {
       <div class="w-title">
         <i class="ph-bold ph-lightbulb" style="color:${onCount > 0 ? "var(--accent-2)" : "var(--accent-3)"}"></i>
         <h3>${escapeHtml(place)}</h3>
-        <span class="w-title-meta">${onCount}/${total} ON</span>
+        <span class="w-title-meta">${onCount}/${total} ${escapeHtml(t("on", "ON"))}</span>
       </div>
       <div class="w-body list-body">${rows}</div>
     </div>`;

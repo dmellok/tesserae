@@ -1,0 +1,9 @@
+{
+  "no_samples_in_window": "No samples in the window.",
+  "low": "Low",
+  "high": "High",
+  "hours_abbr": "H",
+  "history": "History",
+  "no_sensors_selected": "No sensors selected.",
+  "no_chart_for_selection": "No chart for this selection."
+}

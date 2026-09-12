@@ -1,0 +1,15 @@
+{
+  "weather": "Počasí",
+  "cond_sunny": "Slunečno",
+  "cond_mostly_clear": "Skoro jasno",
+  "cond_partly_cloudy": "Polojasno",
+  "cond_cloudy": "Oblačno",
+  "cond_fog": "Mlha",
+  "cond_drizzle": "Mrholení",
+  "cond_rain": "Déšť",
+  "cond_rain_heavy": "Silný déšť",
+  "cond_snow": "Sněžení",
+  "cond_snow_heavy": "Silné sněžení",
+  "cond_showers": "Přeháňky",
+  "cond_storm": "Bouřka"
+}

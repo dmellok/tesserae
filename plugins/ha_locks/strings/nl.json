@@ -1,0 +1,17 @@
+{
+  "just_now": "zojuist",
+  "minutes_abbr": "m",
+  "hours_abbr": "u",
+  "days_abbr": "d",
+  "state_locked": "op slot",
+  "state_unlocked": "van slot",
+  "state_open": "open",
+  "state_closed": "dicht",
+  "secured": "beveiligd",
+  "locks": "Sloten",
+  "doors_and_locks": "Deuren & sloten",
+  "all_clear": "Alles in orde.",
+  "open_since": "open sinds",
+  "open_count_suffix": "OPEN",
+  "all_secured": "ALLES DICHT"
+}

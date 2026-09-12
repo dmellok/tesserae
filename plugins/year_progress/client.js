@@ -86,13 +86,19 @@ function dotGrid(cols, rows, filledCount, accent) {
     </svg>`;
 }
 
-function formatPct(n) {
-  const r = Math.round(n * 10) / 10;
-  return (Math.abs(r % 1) < 0.05 ? Math.round(r) : r).toString();
+// One decimal, trailing ".0" dropped, separator from the locale.
+function formatPct(n, locale) {
+  return new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(n);
+}
+
+function formatInt(n, locale) {
+  return new Intl.NumberFormat(locale).format(n);
 }
 
 export default function render(shadow, ctx) {
   const opts = ctx?.cell?.options || {};
+  const t = ctx?.t || ((key, fallback) => fallback ?? key);
+  const locale = ctx?.locale || "en";
   const mode = opts.mode === "life-weeks" ? "life-weeks" : "year";
   const accent = ACCENTS[opts.accent] || ACCENTS.terracotta;
   const showPct = opts.show_percentage !== false;
@@ -114,8 +120,12 @@ export default function render(shadow, ctx) {
     pct = (doy / total) * 100;
     filled = weekOfYearIndex(now);
     kicker = String(year);
-    metaLeft = `Week ${filled + 1} of ${WEEKS_PER_YEAR}`;
-    metaRight = `${total - doy} days left`;
+    metaLeft = t("week_n_of_total", "Week {n} of {total}")
+      .replace("{n}", String(filled + 1))
+      .replace("{total}", String(WEEKS_PER_YEAR));
+    const daysLeft = total - doy;
+    metaRight = (daysLeft === 1 ? t("day_left", "{n} day left") : t("days_left", "{n} days left"))
+      .replace("{n}", String(daysLeft));
   } else {
     const birthYearRaw = Number(opts.birth_year);
     const lifeYears = Math.max(1, Math.min(120, Number(opts.life_expectancy_years) || 80));
@@ -125,9 +135,9 @@ export default function render(shadow, ctx) {
         <div class="w" data-widget="year_progress">
           <div class="w-title">
             <i class="ph-bold ph-calendar-dots" style="color:${accent}"></i>
-            <h3>Life in weeks</h3>
+            <h3>${escapeHtml(t("life_in_weeks", "Life in weeks"))}</h3>
           </div>
-          <div class="w-body"><p class="u-muted">Set a birth year in cell options.</p></div>
+          <div class="w-body"><p class="u-muted">${escapeHtml(t("set_birth_year", "Set a birth year in cell options."))}</p></div>
         </div>`;
       return;
     }
@@ -140,12 +150,17 @@ export default function render(shadow, ctx) {
     filled = pastWeeks;
     gridCols = WEEKS_PER_YEAR;
     gridRows = lifeYears;
-    kicker = `Year ${fullYearsLived + 1} of ${lifeYears}`;
-    metaLeft = `${pastWeeks.toLocaleString()} weeks lived`;
-    metaRight = `${(totalWeeks - pastWeeks).toLocaleString()} weeks to go`;
+    kicker = t("year_n_of_total", "Year {n} of {total}")
+      .replace("{n}", String(fullYearsLived + 1))
+      .replace("{total}", String(lifeYears));
+    const weeksToGo = totalWeeks - pastWeeks;
+    metaLeft = (pastWeeks === 1 ? t("week_lived", "{n} week lived") : t("weeks_lived", "{n} weeks lived"))
+      .replace("{n}", formatInt(pastWeeks, locale));
+    metaRight = (weeksToGo === 1 ? t("week_to_go", "{n} week to go") : t("weeks_to_go", "{n} weeks to go"))
+      .replace("{n}", formatInt(weeksToGo, locale));
   }
 
-  const pctText = `${formatPct(pct)}%`;
+  const pctText = `${formatPct(pct, locale)}%`;
   const grid = dotGrid(gridCols, gridRows, filled, accent);
 
   // Linear progress strip for the sm/md layouts where the SVG grid
@@ -237,7 +252,7 @@ export default function render(shadow, ctx) {
         <span class="yp-kicker">${escapeHtml(kicker)}</span>
         <div class="yp-hero">
           ${showPct ? `<span class="num">${escapeHtml(pctText)}</span>` : ""}
-          <span class="suf">${mode === "year" ? "through the year" : "of expected life"}</span>
+          <span class="suf">${escapeHtml(mode === "year" ? t("through_the_year", "through the year") : t("of_expected_life", "of expected life"))}</span>
         </div>
         ${linearBar}
         <div class="yp-grid-wrap">${grid}</div>

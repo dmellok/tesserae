@@ -1,0 +1,14 @@
+{
+  "dashboard": "仪表盘",
+  "wifi_excellent": "极佳",
+  "wifi_good": "良好",
+  "wifi_fair": "一般",
+  "wifi_weak": "弱",
+  "available": "可更新",
+  "firmware": "固件",
+  "temperature": "温度",
+  "degrees": "度",
+  "rh": "RH",
+  "humidity": "湿度",
+  "percent": "%"
+}

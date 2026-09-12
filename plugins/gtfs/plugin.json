@@ -3,6 +3,7 @@
   "name": "GTFS / GTFS-RT",
   "version": "0.12.0",
   "kind": "widget",
+  "locales": ["en", "cs", "de", "es", "fr", "it", "lt", "nb", "nl", "pl", "pt", "sk", "sv", "zh-CN", "zh-TW"],
   "description": "Approaching vehicles at a stop (or two), from any GTFS feed. Presets for the NYC Subway and BART, live times and delays from GTFS-RT TripUpdates, service alerts, vehicle positions, and an optional split-by-direction board.",
   "icon": "ph-bus",
   "supports": {

@@ -1,0 +1,16 @@
+{
+  "yesterday": "i går",
+  "day_abbr": "d",
+  "late": "for sent",
+  "today": "i dag",
+  "tomorrow": "i morgen",
+  "priority_high": "høy",
+  "priority_medium": "middels",
+  "priority_low": "lav",
+  "todo": "Gjøremål",
+  "all_done": "Alt gjort.",
+  "priority": "prioritet",
+  "overdue": "FORFALT",
+  "to_do": "Å GJØRE",
+  "done": "GJORT"
+}

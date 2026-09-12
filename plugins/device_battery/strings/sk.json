@@ -1,0 +1,14 @@
+{
+  "just_now": "práve teraz",
+  "minutes_ago": "pred {n} min",
+  "hours_ago": "pred {n} h",
+  "days_ago": "pred {n} d",
+  "today": "dnes",
+  "tomorrow": "zajtra",
+  "in_n_days": "o {n} dní",
+  "in_n_weeks": "o {n} týždňov",
+  "in_n_months": "o {n} mesiacov",
+  "device_batteries": "Batérie zariadení",
+  "no_devices": "Zatiaľ žiadne zariadenia hlásiace batériu.",
+  "n_of_total": "{n} z {total}"
+}

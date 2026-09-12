@@ -1,0 +1,8 @@
+{
+  "state_playing": "spielt",
+  "state_paused": "pausiert",
+  "state_idle": "inaktiv",
+  "state_off": "aus",
+  "state_unavailable": "nicht verfügbar",
+  "media": "Medien"
+}

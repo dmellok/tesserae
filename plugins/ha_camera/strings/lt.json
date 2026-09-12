@@ -1,0 +1,11 @@
+{
+  "just_now": "ką tik",
+  "minutes_ago": "prieš {n} min",
+  "hours_ago": "prieš {n} val.",
+  "days_ago": "prieš {n} d.",
+  "motion": "judesys",
+  "motion_upper": "JUDESYS",
+  "camera": "Kamera",
+  "no_signal": "nėra signalo",
+  "cameras": "Kameros"
+}

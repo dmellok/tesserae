@@ -1,0 +1,9 @@
+{
+  "no_samples_in_window": "Aucun relevé sur la période.",
+  "low": "Min",
+  "high": "Max",
+  "hours_abbr": "h",
+  "history": "Historique",
+  "no_sensors_selected": "Aucun capteur sélectionné.",
+  "no_chart_for_selection": "Aucun graphique pour cette sélection."
+}

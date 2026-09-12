@@ -3,6 +3,7 @@
   "name": "Year, Progress",
   "version": "0.1.0",
   "kind": "widget",
+  "locales": ["en", "cs", "de", "es", "fr", "it", "lt", "nb", "nl", "pl", "pt", "sk", "sv", "zh-CN", "zh-TW"],
   "description": "How far through the year you are. Two modes: the current calendar year as a row of weekly dots, or 'life in weeks' as a long-form grid (give a birth year). Pure client-side, no network.",
   "icon": "ph-calendar-dots",
   "supports": { "sizes": ["xs", "sm", "md", "lg"] },

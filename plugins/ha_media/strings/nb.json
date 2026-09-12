@@ -1,0 +1,8 @@
+{
+  "state_playing": "spiller",
+  "state_paused": "pauset",
+  "state_idle": "inaktiv",
+  "state_off": "av",
+  "state_unavailable": "utilgjengelig",
+  "media": "Medier"
+}

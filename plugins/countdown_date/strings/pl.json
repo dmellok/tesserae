@@ -1,0 +1,12 @@
+{
+  "hour": "godzina",
+  "hours": "godzin",
+  "day": "dzień",
+  "days": "dni",
+  "unit_ago": "{unit} temu",
+  "unit_to_go": "{unit} do końca",
+  "countdown": "Odliczanie",
+  "set_target_date": "Ustaw datę docelową w opcjach komórki.",
+  "date_has_passed": "Data minęła.",
+  "today": "Dziś"
+}

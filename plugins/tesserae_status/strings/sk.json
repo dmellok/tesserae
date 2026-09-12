@@ -1,0 +1,14 @@
+{
+  "dashboard": "Prehľad",
+  "wifi_excellent": "Výborný",
+  "wifi_good": "Dobrý",
+  "wifi_fair": "Slušný",
+  "wifi_weak": "Slabý",
+  "available": "k dispozícii",
+  "firmware": "Firmvér",
+  "temperature": "Teplota",
+  "degrees": "stupňov",
+  "rh": "RV",
+  "humidity": "Vlhkosť",
+  "percent": "percent"
+}

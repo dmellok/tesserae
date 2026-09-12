@@ -1,0 +1,18 @@
+{
+  "hourly": "Hodinovo",
+  "legend_temperature": "Teplota",
+  "legend_rain": "Dážď %",
+  "legend_now": "Teraz",
+  "now_suffix": "TERAZ",
+  "no_hourly_data": "Žiadne hodinové dáta.",
+  "cond_clear": "Jasno",
+  "cond_overcast": "Zamračené",
+  "cond_partly_cloudy": "Polooblačno",
+  "cond_drizzle": "Mrholenie",
+  "cond_rain": "Dážď",
+  "cond_rain_heavy": "Silný dážď",
+  "cond_showers": "Prehánky",
+  "cond_snow": "Sneženie",
+  "cond_thunderstorm": "Búrka",
+  "cond_fog": "Hmla"
+}

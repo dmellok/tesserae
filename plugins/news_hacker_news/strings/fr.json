@@ -1,0 +1,19 @@
+{
+  "feed_top": "Top",
+  "feed_new": "Nouveautés",
+  "feed_best": "Meilleurs",
+  "feed_show": "Show",
+  "feed_ask": "Ask",
+  "now": "maint.",
+  "minutes_abbr": "min",
+  "hours_abbr": "h",
+  "days_abbr": "j",
+  "weeks_abbr": "sem",
+  "type_show": "SHOW",
+  "type_ask": "ASK",
+  "type_tell": "TELL",
+  "type_launch": "LAUNCH",
+  "type_job": "EMPLOI",
+  "hacker_news": "Hacker News",
+  "no_stories": "Aucun article."
+}

@@ -1,0 +1,15 @@
+{
+  "weather": "Počasie",
+  "cond_sunny": "Slnečno",
+  "cond_mostly_clear": "Prevažne jasno",
+  "cond_partly_cloudy": "Polooblačno",
+  "cond_cloudy": "Oblačno",
+  "cond_fog": "Hmla",
+  "cond_drizzle": "Mrholenie",
+  "cond_rain": "Dážď",
+  "cond_rain_heavy": "Silný dážď",
+  "cond_snow": "Sneženie",
+  "cond_snow_heavy": "Silné sneženie",
+  "cond_showers": "Prehánky",
+  "cond_storm": "Búrka"
+}

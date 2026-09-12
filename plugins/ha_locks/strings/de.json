@@ -1,0 +1,17 @@
+{
+  "just_now": "gerade eben",
+  "minutes_abbr": "min",
+  "hours_abbr": "h",
+  "days_abbr": "T",
+  "state_locked": "verriegelt",
+  "state_unlocked": "entriegelt",
+  "state_open": "offen",
+  "state_closed": "geschlossen",
+  "secured": "gesichert",
+  "locks": "Schlösser",
+  "doors_and_locks": "Türen & Schlösser",
+  "all_clear": "Alles sicher.",
+  "open_since": "offen seit",
+  "open_count_suffix": "OFFEN",
+  "all_secured": "ALLES GESICHERT"
+}

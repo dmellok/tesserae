@@ -1,0 +1,9 @@
+{
+  "minutes_abbr": "m",
+  "hours_abbr": "h",
+  "days_abbr": "d",
+  "weeks_abbr": "t",
+  "months_abbr": "mes",
+  "feed": "Kanál",
+  "no_items": "Žiadne položky."
+}

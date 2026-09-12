@@ -1,0 +1,12 @@
+{
+  "hour": "小时",
+  "hours": "小时",
+  "day": "天",
+  "days": "天",
+  "unit_ago": "{unit}前",
+  "unit_to_go": "还有{unit}",
+  "countdown": "倒计时",
+  "set_target_date": "请在单元格选项中设置目标日期。",
+  "date_has_passed": "日期已过。",
+  "today": "今天"
+}

@@ -1,0 +1,14 @@
+{
+  "week_n_of_total": "Semana {n} de {total}",
+  "day_left": "queda {n} día",
+  "days_left": "quedan {n} días",
+  "life_in_weeks": "La vida en semanas",
+  "set_birth_year": "Indica el año de nacimiento en las opciones de la celda.",
+  "year_n_of_total": "Año {n} de {total}",
+  "week_lived": "{n} semana vivida",
+  "weeks_lived": "{n} semanas vividas",
+  "week_to_go": "queda {n} semana",
+  "weeks_to_go": "quedan {n} semanas",
+  "through_the_year": "del año",
+  "of_expected_life": "de vida esperada"
+}

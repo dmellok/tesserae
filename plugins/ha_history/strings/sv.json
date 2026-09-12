@@ -1,0 +1,9 @@
+{
+  "no_samples_in_window": "Inga mätvärden i perioden.",
+  "low": "Låg",
+  "high": "Hög",
+  "hours_abbr": "h",
+  "history": "Historik",
+  "no_sensors_selected": "Inga sensorer valda.",
+  "no_chart_for_selection": "Inget diagram för detta urval."
+}

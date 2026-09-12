@@ -1,0 +1,15 @@
+{
+  "weather": "Meteo",
+  "cond_sunny": "Soleggiato",
+  "cond_mostly_clear": "Poco nuvoloso",
+  "cond_partly_cloudy": "Parz. nuvoloso",
+  "cond_cloudy": "Nuvoloso",
+  "cond_fog": "Nebbia",
+  "cond_drizzle": "Pioviggine",
+  "cond_rain": "Pioggia",
+  "cond_rain_heavy": "Pioggia forte",
+  "cond_snow": "Neve",
+  "cond_snow_heavy": "Neve forte",
+  "cond_showers": "Rovesci",
+  "cond_storm": "Temporale"
+}

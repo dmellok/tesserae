@@ -27,25 +27,70 @@ function statusAccent(status) {
 
 // Compact "Nm ago" for the change badge, only used when the change
 // is within the 10-minute window, so it's always sub-hour.
-function changeAgo(iso) {
+function changeAgo(iso, t) {
   if (!iso) return null;
-  const t = Date.parse(iso);
-  if (!Number.isFinite(t)) return null;
-  const secs = Math.max(0, (Date.now() - t) / 1000);
+  const ts = Date.parse(iso);
+  if (!Number.isFinite(ts)) return null;
+  const secs = Math.max(0, (Date.now() - ts) / 1000);
   if (secs > 600) return null; // outside 10-minute window → no badge
-  if (secs < 60) return "just now";
-  return `${Math.floor(secs / 60)}m ago`;
+  if (secs < 60) return t("just_now", "just now");
+  return `${Math.floor(secs / 60)}${t("minutes_ago_suffix", "m ago")}`;
+}
+
+// server.py title-cases the raw HA state for on/off rows ("on" → "On",
+// "not_home" → "Not home") and sends "unavailable" / "not found" for
+// missing ones. Those vocabularies are closed (its _ON / _OFF /
+// _UNAVAILABLE sets), so the client can name a translated slot for each
+// English label; anything outside the sets (numeric, named states) is
+// data and passes through untouched.
+function stateLabelKeys(t) {
+  return {
+    on: {
+      On: t("state_on", "On"),
+      Open: t("state_open", "Open"),
+      Unlocked: t("state_unlocked", "Unlocked"),
+      Home: t("state_home", "Home"),
+      Playing: t("state_playing", "Playing"),
+      Active: t("state_active", "Active"),
+      Detected: t("state_detected", "Detected"),
+    },
+    off: {
+      Off: t("state_off", "Off"),
+      Closed: t("state_closed", "Closed"),
+      Locked: t("state_locked", "Locked"),
+      Away: t("state_away", "Away"),
+      "Not home": t("state_not_home", "Not home"),
+      Idle: t("state_idle", "Idle"),
+      Standby: t("state_standby", "Standby"),
+      Disarmed: t("state_disarmed", "Disarmed"),
+    },
+    missing: {
+      unavailable: t("unavailable", "unavailable"),
+      "not found": t("not_found", "not found"),
+    },
+  };
+}
+
+function stateLabel(it, labels) {
+  const label = it.label || "-";
+  const bucket = labels[it.status];
+  return (bucket && bucket[label]) || label;
 }
 
 export default function render(shadow, ctx) {
   const data = ctx?.data ?? {};
+  const t = ctx?.t || ((key, fallback) => fallback ?? key);
   const css = `<link rel="stylesheet" href="/static/style/spectra-widgets.css">`;
+  // server.py sends "Entities" verbatim when the cell has no Title
+  // option, so only that exact default gets translated; anything the
+  // user typed is theirs.
+  const title = data.title && data.title !== "Entities" ? data.title : t("entities", "Entities");
 
   if (data.error) {
     shadow.innerHTML = `
       ${css}
       <div class="w" data-widget="ha_entities">
-        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>Entities</h3></div>
+        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>${escapeHtml(title)}</h3></div>
         <div class="w-body"><p class="u-muted">${escapeHtml(data.error)}</p></div>
       </div>`;
     return;
@@ -55,14 +100,14 @@ export default function render(shadow, ctx) {
     shadow.innerHTML = `
       ${css}
       <div class="w" data-widget="ha_entities">
-        <div class="w-title"><i class="ph-bold ph-list"></i><h3>${escapeHtml(data.title || "Entities")}</h3></div>
-        <div class="w-body"><p class="u-muted">No entities selected.</p></div>
+        <div class="w-title"><i class="ph-bold ph-list"></i><h3>${escapeHtml(title)}</h3></div>
+        <div class="w-body"><p class="u-muted">${escapeHtml(t("no_entities_selected", "No entities selected."))}</p></div>
       </div>`;
     return;
   }
 
   const items = data.items;
-  const title = data.title || "Entities";
+  const labels = stateLabelKeys(t);
   // Visibility toggles from the server payload; default on so cells
   // saved before the options existed keep their title / names.
   const showTitle = data.show_title !== false;
@@ -70,14 +115,14 @@ export default function render(shadow, ctx) {
 
   // Count recently-changed items so the title bar can carry a hint.
   let recentCount = 0;
-  for (const it of items) if (changeAgo(it.last_changed)) recentCount++;
+  for (const it of items) if (changeAgo(it.last_changed, t)) recentCount++;
 
   const rows = items.map((it, i) => {
     const accent = statusAccent(it.status);
-    const ago = changeAgo(it.last_changed);
+    const ago = changeAgo(it.last_changed, t);
     const changedClass = ago ? " is-changed" : "";
     const changeBadge = ago
-      ? `<span class="entity-change-badge" title="changed ${escapeHtml(it.last_changed)}">
+      ? `<span class="entity-change-badge" title="${escapeHtml(t("changed", "changed"))} ${escapeHtml(it.last_changed)}">
           <i class="ph-bold ph-circle-notch"></i>${escapeHtml(ago)}
         </span>`
       : "";
@@ -88,7 +133,7 @@ export default function render(shadow, ctx) {
           ${showNames ? `<span class="list-title">${escapeHtml(it.name)}</span>` : ""}
           ${changeBadge}
         </div>
-        <span class="list-meta" style="color:${accent}">${escapeHtml(it.label || "-")}</span>
+        <span class="list-meta" style="color:${accent}">${escapeHtml(stateLabel(it, labels))}</span>
       </div>`;
   }).join("");
 

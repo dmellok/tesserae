@@ -1,0 +1,18 @@
+{
+  "hourly": "逐小时",
+  "legend_temperature": "温度",
+  "legend_rain": "降水 %",
+  "legend_now": "现在",
+  "now_suffix": "现在",
+  "no_hourly_data": "暂无逐小时数据。",
+  "cond_clear": "晴",
+  "cond_overcast": "阴",
+  "cond_partly_cloudy": "多云",
+  "cond_drizzle": "毛毛雨",
+  "cond_rain": "雨",
+  "cond_rain_heavy": "大雨",
+  "cond_showers": "阵雨",
+  "cond_snow": "雪",
+  "cond_thunderstorm": "雷阵雨",
+  "cond_fog": "雾"
+}

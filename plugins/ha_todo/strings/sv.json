@@ -1,0 +1,16 @@
+{
+  "yesterday": "igår",
+  "day_abbr": "d",
+  "late": "sen",
+  "today": "idag",
+  "tomorrow": "imorgon",
+  "priority_high": "hög",
+  "priority_medium": "medel",
+  "priority_low": "låg",
+  "todo": "Att göra",
+  "all_done": "Allt klart.",
+  "priority": "prioritet",
+  "overdue": "FÖRSENADE",
+  "to_do": "ATT GÖRA",
+  "done": "KLARA"
+}

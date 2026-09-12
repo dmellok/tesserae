@@ -1,0 +1,16 @@
+{
+  "yesterday": "včera",
+  "day_abbr": "d",
+  "late": "pozdě",
+  "today": "dnes",
+  "tomorrow": "zítra",
+  "priority_high": "vysoká",
+  "priority_medium": "střední",
+  "priority_low": "nízká",
+  "todo": "Úkoly",
+  "all_done": "Vše hotovo.",
+  "priority": "priorita",
+  "overdue": "PO TERMÍNU",
+  "to_do": "ZBÝVÁ",
+  "done": "HOTOVO"
+}

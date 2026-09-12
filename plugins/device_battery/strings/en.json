@@ -1,0 +1,14 @@
+{
+  "just_now": "just now",
+  "minutes_ago": "{n}m ago",
+  "hours_ago": "{n}h ago",
+  "days_ago": "{n}d ago",
+  "today": "today",
+  "tomorrow": "tomorrow",
+  "in_n_days": "in {n} days",
+  "in_n_weeks": "in {n} weeks",
+  "in_n_months": "in {n} months",
+  "device_batteries": "Device Batteries",
+  "no_devices": "No battery-reporting devices registered yet.",
+  "n_of_total": "{n} of {total}"
+}

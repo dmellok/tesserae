@@ -1,0 +1,16 @@
+{
+  "not_found": "nie znaleziono",
+  "mode_off": "wył.",
+  "mode_heat": "grzanie",
+  "mode_cool": "chłodzenie",
+  "mode_heat_cool": "grzanie/chłodz.",
+  "mode_auto": "auto",
+  "mode_dry": "osuszanie",
+  "mode_fan_only": "wentylator",
+  "humidity_tip_target": "wilgotność {h}% (cel {t}%)",
+  "humidity_tip": "wilgotność {h}%",
+  "target": "Cel",
+  "climate": "Klimat",
+  "no_entities_selected": "Nie wybrano encji.",
+  "zones": "STREFY"
+}

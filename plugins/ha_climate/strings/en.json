@@ -1,0 +1,16 @@
+{
+  "not_found": "not found",
+  "mode_off": "off",
+  "mode_heat": "heat",
+  "mode_cool": "cool",
+  "mode_heat_cool": "heat cool",
+  "mode_auto": "auto",
+  "mode_dry": "dry",
+  "mode_fan_only": "fan only",
+  "humidity_tip_target": "humidity {h}% (target {t}%)",
+  "humidity_tip": "humidity {h}%",
+  "target": "Target",
+  "climate": "Climate",
+  "no_entities_selected": "No entities selected.",
+  "zones": "ZONES"
+}

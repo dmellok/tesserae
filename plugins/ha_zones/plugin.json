@@ -3,6 +3,7 @@
   "name": "Home Assistant, Zones",
   "version": "0.2.0",
   "kind": "widget",
+  "locales": ["en", "cs", "de", "es", "fr", "it", "lt", "nb", "nl", "pl", "pt", "sk", "sv", "zh-CN", "zh-TW"],
   "description": "Who's home, who's away, auto-discovers every person.* entity in Home Assistant. Each row leads with the person's avatar (HA profile picture, or a coloured-initials circle keyed to their name when there's no picture) and right-aligns a zone-glyph (briefcase for work, graduation-cap for school, barbell for gym, etc.) + the zone label. One get_states call covers the whole household.",
   "icon": "ph-house",
   "supports": {
