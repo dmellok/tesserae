@@ -790,3 +790,33 @@ def test_circuitpython_guard_keeps_the_palette_attached() -> None:
     assert palette is not None
     flat = img.getpalette()[: len(palette) * 3]
     assert flat == [channel for entry in palette for channel in entry]
+
+
+@pytest.mark.parametrize("dither", ["jarvis", "stucki", "atkinson"])
+def test_error_diffusion_clamps_accumulated_error(dither: str) -> None:
+    """A flat region the palette cannot reach must not act as an error
+    reservoir. Before the clamp, every pixel of a 255-white field dithered
+    against a palette whose white is 200 banked +55 per channel with nowhere
+    to spend it; Jarvis and Stucki propagate all of it, so the running value
+    climbed into the thousands and then dumped into whatever came next,
+    painting a mid-grey strip solid white in a wave-shaped swathe. Pillow's
+    Floyd-Steinberg clips the pixel to 0-255 before matching (CLIP8), which
+    bounds the error by construction; the numpy loop now does the same."""
+    from app.quantizer import (
+        _ATKINSON_WEIGHTS,
+        _JJN_WEIGHTS,
+        _STUCKI_WEIGHTS,
+        _error_diffusion,
+    )
+
+    weights = {"jarvis": _JJN_WEIGHTS, "stucki": _STUCKI_WEIGHTS, "atkinson": _ATKINSON_WEIGHTS}
+    w, h, split = 200, 100, 60
+    arr = np.full((h, w, 3), 255, dtype=np.uint8)
+    arr[split:, :, :] = 100  # mid-grey strip under an out-of-gamut white field
+    palette = np.array([[0, 0, 0], [200, 200, 200]], dtype=np.float32)
+    raw = _error_diffusion(Image.fromarray(arr), palette, weights[dither])
+    out = np.frombuffer(raw, dtype=np.uint8).reshape(h, w)
+    # 100 sits at 50% of the 0..200 range, so the strip should come out
+    # roughly half black; the failure mode is a strip that is almost all white.
+    black_fraction = float((out[split:, :] == 0).mean())
+    assert 0.35 < black_fraction < 0.65, black_fraction

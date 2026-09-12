@@ -1365,6 +1365,28 @@ def _error_diffusion(
             r = buf_r[idx]
             g = buf_g[idx]
             b = buf_b[idx]
+            # Clamp the diffused value to the displayable range before
+            # matching, as Pillow's Floyd-Steinberg does (CLIP8). Without
+            # this a flat field the palette cannot reach (white above the
+            # calibrated white, a saturated tone past the panel's hull)
+            # banks the same residual on every pixel; the wide kernels
+            # (Jarvis, Stucki) propagate all of it, so the running value
+            # climbs into the thousands and dumps into the next region as
+            # a wave-shaped swathe of solid black or white. Clamping bounds
+            # the error at +-255 per channel so it can only ever nudge a
+            # neighbour, never overwhelm it.
+            if r < 0.0:
+                r = 0.0
+            elif r > 255.0:
+                r = 255.0
+            if g < 0.0:
+                g = 0.0
+            elif g > 255.0:
+                g = 255.0
+            if b < 0.0:
+                b = 0.0
+            elif b > 255.0:
+                b = 255.0
             if use_lab:
                 # LAB nearest-palette. chroma_weight (2.0 for chroma-
                 # aware, 1.0 for plain LAB) biases towards preserving
