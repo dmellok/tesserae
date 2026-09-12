@@ -5,6 +5,7 @@
   "kind": "widget",
   "description": "Current weather as a pill card with weather-and-time-of-day theming. Uses the extended palette opt-in so soft gradients (sunset, night sky) render on 7-colour e-ink panels via the renderer's dither pass. Data from Open-Meteo (no API key).",
   "icon": "ph-cloud-sun",
+  "locales": ["en", "fr"],
   "supports": {
     "sizes": [
       "sm",

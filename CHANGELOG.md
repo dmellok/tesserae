@@ -41,6 +41,10 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   data" empty states, and the rain-chance tooltip) is now available in
   French, following the same `locales` contract as weather_now and the
   calendar_* widget family (`ctx.t()` + `strings/<locale>.json`).
+- The weather_now_scenic widget's panel text (the current-conditions label
+  and the error-state title) is now available in French, following the same
+  `locales` / `ctx.t()` contract as weather_now and the calendar_* widget
+  family (docs/widgets.md#locales-strings).
 - The Dashboards page has Active and Archived tabs. Archive parks a dashboard
   you're not using without deleting it: it keeps its layout, device links,
   and history, but leaves the "go to page" and lineup pickers, drops its

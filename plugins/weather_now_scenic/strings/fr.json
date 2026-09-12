@@ -1,0 +1,15 @@
+{
+  "weather": "Météo",
+  "cond_sunny": "Ensoleillé",
+  "cond_mostly_clear": "Généralement dégagé",
+  "cond_partly_cloudy": "Partiellement nuageux",
+  "cond_cloudy": "Nuageux",
+  "cond_fog": "Brouillard",
+  "cond_drizzle": "Bruine",
+  "cond_rain": "Pluie",
+  "cond_rain_heavy": "Pluie forte",
+  "cond_snow": "Neige",
+  "cond_snow_heavy": "Neige forte",
+  "cond_showers": "Averses",
+  "cond_storm": "Orage"
+}

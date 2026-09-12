@@ -1,0 +1,15 @@
+{
+  "weather": "Weather",
+  "cond_sunny": "Sunny",
+  "cond_mostly_clear": "Mostly clear",
+  "cond_partly_cloudy": "Partly cloudy",
+  "cond_cloudy": "Cloudy",
+  "cond_fog": "Fog",
+  "cond_drizzle": "Drizzle",
+  "cond_rain": "Rain",
+  "cond_rain_heavy": "Heavy Rain",
+  "cond_snow": "Snow",
+  "cond_snow_heavy": "Heavy Snow",
+  "cond_showers": "Showers",
+  "cond_storm": "Storm"
+}
