@@ -173,10 +173,18 @@ The original **M5Paper** (pre-S3, classic ESP32-D0WDQ6-V3) drives the same
 4.7" glass through an IT8951 controller over SPI, so it reuses the reTerminal
 E1003's greyscale driver. Also discontinued; this entry is for existing owners.
 
+The **PaperMono** (2026, Pro and Lite) is a 3.97" 480x800 4-level greyscale
+handheld on the reTerminal Sticky's controller family, so it reuses that
+driver and wire format; its panel rails sit behind an I2C IO expander and
+its battery is read from the on-board PMIC. Built from M5Stack's published
+pin map and not yet verified on a unit; touch, microSD and the frontlight are
+not wired yet.
+
 | Model | Panel | Client | Status |
 |---|---|---|---|
 | [M5Paper](https://docs.m5stack.com/en/core/m5paper) | 4.7" mono, 16-level grey, 960×540 (IT8951) | [tesserae-device-firmware](https://github.com/dmellok/tesserae-device-firmware) | ✅ |
 | [PaperS3](https://docs.m5stack.com/en/core/PaperS3) | 4.7" mono, 16-level grey, 960×540 | [tesserae-device-firmware](https://github.com/dmellok/tesserae-device-firmware) | TBD |
+| [PaperMono / PaperMono Lite](https://docs.m5stack.com/en/core/PaperMono) | 3.97" mono, 4-level grey, 480×800 portrait (SSD1677) | [tesserae-device-firmware](https://github.com/dmellok/tesserae-device-firmware) | TBD |
 
 ### Pimoroni Inky
 

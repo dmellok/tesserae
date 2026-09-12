@@ -186,6 +186,52 @@ def test_ee03_is_its_own_kind_sharing_the_e1003_gray_wire_contract(
     assert e1003.manifest.get("touch") is True
 
 
+def test_papermono_is_its_own_kind_sharing_the_sticky_wire_contract(
+    tmp_path: Path, device_schema_path: Path, hardware_schema_path: Path
+) -> None:
+    """The M5Stack PaperMono carries the reTerminal Sticky's controller family
+    (SSD1677, 800x480 scan mounted portrait) and its firmware transposes on
+    the device the same way, so it packs the identical 96000-byte 2-bpp frame
+    at the same 120-byte portrait stride via esp32_gray2_bin. It still needs
+    its own kind because the kind id names the OTA lineage, and it must carry
+    auto_select: false so relay pairing never infers it over the Sticky or
+    the Xteink X4 gray build (identical protocol, gamut and geometry on the
+    wire, and this id sorts ahead of both)."""
+    registry = device_loader.discover(
+        REPO_ROOT / "devices",
+        schema_path=device_schema_path,
+        data_root=tmp_path,
+        hardware_dir=REPO_ROOT / "hardware",
+        hardware_schema_path=hardware_schema_path,
+    )
+    assert registry.errors == []
+
+    papermono = registry.devices["m5stack_papermono"]
+    sticky = registry.devices["seeed_reterminal_sticky"]
+
+    assert papermono.id != sticky.id
+    assert papermono.kind_of is None and sticky.kind_of is None
+
+    # Same wire contract, stride included: native dims are the composition.
+    assert papermono.manifest["_catalog_entry"]["protocol"] == "esp32_bw_client"
+    assert papermono.manifest["renderers"] == sticky.manifest["renderers"] == ["esp32_gray2_bin"]
+    assert papermono.panel is not None
+    assert (papermono.panel["w"], papermono.panel["h"]) == (480, 800)
+    assert (papermono.panel["native_w"], papermono.panel["native_h"]) == (480, 800)
+    assert papermono.panel["gamut"] == "gray_4"
+    assert papermono.panel["orientation"] == sticky.panel["orientation"] == "portrait"
+    assert papermono.panel["w"] * papermono.panel["h"] // 4 == 96000
+
+    # Indistinguishable on the wire -> inference must stay off. The id sorts
+    # ahead of both siblings, so this is what keeps them from being relabelled.
+    assert papermono.manifest["_catalog_entry"]["auto_select"] is False
+    assert papermono.id < sticky.id and papermono.id < "xteink_x4_gray"
+
+    # Touch is not wired on this board yet; the Sticky's is.
+    assert papermono.manifest.get("touch") is not True
+    assert sticky.manifest.get("touch") is True
+
+
 def test_discover_validates_schema(tmp_path: Path, hardware_schema_path: Path) -> None:
     """A hardware entry missing a required field surfaces as a LoaderError
     with the field path in the message, not a crash."""

@@ -1,0 +1,64 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "m5stack_papermono",
+  "name": "M5Stack PaperMono",
+  "vendor": "M5Stack",
+  "url": "https://docs.m5stack.com/en/core/PaperMono",
+  "icon": "device-tablet",
+  "description": "3.97 inch touch ePaper handheld with 4-level greyscale, ESP32-S3R8 with 8 MB PSRAM, 1150 mAh battery, frontlight, microSD, and on the Pro variant LoRa and NFC; the Lite is the same board without the radios and shares this kind. The SSD1677 controller scans 800x480 landscape and the glass is mounted portrait, but the firmware transposes on the device, so the server composes AND packs ordinary 480x800 portrait: 120-byte rows, no server-side rotation. Pairs with the tesserae-device-firmware build that declares this kind at register, and speaks Tesserae's v1 REST device API. Server-side pack via esp32_gray2_bin produces a raw 2-bpp 4-level greyscale buffer (96000 bytes) the firmware paints without any on-device decode.",
+  "protocol": "esp32_bw_client",
+  "renderers": [
+    "esp32_gray2_bin"
+  ],
+  "panel": {
+    "w": 480,
+    "h": 800,
+    "orientation": "portrait",
+    "name": "3.97 inch ePaper, 4-level greyscale (480x800 portrait, SSD1677)",
+    "gamut": "gray_4",
+    "native_w": 480,
+    "native_h": 800
+  },
+  "refresh_floor_s": 60,
+  "image_format": "bin",
+  "touch": false,
+  "auto_select": false,
+  "notes_md": "**Not yet verified on hardware.** The firmware target (env `m5stack-papermono`) was built from M5Stack's published pin map and their own ESP-IDF reference projects without a unit on the bench. The panel is the reTerminal Sticky's controller family (SSD1677, 800x480 scan, portrait mount) so the driver and the wire format carry over unchanged; what is new is that the panel's reset and 3.3 V enable are outputs of an M5IOE1 I2C expander rather than MCU GPIOs, and the battery voltage is read from the M5PM1 PMIC. Flash the `m5stack-papermono-selftest` build first: four grey bands, black at the top, white at the bottom.\n\nWire format is exactly 96000 bytes, 4 pixels per byte MSB first (bits 7-6 = leftmost pixel), 2-bit value 0b00 = black, 0b11 = white, linear 4-level grey; no header, no padding, no checksum. **`native_w`/`native_h` are 480x800, matching the composition, not the controller's 800x480 scan**: these fields mean the row stride the *firmware* reads, and this firmware transposes on the device like the Sticky's. `orientation` is `portrait` by analogy with the Sticky's verified mount, not pinned on this glass; the first unit will confirm or flip it.\n\n**Pro and Lite share this kind.** The PaperMono Lite drops the SX1262 LoRa radio and the ST25R3916 NFC reader and is otherwise the same board, and this firmware drives neither radio, so one image and one OTA lineage cover both.\n\nWired on the device: the two side keys (previous / next dashboard, both wake the panel from deep sleep), the buzzer (the `beep_*` settings below), battery telemetry via the PMIC. Not wired yet: the FT6336G touch controller (a different register map from the Goodix driver the other touch panels use), the expander-gated microSD slot for the deck cache, the frontlight, and the RGB LED, so `touch` is false and there is no overlay support until the partial-refresh path is confirmed on this glass.\n\n`auto_select: false` because this SKU is indistinguishable on the wire from `seeed_reterminal_sticky` and `xteink_x4_gray`: same protocol, same gamut, same 480x800 geometry, same 96000 bytes. A device running this firmware names its own kind at register and discover, so nothing is lost there, but relay pairing infers a SKU from the wire signature, and this id sorts ahead of both siblings in that tie-break. Without this flag a Sticky or an X4 pairing over a relay would be relabelled a PaperMono and pinned to the wrong OTA lineage.",
+  "config_schema_extends": {
+    "beep_enabled": {
+      "type": "boolean",
+      "label": "Beep on interaction",
+      "default": false,
+      "help": "Sound the on-board buzzer the moment a button press registers, before the server is contacted. E-ink takes seconds to repaint, so without it there is no confirmation the panel heard you. Off by default: a panel that starts beeping unannounced is worse than a silent one."
+    },
+    "beep_tone": {
+      "type": "select",
+      "label": "Beep tone",
+      "default": "beep",
+      "choices": [
+        {"value": "click", "label": "Click"},
+        {"value": "beep", "label": "Beep"},
+        {"value": "chirp", "label": "Chirp (rising two-tone)"},
+        {"value": "low", "label": "Low beep"},
+        {"value": "double", "label": "Double beep"},
+        {"value": "rising", "label": "Rising three-tone"},
+        {"value": "custom", "label": "Custom (write your own below)"}
+      ],
+      "help": "Which sound to make. The server sends the actual notes, so these are editable without a firmware update. The buzzer is a passive piezo, loudest around 2 kHz."
+    },
+    "beep_pattern": {
+      "type": "string",
+      "label": "Custom tone",
+      "default": "",
+      "help": "Only used when the tone is set to Custom. Notes as frequency:milliseconds pairs, comma separated, e.g. 1800:30,2600:40. A frequency of 0 is a rest. Up to 8 notes, 200-8000 Hz, 1 second total."
+    },
+    "beep_volume": {
+      "type": "int",
+      "label": "Beep volume",
+      "default": 60,
+      "min": 0,
+      "max": 100,
+      "help": "Drive strength as a percentage. The piezo is loudest at 100 and audible but discreet around 30; 0 is silent, same as turning the beep off."
+    }
+  }
+}

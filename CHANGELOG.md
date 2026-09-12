@@ -8,6 +8,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **M5Stack PaperMono hardware kind.** New `m5stack_papermono` kind for the
+  3.97" 480x800 4-level greyscale handheld (Pro and Lite share it): the
+  reTerminal Sticky's wire contract (`esp32_bw_client`, `gray_4`, a
+  96000-byte 2-bpp frame from `esp32_gray2_bin` at the portrait stride the
+  firmware transposes), paired with the `m5stack-papermono` target in
+  tesserae-device-firmware. `auto_select: false` because it is
+  indistinguishable on the relay wire from the Sticky and the Xteink X4
+  gray build. Built from M5Stack's published pin map; not yet verified on
+  hardware, and listed as such in the compatibility matrix.
 - Every bundled widget now translates its panel text. The 28 widgets that
   still painted hardcoded English (the Home Assistant set, clocks, countdown,
   year progress, todo, news, pictures, transit, status) moved their labels,
