@@ -531,13 +531,24 @@ def _configured_poll_s(device: Device) -> int:
     return 60
 
 
-# Seconds to add to a projected content change before telling the client to
-# poll. The scheduler fires at the projected instant and the render itself is
-# a browser compose plus a quantize, so a client polling at exactly that
-# moment races the render and collects the *previous* frame. A margin costs
-# nothing (the device is asleep for it) and turns a guaranteed miss into a
-# hit.
+# Seconds to add to a widget's declared change before telling the client to
+# poll. The render is a browser compose plus a quantize, so a client polling
+# at exactly that moment races it and collects the *previous* frame. A margin
+# costs nothing (the device is asleep for it) and turns a guaranteed miss
+# into a hit. ``/frame`` also re-renders on demand once a declared change has
+# passed, so this only needs to cover the render itself.
 _CONTENT_POLL_MARGIN_S: int = 20
+
+# Seconds to add to a *scheduler-projected* change. The scheduler does not
+# fire at the projected instant: it wakes every ``tick_seconds`` (30 s, on a
+# phase set by when the process started), fires everything due in ascending
+# priority order, and each fire renders in turn, so a lineup due at 06:00:00
+# lands anywhere up to ~40 s later on a busy tick. A device told to come back
+# at 06:00:20 polled before the frame existed, collected yesterday's, and
+# slept its whole configured interval on it. The margin has to clear a full
+# tick plus the renders that share it.
+_SCHEDULER_TICK_S: int = 30
+_PROJECTED_POLL_MARGIN_S: int = _SCHEDULER_TICK_S + 2 * _CONTENT_POLL_MARGIN_S
 
 # Never ask a client to poll faster than this, however close the next change
 # is. Itself clamped by the configured interval below, so a deliberately
@@ -591,9 +602,16 @@ def _projected_poll_s(device: Device, configured_s: int) -> int | None:
         if event.certainty not in _WAKE_WORTHY_CERTAINTIES:
             continue
         delta = (event.scheduled_at - now).total_seconds()
-        if delta < 0:
+        # A record whose target has passed but which has not fired yet is
+        # projected at "now" (the next tick fires it). It reaches here a
+        # fraction of a second in the past, because ``scheduled_at`` is
+        # truncated to whole seconds, and used to be skipped as stale, so a
+        # device that polled a moment before the tick was told to sleep its
+        # whole interval on the old frame. Anything overdue by less than a
+        # tick is imminent: poll again after the margin.
+        if delta < -_SCHEDULER_TICK_S:
             continue
-        return int(delta) + _CONTENT_POLL_MARGIN_S
+        return max(0, int(delta)) + _PROJECTED_POLL_MARGIN_S
     return None
 
 

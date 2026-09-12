@@ -8,6 +8,16 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- A sleeping REST device woken for a daily lineup no longer collects the
+  previous day's frame. The device was told to poll 20 s after the lineup's
+  target, but the scheduler fires on a 30 s tick and renders each due lineup
+  in turn, so most mornings the poll landed before the new frame existed. The
+  miss then stuck: the projection reported the lineup as due now, a
+  fraction of a second in the past once truncated to the second, and the
+  poll path skipped it as stale and sent the device to sleep for its whole
+  interval on the old frame. The scheduler margin is now 70 s, and a change
+  overdue by less than a tick means "poll again after the margin".
+
 - The Location picker on the weather, sky, and sunrise widgets now accepts a
   pasted `lat, lon` pair. It only ever asked the city name search, which
   returned "No matches." for coordinates, so a spot with no nearby town could
