@@ -70,6 +70,8 @@ def fetch(
             entry = _api_request(api_key, when)
         except urllib.error.HTTPError as err:
             last_err = f"HTTP {err.code}: {err.reason}"
+            with contextlib.suppress(Exception):
+                err.close()
             break
         except Exception as err:
             last_err = f"{type(err).__name__}: {err}"

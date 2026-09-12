@@ -14,6 +14,7 @@ mypy --strict applies to this module, see pyproject.toml.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import urllib.error
 import urllib.request
@@ -79,6 +80,8 @@ def _call(
             return int(resp.status), {k: v for k, v in resp.headers.items()}, resp.read()
     except urllib.error.HTTPError as exc:
         body = exc.read()
+        with contextlib.suppress(Exception):
+            exc.close()
         code: str | None = None
         message: str | None = None
         try:

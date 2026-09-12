@@ -24,6 +24,7 @@ are overridable with ``--url`` / ``--token``.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import os
 import sys
@@ -67,7 +68,11 @@ def _render(
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             return bytes(resp.read())
     except urllib.error.HTTPError as err:
-        detail = err.read().decode("utf-8", "replace").strip()
+        try:
+            detail = err.read().decode("utf-8", "replace").strip()
+        finally:
+            with contextlib.suppress(Exception):
+                err.close()
         raise SystemExit(f"render failed ({err.code}) for {widget_id!r}: {detail}") from err
     except urllib.error.URLError as err:
         raise SystemExit(
