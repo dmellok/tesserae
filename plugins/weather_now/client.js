@@ -71,6 +71,48 @@ const METRIC_ACCENT = {
   cloud: "var(--text-secondary)",
 };
 
+// Metric icon → strings/<locale>.json key. server.py's metrics array
+// already carries an English `label` (fallback text for ctx.t()); this
+// just names the translated slot for each metric so a locale can swap it.
+const METRIC_LABEL_KEY = {
+  humidity: "metric_humidity",
+  wind: "metric_wind",
+  rainprob: "metric_rain_today",
+  uv: "metric_uv",
+  pressure: "metric_pressure",
+  dew: "metric_dew",
+  visibility: "metric_visibility",
+  cloud: "metric_cloud",
+};
+
+// WMO weather code → strings/<locale>.json key, mirrors server.py's
+// _WMO table 1:1 so a translated condition matches the exact English
+// text (``data.cond``) it replaces rather than a coarser icon-grouped
+// approximation. Keep in sync if server.py's _WMO table changes.
+const COND_KEY_BY_CODE = {
+  0: "cond_clear",
+  1: "cond_mostly_clear",
+  2: "cond_partly_cloudy",
+  3: "cond_overcast",
+  45: "cond_fog",
+  48: "cond_rime_fog",
+  51: "cond_drizzle_light",
+  53: "cond_drizzle",
+  55: "cond_drizzle_dense",
+  61: "cond_rain_light",
+  63: "cond_rain",
+  65: "cond_rain_heavy",
+  71: "cond_snow_light",
+  73: "cond_snow",
+  75: "cond_snow_heavy",
+  80: "cond_showers",
+  81: "cond_showers",
+  82: "cond_showers_violent",
+  95: "cond_thunderstorm",
+  96: "cond_thunderstorm",
+  99: "cond_thunderstorm",
+};
+
 function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
@@ -142,11 +184,12 @@ function sunArc(sun) {
 
 export default function render(shadow, ctx) {
   const data = ctx?.data ?? {};
+  const t = ctx?.t || ((key, fallback) => fallback ?? key);
   if (data.error) {
     shadow.innerHTML = `
       <link rel="stylesheet" href="/static/style/spectra-widgets.css">
       <div class="w">
-        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>Weather</h3></div>
+        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>${escapeHtml(t("weather", "Weather"))}</h3></div>
         <div class="w-body"><p class="u-muted">${escapeHtml(data.error)}</p></div>
       </div>`;
     return;
@@ -156,18 +199,21 @@ export default function render(shadow, ctx) {
   const icon = PH_BY_NAME[data.icon] || "ph-cloud";
   const heroAccent = COND_ACCENT[data.icon] || "var(--accent-4)";
   const temp = fmtTemp(data.temp);
-  const cond = data.cond || "";
-  const feels = data.feels != null ? `feels ${fmtTemp(data.feels)}` : "";
+  const condKey = COND_KEY_BY_CODE[data.code];
+  const cond = condKey ? t(condKey, data.cond || "") : (data.cond || "");
+  const feels = data.feels != null ? `${t("feels", "feels")} ${fmtTemp(data.feels)}` : "";
   const subParts = [cond, feels].filter(Boolean);
 
   const metrics = Array.isArray(data.metrics) ? data.metrics.slice(0, 4) : [];
   const cells = metrics.map((m) => {
     const ph = METRIC_PH[m.icon] || "ph-circle";
     const accent = METRIC_ACCENT[m.icon] || "var(--text-secondary)";
+    const labelKey = METRIC_LABEL_KEY[m.icon];
+    const mLabel = labelKey ? t(labelKey, m.label || "") : (m.label || "");
     const unit = m.unit ? `<span class="unit"> ${escapeHtml(m.unit)}</span>` : "";
     return `
       <div class="wx-cell">
-        <span class="d">${escapeHtml(m.label || "")}</span>
+        <span class="d">${escapeHtml(mLabel)}</span>
         <i class="ph-bold ${ph}" style="color:${accent}"></i>
         <span class="t">${escapeHtml(fmtMetric(m))}${unit}</span>
       </div>`;
@@ -213,7 +259,7 @@ export default function render(shadow, ctx) {
         .wx-cell .d { display: none; }
       </style>
       <div class="w" data-widget="weather_now"><div class="w-body">${
-        cells ? `<div class="wx-forecast">${cells}</div>` : '<p class="u-muted">No metrics</p>'
+        cells ? `<div class="wx-forecast">${cells}</div>` : `<p class="u-muted">${escapeHtml(t("no_metrics", "No metrics"))}</p>`
       }</div></div>`;
     return;
   }
@@ -228,7 +274,7 @@ export default function render(shadow, ctx) {
         .wx-sun-day { color: var(--text-secondary); }
       </style>
       <div class="w" data-widget="weather_now"><div class="w-body">${
-        arcBlock || '<p class="u-muted">No sun data</p>'
+        arcBlock || `<p class="u-muted">${escapeHtml(t("no_sun_data", "No sun data"))}</p>`
       }</div></div>`;
     return;
   }
