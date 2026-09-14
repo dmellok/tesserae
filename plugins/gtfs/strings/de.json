@@ -15,9 +15,9 @@
   "arrives": "Ankunft",
   "then": "dann",
   "min": "min",
-  "min_to_leave": "min bis Aufbruch",
-  "leave_now": "jetzt los",
-  "arriving": "kommt",
+  "min_to_leave": "min bis Abfahrt",
+  "leave_now": "Abfahrt jetzt",
+  "arriving": "einfahrend",
   "cancelled": "Entfällt",
   "to": "nach",
   "nothing_approaching": "Nichts in Sicht"

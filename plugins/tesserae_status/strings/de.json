@@ -8,7 +8,7 @@
   "firmware": "Firmware",
   "temperature": "Temperatur",
   "degrees": "Grad",
-  "rh": "rF",
+  "rh": "rH",
   "humidity": "Luftfeuchte",
   "percent": "Prozent"
 }
