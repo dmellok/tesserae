@@ -1038,6 +1038,25 @@ def get_frame(device_id: str) -> Response:
                 button_result = None
 
     push_mgr = current_app.config.get("PUSH_MANAGER")
+    # A fire-and-forget webhook is the one action whose visible outcome the
+    # server cannot produce itself: the receiver decides whether to push a
+    # new frame back, and the device collects it in its linger window or on
+    # its next timer wake. Serving whatever else happens to be newest on this
+    # poll (a widget-declared change, a promoted patch render, a scheduled
+    # re-render of the same page) puts a full e-ink flash of the unchanged
+    # dashboard in front of the real update (#274). The wake keeps the frame
+    # it reports holding; the stroke was already validated against it.
+    if_none_match = request.headers.get("If-None-Match", "")
+    if button_result is not None and button_result.hold_frame and if_none_match:
+        resp = Response(status=304)
+        resp.headers["ETag"] = if_none_match
+        latest_ext = (push_mgr.latest_render_for(device.id) or {}).get("ext") if push_mgr else None
+        if latest_ext:
+            held_path = f"/renders/{_normalize_digest(if_none_match)}.{latest_ext}"
+            held_url = f"{request.url_root.rstrip('/')}{held_path}"
+            held_sig = sign_render_query(current_app.secret_key, held_path)
+            resp.headers["Content-Location"] = f"{held_url}?{held_sig}" if held_sig else held_url
+        return resp
     _refresh_if_widget_change_elapsed(device, push_mgr)
     # Promote-on-poll fallback (#271): a render diverted to patches whose
     # blob was never fetched means patch delivery didn't happen (deep

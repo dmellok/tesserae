@@ -160,6 +160,11 @@ class ButtonHandleResult:
     pushed_page_id: str | None
     push_result: PushResult | None
     force_download: bool = False
+    # True when the action's visible outcome is up to an external receiver
+    # (a fire-and-forget webhook) and nothing was pushed on this wake: the
+    # frame route keeps the panel on what it already shows instead of
+    # repainting an unrelated re-render ahead of the receiver's push (#274).
+    hold_frame: bool = False
 
     def to_envelope(self) -> dict[str, str | int | bool | None]:
         """Serialisable subset for the ``rotation`` block on ``/frame``
@@ -1956,6 +1961,11 @@ class ButtonService:
             pushed_page_id=pushed_page_id,
             push_result=push_result,
             force_download=result.force_download,
+            hold_frame=(
+                action_name in _WEBHOOK_ACTIONS
+                and pushed_page_id is None
+                and not result.force_download
+            ),
         )
         # Status distinguishes the outcomes admins care about: an actual
         # push, a fire-and-forget webhook (no push), or a rotate/refresh

@@ -576,6 +576,15 @@ repaint comes back on this same response. A stale digest, a stroke on
 a non-interactive area, or a frame with no touch regions all degrade
 to a plain frame poll; the wake is never an error.
 
+A fire-and-forget `webhook:` action is the one exception to "serve the
+newest frame": the receiver, not the server, decides what the panel
+shows next. A wake that carries `If-None-Match` therefore answers `304`
+for the frame it already holds, even if a newer render of the same page
+exists, rather than flashing an unrelated re-render ahead of whatever the
+receiver pushes back. A lingering device collects that push in its
+`touch_linger_s` window; a device that sleeps straight away picks it up
+on its next timer wake, exactly as it would any other push.
+
 Continuously powered clients that poll `/frame` on a timer can send
 the stroke out-of-band instead via `POST /api/v1/device/<id>/tap`
 with body `{"x0": …, "y0": …, "x1"?: …, "y1"?: …, "duration_ms"?: …,

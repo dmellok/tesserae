@@ -482,3 +482,76 @@ def test_custom_with_nothing_written_falls_back_to_a_beep(app: Flask) -> None:
         data=json.dumps({}),
     )
     assert status.get_json()["config"]["beep_pattern"] == "2000:60"
+
+
+# -- #274: a webhook wake keeps the frame on the glass -------------------
+
+
+def _swap_latest_on_touch(app: Flask, device_id: str, digest: str) -> None:
+    """Simulate a render minted during the wake, after the stroke was
+    validated: the listener runs once the touch is fully handled, before
+    the frame lookup."""
+    push_mgr = app.config["PUSH_MANAGER"]
+
+    def _listener(_payload: dict) -> None:
+        push_mgr._latest_renders[device_id] = {
+            "digest": digest,
+            "ext": "bin",
+            "filename": f"{digest}.bin",
+            "composition_digest": "comp456",
+        }
+
+    app.config["BUTTON_SERVICE"].add_listener(_listener)
+
+
+def test_frame_webhook_touch_wake_holds_frame_over_newer_render(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    token = _register(app, client)
+    _seed_frame(app, "hall_panel", regions=[WEBHOOK_REGION])
+    _swap_latest_on_touch(app, "hall_panel", "art999")
+
+    resp = client.get(
+        "/api/v1/device/hall_panel/frame"
+        "?touch_x0=100&touch_y0=100&touch_digest=art123&touch_event_id=1",
+        headers={"Authorization": f"Bearer {token}", "If-None-Match": '"art123"'},
+    )
+    assert resp.status_code == 304
+    assert resp.headers["ETag"] == '"art123"'
+    assert "/renders/art123.bin" in resp.headers["Content-Location"]
+    rows = list(app.config["EVENT_LOG"].list(type="touch", source="touch", limit=10))
+    assert rows and rows[0].status == "webhook_dispatched"
+
+
+def test_frame_webhook_touch_wake_without_etag_serves_newest(app: Flask) -> None:
+    """No If-None-Match means the client has nothing to hold; serve as usual."""
+    client = app.test_client()
+    _sign_in(client)
+    token = _register(app, client)
+    _seed_frame(app, "hall_panel", regions=[WEBHOOK_REGION])
+    _swap_latest_on_touch(app, "hall_panel", "art999")
+
+    resp = client.get(
+        "/api/v1/device/hall_panel/frame?touch_x0=100&touch_y0=100&touch_digest=art123",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 200
+    assert resp.get_json()["render_id"] == "art999"
+
+
+def test_frame_non_webhook_touch_wake_serves_newer_render(app: Flask) -> None:
+    """The hold is specific to the webhook outcome: a tap that resolves to
+    no region still collects the newer render on this wake."""
+    client = app.test_client()
+    _sign_in(client)
+    token = _register(app, client)
+    _seed_frame(app, "hall_panel", regions=[WEBHOOK_REGION])
+    _swap_latest_on_touch(app, "hall_panel", "art999")
+
+    resp = client.get(
+        "/api/v1/device/hall_panel/frame"
+        "?touch_x0=1500&touch_y0=1100&touch_digest=art123&touch_event_id=2",
+        headers={"Authorization": f"Bearer {token}", "If-None-Match": '"art123"'},
+    )
+    assert resp.status_code == 200
+    assert resp.get_json()["render_id"] == "art999"

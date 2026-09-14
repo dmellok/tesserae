@@ -35,6 +35,14 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **A webhook tap no longer repaints the old dashboard before the real
+  update.** A touch wake whose action is a fire-and-forget `webhook:` (or
+  `webhook_refresh`) now answers `304` for the frame the panel reports
+  holding, even when a newer render of the same page has appeared, instead
+  of serving that render and flashing an unchanged dashboard ahead of
+  whatever the receiver pushes back. The pushed frame lands in the linger
+  window as before, or on the next timer wake. Page, rotate and Home
+  Assistant actions still repaint on the same wake (#274).
 - **Upgrading a catalog bundle removes the widgets it dropped.** When a
   new release of a bundle renames or drops a folder, the marketplace
   installer now deletes the old folder instead of leaving it behind as an
