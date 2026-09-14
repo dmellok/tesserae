@@ -42,6 +42,7 @@ from app import (
     experiments,
     history_routes,
     onboarding,
+    online,
     page_routes,
     plugin_loader,
     renderer_loader,
@@ -1222,7 +1223,16 @@ def create_app(
                 app_settings = dict(store.get_section("app") or {})
             except Exception:
                 app_settings = {}
+        # Installs that never answered the opt-in question (skipped the wizard,
+        # or predate it) get a one-click prompt in the header until they do.
+        online_unanswered = False
+        if store is not None and "online_features" not in app_settings:
+            try:
+                online_unanswered = onboarding.is_onboarded(store) and not online.is_ephemeral()
+            except Exception:
+                online_unanswered = False
         return {
+            "online_features_unanswered": online_unanswered,
             "nav_admin_plugins": sorted(
                 (p for p in registry.plugins.values() if p.has_admin),
                 key=lambda p: p.name.lower(),

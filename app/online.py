@@ -68,6 +68,12 @@ def _ephemeral_environment() -> bool:
     return bool(os.environ.get("GITPOD_WORKSPACE_ID"))
 
 
+def is_ephemeral() -> bool:
+    """Public read of :func:`_ephemeral_environment` for callers outside this
+    module (the header opt-in prompt hides itself in CI / dev containers)."""
+    return _ephemeral_environment()
+
+
 def online_enabled(settings_store: Any) -> bool:
     """Master opt-in. ``settings.app.online_features`` defaults to **off**: a
     fresh install never contacts api.tesserae.ink until the user says yes at the

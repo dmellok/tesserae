@@ -43,6 +43,10 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 # lose the next image rebuild), this just stops us advertising a
 # button that doesn't apply.
 ENV TESSERAE_IN_DOCKER=1
+# Release channel the image was built from; docker.yml passes ``edge`` for
+# main-branch pushes and ``stable`` for tag builds. The heartbeat reports it.
+ARG TESSERAE_CHANNEL=stable
+ENV TESSERAE_CHANNEL=${TESSERAE_CHANNEL}
 
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_NO_CACHE_DIR=1 \

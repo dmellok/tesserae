@@ -294,6 +294,27 @@
     </details>
     {% endif %}
     {% endif %}
+    {% if online_features_unanswered %}
+    {# The install never answered the online-features question (skipped the
+       wizard, or predates it). One click either way; both answers persist
+       and the prompt disappears. Posts back to the current page. #}
+    <div class="topbar-optin" role="group" aria-label="Anonymous install count">
+      <form method="post" action="{{ url_for('auth.settings_online_features_toggle') }}" class="inline">
+        <input type="hidden" name="online_features" value="1">
+        <input type="hidden" name="next" value="{{ request.full_path if request.query_string else request.path }}">
+        <button type="submit" class="topbar-restart topbar-optin-yes"
+                title="Send an anonymous daily heartbeat so the maintainer can count this install. Turns on update alerts too.">
+          <i class="ph-bold ph-heart" aria-hidden="true"></i>
+          <span class="topbar-restart-label">Count me in</span>
+        </button>
+      </form>
+      <form method="post" action="{{ url_for('auth.settings_online_features_toggle') }}" class="inline">
+        <input type="hidden" name="online_features" value="0">
+        <input type="hidden" name="next" value="{{ request.full_path if request.query_string else request.path }}">
+        <button type="submit" class="topbar-optin-no" title="Keep this install offline. Changeable later in Settings → System.">No thanks</button>
+      </form>
+    </div>
+    {% endif %}
     {% if marketplace_restart_pending %}
     {# Lit by the marketplace context-processor flag while one or more
        installs/uninstalls are waiting on a process restart. Posts to

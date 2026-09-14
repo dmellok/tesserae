@@ -965,6 +965,29 @@ body.modal-open { overflow: hidden; }
    data-restart-form so clicking it opens the spinner modal and the
    page auto-reloads when the new process is back. */
 .topbar-restart-form { margin: 0; }
+/* Opt-in prompt for installs that never answered the online-features question. */
+.topbar-optin { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; }
+.topbar-optin .inline { margin: 0; }
+.topbar-optin-yes {
+  border-color: color-mix(in srgb, var(--t-accent, #2563eb) 50%, transparent);
+  background: color-mix(in srgb, var(--t-accent, #2563eb) 12%, transparent);
+}
+.topbar-optin-yes:hover,
+.topbar-optin-yes:focus-visible {
+  background: color-mix(in srgb, var(--t-accent, #2563eb) 22%, transparent);
+  border-color: var(--t-accent, #2563eb);
+}
+.topbar-optin-no {
+  height: 36px;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: var(--t-fg-muted, #666);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.topbar-optin-no:hover { color: var(--t-fg, #1a1a1a); text-decoration: underline; }
 .topbar-restart-form { margin-left: auto; }
 /* When batteries are also shown, batteries already grabbed the auto
    margin, so this row of trailing items collapses cleanly. */

@@ -52,7 +52,9 @@ from app.tz_resolve import _resolve_iana_timezone
 
 bp = Blueprint("onboarding", __name__, url_prefix="/onboarding")
 
-STEPS: tuple[str, ...] = ("welcome", "timezone", "broker", "device", "share", "dashboard")
+# ``share`` sits right after the welcome so every install sees the opt-in
+# question before the steps where setup is commonly abandoned (broker, device).
+STEPS: tuple[str, ...] = ("welcome", "share", "timezone", "broker", "device", "dashboard")
 STEP_LABELS: dict[str, str] = {
     "welcome": "Welcome",
     # The online-features opt-in. Placed just before the dashboard step so the
@@ -495,16 +497,21 @@ def push_starter(page_id: str) -> Response:
 
 @bp.post("/share")
 def save_share() -> Response:
-    """Record the online-features opt-in choice, then advance to the final
-    dashboard step.
+    """Record the online-features opt-in choice, then advance to the timezone
+    step.
 
     Yes turns on update checks, firmware indicators, marketplace install
     counts, and the anonymous heartbeat; No keeps the install fully offline.
     Changeable later in Settings -> System. Setup itself is finished on the
-    dashboard step, so this only records the choice and moves on."""
+    dashboard step, so this only records the choice and moves on. A yes also
+    sends the install's first heartbeat straight away, so a trial that never
+    reaches the daemon's boot delay still counts."""
     enabled = request.form.get("online_features") in ("1", "true", "on")
     _settings().patch_section("app", {"online_features": enabled})
     if enabled:
+        from app import heartbeat as _heartbeat
+
+        _heartbeat.kick(current_app)
         flash("Thank you, genuinely. You're now one of the installs I get to build for.", "ok")
     else:
         flash(
@@ -512,7 +519,7 @@ def save_share() -> Response:
             "turn it on anytime in Settings -> System -> Online features.",
             "ok",
         )
-    return redirect(url_for("onboarding.step", step="dashboard"))
+    return redirect(url_for("onboarding.step", step="timezone"))
 
 
 @bp.post("/skip")

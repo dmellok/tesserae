@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import io
 
-from flask import current_app, flash, request, send_file, session
+from flask import current_app, flash, redirect, request, send_file, session
 from werkzeug.wrappers import Response
 
 from app import backup as _backup_mod
@@ -408,6 +408,10 @@ def system_online_features_toggle() -> Response:
     """
     enabled = request.form.get("online_features") in ("1", "true", "on")
     settings_store().patch_section("app", {"online_features": enabled})
+    if enabled:
+        from app import heartbeat as _heartbeat
+
+        _heartbeat.kick(current_app)
     flash(
         (
             "Online features enabled. Update checks and anonymous install counts are active."
@@ -416,4 +420,9 @@ def system_online_features_toggle() -> Response:
         ),
         "ok",
     )
+    # The header prompt posts here from any page; go back there rather than
+    # dropping the operator into Settings. Relative paths only.
+    nxt = str(request.form.get("next") or "")
+    if nxt.startswith("/") and not nxt.startswith("//"):
+        return redirect(nxt)
     return system_redirect()

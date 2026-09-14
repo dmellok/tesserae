@@ -27,6 +27,7 @@ from typing import Any
 
 from flask import Flask
 
+from app import heartbeat as _heartbeat
 from app import install_id as _install_id
 from app import online
 
@@ -54,6 +55,10 @@ def status(app: Flask) -> dict[str, Any]:
     settings = app.config.get("SETTINGS_STORE")
     if not online.online_enabled(settings):
         return {"available": False, "disabled": True}
+    # Same gate, same moment: an install whose UI is open and that has a
+    # heartbeat due sends it now. Closes the gap where short-lived installs
+    # showed up in the update check but never in the heartbeat.
+    _heartbeat.kick(app)
     now = time.time()
     with _lock:
         stale = (now - _fetched_at) > _TTL_SECONDS

@@ -116,20 +116,36 @@ server side and the IP is then discarded.
 Once a day, Tesserae POSTs to `https://api.tesserae.ink/heartbeat` so the
 maintainer can see how many installs are active and what to prioritise.
 The body is only low-cardinality, aggregate values: your install's random
-ID, the running version and channel, the OS family (linux/macos/windows),
-CPU arch, Python minor version, deployment kind (docker/ha_addon/pip/lxc/
-source), transport (mqtt/rest/both/none), a **bucketed** device count
-(`0`, `1`, `2-3`, `4-9`, `10+`, never the exact number), the set of
-device kinds you've configured, the firmware versions running on them
-grouped by kind (so the maintainer can see what firmware is in the field),
-a Home Assistant boolean, and a **bucketed** count of paired companion apps
-(same `0`/`1`/`2-3`/… buckets, never a client name, install id, or app
-version). The device count and kinds cover only the
-devices you've actually added, not the built-in catalogue. No names, paths,
-layouts, or exact counts. The server stores only the **day** (not a
-timestamp), so the cadence can't become a per-install activity trace, and
-it dedupes to one heartbeat per install per day. A coarse country is
-derived from the request IP and the IP is then discarded.
+ID, the running version and release channel (`stable` for a tagged release,
+`edge` for a main-branch image, `main` for a source checkout that isn't on a
+tag), the OS family (linux/macos/windows), CPU arch, Python minor version,
+deployment kind (docker/ha_addon/pip/lxc/source), transport
+(mqtt/rest/both/none), a **bucketed** device count (`0`, `1`, `2-3`, `4-9`,
+`10+`, never the exact number), a **bucketed** install age (`0`, `1-7`,
+`8-30`, `31-90`, `90+` days since the install ID was minted), and a Home
+Assistant boolean.
+
+Per device kind you've configured it sends one object with the kind, the
+newest firmware version reported by devices of that kind, the panel's
+declared colour gamut (for example `bwry_4`) and resolution (`800x480`), and
+a **bucketed** wake cadence (`<5m`, `5-15m`, `15-60m`, `1-6h`, `6h+`,
+`always_on`). These describe the hardware SKU, never an individual device.
+
+It also carries a **bucketed** count of paired companion apps (same buckets,
+never a client name, install id, or app version), a **bucketed** count of
+lineups, four feature booleans (cloud relay linked, touch in use, MCP on,
+quiet hours set: whether the feature is used at all, never how), and a
+**bucketed** OTA rollout snapshot (devices offered a firmware release,
+devices already on it, devices whose last report was a failure). The device
+count and kinds cover only the devices you've actually added, not the
+built-in catalogue. No names, paths, layouts, or exact counts. The server
+stores only the **day** (not a timestamp), so the cadence can't become a
+per-install activity trace, and it dedupes to one heartbeat per install per
+day. A coarse country is derived from the request IP and the IP is then
+discarded.
+
+The first heartbeat leaves as soon as you opt in (in the wizard, in
+Settings, or from the header prompt); after that the cadence is daily.
 
 ### App update check (header badge + `tesserae_status`)
 

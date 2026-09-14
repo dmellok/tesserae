@@ -8,6 +8,26 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Richer, more accurate install heartbeat.** The daily heartbeat now
+  reports the real release channel (`stable` for tag builds, `edge` for
+  main-branch images, `main` for an untagged source checkout; it was
+  hard-coded to `stable`), a bucketed install age, one object per device
+  kind carrying the newest reported firmware plus the panel's declared
+  gamut, resolution and bucketed wake cadence, a bucketed lineup count,
+  four feature booleans (relay, touch, MCP, quiet hours) and a bucketed OTA
+  rollout snapshot. Per-kind firmware had been sent in a shape the API
+  ignored, so every install read as `unknown` firmware. The first heartbeat
+  of an install's life now leaves within seconds of opting in (wizard,
+  Settings toggle, or the first page view) instead of after the daemon's
+  boot delay, which had left short-lived installs visible in the update
+  check but absent from the heartbeat. The privacy page lists the exact
+  payload.
+- **Opt-in question moved to the front of the wizard**, right after the
+  welcome, so it is seen before the steps where setup is often abandoned.
+  Installs that never answered (skipped the wizard, or predate it) get a
+  one-click prompt in the header; either answer persists.
+- Docker images are stamped with `TESSERAE_CHANNEL` at build time.
+
 - **M5Stack PaperMono hardware kind.** New `m5stack_papermono` kind for the
   3.97" 480x800 4-level greyscale handheld (Pro and Lite share it): the
   reTerminal Sticky's wire contract (`esp32_bw_client`, `gray_4`, a
