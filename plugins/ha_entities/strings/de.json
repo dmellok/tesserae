@@ -15,7 +15,7 @@
   "state_not_home": "Nicht zuhause",
   "state_idle": "Inaktiv",
   "state_standby": "Standby",
-  "state_disarmed": "Unscharf",
+  "state_disarmed": "Deaktiviert",
   "unavailable": "nicht verfügbar",
   "not_found": "nicht gefunden",
   "entities": "Entitäten",
