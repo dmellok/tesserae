@@ -1,0 +1,66 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "Home Assistant, Dashboard",
+  "version": "0.1.0",
+  "kind": "widget",
+  "locales": ["en", "cs", "de", "es", "fr", "it", "lt", "nb", "nl", "pl", "pt", "sk", "sv", "zh-CN", "zh-TW"],
+  "description": "Shows one of your existing Home Assistant dashboards as-is, no rebuilding in Tesserae. The server opens the dashboard in headless Chromium, signed in with the Home Assistant Core token, hides the sidebar and header, and captures the view at the cell's size. Point it at any dashboard path (lovelace/0, dashboard-kitchen/overview). Frames are re-rendered on the interval you set and the last good frame is kept between renders.",
+  "icon": "ph-layout",
+  "supports": { "sizes": ["sm", "md", "lg"] },
+  "cell_options": [
+    {
+      "name": "path",
+      "type": "string",
+      "label": "Dashboard path",
+      "help": "The part of the Home Assistant URL after the host, e.g. lovelace/0 or dashboard-kitchen/overview. Leave blank for the default dashboard.",
+      "default": "lovelace/0"
+    },
+    {
+      "name": "zoom",
+      "type": "select",
+      "label": "Zoom",
+      "default": "1",
+      "help": "Scales the dashboard before capture. Larger values make cards bigger and easier to read on e-ink, fewer of them fit.",
+      "choices": [
+        { "value": "0.75", "label": "75%" },
+        { "value": "1",    "label": "100%" },
+        { "value": "1.25", "label": "125%" },
+        { "value": "1.5",  "label": "150%" },
+        { "value": "2",    "label": "200%" }
+      ]
+    },
+    {
+      "name": "dark_mode",
+      "type": "boolean",
+      "label": "Dark theme",
+      "default": false,
+      "help": "Render with Home Assistant's dark mode. Light is usually the better fit for a panel."
+    },
+    {
+      "name": "kiosk",
+      "type": "boolean",
+      "label": "Kiosk query",
+      "default": true,
+      "help": "Appends ?kiosk to the URL so the kiosk-mode integration, if installed, strips the remaining chrome. Harmless without it."
+    },
+    {
+      "name": "settle_seconds",
+      "type": "number",
+      "label": "Settle delay (seconds)",
+      "help": "Extra wait after the dashboard reports loaded, so cards that fetch their own data (history graphs, cameras, maps) have painted before capture.",
+      "default": 2,
+      "min": 0,
+      "max": 12
+    },
+    {
+      "name": "refresh_seconds",
+      "type": "number",
+      "label": "Re-render interval (seconds)",
+      "help": "How old a captured frame may be before the next render replaces it. Each render opens a browser for a few seconds, so keep this near the panel's own wake interval.",
+      "default": 300,
+      "min": 30,
+      "max": 86400
+    }
+  ],
+  "render": { "dither": "ordered", "needs_network": true }
+}

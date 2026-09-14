@@ -6,6 +6,22 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.416.0], 2026-09-15
+
+### Added
+
+- **Home Assistant dashboard widget (`ha_dashboard`).** Shows an existing
+  Home Assistant dashboard on the panel as-is, no rebuilding in Tesserae.
+  The server opens the dashboard top-level in headless Chromium, signed in
+  from the Home Assistant Core token, with the sidebar hidden and the app
+  header cropped away, and captures it at the cell's size. Options cover
+  the dashboard path, zoom, dark theme, a `?kiosk` query for the kiosk-mode
+  integration, a settle delay and a re-render interval. Renders run off the
+  hydrate path and the last good frame is kept between them, so a panel
+  refresh never waits on a browser launch. The renderer gained the hooks
+  this needs: a per-request init script, a ready-condition wait plus settle
+  for external pages, and an ignore-TLS-errors flag.
+
 ## [0.415.0], 2026-09-14
 
 ### Added

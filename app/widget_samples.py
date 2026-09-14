@@ -145,6 +145,49 @@ _CAMERA_SAMPLE_DATA_URL = (
 )
 
 
+def _ha_dashboard() -> dict[str, Any]:
+    # Matches ha_dashboard.server's frame shape. The frame is drawn here
+    # rather than captured, since the gallery has no Home Assistant to open:
+    # a light dashboard of tiles with the header already cropped away.
+    import base64
+    import io
+
+    from PIL import Image, ImageDraw
+
+    w, h = 640, 400
+    im = Image.new("RGB", (w, h), (250, 250, 250))
+    draw = ImageDraw.Draw(im)
+    tiles = [
+        ("Living room", "21.5 °C"),
+        ("Humidity", "46 %"),
+        ("Solar", "3.4 kW"),
+        ("Front door", "Locked"),
+        ("Lights", "3 on"),
+        ("Washer", "Done"),
+    ]
+    cols, rows, pad = 3, 2, 16
+    tw = (w - pad * (cols + 1)) // cols
+    th = (h - pad * (rows + 1)) // rows
+    for i, (name, value) in enumerate(tiles):
+        x = pad + (i % cols) * (tw + pad)
+        y = pad + (i // cols) * (th + pad)
+        draw.rounded_rectangle(
+            (x, y, x + tw, y + th), radius=12, fill=(255, 255, 255), outline=(224, 224, 224)
+        )
+        draw.text((x + 16, y + 16), name, fill=(96, 96, 96))
+        draw.text((x + 16, y + th // 2), value, fill=(33, 33, 33))
+    out = io.BytesIO()
+    im.save(out, format="PNG", optimize=True)
+    return {
+        "frame": "data:image/png;base64," + base64.b64encode(out.getvalue()).decode("ascii"),
+        "w": w,
+        "h": h,
+        "path": "/lovelace/0",
+        "rendered_at": 0.0,
+        "stale": False,
+    }
+
+
 def _ha_camera() -> dict[str, Any]:
     # Matches the server shape: ``{label, items: [{...}, ...]}``. The
     # client unwraps ``items[0]`` to drive the hero, multi-camera
@@ -912,6 +955,7 @@ SAMPLES: dict[str, Any] = {
     "github_streak": _github_streak,
     "ha_battery": _ha_battery,
     "ha_camera": _ha_camera,
+    "ha_dashboard": _ha_dashboard,
     "ha_climate": _ha_climate,
     "ha_energy": _ha_energy,
     "ha_entities": _ha_entities,

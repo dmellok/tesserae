@@ -224,6 +224,26 @@ class RenderRequest:
     # the default. When None, external renders keep the #178
     # ``external_user_agent`` default.
     user_agent: str | None = None
+    # JavaScript run in every new document of the context before the page's
+    # own scripts (Playwright ``add_init_script``). The Home Assistant
+    # dashboard widget uses it to seed ``localStorage`` with a session so the
+    # frontend opens straight onto a dashboard instead of the login screen.
+    # It can carry a credential, so nothing here ever logs it.
+    init_script: str | None = None
+    # External renders only: a JS function polled after the networkidle wait
+    # until it returns truthy, so a single-page app can be captured once it
+    # reports itself loaded rather than after a guessed delay. Best effort: a
+    # timeout logs and the capture goes ahead with what has painted.
+    ready_js: str | None = None
+    ready_timeout_ms: int = 10_000
+    # Fixed pause after the ready wait, for apps that keep painting after
+    # they say they are done (external renders only).
+    settle_ms: int = 0
+    # Accept a self-signed or mismatched certificate on the context. Off by
+    # default; the HA dashboard widget sets it from ha_core's ``verify_tls``
+    # so a home server on its own CA renders the way its REST calls already
+    # work.
+    ignore_https_errors: bool = False
 
 
 def origin_of(url: str) -> str:
@@ -544,6 +564,37 @@ def _log_failed_images(settle: Any) -> None:
     )
 
 
+def _context_extras(request: RenderRequest) -> dict[str, Any]:
+    """Context kwargs a request adds on top of the viewport / scheme set."""
+    extras: dict[str, Any] = {}
+    if request.ignore_https_errors:
+        extras["ignore_https_errors"] = True
+    return extras
+
+
+def _prime_context(context: Any, request: RenderRequest) -> None:
+    """Install the request's init script, if any, before the first page."""
+    if request.init_script:
+        context.add_init_script(request.init_script)
+
+
+def _external_ready_wait(page: Any, request: RenderRequest) -> str:
+    """After the networkidle wait on an external render, poll ``ready_js``
+    (best effort) and then hold for ``settle_ms``. Returns the outcome
+    (``fired`` / ``timeout`` / ``skipped``) for the settle record."""
+    outcome = "skipped"
+    if request.ready_js:
+        try:
+            page.wait_for_function(request.ready_js, timeout=request.ready_timeout_ms)
+            outcome = "fired"
+        except PlaywrightError as err:
+            logger.warning("external ready wait timed out: %s", str(err).splitlines()[0][:200])
+            outcome = "timeout"
+    if request.settle_ms > 0:
+        page.wait_for_timeout(request.settle_ms)
+    return outcome
+
+
 def _new_composer_page(browser: Browser, request: RenderRequest) -> tuple[Any, Any]:
     """Open a fresh context + page sized to the request and return
     ``(context, page)``. Caller owns closing the context."""
@@ -556,7 +607,9 @@ def _new_composer_page(browser: Browser, request: RenderRequest) -> tuple[Any, A
         context_kwargs["timezone_id"] = request.timezone_id
     if request.user_agent:
         context_kwargs["user_agent"] = request.user_agent
+    context_kwargs.update(_context_extras(request))
     context = browser.new_context(**context_kwargs)
+    _prime_context(context, request)
     page = context.new_page()
     _install_request_policy(page, request)
     page.set_default_timeout(request.timeout_ms)
@@ -582,6 +635,7 @@ def _navigate_and_settle(page: Any, request: RenderRequest, attempt: int) -> dic
             page.wait_for_load_state("networkidle", timeout=8_000)
         except PlaywrightError:
             logger.debug("external url networkidle wait gave up", exc_info=True)
+        settle["ready"] = _external_ready_wait(page, request)
     elif request.wait_until == "networkidle":
         page.goto(request.url, wait_until="load")
     else:
@@ -675,8 +729,10 @@ def _screenshot_attempt(browser: Browser, request: RenderRequest, attempt: int) 
         # External site: don't advertise HeadlessChrome (#178). Composer
         # self-renders keep the default UA; nothing gates localhost.
         context_kwargs["user_agent"] = external_user_agent(browser)
+    context_kwargs.update(_context_extras(request))
     context = browser.new_context(**context_kwargs)
     try:
+        _prime_context(context, request)
         page = context.new_page()
         _install_request_policy(page, request)
         page.set_default_timeout(request.timeout_ms)
@@ -718,6 +774,7 @@ def _screenshot_attempt(browser: Browser, request: RenderRequest, attempt: int) 
                 page.wait_for_load_state("networkidle", timeout=8_000)
             except PlaywrightError:
                 logger.debug("external url networkidle wait gave up", exc_info=True)
+            _external_ready_wait(page, request)
         elif request.wait_until == "networkidle":
             # Composer render: translate the dataclass default
             # ``networkidle`` to ``load`` because widget CSS/JS keep

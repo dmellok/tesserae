@@ -2,7 +2,7 @@
 
 # Widget gallery
 
-The **36 widgets** that ship with Tesserae. Each is a drop-a-folder widget under `plugins/<id>/`; drop your own in and it shows up in the editor's picker. Want to build one? See [Build a widget with AI](../dev/writing-a-widget.md).
+The **37 widgets** that ship with Tesserae. Each is a drop-a-folder widget under `plugins/<id>/`; drop your own in and it shows up in the editor's picker. Want to build one? See [Build a widget with AI](../dev/writing-a-widget.md).
 
 !!! tip "Looking for more widgets?"
     Browse the full community catalog at [tesserae.ink/catalog](https://tesserae.ink/catalog/): widgets, themes, and dashboard templates, all installable from **Settings → Widgets → Browse catalog** inside the app.
@@ -218,6 +218,16 @@ The **36 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
 
+-   **Home Assistant, Dashboard** &middot; `ha_dashboard`
+
+    ---
+
+    ![ha_dashboard](../screenshots/widgets/ha_dashboard.png)
+
+    Shows one of your existing Home Assistant dashboards as-is, no rebuilding in Tesserae. The server opens the dashboard in headless Chromium, signed in with the Home Assistant Core token, hides the sidebar and header, and captures the view at the cell's size. Point it at any dashboard path (lovelace/0, dashboard-kitchen/overview). Frames are re-rendered on the interval you set and the last good frame is kept between renders.
+
+    **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
+
 -   **Home Assistant, Energy** &middot; `ha_energy`
 
     ---
@@ -244,7 +254,7 @@ The **36 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     ![ha_history](../screenshots/widgets/ha_history.png)
 
-    A numeric Home Assistant sensor over time. Pairs the current value + trend arrow + min/max with a Chart.js line chart, optional threshold horizontal line, optional fixed y-axis range, min/max marker dots + labels on the curve, and an averaged hourly-profile ghost overlay for long windows. Requires the Home Assistant Core plugin.
+    A numeric Home Assistant sensor over time. Pairs the current value + trend arrow + min/max (in the legend strip, or as a large headline above the chart) with a Chart.js line chart, optional threshold horizontal line, optional fixed y-axis range, min/max marker dots + labels on the curve, and an averaged hourly-profile ghost overlay for long windows. Requires the Home Assistant Core plugin.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
 
@@ -346,7 +356,7 @@ The **36 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     _Screenshot pending, run `python scripts/capture_widget_shots.py`._
 
-    Approaching vehicles at a stop (or two), from any GTFS feed. Presets for the NYC Subway and BART, live times and delays from GTFS-RT, service alerts, and an optional split-by-direction board.
+    Approaching vehicles at a stop (or two), from any GTFS feed. Presets for the NYC Subway and BART, live times and delays from GTFS-RT TripUpdates, service alerts, vehicle positions, and an optional split-by-direction board.
 
     **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** -
 
