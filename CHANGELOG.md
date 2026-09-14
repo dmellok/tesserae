@@ -32,6 +32,8 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   language pickers list all of them automatically. A repo-wide test now
   pins every widget's locales to its shipped files, the English key set to
   every translation, and each literal `t()` call to its English text.
+  The German strings for the transit, climate, entities, locks, automation
+  history and status widgets were then reviewed by a native speaker (#315).
 
 ### Fixed
 
