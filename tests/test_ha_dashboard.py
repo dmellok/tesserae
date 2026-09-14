@@ -267,9 +267,15 @@ def test_slow_first_render_returns_pending_then_the_frame(
 ) -> None:
     monkeypatch.setattr(widget, "FIRST_WAIT_S", 0.05)
     browser.delay_s = 0.4
+    before = time.time()
     with app.app_context():
         data = widget.fetch({}, {}, ctx=_ctx())
+    # The placeholder declares when to look again, so the device path
+    # re-renders the page once the frame lands rather than keeping the
+    # placeholder until the next Send.
+    retry_at = data.pop("next_change_at")
     assert data == {"pending": True, "path": "/lovelace/0"}
+    assert before + widget.PENDING_RETRY_S <= retry_at <= time.time() + widget.PENDING_RETRY_S
     params = next(iter(widget._jobs))
     widget._jobs[params].done.wait(3.0)
     with app.app_context():

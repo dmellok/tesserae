@@ -23,8 +23,12 @@ result is cached per (path, size, zoom, theme). ``fetch()`` returns the
 cached frame when it is younger than ``refresh_seconds``, otherwise it
 starts a render and returns the previous frame while that runs. Only the
 very first render for a cell is waited for, and only up to ``FIRST_WAIT_S``,
-so a panel's first paint usually carries the dashboard and never stalls on
-it. Renders are single-flight per key and serialised across keys, so a
+so a panel's first paint never stalls on it. A cold render rarely fits in
+that window, so the first fetch for a cell size usually goes out as
+``pending`` and the cell shows a placeholder. That result carries a
+``next_change_at`` hint (#243) so the device path re-renders the page once
+the frame has landed, instead of leaving the placeholder on glass until
+the next Send. Renders are single-flight per key and serialised across keys, so a
 page with three dashboard cells opens one browser at a time. The pooled
 browser is not used on purpose: its worker is the thread rendering the
 composer page this fetch is part of, so queuing on it would deadlock.
@@ -63,6 +67,11 @@ ERROR_RETRY_S = 60.0
 # comfortably; a dashboard that takes longer than this is not going to
 # paint.
 RENDER_TIMEOUT_MS = 25_000
+# How far out a ``pending`` result declares its next change. A cold render
+# (launch + navigation + ready wait + settle) lands well inside this, and the
+# device path adds its own render margin before it polls again; a render
+# that overruns simply declares once more on the re-render.
+PENDING_RETRY_S = 30.0
 READY_TIMEOUT_MS = 10_000
 DEFAULT_PATH = "lovelace/0"
 DEFAULT_REFRESH_S = 300
@@ -411,7 +420,11 @@ def fetch(
         return _shape(frame, params, stale=False)
     if error is not None:
         return {"error": error[1], "path": params.path}
-    return {"pending": True, "path": params.path}
+    return {
+        "pending": True,
+        "path": params.path,
+        "next_change_at": time.time() + PENDING_RETRY_S,
+    }
 
 
 def _verify_tls(core: Any) -> bool:

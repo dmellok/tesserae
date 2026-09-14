@@ -195,3 +195,52 @@ def test_compose_route_wires_target_for_canvas(app: Flask) -> None:
     assert _captured_target(app, page, "?w=800&h=480") == "dev_a"
     # A push with no device_id stays empty (unbound / non-per-device render).
     assert _captured_target(app, page, "?w=800&h=480&for_push=1") == ""
+
+
+def _record_hint_via_compose(app: Flask, page: Page, query: str, when: float) -> None:
+    """Compose ``page`` with every widget fetch answering ``next_change_at``."""
+    import app.composer as composer
+
+    app.config["PAGE_STORE"].save(page)
+    orig = composer._fetch_plugin_data
+    composer._fetch_plugin_data = lambda *a, **k: {"next_change_at": when}  # type: ignore[assignment]
+    try:
+        assert app.test_client().get(f"/compose/{page.id}{query}").status_code == 200
+    finally:
+        composer._fetch_plugin_data = orig  # type: ignore[assignment]
+
+
+def test_shared_push_records_next_change_for_every_fanned_out_device(app: Flask) -> None:
+    """A page without a per-device widget renders once per panel group and
+    the frame is copied to each member, so the compose URL carries no
+    device_id. The widgets' declared change (#243) still has to land on
+    every device that will show the frame, or the /frame path never
+    re-renders and a placeholder stays on glass until the next Send."""
+    import time
+
+    from app import widget_next_change
+
+    _two_devices(app)
+    when = time.time() + 30
+    page = Page(
+        id="shared",
+        name="Shared",
+        device_ids=["dev_a", "dev_b"],
+        cells=[Cell(id="c1", plugin="weather_now", x=0, y=0, w=800, h=480)],
+    )
+    _record_hint_via_compose(app, page, "?w=800&h=480&for_push=1", when)
+    assert widget_next_change.peek(app, "dev_a") == when
+    assert widget_next_change.peek(app, "dev_b") == when
+
+    # A per-device render names its device and records for that one only.
+    widget_next_change.clear(app, "dev_a")
+    widget_next_change.clear(app, "dev_b")
+    _record_hint_via_compose(app, page, "?w=800&h=480&for_push=1&device_id=dev_b", when)
+    assert widget_next_change.peek(app, "dev_a") is None
+    assert widget_next_change.peek(app, "dev_b") == when
+
+    # A preview is not what any device shows: no hint.
+    widget_next_change.clear(app, "dev_b")
+    _record_hint_via_compose(app, page, "?w=800&h=480", when)
+    assert widget_next_change.peek(app, "dev_a") is None
+    assert widget_next_change.peek(app, "dev_b") is None

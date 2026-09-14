@@ -38,7 +38,7 @@ from werkzeug.wrappers import Response as WerkzeugResponse
 from app import widget_next_change
 from app.bindings import apply_binding
 from app.locale_resolve import resolve_locale
-from app.panel import PANEL_PRESETS, resolve_panel_for_page
+from app.panel import PANEL_PRESETS, panel_groups_for_push, resolve_panel_for_page
 from app.plugin_http import fetch_json
 from app.plugin_loader import Font, PluginRegistry
 from app.state.page_store import Page, PageStore
@@ -998,15 +998,23 @@ def _hydrate_page(
     # status path can wake the panel then instead of on a blind grid.
     # Previews and sample renders are excluded: they are not what any
     # device is showing.
+    # A per-device render names its device; a shared push render is fanned
+    # out to every device on the panel group, so the hint is recorded for
+    # each of them (the compose route lists them as ``hint_device_ids``).
     if not preview and not sample:
-        _device_for_hint = str(page_dict.get("target_device_id") or "")
-        if _device_for_hint:
+        _devices_for_hint = [str(page_dict.get("target_device_id") or "")]
+        if not _devices_for_hint[0]:
+            _devices_for_hint = [str(d) for d in page_dict.get("hint_device_ids") or [] if d]
+        if _devices_for_hint:
+            _hints = widget_next_change.collect(data_by_cell_index)
+            _now = time.time()
+        for _device_for_hint in _devices_for_hint:
             try:
                 widget_next_change.record(
                     current_app._get_current_object(),  # type: ignore[attr-defined]
                     _device_for_hint,
-                    widget_next_change.collect(data_by_cell_index),
-                    now=time.time(),
+                    _hints,
+                    now=_now,
                 )
             except Exception:
                 logger.exception("compose: next-change hint failed for %s", _device_for_hint)
@@ -1505,6 +1513,33 @@ def compose_overlay_atlas() -> str:
     )
 
 
+def _push_fanout_device_ids(
+    page: Page, devices: Any, settings: Any, panel_w: int, panel_h: int
+) -> list[str]:
+    """Bound device ids a shared push render at ``panel_w x panel_h`` is
+    fanned out to, so a widget's ``next_change_at`` (#243) can be recorded
+    for each of them. A shared render carries no ``?device_id``: only pages
+    with a per-device widget fan out per device, every other push renders
+    once per panel group and copies the frame to each member.
+
+    Matched on dims because a page bound to panels of different sizes gets
+    one compose per group; a group whose dims do not match this render is
+    rendered separately and records its own hint. Falls back to every bound
+    device when no group matches (a ``?w=&h=`` override), where over-
+    declaring costs at most one extra re-render."""
+    if devices is None or not getattr(page, "device_ids", None):
+        return []
+    try:
+        groups = panel_groups_for_push(page, devices, settings)
+    except Exception:
+        logger.debug("compose: panel groups for hint fan-out failed", exc_info=True)
+        return [str(d) for d in page.device_ids]
+    matched = [dids for panel, dids in groups if (panel.w, panel.h) == (panel_w, panel_h)]
+    if matched:
+        return [str(d) for dids in matched for d in dids]
+    return [str(d) for d in page.device_ids]
+
+
 def _preview_target_device(page: Page, devices: Any) -> str:
     """First bound device id that exists in the registry, or ``""``.
 
@@ -1606,6 +1641,10 @@ def compose(page_id: str) -> Response:
     page_dict["panel"] = {"w": panel_w, "h": panel_h}
     if target_device_id:
         page_dict["target_device_id"] = target_device_id
+    elif for_push:
+        page_dict["hint_device_ids"] = _push_fanout_device_ids(
+            page, devices, settings_store, panel_w, panel_h
+        )
     return _uncacheable(
         render_template(
             "compose.html",
