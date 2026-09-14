@@ -6,6 +6,8 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.415.0], 2026-09-14
+
 ### Added
 
 - **Richer, more accurate install heartbeat.** The daily heartbeat now
