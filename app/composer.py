@@ -1346,6 +1346,7 @@ def _build_canvas_els(
                     {
                         "label": e.label,
                         "state": e.state,
+                        "value_key": e.value_key,
                         "axis": e.axis,
                         "value_min": e.value_min,
                         "value_max": e.value_max,

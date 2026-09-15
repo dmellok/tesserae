@@ -334,7 +334,14 @@
       return s;
     }
 
-    row("Entity", textField(e.value_key, "ha:light.desk", function (v) { e.value_key = v; }));
+    row("Entity", textField(e.value_key, e.kind === "button" ? "optional: ha:light.desk" : "ha:light.desk",
+      function (v) { e.value_key = v; }));
+    if (e.kind === "button") {
+      var hint = el("div");
+      hint.textContent = "A bound button is drawn filled while the entity is on. Tap still fires the action.";
+      hint.style.cssText = "font-size:11px;color:var(--t-muted, #6b6b6b);margin:-2px 0 6px 100px";
+      mount.appendChild(hint);
+    }
     if (e.kind === "slider" || e.kind === "stepper") {
       row("Min", numField(e.value_min, function (v) { e.value_min = v; }));
       row("Max", numField(e.value_max, function (v) { e.value_max = v; }));
@@ -344,7 +351,7 @@
       row("Axis", selectField(e.axis, [["x", "Horizontal"], ["y", "Vertical"]],
         function (v) { e.axis = v; }));
     }
-    if (e.kind === "switch") {
+    if (e.kind === "switch" || (e.kind === "button" && e.value_key)) {
       row("Preview state", selectField(e.state, [["", "—"], ["off", "Off"], ["on", "On"]],
         function (v) { e.state = v; }));
     }
@@ -2156,7 +2163,8 @@
 
   // Inspector for a touch-v3 primitive: name, label (button/switch), and the
   // interaction section (entity binding + range + action picker). No color/fill
-  // controls: the firmware draws the control, not the render.
+  // controls: the firmware draws the control, not the render. The one state
+  // cue is a bound button (Entity set), drawn filled while the entity is on.
   function renderPrimitiveProps(mount, e) {
     var name = { button: "Button", switch: "Switch", slider: "Slider", stepper: "Stepper" }[e.kind]
       || "Control";

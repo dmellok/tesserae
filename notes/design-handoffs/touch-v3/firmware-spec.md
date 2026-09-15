@@ -144,6 +144,11 @@ All within rect `R={x,y,w,h}`, tokens from `primitives.json`.
 - Content (mode `label`/`icon`/`icon_label`): width = icon_w + gap(8) + label_w
   (omit missing parts); center in R. Icon px 40. Label via S6.
 - Press: XOR-invert all of R, DU refresh; restore + fire on release.
+- Bound (`value_key` present, server ≥ 0.419): the button also carries `state`
+  and is drawn with all of R inverted while `on` (ink field, paper content), the
+  same pixels as the press look. State moves only via the values stream /
+  reconcile; a tap never flips it optimistically (the action may not be a
+  toggle). Without `value_key` a button ignores `state`.
 
 **switch** (label left)
 - label_w = text width; gap 10; control area = R minus (label_w+gap) on the left.

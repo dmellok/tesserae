@@ -271,8 +271,10 @@ class Element(BaseModel):
     # --- Touch v3 typed primitives (device-owned touch; kind == button | switch
     # | slider | stepper). The firmware draws these from the served spec and owns
     # interaction; see notes/design-handoffs/touch-v3/. ``value_key`` binds a
-    # switch/slider/stepper to an entity ("ha:light.desk"); ``state`` seeds a
-    # switch ("on"/"off"); ``axis`` is the slider fill direction ("x"|"y");
+    # switch/slider/stepper to an entity ("ha:light.desk"), and optionally a
+    # button, which then draws filled while the entity is on; ``state`` seeds
+    # a switch or bound button ("on"/"off"); ``axis`` is the slider fill
+    # direction ("x"|"y");
     # ``value_min``/``value_max``/``value_step``/``value_now`` are the
     # slider/stepper numeric range and seeded value. A button's action is its
     # ``on_tap`` spec (reused); switch/slider/stepper derive their action from

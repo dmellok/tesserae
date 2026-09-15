@@ -66,8 +66,13 @@
     }
 
     if (e.kind === "button") {
+      // A button bound to an entity (value_key) is drawn filled while that
+      // entity is on: ink frame + fill, paper content. Same geometry either
+      // way, so the on-device draw and this preview stay aligned.
+      var lit = !!e.value_key && e.state === "on";
       wrap.style.cssText = base + ";border:2px solid " + ink + ";border-radius:12px;" +
-        "display:flex;align-items:center;justify-content:center;gap:8px;font-weight:700";
+        "display:flex;align-items:center;justify-content:center;gap:8px;font-weight:700" +
+        (lit ? ";background:" + ink + ";color:" + paper : "");
       if (e.icon) {
         var weight = e.weight || "bold";
         if (!/^(thin|light|regular|bold|fill|duotone)$/.test(weight)) weight = "bold";

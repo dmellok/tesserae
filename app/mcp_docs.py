@@ -182,7 +182,9 @@ TOUCH PRIMITIVES (button / switch / slider / stepper -- the DEFAULT for interact
   and the render reserves a blank rect for it. On every other target -- a display-only panel, a
   preview, an unbound page -- the server paints the control instead, so it is always visible
   somewhere. Reach for these whenever the user asks for a button/switch/slider/stepper:
-    {"kind":"button",  <box>, "label":"Movie", "icon":"<phosphor>"?, "on_tap":<action spec>} -- fires on_tap.
+    {"kind":"button",  <box>, "label":"Movie", "icon":"<phosphor>"?, "on_tap":<action spec>,
+      "value_key":"ha:<entity>"?} -- fires on_tap; with value_key it also reflects that entity's
+      state, drawn filled (inverted) while on. Use it for a "light is on" tile whose tap toggles.
     {"kind":"switch",  <box>, "label":"Desk", "value_key":"ha:<entity>", "state":"on"|"off"?} -- taps
       toggle the bound entity and reflect its live state (no on_tap; the toggle is derived).
     {"kind":"slider",  <box>, "axis":"x"|"y", "value_key":"ha:<entity>[:<attr>]",

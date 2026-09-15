@@ -107,6 +107,33 @@ def test_layout_digest_moves_on_structural_change() -> None:
     assert build_frame_spec(els)["layout_digest"] != base["layout_digest"]
 
 
+def test_bound_button_carries_entity_state() -> None:
+    # A button with an entity bound reflects it (drawn filled while on) and
+    # still fires its own action; an unbound button carries neither field.
+    lit = Element(
+        id="b",
+        kind="button",
+        w=10,
+        h=10,
+        label="Desk",
+        on_tap="ha:light.toggle",
+        value_key="ha:light.desk",
+        state="on",
+    )
+    doc = build_frame_spec([lit])
+    prim = doc["primitives"][0]
+    assert prim["value_key"] == "ha:light.desk"
+    assert prim["state"] == "on"
+    assert prim["action"] == {"tier": 1, "type": "ha"}
+    assert not list(_validator().iter_errors(doc))
+    plain = build_frame_spec([Element(id="b", kind="button", w=10, h=10, on_tap="refresh")])
+    assert "value_key" not in plain["primitives"][0]
+    assert "state" not in plain["primitives"][0]
+    # State is data, not layout: flipping it leaves the digest alone.
+    lit.state = "off"
+    assert build_frame_spec([lit])["layout_digest"] == doc["layout_digest"]
+
+
 def test_button_action_classified() -> None:
     doc = build_frame_spec([Element(id="b", kind="button", w=10, h=10, on_tap="ha:light.toggle")])
     assert doc["primitives"][0]["action"] == {"tier": 1, "type": "ha"}

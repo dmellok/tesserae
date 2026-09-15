@@ -2442,7 +2442,8 @@ def _sse(event: str, data: dict[str, Any]) -> str:
 
 def _touch_value_key_slots(app_obj: Any, page_id: str) -> list[dict[str, Any]]:
     """Minimal value slots for the touch primitives on a canvas page, so the SSE
-    values stream carries live state for switches/sliders/steppers keyed by
+    values stream carries live state for switches/sliders/steppers (and
+    state-bound buttons) keyed by
     value_key (which the firmware maps back to its primitives). Runs outside a
     request context, so the page store is read through ``app_obj.config``."""
     if not page_id:
@@ -2455,7 +2456,7 @@ def _touch_value_key_slots(app_obj: Any, page_id: str) -> list[dict[str, Any]]:
     seen: set[str] = set()
     for el in page.canvas.els:
         vk = getattr(el, "value_key", "")
-        if el.kind in ("switch", "slider", "stepper") and vk and vk not in seen:
+        if el.kind in ("button", "switch", "slider", "stepper") and vk and vk not in seen:
             seen.add(vk)
             slots.append({"key": vk})
     return slots

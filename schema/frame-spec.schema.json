@@ -88,7 +88,9 @@
       "properties": {
         "label": { "$ref": "#/$defs/text_ref" },
         "icon": { "$ref": "#/$defs/icon_ref" },
-        "action": { "$ref": "#/$defs/action" }
+        "action": { "$ref": "#/$defs/action" },
+        "value_key": { "type": "string", "description": "Optional state source, e.g. ha:light.desk. A bound button is drawn filled (inverted) while the entity is on; the tap still fires action." },
+        "state": { "type": "string", "enum": ["on", "off"], "description": "Current state seeded by the server (bound buttons only)." }
       }
     },
     "switch_fields": {

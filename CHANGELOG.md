@@ -6,6 +6,18 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added
+
+- **Touch buttons that show their entity's state.** A button control in
+  the freeform editor takes an optional Entity (the same `ha:` binding a
+  switch uses). While that entity is on, the button is drawn filled,
+  ink field with paper label and icon, and it goes back to an outline
+  when it turns off; the tap still fires whatever action the button has.
+  It follows the live values stream like a switch, so an external change
+  in Home Assistant repaints it. Needs firmware 1.38 or later on the
+  panel to draw the filled state; the composed preview shows it on any
+  device.
+
 ## [0.418.1], 2026-09-16
 
 ### Added

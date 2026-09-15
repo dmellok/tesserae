@@ -126,6 +126,13 @@ def _primitive_for(el: Element, wire: WireFn | None) -> dict[str, Any] | None:
             base["label"] = _text_ref(ATLAS_LABEL, text=el.label)
         if el.icon:
             base["icon"] = {"name": el.icon, "weight": el.weight or "bold", "px": 40}
+        if el.value_key:
+            # A state-bound button reflects its entity (drawn filled while
+            # on) and still fires on_tap. Same seeding + live-values contract
+            # as a switch; the tap is momentary, so no optimistic flip.
+            base["value_key"] = el.value_key
+            if el.state in ("on", "off"):
+                base["state"] = el.state
         return base
 
     if el.kind == "switch":

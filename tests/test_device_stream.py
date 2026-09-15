@@ -96,6 +96,7 @@ def _canvas_page(app: Flask) -> None:
                     Element(id="sw", kind="switch", value_key="ha:light.desk"),
                     Element(id="dup", kind="switch", value_key="ha:light.desk"),  # deduped
                     Element(id="btn", kind="button", on_tap="refresh"),  # no binding
+                    Element(id="lit", kind="button", on_tap="refresh", value_key="ha:switch.fan"),
                     Element(id="w", kind="widget", widget="weather_now"),  # not a primitive
                 ]
             ),
@@ -108,7 +109,7 @@ def test_touch_value_key_slots_collects_bindings(app: Flask) -> None:
 
     _canvas_page(app)
     slots = _touch_value_key_slots(app, "p1")
-    assert [s["key"] for s in slots] == ["ha:light.desk"]
+    assert [s["key"] for s in slots] == ["ha:light.desk", "ha:switch.fan"]
     assert _touch_value_key_slots(app, "") == []
     assert _touch_value_key_slots(app, "missing") == []
 
@@ -124,10 +125,11 @@ def test_touch_primitive_values_streamed(app: Flask) -> None:
         "composition_digest": "c" * 16,
         "page_id": "p1",
     }
-    _stub_ha(app, {"light.desk": "on"})
+    _stub_ha(app, {"light.desk": "on", "switch.fan": "off"})
     evs = _events(list(_stream_events(app, device, max_ticks=1, scan_s=0)))
     values = [d for name, d in evs if name == "values"]
     assert values and values[0]["values"]["ha:light.desk"] == "on"
+    assert values[0]["values"]["ha:switch.fan"] == "off"  # a bound button streams too
 
 
 def test_sync_emitted_on_frame_change_and_deduped(app: Flask) -> None:
