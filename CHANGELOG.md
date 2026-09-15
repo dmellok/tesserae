@@ -8,6 +8,14 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Per-feed symbol on calendar feeds.** Each feed in Settings → Widgets
+  → Calendar Feeds takes an optional symbol, an emoji or a short marker,
+  next to its colour. The Day, Week and Month widgets put it in front of
+  every event from that feed, so calendars stay tellable apart on a
+  black-and-white panel and Home Assistant calendars that share a colour
+  still read as separate. Events and todos carry it as `feed_symbol` for
+  community widgets to pick up.
+
 - **Remove cells mode in the custom layout editor.** A "Remove cells"
   toggle under the board switches off the insert strips and resize
   handles so a click anywhere on a cell deletes it (with the usual

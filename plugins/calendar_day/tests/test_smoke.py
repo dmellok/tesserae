@@ -240,3 +240,18 @@ def test_a_small_hours_ahead_does_not_hide_the_morning() -> None:
     start, end = _fetch_capturing_window(hours_ahead=2)
     assert start == datetime(2026, 8, 21, 0, 0, tzinfo=UTC)
     assert end == datetime(2026, 8, 21, 11, 0, tzinfo=UTC)
+
+
+def test_feed_symbol_leads_the_title() -> None:
+    """A feed's symbol (Calendar Feeds, #317) goes in front of the summary,
+    and a feed with none leaves the title alone."""
+    app = _stub_app(
+        [
+            {"summary": "Standup", "start": _future_iso(1), "all_day": False, "feed_symbol": "💼"},
+            {"summary": "Dentist", "start": _future_iso(2), "all_day": False, "feed_symbol": ""},
+            {"summary": "Old client", "start": _future_iso(3), "all_day": False},
+        ]
+    )
+    with patch.object(server, "current_app", app):
+        out = server.fetch(options={}, settings={}, ctx={})
+    assert [e["summary"] for e in out["events"]] == ["💼 Standup", "Dentist", "Old client"]

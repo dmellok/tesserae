@@ -132,6 +132,11 @@
         <label for="feed-colour">Colour</label>
         <input type="color" id="feed-colour" name="colour" value="#0d8c7e">
       </div>
+      <div class="field">
+        <label for="feed-symbol">Symbol</label>
+        <input type="text" id="feed-symbol" name="symbol" class="cf-symbol-input" maxlength="8" placeholder="💼" autocomplete="off"
+               title="Optional. An emoji or short marker put in front of every event from this feed, so calendars stay tellable apart on a black-and-white panel.">
+      </div>
     </div>
     <div class="field">
       <label for="feed-url">iCal URL</label>
@@ -154,6 +159,12 @@
         <input type="color" name="colour" value="{{ f.colour or '#0d8c7e' }}" class="cf-swatch cf-swatch--input"
                title="{% if f.use_event_colours %}Feed colour, used where an event sets none{% else %}Change colour{% endif %}"
                aria-label="Colour for {{ f.name }}"
+               onchange="this.form.requestSubmit()">
+      </form>
+      <form method="post" action="{{ url_for('calendar_core_admin.update_symbol', feed_id=f.id) }}" class="inline cf-symbol">
+        <input type="text" name="symbol" value="{{ f.symbol or '' }}" class="cf-symbol-input" maxlength="8" placeholder="＋" autocomplete="off"
+               title="Symbol shown in front of every event from this feed. Leave blank for none."
+               aria-label="Symbol for {{ f.name }}"
                onchange="this.form.requestSubmit()">
       </form>
       <span class="cf-name">
@@ -240,7 +251,7 @@
   .cf-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
   .cf-row {
     display: grid;
-    grid-template-columns: auto 1fr 1.4fr auto;
+    grid-template-columns: auto auto 1fr 1.4fr auto;
     align-items: center;
     gap: 12px;
     padding: 10px 12px;
@@ -253,6 +264,9 @@
   .cf-row.is-disabled { opacity: 0.55; }
   .cf-swatch { width: 14px; height: 14px; border-radius: 4px; border: 1px solid rgba(0,0,0,0.1); }
   .cf-colour { margin: 0; display: flex; }
+  .cf-symbol { margin: 0; display: flex; }
+  .cf-symbol-input { width: 3.2em; text-align: center; padding: 2px 4px; font-size: var(--t-size-md); }
+  .cf-symbol .cf-symbol-input { width: 2.6em; }
   .cf-swatch--input { padding: 0; cursor: pointer; background: none; }
   .cf-swatch--input::-webkit-color-swatch-wrapper { padding: 0; }
   .cf-swatch--input::-webkit-color-swatch { border: none; border-radius: 3px; }

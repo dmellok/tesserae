@@ -23,6 +23,14 @@ def _parse_feeds_filter(s: str) -> list[str] | None:
     return [x.strip() for x in s.split(",") if x.strip()]
 
 
+def _titled(event: dict[str, Any]) -> str:
+    """The event title as the panel shows it: the feed's symbol, when one is
+    set in Calendar Feeds, in front of the summary (#317)."""
+    summary = str(event.get("summary") or "")
+    symbol = str(event.get("feed_symbol") or "").strip()
+    return f"{symbol} {summary}".strip() if symbol else summary
+
+
 def fetch(
     options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, Any]
 ) -> dict[str, Any]:
@@ -91,7 +99,7 @@ def fetch(
                 "weekday": cur.weekday(),  # 0=Mon
                 "events": [
                     {
-                        "summary": e["summary"],
+                        "summary": _titled(e),
                         "start": e["start"],
                         # The client's height calculation falls back to a
                         # 1-hour duration when end is missing. Forward it

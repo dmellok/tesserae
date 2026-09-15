@@ -321,3 +321,26 @@ def test_feed_row_renders_colour_input(app: Any) -> None:
     html = client.get("/plugins/calendar_core/").get_data(as_text=True)
     assert f"/plugins/calendar_core/feeds/{fid}/colour" in html
     assert 'name="colour" value="#123456"' in html
+
+
+def test_feed_symbol_is_stored_edited_and_shown(app: Any) -> None:
+    """The per-feed symbol (#317): set on add, changed in place from the feed
+    row, and rendered back into the row's field."""
+    client = app.test_client()
+    _sign_in(client)
+    client.post(
+        "/plugins/calendar_core/feeds",
+        data={"source": "ha", "name": "School", "entity_id": "calendar.school", "symbol": " 🎒 "},
+    )
+    feed = next(f for f in _feeds(app) if f["name"] == "School")
+    assert feed["symbol"] == "🎒"
+    resp = client.post(
+        f"/plugins/calendar_core/feeds/{feed['id']}/symbol",
+        data={"symbol": "S"},
+        follow_redirects=True,
+    )
+    assert resp.status_code == 200
+    assert next(f for f in _feeds(app) if f["id"] == feed["id"])["symbol"] == "S"
+    assert 'name="symbol" value="S"' in resp.get_data(as_text=True)
+    client.post(f"/plugins/calendar_core/feeds/{feed['id']}/symbol", data={"symbol": ""})
+    assert next(f for f in _feeds(app) if f["id"] == feed["id"])["symbol"] == ""

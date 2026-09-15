@@ -25,6 +25,14 @@ def _parse_feeds_filter(s: str) -> list[str] | None:
     return [x.strip() for x in s.split(",") if x.strip()]
 
 
+def _titled(event: dict[str, Any]) -> str:
+    """The event title as the panel shows it: the feed's symbol, when one is
+    set in Calendar Feeds, in front of the summary (#317)."""
+    summary = str(event.get("summary") or "")
+    symbol = str(event.get("feed_symbol") or "").strip()
+    return f"{symbol} {summary}".strip() if symbol else summary
+
+
 def fetch(
     options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, Any]
 ) -> dict[str, Any]:
@@ -100,7 +108,7 @@ def fetch(
                 "is_today": cur == today,
                 "events": [
                     {
-                        "summary": e["event"]["summary"],
+                        "summary": _titled(e["event"]),
                         "start": e["event"]["start"],
                         # Forward end so a future client variant that wants
                         # to time-slot events in the day cell can; the

@@ -11,6 +11,9 @@ Feeds are stored in ``feeds.json`` inside the plugin's data_dir:
   {"feeds": [{"id": "..", "name": "..", "url": "..", "colour": "#..", "enabled": true}]}
 A feed can instead point at a Home Assistant calendar entity:
   {"id": "..", "name": "..", "source": "ha", "entity_id": "calendar...", ...}
+Either kind may carry an optional ``"symbol"`` (an emoji or a short
+marker) that widgets put in front of every event from that feed, so
+calendars stay distinguishable on a panel that can't show their colour.
 The admin page (mounted at /plugins/calendar_core/) provides CRUD for
 this list, same shape as the todo plugin.
 
@@ -58,6 +61,10 @@ CACHE_TTL_S = 15 * 60
 HTTP_TIMEOUT_S = 15
 USER_AGENT = "tesserae/0.1 (+calendar_core)"
 DEFAULT_COLOUR = "#0d8c7e"
+#: Longest per-feed symbol kept. A single emoji can be several code points
+#: (a flag is two, a skin-toned or ZWJ sequence more), so this is generous
+#: for one glyph while still refusing a sentence typed into the field.
+SYMBOL_MAX_CHARS = 8
 
 # Per-feed HTTP auth modes. "none" is the default (public Google / iCloud
 # share URLs); "basic" and "digest" cover a CalDAV server that gates its
@@ -101,6 +108,14 @@ def _save_feeds(data: dict[str, Any], data_dir: Path | None = None) -> None:
     path = _feeds_path(data_dir)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
+def _clean_symbol(raw: Any) -> str:
+    """The per-feed symbol as stored: trimmed, control characters dropped,
+    capped at ``SYMBOL_MAX_CHARS`` code points. ``""`` means no symbol, and
+    is what every feed carried before the field existed."""
+    text = "".join(ch for ch in str(raw or "") if ch.isprintable() or ch == "\u200d")
+    return text.strip()[:SYMBOL_MAX_CHARS]
 
 
 def _slugify(s: str) -> str:
@@ -652,8 +667,8 @@ def load_events(
 ) -> list[dict[str, Any]]:
     """Public API for the calendar_* widgets, returns events from the
     requested feeds inside [start, end), tagged with the feed's
-    name + colour. Pass ``None`` for ``feed_ids`` to include every
-    enabled feed."""
+    name, colour and symbol. Pass ``None`` for ``feed_ids`` to include
+    every enabled feed."""
     dd = data_dir if data_dir is not None else _data_dir()
     feeds = _load_feeds(dd).get("feeds") or []
     wanted = set(feed_ids) if feed_ids else None
@@ -669,6 +684,7 @@ def load_events(
                 ev["feed_id"] = fid
                 ev["feed_name"] = feed.get("name") or fid
                 ev["feed_colour"] = feed.get("colour") or DEFAULT_COLOUR
+                ev["feed_symbol"] = _clean_symbol(feed.get("symbol"))
                 out.append(ev)
             continue
         url = feed.get("url")
@@ -694,6 +710,12 @@ def load_events(
             # falls back, so a partly-coloured calendar stays coherent.
             own = str(ev.get("event_colour") or "") if use_event_colours else ""
             ev["feed_colour"] = own or feed.get("colour") or DEFAULT_COLOUR
+            # The feed's marker, stamped beside the colour so a widget can
+            # put it in front of the title (#317). Unlike colour it is never
+            # per event: the point is to say which calendar an event came
+            # from, which one colour per calendar can't on a mono panel and
+            # per-event colours obscure.
+            ev["feed_symbol"] = _clean_symbol(feed.get("symbol"))
             out.append(ev)
     out.sort(key=lambda e: (not e["all_day"], e["start"]))
     return out
@@ -778,8 +800,8 @@ def load_todos(
     data_dir: Path | None = None,
 ) -> list[dict[str, Any]]:
     """Public API for todo widgets: VTODO items from the requested feeds,
-    tagged with the feed's name + colour. Pass ``None`` for ``feed_ids``
-    to include every enabled feed. VTODOs aren't recurrence-expanded (a
+    tagged with the feed's name, colour and symbol. Pass ``None`` for
+    ``feed_ids`` to include every enabled feed. VTODOs aren't recurrence-expanded (a
     recurring todo is rare and the semantics are murky); each VTODO
     component maps to one item."""
     dd = data_dir if data_dir is not None else _data_dir()
@@ -802,6 +824,7 @@ def load_todos(
             item["feed_id"] = fid
             item["feed_name"] = feed.get("name") or fid
             item["feed_colour"] = feed.get("colour") or DEFAULT_COLOUR
+            item["feed_symbol"] = _clean_symbol(feed.get("symbol"))
             out.append(item)
     return out
 
@@ -1498,6 +1521,7 @@ def blueprint() -> Blueprint:
         name = (request.form.get("name") or "").strip()
         url = (request.form.get("url") or "").strip()
         colour = (request.form.get("colour") or DEFAULT_COLOUR).strip()
+        symbol = _clean_symbol(request.form.get("symbol"))
         # Set when the add came from the discovery list (the per-row Add form
         # echoes the discovery URL). We re-render the discovered list afterwards
         # so adding one calendar doesn't wipe the others off the page.
@@ -1521,6 +1545,7 @@ def blueprint() -> Blueprint:
                     "source": "ha",
                     "entity_id": entity_id,
                     "colour": colour,
+                    "symbol": symbol,
                     "enabled": True,
                     "created_at": datetime.now(UTC).replace(microsecond=0).isoformat(),
                 }
@@ -1542,6 +1567,7 @@ def blueprint() -> Blueprint:
             "name": name,
             "url": url,
             "colour": colour,
+            "symbol": symbol,
             "enabled": True,
             "created_at": datetime.now(UTC).replace(microsecond=0).isoformat(),
         }
@@ -1638,6 +1664,26 @@ def blueprint() -> Blueprint:
         feed["colour"] = colour.lower()
         _save_feeds(data)
         flash(f"Updated colour for '{feed.get('name') or feed_id}'.", "ok")
+        return redirect(url_for("calendar_core_admin.index"))
+
+    @bp.post("/feeds/<feed_id>/symbol")
+    def update_symbol(feed_id: str) -> Response:
+        """Set or clear a saved feed's symbol in place (#317). Like the
+        colour it is stamped at load time, so no cache needs dropping."""
+        data = _load_feeds()
+        feed = next((f for f in data.get("feeds", []) if f.get("id") == feed_id), None)
+        if not feed:
+            abort(404)
+        symbol = _clean_symbol(request.form.get("symbol"))
+        feed["symbol"] = symbol
+        _save_feeds(data)
+        name = feed.get("name") or feed_id
+        flash(
+            f"Events from '{name}' now start with {symbol}."
+            if symbol
+            else f"Cleared the symbol for '{name}'.",
+            "ok",
+        )
         return redirect(url_for("calendar_core_admin.index"))
 
     @bp.post("/discover")
