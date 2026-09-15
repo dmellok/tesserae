@@ -6,6 +6,8 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.418.1], 2026-09-16
+
 ### Added
 
 - **Per-feed symbol on calendar feeds.** Each feed in Settings → Widgets
