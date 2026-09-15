@@ -25,6 +25,14 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **The `:latest` Docker tag now follows GitHub Releases.** The image
+  workflow also retagged `:latest` on every commit to `main`, so the
+  default `docker-compose.yml` had been tracking edge builds since the
+  image first shipped. `:latest` now moves only when a release is
+  tagged; `:edge` (and the existing `:main`) follow `main` for anyone
+  who wants to stay on the bleeding edge. Documented on the Docker
+  install page.
+
 - **Deleting a layout cell no longer splits it instead.** The hover X
   sat underneath the top and right insert strips, so a click on it
   often landed on the strip and inserted a new cell. The X now sits

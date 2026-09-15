@@ -1,10 +1,13 @@
 # Build + publish the official Docker image to GHCR.
 #
 # Triggers:
-#   * push of a v* tag, builds & publishes :<version> + :latest
-#   * manual dispatch, builds + publishes :latest (smoke test).
-#   * PR or push to main, builds without push so the Dockerfile
-#     stays correct without spamming the registry.
+#   * push of a v* tag, builds & publishes :<version> + :<major.minor>
+#     + :latest. ``:latest`` only ever moves here, so the default
+#     docker-compose.yml tracks GitHub Releases.
+#   * push to main, builds & publishes :main + :edge +
+#     :<pyproject>-edge.<commit-time> (the HA edge App pins the last one).
+#   * PR, builds without push so the Dockerfile stays correct without
+#     spamming the registry.
 #
 # Multi-arch: linux/amd64 + linux/arm64. arm64 covers Raspberry Pi 4/5,
 # the only ARM target most users will care about. arm/v7 (Pi 3 and
@@ -90,11 +93,14 @@ jobs:
             # v0.7.4 → :0.7.4 + :0.7 + :latest
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            # Push to main → :main (handy for tracking the bleeding edge
-            # without firing the tag-only flow). Latest is reserved for
-            # the most recent semver tag.
+            # Push to main → :main + :edge, the moving tags for tracking
+            # the bleeding edge. ``:latest`` is deliberately NOT listed
+            # here: metadata-action adds it on its own for semver tag
+            # pushes, so it follows the most recent release. It used to be
+            # added on every main push as well, which put everyone on the
+            # default compose file onto edge builds (discussion #316).
             type=ref,event=branch
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=edge,enable={{is_default_branch}}
             # Push to main → :<pyproject>-edge.<sha7> for the HA Add-on
             # edge channel to pin to. ``enable=`` makes the tag conditional
             # so non-main events don't try to push an empty value.

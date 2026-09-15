@@ -6,13 +6,23 @@ so the webpage / dashboard renderer works out of the box.
 
 The image is hosted on GitHub Container Registry as
 [`ghcr.io/dmellok/tesserae`](https://github.com/dmellok/tesserae/pkgs/container/tesserae).
-Tags follow Tesserae versions (e.g. `:0.14.0`, `:0.14`), plus a
-`:latest` pointing at the most recent release tag.
+Tags follow Tesserae versions (e.g. `:0.418.1`, `:0.418`), plus two
+moving tags:
+
+| Tag | Follows | Use it for |
+| --- | --- | --- |
+| `:latest` | the most recent [GitHub Release](https://github.com/dmellok/tesserae/releases) | the default `docker-compose.yml`; what the HA App's stable channel ships |
+| `:edge` (alias `:main`) | every commit on `main` | trying a fix before it is released; the HA App's edge channel |
+
+Before 0.418.1 the workflow also moved `:latest` on every commit to
+`main`, so a `docker compose pull` on the default file could land you on
+an edge build. If you want to keep tracking `main`, switch the image
+line to `:edge`.
 
 !!! tip "Pin the tag in setups you care about"
     `:latest` is convenient for kicking the tyres but moves whenever
     a new release is published. Pin to a specific version (e.g.
-    `:0.14.0`) so `docker compose pull && up -d` is the deliberate
+    `:0.418.1`) so `docker compose pull && up -d` is the deliberate
     upgrade step.
 
 ## Quick start
