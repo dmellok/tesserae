@@ -1223,6 +1223,26 @@ def create_app(
                 app_settings = dict(store.get_section("app") or {})
             except Exception:
                 app_settings = {}
+        # Sign-in and first-run setup seen without a session: render the
+        # bare shell. Nothing that enumerates devices, plugins, or the
+        # installed version reaches the template, so the login page can't
+        # leak them to whoever can reach the port. Skipping the collectors
+        # also keeps the unauthenticated path cheap.
+        if auth.shell_locked():
+            return {
+                "shell_locked": True,
+                "online_features_unanswered": False,
+                "nav_admin_plugins": [],
+                "nav_batteries": [],
+                "app_settings": app_settings,
+                "marketplace_restart_pending": False,
+                "community_discussions_url": "https://github.com/dmellok/tesserae/discussions",
+                "community_discord_url": "https://discord.gg/6qmwkGhGR7",
+                "community_sponsor_url": "https://github.com/sponsors/dmellok",
+                "update_status": None,
+                "agent_watch_enabled": False,
+                "agent_editor_enabled": False,
+            }
         # Installs that never answered the opt-in question (skipped the wizard,
         # or predate it) get a one-click prompt in the header until they do.
         online_unanswered = False
@@ -1232,6 +1252,7 @@ def create_app(
             except Exception:
                 online_unanswered = False
         return {
+            "shell_locked": False,
             "online_features_unanswered": online_unanswered,
             "nav_admin_plugins": sorted(
                 (p for p in registry.plugins.values() if p.has_admin),

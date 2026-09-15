@@ -124,6 +124,10 @@
       <span class="brand-mark" aria-hidden="true"></span>
       <span class="brand-name">Tesserae</span>
     </a>
+    {# Locked shell (sign-in / first-run setup without a session): no nav,
+       no battery popover, no update badge, no opt-in prompt. See
+       auth.shell_locked; the context processor also withholds the data. #}
+    {% if not shell_locked %}
     {% block topnav %}
     <button type="button" class="nav-toggle" aria-label="Open menu" aria-controls="primary-nav" aria-expanded="false">
       <i class="ph ph-list" aria-hidden="true"></i>
@@ -335,6 +339,7 @@
       <i class="ph ph-sun is-light-only" aria-hidden="true"></i>
       <i class="ph ph-moon is-dark-only" aria-hidden="true"></i>
     </button>
+    {% endif %}
   </header>
 
   {% with messages = get_flashed_messages(with_categories=true) %}
@@ -366,9 +371,17 @@
      context processor so this list stays in sync with the About card
      and the onboarding wrap-up step. #}
   <footer class="app-footer" aria-label="Project info">
+    {% if shell_locked %}
+    {# No version number before sign-in; it tells a stranger which release
+       (and which known issues) this install runs. #}
+    <a href="https://github.com/dmellok/tesserae" target="_blank" rel="noreferrer noopener" title="Tesserae on GitHub">
+      <i class="ph ph-github-logo" aria-hidden="true"></i> Tesserae
+    </a>
+    {% else %}
     <a href="https://github.com/dmellok/tesserae/releases/tag/v{{ config.APP_VERSION }}" target="_blank" rel="noreferrer noopener" title="View v{{ config.APP_VERSION }} on GitHub">
       <i class="ph ph-github-logo" aria-hidden="true"></i> Tesserae v{{ config.APP_VERSION }}
     </a>
+    {% endif %}
     <span class="app-footer-sep" aria-hidden="true">·</span>
     <a href="{{ community_discussions_url }}" target="_blank" rel="noreferrer noopener" title="GitHub Discussions">
       <i class="ph ph-chats-circle" aria-hidden="true"></i> Discussions

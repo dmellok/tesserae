@@ -331,6 +331,31 @@ def logout() -> None:
     session.pop(SESSION_KEY, None)
 
 
+def shell_locked() -> bool:
+    """True when the current page is rendering for someone the gate has
+    not admitted as the operator: the sign-in and first-run setup pages
+    seen without a session. The admin shell (top nav, device battery
+    popover, update badge, version footer) must not render then, since
+    it names every registered device and links every admin page to
+    whoever can reach the port.
+
+    Every page outside ``_OPEN_PATHS`` only renders after the gate let
+    the request through, so those are never locked. The open paths that
+    render a template are ``/login`` and ``/setup``; the rest are APIs
+    and assets. Mirrors the gate's own operator checks so a signed-in
+    admin who lands on ``/login`` still sees the shell."""
+    if not _path_is_open(request.path):
+        return False
+    if is_authed():
+        return False
+    if current_app.config.get("HA_INGRESS_MODE") and request.headers.get("X-Ingress-Path"):
+        return False
+    store = current_app.config.get("SETTINGS_STORE")
+    if isinstance(store, SettingsStore) and not password_required(store):
+        return not (_is_loopback() or _is_private_client())
+    return True
+
+
 # -- before_request gate -----------------------------------------------
 
 

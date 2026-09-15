@@ -6,6 +6,18 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **Sign-in page no longer renders the admin shell.** Before signing in,
+  the login and first-run setup pages showed the full top navigation, the
+  device battery popover with every registered device's name and charge,
+  the update badge, and the running version in the footer. Anyone who
+  could reach the port could read them. Those pages now render a bare
+  shell: brand, form, and the community footer links. The data behind
+  them is withheld at the context-processor level rather than hidden in
+  the template, so nothing device-related is computed or sent for an
+  unauthenticated request.
+
 ## [0.416.0], 2026-09-15
 
 ### Added
