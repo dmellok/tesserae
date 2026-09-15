@@ -1012,6 +1012,10 @@
   color: var(--t-fg-soft);
   cursor: pointer;
   opacity: 0;
+  /* Above the insert strips (later siblings) and the resize handles
+     (z-index 2), which all run under this corner. Without this the X
+     is visible but a click lands on the strip and splits the cell. */
+  z-index: 3;
   transition:
     opacity 120ms ease,
     color 120ms ease,
@@ -1132,6 +1136,39 @@
   bottom: 0;
   left: 11px;
   width: 2px;
+}
+
+/* Remove-cells mode. Insert strips and resize handles are switched
+   off so nothing competes with the tap; the whole cell is the target
+   and reads as such (dashed danger border, X always visible). */
+.layout-editor-actions {
+  margin-top: var(--t-space-2);
+  display: flex;
+  gap: var(--t-space-2);
+}
+.layout-editor-delete-toggle[aria-pressed="true"] {
+  color: var(--t-danger);
+  border-color: var(--t-danger);
+  background: color-mix(in oklab, var(--t-danger) 10%, transparent);
+}
+.layout-editor-board.is-deleting .le-insert,
+.layout-editor-board.is-deleting .le-edge {
+  pointer-events: none;
+  opacity: 0;
+}
+.layout-editor-board.is-deleting .le-cell {
+  cursor: pointer;
+  border-color: var(--t-danger);
+  border-style: dashed;
+}
+.layout-editor-board.is-deleting .le-cell:hover {
+  background: color-mix(in oklab, var(--t-danger) 18%, var(--t-surface));
+}
+.layout-editor-board.is-deleting .le-cell-delete {
+  opacity: 1;
+  pointer-events: none;
+  color: var(--t-danger);
+  border-color: var(--t-danger);
 }
 
 /* Custom layout editor, collapsed under the preset grid by default. */

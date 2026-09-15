@@ -6,7 +6,21 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added
+
+- **Remove cells mode in the custom layout editor.** A "Remove cells"
+  toggle under the board switches off the insert strips and resize
+  handles so a click anywhere on a cell deletes it (with the usual
+  confirm). The mode survives the reload each delete triggers, so
+  several cells can be cleared in a row, and Esc, the button, or
+  collapsing the editor leaves it.
+
 ### Fixed
+
+- **Deleting a layout cell no longer splits it instead.** The hover X
+  sat underneath the top and right insert strips, so a click on it
+  often landed on the strip and inserted a new cell. The X now sits
+  above the strips and the resize handles.
 
 - **Sign-in page no longer renders the admin shell.** Before signing in,
   the login and first-run setup pages showed the full top navigation, the

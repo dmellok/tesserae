@@ -44,6 +44,53 @@
     });
   }
 
+  // Remove-cells mode. The hover X shares its corner with the insert
+  // strips and the resize handles, so on small cells (and on touch) a
+  // tap meant for the X often splits the cell instead. In this mode
+  // the strips and handles are switched off (CSS) and a click anywhere
+  // on a cell runs the delete path. Persisted per page so it survives
+  // the full reload every delete triggers, the user can clear several
+  // cells in a row without re-arming.
+  const deleteToggle = root.querySelector("[data-layout-delete-mode]");
+  const deleteLabel = root.querySelector("[data-layout-delete-label]");
+  const hintText = root.querySelector("[data-layout-hint-text]");
+  const defaultHint = hintText ? hintText.textContent : "";
+  const DELETE_HINT =
+    "Click a cell to remove it, its neighbours absorb the space. " +
+    "Press Esc or Done when you're finished.";
+  const deleteModeKey = `tesserae:custom-layout-delete-mode:${pageId}`;
+  let deleteMode = false;
+  function setDeleteMode(on) {
+    deleteMode = Boolean(on);
+    board.classList.toggle("is-deleting", deleteMode);
+    if (deleteToggle) deleteToggle.setAttribute("aria-pressed", deleteMode ? "true" : "false");
+    if (deleteLabel) deleteLabel.textContent = deleteMode ? "Done removing" : "Remove cells";
+    if (hintText) hintText.textContent = deleteMode ? DELETE_HINT : defaultHint;
+    try {
+      sessionStorage.setItem(deleteModeKey, deleteMode ? "1" : "0");
+    } catch {
+      /* best effort */
+    }
+  }
+  if (deleteToggle) {
+    deleteToggle.addEventListener("click", () => setDeleteMode(!deleteMode));
+    try {
+      if (sessionStorage.getItem(deleteModeKey) === "1") setDeleteMode(true);
+    } catch {
+      /* best effort */
+    }
+  }
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && deleteMode) setDeleteMode(false);
+  });
+  // Collapsing the editor disarms the mode, nobody expects to reopen
+  // it later and find every cell still primed to delete.
+  if (details) {
+    details.addEventListener("toggle", () => {
+      if (!details.open && deleteMode) setDeleteMode(false);
+    });
+  }
+
   let cells = JSON.parse(root.dataset.cells || "[]").map((c) => ({
     id: c.id,
     x: c.x,
@@ -615,6 +662,16 @@
   // Event wiring (delegated; survives re-renders)
   // ---------------------------------------------------------------
   board.addEventListener("click", (e) => {
+    if (deleteMode) {
+      // Strips, handles and the X are pointer-events: none in this
+      // mode, so the target is the cell itself (or its label).
+      const cellEl = e.target.closest(".le-cell");
+      if (!cellEl) return;
+      e.preventDefault();
+      const cell = cells.find((c) => c.id === cellEl.dataset.cellId);
+      if (cell) deleteCell(cell);
+      return;
+    }
     const insertBtn = e.target.closest("[data-insert]");
     if (insertBtn) {
       e.preventDefault();
@@ -655,6 +712,7 @@
     // Skip if the press starts on an interactive child, resize
     // handles, insert zones, the explicit delete X.
     if (e.target.closest("[data-insert], [data-delete-cell], .le-edge")) return;
+    if (deleteMode) return; // a plain click already deletes
     const cellEl = e.target.closest(".le-cell");
     if (!cellEl) return;
     const cell = cells.find((c) => c.id === cellEl.dataset.cellId);

@@ -562,8 +562,23 @@
           <div class="layout-editor-board" data-layout-board></div>
           <p class="layout-editor-hint" data-layout-hint>
             <i class="ph ph-info" aria-hidden="true"></i>
-            Drag any edge between cells to resize. Hover a cell's outer edge to insert a new cell in that direction.
+            <span data-layout-hint-text>Drag any edge between cells to resize. Hover a cell's outer edge to insert a new cell in that direction.</span>
           </p>
+          {# Remove-cells mode. The hover X shares its corner with the
+             insert strips and the resize handles, so on small cells (and
+             on touch) a tap meant for the X often splits the cell
+             instead. In this mode the strips and handles are switched
+             off and the whole cell is the delete target. Persisted per
+             page in sessionStorage so it survives the reload that every
+             delete triggers, letting the user clear several cells in a
+             row. Esc or the same button leaves the mode. #}
+          <div class="layout-editor-actions">
+            <button type="button" class="btn btn--ghost btn--sm layout-editor-delete-toggle"
+                    data-layout-delete-mode aria-pressed="false">
+              <i class="ph ph-trash" aria-hidden="true"></i>
+              <span data-layout-delete-label>Remove cells</span>
+            </button>
+          </div>
           {# Manual refit. The page editor no longer auto-rescales cells
              when a new device with a different aspect is bound (the
              round-trip mangles edge alignment). This button is the

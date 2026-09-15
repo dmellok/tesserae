@@ -1395,6 +1395,18 @@ def _stub_panel(w: int, h: int):
     return p
 
 
+def test_grid_editor_ships_remove_cells_mode(app: Flask) -> None:
+    """The custom layout editor exposes a remove-cells toggle and a
+    swappable hint, the hover X alone is unreliable on small cells."""
+    client = app.test_client()
+    _sign_in(client)
+    pid = _new(client, name="Home", layout="1_cell")
+    html = client.get(f"/pages/{pid}").get_data(as_text=True)
+    assert "data-layout-delete-mode" in html
+    assert 'aria-pressed="false"' in html
+    assert "data-layout-hint-text" in html
+
+
 def _make_page(cells: list[tuple[int, int, int, int]]):
     """Stand-alone Page object with stub plugin-less cells."""
     from app.state.page_store import Cell, Page
