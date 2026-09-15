@@ -6,6 +6,8 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.419.0], 2026-09-16
+
 ### Added
 
 - **Touch buttons that show their entity's state.** A button control in
