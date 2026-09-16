@@ -6,6 +6,8 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.419.3], 2026-09-16
+
 ### Changed
 
 - **The "changed no state" touch warning is now an info line.** Home
