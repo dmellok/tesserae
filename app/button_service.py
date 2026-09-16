@@ -1386,27 +1386,23 @@ class ButtonService:
                     outcome = "ha_dispatched"
                     n_changed = len(changed) if isinstance(changed, list) else None
                     entity = data.get("entity_id")
-                    if n_changed == 0:
-                        # HA answers 200 with an empty list when the service
-                        # ran but touched nothing: the usual cause is an
-                        # entity id that doesn't exist. Silent otherwise.
-                        log.warning(
-                            "touch ha call accepted but changed no state: device=%s %s.%s "
-                            "entity=%s (check the entity id in Home Assistant)",
-                            device_id,
-                            domain,
-                            service,
-                            entity,
-                        )
-                    else:
-                        log.info(
-                            "touch ha call: device=%s %s.%s entity=%s changed=%s",
-                            device_id,
-                            domain,
-                            service,
-                            entity,
-                            "?" if n_changed is None else n_changed,
-                        )
+                    # HA echoes the states that changed DURING the call. An
+                    # empty list means either an entity id that matches
+                    # nothing, or an integration that reports its new state a
+                    # moment later (cloud plugs do), so it is a hint, not a
+                    # verdict: one info line either way.
+                    log.info(
+                        "touch ha call: device=%s %s.%s entity=%s changed=%s%s",
+                        device_id,
+                        domain,
+                        service,
+                        entity,
+                        "?" if n_changed is None else n_changed,
+                        " (no immediate state change: the integration may report it "
+                        "later, or the entity id matches nothing)"
+                        if n_changed == 0
+                        else "",
+                    )
                 except Exception as exc:
                     outcome = "ha_failed"
                     error = f"{type(exc).__name__}: {exc}"

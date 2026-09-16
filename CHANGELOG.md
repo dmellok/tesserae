@@ -6,6 +6,14 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Changed
+
+- **The "changed no state" touch warning is now an info line.** Home
+  Assistant only echoes states that changed during the service call, and
+  plugs that report their state a moment later return an empty list even
+  though the toggle happened. The line still notes the empty echo and
+  names both possible causes.
+
 ### Fixed
 
 - **Send from the freeform editor kept touch working.** The editor's
