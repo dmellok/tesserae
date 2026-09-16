@@ -2369,10 +2369,25 @@ def post_interact(device_id: str) -> Response:
         else None
     )
 
+    interaction = str(body.get("interaction") or "tap")
+
+    def _done(outcome: str, detail: str = "") -> Response:
+        # One line per report, whatever happened: a tap the device hit-tested
+        # locally that then goes nowhere is otherwise invisible in the log.
+        current_app.logger.info(
+            "touch interact: device=%s primitive=%s %s -> %s%s",
+            device.id,
+            primitive_id,
+            interaction,
+            outcome,
+            f" ({detail})" if detail else "",
+        )
+        return jsonify({"outcome": outcome, "primitive_id": primitive_id})
+
     push_mgr = current_app.config.get("PUSH_MANAGER")
     latest = push_mgr.latest_render_for(device.id) if push_mgr is not None else None
     if not latest:
-        return jsonify({"outcome": "no_frame", "primitive_id": primitive_id})
+        return _done("no_frame")
     info = _frame_info_for_digest(device, str(latest.get("digest") or ""))
     page_id = str(info.get("page_id") or "") if info else ""
     canvas = _canvas_for_page(page_id)
@@ -2382,11 +2397,11 @@ def post_interact(device_id: str) -> Response:
         None,
     )
     if el is None:
-        return jsonify({"outcome": "no_target", "primitive_id": primitive_id})
+        return _done("no_target", f"page={page_id or '-'}")
     spec = _action_for_primitive(el)
     svc = current_app.config.get("BUTTON_SERVICE")
     if spec is None or svc is None:
-        return jsonify({"outcome": "noop", "primitive_id": primitive_id})
+        return _done("noop", f"{el.kind} has no action" if spec is None else "no button service")
     result = svc.dispatch_touch_spec(
         device_id=device.id,
         spec=spec,
@@ -2394,7 +2409,7 @@ def post_interact(device_id: str) -> Response:
         event_id=event_id,
         region_box={"x": el.x, "y": el.y, "w": el.w, "h": el.h},
     )
-    return jsonify({"outcome": result.outcome, "primitive_id": primitive_id})
+    return _done(result.outcome, el.kind)
 
 
 # -- device event stream (protocol v2) --------------------------------------

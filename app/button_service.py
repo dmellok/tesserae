@@ -1233,6 +1233,13 @@ class ButtonService:
             else:
                 spec = resolve_gesture_action(region, gesture)
         if spec is None:
+            log.info(
+                "touch no target: device=%s stroke=%s gesture=%s regions=%d",
+                device_id,
+                stroke.to_log(),
+                gesture,
+                len(regions),
+            )
             result = TouchHandleResult(
                 outcome="no_target",
                 gesture=gesture,
@@ -1375,8 +1382,31 @@ class ButtonService:
                 error = "ha action needs 'domain' and 'service'"
             else:
                 try:
-                    self._call_ha(domain, service, data)
+                    changed = self._call_ha(domain, service, data)
                     outcome = "ha_dispatched"
+                    n_changed = len(changed) if isinstance(changed, list) else None
+                    entity = data.get("entity_id")
+                    if n_changed == 0:
+                        # HA answers 200 with an empty list when the service
+                        # ran but touched nothing: the usual cause is an
+                        # entity id that doesn't exist. Silent otherwise.
+                        log.warning(
+                            "touch ha call accepted but changed no state: device=%s %s.%s "
+                            "entity=%s (check the entity id in Home Assistant)",
+                            device_id,
+                            domain,
+                            service,
+                            entity,
+                        )
+                    else:
+                        log.info(
+                            "touch ha call: device=%s %s.%s entity=%s changed=%s",
+                            device_id,
+                            domain,
+                            service,
+                            entity,
+                            "?" if n_changed is None else n_changed,
+                        )
                 except Exception as exc:
                     outcome = "ha_failed"
                     error = f"{type(exc).__name__}: {exc}"
@@ -1451,10 +1481,11 @@ class ButtonService:
         )
         return result
 
-    def _call_ha(self, domain: str, service: str, data: dict[str, Any]) -> None:
+    def _call_ha(self, domain: str, service: str, data: dict[str, Any]) -> Any:
         """Fire a Home Assistant service call through the ha_core plugin
-        (shared base URL / token / TLS policy). Split out so tests can
-        stub the HA transport without an app context."""
+        (shared base URL / token / TLS policy) and return what it echoes
+        back (the changed-state list). Split out so tests can stub the HA
+        transport without an app context."""
         from flask import current_app
 
         registry = current_app.config.get("PLUGIN_REGISTRY")
@@ -1466,7 +1497,7 @@ class ButtonService:
         # light.turn_on doesn't support returning a payload, and HA 400s the
         # request if asked to. call_service_with_response is only for the
         # read-style services that do (todo.get_items et al).
-        mod.call_service(domain, service, data=data, timeout=int(self._ha_timeout_seconds()))
+        return mod.call_service(domain, service, data=data, timeout=int(self._ha_timeout_seconds()))
 
     def _ha_timeout_seconds(self) -> float:
         try:

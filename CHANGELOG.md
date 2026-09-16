@@ -6,6 +6,16 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Changed
+
+- **Touch taps now leave a trail in the log.** Every report from a panel
+  that hit-tests its own controls is logged with its outcome, a Home
+  Assistant call logs the entity and how many states it changed, and a
+  call HA accepts but that changes nothing is a warning naming the entity
+  id. Coordinate taps that land on no region log the stroke and the
+  region count. Before, a tap that reached the server and went nowhere
+  was silent.
+
 ## [0.419.0], 2026-09-16
 
 ### Added
