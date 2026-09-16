@@ -6,6 +6,21 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **Send from the freeform editor kept touch working.** The editor's
+  Send rendered one PNG and pushed it as an image, so the panel got no
+  tap regions and an empty touch spec: switches and buttons on a
+  dashboard sent that way did nothing until the same dashboard was
+  pushed from the dashboard list. Send now pushes the page itself,
+  the same path the list uses.
+- **Polling panels now receive switch and bound-button state.** The
+  values document a panel fetches on its heartbeat and after a tap only
+  carried overlay slots; touch bindings were added on the streaming
+  path alone. A reTerminal Sticky, which polls, never saw a bound
+  button's entity turn on, so the button stayed an outline after the
+  tap. The bindings now ride the polled document too.
+
 ### Changed
 
 - **Touch taps now leave a trail in the log.** Every report from a panel

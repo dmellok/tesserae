@@ -253,3 +253,27 @@ def test_keepalive_is_short_enough_to_reap_a_dead_peer() -> None:
     from app.rest_api import _STREAM_KEEPALIVE_S
 
     assert _STREAM_KEEPALIVE_S <= 10.0
+
+
+def test_polled_values_document_carries_touch_bindings(app: Flask) -> None:
+    # The document a polling panel gets on /status and /frame/data must
+    # include switch / bound-button value_keys, not only overlay slots,
+    # or a panel that doesn't stream never learns its entity moved.
+    from app.rest_api import _overlay_values_doc
+
+    _register(app, app.test_client())
+    device = app.config["DEVICE_REGISTRY"].get("e1003")
+    _canvas_page(app)
+    app.config["PUSH_MANAGER"]._latest_renders["e1003"] = {
+        "digest": "a" * 16,
+        "ext": "bin",
+        "filename": "a.bin",
+        "composition_digest": "c" * 16,
+        "page_id": "p1",
+    }
+    _stub_ha(app, {"light.desk": "on", "switch.fan": "off"})
+    with app.test_request_context("/"):
+        doc = _overlay_values_doc(device, "a" * 16)
+    assert doc is not None
+    assert doc["values"]["ha:light.desk"] == "on"
+    assert doc["values"]["ha:switch.fan"] == "off"

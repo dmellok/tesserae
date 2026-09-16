@@ -784,22 +784,28 @@ def test_devices_json_lists_instances_with_panel_dims(app: Flask) -> None:
     assert kitchen["w"] == 600 and kitchen["h"] == 400
 
 
-def test_send_renders_and_pushes(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("app.renderer.render_to_png", lambda request, pool=None: b"PNGBYTES")
+def test_send_pushes_the_page_per_device(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    # A page push, not an image push: only a page push gives the device its
+    # touch regions, overlay slots and touch-v3 spec.
     calls: list[dict[str, Any]] = []
 
-    def fake_push_image(png: bytes, **kw: Any) -> object:
-        calls.append({"png": png, **kw})
+    def fake_push(page_id: str, **kw: Any) -> object:
+        calls.append({"page_id": page_id, **kw})
         return SimpleNamespace(status="sent", error=None)
 
-    monkeypatch.setattr(app.config["PUSH_MANAGER"], "push_image", fake_push_image)
+    monkeypatch.setattr(app.config["PUSH_MANAGER"], "push", fake_push)
+    monkeypatch.setattr(
+        app.config["PUSH_MANAGER"],
+        "push_image",
+        lambda *a, **kw: (_ for _ in ()).throw(AssertionError("image push used")),
+    )
     client = app.test_client()
     _sign_in(client)
     cid = client.get("/pages/canvas/").location.rsplit("/", 1)[1]
     resp = client.post(f"/pages/canvas/c/{cid}/send", json={"device_ids": ["dev_a"]})
     body = resp.get_json()
     assert resp.status_code == 200 and body["sent"] == ["dev_a"]
-    assert calls[0]["png"] == b"PNGBYTES" and calls[0]["device_id"] == "dev_a"
+    assert calls[0]["page_id"] == cid and calls[0]["device_ids"] == {"dev_a"}
 
 
 def test_compose_canvas_mounts_widgets(app: Flask) -> None:
@@ -1049,9 +1055,9 @@ def test_send_collapses_a_repeated_device(app: Flask, monkeypatch: pytest.Monkey
     pushed: list[str] = []
     monkeypatch.setattr(
         app.config["PUSH_MANAGER"],
-        "push_image",
-        lambda png, **kw: (
-            pushed.append(kw["device_id"]),
+        "push",
+        lambda page_id, **kw: (
+            pushed.append(next(iter(kw["device_ids"]))),
             SimpleNamespace(status="sent", error=None),
         )[1],
     )

@@ -2739,7 +2739,17 @@ def _overlay_values_doc(device: Device, frame_digest: str) -> dict[str, Any] | N
     info = _frame_info_for_digest(device, frame_digest)
     if info is None:
         return None
-    slots = push_mgr.overlay_slots_for(str(info.get("composition_digest") or ""))
+    slots = list(push_mgr.overlay_slots_for(str(info.get("composition_digest") or "")))
+    # Touch bindings (switch / slider / stepper / bound button value_keys)
+    # ride the same document, as they already do on the SSE stream: a
+    # panel that polls instead of streaming otherwise never hears that
+    # its switch moved or its bound button's entity turned on.
+    page_id = str(info.get("page_id") or "")
+    if page_id:
+        seen = {s.get("key") for s in slots}
+        slots.extend(
+            s for s in _touch_value_key_slots(current_app, page_id) if s["key"] not in seen
+        )
     if not slots:
         return None
     get_state = _ha_get_state()
