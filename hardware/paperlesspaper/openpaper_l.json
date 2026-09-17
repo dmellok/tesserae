@@ -21,5 +21,5 @@
   },
   "refresh_floor_s": 60,
   "image_format": "bin",
-  "notes_md": "Not yet confirmed on real hardware: the firmware target was written from the vendor's open firmware without an L on the bench, so it ships as an experimental build. Same flash-backup caveat as the OpenPaper 7 (the vendor cloud certificate lives in a SPIFFS region the Tesserae layout overwrites). Frames are the Waveshare 13.3E6 layout: 1600 rows of 600 packed bytes, left half first. Features that need a frame in device RAM (always-on mode, the cloud relay, the SD deck cache) are not available on this board."
+  "notes_md": "Not yet confirmed on real hardware: the firmware target was written from the vendor's open firmware without an L on the bench, so it ships as an experimental build. Same certificate caveat as the OpenPaper 7 (the vendor cloud certificate lives in a SPIFFS region the Tesserae layout overwrites; vendor support can re-provision it). Frames are the Waveshare 13.3E6 layout: 1600 rows of 600 packed bytes, left half first. Features that need a frame in device RAM (always-on mode, the cloud relay, the SD deck cache) are not available on this board today. The board carries a 16 MB NAND flash, a 128 MB SD card and a MEMS orientation sensor, none of which Tesserae uses yet; the SD card is the natural home for the deck cache once the build has met its hardware."
 }

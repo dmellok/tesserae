@@ -40,6 +40,7 @@ A renderer turns the composition PNG into the exact bytes a client wants. Each s
 | `pico_bin` | `.bin` | - | Composition PNG packed into the panel-native landscape 4-bpp buffer the battery-powered Pico Plus 2 firmware (tesserae-device-pico-bin) streams onto a Pimoroni Inky-style Spectra 6 panel over SPI. |
 | `trmnl_png` | `.png` | [tesserae-trmnl-client](https://github.com/dmellok/tesserae-trmnl-client) | Composition PNG fitted to the device's panel size, then quantised to 1-bit black/white with the selected dither. |
 | `trmnl_png_color` | `.png` | - | Composition PNG quantised to an indexed PNG matched to a Spectra 6 / Waveshare E6 / ACeP colour panel, delivered over the same TRMNL BYOS /api/display path as the 1-bit trmnl_png renderer. |
+| `trmnl_png_gray16` | `.png` | - | Composition PNG fitted to the device's panel size, then quantised to a 16-level greyscale PNG with the selected dither. |
 
 ## Device kinds
 
@@ -57,7 +58,7 @@ The bundled client kinds Tesserae knows how to talk to. A flashed client announc
 | `pi_png_client` | 1424×1200 | `pi_png` | Raspberry-Pi-side client that consumes the PNG frame. |
 | `pico_bin_client` | 1600×1200 | `pico_bin` | Battery-powered Pico Plus 2 firmware (RP2350) driving a Pimoroni Inky-style Spectra 6 panel over SPI. |
 | `picpak_client` | 400×300 | `esp32_bin` | Battery-powered PicPak 4.2" 4-colour BWRY e-paper frame. |
-| `trmnl_client` | 800×480 | `trmnl_png` | HTTP-polled e-paper client compatible with the TRMNL BYOS protocol. |
+| `trmnl_client` | 800×480 | `trmnl_png`, `trmnl_png_gray16` | HTTP-polled e-paper client compatible with the TRMNL BYOS protocol. |
 
 ## Hardware SKUs
 
@@ -101,7 +102,7 @@ Runs the [Tesserae-native firmware](https://github.com/dmellok/tesserae-device-f
 
 ### [paperlesspaper](https://paperlesspaper.de/en)
 
-Open-hardware e-paper picture frames (ESP32-C6, NiMH cells) that run the [Tesserae-native firmware](https://github.com/dmellok/tesserae-device-firmware) in place of the vendor's cloud firmware; flash from [tesserae.ink/flash](https://tesserae.ink/flash). Flashing overwrites the region that holds the frame's vendor cloud certificate, so back up the flash first if you may want the vendor service back. The OpenPaper 7 is on the bench; the OpenPaper L build has not met its hardware yet.
+Open-hardware e-paper picture frames (ESP32-C6, NiMH cells) that run the [Tesserae-native firmware](https://github.com/dmellok/tesserae-device-firmware) in place of the vendor's cloud firmware; flash from [tesserae.ink/flash](https://tesserae.ink/flash). Flashing overwrites the region that holds the frame's vendor cloud certificate; paperlesspaper support can re-provision a frame that wants the vendor service back, or back up that region first to keep your own copy. The OpenPaper 7 is on the bench; the OpenPaper L build has not met its hardware yet.
 
 | SKU | Panel | Gamut | Protocol / Renderer | Kind id |
 |---|---|---|---|---|
@@ -186,3 +187,4 @@ Honest status from the maintainer's own bench. Untested doesn't mean broken, it 
 | `pico_bin` | - | :material-circle-outline: Not yet tested | - |
 | `trmnl_png` | Amazon Kindle Paperwhite 2 (jailbroken) via KOReader trmnl-display plugin + Seeed TRMNL 7.5" OG DIY Kit (XIAO 7.5" panel running the TRMNL firmware) + TRMNL X (stock firmware, 1872x1404) | :material-check-circle: Tested | 1-bit greyscale PNG fitted to the panel + dithered server-side. |
 | `trmnl_png_color` | - | :material-circle-outline: Not yet tested | - |
+| `trmnl_png_gray16` | - | :material-circle-outline: Not yet tested | - |

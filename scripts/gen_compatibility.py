@@ -103,8 +103,9 @@ VENDOR_INTRO: dict[str, str] = {
         "the [Tesserae-native firmware](https://github.com/dmellok/tesserae-device-firmware) "
         "in place of the vendor's cloud firmware; flash from "
         "[tesserae.ink/flash](https://tesserae.ink/flash). Flashing overwrites "
-        "the region that holds the frame's vendor cloud certificate, so back "
-        "up the flash first if you may want the vendor service back. The "
+        "the region that holds the frame's vendor cloud certificate; "
+        "paperlesspaper support can re-provision a frame that wants the vendor "
+        "service back, or back up that region first to keep your own copy. The "
         "OpenPaper 7 is on the bench; the OpenPaper L build has not met its "
         "hardware yet."
     ),
