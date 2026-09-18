@@ -62,14 +62,16 @@
         if (dark) document.documentElement.setAttribute('data-theme', 'dark');
         else document.documentElement.removeAttribute('data-theme');
       }
-      if (saved === 'dark' || saved === 'light') {
-        apply(saved === 'dark');
+      var mode = (saved === 'dark' || saved === 'light') ? saved : 'system';
+      document.documentElement.setAttribute('data-theme-mode', mode);
+      if (mode !== 'system') {
+        apply(mode === 'dark');
       } else if (mq) {
         apply(mq.matches);
+      }
+      if (mq) {
         var follow = function (ev) {
-          var now = null;
-          try { now = localStorage.getItem('tesserae-theme'); } catch (e) { /* ignore */ }
-          if (now !== 'dark' && now !== 'light') apply(ev.matches);
+          if (document.documentElement.getAttribute('data-theme-mode') === 'system') apply(ev.matches);
         };
         if (mq.addEventListener) mq.addEventListener('change', follow);
         else if (mq.addListener) mq.addListener(follow);
@@ -283,10 +285,11 @@
         </ul>
       </a>
       {% endif %}
-      <button type="button" class="theme-toggle theme-toggle--drawer" data-theme-toggle aria-label="Toggle dark mode">
-        <i class="ph ph-sun is-light-only" aria-hidden="true"></i>
-        <i class="ph ph-moon is-dark-only" aria-hidden="true"></i>
-        <span class="theme-toggle-label">Toggle theme</span>
+      <button type="button" class="theme-toggle theme-toggle--drawer" data-theme-toggle aria-label="Theme: follows the device. Click to change." title="Theme: follows the device">
+        <i class="ph ph-circle-half is-mode-system" aria-hidden="true"></i>
+        <i class="ph ph-sun is-mode-light" aria-hidden="true"></i>
+        <i class="ph ph-moon is-mode-dark" aria-hidden="true"></i>
+        <span class="theme-toggle-label" data-theme-label>Theme: follows the device</span>
       </button>
     </nav>
     {% endblock %}
@@ -378,9 +381,10 @@
       </button>
     </form>
     {% endif %}
-    <button type="button" class="theme-toggle theme-toggle--topbar" data-theme-toggle aria-label="Toggle dark mode">
-      <i class="ph ph-sun is-light-only" aria-hidden="true"></i>
-      <i class="ph ph-moon is-dark-only" aria-hidden="true"></i>
+    <button type="button" class="theme-toggle theme-toggle--topbar" data-theme-toggle aria-label="Theme: follows the device. Click to change." title="Theme: follows the device">
+      <i class="ph ph-circle-half is-mode-system" aria-hidden="true"></i>
+      <i class="ph ph-sun is-mode-light" aria-hidden="true"></i>
+      <i class="ph ph-moon is-mode-dark" aria-hidden="true"></i>
     </button>
     {% endif %}
   </header>
@@ -539,16 +543,39 @@
         });
       });
     })();
+    // Theme toggle: cycles System (follow the device) -> Light -> Dark.
+    // The mode lives on <html data-theme-mode>; the effective theme is
+    // <html data-theme="dark"> or nothing, as the stylesheets expect.
     (function () {
+      const root = document.documentElement;
+      const mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+      const ORDER = ['system', 'light', 'dark'];
+      const WORDS = { system: 'follows the device', light: 'light', dark: 'dark' };
+      function describe(mode) {
+        const word = 'Theme: ' + WORDS[mode];
+        document.querySelectorAll('[data-theme-toggle]').forEach((b) => {
+          b.setAttribute('title', word);
+          b.setAttribute('aria-label', word + '. Click to change.');
+        });
+        document.querySelectorAll('[data-theme-label]').forEach((l) => { l.textContent = word; });
+      }
+      function applyMode(mode) {
+        root.setAttribute('data-theme-mode', mode);
+        const dark = mode === 'dark' || (mode === 'system' && mq && mq.matches);
+        if (dark) root.setAttribute('data-theme', 'dark');
+        else root.removeAttribute('data-theme');
+        describe(mode);
+      }
+      describe(root.getAttribute('data-theme-mode') || 'system');
       document.querySelectorAll('[data-theme-toggle]').forEach((tbtn) => {
         tbtn.addEventListener('click', () => {
-          const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-          if (next === 'dark') {
-            document.documentElement.setAttribute('data-theme', 'dark');
-          } else {
-            document.documentElement.removeAttribute('data-theme');
-          }
-          try { localStorage.setItem('tesserae-theme', next); } catch (e) { /* ignore */ }
+          const current = root.getAttribute('data-theme-mode') || 'system';
+          const next = ORDER[(ORDER.indexOf(current) + 1) % ORDER.length];
+          applyMode(next);
+          try {
+            if (next === 'system') localStorage.removeItem('tesserae-theme');
+            else localStorage.setItem('tesserae-theme', next);
+          } catch (e) { /* ignore */ }
         });
       });
     })();

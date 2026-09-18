@@ -120,3 +120,15 @@ def test_password_disabled_lan_client_keeps_the_shell(app_with_gate: Flask) -> N
         .get_data(as_text=True)
     )
     assert 'id="primary-nav"' in body
+
+
+def test_theme_toggle_offers_system_light_and_dark(app) -> None:
+    """The topbar theme control cycles through following the device,
+    light and dark, and the shell exposes the current mode for its icon."""
+    client = app.test_client()
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+    body = client.get("/settings/server").get_data(as_text=True)
+    assert "data-theme-mode" in body
+    for cls in ("is-mode-system", "is-mode-light", "is-mode-dark"):
+        assert cls in body
+    assert "Theme: follows the device" in body

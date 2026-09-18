@@ -213,6 +213,13 @@
 
 /* Show/hide based on the current theme. Dark icon is visible only when
    data-theme=dark, light icon is visible only when it's absent. */
+/* Theme toggle icon per mode: half-circle while following the device,
+   sun/moon once a choice is saved. Before the bootstrap runs the mode
+   attribute is absent, which reads as "system". */
+:root[data-theme-mode="light"] .is-mode-system,
+:root[data-theme-mode="dark"] .is-mode-system { display: none; }
+:root:not([data-theme-mode="light"]) .is-mode-light { display: none; }
+:root:not([data-theme-mode="dark"]) .is-mode-dark { display: none; }
 :root[data-theme="dark"] .is-light-only { display: none; }
 :root:not([data-theme="dark"]) .is-dark-only { display: none; }
 
