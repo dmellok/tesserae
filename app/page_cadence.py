@@ -39,10 +39,18 @@ from app.device_loader import Device
 logger = logging.getLogger(__name__)
 
 
+# The wake-interval field is ``sleep_interval_s`` on the REST kinds and
+# ``refresh_rate_s`` on the TRMNL kind; whichever the kind declares carries
+# the bounds its firmware accepts.
+_INTERVAL_FIELDS = ("sleep_interval_s", "refresh_rate_s")
+
+
 def _schema_bounds(device: Device) -> tuple[int | None, int | None]:
     """The kind's declared wake-interval bounds, or ``(None, None)``."""
     schema = device.config_schema or {}
-    spec = schema.get("sleep_interval_s") if isinstance(schema, dict) else None
+    spec: Any = None
+    if isinstance(schema, dict):
+        spec = next((schema[f] for f in _INTERVAL_FIELDS if isinstance(schema.get(f), dict)), None)
     if not isinstance(spec, dict):
         return None, None
     lo = spec.get("min")

@@ -204,3 +204,35 @@ def test_an_agent_can_set_and_read_the_interval(app: Flask) -> None:
         ).status_code
         == 422
     )
+
+
+def test_the_clamp_reads_the_trmnl_kind_bounds_too(app: Flask) -> None:
+    """The TRMNL kind declares its wake bounds under ``refresh_rate_s`` rather
+    than ``sleep_interval_s``; the clamp has to find them there, or a page
+    asking for one second reaches a TRMNL as ``refresh_rate: 1``."""
+    from app import page_cadence
+
+    kind = app.config["DEVICE_REGISTRY"].get("trmnl_client")
+    assert kind is not None
+    assert page_cadence._schema_bounds(kind) == (5, 86400)
+
+    _show(app, kind.id, Page(id="hot", name="Hot", sleep_interval_s=1))
+    with app.test_request_context():
+        assert page_cadence.page_sleep_interval_s(kind) == 5
+
+
+def test_an_unparseable_form_value_keeps_what_is_stored(app: Flask) -> None:
+    """Garbage in the custom box must not invent a one-second interval on a
+    page that had none; the stored value (or its absence) stays."""
+    client = app.test_client()
+    _register(app, client, "panel")
+    app.config["PAGE_STORE"].save(Page(id="agenda", name="Agenda"))
+
+    client.post(
+        "/pages/agenda", data={"sleep_interval_s": "custom", "sleep_interval_s_custom": "soon"}
+    )
+    assert app.config["PAGE_STORE"].get("agenda").sleep_interval_s is None
+
+    client.post("/pages/agenda", data={"sleep_interval_s": "3600"})
+    client.post("/pages/agenda", data={"sleep_interval_s": "soon"})
+    assert app.config["PAGE_STORE"].get("agenda").sleep_interval_s == 3600

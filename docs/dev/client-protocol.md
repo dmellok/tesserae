@@ -1593,7 +1593,7 @@ the next poll earlier.
   `min`/`max`, so a dashboard cannot ask a panel to wake faster than its
   firmware allows, and it applies only to a device that sleeps, since an
   always-on panel is not on the sleep grid at all. Set it per dashboard
-  (Dashboards → Wake) or over MCP (`PATCH /api/mcp/canvas/<id>`).
+  (Dashboards → Wake) or over MCP (`PATCH /api/mcp/pages/<id>/canvas`).
 - The configured interval remains the ceiling. It's never extended,
   because manual Send, webhooks, Home Assistant events and data-change
   refreshes have no schedule to project, and a device sleeping past its

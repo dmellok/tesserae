@@ -184,6 +184,19 @@ def _coerce_float(
     return value
 
 
+def _coerce_optional_int(raw: str | None, default: int | None, *, lo: int, hi: int) -> int | None:
+    """Like :func:`_coerce_int` for a field whose stored value may be unset:
+    an unparseable submit keeps whatever is stored (including nothing) rather
+    than inventing a value at the bottom of the range."""
+    if raw is None or raw == "":
+        return default
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return default
+    return min(hi, max(lo, value))
+
+
 def _coerce_int(
     raw: str | None, default: int, *, lo: int | None = None, hi: int | None = None
 ) -> int:
@@ -1041,13 +1054,13 @@ def update(page_id: str) -> Response:
             updates["sleep_interval_s"] = (
                 page.sleep_interval_s
                 if raw is None or raw == ""
-                else _coerce_int(raw, page.sleep_interval_s or 1, lo=1, hi=604800)
+                else _coerce_optional_int(raw, page.sleep_interval_s, lo=1, hi=604800)
             )
         elif raw is None or raw == "":
             updates["sleep_interval_s"] = None
         else:
-            updates["sleep_interval_s"] = _coerce_int(
-                raw, page.sleep_interval_s or 1, lo=1, hi=604800
+            updates["sleep_interval_s"] = _coerce_optional_int(
+                raw, page.sleep_interval_s, lo=1, hi=604800
             )
     if "gap" in form:
         updates["gap"] = _coerce_int(form.get("gap"), page.gap, lo=0)

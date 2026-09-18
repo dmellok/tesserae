@@ -655,8 +655,11 @@ Don't thread base_rev while streaming (the rev changes every append).""",
 Remove ONE element from a canvas by id. Returns the compact ack.""",
     "patch_canvas": """\
 Change document-level fields (any of name, w, h, theme, style, font, bg,
-bg_image, bg_fit) without touching the elements. Use update_element / set_canvas
-for elements. Returns the ack.""",
+bg_image, bg_fit, sleep_interval_s) without touching the elements.
+"sleep_interval_s" is how often a panel showing this dashboard wakes to fetch a
+new frame, in seconds (1..604800), or null to leave the device's own interval in
+charge; the server clamps it to what the device kind accepts. Use
+update_element / set_canvas for elements. Returns the ack.""",
     "arrange": """\
 Compute "count" aligned child boxes inside "box" ({x,y,w,h}) for a
 "grid" / "row" / "column" layout, so you place cells by intent instead of

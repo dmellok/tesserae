@@ -950,8 +950,11 @@ def build_server() -> Any:
 
     def patch_canvas(page_id: str, patch: dict[str, Any], base_rev: str = "") -> Any:
         """Change document-level fields (any of name, w, h, theme, style, font, bg,
-        bg_image, bg_fit) without touching the elements. Use update_element / set_canvas
-        for elements. Returns the ack."""
+        bg_image, bg_fit, sleep_interval_s) without touching the elements.
+        "sleep_interval_s" is how often a panel showing this dashboard wakes to fetch a
+        new frame, in seconds (1..604800), or null to leave the device's own interval in
+        charge; the server clamps it to what the device kind accepts. Use
+        update_element / set_canvas for elements. Returns the ack."""
         return _json("PATCH", f"/pages/{page_id}/canvas{_rev_suffix(base_rev)}", patch)
 
     def arrange(
