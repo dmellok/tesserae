@@ -72,30 +72,63 @@ Melbourne, and my next calendar event, then show me a preview."*
 
 ## Tools
 
+**Discover**
+
 | Tool | What it does |
 | --- | --- |
-| `list_widgets` | Every placeable widget (with fragments) + theme/style/font options |
+| `list_widgets` | Every placeable widget (with fragments), summarised; `section="appearance"` for themes, styles and fonts; `full=True` for the whole catalog |
 | `get_widget_options` | A widget's options + format hints (big choice lists omitted by default) |
 | `get_widget_choices` | Page through one option's choice rows (HA entity pickers etc.) |
-| `probe_widget_data` | A widget's data + `data_source` (live/sample/error) + bindable field paths |
-| `list_devices` | Registered panels: dimensions + colour capability (palette, mono flag) |
+| `probe_widget_data` | A widget's data + `data_source` (live/sample/error) + bindable field paths; long lists truncated unless `full=True` |
+| `list_services` | Non-placeable service plugins (Open-Meteo, REST/JSON, Home Assistant) usable as code/data element sources |
+| `list_icons` | Search the vendored Phosphor icon set for a valid slug |
+| `list_fonts` / `add_font` / `delete_font` | Cache a Google Fonts family or a single woff2/ttf/otf face on the server, list the cache, remove an entry |
+| `list_devices` | Registered panels: dimensions, colour capability, touch flag, firmware capabilities (overlay, deck cache, protocol) |
+| `describe_actions` | The authoritative touch-action vocabulary |
+
+**Build**
+
+| Tool | What it does |
+| --- | --- |
 | `list_pages` | Existing canvas dashboards |
 | `create_canvas_page` | Create an empty canvas (size it to your panel) |
+| `delete_canvas_page` | Remove a canvas dashboard |
 | `get_canvas` | Read a canvas document (returns a `rev` for concurrency-safe writes) |
 | `set_canvas` | Replace a canvas document (422 with field errors if invalid) |
-| `add_element` | Append one element (live-updates an open editor) |
-| `update_element` | Change one element in place (no full re-send) |
-| `delete_element` | Remove one element |
 | `patch_canvas` | Change document-level fields (size, theme, bg) without touching elements |
+| `set_canvas_background` | Generate a full-bleed background image from a prompt (fal.ai) |
+| `add_element` | Append one element (live-updates an open editor) |
+| `add_elements_bulk` | Append many elements in one all-or-nothing save |
+| `update_element` | Change one element in place (no full re-send) |
+| `append_code` | Append to a code element's `html` / `css` / `js`, streaming it in chunk by chunk |
+| `delete_element` | Remove one element |
 | `arrange` | Compute aligned grid/row/column boxes so you lay out by intent, not pixels |
 | `measure_text` | Measure rendered text width/height so a box fits its content |
-| `render_report` | Read back what rendered (values, overflow, live-vs-sample, colours) as JSON |
-| `render_preview` | Render the canvas to a PNG the agent can see |
-| `push_to_device` | Push the canvas to explicit device(s) |
 
-Writes (`set_canvas`, `add_element`, `update_element`, `delete_element`, `patch_canvas`)
-accept an optional `base_rev` (from `get_canvas`); if the page changed since, the
-write returns HTTP 409 so you re-read instead of clobbering a concurrent edit.
+**Check and ship**
+
+| Tool | What it does |
+| --- | --- |
+| `render_preview` | Render the canvas to a PNG the agent can see (`fresh=True` bypasses caches) |
+| `render_report` | Read back what rendered (values, overflow, colours, tap regions, invalid actions and icons) as JSON; `debug=True` adds console errors, failed requests, dropped CSS and font load status |
+| `bind_devices` | Persist the canvas's target device set for Send and scheduling |
+| `push_to_device` | Render once and push the canvas to explicit device(s) |
+
+**Schedule and navigate**
+
+| Tool | What it does |
+| --- | --- |
+| `list_rotations` / `create_rotation` / `delete_rotation` | Ordered page cycles that advance on a wall-clock interval |
+| `list_schedules` / `create_schedule` / `delete_schedule` | Time-driven pushes of a page to its devices |
+| `list_decks` / `create_deck` / `delete_deck` | Pages kept pre-rendered per device so buttons and taps switch instantly |
+| `suggest_decks` | Derive a deck from the `page:<id>` links already on elements |
+
+Writes (`set_canvas`, `add_element`, `add_elements_bulk`, `update_element`,
+`delete_element`, `patch_canvas`) accept an optional `base_rev` (from
+`get_canvas`); if the page changed since, the write returns HTTP 409 so you
+re-read instead of clobbering a concurrent edit.
+
+Release history is in [CHANGELOG.md](CHANGELOG.md).
 
 ## Run without installing
 
