@@ -488,3 +488,21 @@ def test_themes_strip_still_shows_disabled_themes(app: Flask) -> None:
     body = client.get("/themes").get_data(as_text=True)
     assert 'data-theme="sepia"' in body
     assert "hidden" in body  # the small badge text
+
+
+def test_themes_live_under_settings_not_the_top_nav(app: Flask) -> None:
+    """Themes moved from the top nav into Settings: the nav has no Themes
+    item, the Settings tab strip does, and the Themes page renders with
+    the Settings head and that tab active."""
+    client = app.test_client()
+    _sign_in(client)
+    body = client.get("/themes").get_data(as_text=True)
+    assert "<span>Settings</span>" in body
+    assert 'class="tab is-active"' in body
+    nav = body.split('<nav class="tabs"')[0]
+    assert '/themes"' not in nav.split("topnav")[-1] or "ph-palette" not in nav
+    tabs = body.split('<nav class="tabs"', 1)[1].split("</nav>", 1)[0]
+    assert "Themes" in tabs and 'href="/themes"' in tabs
+    # The composer points at it from the theme picker.
+    other = client.get("/settings/server").get_data(as_text=True)
+    assert "<span>Themes</span>" not in other.split('<nav class="tabs"')[0]

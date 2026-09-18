@@ -1,8 +1,8 @@
 {% extends "_base.html" %}
-{% from "_components.html" import button, text_input, select_field, color_input, switch %}
+{% from "_components.html" import button, text_input, select_field, color_input, switch, settings_tabs %}
 {% block title %}
-{% if is_new %}New theme, Themes, Tesserae
-{% else %}{{ theme.name }}, Themes, Tesserae
+{% if is_new %}New theme, Settings: Themes, Tesserae
+{% else %}{{ theme.name }}, Settings: Themes, Tesserae
 {% endif %}
 {% endblock %}
 {% block head_extra %}
@@ -15,9 +15,16 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='style/themes.css') }}">
 {% endblock %}
 {% block main %}
-<header class="page-head themes-head">
+<header class="page-head">
+  <h1><i class="ph ph-gear-six"></i> Settings</h1>
+  <p class="lede">Colour and type presets dashboards pick from. Editing a theme restyles every dashboard that uses it.</p>
+</header>
+
+{{ settings_tabs('themes') }}
+
+<header class="themes-head">
   <div>
-    <h1><i class="ph ph-palette"></i> Themes</h1>
+    <h2 class="themes-head-title"><i class="ph ph-palette" aria-hidden="true"></i> Themes</h2>
     <p class="lede">
       Click any theme in the strip to load it. Bundled themes are
       read-only, duplicate one to start your own. Upload a photo at

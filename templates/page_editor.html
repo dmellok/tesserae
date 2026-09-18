@@ -460,6 +460,7 @@
           {{ select_field('page-font', 'font', 'Font', value=page.font or '', options=font_options, blank_label='(default)') }}
           {{ color_input('page-bleed', 'bleed_color', 'Matting colour', value=page.bleed_color or '#ffffff') }}
         </div>
+        <p class="field-help"><a href="{{ url_for('themes.index') }}">Manage themes</a> under Settings to edit or add one.</p>
         {{ slider('page-gap', 'gap', 'Gap', value=page.gap, min=0, max=200, unit='px',
                   help='Visible matting strip between cells + around panel edges.') }}
         {{ slider('page-radius', 'corner_radius', 'Corner radius', value=page.corner_radius, min=0, max=80, unit='px') }}

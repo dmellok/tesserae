@@ -177,10 +177,6 @@
          class="{% if request.blueprint == 'stats' %}is-active{% endif %}">
          <i class="ph ph-chart-bar" aria-hidden="true"></i><span>Stats</span>
       </a>
-      <a href="{{ url_for('themes.index') }}"
-         class="{% if request.blueprint == 'themes' %}is-active{% endif %}">
-         <i class="ph ph-palette" aria-hidden="true"></i><span>Themes</span>
-      </a>
       <details class="nav-dropdown {% if request.blueprint == 'plugins' or request.path.startswith('/plugins/') %}is-active{% endif %}">
         <summary>
           <i class="ph ph-puzzle-piece" aria-hidden="true"></i><span>Widgets</span>
@@ -242,7 +238,7 @@
          with nothing highlighted on those pages, and a new one would keep
          reintroducing it. #}
       <a href="{{ url_for('auth.settings') }}"
-         class="{% if (request.blueprint == 'auth' and request.path.startswith('/settings')) or request.blueprint == 'events' %}is-active{% endif %}">
+         class="{% if (request.blueprint == 'auth' and request.path.startswith('/settings')) or request.blueprint in ('events', 'themes') %}is-active{% endif %}">
          <i class="ph ph-gear-six" aria-hidden="true"></i><span>Settings</span>
       </a>
       {% if update_status is defined and update_status.available %}

@@ -19,6 +19,20 @@
   gap: var(--t-space-4);
   flex-wrap: wrap;
 }
+/* Under the Settings head + tab strip now, so this is a section
+   heading rather than the page title. */
+.themes-head { margin: var(--t-space-5) 0 var(--t-space-4); }
+.themes-head-title {
+  display: flex;
+  align-items: center;
+  gap: var(--t-space-2);
+  margin: 0 0 4px;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.themes-head-title .ph { color: var(--t-accent); font-size: 20px; }
+.themes-head .lede { margin: 0; }
 .themes-head-actions {
   display: flex;
   gap: var(--t-space-2);
