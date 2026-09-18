@@ -58,6 +58,7 @@ from app import (
 from app import (
     install_id as install_id_module,
 )
+from app import mcp_bridge as _mcp_bridge
 from app import version_check as _version_check
 from app.discovery import DiscoveryCache
 from app.ha_discovery import HomeAssistantDiscovery
@@ -1218,6 +1219,21 @@ def create_app(
             except Exception:
                 logger.exception("refreshing HA configs after port capture")
 
+    def _mcp_bridge_update(store: SettingsStore | None) -> dict[str, Any] | None:
+        """The bridge status for the topbar badge, or None when nothing is owed.
+
+        Cheap: one settings read, no network. Gated on the MCP experiment so a
+        stale record left behind by a since-disabled MCP surface can't keep
+        nagging, and on ``update_available`` so a current, unknown, or ahead
+        bridge renders nothing at all."""
+        if store is None or not experiments.is_enabled("mcp"):
+            return None
+        try:
+            status = _mcp_bridge.status(store)
+        except Exception:
+            return None
+        return status if status["update_available"] else None
+
     @app.context_processor
     def _inject_nav_data() -> dict[str, Any]:
         """Make the list of admin-equipped plugins available to every
@@ -1256,6 +1272,7 @@ def create_app(
                 "community_discord_url": "https://discord.gg/6qmwkGhGR7",
                 "community_sponsor_url": "https://github.com/sponsors/dmellok",
                 "update_status": None,
+                "mcp_bridge_update": None,
                 "agent_watch_enabled": False,
                 "agent_editor_enabled": False,
             }
@@ -1297,6 +1314,11 @@ def create_app(
             # last background-refreshed result (never blocks the render); off
             # entirely when online features are disabled. See app/version_check.
             "update_status": _version_check.status(app),
+            # The connected tesserae-mcp bridge, only when it is behind the
+            # release this repo ships. Mirrors the Settings -> System -> MCP
+            # card in the topbar so an operator notices without opening
+            # Settings; None (no badge) whenever there is nothing to do.
+            "mcp_bridge_update": _mcp_bridge_update(store),
             # Whether the admin shell should watch for agent activity (the
             # follow toast). Gated on the same experiment as the MCP surface,
             # checked here so the base template never wires a poll against a

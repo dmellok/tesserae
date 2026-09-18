@@ -263,3 +263,44 @@ def test_instructions_endpoint_carries_the_tool_docs(app: Flask) -> None:
 
     assert payload["tool_docs"] == mcp_docs.TOOL_DOCS
     assert payload["tool_docs"]["create_schedule"].count("fires_at") >= 1
+
+
+# -- topbar badge -------------------------------------------------------
+
+
+def test_topbar_badges_an_outdated_bridge_on_every_admin_page(app: Flask) -> None:
+    """The Settings card is easy to never open. An outdated bridge also lights
+    a badge in the topbar, next to the app update badge, on any admin page."""
+    client = _admin(app)
+    client.get("/api/mcp/devices", headers={"User-Agent": "tesserae-mcp/0.9.0"})
+
+    html = client.get("/settings/about").get_data(as_text=True)
+
+    assert "topbar-update--mcp" in html
+    assert f"MCP bridge · v{mcp_bridge.EXPECTED_VERSION}" in html
+    assert "/settings/system#mcp" in html
+
+
+def test_topbar_stays_quiet_for_a_current_or_unknown_bridge(app: Flask) -> None:
+    client = _admin(app)
+
+    assert "topbar-update--mcp" not in client.get("/settings/about").get_data(as_text=True)
+
+    client.get(
+        "/api/mcp/devices",
+        headers={"User-Agent": f"tesserae-mcp/{mcp_bridge.EXPECTED_VERSION}"},
+    )
+    assert "topbar-update--mcp" not in client.get("/settings/about").get_data(as_text=True)
+
+    client.get("/api/mcp/devices", headers={"User-Agent": "curl/8.4.0"})
+    assert "topbar-update--mcp" not in client.get("/settings/about").get_data(as_text=True)
+
+
+def test_topbar_badge_goes_with_the_mcp_experiment(app: Flask) -> None:
+    """Disabling the MCP surface leaves the last-seen record in settings. A
+    badge nagging about a bridge that can no longer connect would be noise."""
+    client = _admin(app)
+    client.get("/api/mcp/devices", headers={"User-Agent": "tesserae-mcp/0.9.0"})
+    _store(app).patch_section("experiments", {"mcp": False})
+
+    assert "topbar-update--mcp" not in client.get("/settings/about").get_data(as_text=True)
