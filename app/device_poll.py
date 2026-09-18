@@ -241,7 +241,11 @@ def next_poll_decision(device: Device, *, configured_s: int) -> tuple[int, int |
     ceiling. ``app.rest_api`` passes its ``sleep_interval_s`` resolution,
     ``app.trmnl_api`` its ``refresh_rate_s`` resolution. An always-on
     device overrides it with its awake cadence, since a sleep interval
-    says nothing about when a device that never sleeps comes back.
+    says nothing about when a device that never sleeps comes back, and a
+    sleeping device showing a page that declares its own interval
+    overrides it with that (#144) — the content is what knows how often
+    it changes. Both are resolved here rather than in each caller, so the
+    two wire protocols answer the same way.
 
     Within the ceiling, the soonest known change (the scheduler's
     projection of schedules + rotation steps, and a widget's own
@@ -282,6 +286,21 @@ def _decision_inner(device: Device, configured_s: int) -> tuple[int, int | None]
     now = time.time()
     awake = device_awake_poll_s(device)
     configured = awake if awake is not None else configured_s
+    if awake is None:
+        # The page on the glass may declare its own wake interval, and when it
+        # does it replaces the device's (#144). Only for a device that sleeps:
+        # an always-on panel is not on the sleep grid at all, so a page's
+        # cadence says nothing about when it comes back, and honouring one
+        # there would slow the manual Send that always-on mode exists for.
+        from app import page_cadence
+
+        try:
+            declared = page_cadence.page_sleep_interval_s(device)
+        except Exception:
+            logger.exception("device_poll: page cadence failed for device=%s", device.id)
+            declared = None
+        if declared is not None:
+            configured = declared
 
     aligned_epoch: float | None = None
     alignment = None

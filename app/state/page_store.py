@@ -212,6 +212,21 @@ class Page(BaseModel):
     # a property of the page rather than a side effect of rotation
     # dwell (discussion #140).
     refresh_minutes: int = Field(default=0, ge=0, le=1440)
+    # Wake cadence ("Wake" in the UI, #144): how often a device showing this
+    # page should come back for a new frame, in seconds. None (default) leaves
+    # the device's own ``sleep_interval_s`` in charge, which is where this has
+    # always lived. The content is what knows: a daily agenda on a five-minute
+    # panel woke ~288 times a day to collect 287 304s (discussion #24).
+    #
+    # Distinct from ``refresh_minutes`` above, which is how often the server
+    # re-renders this page. That one is about the frame existing; this one is
+    # about the device coming to fetch it. A page that re-renders hourly and is
+    # polled daily shows yesterday's frame for most of the day.
+    #
+    # Bounds here are the widest any kind allows; the resolution in
+    # ``app.page_cadence`` clamps to the device kind's own min/max, since only
+    # the device knows what its firmware accepts.
+    sleep_interval_s: int | None = Field(default=None, ge=1, le=604800)
     cells: list[Cell] = Field(default_factory=list)
     font: str | None = None
     # Spectra theme id, picks one of the self-contained semantic blocks
