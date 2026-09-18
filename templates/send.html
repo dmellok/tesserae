@@ -232,7 +232,7 @@
                    data-panel-w="{{ d.w }}" data-panel-h="{{ d.h }}" data-label="{{ d.label }}"
                    {% if form_device_ids %}{% if d.id in form_device_ids %}checked{% endif %}{% elif d.id == sole_device %}checked{% endif %}>
             <i class="ph ph-check send-chip-on" aria-hidden="true"></i>
-            <i class="ph ph-monitor send-chip-off" aria-hidden="true"></i>
+            <i class="ph ph-{{ d.icon or 'monitor' }} send-chip-off" aria-hidden="true"></i>
             <span class="send-chip-name">{{ d.label }}</span>
             <span class="send-chip-dims">{{ d.dims }}</span>
           </label>

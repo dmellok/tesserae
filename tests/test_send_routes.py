@@ -773,3 +773,20 @@ def test_history_labels_a_note_push(app: Flask) -> None:
     body = client.get("/history").get_data(as_text=True)
     assert "dx-source-note" in body
     assert "Back at 3pm" in body
+
+
+def test_send_target_chips_use_each_displays_icon(app: Flask) -> None:
+    """The target chips carry the display's own Phosphor icon (from its
+    manifest), not a generic monitor, so kinds can be told apart."""
+    client = app.test_client()
+    _sign_in(client)
+    _register_device(client, "esp32_hall", "esp32_client")
+    _register_device(client, "pi_den", "pi_bin_client")
+    registry = app.config["DEVICE_REGISTRY"]
+    body = client.get("/send").get_data(as_text=True)
+    icons = {registry.devices[i].icon for i in ("esp32_hall", "pi_den")}
+    for icon in icons:
+        assert f"ph ph-{icon} send-chip-off" in body
+    # Nothing falls back to the generic glyph unless a kind really uses it.
+    if "monitor" not in icons:
+        assert "ph ph-monitor send-chip-off" not in body
