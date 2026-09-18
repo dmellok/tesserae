@@ -66,7 +66,7 @@ def _seed(app: Flask, client) -> None:
 
 
 def _rows(html: str) -> str:
-    return html[html.index("dx-discovered-list") :]
+    return html[html.index("dx-hist-card") :]
 
 
 def test_device_filter_keeps_only_that_displays_rows(app: Flask) -> None:
@@ -77,7 +77,7 @@ def test_device_filter_keeps_only_that_displays_rows(app: Flask) -> None:
     rows = _rows(html)
     assert "hall_page" in rows and "both_page" in rows
     assert "kitchen_page" not in rows
-    assert rows.count("dx-history-row") == 2
+    assert rows.count('data-history-row="') == 2
 
 
 def test_device_chip_row_lists_displays_with_counts(app: Flask) -> None:
@@ -85,16 +85,16 @@ def test_device_chip_row_lists_displays_with_counts(app: Flask) -> None:
     _sign_in(client)
     _seed(app, client)
     html = client.get("/history").get_data(as_text=True)
-    strip = html[html.index("dx-filter-strip--devices") : html.index("dx-history-toolbar")]
+    strip = html[html.index("dx-hist-displays") : html.index("dx-hist-clear")]
     assert "All displays" in strip
     assert strip.index("All displays") < strip.index("Lounge") < strip.index("Hall")
-    assert strip.count("dx-filter-chip--display") == 3
+    assert strip.count("seg-item dx-hist-display") == 3
     # Counts: three loaded rows in all, two per display.
-    assert '<span class="dx-count-pill">3</span>' in strip
-    assert strip.count('<span class="dx-count-pill">2</span>') == 2
+    assert '<span class="seg-count">3</span>' in strip
+    assert strip.count('<span class="seg-count">2</span>') == 2
     # Nothing filtered yet: "All displays" is the active chip.
     all_chip = strip[max(0, strip.index("All displays") - 400) : strip.index("All displays")]
-    assert "is-active" in all_chip
+    assert "is-on" in all_chip
     assert 'aria-selected="true"' in all_chip
 
 
@@ -105,7 +105,7 @@ def test_switching_filters_preserves_each_other(app: Flask) -> None:
     html = client.get("/history?device=hall&include_skipped=1&sort=dashboard").get_data(
         as_text=True
     )
-    strip = html[: html.index("dx-history-toolbar")]
+    strip = html[: html.index("dx-hist-clear")]
     # Source chips keep the display filter; display chips keep the rest.
     assert (
         "source=scheduler&amp;device=hall" in strip or "device=hall&amp;source=scheduler" in strip
@@ -113,7 +113,7 @@ def test_switching_filters_preserves_each_other(app: Flask) -> None:
     hall_chip = strip[
         strip.rindex("Only pushes to Hall") - 400 : strip.rindex("Only pushes to Hall")
     ]
-    assert "is-active" in hall_chip
+    assert "is-on" in hall_chip
     assert "include_skipped=1" in hall_chip and "sort=dashboard" in hall_chip
     # The "All displays" link drops only the device arg.
     all_chip = strip[
@@ -128,7 +128,9 @@ def test_row_chip_names_the_hardware_on_hover(app: Flask) -> None:
     _sign_in(client)
     _seed(app, client)
     html = client.get("/history").get_data(as_text=True)
-    chip = html[html.index('class="dx-device-chip"') : html.index('class="dx-device-chip"') + 120]
+    chip = html[
+        html.index('class="tg dx-hist-device"') : html.index('class="tg dx-hist-device"') + 120
+    ]
     assert 'title="' in chip
     # The kind's display name, not its id.
     assert "esp32_client" not in chip

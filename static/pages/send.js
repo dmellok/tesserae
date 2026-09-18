@@ -603,8 +603,18 @@
   options.addEventListener("input", () => render());
   options.addEventListener("change", () => render());
 
+  // Ticked-state class on each target tile, for browsers without :has().
+  function syncTiles() {
+    if (!checklist) return;
+    checklist.querySelectorAll('input[name="device_id"]').forEach((box) => {
+      const tile = box.closest(".tile");
+      if (tile) tile.classList.toggle("is-on", box.checked);
+    });
+  }
+  syncTiles();
   if (checklist) {
     checklist.addEventListener("change", (ev) => {
+      syncTiles();
       if (!ev.target || !ev.target.matches('input[name="device_id"]')) return;
       // Follow the tick into the preview when the shown display isn't ticked.
       if (previewDevice && ev.target.checked) {

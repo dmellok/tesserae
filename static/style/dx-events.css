@@ -73,34 +73,24 @@
   border-color: var(--evt-bd, var(--t-border));
 }
 
-/* Filter chip per-type swatch. Inactive uses the same custom
-   properties to colour the leading icon; active swaps the bg to
-   the saturated fg and flips text white. */
-.dx-filter-chip--push     { --evt-fg: var(--t-accent, #15846a); --evt-bg: var(--t-accent-tint, #dcefe8); --evt-bd: var(--t-accent-tint, #dcefe8); }
-.dx-filter-chip--renderer { --evt-fg: #5b8def; --evt-bg: #e4ecfb; --evt-bd: #cfddf6; }
-.dx-filter-chip--render   { --evt-fg: #5b8def; --evt-bg: #e4ecfb; --evt-bd: #cfddf6; }
-.dx-filter-chip--rotation { --evt-fg: #2b6b75; --evt-bg: #def0f1; --evt-bd: #b4dde0; }
-.dx-filter-chip--scheduler { --evt-fg: var(--t-pill-warn-fg); --evt-bg: var(--t-pill-warn-bg); --evt-bd: var(--t-pill-warn-border); }
-.dx-filter-chip--schedule { --evt-fg: var(--t-pill-warn-fg); --evt-bg: var(--t-pill-warn-bg); --evt-bd: var(--t-pill-warn-border); }
-.dx-filter-chip--conditions { --evt-fg: #7b59d1; --evt-bg: #ece3fb; --evt-bd: #d8c7f3; }
-.dx-filter-chip--heartbeat { --evt-fg: #c0392b; --evt-bg: var(--t-pill-danger-bg); --evt-bd: var(--t-pill-danger-border); }
-.dx-filter-chip--auth     { --evt-fg: #1f7a5a; --evt-bg: #dff2ea; --evt-bd: #b8e0ce; }
-.dx-filter-chip--plugin   { --evt-fg: #b15a1c; --evt-bg: #fbe9d4; --evt-bd: #f0d2a8; }
-.dx-filter-chip--transport,
-.dx-filter-chip--telemetry { --evt-fg: #2b6b75; --evt-bg: #def0f1; --evt-bd: #b4dde0; }
-.dx-filter-chip--device   { --evt-fg: #b34a8a; --evt-bg: #fbe6f1; --evt-bd: #f0c3df; }
-.dx-filter-chip[class*="dx-filter-chip--"] > .ph { color: var(--evt-fg, var(--t-fg-soft)); }
-.dx-filter-chip[class*="dx-filter-chip--"].is-active {
-  background: var(--evt-fg, var(--t-accent));
-  border-color: var(--evt-fg, var(--t-accent));
-  color: var(--t-accent-fg);
-}
-.dx-filter-chip[class*="dx-filter-chip--"].is-active > .ph,
-.dx-filter-chip[class*="dx-filter-chip--"].is-active > span { color: var(--t-accent-fg); }
-.dx-filter-chip[class*="dx-filter-chip--"].is-active .dx-count-pill {
-  background: rgba(255, 255, 255, 0.22);
-  color: var(--t-accent-fg);
-}
+/* Segmented filter per-type swatch: the leading icon takes the
+   type's colour in both states; the selected option stays the raised
+   block from chips.css. */
+.seg-item--push     { --evt-fg: var(--t-accent, #15846a); --evt-bg: var(--t-accent-tint, #dcefe8); --evt-bd: var(--t-accent-tint, #dcefe8); }
+.seg-item--renderer { --evt-fg: #5b8def; --evt-bg: #e4ecfb; --evt-bd: #cfddf6; }
+.seg-item--render   { --evt-fg: #5b8def; --evt-bg: #e4ecfb; --evt-bd: #cfddf6; }
+.seg-item--rotation { --evt-fg: #2b6b75; --evt-bg: #def0f1; --evt-bd: #b4dde0; }
+.seg-item--scheduler { --evt-fg: var(--t-pill-warn-fg); --evt-bg: var(--t-pill-warn-bg); --evt-bd: var(--t-pill-warn-border); }
+.seg-item--schedule { --evt-fg: var(--t-pill-warn-fg); --evt-bg: var(--t-pill-warn-bg); --evt-bd: var(--t-pill-warn-border); }
+.seg-item--conditions { --evt-fg: #7b59d1; --evt-bg: #ece3fb; --evt-bd: #d8c7f3; }
+.seg-item--heartbeat { --evt-fg: #c0392b; --evt-bg: var(--t-pill-danger-bg); --evt-bd: var(--t-pill-danger-border); }
+.seg-item--auth     { --evt-fg: #1f7a5a; --evt-bg: #dff2ea; --evt-bd: #b8e0ce; }
+.seg-item--plugin   { --evt-fg: #b15a1c; --evt-bg: #fbe9d4; --evt-bd: #f0d2a8; }
+.seg-item--transport,
+.seg-item--telemetry { --evt-fg: #2b6b75; --evt-bg: #def0f1; --evt-bd: #b4dde0; }
+.seg-item--device   { --evt-fg: #b34a8a; --evt-bg: #fbe6f1; --evt-bd: #f0c3df; }
+.seg-item[class*="seg-item--"] > .ph { color: var(--evt-fg, var(--t-fg-soft)); }
+
 
 .dx-event-body {
   flex: 1 1 auto;

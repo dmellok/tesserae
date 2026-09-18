@@ -1,182 +1,343 @@
 /* ============================================================
- *  /history — v0.56 admin-uplift Tier 1.2
+ *  /history, the day timeline.
  *
- *  Inset row split into three columns: timestamp left,
- *  source/target middle, status/duration/actions right.
- *  Failed rows flip the soft pink band background. Each row
- *  also carries a 64×64 thumbnail of the rendered frame
- *  (or a placeholder when no render exists).
+ *  Two filter rows of segmented controls (source + view toggles,
+ *  then displays + the clear-history control), and one card of
+ *  groups: "Today", "Yesterday", dated days (or one group per
+ *  dashboard under "By dashboard"). Each group is a rail of rows:
+ *  a status dot on a 2px line, then time, thumbnail, tags, status,
+ *  duration and actions on one grid line. Failed rows go red on the
+ *  dot and sit on a tinted band.
  *
- *  v0.63.7 extracted from settings.css. No rules changed.
+ *  Tags and segmented controls come from chips.css (.tg / .seg);
+ *  everything here is layout. Tokens only, so dark mode follows.
  * ============================================================ */
 
-/* Row + columns -------------------------------------------------- */
-.dx-history-row { align-items: stretch; padding: 12px 15px; gap: 14px; }
-.dx-history-row--failed {
-  background: var(--t-pill-danger-bg);
-  border-color: var(--t-pill-danger-border);
-}
-.dx-history-time {
+/* Filters ------------------------------------------------------ */
+.dx-hist-filters {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  flex: 0 0 auto;
-  text-decoration: none;
-  color: inherit;
-  min-width: 70px;
-}
-.dx-history-clock code {
-  font-family: var(--t-font-mono);
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--t-fg);
-  background: transparent;
-  padding: 0;
-}
-.dx-history-date {
-  font-size: 11px;
-  color: var(--t-muted);
-}
-.dx-history-mid {
-  display: flex;
-  align-items: center;
   gap: 8px;
+  margin: 0 0 18px;
+}
+.dx-hist-filter-row {
+  display: flex;
   flex-wrap: wrap;
-  flex: 1 1 auto;
+  align-items: center;
+  gap: 10px;
   min-width: 0;
 }
-.dx-history-target {
-  font-size: 13px;
-  color: var(--t-fg);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  flex: 1 1 0;
-  min-width: 0;
+.dx-hist-filter-divider {
+  flex: none;
+  width: 1px;
+  height: 26px;
+  background: var(--t-border-strong);
 }
-.dx-history-err {
-  font-size: 11.5px;
-  color: var(--t-pill-danger-fg);
-  font-family: var(--t-font-mono);
-}
-/* Secondary detail line rendered next to the target on rows where
-   the raw target alone doesn't tell the whole story (currently only
-   button events, whose target is a device id and whose interesting
-   fields sit in extra: button name, action spec, pushed page).
-   Same wrap as the rest of dx-history-mid, monospace for the
-   ``→ action`` glyph to sit predictably. */
-.dx-history-detail {
-  font-size: 11.5px;
-  font-family: var(--t-font-mono);
-  white-space: normal;
-  min-width: 0;
-  flex-basis: 100%;
-  order: 10;
-}
-.dx-history-end {
+.dx-hist-clear {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex: 0 0 auto;
+  margin: 0 0 0 auto;
+  font-size: 13px;
 }
-.dx-history-dur {
-  font-family: var(--t-font-mono);
+.dx-hist-clear-age {
+  height: 30px;
+  padding: 0 8px;
+  border-radius: var(--t-radius-sm, 7px);
+  border: 1px solid var(--t-border);
+  background: var(--t-surface);
+  color: var(--t-fg);
   font-size: 12.5px;
-  color: var(--t-fg-soft);
-  min-width: 36px;
-  text-align: right;
+}
+.dx-hist-clear-btn { color: var(--t-danger); }
+
+/* Card + groups ------------------------------------------------ */
+.dx-hist-card {
+  padding: 8px 22px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.dx-hist-card > .dx-empty { padding: 40px 22px 32px; }
+.dx-hist-group-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 6px 0 4px;
+}
+.dx-hist-group-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--t-fg);
+}
+.dx-hist-group-sub {
+  font-family: var(--t-font-mono);
+  font-size: 11.5px;
+  color: var(--t-muted);
+  white-space: nowrap;
 }
 
-/* Square thumbnail at the left of each push row. Click opens
-   the same lightbox as the timestamp link. ``--empty`` is a
-   placeholder square for events without a stored composition
-   PNG (URL pushes, errors before render). */
-.dx-history-thumb {
-  flex: 0 0 auto;
-  width: 64px;
-  height: 64px;
-  border-radius: 10px;
-  overflow: hidden;
-  border: 1px solid var(--t-border, #ecebe5);
-  background: var(--t-inset, #faf9f6);
+/* The rail: one 2px line per group, behind every row's dot. */
+.dx-hist-rows {
+  --dx-hist-rail: 21px;
+  position: relative;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.dx-hist-rows::before {
+  content: "";
+  position: absolute;
+  left: var(--dx-hist-rail);
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--t-border);
+  z-index: 1;
+}
+
+/* Rows --------------------------------------------------------- */
+.dx-hist-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 24px 16px 70px 64px minmax(0, 1fr) auto 52px auto;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 10px;
+  border-bottom: 1px solid color-mix(in oklab, var(--t-border) 70%, transparent);
+}
+.dx-hist-row:last-child { border-bottom: 0; }
+.dx-hist-row--failed {
+  background: var(--t-pill-danger-bg);
+  border-radius: 8px;
+}
+.dx-hist-dot {
+  position: relative;
+  z-index: 2;
+  justify-self: center;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--t-accent);
+  box-shadow: 0 0 0 3px var(--t-surface);
+}
+.dx-hist-dot.is-bad { background: var(--t-danger); }
+.dx-hist-row--failed .dx-hist-dot { box-shadow: 0 0 0 3px var(--t-pill-danger-bg); }
+.dx-hist-select {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  cursor: pointer;
+  accent-color: var(--t-accent);
+}
+.dx-hist-time {
+  font-family: var(--t-font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--t-fg);
+  text-decoration: none;
+  white-space: nowrap;
+}
+a.dx-hist-time[href]:hover { color: var(--t-accent); }
+
+/* 64x48 thumbnail of the rendered frame; failures without a render get
+   a mono "no frame" placeholder with a faint red edge. */
+.dx-hist-thumb {
   display: grid;
   place-items: center;
+  width: 64px;
+  height: 48px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--t-border);
+  background: var(--t-inset);
+  text-decoration: none;
 }
-.dx-history-thumb img {
+.dx-hist-thumb img {
   display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
-.dx-history-thumb--empty {
-  color: var(--t-muted, #9a9a93);
-  font-size: 22px;
-}
-
-/* Device chip (small inline pill on history rows + anywhere else
-   we surface "this push went to <device>"). */
-.dx-device-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 9px;
-  background: var(--t-surface);
-  border: 1px solid var(--t-border);
-  border-radius: 6px;
-  font-size: 11.5px;
-  font-weight: 600;
-  color: var(--t-fg-soft);
-}
-.dx-device-chip .ph { color: var(--t-muted); font-size: 12px; }
-
-/* Source pill — colour-coded by push origin. Lightweight pill;
-   distinct from .dx-pill status chips so the two read as
-   different categories ("how was this pushed" vs "did it land"). */
-.dx-source-chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 3px 9px;
-  border-radius: 6px;
-  font-size: 11.5px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  background: var(--t-pill-neutral-bg);
-  color: var(--t-pill-neutral-fg);
-  border: 1px solid transparent;
-}
-.dx-source-page,
-.dx-source-file,
-.dx-source-url,
-.dx-source-webpage,
-.dx-source-note {
-  background: color-mix(in oklab, var(--t-accent) 16%, var(--t-surface));
-  color: var(--t-accent);
-}
-.dx-source-schedule,
-.dx-source-rotation {
-  background: var(--t-pill-warn-bg);
-  color: var(--t-pill-warn-fg);
-}
-.dx-source-webhook,
-.dx-source-ha {
-  background: color-mix(in oklab, #a35a2c 16%, var(--t-surface));
-  color: var(--t-warn);
-}
-.dx-source-resend,
-.dx-source-manual,
-.dx-source-setup,
-.dx-source-unknown {
-  background: var(--t-pill-neutral-bg);
-  color: var(--t-pill-neutral-fg);
-}
-/* Background work (deck / album warms): deliberately quieter than the
-   real push tones, matching its hidden-by-default standing in the feed. */
-.dx-source-warm {
-  background: color-mix(in oklab, var(--t-muted) 12%, var(--t-surface));
+.dx-hist-thumb--empty {
+  font-family: var(--t-font-mono);
+  font-size: 10px;
   color: var(--t-muted);
 }
+.dx-hist-thumb--empty.is-bad { border-color: var(--t-pill-danger-border); }
 
-/* Per-display filter strip sits directly under the source strip; the two
-   read as one filter block, so the gap between them is tighter than the
-   gap to the toolbar below. */
-.dx-filter-strip--devices { margin-top: -6px; }
+.dx-hist-mid {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  min-width: 0;
+}
+.dx-hist-tags {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+.dx-hist-break { display: none; }
+.dx-hist-target {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  font-size: 14px;
+  color: var(--t-fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dx-hist-err {
+  flex: 1 1 0;
+  min-width: 140px;
+  font-size: 12px;
+  color: var(--t-pill-danger-fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Button rows: pressed button, resolved action and resulting page. */
+.dx-hist-detail {
+  flex-basis: 100%;
+  font-family: var(--t-font-mono);
+  font-size: 11.5px;
+  color: var(--t-muted);
+  min-width: 0;
+}
+.dx-hist-statuses {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.dx-hist-dur {
+  font-family: var(--t-font-mono);
+  font-size: 12px;
+  color: var(--t-fg-soft);
+  text-align: right;
+  white-space: nowrap;
+}
+.dx-hist-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.dx-hist-actions .form { margin: 0; }
+
+/* Overflow menu (delete lives here). Same shape as the Lineups cards. */
+.dx-hist-more { position: relative; display: inline-flex; }
+.dx-hist-more > summary {
+  list-style: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  color: color-mix(in oklab, var(--t-fg) 55%, transparent);
+  cursor: pointer;
+}
+.dx-hist-more > summary::-webkit-details-marker { display: none; }
+.dx-hist-more > summary:hover,
+.dx-hist-more[open] > summary {
+  background: color-mix(in oklab, var(--t-fg) 6%, var(--t-surface));
+  color: var(--t-fg);
+}
+.dx-hist-more-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 30;
+  min-width: 140px;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  background: var(--t-surface);
+  border: 1px solid color-mix(in oklab, var(--t-border) 90%, transparent);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px color-mix(in oklab, var(--t-fg) 12%, transparent);
+}
+.dx-hist-more-menu .form { margin: 0; }
+.dx-hist-more-item {
+  display: block;
+  background: none;
+  border: 0;
+  box-shadow: none;
+  text-align: left;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 7px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--t-fg);
+  text-decoration: none;
+  cursor: pointer;
+}
+.dx-hist-more-item:hover { background: color-mix(in oklab, var(--t-fg) 6%, var(--t-surface)); }
+.dx-hist-more-item.is-danger { color: var(--t-danger); }
+
+/* Bulk bar ----------------------------------------------------- */
+#dx-hist-bulk-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px;
+  border: 1px solid var(--t-border);
+  border-radius: 12px;
+  background: var(--t-surface);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, .24);
+}
+#dx-hist-bulk-bar[hidden] { display: none; }
+#dx-hist-bulk-bar .dx-bulk-count { font-size: 13px; font-weight: 600; white-space: nowrap; }
+#dx-hist-bulk-bar .dx-bulk-actions { display: flex; align-items: center; gap: 8px; }
+#dx-hist-bulk-bar .form { margin: 0; }
+
+/* Phones ------------------------------------------------------- */
+@media (max-width: 640px) {
+  /* Filter groups scroll sideways inside their own row; the page never does. */
+  .dx-hist-filter-row {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    padding-bottom: 2px;
+  }
+  .dx-hist-filter-row > .seg { flex: none; flex-wrap: nowrap; }
+  .dx-hist-clear { margin-left: 0; flex: none; }
+
+  .dx-hist-card { padding: 6px 12px 10px; }
+  .dx-hist-rows { --dx-hist-rail: 12px; }
+
+  /* Two lines: dot + tick + time + tags, then thumb + dashboard +
+     status + duration + actions. The mid wrapper dissolves so its
+     children join the row's flex flow. */
+  .dx-hist-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 8px;
+    padding: 10px 6px 10px 28px;
+  }
+  .dx-hist-dot { position: absolute; left: 8px; top: 19px; }
+  .dx-hist-mid { display: contents; }
+  .dx-hist-select { order: 1; }
+  .dx-hist-time { order: 2; }
+  .dx-hist-tags { order: 3; flex-wrap: wrap; }
+  .dx-hist-break { order: 4; display: block; flex-basis: 100%; height: 0; }
+  .dx-hist-thumb { order: 5; width: 48px; height: 36px; }
+  .dx-hist-target { order: 6; flex: 1 1 0; min-width: 60px; font-size: 13.5px; }
+  .dx-hist-statuses { order: 7; }
+  .dx-hist-dur { order: 8; }
+  .dx-hist-actions { order: 9; }
+  .dx-hist-err { order: 10; flex-basis: 100%; min-width: 0; }
+  .dx-hist-detail { order: 11; }
+}

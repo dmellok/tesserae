@@ -97,7 +97,7 @@
     <div class="dx-pending-codes">
       <div class="dx-discovered-sublabel">
         <span>PENDING CODES</span>
-        <span class="dx-count-pill">{{ companion_pairing_codes|length }}</span>
+        <span class="tg-count">{{ companion_pairing_codes|length }}</span>
       </div>
       <ul class="dx-discovered-list">
         {% for p in companion_pairing_codes %}
@@ -129,7 +129,7 @@
     <div class="dx-pending-codes">
       <div class="dx-discovered-sublabel">
         <span>PAIRED APPS</span>
-        <span class="dx-count-pill">{{ companion_sessions|length }}</span>
+        <span class="tg-count">{{ companion_sessions|length }}</span>
       </div>
       <ul class="dx-discovered-list">
         {% for c in companion_sessions %}

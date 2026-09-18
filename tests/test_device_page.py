@@ -235,7 +235,7 @@ def test_connection_chips_link_to_the_firmware_page(app: Flask, monkeypatch) -> 
     body = client.get(f"/settings/devices/{dev}").get_data(as_text=True)
     chips = body[body.index("dx-conn-chips") : body.index("dx-conn-chips") + 1400]
     assert re.search(
-        r'<a class="pill is-warn" href="/settings/firmware"[^>]*>v1.40.0 available</a>', chips
+        r'<a class="tg tg--warn" href="/settings/firmware"[^>]*>v1.40.0 available</a>', chips
     )
     assert 'href="https://github.com/example/firmware/releases/tag/v1.40.0"' in chips
     assert "release notes" in chips

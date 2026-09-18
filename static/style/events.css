@@ -235,7 +235,7 @@
   align-items: center;
   gap: var(--t-space-1);
   padding: var(--t-space-1) var(--t-space-3);
-  border-radius: var(--t-radius-pill);
+  border-radius: var(--t-radius-sm);
   background: var(--t-surface-soft);
   color: var(--t-fg-soft);
   text-decoration: none;
@@ -247,7 +247,7 @@
 .event-type-filter .chip .muted {
   font-size: var(--t-size-xs);
   padding: 1px 6px;
-  border-radius: var(--t-radius-pill);
+  border-radius: 5px;
   background: color-mix(in oklab, var(--t-fg) 6%, transparent);
 }
 .event-type-filter .chip:hover {

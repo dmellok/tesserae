@@ -244,38 +244,13 @@
   box-shadow: 0 0 0 2px var(--t-surface, #fff);
   pointer-events: none;
 }
-/* "New devices" chip: heard-but-unregistered devices. Sits first in the
+/* "New devices" tag: heard-but-unregistered devices, a .tg tg--teal
+   tg--lg (chips.css) with the count as .tg-count. Sits first in the
    right-hand cluster, so it takes the auto margin and hands the tight
    4px spacing to whatever follows it (batteries, restart, theme). */
-.topbar-discovered--topbar {
-  margin-left: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 36px;
-  padding: 0 10px;
-  border-radius: var(--t-radius-sm);
-  color: var(--t-accent) !important;
-  font-size: 13px;
-  font-weight: 600;
-  text-decoration: none;
-  white-space: nowrap;
-}
-.topbar-discovered--topbar:hover { background: var(--t-accent-soft); }
-.topbar-discovered--topbar > .ph-bold { font-size: 18px; }
-.topbar-discovered-count {
-  display: inline-grid;
-  place-items: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  border-radius: 999px;
-  background: var(--t-accent);
-  color: var(--t-accent-fg);
-  font-size: 0.7rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
+.topbar-discovered--topbar { margin-left: auto; }
+.topbar-discovered--topbar > .ph-bold { font-size: 15px; }
+.topbar-discovered-count { font-variant-numeric: tabular-nums; }
 .topbar-discovered--topbar ~ .topbar-batteries--topbar,
 .topbar-discovered--topbar ~ .theme-toggle--topbar,
 .topbar-discovered--topbar ~ .topbar-optin { margin-left: 4px; }
@@ -308,25 +283,9 @@
 .topbar-batteries--topbar.is-tone-critical > summary { color: var(--t-danger); }
 .topbar-batteries--topbar.is-tone-low      > summary { color: var(--t-warn); }
 .topbar-batteries--topbar.is-tone-ok       > summary { color: var(--t-fg-soft); }
-.topbar-batteries-count {
-  display: inline-grid;
-  place-items: center;
-  min-width: 18px;
-  padding: 0 4px;
-  height: 18px;
-  background: var(--t-surface-sunk);
-  border-radius: 999px;
-  font-size: 0.7rem;
-  font-weight: 700;
-}
-.topbar-batteries--topbar.is-tone-critical .topbar-batteries-count {
-  background: color-mix(in oklab, var(--t-danger) 18%, transparent);
-  color: var(--t-danger);
-}
-.topbar-batteries--topbar.is-tone-low .topbar-batteries-count {
-  background: color-mix(in oklab, var(--t-warn) 18%, transparent);
-  color: var(--t-warn);
-}
+.topbar-batteries-count { font-variant-numeric: tabular-nums; opacity: 1; }
+.topbar-batteries--topbar.is-tone-critical .topbar-batteries-count { color: var(--t-danger); }
+.topbar-batteries--topbar.is-tone-low .topbar-batteries-count { color: var(--t-warn); }
 .topbar-batteries-popover {
   position: absolute;
   top: calc(100% + 6px);
@@ -808,10 +767,11 @@
 }
 .tab .ph { font-size: 15px; opacity: 0.75; transition: opacity var(--t-trans-fast); }
 .tab .muted {
-  font-size: var(--t-size-xs);
-  padding: 1px 6px;
-  border-radius: var(--t-radius-pill);
-  background: var(--t-surface-sunk);
+  font-family: var(--t-font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  opacity: 0.75;
   margin-left: var(--t-space-1);
   font-variant-numeric: tabular-nums;
 }

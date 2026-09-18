@@ -173,7 +173,7 @@
 .dx-bar-tag {
   margin-left: 6px;
   padding: 1px 6px;
-  border-radius: 999px;
+  border-radius: 5px;
   background: var(--t-pill-neutral-bg, var(--t-surface-sunk));
   color: var(--t-muted);
   font-size: 0.72rem;
@@ -265,7 +265,7 @@
   gap: 6px;
   padding: 4px 10px;
   border: 1px solid var(--t-border);
-  border-radius: 999px;
+  border-radius: 5px;
   font-size: 0.84rem;
 }
 

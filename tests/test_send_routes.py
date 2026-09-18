@@ -776,7 +776,7 @@ def test_history_labels_a_note_push(app: Flask) -> None:
 
 
 def test_send_target_chips_use_each_displays_icon(app: Flask) -> None:
-    """The target chips carry the display's own Phosphor icon (from its
+    """The target tiles carry the display's own Phosphor icon (from its
     manifest), not a generic monitor, so kinds can be told apart."""
     client = app.test_client()
     _sign_in(client)
@@ -786,7 +786,7 @@ def test_send_target_chips_use_each_displays_icon(app: Flask) -> None:
     body = client.get("/send").get_data(as_text=True)
     icons = {registry.devices[i].icon for i in ("esp32_hall", "pi_den")}
     for icon in icons:
-        assert f"ph ph-{icon} send-chip-off" in body
+        assert f"ph ph-{icon} tile-icon" in body
     # Nothing falls back to the generic glyph unless a kind really uses it.
     if "monitor" not in icons:
-        assert "ph ph-monitor send-chip-off" not in body
+        assert "ph ph-monitor tile-icon" not in body

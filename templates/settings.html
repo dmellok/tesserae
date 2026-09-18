@@ -437,7 +437,7 @@
         <div class="timetable-what">
           <i class="ph ph-squares-four" aria-hidden="true"></i>
           <span>{{ entry.page_name }}</span>
-          {% if not entry.enabled %}<span class="pill">disabled</span>{% endif %}
+          {% if not entry.enabled %}<span class="tg tg--sm">disabled</span>{% endif %}
         </div>
         <div class="timetable-edit">
           <a class="button ghost" href="{{ url_for('schedules.index') }}#schedule-{{ entry.schedule_id }}">
@@ -586,9 +586,9 @@
     <p>
       <strong>v{{ system_release_check.current_version }}</strong>
       {% if system_release_check.behind and system_release_check.latest_tag %}
-        &middot; <span class="pill is-warn">{{ system_release_check.latest_tag }} available</span>
+        &middot; <span class="tg tg--warn">{{ system_release_check.latest_tag }} available</span>
       {% elif not system_release_check.error and system_release_check.latest_tag %}
-        &middot; <span class="pill is-ok">up to date</span>
+        &middot; <span class="tg tg--ok">up to date</span>
       {% endif %}
     </p>
 
@@ -621,7 +621,7 @@ docker compose up -d</code></pre>
       <strong>v{{ system_state.version }}</strong>
       &middot; <code>{{ system_state.short_sha }}</code>
       &middot; branch <code>{{ system_state.branch }}</code>
-      {% if system_state.dirty %} &middot; <span class="pill is-warn">working tree dirty</span>{% endif %}
+      {% if system_state.dirty %} &middot; <span class="tg tg--warn">working tree dirty</span>{% endif %}
     </p>
     {% endif %}
 
@@ -706,12 +706,12 @@ docker compose up -d</code></pre>
     <p>
       Status:
       {% if not system_password_required %}
-        <span class="pill is-warn">password disabled</span>
+        <span class="tg tg--warn">password disabled</span>
         <span class="muted">- private-network clients reach the admin UI without a prompt.</span>
       {% elif system_password_set %}
-        <span class="pill is-ok">password set</span>
+        <span class="tg tg--ok">password set</span>
       {% else %}
-        <span class="pill is-warn">no password</span>
+        <span class="tg tg--warn">no password</span>
       {% endif %}
     </p>
 
@@ -851,7 +851,7 @@ docker compose up -d</code></pre>
       <summary>
         <i class="ph ph-caret-right" aria-hidden="true"></i>
         <span>Existing backups</span>
-        <span class="pill">{{ system_backups | length }}</span>
+        <span class="tg tg--sm tg--mono">{{ system_backups | length }}</span>
       </summary>
       <ul class="backup-list">
         {% for b in system_backups %}
@@ -859,7 +859,7 @@ docker compose up -d</code></pre>
           <div class="backup-meta">
             <div class="backup-top">
               <code>{{ b.id }}</code>
-              <span class="pill">{{ b.label }}</span>
+              <span class="tg tg--sm">{{ b.label }}</span>
               <span class="backup-size">{{ (b.bytes / 1024) | round | int }} KB</span>
             </div>
             {% if b.note %}<div class="backup-note">{{ b.note }}</div>{% endif %}
@@ -887,10 +887,10 @@ docker compose up -d</code></pre>
 
     <p>
       Status: {% if system_webhook_token_set %}
-        <span class="pill is-ok">token set</span>
+        <span class="tg tg--ok">token set</span>
         <span class="muted">- masked. Regenerate to mint a new one, or paste a custom value below.</span>
       {% else %}
-        <span class="pill">no token</span>
+        <span class="tg">no token</span>
         <span class="muted">- webhooks are disabled until you set one. Regenerate below, or paste your own.</span>
       {% endif %}
     </p>
@@ -996,9 +996,9 @@ docker compose up -d</code></pre>
     <div class="field-row" style="display:flex;align-items:center;gap:12px;justify-content:space-between;padding:10px 0;{% if not loop.last %}border-bottom:1px solid var(--t-border, rgba(0,0,0,.08));{% endif %}">
       <div style="min-width:0">
         <strong>{{ exp.label }}</strong>
-        {% if exp.enabled %}<span class="pill is-ok">on</span>{% else %}<span class="pill">off</span>{% endif %}
-        {% if exp.env_forced %}<span class="pill">forced by env</span>{% endif %}
-        {% if exp.needs_online %}<span class="pill is-warn">needs online features</span>{% endif %}
+        {% if exp.enabled %}<span class="tg tg--ok">on</span>{% else %}<span class="tg">off</span>{% endif %}
+        {% if exp.env_forced %}<span class="tg">forced by env</span>{% endif %}
+        {% if exp.needs_online %}<span class="tg tg--warn">needs online features</span>{% endif %}
         <div class="field-help" style="margin:2px 0 0">{{ exp.description }}</div>
         {% if exp.needs_online %}
         {# The feature is hosted, so the flag alone does nothing. Say so here
@@ -1032,8 +1032,8 @@ docker compose up -d</code></pre>
 
     <p>
       Status:
-      {% if system_mcp_enabled %}<span class="pill is-ok">enabled</span>
-      {% else %}<span class="pill">disabled</span>
+      {% if system_mcp_enabled %}<span class="tg tg--ok">enabled</span>
+      {% else %}<span class="tg">disabled</span>
         <span class="muted">- the /api/mcp API 404s until you enable it.</span>
       {% endif %}
     </p>
@@ -1053,9 +1053,9 @@ docker compose up -d</code></pre>
     {% if system_mcp_enabled %}
     <p>
       Token:
-      {% if system_mcp_token_set %}<span class="pill is-ok">set</span>
+      {% if system_mcp_token_set %}<span class="tg tg--ok">set</span>
         <span class="muted">- masked. Loopback callers work without it; remote agents present it as a bearer token.</span>
-      {% else %}<span class="pill">none</span>
+      {% else %}<span class="tg">none</span>
         <span class="muted">- an agent on this machine works without one; generate a token for a remote agent.</span>
       {% endif %}
     </p>
@@ -1068,11 +1068,11 @@ docker compose up -d</code></pre>
       <summary>
         <i class="ph ph-plug" aria-hidden="true"></i> Connected bridge
         {% if system_mcp_bridge.unknown_client %}
-          &middot; <span class="pill">{{ system_mcp_bridge.client }}</span>
+          &middot; <span class="tg">{{ system_mcp_bridge.client }}</span>
         {% elif system_mcp_bridge.update_available %}
-          &middot; <span class="pill is-warn">v{{ system_mcp_bridge.version }} &rarr; v{{ system_mcp_bridge.expected }}</span>
+          &middot; <span class="tg tg--warn">v{{ system_mcp_bridge.version }} &rarr; v{{ system_mcp_bridge.expected }}</span>
         {% else %}
-          &middot; <span class="pill is-ok">v{{ system_mcp_bridge.version }}</span>
+          &middot; <span class="tg tg--ok">v{{ system_mcp_bridge.version }}</span>
         {% endif %}
       </summary>
 

@@ -70,7 +70,7 @@ def test_press_row_folds_into_push_row_by_default(app: Flask) -> None:
     _sign_in(client)
     body = client.get("/history").get_data(as_text=True)
 
-    assert body.count("dx-inset-row") == 1
+    assert body.count('data-history-row="') == 1
     # Both halves' status chips on the one row.
     assert ">button</span>" in body
     assert ">pushed</span>" in body
@@ -88,7 +88,7 @@ def test_split_presses_shows_raw_rows(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
     body = client.get("/history?split_presses=1").get_data(as_text=True)
-    assert body.count("dx-inset-row") == 2
+    assert body.count('data-history-row="') == 2
 
 
 def test_press_with_missing_partner_renders_unfolded(app: Flask) -> None:
@@ -104,7 +104,7 @@ def test_press_with_missing_partner_renders_unfolded(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
     body = client.get("/history").get_data(as_text=True)
-    assert body.count("dx-inset-row") == 1
+    assert body.count('data-history-row="') == 1
     assert f'value="{press_id}"' in body
     # Nothing to resend: the press has no digest and no partner.
     assert "preview only; resend from the original push" in body

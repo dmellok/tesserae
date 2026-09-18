@@ -39,7 +39,7 @@
   <div class="dk-screen-frame">
     {% if s.thumb %}<img src="{{ s.thumb }}" alt="" loading="lazy">{% else %}<i class="ph ph-monitor" aria-hidden="true"></i>{% endif %}
     {% if s.live %}<span class="dk-screen-wash" aria-hidden="true"></span>{% endif %}
-    {% if s.waiting %}<span class="dk-ribbon is-warn">waiting</span>{% endif %}
+    {% if s.waiting %}<span class="tg tg--sm tg--upper tg--warn dk-ribbon">waiting</span>{% endif %}
   </div>
   <figcaption>
     {% if s.live %}<i class="ph-fill ph-play" aria-hidden="true"></i>{% endif %}
@@ -65,7 +65,7 @@
   <div class="dk-screen-frame">
     {% if c.on_panel.thumb %}<img src="{{ c.on_panel.thumb }}" alt="" loading="lazy">{% else %}<i class="ph ph-monitor" aria-hidden="true"></i>{% endif %}
     <span class="dk-screen-wash" aria-hidden="true"></span>
-    <span class="dk-ribbon">on the panel</span>
+    <span class="tg tg--sm tg--upper tg--teal dk-ribbon">on the panel</span>
   </div>
   <figcaption>
     <i class="ph-fill ph-play" aria-hidden="true"></i>
@@ -77,7 +77,7 @@
 <figure class="dk-screen dk-screen--panel is-empty">
   <div class="dk-screen-frame">
     <i class="ph ph-monitor" aria-hidden="true"></i>
-    <span class="dk-ribbon">on the panel</span>
+    <span class="tg tg--sm tg--upper tg--teal dk-ribbon">on the panel</span>
   </div>
   <figcaption><span class="dk-screen-name">{{ c.panel_empty_label }}</span></figcaption>
 </figure>
@@ -88,7 +88,7 @@
 <article class="dk-row{% if c.playing %} is-playing{% endif %}{% if not c.enabled %} is-off{% endif %}{% if c.is_new %} is-new{% endif %}"
          data-kind="{{ c.kind }}"{% if row_id %} id="udeck-{{ c.id }}"{% endif %}>
   <div class="dk-row-head">
-    <span class="dk-badge{% if c.playing and c.kind == 'cycle' %} is-live{% endif %}">
+    <span class="tg tg--upper dk-badge{% if c.playing and c.kind == 'cycle' %} tg--teal{% endif %}">
       {% if c.playing and c.kind == 'cycle' %}<i class="ph-fill ph-play" aria-hidden="true"></i>{% else %}<i class="ph-bold ph-{{ c.badge_icon }}" aria-hidden="true"></i>{% endif %}{{ c.badge }}
     </span>
     <span class="dk-name">{{ c.name }}</span>
@@ -96,14 +96,14 @@
        groups that have no display of their own. #}
     {% if show_chips %}
     {% for dn in c.device_names %}
-    <span class="dk-devchip"><i class="ph ph-monitor" aria-hidden="true"></i>{{ dn }}</span>
+    <span class="tg dk-devchip"><i class="ph ph-monitor" aria-hidden="true"></i>{{ dn }}</span>
     {% endfor %}
     {% endif %}
     <span class="dk-meta">{{ c.meta }}</span>
     {# An enabled rotation that is not playing says what the display holds
        instead and when it takes the panel back (#280). #}
     {% if c.paused_reason %}
-    <span class="dk-paused" title="This rotation is enabled but the display is showing something else">
+    <span class="tg tg--warn dk-paused" title="This rotation is enabled but the display is showing something else">
       <i class="ph ph-pause" aria-hidden="true"></i>{{ c.paused_reason }}
     </span>
     {% endif %}

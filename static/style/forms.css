@@ -612,7 +612,7 @@ code {
 .wizard-pill {
   padding: 7px 13px;
   border: 1px solid var(--t-border);
-  border-radius: 999px;
+  border-radius: var(--t-radius-sm);
   background: var(--t-surface);
   color: var(--t-fg-soft);
   font: inherit;
@@ -2146,7 +2146,7 @@ input[type="range"].slider:focus::-moz-range-thumb {
   font-size: var(--t-size-sm);
   background: var(--t-bg, white);
   border: 1px solid var(--t-border, rgba(0, 0, 0, 0.12));
-  border-radius: var(--t-radius-pill, 999px);
+  border-radius: 5px;
   cursor: pointer;
   color: var(--t-fg, inherit);
   line-height: 1.3;

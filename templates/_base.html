@@ -112,6 +112,7 @@
      the split commit). #}
   <link rel="stylesheet" href="{{ url_for('static', filename='style/base.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='style/shell.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style/chips.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='style/forms.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='style/settings.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='style/schedules.css') }}">
@@ -294,17 +295,17 @@
     </nav>
     {% endblock %}
     {% if nav_discovered %}
-    {# "New devices" chip: devices that announced themselves (REST or MQTT)
+    {# "New devices" tag: devices that announced themselves (REST or MQTT)
        but are not registered. Links to the Devices tab with every
        register row opened. Server-rendered per page; the Devices tab's
        discovery poll reloads it live. #}
     <a href="{{ url_for('auth.settings_area', area='devices', discovered=1) }}"
-       class="topbar-discovered topbar-discovered--topbar"
+       class="tg tg--teal tg--lg topbar-discovered topbar-discovered--topbar"
        title="{{ nav_discovered|length }} new device{{ 's' if nav_discovered|length != 1 else '' }} heard, not registered yet"
        aria-label="{{ nav_discovered|length }} new device{{ 's' if nav_discovered|length != 1 else '' }} heard, not registered yet">
       <i class="ph-bold ph-broadcast" aria-hidden="true"></i>
-      <span class="topbar-discovered-count">{{ nav_discovered|length }}</span>
       <span class="topbar-discovered-label">New device{{ 's' if nav_discovered|length != 1 else '' }}</span>
+      <span class="tg-count topbar-discovered-count">{{ nav_discovered|length }}</span>
     </a>
     {% endif %}
     {% if nav_batteries %}
@@ -324,7 +325,7 @@
     <details class="topbar-batteries topbar-batteries--topbar is-tone-{{ _worst.tone }}" data-batteries>
       <summary aria-label="Device batteries">
         <i class="ph-bold ph-battery-{% if _worst.tone == 'critical' %}warning{% elif _worst.tone == 'low' %}low{% else %}medium{% endif %}" aria-hidden="true"></i>
-        <span class="topbar-batteries-count">{{ nav_batteries|length }}</span>
+        <span class="tg-count topbar-batteries-count">{{ nav_batteries|length }}</span>
       </summary>
       <div class="topbar-batteries-popover" role="dialog" aria-label="Device batteries">
         <header class="topbar-batteries-head">Device batteries</header>
@@ -462,6 +463,14 @@
   <script src="{{ url_for('static', filename='entity-overrides.js') }}"></script>
   <script src="{{ url_for('static', filename='variables-textarea.js') }}"></script>
   <script>
+    // Target tiles (.tile, chips.css): mirror the checkbox into an is-on
+    // class for browsers without :has().
+    document.addEventListener('change', function (ev) {
+      const box = ev.target;
+      if (!box || box.type !== 'checkbox' || !box.closest) return;
+      const tile = box.closest('.tile');
+      if (tile) tile.classList.toggle('is-on', box.checked);
+    });
     // Hamburger toggle for the right-side nav drawer.
     (function () {
       const btn = document.querySelector('.nav-toggle');

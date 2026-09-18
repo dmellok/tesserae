@@ -1,183 +1,154 @@
 {% extends "_base.html" %}
-{% from "_components.html" import section_card %}
 {% block title %}History, Tesserae{% endblock %}
 
-{# Source → {label, icon, tone} for the colour-coded source pill on
-   each push row. ``tone`` swaps the pill chrome class (`.is-schedule`
-   / `.is-dashboard` / etc) so the eye can scan triggers at a glance.
-   Unknown sources fall through to a neutral chip with the raw value. #}
+{# Source → (label, icon, key, tone). ``key`` is a stable per-source hook
+   class (``dx-source-<key>``); ``tone`` picks the tint tag colour:
+   teal for hand-sent things, ochre for anything a timer fired, terracotta
+   for external triggers, slate for housekeeping, none for background
+   work. Unknown sources fall through to a neutral tag with the raw value. #}
 {% set SOURCE_META = {
-  'page':           ('Send page',      'paper-plane-tilt',     'page'),
-  'file':           ('File',           'image-square',         'file'),
-  'url':            ('URL',            'link-simple',          'url'),
-  'webpage':        ('Webpage',        'globe',                'webpage'),
-  'note':           ('Note',           'note',                 'note'),
-  'scheduler':      ('Schedule',       'calendar-dots',        'schedule'),
-  'rotation':       ('Rotation',       'shuffle',              'rotation'),
-  'webhook':        ('Webhook',        'arrow-square-in',      'webhook'),
-  'home_assistant': ('Home Assistant', 'house',                'ha'),
-  'manual':         ('Manual',         'cursor-click',         'manual'),
-  'resend':         ('Resend',         'arrow-clockwise',      'resend'),
-  'onboarding':     ('Setup',          'sparkle',              'setup'),
-  'button':         ('Button',         'hand-tap',             'button'),
-  'deck':           ('Rotation step',      'arrows-clockwise', 'rotation'),
-  'deck_init':      ('Lineup start',       'play',             'rotation'),
-  'deck_warm':      ('Background refresh', 'clock-clockwise',  'warm'),
-  'album_warm':     ('Album refresh',      'images',           'warm'),
-  'page_refresh':   ('Auto update',        'clock-clockwise',  'schedule'),
+  'page':           ('Send page',          'paper-plane-tilt',  'page',     'teal'),
+  'file':           ('File',               'image-square',      'file',     'teal'),
+  'url':            ('URL',                'link-simple',       'url',      'teal'),
+  'webpage':        ('Webpage',            'globe',             'webpage',  'teal'),
+  'note':           ('Note',               'note',              'note',     'teal'),
+  'scheduler':      ('Schedule',           'calendar-dots',     'schedule', 'ochre'),
+  'rotation':       ('Rotation',           'shuffle',           'rotation', 'ochre'),
+  'deck':           ('Rotation step',      'arrows-clockwise',  'rotation', 'ochre'),
+  'deck_init':      ('Lineup start',       'play',              'rotation', 'ochre'),
+  'page_refresh':   ('Auto update',        'clock-clockwise',   'schedule', 'ochre'),
+  'webhook':        ('Webhook',            'arrow-square-in',   'webhook',  'terracotta'),
+  'home_assistant': ('Home Assistant',     'house',             'ha',       'terracotta'),
+  'button':         ('Button',             'hand-tap',          'button',   'terracotta'),
+  'manual':         ('Manual',             'cursor-click',      'manual',   'slate'),
+  'resend':         ('Resend',             'arrow-clockwise',   'resend',   'slate'),
+  'onboarding':     ('Setup',              'sparkle',           'setup',    'slate'),
+  'deck_warm':      ('Background refresh', 'clock-clockwise',   'warm',     ''),
+  'album_warm':     ('Album refresh',      'images',            'warm',     ''),
 } %}
 
-{% macro source_chip(source) %}
-  {% set meta = SOURCE_META.get(source) %}
-  <span class="dx-source-chip dx-source-{{ meta[2] if meta else 'unknown' }}">
-    {{ meta[0] if meta else source }}
-  </span>
-{% endmacro %}
+{# Status → (label, tone). "pushed" only promises the server published the
+   frame (discussion #62); receipt tracking is separate. #}
+{% set STATUS_META = {
+  'sent':               ('pushed',    'ok'),
+  'dispatched':         ('button',    'ok'),
+  'fetched':            ('fetched',   'ok'),
+  'warmed':             ('warmed',    ''),
+  'no_change':          ('no change', ''),
+  'webhook_dispatched': ('webhook',   ''),
+  'noop':               ('no-op',     ''),
+  'deduped':            ('duplicate', ''),
+  'unmapped':           ('unmapped',  'warn'),
+  'busy':               ('busy',      'warn'),
+  'quiet':              ('quiet',     'warn'),
+  'held':               ('held',      'warn'),
+  'not_found':          ('not found', 'bad'),
+} %}
 
-{% macro status_chip(status) %}
-  {# v0.71.x (discussion #62): "delivered" implied end-to-end receipt,
-     but the push pipeline's ``sent`` status only means the server
-     successfully published the frame (broker publish, or a REST
-     device with a new digest ready to poll). It doesn't guarantee
-     the panel has applied it yet. Renamed to ``pushed`` so the chip
-     matches the actual guarantee; separate receipt tracking is a
-     follow-up. #}
-  {% if status == 'sent' %}<span class="dx-pill is-ok"><span class="dx-pill-dot"></span>pushed</span>
-  {# A warm renders into the deck/album side cache without repainting the
-     panel; it must not wear the same pill as a push the display showed. #}
-  {% elif status == 'warmed' %}<span class="dx-pill is-info"><span class="dx-pill-dot"></span>warmed</span>
-  {% elif status == 'no_change' %}<span class="dx-pill is-info"><span class="dx-pill-dot"></span>no change</span>
-  {% elif status == 'dispatched' %}<span class="dx-pill is-ok"><span class="dx-pill-dot"></span>button</span>
-  {% elif status == 'webhook_dispatched' %}<span class="dx-pill is-info"><span class="dx-pill-dot"></span>webhook</span>
-  {% elif status == 'fetched' %}<span class="dx-pill is-ok"><span class="dx-pill-dot"></span>fetched</span>
-  {% elif status == 'noop' %}<span class="dx-pill is-info"><span class="dx-pill-dot"></span>no-op</span>
-  {% elif status == 'deduped' %}<span class="dx-pill is-info"><span class="dx-pill-dot"></span>duplicate</span>
-  {% elif status == 'unmapped' %}<span class="dx-pill is-warn"><span class="dx-pill-dot"></span>unmapped</span>
-  {% elif status == 'busy' %}<span class="dx-pill is-warn"><span class="dx-pill-dot"></span>busy</span>
-  {% elif status == 'quiet' %}<span class="dx-pill is-warn"><span class="dx-pill-dot"></span>quiet</span>
-  {% elif status == 'not_found' %}<span class="dx-pill is-danger"><span class="dx-pill-dot"></span>not found</span>
-  {% else %}<span class="dx-pill is-danger"><span class="dx-pill-dot"></span>failed</span>{% endif %}
-{% endmacro %}
+{% macro source_tag(source) %}
+  {% set meta = SOURCE_META.get(source) %}
+  <span class="tg{% if meta and meta[3] %} tg--{{ meta[3] }}{% endif %} dx-source-{{ meta[2] if meta else 'unknown' }}">{{ meta[0] if meta else source }}</span>
+{%- endmacro %}
+
+{% macro status_tag(status) %}
+  {% set meta = STATUS_META.get(status, ('failed', 'bad')) %}
+  <span class="tg{% if meta[1] %} tg--{{ meta[1] }}{% endif %} dx-hist-status">{{ meta[0] }}</span>
+{%- endmacro %}
 
 {% block main %}
 <header class="page-head">
   <h1><i class="ph ph-clock-counter-clockwise"></i> History</h1>
-  <p class="lede">Newest pushes first. Each row links to the rendered artifact and the device it landed on.</p>
+  <p class="lede">Every push, newest first. Each row links to the rendered frame and the display it landed on.</p>
 </header>
 
 {% if chips %}
-{# Filter chip strip across the top of the page (outside the card so
-   it sits as page-level navigation). Style matches the existing
-   ``.event-type-filter`` shape but uses the v0.56 chip + count-pill
-   vocabulary so it reads as part of the new admin surface. #}
-<nav class="dx-filter-strip" role="tablist" aria-label="Filter by source">
-  {% for chip in chips %}
-  {% set meta = SOURCE_META.get(chip.source) %}
-  <a href="{{ url_for('history.index', device=active_device) if chip.source == '' else url_for('history.index', source=chip.source, device=active_device) }}"
-     role="tab"
-     class="dx-filter-chip{% if chip.active %} is-active{% endif %}"
-     title="{{ 'All pushes' if chip.source == '' else ('Filter to: ' ~ (meta[0] if meta else chip.source)) }}">
-    <i class="ph ph-{{ 'list-bullets' if chip.source == '' else (meta[1] if meta else 'question') }}" aria-hidden="true"></i>
-    <span>{{ 'All' if chip.source == '' else (meta[0] if meta else chip.source) }}</span>
-    <span class="dx-count-pill">{{ chip.count }}</span>
-  </a>
-  {% endfor %}
-  {# Skipped-pushes toggle preserves the existing behaviour, restyled. #}
-  {% if include_skipped %}
-  <a href="{{ url_for('history.index', source=active_source, device=active_device, include_background=(1 if include_background else None), split_presses=(1 if split_presses else None), sort=(sort_mode if sort_mode != 'time' else None)) }}"
-     class="dx-filter-chip is-active" title="Hide skipped pushes (quiet hours, condition holds)">
-    <i class="ph ph-eye" aria-hidden="true"></i><span>Skipped shown</span>
-  </a>
-  {% else %}
-  <a href="{{ url_for('history.index', source=active_source, device=active_device, include_skipped=1, include_background=(1 if include_background else None), split_presses=(1 if split_presses else None), sort=(sort_mode if sort_mode != 'time' else None)) }}"
-     class="dx-filter-chip" title="Show pushes skipped by quiet hours or condition holds">
-    <i class="ph ph-eye-closed" aria-hidden="true"></i><span>Show skipped</span>
-  </a>
+<div class="dx-hist-filters">
+  {# Row 1: source group, then the view toggles. #}
+  <div class="dx-hist-filter-row">
+    <nav class="seg dx-hist-sources" role="tablist" aria-label="Filter by source">
+      {% for chip in chips %}
+      {% set meta = SOURCE_META.get(chip.source) %}
+      <a href="{{ url_for('history.index', **dict(filter_args, source=(chip.source or None))) }}"
+         role="tab" aria-selected="{{ 'true' if chip.active else 'false' }}"
+         class="seg-item{% if chip.active %} is-on{% endif %}"
+         title="{{ 'All pushes' if chip.source == '' else ('Filter to: ' ~ (meta[0] if meta else chip.source)) }}">
+        <i class="ph ph-{{ 'list-bullets' if chip.source == '' else (meta[1] if meta else 'question') }}" aria-hidden="true"></i>
+        <span>{{ 'All' if chip.source == '' else (meta[0] if meta else chip.source) }}</span>
+        <span class="seg-count">{{ chip.count }}</span>
+      </a>
+      {% endfor %}
+    </nav>
+    <span class="dx-hist-filter-divider" aria-hidden="true"></span>
+    <nav class="seg dx-hist-toggles" aria-label="View options">
+      {# Skipped pushes (quiet hours, condition holds) are hidden by default. #}
+      <a href="{{ url_for('history.index', **dict(filter_args, include_skipped=(None if include_skipped else 1))) }}"
+         class="seg-item{% if include_skipped %} is-on{% endif %}" aria-pressed="{{ 'true' if include_skipped else 'false' }}"
+         title="{{ 'Hide pushes skipped by quiet hours or condition holds' if include_skipped else 'Show pushes skipped by quiet hours or condition holds' }}">
+        <i class="ph ph-{{ 'eye' if include_skipped else 'eye-closed' }}" aria-hidden="true"></i><span>Show skipped</span>
+      </a>
+      {# Background work (deck / album warms) never repaints a panel. #}
+      <a href="{{ url_for('history.index', **dict(filter_args, include_background=(None if include_background else 1))) }}"
+         class="seg-item{% if include_background %} is-on{% endif %}" aria-pressed="{{ 'true' if include_background else 'false' }}"
+         title="{{ 'Hide background refresh renders' if include_background else 'Show background refresh renders (warmed frames that never repainted a panel)' }}">
+        <i class="ph ph-clock-clockwise" aria-hidden="true"></i><span>Show background</span>
+      </a>
+      {# A press and the push it triggered fold into one row by default. #}
+      <a href="{{ url_for('history.index', **dict(filter_args, split_presses=(None if split_presses else 1))) }}"
+         class="seg-item{% if split_presses %} is-on{% endif %}" aria-pressed="{{ 'true' if split_presses else 'false' }}"
+         title="{{ 'Fold button presses into the push they triggered' if split_presses else 'Show presses and the pushes they triggered as separate rows' }}">
+        <i class="ph ph-{{ 'arrows-in-line-vertical' if split_presses else 'arrows-out-line-vertical' }}" aria-hidden="true"></i><span>Split presses</span>
+      </a>
+      <a href="{{ url_for('history.index', **dict(filter_args, sort=None)) }}"
+         class="seg-item{% if sort_mode == 'time' %} is-on{% endif %}" aria-pressed="{{ 'true' if sort_mode == 'time' else 'false' }}"
+         title="Group by day, newest first">
+        <i class="ph ph-clock-counter-clockwise" aria-hidden="true"></i><span>Newest first</span>
+      </a>
+      <a href="{{ url_for('history.index', **dict(filter_args, sort='dashboard')) }}"
+         class="seg-item{% if sort_mode == 'dashboard' %} is-on{% endif %}" aria-pressed="{{ 'true' if sort_mode == 'dashboard' else 'false' }}"
+         title="Group rows sharing a dashboard (or display, for button rows)">
+        <i class="ph ph-squares-four" aria-hidden="true"></i><span>By dashboard</span>
+      </a>
+    </nav>
+  </div>
+  {# Row 2: per-display filter (discussion #280) and the clear-history control. #}
+  {% if device_chips|length > 1 or history %}
+  <div class="dx-hist-filter-row dx-hist-filter-row--displays">
+    {% if device_chips|length > 1 %}
+    <nav class="seg dx-hist-displays" role="tablist" aria-label="Filter by display">
+      {% for chip in device_chips %}
+      <a href="{{ url_for('history.index', **dict(filter_args, device=(chip.id or None))) }}"
+         role="tab" aria-selected="{{ 'true' if chip.active else 'false' }}"
+         class="seg-item dx-hist-display{% if chip.active %} is-on{% endif %}"
+         title="{{ 'Pushes to every display' if chip.id == '' else ('Only pushes to ' ~ chip.name) }}">
+        <i class="ph ph-{{ chip.icon or 'monitor' }}" aria-hidden="true"></i>
+        <span>{{ chip.name }}</span>
+        <span class="seg-count">{{ chip.count }}</span>
+      </a>
+      {% endfor %}
+    </nav>
+    {% endif %}
+    {% if history %}
+    {# Manual housekeeping (issue #116): clear everything older than a cutoff. #}
+    <form method="post" action="{{ url_for('send.clear_history') }}" class="form form--inline dx-hist-clear"
+          onsubmit="return confirm('Delete the selected history? This cannot be undone.');">
+      <label class="u-muted" for="hist-older">Clear history</label>
+      <select name="older_than" id="hist-older" class="dx-hist-clear-age">
+        <option value="7">older than 7 days</option>
+        <option value="30">older than 30 days</option>
+        <option value="90">older than 90 days</option>
+        <option value="">all history</option>
+      </select>
+      <button type="submit" class="dx-btn-ghost-sm dx-hist-clear-btn">
+        <i class="ph ph-trash" aria-hidden="true"></i><span>Delete</span>
+      </button>
+    </form>
+    {% endif %}
+  </div>
   {% endif %}
-  {# Background work (deck / album warms) is hidden by default so the feed
-     reads as "what the panels actually showed"; this toggle brings it back
-     for anyone auditing the render pipeline. #}
-  {% if include_background %}
-  <a href="{{ url_for('history.index', source=active_source, device=active_device, include_skipped=(1 if include_skipped else None), split_presses=(1 if split_presses else None), sort=(sort_mode if sort_mode != 'time' else None)) }}"
-     class="dx-filter-chip is-active" title="Hide background refresh renders (they never repaint a panel)">
-    <i class="ph ph-clock-clockwise" aria-hidden="true"></i><span>Background shown</span>
-  </a>
-  {% else %}
-  <a href="{{ url_for('history.index', source=active_source, device=active_device, include_background=1, include_skipped=(1 if include_skipped else None), split_presses=(1 if split_presses else None), sort=(sort_mode if sort_mode != 'time' else None)) }}"
-     class="dx-filter-chip" title="Show background refresh renders (warmed frames that never repainted a panel)">
-    <i class="ph ph-clock-clockwise" aria-hidden="true"></i><span>Show background</span>
-  </a>
-  {% endif %}
-  {# Press-fold toggle: by default a button/touch press and the push it
-     triggered render as one merged row; splitting shows the raw
-     two-row log for auditing. #}
-  {% if split_presses %}
-  <a href="{{ url_for('history.index', source=active_source, device=active_device, include_skipped=(1 if include_skipped else None), include_background=(1 if include_background else None), sort=(sort_mode if sort_mode != 'time' else None)) }}"
-     class="dx-filter-chip is-active" title="Fold button presses into the push they triggered">
-    <i class="ph ph-arrows-in-line-vertical" aria-hidden="true"></i><span>Presses split</span>
-  </a>
-  {% else %}
-  <a href="{{ url_for('history.index', source=active_source, device=active_device, include_skipped=(1 if include_skipped else None), include_background=(1 if include_background else None), split_presses=1, sort=(sort_mode if sort_mode != 'time' else None)) }}"
-     class="dx-filter-chip" title="Show presses and the pushes they triggered as separate rows">
-    <i class="ph ph-arrows-out-line-vertical" aria-hidden="true"></i><span>Split presses</span>
-  </a>
-  {% endif %}
-  {# v0.69.17: sort toggle. Default "Newest first" is chronological
-     (rows already come back that way from the event log); "By
-     dashboard" groups rows sharing a target so a per-dashboard read
-     is one scroll rather than a needle-in-haystack scan. #}
-  <a href="{{ url_for('history.index', source=active_source, device=active_device, include_skipped=(1 if include_skipped else None), include_background=(1 if include_background else None), split_presses=(1 if split_presses else None)) }}"
-     class="dx-filter-chip{% if sort_mode == 'time' %} is-active{% endif %}"
-     title="Sort chronologically (newest first)">
-    <i class="ph ph-clock-counter-clockwise" aria-hidden="true"></i><span>Newest first</span>
-  </a>
-  <a href="{{ url_for('history.index', source=active_source, device=active_device, include_skipped=(1 if include_skipped else None), include_background=(1 if include_background else None), split_presses=(1 if split_presses else None), sort='dashboard') }}"
-     class="dx-filter-chip{% if sort_mode == 'dashboard' %} is-active{% endif %}"
-     title="Group rows sharing a dashboard (or device, for button rows)">
-    <i class="ph ph-squares-four" aria-hidden="true"></i><span>By dashboard</span>
-  </a>
-</nav>
-{# Per-display filter (discussion #280): one chip per display the loaded
-   rows landed on, counts included, with every other filter carried along. #}
-{% if device_chips|length > 1 %}
-<nav class="dx-filter-strip dx-filter-strip--devices" role="tablist" aria-label="Filter by display">
-  {% for chip in device_chips %}
-  <a href="{{ url_for('history.index', source=active_source, device=(chip.id or None), include_skipped=(1 if include_skipped else None), include_background=(1 if include_background else None), split_presses=(1 if split_presses else None), sort=(sort_mode if sort_mode != 'time' else None)) }}"
-     role="tab" aria-selected="{{ 'true' if chip.active else 'false' }}"
-     class="dx-filter-chip dx-filter-chip--display{% if chip.active %} is-active{% endif %}"
-     title="{{ 'Pushes to every display' if chip.id == '' else ('Only pushes to ' ~ chip.name) }}">
-    <i class="ph ph-{{ chip.icon or 'monitor' }}" aria-hidden="true"></i>
-    <span>{{ chip.name }}</span>
-    <span class="dx-count-pill">{{ chip.count }}</span>
-  </a>
-  {% endfor %}
-</nav>
-{% endif %}
-{% endif %}
-
-{% if history %}
-{# Manual history housekeeping (issue #116): tick rows for a bulk delete, or
-   clear everything / everything older than a cutoff. #}
-<div class="dx-history-toolbar">
-  <form method="post" action="{{ url_for('send.clear_history') }}" class="form form--inline dx-history-clear"
-        onsubmit="return confirm('Delete the selected history? This cannot be undone.');">
-    <label class="u-muted" for="hist-older">Clear history:</label>
-    <select name="older_than" id="hist-older" class="dx-history-clear-age">
-      <option value="7">older than 7 days</option>
-      <option value="30">older than 30 days</option>
-      <option value="90">older than 90 days</option>
-      <option value="">all history</option>
-    </select>
-    <button type="submit" class="dx-btn-ghost-sm dx-btn-push">
-      <i class="ph ph-trash" aria-hidden="true"></i><span>Delete</span>
-    </button>
-  </form>
 </div>
 {% endif %}
 
-{% call section_card(icon='clock-counter-clockwise', title='Push history',
-                     description='Every push attempted on the panel pipeline — file, URL, webpage, dashboard, or schedule fire.',
-                     meta={'label': '', 'value': history|length}) %}
+<section class="dx-section-card dx-hist-card" aria-label="Push history">
   {% if not history %}
   <div class="dx-empty">
     <div class="dx-empty-icon"><i class="ph ph-clock-counter-clockwise" aria-hidden="true"></i></div>
@@ -194,69 +165,76 @@
     </p>
   </div>
   {% else %}
-  <ul class="dx-discovered-list">
-    {% set ok_statuses = ('sent', 'warmed', 'busy', 'quiet', 'no_change', 'dispatched', 'webhook_dispatched', 'fetched', 'noop', 'deduped', 'unmapped') %}
-    {% for ev in history %}
-    {% set is_failed = ev.status not in ok_statuses or (ev.push_status and ev.push_status not in ok_statuses) %}
-    <li class="dx-inset-row dx-history-row{% if is_failed %} dx-history-row--failed{% endif %}">
-      <input type="checkbox" class="dx-history-select" value="{{ ev.ids|join(',') }}"
-             aria-label="Select entry #{{ ev.id }}" title="Select for bulk delete">
-      {% if ev.preview_digest %}
-      <a class="dx-history-thumb" href="{{ url_for('renders', filename=ev.preview_digest ~ '.png') }}" data-lightbox aria-label="Open render for push #{{ ev.id }}">
-        <img src="{{ url_for('renders', filename=ev.preview_digest ~ '.png', w=180) }}" alt="" width="64" height="64" loading="lazy" decoding="async">
-      </a>
-      {% else %}
-      <span class="dx-history-thumb dx-history-thumb--empty" aria-hidden="true">
-        <i class="ph ph-image-square"></i>
-      </span>
-      {% endif %}
-      <a class="dx-history-time" {% if ev.preview_digest %}href="{{ url_for('renders', filename=ev.preview_digest ~ '.png') }}" data-lightbox aria-label="Push #{{ ev.id }}"{% endif %}>
-        <span class="dx-history-clock"><code>{{ ev.abs.split(' ')[1] if ' ' in ev.abs else ev.abs }}</code></span>
-        <span class="dx-history-date">{{ ev.rel }}</span>
-      </a>
-      <div class="dx-history-mid">
-        {% if ev.target_devices %}
-        {% for dev in ev.target_devices %}
-        <span class="dx-device-chip"{% if dev.kind %} title="{{ dev.kind }}"{% endif %}><i class="ph ph-{{ dev.icon or 'monitor' }}" aria-hidden="true"></i> {{ dev.name }}</span>
-        {% endfor %}
-        {% endif %}
-        {{ source_chip(ev.source) }}
-        <span class="dx-history-target">{{ ev.target }}</span>
-        {% if ev.error %}<span class="dx-history-err">{{ ev.error }}</span>{% endif %}
-        {% if ev.button_detail %}
-        <span class="dx-history-detail u-muted">{{ ev.button_detail }}</span>
-        {% endif %}
-      </div>
-      <div class="dx-history-end">
-        {{ status_chip(ev.status) }}
-        {% if ev.push_status %}{{ status_chip(ev.push_status) }}{% endif %}
-        <span class="dx-history-dur">{% if ev.duration_s %}{{ '%.1f'|format(ev.duration_s) }}s{% else %}—{% endif %}</span>
-        <form method="post" action="{{ url_for('send.resend', event_id=ev.resend_id) }}" class="form form--inline">
-          <button type="submit" class="dx-btn-ghost-sm dx-btn-icon-only" {% if not ev.can_resend %}disabled title="preview only; resend from the original push"{% else %}title="Resend this push"{% endif %}>
-            <i class="ph ph-arrow-clockwise" aria-hidden="true"></i>
-          </button>
-        </form>
-        {# A folded row deletes both of its halves through the bulk endpoint. #}
-        {% if ev.ids|length > 1 %}
-        <form method="post" action="{{ url_for('send.bulk_delete') }}" class="form form--inline" onsubmit="return confirm('Delete this entry?');">
-          {% for rid in ev.ids %}<input type="hidden" name="event_ids" value="{{ rid }}">{% endfor %}
-          <button type="submit" class="dx-btn-ghost-sm dx-btn-icon-only" title="Delete entry">
-            <i class="ph ph-trash" aria-hidden="true"></i>
-          </button>
-        </form>
+  {% for group in groups %}
+  <section class="dx-hist-group" data-history-group="{{ group.key }}">
+    <div class="dx-hist-group-head">
+      <h2 class="dx-hist-group-title">{{ group.label }}</h2>
+      <span class="dx-hist-group-sub">{{ group.count }} push{{ 'es' if group.count != 1 }}{% if group.failed %} · {{ group.failed }} failed{% endif %}</span>
+    </div>
+    <ul class="dx-hist-rows">
+      {% for ev in group.rows %}
+      <li class="dx-hist-row{% if ev.failed %} dx-hist-row--failed{% endif %}" data-history-row="{{ ev.id }}">
+        <span class="dx-hist-dot{% if ev.failed %} is-bad{% endif %}" aria-hidden="true"></span>
+        <input type="checkbox" class="dx-hist-select" value="{{ ev.ids|join(',') }}"
+               aria-label="Select entry #{{ ev.id }}" title="Select for bulk delete">
+        <a class="dx-hist-time" {% if ev.preview_digest %}href="{{ url_for('renders', filename=ev.preview_digest ~ '.png') }}" data-lightbox aria-label="Push #{{ ev.id }}"{% endif %} title="{{ ev.abs }} ({{ ev.rel }})">{{ ev.time }}</a>
+        {% if ev.preview_digest %}
+        <a class="dx-hist-thumb" href="{{ url_for('renders', filename=ev.preview_digest ~ '.png') }}" data-lightbox aria-label="Open render for push #{{ ev.id }}">
+          <img src="{{ url_for('renders', filename=ev.preview_digest ~ '.png', w=180) }}" alt="" width="64" height="48" loading="lazy" decoding="async">
+        </a>
         {% else %}
-        <form method="post" action="{{ url_for('send.delete', event_id=ev.id) }}" class="form form--inline" onsubmit="return confirm('Delete this entry?');">
-          <button type="submit" class="dx-btn-ghost-sm dx-btn-icon-only" title="Delete entry">
-            <i class="ph ph-trash" aria-hidden="true"></i>
-          </button>
-        </form>
+        <span class="dx-hist-thumb dx-hist-thumb--empty{% if ev.failed %} is-bad{% endif %}" aria-hidden="true">no frame</span>
         {% endif %}
-      </div>
-    </li>
-    {% endfor %}
-  </ul>
+        <div class="dx-hist-mid">
+          <span class="dx-hist-tags">
+            {% for dev in ev.target_devices %}
+            <span class="tg dx-hist-device"{% if dev.kind %} title="{{ dev.kind }}"{% endif %}><i class="ph ph-{{ dev.icon or 'monitor' }}" aria-hidden="true"></i>{{ dev.name }}</span>
+            {% endfor %}
+            {{ source_tag(ev.source) }}
+          </span>
+          <span class="dx-hist-break" aria-hidden="true"></span>
+          <span class="dx-hist-target">{{ ev.target }}</span>
+          {% if ev.error %}<span class="dx-hist-err" title="{{ ev.error }}">{{ ev.error }}</span>{% endif %}
+          {% if ev.button_detail %}<span class="dx-hist-detail">{{ ev.button_detail }}</span>{% endif %}
+        </div>
+        <span class="dx-hist-statuses">
+          {{ status_tag(ev.status) }}
+          {% if ev.push_status %}{{ status_tag(ev.push_status) }}{% endif %}
+        </span>
+        <span class="dx-hist-dur">{% if ev.duration_s %}{{ '%.1f'|format(ev.duration_s) }}s{% endif %}</span>
+        <span class="dx-hist-actions">
+          <form method="post" action="{{ url_for('send.resend', event_id=ev.resend_id) }}" class="form form--inline">
+            <button type="submit" class="dx-btn-ghost-sm dx-btn-icon-only" {% if not ev.can_resend %}disabled title="preview only; resend from the original push"{% else %}title="Resend this push"{% endif %}>
+              <i class="ph ph-arrow-clockwise" aria-hidden="true"></i>
+            </button>
+          </form>
+          <details class="dx-hist-more">
+            <summary aria-label="More actions for entry #{{ ev.id }}" title="More"><i class="ph-bold ph-dots-three" aria-hidden="true"></i></summary>
+            <div class="dx-hist-more-menu">
+              {% if ev.preview_digest %}
+              <a class="dx-hist-more-item" href="{{ url_for('renders', filename=ev.preview_digest ~ '.png') }}" data-lightbox>Open frame</a>
+              {% endif %}
+              {# A folded row deletes both of its halves through the bulk endpoint. #}
+              {% if ev.ids|length > 1 %}
+              <form method="post" action="{{ url_for('send.bulk_delete') }}" class="form form--inline" onsubmit="return confirm('Delete this entry?');">
+                {% for rid in ev.ids %}<input type="hidden" name="event_ids" value="{{ rid }}">{% endfor %}
+                <button type="submit" class="dx-hist-more-item is-danger">Delete</button>
+              </form>
+              {% else %}
+              <form method="post" action="{{ url_for('send.delete', event_id=ev.id) }}" class="form form--inline" onsubmit="return confirm('Delete this entry?');">
+                <button type="submit" class="dx-hist-more-item is-danger">Delete</button>
+              </form>
+              {% endif %}
+            </div>
+          </details>
+        </span>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endfor %}
   {% endif %}
-{% endcall %}
+</section>
 
 {# Bulk action bar: floats in once >=1 row is checked. The ids of the checked
    rows are injected as hidden inputs on submit (kept out of the per-row forms
@@ -272,32 +250,12 @@
   </div>
 </div>
 
-<style>
-  .dx-history-toolbar { display: flex; justify-content: flex-end; margin: 0 0 12px; }
-  .dx-history-clear { display: flex; align-items: center; gap: 8px; margin: 0; }
-  .dx-history-clear-age {
-    height: 32px; padding: 0 8px; border-radius: var(--t-radius-sm);
-    border: 1px solid var(--t-border); background: var(--t-surface); color: var(--t-fg);
-    font-size: 0.85rem;
-  }
-  .dx-history-select { flex: 0 0 auto; width: 16px; height: 16px; margin-right: 6px; cursor: pointer; accent-color: var(--t-accent); }
-  #dx-hist-bulk-bar {
-    position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%);
-    z-index: 500; display: flex; align-items: center; gap: 14px;
-    padding: 10px 14px; border: 1px solid var(--t-border); border-radius: 12px;
-    background: var(--t-surface); box-shadow: 0 12px 34px rgba(0, 0, 0, .24);
-  }
-  #dx-hist-bulk-bar[hidden] { display: none; }
-  #dx-hist-bulk-bar .dx-bulk-count { font-size: 13px; font-weight: 600; white-space: nowrap; }
-  #dx-hist-bulk-bar .dx-bulk-actions { display: flex; align-items: center; gap: 8px; }
-  #dx-hist-bulk-bar .form { margin: 0; }
-</style>
 <script>
   // History multi-select: checkboxes drive a floating bulk-delete bar. On
   // submit the checked ids are injected as hidden event_ids inputs into the
   // bulk form (kept out of the per-row forms, so no nested-form issues).
   (function () {
-    const boxes = Array.prototype.slice.call(document.querySelectorAll('.dx-history-select'));
+    const boxes = Array.prototype.slice.call(document.querySelectorAll('.dx-hist-select'));
     const bar = document.getElementById('dx-hist-bulk-bar');
     if (!boxes.length || !bar) return;
     const count = document.getElementById('dx-hist-bulk-count');
@@ -328,6 +286,19 @@
       sync();
     });
     sync();
+  })();
+  // One open overflow menu at a time; any outside click closes it.
+  (function () {
+    const menus = Array.prototype.slice.call(document.querySelectorAll('details.dx-hist-more'));
+    if (!menus.length) return;
+    document.addEventListener('click', function (e) {
+      menus.forEach(function (m) { if (m.open && !m.contains(e.target)) m.open = false; });
+    });
+    menus.forEach(function (m) {
+      m.addEventListener('toggle', function () {
+        if (m.open) menus.forEach(function (o) { if (o !== m) o.open = false; });
+      });
+    });
   })();
 </script>
 {% endblock %}

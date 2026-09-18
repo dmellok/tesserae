@@ -54,7 +54,7 @@
 .ag-tick.is-err .ag-tick-l{color:var(--t-danger)}
 
 /* ---- toolbar throbber pill ---- */
-.ag-pill{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 9px;border-radius:999px;background:var(--t-accent-soft);color:var(--t-accent-ink,var(--t-accent));border:1px solid color-mix(in srgb, var(--t-accent) 30%, transparent);font:700 10px var(--t-font);letter-spacing:.07em;text-transform:uppercase;cursor:pointer;white-space:nowrap}
+.ag-pill{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 9px;border-radius:5px;background:var(--t-accent-soft);color:var(--t-accent-ink,var(--t-accent));border:1px solid color-mix(in srgb, var(--t-accent) 30%, transparent);font:700 10px var(--t-font);letter-spacing:.07em;text-transform:uppercase;cursor:pointer;white-space:nowrap}
 .ag-pill[hidden]{display:none}
 .ag-bars{display:inline-flex;align-items:flex-end;gap:2px;height:11px}
 .ag-bars i{display:block;width:2.5px;height:4px;border-radius:1px;background:currentColor;opacity:.45}

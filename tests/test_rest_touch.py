@@ -258,7 +258,7 @@ def test_touch_event_shows_on_events_page(app: Flask) -> None:
         headers={"Authorization": f"Bearer {token}"},
     )
     page = client.get("/events?type=touch").get_data(as_text=True)
-    assert "dx-filter-chip--touch" in page  # the chip
+    assert "seg-item--touch" in page  # the filter option
     assert "event-touch" in page  # the friendly summary block
     assert "webhook:http://127.0.0.1:9/tesserae-test" in page  # resolved action
 

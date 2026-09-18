@@ -32,16 +32,16 @@
         {% endif %}
       </div>
       {# Surface the section's meta dict (e.g. broker's MQTT URL) as a
-         right-aligned read-only chip, same shape as the Network card's
-         NETWORK IP chip. The legacy section may carry multiple meta
+         right-aligned read-only tag, same shape as the Network card's
+         NETWORK IP tag. The legacy section may carry multiple meta
          rows; show only the first to keep the header tidy. #}
       {% if section.meta %}
       {% for key, value in section.meta.items() %}
         {% if loop.first %}
-        <div class="dx-section-meta">
+        <span class="tg tg--upper dx-section-meta">
           {{ key|upper }}
-          <code>{{ value }}</code>
-        </div>
+          <span class="tg-count">{{ value }}</span>
+        </span>
         {% endif %}
       {% endfor %}
       {% endif %}

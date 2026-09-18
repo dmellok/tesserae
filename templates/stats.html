@@ -22,14 +22,16 @@
    children's own margins are reset, so tiles, cards, and the two-column
    grid can't each contribute a different gap. #}
 <div class="dx-stats-stack">
-<nav class="dx-filter-strip" role="tablist" aria-label="Stats window">
-  {% for w in window_options %}
-  <a href="{{ url_for('stats.index', window=w) }}" role="tab"
-     class="dx-filter-chip{% if w == window %} is-active{% endif %}"
-     title="Show the last {{ w }} days">
-    <i class="ph ph-clock" aria-hidden="true"></i><span>{{ w }}d</span>
-  </a>
-  {% endfor %}
+<nav class="dx-filter-strip" aria-label="Stats window">
+  <span class="seg" role="tablist">
+    {% for w in window_options %}
+    <a href="{{ url_for('stats.index', window=w) }}" role="tab"
+       class="seg-item{% if w == window %} is-on{% endif %}"
+       title="Show the last {{ w }} days">
+      <i class="ph ph-clock" aria-hidden="true"></i><span>{{ w }}d</span>
+    </a>
+    {% endfor %}
+  </span>
   <span class="dx-filter-note">
     {% if paused %}
     <i class="ph ph-pause-circle" aria-hidden="true"></i> Collection paused

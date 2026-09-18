@@ -36,10 +36,7 @@
   .dx-section-head {
     flex-wrap: wrap;
   }
-  .dx-section-head .dx-section-meta {
-    width: 100%;
-    margin-top: 6px;
-  }
+  .dx-section-head .dx-section-meta { margin-top: 6px; }
 
   /* Field grids collapse to a single column. Pages already
      declare their own breakpoints, but the page-default

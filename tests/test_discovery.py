@@ -373,7 +373,7 @@ def test_topbar_chip_lists_unregistered_devices(app: Flask) -> None:
 
     cache.record("esp32_attic", b'{"kind":"esp32_client","ip":"192.168.50.91"}')
     body = client.get("/settings/server").get_data(as_text=True)
-    assert 'class="topbar-discovered topbar-discovered--topbar"' in body
+    assert 'class="tg tg--teal tg--lg topbar-discovered topbar-discovered--topbar"' in body
     assert "1 new device heard" in body
     assert "/settings/devices?discovered=1" in body
     # The drawer entry names the device for the phone layout.

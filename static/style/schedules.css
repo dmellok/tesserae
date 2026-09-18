@@ -78,7 +78,7 @@
   align-items: center;
   gap: var(--t-space-1);
   padding: var(--t-space-1) var(--t-space-3);
-  border-radius: var(--t-radius-pill);
+  border-radius: var(--t-radius-sm);
   border: 1px solid var(--t-border-strong);
   background: var(--t-surface);
   cursor: pointer;
@@ -201,46 +201,7 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
 
 .muted { color: var(--t-muted); }
 
-/* Pill: small status / tag chip used in the schedules + rotations
-   index tables. The base sets the shape + neutral background; the
-   ``is-*`` modifiers swap in tone colours via color-mix so they stay
-   readable against every theme without hand-tuned hex per variant. */
-.pill {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--t-space-1);
-  padding: 2px var(--t-space-2);
-  border-radius: var(--t-radius-pill);
-  background: color-mix(in oklab, var(--t-fg, #1B1A16) 7%, transparent);
-  color: var(--t-fg-soft, var(--t-muted));
-  font-size: var(--t-size-xs);
-  font-weight: 600;
-  white-space: nowrap;
-  line-height: 1.4;
-}
-.pill .ph { font-size: 12px; }
-.pill.is-ok {
-  background: color-mix(in oklab, var(--t-ok) 18%, transparent);
-  color: color-mix(in oklab, var(--t-ok) 70%, var(--t-fg, #1B1A16));
-}
-.pill.is-warn {
-  background: color-mix(in oklab, var(--t-warn) 18%, transparent);
-  color: color-mix(in oklab, var(--t-warn) 70%, var(--t-fg, #1B1A16));
-}
-.pill.is-danger {
-  background: color-mix(in oklab, var(--t-danger) 18%, transparent);
-  color: color-mix(in oklab, var(--t-danger) 70%, var(--t-fg, #1B1A16));
-}
-.pill.is-accent {
-  background: color-mix(in oklab, var(--t-accent) 18%, transparent);
-  color: color-mix(in oklab, var(--t-accent) 75%, var(--t-fg, #1B1A16));
-}
-/* Held / waiting state: a warm dusty rose so it reads "paused", not
-   alarming. Sits next to is-warn without competing for attention. */
-.pill.is-held {
-  background: color-mix(in oklab, #A66161 18%, transparent);
-  color: color-mix(in oklab, #A66161 75%, var(--t-fg, #1B1A16));
-}
+/* Small status tags are .tg from chips.css. */
 
 /* ----- Schedules timeline ------------------------------------------ */
 
@@ -785,7 +746,7 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
   gap: 0.3em;
   padding: 2px 8px;
   background: var(--t-surface-sunken, color-mix(in srgb, var(--t-text) 6%, transparent));
-  border-radius: var(--t-radius-pill, 999px);
+  border-radius: 5px;
   color: var(--t-muted);
 }
 
@@ -842,10 +803,6 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
 .rotation-countdown-meta strong {
   font-variant-numeric: tabular-nums;
   font-weight: 600;
-}
-.rotation-countdown-meta .pill {
-  font-size: 0.75em;
-  padding: 1px 8px;
 }
 
 /* ----- Per-step "play" button --------------------------------------

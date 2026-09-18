@@ -1,0 +1,161 @@
+/* Chips, tags and segmented controls (chip system "C · Segmented blocks").
+   One family for every small label in the admin UI: borderless tints with a
+   5px radius, joined segmented controls for filter groups on a grey track,
+   and target tiles with a real checkbox. Everything is a flex row with
+   line-height 1 so text, icons and counts sit on one vertical centre.
+
+   Classes:
+     .tg                 tint tag (default neutral)
+     .tg--teal .tg--ochre .tg--terracotta .tg--slate   source / kind tones
+     .tg--ok .tg--warn .tg--bad                        status tones
+     .tg--ink            solid ink (selected / emphasis)
+     .tg-count           mono count inside a tag
+     .seg                segmented track;  .seg-item  one option;  .is-on selected
+     .seg-count          mono count inside an option
+     .tile               target tile;  .tile-check  checkbox square;  .tile-sub  mono sub line
+   Tones are color-mix on tokens so dark mode follows automatically. */
+
+.tg {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 9px;
+  border-radius: 5px;
+  border: 0;
+  font-family: var(--t-font);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0;
+  text-transform: none;
+  white-space: nowrap;
+  vertical-align: middle;
+  background: color-mix(in oklab, var(--t-fg) 7%, var(--t-surface));
+  color: var(--t-fg-soft);
+  text-decoration: none;
+}
+.tg > .ph, .tg > .ph-bold, .tg > .ph-fill { font-size: 12px; line-height: 1; }
+.tg-count {
+  font-family: var(--t-font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  opacity: .75;
+}
+.tg--sm { height: 22px; padding: 0 7px; font-size: 11px; }
+.tg--lg { height: 30px; padding: 0 11px; font-size: 13px; }
+.tg--mono { font-family: var(--t-font-mono); font-size: 11px; letter-spacing: .04em; }
+.tg--upper { text-transform: uppercase; letter-spacing: .06em; font-size: 11px; font-weight: 700; }
+
+.tg--teal       { background: color-mix(in oklab, var(--t-accent) 18%, var(--t-surface)); color: color-mix(in oklab, var(--t-accent) 78%, var(--t-fg)); }
+.tg--ochre      { background: color-mix(in oklab, #c08a18 20%, var(--t-surface)); color: color-mix(in oklab, #c08a18 72%, var(--t-fg)); }
+.tg--terracotta { background: color-mix(in oklab, #c95d2e 18%, var(--t-surface)); color: color-mix(in oklab, #c95d2e 76%, var(--t-fg)); }
+.tg--slate      { background: color-mix(in oklab, #5e7186 18%, var(--t-surface)); color: color-mix(in oklab, #5e7186 80%, var(--t-fg)); }
+.tg--ok         { background: color-mix(in oklab, var(--t-ok) 16%, var(--t-surface)); color: color-mix(in oklab, var(--t-ok) 70%, var(--t-fg)); }
+.tg--warn       { background: color-mix(in oklab, var(--t-warn) 20%, var(--t-surface)); color: color-mix(in oklab, var(--t-warn) 70%, var(--t-fg)); }
+.tg--bad        { background: color-mix(in oklab, var(--t-danger) 14%, var(--t-surface)); color: color-mix(in oklab, var(--t-danger) 78%, var(--t-fg)); }
+.tg--ink        { background: var(--t-fg); color: var(--t-bg); }
+.tg--accent     { background: var(--t-accent); color: var(--t-accent-fg); }
+:root[data-theme="dark"] .tg--teal       { color: #6ed4be; }
+:root[data-theme="dark"] .tg--ochre      { color: #e5b94d; }
+:root[data-theme="dark"] .tg--terracotta { color: #f29170; }
+:root[data-theme="dark"] .tg--slate      { color: #a4b4c4; }
+
+a.tg:hover, button.tg:hover { filter: brightness(.96); }
+button.tg { cursor: pointer; font: inherit; font-size: 12px; font-weight: 600; }
+
+/* Segmented control: one joined group on a grey track. Wraps when a
+   group is long; the selected option is a raised white block. */
+.seg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 3px;
+  padding: 3px;
+  min-height: 34px;
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--t-fg) 9%, var(--t-surface));
+  vertical-align: middle;
+}
+.seg-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  font-family: var(--t-font);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--t-fg-soft);
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.seg-item > .ph, .seg-item > .ph-bold { font-size: 13px; line-height: 1; }
+.seg-item:hover { color: var(--t-fg); }
+.seg-item.is-on {
+  background: var(--t-surface);
+  color: var(--t-fg);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .12);
+}
+.seg-item.is-on:hover { color: var(--t-fg); }
+.seg-count {
+  font-family: var(--t-font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  opacity: .7;
+}
+.seg-item:focus-visible { outline: 2px solid var(--t-accent); outline-offset: 1px; }
+.seg--sm { min-height: 30px; padding: 2px; }
+.seg--sm .seg-item { height: 26px; padding: 0 9px; font-size: 12px; }
+
+/* Target tile: a display you can tick, with the dims under the name. */
+.tile {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: 44px;
+  padding: 0 14px 0 10px;
+  border-radius: 8px;
+  border: 0;
+  background: color-mix(in oklab, var(--t-fg) 7%, var(--t-surface));
+  color: var(--t-fg);
+  font-family: var(--t-font);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.15;
+  cursor: pointer;
+  user-select: none;
+}
+.tile input { position: absolute; opacity: 0; width: 0; height: 0; }
+.tile-check {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  border-radius: 4px;
+  border: 1.5px solid var(--t-border-strong);
+  background: var(--t-surface);
+  display: inline-grid;
+  place-items: center;
+  color: var(--t-accent-fg);
+  font-size: 11px;
+}
+.tile-check > .ph, .tile-check > .ph-bold { display: none; font-size: 11px; line-height: 1; }
+.tile-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.tile-sub { font-family: var(--t-font-mono); font-size: 10.5px; font-weight: 400; opacity: .75; line-height: 1; }
+.tile.is-on, .tile:has(input:checked) {
+  background: color-mix(in oklab, var(--t-accent) 18%, var(--t-surface));
+  color: color-mix(in oklab, var(--t-accent) 78%, var(--t-fg));
+  box-shadow: inset 0 0 0 2px var(--t-accent);
+}
+.tile.is-on .tile-check, .tile:has(input:checked) .tile-check { background: var(--t-accent); border-color: var(--t-accent); }
+.tile.is-on .tile-check > .ph, .tile.is-on .tile-check > .ph-bold,
+.tile:has(input:checked) .tile-check > .ph, .tile:has(input:checked) .tile-check > .ph-bold { display: inline; }
+:root[data-theme="dark"] .tile.is-on, :root[data-theme="dark"] .tile:has(input:checked) { color: #6ed4be; }
+.tile:focus-within { outline: 2px solid var(--t-accent); outline-offset: 2px; }

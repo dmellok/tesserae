@@ -28,7 +28,7 @@
     <button type="button" class="dx-btn" data-disc-toggle aria-controls="discovered-devices"
             {% if not _discovered %}disabled title="Nothing has announced itself yet."{% endif %}>
       <i class="ph ph-broadcast" aria-hidden="true"></i>
-      <span>{{ _discovered|length }} discovered</span>
+      <span class="tg-count">{{ _discovered|length }}</span><span>discovered</span>
       {% if _discovered %}<span class="dx-devtb-dot" aria-hidden="true"></span>{% endif %}
     </button>
     <div class="dx-devtb-right">
@@ -88,7 +88,7 @@
             <i class="ph ph-{{ section.icon or 'device-mobile' }} dx-devrow-icon" aria-hidden="true"></i>
             <span>{{ section.device_name }}</span>
           </span>
-          <span class="dx-devrow-link"><span class="dx-tpill">{{ section.transport_badge }}</span></span>
+          <span class="dx-devrow-link"><span class="tg tg--sm tg--mono">{{ section.transport_badge }}</span></span>
         </span>
         <span class="dx-devrow-l dx-devrow-l2">
           <span class="dx-devrow-kind">{{ section.kind_name }}</span>

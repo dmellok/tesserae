@@ -236,7 +236,7 @@
 }
 .cat-chip {
   padding: 4px 9px;
-  border-radius: var(--t-radius-pill);
+  border-radius: var(--t-radius-sm);
   border: 1px solid var(--t-border-strong);
   background: var(--t-surface);
   color: var(--t-fg-soft);
@@ -424,7 +424,7 @@
 }
 .cat-badge {
   padding: 2px 7px;
-  border-radius: var(--t-radius-pill);
+  border-radius: 5px;
   background: var(--t-pill-ok-bg);
   color: var(--t-pill-ok-fg);
   font-size: 10.5px;

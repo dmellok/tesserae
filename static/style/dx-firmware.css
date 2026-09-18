@@ -3,7 +3,7 @@
  *
  *  A single flat device table: installed vs available firmware,
  *  a status chip from the device's heartbeat OTA report, and a
- *  queue / withdraw action per row. Reuses the global .pill chip
+ *  queue / withdraw action per row. Reuses the .tg tags from chips.css
  *  vocabulary.
  * ============================================================ */
 

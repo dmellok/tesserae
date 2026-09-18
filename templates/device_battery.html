@@ -8,16 +8,18 @@
   <p class="lede">Charging and drain trends for every battery-powered display.</p>
 </header>
 
-{# Window picker as the v0.56 filter chip strip, page-level above the
-   section card so it reads as the primary control. #}
-<nav class="dx-filter-strip" role="tablist" aria-label="History window">
-  {% for w in window_options %}
-  <a href="{{ url_for('device_battery.index', window=w) }}" role="tab"
-     class="dx-filter-chip{% if w == window_days %} is-active{% endif %}"
-     title="Show {{ w }} day window">
-    <i class="ph ph-clock" aria-hidden="true"></i><span>{{ w }}d</span>
-  </a>
-  {% endfor %}
+{# Window picker as a segmented control, page-level above the section
+   card so it reads as the primary control. #}
+<nav class="dx-filter-strip" aria-label="History window">
+  <span class="seg" role="tablist">
+    {% for w in window_options %}
+    <a href="{{ url_for('device_battery.index', window=w) }}" role="tab"
+       class="seg-item{% if w == window_days %} is-on{% endif %}"
+       title="Show {{ w }} day window">
+      <i class="ph ph-clock" aria-hidden="true"></i><span>{{ w }}d</span>
+    </a>
+    {% endfor %}
+  </span>
 </nav>
 
 {% call section_card(icon='battery-medium', title='Device batteries',

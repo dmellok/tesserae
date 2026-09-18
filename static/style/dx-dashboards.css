@@ -31,13 +31,7 @@
   text-transform: none;
 }
 .dx-dashboard-group-head .ph { color: var(--t-accent, #15846a); font-size: 14px; }
-.dx-dashboard-group-head .dx-pill {
-  margin-left: 2px;
-  background: var(--t-pill-neutral-bg, #f0efea);
-  color: var(--t-pill-neutral-fg, #56564f);
-  border: 1px solid var(--t-pill-neutral-border, #e2e1db);
-  font-weight: 600;
-}
+.dx-dashboard-group-head .tg { margin-left: 2px; }
 
 /* Mobile collapse (≤ 640px). The row is flex with the dashboard
    main (icon + name + meta strip) on the left and the

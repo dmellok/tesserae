@@ -332,8 +332,8 @@
     list.forEach((p) => {
       const chip = document.createElement("button");
       chip.type = "button";
-      chip.className = "dxe-chip";
-      chip.innerHTML = `<span class="dxe-chip-plus">+</span>${escape(p.name)}`;
+      chip.className = "tg tg--lg dxe-chip";
+      chip.innerHTML = `<i class="ph-bold ph-plus dxe-chip-plus" aria-hidden="true"></i>${escape(p.name)}`;
       chip.addEventListener("click", () => addMember(p.id));
       avail.appendChild(chip);
     });

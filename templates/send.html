@@ -219,22 +219,24 @@
         </fieldset>
       </details>
 
-      {# Target displays: chip grid. Each ticked display is rendered at its
-         own panel size and gets its own push. Required; the routes reject
-         the form if nothing's ticked. #}
+      {# Target displays: tile grid (.tile, chips.css). Each ticked display
+         is rendered at its own panel size and gets its own push. Required;
+         the routes reject the form if nothing's ticked. #}
       <div class="field send-targets">
         <label>Target displays <span class="required-marker" aria-hidden="true">*</span></label>
         {% if device_options %}
         <div class="send-chips" data-send-device-checklist>
           {% for d in device_options %}
-          <label class="send-chip">
+          {% set _ticked = (d.id in form_device_ids) if form_device_ids else (d.id == sole_device) %}
+          <label class="tile send-tile{% if _ticked %} is-on{% endif %}">
             <input type="checkbox" name="device_id" value="{{ d.id }}"
                    data-panel-w="{{ d.w }}" data-panel-h="{{ d.h }}" data-label="{{ d.label }}"
-                   {% if form_device_ids %}{% if d.id in form_device_ids %}checked{% endif %}{% elif d.id == sole_device %}checked{% endif %}>
-            <i class="ph ph-check send-chip-on" aria-hidden="true"></i>
-            <i class="ph ph-{{ d.icon or 'monitor' }} send-chip-off" aria-hidden="true"></i>
-            <span class="send-chip-name">{{ d.label }}</span>
-            <span class="send-chip-dims">{{ d.dims }}</span>
+                   {% if _ticked %}checked{% endif %}>
+            <span class="tile-check" aria-hidden="true"><i class="ph-bold ph-check"></i></span>
+            <span class="tile-body">
+              <span class="tile-name"><i class="ph ph-{{ d.icon or 'monitor' }} tile-icon" aria-hidden="true"></i>{{ d.label }}</span>
+              <span class="tile-sub">{{ d.dims }}</span>
+            </span>
           </label>
           {% endfor %}
         </div>

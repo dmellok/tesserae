@@ -34,17 +34,19 @@
 
 {{ settings_tabs('events') }}
 
-<nav class="dx-filter-strip" role="tablist" aria-label="Filter by event type">
-  <a href="?type=all" role="tab" class="dx-filter-chip{% if selected == 'all' %} is-active{% endif %}">
-    <i class="ph ph-list-bullets" aria-hidden="true"></i>
-    <span>All</span><span class="dx-count-pill">{{ counts.all }}</span>
-  </a>
-  {% for t in known_types %}
-  <a href="?type={{ t }}" role="tab" class="dx-filter-chip dx-filter-chip--{{ t }}{% if selected == t %} is-active{% endif %}">
-    <i class="ph ph-{{ TYPE_ICONS.get(t, 'circle') }}" aria-hidden="true"></i>
-    <span>{{ t|capitalize }}</span><span class="dx-count-pill">{{ counts[t] }}</span>
-  </a>
-  {% endfor %}
+<nav class="dx-filter-strip" aria-label="Filter by event type">
+  <span class="seg" role="tablist">
+    <a href="?type=all" role="tab" class="seg-item{% if selected == 'all' %} is-on{% endif %}">
+      <i class="ph ph-list-bullets" aria-hidden="true"></i>
+      <span>All</span><span class="seg-count">{{ counts.all }}</span>
+    </a>
+    {% for t in known_types %}
+    <a href="?type={{ t }}" role="tab" class="seg-item seg-item--{{ t }}{% if selected == t %} is-on{% endif %}">
+      <i class="ph ph-{{ TYPE_ICONS.get(t, 'circle') }}" aria-hidden="true"></i>
+      <span>{{ t|capitalize }}</span><span class="seg-count">{{ counts[t] }}</span>
+    </a>
+    {% endfor %}
+  </span>
 </nav>
 
 {% call section_card(icon='pulse', title='Event timeline',

@@ -28,13 +28,13 @@
           <p class="dx-section-desc">{{ group.description }}</p>
         </div>
 
-        {# Network card carries a NETWORK IP chip; Quiet hours / Low-
+        {# Network card carries a NETWORK IP tag; Quiet hours / Low-
            battery carry their master toggle in the header row. #}
         {% if group.meta_label and group.meta_value %}
-        <div class="dx-section-meta">
+        <span class="tg tg--upper dx-section-meta">
           {{ group.meta_label }}
-          <code>{{ group.meta_value }}</code>
-        </div>
+          <span class="tg-count">{{ group.meta_value }}</span>
+        </span>
         {% endif %}
 
         {% if group.master_field %}

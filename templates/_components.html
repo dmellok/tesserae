@@ -655,8 +655,13 @@ macro here instead.
 
    ``cta`` is an optional dict {label, href, icon, variant} for an
    inline header action ('+ New schedule' on Schedules, 'Browse...'
-   on Widgets, etc). ``meta`` is an optional right-aligned chip
-   (the NETWORK IP block on the Server tab uses this shape). #}
+   on Widgets, etc). ``meta`` is an optional right-aligned tag
+   (label plus mono count; the NETWORK IP block on the Server tab uses
+   this shape). #}
+{#- Map a route-supplied ``pill_class`` (is-ok / is-warn / is-danger /
+   is-accent / is-held / is-info / is-neutral) to the chips.css tone. -#}
+{%- macro tg_tone(pill_class) -%}{{ {'is-ok': 'tg--ok', 'is-warn': 'tg--warn', 'is-danger': 'tg--bad', 'is-accent': 'tg--teal', 'is-held': 'tg--terracotta', 'is-info': 'tg--slate'}.get(pill_class or '', '') }}{%- endmacro -%}
+
 {%- macro section_card(icon, title, description=None, cta=None, meta=None, id=None, extra_class='') -%}
 <section class="dx-section-card {{ extra_class }}"{% if id %} id="{{ id }}"{% endif %}>
   <header class="dx-section-head">
@@ -670,10 +675,10 @@ macro here instead.
       {% if description %}<p class="dx-section-desc">{{ description }}</p>{% endif %}
     </div>
     {% if meta %}
-    <div class="dx-section-meta">
+    <span class="tg tg--upper dx-section-meta">
       {% if meta.label %}{{ meta.label }}{% endif %}
-      {% if meta.value %}<code>{{ meta.value }}</code>{% endif %}
-    </div>
+      {% if meta.value %}<span class="tg-count">{{ meta.value }}</span>{% endif %}
+    </span>
     {% endif %}
     {% if cta %}
     <a href="{{ cta.href }}" class="dx-btn-{{ cta.variant or 'primary' }}">

@@ -1,5 +1,5 @@
 {% extends "_base.html" %}
-{% from "_components.html" import settings_tabs, card_head, empty_state %}
+{% from "_components.html" import settings_tabs, card_head, empty_state, tg_tone %}
 {% block title %}Firmware, Tesserae{% endblock %}
 
 {% macro fw(v) %}{{ v if v.startswith('v') else 'v' ~ v }}{% endmacro %}
@@ -86,14 +86,14 @@
           {% elif not d.capable %}
           <span class="dx-status-muted" title="Device has not advertised OTA support; update over USB.">USB update only</span>
           {% elif d.phase %}
-          <span class="pill {{ d.pill_class }}"{% if d.detail %} title="{{ d.detail }}"{% endif %}>
+          <span class="tg {{ tg_tone(d.pill_class) }}"{% if d.detail %} title="{{ d.detail }}"{% endif %}>
             {{ d.phase }}{% if d.target_fw %} {{ fw(d.target_fw) }}{% endif %}{% if d.reason and d.pill_class == 'is-danger' %} ({{ d.reason }}){% endif %}
           </span>
           {% if d.report_relative %}<span class="dx-status-muted">{{ d.report_relative }}</span>{% endif %}
           {% elif d.queued %}
-          <span class="pill is-accent">queued{% if d.queued_fw %} {{ fw(d.queued_fw) }}{% endif %}</span>
+          <span class="tg tg--teal">queued{% if d.queued_fw %} {{ fw(d.queued_fw) }}{% endif %}</span>
           {% elif d.update_available %}
-          <span class="pill is-warn">update available</span>
+          <span class="tg tg--warn">update available</span>
           {% elif d.fw_version %}
           <span class="dx-status-muted">up to date</span>
           {% else %}
@@ -159,7 +159,7 @@
         <strong>{{ k.kind_name }}</strong>
         <code>{{ k.kind_id }}</code>
         {% if k.fw_version %}
-        <span class="pill {{ 'is-ok' if k.state == 'promoted' else ('is-held' if k.state == 'paused' else 'is-accent') }}">{{ k.state }}</span>
+        <span class="tg {{ 'tg--ok' if k.state == 'promoted' else ('tg--terracotta' if k.state == 'paused' else 'tg--teal') }}">{{ k.state }}</span>
         <code>{{ fw(k.fw_version) }}</code>
         {% else %}
         <span class="dx-status-muted">no release imported</span>
@@ -171,9 +171,10 @@
         {% if k.capable_devices %}
         <div class="cf-dev-grid">
           {% for d in k.capable_devices %}
-          <label class="cf-dev-chip">
+          <label class="tile{% if d.is_canary %} is-on{% endif %}">
             <input type="checkbox" name="device_ids" value="{{ d.id }}" {% if d.is_canary %}checked{% endif %}>
-            <span>{{ d.name }}</span>
+            <span class="tile-check" aria-hidden="true"><i class="ph-bold ph-check"></i></span>
+            <span class="tile-body">{{ d.name }}</span>
           </label>
           {% endfor %}
         </div>

@@ -34,24 +34,6 @@
   gap: var(--t-space-2);
   margin: var(--t-space-2) 0 var(--t-space-3);
 }
-.cf-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 10px;
-  border-radius: var(--t-radius-pill);
-  border: 1px solid var(--t-border);
-  background: var(--t-surface-soft);
-  color: var(--t-fg-soft);
-  font-size: var(--t-size-xs);
-  font-weight: 600;
-  white-space: nowrap;
-}
-.cf-chip--off {
-  color: var(--t-warn, #92400e);
-  border-color: color-mix(in oklab, var(--t-warn, #d97706) 40%, transparent);
-  background: color-mix(in oklab, var(--t-warn, #d97706) 12%, transparent);
-}
 
 /* -- deck cards -------------------------------------------- */
 
@@ -114,23 +96,6 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--t-space-2);
-}
-.cf-dev-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 12px;
-  border: 1px solid var(--t-border);
-  border-radius: var(--t-radius-pill);
-  background: var(--t-surface-soft);
-  font-size: var(--t-size-sm);
-  cursor: pointer;
-  transition: border-color var(--t-trans-fast), background var(--t-trans-fast);
-}
-.cf-dev-chip:has(input:checked) {
-  border-color: var(--t-accent);
-  background: var(--t-accent-tint);
-  color: var(--t-accent);
 }
 
 .cf-page-refresh {
@@ -306,9 +271,10 @@
 .dxe-avail-head { display: flex; align-items: baseline; justify-content: space-between; }
 .dxe-avail-count { font-size: 12px; color: var(--t-fg-soft); }
 .dxe-chips { display: flex; flex-wrap: wrap; gap: 7px; }
-.dxe-chip { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--t-border); background: var(--t-inset); border-radius: var(--t-radius-pill); padding: 6px 12px 6px 10px; font-size: 12.5px; color: var(--t-fg); cursor: pointer; }
-.dxe-chip:hover { border-color: var(--t-fg); background: var(--t-surface); }
-.dxe-chip-plus { color: var(--t-fg-soft); font-size: 13px; }
+/* Addable dashboards: .tg tags that act as buttons (chips.css). */
+.dxe-chip { color: var(--t-fg); }
+.dxe-chip:hover { background: color-mix(in oklab, var(--t-fg) 12%, var(--t-surface)); filter: none; }
+.dxe-chip-plus { color: var(--t-fg-soft); }
 
 /* form controls reuse the app's field styling, all one height */
 .dxe { --dxe-ctl-h: 36px; }
@@ -421,31 +387,14 @@
 .dk-empty h2 { margin: 0; font-size: 18px; }
 .dk-empty p { margin: 0 0 10px; font-size: 14px; color: color-mix(in oklab, var(--t-fg) 55%, transparent); }
 
-.dk-devchip,
-.dk-paused {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 9px;
-  border-radius: 999px;
-  border: 1px solid color-mix(in oklab, var(--t-border) 90%, transparent);
-  font-size: 12px;
-  font-weight: 600;
-  color: color-mix(in oklab, var(--t-fg) 60%, transparent);
-  white-space: nowrap;
-}
-.dk-devchip i,
-.dk-paused i { font-size: 13px; }
-
-/* Why an enabled rotation is not playing: the same chip chrome as the
-   display chips, kept neutral so it reads as a note, not an alarm. */
+/* Display and paused-reason tags are .tg (chips.css); only the
+   truncation of a long paused reason lives here. */
 .dk-paused {
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.dk-paused i { color: color-mix(in oklab, var(--t-fg) 45%, transparent); }
 
 /* Page-head pointer to the pause switch in Settings, and the band shown
    while it is on. */
@@ -541,23 +490,6 @@
   padding: 18px 22px 14px;
   flex-wrap: wrap;
 }
-.dk-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 5px 11px;
-  border-radius: 7px;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  background: color-mix(in oklab, var(--t-fg) 6%, var(--t-surface));
-  color: color-mix(in oklab, var(--t-fg) 60%, transparent);
-}
-.dk-badge.is-live {
-  background: color-mix(in oklab, var(--t-accent) 12%, var(--t-surface));
-  color: var(--t-accent);
-}
 .dk-name { font-size: 20px; font-weight: 700; letter-spacing: -0.015em; color: var(--t-fg); }
 .dk-meta { font: 12.5px var(--t-font-mono); color: color-mix(in oklab, var(--t-fg) 55%, transparent); }
 .dk-actions {
@@ -598,24 +530,17 @@
 .dk-timing .dk-next { margin-left: 0; padding-bottom: 0; }
 
 /* Ribbons: ON THE PANEL on the fetched frame, WAITING on an intended step
-   the display has not picked up yet. */
+   the display has not picked up yet. Small .tg tags pinned to the frame's
+   corner; the tone classes carry the colour. */
 .dk-ribbon {
   position: absolute;
   top: 6px;
   left: 6px;
   z-index: 1;
-  padding: 2px 7px;
-  border-radius: 5px;
-  background: var(--t-accent);
-  color: var(--t-accent-fg);
+  height: 20px;
+  padding: 0 6px;
   font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  line-height: 1.4;
-  white-space: nowrap;
 }
-.dk-ribbon.is-warn { background: var(--t-warn-bg); color: color-mix(in oklab, var(--t-warn) 72%, var(--t-fg)); }
 .dk-screen.is-waiting .dk-screen-frame { outline: 2px dashed var(--t-warn); outline-offset: 2px; }
 .dk-behind { display: block; white-space: nowrap; font: 11px var(--t-font-mono); color: color-mix(in oklab, var(--t-warn) 72%, var(--t-fg)); margin-top: -3px; }
 .dk-screen--panel figcaption .dk-screen-at { margin-left: auto; flex: none; white-space: nowrap; font: 11px var(--t-font-mono); font-weight: 400; color: color-mix(in oklab, var(--t-fg) 45%, transparent); }

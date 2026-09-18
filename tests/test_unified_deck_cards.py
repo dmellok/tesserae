@@ -793,7 +793,7 @@ def test_rotation_row_marks_intended_step_waiting_until_the_panel_fetches_it(
     assert f"showing {intended.title()}" not in section
     assert "dk-row is-playing" in section and "Playing · Rotation" in section
     assert "dk-screen is-waiting" in section
-    assert 'class="dk-ribbon is-warn">waiting' in section
+    assert 'class="tg tg--sm tg--upper tg--warn dk-ribbon">waiting' in section
     assert re.search(r'class="dk-behind">\d+ min behind · poll ≈ \d\d:\d\d<', section)
     # The intended step is waiting, not live; only the on-panel frame is live.
     assert 'class="dk-screen is-live"' not in section
@@ -937,7 +937,7 @@ def test_rotation_row_says_the_display_holds_a_manual_push(app: Flask) -> None:
     section = body[body.index('id="display-panel"') :]
     assert "dk-row is-playing" not in section
     assert re.search(
-        rf'class="dk-paused"[^>]*>\s*<i[^>]*></i>showing {other.title()} from a manual push'
+        rf'class="tg tg--warn dk-paused"[^>]*>\s*<i[^>]*></i>showing {other.title()} from a manual push'
         rf" · resumes {_local_hhmm()}\s*<",
         section,
     )

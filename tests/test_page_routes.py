@@ -1954,7 +1954,7 @@ def test_tab_strip_counts_active_and_archived(app: Flask, tmp_path: Path) -> Non
     html = client.get("/pages").get_data(as_text=True)
     assert 'href="/pages?tab=archived"' in html
     # One active, one archived: both count pills render.
-    assert html.count('<span class="dx-count-pill">1</span>') == 2
+    assert html.count('<span class="seg-count">1</span>') == 2
 
 
 def test_archive_refused_while_page_is_in_a_lineup(app: Flask, tmp_path: Path) -> None:
@@ -1977,7 +1977,7 @@ def test_active_row_disables_archive_for_lineup_members(app: Flask, tmp_path: Pa
     html = client.get("/pages").get_data(as_text=True)
     assert f'action="/pages/{pid}/archive"' in html
     assert "In lineup: Hall lineup" in html
-    assert "1 lineup" in html
+    assert '<span class="tg-count">1</span>lineup' in html
 
 
 def test_unarchive_restores_the_page(app: Flask, tmp_path: Path) -> None:
@@ -2107,7 +2107,7 @@ def test_dashboard_groups_are_disclosures_with_a_collapse_all_control(app: Flask
     head = body[body.index('data-dash-group="lounge"') : body.index('data-dash-group="unbound"')]
     assert '<summary class="dx-dashboard-group-head">' in head
     assert "dx-dashboard-caret" in head
-    assert "Lounge" in head and '<span class="dx-pill">1</span>' in head
+    assert "Lounge" in head and '<span class="tg tg--sm tg--mono">1</span>' in head
     # Folded state is restored by an inline script keyed on localStorage.
     assert "tesserae-dash-groups" in body
     assert 'class="dx-btn-ghost-sm dx-dash-groups-toggle" data-dash-groups-toggle' in body

@@ -655,7 +655,7 @@
               {% else %}
                 daily {{ s.fires_at.strftime('%H:%M') if s.fires_at else '??:??' }}
               {% endif %}
-              {% if s.smart_sync %}<span class="pill is-info" title="Smart sync on">JIT</span>{% endif %}
+              {% if s.smart_sync %}<span class="tg tg--sm tg--slate" title="Smart sync on">JIT</span>{% endif %}
             </div>
           </div>
           <button type="button" class="ghost-link" data-open-schedule-dialog="schedule-dialog-{{ s.id }}">Edit</button>

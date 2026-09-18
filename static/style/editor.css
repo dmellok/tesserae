@@ -499,7 +499,7 @@
   font-size: var(--t-size-sm);
   font-weight: 600;
   padding: var(--t-space-1) var(--t-space-3);
-  border-radius: var(--t-radius-pill);
+  border-radius: 5px;
   background: var(--t-ok-bg);
   color: var(--t-ok);
   border: 1px solid color-mix(in oklab, var(--t-ok) 25%, transparent);
@@ -1382,7 +1382,7 @@
   margin: 0 0 var(--t-space-3);
   padding: 2px;
   background: var(--t-surface-sunk);
-  border-radius: var(--t-radius-pill);
+  border-radius: 8px;
 }
 .preview-mode {
   border: 0;
@@ -1391,7 +1391,7 @@
   font: inherit;
   font-size: var(--t-size-sm);
   padding: 4px 12px;
-  border-radius: var(--t-radius-pill);
+  border-radius: 6px;
   cursor: pointer;
 }
 .preview-mode.is-active {

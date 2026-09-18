@@ -9,7 +9,7 @@ push pipeline stays in one module, only the read view moved here.
 from __future__ import annotations
 
 import time
-from datetime import datetime
+from datetime import date, datetime, timedelta, tzinfo
 from typing import Any
 
 from flask import Blueprint, Flask, current_app, render_template, request
@@ -191,12 +191,18 @@ def history_view(rows: list[EventRow], *, fold_presses: bool = False) -> list[di
         # A folded row resends and times as its push half; deletion
         # removes both halves via ``ids``.
         resend_ev = push_ev if push_ev is not None and push_ev.digest else ev
+        push_status = push_ev.status if push_ev is not None else None
+        local_dt = datetime.fromtimestamp(ev.timestamp, tz=app_timezone())
         out.append(
             {
                 "id": ev.id,
                 "ids": [ev.id] + ([push_ev.id] if push_ev is not None else []),
                 "status": ev.status,
-                "push_status": push_ev.status if push_ev is not None else None,
+                "push_status": push_status,
+                # Either half outside the "landed or harmlessly skipped" set
+                # marks the row failed: red timeline dot, tinted band.
+                "failed": ev.status not in OK_STATUSES
+                or (push_status is not None and push_status not in OK_STATUSES),
                 "digest": ev.digest,
                 "preview_digest": preview_digest,
                 "can_resend": bool(resend_ev.digest),
@@ -212,9 +218,9 @@ def history_view(rows: list[EventRow], *, fold_presses: bool = False) -> list[di
                 # MicroCloud defaults). Falls back to system-local when the
                 # setting is empty or "system"; see ``app_timezone`` for the
                 # resolution ladder.
-                "abs": datetime.fromtimestamp(ev.timestamp, tz=app_timezone()).strftime(
-                    "%Y-%m-%d %H:%M:%S"
-                ),
+                "abs": local_dt.strftime("%Y-%m-%d %H:%M:%S"),
+                "time": local_dt.strftime("%H:%M:%S"),
+                "timestamp": ev.timestamp,
                 "duration_s": ev.duration_s or (push_ev.duration_s if push_ev is not None else 0.0),
                 "error": ev.error or (push_ev.error if push_ev is not None else None),
                 "renderers": renderers,
@@ -222,6 +228,79 @@ def history_view(rows: list[EventRow], *, fold_presses: bool = False) -> list[di
             }
         )
     return out
+
+
+#: Statuses that count as "went fine" on the History page. Anything else
+#: (``failed``, ``error``, ``not_found`` and friends) marks the row failed.
+OK_STATUSES: frozenset[str] = frozenset(
+    (
+        "sent",
+        "warmed",
+        "busy",
+        "quiet",
+        "held",
+        "no_change",
+        "dispatched",
+        "webhook_dispatched",
+        "fetched",
+        "noop",
+        "deduped",
+        "unmapped",
+    )
+)
+
+
+def day_label(day: date, today: date) -> str:
+    """Group heading for a local calendar day: "Today", "Yesterday", then
+    "Tue 16 Sep" (with the year once the day falls outside this one)."""
+    if day == today:
+        return "Today"
+    if day == today - timedelta(days=1):
+        return "Yesterday"
+    label = f"{day:%a} {day.day} {day:%b}"
+    if day.year != today.year:
+        label = f"{label} {day.year}"
+    return label
+
+
+def _group(key: str, label: str) -> dict[str, Any]:
+    return {"key": key, "label": label, "rows": [], "count": 0, "failed": 0}
+
+
+def group_history(
+    rows: list[dict[str, Any]], *, by: str, tz: tzinfo | None = None, now: float | None = None
+) -> list[dict[str, Any]]:
+    """Bucket shaped History rows for the timeline.
+
+    ``by="day"`` groups on the local calendar day (in the app timezone)
+    each push happened, newest day first, with "Today" / "Yesterday"
+    headings. ``by="dashboard"`` groups on the resolved target label
+    instead, in the order the rows arrive (already sorted by target). Each
+    group carries its row count and how many of those failed, for the
+    "N pushes · M failed" line under the heading. Row order inside a group
+    is the incoming order, so the newest-first feed stays newest-first.
+    """
+    zone = tz if tz is not None else app_timezone()
+    groups: list[dict[str, Any]] = []
+    index: dict[str, dict[str, Any]] = {}
+    today = datetime.fromtimestamp(now if now is not None else time.time(), tz=zone).date()
+    for row in rows:
+        if by == "dashboard":
+            label = str(row.get("target") or "")
+            key = f"dash:{label.casefold()}"
+        else:
+            day = datetime.fromtimestamp(float(row["timestamp"]), tz=zone).date()
+            key = day.isoformat()
+            label = day_label(day, today)
+        group = index.get(key)
+        if group is None:
+            group = index[key] = _group(key, label)
+            groups.append(group)
+        group["rows"].append(row)
+        group["count"] += 1
+        if row.get("failed"):
+            group["failed"] += 1
+    return groups
 
 
 def _button_detail(ev: EventRow, page_names: dict[str, str]) -> str | None:
@@ -387,6 +466,7 @@ def index() -> str:
         # dashboard clump. The base list is already newest-first, so
         # within each dashboard clump the recency order is preserved.
         history.sort(key=lambda row: (row.get("target") or "").casefold())
+    groups = group_history(history, by="dashboard" if sort_mode == "dashboard" else "day")
     # Per-source counts power the filter-chip badges. We include zero-
     # count chips for the canonical sources so the filter row is stable
     # across page loads (chips don't appear/disappear as the log churns).
@@ -403,9 +483,22 @@ def index() -> str:
         if src in FILTERABLE_SOURCES or counts.get(src, 0) == 0:
             continue
         chips.append({"source": src, "count": counts[src], "active": source == src})
+    # The current filter state as url_for kwargs. Every filter link is
+    # ``url_for('history.index', **dict(filter_args, <one change>))`` so
+    # each control keeps the others exactly as they are (None values are
+    # dropped from the query string).
+    filter_args = {
+        "source": source,
+        "device": device,
+        "include_skipped": 1 if include_skipped else None,
+        "include_background": 1 if include_background else None,
+        "split_presses": 1 if split_presses else None,
+        "sort": sort_mode if sort_mode != "time" else None,
+    }
     return render_template(
         "history.html",
         history=history,
+        groups=groups,
         chips=chips,
         active_source=source,
         active_device=device,
@@ -414,6 +507,7 @@ def index() -> str:
         include_background=include_background,
         split_presses=split_presses,
         sort_mode=sort_mode,
+        filter_args=filter_args,
     )
 
 

@@ -515,7 +515,7 @@
   font-size: var(--t-size-md);
   font-weight: 600;
 }
-.backup-top .pill { text-transform: lowercase; }
+.backup-top .tg { text-transform: lowercase; }
 .backup-size {
   font-size: 12px;
   color: var(--t-muted);
@@ -794,17 +794,6 @@
   color: var(--dx-ink);
 }
 .dx-device-card .dx-title-name { min-width: 0; }
-.dx-device-card .dx-transport-badge {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--dx-faint);
-  background: var(--dx-border-faint);
-  border: 1px solid var(--dx-border);
-  padding: 2px 7px;
-  border-radius: 5px;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
 .dx-device-card .dx-status-line {
   display: flex;
   align-items: center;
@@ -1188,7 +1177,7 @@
   display: inline-flex;
   align-items: center;
   padding: 4px 12px;
-  border-radius: var(--t-radius-pill);
+  border-radius: var(--t-radius-sm);
   background: var(--t-surface-soft);
   color: var(--t-fg-soft);
   font-size: var(--t-size-sm);
@@ -1840,24 +1829,8 @@ form[data-dirty] .dx-inline-save { display: none; }
   font-size: 12.5px;
   color: var(--dx-faint);
 }
-.dx-section-meta {
-  font-size: 10.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--dx-faint);
-}
-.dx-section-meta code {
-  font-family: ui-monospace, Menlo, monospace;
-  font-size: 12.5px;
-  color: var(--dx-ink-soft);
-  background: var(--dx-inset);
-  border: 1px solid var(--t-border);
-  border-radius: 5px;
-  padding: 2px 7px;
-  text-transform: none;
-  letter-spacing: 0;
-  margin-left: 6px;
-}
+.dx-section-meta { flex: none; }
+.dx-section-meta .tg-count { font-size: 12px; opacity: 1; color: var(--t-fg); }
 .dx-section-card .field { margin-top: 12px; }
 .dx-section-card .field-grid { margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 @media (max-width: 540px) { .dx-section-card .field-grid { grid-template-columns: 1fr; } }
@@ -2011,15 +1984,6 @@ form[data-dirty] .dx-inline-save { display: none; }
   background: var(--t-accent-soft);
   color: var(--t-accent);
   font-size: 19px;
-}
-.dx-section-meta {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 10.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--dx-faint, #9a9a93);
 }
 .dx-section-body { display: flex; flex-direction: column; gap: 0; }
 .dx-section-body .field {
@@ -2251,11 +2215,6 @@ form[data-dirty] .dx-inline-save { display: none; }
   color: var(--t-accent);
 }
 :root[data-theme="dark"] .dx-device-card .dx-title { color: var(--t-fg); }
-:root[data-theme="dark"] .dx-device-card .dx-transport-badge {
-  background: var(--t-surface-soft);
-  border-color: var(--t-border);
-  color: var(--t-fg-soft);
-}
 :root[data-theme="dark"] .dx-device-card .dx-status-line,
 :root[data-theme="dark"] .dx-device-card .dx-status-muted { color: var(--t-fg-soft); }
 :root[data-theme="dark"] .dx-device-card .dx-collapse-btn {
@@ -2374,12 +2333,6 @@ form[data-dirty] .dx-inline-save { display: none; }
 /* Server-tab section card chrome */
 :root[data-theme="dark"] .dx-section-title { color: var(--t-fg); }
 :root[data-theme="dark"] .dx-section-desc { color: var(--t-muted); }
-:root[data-theme="dark"] .dx-section-meta { color: var(--t-muted); }
-:root[data-theme="dark"] .dx-section-meta code {
-  background: var(--t-surface-soft);
-  border-color: var(--t-border);
-  color: var(--t-fg-soft);
-}
 :root[data-theme="dark"] .dx-section-head {
   border-bottom-color: var(--t-border);
 }
@@ -2429,11 +2382,7 @@ form[data-dirty] .dx-inline-save { display: none; }
 :root[data-theme="dark"] .dx-discovered-meta code { color: var(--t-fg-soft); }
 :root[data-theme="dark"] .dx-discovered-explainer { color: var(--t-muted); }
 :root[data-theme="dark"] .dx-discovered-sublabel { color: var(--t-muted); }
-:root[data-theme="dark"] .dx-count-pill {
-  color: var(--t-accent);
-  background: color-mix(in oklab, var(--t-accent) 22%, var(--t-surface));
-}
-:root[data-theme="dark"] .dx-listening { color: var(--t-muted); }
+:root[data-theme="dark"] :root[data-theme="dark"] .dx-listening { color: var(--t-muted); }
 :root[data-theme="dark"] .dx-listening-dot {
   background: var(--t-accent);
   box-shadow: 0 0 0 3px color-mix(in oklab, var(--t-accent) 30%, transparent);
@@ -2580,21 +2529,6 @@ form[data-dirty] .dx-inline-save { display: none; }
   letter-spacing: 0.07em;
   text-transform: uppercase;
   color: var(--t-muted);
-}
-.dx-count-pill {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 6px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0;
-  color: var(--t-accent);
-  background: var(--t-accent-soft);
-  border-radius: 999px;
-  text-transform: none;
 }
 .dx-discovered-explainer {
   margin: 6px 0 10px;
@@ -3088,7 +3022,7 @@ form[data-dirty] .dx-inline-save { display: none; }
    the same building blocks:
 
    * .dx-pill .is-ok / .is-warn / .is-danger / .is-neutral — status
-     chips with the spec's pill palette
+     tags (events + widgets); new work uses .tg from chips.css
    * .dx-dow-pill — selectable day-of-week chip
    * .dx-input — the spec's input baseline (existing fields keep
      their forms.css styling; this is for hand-rolled inputs inside
@@ -3383,40 +3317,15 @@ select.dx-input:hover {
 }
 .dx-meta-v { color: var(--t-fg-soft); font-size: 11.5px; }
 
-/* Filter strip used across History + Events. Sits as a top-of-page
-   tab nav with count-pill counters; active chip gets the accent
-   underline same as the device card tabs. */
+/* Filter strip: a page-level row holding one segmented control
+   (.seg, chips.css) plus any trailing action or note. Layout only; the
+   options themselves are .seg-item. */
 .dx-filter-strip {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 6px;
-  margin-bottom: 14px;
-  padding: 0 2px;
-}
-.dx-filter-chip {
-  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 7px 12px;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--t-muted);
-  font-size: 12.5px;
-  font-weight: 600;
-  text-decoration: none;
-  border: 1px solid var(--t-border);
-  transition: color 120ms ease, background 120ms ease, border-color 120ms ease;
-}
-.dx-filter-chip:hover { color: var(--t-fg); border-color: var(--t-border-strong); }
-.dx-filter-chip.is-active {
-  background: var(--t-accent-tint);
-  color: var(--t-accent);
-  border-color: var(--t-accent-tint);
-}
-.dx-filter-chip .dx-count-pill { background: var(--t-pill-neutral-bg); color: var(--t-pill-neutral-fg); }
-.dx-filter-chip.is-active .dx-count-pill {
-  background: var(--t-accent);
-  color: var(--t-accent-fg);
+  gap: 8px 10px;
+  margin-bottom: 14px;
 }
 
 /* ============================================================
@@ -3493,7 +3402,7 @@ select.dx-input:hover {
  * ============================================================ */
 
 /* All Events page rules (.dx-events-toolbar, .dx-event-row,
-   .dx-event-row--<type> per-type swatch, .dx-filter-chip per-type
+   .dx-event-row--<type> per-type swatch, .seg-item--<type> per-type
    colour, .dx-event-summary / -icon / -body / -head / -meta /
    -caret / -expand / -thumb-link) now live in dx-events.css. */
 
@@ -3747,17 +3656,6 @@ select.dx-input:hover {
 .dx-dot.is-warn { background: var(--dx-warn); }
 .dx-dot.is-stale { background: var(--dx-danger); }
 .dx-dot.is-unknown { background: var(--t-border-strong); }
-.dx-tpill {
-  display: inline-block;
-  font-family: var(--dx-mono);
-  font-size: 10.5px;
-  letter-spacing: 0.04em;
-  padding: 2px 7px;
-  border-radius: 5px;
-  background: var(--t-surface-sunk, #f0efec);
-  color: var(--t-fg-soft, #6b6b67);
-  white-space: nowrap;
-}
 .dx-devstatus {
   display: inline-flex;
   align-items: center;
@@ -4254,20 +4152,8 @@ select.dx-input:hover {
 }
 .dx-power-grid .field { padding: 0; margin: 0; border-top: 0 !important; }
 
-/* Connection: header chips + wider dl. */
+/* Connection: header tags (.tg) + wider dl. */
 .dx-conn-chips { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; flex: none; }
-.dx-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 12px;
-  color: var(--dx-ink-soft);
-  padding: 3px 9px;
-  border: 1px solid var(--t-border);
-  border-radius: 999px;
-  white-space: nowrap;
-}
-.dx-chip code { background: transparent; padding: 0; font-size: 12px; color: var(--t-fg); }
 .dx-conn-grid--page { display: block; padding: 0; margin: 0; }
 .dx-conn-grid--page > div:last-child { border-bottom: 0; }
 .dx-conn-grid--page > div { display: flex; justify-content: space-between; gap: 16px; padding: 9px 0; border-bottom: 1px solid var(--dx-border-soft); font-size: 13px; }
@@ -4299,7 +4185,6 @@ select.dx-input:hover {
 :root[data-theme="dark"] .dx-btn.is-ghost:hover { background: var(--t-surface-raised); }
 :root[data-theme="dark"] .dx-btn.is-danger { background: transparent; color: var(--t-danger); border-color: color-mix(in oklab, var(--t-danger) 50%, transparent); }
 :root[data-theme="dark"] .dx-btn.is-danger:hover { background: var(--t-danger-bg); }
-:root[data-theme="dark"] .dx-tpill { background: var(--t-surface-soft); color: var(--t-fg-soft); border: 1px solid var(--t-border); }
 :root[data-theme="dark"] .dx-devtb-search,
 :root[data-theme="dark"] .dx-devtb-select { background: var(--t-surface-soft); border-color: var(--t-border); }
 :root[data-theme="dark"] .dx-devtable { background: var(--t-surface); border-color: var(--t-border); box-shadow: var(--t-shadow-sm), var(--t-shadow-inset); }
@@ -4345,7 +4230,7 @@ select.dx-input:hover {
     -webkit-overflow-scrolling: touch;
   }
   .dx-subnav::-webkit-scrollbar { display: none; }
-  .dx-subnav-link { flex: none; padding: 7px 12px; border-radius: 999px; border: 1px solid var(--t-border); font-size: 13px; }
+  .dx-subnav-link { flex: none; padding: 7px 12px; border-radius: var(--t-radius-sm); border: 1px solid var(--t-border); font-size: 13px; }
   .dx-subnav-link.is-active { border-color: transparent; }
   .dx-devsec .dx-field-grid,
   .dx-devsec .dx-field-grid--3,

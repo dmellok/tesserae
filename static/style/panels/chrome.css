@@ -52,7 +52,7 @@
   .pbtn:hover{background:var(--t-surface-sunk)}
   .pbtn.accent{background:var(--t-accent);color:var(--t-accent-fg);border-color:transparent;box-shadow:var(--t-shadow-sm)}
   .pbtn.accent:hover{background:var(--t-accent-hover)}
-  .tchip{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;font:700 10.5px var(--t-font);letter-spacing:.04em;background:var(--t-surface-sunk);color:var(--t-muted)}
+  .tchip{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:5px;font:700 10.5px var(--t-font);letter-spacing:.04em;background:var(--t-surface-sunk);color:var(--t-muted)}
 
   .card2{background:var(--t-surface);border:1px solid var(--t-border);border-radius:12px;box-shadow:var(--t-shadow-sm);overflow:hidden;display:flex;flex-direction:column}
   .pnh{display:flex;align-items:center;justify-content:space-between;padding:11px 13px;border-bottom:1px solid var(--t-border);flex:none}
@@ -74,7 +74,7 @@
   .wgh{display:flex;align-items:center;gap:9px;padding:9px;border-radius:8px;cursor:pointer;font:700 12.5px var(--t-font);color:var(--t-fg)}
   .wgh:hover{background:var(--t-surface-sunk)}
   .wgh .wi{width:24px;height:24px;display:grid;place-items:center;border-radius:6px;font-size:14px;color:#fff;flex:none}
-  .wgh .ct{margin-left:auto;font:600 10px var(--t-font-mono);color:var(--t-muted);background:var(--t-surface-sunk);padding:2px 6px;border-radius:999px}
+  .wgh .ct{margin-left:auto;font:600 10px var(--t-font-mono);color:var(--t-muted);background:var(--t-surface-sunk);padding:2px 6px;border-radius:5px}
   .wgh .cv{margin-left:auto;color:var(--t-muted);font-size:13px}
   .fld{display:flex;align-items:center;gap:9px;padding:7px 10px 7px 32px;border-radius:7px;font:600 12.5px var(--t-font);color:var(--t-fg-soft);cursor:grab}
   .fld:hover{background:var(--t-surface-sunk);color:var(--t-fg)}
@@ -123,7 +123,7 @@
   .ws{position:relative;overflow:hidden;display:grid;place-items:center;background:var(--t-bg)}
   .ws::before{content:"";position:absolute;inset:0;background-image:radial-gradient(color-mix(in oklab,var(--t-fg) 9%,transparent) 1px,transparent 1.5px);background-size:22px 22px;opacity:.5}
   .board-wrap{position:relative;z-index:1}
-  .sizetab{position:absolute;left:50%;transform:translateX(-50%);bottom:-34px;display:inline-flex;align-items:center;gap:8px;padding:5px 11px;border-radius:999px;background:var(--t-surface);border:1px solid var(--t-border);box-shadow:var(--t-shadow-sm);font:600 11.5px var(--t-font-mono);color:var(--t-fg-soft);white-space:nowrap}
+  .sizetab{position:absolute;left:50%;transform:translateX(-50%);bottom:-34px;display:inline-flex;align-items:center;gap:8px;padding:5px 11px;border-radius:6px;background:var(--t-surface);border:1px solid var(--t-border);box-shadow:var(--t-shadow-sm);font:600 11.5px var(--t-font-mono);color:var(--t-fg-soft);white-space:nowrap}
   .sizetab .dot{width:6px;height:6px;border-radius:50%;background:var(--t-accent)}
   .sizetab .car{color:var(--t-muted)}
 
@@ -174,7 +174,7 @@
   .marquee{position:absolute;z-index:4;border:1.5px dashed var(--t-accent);background:color-mix(in oklab,var(--t-accent) 12%,transparent);border-radius:2px}
   .cread{position:absolute;z-index:7;font:600 10px var(--t-font-mono);background:var(--t-fg);color:var(--t-bg);padding:3px 7px;border-radius:5px;white-space:nowrap;box-shadow:var(--t-shadow-sm)}
   :root[data-theme="dark"] .ed .cread{background:#000;color:#e7e9ee}
-  .simbadge{position:absolute;z-index:8;display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;font:700 11px var(--t-font);letter-spacing:.03em;background:var(--t-fg);color:var(--t-bg);box-shadow:var(--t-shadow-md)}
+  .simbadge{position:absolute;z-index:8;display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:5px;font:700 11px var(--t-font);letter-spacing:.03em;background:var(--t-fg);color:var(--t-bg);box-shadow:var(--t-shadow-md)}
   .simbadge i{font-size:13px}
   .warn{position:absolute;z-index:8;display:flex;align-items:center;gap:6px;background:var(--t-warn-bg);border:1px solid var(--t-warn-bd);color:var(--t-warn);font:700 10.5px var(--t-font);padding:4px 8px;border-radius:8px;box-shadow:var(--t-shadow-md);white-space:nowrap}
   .warn i{font-size:13px}

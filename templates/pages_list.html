@@ -17,17 +17,19 @@
    can be archived, so the Archive button is disabled on lineup members
    and names the lineup in its tooltip. #}
 {% set archived_tab = (tab == 'archived') %}
-<nav class="dx-filter-strip" role="tablist" aria-label="Dashboard list">
-  <a href="{{ url_for('pages.index') }}" role="tab" aria-selected="{{ 'false' if archived_tab else 'true' }}"
-     class="dx-filter-chip{% if not archived_tab %} is-active{% endif %}" title="Dashboards in use">
-    <i class="ph ph-squares-four" aria-hidden="true"></i><span>Active</span>
-    <span class="dx-count-pill">{{ active_count }}</span>
-  </a>
-  <a href="{{ url_for('pages.index', tab='archived') }}" role="tab" aria-selected="{{ 'true' if archived_tab else 'false' }}"
-     class="dx-filter-chip{% if archived_tab %} is-active{% endif %}" title="Dashboards you've parked but not deleted">
-    <i class="ph ph-archive" aria-hidden="true"></i><span>Archived</span>
-    <span class="dx-count-pill">{{ archived_count }}</span>
-  </a>
+<nav class="dx-filter-strip" aria-label="Dashboard list">
+  <span class="seg" role="tablist">
+    <a href="{{ url_for('pages.index') }}" role="tab" aria-selected="{{ 'false' if archived_tab else 'true' }}"
+       class="seg-item{% if not archived_tab %} is-on{% endif %}" title="Dashboards in use">
+      <i class="ph ph-squares-four" aria-hidden="true"></i><span>Active</span>
+      <span class="seg-count">{{ active_count }}</span>
+    </a>
+    <a href="{{ url_for('pages.index', tab='archived') }}" role="tab" aria-selected="{{ 'true' if archived_tab else 'false' }}"
+       class="seg-item{% if archived_tab %} is-on{% endif %}" title="Dashboards you've parked but not deleted">
+      <i class="ph ph-archive" aria-hidden="true"></i><span>Archived</span>
+      <span class="seg-count">{{ archived_count }}</span>
+    </a>
+  </span>
   {# Every per-display group is a disclosure; with two or more of them a
      single control folds or unfolds the lot. The label follows the
      groups' state, so it always names the action it will take. #}
@@ -96,11 +98,11 @@
       {% if device %}
       <i class="ph ph-device-mobile-camera" aria-hidden="true"></i>
       <span>{{ device.display_name }}</span>
-      <span class="dx-pill">{{ group|length }}</span>
+      <span class="tg tg--sm tg--mono">{{ group|length }}</span>
       {% else %}
       <i class="ph ph-link-break" aria-hidden="true"></i>
       <span>Unbound</span>
-      <span class="dx-pill">{{ group|length }}</span>
+      <span class="tg tg--sm tg--mono">{{ group|length }}</span>
       {% endif %}
     </summary>
     <ul class="dx-discovered-list">
@@ -122,15 +124,15 @@
           <div class="dx-dashboard-text">
             <div class="dx-dashboard-name">
               {{ page.name }}
-              {% if page.layout_kind == 'canvas' %}<span class="dx-pill">Freeform</span>{% endif %}
-              {% if page.created_by == 'mcp' %}<span class="dx-pill" title="Created by an agent over the MCP API"><i class="ph ph-robot" aria-hidden="true"></i> Agent</span>{% endif %}
+              {% if page.layout_kind == 'canvas' %}<span class="tg tg--sm">Freeform</span>{% endif %}
+              {% if page.created_by == 'mcp' %}<span class="tg tg--sm" title="Created by an agent over the MCP API"><i class="ph ph-robot" aria-hidden="true"></i>Agent</span>{% endif %}
               {# A dashboard that declares its own settings says so here, since
                  the whole point is that whoever inherits it can change the
                  parts meant to be changed without opening the composer. #}
-              {% if page.layout_kind == 'canvas' and page.canvas and page.canvas.inputs %}<span class="dx-pill" title="This dashboard has its own settings page"><i class="ph ph-sliders-horizontal" aria-hidden="true"></i> {{ page.canvas.inputs|length }} setting{{ '' if page.canvas.inputs|length == 1 else 's' }}</span>{% endif %}
+              {% if page.layout_kind == 'canvas' and page.canvas and page.canvas.inputs %}<span class="tg tg--sm" title="This dashboard has its own settings page"><i class="ph ph-sliders-horizontal" aria-hidden="true"></i><span class="tg-count">{{ page.canvas.inputs|length }}</span>setting{{ '' if page.canvas.inputs|length == 1 else 's' }}</span>{% endif %}
               {% set _lineups = page_lineups.get(page.id) or [] %}
-              {% if _lineups %}<span class="dx-pill" title="In lineup{{ '' if _lineups|length == 1 else 's' }}: {{ _lineups|join(', ') }}"><i class="ph ph-cards-three" aria-hidden="true"></i> {{ _lineups|length }} lineup{{ '' if _lineups|length == 1 else 's' }}</span>{% endif %}
-              {% if archived_tab %}<span class="dx-pill" title="Archived: not offered in pickers and not refreshed in the background"><i class="ph ph-archive" aria-hidden="true"></i> Archived</span>{% endif %}
+              {% if _lineups %}<span class="tg tg--sm" title="In lineup{{ '' if _lineups|length == 1 else 's' }}: {{ _lineups|join(', ') }}"><i class="ph ph-cards-three" aria-hidden="true"></i><span class="tg-count">{{ _lineups|length }}</span>lineup{{ '' if _lineups|length == 1 else 's' }}</span>{% endif %}
+              {% if archived_tab %}<span class="tg tg--sm" title="Archived: not offered in pickers and not refreshed in the background"><i class="ph ph-archive" aria-hidden="true"></i>Archived</span>{% endif %}
             </div>
             <div class="dx-meta-strip">
               <span><span class="dx-meta-k">Size</span><code>{% if d %}{{ d.w }}×{{ d.h }}{% else %}—{% endif %}</code></span>

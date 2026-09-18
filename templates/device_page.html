@@ -15,7 +15,7 @@
    Colour calibration (test patterns, palette, tone) has its own page,
    device_calibration.html. #}
 {% from "_components.html" import auto_field, info_pop, number_input, select_field, slider, switch, text_input, days_field with context %}
-{% from "_components.html" import settings_tabs %}
+{% from "_components.html" import settings_tabs, tg_tone %}
 {% from "_device_parts.html" import overview_tiles, render_thumb with context %}
 
 {% set _name = section.device_name or section.device_id %}
@@ -129,7 +129,7 @@
         <div class="dx-status-line dx-album-line">
           <span class="dx-status-muted">Offline album</span>
           <span class="dx-status-headline">{{ coll.album_name }}</span>
-          {% if coll.pill_class %}<span class="pill {{ coll.pill_class }}">{{ coll.state }}</span>{% else %}<span class="dx-status-muted">no report yet</span>{% endif %}
+          {% if coll.pill_class %}<span class="tg tg--sm {{ tg_tone(coll.pill_class) }}">{{ coll.state }}</span>{% else %}<span class="dx-status-muted">no report yet</span>{% endif %}
           {% if coll.counts %}<span class="dx-status-muted">·</span><span class="dx-status-muted">{{ coll.counts }}</span>{% endif %}
           {% if coll.relative %}<span class="dx-status-muted">·</span><span class="dx-status-muted">reported {{ coll.relative }}</span>{% endif %}
           <button type="submit" form="album-resync-{{ section.device_id }}" class="dx-btn-ghost-sm"
@@ -539,8 +539,8 @@
             <div class="timetable-what">
               <i class="ph ph-squares-four" aria-hidden="true"></i>
               <span>{{ entry.page_name }}</span>
-              {% if not entry.enabled %}<span class="pill">disabled</span>{% endif %}
-              {% if entry.wont_send %}<span class="pill" title="This dashboard isn't bound to any device, so it won't send. Bind it to a device, or enable legacy unbound broadcast in Settings.">unbound · won't send</span>{% endif %}
+              {% if not entry.enabled %}<span class="tg tg--sm">disabled</span>{% endif %}
+              {% if entry.wont_send %}<span class="tg tg--sm tg--warn" title="This dashboard isn't bound to any device, so it won't send. Bind it to a device, or enable legacy unbound broadcast in Settings.">unbound · won't send</span>{% endif %}
             </div>
             <div class="timetable-edit">
               <a class="button ghost" href="{{ url_for('schedules.index') }}#schedule-{{ entry.schedule_id }}">
@@ -576,26 +576,24 @@
         {% set _ota = section.status.ota %}
         <div class="dx-conn-chips">
           {% if _fw and _fw.current %}
-          <span class="dx-chip">firmware <code>{{ _fw.current if _fw.current.startswith('v') else 'v' ~ _fw.current }}</code></span>
+          <span class="tg">firmware<span class="tg-count">{{ _fw.current if _fw.current.startswith('v') else 'v' ~ _fw.current }}</span></span>
           {# A newer build leads to the Firmware page, where the update is
              actually rolled out; the GitHub release stays one step away for
              the notes. #}
           {% if _fw.state == 'outdated' and _fw.latest %}
-          <a class="pill is-warn" href="{{ url_for('auth.firmware_index') }}"
+          <a class="tg tg--warn" href="{{ url_for('auth.firmware_index') }}"
              title="{{ _fw.notes_headline or ('Latest available: v' ~ _fw.latest) }}. Open the Firmware page to roll it out.">v{{ _fw.latest }} available</a>
           {% if _fw.release_url %}
-          <a class="dx-chip dx-chip-link" href="{{ _fw.release_url }}" target="_blank" rel="noopener"
+          <a class="tg" href="{{ _fw.release_url }}" target="_blank" rel="noopener"
              title="Release notes for v{{ _fw.latest }} on GitHub"><i class="ph ph-arrow-square-out" aria-hidden="true"></i>release notes</a>
           {% endif %}
           {% endif %}
           {% endif %}
-          <a class="dx-chip dx-chip-link" href="{{ url_for('auth.firmware_index') }}" data-firmware-page-link
+          <a class="tg" href="{{ url_for('auth.firmware_index') }}" data-firmware-page-link
              title="Firmware versions and rollouts for every display"><i class="ph ph-cpu" aria-hidden="true"></i>Firmware page</a>
           {% if _ota %}
-          <span class="dx-chip">OTA
-            <span class="pill {{ _ota.pill_class }}"{% if _ota.detail %} title="{{ _ota.detail }}"{% endif %}>
-              {{ _ota.phase }}{% if _ota.target_fw %} {{ _ota.target_fw if _ota.target_fw.startswith('v') else 'v' ~ _ota.target_fw }}{% endif %}{% if _ota.reason and _ota.pill_class == 'is-danger' %} ({{ _ota.reason }}){% endif %}
-            </span>
+          <span class="tg {{ tg_tone(_ota.pill_class) }}"{% if _ota.detail %} title="{{ _ota.detail }}"{% endif %}>OTA
+            <span class="tg-count">{{ _ota.phase }}{% if _ota.target_fw %} {{ _ota.target_fw if _ota.target_fw.startswith('v') else 'v' ~ _ota.target_fw }}{% endif %}{% if _ota.reason and _ota.pill_class == 'is-danger' %} ({{ _ota.reason }}){% endif %}</span>
           </span>
           {% endif %}
         </div>
