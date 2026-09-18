@@ -6,6 +6,21 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added
+
+- **A dashboard can declare how often the panel showing it should wake.**
+  Wake cadence has always been a device property, but the content is what
+  knows how often it changes: a once-daily agenda on a five-minute panel
+  woke roughly 288 times a day to collect 287 304s (discussion #24). A
+  dashboard now carries an optional `sleep_interval_s`, and a sleeping
+  device showing it wakes on that instead of its own interval — longer
+  for a daily page, shorter for a transit board. Clamped to the device
+  kind's own min/max, because only the device knows what its firmware
+  accepts, and skipped entirely for an always-on panel, which is not on
+  the sleep grid at all. Set it in Dashboards → Wake, or over MCP with
+  `PATCH /api/mcp/pages/<id>/canvas`; leaving it empty hands the device
+  back its own interval, which is what every existing dashboard does.
+
 ## [0.419.3], 2026-09-16
 
 ### Changed

@@ -177,6 +177,38 @@
                   {% if not is_custom %}hidden{% endif %}>Set</button>
           <noscript><button type="submit" class="ghost">Set</button></noscript>
         </form>
+        <form method="post" action="{{ url_for('pages.update', page_id=page.id) }}"
+              class="dx-updates-ctl" title="How often a panel showing this dashboard wakes to collect a new frame. Leave on the device's own interval unless this dashboard changes on its own schedule.">
+          <span class="dx-meta-k">Wake</span>
+          {# The other half of "Updates": that one is how often the frame is
+             re-rendered, this is how often a panel comes to fetch it. They are
+             independent — a page that re-renders hourly and is polled daily
+             shows yesterday's frame for most of the day — and the presets here
+             are seconds because that is the unit the device config uses.
+             Clamped per device kind on the way out, since only the device
+             knows what its firmware accepts. #}
+          {% set wake_presets = [120, 900, 1800, 3600, 21600, 43200, 86400] %}
+          {% set wake_custom = page.sleep_interval_s is not none and page.sleep_interval_s not in wake_presets %}
+          <select name="sleep_interval_s" data-updates-preset aria-label="How often a panel showing this dashboard wakes">
+            <option value="" {% if page.sleep_interval_s is none %}selected{% endif %}>device's own interval</option>
+            <option value="120" {% if page.sleep_interval_s == 120 %}selected{% endif %}>every 2 min</option>
+            <option value="900" {% if page.sleep_interval_s == 900 %}selected{% endif %}>every 15 min</option>
+            <option value="1800" {% if page.sleep_interval_s == 1800 %}selected{% endif %}>every 30 min</option>
+            <option value="3600" {% if page.sleep_interval_s == 3600 %}selected{% endif %}>hourly</option>
+            <option value="21600" {% if page.sleep_interval_s == 21600 %}selected{% endif %}>every 6 h</option>
+            <option value="43200" {% if page.sleep_interval_s == 43200 %}selected{% endif %}>every 12 h</option>
+            <option value="86400" {% if page.sleep_interval_s == 86400 %}selected{% endif %}>daily</option>
+            <option value="custom" {% if wake_custom %}selected{% endif %}>custom…</option>
+          </select>
+          <input type="number" name="sleep_interval_s_custom" min="1" max="604800" step="1"
+                 value="{{ page.sleep_interval_s or '' }}" data-updates-custom
+                 aria-label="Wake interval in seconds"
+                 {% if not wake_custom %}hidden{% endif %}>
+          <span class="dx-updates-unit" data-updates-unit {% if not wake_custom %}hidden{% endif %}>s</span>
+          <button type="submit" class="ghost dx-updates-set" data-updates-set
+                  {% if not wake_custom %}hidden{% endif %}>Set</button>
+          <noscript><button type="submit" class="ghost">Set</button></noscript>
+        </form>
         {% endif %}
         <div class="dx-discovered-actions">
           <a class="dx-btn-primary-sm" href="{{ url_for('pages.edit', page_id=page.id) }}">

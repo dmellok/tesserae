@@ -1146,6 +1146,8 @@ def list_pages() -> Response:
             "elements": (len(p.canvas.els) if p.canvas else 0),
             "device_ids": list(p.device_ids),
             "created_by": p.created_by,
+            # Absent means the panels showing it keep their own wake interval.
+            "sleep_interval_s": p.sleep_interval_s,
         }
         for p in _pr._canvas_pages()
     ]
@@ -1315,6 +1317,9 @@ def get_canvas(page_id: str) -> Response:
         return _err(404, f"no canvas dashboard {page_id!r}")
     doc = _pr._as_doc(page).model_dump(mode="json")
     doc["rev"] = _pr._canvas_rev(page)
+    # Page-level, not part of the canvas document, but an agent that can set it
+    # through patch_canvas has to be able to read back what it set.
+    doc["sleep_interval_s"] = page.sleep_interval_s
     doc["updated_at"] = page.updated_at
     doc["updated_by"] = page.updated_by
     return jsonify(doc)
@@ -1671,10 +1676,16 @@ def delete_element(page_id: str, element_id: str) -> Response:
 
 @bp.patch("/pages/<page_id>/canvas")
 def patch_canvas(page_id: str) -> Response:
-    """Update document-level fields (name, size, appearance, config inputs) without
-    touching the elements. Body accepts any of
-    ``{name,w,h,theme,style,font,bg,bg_image,bg_fit,inputs}``. Use ``set_canvas`` /
-    element endpoints for ``els``. Supports ``?base_rev=``.
+    """Update document-level fields (name, size, appearance, wake cadence, config
+    inputs) without touching the elements. Body accepts any of
+    ``{name,w,h,theme,style,font,bg,bg_image,bg_fit,sleep_interval_s,inputs}``. Use
+    ``set_canvas`` / element endpoints for ``els``. Supports ``?base_rev=``.
+
+    ``sleep_interval_s`` is how often a panel showing this dashboard should wake
+    to collect a new frame, in seconds, or ``null`` to leave the device's own
+    interval in charge. A dashboard that only changes once a day says so here
+    rather than having every panel that shows it reconfigured (#144); the server
+    clamps to what the device kind's firmware accepts.
 
     ``inputs`` replaces the dashboard's declared config surface wholesale, so an
     agent that has just placed the elements can declare what the finished
@@ -1698,6 +1709,14 @@ def patch_canvas(page_id: str) -> Response:
     for field in ("theme", "style", "font", "bg", "bg_image", "bg_fit"):
         if field in body and isinstance(body[field], str):
             setattr(layout, field, body[field])
+    if "sleep_interval_s" in body:
+        raw = body["sleep_interval_s"]
+        if raw is None:
+            page.sleep_interval_s = None
+        elif isinstance(raw, int) and not isinstance(raw, bool) and 1 <= raw <= 604800:
+            page.sleep_interval_s = raw
+        else:
+            return _err(422, "sleep_interval_s must be null, or 1..604800 seconds")
     if "inputs" in body:
         if not isinstance(body["inputs"], list):
             return _err(400, "inputs must be a list")

@@ -1027,6 +1027,28 @@ def update(page_id: str) -> Response:
         if raw == "custom":
             raw = form.get("refresh_minutes_custom")
         updates["refresh_minutes"] = _coerce_int(raw, page.refresh_minutes, lo=0, hi=1440)
+    if "sleep_interval_s" in form:
+        # The other half of Updates (#144): how often a panel showing this
+        # dashboard wakes to collect the frame, rather than how often the frame
+        # is made. Empty is the meaningful value here — "leave the device's own
+        # interval in charge" — so it clears the field rather than falling back
+        # to the stored one, which is the opposite of the minutes box above.
+        # "custom" with nothing typed is the stray-submit case and keeps what is
+        # stored, matching Updates.
+        raw = form.get("sleep_interval_s")
+        if raw == "custom":
+            raw = form.get("sleep_interval_s_custom")
+            updates["sleep_interval_s"] = (
+                page.sleep_interval_s
+                if raw is None or raw == ""
+                else _coerce_int(raw, page.sleep_interval_s or 1, lo=1, hi=604800)
+            )
+        elif raw is None or raw == "":
+            updates["sleep_interval_s"] = None
+        else:
+            updates["sleep_interval_s"] = _coerce_int(
+                raw, page.sleep_interval_s or 1, lo=1, hi=604800
+            )
     if "gap" in form:
         updates["gap"] = _coerce_int(form.get("gap"), page.gap, lo=0)
     if "corner_radius" in form:

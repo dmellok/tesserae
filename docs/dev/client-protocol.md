@@ -1572,8 +1572,7 @@ A schedule or rotation cannot *wake* a device; it only changes what
 frame is waiting the next time the device polls. It can, however, pull
 the next poll earlier.
 
-- `next_poll_s` is the device's configured `sleep_interval_s`
-  (device-instance setting → kind-schema default → 60s) **capped
+- `next_poll_s` is the device's configured wake interval **capped
   against the next projected content change**. If a bound schedule or
   rotation step is due in 2 minutes and the configured interval is 15,
   you're told to come back in about 2 minutes, so you see the change on
@@ -1584,6 +1583,17 @@ the next poll earlier.
   has just passed) is reported as due now, so a device that arrives a
   moment early is told to poll again after the margin rather than sleep
   its whole interval on the old frame.
+- **The configured interval resolves in this order:** the always-on
+  cadence for a device that never sleeps, then the `sleep_interval_s`
+  declared by the dashboard currently on the glass, then the
+  device-instance setting, then the kind-schema default, then 60 s. The
+  page-level value exists because the content is what knows how often it
+  changes: a once-daily agenda on a five-minute panel woke roughly 288
+  times a day to collect 287 `304`s. It is clamped to the kind's own
+  `min`/`max`, so a dashboard cannot ask a panel to wake faster than its
+  firmware allows, and it applies only to a device that sleeps, since an
+  always-on panel is not on the sleep grid at all. Set it per dashboard
+  (Dashboards → Wake) or over MCP (`PATCH /api/mcp/canvas/<id>`).
 - The configured interval remains the ceiling. It's never extended,
   because manual Send, webhooks, Home Assistant events and data-change
   refreshes have no schedule to project, and a device sleeping past its
