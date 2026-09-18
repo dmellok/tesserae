@@ -9,8 +9,22 @@
     <button type="button" class="button primary" data-open-timed-wizard>
       <i class="ph ph-magic-wand" aria-hidden="true"></i><span>Set up a display</span>
     </button>
+    {# The pause switch stays under Settings > Server > Automation because it
+       also halts schedules and buttons; this page only points at it. #}
+    {% if not automation_paused %}
+    <a class="dk-automation-hint" href="{{ automation_url }}" data-automation-hint>
+      <i class="ph ph-pause-circle" aria-hidden="true"></i><span>Pause everything from Settings › Server › Automation</span>
+    </a>
+    {% endif %}
   </p>
 </header>
+{% if automation_paused %}
+<div class="dx-warn-band dk-paused-band" role="status" data-automation-paused>
+  <i class="ph-fill ph-warning" aria-hidden="true"></i>
+  <p>Automation is paused. Nothing on this page will push until it is resumed.
+    <a href="{{ automation_url }}">Resume in Settings</a></p>
+</div>
+{% endif %}
 {% include "_timed_wizard.html" %}
 {% include "_legacy_migration_notice.html" %}
 
@@ -86,6 +100,13 @@
     {% endfor %}
     {% endif %}
     <span class="dk-meta">{{ c.meta }}</span>
+    {# An enabled rotation that is not playing says what the display holds
+       instead and when it takes the panel back (#280). #}
+    {% if c.paused_reason %}
+    <span class="dk-paused" title="This rotation is enabled but the display is showing something else">
+      <i class="ph ph-pause" aria-hidden="true"></i>{{ c.paused_reason }}
+    </span>
+    {% endif %}
     <div class="dk-actions">
       {% if c.kind == 'cycle' and c.play_url %}
       <form method="post" action="{{ c.play_url }}" class="inline">

@@ -198,7 +198,7 @@
       if (state.mode === 'interval') {
         return Boolean(state.dash) && Number(state.interval) >= 1 && displayOk();
       }
-      return (!scoped() || Boolean(state.device)) && state.picks.length >= 2;
+      return (!scoped() || Boolean(state.device)) && state.picks.length >= 1;
     }
     return true;
   };
@@ -331,8 +331,8 @@
     el.pickCount.textContent =
       state.picks.length === 0 ? 'None picked yet' : state.picks.length + ' picked';
     el.multiHint.textContent = state.mode === 'cycle'
-      ? 'Pick two or more. Numbers show the order they will appear in.'
-      : 'Pick two or more. Order sets the page numbers in the editor.';
+      ? 'Pick one or more. Numbers show the order they will appear in.'
+      : 'Pick one or more. Order sets the page numbers in the editor.';
     el.cycleHint.textContent = state.picks.length > 0
       ? 'A full loop takes about ' + loopMinutes() + ' minutes.'
       : 'Each dashboard can stay up for a different length of time.';
@@ -456,7 +456,7 @@
         interval: ['Which dashboard, and how often?',
           'Shorter cadences use more battery on radio-only displays.'],
         cycle: ['Build the rotation',
-          'Pick two or more. They show in this order and the loop repeats all day.'],
+          'Pick one or more. They show in this order and the loop repeats all day. One dashboard just refreshes on the timer.'],
         deck: ['Choose the pages',
           'Pick the dashboards that belong to this deck. You will link them in the editor.'],
       }[state.mode] || ['', ''];

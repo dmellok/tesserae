@@ -51,12 +51,29 @@
     html[data-theme="dark"] { background: #0e1015; color-scheme: dark; }
   </style>
   <script>
-    // Apply the saved theme before paint to avoid a light-mode flash.
+    // Apply the theme before paint to avoid a light-mode flash. A saved
+    // choice wins; with none, follow the operating system and keep
+    // following it until the toggle is used.
     (function () {
-      try {
-        var t = localStorage.getItem('tesserae-theme');
-        if (t === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
-      } catch (e) { /* localStorage unavailable */ }
+      var saved = null;
+      try { saved = localStorage.getItem('tesserae-theme'); } catch (e) { /* localStorage unavailable */ }
+      var mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+      function apply(dark) {
+        if (dark) document.documentElement.setAttribute('data-theme', 'dark');
+        else document.documentElement.removeAttribute('data-theme');
+      }
+      if (saved === 'dark' || saved === 'light') {
+        apply(saved === 'dark');
+      } else if (mq) {
+        apply(mq.matches);
+        var follow = function (ev) {
+          var now = null;
+          try { now = localStorage.getItem('tesserae-theme'); } catch (e) { /* ignore */ }
+          if (now !== 'dark' && now !== 'light') apply(ev.matches);
+        };
+        if (mq.addEventListener) mq.addEventListener('change', follow);
+        else if (mq.addListener) mq.addListener(follow);
+      }
     })();
     // SCRIPT_NAME under HA Ingress (e.g. /api/hassio_ingress/<token>), empty
     // otherwise. JS that builds absolute paths must prepend this, root-
@@ -168,7 +185,7 @@
         </summary>
         <div class="nav-dropdown-panel">
           <a class="nav-dropdown-link" href="{{ url_for('plugins.plugins_index') }}">
-            <i class="ph ph-list-bullets" aria-hidden="true"></i>All widgets
+            <i class="ph ph-list-bullets" aria-hidden="true"></i>Installed widgets
           </a>
           <a class="nav-dropdown-link" href="{{ url_for('marketplace.browse') }}">
             <i class="ph ph-storefront" aria-hidden="true"></i>Browse catalog

@@ -906,3 +906,135 @@ def test_mins_label_shapes() -> None:
     assert _mins_label(32) == "32 min"
     assert _mins_label(60) == "1 h"
     assert _mins_label(125) == "2 h 5 min"
+
+
+def _local_hhmm() -> str:
+    return r"\d\d:\d\d"
+
+
+def test_rotation_row_says_the_display_holds_a_manual_push(app: Flask) -> None:
+    """An enabled rotation whose display shows a page someone pushed by
+    hand: the row loses Playing and gains a pill naming the page, the
+    manual push, and when the rotation takes the panel back (#280)."""
+    client = app.test_client()
+    _sign_in(client)
+    _register_display(app, client, "panel")
+    device = app.config["DEVICE_REGISTRY"].devices["panel"]
+    device.manifest["transport"] = "mqtt"
+    _seed_loop_on(app, "panel")
+    other = _other(_intended_page(app))
+    _stamp_render(app, "panel", page_id=other)
+    app.config["EVENT_LOG"].record(
+        type="push",
+        source="page",
+        target=other,
+        status="sent",
+        digest="new",
+        extra={"device_ids": ["panel"]},
+    )
+
+    body = client.get("/decks").get_data(as_text=True)
+    section = body[body.index('id="display-panel"') :]
+    assert "dk-row is-playing" not in section
+    assert re.search(
+        rf'class="dk-paused"[^>]*>\s*<i[^>]*></i>showing {other.title()} from a manual push'
+        rf" · resumes {_local_hhmm()}\s*<",
+        section,
+    )
+
+
+def test_rotation_row_names_the_lineup_holding_the_display(app: Flask) -> None:
+    from app.state.deck_model import Deck, DeckPage
+
+    client = app.test_client()
+    _sign_in(client)
+    _register_display(app, client, "panel")
+    _seed_loop_on(app, "panel")
+    other = _other(_intended_page(app))
+    app.config["DECK_STORE"].upsert(
+        Deck(
+            id="wayfind",
+            name="Hall wayfinding",
+            device_ids=["panel"],
+            pages=[DeckPage(page_id=other)],
+        )
+    )
+    app.config["DECK_NAV_STORE"].set("panel", "wayfind", other)
+
+    body = client.get("/decks").get_data(as_text=True)
+    section = body[body.index('id="display-panel"') :]
+    assert f"showing {other.title()} from Hall wayfinding" in section
+    assert "from a manual push" not in section
+
+
+def test_rotation_row_waits_for_the_panel_when_its_frame_is_unknown(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    _register_display(app, client, "panel")
+    _seed_loop_on(app, "panel")
+    body = client.get("/decks").get_data(as_text=True)
+    section = body[body.index('id="display-panel"') :]
+    assert "waiting for the panel" in section
+
+
+def test_disabled_rotation_carries_no_paused_pill(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    _register_display(app, client, "panel")
+    app.config["ROTATION_STORE"].upsert(
+        Rotation(
+            id="loop",
+            name="Kitchen loop",
+            enabled=False,
+            device_ids=["panel"],
+            steps=[
+                RotationStep(page_id="kitchen", dwell_minutes=15),
+                RotationStep(page_id="hall", dwell_minutes=15),
+            ],
+        )
+    )
+    other = "hall"
+    _stamp_render(app, "panel", page_id=other)
+    body = client.get("/decks").get_data(as_text=True)
+    section = body[body.index('id="display-panel"') :]
+    assert "dk-row is-off" in section
+    assert "dk-paused" not in section
+
+
+def test_playing_rotation_carries_no_paused_pill(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    _register_display(app, client, "panel")
+    device = app.config["DEVICE_REGISTRY"].devices["panel"]
+    device.manifest["transport"] = "mqtt"
+    _seed_loop_on(app, "panel")
+    _stamp_render(app, "panel", page_id=_intended_page(app))
+    body = client.get("/decks").get_data(as_text=True)
+    section = body[body.index('id="display-panel"') :]
+    assert "dk-row is-playing" in section
+    assert "dk-paused" not in section
+
+
+def test_lineups_points_at_the_automation_pause_switch(app: Flask) -> None:
+    """The pause switch stays in Settings (it also halts schedules and
+    buttons); Lineups shows a band while it is on and a quiet hint to it
+    otherwise."""
+    client = app.test_client()
+    _sign_in(client)
+    _seed_all_shapes(app)
+    target = "/settings/server#server-automation_paused"
+
+    body = client.get("/decks").get_data(as_text=True)
+    assert "data-automation-paused" not in body
+    hint = body[body.index("data-automation-hint") - 200 : body.index("data-automation-hint") + 200]
+    assert f'href="{target}"' in hint
+    assert "Pause everything from Settings › Server › Automation" in body
+
+    app.config["SETTINGS_STORE"].update_section("app", {"automation_paused": True})
+    body = client.get("/decks").get_data(as_text=True)
+    assert "data-automation-hint" not in body
+    band = body[body.index("data-automation-paused") : body.index("data-automation-paused") + 400]
+    assert "Automation is paused. Nothing on this page will push until it is resumed." in band
+    assert f'href="{target}">Resume in Settings</a>' in band
+    # Rows still render beneath the band.
+    assert "Kitchen loop" in body

@@ -129,6 +129,10 @@ class CompanionToken:
     created_at: str
     last_used_at: str | None = None
     revoked_at: str | None = None
+    # The note typed when the pairing code was issued ("Kayden's iPhone"),
+    # carried over so the paired-apps list can tell two phones of the
+    # same model apart. Admin-facing only.
+    note: str = ""
 
     @property
     def revoked(self) -> bool:
@@ -150,6 +154,7 @@ class CompanionToken:
             "created_at": self.created_at,
             "last_used_at": self.last_used_at,
             "revoked_at": self.revoked_at,
+            "note": self.note,
         }
 
     def _persist_dict(self) -> dict[str, Any]:
@@ -161,6 +166,7 @@ class CompanionToken:
             "created_at": self.created_at,
             "last_used_at": self.last_used_at,
             "revoked_at": self.revoked_at,
+            "note": self.note,
         }
 
     @classmethod
@@ -183,6 +189,7 @@ class CompanionToken:
             created_at=str(raw.get("created_at") or _now_iso()),
             last_used_at=(str(raw["last_used_at"]) if raw.get("last_used_at") else None),
             revoked_at=(str(raw["revoked_at"]) if raw.get("revoked_at") else None),
+            note=str(raw.get("note") or ""),
         )
 
 
@@ -202,6 +209,7 @@ class CompanionTokenStore:
         *,
         client: dict[str, Any],
         scopes: tuple[str, ...] | list[str] = COMPANION_SCOPES,
+        note: str = "",
     ) -> tuple[str, CompanionToken]:
         """Mint a fresh credential. Returns ``(plaintext_token, record)``.
 
@@ -215,6 +223,7 @@ class CompanionTokenStore:
             scopes=list(scopes),
             client=dict(client),
             created_at=_now_iso(),
+            note=note.strip()[:120],
         )
         with self._lock:
             self._tokens[record.token_id] = record

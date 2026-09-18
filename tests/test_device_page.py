@@ -201,3 +201,42 @@ def test_push_now_without_a_page_explains_itself(app: Flask) -> None:
     assert resp.location.endswith(f"/settings/devices/{dev}#overview")
     body = client.get(f"/settings/devices/{dev}").get_data(as_text=True)
     assert "has not been sent a dashboard yet" in body
+
+
+def test_connection_chips_link_to_the_firmware_page(app: Flask, monkeypatch) -> None:
+    """The Connection header always offers the Firmware page; a newer build
+    makes the "available" pill go there too, with the GitHub release one
+    step away as release notes (#280)."""
+    from app.firmware_check import FirmwareInfo
+    from app.settings import index_routes
+
+    client = app.test_client()
+    _sign_in(client)
+    dev = _add(client)
+    body = client.get(f"/settings/devices/{dev}").get_data(as_text=True)
+    assert 'href="/settings/firmware" data-firmware-page-link' in body
+
+    app.config["DEVICE_STATUS"][dev] = {
+        "received_at": time.time(),
+        "parsed": {"fw_version": "1.39.0"},
+    }
+    monkeypatch.setattr(index_routes, "_firmware_check_enabled", lambda: True)
+    monkeypatch.setattr(
+        index_routes.firmware_check_module,
+        "latest_for_kind",
+        lambda kind_id, current="": FirmwareInfo(
+            version="1.40.0",
+            released_at="2026-09-18",
+            url="https://github.com/example/firmware/releases/tag/v1.40.0",
+            notes_headline="Faster wakes",
+            assets=(),
+        ),
+    )
+    body = client.get(f"/settings/devices/{dev}").get_data(as_text=True)
+    chips = body[body.index("dx-conn-chips") : body.index("dx-conn-chips") + 1400]
+    assert re.search(
+        r'<a class="pill is-warn" href="/settings/firmware"[^>]*>v1.40.0 available</a>', chips
+    )
+    assert 'href="https://github.com/example/firmware/releases/tag/v1.40.0"' in chips
+    assert "release notes" in chips
+    assert "Faster wakes" in chips

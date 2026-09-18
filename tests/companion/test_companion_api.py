@@ -531,3 +531,22 @@ def test_revoked_token_is_dropped_from_admin_listing(app: Flask) -> None:
     assert len(store.list_active()) == 1
     app.test_client().delete("/api/app/v1/session", headers={"Authorization": f"Bearer {token}"})
     assert store.list_active() == []
+
+
+def test_pair_keeps_the_issue_note_on_the_token(app: Flask) -> None:
+    """The note typed when the code was issued survives redemption so the
+    paired-apps list can tell two phones of the same model apart."""
+    client = app.test_client()
+    code = app.config["COMPANION_PAIRING_STORE"].issue(note="Kayden's iPhone").code
+    resp = _pair(client, code)
+    assert resp.status_code == 201, resp.get_data(as_text=True)
+    token_id = resp.get_json()["token_id"]
+    store = app.config["COMPANION_TOKENS"]
+    record = next(r for r in store.list_active() if r.token_id == token_id)
+    assert record.note == "Kayden's iPhone"
+    assert record.public_dict()["note"] == "Kayden's iPhone"
+    # Reloading from disk keeps it.
+    reloaded = type(store)(store._path)
+    assert (
+        next(r for r in reloaded.list_active() if r.token_id == token_id).note == "Kayden's iPhone"
+    )

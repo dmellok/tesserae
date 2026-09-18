@@ -1155,9 +1155,11 @@ def test_editor_shows_one_preview_per_aspect_and_checked_devices(app: Flask) -> 
     assert body.count('class="preview-frame"') == 2
     assert "w=800&amp;h=480" in body
     assert "w=480&amp;h=800" in body
-    # Both devices are pre-checked checkboxes named device_ids.
-    assert body.count('name="device_ids"') == 2
-    assert body.count("checked") >= 2
+    # Both devices are pre-checked checkboxes named device_ids (the
+    # schedule dialogs further down carry their own display picker).
+    editor_only = body.split("<dialog", 1)[0]
+    assert editor_only.count('name="device_ids"') == 2
+    assert editor_only.count("checked") >= 2
 
 
 def test_multiselect_cell_option_coercion() -> None:
@@ -2050,3 +2052,76 @@ def test_archived_flag_round_trips_through_pages_json(tmp_path: Path) -> None:
     assert reloaded.get("a").archived is True
     assert [p.id for p in reloaded.list_active()] == ["b"]
     assert {p.id for p in reloaded.list()} == {"a", "b"}
+
+
+def test_editor_hosts_the_schedule_form_in_a_dialog(app: Flask) -> None:
+    """Discussion #280: Add schedule / Edit open a <dialog> in the editor
+    with the Lineups schedule form, posting back with ``next`` so the
+    user never leaves the dashboard."""
+    from app.state.schedule_model import Schedule
+
+    client = app.test_client()
+    _sign_in(client)
+    pid = _new(client, name="Home", layout="1_cell")
+    app.config["SCHEDULE_STORE"].upsert(
+        Schedule(
+            id="morning", name="Morning push", page_id=pid, type="interval", interval_minutes=15
+        )
+    )
+    html = client.get(f"/pages/{pid}").get_data(as_text=True)
+    assert 'id="schedules"' in html
+    assert 'data-open-schedule-dialog="schedule-dialog-new"' in html
+    assert 'data-open-schedule-dialog="schedule-dialog-morning"' in html
+    assert '<dialog id="schedule-dialog-new" class="wizard-dialog schedule-dialog"' in html
+    assert '<dialog id="schedule-dialog-morning" class="wizard-dialog schedule-dialog"' in html
+    assert 'value="Morning push"' in html
+    assert f'<input type="hidden" name="next" value="/pages/{pid}#schedules">' in html
+    assert 'action="/schedules/morning/update"' in html
+    assert 'action="/schedules/new"' in html
+    assert "condition-picker.js" in html
+    # The old outbound links are gone; All schedules stays.
+    assert "prefill_page" not in html
+    assert 'href="/schedules"' in html
+
+
+def test_dashboard_groups_are_disclosures_with_a_collapse_all_control(app: Flask) -> None:
+    """Every per-display group on the Dashboards list is a ``<details>``
+    that opens by default, and with two or more groups a Collapse all /
+    Expand all control sits beside the Active / Archived chips (#280)."""
+    client = app.test_client()
+    _sign_in(client)
+    resp = client.post(
+        "/settings/devices/add", data={"id": "lounge", "kind": "esp32_client", "name": "Lounge"}
+    )
+    assert resp.status_code == 302
+    from app.state.page_store import Page
+
+    store = app.config["PAGE_STORE"]
+    store.save(Page(id="bound", name="Bound", device_ids=["lounge"]))
+    store.save(Page(id="loose", name="Loose"))
+    body = client.get("/pages").get_data(as_text=True)
+    assert body.count('<details class="dx-dashboard-group" open') == 2
+    assert 'data-dash-group="lounge"' in body
+    assert 'data-dash-group="unbound"' in body
+    # The head is the summary: caret, icon, name, count pill.
+    head = body[body.index('data-dash-group="lounge"') : body.index('data-dash-group="unbound"')]
+    assert '<summary class="dx-dashboard-group-head">' in head
+    assert "dx-dashboard-caret" in head
+    assert "Lounge" in head and '<span class="dx-pill">1</span>' in head
+    # Folded state is restored by an inline script keyed on localStorage.
+    assert "tesserae-dash-groups" in body
+    assert 'class="dx-btn-ghost-sm dx-dash-groups-toggle" data-dash-groups-toggle' in body
+    assert "Collapse all" in body
+    # Rows and their bulk-select checkboxes still live inside the groups.
+    assert head.count("dx-dash-select") == 1
+
+
+def test_single_group_has_no_collapse_all_control(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    from app.state.page_store import Page
+
+    app.config["PAGE_STORE"].save(Page(id="loose", name="Loose"))
+    body = client.get("/pages").get_data(as_text=True)
+    assert body.count('<details class="dx-dashboard-group" open') == 1
+    assert 'class="dx-btn-ghost-sm dx-dash-groups-toggle" data-dash-groups-toggle' not in body

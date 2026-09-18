@@ -18,6 +18,7 @@ from collections.abc import Iterable
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlencode, urlsplit, urlunsplit
 
 from flask import (
     Blueprint,
@@ -492,6 +493,27 @@ def _smart_sync_states(schedules: list[Schedule], pages: list[Any]) -> dict[str,
     return out
 
 
+def _next_url() -> str | None:
+    """A local path the create / update endpoints should land on instead
+    of the Lineups page (the dashboard editor's schedule dialog passes
+    itself, #280). Anything that isn't a same-site path is ignored, the
+    same rule ``dismiss_migration_notice`` applies to ``back``."""
+    nxt = (request.form.get("next") or "").strip()
+    if not nxt.startswith("/") or nxt.startswith("//"):
+        return None
+    return nxt
+
+
+def _next_with_error(nxt: str, edit_id: str) -> str:
+    """``nxt`` plus ``schedule_error=1&schedule_edit=<id>`` so the editor
+    reopens the dialog the failed submit came from. Keeps any fragment."""
+    parts = urlsplit(nxt)
+    query = parts.query
+    extra = urlencode({"schedule_error": "1", "schedule_edit": edit_id})
+    query = f"{query}&{extra}" if query else extra
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, query, parts.fragment))
+
+
 def _json_error(msg: str) -> Response:
     resp = jsonify({"ok": False, "error": msg})
     resp.status_code = 400
@@ -503,6 +525,8 @@ def create() -> Response:
     # The setup wizard submits with respond=json (fetch) so it can stay on
     # its created screen instead of following the redirect.
     wants_json = request.form.get("respond") == "json"
+    # The dashboard editor's dialog (#280) asks to come back to the editor.
+    nxt = _next_url()
     try:
         schedule = _parse_form(request.form)
     except ValidationError as exc:
@@ -510,17 +534,17 @@ def create() -> Response:
         if wants_json:
             return _json_error(msg)
         flash(msg, "error")
-        return redirect(url_for("schedules.index"))
+        return redirect(_next_with_error(nxt, "new") if nxt else url_for("schedules.index"))
     if not _ID_RE.match(schedule.id):
         msg = f"Bad id {schedule.id!r} (snake_case only)."
         if wants_json:
             return _json_error(msg)
         flash(msg, "error")
-        return redirect(url_for("schedules.index"))
+        return redirect(_next_with_error(nxt, "new") if nxt else url_for("schedules.index"))
     _store().upsert(schedule)
     flash(f"Schedule {schedule.name!r} saved.", "ok")
     # Land on the unified list with the new card highlighted (#167).
-    url = url_for("decks.index", hl=schedule.id) + f"#udeck-{schedule.id}"
+    url = nxt or (url_for("decks.index", hl=schedule.id) + f"#udeck-{schedule.id}")
     if wants_json:
         return jsonify({"ok": True, "id": schedule.id, "url": url})
     return redirect(url)
@@ -532,10 +556,13 @@ def update(schedule_id: str) -> Response:
     if existing is None:
         flash(f"No schedule with id {schedule_id!r}.", "error")
         return redirect(url_for("schedules.index"))
+    nxt = _next_url()
     try:
         schedule = _parse_form(request.form, existing_id=schedule_id)
     except ValidationError as exc:
         flash(f"Invalid schedule: {_first_error(exc)}", "error")
+        if nxt:
+            return redirect(_next_with_error(nxt, schedule_id))
         return redirect(url_for("schedules.index", edit=schedule_id))
     # Don't let the user rename the id via this endpoint; force-pin to
     # the URL's schedule_id so a typo can't fork into a second record.
@@ -547,7 +574,7 @@ def update(schedule_id: str) -> Response:
         schedule = schedule.model_copy(update={"device_ids": list(existing.device_ids)})
     _store().upsert(schedule)
     flash(f"Schedule {schedule.name!r} updated.", "ok")
-    return redirect(url_for("schedules.index"))
+    return redirect(nxt or url_for("schedules.index"))
 
 
 @bp.post("/<schedule_id>/toggle")

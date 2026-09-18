@@ -125,9 +125,13 @@ def history_view(rows: list[EventRow], *, fold_presses: bool = False) -> list[di
     if devices is not None:
         for did, dev in devices.devices.items():
             if dev.kind_of is not None:
+                kind = devices.devices.get(dev.kind_of)
                 device_meta[did] = {
+                    "id": did,
                     "name": dev.display_name,
                     "icon": dev.icon or "monitor",
+                    # The hardware behind the name, for the chip's hover title.
+                    "kind": kind.display_name if kind is not None else dev.kind_of,
                 }
     # Press → push pairing for the fold. Only pairs where both rows are
     # inside the fetched batch fold; ids are unique so a stale
@@ -200,6 +204,8 @@ def history_view(rows: list[EventRow], *, fold_presses: bool = False) -> list[di
                 "source": ev.source,
                 "target": target,
                 "target_devices": target_devices,
+                # Raw ids behind the chips, for the per-display filter.
+                "device_ids": [d["id"] for d in target_devices],
                 "rel": _relative(ev.timestamp),
                 # v0.69.6 (issue #52 item 2): render in the user's configured
                 # timezone rather than the container's local (UTC on Docker /
@@ -278,6 +284,49 @@ _DEFAULT_HIDDEN_STATUSES: tuple[str, ...] = ("quiet", "held")
 _BACKGROUND_SOURCES: tuple[str, ...] = ("deck_warm", "album_warm")
 
 
+#: Rows a History page shows.
+HISTORY_PAGE_ROWS = 100
+#: How many pages' worth of rows the fetch reads when a display filter is on.
+DEVICE_FILTER_REACH = 5
+
+
+def _device_chips(history: list[dict[str, Any]], *, active: str | None) -> list[dict[str, Any]]:
+    """Chips for the per-display filter strip: "All displays" first, then
+    one per display that appears in the loaded rows, in registry order,
+    each with its row count. A display the filter names but no loaded row
+    mentions still gets a chip, so the active filter can always be seen
+    and cleared."""
+    counts: dict[str, int] = {}
+    names: dict[str, dict[str, str]] = {}
+    for row in history:
+        for dev in row["target_devices"]:
+            counts[dev["id"]] = counts.get(dev["id"], 0) + 1
+            names.setdefault(dev["id"], dev)
+    chips: list[dict[str, Any]] = [
+        {"id": "", "name": "All displays", "icon": "monitor", "count": len(history)}
+    ]
+    order: list[str] = []
+    devices = _devices()
+    if devices is not None:
+        order = [did for did, dev in devices.devices.items() if dev.kind_of is not None]
+    for did in order + [d for d in counts if d not in order]:
+        if did not in counts and did != active:
+            continue
+        meta = names.get(did)
+        if meta is None:
+            dev = devices.devices.get(did) if devices is not None else None
+            meta = {
+                "name": dev.display_name if dev is not None else did,
+                "icon": (dev.icon if dev is not None and dev.icon else "monitor"),
+            }
+        chips.append(
+            {"id": did, "name": meta["name"], "icon": meta["icon"], "count": counts.get(did, 0)}
+        )
+    for chip in chips:
+        chip["active"] = (chip["id"] or None) == active
+    return chips
+
+
 @bp.get("")
 def index() -> str:
     raw_source = (request.args.get("source") or "").strip()
@@ -309,20 +358,29 @@ def index() -> str:
     sort_mode = (request.args.get("sort") or "").strip().lower()
     if sort_mode not in ("dashboard",):
         sort_mode = "time"
+    # Per-display filter (discussion #280): a device id narrows the feed to
+    # rows that landed on that display; empty means every display.
+    device = (request.args.get("device") or "").strip() or None
     events = _events()
     hidden: tuple[str, ...] = () if include_skipped else _DEFAULT_HIDDEN_STATUSES
     if not include_background and source not in _BACKGROUND_SOURCES:
         hidden = (*hidden, "warmed")
     exclude_statuses = hidden or None
+    # The display filter applies after the fetch (device ids live in each
+    # row's ``extra``), so it reads deeper into the log to keep a filtered
+    # page about as long as an unfiltered one.
     history = history_view(
         events.list(
             type="push",
             source=source,
             exclude_statuses=exclude_statuses,
-            limit=100,
+            limit=HISTORY_PAGE_ROWS * (DEVICE_FILTER_REACH if device else 1),
         ),
         fold_presses=not split_presses,
     )
+    device_chips = _device_chips(history, active=device)
+    if device:
+        history = [row for row in history if device in row["device_ids"]][:HISTORY_PAGE_ROWS]
     if sort_mode == "dashboard":
         # Stable-sort by the resolved target label (page name or
         # device name for button rows) so entries of the same
@@ -350,6 +408,8 @@ def index() -> str:
         history=history,
         chips=chips,
         active_source=source,
+        active_device=device,
+        device_chips=device_chips,
         include_skipped=include_skipped,
         include_background=include_background,
         split_presses=split_presses,

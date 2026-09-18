@@ -509,6 +509,9 @@
     if (data.ok === false) throw new Error(data.message || "save failed");
   }
 
+  // Resolves true when every form persisted, false when a save failed
+  // (the status pill already shows the error). The schedule dialog
+  // awaits this before it navigates away (#280).
   async function saveAll() {
     setStatus("saving");
     if (saveBtn) saveBtn.disabled = true;
@@ -518,12 +521,21 @@
       }
       setDirty(false);
       reloadPreview();
+      return true;
     } catch (err) {
       setStatus("error");
       if (saveBtn) saveBtn.disabled = false;
       console.error("[editor] save failed:", err);
+      return false;
     }
   }
+
+  // Small surface for sibling scripts on the editor page (the schedule
+  // dialog): is anything really unsaved, and save it all.
+  window.tesseraeEditor = {
+    isDirty: () => Boolean(saveBtn && !saveBtn.disabled) && _hasRealFormDiff(),
+    saveAll,
+  };
 
   // Per-cell touch Interaction editor (issue #49). Renders the shared
   // TouchInteraction picker into each cell card's mount and mirrors its

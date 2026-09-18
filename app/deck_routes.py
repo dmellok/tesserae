@@ -192,6 +192,80 @@ def _live_map() -> dict[str, tuple[str | None, str | None]]:
     return out
 
 
+#: Push sources that mean "someone sent this by hand" on the Lineups page.
+_MANUAL_PUSH_SOURCES = frozenset(
+    {"page", "manual", "file", "url", "webpage", "note", "resend", "onboarding", "companion"}
+)
+
+
+def _frame_origin(
+    device_id: str,
+    page_id: str,
+    *,
+    own_id: str,
+    nav_rec: dict[str, Any] | None,
+    lineup_names: dict[str, str],
+) -> str | None:
+    """Where the frame a display holds came from, as a short phrase that
+    follows "showing <page> from": another lineup by name, a manual push, a
+    tap, a schedule, and so on. ``None`` when the log has no push for that
+    page on that display, so the caller says only what is showing.
+
+    The nav record wins when it names the page (a deck-driven display), then
+    the newest successful push row for the page on this display; a rotation
+    or schedule fire is named through the engine row that links to that
+    push."""
+    if nav_rec and nav_rec.get("page_id") == page_id and nav_rec.get("deck_id"):
+        deck_id = str(nav_rec["deck_id"])
+        if deck_id == own_id:
+            return "an earlier step"
+        return lineup_names.get(deck_id) or "another lineup"
+    events = current_app.config.get("EVENT_LOG")
+    if events is None:
+        return None
+    try:
+        rows = events.list(type="push", target=page_id, statuses=("sent",), limit=25)
+    except Exception:
+        return None
+    push = next(
+        (ev for ev in rows if device_id in (ev.extra.get("device_ids") or [])),
+        None,
+    )
+    if push is None:
+        return None
+    source = push.source
+    if source in _MANUAL_PUSH_SOURCES:
+        return "a manual push"
+    if source == "button":
+        return "a tap"
+    if source == "home_assistant":
+        return "Home Assistant"
+    if source == "webhook":
+        return "a webhook"
+    if source == "page_refresh":
+        return "an auto update"
+    if source in ("deck", "deck_init"):
+        return "another lineup"
+    if source in ("rotation", "scheduler"):
+        # The engine row that caused this push names the record.
+        try:
+            engine_rows = events.list(type=source, limit=50)
+        except Exception:
+            engine_rows = []
+        for row in engine_rows:
+            if row.extra.get("push_event_id") != push.id:
+                continue
+            if source == "scheduler":
+                name = row.extra.get("schedule_name")
+                return f"the {name} schedule" if name else "a schedule"
+            if row.target == own_id:
+                return "an earlier step"
+            name = row.extra.get("rotation_name")
+            return str(name) if name else "another rotation"
+        return "a schedule" if source == "scheduler" else "another rotation"
+    return None
+
+
 def _mins_label(minutes: int) -> str:
     """``32 min`` / ``1 h 5 min`` / ``2 h``; under a minute reads ``<1 min``."""
     minutes = max(0, int(minutes))
@@ -398,6 +472,56 @@ def _design_cards(
     thumbs = _page_thumbs(pages)
     live = _live_map()
     panel_states = _panel_states(devices)
+    nav = _nav_store()
+    lineup_names = {d.id: d.name for d in nav_decks}
+    lineup_names.update({r.id: r.name for r in rotations})
+    for deck in _store().all():
+        lineup_names.setdefault(deck.id, deck.name)
+    origin_cache: dict[tuple[str, str, str], str | None] = {}
+
+    def paused_reason(card: dict[str, Any], device_id: str | None) -> str | None:
+        """Why an enabled rotation is not playing on ``device_id``: the
+        display holds something else (a manual push, a tap, another lineup,
+        a schedule), or the server does not know its frame yet. ``None``
+        while the rotation plays, is disabled, or is outside its hours."""
+        if not device_id:
+            return None
+        if not card["enabled"] or card["playing"] or card["planned_page_id"] is None:
+            return None
+        intended = card["planned_page_id"]
+        state = panel_states.get(device_id)
+        rec = live.get(device_id)
+        held: str | None = None
+        if state is not None and state["page_id"] and state["page_id"] != intended:
+            held = state["page_id"]
+        elif rec is not None:
+            held = rec[1]
+        if not held:
+            return "waiting for the panel"
+        if held == intended:
+            return None
+        nav_rec = None
+        if nav is not None:
+            try:
+                nav_rec = nav.get(device_id)
+            except Exception:
+                nav_rec = None
+        key = (device_id, held, card["id"])
+        if key not in origin_cache:
+            origin_cache[key] = _frame_origin(
+                device_id,
+                held,
+                own_id=card["id"],
+                nav_rec=nav_rec,
+                lineup_names=lineup_names,
+            )
+        origin = origin_cache[key]
+        label = f"showing {page_names.get(held, held)}"
+        if origin:
+            label += f" from {origin}"
+        if card["next_advance"]:
+            label += f" · resumes {card['next_advance']}"
+        return label
 
     def cycle_for_display(card: dict[str, Any], device_id: str | None) -> dict[str, Any]:
         """A rotation row as one display sees it: the frame on that panel,
@@ -443,6 +567,7 @@ def _design_cards(
         out["behind_minutes"] = behind
         out["behind_label"] = f"{_mins_label(behind)} behind" if behind is not None else None
         out["next_poll_label"] = next_poll
+        out["paused_reason"] = paused_reason(card, device_id)
         return out
 
     def resolve_devices(explicit: list[str], page_ids: list[str]) -> list[str]:
@@ -852,6 +977,12 @@ def index() -> str:
         deck_devices={d.id: list(d.device_ids) for d in all_decks},
         highlight_id=request.args.get("hl"),
     )
+    # The pause switch lives under Settings > Server > Automation because it
+    # also stops schedules and buttons; this page only points at it.
+    settings = current_app.config.get("SETTINGS_STORE")
+    automation_paused = False
+    if settings is not None:
+        automation_paused = bool((settings.get_section("app") or {}).get("automation_paused"))
     return render_template(
         "decks.html",
         decks=decks,
@@ -861,6 +992,8 @@ def index() -> str:
         graphs=graphs,
         suggestions=suggestions,
         edit_id=request.args.get("edit"),
+        automation_paused=automation_paused,
+        automation_url=url_for("auth.settings_area", area="server") + "#server-automation_paused",
         # -- the Lineups list: one row per deck, grouped per display -------
         cards=design["cards"],
         groups=design["groups"],

@@ -277,3 +277,82 @@ def test_last_fired_abs_uses_configured_timezone(app: Flask) -> None:
 
     assert view is not None
     assert view["abs"] == "2021-01-01 08:00"
+
+
+# -- ``next``: the dashboard editor's schedule dialog (#280) -----------
+
+
+def _valid_form(**extra: object) -> dict[str, object]:
+    base: dict[str, object] = {
+        "name": "Editor schedule",
+        "page_id": "home",
+        "type": "interval",
+        "interval_minutes": "15",
+        "priority": "0",
+        "enabled": "on",
+    }
+    base.update(extra)
+    return base
+
+
+def test_create_with_next_returns_to_the_caller(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    resp = client.post(
+        "/schedules/new", data=_valid_form(next="/pages/home#schedules"), follow_redirects=False
+    )
+    assert resp.status_code in (302, 303)
+    assert resp.headers["Location"].endswith("/pages/home#schedules")
+    assert app.config["SCHEDULE_STORE"].get("editor_schedule") is not None
+
+
+def test_create_error_with_next_flags_the_dialog(app: Flask) -> None:
+    """A bad form bounces to ``next`` with ``schedule_error`` + the dialog
+    id so the editor reopens it; the fragment survives."""
+    client = app.test_client()
+    _sign_in(client)
+    resp = client.post(
+        "/schedules/new",
+        data=_valid_form(interval_minutes="0", next="/pages/home#schedules"),
+        follow_redirects=False,
+    )
+    location = resp.headers["Location"]
+    assert location.startswith("/pages/home?")
+    assert "schedule_error=1" in location
+    assert "schedule_edit=new" in location
+    assert location.endswith("#schedules")
+    assert not app.config["SCHEDULE_STORE"].all()
+
+
+def test_update_with_next_returns_to_the_caller_and_errors_name_the_schedule(
+    app: Flask,
+) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    client.post("/schedules/new", data=_valid_form())
+    resp = client.post(
+        "/schedules/editor_schedule/update",
+        data=_valid_form(name="Renamed", next="/pages/home#schedules"),
+        follow_redirects=False,
+    )
+    assert resp.headers["Location"].endswith("/pages/home#schedules")
+    assert app.config["SCHEDULE_STORE"].get("editor_schedule").name == "Renamed"
+    resp = client.post(
+        "/schedules/editor_schedule/update",
+        data=_valid_form(interval_minutes="0", next="/pages/home#schedules"),
+        follow_redirects=False,
+    )
+    location = resp.headers["Location"]
+    assert "schedule_error=1" in location
+    assert "schedule_edit=editor_schedule" in location
+
+
+def test_next_must_be_a_local_path(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    for n, bad in enumerate(("https://evil.example/", "//evil.example/x", "pages/home")):
+        resp = client.post(
+            "/schedules/new", data=_valid_form(name=f"n{n}", next=bad), follow_redirects=False
+        )
+        assert "evil" not in resp.headers["Location"]
+        assert resp.headers["Location"].startswith("/decks")

@@ -4407,3 +4407,6 @@ select.dx-input:hover {
   .dx-devrow-seen { justify-self: start; }
   .dx-devrow-seen { max-width: none; }
 }
+
+/* Pairing note beside the paired app name (Settings › Companion app). */
+.companion-note { font-weight: 500; color: var(--t-fg-soft); }

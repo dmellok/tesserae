@@ -421,7 +421,8 @@
 .dk-empty h2 { margin: 0; font-size: 18px; }
 .dk-empty p { margin: 0 0 10px; font-size: 14px; color: color-mix(in oklab, var(--t-fg) 55%, transparent); }
 
-.dk-devchip {
+.dk-devchip,
+.dk-paused {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -433,7 +434,32 @@
   color: color-mix(in oklab, var(--t-fg) 60%, transparent);
   white-space: nowrap;
 }
-.dk-devchip i { font-size: 13px; }
+.dk-devchip i,
+.dk-paused i { font-size: 13px; }
+
+/* Why an enabled rotation is not playing: the same chip chrome as the
+   display chips, kept neutral so it reads as a note, not an alarm. */
+.dk-paused {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dk-paused i { color: color-mix(in oklab, var(--t-fg) 45%, transparent); }
+
+/* Page-head pointer to the pause switch in Settings, and the band shown
+   while it is on. */
+.dk-automation-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  color: color-mix(in oklab, var(--t-fg) 55%, transparent);
+  text-decoration: none;
+}
+.dk-automation-hint:hover { color: var(--t-accent); text-decoration: underline; }
+.dk-automation-hint i { font-size: 14px; }
+.dk-paused-band { margin: 0 0 18px; font-size: 13px; }
 
 /* Delivery-gap notice: member dashboards bound to a different display. */
 .dk-warn {
@@ -737,6 +763,7 @@
   /* A basis over half the row: the meta never fits beside badge + name,
      so it opens the second line, where the actions join it. */
   .dk-meta { flex: 1 1 55%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dk-paused { flex: 1 1 100%; white-space: normal; }
   .dk-actions { margin-left: auto; flex: 0 0 auto; gap: 14px; }
   .dk-devchip { max-width: 100%; }
   .dk-warn { margin-left: 16px; margin-right: 16px; }

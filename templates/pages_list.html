@@ -28,6 +28,15 @@
     <i class="ph ph-archive" aria-hidden="true"></i><span>Archived</span>
     <span class="dx-count-pill">{{ archived_count }}</span>
   </a>
+  {# Every per-display group is a disclosure; with two or more of them a
+     single control folds or unfolds the lot. The label follows the
+     groups' state, so it always names the action it will take. #}
+  {% if page_groups|length >= 2 %}
+  <button type="button" class="dx-btn-ghost-sm dx-dash-groups-toggle" data-dash-groups-toggle
+          title="Fold or unfold every display's group">
+    <i class="ph ph-arrows-in-line-vertical" aria-hidden="true"></i><span>Collapse all</span>
+  </button>
+  {% endif %}
 </nav>
 
 {% if archived_tab %}
@@ -78,8 +87,12 @@
   </div>
   {% else %}
   {% for device, group in page_groups %}
-  <div class="dx-dashboard-group">
-    <h4 class="dx-dashboard-group-head">
+  {# One disclosure per display. Groups open by default; a group the
+     user folded stays folded across visits (localStorage, restored by the
+     inline script right after the list so it does not flash open). #}
+  <details class="dx-dashboard-group" open data-dash-group="{{ device.id if device else 'unbound' }}">
+    <summary class="dx-dashboard-group-head">
+      <i class="ph ph-caret-down dx-dashboard-caret" aria-hidden="true"></i>
       {% if device %}
       <i class="ph ph-device-mobile-camera" aria-hidden="true"></i>
       <span>{{ device.display_name }}</span>
@@ -89,7 +102,7 @@
       <span>Unbound</span>
       <span class="dx-pill">{{ group|length }}</span>
       {% endif %}
-    </h4>
+    </summary>
     <ul class="dx-discovered-list">
       {% for page in group %}
       {% set d = page_dims.get(page.id) %}
@@ -236,8 +249,23 @@
       </li>
       {% endfor %}
     </ul>
-  </div>
+  </details>
   {% endfor %}
+  <script>
+    // Restore folded groups before the list paints. Runs inline right after
+    // the groups so the DOM it touches exists and nothing has been painted
+    // open first. A missing or unreadable store leaves every group open.
+    (function () {
+      var KEY = 'tesserae-dash-groups';
+      var folded = [];
+      try { folded = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) { folded = []; }
+      if (!Array.isArray(folded) || !folded.length) return;
+      var groups = document.querySelectorAll('details[data-dash-group]');
+      for (var i = 0; i < groups.length; i++) {
+        if (folded.indexOf(groups[i].getAttribute('data-dash-group')) !== -1) groups[i].removeAttribute('open');
+      }
+    })();
+  </script>
   {% endif %}
 {% endcall %}
 
@@ -429,6 +457,35 @@
       row.addEventListener('mouseleave', function () { clearTimeout(timer); hide(); });
     });
     window.addEventListener('scroll', hide, { passive: true });
+  })();
+
+  // Per-display groups: remember which ones the user folded, and drive the
+  // Collapse all / Expand all control from the groups' live state.
+  (function () {
+    const KEY = 'tesserae-dash-groups';
+    const groups = Array.prototype.slice.call(document.querySelectorAll('details[data-dash-group]'));
+    if (!groups.length) return;
+    const toggle = document.querySelector('[data-dash-groups-toggle]');
+    function save() {
+      const folded = groups.filter(function (g) { return !g.open; })
+        .map(function (g) { return g.getAttribute('data-dash-group'); });
+      try { localStorage.setItem(KEY, JSON.stringify(folded)); } catch (e) { /* private mode */ }
+    }
+    function syncToggle() {
+      if (!toggle) return;
+      const anyOpen = groups.some(function (g) { return g.open; });
+      toggle.querySelector('span').textContent = anyOpen ? 'Collapse all' : 'Expand all';
+      toggle.querySelector('.ph').className = 'ph ' + (anyOpen ? 'ph-arrows-in-line-vertical' : 'ph-arrows-out-line-vertical');
+      toggle.setAttribute('data-state', anyOpen ? 'open' : 'closed');
+    }
+    groups.forEach(function (g) { g.addEventListener('toggle', function () { save(); syncToggle(); }); });
+    if (toggle) toggle.addEventListener('click', function () {
+      const anyOpen = groups.some(function (g) { return g.open; });
+      groups.forEach(function (g) { g.open = !anyOpen; });
+      save();
+      syncToggle();
+    });
+    syncToggle();
   })();
 
   // Multi-select: checkboxes drive a floating bulk bar. On push/delete the

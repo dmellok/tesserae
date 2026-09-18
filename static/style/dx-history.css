@@ -175,3 +175,8 @@
   background: color-mix(in oklab, var(--t-muted) 12%, var(--t-surface));
   color: var(--t-muted);
 }
+
+/* Per-display filter strip sits directly under the source strip; the two
+   read as one filter block, so the gap between them is tighter than the
+   gap to the toolbar below. */
+.dx-filter-strip--devices { margin-top: -6px; }

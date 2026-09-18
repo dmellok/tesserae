@@ -1,5 +1,6 @@
 {% extends "_base.html" %}
 {% from "_components.html" import text_input, slider, switch, select_field, color_input, button, auto_field, card_head %}
+{% from "_schedule_form.html" import schedule_form, schedule_form_scripts %}
 {% block title %}{{ page.name }}, Dashboard editor, Tesserae{% endblock %}
 
 {% block head_extra %}
@@ -633,9 +634,9 @@
        desktop the preview stays sticky in the right column; on
        mobile the preview and this card both scroll with the page
        (the back-to-top FAB handles jumping back to the preview). #}
-    <section class="dx-section-card schedules-card">
+    <section class="dx-section-card schedules-card" id="schedules">
       {{ card_head('Schedules', icon_name='alarm',
-         blurb='Pushes that fire this dashboard. The Schedules page is the canonical edit surface.') }}
+         blurb='Pushes that fire this dashboard. Add or edit one here without leaving the editor.') }}
       {% if schedules_for_page %}
       <ul class="schedules-card-list">
         {% for s in schedules_for_page %}
@@ -657,7 +658,7 @@
               {% if s.smart_sync %}<span class="pill is-info" title="Smart sync on">JIT</span>{% endif %}
             </div>
           </div>
-          <a class="ghost-link" href="{{ url_for('schedules.index', edit=s.id) }}">Edit</a>
+          <button type="button" class="ghost-link" data-open-schedule-dialog="schedule-dialog-{{ s.id }}">Edit</button>
         </li>
         {% endfor %}
       </ul>
@@ -667,15 +668,45 @@
       </p>
       {% endif %}
       <div class="schedules-card-actions">
-        <a class="button" href="{{ url_for('schedules.index', prefill_page=page.id) }}#schedule-form-card">
+        <button type="button" class="button" data-open-schedule-dialog="schedule-dialog-new">
           <i class="ph ph-plus" aria-hidden="true"></i>
           Add schedule
-        </a>
+        </button>
         <a class="ghost-link" href="{{ url_for('schedules.index') }}">All schedules</a>
       </div>
     </section>
   </div>
 </div>
+
+{# Schedule dialogs (discussion #280): the same form the Lineups page
+   renders, hosted in a <dialog> so adding or editing a schedule never
+   leaves the editor. One dialog per existing schedule plus one blank,
+   all rendered up front so condition-picker.js attaches on load; the
+   create / update endpoints get ``next`` and come back to #schedules. #}
+{% set _schedule_next = url_for('pages.edit', page_id=page.id) ~ '#schedules' %}
+{% macro schedule_dialog(dialog_id, title, icon, s, edit_mode, next_url) %}
+<dialog id="{{ dialog_id }}" class="wizard-dialog schedule-dialog" aria-labelledby="{{ dialog_id }}-title" data-schedule-dialog>
+  <div class="wizard-head">
+    <span class="wizard-head-icon" aria-hidden="true"><i class="ph ph-{{ icon }}"></i></span>
+    <div class="wizard-head-text">
+      <h2 id="{{ dialog_id }}-title">{{ title }}</h2>
+      <p class="wizard-progress">Fires {{ page.name }}. Pick a cadence, add conditions if you need them.</p>
+    </div>
+    <button type="button" class="wizard-close" data-schedule-dialog-close aria-label="Close">
+      <i class="ph ph-x" aria-hidden="true"></i>
+    </button>
+  </div>
+  <div class="wizard-body">
+    <p class="schedule-dialog-note" data-schedule-dialog-note hidden></p>
+    {{ schedule_form(s, edit_mode, schedule_pages, schedule_devices, next_url=next_url, in_dialog=true) }}
+  </div>
+</dialog>
+{% endmacro %}
+{% set _blank_schedule = {'id': '', 'name': '', 'page_id': page.id, 'enabled': true, 'type': 'interval', 'interval_minutes': 30, 'fires_at': none, 'device_ids': [], 'time_of_day_start': '', 'time_of_day_end': '', 'priority': 0, 'days_of_week': [0,1,2,3,4,5,6], 'smart_sync': false, 'smart_sync_lead_s': 10} %}
+{{ schedule_dialog('schedule-dialog-new', 'New schedule', 'plus-circle', _blank_schedule, false, _schedule_next) }}
+{% for s in schedules_for_page %}
+{{ schedule_dialog('schedule-dialog-' ~ s.id, 'Edit schedule', 'pencil-simple', s, true, _schedule_next) }}
+{% endfor %}
 
 {# Floating "back to top" button, appears on small viewports once the
    preview card scrolls out of view. Tap = smooth scroll to the top of
@@ -695,6 +726,90 @@
 <script src="{{ url_for('static', filename='touch_interaction.js') }}"></script>
 <script src="{{ url_for('static', filename='pages/editor.js') }}"></script>
 <script src="{{ url_for('static', filename='pages/layout_editor.js') }}"></script>
+{{ schedule_form_scripts() }}
+<script>
+(function () {
+  // Schedule dialogs (#280). Open from the Schedules card, close on
+  // Escape (native), backdrop click, the X, or Cancel. Before the form
+  // navigates away, unsaved dashboard edits are saved first, the same
+  // thing the editor already does when a widget picker reloads the page.
+  const dialogs = document.querySelectorAll("[data-schedule-dialog]");
+  if (!dialogs.length || typeof HTMLDialogElement === "undefined") return;
+
+  function noteFor(dialog, text, isError) {
+    const note = dialog.querySelector("[data-schedule-dialog-note]");
+    if (!note) return;
+    note.textContent = text || "";
+    note.classList.toggle("is-error", Boolean(isError));
+    note.hidden = !text;
+  }
+
+  function openDialog(dialog) {
+    if (dialog.open) return;
+    noteFor(dialog, "");
+    dialog.showModal();
+    const name = dialog.querySelector('input[name="name"]');
+    if (name) {
+      name.focus();
+      name.select();
+    }
+  }
+
+  document.querySelectorAll("[data-open-schedule-dialog]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const dialog = document.getElementById(btn.dataset.openScheduleDialog);
+      if (dialog) openDialog(dialog);
+    });
+  });
+
+  dialogs.forEach((dialog) => {
+    dialog.querySelectorAll("[data-schedule-dialog-close]").forEach((btn) => {
+      btn.addEventListener("click", () => dialog.close());
+    });
+    // A click on the backdrop lands on the <dialog> itself; clicks on
+    // content land on a descendant.
+    dialog.addEventListener("click", (ev) => {
+      if (ev.target === dialog) dialog.close();
+    });
+
+    const form = dialog.querySelector("form.schedule-form");
+    if (!form) return;
+    let saving = false;
+    let cleared = false;
+    form.addEventListener("submit", (ev) => {
+      if (cleared) return; // re-entrant submit after the dashboard saved
+      const editor = window.tesseraeEditor;
+      if (!editor || !editor.isDirty()) return;
+      ev.preventDefault();
+      if (saving) return;
+      saving = true;
+      noteFor(dialog, "Saving the dashboard first...");
+      editor.saveAll().then((ok) => {
+        saving = false;
+        if (!ok) {
+          noteFor(dialog, "The dashboard could not be saved. Fix that first, then save the schedule.", true);
+          return;
+        }
+        cleared = true;
+        if (typeof form.requestSubmit === "function") form.requestSubmit();
+        else form.submit();
+      });
+    });
+  });
+
+  // A failed submit comes back with ?schedule_error=1&schedule_edit=<id>
+  // (the error is in the flash); reopen the dialog it came from.
+  const params = new URLSearchParams(location.search);
+  if (params.get("schedule_error")) {
+    const dialog = document.getElementById("schedule-dialog-" + (params.get("schedule_edit") || "new"));
+    if (dialog) openDialog(dialog);
+    params.delete("schedule_error");
+    params.delete("schedule_edit");
+    const rest = params.toString();
+    history.replaceState(null, "", location.pathname + (rest ? "?" + rest : "") + "#schedules");
+  }
+})();
+</script>
 <script>
 (function () {
   const btn = document.querySelector("[data-scroll-to-preview]");

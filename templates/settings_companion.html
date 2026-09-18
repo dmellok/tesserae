@@ -135,7 +135,7 @@
         {% for c in companion_sessions %}
         <li class="dx-discovered-row">
           <div class="dx-discovered-info">
-            <div class="dx-discovered-id">{{ c.name }}</div>
+            <div class="dx-discovered-id">{{ c.name }}{% if c.note %} <span class="companion-note">· {{ c.note }}</span>{% endif %}</div>
             <div class="dx-discovered-meta">
               <span class="dx-meta-pair"><span class="dx-meta-k">Last use</span><span class="dx-meta-v">{{ c.last_used_at or 'never' }}</span></span>
               <span class="dx-meta-pair"><span class="dx-meta-k">Paired</span><span class="dx-meta-v">{{ c.created_at }}</span></span>

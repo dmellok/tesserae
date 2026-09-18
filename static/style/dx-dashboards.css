@@ -89,3 +89,40 @@
   min-width: 96px;
   justify-content: center;
 }
+
+/* Per-display groups are disclosures: the head doubles as the summary.
+   The caret turns when the group is open; a folded group keeps only its
+   head, and the choice survives across visits (localStorage). */
+.dx-dashboard-group > summary {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+  border-radius: 6px;
+}
+.dx-dashboard-group > summary::-webkit-details-marker { display: none; }
+.dx-dashboard-group > summary:hover { color: var(--t-fg, #1d1d1b); }
+.dx-dashboard-group > summary:focus-visible {
+  outline: 2px solid var(--t-accent, #15846a);
+  outline-offset: 2px;
+}
+.dx-dashboard-group-head .dx-dashboard-caret {
+  color: var(--t-muted, #9a9a93);
+  font-size: 13px;
+  transition: transform 140ms ease;
+  transform: rotate(-90deg);
+}
+.dx-dashboard-group[open] > .dx-dashboard-group-head .dx-dashboard-caret { transform: rotate(0deg); }
+.dx-dashboard-group:not([open]) > .dx-dashboard-group-head { margin-bottom: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .dx-dashboard-group-head .dx-dashboard-caret { transition: none; }
+}
+
+/* Collapse all / Expand all sits at the end of the Active / Archived strip. */
+.dx-dash-groups-toggle {
+  margin-left: auto;
+  align-self: center;
+  white-space: nowrap;
+}
+@media (max-width: 640px) {
+  .dx-dash-groups-toggle { margin-left: 0; }
+}

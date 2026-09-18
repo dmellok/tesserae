@@ -546,7 +546,10 @@ def pair() -> Any:
         # the single-use store. Report expiry, the common case.
         return _error("pairing_expired", "The pairing code is expired or unknown.", 400)
 
-    plaintext, record = _tokens().issue(client=client, scopes=COMPANION_SCOPES)
+    # Keep the note typed at issue time so Settings can name the phone.
+    plaintext, record = _tokens().issue(
+        client=client, scopes=COMPANION_SCOPES, note=getattr(consumed, "note", "") or ""
+    )
     payload = {
         "token": plaintext,
         "token_id": record.token_id,

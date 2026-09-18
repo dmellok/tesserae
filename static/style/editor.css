@@ -1337,6 +1337,42 @@
   margin-top: var(--t-space-3);
 }
 
+/* Schedule dialog (#280): the Lineups schedule form hosted in the editor
+   so adding or editing a schedule never leaves the dashboard. Borrows the
+   setup wizard's dialog shell (.wizard-dialog in forms.css); the rules
+   here only size the body for a form and tighten phones. */
+.schedule-dialog .wizard-body {
+  padding-top: 4px;
+}
+.schedule-dialog .schedule-form .actions {
+  display: flex;
+  align-items: center;
+  gap: var(--t-space-3);
+  margin-top: var(--t-space-3);
+}
+.schedule-dialog-note {
+  margin: 0;
+  font-size: var(--t-size-sm);
+  color: var(--t-fg-soft);
+}
+.schedule-dialog-note.is-error {
+  color: var(--t-danger, #b42318);
+}
+@media (max-width: 640px) {
+  .schedule-dialog {
+    width: calc(100vw - 24px);
+    max-width: none;
+    margin: 12px auto;
+    max-height: calc(100vh - 24px);
+    max-height: calc(100dvh - 24px);
+  }
+  .schedule-dialog .sf-primary,
+  .schedule-dialog .sf-cadence,
+  .schedule-dialog .sf-meta {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Panel-view toggle (#45): HTML view / Panel view segmented control over the
    live preview. Panel view shows the composition quantised + dithered to the
    panel's palette (crisp 1:1, so image-rendering is pixelated). */

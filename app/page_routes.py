@@ -683,6 +683,16 @@ def _editor_context(page: Page) -> dict[str, Any]:
         else []
     )
 
+    # The schedule dialog (#280) hosts the same form as the Lineups page,
+    # so it needs every dashboard for the picker and the bindable display
+    # instances for the display picker.
+    schedule_pages = sorted(_store().list_active(), key=lambda p: p.name.lower())
+    schedule_devices = (
+        [d for d in device_registry.all() if d.kind_of is not None]
+        if device_registry is not None
+        else []
+    )
+
     return {
         "page": page,
         "panel": panel,
@@ -697,6 +707,8 @@ def _editor_context(page: Page) -> dict[str, Any]:
         "device_options": device_options,
         "theme_options": theme_options,
         "schedules_for_page": schedules_for_page,
+        "schedule_pages": schedule_pages,
+        "schedule_devices": schedule_devices,
     }
 
 
