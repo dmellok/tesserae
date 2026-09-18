@@ -54,28 +54,24 @@ def test_device_section_renders_with_no_heartbeat(app: Flask) -> None:
     resp = client.get("/settings/devices")
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
-    # Built-in kind cards are hidden, only instances appear.
-    assert "Pi BIN client</span>" not in body
-    assert "Pi PNG client</span>" not in body
-    assert "ESP32 client</span>" not in body
+    # Built-in kinds are templates, never rows; only instances appear.
+    assert 'data-device-id="pi_bin_client"' not in body
+    assert 'data-device-id="pi_png_client"' not in body
+    assert 'data-device-id="esp32_client"' not in body
     # Registered instances do show up, with the "no heartbeat" status state.
-    # The handoff-redesigned device card uses the bare device name in
-    # the header (no "Device: " prefix); the data layer's title still
-    # carries the prefix for non-device callers.
     assert "Lab ESP32" in body
     assert "Kitchen Pi" in body
-    assert "no heartbeat received yet" in body
+    assert "no heartbeat yet" in body
     # ESP32 instance inherits its kind's config_topic, so the sleep
-    # interval form lives on the instance card.
-    assert "Sleep interval" in body
-    assert 'name="sleep_interval_s"' in body
-    # Pi instances inherit no config_topic, no config form on theirs.
-    # Slice the Pi card by its deterministic anchor id (card order isn't
-    # guaranteed alphabetical).
-    pi_start = body.index('id="device-pi_bin_kitchen"')
-    pi_end = body.find('id="device-', pi_start + 1)
-    pi_section = body[pi_start : pi_end if pi_end != -1 else len(body)]
-    assert 'name="sleep_interval_s"' not in pi_section
+    # interval form lives on its device page.
+    esp = client.get("/settings/devices/esp32_lab").get_data(as_text=True)
+    assert "no heartbeat" in esp
+    assert "Sleep interval" in esp
+    assert 'name="sleep_interval_s"' in esp
+    # The Pi instance has its own page too.
+    pi = client.get("/settings/devices/pi_bin_kitchen")
+    assert pi.status_code == 200
+    assert "Kitchen Pi" in pi.get_data(as_text=True)
 
 
 def test_status_cache_renders_after_heartbeat(app: Flask) -> None:
@@ -94,8 +90,9 @@ def test_status_cache_renders_after_heartbeat(app: Flask) -> None:
         },
     }
     body = client.get("/settings/devices").get_data(as_text=True)
-    # Fresh heartbeat -> "ok" status dot + parsed fields visible.
+    # Fresh heartbeat -> "ok" status dot on the table row.
     assert "is-ok" in body
+    body = client.get("/settings/devices/esp32_lab").get_data(as_text=True)
     assert "3820" in body
     assert "10.0.0.42" in body
 

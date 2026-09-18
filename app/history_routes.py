@@ -39,6 +39,7 @@ FILTERABLE_SOURCES = (
     "file",
     "url",
     "webpage",
+    "note",
     "manual",
     "resend",
     "onboarding",

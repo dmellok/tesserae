@@ -55,9 +55,9 @@ def test_apply_bundled_profile_writes_slug_to_device(app: Flask) -> None:
         follow_redirects=False,
     )
     assert resp.status_code == 302
-    assert "tab=calibration" in resp.location
+    assert "/calibration" in resp.location
     # Store round-trip: the picker should read back the slug.
-    body = client.get("/settings/devices").get_data(as_text=True)
+    body = client.get(f"/settings/devices/{dev}/calibration").get_data(as_text=True)
     assert "paperlesspaper-spectra6" in body
 
 
@@ -71,7 +71,7 @@ def test_apply_unknown_slug_flashes_error(app: Flask) -> None:
         follow_redirects=False,
     )
     assert resp.status_code == 302
-    assert "tab=calibration" in resp.location
+    assert "/calibration" in resp.location
 
 
 def test_reset_clears_the_slug(app: Flask) -> None:
@@ -465,11 +465,11 @@ def test_delete_bundled_profile_refused(app: Flask) -> None:
     assert resp.status_code == 302
 
 
-def test_calibration_tab_renders_palette_card(app: Flask) -> None:
+def test_calibration_page_renders_palette_card(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
-    _register_device(client)
-    body = client.get("/settings/devices").get_data(as_text=True)
+    dev = _register_device(client)
+    body = client.get(f"/settings/devices/{dev}/calibration").get_data(as_text=True)
     # Palette picker + attribution link show up.
     assert "Palette recalibration" in body
     assert "paperlesspaper-spectra6" in body

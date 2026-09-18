@@ -329,6 +329,6 @@ def test_the_card_renders_the_declared_rotation(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
     assert _register(client, app, device_id="pi_touch_ui", rotation=0).status_code == 201
-    body = client.get("/settings/devices").get_data(as_text=True)
+    body = client.get("/settings/devices/pi_touch_ui").get_data(as_text=True)
     # The selected option is the one carrying the stored orientation.
     assert '<option value="portrait" selected>0°</option>' in body

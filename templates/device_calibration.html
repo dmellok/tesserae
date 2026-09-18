@@ -1,0 +1,367 @@
+{% extends "_base.html" %}
+{# Colour calibration page for one display (2026-09 redesign):
+   /settings/devices/<id>/calibration. The old Calibration tab as its
+   own page: colour test patterns (+ custom image), palette
+   recalibration (profile picker, colours, tone editor with its own
+   save bar) and the per-renderer tone & dither fields, which post
+   through the combined form with ``_active_tab=calibration`` so the
+   save lands back here. #}
+{% from "_components.html" import auto_field, switch with context %}
+{% from "_components.html" import settings_tabs %}
+
+{% set _name = section.device_name or section.device_id %}
+{% set _combined_form_id = section.id ~ '-combined' %}
+
+{% block title %}{{ _name }} calibration: Devices, Tesserae{% endblock %}
+{% block page_class %}dx-devpage{% endblock %}
+{% block main %}
+<header class="page-head">
+  <h1><i class="ph ph-gear-six"></i> Settings</h1>
+  <p class="lede">Every display this server talks to. Pair a new one, or open a device to change how it looks and behaves.</p>
+</header>
+
+{{ settings_tabs('devices') }}
+
+<script src="{{ url_for('static', filename='pages/settings.js') }}"></script>
+
+{% set is_calibration = True %}
+{% include '_device_page_head.html' %}
+
+{% if section.calibration_picture_quality %}
+<form method="post" action="{{ section.combined_endpoint }}"
+      id="{{ _combined_form_id }}" class="device-combined-form" data-dirty-form></form>
+<input type="hidden" name="_active_tab" value="calibration" form="{{ _combined_form_id }}">
+{% endif %}
+
+{# ``data-device-card`` + ``data-device-id`` keep the test-pattern /
+   palette / tone scripts in settings.js scoped to this page: they look
+   up the preview image, the profile picker and the localStorage key by
+   that wrapper. #}
+<div class="dx-devpage-main dx-devpage-main--full" id="{{ section.id }}"
+     data-device-card data-device-id="{{ section.device_id }}">
+
+  {# COLOUR TEST PATTERNS #}
+  {% if section.test_pattern_endpoint and section.test_patterns %}
+  <section class="dx-section-card dx-devsec" id="patterns" data-devsec>
+    <header class="dx-section-head">
+      <span class="dx-section-icon" aria-hidden="true"><i class="ph ph-paint-brush"></i></span>
+      <div class="dx-section-titleblock">
+        <h3 class="dx-section-title">Colour test patterns</h3>
+        <p class="dx-section-desc">Native-palette pattern sent straight to the panel, bypassing compose and dither. The preview is byte-identical to what the panel paints.</p>
+      </div>
+    </header>
+    <div class="dx-section-body">
+      <div class="dx-calib-section">
+        <form method="post" action="{{ section.test_pattern_endpoint }}" class="form dx-test-pattern-form" data-test-pattern-form>
+          <div class="dx-test-pattern-grid">
+            <div class="dx-test-pattern-controls">
+              <fieldset class="dx-pattern-picker">
+                <legend class="device-subhead" style="font-size: 0.85em; margin: 0 0 6px;">Pattern</legend>
+                {% for p in section.test_patterns %}
+                <label class="dx-pattern-option">
+                  <input type="radio" name="pattern" value="{{ p.id }}" {% if loop.first %}checked{% endif %}
+                         data-needs-color="{% if p.needs_color %}1{% else %}0{% endif %}">
+                  <span class="dx-pattern-body">
+                    <span class="dx-pattern-label">{{ p.label }}</span>
+                    <span class="dx-pattern-desc field-help">{{ p.description }}</span>
+                  </span>
+                </label>
+                {% endfor %}
+              </fieldset>
+              {% if section.test_pattern_colors %}
+              <div class="dx-color-picker" data-color-picker hidden>
+                <label for="{{ section.id }}-color-index">Colour</label>
+                <select id="{{ section.id }}-color-index" name="color_index" class="input" data-color-select>
+                  {% for c in section.test_pattern_colors %}
+                  <option value="{{ c.index }}" data-hex="{{ c.hex }}">{{ c.label }}</option>
+                  {% endfor %}
+                </select>
+                <span class="dx-color-chip" data-color-chip style="background: {{ section.test_pattern_colors[0].hex }};" aria-hidden="true"></span>
+              </div>
+              {% endif %}
+              <div class="dx-pattern-actions">
+                <button type="submit" class="button primary"><i class="ph ph-paint-brush" aria-hidden="true"></i><span>Send to panel</span></button>
+              </div>
+            </div>
+            <div class="dx-pattern-preview">
+              <img src="{{ section.test_pattern_preview_url }}?pattern={{ section.test_patterns[0].id }}"
+                   alt="Test pattern preview" data-preview-img data-preview-base="{{ section.test_pattern_preview_url }}" loading="lazy">
+              {% if section.panel %}<span class="dx-preview-caption field-help">{{ section.panel.w }} × {{ section.panel.h }}</span>{% endif %}
+            </div>
+          </div>
+        </form>
+
+        {% if section.custom_image_upload_endpoint %}
+        <details class="dx-palette-import" style="margin-top: 12px;">
+          <summary>{% if section.custom_image_uploaded %}Replace or remove custom image{% else %}Upload custom calibration image{% endif %}</summary>
+          <form method="post" action="{{ section.custom_image_upload_endpoint }}" enctype="multipart/form-data" class="form">
+            <div class="dx-palette-save-row">
+              <input type="file" name="image" accept="image/png,image/jpeg,image/webp" required class="input">
+              <button type="submit" class="button">Upload</button>
+            </div>
+            <p class="field-help">PNG, JPEG, or WebP. Fit-to-panel with white padding on render (same as the Send-file flow).</p>
+          </form>
+          {% if section.custom_image_uploaded and section.custom_image_delete_endpoint %}
+          <form method="post" action="{{ section.custom_image_delete_endpoint }}" class="form form--inline"
+                onsubmit="return confirm('Remove the uploaded calibration image?');" style="margin-top: 8px;">
+            <button type="submit" class="button ghost dx-danger">Delete uploaded image</button>
+          </form>
+          {% endif %}
+        </details>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+  {# PALETTE RECALIBRATION #}
+  {% if section.palette_apply_endpoint %}
+  <section class="dx-section-card dx-devsec" id="palette" data-devsec>
+    <header class="dx-section-head">
+      <span class="dx-section-icon" aria-hidden="true"><i class="ph ph-swatches"></i></span>
+      <div class="dx-section-titleblock">
+        <h3 class="dx-section-title">Palette recalibration</h3>
+        <p class="dx-section-desc">Pick a community-measured profile, then fine-tune below if the panel looks off. Bundled palettes come from <a href="https://github.com/paperlesspaper/epdoptimize" target="_blank" rel="noopener">paperlesspaper/epdoptimize</a>. Changes apply to every display of this kind.</p>
+      </div>
+    </header>
+    <div class="dx-section-body">
+      <div class="dx-calib-section">
+        {% set active_slug = section.palette_profile_slug or '' %}
+        {% set active_choice = namespace(entry=none) %}
+        {% for c in section.palette_profile_choices %}{% if c.slug == active_slug %}{% set active_choice.entry = c %}{% endif %}{% endfor %}
+
+        <form method="post" action="{{ section.palette_apply_endpoint }}" class="form dx-palette-apply-form" data-palette-apply-form>
+          <div class="dx-palette-picker-row">
+            <label for="{{ section.id }}-palette-slug" class="dx-palette-picker-label">Profile</label>
+            <select id="{{ section.id }}-palette-slug" name="slug" class="input dx-palette-select" data-palette-slug>
+              <option value="">Built-in default (no profile)</option>
+              {% for c in section.palette_profile_choices %}
+              <optgroup label="{% if c.bundled %}Bundled presets{% else %}Your profiles{% endif %}"
+                        {% if not loop.first and section.palette_profile_choices[loop.index0 - 1].bundled == c.bundled %}style="display:none;"{% endif %}>
+                <option value="{{ c.slug }}" data-attribution="{{ c.attribution or '' }}" data-notes="{{ c.notes or '' }}"
+                        data-bundled="{% if c.bundled %}1{% else %}0{% endif %}" {% if c.slug == active_slug %}selected{% endif %}>
+                  {{ c.name }}{% if not c.bundled %} (custom){% endif %}
+                </option>
+              </optgroup>
+              {% endfor %}
+            </select>
+            <button type="submit" class="button primary">Apply</button>
+          </div>
+        </form>
+
+        {% if active_choice.entry %}
+        {% set entry = active_choice.entry %}
+        <p class="dx-palette-attribution field-help" data-palette-attribution>
+          {% if entry.based_on %}Based on <code>{{ entry.based_on }}</code>{% if entry.attribution %} · {% endif %}{% endif %}
+          {% if entry.attribution %}<a href="{{ entry.attribution }}" target="_blank" rel="noopener">{{ entry.attribution }}</a>{% endif %}
+        </p>
+        {% if entry.notes %}<p class="dx-palette-notes field-help" data-palette-notes>{{ entry.notes }}</p>{% endif %}
+        {% endif %}
+
+        <div class="dx-palette-actions">
+          {% if section.palette_reset_endpoint %}
+          <form method="post" action="{{ section.palette_reset_endpoint }}" class="form form--inline">
+            <button type="submit" class="button ghost">Reset to built-in</button>
+          </form>
+          {% endif %}
+          {% if active_slug %}
+          <a class="button ghost" href="{{ url_for('auth.palette_profile_export', slug=active_slug) }}" download>Export JSON</a>
+          {% if active_choice.entry and not active_choice.entry.bundled %}
+          <form method="post" action="{{ url_for('auth.palette_profile_delete', slug=active_slug) }}" class="form form--inline"
+                onsubmit="return confirm('Delete this custom profile? Devices using it fall back to the built-in palette.');">
+            <button type="submit" class="button ghost dx-danger">Delete profile</button>
+          </form>
+          {% endif %}
+          {% endif %}
+        </div>
+
+        {% if section.palette_save_endpoint %}
+        <details class="dx-palette-save">
+          <summary>Save as new profile</summary>
+          <form method="post" action="{{ section.palette_save_endpoint }}" class="form">
+            <input type="hidden" name="base_slug" value="{{ active_slug }}">
+            <div class="dx-palette-save-row">
+              <input type="text" name="name" class="input" placeholder="e.g. Living room, evening" required maxlength="80">
+              <button type="submit" class="button">Save + apply</button>
+            </div>
+            <p class="field-help">Clones the currently-selected profile so you can edit and share.</p>
+          </form>
+        </details>
+        {% endif %}
+
+        {% if section.palette_import_endpoint %}
+        <details class="dx-palette-import">
+          <summary>Import profile from JSON</summary>
+          <form method="post" action="{{ section.palette_import_endpoint }}" enctype="multipart/form-data" class="form">
+            <input type="hidden" name="instance_id" value="{{ section.device_id }}">
+            <div class="dx-palette-save-row">
+              <input type="file" name="profile" accept="application/json,.json" required class="input">
+              <button type="submit" class="button">Import + apply</button>
+            </div>
+            <p class="field-help">Uploaded JSON must match the profile schema (see docs/dev/calibration).</p>
+          </form>
+        </details>
+        {% endif %}
+
+        {# Per-colour palette editor. Bundled profiles fork on first tweak. #}
+        {% if section.palette_update_palette_endpoint and section.palette_profile_colors %}
+        <hr class="dx-divider">
+        <p class="device-subhead">Palette colours</p>
+        {% if section.palette_profile_tone.bundled %}
+        <p class="field-help" style="margin: 0 0 12px;">Editing bundled colours forks the preset into an editable copy under "Your profiles".</p>
+        {% endif %}
+        <form method="post" action="{{ section.palette_update_palette_endpoint }}" class="form dx-palette-colors-form">
+          <div class="dx-palette-colors-grid">
+            {% for c in section.palette_profile_colors %}
+            <label class="dx-palette-color-cell">
+              <span class="dx-palette-color-name">{{ c.label }}</span>
+              <input type="color" name="{{ c.name }}" value="{{ c.hex }}" class="dx-palette-color-input" data-palette-color-input>
+              <output class="dx-palette-color-hex" data-palette-color-hex>{{ c.hex }}</output>
+            </label>
+            {% endfor %}
+          </div>
+          <button type="submit" class="button">
+            <i class="ph ph-eyedropper" aria-hidden="true"></i>
+            <span>{% if section.palette_profile_tone.bundled %}Fork &amp; save colours{% else %}Save colours{% endif %}</span>
+          </button>
+        </form>
+        {% endif %}
+
+        {# Tone editor: sliders write to the active profile via its own
+           POST and its own sticky save bar. #}
+        {% if section.palette_update_tone_endpoint and section.palette_profile_tone.editable %}
+        <hr class="dx-divider">
+        <p class="device-subhead">Tone &amp; dither</p>
+        {% if section.palette_profile_tone.bundled %}
+        <p class="field-help" style="margin: 0 0 12px;">Editing a bundled preset forks it into an editable copy so the original stays intact. The copy shows up under "Your profiles" in the picker above.</p>
+        {% endif %}
+        <form method="post" action="{{ section.palette_update_tone_endpoint }}" id="{{ section.id }}-tone-form"
+              class="form dx-palette-tone-form" data-dirty-form>
+          <div class="dx-tone-grid">
+            <label class="dx-tone-slider">
+              <span class="dx-tone-label">Exposure</span>
+              <input type="range" name="exposure" min="-100" max="100" step="1" value="{{ section.palette_profile_tone.exposure }}" data-tone-input>
+              <output class="dx-tone-value" data-tone-value>{{ section.palette_profile_tone.exposure }}</output>
+            </label>
+            <label class="dx-tone-slider">
+              <span class="dx-tone-label">S-curve (mid-tone punch)</span>
+              <input type="range" name="s_curve" min="-100" max="100" step="1" value="{{ section.palette_profile_tone.s_curve }}" data-tone-input>
+              <output class="dx-tone-value" data-tone-value>{{ section.palette_profile_tone.s_curve }}</output>
+            </label>
+            <label class="dx-tone-slider">
+              <span class="dx-tone-label">Diffusion strength</span>
+              <input type="range" name="diffusion_strength" min="0" max="200" step="5" value="{{ section.palette_profile_tone.diffusion_strength }}" data-tone-input>
+              <output class="dx-tone-value" data-tone-value>{{ section.palette_profile_tone.diffusion_strength }}</output>
+            </label>
+            {{ switch(section.id ~ '-serpentine', 'serpentine', 'Serpentine scan (error-diffusion only)', checked=section.palette_profile_tone.serpentine) }}
+            <label class="dx-tone-slider">
+              <span class="dx-tone-label">LAB compress: min</span>
+              <input type="range" name="lab_compress_min" min="0" max="100" step="1" value="{{ section.palette_profile_tone.lab_compress_min }}" data-tone-input>
+              <output class="dx-tone-value" data-tone-value>{{ section.palette_profile_tone.lab_compress_min }}</output>
+            </label>
+            <label class="dx-tone-slider">
+              <span class="dx-tone-label">LAB compress: max</span>
+              <input type="range" name="lab_compress_max" min="0" max="100" step="1" value="{{ section.palette_profile_tone.lab_compress_max }}" data-tone-input>
+              <output class="dx-tone-value" data-tone-value>{{ section.palette_profile_tone.lab_compress_max }}</output>
+            </label>
+            <label class="dx-tone-slider dx-tone-select-row">
+              <span class="dx-tone-label">Colour match</span>
+              <select name="color_match" class="input">
+                {% for opt in [('rgb', 'RGB nearest (fastest)'), ('lab', 'LAB perceptual'), ('chroma-aware', 'LAB, chroma-weighted (best hue fidelity)')] %}
+                <option value="{{ opt[0] }}" {% if section.palette_profile_tone.color_match == opt[0] %}selected{% endif %}>{{ opt[1] }}</option>
+                {% endfor %}
+              </select>
+            </label>
+          </div>
+          <details class="dx-palette-experimental">
+            <summary>Experimental: edge handling</summary>
+            <p class="field-help" style="margin: 8px 0 12px;">Post-processes text and hairline edges. Great on dashboards with mixed photo + text content; can look busy on pure photos.</p>
+            <div class="dx-tone-grid">
+              <label class="dx-tone-slider">
+                <span class="dx-tone-label">Smoothing radius (px)</span>
+                <input type="range" name="smoothing_radius" min="0" max="3" step="1" value="{{ section.palette_profile_tone.smoothing_radius }}" data-tone-input>
+                <output class="dx-tone-value" data-tone-value>{{ section.palette_profile_tone.smoothing_radius }}</output>
+              </label>
+              {{ switch(section.id ~ '-preserve-line-art', 'preserve_line_art', 'Preserve line-art edges (nearest-neighbour on detected text / rules)', checked=section.palette_profile_tone.preserve_line_art) }}
+              <label class="dx-tone-slider">
+                <span class="dx-tone-label">Protect the panel's own colours</span>
+                <input type="range" name="protect_native_colours" min="0" max="48" step="4" value="{{ section.palette_profile_tone.protect_native_colours }}" data-tone-input>
+                <output class="dx-tone-value" data-tone-value>{{ section.palette_profile_tone.protect_native_colours }}</output>
+              </label>
+              <p class="field-help" style="margin: 4px 0 0;">
+                Keeps pixels that already sit on one of the panel's colours off the dither, so flat white and
+                black backgrounds stop picking up speckle from their neighbours. 0 is off. Raise it if a
+                background is nearly-but-not-exactly a panel colour; too high starts flattening pale parts of photos.
+              </p>
+            </div>
+          </details>
+          <button type="submit" class="button primary dx-inline-save">
+            <i class="ph ph-floppy-disk" aria-hidden="true"></i>
+            <span>{% if section.palette_profile_tone.bundled %}Fork &amp; save{% else %}Save tone{% endif %}</span>
+          </button>
+        </form>
+        <div class="dx-save-bar dx-save-bar--page" data-save-bar data-save-bar-for="{{ section.id }}-tone-form" hidden>
+          <span class="dx-save-bar-msg">Unsaved tone changes for {{ _name }}</span>
+          <div class="dx-save-bar-actions">
+            <button type="reset" form="{{ section.id }}-tone-form" class="dx-save-bar-discard">Discard</button>
+            <button type="submit" form="{{ section.id }}-tone-form" class="dx-save-bar-save">
+              <i class="ph ph-floppy-disk" aria-hidden="true"></i>
+              <span>{% if section.palette_profile_tone.bundled %}Fork &amp; save{% else %}Save tone{% endif %}</span>
+            </button>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+  {# PER-RENDERER TONE & DITHER (contrast / saturation / dither), saved
+     through the combined form. Its own top-level guard: it is driven by
+     the renderer clones' manifests, not by the palette family, so a
+     bwry_4 / mono panel still gets it (#52 follow-up). #}
+  {% if section.calibration_picture_quality %}
+  <section class="dx-section-card dx-devsec" id="tone" data-devsec>
+    <header class="dx-section-head">
+      <span class="dx-section-icon" aria-hidden="true"><i class="ph ph-sliders-horizontal"></i></span>
+      <div class="dx-section-titleblock">
+        <h3 class="dx-section-title">Tone &amp; dither</h3>
+        <p class="dx-section-desc">Per-renderer picture quality for this display.</p>
+      </div>
+    </header>
+    <div class="dx-section-body">
+      {% for pq in section.calibration_picture_quality %}
+      {% if not loop.first %}<hr class="dx-divider">{% endif %}
+      <p class="device-subhead">{{ pq.base_name }} · tone &amp; dither</p>
+      <div class="dx-field-grid">
+        {% for field in pq.fields %}
+          {% set value = pq.state.get(field.name, field.get('default', '')) %}
+          {{ auto_field(section.id ~ '-cal-' ~ pq.base_id ~ '-' ~ field.name, pq.clone_id ~ ':' ~ field.name, field, value, form=_combined_form_id) }}
+        {% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  <div class="dx-save-bar dx-save-bar--page" data-save-bar data-save-bar-for="{{ _combined_form_id }}" hidden>
+    <span class="dx-save-bar-msg">Unsaved changes on {{ _name }}</span>
+    <div class="dx-save-bar-actions">
+      <button type="reset" form="{{ _combined_form_id }}" class="dx-save-bar-discard">Discard</button>
+      <button type="submit" form="{{ _combined_form_id }}" class="dx-save-bar-save">
+        <i class="ph ph-floppy-disk" aria-hidden="true"></i><span>Save</span>
+      </button>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if not (section.test_pattern_endpoint and section.test_patterns) and not section.palette_apply_endpoint and not section.calibration_picture_quality %}
+  <div class="dx-section-card">
+    <div class="dx-empty">
+      <div class="dx-empty-icon"><i class="ph ph-palette" aria-hidden="true"></i></div>
+      <p class="dx-empty-title">Nothing to calibrate</p>
+      <p class="dx-empty-help">This display's renderer exposes no colour controls.</p>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

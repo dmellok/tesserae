@@ -1,0 +1,73 @@
+{# One-shot access-token reveal modal. Shared by the Devices tab (after
+   Add device / register) and the device page (after Regenerate token,
+   Reveal, or a transport flip). Expects ``trmnl_token_reveal`` (None
+   or {device_name, token, client_ip?}); popped from the session by the
+   route that renders the page, so a refresh never re-shows it. #}
+{% if trmnl_token_reveal %}
+<div class="modal" data-modal role="dialog" aria-modal="true" aria-labelledby="trmnl-reveal-title">
+  <div class="modal-card">
+    <header class="modal-head">
+      <h2 id="trmnl-reveal-title"><i class="ph ph-device-tablet-speaker"></i> TRMNL access token</h2>
+      <button type="button" class="modal-close" data-modal-close aria-label="Close">
+        <i class="ph ph-x"></i>
+      </button>
+    </header>
+    <div class="modal-body">
+      <p class="lede">Type this into <code>{{ trmnl_token_reveal.device_name }}</code>'s client config (KOReader plugin → TRMNL settings). It's short on purpose so you can enter it on an on-screen keyboard without losing your mind. Native TRMNL hardware (XIAO DIY kit, commercial TRMNL devices) doesn't need this, those clients auto-provision by MAC the first time they poll Tesserae and don't expose a "paste a token" UI. Copy it now, refreshing this page won't bring the modal back, though the device card always shows the current token.</p>
+      {% if trmnl_token_reveal.client_ip %}
+      <p class="lede"><i class="ph ph-broadcast" aria-hidden="true"></i> The device polled in from <code>{{ trmnl_token_reveal.client_ip }}</code>. Open its config UI there (usually the same address in a browser) and replace the placeholder access token with the value below.</p>
+      {% endif %}
+      <div class="token-row">
+        <input type="text" class="token-input" value="{{ trmnl_token_reveal.token }}" readonly data-modal-token aria-label="TRMNL access token">
+        <button type="button" class="button" data-modal-copy>
+          <i class="ph ph-copy"></i> Copy
+        </button>
+      </div>
+      <p class="field-help">Server URL: <code>http://{{ request.host }}</code></p>
+      <p class="field-help"><strong>LAN-safe, not internet-safe.</strong> The short token is fine for a homelab Tesserae behind a firewall / Tailscale / VPN. If your instance is reachable from the public internet, stack additional auth in front (reverse proxy with HTTP basic auth, OAuth, Cloudflare Access, anything), five characters won't survive a determined brute-force.</p>
+    </div>
+    <footer class="modal-foot">
+      <button type="button" class="button ghost" data-modal-close>Done</button>
+    </footer>
+  </div>
+</div>
+<script>
+  (function () {
+    const modal = document.querySelector('[data-modal]');
+    if (!modal) return;
+    const input = modal.querySelector('[data-modal-token]');
+    const copyBtn = modal.querySelector('[data-modal-copy]');
+    document.body.classList.add('modal-open');
+    function close() {
+      modal.remove();
+      document.body.classList.remove('modal-open');
+    }
+    modal.addEventListener('click', (ev) => {
+      if (ev.target === modal || ev.target.closest('[data-modal-close]')) close();
+    });
+    document.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape' && document.body.contains(modal)) close();
+    });
+    if (copyBtn && input) {
+      copyBtn.addEventListener('click', async () => {
+        const value = input.value;
+        let ok = false;
+        try {
+          await navigator.clipboard.writeText(value);
+          ok = true;
+        } catch {
+          input.select();
+          input.setSelectionRange(0, value.length);
+          try { ok = document.execCommand('copy'); } catch { ok = false; }
+        }
+        const original = copyBtn.innerHTML;
+        copyBtn.innerHTML = ok
+          ? '<i class="ph ph-check"></i> Copied'
+          : '<i class="ph ph-warning"></i> Copy failed';
+        setTimeout(() => { copyBtn.innerHTML = original; }, 1800);
+      });
+    }
+  })();
+</script>
+{% endif %}
+

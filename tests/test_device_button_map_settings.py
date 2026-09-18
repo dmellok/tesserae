@@ -45,7 +45,7 @@ def test_button_map_textarea_is_associated_with_the_combined_form(app: Flask) ->
     _sign_in(client)
     _add_device(client)
 
-    body = client.get("/settings/devices").get_data(as_text=True)
+    body = client.get("/settings/devices/kitchen").get_data(as_text=True)
     match = re.search(r"<textarea[^>]*name=\"button_map_json\"[^>]*>", body)
     assert match is not None, "button map textarea missing from the devices page"
     textarea = match.group(0)
@@ -68,5 +68,5 @@ def test_saving_a_button_map_persists_and_renders_back(app: Flask) -> None:
     stored = app.config["SETTINGS_STORE"].get_section("devices").get("kitchen", {})
     assert stored.get("button_map") == {"left": "webhook:http://example.test/hook"}
 
-    body = client.get("/settings/devices").get_data(as_text=True)
+    body = client.get("/settings/devices/kitchen").get_data(as_text=True)
     assert "webhook:http://example.test/hook" in body

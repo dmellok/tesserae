@@ -1,4 +1,4 @@
-/* ----- Send tabs: paired options + preview cards -------------------- */
+/* ----- Send: one box + live preview -------------------------------- */
 
 .send-pair {
   display: grid;
@@ -6,42 +6,487 @@
   gap: var(--t-space-5);
   align-items: start;
 }
-.send-pair[hidden] { display: none !important; }
 @media (min-width: 900px) {
   .send-pair {
-    /* Spec ratio: preview column slightly wider than options so the
-       portrait panel ratio doesn't get cramped. Both columns can
-       shrink to zero for very narrow viewports. */
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.18fr);
+    /* Source card a touch wider than the preview so the box has room
+       for the segmented control + helper on one line. */
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
   }
 }
 .send-pair-options { min-width: 0; }
-.send-pair-preview {
+.send-pair-preview { min-width: 0; }
+/* Cancel the global ``.dx-section-card + .dx-section-card`` top margin
+   inside this grid: the cards sit side by side, not stacked. */
+.send-pair > .dx-section-card + .dx-section-card { margin-top: 0; }
+
+.send-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
   min-width: 0;
 }
-/* Cancel the global ``.dx-section-card + .dx-section-card``
-   16px top margin inside this grid — the rule is meant for
-   vertically stacked siblings on admin pages, but here the
-   options + preview cards are side-by-side in a 2-col grid and
-   the sibling selector still fires, pushing the preview down
-   ~16px relative to the options card. Both card tops align
-   again with this reset. */
-.send-pair > .dx-section-card + .dx-section-card { margin-top: 0; }
-.send-pair-preview .card-head { width: 100%; }
+.send-form .field { margin: 0; padding: 0; }
+.send-form .field > label {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--t-fg-soft);
+  margin-bottom: 8px;
+}
+.send-form .field-help {
+  margin: 8px 0 0;
+  font-size: 11.5px;
+  color: var(--t-muted);
+}
+
+/* The box: dashed, teal once it holds something. */
+.send-box {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 20px;
+  border: 2px dashed var(--t-border-strong);
+  border-radius: 14px;
+  background: var(--t-surface);
+  min-width: 0;
+  transition: border-color var(--t-trans-fast), background var(--t-trans-fast);
+}
+.send-box[data-state="filled"],
+.send-box[data-state="file"],
+.send-box[data-state="typing"] { border-color: var(--t-accent); }
+.send-box.is-dragging {
+  border-style: solid;
+  border-color: var(--t-accent);
+  background: var(--t-accent-soft);
+}
+.send-box:has(.send-file-input:focus-visible) {
+  outline: 2px solid var(--t-accent);
+  outline-offset: 3px;
+}
+
+.send-box-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+/* Segmented control: same track as the lineup editor's .dxe-seg-track. */
+.send-seg {
+  display: inline-flex;
+  align-items: stretch;
+  flex: none;
+  height: 34px;
+  box-sizing: border-box;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 9px;
+  background: var(--t-border);
+}
+.send-seg-item { position: relative; display: inline-flex; }
+.send-seg-item input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+}
+.send-seg-item span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 12px;
+  border-radius: 7px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--t-fg-soft);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--t-trans-fast), color var(--t-trans-fast);
+}
+.send-seg-item span .ph { font-size: 13px; }
+.send-seg-item input:checked + span {
+  background: var(--t-surface);
+  color: var(--t-fg);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+.send-seg-item input:disabled + span { opacity: 0.45; cursor: not-allowed; }
+.send-seg-item input:focus-visible + span {
+  outline: 2px solid var(--t-accent);
+  outline-offset: 1px;
+}
+
+.send-auto {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--t-accent);
+}
+.send-auto[hidden] { display: none !important; }
+.send-box-hint {
+  flex: 1 1 200px;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--t-muted);
+}
+
+/* Empty state. */
+.send-box-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 26px 0 18px;
+  text-align: center;
+  border-radius: 10px;
+  cursor: text;
+  outline: none;
+}
+.send-box-empty[hidden] { display: none !important; }
+.send-box-empty:focus-visible { outline: 2px solid var(--t-accent); outline-offset: 4px; }
+.send-box-empty-icon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--t-surface-sunk);
+  color: var(--t-accent);
+  font-size: 26px;
+}
+.send-box-empty-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--t-fg);
+}
+.send-box-empty-desc {
+  margin: 0;
+  max-width: 420px;
+  font-size: 12.5px;
+  color: var(--t-fg-soft);
+}
+.send-browse-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  margin-top: 4px;
+  padding: 0 14px;
+  border: 1px solid var(--t-border-strong);
+  border-radius: 8px;
+  background: var(--t-surface);
+  box-shadow: var(--t-shadow-xs);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--t-fg);
+  cursor: pointer;
+  transition: border-color var(--t-trans-fast), color var(--t-trans-fast);
+}
+.send-browse-btn:hover { border-color: var(--t-accent); color: var(--t-accent); }
+
+/* The one input. */
+.send-box-value { min-width: 0; }
+.send-box-value[hidden] { display: none !important; }
+.send-editor {
+  min-height: 34px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--t-border);
+  outline: none;
+  font-family: var(--t-font);
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--t-fg);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  caret-color: var(--t-accent);
+  transition: border-color var(--t-trans-fast);
+}
+.send-editor:focus { border-bottom-color: var(--t-accent); }
+.send-editor:empty::before {
+  content: attr(data-placeholder);
+  color: var(--t-muted);
+  pointer-events: none;
+}
+.send-editor.is-url {
+  font-family: var(--t-font-mono);
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+.send-editor.is-url::-webkit-scrollbar { display: none; }
+.send-editor.is-note { padding: 6px 0; }
+.send-editor.is-note::first-line {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* A dropped file or a gallery image, in place of the input. */
+.send-box-file {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+}
+.send-box-file[hidden] { display: none !important; }
+.send-box-file img {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  padding: 4px;
+  border: 1px solid var(--t-border);
+  border-radius: 8px;
+  background: var(--t-surface-soft);
+}
+.send-box-file-meta { display: grid; gap: 2px; min-width: 0; }
+.send-box-file-meta strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  color: var(--t-fg);
+}
+.send-box-file-meta .muted { font-size: 12px; }
+
+.send-box-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+  color: var(--t-fg-soft);
+}
+.send-box-foot[hidden] { display: none !important; }
+.send-box-foot .ph { font-size: 15px; }
+.send-browse-link {
+  color: var(--t-accent);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.send-file-input {
+  /* Visually hidden but focusable + form-submittable; the browse labels
+     point at it. */
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Options disclosure: closed by default, summary carries the values. */
+.send-options {
+  border: 1px solid var(--t-border);
+  border-radius: 10px;
+  background: var(--t-surface-soft);
+  min-width: 0;
+}
+.send-options[hidden] { display: none !important; }
+.send-options > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  list-style: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--t-fg);
+  cursor: pointer;
+  min-width: 0;
+}
+.send-options > summary::-webkit-details-marker { display: none; }
+.send-options-caret {
+  display: inline-flex;
+  color: var(--t-muted);
+  font-size: 13px;
+  transition: transform 150ms ease;
+}
+.send-options[open] > summary .send-options-caret { transform: rotate(90deg); }
+.send-options-title { flex: none; }
+.send-options-value {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-left: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+  font-family: var(--t-font-mono);
+  font-size: 11.5px;
+  font-weight: 400;
+  color: var(--t-fg-soft);
+}
+.send-options-pane {
+  margin: 0;
+  padding: 2px 14px 14px;
+  border: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.send-options-pane[hidden] { display: none !important; }
+.send-options-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.send-options-grid--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.send-options-pane .field > label {
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+.send-options-pane input,
+.send-options-pane select {
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+.send-options-pane textarea {
+  width: 100%;
+  font-size: 13px;
+  font-family: var(--t-font-mono);
+}
+
+/* Target displays: chip grid. */
+.send-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.send-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-width: 0;
+  padding: 6px 12px;
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-radius-pill);
+  background: var(--t-surface-soft);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--t-fg-soft);
+  cursor: pointer;
+  transition: border-color var(--t-trans-fast), background var(--t-trans-fast), color var(--t-trans-fast);
+}
+.send-chip input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+}
+.send-chip:hover { border-color: var(--t-border-strong); }
+.send-chip:focus-within { outline: 2px solid var(--t-accent); outline-offset: 2px; }
+.send-chip .ph { font-size: 12px; flex: none; }
+.send-chip-on { display: none; }
+.send-chip:has(input:checked) {
+  border-color: var(--t-accent);
+  background: var(--t-accent-tint);
+  color: var(--t-accent);
+  font-weight: 600;
+}
+.send-chip:has(input:checked) .send-chip-on { display: inline; }
+.send-chip:has(input:checked) .send-chip-off { display: none; }
+.send-chip-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.send-chip-dims {
+  flex: none;
+  font-family: var(--t-font-mono);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--t-muted);
+}
+.send-chip:has(input:checked) .send-chip-dims { color: inherit; opacity: 0.8; }
+
+.send-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+}
+.send-push { padding: 10px 18px; }
+.send-push .ph { font-size: 15px; }
+
+/* Preview card: display switcher chip in the header. */
+.send-display-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  height: 28px;
+  padding: 0 8px 0 12px;
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-radius-pill);
+  background: var(--t-surface);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--t-fg);
+  cursor: pointer;
+}
+.send-display-chip select {
+  appearance: none;
+  -webkit-appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0 16px 0 0;
+  margin: 0;
+  max-width: 180px;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-overflow: ellipsis;
+}
+.send-display-chip select:focus { outline: none; }
+.send-display-chip:focus-within { outline: 2px solid var(--t-accent); outline-offset: 2px; }
+.send-display-chip .ph {
+  position: absolute;
+  right: 9px;
+  font-size: 11px;
+  color: var(--t-muted);
+  pointer-events: none;
+}
+.send-pair-preview .dx-section-head { align-items: center; }
 .send-pair-preview .preview-frame {
-  /* Let the preview use the column's full width. The base
-     ``.preview-frame`` caps at 720px (editor context); on the
-     page-wide Send layout the column is comfortably wider than
-     that, so we lift the cap to keep the preview from looking
-     pinned in a much larger card. Aspect-ratio still locks the
-     proportion. */
+  /* Let the preview use the column's full width; the base ``.preview-frame``
+     caps at 720px for the editor, and editor.css's sub-1100px rule turns it
+     into a 36vh inline-block sized by ``--panel-ar`` (unset here). Aspect-
+     ratio still locks the proportion. */
+  display: block;
+  width: 100%;
   margin: 0 auto;
   max-width: none;
+  max-height: none;
 }
 .send-pair-preview .preview-dims {
-  margin: 0;
+  margin: 8px 0 0;
   font-size: 12px;
-  align-self: end;
+  font-family: var(--t-font-mono);
+  text-align: right;
 }
 .send-pair-preview .preview-image {
   width: 100%;
@@ -65,6 +510,10 @@
   z-index: 0;
 }
 .preview-frame > img.preview-bg[hidden] { display: none !important; }
+/* editor.css gives .preview-image ``display: block``, which outranks the
+   UA ``[hidden]`` rule; spell the hidden state out so an empty <img>
+   doesn't paint over the placeholder or the note iframe. */
+.preview-frame > img.preview-image[hidden] { display: none !important; }
 .preview-frame > img.preview-image { z-index: 1; }
 .preview-placeholder {
   display: grid;
@@ -74,35 +523,38 @@
   height: 100%;
   padding: var(--t-space-5);
   color: var(--t-muted);
-  /* Subtle checkerboard so the preview canvas reads as a designer's
-     transparent surface rather than a flat fill. The squares are
-     tinted with the soft surface tokens so they barely register -
-     they're texture, not pattern. */
-  background:
-    conic-gradient(from 90deg at 1px 1px,
-      transparent 0 25%, color-mix(in oklab, var(--t-fg) 3%, transparent) 0 50%,
-      transparent 0 75%, color-mix(in oklab, var(--t-fg) 3%, transparent) 0 100%);
-  background-size: 16px 16px;
+  background: var(--t-surface-soft);
 }
-.preview-placeholder [class^="ph-duotone"] {
-  font-size: 64px;
-  color: var(--t-fg-soft);
-  margin-bottom: var(--t-space-2);
-  opacity: 0.55;
-  animation: preview-breathe 4.5s var(--t-ease-snappy) infinite;
-}
-@keyframes preview-breathe {
-  0%, 100% { transform: scale(1);    opacity: 0.5; }
-  50%      { transform: scale(1.04); opacity: 0.7; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .preview-placeholder [class^="ph-duotone"] { animation: none; }
-}
+.preview-placeholder[hidden] { display: none !important; }
 .preview-placeholder p {
   margin: 0;
-  font-size: var(--t-size-sm);
-  color: var(--t-fg-soft);
+  font-size: 15px;
+  color: var(--t-muted);
   letter-spacing: -0.005em;
+}
+
+/* Phones and small tablets: one column (the grid already does that below
+   900px), nothing may push the page wider than the viewport. */
+@media (max-width: 640px) {
+  .send-pair { gap: var(--t-space-4); }
+  .send-box { padding: 14px 12px; gap: 12px; }
+  .send-box-head { gap: 8px 10px; }
+  .send-seg-item span { padding: 0 10px; font-size: 12px; gap: 5px; }
+  .send-box-hint { flex-basis: 100%; }
+  .send-editor.is-url { font-size: 16px; }
+  .send-editor.is-note::first-line { font-size: 19px; }
+  .send-box-empty { padding: 18px 0 10px; }
+  .send-box-empty-title { font-size: 15.5px; }
+  .send-box-file { grid-template-columns: 56px minmax(0, 1fr) auto; gap: 10px; }
+  .send-box-file img { width: 56px; height: 56px; }
+  .send-options > summary { padding: 10px 12px; }
+  .send-options-pane { padding: 2px 12px 12px; }
+  .send-options-grid,
+  .send-options-grid--3 { grid-template-columns: 1fr; }
+  .send-actions { justify-content: stretch; margin-top: 2px; }
+  .send-push { width: 100%; justify-content: center; }
+  .send-display-chip select { max-width: 120px; }
+  .send-pair-preview .dx-section-head { flex-wrap: wrap; }
 }
 
 /* ----- History ------------------------------------------------------ */

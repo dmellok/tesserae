@@ -201,7 +201,7 @@ def test_devices_page_offers_resync_for_a_bound_album(app: Flask) -> None:
     client = app.test_client()
     _setup(app, client)
 
-    body = client.get("/settings/devices").get_data(as_text=True)
+    body = client.get("/settings/devices/frame01").get_data(as_text=True)
     assert "/settings/devices/frame01/album/resync" in body
     assert "Resync" in body
 
@@ -214,7 +214,7 @@ def test_devices_page_shows_the_album_before_any_report(app: Flask) -> None:
     _seed_folder(app, "holidays", ["a.jpg"])
     _bind_album(app, "frame01")
 
-    body = client.get("/settings/devices").get_data(as_text=True)
+    body = client.get("/settings/devices/frame01").get_data(as_text=True)
     assert "Offline album" in body
     assert "no report yet" in body
     assert "/settings/devices/frame01/album/resync" in body

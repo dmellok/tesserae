@@ -729,13 +729,11 @@ def relay_app(tmp_path: Path) -> Any:
 
 def test_devices_tab_treats_relay_device_as_first_class(relay_app: Any) -> None:
     _app, client = relay_app
-    html = client.get("/settings/devices").get_data(as_text=True)
-    card_start = html.find('id="device-parents_panel"')
-    assert card_start != -1
-    # The relay panel is this app's only device instance, so everything from
-    # its card onward belongs to it (the card body nests <section>s, which
-    # defeats a clean single-section slice).
-    card = html[card_start:]
+    listing = client.get("/settings/devices").get_data(as_text=True)
+    # Listed in the devices table like any local device.
+    assert 'id="device-parents_panel"' in listing
+    html = client.get("/settings/devices/parents_panel").get_data(as_text=True)
+    card = html
     # Full config card: the same knobs a local device gets.
     for marker in ("sleep_interval_s", "quiet_hours_enabled", "panel_orientation", "panel_w"):
         assert marker in card, marker

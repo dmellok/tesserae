@@ -903,394 +903,9 @@ def _build_sections() -> list[dict[str, Any]]:
     _instances = [d for d in devices().all() if d.kind_of is not None]
     _instances.sort(key=lambda d: ((d.name or d.id).casefold(), d.id))
     for device in _instances:
-        # Built-in kinds are templates, not bindable devices, they
-        # never appear on the Devices tab. Every physical display is
-        # represented by an instance (added manually or auto-registered
-        # from the Discovered strip).
-        if device.kind_of is None:
-            continue
-        sid = f"device-{device.id}"
-        fields = _visible_config_fields(device)
-        is_instance = device.kind_of is not None
-        # Picture-quality (dither / saturation / contrast) lives on the
-        # clone renderer keyed ``<base_id>__<device_id>``, one clone
-        # per renderer the device's kind consumes. Surface each clone's
-        # device_setting-flagged fields as a "Picture quality" subsection;
-        # the template renders them inside the combined form with the
-        # name pattern ``<clone_id>:<field_name>`` so the save handler
-        # can route each value back to the right clone's namespace.
-        # Contrast + saturation moved to the Calibration tab in v0.67,
-        # dither joined them in v0.68 (all three are colour-tuning
-        # concerns, not hardware setup). ``calibrated`` was retired in
-        # v0.68 too: the palette-profile picker now owns "which palette
-        # does this device paint"; storage is preserved for backward
-        # compat with older configs but the toggle no longer surfaces
-        # in either tab.
-        _CALIBRATION_TAB_FIELDS = {"contrast", "saturation", "dither"}
-        _HIDDEN_TAB_FIELDS = {"calibrated"}
-        picture_quality: list[dict[str, Any]] = []
-        calibration_picture_quality: list[dict[str, Any]] = []
-        if is_instance:
-            for clone in renderers().for_device(device.id):
-                all_dev_fields = [
-                    f for f in clone.manifest.get("settings", []) if f.get("device_setting")
-                ]
-                if not all_dev_fields:
-                    continue
-                rendering_fields = [
-                    f
-                    for f in all_dev_fields
-                    if f["name"] not in _CALIBRATION_TAB_FIELDS
-                    and f["name"] not in _HIDDEN_TAB_FIELDS
-                ]
-                calibration_fields = [
-                    f for f in all_dev_fields if f["name"] in _CALIBRATION_TAB_FIELDS
-                ]
-                base_id = clone.id.split("__", 1)[0]
-                base_name = clone.name.split(" (", 1)[0]
-                state = store.get_for_runtime("renderers", clone.id, all_dev_fields)
-                if rendering_fields:
-                    picture_quality.append(
-                        {
-                            "clone_id": clone.id,
-                            "base_id": base_id,
-                            "base_name": base_name,
-                            "fields": rendering_fields,
-                            "state": state,
-                        }
-                    )
-                if calibration_fields:
-                    calibration_picture_quality.append(
-                        {
-                            "clone_id": clone.id,
-                            "base_id": base_id,
-                            "base_name": base_name,
-                            "fields": calibration_fields,
-                            "state": state,
-                        }
-                    )
-        sections.append(
-            {
-                "id": sid,
-                "kind": "device",
-                "title": f"Device: {device.name}",
-                "icon": device.icon,
-                "blurb": device.manifest.get("description") or "",
-                "fields": fields,
-                # Renderer picker: only present when the device's kind
-                # offers more than one renderer (trmnl_client: 1-bit vs
-                # 16-grey PNG). None hides the control via a Jinja check.
-                "renderer_choice": (_renderer_choice_for(device) if is_instance else None),
-                "state": (store.get_for_runtime("devices", device.id, fields) if fields else {}),
-                "endpoint": (url_for("auth.settings_update", section_kind=sid) if fields else None),
-                # Single Save for the whole device card, the template
-                # wraps the renderer-config + panel + quiet-hours fields
-                # in one form posting here, and this handler fans out to
-                # the same service helpers the per-subsection endpoints
-                # call. Only present on instances (kinds aren't editable
-                # in the UI). The per-subsection endpoints above stay
-                # available for programmatic callers / direct hits.
-                "combined_endpoint": (
-                    url_for("auth.devices_update_combined", instance_id=device.id)
-                    if is_instance
-                    else None
-                ),
-                "meta": _device_meta_block(device, is_instance),
-                "connection_details": _device_connection_details(device, is_instance),
-                "transport_badge": _transport_badge(device),
-                "status": _status_view(device),
-                # The colour-gamut control only matters for the .bin Pi path
-                # (pi_bin packs server-side to a fixed palette). PNG clients
-                # project their own gamut on-device; the ESP32 firmware is
-                # always E6. Gate on the device's base renderer being pi_bin.
-                "gamut_capable": any(
-                    rid.split("__", 1)[0] == "pi_bin" for rid in device.renderer_ids
-                ),
-                "delete_endpoint": (
-                    url_for("auth.devices_delete", instance_id=device.id) if is_instance else None
-                ),
-                # Counts for the delete-confirm modal (v0.69.2, issue
-                # #48): what a checked "Also wipe" tickbox would drop.
-                # Zero everywhere means the delete is already clean and
-                # the UI can skip the checkbox row.
-                "orphan_state": _orphan_state_counts_for(device) if is_instance else None,
-                # Regenerate token, only present on devices that use
-                # access tokens (TRMNL). The template gates the button
-                # on this being non-None so a Pi/ESP32 card doesn't
-                # grow a meaningless control.
-                "regenerate_token_endpoint": (
-                    url_for("auth.devices_regenerate_token", instance_id=device.id)
-                    if is_instance and "access_token" in device.manifest
-                    else None
-                ),
-                # Reveal-token endpoint (issue #20). The Connection details
-                # row shows the masked token; the Reveal button POSTs here
-                # with an explicit confirmation and the route logs the
-                # reveal to the EventLog for audit. Only present on devices
-                # that have a token (REST + TRMNL); MQTT devices skip it.
-                "reveal_token_endpoint": (
-                    url_for("auth.devices_reveal_token", instance_id=device.id)
-                    if is_instance and "access_token" in device.manifest
-                    else None
-                ),
-                # Transport flip (v0.52 Phase 1b). Instance-only; flips
-                # between MQTT and REST without losing the device's id /
-                # panel / per-clone renderer settings. ``transport`` is
-                # the CURRENT transport, the template uses it to decide
-                # the button label and the new value to POST. None on
-                # kinds (only instances flip).
-                # Push devices (OpenDisplay-via-HA) don't flip: there's no
-                # broker to switch to and no REST poll to mint a token for,
-                # the frame always goes out through the HA service call.
-                "set_transport_endpoint": (
-                    url_for("auth.devices_set_transport", instance_id=device.id)
-                    if is_instance and device.transport in ("mqtt", "rest")
-                    else None
-                ),
-                "transport": device.transport if is_instance else None,
-                # OpenDisplay setup helper: detects whether this Tesserae is
-                # the HA add-on and points at the integration (HA path) or
-                # the bridge (standalone). None for non-OpenDisplay kinds.
-                "opendisplay_setup": _opendisplay_setup(device),
-                # The Display-name field reads ``device_name`` (raw) for
-                # the input's value, separately from ``title`` (which gets
-                # a "Device: " prefix for the card heading). Instance-only;
-                # built-in kinds aren't editable, and ``None`` hides the
-                # field via a Jinja ``is not none`` check.
-                "device_name": device.name if is_instance else None,
-                # Panel edit (orientation + dims) is only offered on
-                # instances, kinds aren't shown here at all.
-                "panel": device.panel if is_instance else None,
-                "panel_rotation_options": (
-                    _rotation_options(device.panel) if is_instance else None
-                ),
-                "panel_endpoint": (
-                    url_for("auth.devices_update_panel", instance_id=device.id)
-                    if is_instance
-                    else None
-                ),
-                "device_id": device.id,
-                "calibrate_endpoint": (
-                    url_for("auth.devices_calibrate", instance_id=device.id)
-                    if is_instance
-                    else None
-                ),
-                "calibrate_apply_endpoint": (
-                    url_for("auth.devices_calibrate_apply", instance_id=device.id)
-                    if is_instance
-                    else None
-                ),
-                # Colour test-pattern picker (Calibration tab). The
-                # endpoint POSTs pattern_id + optional color_index and
-                # pushes the resulting PNG through the device's real
-                # renderer; the preview URL returns the same bytes as
-                # an <img> source so the tab can show what will be
-                # sent. Both are None on kinds since the push path is
-                # instance-only. ``test_pattern_colors`` lists palette
-                # entries as (index, label, hex) tuples for the solid-
-                # fill picker; snap to the device's declared gamut so
-                # the labels match the panel.
-                "test_pattern_endpoint": (
-                    url_for("auth.devices_send_test_pattern", instance_id=device.id)
-                    if is_instance
-                    else None
-                ),
-                "test_pattern_preview_url": (
-                    url_for("auth.devices_test_pattern_preview", instance_id=device.id)
-                    if is_instance
-                    else None
-                ),
-                "test_patterns": (
-                    test_patterns.list_patterns(
-                        has_custom_image=_has_custom_image(device.id),
-                        gamut=str((device.panel or {}).get("gamut") or ""),
-                    )
-                    if is_instance
-                    else []
-                ),
-                "custom_image_uploaded": _has_custom_image(device.id) if is_instance else False,
-                "custom_image_upload_endpoint": (
-                    url_for("auth.devices_custom_image_upload", instance_id=device.id)
-                    if is_instance
-                    else None
-                ),
-                "custom_image_delete_endpoint": (
-                    url_for("auth.devices_custom_image_delete", instance_id=device.id)
-                    if is_instance
-                    else None
-                ),
-                "test_pattern_colors": (_test_pattern_colors_for(device) if is_instance else []),
-                # Palette profile picker (Calibration tab, Phase 1 of the
-                # v0.67 palette-profile work). ``palette_profile_slug`` is
-                # the currently-applied slug (empty when none);
-                # ``palette_profile_choices`` is the ordered dropdown
-                # scoped to this device's gamut so a Spectra 6 panel doesn't
-                # see the Inky 7-colour presets and vice versa. Endpoints
-                # are None on kinds (the picker is instance-only), and
-                # v0.69.11 also null-gates the whole palette section when
-                # the device's gamut has no matching profile family
-                # (mono, bwry_4, rgb24, rgb16) so the picker doesn't
-                # falsely offer Spectra 6 profiles to a mono panel.
-                "palette_profile_slug": (_palette_profile_slug_for(device) if is_instance else ""),
-                "palette_profile_choices": (
-                    _palette_profile_choices_for(device) if is_instance else []
-                ),
-                "palette_apply_endpoint": (
-                    url_for("auth.devices_palette_apply", instance_id=device.id)
-                    if is_instance and _palette_family_for(device)
-                    else None
-                ),
-                "palette_save_endpoint": (
-                    url_for("auth.devices_palette_save", instance_id=device.id)
-                    if is_instance and _palette_family_for(device)
-                    else None
-                ),
-                "palette_reset_endpoint": (
-                    url_for("auth.devices_palette_reset", instance_id=device.id)
-                    if is_instance and _palette_family_for(device)
-                    else None
-                ),
-                "palette_import_endpoint": (
-                    url_for("auth.palette_profile_import")
-                    if is_instance and _palette_family_for(device)
-                    else None
-                ),
-                # Tone / dither editor (v0.67.1). ``palette_profile_tone``
-                # carries the active profile's current values so the
-                # sliders pre-populate; ``palette_update_tone_endpoint``
-                # is the POST target for the editor.
-                "palette_profile_tone": (_palette_profile_tone_for(device) if is_instance else {}),
-                "palette_update_tone_endpoint": (
-                    url_for("auth.devices_palette_update_tone", instance_id=device.id)
-                    if is_instance and _palette_family_for(device)
-                    else None
-                ),
-                # Per-colour palette editor (v0.67.3). Endpoint takes 6-7
-                # hex values keyed by colour name. ``palette_profile_colors``
-                # carries the active profile's current values so the
-                # ``<input type="color">`` fields pre-populate on render;
-                # None when no profile is applied so the template hides
-                # the editor block.
-                "palette_update_palette_endpoint": (
-                    url_for("auth.devices_palette_update_palette", instance_id=device.id)
-                    if is_instance and _palette_family_for(device)
-                    else None
-                ),
-                "palette_profile_colors": (
-                    _palette_profile_colors_for(device) if is_instance else None
-                ),
-                # Contrast + saturation live in the Calibration tab now.
-                # Shape mirrors ``picture_quality`` so the same template
-                # macros render them; storage is the same per-clone
-                # ``renderers.<clone_id>.<field>`` path (the fields are
-                # just hidden from the Rendering tab in v0.67+).
-                "calibration_picture_quality": calibration_picture_quality,
-                # Per-device quiet-hours override. Read from the
-                # manifest so the form can preselect the user's
-                # current setting; ``quiet_hours_endpoint`` is None on
-                # kinds (only instances can override).
-                "picture_quality": picture_quality,
-                "quiet_hours": (device.manifest.get("quiet_hours") or {} if is_instance else {}),
-                "quiet_hours_endpoint": (
-                    url_for("auth.devices_update_quiet_hours", instance_id=device.id)
-                    if is_instance
-                    else None
-                ),
-                # Per-device battery-display offset (mV + %). Manifest
-                # block is ``battery_offset: {mv, pct}``; both default to
-                # 0 and the block drops when both are 0. Like quiet
-                # hours, this is an instances-only knob; kinds don't get
-                # the form.
-                "battery_offset": (
-                    device.manifest.get("battery_offset") or {} if is_instance else {}
-                ),
-                "battery_offset_endpoint": (
-                    url_for("auth.devices_update_battery_offset", instance_id=device.id)
-                    if is_instance
-                    else None
-                ),
-                # Per-device locale override (see app.locale_resolve).
-                # Instances-only, same reasoning as quiet_hours /
-                # battery_offset above: a kind's own manifest isn't
-                # editable through this UI. Saved through the combined
-                # form (no dedicated AJAX endpoint -- unlike quiet hours
-                # / battery offset this isn't a dependent-field group,
-                # just one select).
-                "locale": (device.manifest.get("locale") or "" if is_instance else ""),
-                "locale_editable": is_instance,
-                # Same live language list the app-wide picker offers
-                # (app.locale_choices): whatever the loaded widgets ship.
-                "locale_choices": _locale_choices() if is_instance else [],
-                # Per-device button map (physical button wakes). The
-                # textarea shows the stored per-device override (empty
-                # when nothing is set); the "effective map" fold-out
-                # shows the resolved merge of default + global + per-
-                # device so an admin can see what buttons actually
-                # resolve to right now. Registered action names come
-                # from the runtime registry so third-party plugins
-                # that call ``button_actions.register`` at import time
-                # show up in the help text automatically.
-                "button_map_capable": is_instance,
-                "button_map_json": (
-                    _button_map_stored_json(store, device.id) if is_instance else ""
-                ),
-                "button_map_effective": (
-                    _button_map_effective_json(store, device.id) if is_instance else ""
-                ),
-                "button_actions_available": (registered_actions() if is_instance else ()),
-                # Per-device rotation view: every Schedule whose target
-                # page binds to this device, sorted by window start.
-                # Pure read view, each row deep-links to the Schedules
-                # editor where the user can actually change it.
-                "timetable_entries": (
-                    device_timetable.timetable_for_device(
-                        device.id,
-                        devices=devices(),
-                        pages=current_app.config["PAGE_STORE"],
-                        schedules=current_app.config["SCHEDULE_STORE"],
-                        unbound_broadcast=bool(
-                            settings_store().get_section("app").get("unbound_broadcast", False)
-                        ),
-                    )
-                    if is_instance
-                    else []
-                ),
-                # Synchronized wake (wake alignment). REST instances
-                # only: the per-cycle next_poll_s that implements the
-                # grid rides the /status response, which MQTT / relay /
-                # push devices never poll. Values come from the same
-                # settings.devices.<id> block the sleep interval lives
-                # in; the Schedule tab renders the form and the
-                # combined save handler owns validation.
-                "wake_align_capable": bool(is_instance and device.transport == "rest"),
-                "wake_align": (_wake_align_view(store, device.id) if is_instance else {}),
-                # Update delivery (#271). REST instances only: the patch
-                # divert this steers never fires for MQTT / relay / push
-                # transports. Stored in settings.devices.<id> as
-                # refresh_mode; absent reads as "auto".
-                "refresh_mode_capable": bool(is_instance and device.transport == "rest"),
-                "refresh_mode": (
-                    str(
-                        ((store.get_section("devices") or {}).get(device.id) or {}).get(
-                            "refresh_mode"
-                        )
-                        or ""
-                    )
-                    if is_instance
-                    else ""
-                ),
-                # Read-only diagnostic block: app version, resolved
-                # kind + renderer clone ids, panel details, on-disk
-                # instance file, raw JSON with secrets masked. Renders
-                # under a collapsed <details> at the bottom of the
-                # General tab so it stays out of the way until needed.
-                "debug_info": _device_debug_info(device, is_instance),
-                # Touch-capable panels (digitizer, e.g. reTerminal E1003)
-                # get a "Touch monitor" link to the per-device visualiser
-                # (issue #49).
-                "touch": bool(is_instance and device.manifest.get("touch")),
-            }
-        )
+        section = _build_device_section(store, device)
+        if section is not None:
+            sections.append(section)
 
     for plugin in plugins().plugins.values():
         fields = mark_unreadable_secrets(
@@ -1312,6 +927,521 @@ def _build_sections() -> list[dict[str, Any]]:
         )
 
     return sections
+
+
+def _build_device_section(store: Any, device: Device) -> dict[str, Any] | None:
+    """Build the view-model for one device instance: the dict the
+    Devices table row, the quick panel, the device page and the
+    calibration page all read from. ``None`` for built-in kinds, which
+    are templates rather than bindable displays."""
+    # Built-in kinds are templates, not bindable devices, they
+    # never appear on the Devices tab. Every physical display is
+    # represented by an instance (added manually or auto-registered
+    # from the Discovered strip).
+    if device.kind_of is None:
+        return None
+    sid = f"device-{device.id}"
+    fields = _visible_config_fields(device)
+    is_instance = device.kind_of is not None
+    # Picture-quality (dither / saturation / contrast) lives on the
+    # clone renderer keyed ``<base_id>__<device_id>``, one clone
+    # per renderer the device's kind consumes. Surface each clone's
+    # device_setting-flagged fields as a "Picture quality" subsection;
+    # the template renders them inside the combined form with the
+    # name pattern ``<clone_id>:<field_name>`` so the save handler
+    # can route each value back to the right clone's namespace.
+    # Contrast + saturation moved to the Calibration tab in v0.67,
+    # dither joined them in v0.68 (all three are colour-tuning
+    # concerns, not hardware setup). ``calibrated`` was retired in
+    # v0.68 too: the palette-profile picker now owns "which palette
+    # does this device paint"; storage is preserved for backward
+    # compat with older configs but the toggle no longer surfaces
+    # in either tab.
+    _CALIBRATION_TAB_FIELDS = {"contrast", "saturation", "dither"}
+    _HIDDEN_TAB_FIELDS = {"calibrated"}
+    picture_quality: list[dict[str, Any]] = []
+    calibration_picture_quality: list[dict[str, Any]] = []
+    if is_instance:
+        for clone in renderers().for_device(device.id):
+            all_dev_fields = [
+                f for f in clone.manifest.get("settings", []) if f.get("device_setting")
+            ]
+            if not all_dev_fields:
+                continue
+            rendering_fields = [
+                f
+                for f in all_dev_fields
+                if f["name"] not in _CALIBRATION_TAB_FIELDS and f["name"] not in _HIDDEN_TAB_FIELDS
+            ]
+            calibration_fields = [f for f in all_dev_fields if f["name"] in _CALIBRATION_TAB_FIELDS]
+            base_id = clone.id.split("__", 1)[0]
+            base_name = clone.name.split(" (", 1)[0]
+            state = store.get_for_runtime("renderers", clone.id, all_dev_fields)
+            if rendering_fields:
+                picture_quality.append(
+                    {
+                        "clone_id": clone.id,
+                        "base_id": base_id,
+                        "base_name": base_name,
+                        "fields": rendering_fields,
+                        "state": state,
+                    }
+                )
+            if calibration_fields:
+                calibration_picture_quality.append(
+                    {
+                        "clone_id": clone.id,
+                        "base_id": base_id,
+                        "base_name": base_name,
+                        "fields": calibration_fields,
+                        "state": state,
+                    }
+                )
+    section: dict[str, Any] = {
+        "id": sid,
+        "kind": "device",
+        "title": f"Device: {device.name}",
+        "icon": device.icon,
+        "blurb": device.manifest.get("description") or "",
+        "fields": fields,
+        # Renderer picker: only present when the device's kind
+        # offers more than one renderer (trmnl_client: 1-bit vs
+        # 16-grey PNG). None hides the control via a Jinja check.
+        "renderer_choice": (_renderer_choice_for(device) if is_instance else None),
+        "state": (store.get_for_runtime("devices", device.id, fields) if fields else {}),
+        "endpoint": (url_for("auth.settings_update", section_kind=sid) if fields else None),
+        # Single Save for the whole device card, the template
+        # wraps the renderer-config + panel + quiet-hours fields
+        # in one form posting here, and this handler fans out to
+        # the same service helpers the per-subsection endpoints
+        # call. Only present on instances (kinds aren't editable
+        # in the UI). The per-subsection endpoints above stay
+        # available for programmatic callers / direct hits.
+        "combined_endpoint": (
+            url_for("auth.devices_update_combined", instance_id=device.id) if is_instance else None
+        ),
+        "meta": _device_meta_block(device, is_instance),
+        "connection_details": _device_connection_details(device, is_instance),
+        "transport_badge": _transport_badge(device),
+        "status": _status_view(device),
+        # The colour-gamut control only matters for the .bin Pi path
+        # (pi_bin packs server-side to a fixed palette). PNG clients
+        # project their own gamut on-device; the ESP32 firmware is
+        # always E6. Gate on the device's base renderer being pi_bin.
+        "gamut_capable": any(rid.split("__", 1)[0] == "pi_bin" for rid in device.renderer_ids),
+        "delete_endpoint": (
+            url_for("auth.devices_delete", instance_id=device.id) if is_instance else None
+        ),
+        # Counts for the delete-confirm modal (v0.69.2, issue
+        # #48): what a checked "Also wipe" tickbox would drop.
+        # Zero everywhere means the delete is already clean and
+        # the UI can skip the checkbox row.
+        "orphan_state": _orphan_state_counts_for(device) if is_instance else None,
+        # Regenerate token, only present on devices that use
+        # access tokens (TRMNL). The template gates the button
+        # on this being non-None so a Pi/ESP32 card doesn't
+        # grow a meaningless control.
+        "regenerate_token_endpoint": (
+            url_for("auth.devices_regenerate_token", instance_id=device.id)
+            if is_instance and "access_token" in device.manifest
+            else None
+        ),
+        # Reveal-token endpoint (issue #20). The Connection details
+        # row shows the masked token; the Reveal button POSTs here
+        # with an explicit confirmation and the route logs the
+        # reveal to the EventLog for audit. Only present on devices
+        # that have a token (REST + TRMNL); MQTT devices skip it.
+        "reveal_token_endpoint": (
+            url_for("auth.devices_reveal_token", instance_id=device.id)
+            if is_instance and "access_token" in device.manifest
+            else None
+        ),
+        # Transport flip (v0.52 Phase 1b). Instance-only; flips
+        # between MQTT and REST without losing the device's id /
+        # panel / per-clone renderer settings. ``transport`` is
+        # the CURRENT transport, the template uses it to decide
+        # the button label and the new value to POST. None on
+        # kinds (only instances flip).
+        # Push devices (OpenDisplay-via-HA) don't flip: there's no
+        # broker to switch to and no REST poll to mint a token for,
+        # the frame always goes out through the HA service call.
+        "set_transport_endpoint": (
+            url_for("auth.devices_set_transport", instance_id=device.id)
+            if is_instance and device.transport in ("mqtt", "rest")
+            else None
+        ),
+        "transport": device.transport if is_instance else None,
+        # OpenDisplay setup helper: detects whether this Tesserae is
+        # the HA add-on and points at the integration (HA path) or
+        # the bridge (standalone). None for non-OpenDisplay kinds.
+        "opendisplay_setup": _opendisplay_setup(device),
+        # The Display-name field reads ``device_name`` (raw) for
+        # the input's value, separately from ``title`` (which gets
+        # a "Device: " prefix for the card heading). Instance-only;
+        # built-in kinds aren't editable, and ``None`` hides the
+        # field via a Jinja ``is not none`` check.
+        "device_name": device.name if is_instance else None,
+        # Panel edit (orientation + dims) is only offered on
+        # instances, kinds aren't shown here at all.
+        "panel": device.panel if is_instance else None,
+        "panel_rotation_options": (_rotation_options(device.panel) if is_instance else None),
+        "panel_endpoint": (
+            url_for("auth.devices_update_panel", instance_id=device.id) if is_instance else None
+        ),
+        "device_id": device.id,
+        "calibrate_endpoint": (
+            url_for("auth.devices_calibrate", instance_id=device.id) if is_instance else None
+        ),
+        "calibrate_apply_endpoint": (
+            url_for("auth.devices_calibrate_apply", instance_id=device.id) if is_instance else None
+        ),
+        # Colour test-pattern picker (Calibration tab). The
+        # endpoint POSTs pattern_id + optional color_index and
+        # pushes the resulting PNG through the device's real
+        # renderer; the preview URL returns the same bytes as
+        # an <img> source so the tab can show what will be
+        # sent. Both are None on kinds since the push path is
+        # instance-only. ``test_pattern_colors`` lists palette
+        # entries as (index, label, hex) tuples for the solid-
+        # fill picker; snap to the device's declared gamut so
+        # the labels match the panel.
+        "test_pattern_endpoint": (
+            url_for("auth.devices_send_test_pattern", instance_id=device.id)
+            if is_instance
+            else None
+        ),
+        "test_pattern_preview_url": (
+            url_for("auth.devices_test_pattern_preview", instance_id=device.id)
+            if is_instance
+            else None
+        ),
+        "test_patterns": (
+            test_patterns.list_patterns(
+                has_custom_image=_has_custom_image(device.id),
+                gamut=str((device.panel or {}).get("gamut") or ""),
+            )
+            if is_instance
+            else []
+        ),
+        "custom_image_uploaded": _has_custom_image(device.id) if is_instance else False,
+        "custom_image_upload_endpoint": (
+            url_for("auth.devices_custom_image_upload", instance_id=device.id)
+            if is_instance
+            else None
+        ),
+        "custom_image_delete_endpoint": (
+            url_for("auth.devices_custom_image_delete", instance_id=device.id)
+            if is_instance
+            else None
+        ),
+        "test_pattern_colors": (_test_pattern_colors_for(device) if is_instance else []),
+        # Palette profile picker (Calibration tab, Phase 1 of the
+        # v0.67 palette-profile work). ``palette_profile_slug`` is
+        # the currently-applied slug (empty when none);
+        # ``palette_profile_choices`` is the ordered dropdown
+        # scoped to this device's gamut so a Spectra 6 panel doesn't
+        # see the Inky 7-colour presets and vice versa. Endpoints
+        # are None on kinds (the picker is instance-only), and
+        # v0.69.11 also null-gates the whole palette section when
+        # the device's gamut has no matching profile family
+        # (mono, bwry_4, rgb24, rgb16) so the picker doesn't
+        # falsely offer Spectra 6 profiles to a mono panel.
+        "palette_profile_slug": (_palette_profile_slug_for(device) if is_instance else ""),
+        "palette_profile_choices": (_palette_profile_choices_for(device) if is_instance else []),
+        "palette_apply_endpoint": (
+            url_for("auth.devices_palette_apply", instance_id=device.id)
+            if is_instance and _palette_family_for(device)
+            else None
+        ),
+        "palette_save_endpoint": (
+            url_for("auth.devices_palette_save", instance_id=device.id)
+            if is_instance and _palette_family_for(device)
+            else None
+        ),
+        "palette_reset_endpoint": (
+            url_for("auth.devices_palette_reset", instance_id=device.id)
+            if is_instance and _palette_family_for(device)
+            else None
+        ),
+        "palette_import_endpoint": (
+            url_for("auth.palette_profile_import")
+            if is_instance and _palette_family_for(device)
+            else None
+        ),
+        # Tone / dither editor (v0.67.1). ``palette_profile_tone``
+        # carries the active profile's current values so the
+        # sliders pre-populate; ``palette_update_tone_endpoint``
+        # is the POST target for the editor.
+        "palette_profile_tone": (_palette_profile_tone_for(device) if is_instance else {}),
+        "palette_update_tone_endpoint": (
+            url_for("auth.devices_palette_update_tone", instance_id=device.id)
+            if is_instance and _palette_family_for(device)
+            else None
+        ),
+        # Per-colour palette editor (v0.67.3). Endpoint takes 6-7
+        # hex values keyed by colour name. ``palette_profile_colors``
+        # carries the active profile's current values so the
+        # ``<input type="color">`` fields pre-populate on render;
+        # None when no profile is applied so the template hides
+        # the editor block.
+        "palette_update_palette_endpoint": (
+            url_for("auth.devices_palette_update_palette", instance_id=device.id)
+            if is_instance and _palette_family_for(device)
+            else None
+        ),
+        "palette_profile_colors": (_palette_profile_colors_for(device) if is_instance else None),
+        # Contrast + saturation live in the Calibration tab now.
+        # Shape mirrors ``picture_quality`` so the same template
+        # macros render them; storage is the same per-clone
+        # ``renderers.<clone_id>.<field>`` path (the fields are
+        # just hidden from the Rendering tab in v0.67+).
+        "calibration_picture_quality": calibration_picture_quality,
+        # Per-device quiet-hours override. Read from the
+        # manifest so the form can preselect the user's
+        # current setting; ``quiet_hours_endpoint`` is None on
+        # kinds (only instances can override).
+        "picture_quality": picture_quality,
+        "quiet_hours": (device.manifest.get("quiet_hours") or {} if is_instance else {}),
+        "quiet_hours_endpoint": (
+            url_for("auth.devices_update_quiet_hours", instance_id=device.id)
+            if is_instance
+            else None
+        ),
+        # Per-device battery-display offset (mV + %). Manifest
+        # block is ``battery_offset: {mv, pct}``; both default to
+        # 0 and the block drops when both are 0. Like quiet
+        # hours, this is an instances-only knob; kinds don't get
+        # the form.
+        "battery_offset": (device.manifest.get("battery_offset") or {} if is_instance else {}),
+        "battery_offset_endpoint": (
+            url_for("auth.devices_update_battery_offset", instance_id=device.id)
+            if is_instance
+            else None
+        ),
+        # Per-device locale override (see app.locale_resolve).
+        # Instances-only, same reasoning as quiet_hours /
+        # battery_offset above: a kind's own manifest isn't
+        # editable through this UI. Saved through the combined
+        # form (no dedicated AJAX endpoint -- unlike quiet hours
+        # / battery offset this isn't a dependent-field group,
+        # just one select).
+        "locale": (device.manifest.get("locale") or "" if is_instance else ""),
+        "locale_editable": is_instance,
+        # Same live language list the app-wide picker offers
+        # (app.locale_choices): whatever the loaded widgets ship.
+        "locale_choices": _locale_choices() if is_instance else [],
+        # Per-device button map (physical button wakes). The
+        # textarea shows the stored per-device override (empty
+        # when nothing is set); the "effective map" fold-out
+        # shows the resolved merge of default + global + per-
+        # device so an admin can see what buttons actually
+        # resolve to right now. Registered action names come
+        # from the runtime registry so third-party plugins
+        # that call ``button_actions.register`` at import time
+        # show up in the help text automatically.
+        "button_map_capable": is_instance,
+        "button_map_json": (_button_map_stored_json(store, device.id) if is_instance else ""),
+        "button_map_effective": (
+            _button_map_effective_json(store, device.id) if is_instance else ""
+        ),
+        "button_actions_available": (registered_actions() if is_instance else ()),
+        # Per-device rotation view: every Schedule whose target
+        # page binds to this device, sorted by window start.
+        # Pure read view, each row deep-links to the Schedules
+        # editor where the user can actually change it.
+        "timetable_entries": (
+            device_timetable.timetable_for_device(
+                device.id,
+                devices=devices(),
+                pages=current_app.config["PAGE_STORE"],
+                schedules=current_app.config["SCHEDULE_STORE"],
+                unbound_broadcast=bool(
+                    settings_store().get_section("app").get("unbound_broadcast", False)
+                ),
+            )
+            if is_instance
+            else []
+        ),
+        # Synchronized wake (wake alignment). REST instances
+        # only: the per-cycle next_poll_s that implements the
+        # grid rides the /status response, which MQTT / relay /
+        # push devices never poll. Values come from the same
+        # settings.devices.<id> block the sleep interval lives
+        # in; the Schedule tab renders the form and the
+        # combined save handler owns validation.
+        "wake_align_capable": bool(is_instance and device.transport == "rest"),
+        "wake_align": (_wake_align_view(store, device.id) if is_instance else {}),
+        # Update delivery (#271). REST instances only: the patch
+        # divert this steers never fires for MQTT / relay / push
+        # transports. Stored in settings.devices.<id> as
+        # refresh_mode; absent reads as "auto".
+        "refresh_mode_capable": bool(is_instance and device.transport == "rest"),
+        "refresh_mode": (
+            str(
+                ((store.get_section("devices") or {}).get(device.id) or {}).get("refresh_mode")
+                or ""
+            )
+            if is_instance
+            else ""
+        ),
+        # Read-only diagnostic block: app version, resolved
+        # kind + renderer clone ids, panel details, on-disk
+        # instance file, raw JSON with secrets masked. Renders
+        # under a collapsed <details> at the bottom of the
+        # General tab so it stays out of the way until needed.
+        "debug_info": _device_debug_info(device, is_instance),
+        # Touch-capable panels (digitizer, e.g. reTerminal E1003)
+        # get a "Touch monitor" link to the per-device visualiser
+        # (issue #49).
+        "touch": bool(is_instance and device.manifest.get("touch")),
+    }
+    # Keys the redesigned Devices tab (table row + quick panel) and the
+    # per-device page read on top of the card-era dict above.
+    kind = devices().get(str(device.kind_of))
+    section["kind_name"] = kind.name if kind is not None else str(device.kind_of)
+    section["page_url"] = url_for("auth.device_page", instance_id=device.id)
+    section["calibration_url"] = url_for("auth.device_calibration", instance_id=device.id)
+    section["preview_url"] = url_for("preview_png", device_id=device.id)
+    section["mirror_url"] = url_for("mirror", device_id=device.id)
+    section["touch_monitor_url"] = (
+        url_for("touch_monitor.monitor", device_id=device.id) if section["touch"] else None
+    )
+    section["push_now_endpoint"] = url_for("auth.devices_push_now", instance_id=device.id)
+    section["overview"] = _device_overview(device, section)
+    section["lineup_names"] = _lineup_names_for(device.id, section["timetable_entries"])
+    return section
+
+
+def _device_overview(device: Device, section: dict[str, Any]) -> dict[str, Any]:
+    """The four headline tiles (showing / battery / firmware / next wake)
+    shared by the Devices table's quick panel and the device page's
+    Overview section, plus whether a render exists for the thumbnail."""
+    push_mgr = current_app.config.get("PUSH_MANAGER")
+    latest: dict[str, Any] | None = None
+    if push_mgr is not None:
+        held_fn = getattr(push_mgr, "held_render_for", None)
+        latest = held_fn(device.id) if callable(held_fn) else None
+        if not latest:
+            latest = push_mgr.latest_render_for(device.id)
+    showing: dict[str, Any] = {"value": "Nothing yet", "sub": "no frame pushed", "muted": True}
+    if latest:
+        page_id = str(latest.get("page_id") or "")
+        name = ""
+        if page_id:
+            page_store = current_app.config.get("PAGE_STORE")
+            page = page_store.get(page_id) if page_store is not None else None
+            name = str(getattr(page, "name", "") or page_id)
+        served_at = latest.get("last_served_at")
+        stamp = served_at if isinstance(served_at, (int, float)) else latest.get("timestamp")
+        sub = ""
+        if isinstance(stamp, (int, float)) and stamp > 0:
+            verb = "fetched" if isinstance(served_at, (int, float)) else "rendered"
+            sub = f"{verb} {time.strftime('%H:%M', time.localtime(float(stamp)))}"
+        showing = {"value": name or "Latest render", "sub": sub, "muted": False}
+    status = section["status"]
+    power = status["tiles"]["power"]
+    pct = status["parsed"].get("battery_pct")
+    battery_low = isinstance(pct, (int, float)) and 0 < pct < 20
+    fw = status["firmware"] or {}
+    fw_current = fw.get("current")
+    fw_value = (
+        (fw_current if str(fw_current).startswith("v") else f"v{fw_current}")
+        if fw_current
+        else "Unknown"
+    )
+    if fw.get("state") == "outdated" and fw.get("latest"):
+        fw_sub = f"v{fw['latest']} available"
+    elif fw.get("state") == "current":
+        fw_sub = "up to date"
+    else:
+        fw_sub = ""
+    ss = status["smart_sync"] or {}
+    interval_s = ss.get("interval_s") or section["state"].get("sleep_interval_s")
+    next_sub = ""
+    if isinstance(interval_s, (int, float)) and interval_s > 0:
+        next_sub = f"sleeps {_format_duration(float(interval_s))}"
+    predicted = ss.get("predicted_rel")
+    return {
+        "has_render": bool(latest),
+        "showing": showing,
+        "battery": {
+            "value": power.get("label") or "-",
+            "sub": power.get("sub") or "",
+            "low": battery_low,
+            "muted": power.get("label") == "Mains",
+        },
+        "firmware": {"value": fw_value, "sub": fw_sub, "muted": not fw_current},
+        "next_wake": {
+            "value": predicted or "-",
+            "sub": next_sub,
+            "muted": not predicted,
+        },
+    }
+
+
+def _lineup_names_for(device_id: str, timetable_entries: list[Any]) -> list[str]:
+    """Names of the lineups (decks) and schedules that target this
+    display, in the order the Lineups page lists them."""
+    names: list[str] = []
+    deck_store = current_app.config.get("DECK_STORE")
+    if deck_store is not None:
+        try:
+            decks = deck_store.all()
+        except Exception:  # pragma: no cover - store unreadable
+            decks = []
+        for deck in decks:
+            if device_id in (getattr(deck, "device_ids", None) or []):
+                names.append(str(deck.name))
+    for entry in timetable_entries:
+        label = str(getattr(entry, "schedule_name", "") or "")
+        if label and label not in names:
+            names.append(label)
+    return names
+
+
+def _device_section_or_none(instance_id: str) -> dict[str, Any] | None:
+    device = devices().get(instance_id)
+    if device is None or device.kind_of is None:
+        return None
+    return _build_device_section(settings_store(), device)
+
+
+@bp.get("/settings/devices/<instance_id>", endpoint="device_page")
+def device_page(instance_id: str) -> str | Response:
+    """One display's settings: every knob the old expandable card
+    carried, laid out as anchored sections with a sub-nav."""
+    section = _device_section_or_none(instance_id)
+    if section is None:
+        flash(f"Unknown device {instance_id!r}.", "error")
+        return redirect(url_for("auth.settings_area", area="devices"))
+    return render_template(
+        "device_page.html",
+        section=section,
+        active_area="devices",
+        # ?calibrating=<id> shows the "which number is top-left?" answer
+        # form inside the Display section's orientation band.
+        calibrating=request.args.get("calibrating") or "",
+        # One-shot token reveal after regenerate / reveal / transport flip
+        # lands here now rather than on the Devices tab.
+        trmnl_token_reveal=session.pop("_trmnl_token_reveal", None),
+    )
+
+
+@bp.get("/settings/devices/<instance_id>/calibration", endpoint="device_calibration")
+def device_calibration(instance_id: str) -> str | Response:
+    """Colour calibration for one display: test patterns, palette
+    recalibration, tone curves and the per-renderer tone fields."""
+    section = _device_section_or_none(instance_id)
+    if section is None:
+        flash(f"Unknown device {instance_id!r}.", "error")
+        return redirect(url_for("auth.settings_area", area="devices"))
+    return render_template(
+        "device_calibration.html",
+        section=section,
+        active_area="devices",
+        calibrating="",
+        trmnl_token_reveal=None,
+    )
 
 
 # Config fields that only make sense on a panel the firmware says can hold

@@ -147,7 +147,8 @@
 .dx-source-page,
 .dx-source-file,
 .dx-source-url,
-.dx-source-webpage {
+.dx-source-webpage,
+.dx-source-note {
   background: color-mix(in oklab, var(--t-accent) 16%, var(--t-surface));
   color: var(--t-accent);
 }

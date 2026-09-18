@@ -1,14 +1,18 @@
 """Admin Send page.
 
-Four tabs, one URL: ``/send``. Each tab POSTs to a dedicated endpoint and
-redirects to ``/history`` so the result lands in the push log.
+One box, one URL: ``/send``. The page works out what was pasted or dropped
+(an image, a web page, or a note) and POSTs to the matching endpoint,
+which redirects to ``/history`` so the result lands in the push log.
 
-Tabs:
+Endpoints:
 
-* **File**, multipart upload, pushed as an image
-* **Saved**, pick a saved dashboard, render through the composer
-* **URL**  , fetch an image URL, push the bytes
-* **Webpage**, Playwright-screenshot an arbitrary URL, push the bytes
+* ``/send/file``, multipart upload, pushed as an image
+* ``/send/url``, fetch an image URL, push the bytes
+* ``/send/webpage``, Playwright-screenshot an arbitrary URL, push the bytes
+* ``/send/note``, render a few lines of text in a panel theme, push the PNG
+* ``/send/gallery``, push a picture_gallery image
+* ``/send/page`` / ``/send/pages``, saved dashboards (posted from the
+  Dashboards page)
 
 The standalone History page (``history_routes``) shows the push log and
 hosts resend / delete actions that POST back to ``/send/resend/...`` and
@@ -41,11 +45,23 @@ from app.device_loader import DeviceRegistry
 from app.http_headers import HeaderError, parse_header_map
 from app.image_upload import IMAGE_ROTATE_MODES
 from app.net_guard import BlockedURLError, assert_operator_url
+from app.note_render import (
+    DEFAULT_NOTE_THEME,
+    normalise_align,
+    normalise_size,
+    note_html,
+    note_label,
+    render_note_png,
+    theme_variables,
+)
 from app.panel import device_panel, resolve_settings_panel
 from app.push import PushManager, PushResult
+from app.state.community_themes import emit_css as emit_community_css
 from app.state.event_log import EventLog
 from app.state.page_store import PageStore
 from app.state.settings_store import SettingsStore
+from app.state.theme_registry import build_registry, picker_options
+from app.state.user_themes import emit_css as emit_user_css
 
 logger = logging.getLogger(__name__)
 
@@ -136,9 +152,55 @@ def _form_device_ids() -> list[str]:
     ]
 
 
-def _render_send_with_form(tab: str) -> Response:
-    """Re-render the Send page on the current tab with the user's typed
-    form values preserved.
+def _theme_picker_options() -> list[dict[str, str]]:
+    """Themes the note options offer, the same set the page editor's
+    picker shows: bundled + community-installed + user-saved, minus the
+    ids the user hid under ``settings.app.disabled_theme_ids``."""
+    user_store = current_app.config.get("USER_THEMES_STORE")
+    community_store = current_app.config.get("COMMUNITY_THEMES_STORE")
+    registry = build_registry(
+        user_themes=(
+            [t.to_registry_theme() for t in user_store.list_all()]
+            if user_store is not None
+            else None
+        ),
+        community_themes=(
+            [t.to_registry_theme() for t in community_store.list_all()]
+            if community_store is not None
+            else None
+        ),
+    )
+    raw = _settings().get_section("app").get("disabled_theme_ids") or []
+    disabled = {str(x) for x in raw if isinstance(x, str)} if isinstance(raw, list) else set()
+    return picker_options(registry, disabled_ids=disabled)
+
+
+def _theme_extra_css() -> str:
+    """User + community theme CSS, so a note bound to a saved or installed
+    theme resolves its variables the way ``/compose`` would."""
+    parts: list[str] = []
+    user_store = current_app.config.get("USER_THEMES_STORE")
+    if user_store is not None:
+        parts.append(emit_user_css(user_store))
+    community_store = current_app.config.get("COMMUNITY_THEMES_STORE")
+    if community_store is not None:
+        parts.append(emit_community_css(community_store))
+    return "\n".join(parts)
+
+
+def _send_page_context(*, kind: str, gallery: dict[str, str] | None) -> dict[str, Any]:
+    return {
+        "panel": resolve_settings_panel(_settings()),
+        "device_options": _device_options(),
+        "kind": kind,
+        "gallery": gallery,
+        "note_themes": _theme_picker_options(),
+        "note_default_theme": DEFAULT_NOTE_THEME,
+    }
+
+
+def _render_send_with_form(kind: str) -> Response:
+    """Re-render the Send page with the user's typed form values preserved.
 
     The Send routes used to ``redirect`` back to ``send.index`` on
     validation failure (no device ticked, blank URL, etc.), which
@@ -148,14 +210,13 @@ def _render_send_with_form(tab: str) -> Response:
     message AND keeps the form populated so the user can fix the one
     missing field and resubmit. The file-upload field can't be
     preserved (browser security), but every other input round-trips.
+    ``kind`` names the box's detected / chosen kind so the page reopens
+    on the same options pane.
     """
     return make_response(
         render_template(
             "send.html",
-            panel=resolve_settings_panel(_settings()),
-            device_options=_device_options(),
-            tab=tab,
-            gallery=_gallery_ref(),
+            **_send_page_context(kind=kind, gallery=_gallery_ref()),
             form_values=request.form.to_dict(flat=True),
             # ``device_id`` is the only multi-value picker, flat
             # ``to_dict`` loses every value except the last. Pass the
@@ -192,7 +253,7 @@ def _require_target_devices(tab: str) -> list[str] | Response:
         else "No devices registered yet, add one in Settings → Devices."
     )
     flash(msg, "error")
-    return _render_send_with_form(tab)
+    return _render_send_with_form(_KIND_ALIASES.get(tab, tab))
 
 
 def _run_in_background(work: Callable[[], object], *, label: str) -> None:
@@ -303,17 +364,24 @@ def _gallery_ref() -> dict[str, str] | None:
     }
 
 
+#: Legacy ``?tab=`` values map onto the box's kinds so old bookmarks and
+#: the error redirects below still open the right options pane.
+_KIND_ALIASES: dict[str, str] = {
+    "file": "image",
+    "url": "image",
+    "gallery": "image",
+    "image": "image",
+    "webpage": "webpage",
+    "note": "note",
+}
+
+
 @bp.get("")
 def index() -> str:
     gallery = _gallery_ref()
-    tab = request.args.get("tab") or ("gallery" if gallery else "file")
-    return render_template(
-        "send.html",
-        panel=resolve_settings_panel(_settings()),
-        device_options=_device_options(),
-        tab=tab,
-        gallery=gallery,
-    )
+    raw = (request.args.get("kind") or request.args.get("tab") or "").strip().lower()
+    kind = _KIND_ALIASES.get(raw, "image" if gallery else "")
+    return render_template("send.html", **_send_page_context(kind=kind, gallery=gallery))
 
 
 @bp.post("/file")
@@ -475,6 +543,89 @@ def send_webpage() -> Response:
         ),
     )
     return redirect(url_for("history.index"))
+
+
+def _note_theme_id() -> str:
+    """The theme the form picked, or the panel default when it said so or
+    named something that isn't installed."""
+    raw = (request.form.get("theme") or request.args.get("theme") or "").strip()
+    if not raw or raw == "default":
+        return DEFAULT_NOTE_THEME
+    known = {opt["value"] for opt in _theme_picker_options()}
+    return raw if raw in known else DEFAULT_NOTE_THEME
+
+
+@bp.post("/note")
+def send_note() -> Response:
+    """Render a note (headline + body, in a panel theme) for each ticked
+    display at that display's own panel size and push it. Lands in
+    History as source ``note`` with the headline as the target."""
+    text = (request.form.get("text") or "").strip()
+    if not text:
+        flash("Type a note first.", "error")
+        return redirect(url_for("send.index", kind="note"))
+    size = normalise_size(request.form.get("size"))
+    align = normalise_align(request.form.get("align"))
+    theme_id = _note_theme_id()
+    theme_vars = theme_variables(theme_id, _theme_extra_css())
+    label = note_label(text)
+    targets = _require_target_devices("note")
+    if isinstance(targets, Response):
+        return targets
+    registry = _devices()
+    pool = current_app.config.get("BROWSER_POOL")
+    events = _events()
+    push = _push()
+
+    def _push_one(tid: str | None) -> PushResult:
+        device = registry.devices.get(tid or "") if registry is not None else None
+        panel = device_panel(device) if device is not None else None
+        if panel is None:
+            panel = resolve_settings_panel(_settings())
+        started = time.monotonic()
+        try:
+            png = render_note_png(
+                text,
+                w=panel.w,
+                h=panel.h,
+                size=size,
+                align=align,
+                theme_vars=theme_vars,
+                pool=pool,
+            )
+        except Exception as err:
+            logger.warning("note render failed for %s: %s", tid, err)
+            events.record(
+                type="push",
+                source="note",
+                target=label,
+                status="failed",
+                error=f"render: {err}",
+                duration_s=time.monotonic() - started,
+            )
+            return PushResult(status="failed", page_id=label, error=f"render: {err}")
+        return push.push_image(png, source_label=label, device_id=tid, source="note")
+
+    _push_to_targets(f"Note {label!r}", targets, _push_one)
+    return redirect(url_for("history.index"))
+
+
+@bp.get("/note/preview")
+def note_preview() -> Response:
+    """The note as an HTML page, for the Send page's live preview iframe.
+    Same document the push screenshots, so what the iframe shows at the
+    chosen display's size is what the panel gets."""
+    text = request.args.get("text") or ""
+    page = note_html(
+        text,
+        size=normalise_size(request.args.get("size")),
+        align=normalise_align(request.args.get("align")),
+        theme_vars=theme_variables(_note_theme_id(), _theme_extra_css()),
+    )
+    resp = make_response(page)
+    resp.headers["Content-Type"] = "text/html; charset=utf-8"
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
 
 
 @bp.post("/gallery")

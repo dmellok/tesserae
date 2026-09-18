@@ -115,7 +115,7 @@ def test_send_invokes_push_image(app: Flask) -> None:
     )
     assert resp.status_code == 302
     # Redirects back to the Calibration tab so muscle memory holds.
-    assert "tab=calibration" in resp.location
+    assert resp.location.endswith(f"/settings/devices/{dev}/calibration")
     # push_image was called with the device id + a test-pattern label.
     pm.push_image.assert_called_once()
     call_kwargs = pm.push_image.call_args.kwargs
@@ -215,19 +215,21 @@ def test_preview_exposure_query_shifts_grayscale(app: Flask) -> None:
     assert baseline != bumped
 
 
-def test_calibration_tab_renders_in_devices_index(app: Flask) -> None:
+def test_calibration_page_renders(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
-    _register_device(client)
-    body = client.get("/settings/devices").get_data(as_text=True)
-    # Tab label + at least one pattern option landed in the DOM.
-    assert 'data-tab="calibration"' in body
+    dev = _register_device(client)
+    resp = client.get(f"/settings/devices/{dev}/calibration")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    # Breadcrumb + at least one pattern option landed in the DOM.
     assert "Calibration" in body
     assert "Palette swatches" in body
     assert "Send to panel" in body
-    # The footer Calibrate button is gone (moved to the tab) so it no
-    # longer competes with the tab-hosted flow for muscle memory.
-    assert 'data-tab-link="calibration"' not in body
+    # The device page links here, and does not carry the patterns itself.
+    page = client.get(f"/settings/devices/{dev}").get_data(as_text=True)
+    assert f"/settings/devices/{dev}/calibration" in page
+    assert "Send to panel" not in page
 
 
 # ---- v0.69.14 fixes -------------------------------------------------
@@ -248,18 +250,16 @@ def _upload_png(client, device_id: str, name: str = "test.png"):
     )
 
 
-def test_custom_image_upload_redirect_keeps_card_expanded(app: Flask) -> None:
-    """Bug A: after uploading, the redirect must carry ``opened=<id>``
-    so the device card stays expanded. Previously only ``tab=calibration``
-    was set and the card collapsed on every upload."""
+def test_custom_image_upload_redirect_lands_on_the_calibration_page(app: Flask) -> None:
+    """After uploading, the redirect lands back on the device's own
+    calibration page (the card-era equivalent of staying expanded on
+    the Calibration tab)."""
     client = app.test_client()
     _sign_in(client)
     dev = _register_device(client)
     resp = _upload_png(client, dev)
     assert resp.status_code == 302
-    assert f"opened={dev}" in resp.location
-    assert "tab=calibration" in resp.location
-    assert f"#device-{dev}" in resp.location
+    assert resp.location.endswith(f"/settings/devices/{dev}/calibration")
 
 
 def test_custom_image_delete_redirect_keeps_card_expanded(app: Flask) -> None:
@@ -274,8 +274,7 @@ def test_custom_image_delete_redirect_keeps_card_expanded(app: Flask) -> None:
         follow_redirects=False,
     )
     assert resp.status_code == 302
-    assert f"opened={dev}" in resp.location
-    assert "tab=calibration" in resp.location
+    assert resp.location.endswith(f"/settings/devices/{dev}/calibration")
 
 
 def test_send_test_pattern_redirect_keeps_card_expanded(app: Flask) -> None:
@@ -295,41 +294,21 @@ def test_send_test_pattern_redirect_keeps_card_expanded(app: Flask) -> None:
         follow_redirects=False,
     )
     assert resp.status_code == 302
-    assert f"opened={dev}" in resp.location
-    assert "tab=calibration" in resp.location
+    assert resp.location.endswith(f"/settings/devices/{dev}/calibration")
 
 
-def test_tab_state_is_scoped_to_opened_device(app: Flask) -> None:
-    """Bug B: ``?tab=calibration`` only applies to the card whose
-    device id matches ``?opened=``. Other cards on the page still
-    render on their default (status) tab. Before this fix, ``?tab=``
-    was shared so all cards followed one card's tab click."""
-    import re
-
+def test_device_page_is_scoped_to_one_device(app: Flask) -> None:
+    """Each device page carries only its own combined form; a second
+    registered device never leaks its fields into the first's page."""
     client = app.test_client()
     _sign_in(client)
     _register_device(client, "dev_alpha")
     _register_device(client, "dev_beta")
-    body = client.get("/settings/devices?tab=calibration&opened=dev_alpha").get_data(as_text=True)
-    alpha_idx = body.index('id="device-dev_alpha"')
-    beta_idx = body.index('id="device-dev_beta"')
-    alpha_html = body[alpha_idx:beta_idx]
-    beta_html = body[beta_idx:]
-
-    def _panels(html: str) -> dict[str, bool]:
-        # Map each ``data-panel="<name>"`` to whether it is the active
-        # tab (``class=... is-active``). Uses regex to tolerate the
-        # template's whitespace + attribute order.
-        out: dict[str, bool] = {}
-        for m in re.finditer(r'data-panel="([^"]+)"[^>]*class="([^"]*)"', html, flags=re.DOTALL):
-            out[m.group(1)] = "is-active" in m.group(2)
-        return out
-
-    alpha_panels = _panels(alpha_html)
-    beta_panels = _panels(beta_html)
-    assert alpha_panels.get("calibration") is True
-    assert beta_panels.get("calibration") is False
-    assert beta_panels.get("status") is True
+    body = client.get("/settings/devices/dev_alpha").get_data(as_text=True)
+    assert 'id="device-dev_alpha-combined"' in body
+    assert 'id="device-dev_beta-combined"' not in body
+    assert 'action="/settings/devices/dev_alpha/save"' in body
+    assert 'action="/settings/devices/dev_beta/save"' not in body
 
 
 def test_preview_slug_query_previews_candidate_profile(app: Flask) -> None:
@@ -394,8 +373,10 @@ def test_devices_page_has_no_nested_form_tags(app: Flask) -> None:
     _sign_in(client)
     dev = _register_device(client)
     for url in (
+        f"/settings/devices/{dev}",
+        f"/settings/devices/{dev}?calibrating={dev}",
+        f"/settings/devices/{dev}/calibration",
         f"/settings/devices?opened={dev}",
-        f"/settings/devices?calibrating={dev}",
     ):
         body = client.get(url).get_data(as_text=True)
         depth = 0
@@ -413,12 +394,12 @@ def test_orientation_card_buttons_target_calibrate_forms(app: Flask) -> None:
     _sign_in(client)
     dev = _register_device(client)
 
-    body = client.get(f"/settings/devices?opened={dev}").get_data(as_text=True)
+    body = client.get(f"/settings/devices/{dev}").get_data(as_text=True)
     assert f'id="device-{dev}-calibrate"' in body
     assert f'action="/settings/devices/{dev}/calibrate"' in body
     assert f'form="device-{dev}-calibrate"' in body
 
-    body = client.get(f"/settings/devices?calibrating={dev}").get_data(as_text=True)
+    body = client.get(f"/settings/devices/{dev}?calibrating={dev}").get_data(as_text=True)
     assert f'id="device-{dev}-calibrate-apply"' in body
     assert f'action="/settings/devices/{dev}/calibrate/apply"' in body
     assert body.count(f'form="device-{dev}-calibrate-apply"') == 4
@@ -440,7 +421,7 @@ def test_preset_controls_stay_associated_with_the_combined_form(app: Flask) -> N
     _sign_in(client)
     dev = _register_device(client)
 
-    body = client.get(f"/settings/devices?opened={dev}").get_data(as_text=True)
+    body = client.get(f"/settings/devices/{dev}").get_data(as_text=True)
     combined = f'form="device-{dev}-combined"'
     select = re.search(rf'<select[^>]*id="device-{dev}-sleep_interval_s-preset"[^>]*>', body)
     assert select is not None, "the sleep interval should render as a preset control"

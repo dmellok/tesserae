@@ -1,0 +1,144 @@
+{# Settings › Devices body (2026-09 redesign).
+   Toolbar (Add device / N discovered / search / transport filter), the
+   Add device panel (hidden until asked for), the devices table with one
+   expandable quick panel per row, and the discovered banner. Every
+   knob a device has lives on its own page, /settings/devices/<id>.
+
+   Inputs (from ``settings_area``): ``sections`` (device dicts built by
+   ``_build_device_section``), ``device_kinds``, ``discovered_rest`` /
+   ``discovered_mqtt``, ``pairing_codes``, ``pairing_reveal``. #}
+
+{% from "_device_parts.html" import overview_tiles, render_thumb, device_actions with context %}
+
+{% set _opened = request.args.get('opened') %}
+{% set _show_add = request.args.get('add') == '1' or pairing_reveal or pairing_codes %}
+{% set _discovered = discovered_rest + discovered_mqtt %}
+{% set _devices = sections | selectattr('kind', 'equalto', 'device') | list %}
+{% set _transports = [] %}
+{% for s in _devices %}{% if s.transport_badge not in _transports %}{% set _ = _transports.append(s.transport_badge) %}{% endif %}{% endfor %}
+
+<div class="dx-devices-area">
+
+  {# TOOLBAR #}
+  <div class="dx-devtb" data-devtb>
+    <button type="button" class="dx-btn is-primary" data-add-toggle
+            aria-controls="add-device-panel" aria-expanded="{% if _show_add %}true{% else %}false{% endif %}">
+      <i class="ph ph-plus" aria-hidden="true"></i><span>Add device</span>
+    </button>
+    <button type="button" class="dx-btn" data-disc-toggle aria-controls="discovered-devices"
+            {% if not _discovered %}disabled title="Nothing has announced itself yet."{% endif %}>
+      <i class="ph ph-broadcast" aria-hidden="true"></i>
+      <span>{{ _discovered|length }} discovered</span>
+      {% if _discovered %}<span class="dx-devtb-dot" aria-hidden="true"></span>{% endif %}
+    </button>
+    <div class="dx-devtb-right">
+      <label class="dx-devtb-search">
+        <i class="ph ph-magnifying-glass" aria-hidden="true"></i>
+        <input type="search" placeholder="Search devices" aria-label="Search devices"
+               autocomplete="off" spellcheck="false" data-devtable-search>
+      </label>
+      <select class="dx-devtb-select" aria-label="Filter by transport" data-devtable-filter>
+        <option value="">All transports</option>
+        {% for t in _transports %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+      </select>
+    </div>
+  </div>
+
+  {# ADD DEVICE PANEL: the existing card, revealed by the toolbar button
+     (or ?add=1, or while a pairing code is pending / just issued). #}
+  {% if device_kinds %}
+  <div class="dx-devadd" id="add-device-panel" data-add-panel{% if not _show_add %} hidden{% endif %}>
+    {% include '_add_device_card.html' %}
+  </div>
+  {% endif %}
+
+  {# DEVICES TABLE #}
+  {% if _devices %}
+  <div class="dx-devtable card" data-devtable>
+    <div class="dx-devtable-head" aria-hidden="true">
+      <span></span>
+      <span>Device</span>
+      <span>Kind</span>
+      <span>Link</span>
+      <span>Panel</span>
+      <span>Battery</span>
+      <span>Firmware</span>
+      <span>Last seen</span>
+      <span></span>
+    </div>
+
+    {% for section in _devices %}
+    {% set _open = _opened == section.device_id %}
+    {% set _h = section.status.health %}
+    <div class="dx-devrow{% if _open %} is-open{% endif %}"
+         id="device-{{ section.device_id }}"
+         data-devrow data-device-id="{{ section.device_id }}"
+         data-transport="{{ section.transport_badge }}"
+         data-search="{{ (section.device_name ~ ' ' ~ section.kind_name ~ ' ' ~ section.device_id ~ ' ' ~ section.transport_badge)|lower }}"
+         role="button" tabindex="0"
+         aria-expanded="{% if _open %}true{% else %}false{% endif %}"
+         aria-controls="quick-{{ section.device_id }}">
+      {# Markup is in phone order (three stacked lines); on desktop the
+         wrappers are ``display: contents`` and ``order`` restores the
+         column sequence. #}
+      <span class="dx-dot is-{{ _h }}" aria-hidden="true"></span>
+      <span class="dx-devrow-body">
+        <span class="dx-devrow-l dx-devrow-l1">
+          <span class="dx-devrow-name">
+            <i class="ph ph-{{ section.icon or 'device-mobile' }} dx-devrow-icon" aria-hidden="true"></i>
+            <span>{{ section.device_name }}</span>
+          </span>
+          <span class="dx-devrow-link"><span class="dx-tpill">{{ section.transport_badge }}</span></span>
+        </span>
+        <span class="dx-devrow-l dx-devrow-l2">
+          <span class="dx-devrow-kind">{{ section.kind_name }}</span>
+          <span class="dx-devrow-mono dx-devrow-panel">{% if section.panel %}{{ section.panel.w }}×{{ section.panel.h }}{% else %}-{% endif %}</span>
+        </span>
+        <span class="dx-devrow-l dx-devrow-l3">
+          <span class="dx-devrow-mono dx-devrow-batt{% if section.overview.battery.low %} is-warn{% endif %}">{% if section.overview.battery.muted %}-{% else %}{{ section.overview.battery.value }}{% endif %}</span>
+          <span class="dx-devrow-mono dx-devrow-fw">{% if section.status.firmware and section.status.firmware.current %}{{ section.overview.firmware.value }}{% else %}-{% endif %}</span>
+          <span class="dx-devrow-seen is-{{ _h }}">{% if _h == 'unknown' %}no heartbeat yet{% else %}{{ section.status.relative }}{% endif %}</span>
+        </span>
+      </span>
+      <span class="dx-devrow-chev" aria-hidden="true"><i class="ph ph-caret-right"></i></span>
+    </div>
+
+    {# QUICK PANEL: thumbnail + four tiles + actions + lineups + Open settings. #}
+    <div class="dx-devquick" id="quick-{{ section.device_id }}" data-devquick{% if not _open %} hidden{% endif %}>
+      {{ render_thumb(section, 'dx-thumb--quick') }}
+      <div class="dx-devquick-body">
+        <div class="dx-devquick-tiles">
+          {{ overview_tiles(section) }}
+        </div>
+        <div class="dx-devquick-actions">
+          {{ device_actions(section, 'is-sm') }}
+          <span class="dx-devquick-lineups" title="Lineups and schedules targeting this display">
+            {% if section.lineup_names %}{{ section.lineup_names|join(' · ') }}{% else %}No lineups yet{% endif %}
+          </span>
+          <a class="dx-btn is-primary is-sm dx-devquick-open" href="{{ section.page_url }}">
+            <span>Open settings</span><i class="ph ph-caret-right" aria-hidden="true"></i>
+          </a>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+
+    <div class="dx-devtable-empty" data-devtable-empty hidden>No devices match.</div>
+  </div>
+  {% else %}
+  <div class="dx-devtable card">
+    <div class="dx-empty">
+      <div class="dx-empty-icon"><i class="ph ph-devices" aria-hidden="true"></i></div>
+      <p class="dx-empty-title">No devices yet</p>
+      <p class="dx-empty-help">Power a panel on and it announces itself below, or add one by hand.</p>
+      <button type="button" class="dx-btn is-primary" data-add-toggle aria-controls="add-device-panel">
+        <i class="ph ph-plus" aria-hidden="true"></i><span>Add device</span>
+      </button>
+    </div>
+  </div>
+  {% endif %}
+
+  {# DISCOVERED BANNER #}
+  {% include '_discovered_strip.html' %}
+
+</div>

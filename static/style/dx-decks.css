@@ -557,9 +557,51 @@
 .dk-act-rule { width: 1px; height: 20px; background: color-mix(in oklab, var(--t-border) 90%, transparent); }
 
 .dk-body { padding: 0 22px 20px; display: flex; gap: 10px; }
-.dk-body--cycle { align-items: flex-end; }
+/* Rotation rows: on-panel column | divider | planned strip | timing. Top
+   aligned, so a waiting step's extra caption line never shoves its
+   neighbours around. */
+.dk-body--cycle { align-items: flex-start; gap: 22px; padding-top: 4px; }
 .dk-body--send { align-items: center; gap: 20px; }
 .dk-body--nav { align-items: flex-end; gap: 14px; }
+
+.dk-panel { flex: none; position: relative; }
+.dk-divider { flex: none; width: 1px; align-self: stretch; background: color-mix(in oklab, var(--t-border) 90%, transparent); }
+.dk-strip { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
+.dk-timing { margin-left: auto; flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; padding-top: 22px; }
+.dk-stats { display: flex; gap: 10px; }
+.dk-timing .dk-next { margin-left: 0; padding-bottom: 0; }
+
+/* Ribbons: ON THE PANEL on the fetched frame, WAITING on an intended step
+   the display has not picked up yet. */
+.dk-ribbon {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 1;
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: var(--t-accent);
+  color: var(--t-accent-fg);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.dk-ribbon.is-warn { background: var(--t-warn-bg); color: color-mix(in oklab, var(--t-warn) 72%, var(--t-fg)); }
+.dk-screen.is-waiting .dk-screen-frame { outline: 2px dashed var(--t-warn); outline-offset: 2px; }
+.dk-behind { display: block; white-space: nowrap; font: 11px var(--t-font-mono); color: color-mix(in oklab, var(--t-warn) 72%, var(--t-fg)); margin-top: -3px; }
+.dk-screen--panel figcaption .dk-screen-at { margin-left: auto; flex: none; white-space: nowrap; font: 11px var(--t-font-mono); font-weight: 400; color: color-mix(in oklab, var(--t-fg) 45%, transparent); }
+.dk-screen--panel.is-empty figcaption { color: color-mix(in oklab, var(--t-fg) 45%, transparent); }
+.dk-screen--panel.is-empty .dk-screen-frame { border-style: dashed; }
+
+/* Dwell progress under "next advance": start of the window on the left,
+   time to the next advance on the right. */
+.dk-progress { display: flex; flex-direction: column; gap: 5px; width: 180px; max-width: 100%; }
+.dk-progress-track { height: 6px; border-radius: 999px; background: color-mix(in oklab, var(--t-border) 90%, transparent); overflow: hidden; }
+.dk-progress-fill { height: 100%; border-radius: 999px; background: var(--t-accent); }
+.dk-progress-labels { display: flex; justify-content: space-between; font: 11px var(--t-font-mono); color: color-mix(in oklab, var(--t-fg) 45%, transparent); }
 
 .dk-screen { margin: 0; display: flex; flex-direction: column; gap: 7px; width: 150px; flex-shrink: 0; }
 .dk-screen-frame {
@@ -612,7 +654,7 @@
 }
 .dk-cond:hover { color: var(--t-accent); }
 .dk-step-ix { margin-left: auto; font: 11px var(--t-font-mono); color: color-mix(in oklab, var(--t-fg) 35%, transparent); }
-.dk-chevron { color: color-mix(in oklab, var(--t-fg) 25%, transparent); font-size: 14px; margin-bottom: 28px; align-self: flex-end; }
+.dk-chevron { color: color-mix(in oklab, var(--t-fg) 25%, transparent); font-size: 14px; margin-top: 40px; flex: none; }
 
 .dk-next {
   margin-left: auto;
@@ -684,7 +726,38 @@
   .dk-screen-wash.do-push { animation: none; }
   .dk-row.is-new { animation: none; box-shadow: none; }
 }
-@media (max-width: 760px) {
-  .dk-body { flex-wrap: wrap; }
-  .dk-actions { margin-left: 0; width: 100%; }
+/* Phones and small tablets: the row head keeps badge + name on one line
+   with meta + actions on the next; a rotation body stacks (panel, then the
+   strip scrolling sideways inside itself, then the timing full width); a
+   schedule's rail drops under its screen at full width. Nothing here may
+   push the page wider than the viewport. */
+@media (max-width: 900px) {
+  .dk-row-head { row-gap: 8px; column-gap: 12px; padding: 16px 16px 12px; }
+  .dk-name { font-size: 18px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+  /* A basis over half the row: the meta never fits beside badge + name,
+     so it opens the second line, where the actions join it. */
+  .dk-meta { flex: 1 1 55%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dk-actions { margin-left: auto; flex: 0 0 auto; gap: 14px; }
+  .dk-devchip { max-width: 100%; }
+  .dk-warn { margin-left: 16px; margin-right: 16px; }
+  .dk-body { flex-wrap: wrap; padding: 0 16px 16px; }
+  .dk-body--cycle { gap: 14px; }
+  .dk-panel, .dk-strip, .dk-timing { flex: 1 1 100%; width: 100%; }
+  .dk-divider { display: none; }
+  /* Scrolls sideways inside itself; the padding keeps the dashed outline
+     and the behind line inside the scroll box. */
+  .dk-strip { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; padding: 4px; margin: -4px; width: calc(100% + 8px); }
+  .dk-strip .dk-behind { white-space: normal; }
+  .dk-timing { margin-left: 0; padding-top: 4px; align-items: stretch; }
+  .dk-stats { justify-content: space-between; }
+  .dk-stats .dk-next { margin-left: 0; padding-bottom: 0; text-align: left; }
+  .dk-stats .dk-next + .dk-next { text-align: right; }
+  .dk-progress { width: 100%; }
+  .dk-rail-wrap { flex: 1 1 100%; padding-bottom: 6px; }
+  .dk-body--send { row-gap: 14px; }
+  .dk-body--send .dk-next { margin-left: 0; padding-bottom: 0; }
+  .dk-body--send .dk-next + .dk-next { margin-left: auto; }
+  .dk-body--nav .dk-next.dk-count { padding-bottom: 0; }
+  .dk-nav-note { padding-bottom: 0; flex: 1 1 100%; }
+  .dk-steppers { padding-bottom: 0; }
 }

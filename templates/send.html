@@ -1,506 +1,302 @@
 {% extends "_base.html" %}
-{% from "_components.html" import card_head, button, info_pop %}
+{% from "_components.html" import info_pop %}
 {% block title %}Send, Tesserae{% endblock %}
 {% block page_class %}page-wide{% endblock %}
 
 {# Defaults so the template stays safe whether render came from a GET
    (empty form) or a POST that hit ``_render_send_with_form`` after a
-   validation failure (typed URL / viewport / fit / device ticks
+   validation failure (typed text / viewport / fit / device ticks
    round-trip via ``form_values`` + ``form_device_ids``). #}
 {% set form_values = form_values | default({}, true) %}
 {% set form_device_ids = form_device_ids | default([], true) %}
+{% set kind = kind | default('', true) %}
+{% set note_themes = note_themes | default([], true) %}
+{% set initial_text = form_values.get('text') or form_values.get('url') or '' %}
 
-{# Saved-dashboard sends live on the Dashboards page (per-row Send +
-   editor Push-now button). Keeping a duplicate picker here gave two
-   places to do the same thing; Send is now arbitrary-input only. #}
-{% set CORE_TABS = [
-  ('file','File','upload-simple'),
-  ('url','URL','link'),
-  ('webpage','Webpage','globe'),
-] %}
-{# The Gallery tab only appears when you arrive via a gallery image's Send. #}
-{% set TABS = ([('gallery','Gallery','image-square')] + CORE_TABS) if gallery else CORE_TABS %}
-
-{% macro pill_status(status) %}
-  {% if status == 'sent' %}<span class="pill is-ok">sent</span>
-  {% elif status == 'busy' %}<span class="pill is-warn">busy</span>
-  {% elif status == 'not_found' %}<span class="pill is-danger">not found</span>
-  {% else %}<span class="pill is-danger">failed</span>{% endif %}
-{% endmacro %}
-
-{% macro preview_card(title, blurb=None) %}
-<section class="dx-section-card send-pair-preview">
-  <header class="dx-section-head">
-    <span class="dx-section-icon" aria-hidden="true"><i class="ph ph-monitor-play"></i></span>
-    <div class="dx-section-titleblock">
-      <h3 class="dx-section-title">{{ title }}</h3>
-      {% if blurb %}<p class="dx-section-desc">{{ blurb }}</p>{% endif %}
-    </div>
-  </header>
-  <div class="dx-section-body">
-    <div class="preview-frame"
-         data-fit-preview
-         data-panel-w="{{ panel.w }}"
-         data-panel-h="{{ panel.h }}"
-         style="aspect-ratio: {{ panel.w }} / {{ panel.h }};">
-      {{ caller() }}
-    </div>
-    <p class="muted preview-dims">{{ panel.w }} × {{ panel.h }}</p>
-  </div>
-</section>
-{% endmacro %}
-
-{# Target-device picker shared by the File / URL / Webpage / Gallery tabs.
-   Tick one or more displays; the push renders + fans out to each at that
-   display's panel size. Required, the routes reject the form if nothing's
-   ticked (used to silently fan out at the global panel preset, which fed
-   the wrong-sized frame to every other device). Mirrors the dashboard
-   editor's device checklist. #}
-{% macro device_picker(field_id) %}
-{% if device_options %}
 {# Auto-tick when there's only one registered device: the user's intent
    is unambiguous and ticking it manually every time is just a tax. With
    two or more devices we leave them all untouched so the user has to
-   pick deliberately.
-
-   Validation-failure re-render preserves prior ticks via
-   ``form_device_ids``; that takes precedence over the sole-device
-   auto-tick so a user who consciously unticked the only device on a
-   previous submit doesn't get it re-ticked behind their back. #}
+   pick deliberately. A validation-failure re-render preserves prior
+   ticks via ``form_device_ids``, which takes precedence. #}
 {% set sole_device = device_options[0].id if device_options|length == 1 else None %}
-<div class="field">
-  <label>Target devices <span class="required-marker" aria-hidden="true">*</span></label>
-  {# data-send-device-checklist, picked up by send.js to enable/
-     disable the form's Send button as checkboxes toggle, so the user
-     gets the "no device picked" feedback upfront instead of after a
-     POST round-trip. #}
-  <div class="device-checklist" data-send-device-checklist>
-    {% for d in device_options %}
-    <label class="device-check">
-      <input type="checkbox" name="device_id" value="{{ d.id }}"
-             data-panel-w="{{ d.w }}" data-panel-h="{{ d.h }}"
-             {% if form_device_ids %}{% if d.id in form_device_ids %}checked{% endif %}{% elif d.id == sole_device %}checked{% endif %}>
-      <span class="device-check-icon"><i class="ph ph-{{ d.icon }}" aria-hidden="true"></i></span>
-      <span class="device-check-body">
-        <span class="device-check-name">{{ d.label }}</span>
-        <span class="device-check-dims">{{ d.dims }}</span>
-      </span>
-      <span class="device-check-tick"><i class="ph ph-check" aria-hidden="true"></i></span>
-    </label>
-    {% endfor %}
-  </div>
-  <p class="field-help">{% if sole_device %}Only one device is registered, so it's preselected. {% endif %}Pick at least one. Each ticked display is rendered at its own panel size and gets its own push.</p>
-</div>
-{% else %}
-<div class="field">
-  <label>Target devices</label>
-  <p class="field-help">No devices registered yet, add one in <a href="{{ url_for('auth.settings_area', area='devices') }}">Settings → Devices</a> before sending.</p>
-</div>
-{% endif %}
-{% endmacro %}
-
-{# Image fit mode, how a non-panel-sized image maps onto the panel.
-   Shared by File / URL / Webpage / Gallery.
-
-   ``rotate`` adds the turn picker alongside it, for the sources that
-   carry their own orientation (a photo). A webpage capture is rendered
-   at the viewport it was given, so there's nothing to turn there. #}
-{% macro fit_picker(field_id, rotate=true) %}
-{% set _selected_fit = form_values.get('fit', 'fit') %}
-<div class="field">
-  <label for="{{ field_id }}">Image fit{{ info_pop("How the image maps onto the panel when it isn't already panel-sized.") }}</label>
-  <select id="{{ field_id }}" name="fit">
-    <option value="fit"     {% if _selected_fit == 'fit' %}selected{% endif %}>Fit, letterbox (keep aspect)</option>
-    <option value="fill"    {% if _selected_fit == 'fill' %}selected{% endif %}>Fill, crop to cover</option>
-    <option value="stretch" {% if _selected_fit == 'stretch' %}selected{% endif %}>Stretch, squash to exact dims</option>
-    <option value="center"  {% if _selected_fit == 'center' %}selected{% endif %}>Center, no scaling</option>
-    <option value="blur"    {% if _selected_fit == 'blur' %}selected{% endif %}>Center + blurred background</option>
-  </select>
-</div>
-{% if rotate %}
-{% set _selected_rotate = form_values.get('rotate', '0') %}
-<div class="field">
-  <label for="{{ field_id }}-rotate">Image rotation{{ info_pop("Turns this image before it's fitted, for when the photo and the panel disagree about which way is up. Auto turns a portrait photo a quarter to fill a landscape panel, and the reverse. A panel that's mounted the other way around wants the display's own Rotation setting instead, so dashboards land right too.") }}</label>
-  <select id="{{ field_id }}-rotate" name="rotate">
-    <option value="0"    {% if _selected_rotate == '0' %}selected{% endif %}>None, keep the image's orientation</option>
-    <option value="auto" {% if _selected_rotate == 'auto' %}selected{% endif %}>Auto, turn to match the panel</option>
-    <option value="90"   {% if _selected_rotate == '90' %}selected{% endif %}>90° clockwise</option>
-    <option value="180"  {% if _selected_rotate == '180' %}selected{% endif %}>180°</option>
-    <option value="270"  {% if _selected_rotate == '270' %}selected{% endif %}>270° clockwise</option>
-  </select>
-</div>
-{% endif %}
-{% endmacro %}
 
 {% block main %}
 <header class="page-head">
   <h1><i class="ph ph-paper-plane-tilt"></i> Send</h1>
-  <p class="lede">
-    Push anything to the panel. Source can be an upload, a saved
-    dashboard, an image URL, or any webpage. Past pushes live under
-    History.
-  </p>
+  <p class="lede">Push anything to a display. Past pushes live under History.</p>
 </header>
 
-<nav class="tabs" role="tablist">
-  {% for slug, label, ic in TABS %}
-  <a href="?tab={{ slug }}" role="tab"
-     class="tab {% if tab == slug %}is-active{% endif %}">
-    <i class="ph ph-{{ ic }}" aria-hidden="true"></i><span>{{ label }}</span>
-  </a>
-  {% endfor %}
-</nav>
-
-{# ----- Gallery tab (only when arriving from a gallery image) ----- #}
-{% if gallery %}
-<div class="send-pair" id="tab-gallery" {% if tab != 'gallery' %}hidden{% endif %}>
+<div class="send-pair" data-send-page>
   <section class="dx-section-card send-pair-options">
     <header class="dx-section-head">
-      <span class="dx-section-icon" aria-hidden="true"><i class="ph ph-image-square"></i></span>
+      <span class="dx-section-icon" aria-hidden="true"><i class="ph ph-clipboard-text"></i></span>
       <div class="dx-section-titleblock">
-        <h3 class="dx-section-title">Gallery image</h3>
-        <p class="dx-section-desc">Push the gallery image you arrived from. Pick the displays + image fit below.</p>
+        <h3 class="dx-section-title">What to send</h3>
+        <p class="dx-section-desc">Drop an image, paste a link, or just type. Tesserae works out the rest.</p>
       </div>
     </header>
-    <form method="post" action="{{ url_for('send.send_gallery') }}" class="form">
-      <input type="hidden" name="g_folder" value="{{ gallery.folder }}">
-      <input type="hidden" name="g_file" value="{{ gallery.file }}">
-      <p class="field-help">Sending <strong>{{ gallery.file }}</strong> from <strong>{{ gallery.folder }}</strong>. Pick the displays + fit below.</p>
-      {{ device_picker('gallery-device') }}
-      {{ fit_picker('gallery-fit') }}
-      <div class="actions">
-        <button type="submit" class="dx-btn-primary" data-requires-device-pick>
-          <i class="ph ph-paper-plane-tilt" aria-hidden="true"></i><span>Push image</span>
-        </button>
-      </div>
-    </form>
-  </section>
-  {% call preview_card('Live preview', blurb='What the panel will show after fitting.') %}
-    <img src="{{ gallery.url }}" alt="" class="preview-bg" aria-hidden="true" hidden>
-    <img src="{{ gallery.url }}" alt="" class="preview-image">
-  {% endcall %}
-</div>
-{% endif %}
 
-{# ----- File tab ----- #}
-<div class="send-pair" id="tab-file" {% if tab != 'file' %}hidden{% endif %}>
-  <section class="dx-section-card send-pair-options">
-    <header class="dx-section-head">
-      <span class="dx-section-icon" aria-hidden="true"><i class="ph ph-upload-simple"></i></span>
-      <div class="dx-section-titleblock">
-        <h3 class="dx-section-title">Upload a file</h3>
-        <p class="dx-section-desc">Drop an image or browse — PNG, JPEG, GIF, or BMP up to 16 MiB. Picks the target displays + fit below.</p>
-      </div>
-    </header>
-    <form method="post" action="{{ url_for('send.send_file') }}" enctype="multipart/form-data" class="form">
-      <label class="dropzone" data-dropzone>
-        <input type="file" id="file-image" name="image" accept="image/*" required class="dropzone-input" data-dropzone-input>
-        <div class="dropzone-body" data-dropzone-body>
-          <span class="dropzone-icon"><i class="ph ph-image-square" aria-hidden="true"></i></span>
-          <p class="dropzone-title">Drop an image here</p>
-          <p class="dropzone-hint">PNG, JPEG, GIF, or BMP, up to 16 MiB</p>
-          <span class="dropzone-browse"><i class="ph ph-folder-open" aria-hidden="true"></i> or browse</span>
-        </div>
-        <div class="dropzone-preview" data-dropzone-preview hidden>
-          <img alt="" data-dropzone-thumb>
-          <div class="dropzone-meta">
-            <strong data-dropzone-name></strong>
-            <span class="muted" data-dropzone-size></span>
+    {# One form for every kind. The page script points ``action`` at the
+       matching endpoint on submit (file / url / webpage / gallery / note)
+       and renames the text field (``url`` or ``text``) to what that
+       endpoint reads. Inactive option panes are disabled fieldsets so
+       their inputs never post. #}
+    <form method="post" action="{{ url_for('send.send_url') }}" enctype="multipart/form-data"
+          class="form send-form" data-send-form
+          data-action-file="{{ url_for('send.send_file') }}"
+          data-action-url="{{ url_for('send.send_url') }}"
+          data-action-webpage="{{ url_for('send.send_webpage') }}"
+          data-action-gallery="{{ url_for('send.send_gallery') }}"
+          data-action-note="{{ url_for('send.send_note') }}"
+          data-note-preview-url="{{ url_for('send.note_preview') }}"
+          data-initial-kind="{{ kind }}"
+          data-initial-text="{{ initial_text }}"
+          data-default-panel-w="{{ panel.w }}" data-default-panel-h="{{ panel.h }}">
+      {% if gallery %}
+      {# Arriving from a gallery image's Send: the image is preselected
+         as kind Image and shown in the box. Clearing it disables these so
+         the form falls back to whatever is pasted next. #}
+      <input type="hidden" name="g_folder" value="{{ gallery.folder }}" data-send-gallery-field>
+      <input type="hidden" name="g_file" value="{{ gallery.file }}" data-send-gallery-field>
+      {% endif %}
+
+      <div class="send-box" data-send-box data-state="empty"
+           {% if gallery %}data-gallery-url="{{ gallery.url }}" data-gallery-name="{{ gallery.file }}" data-gallery-folder="{{ gallery.folder }}"{% endif %}>
+        <div class="send-box-head">
+          <div class="send-seg" role="radiogroup" aria-label="Send as">
+            <label class="send-seg-item">
+              <input type="radio" name="kind" value="image" data-send-kind>
+              <span><i class="ph ph-image-square" aria-hidden="true"></i>Image</span>
+            </label>
+            <label class="send-seg-item">
+              <input type="radio" name="kind" value="note" data-send-kind>
+              <span><i class="ph ph-note" aria-hidden="true"></i>Note</span>
+            </label>
+            <label class="send-seg-item">
+              <input type="radio" name="kind" value="webpage" data-send-kind>
+              <span><i class="ph ph-globe" aria-hidden="true"></i>Webpage</span>
+            </label>
           </div>
-          <button type="button" class="ghost danger" data-dropzone-clear title="Remove">
+          <span class="send-auto" data-send-auto hidden><i class="ph ph-sparkle" aria-hidden="true"></i>auto</span>
+          <span class="send-box-hint" data-send-hint>Picks itself once you paste or drop something.</span>
+        </div>
+
+        <div class="send-box-empty" data-send-empty tabindex="0" role="button"
+             aria-label="Paste a link, drop an image, or type a note">
+          <span class="send-box-empty-icon" aria-hidden="true"><i class="ph ph-clipboard-text"></i></span>
+          <p class="send-box-empty-title">Paste a link, drop an image, or type a note</p>
+          <p class="send-box-empty-desc">An image link sends the picture. Any other link is rendered as a web page. Plain text becomes a note in the panel's theme.</p>
+          <label class="send-browse-btn" for="send-file"><i class="ph ph-folder-open" aria-hidden="true"></i><span>Browse for a file</span></label>
+        </div>
+
+        <div class="send-box-value" data-send-value hidden>
+          {# The one input: a single line for a URL, a growing block for a
+             note. ``plaintext-only`` keeps pasted formatting out; the
+             hidden input mirrors the text into the form. #}
+          <div class="send-editor" contenteditable="plaintext-only" role="textbox" aria-multiline="true"
+               aria-label="Link or note text" spellcheck="false"
+               data-send-editor data-placeholder="Paste a link or type a note"></div>
+          <input type="hidden" name="url" value="" data-send-text>
+        </div>
+
+        <div class="send-box-file" data-send-file-row hidden>
+          <img alt="" data-send-file-thumb>
+          <div class="send-box-file-meta">
+            <strong data-send-file-name></strong>
+            <span class="muted" data-send-file-size></span>
+          </div>
+          <button type="button" class="ghost danger" data-send-file-clear title="Remove" aria-label="Remove file">
             <i class="ph ph-x" aria-hidden="true"></i>
           </button>
         </div>
-      </label>
-      {{ device_picker('file-device') }}
-      {{ fit_picker('file-fit') }}
-      <div class="actions">
-        <button type="submit" class="dx-btn-primary" data-requires-device-pick>
-          <i class="ph ph-paper-plane-tilt" aria-hidden="true"></i><span>Push file</span>
-        </button>
-        {{ info_pop('The renderers fit the upload to the configured ' ~ panel.w ~ ' × ' ~ panel.h ~ ' panel.') }}
-      </div>
-    </form>
-  </section>
-  {% call preview_card('Live preview', blurb='What the panel will show after fitting.') %}
-    <img data-file-preview-bg alt="" class="preview-bg" aria-hidden="true" hidden>
-    <img data-file-preview alt="" class="preview-image" hidden>
-    <div class="preview-placeholder" data-file-preview-placeholder>
-      <i class="ph-duotone ph-image" aria-hidden="true"></i>
-      <p>Drop a file to see the preview.</p>
-    </div>
-  {% endcall %}
-</div>
 
-{# ----- URL tab ----- #}
-<div class="send-pair" id="tab-url" {% if tab != 'url' %}hidden{% endif %}>
-  <section class="dx-section-card send-pair-options">
-    <header class="dx-section-head">
-      <span class="dx-section-icon" aria-hidden="true"><i class="ph ph-link"></i></span>
-      <div class="dx-section-titleblock">
-        <h3 class="dx-section-title">Image URL</h3>
-        <p class="dx-section-desc">Paste an image URL. Downloaded server-side (16 MiB max). Same fit/push path as File.</p>
-      </div>
-    </header>
-    <form method="post" action="{{ url_for('send.send_url') }}" class="form">
-      <div class="field">
-        <label for="url-input">URL{{ info_pop('Downloaded server-side (16 MiB max). Same fit/push path as file upload.') }}</label>
-        <input type="url" id="url-input" name="url" placeholder="https://..." required
-               value="{{ form_values.get('url', '') if tab == 'url' else '' }}"
-               data-url-preview-target>
-      </div>
-      {{ device_picker('url-device') }}
-      {{ fit_picker('url-fit') }}
-      <div class="actions">
-        <button type="submit" class="dx-btn-primary" data-requires-device-pick>
-          <i class="ph ph-download-simple" aria-hidden="true"></i><span>Fetch &amp; push</span>
-        </button>
-      </div>
-    </form>
-  </section>
-  {% call preview_card('Live preview', blurb='Loaded directly in your browser, final fit happens server-side.') %}
-    <img data-url-preview-bg alt="" class="preview-bg" aria-hidden="true" hidden>
-    <img data-url-preview alt="" class="preview-image" hidden>
-    <div class="preview-placeholder" data-url-preview-placeholder>
-      <i class="ph-duotone ph-link" aria-hidden="true"></i>
-      <p>Paste an image URL to preview it.</p>
-    </div>
-  {% endcall %}
-</div>
+        <div class="send-box-foot" data-send-foot hidden>
+          <i class="ph ph-upload-simple" aria-hidden="true"></i>
+          <span>or drop an image here, or <label class="send-browse-link" for="send-file">browse</label></span>
+        </div>
 
-{# ----- Webpage tab ----- #}
-<div class="send-pair" id="tab-webpage" {% if tab != 'webpage' %}hidden{% endif %}>
-  <section class="dx-section-card send-pair-options">
-    <header class="dx-section-head">
-      <span class="dx-section-icon" aria-hidden="true"><i class="ph ph-globe"></i></span>
-      <div class="dx-section-titleblock">
-        <h3 class="dx-section-title">Webpage</h3>
-        <p class="dx-section-desc">Render any webpage in headless Chromium, then fit + push. Defaults match your panel size.</p>
+        <input type="file" id="send-file" name="image" accept="image/*" class="send-file-input" data-send-file>
       </div>
-    </header>
-    <form method="post" action="{{ url_for('send.send_webpage') }}" class="form" target="webpage-preview-iframe">
-      <div class="field">
-        <label for="webpage-url">URL{{ info_pop('Rendered headlessly with Chromium at the viewport below, then fit + pushed.') }}</label>
-        <input type="url" id="webpage-url" name="url" placeholder="https://..." required
-               value="{{ form_values.get('url', '') if tab == 'webpage' else '' }}"
-               data-webpage-preview-target>
-      </div>
-      <div class="field-grid">
-        <div class="field">
-          <label for="webpage-w">Viewport width{{ info_pop('Defaults match your panel (' ~ panel.w ~ ' × ' ~ panel.h ~ '). Override for higher-DPI captures.') }}</label>
-          <input type="number" id="webpage-w" name="viewport_w"
-                 value="{{ form_values.get('viewport_w', panel.w) if tab == 'webpage' else panel.w }}" min="200" step="1">
-        </div>
-        <div class="field">
-          <label for="webpage-h">Viewport height</label>
-          <input type="number" id="webpage-h" name="viewport_h"
-                 value="{{ form_values.get('viewport_h', panel.h) if tab == 'webpage' else panel.h }}" min="200" step="1">
-        </div>
-      </div>
-      {# Request headers (#234). Collapsed because most pages need none, and
-         deliberately not pre-filled from ``form_values``: the value can hold a
-         bearer token, and a token echoed back into the page source is how it
-         ends up in a screenshot or a browser cache. #}
-      <details class="dx-send-headers">
-        <summary>Request headers (optional)</summary>
-        <div class="field">
-          <label for="webpage-headers">Headers{{ info_pop('JSON object, for a page behind a bearer token or API key. Sent only to this URL\'s own origin, never to redirects elsewhere or third-party resources. User-Agent is honoured as the browser identity for this capture.') }}</label>
-          <textarea id="webpage-headers" name="headers" rows="4" autocomplete="off" spellcheck="false"
-                    placeholder='{"Authorization": "Bearer …"}'></textarea>
-          <p class="field-help">Not remembered between pushes. Values never appear in History or logs.</p>
-        </div>
+
+      <details class="send-options" data-send-options hidden>
+        <summary>
+          <span class="send-options-caret" aria-hidden="true"><i class="ph ph-caret-right"></i></span>
+          <span class="send-options-title" data-send-options-title>Options</span>
+          <span class="send-options-value" data-send-options-value></span>
+        </summary>
+
+        {# Web page: viewport defaults to the preview display's panel size,
+           and follows it until the user edits the numbers. #}
+        <fieldset class="send-options-pane" data-send-pane="webpage" disabled hidden>
+          <div class="send-options-grid">
+            <div class="field">
+              <label for="send-viewport-w">Viewport width{{ info_pop('Defaults to the preview display\'s panel size. Override for a higher-DPI capture.') }}</label>
+              <input type="number" id="send-viewport-w" name="viewport_w" min="200" step="1"
+                     value="{{ form_values.get('viewport_w', panel.w) }}" data-send-viewport-w>
+            </div>
+            <div class="field">
+              <label for="send-viewport-h">Viewport height</label>
+              <input type="number" id="send-viewport-h" name="viewport_h" min="200" step="1"
+                     value="{{ form_values.get('viewport_h', panel.h) }}" data-send-viewport-h>
+            </div>
+          </div>
+          {# Request headers (#234). Deliberately never pre-filled from
+             ``form_values``: the value can hold a bearer token, and a token
+             echoed back into the page source is how it ends up in a
+             screenshot or a browser cache. #}
+          <div class="field">
+            <label for="send-headers">Request headers{{ info_pop('JSON object, for a page behind a bearer token or API key. Sent only to this URL\'s own origin, never to redirects elsewhere or third-party resources. User-Agent is honoured as the browser identity for this capture.') }}</label>
+            <textarea id="send-headers" name="headers" rows="3" autocomplete="off" spellcheck="false"
+                      placeholder='{"Authorization": "Bearer …"}' data-send-headers></textarea>
+            <p class="field-help">Optional. Not remembered between pushes. Values never appear in History or logs.</p>
+          </div>
+        </fieldset>
+
+        {# Image: how a non-panel-sized picture maps onto the panel. #}
+        {% set _fit = form_values.get('fit', 'fit') %}
+        {% set _rotate = form_values.get('rotate', '0') %}
+        <fieldset class="send-options-pane" data-send-pane="image" disabled hidden>
+          <div class="send-options-grid">
+            <div class="field">
+              <label for="send-fit">Image fit{{ info_pop("How the image maps onto the panel when it isn't already panel-sized.") }}</label>
+              <select id="send-fit" name="fit" data-send-fit>
+                <option value="fit"     {% if _fit == 'fit' %}selected{% endif %}>Fit, letterbox (keep aspect)</option>
+                <option value="fill"    {% if _fit == 'fill' %}selected{% endif %}>Fill, crop to cover</option>
+                <option value="stretch" {% if _fit == 'stretch' %}selected{% endif %}>Stretch, squash to exact dims</option>
+                <option value="center"  {% if _fit == 'center' %}selected{% endif %}>Center, no scaling</option>
+                <option value="blur"    {% if _fit == 'blur' %}selected{% endif %}>Center + blurred background</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="send-rotate">Image rotation{{ info_pop("Turns this image before it's fitted, for when the photo and the panel disagree about which way is up. Auto turns a portrait photo a quarter to fill a landscape panel, and the reverse. A panel that's mounted the other way around wants the display's own Rotation setting instead, so dashboards land right too.") }}</label>
+              <select id="send-rotate" name="rotate" data-send-rotate>
+                <option value="0"    {% if _rotate == '0' %}selected{% endif %}>None, keep the image's orientation</option>
+                <option value="auto" {% if _rotate == 'auto' %}selected{% endif %}>Auto, turn to match the panel</option>
+                <option value="90"   {% if _rotate == '90' %}selected{% endif %}>90° clockwise</option>
+                <option value="180"  {% if _rotate == '180' %}selected{% endif %}>180°</option>
+                <option value="270"  {% if _rotate == '270' %}selected{% endif %}>270° clockwise</option>
+              </select>
+            </div>
+          </div>
+        </fieldset>
+
+        {# Note: size, alignment, theme. #}
+        {% set _size = form_values.get('size', 'large') %}
+        {% set _align = form_values.get('align', 'center') %}
+        {% set _theme = form_values.get('theme', 'default') %}
+        <fieldset class="send-options-pane" data-send-pane="note" disabled hidden>
+          <div class="send-options-grid send-options-grid--3">
+            <div class="field">
+              <label for="send-note-size">Size</label>
+              <select id="send-note-size" name="size" data-send-note-opt>
+                <option value="large"  {% if _size == 'large' %}selected{% endif %}>Large</option>
+                <option value="medium" {% if _size == 'medium' %}selected{% endif %}>Medium</option>
+                <option value="small"  {% if _size == 'small' %}selected{% endif %}>Small</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="send-note-align">Align</label>
+              <select id="send-note-align" name="align" data-send-note-opt>
+                <option value="left"   {% if _align == 'left' %}selected{% endif %}>Left</option>
+                <option value="center" {% if _align == 'center' %}selected{% endif %}>Centre</option>
+                <option value="right"  {% if _align == 'right' %}selected{% endif %}>Right</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="send-note-theme">Theme</label>
+              <select id="send-note-theme" name="theme" data-send-note-opt>
+                <option value="default" {% if _theme == 'default' %}selected{% endif %}>Panel default</option>
+                {% for group, opts in note_themes | groupby('group') %}
+                <optgroup label="{{ group }}">
+                  {% for opt in opts %}
+                  <option value="{{ opt.value }}" {% if _theme == opt.value %}selected{% endif %}>{{ opt.label }}</option>
+                  {% endfor %}
+                </optgroup>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+        </fieldset>
       </details>
-      {{ device_picker('webpage-device') }}
-      {{ fit_picker('webpage-fit', rotate=false) }}
-      <div class="actions">
-        <button type="submit" class="dx-btn-primary" data-requires-device-pick>
-          <i class="ph ph-browser" aria-hidden="true"></i><span>Render &amp; push</span>
+
+      {# Target displays: chip grid. Each ticked display is rendered at its
+         own panel size and gets its own push. Required; the routes reject
+         the form if nothing's ticked. #}
+      <div class="field send-targets">
+        <label>Target displays <span class="required-marker" aria-hidden="true">*</span></label>
+        {% if device_options %}
+        <div class="send-chips" data-send-device-checklist>
+          {% for d in device_options %}
+          <label class="send-chip">
+            <input type="checkbox" name="device_id" value="{{ d.id }}"
+                   data-panel-w="{{ d.w }}" data-panel-h="{{ d.h }}" data-label="{{ d.label }}"
+                   {% if form_device_ids %}{% if d.id in form_device_ids %}checked{% endif %}{% elif d.id == sole_device %}checked{% endif %}>
+            <i class="ph ph-check send-chip-on" aria-hidden="true"></i>
+            <i class="ph ph-monitor send-chip-off" aria-hidden="true"></i>
+            <span class="send-chip-name">{{ d.label }}</span>
+            <span class="send-chip-dims">{{ d.dims }}</span>
+          </label>
+          {% endfor %}
+        </div>
+        <p class="field-help">{% if sole_device %}Only one display is registered, so it's preselected. {% endif %}Each ticked display is rendered at its own panel size and gets its own push.</p>
+        {% else %}
+        <p class="field-help">No displays registered yet, add one in <a href="{{ url_for('auth.settings_area', area='devices') }}">Settings → Devices</a> before pushing.</p>
+        {% endif %}
+      </div>
+
+      <div class="send-actions">
+        <button type="submit" class="dx-btn-primary send-push" data-send-push disabled>
+          <i class="ph ph-paper-plane-tilt" aria-hidden="true"></i><span data-send-push-label>Push</span>
         </button>
       </div>
     </form>
   </section>
-  {% call preview_card('Live preview', blurb='Loaded in an iframe at your browser, the panel render uses headless Chromium server-side.') %}
-    <iframe data-webpage-preview-iframe
-            sandbox="allow-scripts"
-            referrerpolicy="no-referrer"
-            style="width: {{ panel.w }}px; height: {{ panel.h }}px; background: white;"
-            hidden></iframe>
-    <div class="preview-placeholder" data-webpage-preview-placeholder>
-      <i class="ph-duotone ph-globe" aria-hidden="true"></i>
-      <p>Enter a URL to preview it.</p>
+
+  <section class="dx-section-card send-pair-preview">
+    <header class="dx-section-head">
+      <span class="dx-section-icon" aria-hidden="true"><i class="ph ph-monitor-play"></i></span>
+      <div class="dx-section-titleblock">
+        <h3 class="dx-section-title">Live preview</h3>
+        <p class="dx-section-desc" data-send-preview-desc>What the panel will show after fitting.</p>
+      </div>
+      {% if device_options %}
+      <label class="send-display-chip">
+        <span class="sr-only">Preview display</span>
+        <select data-send-preview-device aria-label="Preview display">
+          {% for d in device_options %}
+          <option value="{{ d.id }}" data-panel-w="{{ d.w }}" data-panel-h="{{ d.h }}">{{ d.label }}</option>
+          {% endfor %}
+        </select>
+        <i class="ph ph-caret-down" aria-hidden="true"></i>
+      </label>
+      {% endif %}
+    </header>
+    <div class="dx-section-body">
+      <div class="preview-frame"
+           data-fit-preview
+           data-panel-w="{{ panel.w }}"
+           data-panel-h="{{ panel.h }}"
+           style="aspect-ratio: {{ panel.w }} / {{ panel.h }};">
+        <img alt="" class="preview-bg" aria-hidden="true" hidden data-send-preview-bg>
+        <img alt="" class="preview-image" hidden data-send-preview-image>
+        <iframe data-send-preview-webpage
+                sandbox="allow-scripts"
+                referrerpolicy="no-referrer"
+                title="Web page preview"
+                style="width: {{ panel.w }}px; height: {{ panel.h }}px; background: white;"
+                hidden></iframe>
+        <iframe data-send-preview-note
+                title="Note preview"
+                style="width: {{ panel.w }}px; height: {{ panel.h }}px; background: white;"
+                hidden></iframe>
+        <div class="preview-placeholder" data-send-preview-placeholder>
+          <p data-send-preview-placeholder-text>Preview appears once there is something to send</p>
+        </div>
+      </div>
+      <p class="muted preview-dims" data-send-preview-dims>{{ panel.w }} × {{ panel.h }}</p>
     </div>
-  {% endcall %}
+  </section>
 </div>
 
-<script>
-  // File dropzone: drag-and-drop, click-to-browse, preview thumb.
-  (function () {
-    const zone = document.querySelector('[data-dropzone]');
-    if (!zone) return;
-    const input = zone.querySelector('[data-dropzone-input]');
-    const body = zone.querySelector('[data-dropzone-body]');
-    const preview = zone.querySelector('[data-dropzone-preview]');
-    const thumb = zone.querySelector('[data-dropzone-thumb]');
-    const nameEl = zone.querySelector('[data-dropzone-name]');
-    const sizeEl = zone.querySelector('[data-dropzone-size]');
-    const clear = zone.querySelector('[data-dropzone-clear]');
-    const filePreview = document.querySelector('[data-file-preview]');
-    const filePlaceholder = document.querySelector('[data-file-preview-placeholder]');
-    const form = zone.closest('form');
-
-    // ``arrayBuffer()`` snapshot kept in flight so the form-submit
-    // handler can await it before sending. See ``ingestFile`` for the
-    // why — short version: Android Chrome lazy-reads the file URI at
-    // submit time and aborts with ``ERR_UPLOAD_FILE_CHANGED`` when
-    // Google Photos sync / HEIC conversion / EXIF rewrite touch the
-    // file between selection and submit. Snapshotting at selection
-    // time decouples submit from the URI.
-    let ingesting = null;
-
-    function fmt(bytes) {
-      if (bytes < 1024) return bytes + ' B';
-      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-      return (bytes / 1024 / 1024).toFixed(2) + ' MB';
-    }
-    function showFile(file) {
-      if (!file) {
-        body.hidden = false;
-        preview.hidden = true;
-        thumb.src = '';
-        if (filePreview) { filePreview.hidden = true; filePreview.src = ''; }
-        if (filePlaceholder) filePlaceholder.hidden = false;
-        return;
-      }
-      nameEl.textContent = file.name;
-      sizeEl.textContent = fmt(file.size);
-      const url = URL.createObjectURL(file);
-      thumb.src = url;
-      body.hidden = true;
-      preview.hidden = false;
-      if (filePreview) { filePreview.src = url; filePreview.hidden = false; }
-      if (filePlaceholder) filePlaceholder.hidden = true;
-    }
-    // Read the file's bytes into memory NOW and replace input.files
-    // with a fresh File backed by those bytes. The form's normal
-    // submit then sends the in-memory snapshot rather than re-reading
-    // the original URI — which on Android Chrome routinely fails with
-    // ERR_UPLOAD_FILE_CHANGED when Google Photos sync, HEIC
-    // conversion, or EXIF rewrite touch the file after selection.
-    // We also tag the snapshot with a marker property so we don't
-    // double-snapshot if the change event somehow fires again on the
-    // same bytes (e.g. mobile browsers that fire change on focus).
-    async function ingestFile(rawFile) {
-      if (!rawFile) return;
-      if (rawFile.__tesserae_snapshotted) return;
-      ingesting = (async () => {
-        let snapped = rawFile;
-        try {
-          const buf = await rawFile.arrayBuffer();
-          snapped = new File([buf], rawFile.name, {
-            type: rawFile.type || 'application/octet-stream',
-            lastModified: rawFile.lastModified,
-          });
-          Object.defineProperty(snapped, '__tesserae_snapshotted', { value: true });
-        } catch (err) {
-          // OS denied access mid-read, or out of memory on a huge file.
-          // Fall back to the original File — submit may still work; if
-          // it hits ERR_UPLOAD_FILE_CHANGED the user retries.
-          console.warn('tesserae: file snapshot failed, falling back', err);
-        }
-        const dt = new DataTransfer();
-        dt.items.add(snapped);
-        input.files = dt.files;
-        showFile(snapped);
-      })();
-      try { await ingesting; } finally { ingesting = null; }
-    }
-    input.addEventListener('change', () => {
-      if (input.files[0]) ingestFile(input.files[0]);
-      else showFile(null);
-    });
-    clear.addEventListener('click', (e) => {
-      e.preventDefault();
-      input.value = '';
-      showFile(null);
-    });
-    ['dragenter', 'dragover'].forEach((ev) => zone.addEventListener(ev, (e) => {
-      e.preventDefault(); zone.classList.add('is-dragging');
-    }));
-    ['dragleave', 'dragend', 'drop'].forEach((ev) => zone.addEventListener(ev, (e) => {
-      e.preventDefault(); zone.classList.remove('is-dragging');
-    }));
-    zone.addEventListener('drop', (e) => {
-      const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-      if (!file) return;
-      ingestFile(file);
-    });
-    // Block the form submit until any in-flight snapshot completes,
-    // otherwise a fast user clicking Push before arrayBuffer resolves
-    // would still submit the original URI-backed file. Snapshots are
-    // sub-second even for 16 MiB so the delay is invisible in the
-    // common case.
-    if (form) {
-      form.addEventListener('submit', (e) => {
-        if (!ingesting) return;
-        e.preventDefault();
-        ingesting.then(() => form.submit());
-      });
-    }
-  })();
-
-  // Saved-dashboard preview: swap iframe src when the select changes.
-  (function () {
-    const select = document.querySelector('[data-saved-preview-target]');
-    const iframe = document.querySelector('[data-saved-preview-iframe]');
-    if (!select || !iframe) return;
-    const base = '{{ url_for("composer.compose", page_id="__PID__") }}'.replace('__PID__', '');
-    select.addEventListener('change', () => {
-      const pid = select.value;
-      if (!pid) return;
-      iframe.src = base + pid + '?preview=1&_t=' + Date.now();
-    });
-  })();
-
-  // URL preview: client-side <img> attempt; falls back to placeholder on error.
-  (function () {
-    const input = document.querySelector('[data-url-preview-target]');
-    const img = document.querySelector('[data-url-preview]');
-    const ph = document.querySelector('[data-url-preview-placeholder]');
-    if (!input || !img || !ph) return;
-    let timer;
-    function load() {
-      const url = input.value.trim();
-      if (!url) { img.hidden = true; img.src = ''; ph.hidden = false; return; }
-      img.onerror = () => { img.hidden = true; ph.hidden = false; };
-      img.onload = () => { img.hidden = false; ph.hidden = true; };
-      img.src = url;
-    }
-    input.addEventListener('input', () => {
-      clearTimeout(timer);
-      timer = setTimeout(load, 500);
-    });
-  })();
-
-  // Webpage preview: load the URL in a sandboxed iframe as a rough proxy.
-  (function () {
-    const input = document.querySelector('[data-webpage-preview-target]');
-    const iframe = document.querySelector('[data-webpage-preview-iframe]');
-    const ph = document.querySelector('[data-webpage-preview-placeholder]');
-    if (!input || !iframe || !ph) return;
-    let timer;
-    function load() {
-      const url = input.value.trim();
-      if (!url) { iframe.hidden = true; iframe.src = 'about:blank'; ph.hidden = false; return; }
-      try { new URL(url); } catch (e) { return; }
-      iframe.src = url;
-      iframe.hidden = false;
-      ph.hidden = true;
-    }
-    input.addEventListener('input', () => {
-      clearTimeout(timer);
-      timer = setTimeout(load, 700);
-    });
-  })();
-</script>
 <script src="{{ url_for('static', filename='pages/send.js') }}"></script>
 {% endblock %}

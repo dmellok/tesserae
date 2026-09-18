@@ -1,64 +1,11 @@
-/* Settings page controller (2026-06 handoff redesign).
-   Drives the redesigned device card + server-settings section cards.
-   Scope is intentionally narrow: tabs, dirty tracking + sticky save
-   bar, dependent dimming, collapse toggle. No framework, no build. */
+/* Settings page controller (2026-06 handoff redesign, 2026-09 devices
+   redesign). Drives the Devices table (row toggle, search, transport
+   filter, discovered banner), the per-device page (sub-nav, dirty
+   tracking + sticky save bar, dependent dimming, orientation swap) and
+   the server-settings section cards. No framework, no build. */
 
 (function () {
   'use strict';
-
-  // ---- Device card tabs --------------------------------------------------
-  // Tab state is per-card and survives reload via the ``?tab=`` query
-  // param so deep links land on the right panel after a POST + 302.
-  function initDeviceCard(card) {
-    const tabs = card.querySelectorAll('[data-tab]');
-    const panels = card.querySelectorAll('[data-panel]');
-    if (tabs.length === 0) return;
-
-    tabs.forEach(function (tab) {
-      tab.addEventListener('click', function () {
-        const target = tab.getAttribute('data-tab');
-        tabs.forEach(function (t) {
-          const on = t === tab;
-          t.classList.toggle('is-active', on);
-          t.setAttribute('aria-selected', on ? 'true' : 'false');
-        });
-        panels.forEach(function (p) {
-          const on = p.getAttribute('data-panel') === target;
-          p.classList.toggle('is-active', on);
-          p.setAttribute('aria-hidden', on ? 'false' : 'true');
-        });
-        // Replace the query string so a reload (or a redirect-after-save
-        // from the form below) returns to the same tab. Set ``?opened=``
-        // to this card's device id so the tab param is scoped to it;
-        // without that, other cards on the page inherit the same tab on
-        // the next render (they read the same shared ``?tab=``).
-        const url = new URL(window.location.href);
-        url.searchParams.set('tab', target);
-        const deviceId = card.getAttribute('data-device-id');
-        if (deviceId) url.searchParams.set('opened', deviceId);
-        // v0.69.17: sync the hidden ``_active_tab`` field on the
-        // combined form so a save-after-tab-switch redirects back to
-        // the tab the user is looking at, not the tab that was active
-        // when the page first rendered.
-        const activeTabField = card.querySelector('[data-active-tab-field]');
-        if (activeTabField) activeTabField.value = target;
-        // Anchor lets multiple device cards co-exist on one page; we
-        // bias to the focused card so #device-<id> stays accurate.
-        history.replaceState(null, '', url.pathname + url.search + '#' + card.id);
-      });
-    });
-  }
-
-  // ---- Collapse toggle ---------------------------------------------------
-  function initCollapse(card) {
-    const btn = card.querySelector('[data-device-toggle]');
-    if (!btn) return;
-    btn.addEventListener('click', function () {
-      const collapsed = card.getAttribute('data-collapsed') === 'true';
-      card.setAttribute('data-collapsed', collapsed ? 'false' : 'true');
-      btn.setAttribute('aria-expanded', collapsed ? 'true' : 'false');
-    });
-  }
 
   // ---- Dirty tracking + sticky save bar ----------------------------------
   // v0.69.9: reverts the v0.69.6 always-visible-muted variant now
@@ -99,11 +46,21 @@
       if (bar) bar.hidden = true;
     }
 
+    // Device page: remember which section the edit happened in so the
+    // save redirect lands back on it (``_section`` hidden field).
+    const sectionField = form.id
+      ? document.querySelector('[data-section-field][form="' + form.id + '"]')
+      : null;
+    function noteSection(target) {
+      if (!sectionField || !target || !target.closest) return;
+      const sec = target.closest('[data-devsec]');
+      if (sec && sec.id) sectionField.value = sec.id;
+    }
     document.addEventListener('input', function (ev) {
-      if (ev.target && ev.target.form === form) markDirty();
+      if (ev.target && ev.target.form === form) { markDirty(); noteSection(ev.target); }
     });
     document.addEventListener('change', function (ev) {
-      if (ev.target && ev.target.form === form) markDirty();
+      if (ev.target && ev.target.form === form) { markDirty(); noteSection(ev.target); }
     });
     form.addEventListener('reset', function () {
       // Reset is synchronous but the inputs aren't updated until after
@@ -180,6 +137,220 @@
     }
     master.addEventListener('change', sync);
     sync();
+  }
+
+  // ---- Devices table (Settings › Devices) ------------------------------
+  // Each row toggles the quick panel under it; only one is open at a
+  // time. ``?opened=<id>`` in the URL mirrors the open row so a POST +
+  // 302 (register, add) lands with the same panel open.
+  function initDevicesTable(table) {
+    const rows = Array.from(table.querySelectorAll('[data-devrow]'));
+    function panelFor(row) {
+      const id = row.getAttribute('aria-controls');
+      return id ? document.getElementById(id) : null;
+    }
+    function setOpen(row, open) {
+      const panel = panelFor(row);
+      row.classList.toggle('is-open', open);
+      row.setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (panel) panel.hidden = !open;
+    }
+    function toggle(row) {
+      const opening = !row.classList.contains('is-open');
+      rows.forEach(function (r) { if (r !== row) setOpen(r, false); });
+      setOpen(row, opening);
+      const url = new URL(window.location.href);
+      if (opening) url.searchParams.set('opened', row.getAttribute('data-device-id') || '');
+      else url.searchParams.delete('opened');
+      history.replaceState(null, '', url.pathname + url.search);
+    }
+    rows.forEach(function (row) {
+      row.addEventListener('click', function (ev) {
+        // Links / buttons inside the row (none today) should not toggle.
+        if (ev.target.closest('a, button, input, select, form')) return;
+        toggle(row);
+      });
+      row.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); toggle(row); }
+      });
+    });
+
+    // Search + transport filter: client-side, over name / kind / id.
+    const search = document.querySelector('[data-devtable-search]');
+    const filter = document.querySelector('[data-devtable-filter]');
+    const empty = table.querySelector('[data-devtable-empty]');
+    function applyFilter() {
+      const q = (search ? search.value : '').trim().toLowerCase();
+      const t = filter ? filter.value : '';
+      let shown = 0;
+      rows.forEach(function (row) {
+        const hay = row.getAttribute('data-search') || '';
+        const okQ = !q || hay.indexOf(q) !== -1;
+        const okT = !t || row.getAttribute('data-transport') === t;
+        const show = okQ && okT;
+        row.hidden = !show;
+        const panel = panelFor(row);
+        if (panel && !show) { setOpen(row, false); }
+        if (show) shown += 1;
+      });
+      if (empty) empty.hidden = shown !== 0;
+    }
+    if (search) search.addEventListener('input', applyFilter);
+    if (filter) filter.addEventListener('change', applyFilter);
+  }
+
+  // Add device: the toolbar button reveals the (hidden by default) card.
+  function initAddDeviceToggle() {
+    const panel = document.querySelector('[data-add-panel]');
+    if (!panel) return;
+    document.querySelectorAll('[data-add-toggle]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const open = panel.hidden;
+        panel.hidden = !open;
+        document.querySelectorAll('[data-add-toggle]').forEach(function (b) {
+          b.setAttribute('aria-expanded', open ? 'true' : 'false');
+        });
+        if (open) {
+          panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          const first = panel.querySelector('input[type="text"], input:not([type="hidden"])');
+          if (first) first.focus({ preventScroll: true });
+        }
+      });
+    });
+  }
+
+  // Discovered banner: "Register <id>" (and the id chips) reveal that
+  // device's register row; the toolbar's "N discovered" reveals all of
+  // them; "Dismiss all" posts every dismiss form then reloads.
+  function initDiscoveredBanner() {
+    const banner = document.querySelector('[data-disc-banner]');
+    if (!banner) return;
+    const rows = Array.from(banner.querySelectorAll('[data-disc-row]'));
+    function reveal(id) {
+      rows.forEach(function (r) {
+        if (!id || r.getAttribute('data-disc-row') === id) r.hidden = false;
+      });
+      const target = id
+        ? banner.querySelector('[data-disc-row="' + id.replace(/"/g, '\\"') + '"]')
+        : rows[0];
+      if (target) {
+        const input = target.querySelector('input[name="name"]');
+        if (input) input.focus({ preventScroll: true });
+        target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }
+    banner.querySelectorAll('[data-disc-reveal]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        reveal(btn.getAttribute('data-disc-reveal'));
+      });
+    });
+    document.querySelectorAll('[data-disc-toggle]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const anyHidden = rows.some(function (r) { return r.hidden; });
+        if (anyHidden) {
+          reveal('');
+          banner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        } else {
+          rows.forEach(function (r) { r.hidden = true; });
+        }
+      });
+    });
+    // Arriving from the topbar "New devices" chip: open every register
+    // row and bring the banner into view.
+    if (new URLSearchParams(location.search).get('discovered')) {
+      reveal('');
+      banner.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    const dismissAll = banner.querySelector('[data-disc-dismiss-all]');
+    if (dismissAll) {
+      dismissAll.addEventListener('click', async function () {
+        const forms = Array.from(banner.querySelectorAll('[data-disc-dismiss-form]'));
+        if (!forms.length) return;
+        if (!window.confirm('Dismiss ' + (forms.length === 1 ? 'this device' : 'all ' + forms.length + ' devices') + '? They come back if they announce again.')) return;
+        dismissAll.disabled = true;
+        for (const f of forms) {
+          try {
+            await fetch(f.getAttribute('action'), {
+              method: 'POST',
+              credentials: 'same-origin',
+              redirect: 'manual',
+              headers: { 'X-Requested-With': 'fetch' },
+            });
+          } catch (e) { /* keep going, the reload shows what stuck */ }
+        }
+        window.location.reload();
+      });
+    }
+  }
+
+  // ---- Device page sub-nav ------------------------------------------
+  // Highlights the section nearest the top of the viewport and smooth-
+  // scrolls on click. Pure convenience: the links are plain anchors.
+  function initSubnav(nav) {
+    const links = Array.from(nav.querySelectorAll('[data-subnav-link]'));
+    const sections = links
+      .map(function (l) { return document.getElementById(l.getAttribute('data-subnav-link')); })
+      .filter(Boolean);
+    if (!sections.length) return;
+    function setActive(id) {
+      links.forEach(function (l) {
+        l.classList.toggle('is-active', l.getAttribute('data-subnav-link') === id);
+      });
+    }
+    let ticking = false;
+    function onScroll() {
+      if (ticking) return;
+      ticking = true;
+      window.requestAnimationFrame(function () {
+        ticking = false;
+        const probe = window.innerHeight * 0.25;
+        let current = sections[0].id;
+        sections.forEach(function (s) {
+          if (s.getBoundingClientRect().top <= probe) current = s.id;
+        });
+        setActive(current);
+      });
+    }
+    links.forEach(function (l) {
+      l.addEventListener('click', function (ev) {
+        const target = document.getElementById(l.getAttribute('data-subnav-link'));
+        if (!target) return;
+        ev.preventDefault();
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        history.replaceState(null, '', '#' + target.id);
+        setActive(target.id);
+        // On the phone strip, keep the active pill in view.
+        l.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      });
+    });
+    window.addEventListener('scroll', onScroll, { passive: true });
+    if (window.location.hash) {
+      const id = window.location.hash.slice(1);
+      if (document.getElementById(id)) setActive(id);
+    } else {
+      onScroll();
+    }
+  }
+
+  // ---- Orientation swap (device page Display section) ---------------
+  // Changing the ASPECT (landscape<->portrait) swaps width / height so
+  // the form stays WYSIWYG; flipping within the same aspect must not.
+  // Scoped by a wrapper because the inputs associate to the combined
+  // form via ``form=""`` rather than nesting inside it.
+  function initOrientSwap(root) {
+    const orient = root.querySelector('select[name="panel_orientation"]');
+    const w = root.querySelector('input[name="panel_w"]');
+    const h = root.querySelector('input[name="panel_h"]');
+    if (!orient || !w || !h) return;
+    const isPortrait = function (v) { return v.indexOf('portrait') === 0; };
+    let last = orient.value;
+    orient.addEventListener('change', function () {
+      if (isPortrait(orient.value) !== isPortrait(last)) {
+        const tmp = w.value; w.value = h.value; h.value = tmp;
+        w.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      last = orient.value;
+    });
   }
 
   // ---- Boot --------------------------------------------------------------
@@ -414,7 +585,7 @@
       if (!dev || !dev.w || !dev.h) return;
       // Works from both the device card (config field) and the Add-device
       // card (OpenDisplay branch), whichever holds this picker + panel inputs.
-      const card = root.closest('[data-device-body], [data-device-card], [data-add-device-card]');
+      const card = root.closest('[data-device-body], [data-device-card], [data-device-page], [data-add-device-card]');
       if (!card) return;
       const w = card.querySelector('input[name="panel_w"]');
       const h = card.querySelector('input[name="panel_h"]');
@@ -496,10 +667,11 @@
   }
 
   ready(function () {
-    document.querySelectorAll('[data-device-card]').forEach(function (card) {
-      initDeviceCard(card);
-      initCollapse(card);
-    });
+    document.querySelectorAll('[data-devtable]').forEach(initDevicesTable);
+    initAddDeviceToggle();
+    initDiscoveredBanner();
+    document.querySelectorAll('[data-subnav]').forEach(initSubnav);
+    document.querySelectorAll('[data-orient-swap]').forEach(initOrientSwap);
     document.querySelectorAll('[data-ha-device-picker]').forEach(initHaDevicePicker);
     document.querySelectorAll('[data-dirty-form]').forEach(initDirtyForm);
     initSaveBarStackObserver();

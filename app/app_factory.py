@@ -76,6 +76,21 @@ REPO_ROOT: Path = Path(__file__).resolve().parent.parent
 _MAX_THUMB_HEIGHT_MULTIPLIER: int = 8
 
 
+def _collect_discovered(app: Flask) -> list[dict[str, Any]]:
+    """Devices that announced themselves but are not registered yet, for
+    the topbar "new devices" chip. Reads the discovery cache only, so it
+    is cheap enough to run on every page render; never raises."""
+    cache = app.config.get("DISCOVERY_CACHE")
+    registry = app.config.get("DEVICE_REGISTRY")
+    if cache is None or registry is None:
+        return []
+    try:
+        known = set(registry.devices)
+        return [{"id": d.id, "kind": d.kind, "ip": d.ip} for d in cache.all() if d.id not in known]
+    except Exception:
+        return []
+
+
 def _collect_battery_status(app: Flask) -> list[dict[str, Any]]:
     """Snapshot of every registered device instance that reported a
     battery_pct in its last heartbeat. Returns a list of ``{id, name,
@@ -1234,6 +1249,7 @@ def create_app(
                 "online_features_unanswered": False,
                 "nav_admin_plugins": [],
                 "nav_batteries": [],
+                "nav_discovered": [],
                 "app_settings": app_settings,
                 "marketplace_restart_pending": False,
                 "community_discussions_url": "https://github.com/dmellok/tesserae/discussions",
@@ -1259,6 +1275,9 @@ def create_app(
                 key=lambda p: p.name.lower(),
             ),
             "nav_batteries": _collect_battery_status(app),
+            # Heard-but-unregistered devices; lights the topbar chip that
+            # links to the Devices tab with the register rows opened.
+            "nav_discovered": _collect_discovered(app),
             "app_settings": app_settings,
             # Lights the topbar "Restart required" button when set by
             # the marketplace install/uninstall routes. Cleared on

@@ -685,9 +685,9 @@ def test_device_card_exposes_picture_quality(app_with_gate: Flask) -> None:
         "/settings/devices/add",
         data={"id": "pi_lab", "kind": "pi_bin_client", "panel_preset": "inky_7_3"},
     )
-    body = client.get("/settings/devices").get_data(as_text=True)
+    body = client.get("/settings/devices/pi_lab/calibration").get_data(as_text=True)
     # Subsection titled after the renderer's base name.
-    assert "Pi BIN client — tone" in body
+    assert "Pi BIN client · tone" in body
     # Namespaced field names. Clone id is ``pi_bin__pi_lab``.
     assert 'name="pi_bin__pi_lab:dither"' in body
     assert 'name="pi_bin__pi_lab:saturation"' in body
@@ -723,12 +723,12 @@ def test_calibration_tone_dither_survives_familyless_gamut(app_with_gate: Flask)
             "pi_bin__kitchen_pi:saturation": "1.5",
         },
     )
-    body = client.get("/settings/devices").get_data(as_text=True)
+    body = client.get("/settings/devices/kitchen_pi/calibration").get_data(as_text=True)
     # Palette recalibration block correctly hidden for a familyless
     # gamut (no matching palette family).
     assert "Palette recalibration" not in body
     # But the tone & dither picture-quality block MUST still render.
-    assert "Pi BIN client — tone" in body
+    assert "Pi BIN client · tone" in body
     assert 'name="pi_bin__kitchen_pi:dither"' in body
     assert 'name="pi_bin__kitchen_pi:saturation"' in body
     assert 'name="pi_bin__kitchen_pi:contrast"' in body
@@ -755,7 +755,7 @@ def test_calibration_block_survives_save_when_instance_id_collides_with_base(
     client.post("/settings/devices/add", data={"id": "pi_bin", "kind": "pi_bin_client"})
 
     # First render (equivalent to a fresh process): block is present.
-    body_before = client.get("/settings/devices").get_data(as_text=True)
+    body_before = client.get("/settings/devices/pi_bin/calibration").get_data(as_text=True)
     assert 'name="pi_bin__pi_bin:dither"' in body_before
 
     # Combined-form save (change a slider), exactly what the user does.
@@ -773,8 +773,8 @@ def test_calibration_block_survives_save_when_instance_id_collides_with_base(
     )
 
     # After the save, without a restart, the block must still be there.
-    body_after = client.get("/settings/devices").get_data(as_text=True)
-    assert "Pi BIN client — tone" in body_after
+    body_after = client.get("/settings/devices/pi_bin/calibration").get_data(as_text=True)
+    assert "Pi BIN client · tone" in body_after
     assert 'name="pi_bin__pi_bin:dither"' in body_after
     assert 'name="pi_bin__pi_bin:saturation"' in body_after
     assert 'name="pi_bin__pi_bin:contrast"' in body_after
@@ -794,9 +794,10 @@ def test_device_card_exposes_pi_png_settings(app_with_gate: Flask) -> None:
         "/settings/devices/add",
         data={"id": "png_lab", "kind": "pi_png_client", "panel_preset": "inky_7_3"},
     )
-    body = client.get("/settings/devices").get_data(as_text=True)
-    assert "Pi PNG client — rendering" in body
-    assert "Pi PNG client — tone" in body
+    body = client.get("/settings/devices/png_lab").get_data(as_text=True)
+    assert "Pi PNG client · rendering" in body
+    body += client.get("/settings/devices/png_lab/calibration").get_data(as_text=True)
+    assert "Pi PNG client · tone" in body
     assert 'name="pi_png__png_lab:rotate"' in body
     assert 'name="pi_png__png_lab:scale"' in body
     assert 'name="pi_png__png_lab:bg"' in body
@@ -921,7 +922,7 @@ def test_calibrate_pushes_card_and_shows_answer_form(app_with_gate: Flask) -> No
     assert resp.status_code == 302
     assert "calibrating=esp32_lab" in resp.location
     # The follow-up page renders the "which number is top-left?" choices.
-    body = client.get("/settings/devices?calibrating=esp32_lab").get_data(as_text=True)
+    body = client.get("/settings/devices/esp32_lab?calibrating=esp32_lab").get_data(as_text=True)
     assert "which number is in the top-left" in body.lower()
     assert 'name="top_left" value="1"' in body
 
@@ -1007,8 +1008,8 @@ def test_debug_section_surfaces_resolved_renderer_and_version(app_with_gate: Fla
         "/settings/devices/add",
         data={"id": "esp32_kitchen", "kind": "esp32_client", "name": "Kitchen"},
     )
-    body = client.get("/settings/devices").get_data(as_text=True)
-    assert "Debug &amp; diagnostics" in body, "expected the Debug summary label on the device card"
+    body = client.get("/settings/devices/esp32_kitchen").get_data(as_text=True)
+    assert "Debug &amp; diagnostics" in body, "expected the Debug summary label on the device page"
     # Tesserae version shows in the debug block.
     assert app_with_gate.config["APP_VERSION"] in body
     # Renderer clone id follows the ``<renderer>__<instance>`` convention
@@ -1058,7 +1059,7 @@ def test_device_card_shows_device_id_and_mac(app_with_gate: Flask) -> None:
         b'{"kind":"pico_bin_client","transport":"rest","mac":"AA:BB:CC:DD:EE:FF"}',
     )
     client.post("/settings/devices/discovery/pico_garage/register", follow_redirects=False)
-    body = client.get("/settings/devices").get_data(as_text=True)
+    body = client.get("/settings/devices/pico_garage").get_data(as_text=True)
     assert "Device id" in body
     assert "AA:BB:CC:DD:EE:FF" in body
 
@@ -1066,7 +1067,7 @@ def test_device_card_shows_device_id_and_mac(app_with_gate: Flask) -> None:
     # rather than silently omitting the row.
     client.post("/settings/devices/add", data={"id": "pico_shed", "kind": "pico_bin_client"})
     client.post("/settings/devices/pico_shed/set-transport", data={"transport": "rest"})
-    body = client.get("/settings/devices").get_data(as_text=True)
+    body = client.get("/settings/devices/pico_shed").get_data(as_text=True)
     assert "not recorded" in body
 
 
@@ -1282,10 +1283,10 @@ def test_device_card_renders_humanized_status_tiles(app_with_gate: Flask) -> Non
             "humidity_pct": 58.2,
         },
     }
-    body = client.get("/settings/devices").get_data(as_text=True)
+    body = client.get("/settings/devices/esp32_lab").get_data(as_text=True)
     # Core tiles plus optional environmental telemetry render.
     assert "Signal" in body
-    assert "Power" in body
+    assert "Battery" in body
     assert "Firmware" in body
     assert "Environment" in body
     # Humanized signal label + dBm sub-line.
@@ -1468,7 +1469,7 @@ def test_quiet_hours_weekday_pickers_render_on_both_layers(
     server = client.get("/settings/server").get_data(as_text=True)
     assert 'name="quiet_hours_days"' in server and 'name="quiet_hours_all_day"' in server
     assert 'name="quiet_hours_sleep"' in server
-    devices = client.get("/settings/devices").get_data(as_text=True)
+    devices = client.get("/settings/devices/esp32_lab").get_data(as_text=True)
     assert "days-picker" in devices
     import re
 

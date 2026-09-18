@@ -43,8 +43,8 @@ macro here instead.
 {#- All input-rendering macros take an optional ``form`` parameter
     (v0.69.9): when set, renders as the HTML5 ``form="<id>"`` attribute
     on the input element so the input submits to a form it isn't a
-    descendant of. Used by ``_device_card.html`` to work around the
-    HTML5 nested-forms restriction: the device card's outer combined
+    descendant of. Used by ``device_page.html`` to work around the
+    HTML5 nested-forms restriction: the device page's outer combined
     form and the per-endpoint calibrate / palette / tone forms would
     otherwise nest inside each other, and the first inner </form>
     would close the outer form early. Explicit ``form`` attribute

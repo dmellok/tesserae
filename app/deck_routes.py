@@ -11,8 +11,10 @@ from __future__ import annotations
 
 import contextlib
 import json
+import math
 import re
-from datetime import datetime, timedelta
+import time
+from datetime import datetime, timedelta, tzinfo
 from typing import Any, Literal, cast
 
 from flask import (
@@ -190,6 +192,80 @@ def _live_map() -> dict[str, tuple[str | None, str | None]]:
     return out
 
 
+def _mins_label(minutes: int) -> str:
+    """``32 min`` / ``1 h 5 min`` / ``2 h``; under a minute reads ``<1 min``."""
+    minutes = max(0, int(minutes))
+    if minutes < 1:
+        return "<1 min"
+    if minutes < 60:
+        return f"{minutes} min"
+    hours, rest = divmod(minutes, 60)
+    return f"{hours} h {rest} min" if rest else f"{hours} h"
+
+
+def _hhmm(epoch: float, tz: tzinfo) -> str:
+    return datetime.fromtimestamp(epoch, tz=tz).strftime("%H:%M")
+
+
+def _panel_states(devices: list[Any]) -> dict[str, dict[str, Any]]:
+    """What each display holds right now, as far as the server can tell:
+    ``device_id -> {page_id, at, verb, next_wake}``.
+
+    A REST display fetches frames itself, so the frame on its glass is the
+    one it last served (``last_served_render_for``), stamped when the served
+    digest changed: ``verb`` is ``fetched``. When the latest render has not
+    been fetched yet the panel still holds the previous one, whose page is
+    known only while the grace copy survives; otherwise the page is
+    ``None`` and no claim is made. Every other transport has no handover to
+    observe, so the current render's publish moment stands in: ``sent``.
+
+    ``next_wake`` is the telemetry prediction for the display's next
+    check-in when one exists and is still ahead; there is no guess
+    otherwise."""
+    push = current_app.config.get("PUSH_MANAGER")
+    telemetry = current_app.config.get("DEVICE_TELEMETRY")
+    now_ts = time.time()
+    out: dict[str, dict[str, Any]] = {}
+    for d in devices:
+        pull = getattr(d, "transport", "mqtt") == "rest"
+        page_id: Any = None
+        at: Any = None
+        latest_fn = getattr(push, "latest_render_for", None)
+        latest = latest_fn(d.id) if callable(latest_fn) else None
+        if isinstance(latest, dict):
+            if pull:
+                served_fn = getattr(push, "last_served_render_for", None)
+                served = served_fn(d.id) if callable(served_fn) else None
+                if isinstance(served, dict):
+                    at = served.get("served_at")
+                    if served.get("digest") == latest.get("digest"):
+                        page_id = latest.get("page_id")
+                    else:
+                        prev_fn = getattr(push, "previous_render_for", None)
+                        prev = prev_fn(d.id, max_age_s=math.inf) if callable(prev_fn) else None
+                        if isinstance(prev, dict) and prev.get("digest") == served.get("digest"):
+                            page_id = prev.get("page_id")
+            else:
+                page_id = latest.get("page_id")
+                at = latest.get("timestamp")
+        next_wake: float | None = None
+        if telemetry is not None:
+            try:
+                entry = telemetry.get(d.id)
+            except Exception:
+                entry = None
+            predicted = getattr(entry, "predicted_next_wake_at", None)
+            if isinstance(predicted, (int, float)) and predicted > now_ts:
+                next_wake = float(predicted)
+        out[d.id] = {
+            "page_id": page_id if isinstance(page_id, str) and page_id else None,
+            "at": float(at) if isinstance(at, (int, float)) else None,
+            "verb": "fetched" if pull else "sent",
+            "next_wake": next_wake,
+        }
+    return out
+
+
 def _nav_badge(deck: Deck) -> str:
     """Card badge for a navigable deck.
 
@@ -321,6 +397,53 @@ def _design_cards(
     deck_devices = deck_devices or {}
     thumbs = _page_thumbs(pages)
     live = _live_map()
+    panel_states = _panel_states(devices)
+
+    def cycle_for_display(card: dict[str, Any], device_id: str | None) -> dict[str, Any]:
+        """A rotation row as one display sees it: the frame on that panel,
+        and whether the step the server intends has reached it yet. The
+        planned strip marks the intended step live when the panel shows
+        it, waiting when it does not; a panel whose page the server cannot
+        name raises no alarm. Other kinds pass through unchanged."""
+        if card["kind"] != "cycle":
+            return card
+        state = panel_states.get(device_id) if device_id else None
+        intended = card["planned_page_id"]
+        on_panel: dict[str, Any] | None = None
+        waiting = False
+        if state is not None and state["page_id"]:
+            pid = state["page_id"]
+            at = state["at"]
+            on_panel = {
+                "page_id": pid,
+                "name": page_names.get(pid, pid),
+                "thumb": thumbs.get(pid, ""),
+                "at_label": f"{state['verb']} {_hhmm(at, tz)}" if at is not None else None,
+            }
+            waiting = intended is not None and pid != intended
+        behind: int | None = None
+        start = card["dwell_start_epoch"]
+        if waiting and isinstance(start, (int, float)):
+            behind = max(0, int((now_ts - start) // 60))
+        next_poll = None
+        if waiting and state is not None and state["next_wake"] is not None:
+            next_poll = _hhmm(state["next_wake"], tz)
+        out = dict(card)
+        out["screens"] = [
+            {**s, "live": s["intended"] and not waiting, "waiting": s["intended"] and waiting}
+            for s in card["screens"]
+        ]
+        out["on_panel"] = on_panel
+        out["panel_empty_label"] = (
+            "not fetched yet"
+            if state is not None and state["verb"] == "fetched"
+            else "nothing sent yet"
+        )
+        out["waiting"] = waiting
+        out["behind_minutes"] = behind
+        out["behind_label"] = f"{_mins_label(behind)} behind" if behind is not None else None
+        out["next_poll_label"] = next_poll
+        return out
 
     def resolve_devices(explicit: list[str], page_ids: list[str]) -> list[str]:
         """Displays a record lands on: its own binding, else the union of
@@ -370,6 +493,9 @@ def _design_cards(
             "thumb": thumbs.get(pid, ""),
             "index": index,
             "live": is_live,
+            # The step the server intends, before any display's view of it
+            # splits ``live`` into live-or-waiting (see cycle_for_display).
+            "intended": is_live,
             "cond": has_conditions,
         }
 
@@ -440,11 +566,34 @@ def _design_cards(
         n = len(r.steps)
         play_next = ((step_index or 0) + 1) % n if n else 0
         rot_device_ids = resolve_devices(r.device_ids, [s.page_id for s in r.steps])
+        # The current dwell window: how far through it the rotation is, and
+        # how long until the next advance. Both come from the same step
+        # state ``next_advance`` does, so the bar and the time agree.
+        dwell_start = cur.get("step_started_epoch") if active else None
+        dwell_start_label = None
+        dwell_pct = None
+        next_in_label = None
+        if (
+            isinstance(dwell_start, (int, float))
+            and isinstance(nxt, (int, float))
+            and nxt > dwell_start
+        ):
+            dwell_start_label = _hhmm(dwell_start, tz)
+            dwell_pct = round(
+                min(100.0, max(0.0, (now_ts - dwell_start) / (nxt - dwell_start) * 100))
+            )
+            next_in_label = f"in {_mins_label(math.ceil(max(0.0, nxt - now_ts) / 60))}"
         cards.append(
             {
                 "kind": "cycle",
                 "id": r.id,
                 "name": r.name,
+                "planned_page_id": current_page,
+                "planned_step_index": step_index,
+                "dwell_start_epoch": dwell_start if isinstance(dwell_start, (int, float)) else None,
+                "dwell_start_label": dwell_start_label,
+                "dwell_pct": dwell_pct,
+                "next_in_label": next_in_label,
                 "warning": binding_warning(r.device_ids, [s.page_id for s in r.steps]),
                 "enabled": r.enabled,
                 "playing": playing,
@@ -534,6 +683,10 @@ def _design_cards(
     for card in cards:
         card["is_new"] = highlight_id is not None and card["id"] == highlight_id
     cards.sort(key=lambda c: str(c["name"]).lower())
+    # The flat list carries each rotation as its first display sees it, so
+    # callers reading ``cards`` get the on-panel fields too; the per-display
+    # sections below resolve the same row against their own panel.
+    cards = [cycle_for_display(c, c["device_ids"][0] if c["device_ids"] else None) for c in cards]
 
     # One section per display, in registry order; a card targeting several
     # displays appears under each. Displays with nothing lined up are
@@ -547,17 +700,30 @@ def _design_cards(
         return sum(counted) if counted else None
 
     for d in devices:
-        dev_cards = [c for c in cards if d.id in c["device_ids"]]
+        dev_cards = [cycle_for_display(c, d.id) for c in cards if d.id in c["device_ids"]]
         if not dev_cards:
             continue
-        rec = live.get(d.id)
-        live_pid = rec[1] if rec else None
+        # "showing" is what the panel holds, the same resolution the
+        # on-panel column uses, so the header never contradicts the card
+        # beneath it (#280). The nav / latest-render view stands in only
+        # when the panel's page is unknown.
+        state = panel_states.get(d.id) or {}
+        live_pid = state.get("page_id")
+        showing_title = None
+        if live_pid:
+            at = state.get("at")
+            if at is not None:
+                showing_title = f"{state['verb']} {_hhmm(at, tz)}"
+        else:
+            rec = live.get(d.id)
+            live_pid = rec[1] if rec else None
         groups.append(
             {
                 "id": d.id,
                 "name": device_names.get(d.id, d.id),
                 "icon": d.icon,
                 "showing": page_names.get(live_pid, live_pid) if live_pid else None,
+                "showing_title": showing_title,
                 "thumb": thumbs.get(live_pid, "") if live_pid else "",
                 "refreshes_today": refresh_total(dev_cards),
                 "cards": dev_cards,

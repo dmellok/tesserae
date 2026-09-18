@@ -293,8 +293,8 @@ def test_display_group_carries_live_status_and_device_chip(app: Flask) -> None:
     # The display's section exists and reports what it is showing.
     assert 'id="display-panel"' in body
     assert "dk-group-live" in body and "showing Hall" in body
-    # The bound row carries a device chip naming the display.
-    assert "dk-devchip" in body
+    # The section header names the display; the row no longer repeats it.
+    assert "dk-devchip" not in body
     # The live screen card lights up on the playing row.
     assert "dk-screen is-live" in body
 
@@ -694,3 +694,215 @@ def test_disabled_timed_rows_show_no_count(app: Flask) -> None:
     body = client.get("/decks").get_data(as_text=True)
     assert "Morning brief" in body
     assert "refreshes today" not in body
+
+
+# -- rotation rows: what the panel holds vs what the server intends ----------
+
+
+def _seed_loop_on(app: Flask, device_id: str) -> None:
+    """A two-step rotation bound to ``device_id``, anchored at midnight so
+    it is active whenever the test runs."""
+    app.config["ROTATION_STORE"].upsert(
+        Rotation(
+            id="loop",
+            name="Kitchen loop",
+            device_ids=[device_id],
+            steps=[
+                RotationStep(page_id="kitchen", dwell_minutes=15),
+                RotationStep(page_id="hall", dwell_minutes=15),
+            ],
+        )
+    )
+
+
+def _intended_page(app: Flask) -> str:
+    from app.rotation_routes import _current_step_for_each
+
+    with app.test_request_context("/"):
+        cur = _current_step_for_each(app.config["ROTATION_STORE"].all())
+    page = cur["loop"]["page_id"]
+    assert page in ("kitchen", "hall")
+    return page
+
+
+def _other(page: str) -> str:
+    return "hall" if page == "kitchen" else "kitchen"
+
+
+def _stamp_render(app: Flask, device_id: str, **fields) -> None:
+    push = app.config["PUSH_MANAGER"]
+    push._latest_renders[device_id] = {
+        "digest": "new",
+        "ext": "png",
+        "filename": "new.png",
+        "renderer_id": "r",
+        "timestamp": 1_700_000_000.0,
+        **fields,
+    }
+
+
+def test_rotation_row_marks_intended_step_waiting_until_the_panel_fetches_it(
+    app: Flask,
+) -> None:
+    """A REST display still holding the previous step: the on-panel column
+    shows that frame with its fetch time, the intended step carries the
+    WAITING ribbon with how far behind the panel is and when it polls next,
+    and the strip has no live step."""
+    import time as _time
+
+    client = app.test_client()
+    _sign_in(client)
+    _register_display(app, client, "panel")
+    device = app.config["DEVICE_REGISTRY"].devices["panel"]
+    assert device.transport == "rest"
+    _seed_loop_on(app, "panel")
+    intended = _intended_page(app)
+    now = _time.time()
+    push = app.config["PUSH_MANAGER"]
+    # Latest render is the intended page; the panel last fetched the older
+    # digest, whose grace copy names the other page.
+    _stamp_render(
+        app,
+        "panel",
+        page_id=intended,
+        last_served_digest="old",
+        last_served_at=now - 1800,
+    )
+    push._previous_renders["panel"] = {
+        "digest": "old",
+        "page_id": _other(intended),
+        "superseded_at": now - 600,
+    }
+    app.config["DEVICE_TELEMETRY"].record_heartbeat(
+        "panel", received_at=now - 60, parsed={"next_sleep_s": 900}, configured_sleep_s=900
+    )
+
+    body = client.get("/decks").get_data(as_text=True)
+    section = body[body.index('id="display-panel"') :]
+    assert "dk-screen dk-screen--panel is-live" in section
+    assert re.search(r'class="dk-screen-at">fetched \d\d:\d\d<', section)
+    # The header agrees with the on-panel column (#280): it names the page
+    # the panel holds, not the one the server intends, with the fetch time
+    # as its title. The badge and border still follow server intent.
+    other_name = _other(intended).title()
+    assert re.search(
+        r'class="dk-group-live" title="fetched \d\d:\d\d">.*?showing ' + other_name,
+        section,
+        re.S,
+    )
+    assert f"showing {intended.title()}" not in section
+    assert "dk-row is-playing" in section and "Playing · Rotation" in section
+    assert "dk-screen is-waiting" in section
+    assert 'class="dk-ribbon is-warn">waiting' in section
+    assert re.search(r'class="dk-behind">\d+ min behind · poll ≈ \d\d:\d\d<', section)
+    # The intended step is waiting, not live; only the on-panel frame is live.
+    assert 'class="dk-screen is-live"' not in section
+    assert "dk-progress" in section
+    assert "Send now" not in body and "next fire" not in body
+    assert "Push now" in body
+
+
+def test_rotation_row_reads_live_once_the_panel_shows_the_intended_step(
+    app: Flask,
+) -> None:
+    """An MQTT display whose last publish is the intended page: no waiting
+    state, the strip's intended step is live, the on-panel caption says
+    when it was sent."""
+    client = app.test_client()
+    _sign_in(client)
+    _register_display(app, client, "panel")
+    device = app.config["DEVICE_REGISTRY"].devices["panel"]
+    device.manifest["transport"] = "mqtt"
+    assert device.transport == "mqtt"
+    _seed_loop_on(app, "panel")
+    _stamp_render(app, "panel", page_id=_intended_page(app))
+
+    body = client.get("/decks").get_data(as_text=True)
+    section = body[body.index('id="display-panel"') :]
+    assert re.search(r'class="dk-screen-at">sent \d\d:\d\d<', section)
+    assert "is-waiting" not in section and "dk-behind" not in section
+    assert 'class="dk-screen is-live"' in section
+    assert re.search(r'role="progressbar"[^>]*aria-valuenow="\d+"', section)
+
+
+def test_rotation_row_raises_no_alarm_when_the_panel_page_is_unknown(app: Flask) -> None:
+    """Nothing served yet: an empty on-panel column, and the intended step
+    stays live rather than waiting on evidence the server does not have."""
+    client = app.test_client()
+    _sign_in(client)
+    _register_display(app, client, "panel")
+    _seed_loop_on(app, "panel")
+
+    body = client.get("/decks").get_data(as_text=True)
+    section = body[body.index('id="display-panel"') :]
+    assert "dk-screen dk-screen--panel is-empty" in section
+    assert "not fetched yet" in section
+    assert "is-waiting" not in section
+    assert 'class="dk-screen is-live"' in section
+
+
+def test_cycle_card_view_model_carries_panel_and_dwell_fields(app: Flask) -> None:
+    import time as _time
+
+    from app.deck_routes import _design_cards
+    from app.rotation_routes import _current_step_for_each
+
+    client = app.test_client()
+    _sign_in(client)
+    _register_display(app, client, "panel")
+    _seed_loop_on(app, "panel")
+    intended = _intended_page(app)
+    now = _time.time()
+    _stamp_render(
+        app,
+        "panel",
+        page_id=intended,
+        last_served_digest="old",
+        last_served_at=now - 1800,
+    )
+    app.config["PUSH_MANAGER"]._previous_renders["panel"] = {
+        "digest": "old",
+        "page_id": _other(intended),
+        "superseded_at": now - 600,
+    }
+    rotations = app.config["ROTATION_STORE"].all()
+    pages = app.config["PAGE_STORE"].list_active()
+    devices = [d for d in app.config["DEVICE_REGISTRY"].all() if d.kind_of is not None]
+    with app.test_request_context("/decks"):
+        design = _design_cards(
+            nav_decks=[],
+            rotations=rotations,
+            schedules=[],
+            current_step=_current_step_for_each(rotations),
+            schedule_status={},
+            pages=pages,
+            devices=devices,
+        )
+    card = design["groups"][0]["cards"][0]
+    assert card["planned_page_id"] == intended
+    assert design["groups"][0]["showing"] == _other(intended).title()
+    assert design["groups"][0]["showing_title"].startswith("fetched ")
+    assert card["planned_step_index"] == card["step_index"]
+    assert card["on_panel"]["page_id"] == _other(intended)
+    assert card["on_panel"]["at_label"].startswith("fetched ")
+    assert card["waiting"] is True
+    assert isinstance(card["behind_minutes"], int) and card["behind_minutes"] >= 0
+    assert card["behind_label"].endswith(" behind")
+    assert card["next_poll_label"] is None  # no telemetry, no guess
+    assert 0 <= card["dwell_pct"] <= 100
+    assert re.fullmatch(r"\d\d:\d\d", card["dwell_start_label"])
+    assert card["next_in_label"].startswith("in ")
+    assert [s["waiting"] for s in card["screens"]].count(True) == 1
+    assert not any(s["live"] for s in card["screens"])
+    # The flat list resolves the row against its first display the same way.
+    flat = next(c for c in design["cards"] if c["kind"] == "cycle")
+    assert flat["waiting"] is True and flat["on_panel"]["page_id"] == _other(intended)
+
+
+def test_mins_label_shapes() -> None:
+    from app.deck_routes import _mins_label
+
+    assert _mins_label(0) == "<1 min"
+    assert _mins_label(32) == "32 min"
+    assert _mins_label(60) == "1 h"
+    assert _mins_label(125) == "2 h 5 min"

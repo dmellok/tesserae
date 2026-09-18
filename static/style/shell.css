@@ -237,6 +237,43 @@
   box-shadow: 0 0 0 2px var(--t-surface, #fff);
   pointer-events: none;
 }
+/* "New devices" chip: heard-but-unregistered devices. Sits first in the
+   right-hand cluster, so it takes the auto margin and hands the tight
+   4px spacing to whatever follows it (batteries, restart, theme). */
+.topbar-discovered--topbar {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: var(--t-radius-sm);
+  color: var(--t-accent) !important;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.topbar-discovered--topbar:hover { background: var(--t-accent-soft); }
+.topbar-discovered--topbar > .ph-bold { font-size: 18px; }
+.topbar-discovered-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--t-accent);
+  color: var(--t-accent-fg);
+  font-size: 0.7rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.topbar-discovered--topbar ~ .topbar-batteries--topbar,
+.topbar-discovered--topbar ~ .theme-toggle--topbar,
+.topbar-discovered--topbar ~ .topbar-optin { margin-left: 4px; }
+.topbar-discovered--topbar ~ .topbar-restart-form { margin-left: 0; }
+.topnav .topbar-discovered--drawer { display: none; }
 .topbar-batteries { position: relative; }
 .topbar-batteries--topbar { margin-left: auto; }
 /* Push the theme-toggle's auto-margin off when the indicator is
@@ -438,6 +475,29 @@
      so the specificity beats the generic .topnav a inline-flex rule
      (otherwise the <a>-wrapped drawer batteries inherit nav-link
      layout instead of the block list shape we want here). */
+  .topbar-discovered--topbar { display: none; }
+  .topnav .topbar-discovered--drawer {
+    display: block;
+    padding: var(--t-space-3) var(--t-space-3);
+    color: var(--t-accent);
+    font-size: 0.85rem;
+  }
+  .topnav .topbar-discovered--drawer .topbar-discovered-label {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--t-space-2);
+    font-weight: 600;
+  }
+  .topnav .topbar-discovered--drawer .ph-bold { font-size: 18px; }
+  .topnav .topbar-discovered-drawer-list {
+    list-style: none;
+    margin: var(--t-space-1) 0 0;
+    padding: 0 0 0 26px;
+    color: var(--t-fg-soft);
+    font-size: 0.8rem;
+  }
+  .topnav .topbar-discovered-drawer-list li { display: flex; gap: var(--t-space-2); }
+  .topnav .topbar-discovered-id { font-family: var(--t-font-mono); }
   .topbar-batteries--topbar { display: none; }
   .topnav .topbar-batteries--drawer {
     display: block;

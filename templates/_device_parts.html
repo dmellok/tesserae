@@ -1,0 +1,72 @@
+{# Small building blocks shared by the Devices table (quick panel), the
+   device page and the calibration page. Import with context so
+   ``url_for`` and ``request`` resolve inside the macros. #}
+
+{# One headline tile: mono uppercase label, big value, mono sub-line.
+   ``t`` is one of the dicts ``_device_overview`` builds (value / sub /
+   muted / low). #}
+{%- macro stat_tile(label, t) -%}
+<div class="dx-qtile">
+  <span class="dx-qtile-label">{{ label }}</span>
+  <span class="dx-qtile-value{% if t.muted %} is-muted{% endif %}{% if t.low %} is-warn{% endif %}">{{ t.value }}</span>
+  <span class="dx-qtile-sub">{{ t.sub or '' }}</span>
+</div>
+{%- endmacro -%}
+
+{# The four tiles every overview shows, in the order the mockups fix. #}
+{%- macro overview_tiles(section) -%}
+{{ stat_tile('Showing', section.overview.showing) }}
+{{ stat_tile('Battery', section.overview.battery) }}
+{{ stat_tile('Firmware', section.overview.firmware) }}
+{{ stat_tile('Next wake', section.overview.next_wake) }}
+{%- endmacro -%}
+
+{# Latest-render thumbnail, or a placeholder when nothing has been
+   pushed yet. The size is set by the caller's CSS class. #}
+{%- macro render_thumb(section, extra_class='') -%}
+<div class="dx-thumb {{ extra_class }}">
+  {% if section.overview.has_render %}
+  <img src="{{ section.preview_url }}" alt="Latest render on {{ section.device_name }}" loading="lazy">
+  {% else %}
+  <span class="dx-thumb-empty"><i class="ph ph-image" aria-hidden="true"></i><span>No render yet</span></span>
+  {% endif %}
+</div>
+{%- endmacro -%}
+
+{# "online · seen 2 min ago" with a coloured dot; stale / never variants. #}
+{%- macro device_status(section) -%}
+{% set h = section.status.health %}
+<span class="dx-devstatus is-{{ h }}">
+  <span class="dx-dot is-{{ h }}" aria-hidden="true"></span>
+  {% if h == 'ok' %}online · seen {{ section.status.relative }}
+  {% elif h == 'warn' %}quiet · seen {{ section.status.relative }}
+  {% elif h == 'stale' %}stale · seen {{ section.status.relative }}
+  {% else %}no heartbeat yet{% endif %}
+</span>
+{%- endmacro -%}
+
+{# Header actions shared by the device page and the quick panel:
+   Preview (raw PNG), Mirror (auto-refreshing page), Push now, and the
+   Touch monitor for digitizer panels. ``size`` is '' or 'is-sm'. #}
+{%- macro device_actions(section, size='', with_touch=True) -%}
+<a class="dx-btn {{ size }}" href="{{ section.preview_url }}" target="_blank" rel="noopener"
+   title="Latest composition PNG, raw image (good for Home Assistant, Grafana, etc).">
+  <i class="ph ph-image" aria-hidden="true"></i><span>Preview</span>
+</a>
+<a class="dx-btn {{ size }}" href="{{ section.mirror_url }}" target="_blank" rel="noopener"
+   title="Auto-refreshing browser page (good for iPad / kiosk dashboards).">
+  <i class="ph ph-monitor-play" aria-hidden="true"></i><span>Mirror</span>
+</a>
+<form method="post" action="{{ section.push_now_endpoint }}" class="form form--inline">
+  <button type="submit" class="dx-btn {{ size }}"
+          title="Re-send the page this display is on (its lineup step, or the last page pushed to it).">
+    <i class="ph ph-paper-plane-tilt" aria-hidden="true"></i><span>Push now</span>
+  </button>
+</form>
+{% if with_touch and section.touch_monitor_url %}
+<a class="dx-btn {{ size }}" href="{{ section.touch_monitor_url }}"
+   title="Live view of taps, swipes and sliders landing on this panel.">
+  <i class="ph ph-hand-tap" aria-hidden="true"></i><span>Touch monitor</span>
+</a>
+{% endif %}
+{%- endmacro -%}

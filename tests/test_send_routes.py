@@ -52,19 +52,40 @@ def _png_bytes(w: int = 50, h: int = 50) -> bytes:
     return buf.getvalue()
 
 
-def test_send_index_renders_all_tabs(app: Flask) -> None:
+def test_send_index_renders_the_one_box(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
     resp = client.get("/send")
     body = resp.get_data(as_text=True)
     assert resp.status_code == 200
-    # History moved to its own /history page (top-level nav). Saved-
-    # dashboard sends live on the Dashboards page (per-row Send + the
-    # editor Push-now button), so only the arbitrary-input tabs live
-    # on /send now.
-    for slug in ("file", "url", "webpage"):
-        assert f"tab-{slug}" in body
-        assert f"tab={slug}" in body
+    # One form; the page script points it at the endpoint for the
+    # detected kind. Every endpoint is wired as a data attribute.
+    assert "data-send-form" in body
+    for action in ("file", "url", "webpage", "gallery", "note"):
+        assert f'data-action-{action}="/send/{action}"' in body
+    # The kind control is a radio group with the three kinds.
+    assert 'role="radiogroup"' in body
+    for kind in ("image", "note", "webpage"):
+        assert f'name="kind" value="{kind}"' in body
+    # Options live in a real <details>, closed by default.
+    assert '<details class="send-options"' in body
+    assert '<details class="send-options" data-send-options open' not in body
+    # The old tab strip is gone.
+    assert "tab-file" not in body
+    assert 'role="tablist"' not in body
+
+
+def test_send_index_maps_legacy_tab_params_to_a_kind(app: Flask) -> None:
+    """Old bookmarks and the error redirects still carry ``?tab=``; the
+    page opens on the matching kind rather than 404ing or ignoring it."""
+    client = app.test_client()
+    _sign_in(client)
+    body = client.get("/send?tab=webpage").get_data(as_text=True)
+    assert 'data-initial-kind="webpage"' in body
+    body = client.get("/send?tab=url").get_data(as_text=True)
+    assert 'data-initial-kind="image"' in body
+    body = client.get("/send?kind=note").get_data(as_text=True)
+    assert 'data-initial-kind="note"' in body
 
 
 def test_file_upload_invokes_push_image(app: Flask) -> None:
@@ -503,8 +524,11 @@ def test_gallery_query_shows_section(app: Flask, tmp_path: Path, monkeypatch) ->
     client = app.test_client()
     _sign_in(client)
     body = client.get("/send?g_folder=trips&g_file=p.jpg").get_data(as_text=True)
-    assert 'id="tab-gallery"' in body
+    # The gallery image is preselected as kind Image and shown in the box.
     assert 'name="g_file" value="p.jpg"' in body
+    assert 'data-initial-kind="image"' in body
+    assert 'data-gallery-name="p.jpg"' in body
+    assert "/trips/p.jpg" in body  # served image url for the thumbnail + preview
     assert 'name="fit"' in body  # fit picker present
 
 
@@ -586,3 +610,166 @@ def test_send_page_survives_device_with_invalid_panel(app: Flask) -> None:
     assert good in body
     # The broken device's id mustn't appear as a checkbox value.
     assert 'value="broken"' not in body
+
+
+# ----- Note kind -------------------------------------------------------
+
+
+def _register_sized_device(client, device_id: str, preset: str) -> str:
+    resp = client.post(
+        "/settings/devices/add",
+        data={"id": device_id, "kind": "esp32_client", "panel_preset": preset},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302, resp.data
+    return device_id
+
+
+def test_send_note_renders_at_each_ticked_displays_size(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """One render + one push per ticked display, each at that display's own
+    panel size, through push_image with source ``note`` so History shows
+    the origin and the headline."""
+    client = app.test_client()
+    _sign_in(client)
+    big = _register_sized_device(client, "big", "inky_13_3")
+    small = _register_sized_device(client, "small", "inky_7_3")
+    renders: list[dict] = []
+
+    def fake_render(text: str, **kwargs):
+        renders.append({"text": text, **kwargs})
+        return _png_bytes(kwargs["w"], kwargs["h"])
+
+    import app.send_routes as send_routes
+
+    monkeypatch.setattr(send_routes, "render_note_png", fake_render)
+    pm = MagicMock()
+    pm.push_image.return_value = PushResult(status="sent", page_id="Back at 3pm")
+    app.config["PUSH_MANAGER"] = pm
+    resp = client.post(
+        "/send/note",
+        data={
+            "text": "Back at 3pm\nGone to the vet with Biscuit",
+            "size": "medium",
+            "align": "left",
+            "theme": "default",
+            "device_id": [big, small],
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    assert resp.location.endswith("/history")
+    assert {(r["w"], r["h"]) for r in renders} == {(1600, 1200), (800, 480)}
+    assert all(r["size"] == "medium" and r["align"] == "left" for r in renders)
+    # "Panel default" resolves to the light theme's variables.
+    assert all(r["theme_vars"].get("--bg") for r in renders)
+    assert pm.push_image.call_count == 2
+    for call in pm.push_image.call_args_list:
+        assert call.kwargs["source"] == "note"
+        assert call.kwargs["source_label"] == "Back at 3pm"
+    assert {c.kwargs["device_id"] for c in pm.push_image.call_args_list} == {big, small}
+
+
+def test_send_note_render_failure_lands_in_history(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    dev = _register_device(client)
+    import app.send_routes as send_routes
+
+    def boom(text: str, **kwargs):
+        raise RuntimeError("chromium missing")
+
+    monkeypatch.setattr(send_routes, "render_note_png", boom)
+    pm = MagicMock()
+    app.config["PUSH_MANAGER"] = pm
+    client.post("/send/note", data={"text": "Hello", "device_id": dev})
+    pm.push_image.assert_not_called()
+    rows = app.config["EVENT_LOG"].list(type="push", limit=5)
+    assert rows and rows[0].source == "note"
+    assert rows[0].status == "failed"
+    assert "chromium missing" in (rows[0].error or "")
+
+
+def test_send_note_rejects_empty_text(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    dev = _register_device(client)
+    pm = MagicMock()
+    app.config["PUSH_MANAGER"] = pm
+    resp = client.post("/send/note", data={"text": "   ", "device_id": dev}, follow_redirects=True)
+    pm.push_image.assert_not_called()
+    assert b"Type a note first" in resp.data
+
+
+def test_send_note_requires_a_target(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    _register_device(client)
+    _register_device(client, device_id="second")
+    pm = MagicMock()
+    app.config["PUSH_MANAGER"] = pm
+    resp = client.post("/send/note", data={"text": "Hello there"}, follow_redirects=True)
+    pm.push_image.assert_not_called()
+    body = resp.get_data(as_text=True)
+    assert "Pick at least one" in body
+    # The re-render keeps the note and reopens on the Note kind.
+    assert 'data-initial-text="Hello there"' in body
+    assert 'data-initial-kind="note"' in body
+
+
+def test_note_preview_returns_the_note_page(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    resp = client.get(
+        "/send/note/preview",
+        query_string={
+            "text": "Back at 3pm\nGone <out>",
+            "size": "small",
+            "align": "right",
+            "theme": "nord",
+        },
+    )
+    assert resp.status_code == 200
+    assert resp.headers["Content-Type"].startswith("text/html")
+    body = resp.get_data(as_text=True)
+    assert '<div class="note-head">Back at 3pm</div>' in body
+    assert "Gone &lt;out&gt;" in body
+    assert "font-size:6.5vmin" in body  # small
+    assert "text-align:right" in body
+    # Nord's own bg, inlined so the iframe needs nothing else from the app.
+    from app.note_render import theme_variables
+
+    assert theme_variables("nord")["--bg"] in body
+
+
+def test_note_preview_unknown_theme_falls_back_to_panel_default(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    body = client.get(
+        "/send/note/preview", query_string={"text": "Hi", "theme": "no-such-theme"}
+    ).get_data(as_text=True)
+    from app.note_render import theme_variables
+
+    assert theme_variables("light")["--bg"] in body
+
+
+def test_note_options_list_the_available_themes(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    body = client.get("/send").get_data(as_text=True)
+    assert 'name="theme"' in body
+    assert '<option value="default" selected>Panel default</option>' in body
+    assert '<option value="nord"' in body
+
+
+def test_history_labels_a_note_push(app: Flask) -> None:
+    log = app.config["EVENT_LOG"]
+    log.record(type="push", source="note", target="Back at 3pm", status="sent", digest="abc")
+    client = app.test_client()
+    _sign_in(client)
+    body = client.get("/history").get_data(as_text=True)
+    assert "dx-source-note" in body
+    assert "Back at 3pm" in body

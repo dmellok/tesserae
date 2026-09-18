@@ -254,6 +254,18 @@
         </ul>
       </a>
       {% endif %}
+      {% if nav_discovered %}
+      <a href="{{ url_for('auth.settings_area', area='devices', discovered=1) }}"
+         class="topbar-discovered topbar-discovered--drawer">
+        <i class="ph-bold ph-broadcast" aria-hidden="true"></i>
+        <span class="topbar-discovered-label">{{ nav_discovered|length }} new device{{ 's' if nav_discovered|length != 1 else '' }}</span>
+        <ul class="topbar-discovered-drawer-list">
+          {% for d in nav_discovered %}
+          <li><span class="topbar-discovered-id">{{ d.id }}</span>{% if d.ip %}<span class="topbar-discovered-ip">{{ d.ip }}</span>{% endif %}</li>
+          {% endfor %}
+        </ul>
+      </a>
+      {% endif %}
       <button type="button" class="theme-toggle theme-toggle--drawer" data-theme-toggle aria-label="Toggle dark mode">
         <i class="ph ph-sun is-light-only" aria-hidden="true"></i>
         <i class="ph ph-moon is-dark-only" aria-hidden="true"></i>
@@ -261,6 +273,20 @@
       </button>
     </nav>
     {% endblock %}
+    {% if nav_discovered %}
+    {# "New devices" chip: devices that announced themselves (REST or MQTT)
+       but are not registered. Links to the Devices tab with every
+       register row opened. Server-rendered per page; the Devices tab's
+       discovery poll reloads it live. #}
+    <a href="{{ url_for('auth.settings_area', area='devices', discovered=1) }}"
+       class="topbar-discovered topbar-discovered--topbar"
+       title="{{ nav_discovered|length }} new device{{ 's' if nav_discovered|length != 1 else '' }} heard, not registered yet"
+       aria-label="{{ nav_discovered|length }} new device{{ 's' if nav_discovered|length != 1 else '' }} heard, not registered yet">
+      <i class="ph-bold ph-broadcast" aria-hidden="true"></i>
+      <span class="topbar-discovered-count">{{ nav_discovered|length }}</span>
+      <span class="topbar-discovered-label">New device{{ 's' if nav_discovered|length != 1 else '' }}</span>
+    </a>
+    {% endif %}
     {% if nav_batteries %}
     {% set _worst = nav_batteries[0] %}
     {# Topbar battery indicator. Single device renders as a plain link

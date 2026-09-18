@@ -471,7 +471,7 @@ def test_wake_align_form_renders_on_the_devices_page(ui_app: Flask) -> None:
     client = ui_app.test_client()
     _sign_in(client)
     _add_device(client, "kitchen")
-    body = client.get("/settings/devices").get_data(as_text=True)
+    body = client.get("/settings/devices/kitchen").get_data(as_text=True)
     assert 'name="wake_align_mode"' in body
     assert "Synchronized wake" in body
 

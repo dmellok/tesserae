@@ -49,24 +49,9 @@ def _write_device_slug(instance_id: str, slug: str) -> None:
 
 
 def _redirect_to_calibration(instance_id: str) -> Response:
-    """Every action lands the user back on the Calibration tab of the
-    device they were editing.
-
-    Threads ``opened=<instance_id>`` so the device card stays expanded
-    across the redirect (v0.69.9, issue #52 item 3 follow-up). Prior to
-    v0.69.9 only ``devices_update_combined`` did this; every palette /
-    tone / calibrate action fell through the else branch and the card
-    collapsed on every Apply.
-    """
-    return redirect(
-        url_for(
-            "auth.settings_area",
-            area="devices",
-            tab="calibration",
-            opened=instance_id,
-            _anchor=f"device-{instance_id}",
-        )
-    )
+    """Every action lands the user back on the calibration page of the
+    device they were editing."""
+    return redirect(url_for("auth.device_calibration", instance_id=instance_id))
 
 
 def _now_iso() -> str:

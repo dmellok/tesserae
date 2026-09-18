@@ -213,8 +213,8 @@ def test_discovered_devices_render_on_devices_page(app: Flask) -> None:
     # "Discovered" (the description carries the explainer now), and
     # the row is grouped under "MQTT-DISCOVERED" since the test entry
     # carries no ``transport`` hint.
-    assert "Discovered" in body
-    assert "MQTT-discovered" in body
+    assert "not registered" in body
+    assert "MQTT" in body
     assert "esp32_attic" in body
     assert "esp32_client" in body
     assert "640×384" in body
@@ -357,3 +357,33 @@ def test_trmnl_discovery_preserves_real_token() -> None:
     assert entry is not None
     assert entry.parsed.get("access_token") == "kfrxz"
     assert entry.parsed.get("needs_pairing") is not True
+
+
+def test_topbar_chip_lists_unregistered_devices(app: Flask) -> None:
+    """The base template lights a "New devices" chip while the discovery
+    cache holds a device that is not registered, linking to the Devices
+    tab with the register rows opened. Registered ids and a cleared cache
+    leave the topbar alone."""
+    cache = app.config["DISCOVERY_CACHE"]
+    client = app.test_client()
+    _sign_in(client)
+
+    body = client.get("/settings/server").get_data(as_text=True)
+    assert "topbar-discovered" not in body
+
+    cache.record("esp32_attic", b'{"kind":"esp32_client","ip":"192.168.50.91"}')
+    body = client.get("/settings/server").get_data(as_text=True)
+    assert 'class="topbar-discovered topbar-discovered--topbar"' in body
+    assert "1 new device heard" in body
+    assert "/settings/devices?discovered=1" in body
+    # The drawer entry names the device for the phone layout.
+    assert "esp32_attic" in body
+
+    cache.record("pi_hall", b'{"kind":"pi_bin_client"}')
+    body = client.get("/settings/server").get_data(as_text=True)
+    assert "2 new devices heard" in body
+
+    cache.forget("esp32_attic")
+    cache.forget("pi_hall")
+    body = client.get("/settings/server").get_data(as_text=True)
+    assert "topbar-discovered" not in body

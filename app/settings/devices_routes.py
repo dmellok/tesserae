@@ -50,6 +50,33 @@ from ._shared import (
     values_from_form,
 )
 
+_DEVICE_PAGE_SECTIONS: frozenset[str] = frozenset(
+    {
+        "overview",
+        "identity",
+        "display",
+        "timing",
+        "controls",
+        "rendering",
+        "power",
+        "lineups",
+        "connection",
+        "remove",
+    }
+)
+
+
+def _device_page_redirect(instance_id: str, anchor: str | None = None) -> Response:
+    """Land back on the device's own page, at the section that was
+    being edited (``#display``, ``#timing``, ...)."""
+    return redirect(url_for("auth.device_page", instance_id=instance_id, _anchor=anchor))
+
+
+def _calibration_page_redirect(instance_id: str) -> Response:
+    """Every colour-calibration action lands back on the device's
+    calibration page."""
+    return redirect(url_for("auth.device_calibration", instance_id=instance_id))
+
 
 def _dev_seed_kinds() -> list[tuple[str, str, str]]:
     """Dev-mode seed set: (kind_id, instance_id_prefix, human name).
@@ -319,10 +346,8 @@ def devices_set_transport(instance_id: str) -> Response:
           later doesn't force re-pairing.
         - The status/config topics derived at instance creation stay
           on the manifest, so MQTT mode works without re-deriving."""
-    anchor = f"device-{instance_id}"
-    redirect_to = redirect(
-        url_for("auth.settings_area", area="devices", opened=instance_id, _anchor=anchor)
-    )
+    anchor = "connection"
+    redirect_to = _device_page_redirect(instance_id, anchor)
 
     devs = devices()
     device = devs.get(instance_id)
@@ -386,10 +411,8 @@ def devices_regenerate_token(instance_id: str) -> Response:
     the next Settings → Devices render pops the same one-shot modal as
     the add-device flow. The old token stops working immediately -
     the client will fail its next poll and need its config updated."""
-    anchor = f"device-{instance_id}"
-    redirect_to = redirect(
-        url_for("auth.settings_area", area="devices", opened=instance_id, _anchor=anchor)
-    )
+    anchor = "connection"
+    redirect_to = _device_page_redirect(instance_id, anchor)
 
     devs = devices()
     device = devs.get(instance_id)
@@ -435,10 +458,8 @@ def devices_reveal_token(instance_id: str) -> Response:
 
     The reveal is logged to the EventLog so an admin can audit who
     surfaced the token and when."""
-    anchor = f"device-{instance_id}"
-    redirect_to = redirect(
-        url_for("auth.settings_area", area="devices", opened=instance_id, _anchor=anchor)
-    )
+    anchor = "connection"
+    redirect_to = _device_page_redirect(instance_id, anchor)
 
     devs = devices()
     device = devs.get(instance_id)
@@ -864,16 +885,14 @@ def devices_update_panel(instance_id: str) -> Response:
     """Update a registered instance's panel dims + orientation, then
     hot-reload it so pages bound to this device pick up the new size
     without a restart."""
-    anchor = f"device-{instance_id}"
+    anchor = "display"
     form = request.form
     try:
         new_w = int(form.get("panel_w") or 0)
         new_h = int(form.get("panel_h") or 0)
     except ValueError:
         flash("Logical panel width and height must be whole numbers.", "error")
-        return redirect(
-            url_for("auth.settings_area", area="devices", opened=instance_id, _anchor=anchor)
-        )
+        return _device_page_redirect(instance_id, anchor)
 
     underscan_raw = form.get("panel_underscan")
     underscan: int | None = None
@@ -897,9 +916,7 @@ def devices_update_panel(instance_id: str) -> Response:
     )
     if not result.ok or result.device is None:
         flash(result.error or "Panel update failed.", "error")
-        return redirect(
-            url_for("auth.settings_area", area="devices", opened=instance_id, _anchor=anchor)
-        )
+        return _device_page_redirect(instance_id, anchor)
     rebuild_transport_fn()()
     panel = result.device.panel or {}
     flash(
@@ -907,9 +924,7 @@ def devices_update_panel(instance_id: str) -> Response:
         f"{panel.get('w')}×{panel.get('h')} at {orientation_label(panel.get('orientation', 'landscape'))}.",
         "ok",
     )
-    return redirect(
-        url_for("auth.settings_area", area="devices", opened=instance_id, _anchor=anchor)
-    )
+    return _device_page_redirect(instance_id, anchor)
 
 
 def _quiet_days_from_form(form: Any) -> dict[str, Any]:
@@ -936,7 +951,7 @@ def devices_update_quiet_hours(instance_id: str) -> Response:
     it over the app-level setting when ``enabled`` is true. Clearing
     every field drops the block entirely so the device falls back to
     the app default."""
-    anchor = f"device-{instance_id}"
+    anchor = "timing"
     form = request.form
     result = device_service.update_instance_quiet_hours(
         devices=devices(),
@@ -950,9 +965,7 @@ def devices_update_quiet_hours(instance_id: str) -> Response:
     )
     if not result.ok or result.device is None:
         flash(result.error or "Couldn't save quiet hours.", "error")
-        return redirect(
-            url_for("auth.settings_area", area="devices", opened=instance_id, _anchor=anchor)
-        )
+        return _device_page_redirect(instance_id, anchor)
     qh = (result.device.manifest.get("quiet_hours") or {}) if result.device else {}
     if qh.get("enabled") and qh.get("start") and qh.get("end"):
         flash(
@@ -965,9 +978,7 @@ def devices_update_quiet_hours(instance_id: str) -> Response:
             f"(falls back to app setting).",
             "ok",
         )
-    return redirect(
-        url_for("auth.settings_area", area="devices", opened=instance_id, _anchor=anchor)
-    )
+    return _device_page_redirect(instance_id, anchor)
 
 
 @bp.post("/settings/devices/<instance_id>/album/resync")
@@ -982,10 +993,8 @@ def devices_album_resync(instance_id: str) -> Response:
     check-in sees, which firmware already knows how to handle.
 
     Nothing is pushed here. The device picks this up on its own next wake."""
-    anchor = f"device-{instance_id}"
-    redirect_to = redirect(
-        url_for("auth.settings_area", area="devices", opened=instance_id, _anchor=anchor)
-    )
+    anchor = "overview"
+    redirect_to = _device_page_redirect(instance_id, anchor)
 
     device = devices().get(instance_id)
     if device is None:
@@ -1023,16 +1032,14 @@ def devices_update_battery_offset(instance_id: str) -> Response:
     adjusts the displayed percent. Both at zero drops the block from
     the manifest entirely so the device falls back to the raw
     firmware-reported values."""
-    anchor = f"device-{instance_id}"
+    anchor = "power"
     form = request.form
     try:
         mv = int(form.get("battery_offset_mv") or 0)
         pct = int(form.get("battery_offset_pct") or 0)
     except ValueError:
         flash("Battery offsets must be whole numbers.", "error")
-        return redirect(
-            url_for("auth.settings_area", area="devices", opened=instance_id, _anchor=anchor)
-        )
+        return _device_page_redirect(instance_id, anchor)
     result = device_service.update_instance_battery_offset(
         devices=devices(),
         renderers=renderers(),
@@ -1043,9 +1050,7 @@ def devices_update_battery_offset(instance_id: str) -> Response:
     )
     if not result.ok or result.device is None:
         flash(result.error or "Couldn't save battery offset.", "error")
-        return redirect(
-            url_for("auth.settings_area", area="devices", opened=instance_id, _anchor=anchor)
-        )
+        return _device_page_redirect(instance_id, anchor)
     block = result.device.manifest.get("battery_offset") or {}
     if block:
         flash(
@@ -1055,9 +1060,7 @@ def devices_update_battery_offset(instance_id: str) -> Response:
         )
     else:
         flash(f"Cleared battery offset for {result.device.name!r}.", "ok")
-    return redirect(
-        url_for("auth.settings_area", area="devices", opened=instance_id, _anchor=anchor)
-    )
+    return _device_page_redirect(instance_id, anchor)
 
 
 # -- combined save ------------------------------------------------------
@@ -1076,31 +1079,18 @@ def devices_update_combined(instance_id: str) -> Response:
     one. Each subsection is detected by presence of its inputs and
     runs independently, an error in one is flashed but doesn't block
     the others. Transport rebuild happens once at the end."""
-    anchor = f"device-{instance_id}"
-    # v0.68: threading ``opened=<id>`` back through the redirect keeps
-    # the device card expanded after Save. Without this the card
-    # collapses on every save + reload, which meant the user's next
-    # tweak needed another click on "Show settings" first.
-    # v0.69.17: also thread ``tab=`` so save from General / Calibration
-    # doesn't jump back to Status. The v0.69.14 tab-scoping fix reads
-    # ``?tab=`` only when ``?opened=`` matches, so any redirect that
-    # forgets ``tab=`` lands on the default (Status). The combined form
-    # posts an ``_active_tab`` hidden field carrying whichever tab
-    # rendered the card; we echo it back on redirect.
+    # The combined form lives on two pages now: the device page (every
+    # section) and the calibration page (the per-renderer tone fields).
+    # Each posts a hidden ``_active_tab`` saying where it rendered so the
+    # save lands back on the same page; the device page also passes the
+    # section it was scrolled to as ``_section`` so the anchor holds.
     _redirect_tab = (request.form.get("_active_tab") or "").strip()
-    if _redirect_tab in ("status", "general", "schedule", "calibration"):
-        redirect_to = redirect(
-            url_for(
-                "auth.settings_area",
-                area="devices",
-                opened=instance_id,
-                tab=_redirect_tab,
-                _anchor=anchor,
-            )
-        )
+    _section = (request.form.get("_section") or "").strip()
+    if _redirect_tab == "calibration":
+        redirect_to = _calibration_page_redirect(instance_id)
     else:
-        redirect_to = redirect(
-            url_for("auth.settings_area", area="devices", opened=instance_id, _anchor=anchor)
+        redirect_to = _device_page_redirect(
+            instance_id, _section if _section in _DEVICE_PAGE_SECTIONS else None
         )
 
     devices_registry = devices()
@@ -1543,6 +1533,55 @@ def devices_update_combined(instance_id: str) -> Response:
 # -- delete + calibrate ------------------------------------------------
 
 
+@bp.post("/settings/devices/<instance_id>/push-now")
+def devices_push_now(instance_id: str) -> Response:
+    """Re-push what the display is meant to be showing: the page it is
+    on in its lineup when it follows one, else the page behind its
+    latest render. A display that has never been sent anything has
+    nothing to push, so the button explains itself instead."""
+    anchor = "overview"
+    device = devices().get(instance_id)
+    if device is None or device.kind_of is None:
+        flash(f"Unknown device {instance_id!r}.", "error")
+        return redirect(url_for("auth.settings_area", area="devices"))
+    page_id = ""
+    nav = current_app.config.get("DECK_NAV_STORE")
+    if nav is not None:
+        rec = None
+        try:
+            rec = nav.get(instance_id)
+        except Exception:  # pragma: no cover - store unreadable
+            rec = None
+        if isinstance(rec, dict):
+            page_id = str(rec.get("page_id") or "")
+    pusher = push_manager()
+    if not page_id and pusher is not None:
+        latest = pusher.latest_render_for(instance_id)
+        if isinstance(latest, dict):
+            page_id = str(latest.get("page_id") or "")
+    if not page_id:
+        flash(
+            f"{device.name!r} has not been sent a dashboard yet; push one from Send or a lineup first.",
+            "error",
+        )
+        return _device_page_redirect(instance_id, anchor)
+    if pusher is None:
+        flash("Push pipeline not ready.", "error")
+        return _device_page_redirect(instance_id, anchor)
+    result = pusher.push(
+        page_id,
+        device_ids={instance_id},
+        respect_quiet_hours=False,
+        force_publish=True,
+        source="device_push_now",
+    )
+    if result.status == "sent":
+        flash(f"Pushed {page_id!r} to {device.name!r}.", "ok")
+    else:
+        flash(f"Push {result.status}: {result.error or '(no detail)'}", "error")
+    return _device_page_redirect(instance_id, anchor)
+
+
 @bp.post("/settings/devices/<instance_id>/delete")
 def devices_delete(instance_id: str) -> Response:
     """Remove a user-created device instance. Built-in kinds are
@@ -1673,13 +1712,14 @@ def devices_calibrate(instance_id: str) -> Response:
         flash("Calibration card sent, look at your panel, then answer below.", "ok")
     else:
         flash(f"Calibration push {result.status}: {result.error or '(no detail)'}", "error")
-    # ?calibrating=<id> makes the device card render the answer form.
+    # ?calibrating=<id> makes the device page render the answer form
+    # inside the Display section's orientation band.
     return redirect(
         url_for(
-            "auth.settings_area",
-            area="devices",
+            "auth.device_page",
+            instance_id=instance_id,
             calibrating=instance_id,
-            _anchor=f"device-{instance_id}",
+            _anchor="display",
         )
     )
 
@@ -1688,7 +1728,7 @@ def devices_calibrate(instance_id: str) -> Response:
 def devices_calibrate_apply(instance_id: str) -> Response:
     """Set the orientation derived from the calibration answer, then
     re-push the card so the user can confirm it's now upright."""
-    anchor = f"device-{instance_id}"
+    anchor = "display"
     device = devices().get(instance_id)
     if device is None or device.kind_of is None or device.panel is None:
         flash(f"Unknown device {instance_id!r}.", "error")
@@ -1699,9 +1739,7 @@ def devices_calibrate_apply(instance_id: str) -> Response:
         top_left = 0
     if top_left not in (1, 2, 3, 4):
         flash("Pick which number is in the panel's top-left corner.", "error")
-        return redirect(
-            url_for("auth.settings_area", area="devices", opened=instance_id, _anchor=anchor)
-        )
+        return _device_page_redirect(instance_id, anchor)
 
     panel = device.panel
     pushed = str(panel.get("orientation") or "landscape")
@@ -1723,9 +1761,7 @@ def devices_calibrate_apply(instance_id: str) -> Response:
     )
     if not result.ok or result.device is None:
         flash(result.error or "Calibration failed.", "error")
-        return redirect(
-            url_for("auth.settings_area", area="devices", opened=instance_id, _anchor=anchor)
-        )
+        return _device_page_redirect(instance_id, anchor)
     rebuild_transport_fn()()
     # Confirm re-push at the new orientation.
     if result.device.panel is not None:
@@ -1738,9 +1774,7 @@ def devices_calibrate_apply(instance_id: str) -> Response:
         "upright in that orientation. Re-sent the card to confirm; adjust Rotation below if needed.",
         "ok",
     )
-    return redirect(
-        url_for("auth.settings_area", area="devices", opened=instance_id, _anchor=anchor)
-    )
+    return _device_page_redirect(instance_id, anchor)
 
 
 # -- colour test patterns ----------------------------------------------
@@ -1803,19 +1837,9 @@ def _custom_image_path_for(instance_id: str) -> Path:
 
 
 def _redirect_to_calibration_tab(instance_id: str) -> Response:
-    """Redirect back to the Calibration tab of the given device card,
-    keeping the card expanded (``?opened=``) and the tab selected
-    (``?tab=calibration``). v0.69.14: without ``?opened=`` the card
-    collapsed on every POST + 302 (e.g. custom-image upload)."""
-    return redirect(
-        url_for(
-            "auth.settings_area",
-            area="devices",
-            tab="calibration",
-            opened=instance_id,
-            _anchor=f"device-{instance_id}",
-        )
-    )
+    """Redirect back to the device's calibration page (the Calibration
+    tab of the card era), e.g. after a custom-image upload."""
+    return _calibration_page_redirect(instance_id)
 
 
 @bp.post("/settings/devices/<instance_id>/test-pattern/custom-image/upload")

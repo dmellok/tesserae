@@ -1,109 +1,82 @@
-{# Discovered devices strip (issue #17).
-   Splits the single homogeneous strip into two transport-grouped
-   sub-strips: REST-announced first (the default transport for new
-   installs), MQTT-discovered second. Empty groups vanish; if both
-   are empty the whole card collapses to a radar empty state. Row
-   layout is identical across groups — the structural difference
-   IS the sub-header + explainer.
+{# Discovered devices banner (Settings › Devices, 2026-09 redesign).
+   One dashed banner under the devices table: "N devices have been heard
+   but are not registered." with the ids + IPs in mono, a Register
+   button for the first registrable one and Dismiss all. Register (or
+   clicking an id) expands that device's register row inline under the
+   banner: display-name input, panel-variant select, Register.
 
    Inputs (set by ``settings_area`` in app.settings.index_routes):
    - ``discovered_rest`` — entries with ``parsed.transport == "rest"``
    - ``discovered_mqtt`` — everything else
-   #}
+   The poll in static/discovery-poll.js reloads the page when the set
+   changes, keyed off the ``[data-discovered-poll]`` marker in
+   settings.html, so the banner needs no client-side state. #}
 
-{% from "_components.html" import button with context %}
+{% set _discovered = discovered_rest + discovered_mqtt %}
+{% set _registrable = _discovered | selectattr('kind') | list %}
 
-{% macro discovered_row(d) -%}
-<li class="dx-discovered-row">
-  <div class="dx-discovered-info">
-    <div class="dx-discovered-id"><code>{{ d.id }}</code></div>
-    <div class="dx-discovered-meta">
-      <span class="dx-meta-pair"><span class="dx-meta-k">Kind</span><span class="dx-meta-v">{{ d.kind or '—' }}</span></span>
-      {% if d.parsed.mac %}<span class="dx-meta-pair"><span class="dx-meta-k">MAC</span><code>{{ d.parsed.mac }}</code></span>{% endif %}
-      {% if d.parsed.topic %}<span class="dx-meta-pair"><span class="dx-meta-k">Topic</span><code>{{ d.parsed.topic }}</code></span>{% endif %}
-      {% if d.ip %}<span class="dx-meta-pair"><span class="dx-meta-k">IP</span><code>{{ d.ip }}</code></span>{% endif %}
-      {% if d.panel_w and d.panel_h %}<span class="dx-meta-pair"><span class="dx-meta-k">Panel</span><span class="dx-meta-v">{{ d.panel_w }}×{{ d.panel_h }}</span></span>{% endif %}
-      {% if d.fw_version %}<span class="dx-meta-pair"><span class="dx-meta-k">FW</span><span class="dx-meta-v">{{ d.fw_version }}</span></span>{% endif %}
-      <span class="dx-meta-pair"><span class="dx-meta-k">Seen</span><span class="dx-meta-v">{{ d.relative }}</span></span>
-    </div>
-  </div>
-  <div class="dx-discovered-actions">
-    {% if d.kind %}
-    <form method="post" action="{{ url_for('auth.devices_register_discovered', discovered_id=d.id) }}" class="form form--inline">
-      {# Prefilled from the announce's optional ``name`` (discussion #24);
-         the admin can edit or clear it before registering. #}
-      <input type="text" name="name" value="{{ d.name or '' }}" placeholder="Display name" class="dx-name-input" aria-label="Display name">
-      {% if d.variants %}
-      {# Sibling panels share a wire protocol but differ in gamut / dims
-         (e.g. Inky 4" Spectra 6 600×400 vs legacy ACeP 640×400). The
-         client can't say which it is, so let the user confirm; the
-         pre-selected option follows a declared gamut when present. #}
-      <select name="kind" class="dx-variant-select" aria-label="Panel variant">
-        {% for v in d.variants %}
-        <option value="{{ v.id }}"{% if v.selected %} selected{% endif %}>{{ v.name }}{% if v.w and v.h %} ({{ v.w }}×{{ v.h }}){% endif %}</option>
-        {% endfor %}
-      </select>
+{% if _discovered %}
+<div class="dx-disc-banner" id="discovered-devices" data-disc-banner>
+  <div class="dx-disc-banner-row">
+    <span class="dx-disc-banner-icon" aria-hidden="true"><i class="ph ph-broadcast"></i></span>
+    <p class="dx-disc-banner-text">
+      <strong>{{ _discovered|length }} device{% if _discovered|length != 1 %}s have{% else %} has{% endif %} been heard but {% if _discovered|length != 1 %}are{% else %}is{% endif %} not registered.</strong>
+      {% for d in _discovered %}
+      <button type="button" class="dx-disc-id" data-disc-reveal="{{ d.id }}" title="Register {{ d.id }}">{{ d.id }}{% if d.ip %} · {{ d.ip }}{% endif %}</button>{% if not loop.last %}{% if loop.revindex == 2 %} and {% else %}, {% endif %}{% endif %}
+      {% endfor %}
+    </p>
+    <div class="dx-disc-banner-actions">
+      {% if _registrable %}
+      <button type="button" class="dx-btn is-sm" data-disc-reveal="{{ _registrable[0].id }}">Register {{ _registrable[0].id }}</button>
       {% endif %}
-      <button type="submit" class="dx-btn-primary-sm"><i class="ph ph-plus" aria-hidden="true"></i><span>Register</span></button>
-    </form>
-    {% else %}
-    <span class="dx-discovered-hint">No <code>kind</code> in heartbeat — use Add device below.</span>
-    {% endif %}
-    <form method="post" action="{{ url_for('auth.devices_dismiss_discovered', discovered_id=d.id) }}" class="form form--inline">
-      <button type="submit" class="dx-btn-ghost-sm"><i class="ph ph-x" aria-hidden="true"></i><span>Dismiss</span></button>
-    </form>
+      <button type="button" class="dx-btn is-sm is-ghost" data-disc-dismiss-all>
+        {% if _discovered|length == 1 %}Dismiss{% elif _discovered|length == 2 %}Dismiss both{% else %}Dismiss all{% endif %}
+      </button>
+    </div>
   </div>
-</li>
-{%- endmacro %}
 
-<section class="dx-section-card" id="discovered-devices">
-  <header class="dx-section-head">
-    <span class="dx-section-icon" aria-hidden="true"><i class="ph ph-broadcast"></i></span>
-    <div class="dx-section-titleblock">
-      <h3 class="dx-section-title">Discovered</h3>
-      <p class="dx-section-desc">Devices we've heard from that aren't registered yet. Register to bind one to an instance, or dismiss to hide it.</p>
+  {% for d in _discovered %}
+  <div class="dx-disc-row" data-disc-row="{{ d.id }}" hidden>
+    <div class="dx-disc-row-meta">
+      <code class="dx-disc-row-id">{{ d.id }}</code>
+      <span class="dx-disc-row-facts">
+        {% if d.parsed.transport == 'rest' %}REST{% else %}MQTT{% endif %}
+        · kind {{ d.kind or 'unknown' }}
+        {% if d.parsed.mac %} · MAC <code>{{ d.parsed.mac }}</code>{% endif %}
+        {% if d.parsed.topic %} · topic <code>{{ d.parsed.topic }}</code>{% endif %}
+        {% if d.ip %} · IP <code>{{ d.ip }}</code>{% endif %}
+        {% if d.panel_w and d.panel_h %} · panel {{ d.panel_w }}×{{ d.panel_h }}{% endif %}
+        {% if d.fw_version %} · fw {{ d.fw_version }}{% endif %}
+        · seen {{ d.relative }}
+      </span>
     </div>
-    <span class="dx-listening" aria-hidden="true">
-      <span class="dx-listening-dot"></span>
-      <span class="dx-listening-label">Listening</span>
-    </span>
-  </header>
-
-  <div class="dx-section-body">
-
-    {% if discovered_rest %}
-    <div class="dx-discovered-group">
-      <div class="dx-discovered-sublabel">
-        <span>REST-announced</span>
-        <span class="dx-count-pill">{{ discovered_rest|length }}</span>
-      </div>
-      <p class="dx-discovered-explainer">Auto-claim on register: the device's MAC is bound to its new instance and the next poll authenticates it automatically.</p>
-      <ul class="dx-discovered-list">
-        {% for d in discovered_rest %}{{ discovered_row(d) }}{% endfor %}
-      </ul>
+    <div class="dx-disc-row-actions">
+      {% if d.kind %}
+      <form method="post" action="{{ url_for('auth.devices_register_discovered', discovered_id=d.id) }}" class="form form--inline">
+        {# Prefilled from the announce's optional ``name`` (discussion #24);
+           the admin can edit or clear it before registering. #}
+        <input type="text" name="name" value="{{ d.name or '' }}" placeholder="Display name" class="dx-name-input" aria-label="Display name">
+        {% if d.variants %}
+        {# Sibling panels share a wire protocol but differ in gamut / dims
+           (e.g. Inky 4" Spectra 6 600×400 vs legacy ACeP 640×400). The
+           client can't say which it is, so let the user confirm; the
+           pre-selected option follows a declared gamut when present. #}
+        <select name="kind" class="dx-variant-select" aria-label="Panel variant">
+          {% for v in d.variants %}
+          <option value="{{ v.id }}"{% if v.selected %} selected{% endif %}>{{ v.name }}{% if v.w and v.h %} ({{ v.w }}×{{ v.h }}){% endif %}</option>
+          {% endfor %}
+        </select>
+        {% endif %}
+        <button type="submit" class="dx-btn-primary-sm"><i class="ph ph-plus" aria-hidden="true"></i><span>Register</span></button>
+      </form>
+      {% else %}
+      <span class="dx-discovered-hint">No <code>kind</code> in the heartbeat, add it through Add device instead.</span>
+      {% endif %}
+      <form method="post" action="{{ url_for('auth.devices_dismiss_discovered', discovered_id=d.id) }}" class="form form--inline" data-disc-dismiss-form>
+        <button type="submit" class="dx-btn-ghost-sm"><i class="ph ph-x" aria-hidden="true"></i><span>Dismiss</span></button>
+      </form>
     </div>
-    {% endif %}
-
-    {% if discovered_mqtt %}
-    <div class="dx-discovered-group">
-      <div class="dx-discovered-sublabel">
-        <span>MQTT-discovered</span>
-        <span class="dx-count-pill">{{ discovered_mqtt|length }}</span>
-      </div>
-      <p class="dx-discovered-explainer">Publishing heartbeats on a broker topic. Register to bind it to a configured instance with derived topics.</p>
-      <ul class="dx-discovered-list">
-        {% for d in discovered_mqtt %}{{ discovered_row(d) }}{% endfor %}
-      </ul>
-    </div>
-    {% endif %}
-
-    {% if not discovered_rest and not discovered_mqtt %}
-    <div class="dx-empty">
-      <div class="dx-empty-icon"><i class="ph ph-broadcast" aria-hidden="true"></i></div>
-      <p class="dx-empty-title">No discovered devices</p>
-      <p class="dx-empty-help">Power your panels on and they'll appear here the moment they announce themselves.</p>
-    </div>
-    {% endif %}
-
   </div>
-</section>
+  {% endfor %}
+</div>
+{% endif %}
