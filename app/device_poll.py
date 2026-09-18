@@ -233,6 +233,39 @@ def _quiet_sleep_through_s(device: Device) -> int | None:
     return min(int((ends - now).total_seconds()) + _QUIET_SLEEP_MARGIN_S, _QUIET_SLEEP_MAX_S)
 
 
+def _floor_hold_poll_s(device: Device) -> int | None:
+    """Seconds until a frame currently held by the panel's repaint floor may
+    be handed over (#250), or ``None`` when nothing is waiting on it.
+
+    The delivery path holds a new frame that would land inside the floor and
+    serves it on the next poll past it. Left at the configured interval, a
+    device that deep-sleeps for an hour would sit on the old frame for the
+    rest of that hour over a sixty-second floor. Pulling the wake in to the
+    moment the floor expires is what turns the hold into a deferred paint
+    rather than a lost one.
+
+    Conditioned on a frame actually pending: an idle device's floor has
+    nothing to come back for, and waking it early would spend a radio cycle
+    to collect a 304.
+    """
+    push_mgr = current_app.config.get("PUSH_MANAGER")
+    if push_mgr is None:
+        return None
+    pending = getattr(push_mgr, "has_pending_render", None)
+    if not callable(pending) or not pending(device.id):
+        return None
+
+    from app import refresh_floor
+
+    remaining = refresh_floor.hold_remaining_s(device, push_mgr)
+    if remaining is None:
+        return None
+    # One second past the floor, not onto it: a device whose timer runs a
+    # touch fast would otherwise arrive a fraction early, be held again, and
+    # wait a whole configured interval for a frame it had come back for.
+    return remaining + 1
+
+
 def next_poll_decision(device: Device, *, configured_s: int) -> tuple[int, int | None]:
     """How many seconds until the client should poll again, plus the
     absolute wake instant (epoch) when wake alignment issued one.
@@ -319,6 +352,13 @@ def _decision_inner(device: Device, configured_s: int) -> tuple[int, int | None]
         declared = None
     if declared is not None:
         candidates.append(declared)
+    try:
+        held = _floor_hold_poll_s(device)
+    except Exception:
+        logger.exception("device_poll: repaint-floor hold check failed for device=%s", device.id)
+        held = None
+    if held is not None:
+        candidates.append(held)
     if not candidates:
         return configured, _wake_at(configured)
     # Ceiling: the configured interval. Floor: MIN_CONTENT_POLL_S, itself

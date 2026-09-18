@@ -613,6 +613,16 @@ just `ETag: "<digest>"` and `Content-Location: <absolute URL>`. Re-paint
 the previously-cached frame, or re-fetch the URL if your device didn't
 retain the image bytes across a power cycle.
 
+A `304` also answers a poll that *would* have carried a new frame, when
+the panel's hardware profile declares a `refresh_floor_s` and that many
+seconds have not passed since the last frame was handed over. The glass
+cannot usefully be repainted faster than its floor, so the new frame is
+held rather than dropped: the `ETag` and `Content-Location` still name
+the frame the device is holding, `next_poll_s` is pulled in to the moment
+the floor expires, and the poll that follows serves whatever the newest
+render is by then. Firmware needs no new behaviour for this — it is the
+`304` it already handles. Profiles that declare no floor are never held.
+
 `204 No Content` — server has no frame for this device yet (e.g.
 brand-new device, no dashboard bound). Body:
 ```json

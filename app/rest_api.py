@@ -58,7 +58,7 @@ from urllib.parse import urlencode
 from flask import Blueprint, Flask, current_app, jsonify, request
 from werkzeug.wrappers import Response
 
-from app import device_poll
+from app import device_poll, refresh_floor
 from app.button_service import ButtonService, TouchStroke
 from app.device_loader import Device, DeviceRegistry
 from app.device_service import (
@@ -975,6 +975,26 @@ def _pending_ota(device: Device, body: dict[str, Any]) -> dict[str, str] | None:
     return _staged_ota(device, advertised) or _released_ota(device, body)
 
 
+def _keep_current_frame(if_none_match: str, ext: Any) -> Response:
+    """A 304 telling the device to keep painting the frame it reports
+    holding, with a ``Content-Location`` naming *that* frame rather than
+    the newer one it is not getting yet.
+
+    Used by both paths that deliberately withhold a newer render: a
+    fire-and-forget button action whose real outcome is still in flight
+    (#274), and a repaint held by the panel's floor (#250). A client that
+    booted without a cached URL can still re-fetch what it has.
+    """
+    resp = Response(status=304)
+    resp.headers["ETag"] = if_none_match
+    if ext:
+        held_path = f"/renders/{_normalize_digest(if_none_match)}.{ext}"
+        held_url = f"{request.url_root.rstrip('/')}{held_path}"
+        held_sig = sign_render_query(current_app.secret_key, held_path)
+        resp.headers["Content-Location"] = f"{held_url}?{held_sig}" if held_sig else held_url
+    return resp
+
+
 @bp.get("/<device_id>/frame")
 def get_frame(device_id: str) -> Response:
     """Latest frame URL for this device.
@@ -1048,15 +1068,8 @@ def get_frame(device_id: str) -> Response:
     # it reports holding; the stroke was already validated against it.
     if_none_match = request.headers.get("If-None-Match", "")
     if button_result is not None and button_result.hold_frame and if_none_match:
-        resp = Response(status=304)
-        resp.headers["ETag"] = if_none_match
         latest_ext = (push_mgr.latest_render_for(device.id) or {}).get("ext") if push_mgr else None
-        if latest_ext:
-            held_path = f"/renders/{_normalize_digest(if_none_match)}.{latest_ext}"
-            held_url = f"{request.url_root.rstrip('/')}{held_path}"
-            held_sig = sign_render_query(current_app.secret_key, held_path)
-            resp.headers["Content-Location"] = f"{held_url}?{held_sig}" if held_sig else held_url
-        return resp
+        return _keep_current_frame(if_none_match, latest_ext)
     _refresh_if_widget_change_elapsed(device, push_mgr)
     # Promote-on-poll fallback (#271): a render diverted to patches whose
     # blob was never fetched means patch delivery didn't happen (deep
@@ -1116,6 +1129,31 @@ def get_frame(device_id: str) -> Response:
             # without forcing an otherwise unnecessary download.
             push_mgr.record_frame_served(device.id, latest)
         return resp
+    # Repaint floor (#250): a profile that declares how fast its glass can be
+    # repainted gets that honoured here, on the path that decides to hand the
+    # device a different frame. The frame is held, not dropped — the device
+    # keeps what it reports holding and collects this one on its first poll
+    # past the floor, and ``app.device_poll`` pulls that poll in to the moment
+    # the floor expires. A render landing during the hold replaces this one,
+    # so the panel lands on the latest content when it does repaint.
+    #
+    # Deliberately ahead of ``consume_force_refetch``: a resend held by the
+    # floor must still be a resend when the floor lifts. And deliberately
+    # logged, because from the operator's side a deferred paint and a missed
+    # Send look identical.
+    #
+    # Only a device presenting an ``If-None-Match`` can be held. Without one
+    # there is no frame to tell it to keep, and a client that booted without a
+    # cached ETag needs a URL more than the glass needs the floor.
+    if if_none_match:
+        held_s = refresh_floor.hold_remaining_s(device, push_mgr)
+        if held_s is not None:
+            logger.info(
+                "rest /frame: holding a new frame for device=%s, repaint floor has %ss left",
+                device.id,
+                held_s,
+            )
+            return _keep_current_frame(if_none_match, latest.get("ext"))
     if force_refetch and push_mgr is not None:
         push_mgr.consume_force_refetch(device.id)
     panel = device.manifest.get("panel") or {}

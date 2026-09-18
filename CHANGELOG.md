@@ -6,6 +6,23 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **A panel's `refresh_floor_s` is enforced again, on the path that
+  decides to send a frame.** 41 hardware profiles declare how fast their
+  glass can be repainted, and since v0.332.0 the server applied that
+  nowhere: its only enforcement point had been a clamp on the *poll*
+  cadence, which is a different thing, and removing that clamp (rightly,
+  it made an always-on E1003 wait a minute for a manual Send) left the
+  repaint side unguarded. A new frame that would land inside the floor is
+  now held rather than dropped: the device keeps painting what it holds,
+  its next poll is pulled in to the moment the floor expires, and a render
+  that lands during the hold is the one that paints, so the panel always
+  ends up on the latest content. Held frames are logged with the remaining
+  wait, because from the operator's side a deferred paint and a missed
+  Send look identical. A device that declares no floor, one that has never
+  been served, and a client polling without a cached `ETag` are unaffected.
+
 ## [0.419.3], 2026-09-16
 
 ### Changed
