@@ -45,6 +45,7 @@ from ._shared import (
     format_discovered,
     format_relative,
     mark_unreadable_secrets,
+    note_refresh_floor,
     plugins,
     render_for_admin,
     renderers,
@@ -1477,7 +1478,7 @@ def _visible_config_fields(device: Any) -> list[dict[str, Any]]:
     ``always_on`` written back to its default on the next save rather
     than holding a setting its firmware no longer honours.
     """
-    fields = config_fields_from_schema(device.config_schema)
+    fields = note_refresh_floor(config_fields_from_schema(device.config_schema), device)
     if _can_stay_awake(device.id):
         return fields
     return [f for f in fields if f.get("name") not in _ALWAYS_ON_FIELDS]

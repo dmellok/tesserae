@@ -6,6 +6,23 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Changed
+
+- **A panel's `refresh_floor_s` is now shown rather than ignored.** 41
+  hardware profiles declare how fast their glass can be repainted, and the
+  server read the field nowhere — while `schema/hardware.schema.json` called
+  it a lower bound on poll cadence "surfaced in the Settings UI" and
+  `docs/dev/adding-hardware.md` said it was "enforced on the always-on
+  path", an enforcement removed in v0.332.0. Three descriptions, none of
+  them true. The floor is now stated beside the wake-cadence fields on the
+  device card and reported as `panel.refresh_floor_s` in the Companion API,
+  and the schema and the hardware guide say what the field actually is.
+  Nothing gates on it: the firmware holds its own repaints against a floor
+  it measures from the last paint, where the server only ever sees a
+  handover, and the declared values are authored by protocol rather than
+  measured — the reTerminal Sticky declares 60 while its own notes put a
+  full paint at 1.2 s.
+
 ### Added
 
 - **A dashboard can declare how often the panel showing it should wake.**
