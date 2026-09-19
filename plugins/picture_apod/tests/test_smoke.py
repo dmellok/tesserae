@@ -40,6 +40,8 @@ def test_apod_renders(client: FlaskClient, size: str) -> None:
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
     assert 'data-plugin="picture_apod"' in body
-    # The hdurl (preferred over plain url) round-trips through data-data.
-    assert "galaxy_1176.jpg" in body
+    # The standard-resolution url (preferred over the multi-megabyte
+    # hdurl) round-trips through data-data.
+    assert "galaxy_960.jpg" in body
+    assert "galaxy_1176.jpg" not in body
     assert "Galaxy NGC 3660" in body

@@ -21,6 +21,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   `PATCH /api/mcp/pages/<id>/canvas`; leaving it empty hands the device
   back its own interval, which is what every existing dashboard does.
 
+### Fixed
+
+- **The NASA APOD widget no longer shows a half-loaded picture.** It
+  asked for NASA's HD file, which is routinely several megabytes, and
+  the renderer only waits a few seconds for the network to settle before
+  it screenshots whatever has arrived. It now takes the standard
+  ~1000px image, which is larger than any supported panel anyway, and
+  falls back to the HD file only when NASA offers nothing else.
+
 ## [0.419.3], 2026-09-16
 
 ### Changed

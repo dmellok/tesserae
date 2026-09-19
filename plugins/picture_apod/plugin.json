@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "Picture, NASA APOD",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "kind": "widget",
   "locales": ["en", "cs", "de", "es", "fr", "it", "lt", "nb", "nl", "pl", "pt", "sk", "sv", "zh-CN", "zh-TW"],
   "description": "NASA's Astronomy Picture of the Day, full bleed. Walks back day-by-day past video entries so the cell always shows an image. Uses DEMO_KEY by default; paste your own key at https://api.nasa.gov for a higher rate limit.",

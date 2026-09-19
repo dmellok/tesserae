@@ -4,6 +4,11 @@ Ported from inky-dash's apod plugin. Walks back day-by-day if today's
 entry is a video, capped at LOOKBACK_DAYS so a long video streak can't
 trigger a request storm. Cached for an hour so the composer's repeated
 render hits within a single push pipeline don't each go upstream.
+
+Prefers NASA's standard-resolution ``url`` over ``hdurl``: the HD file is
+routinely several megabytes and the renderer only waits a few seconds
+for the network to go idle, so the panel got a half-loaded picture. The
+standard image is ~1000px wide, more than any supported panel needs.
 """
 
 from __future__ import annotations
@@ -41,7 +46,7 @@ def _api_request(api_key: str, when: date | None = None) -> dict[str, Any]:
 def _pick_image_url(entry: dict[str, Any]) -> str | None:
     if entry.get("media_type") != "image":
         return None
-    url: str | None = entry.get("hdurl") or entry.get("url")
+    url: str | None = entry.get("url") or entry.get("hdurl")
     return url
 
 
