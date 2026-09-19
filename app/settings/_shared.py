@@ -253,6 +253,46 @@ def config_fields_from_schema(schema: dict[str, dict[str, Any]]) -> list[dict[st
     return fields
 
 
+# The cadence fields a panel's declared repaint floor is worth mentioning
+# beside: how often the device asks, awake or asleep.
+_CADENCE_FIELDS = ("sleep_interval_s", "awake_poll_s")
+
+
+def note_refresh_floor(fields: list[dict[str, Any]], device: Any) -> list[dict[str, Any]]:
+    """Mention a panel's declared ``refresh_floor_s`` beside the fields that
+    set how often it comes back.
+
+    Advisory, and said so. The floor describes how fast the glass can be
+    repainted, which is not the same question as how often the device asks —
+    a poll is a conditional GET and a 304 never reaches the panel. Enforcing
+    it on the ask was what made an always-on E1003 wait a minute for a manual
+    Send, and it was rightly removed in v0.332.0; enforcing it on delivery
+    would fight the firmware, which holds its own repaints against a floor
+    measured from the last *paint* and knows what its glass actually does.
+
+    So the server states the number and gates nothing. Presentation only,
+    like the always-on hiding beside it: the saved value is whatever the
+    operator typed.
+    """
+    floor = (getattr(device, "manifest", None) or {}).get("refresh_floor_s")
+    if isinstance(floor, bool) or not isinstance(floor, int) or floor <= 0:
+        return fields
+    out = []
+    for field in fields:
+        if field.get("name") not in _CADENCE_FIELDS:
+            out.append(field)
+            continue
+        noted = dict(field)
+        help_text = str(noted.get("help") or "").strip()
+        note = (
+            f"This panel declares a {floor}s refresh floor: its firmware will not "
+            "repaint the glass faster than that, however often the device asks."
+        )
+        noted["help"] = f"{help_text} {note}".strip() if help_text else note
+        out.append(noted)
+    return out
+
+
 def safe_next(target: str | None) -> str:
     """Bound the post-login redirect to in-app paths so we can't be used as
     an open redirector. Anything not starting with ``/`` (or starting with
