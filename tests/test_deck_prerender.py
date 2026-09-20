@@ -135,6 +135,72 @@ def test_promote_miss_returns_false(wired) -> None:
     assert wired.promote_deck_page("panel", "never_warmed") is False
 
 
+def test_cached_deck_navigation_uploads_to_relay(wired) -> None:
+    """Cached navigation must deliver the selected frame without another push."""
+    from types import SimpleNamespace
+    from unittest.mock import Mock
+
+    from app.ota._codec import b64u_encode
+    from app.relay_crypto import unseal
+    from app.relay_publisher import RelayPublisher
+
+    manager = wired
+    key = b"\x42" * 32
+    device = manager._devices.devices["panel"]
+    device.manifest.update(transport="relay", relay_frame_key=b64u_encode(key))
+    client = Mock()
+    publisher = RelayPublisher(
+        app=SimpleNamespace(config={"EVENT_LOG": manager._event_log}),
+        devices=manager._devices,
+        settings=manager._settings,
+        renders_dir=manager._renders_dir,
+        latest_render_fn=manager.latest_render_for,
+        run_async=False,
+    )
+    notifications = []
+
+    def deliver(result):
+        unlocked = manager._lock.acquire(blocking=False)
+        if unlocked:
+            manager._lock.release()
+        notifications.append((result, unlocked))
+        if unlocked:
+            publisher.on_push(result)
+
+    manager.add_listener(deliver)
+    with patch("app.relay_publisher.build_client", return_value=client):
+        with patch("app.push.capture_composed", return_value=(_png((255, 0, 0)), [])):
+            manager.push("p_a", device_ids={"panel"})
+        a_digest = manager.latest_render_for("panel")["digest"]
+        assert client.put_frame.call_count == 1
+
+        with patch("app.push.capture_composed", return_value=(_png((0, 0, 255)), [])):
+            assert manager.warm_deck_page("p_b", "panel") is True
+        b = manager.deck_render_for("panel", "p_b")
+        assert b["digest"] != a_digest
+        assert manager.latest_render_for("panel")["digest"] == a_digest
+        assert len(notifications) == 1
+        assert client.put_frame.call_count == 1
+
+        assert manager.promote_deck_page("panel", "never_warmed") is False
+        assert len(notifications) == 1
+        with patch("app.push.capture_composed", side_effect=AssertionError("must not render")):
+            assert manager.promote_deck_page("panel", "p_b") is True
+        assert len(notifications) == 2
+        result, unlocked = notifications[-1]
+        assert unlocked
+        assert result.status == "sent" and result.page_id == "p_b"
+        assert result.composition_digest == b["composition_digest"]
+        assert client.put_frame.call_count == 2
+        upload = client.put_frame.call_args.kwargs
+        assert upload["device_id"] == "panel" and upload["etag"] == b["digest"]
+        assert unseal(upload["sealed"], key) == (manager._renders_dir / b["filename"]).read_bytes()
+
+        # Re-selecting the same bytes retains the publisher's upload deduplication.
+        assert manager.promote_deck_page("panel", "p_b") is True
+        assert client.put_frame.call_count == 2
+
+
 def test_warmed_frame_is_gc_protected(wired) -> None:
     manager = wired
     with patch("app.push.capture_composed", return_value=(_png((0, 0, 255)), [])):
