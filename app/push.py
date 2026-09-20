@@ -887,6 +887,13 @@ class PushManager:
             # The live frame changed; a patch anchored to the old frame
             # must not survive it.
             self._drop_patches_locked(device_id, keep_digest=str(info.get("digest") or ""))
+            result = PushResult(
+                status="sent",
+                page_id=page_id,
+                composition_digest=info.get("composition_digest"),
+            )
+        # Relay and other delivery listeners must see cached navigations too.
+        self._notify(result)
         return True
 
     def has_warm_deck_page(self, device_id: str, page_id: str) -> bool:
