@@ -887,10 +887,32 @@ class PushManager:
             # The live frame changed; a patch anchored to the old frame
             # must not survive it.
             self._drop_patches_locked(device_id, keep_digest=str(info.get("digest") or ""))
+            # Carry the cached frame's renderer row so listeners that key
+            # off it see the same shape a real push produces. Without it
+            # HA discovery updates only its hub-level topics and leaves
+            # the navigating display's own current-dashboard / frame /
+            # last-updated entities on the page it just left. Nothing was
+            # published here (the frame was rendered by the warm), so the
+            # row carries no topic, url or byte count, same as the
+            # digest-unchanged skip in ``_push_page_locked``.
             result = PushResult(
                 status="sent",
                 page_id=page_id,
                 composition_digest=info.get("composition_digest"),
+                renderers=[
+                    RendererResult(
+                        renderer_id=str(info.get("renderer_id") or ""),
+                        topic="",
+                        digest=str(info.get("digest") or ""),
+                        url="",
+                        bytes_written=0,
+                        preview_digest=(
+                            str(info.get("preview_digest"))
+                            if isinstance(info.get("preview_digest"), str)
+                            else None
+                        ),
+                    )
+                ],
             )
         # Relay and other delivery listeners must see cached navigations too.
         self._notify(result)

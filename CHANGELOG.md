@@ -36,6 +36,18 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **Deck navigation now reaches panels paired through the cloud relay.**
+  Stepping a deck served the new page instantly over REST but left a
+  relayed panel on the previous image, because a step that finds its
+  frame already warmed swaps it into the live slot without going through
+  a push, and uploading to a panel's relay mailbox hangs off the push.
+  The swap now tells the delivery listeners, so the selected frame is
+  sealed and uploaded like any other. This covers every cached step, not
+  just a button press: timed deck advances, the return to the home page,
+  touch navigation, the companion app and the Decks page controls were
+  all affected. Warming stays silent, and a step back to an identical
+  frame still uploads nothing.
+
 - **The NASA APOD widget no longer shows a half-loaded picture.** It
   asked for NASA's HD file, which is routinely several megabytes, and
   the renderer only waits a few seconds for the network to settle before

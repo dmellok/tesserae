@@ -135,6 +135,30 @@ def test_promote_miss_returns_false(wired) -> None:
     assert wired.promote_deck_page("panel", "never_warmed") is False
 
 
+def test_promote_result_names_the_navigating_display(wired) -> None:
+    """The promotion result carries the cached frame's renderer row, so a
+    listener that fans out per display (HA discovery) updates the panel
+    that navigated and not just its hub-level entities."""
+    manager = wired
+    results = []
+    manager.add_listener(results.append)
+    with patch("app.push.capture_composed", return_value=(_png((255, 0, 0)), [])):
+        manager.push("p_a", device_ids={"panel"})
+    with patch("app.push.capture_composed", return_value=(_png((0, 0, 255)), [])):
+        assert manager.warm_deck_page("p_b", "panel") is True
+    warm = manager.deck_render_for("panel", "p_b")
+
+    with patch("app.push.capture_composed", side_effect=AssertionError("must not render")):
+        assert manager.promote_deck_page("panel", "p_b") is True
+
+    result = results[-1]
+    assert [r.renderer_id for r in result.renderers] == [warm["renderer_id"]]
+    row = result.renderers[0]
+    # ``<base>__<device id>`` is how a listener resolves the display.
+    assert row.renderer_id.endswith("__panel")
+    assert row.digest == warm["digest"] and row.error is None
+
+
 def test_cached_deck_navigation_uploads_to_relay(wired) -> None:
     """Cached navigation must deliver the selected frame without another push."""
     from types import SimpleNamespace
