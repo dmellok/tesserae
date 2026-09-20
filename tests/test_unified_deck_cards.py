@@ -794,7 +794,11 @@ def test_rotation_row_marks_intended_step_waiting_until_the_panel_fetches_it(
     assert "dk-row is-playing" in section and "Playing · Rotation" in section
     assert "dk-screen is-waiting" in section
     assert 'class="tg tg--sm tg--upper tg--warn dk-ribbon">waiting' in section
-    assert re.search(r'class="dk-behind">\d+ min behind · poll ≈ \d\d:\d\d<', section)
+    # ``<1 min`` (HTML-escaped) is the reading for the first minute of a
+    # dwell window, which is where this lands roughly one run in fifteen:
+    # the rotation is anchored at midnight with 15-minute steps, so the
+    # dwell start walks with the wall clock.
+    assert re.search(r'class="dk-behind">(?:&lt;1|\d+) min behind · poll ≈ \d\d:\d\d<', section)
     # The intended step is waiting, not live; only the on-panel frame is live.
     assert 'class="dk-screen is-live"' not in section
     assert "dk-progress" in section
