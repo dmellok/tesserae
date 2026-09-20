@@ -58,12 +58,20 @@ class RelayPublisher:
         renders_dir: Path,
         latest_render_fn: Callable[[str], dict[str, Any] | None],
         run_async: bool = True,
+        after_frame_upload: Callable[[str], None] | None = None,
     ) -> None:
         self._app = app
         self._devices = devices
         self._settings = settings
         self._renders_dir = Path(renders_dir)
         self._latest = latest_render_fn
+        # Called with the device id once a NEW frame is in its mailbox (not
+        # on the digest-unchanged skip). The wiring hands it the button
+        # service's relay prewarm, so the panel's neighbouring rotation
+        # steps are composed while it sleeps and a relayed press is
+        # answered inside its awake window. Must not block: it runs on the
+        # publisher's serial worker, ahead of the other relay devices.
+        self._after_frame_upload = after_frame_upload
         self._last_sent: dict[str, str] = {}
         self._last_config_sent: dict[str, str] = {}
         self._lock = threading.Lock()
@@ -206,6 +214,11 @@ class RelayPublisher:
             self._last_sent[device.id] = digest
         logger.info("relay %s: uploaded frame %s", device.id, digest)
         self._record_event(device, "frame", extra={"digest": digest, "sealed_bytes": len(sealed)})
+        if self._after_frame_upload is not None:
+            try:
+                self._after_frame_upload(device.id)
+            except Exception:
+                logger.exception("relay %s: after-upload hook failed", device.id)
 
     def _maybe_send_config(self, client: RelayClient, device: Any) -> None:
         """Seal + upload the device's config doc when its content changed.

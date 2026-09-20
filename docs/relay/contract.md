@@ -236,7 +236,12 @@ status, and the resulting render arrives through the frame mailbox; the panel
 should keep polling the frame endpoint during its awake window to pick it up.
 Latency is bounded by the home poll interval (the home side polls fast for a
 burst after a press, so follow-up presses in the same awake window land
-quickly).
+quickly). To keep the render out of that budget, the home instance keeps the
+rotation steps either side of a relay panel's current one composed while the
+panel sleeps, re-warmed each time a new frame reaches its mailbox, so the
+response to a press is a promote rather than a cold render. Firmware should
+still size its awake window for the poll interval plus an upload, not for the
+render.
 
 Because the status slot is latest-only, a button-carrying post could be
 overwritten by a later idle beat before the home instance pulls it. Firmware

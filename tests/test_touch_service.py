@@ -699,6 +699,79 @@ class PrewarmStubPushManager(TouchStubPushManager):
         return True
 
 
+@dataclass
+class TtlPrewarmStubPushManager(TouchStubPushManager):
+    """PrewarmStubPushManager variant that also records the TTL a relay
+    prewarm forwards (a linger prewarm passes none)."""
+
+    prewarmed: list[tuple[str, str, float | None]] = field(default_factory=list)
+
+    def prewarm_page(self, page_id: str, *, device_id: str, ttl_s: float | None = None) -> bool:
+        self.prewarmed.append((page_id, device_id, ttl_s))
+        return True
+
+
+def test_relay_prewarm_forwards_dwell_as_ttl(stores: dict[str, Any]) -> None:
+    """A relay panel's neighbours are warmed for the current step's dwell
+    (30 min here), not the 60 s linger default: the press they serve may
+    be minutes away, and the frame on glass is exactly that old too."""
+    _seed_rotation(stores)
+    pm = TtlPrewarmStubPushManager(latest=_latest(), regions=[_tap_region()])
+    svc = _service(stores, pm)
+    spawned: list[tuple[str, float | None]] = []
+    svc._spawn_prewarm = lambda device_id, *, ttl_s=None: spawned.append((device_id, ttl_s))
+
+    svc.spawn_relay_prewarm("kitchen")
+    assert spawned == [("kitchen", 30 * 60.0)]
+
+    svc._prewarm_adjacent("kitchen", ttl_s=30 * 60.0)
+    assert sorted(pm.prewarmed) == [
+        ("afternoon", "kitchen", 1800.0),
+        ("evening", "kitchen", 1800.0),
+    ]
+    # The linger path is unchanged: no TTL argument reaches the push manager.
+    pm.prewarmed.clear()
+    svc._prewarm_adjacent("kitchen")
+    assert sorted(pm.prewarmed) == [
+        ("afternoon", "kitchen", None),
+        ("evening", "kitchen", None),
+    ]
+
+
+def test_relay_prewarm_ttl_is_clamped(stores: dict[str, Any]) -> None:
+    """A one-minute dwell still gets the 60 s floor (home's relay poll alone
+    can take 30 s); a day-long dwell is capped so a press is never handed
+    an hours-old composition."""
+    from app.button_service import RELAY_PREWARM_MAX_TTL_S, RELAY_PREWARM_MIN_TTL_S
+
+    pm = TtlPrewarmStubPushManager(latest=_latest(), regions=[_tap_region()])
+    svc = _service(stores, pm)
+    stores["rotation_store"].upsert(
+        Rotation(
+            id="kitchen_rot",
+            name="Kitchen",
+            device_ids=["kitchen"],
+            steps=[
+                RotationStep(page_id="morning", dwell_minutes=1),
+                RotationStep(page_id="afternoon", dwell_minutes=1440),
+            ],
+        )
+    )
+    assert svc._relay_prewarm_ttl_s("kitchen") == RELAY_PREWARM_MIN_TTL_S
+    # Pin the effective step to the long-dwell one regardless of the clock.
+    svc._effective_step_index = lambda rotation, state: (1, True)
+    assert svc._relay_prewarm_ttl_s("kitchen") == RELAY_PREWARM_MAX_TTL_S
+
+
+def test_relay_prewarm_is_a_noop_without_a_rotation(stores: dict[str, Any]) -> None:
+    pm = TtlPrewarmStubPushManager(latest=_latest(), regions=[_tap_region()])
+    svc = _service(stores, pm)
+    spawned: list[str] = []
+    svc._spawn_prewarm = lambda device_id, *, ttl_s=None: spawned.append(device_id)
+    svc.spawn_relay_prewarm("kitchen")
+    assert spawned == []
+
+
 def test_prewarm_adjacent_targets_prev_and_next_steps(stores: dict[str, Any]) -> None:
     """After a touch on a rotation-bound device, the steps either side of
     the current one get prewarmed (the likely swipe targets), nothing

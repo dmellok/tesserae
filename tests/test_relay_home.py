@@ -90,6 +90,38 @@ class _Dev:
         self.config_schema = {"sleep_interval_s": {"type": "int", "default": 60}}
 
 
+def test_publisher_runs_after_upload_hook_only_for_new_frames(tmp_path: Path) -> None:
+    """The hook (wired to the relay prewarm) fires once per frame that
+    actually reached the mailbox, never on the digest-unchanged skip, and
+    a raising hook does not break the upload bookkeeping."""
+    renders_dir = tmp_path / "renders"
+    renders_dir.mkdir()
+    (renders_dir / "abc123.bin").write_bytes(b"frame")
+    dev = _Dev("panel1", b64u_encode(b"\x22" * 32))
+    latest = {"digest": "abc123", "filename": "abc123.bin", "ext": "bin", "renderer_id": "r"}
+    hooked: list[str] = []
+
+    def hook(device_id: str) -> None:
+        hooked.append(device_id)
+        raise RuntimeError("prewarm exploded")
+
+    pub = RelayPublisher(
+        app=None,  # type: ignore[arg-type]
+        devices=type("R", (), {"devices": {"panel1": dev}})(),
+        settings=None,
+        renders_dir=renders_dir,
+        latest_render_fn=lambda _id: latest,
+        run_async=False,
+        after_frame_upload=hook,
+    )
+    client = _FakeClient()
+    pub._maybe_send(client, dev)  # type: ignore[arg-type]
+    pub._maybe_send(client, dev)  # type: ignore[arg-type]  # same digest: skipped
+    assert len(client.uploads) == 1
+    assert hooked == ["panel1"]
+    assert pub._last_sent["panel1"] == "abc123"
+
+
 def test_publisher_seals_uploads_and_dedupes(tmp_path: Path) -> None:
     renders_dir = tmp_path / "renders"
     renders_dir.mkdir()

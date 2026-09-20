@@ -97,13 +97,16 @@ from app.touch_regions import (
 from app.transport import MqttTransport
 from app.webpage_headers import headers_by_origin_for_page
 
-# Speculative pre-compose cache bounds (issue #49 linger). TTL keeps a
-# prewarmed composition usable across a linger window's tap cadence but
-# never lets a scheduled push minutes later serve widget data captured at
-# touch time; the cap bounds memory (a 1872x1404 composition PNG is a few
-# hundred KB).
+# Speculative pre-compose cache bounds (issue #49 linger). The default TTL
+# keeps a prewarmed composition usable across a linger window's tap cadence
+# but never lets a scheduled push minutes later serve widget data captured
+# at touch time. A caller that knows its consumer is a sleeping panel whose
+# next press may be minutes away (the relay prewarm in ButtonService) passes
+# its own, longer TTL per entry. The cap bounds memory (a 1872x1404
+# composition PNG is a few hundred KB): linger sessions hold two entries per
+# device, and the relay prewarm two more per relay panel.
 _PRECOMPOSE_TTL_S = 60.0
-_PRECOMPOSE_CAP = 6
+_PRECOMPOSE_CAP = 16
 _IMAGE_FIT_MODES = frozenset({"fit", "fill", "blur", "stretch", "center"})
 
 
@@ -1387,8 +1390,8 @@ class PushManager:
             entry = self._precompose.pop(key, None)
         if entry is None:
             return None
-        stamped, png, regions, slots = entry
-        if time.monotonic() - stamped > _PRECOMPOSE_TTL_S:
+        expires_at, png, regions, slots = entry
+        if time.monotonic() > expires_at:
             return None
         return png, regions, slots
 
@@ -1398,29 +1401,35 @@ class PushManager:
         png: bytes,
         regions: list[dict[str, Any]],
         slots: list[dict[str, Any]],
+        *,
+        ttl_s: float = _PRECOMPOSE_TTL_S,
     ) -> None:
+        """Cache a composition until ``now + ttl_s``. Entries carry their own
+        expiry so a long-lived relay prewarm and a short linger prewarm can
+        share the one cache."""
         with self._precompose_lock:
             now = time.monotonic()
             # Drop expired entries opportunistically, then bound the size.
-            for k in [
-                k for k, entry in self._precompose.items() if now - entry[0] > _PRECOMPOSE_TTL_S
-            ]:
+            for k in [k for k, entry in self._precompose.items() if now > entry[0]]:
                 del self._precompose[k]
-            self._precompose[key] = (now, png, regions, slots)
+            self._precompose[key] = (now + ttl_s, png, regions, slots)
             self._precompose.move_to_end(key)
             while len(self._precompose) > _PRECOMPOSE_CAP:
                 self._precompose.popitem(last=False)
 
-    def prewarm_page(self, page_id: str, *, device_id: str) -> bool:
+    def prewarm_page(self, page_id: str, *, device_id: str, ttl_s: float | None = None) -> bool:
         """Speculatively capture the composition a push of ``page_id`` to
         ``device_id`` would render, so that push skips its Playwright
         capture (the dominant share of post-touch latency during a linger
-        session). Best-effort: any failure is logged and swallowed, a
-        missed prewarm only costs the latency it would have saved. Runs
-        without the push lock; the browser pool serialises captures on
-        its own worker, so a prewarm queues behind (never races) a real
-        push's capture. Returns True when a composition was captured or
-        was already cached fresh."""
+        session, and of the round trip a relayed button press has to fit
+        inside the panel's awake window). Best-effort: any failure is
+        logged and swallowed, a missed prewarm only costs the latency it
+        would have saved. Runs without the push lock; the browser pool
+        serialises captures on its own worker, so a prewarm queues behind
+        (never races) a real push's capture. ``ttl_s`` overrides the
+        default linger TTL for callers whose consumer may be minutes away.
+        Returns True when a composition was captured or was already
+        cached unexpired."""
         try:
             page = self._page_store.get(page_id)
             if page is None:
@@ -1440,7 +1449,7 @@ class PushManager:
             key = self._precompose_key(compose_url, page, panel)
             with self._precompose_lock:
                 cached = self._precompose.get(key)
-                if cached is not None and time.monotonic() - cached[0] <= _PRECOMPOSE_TTL_S:
+                if cached is not None and time.monotonic() <= cached[0]:
                     return True
             composition_png, raw_result = capture_composed(
                 CaptureRequest(
@@ -1461,6 +1470,7 @@ class PushManager:
                 composition_png,
                 normalize_regions(raw_regions),
                 normalize_slots(raw_slots),
+                ttl_s=_PRECOMPOSE_TTL_S if ttl_s is None else ttl_s,
             )
             logger.info("prewarm: cached composition for page=%s device=%s", page_id, device_id)
             return True

@@ -8,6 +8,19 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **A button press on a relayed panel now lands inside its awake window.**
+  A press over the cloud relay is store-and-forward: home only learns of
+  it on its next relay poll, then has to render the next rotation step
+  and upload it before the panel stops polling and goes back to sleep.
+  A cold render of a widget-heavy dashboard was the part of that budget
+  that lost the race, and the frame then only showed up at the next timer
+  wake, which read as the press doing nothing. Home now keeps the steps
+  either side of a relay panel's current one composed while it sleeps,
+  refreshed every time a new frame reaches its mailbox, so the answer to
+  a press is a promote rather than a render. The warm compositions live
+  for the current step's dwell (one minute at least, thirty at most), so
+  the page a press brings up is never older than the frame it replaces.
+
 - **A dashboard can declare how often the panel showing it should wake.**
   Wake cadence has always been a device property, but the content is what
   knows how often it changes: a once-daily agenda on a five-minute panel

@@ -912,12 +912,23 @@ def _rebuild_transport(
         from app.relay_publisher import RelayPublisher
 
         push_mgr = app.config["PUSH_MANAGER"]
+
+        def _relay_prewarm(device_id: str) -> None:
+            # Compose the panel's neighbouring rotation steps while it
+            # sleeps, so a relayed button press is a promote, not a cold
+            # render (ButtonService.spawn_relay_prewarm). Looked up per call:
+            # the service is built after the first transport wiring.
+            svc = app.config.get("BUTTON_SERVICE")
+            if svc is not None:
+                svc.spawn_relay_prewarm(device_id)
+
         relay_pub = RelayPublisher(
             app=app,
             devices=devices,
             settings=settings,
             renders_dir=renders_dir,
             latest_render_fn=push_mgr.latest_render_for,
+            after_frame_upload=_relay_prewarm,
         )
         push_mgr.add_listener(relay_pub.on_push)
         # Handle for the Settings save path: a device-config edit nudges a

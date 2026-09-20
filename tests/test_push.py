@@ -1295,6 +1295,31 @@ def test_prewarm_entry_expires_after_ttl(tmp_path: Path, composition_png: bytes)
         assert len(calls) == 2
 
 
+def test_prewarm_with_long_ttl_outlives_linger_default(
+    tmp_path: Path, composition_png: bytes
+) -> None:
+    """A relay prewarm passes its own TTL (the rotation step's dwell), so a
+    composition warmed at the last rotation fire still serves a push
+    minutes later, well past the 60 s linger default."""
+    manager, _client, _ = _wired_bound(tmp_path, composition_png)
+    calls: list[str] = []
+
+    def fake_capture(req, pool=None):
+        calls.append(req.render.url)
+        return (composition_png, [])
+
+    with patch("app.push.capture_composed", side_effect=fake_capture):
+        assert manager.prewarm_page("home", device_id="kitchen", ttl_s=1800.0) is True
+        # Age the entry by ten minutes: expired under the default TTL, live
+        # under the relay one.
+        with manager._precompose_lock:
+            for key, (expires_at, png, regions, slots) in list(manager._precompose.items()):
+                manager._precompose[key] = (expires_at - 600.0, png, regions, slots)
+        result = manager.push("home", device_ids={"kitchen"})
+        assert result.status == "sent"
+        assert len(calls) == 1
+
+
 def test_prewarm_misses_after_page_edit(tmp_path: Path, composition_png: bytes) -> None:
     """An edit between prewarm and push changes the page's content token,
     so the push must re-capture instead of serving the pre-edit frame."""

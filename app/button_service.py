@@ -79,6 +79,13 @@ def _handles_swipe(region: dict[str, Any] | None, gesture: str) -> bool:
     return region is not None and resolve_gesture_action(region, gesture) is not None
 
 
+# Relay prewarm TTL bounds (see ``spawn_relay_prewarm``). The floor keeps a
+# one-minute dwell from expiring before home's ~30 s relay poll even sees
+# the press; the ceiling bounds how stale a "next page" a sleeping panel
+# can be handed when its rotation dwells for hours.
+RELAY_PREWARM_MIN_TTL_S: float = 60.0
+RELAY_PREWARM_MAX_TTL_S: float = 30 * 60.0
+
 # Cap on how long a manual override sticks when we can't compute the
 # rotation's next daily anchor (no rotation bound, or a degenerate
 # anchor value). One hour is long enough to prevent a "scheduler yanks
@@ -1080,20 +1087,60 @@ class ButtonService:
             base=base,
         )
 
-    def _spawn_prewarm(self, device_id: str) -> None:
+    def _spawn_prewarm(self, device_id: str, *, ttl_s: float | None = None) -> None:
         """Fire ``_prewarm_adjacent`` on a daemon thread. Split out so
         tests can run it synchronously."""
         threading.Thread(
             target=self._prewarm_adjacent,
             args=(device_id,),
+            kwargs={"ttl_s": ttl_s},
             name="tesserae-touch-prewarm",
             daemon=True,
         ).start()
 
-    def _prewarm_adjacent(self, device_id: str) -> None:
-        """Prewarm the compositions a linger session will most likely ask
-        for next: the rotation steps either side of the device's current
-        step (prev/next swipe targets). Best-effort by design."""
+    def spawn_relay_prewarm(self, device_id: str) -> None:
+        """Keep a relay panel's neighbouring rotation steps composed while
+        it sleeps, so a relayed button press is answered by a promote
+        instead of a cold render.
+
+        A relayed press is store-and-forward: home learns of it on its
+        next relay poll (up to ~30 s), then has to render and upload the
+        new step before the panel's fixed awake window closes. A cold
+        Playwright capture of a widget-heavy page is the part of that
+        budget home controls, and the one that loses the race. Called by
+        the relay publisher after every frame it uploads, i.e. at each
+        rotation fire and after each press, so the warm compositions are
+        exactly as fresh as the frame on glass; the TTL is the current
+        step's dwell so nothing older than that ever serves. No-op when
+        the device is not on a rotation with at least two steps."""
+        ttl_s = self._relay_prewarm_ttl_s(device_id)
+        if ttl_s is None:
+            return
+        self._spawn_prewarm(device_id, ttl_s=ttl_s)
+
+    def _relay_prewarm_ttl_s(self, device_id: str) -> float | None:
+        """How long a relay prewarm may serve: the current step's dwell
+        (the frame on glass is replaced by the scheduler no later than
+        that), clamped so a very long dwell never hands a press an
+        hours-old composition. None when there is nothing to warm."""
+        try:
+            rotation = self._resolve_rotation(device_id)
+            if rotation is None or len(rotation.steps) < 2:
+                return None
+            state = self._state.get(device_id) or DeviceRotationState(device_id=device_id)
+            step_index, _ = self._effective_step_index(rotation, state)
+            dwell_s = float(rotation.steps[step_index].dwell_minutes * 60)
+        except Exception:
+            log.exception("relay prewarm ttl failed for device=%s", device_id)
+            return None
+        return max(RELAY_PREWARM_MIN_TTL_S, min(RELAY_PREWARM_MAX_TTL_S, dwell_s))
+
+    def _prewarm_adjacent(self, device_id: str, *, ttl_s: float | None = None) -> None:
+        """Prewarm the compositions a linger session, or a sleeping relay
+        panel's next press, will most likely ask for: the rotation steps
+        either side of the device's current step (prev/next targets).
+        ``ttl_s`` is forwarded when given so a relay prewarm outlives the
+        linger default. Best-effort by design."""
         try:
             pusher = self._push_getter()
             prewarm = getattr(pusher, "prewarm_page", None)
@@ -1111,7 +1158,10 @@ class ButtonService:
                 if page_id and page_id not in candidates:
                     candidates.append(page_id)
             for page_id in candidates:
-                prewarm(page_id, device_id=device_id)
+                if ttl_s is None:
+                    prewarm(page_id, device_id=device_id)
+                else:
+                    prewarm(page_id, device_id=device_id, ttl_s=ttl_s)
         except Exception:
             log.exception("touch prewarm failed for device=%s", device_id)
 
