@@ -8,6 +8,42 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **A panel reports the colours it can dither, not only the inks it prints.**
+  `list_devices` has always answered with the raw ink palette, and the
+  composing instructions have always said to design in full colour and not
+  flatten a layout to those inks. That does not work: the prose is an
+  abstraction and the palette is six named hexes, so an agent given both
+  reaches for the hexes and the dashboard comes out poster-flat. The mixes
+  are now named too, each one pair of inks at one ratio with its hex computed
+  from the panel's own palette, so a Spectra 6 panel answers with six inks
+  and eighteen blends and a BWRY panel with four and ten. Each carries a
+  `safe_on`, because a dithered colour holds across a card fill and speckles
+  on a hairline, which is the rule that decides where it can be used.
+  Greyscale and one-bit panels report none, their levels being the whole
+  vocabulary already.
+
+### Changed
+
+- **The MCP instructions now cover craft, not just mechanics.** An agent was
+  told how to place an element and nothing about making the result look
+  designed, so dashboards shipped on the renderer's fallback font, on
+  whatever icon weight came to hand, with sizes scattered through the markup
+  as raw px, and with a week of readings printed as today's number instead of
+  drawn. The instructions now name the bundled families by job, state that
+  duotone and fill icons survive the dither where the thin weights speckle,
+  ask for a type scale declared up front, map data to the chart form that
+  suits it, and give the Chart.js overrides that keep a chart legible on
+  e-ink. They also record what the code sandbox does not inherit: the page
+  theme, style and accent tokens stop at its edge, which was true and written
+  down nowhere.
+
+- **A new dashboard is no longer preceded by a read of the existing ones.**
+  `list_pages` carried no guidance on when it was for, so the gap was filled
+  with a reflexive survey of the operator's other work before any building
+  started. The instructions now say to go straight to the build, keeping the
+  cases where reading a page is right: a request that points at one, or
+  checking a name is free.
+
 - **A button press on a relayed panel now lands inside its awake window.**
   A press over the cloud relay is store-and-forward: home only learns of
   it on its next relay poll, then has to render the next rotation step
