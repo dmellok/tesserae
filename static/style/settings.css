@@ -3747,7 +3747,7 @@ select.dx-input:hover {
 .dx-devtable-head,
 .dx-devrow {
   display: grid;
-  grid-template-columns: 20px minmax(0, 1.6fr) minmax(0, 1.3fr) 70px 110px 80px 90px minmax(0, 1fr) 32px;
+  grid-template-columns: 20px minmax(0, 1.5fr) minmax(0, 1.2fr) 70px 110px 80px minmax(0, 1fr) 112px 32px;
   align-items: center;
   gap: 14px;
   padding: 12px 20px;
@@ -3793,7 +3793,18 @@ select.dx-input:hover {
 .dx-devrow-name > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dx-devrow-icon { font-size: 16px; color: var(--dx-faint); flex: none; }
 .dx-devrow-kind { font-size: 12.5px; color: var(--dx-ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dx-devrow-mono { font-family: var(--dx-mono); font-size: 12px; color: var(--dx-ink-soft); white-space: nowrap; }
+.dx-devrow-mono {
+  font-family: var(--dx-mono);
+  font-size: 12px;
+  color: var(--dx-ink-soft);
+  white-space: nowrap;
+  /* Firmware is free text the device chooses (#325): a client that
+     reports "CP client: 0.1.0 / app API: 0.4.0" must clip inside its
+     own column instead of painting over Last seen. */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .dx-devrow-mono.is-warn { color: var(--dx-warn-text); }
 .dx-devrow-seen { font-size: 12px; color: var(--dx-ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dx-devrow-seen.is-warn,
@@ -4210,7 +4221,7 @@ select.dx-input:hover {
 /* ---- Responsive ----------------------------------------------------- */
 @media (max-width: 1100px) {
   .dx-devtable-head,
-  .dx-devrow { grid-template-columns: 20px minmax(0, 1.6fr) minmax(0, 1.2fr) 64px 92px 64px 76px minmax(0, 1fr) 24px; gap: 10px; padding: 12px 16px; }
+  .dx-devrow { grid-template-columns: 20px minmax(0, 1.5fr) minmax(0, 1.1fr) 64px 92px 64px minmax(0, 1fr) 100px 24px; gap: 10px; padding: 12px 16px; }
   .dx-devquick { padding-left: 16px; }
   .dx-overview { grid-template-columns: 180px minmax(0, 1fr); }
   .dx-thumb--page { width: 180px; height: 135px; }
@@ -4259,6 +4270,14 @@ select.dx-input:hover {
   .dx-devrow-l3 > * + *::before { content: "·"; margin-right: 8px; color: var(--dx-faint); }
   .dx-devrow-l2 > * + *::before { content: "·"; margin-right: 8px; color: var(--dx-faint); }
   .dx-devrow-kind { white-space: normal; }
+  /* The stacked phone lines wrap instead of clipping, so a long
+     device-reported firmware string stays readable (#325). */
+  .dx-devrow-mono {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
   .dx-devrow-chev { align-self: center; }
   .dx-devquick { flex-direction: column; gap: 14px; padding: 14px; }
   .dx-thumb--quick { width: 100%; max-width: 320px; height: auto; aspect-ratio: 4 / 3; }

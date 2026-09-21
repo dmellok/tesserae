@@ -36,6 +36,25 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **A device's firmware line no longer paints over Last seen.** The
+  Devices table gave firmware a fixed, narrow column, and a client that
+  reports free text there rather than a bare version -- a CircuitPython
+  client reporting `CP client: 0.1.0 / app API: 0.4.0` -- ran straight
+  through it and over the column beside it (#325). Firmware now takes
+  the flexible column and clips with an ellipsis, with the full string
+  on hover; the stacked phone layout wraps it instead. A value that
+  isn't a bare version number also stops being given a `v` prefix, so
+  that same client no longer reads as `vCP client: ...`.
+
+- **The device page's section links work in Firefox.** Clicking a link
+  in the vertical nav scrolled the page to the section and then also
+  scrolled the clicked link into view so the phone strip keeps it
+  centred. Two scroll requests against the same box is a browser
+  coin-flip: Chrome drops the second as a no-op, Firefox honours it and
+  cancels the first, so the click did nothing at all (#326). The strip
+  now scrolls its own scrollport, which desktop's sticky column never
+  needs.
+
 - **Deck navigation now reaches panels paired through the cloud relay.**
   Stepping a deck served the new page instantly over REST but left a
   relayed panel on the previous image, because a step that finds its

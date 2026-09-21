@@ -1344,11 +1344,12 @@ def _device_overview(device: Device, section: dict[str, Any]) -> dict[str, Any]:
     battery_low = isinstance(pct, (int, float)) and 0 < pct < 20
     fw = status["firmware"] or {}
     fw_current = fw.get("current")
-    fw_value = (
-        (fw_current if str(fw_current).startswith("v") else f"v{fw_current}")
-        if fw_current
-        else "Unknown"
-    )
+    # Only a bare version number gets the "v" (1.32.2 -> v1.32.2). Clients
+    # report free text here too -- "CP client: 0.1.0 / app API: 0.4.0" must
+    # not come back as "vCP client: ..." (#325).
+    fw_value = str(fw_current) if fw_current else "Unknown"
+    if fw_value[:1].isdigit():
+        fw_value = f"v{fw_value}"
     if fw.get("state") == "outdated" and fw.get("latest"):
         fw_sub = f"v{fw['latest']} available"
     elif fw.get("state") == "current":

@@ -319,8 +319,20 @@
         target.scrollIntoView({ behavior: 'smooth', block: 'start' });
         history.replaceState(null, '', '#' + target.id);
         setActive(target.id);
-        // On the phone strip, keep the active pill in view.
-        l.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        // On the phone strip, keep the active pill in view -- but only
+        // ever by scrolling the nav's OWN scrollport. ``scrollIntoView``
+        // here walks up to the document instead, and a second scroll
+        // request against the document cancels the smooth scroll started
+        // just above, so on Firefox the click appeared to do nothing
+        // (#326). Desktop lays the nav out as a sticky column that never
+        // overflows, so this is a no-op there.
+        if (nav.scrollWidth > nav.clientWidth) {
+          const navBox = nav.getBoundingClientRect();
+          const pill = l.getBoundingClientRect();
+          const left =
+            nav.scrollLeft + (pill.left - navBox.left) - (nav.clientWidth - pill.width) / 2;
+          nav.scrollTo({ left: Math.max(0, left), behavior: 'smooth' });
+        }
       });
     });
     window.addEventListener('scroll', onScroll, { passive: true });

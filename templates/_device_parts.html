@@ -8,7 +8,7 @@
 {%- macro stat_tile(label, t) -%}
 <div class="dx-qtile">
   <span class="dx-qtile-label">{{ label }}</span>
-  <span class="dx-qtile-value{% if t.muted %} is-muted{% endif %}{% if t.low %} is-warn{% endif %}">{{ t.value }}</span>
+  <span class="dx-qtile-value{% if t.muted %} is-muted{% endif %}{% if t.low %} is-warn{% endif %}" title="{{ t.value }}">{{ t.value }}</span>
   <span class="dx-qtile-sub">{{ t.sub or '' }}</span>
 </div>
 {%- endmacro -%}

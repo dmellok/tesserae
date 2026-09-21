@@ -96,7 +96,7 @@
         </span>
         <span class="dx-devrow-l dx-devrow-l3">
           <span class="dx-devrow-mono dx-devrow-batt{% if section.overview.battery.low %} is-warn{% endif %}">{% if section.overview.battery.muted %}-{% else %}{{ section.overview.battery.value }}{% endif %}</span>
-          <span class="dx-devrow-mono dx-devrow-fw">{% if section.status.firmware and section.status.firmware.current %}{{ section.overview.firmware.value }}{% else %}-{% endif %}</span>
+          <span class="dx-devrow-mono dx-devrow-fw"{% if section.status.firmware and section.status.firmware.current %} title="{{ section.overview.firmware.value }}"{% endif %}>{% if section.status.firmware and section.status.firmware.current %}{{ section.overview.firmware.value }}{% else %}-{% endif %}</span>
           <span class="dx-devrow-seen is-{{ _h }}">{% if _h == 'unknown' %}no heartbeat yet{% else %}{{ section.status.relative }}{% endif %}</span>
         </span>
       </span>
