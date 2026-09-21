@@ -413,6 +413,36 @@ over dense packing, and real contrast rather than mid greys. No gradients, no ph
 backgrounds and no animation. Whitespace is free and is most of what separates a designed panel
 from a crowded one, so when in doubt cut an element rather than shrink the type.
 
+IF THE DATA HAS SHAPE, DRAW IT. The sandbox ships a real graphics toolkit and the common
+failure is not reaching for it: a page that had a week of readings to show prints today's number
+in big type, or hand-rolls a row of divs with inline widths, which is a bar chart with no scale,
+no axis and no labels. Read what you probed and pick the form from the data:
+    a series over time            line or area chart (Chart.js)
+    categories compared           bar chart, horizontal when the labels are words
+    parts of a whole              stacked bar, or a doughnut when there are three or four parts
+    a value inside a range        RadialGauge / LinearGauge (canvas-gauges), or an SVG.js arc
+    progress toward a target      a single thick bar or ring, labelled with the number
+    one number with no history    big type is correct. Do not chart a scalar.
+Only the libraries your code names are inlined, so an unused one costs nothing and there is no
+reason to avoid them. After the render, render_report().injected_libs must name the library you
+meant to use; if it does not, your code never referenced the global and the chart is empty.
+
+CHART FOR E-INK, NOT FOR A SCREEN. Chart.js defaults are tuned for a backlit display and look
+muddy on a panel, which is the other reason agents quietly stop using it. Override them every
+time:
+- Thicken everything. borderWidth 3 or 4 on lines, and no hairlines anywhere: a 1px stroke
+  dithers into a dotted line. Solid fills, never translucent ones.
+- Turn the grid off, or keep one axis line at full ink. A field of light grey gridlines is the
+  fastest way to turn a chart into noise.
+- Bake the values in. There is no hover on a panel, so reference ChartDataLabels by name (that
+  is what inlines it) and switch datalabels on, or label the points directly. The legend is
+  already off by default: name the series next to it instead.
+- Size the text off your type scale. Chart.js defaults to roughly 12px, which is unreadable at
+  panel reading distance; set options.font.size from the same base the rest of the page uses.
+- Colour from the panel. Take fills from the blends list_devices reports and axis lines, ticks
+  and labels from the pure inks, so the chart keeps its edges where the fills can afford the
+  dither.
+
 VERIFY EVERY SIZE (this is where layouts break)
 - Size token comes from the cell's LONGER side: xs <=200, sm <=400, md <=700, lg >700 px.
 - To review a widget across sizes on live data, build one contact-sheet canvas with the same
