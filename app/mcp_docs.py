@@ -324,6 +324,13 @@ START HERE (do this first, before designing the layout):
   operator didn't explicitly ask. Binding up front fixes the artboard to the real panel and means
   Send / schedule / rotation already target the right hardware; you only rebind if the target
   actually changes. Skip binding only if there are genuinely no devices yet.
+- DO NOT read the operator's other dashboards on the way in. A request for a new dashboard is a
+  request for that dashboard: list_pages / get_canvas on somebody else's page tells you nothing
+  about the one being asked for, and spending the first part of a build reading old work reads as
+  hesitation. The panel came from list_devices and the design comes from the request. Go and
+  build it. Read another page only when the request actually points at one ("like my weather
+  one", "add this to the kitchen page", "replace what's on the study panel"), or when you need to
+  avoid colliding with a name.
 - Then add an EMPTY code element and build it up with append_code (streams the html/css/js in a
   chunk at a time; an open editor re-renders after each chunk). Do NOT compose the whole design
   silently and post one giant set_canvas at the end -- that reads as a long pause then a blob.
@@ -588,7 +595,11 @@ deck frames on local storage and navigates decks instantly with the
 radio off. "kind" is the hardware model id. All read-only facts; never
 ask the user to enable them, the firmware advertises them.""",
     "list_pages": """\
-List existing canvas (freeform) dashboards.""",
+List existing canvas (freeform) dashboards. For finding a page the operator has
+referred to, or checking a name is free. Building a NEW dashboard does not need
+this call: the target panel comes from list_devices and the design comes from
+the request, so go straight to create_canvas_page rather than surveying what is
+already there.""",
     "create_canvas_page": """\
 Create a new, empty canvas dashboard and return its id. Size it to your
 target panel (see list_devices), then call bind_devices(page_id, [device_ids])
@@ -601,7 +612,10 @@ Delete a canvas dashboard by id (e.g. a throwaway QA page). Returns
     "get_canvas": """\
 Get the full canvas document (size, appearance, and every element) for a
 page, plus "rev" / "updated_at" / "updated_by". Keep the "rev" and pass it as
-base_rev on your next write to be warned (HTTP 409) if the page drifted.""",
+base_rev on your next write to be warned (HTTP 409) if the page drifted.
+For the page you are editing. Reading an unrelated page to study its layout
+before building a new one is wasted work and is not how house style is
+carried: theme / style / font on the new document do that.""",
     "set_canvas": """\
 Replace a canvas dashboard's document. Returns a compact {ok,id,rev,elements}
 ack (not the full document), or an error with field-level "details" (HTTP 422) if
