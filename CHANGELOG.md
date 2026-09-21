@@ -55,6 +55,18 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   now scrolls its own scrollport, which desktop's sticky column never
   needs.
 
+- **An anchored device section lands below the topbar, not under it.**
+  The sub-nav's sticky offset and the scroll-margin a section comes to
+  rest on were both a fixed 16px, measured from the top of the viewport
+  rather than from the bottom of the sticky topbar, so clicking a
+  section put its heading behind the bar (#326). The bar's own height
+  moves: its nav wraps onto a second row between roughly 900px and
+  1100px wide, which is where this was reported. Its measured height is
+  now published as `--t-topbar-h` and both offsets derive from it. The
+  highlight follows: the scroll-spy probe used a quarter of the viewport
+  height, which on a short window sits above the line a clicked section
+  lands on, so the pill above the one you clicked lit up instead.
+
 - **Deck navigation now reaches panels paired through the cloud relay.**
   Stepping a deck served the new page instantly over REST but left a
   relayed panel on the previous image, because a step that finds its

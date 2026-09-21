@@ -4047,7 +4047,10 @@ select.dx-input:hover {
   width: 200px;
   flex: none;
   position: sticky;
-  top: 16px;
+  /* Clear the sticky topbar, whose height changes when its nav wraps
+     (#326). --t-topbar-h is published by components.js; the fallback
+     covers the single-row bar before the first measurement. */
+  top: calc(var(--t-topbar-h, 61px) + 16px);
 }
 .dx-subnav-link {
   display: block;
@@ -4071,7 +4074,7 @@ select.dx-input:hover {
   gap: 16px;
 }
 .dx-devpage-main--full { width: 100%; }
-.dx-devsec { scroll-margin-top: 16px; }
+.dx-devsec { scroll-margin-top: calc(var(--t-topbar-h, 61px) + 16px); }
 .dx-devsec.is-danger { border-color: var(--dx-danger-border); }
 .dx-devsec .dx-section-head { margin-bottom: 8px; }
 .dx-devsec .dx-section-head .dx-btn { flex: none; }

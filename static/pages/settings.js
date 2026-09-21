@@ -303,7 +303,15 @@
       ticking = true;
       window.requestAnimationFrame(function () {
         ticking = false;
-        const probe = window.innerHeight * 0.25;
+        // The probe has to sit at or below where a clicked section comes
+        // to rest, which is just under the sticky topbar. A short viewport
+        // (or a topbar whose nav has wrapped to two rows) puts a quarter
+        // of the viewport height ABOVE that line, and the section you just
+        // jumped to then fails its own test and the pill above it lights
+        // up instead (#326).
+        const bar = document.querySelector('.topbar');
+        const barH = bar ? bar.getBoundingClientRect().height : 0;
+        const probe = Math.max(barH + 24, window.innerHeight * 0.25);
         let current = sections[0].id;
         sections.forEach(function (s) {
           if (s.getBoundingClientRect().top <= probe) current = s.id;

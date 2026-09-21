@@ -800,6 +800,29 @@
     attachLocationSearch(document);
     attachMultiSelect(document);
     attachLightbox();
+    publishTopbarHeight();
+  }
+
+  // The topbar is sticky at top: 0, and its nav wraps onto a second row
+  // between roughly 900px and 1100px wide, so anything that has to clear
+  // it -- a sticky sub-nav, the scroll-margin an anchored section lands
+  // on -- can't use a fixed number (#326). Publish the measured height as
+  // --t-topbar-h and keep it current as the bar reflows.
+  function publishTopbarHeight() {
+    const bar = document.querySelector(".topbar");
+    if (!bar) return;
+    const publish = () => {
+      document.documentElement.style.setProperty(
+        "--t-topbar-h",
+        Math.round(bar.getBoundingClientRect().height) + "px",
+      );
+    };
+    publish();
+    if (window.ResizeObserver) {
+      new ResizeObserver(publish).observe(bar);
+    } else {
+      window.addEventListener("resize", publish);
+    }
   }
 
   if (document.readyState === "loading") {
