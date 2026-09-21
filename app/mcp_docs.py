@@ -395,12 +395,17 @@ comes out looking unfinished. Set all four:
   three or four steps only. One headline per page at the top of the scale, labels small and
   uppercase with letter-spacing, nothing below the base size. Sizes scattered through the markup
   in raw px is what makes a page look assembled rather than designed.
-- BUILD THE PALETTE FROM THE PANEL. list_devices gives "colors", the inks this panel really
-  prints. Use them flat for type, rules and icons, where they stay crisp. Large areas (card
-  fills, headers, chart bands) can take any colour in between: the dither mixes the inks and it
-  reads as that colour across a big shape, though never on a hairline or small text. Give a page
-  one accent doing one job. On a "mono" panel drop colour entirely and carry hierarchy with
-  weight, size and space.
+- BUILD THE PALETTE FROM THE PANEL, AND USE MORE OF IT THAN THE INKS. list_devices reports
+  "colors" (the inks, printed flat) AND "blends" (what the panel makes by dithering two inks
+  together, each with a real hex). A Spectra 6 panel has six of the first and eighteen of the
+  second, so designing out of the six primaries throws away three quarters of the panel and is
+  the most common reason a dashboard looks poster-flat. Reach for the blends first on every
+  large area -- backgrounds, card fills, headers, chart bands -- and keep the pure inks for type,
+  hairlines and icons, which are the only places a dither shows as speckle. Anything between two
+  of the listed colours also renders; the named ones are simply the mixes that land predictably.
+  Give a page one accent doing one job, and check any colour you are unsure of with
+  render_preview. On a "mono" panel drop colour entirely and carry hierarchy with weight, size
+  and space.
 
 E-INK IS READ ACROSS A ROOM, not at desk distance. Fewer and bigger things beats more and
 smaller every time. Strong weights over light ones, solid blocks over outlines, generous space
@@ -608,11 +613,22 @@ is never truncated: it is the reason to call this tool. Pass full=True for
 the whole payload, or raise max_items, when you genuinely need every row.""",
     "list_devices": """\
 List registered display devices with panel dims AND colour capability:
-"color_mode" (e.g. "6-colour (Spectra 6)"), "colors" (the renderable palette
-as hex), "gamut", "orientation", and a "mono" flag. Match a canvas's w/h to
-the target panel. The panel dithers the full-colour render down to these inks,
-so DESIGN IN FULL COLOUR -- the palette guides fine detail (thin text/icons),
-it doesn't cap the whole layout. Honour "mono" for grayscale-only panels.
+"color_mode" (e.g. "6-colour (Spectra 6)"), "colors" (the inks the panel
+prints flat), "blends" (what it prints by dithering two of those together),
+"gamut", "orientation", and a "mono" flag. Match a canvas's w/h to the target
+panel. Honour "mono" for grayscale-only panels.
+
+"colors" is NOT the palette to design from, it is the subset that stays crisp
+at any size. A Spectra 6 panel reports 6 inks and 18 blends, so its real
+vocabulary is two dozen colours, not six; building a dashboard out of the six
+flat primaries is the single most common way to make one look cheap. Each
+blend carries its own hex (computed from this panel's palette, so a calibrated
+panel reports what it will really print), the two inks it mixes, and
+"safe_on". Pure inks for type, hairlines and icons; blends for the large
+areas -- card and panel fills, headers, chart bands, backgrounds -- where the
+dither averages out and reads as the colour rather than as speckle. A colour
+that is neither still renders, dithered to whatever is nearest, so use one
+deliberately and check it with render_preview.
 
 "touch": true appears on panels with a touch digitizer (e.g. the Seeed
 reTerminal E1003). On those, the on_tap / on_swipe / on_slide actions you

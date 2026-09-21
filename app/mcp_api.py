@@ -1015,6 +1015,9 @@ def _gamut_info(gamut: str) -> dict[str, Any]:
             "gamut": gamut,
             "color_mode": f"full colour ({bits}-bit)",
             "colors": [],
+            # No fixed inks, so nothing to name as a mix of two of them. The key is still
+            # present so every device reports the same shape.
+            "blends": [],
             "mono": False,
         }
 
@@ -1033,10 +1036,17 @@ def _gamut_info(gamut: str) -> dict[str, Any]:
     # grayscale, so they should still force a grayscale layout; ``mono`` is
     # grayscale by definition.
     grayscale = resolved in ("mono", "gray_4", "gray_16")
+    # The inks are what the panel prints flat; the blends are what it prints by dithering two of
+    # them together, which is most of its real vocabulary. Reported as named colours rather than
+    # left to the instruction to "design in full colour", because an agent given six hexes and a
+    # paragraph reaches for the hexes.
+    from app.blends import blends_for
+
     return {
         "gamut": gamut,
         "color_mode": label,
         "colors": colors,
+        "blends": blends_for(palette, grayscale),
         "mono": grayscale or len(colors) <= 2,
     }
 
