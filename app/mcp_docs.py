@@ -364,6 +364,50 @@ LOOP: probe -> place -> render_preview -> render_report -> adjust -> (push).
   restart is pending, poll /healthz then retry), the reload hasn't completed, or client.js
   errored. Reload/restart Tesserae (or wait for the restart) and re-render.
 
+MAKE IT LOOK DESIGNED. A code element starts from almost nothing: a three-line reset, and no
+theme tokens at all. Its sandbox is an isolated frame, so the page's theme / style and every
+var(--accent-N) stop at its edge (those are for the native text / icon / shape / data elements,
+which live in the document and do inherit them). Inside a code element the type, the palette and
+the rhythm are all yours to set, and a dashboard that sets none of them is exactly the one that
+comes out looking unfinished. Set all four:
+
+- NAME A FONT, ALWAYS. Ship nothing on the default stack: it resolves to whatever generic face
+  the render box happens to have, which is the single biggest reason a dashboard looks cheap.
+  Any bundled family works by writing its exact display name in the CSS, because autolibs spots
+  the name and inlines the woff2 as a data: URL. Keep a fallback after it:
+  font-family: "Space Grotesk", sans-serif. A <link> or @import to a font CDN never works here.
+  Choose for the job rather than by habit:
+    headline / editorial   Bodoni Moda, DM Serif Display, Archivo Black, Anton, Bebas Neue
+    clean UI, dense data   Inter, IBM Plex Sans, Manrope, Outfit, Jost, Archivo Narrow
+    warmth / character     Space Grotesk, Lora, Crimson Pro, Atkinson Hyperlegible
+    numerals, code, time   JetBrains Mono, IBM Plex Mono, Martian Mono, Spline Sans Mono
+    deliberately retro     VT323, Silkscreen, Press Start 2P, Handjet, Micro 5, Jersey 10
+  Two families is a design, four is a mess: pair one display face with one text face and let
+  weight and size do the rest. list_widgets(section="appearance").fonts is the full list;
+  add_font caches any Google family that is not bundled.
+- DEFAULT TO DUOTONE OR FILL ICONS. ph-duotone and ph-fill keep their shape through the dither;
+  the regular and thin weights break into speckle at the sizes a panel is read from. ph-bold is
+  the one to reach for when the design wants line icons. Only the weights you actually reference
+  are inlined, so using one costs nothing for the other five.
+- DECLARE A TYPE SCALE BEFORE YOU WRITE MARKUP. No tokens reach the sandbox, so put your own
+  :root block at the top of the CSS and work from it: a base size taken from the panel (a 480px
+  panel wants roughly a 17px base, a 1872px one roughly 40px), sizes in em off that base, and
+  three or four steps only. One headline per page at the top of the scale, labels small and
+  uppercase with letter-spacing, nothing below the base size. Sizes scattered through the markup
+  in raw px is what makes a page look assembled rather than designed.
+- BUILD THE PALETTE FROM THE PANEL. list_devices gives "colors", the inks this panel really
+  prints. Use them flat for type, rules and icons, where they stay crisp. Large areas (card
+  fills, headers, chart bands) can take any colour in between: the dither mixes the inks and it
+  reads as that colour across a big shape, though never on a hairline or small text. Give a page
+  one accent doing one job. On a "mono" panel drop colour entirely and carry hierarchy with
+  weight, size and space.
+
+E-INK IS READ ACROSS A ROOM, not at desk distance. Fewer and bigger things beats more and
+smaller every time. Strong weights over light ones, solid blocks over outlines, generous space
+over dense packing, and real contrast rather than mid greys. No gradients, no photographic
+backgrounds and no animation. Whitespace is free and is most of what separates a designed panel
+from a crowded one, so when in doubt cut an element rather than shrink the type.
+
 VERIFY EVERY SIZE (this is where layouts break)
 - Size token comes from the cell's LONGER side: xs <=200, sm <=400, md <=700, lg >700 px.
 - To review a widget across sizes on live data, build one contact-sheet canvas with the same
@@ -505,8 +549,10 @@ option schema, which is the call that actually matters before placing it.
 
 The theme / style / font lists are not in the default response: "appearance"
 carries only a count of each. Call list_widgets(section="appearance") to get
-the full lists, and only when you are setting a page's theme, style or font;
-placing widgets never needs them.
+the full lists when you are setting a page's theme or style, or when you want
+the whole font catalogue before choosing a face. Placing a widget never needs
+them. A code element does not need this call either if you already know the
+family you want: naming it in the CSS is enough to have it inlined.
 
 "section" narrows to one top-level block ("widgets", "appearance",
 "libraries", "icons"). "full" returns the unsummarised catalog for the rare
