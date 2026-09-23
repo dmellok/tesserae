@@ -58,13 +58,28 @@ users:
     #   - ssh-ed25519 AAAA...your-key...
 
 runcmd:
-  # v0.69.18 (issue #35): the ``--branch`` pin ties this cloud-init
-  # to a specific Tesserae release rather than whatever ``main`` is
-  # on the day the SD card boots. Bump on every release: edit the
-  # ``v<X.Y.Z>`` value below to match the just-released tag. Users
-  # who want to track ``main`` can drop the ``--branch`` and
-  # ``--depth`` flags before flashing.
-  - su - tesserae -c 'git clone --branch v0.71.2 --depth 1 https://github.com/dmellok/tesserae.git /home/tesserae/tesserae'
+  # Install the newest tagged release rather than whatever ``main`` is on
+  # the day the container boots. The tag is resolved at boot from the
+  # remote tag list, not hardcoded here: a hardcoded pin (issue #328) goes
+  # stale the moment the next release lands and nobody notices for months.
+  # ``--sort=-v:refname`` sorts numerically, so v0.100.0 beats v0.71.2.
+  # If the tag list can't be read (no network yet, GitHub down), fall back
+  # to ``main`` so the install still completes. To pin a specific version
+  # instead, replace the whole block with a plain
+  # ``git clone --branch vX.Y.Z --depth 1 ... /home/tesserae/tesserae``.
+  - |
+    su - tesserae -c '
+      repo=https://github.com/dmellok/tesserae.git
+      tag=$(git ls-remote --refs --tags --sort=-v:refname "$repo" "v[0-9]*" \
+            2>/dev/null | head -n1 | sed "s#.*/##")
+      if [ -n "$tag" ]; then
+        echo "tesserae: installing release $tag"
+        git clone --branch "$tag" --depth 1 "$repo" /home/tesserae/tesserae
+      else
+        echo "tesserae: could not resolve a release tag, using main"
+        git clone --depth 1 "$repo" /home/tesserae/tesserae
+      fi
+    '
   - su - tesserae -c 'cd /home/tesserae/tesserae && python3 -m venv .venv'
   - su - tesserae -c 'cd /home/tesserae/tesserae && .venv/bin/pip install -e ".[dev]"'
   - /home/tesserae/tesserae/.venv/bin/playwright install-deps chromium

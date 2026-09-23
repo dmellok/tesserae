@@ -77,6 +77,8 @@ Note the `/cloud` suffix on the image name. The slim `images:debian/trixie` imag
 
 On Proxmox, paste the same file into **Datacenter → CT → Cloud-Init → User Data**. Edit the `ssh_authorized_keys` block first to add your public key so you can log in once the container's up.
 
+The config installs the newest tagged Tesserae release, resolved from the repo when the container boots rather than written into the file, so a freshly downloaded copy is never out of date. To pin one version instead, replace the `git clone` block in `runcmd` with `git clone --branch vX.Y.Z --depth 1 https://github.com/dmellok/tesserae.git /home/tesserae/tesserae`.
+
 !!! tip "If `microcloud init` didn't auto-detect your storage"
     Some MicroCloud installs don't pick up NVMe / dedicated storage on their own. If `lxc launch` complains it has no pool to land the container in, list pools with `lxc storage list` and pass the right name through:
 

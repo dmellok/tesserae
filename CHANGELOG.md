@@ -6,6 +6,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **The LXC cloud-init installs the current release again.** `scripts/cloud-init.yaml`
+  cloned a tag written into the file, which was last edited at v0.71.2 and had
+  gone hundreds of releases stale, so anyone provisioning a container from it
+  got a Tesserae from months ago. It now resolves the newest `v*` tag from the
+  repo at boot and clones that, falling back to `main` if the tag list can't be
+  read, so the file cannot go out of date again.
+
 ### Added
 
 - **The battery chart's data feed now carries millivolts as well as percent.**
