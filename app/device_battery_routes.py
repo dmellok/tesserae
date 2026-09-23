@@ -221,7 +221,19 @@ def series_json(device_id: str) -> Any:
     series: list[dict[str, Any]] = []
     for r in rows:
         adj = apply_to_pct(r.pct, mv_off, pct_off, raw_mv=r.battery_mv)
-        series.append({"t_ms": int(r.timestamp * 1000), "pct": adj if adj is not None else r.pct})
+        # ``mv`` alongside ``pct`` because percent is a curve lookup, and the
+        # curve is flat through the middle of a LiPo discharge: two devices
+        # losing the same charge per day can report very different percent per
+        # day depending on where they sit on it. Anyone diagnosing a drain
+        # complaint wants the millivolts. None where the firmware reported no
+        # voltage (older clients send pct only).
+        series.append(
+            {
+                "t_ms": int(r.timestamp * 1000),
+                "pct": adj if adj is not None else r.pct,
+                "mv": apply_to_mv(r.battery_mv, mv_off),
+            }
+        )
     return jsonify(
         {
             "device_id": device_id,

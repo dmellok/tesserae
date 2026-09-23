@@ -390,6 +390,24 @@ def test_series_json_applies_per_device_battery_offset(app: Flask, tmp_path: Pat
     assert all(p > 50 for p in pcts), pcts
 
 
+def test_series_json_carries_millivolts_with_the_offset_applied(app: Flask) -> None:
+    """Percent comes off a discharge curve that is nearly flat through
+    the middle of a LiPo's range, so two panels shedding the same charge
+    per day can report wildly different percent per day. Diagnosing a
+    drain report needs the raw millivolts, and a device that never sent
+    any must come back as null rather than a fabricated zero."""
+    store: BatteryHistory = app.config["BATTERY_HISTORY"]
+    now = time.time()
+    store.record("e1003", pct=80, battery_mv=3990, timestamp=now - 7200)
+    store.record("e1003", pct=79, battery_mv=3985, timestamp=now - 3600)
+    store.record("e1003", pct=79, timestamp=now)  # older client: pct only
+    client = app.test_client()
+    _sign_in(client)
+
+    series = client.get("/devices/battery/e1003/series.json?window=7").get_json()["series"]
+    assert [p["mv"] for p in series] == [3990, 3985, None]
+
+
 def test_clear_history_button_renders_only_for_devices_with_samples(
     app: Flask, tmp_path: Path
 ) -> None:

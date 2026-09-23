@@ -8,6 +8,17 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **The battery chart's data feed now carries millivolts as well as percent.**
+  `/devices/battery/<id>/series.json` reported only the percentage, which is
+  a lookup against a discharge curve that barely moves through the middle of
+  a LiPo's range. Two panels shedding the same charge per day can therefore
+  report very different percent per day depending on where they sit on it,
+  which makes "percent per day" a poor way to compare one panel against
+  another or to chase a drain complaint. The raw reading was already being
+  stored on every heartbeat; it is now returned alongside, with the same
+  per-device calibration offset applied, and null for firmware that sends a
+  percentage only.
+
 - **A panel reports the colours it can dither, not only the inks it prints.**
   `list_devices` has always answered with the raw ink palette, and the
   composing instructions have always said to design in full colour and not
