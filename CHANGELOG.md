@@ -82,6 +82,18 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Changed
 
+- **A panel's `refresh_floor_s` is now shown rather than ignored.** 41
+  hardware profiles list a repaint floor for their glass, and the server read
+  the field nowhere, while `schema/hardware.schema.json` called it a lower
+  bound on poll cadence "surfaced in the Settings UI" and
+  `docs/dev/adding-hardware.md` said it was "enforced on the always-on path",
+  an enforcement removed in v0.332.0. The "?" help on the device card's
+  cadence fields now says what the profile lists, the Companion API reports
+  it as `panel.refresh_floor_s`, and the schema and the hardware guide
+  describe the field as the profile's declaration. Nothing gates on it, and
+  nothing here promises a repaint rate: the declared values are authored by
+  protocol rather than measured, and the reTerminal Sticky lists 60 while its
+  own notes put a full paint at 1.2 s.
 - **The MCP instructions now cover craft, not just mechanics.** An agent was
   told how to place an element and nothing about making the result look
   designed, so dashboards shipped on the renderer's fallback font, on

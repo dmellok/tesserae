@@ -74,7 +74,7 @@
     "refresh_floor_s": {
       "type": "integer",
       "minimum": 1,
-      "description": "Lower bound on the device's poll cadence in seconds. Surfaced in the Settings UI so the user can't set a smaller refresh_rate than the panel actually supports."
+      "description": "The repaint floor the profile lists for this glass, in seconds. A declaration, not a guarantee: it appears in the \"?\" help on the device card's cadence fields and in the Companion API, and nothing gates on it. Not a poll cadence, since a poll is a conditional GET and a 304 never reaches the glass."
     },
     "image_format": {
       "type": "string",

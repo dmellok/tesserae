@@ -253,6 +253,45 @@ def config_fields_from_schema(schema: dict[str, dict[str, Any]]) -> list[dict[st
     return fields
 
 
+# The cadence fields a panel's declared repaint floor is worth mentioning
+# beside: how often the device asks, awake or asleep, and the TRMNL clients'
+# own name for the same thing (the two TRMNL profiles that list a floor carry
+# `refresh_rate_s`, so without it the note never showed for them).
+_CADENCE_FIELDS = ("sleep_interval_s", "awake_poll_s", "refresh_rate_s")
+
+
+def note_refresh_floor(fields: list[dict[str, Any]], device: Any) -> list[dict[str, Any]]:
+    """Mention the repaint floor a panel's profile lists beside the fields
+    that set how often it comes back.
+
+    Advisory, and worded as a declaration. The floor is what the profile says
+    about the glass, which is not the same question as how often the device
+    asks: a poll is a conditional GET and a 304 never reaches the panel.
+    Enforcing it on the ask was what made an always-on E1003 wait a minute
+    for a manual Send, and it was rightly removed in v0.332.0.
+
+    Nothing here says what any device will do with the number. Firmware that
+    holds repaints at all does so against its own compile-time constant, not
+    this field, and several clients hold none, so the note names the profile
+    as its source and stops there. Presentation only, like the always-on
+    hiding beside it: the saved value is whatever the operator typed.
+    """
+    floor = getattr(device, "refresh_floor_s", None)
+    if isinstance(floor, bool) or not isinstance(floor, int) or floor <= 0:
+        return fields
+    note = f"The profile lists a {floor}s repaint floor for this glass."
+    out = []
+    for field in fields:
+        if field.get("name") not in _CADENCE_FIELDS:
+            out.append(field)
+            continue
+        noted = dict(field)
+        help_text = str(noted.get("help") or "").strip()
+        noted["help"] = f"{help_text} {note}".strip() if help_text else note
+        out.append(noted)
+    return out
+
+
 def safe_next(target: str | None) -> str:
     """Bound the post-login redirect to in-app paths so we can't be used as
     an open redirector. Anything not starting with ``/`` (or starting with

@@ -94,6 +94,20 @@ class Device:
         return "monitor"
 
     @property
+    def refresh_floor_s(self) -> int | None:
+        """The repaint floor this panel's profile lists, in seconds, or None
+        when it lists none. ``app.hardware_catalog`` copies it onto the
+        manifest root, and 41 of the bundled profiles carry one.
+
+        What the profile declares, not what the device does. Nothing on the
+        server gates on it, and the values are authored by protocol rather
+        than measured, so callers present it and never enforce it."""
+        raw = self.manifest.get("refresh_floor_s")
+        if isinstance(raw, bool) or not isinstance(raw, int) or raw <= 0:
+            return None
+        return raw
+
+    @property
     def renderer_ids(self) -> list[str]:
         return [str(r) for r in self.manifest.get("renderers", [])]
 

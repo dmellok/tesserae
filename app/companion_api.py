@@ -982,6 +982,12 @@ def _device_view(
             "height": int(panel.h),
             "gamut": str(panel.gamut),
             "orientation": _orientation(int(panel.w), int(panel.h)),
+            # The repaint floor the profile lists for this glass, for a client
+            # that wants to explain why a panel it just pushed to has not
+            # changed yet. Advisory: the server gates nothing on it, and it is
+            # a declaration rather than a promise about when the next frame
+            # lands. Null on a kind that lists none, which is most of them.
+            "refresh_floor_s": device.refresh_floor_s,
         },
         "freshness": freshness,
         "last_seen_at": last_seen_at,

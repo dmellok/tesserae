@@ -503,8 +503,15 @@ def _configured_poll_s(device: Device) -> int:
     the frame is unchanged, and 304 never reaches the panel. Clamping the
     ask to the repaint limit made an E1003 (floor 60) poll once a minute
     however low its awake cadence was set, which is the whole always-on
-    feature defeated by a field about something else. The repaint limit
-    belongs on the path that decides to send a new frame.
+    feature defeated by a field about something else.
+
+    Nor does it gate delivery. The server only ever sees a handover, so it
+    cannot know whether the bytes reached the glass, and the floor a profile
+    lists is written by protocol rather than measured: the reTerminal Sticky
+    lists 60 while its own notes put a full paint at 1.2 s. Here the field is
+    advisory only, a declaration the profile makes: it appears in the "?"
+    help on the device card's cadence fields and in the Companion API, and
+    nothing gates on it (#250).
     """
     awake = device_poll.device_awake_poll_s(device)
     if awake is not None:
