@@ -4,6 +4,8 @@ against the real repo for a sanity check."""
 
 from __future__ import annotations
 
+import os
+import subprocess
 import threading
 from pathlib import Path
 from typing import Any
@@ -124,9 +126,9 @@ def test_check_remote_stable_with_no_tags_is_safe(tmp_path: Path) -> None:
             ("rev-parse", "--abbrev-ref", "origin/HEAD"): "origin/main",
             (
                 "for-each-ref",
-                "--sort=-creatordate",
+                "--sort=-v:refname",
                 "--format=%(refname:short)",
-                "refs/tags",
+                "refs/tags/v[0-9]*",
             ): "",  # no tags
         },
     )
@@ -479,3 +481,78 @@ def test_latest_release_via_api_caches_within_ttl(tmp_path: Path) -> None:
     u.latest_release_via_api("0.64.45")
     u.latest_release_via_api("0.64.45")
     assert u.api_calls == ["/tags"]  # second call served from cache
+
+
+# ----- a release-tag clone (the LXC cloud-init, #328), real git ---------
+
+
+def _run_git(cwd: Path, *args: str) -> str:
+    env = {
+        **os.environ,
+        "GIT_AUTHOR_NAME": "t",
+        "GIT_AUTHOR_EMAIL": "t@example.com",
+        "GIT_COMMITTER_NAME": "t",
+        "GIT_COMMITTER_EMAIL": "t@example.com",
+    }
+    out = subprocess.run(
+        ["git", *args], cwd=cwd, env=env, capture_output=True, text=True, check=True
+    )
+    return out.stdout.strip()
+
+
+def _tag_clone(tmp_path: Path) -> tuple[Path, dict[str, str]]:
+    """An origin with v0.1.0, v0.2.0, a newer mcp-v9.0.0 and one untagged
+    commit on main, cloned the way the cloud-init did: ``--branch v0.2.0
+    --depth 1``, so detached, shallow, and fetching only that tag."""
+    origin = tmp_path / "origin"
+    origin.mkdir()
+    _run_git(origin, "init", "--quiet", "--initial-branch=main")
+    (origin / "pyproject.toml").write_text('[project]\nname = "t"\n', encoding="utf-8")
+    shas: dict[str, str] = {}
+    for name in ("v0.1.0", "v0.2.0", "mcp-v9.0.0", "untagged"):
+        (origin / "log.txt").write_text(name, encoding="utf-8")
+        _run_git(origin, "add", "-A")
+        _run_git(origin, "commit", "--quiet", "-m", name)
+        shas[name] = _run_git(origin, "rev-parse", "HEAD")
+        if name != "untagged":
+            _run_git(origin, "tag", name)
+    repo = tmp_path / "repo"
+    _run_git(
+        tmp_path, "clone", "--quiet", "--branch", "v0.2.0", "--depth", "1",
+        origin.as_uri(), str(repo),
+    )  # fmt: skip
+    return repo, shas
+
+
+def test_a_release_tag_clone_can_check_the_edge_channel(tmp_path: Path) -> None:
+    repo, shas = _tag_clone(tmp_path)
+    u = Updater(repo_root=repo, data_root=_new_data_root(tmp_path))
+    check = u.check_remote("edge")
+    assert check.target_ref == "origin/main"
+    assert check.target_sha == shas["untagged"]
+    assert check.commits_behind == 2
+    assert check.available is True
+
+
+def test_the_stable_channel_ignores_non_release_tags(tmp_path: Path) -> None:
+    repo, shas = _tag_clone(tmp_path)
+    u = Updater(repo_root=repo, data_root=_new_data_root(tmp_path))
+    check = u.check_remote("stable")
+    assert check.target_ref == "v0.2.0"
+    assert check.target_sha == shas["v0.2.0"]
+    assert check.available is False
+
+
+def test_edge_update_moves_a_release_tag_clone_onto_main(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo, shas = _tag_clone(tmp_path)
+    u = Updater(repo_root=repo, data_root=_new_data_root(tmp_path))
+    monkeypatch.setattr(u, "_pip_install", lambda: None)
+    result = u.apply_update("edge")
+    assert result.ok, result.error
+    assert result.to_sha == shas["untagged"]
+    assert _run_git(repo, "rev-parse", "--abbrev-ref", "HEAD") == "main"
+    assert _run_git(repo, "rev-parse", "--abbrev-ref", "main@{upstream}") == "origin/main"
+    # And the next check, now on a branch, finds nothing further to do.
+    assert u.check_remote("edge").available is False

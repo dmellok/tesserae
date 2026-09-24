@@ -272,7 +272,7 @@ class Updater:
         if channel not in CHANNELS:
             raise UpdaterError(f"unknown channel {channel!r}")
         # Fetch refs + tags so target resolution is up to date.
-        self._git("fetch", "--tags", "--quiet", timeout=GIT_TIMEOUT_S)
+        self._fetch()
         current = self._git("rev-parse", "HEAD")
         if channel == "edge":
             target_ref = f"origin/{self._default_branch()}"
@@ -378,7 +378,13 @@ class Updater:
             pre_pyproject = self._show_blob(from_sha, "pyproject.toml")
 
             try:
-                if channel == "edge" and not force:
+                if channel == "edge" and not force and self._is_detached():
+                    # A checkout sitting on a release tag has no branch to
+                    # pull into. The tag is an ancestor of the default
+                    # branch, so moving onto it is the same fast-forward.
+                    branch = self._default_branch()
+                    self._git("checkout", "--quiet", "-B", branch, "--track", f"origin/{branch}")
+                elif channel == "edge" and not force:
                     # ff-only is safe; fails if local branch diverged.
                     self._git("pull", "--ff-only", "--quiet", timeout=GIT_TIMEOUT_S)
                 else:
@@ -536,6 +542,25 @@ class Updater:
             raise UpdaterError(f"git: timed out after {timeout}s") from err
         return (proc.stdout or "").strip()
 
+    def _fetch(self) -> None:
+        """Fetch branches and tags, first repairing a checkout that can't
+        follow the remote. A ``git clone --branch <tag> --depth 1`` (the LXC
+        cloud-init's install, #328) fetches only that one tag, has no
+        ``origin/HEAD`` and is shallow, so the edge channel had no branch to
+        resolve and commit counts ran against a truncated history."""
+        refspecs = self._git("config", "--get-all", "remote.origin.fetch", check=False)
+        if "refs/heads/" not in refspecs:
+            self._git("remote", "set-branches", "origin", "*")
+        if self._git("rev-parse", "--is-shallow-repository") == "true":
+            self._git("fetch", "--unshallow", "--tags", "--quiet", timeout=GIT_TIMEOUT_S)
+        else:
+            self._git("fetch", "--tags", "--quiet", timeout=GIT_TIMEOUT_S)
+        if not self._git("rev-parse", "--verify", "--quiet", "origin/HEAD", check=False):
+            self._git("remote", "set-head", "origin", "--auto", check=False)
+
+    def _is_detached(self) -> bool:
+        return self._git("rev-parse", "--abbrev-ref", "HEAD") == "HEAD"
+
     def _default_branch(self) -> str:
         """Resolve the remote's default branch (typically ``main``).
         Falls back to the current branch if origin/HEAD isn't set."""
@@ -548,10 +573,11 @@ class Updater:
             return self._git("rev-parse", "--abbrev-ref", "HEAD")
 
     def _latest_tag(self) -> str:
-        """Most recent semver-ish tag on any remote ref. Returns empty
-        string if none exist."""
+        """Highest ``vX.Y.Z`` release tag. Returns empty string if none
+        exist. Other tag families in the repo (``mcp-v*`` for the MCP
+        bridge) are not app releases, so they never count."""
         out = self._git(
-            "for-each-ref", "--sort=-creatordate", "--format=%(refname:short)", "refs/tags"
+            "for-each-ref", "--sort=-v:refname", "--format=%(refname:short)", "refs/tags/v[0-9]*"
         )
         for line in out.splitlines():
             line = line.strip()

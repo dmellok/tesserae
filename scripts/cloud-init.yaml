@@ -63,21 +63,24 @@ runcmd:
   # remote tag list, not hardcoded here: a hardcoded pin (issue #328) goes
   # stale the moment the next release lands and nobody notices for months.
   # ``--sort=-v:refname`` sorts numerically, so v0.100.0 beats v0.71.2.
-  # If the tag list can't be read (no network yet, GitHub down), fall back
-  # to ``main`` so the install still completes. To pin a specific version
-  # instead, replace the whole block with a plain
-  # ``git clone --branch vX.Y.Z --depth 1 ... /home/tesserae/tesserae``.
+  # The clone is a full one of ``main`` with the local ``main`` branch moved
+  # back to the tag, not a ``--branch <tag> --depth 1`` clone: that leaves a
+  # detached, shallow checkout that fetches only its own tag, and the in-app
+  # updater can't move on from it. If the tag list can't be read (no network
+  # yet, GitHub down), stay on ``main`` so the install still completes. To
+  # pin a specific version instead, set ``tag=vX.Y.Z`` in place of the lookup.
   - |
     su - tesserae -c '
       repo=https://github.com/dmellok/tesserae.git
+      dir=/home/tesserae/tesserae
       tag=$(git ls-remote --refs --tags --sort=-v:refname "$repo" "v[0-9]*" \
             2>/dev/null | head -n1 | sed "s#.*/##")
+      git clone --quiet "$repo" "$dir"
       if [ -n "$tag" ]; then
         echo "tesserae: installing release $tag"
-        git clone --branch "$tag" --depth 1 "$repo" /home/tesserae/tesserae
+        git -C "$dir" reset --quiet --hard "$tag"
       else
         echo "tesserae: could not resolve a release tag, using main"
-        git clone --depth 1 "$repo" /home/tesserae/tesserae
       fi
     '
   - su - tesserae -c 'cd /home/tesserae/tesserae && python3 -m venv .venv'

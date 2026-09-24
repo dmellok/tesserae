@@ -8,6 +8,16 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **An LXC install from cloud-init can update itself again (#328).** The
+  cloud-init cloned the newest release with `--branch <tag> --depth 1`, which
+  left a detached, shallow checkout that fetched only that one tag, so the
+  Edge update check failed with a bare git usage error. The cloud-init now
+  clones `main` in full and moves it back to the release tag. The updater also
+  repairs a checkout made the old way on its next check (fetching every branch,
+  deepening the history, and moving a detached checkout onto `main` on an Edge
+  update), and the Stable channel now follows only `vX.Y.Z` release tags, not
+  the MCP bridge's `mcp-v*` tags.
+
 - **The MCP bridge stays responsive during a slow render.** Bridge 0.17.1 runs
   each tool on a worker thread instead of the server's one event loop, so a
   `render_preview` that takes several seconds no longer queues every other tool
