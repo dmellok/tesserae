@@ -254,29 +254,32 @@ def config_fields_from_schema(schema: dict[str, dict[str, Any]]) -> list[dict[st
 
 
 # The cadence fields a panel's declared repaint floor is worth mentioning
-# beside: how often the device asks, awake or asleep.
-_CADENCE_FIELDS = ("sleep_interval_s", "awake_poll_s")
+# beside: how often the device asks, awake or asleep, and the TRMNL clients'
+# own name for the same thing (the two TRMNL profiles that list a floor carry
+# `refresh_rate_s`, so without it the note never showed for them).
+_CADENCE_FIELDS = ("sleep_interval_s", "awake_poll_s", "refresh_rate_s")
 
 
 def note_refresh_floor(fields: list[dict[str, Any]], device: Any) -> list[dict[str, Any]]:
-    """Mention a panel's declared ``refresh_floor_s`` beside the fields that
-    set how often it comes back.
+    """Mention the repaint floor a panel's profile lists beside the fields
+    that set how often it comes back.
 
-    Advisory, and said so. The floor describes how fast the glass can be
-    repainted, which is not the same question as how often the device asks —
-    a poll is a conditional GET and a 304 never reaches the panel. Enforcing
-    it on the ask was what made an always-on E1003 wait a minute for a manual
-    Send, and it was rightly removed in v0.332.0; enforcing it on delivery
-    would fight the firmware, which holds its own repaints against a floor
-    measured from the last *paint* and knows what its glass actually does.
+    Advisory, and worded as a declaration. The floor is what the profile says
+    about the glass, which is not the same question as how often the device
+    asks: a poll is a conditional GET and a 304 never reaches the panel.
+    Enforcing it on the ask was what made an always-on E1003 wait a minute
+    for a manual Send, and it was rightly removed in v0.332.0.
 
-    So the server states the number and gates nothing. Presentation only,
-    like the always-on hiding beside it: the saved value is whatever the
-    operator typed.
+    Nothing here says what any device will do with the number. Firmware that
+    holds repaints at all does so against its own compile-time constant, not
+    this field, and several clients hold none, so the note names the profile
+    as its source and stops there. Presentation only, like the always-on
+    hiding beside it: the saved value is whatever the operator typed.
     """
-    floor = (getattr(device, "manifest", None) or {}).get("refresh_floor_s")
+    floor = getattr(device, "refresh_floor_s", None)
     if isinstance(floor, bool) or not isinstance(floor, int) or floor <= 0:
         return fields
+    note = f"The profile lists a {floor}s repaint floor for this glass."
     out = []
     for field in fields:
         if field.get("name") not in _CADENCE_FIELDS:
@@ -284,10 +287,6 @@ def note_refresh_floor(fields: list[dict[str, Any]], device: Any) -> list[dict[s
             continue
         noted = dict(field)
         help_text = str(noted.get("help") or "").strip()
-        note = (
-            f"This panel declares a {floor}s refresh floor: its firmware will not "
-            "repaint the glass faster than that, however often the device asks."
-        )
         noted["help"] = f"{help_text} {note}".strip() if help_text else note
         out.append(noted)
     return out

@@ -89,6 +89,30 @@ ERRATA: tuple[Erratum, ...] = (
 
 SCHEMA_ERRATA: tuple[SchemaErratum, ...] = (
     SchemaErratum(
+        pointer="components/schemas/Panel/properties",
+        patch={
+            "refresh_floor_s": {
+                "description": (
+                    "The repaint floor the panel's profile lists for its glass, in "
+                    "seconds, or null when the profile lists none (most kinds). A "
+                    "declaration, not a promise about when the next frame lands: "
+                    "the server gates nothing on it. Use it to explain why a panel "
+                    "that was just pushed to has not changed yet."
+                ),
+                "type": "integer",
+                "minimum": 1,
+                "nullable": True,
+            },
+        },
+        since="v0.428.0",
+        why=(
+            "#250 reports the refresh_floor_s that 41 hardware profiles list, which "
+            "the server previously read nowhere. Panel is additionalProperties: "
+            "false, so the Companion API's own device responses cannot be validated "
+            "against the published shape until it carries this."
+        ),
+    ),
+    SchemaErratum(
         pointer="components/schemas/Limits/properties",
         patch={
             "device_timeline_max_hours": {

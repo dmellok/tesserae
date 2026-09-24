@@ -53,7 +53,7 @@ Key fields:
 | `description` | no | One-paragraph description. |
 | `protocol_config` | no | Free-form protocol-specific defaults. Each protocol owns its own validation. |
 | `config_schema_extends` | no | Additive merge over the protocol's `config_schema`. Use sparingly. |
-| `refresh_floor_s` | no | How fast this panel's glass can be repainted, in seconds. Advisory: shown beside the cadence fields in Settings and reported in the Companion API, gated on nowhere. The firmware holds its own repaints against its own floor, measured from the last paint; the server only ever sees a handover. Not a poll cadence — a poll is a conditional GET and a 304 never reaches the glass. |
+| `refresh_floor_s` | no | The repaint floor the profile lists for this glass, in seconds. A declaration, not a guarantee: it appears in the "?" help on the device card's cadence fields and in the Companion API, and nothing gates on it. Not a poll cadence, since a poll is a conditional GET and a 304 never reaches the glass. |
 | `image_format` | no | Wire format hint: `png` / `bin` / `webp`. |
 | `notes_md` | no | Maintainer notes shown on the docs hardware page. |
 | `deprecated_aliases` | no | Older ids this SKU also registers under, for back-compat after a rename. |

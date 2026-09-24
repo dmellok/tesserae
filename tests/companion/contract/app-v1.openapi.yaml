@@ -2387,17 +2387,6 @@ components:
         orientation:
           type: string
           enum: [portrait, landscape]
-        refresh_floor_s:
-          description: >-
-            Seconds the panel's own profile declares its glass needs between
-            repaints, or null when the profile declares none (most kinds). Use
-            it to explain why a panel that was just pushed to has not changed
-            yet. Advisory, not a promise: the server gates nothing on it, and
-            the firmware holds its own repaints against a floor it measures
-            from the last paint rather than from this handover.
-          type: integer
-          minimum: 1
-          nullable: true
     DashboardsResponse:
       type: object
       additionalProperties: false

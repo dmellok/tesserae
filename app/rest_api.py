@@ -505,14 +505,13 @@ def _configured_poll_s(device: Device) -> int:
     however low its awake cadence was set, which is the whole always-on
     feature defeated by a field about something else.
 
-    Nor does it gate delivery. The server only ever sees a handover — it
-    cannot know whether the bytes reached the glass, and the floor a
-    profile declares is written by protocol rather than measured: the
-    reTerminal Sticky says 60 while its own notes put a full paint at
-    1.2 s. Firmware holds its own repaints against its own floor, timed
-    from the last paint, and that is where the guarantee lives. Here the
-    field is advisory only: shown beside this setting in the device card
-    and reported in the Companion API, gated on nowhere (#250).
+    Nor does it gate delivery. The server only ever sees a handover, so it
+    cannot know whether the bytes reached the glass, and the floor a profile
+    lists is written by protocol rather than measured: the reTerminal Sticky
+    lists 60 while its own notes put a full paint at 1.2 s. Here the field is
+    advisory only, a declaration the profile makes: it appears in the "?"
+    help on the device card's cadence fields and in the Companion API, and
+    nothing gates on it (#250).
     """
     awake = device_poll.device_awake_poll_s(device)
     if awake is not None:

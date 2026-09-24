@@ -927,18 +927,6 @@ def _nullable_int(value: Any, *, lo: int | None = None, hi: int | None = None) -
     return out
 
 
-def _panel_refresh_floor_s(device: Any) -> int | None:
-    """The panel's declared repaint floor, or ``None`` when it declares none.
-
-    Copied onto the manifest root by ``app.hardware_catalog``; 41 of the
-    bundled profiles carry one.
-    """
-    raw = (getattr(device, "manifest", None) or {}).get("refresh_floor_s")
-    if isinstance(raw, bool) or not isinstance(raw, int) or raw <= 0:
-        return None
-    return raw
-
-
 def _device_view(
     device: Device,
     status: dict[str, Any] | None,
@@ -994,13 +982,12 @@ def _device_view(
             "height": int(panel.h),
             "gamut": str(panel.gamut),
             "orientation": _orientation(int(panel.w), int(panel.h)),
-            # What the profile says this glass can do, for a client that wants
-            # to explain why a panel it just pushed to has not changed yet.
-            # Advisory: the server gates nothing on it and the firmware holds
-            # its own repaints, so a client must not treat it as a promise
-            # about when the next frame lands. Null on a kind that declares
-            # none, which is most of them.
-            "refresh_floor_s": _panel_refresh_floor_s(device),
+            # The repaint floor the profile lists for this glass, for a client
+            # that wants to explain why a panel it just pushed to has not
+            # changed yet. Advisory: the server gates nothing on it, and it is
+            # a declaration rather than a promise about when the next frame
+            # lands. Null on a kind that lists none, which is most of them.
+            "refresh_floor_s": device.refresh_floor_s,
         },
         "freshness": freshness,
         "last_seen_at": last_seen_at,
