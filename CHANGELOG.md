@@ -8,6 +8,11 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **Canvas widgets load assets through Home Assistant Ingress.** The Canvas editor
+  prefixed widget script imports but left root-relative stylesheet and image URLs
+  inside widget shadow roots pointed at the HA frontend. It now prefixes those
+  asset URLs after rendering, matching the Send preview.
+
 - **The LXC cloud-init installs the current release again.** `scripts/cloud-init.yaml`
   cloned a tag written into the file, which was last edited at v0.71.2 and had
   gone hundreds of releases stale, so anyone provisioning a container from it

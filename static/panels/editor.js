@@ -538,7 +538,25 @@
         if (typeof mod.default !== "function") throw new Error("no default export");
         return mod.default(shadow, ctxFor(e));
       })
-      .then(function () { applyParts(e, shadow); })
+      .then(function () {
+        applyParts(e, shadow);
+        if (!prefix) return;
+
+        // Widget assets are root-relative; rebase them after render inserts the shadow DOM.
+        shadow.querySelectorAll("[href], [src]").forEach(function (node) {
+          ["href", "src"].forEach(function (attr) {
+            var value = node.getAttribute(attr);
+            if (
+              value &&
+              value.startsWith("/") &&
+              !value.startsWith("//") &&
+              !value.startsWith(prefix)
+            ) {
+              node.setAttribute(attr, prefix + value);
+            }
+          });
+        });
+      })
       .catch(function (err) {
         shadow.innerHTML =
           '<div style="font:11px/1.3 system-ui;color:#a3402a;padding:6px">' +
