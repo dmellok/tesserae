@@ -13,6 +13,18 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   inside widget shadow roots pointed at the HA frontend. It now prefixes those
   asset URLs after rendering, matching the Send preview.
 
+- **One hung render no longer stops every dashboard from rendering.** The warm
+  browser renders every dashboard on a single worker. The font wait before the
+  screenshot had no time limit, so a font request that never answered could
+  hold that worker indefinitely, and every later dashboard push failed at the
+  105 s pool deadline with a bare `TimeoutError` until the app restarted, while
+  calibration pages (which skip the browser) still went through. The font wait
+  is now capped at 5 s like the image wait. A render whose caller has given up
+  is dropped rather than run for nobody, and if the worker is still inside one
+  render past that render's deadline, the pool starts a fresh worker and
+  Chromium and moves the queued renders to it. The push history now says
+  "browser pool gave no result within 105s" instead of a bare `TimeoutError`.
+
 - **The LXC cloud-init installs the current release again.** `scripts/cloud-init.yaml`
   cloned a tag written into the file, which was last edited at v0.71.2 and had
   gone hundreds of releases stale, so anyone provisioning a container from it

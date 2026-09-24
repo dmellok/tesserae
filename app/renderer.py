@@ -417,8 +417,14 @@ _FONT_WAIT_JS: Final[str] = """async () => {
             );
         }
     }
-    await Promise.all(loads);
-    await document.fonts.ready;
+    // Capped at 5 s like the image wait: document.fonts.load() never
+    // settles on a font request that hangs without an answer, and
+    // page.evaluate has no timeout of its own, so an uncapped wait holds
+    // the pool's only worker for good (every later render then times out).
+    await Promise.race([
+        Promise.all(loads).then(() => document.fonts.ready),
+        new Promise((r) => setTimeout(r, 5000)),
+    ]);
     // Status for the diagnostics path (screenshot path ignores it):
     // which families the wait force-loaded, and the FontFaceSet's
     // state once ready resolved (failed faces count as "done", so a
@@ -1091,6 +1097,28 @@ def render_to_png(request: RenderRequest, *, pool: BrowserPool | None = None) ->
 # -- warm path: long-lived browser owned by a dedicated thread -----------
 
 
+_PoolRequest = RenderRequest | FetchRequest | InspectRequest | CaptureRequest
+
+
+class _PoolWorker:
+    """One generation of the pool's worker: its thread, its queue, and what
+    it is running right now. The pool swaps in a fresh generation when this
+    one is stuck on a single task past that task's deadline."""
+
+    def __init__(self) -> None:
+        # Items are (request, future, budget_s), or the empty-tuple
+        # sentinel that tells the worker to exit.
+        self.q: queue.Queue[
+            tuple[_PoolRequest, concurrent.futures.Future[Any], float] | tuple[()]
+        ] = queue.Queue()
+        self.thread: threading.Thread | None = None
+        self.retired = threading.Event()
+        # Monotonic start of the task in hand, and how long its caller
+        # waits for it. None while the worker is idle.
+        self.busy_since: float | None = None
+        self.busy_budget_s: float = 0.0
+
+
 class BrowserPool:
     """Long-running Chromium owned by a single worker thread.
 
@@ -1105,86 +1133,67 @@ class BrowserPool:
     process is reused, which is where the ~1.5 s of cold-start lives.
 
     Crash recovery: if Chromium dies under us, the next render relaunches
-    it. The worker thread itself survives until ``stop()`` is called."""
+    it. A caller that gives up cancels its task so the worker skips it
+    instead of rendering for nobody. If the worker is still inside one task
+    past that task's own deadline, a Playwright call has hung (one with no
+    timeout of its own), so the pool retires that worker, moves the queued
+    tasks to a fresh worker with its own Chromium, and lets the stuck one
+    exit whenever its call returns. Before this, one hung call made every
+    later render time out until the process restarted."""
 
     _SENTINEL: Final = ()  # signal the worker to drain + exit
 
     def __init__(self) -> None:
-        # Queue carries either a render task (RenderRequest, Future[bytes]),
-        # a fetch task (FetchRequest, Future[str]), or the empty-tuple
-        # sentinel that signals "drain + exit". The worker discriminates
-        # by ``isinstance(request, FetchRequest)``.
-        self._q: queue.Queue[
-            tuple[RenderRequest, concurrent.futures.Future[bytes]]
-            | tuple[FetchRequest, concurrent.futures.Future[str]]
-            | tuple[InspectRequest, concurrent.futures.Future[Any]]
-            | tuple[CaptureRequest, concurrent.futures.Future[tuple[bytes, Any]]]
-            | tuple[()]
-        ] = queue.Queue()
-        self._thread: threading.Thread | None = None
+        self._worker: _PoolWorker | None = None
         self._lock = threading.Lock()
         self._stopped = False
 
+    @property
+    def _thread(self) -> threading.Thread | None:
+        worker = self._worker
+        return worker.thread if worker is not None else None
+
     def start(self) -> None:
         with self._lock:
-            if self._thread is not None or self._stopped:
+            if self._worker is not None or self._stopped:
                 return
-            t = threading.Thread(target=self._run, name="tesserae-browser-pool", daemon=True)
-            t.start()
-            self._thread = t
+            self._worker = self._spawn_locked()
 
     def stop(self, *, timeout: float = 10.0) -> None:
         with self._lock:
             if self._stopped:
                 return
             self._stopped = True
-            thread = self._thread
-        if thread is None:
+            worker = self._worker
+        if worker is None or worker.thread is None:
             return
-        self._q.put(self._SENTINEL)
-        thread.join(timeout=timeout)
-        if thread.is_alive():
+        worker.q.put(self._SENTINEL)
+        worker.thread.join(timeout=timeout)
+        if worker.thread.is_alive():
             logger.warning("browser pool worker did not exit within %.1fs", timeout)
 
     def render(self, request: RenderRequest) -> bytes:
-        # Lazy start on first request, the App settings toggle decides
-        # whether the caller routes here at all, so the pool stays cold
-        # (no Chromium spawned) if it's never asked.
-        if self._thread is None:
-            self.start()
-        if self._stopped:
-            raise RuntimeError("browser pool has been stopped")
-        fut: concurrent.futures.Future[bytes] = concurrent.futures.Future()
-        self._q.put((request, fut))
         # Allow the request's own timeout × max_attempts (so retries fit)
-        # plus generous slack for launch + context setup; the pool isn't
-        # meant to be a hard timeout layer.
-        return fut.result(timeout=(request.timeout_ms * request.max_attempts) / 1000 + 60)
+        # plus generous slack for launch + context setup.
+        return cast(
+            bytes, self._submit(request, (request.timeout_ms * request.max_attempts) / 1000 + 60)
+        )
 
     def inspect(self, request: InspectRequest) -> Any:
         """Run an inspect (evaluate) task on the pooled browser and return its
         JSON result. Same lazy-start + timeout envelope as ``render``."""
-        if self._thread is None:
-            self.start()
-        if self._stopped:
-            raise RuntimeError("browser pool has been stopped")
-        fut: concurrent.futures.Future[Any] = concurrent.futures.Future()
-        self._q.put((request, fut))
-        return fut.result(
-            timeout=(request.render.timeout_ms * request.render.max_attempts) / 1000 + 60
+        return self._submit(
+            request, (request.render.timeout_ms * request.render.max_attempts) / 1000 + 60
         )
 
     def capture(self, request: CaptureRequest) -> tuple[bytes, Any]:
         """Run a screenshot + script capture on the pooled browser. Same
         lazy-start + timeout envelope as ``render``."""
-        if self._thread is None:
-            self.start()
-        if self._stopped:
-            raise RuntimeError("browser pool has been stopped")
-        fut: concurrent.futures.Future[tuple[bytes, Any]] = concurrent.futures.Future()
-        self._q.put((request, fut))
-        return fut.result(
-            timeout=(request.render.timeout_ms * request.render.max_attempts) / 1000 + 60
+        return cast(
+            tuple[bytes, Any],
+            self._submit(
+                request, (request.render.timeout_ms * request.render.max_attempts) / 1000 + 60
+            ),
         )
 
     def fetch_text(self, request: FetchRequest) -> str:
@@ -1193,54 +1202,114 @@ class BrowserPool:
          incognito context so cookies don't carry between widgets / sites
         , important for Reddit, which keys its rate-limit / challenge on
          the cookie jar."""
-        if self._thread is None:
-            self.start()
-        if self._stopped:
-            raise RuntimeError("browser pool has been stopped")
-        fut: concurrent.futures.Future[str] = concurrent.futures.Future()
-        self._q.put((request, fut))
-        return fut.result(timeout=request.timeout_ms / 1000 + 60)
+        return cast(str, self._submit(request, request.timeout_ms / 1000 + 60))
 
-    def _run(self) -> None:
+    def _submit(self, request: _PoolRequest, budget_s: float) -> Any:
+        # Lazy start on first request, the App settings toggle decides
+        # whether the caller routes here at all, so the pool stays cold
+        # (no Chromium spawned) if it's never asked.
+        with self._lock:
+            if self._stopped:
+                raise RuntimeError("browser pool has been stopped")
+            if self._worker is None:
+                self._worker = self._spawn_locked()
+            worker = self._worker
+            fut: concurrent.futures.Future[Any] = concurrent.futures.Future()
+            worker.q.put((request, fut, budget_s))
+        try:
+            return fut.result(timeout=budget_s)
+        except concurrent.futures.TimeoutError:
+            # Nobody is waiting any more: drop the task if it hasn't
+            # started, then check whether the worker is stuck.
+            fut.cancel()
+            self._replace_if_stuck()
+            raise TimeoutError(f"browser pool gave no result within {budget_s:.0f}s") from None
+
+    def _spawn_locked(self) -> _PoolWorker:
+        worker = _PoolWorker()
+        t = threading.Thread(
+            target=self._run, args=(worker,), name="tesserae-browser-pool", daemon=True
+        )
+        worker.thread = t
+        t.start()
+        return worker
+
+    def _replace_if_stuck(self) -> None:
+        with self._lock:
+            worker = self._worker
+            if worker is None or self._stopped:
+                return
+            since = worker.busy_since
+            if since is None:
+                return
+            busy_for = time.monotonic() - since
+            if busy_for <= worker.busy_budget_s:
+                # Busy on a task still inside its deadline: a backlog,
+                # not a hang. Cancelling our own task was enough.
+                return
+            logger.warning(
+                "browser pool worker stuck on one task for %.0fs (deadline %.0fs); "
+                "starting a fresh worker and Chromium",
+                busy_for,
+                worker.busy_budget_s,
+            )
+            worker.retired.set()
+            fresh = self._spawn_locked()
+            while True:
+                try:
+                    item = worker.q.get_nowait()
+                except queue.Empty:
+                    break
+                if item != self._SENTINEL:
+                    fresh.q.put(item)
+            # The stuck worker exits on this once its call returns, and
+            # closes its Chromium on the way out.
+            worker.q.put(self._SENTINEL)
+            self._worker = fresh
+
+    def _handoff(self, item: tuple[_PoolRequest, concurrent.futures.Future[Any], float]) -> None:
+        """Pass a task a retired worker dequeued to the current worker."""
+        with self._lock:
+            current = self._worker
+            if current is None or self._stopped:
+                item[1].cancel()
+                return
+            current.q.put(item)
+
+    def _run(self, worker: _PoolWorker) -> None:
         pw: Playwright | None = None
         browser: Browser | None = None
         try:
             pw = sync_playwright().start()
             while True:
-                item = self._q.get()
+                item = worker.q.get()
                 if item == self._SENTINEL:
                     break
                 # Narrow the type, non-sentinel items are always
-                # (request, future) tuples per the put() contract.
-                request, fut = item  # type: ignore[misc]
+                # (request, future, budget) tuples per the put() contract.
+                request, fut, budget_s = item  # type: ignore[misc]
+                if worker.retired.is_set():
+                    self._handoff((request, fut, budget_s))
+                    break
+                # False when the caller already gave up and cancelled it.
+                if not fut.set_running_or_notify_cancel():
+                    continue
+                worker.busy_since = time.monotonic()
+                worker.busy_budget_s = budget_s
                 try:
                     if browser is None or not browser.is_connected():
                         if browser is not None:
                             with contextlib.suppress(Exception):
                                 browser.close()
                         browser = pw.chromium.launch(**_chromium_launch_kwargs())
-                    # mypy can narrow ``request`` here but the queue's
-                    # union widens ``fut`` to ``Future[str] | Future[bytes]``;
-                    # the isinstance check on the request half doesn't
-                    # propagate. Casting the future on each branch is
-                    # cheaper than restructuring the queue to a tagged
-                    # union.
                     if isinstance(request, FetchRequest):
-                        cast(concurrent.futures.Future[str], fut).set_result(
-                            _fetch_one(browser, request)
-                        )
+                        fut.set_result(_fetch_one(browser, request))
                     elif isinstance(request, InspectRequest):
-                        cast(concurrent.futures.Future[Any], fut).set_result(
-                            _inspect_one(browser, request)
-                        )
+                        fut.set_result(_inspect_one(browser, request))
                     elif isinstance(request, CaptureRequest):
-                        cast(concurrent.futures.Future[tuple[bytes, Any]], fut).set_result(
-                            _capture_one(browser, request)
-                        )
+                        fut.set_result(_capture_one(browser, request))
                     else:
-                        cast(concurrent.futures.Future[bytes], fut).set_result(
-                            _screenshot_one(browser, request)
-                        )
+                        fut.set_result(_screenshot_one(browser, request))
                 except Exception as exc:
                     fut.set_exception(exc)
                     # Force a relaunch if the browser is actually dead, OR
@@ -1259,6 +1328,8 @@ class BrowserPool:
                         with contextlib.suppress(Exception):
                             browser.close()
                         browser = None
+                finally:
+                    worker.busy_since = None
         finally:
             if browser is not None:
                 try:
