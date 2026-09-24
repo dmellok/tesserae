@@ -14,6 +14,18 @@ to how the bridge handles a result, or a refresh of the embedded fallback text.
 The Tesserae version each release tracks is the one on the same commit; see the
 main [CHANGELOG](../../CHANGELOG.md) for the server side of each change.
 
+## [Unreleased]
+
+### Fixed
+
+- A slow call no longer holds up every other tool call. Each tool ran directly
+  on the server's one event loop, so while a `render_preview` or
+  `push_to_device` waited on Tesserae (up to tens of seconds for a first render),
+  every other call, including ones the agent issued in parallel, sat in a queue
+  behind it and the client showed the bridge as unresponsive. Tools now run on a
+  worker thread, so a `list_pages` sent mid-render returns in milliseconds
+  instead of after the render.
+
 ## [0.17.0], 2026-09-09
 
 ### Added

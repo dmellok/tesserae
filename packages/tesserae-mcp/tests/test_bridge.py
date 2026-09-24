@@ -369,6 +369,8 @@ def test_the_appearance_section_is_its_own_read(monkeypatch: pytest.MonkeyPatch)
     rather than hand the agent an integer where the docs promise a list."""
     from typing import Any
 
+    import asyncio
+
     calls: list[str] = []
 
     def fake_request(method: str, path: str, body: Any = None) -> tuple[int, bytes, str]:
@@ -389,7 +391,37 @@ def test_the_appearance_section_is_its_own_read(monkeypatch: pytest.MonkeyPatch)
     # under test here.
     tool = bridge.build_server()._tool_manager.get_tool("list_widgets")
     monkeypatch.setattr(bridge, "_request", fake_request)
-    out = tool.fn(section="appearance")
+    out = asyncio.run(tool.fn(section="appearance"))
     assert calls == ["/appearance"]
     assert out["appearance"]["themes"] == [{"id": "a"}]
     assert out["appearance"]["fonts"] == [{"id": "f"}]
+
+
+def test_slow_tool_calls_run_off_the_event_loop(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A blocking Tesserae call (a render can take tens of seconds) must not
+    stall the server's event loop, so two calls in flight overlap rather than
+    queue one behind the other."""
+    import asyncio
+    import threading
+    from typing import Any
+
+    server = bridge.build_server()
+    tool = server._tool_manager.get_tool("list_pages")
+    assert tool.is_async
+
+    both_in = threading.Barrier(2, timeout=5)
+
+    def fake_request(method: str, path: str, body: Any = None) -> tuple[int, bytes, str]:
+        # Only returns once both calls are inside _request at the same time,
+        # which a loop-blocking call would never allow.
+        both_in.wait()
+        return 200, b'{"pages":[]}', "application/json"
+
+    monkeypatch.setattr(bridge, "_request", fake_request)
+
+    async def two_at_once() -> list[Any]:
+        return await asyncio.gather(
+            server.call_tool("list_pages", {}), server.call_tool("list_pages", {})
+        )
+
+    assert len(asyncio.run(two_at_once())) == 2

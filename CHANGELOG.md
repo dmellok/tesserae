@@ -8,6 +8,11 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **The MCP bridge stays responsive during a slow render.** Bridge 0.17.1 runs
+  each tool on a worker thread instead of the server's one event loop, so a
+  `render_preview` that takes several seconds no longer queues every other tool
+  call behind it. Tesserae now reports 0.17.1 as the current bridge.
+
 - **Canvas widgets load assets through Home Assistant Ingress.** The Canvas editor
   prefixed widget script imports but left root-relative stylesheet and image URLs
   inside widget shadow roots pointed at the HA frontend. It now prefixes those

@@ -17,13 +17,14 @@ Run it as ``tesserae-mcp`` (console script) or ``python -m tesserae_mcp``.
 
 from __future__ import annotations
 
+import functools
 import json
 import os
 import urllib.error
 import urllib.request
 from typing import Any
 
-__version__ = "0.17.0"
+__version__ = "0.17.1"
 
 _BASE = os.environ.get("TESSERAE_URL", "http://127.0.0.1:8765").rstrip("/")
 _TOKEN = os.environ.get("TESSERAE_MCP_TOKEN", "").strip()
@@ -617,6 +618,24 @@ WIRE UP NAVIGATION / SCHEDULING (once the pages exist):
   better: they store the deck's frames on local storage (SD) and navigate with the radio off, so
   decks are the single snappiest navigation you can give those panels.
 """
+
+
+def _off_loop(fn: Any) -> Any:
+    """Wrap a blocking tool so it runs on a worker thread.
+
+    FastMCP calls a plain function directly on its one event loop, so a slow
+    Tesserae call (a render_preview can take tens of seconds) would stall every
+    other request, parallel tool calls included, until it returned. ``wraps``
+    keeps the name, docstring and signature FastMCP builds the schema from.
+    """
+
+    @functools.wraps(fn)
+    async def run(**kwargs: Any) -> Any:
+        import anyio.to_thread
+
+        return await anyio.to_thread.run_sync(functools.partial(fn, **kwargs))
+
+    return run
 
 
 def build_server() -> Any:
@@ -1220,7 +1239,7 @@ def build_server() -> Any:
         description = tool_docs.get(fn.__name__) or (fn.__doc__ or "").strip()
         if fn.__name__ in _DOC_SHAPE_TOOLS:
             description = f"{description}\n\n{doc_shape}"
-        mcp.add_tool(fn, description=description)
+        mcp.add_tool(_off_loop(fn), description=description)
     return mcp
 
 
