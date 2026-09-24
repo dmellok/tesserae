@@ -8,6 +8,12 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **The first-run wizard no longer loops back to the opt-in step (#330).**
+  The device step's Continue, Skip and Next buttons still pointed at the
+  online-features step from before it moved to second place, so skipping the
+  pairing code sent setup back through timezone and transport forever. They
+  now go on to the dashboard step, and Welcome's Get started now leads to the
+  opt-in step instead of passing over it.
 - **An LXC install from cloud-init can update itself again (#328).** The
   cloud-init cloned the newest release with `--branch <tag> --depth 1`, which
   left a detached, shallow checkout that fetched only that one tag, so the

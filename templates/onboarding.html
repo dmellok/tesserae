@@ -31,7 +31,7 @@
     </ol>
     <div class="wizard-nav">
       <span></span>
-      <a class="primary" href="{{ url_for('onboarding.step', step='timezone') }}"><i class="ph ph-arrow-right" aria-hidden="true"></i><span>Get started</span></a>
+      <a class="primary" href="{{ url_for('onboarding.step', step='share') }}"><i class="ph ph-arrow-right" aria-hidden="true"></i><span>Get started</span></a>
     </div>
 
     {# ---------- Timezone ---------- #}
@@ -203,9 +203,9 @@
     <div class="wizard-nav">
       <span></span>
       {% if instances %}
-      <a class="primary" href="{{ url_for('onboarding.step', step='share') }}"><span>Continue</span><i class="ph ph-arrow-right" aria-hidden="true"></i></a>
+      <a class="primary" href="{{ url_for('onboarding.step', step='dashboard') }}"><span>Continue</span><i class="ph ph-arrow-right" aria-hidden="true"></i></a>
       {% else %}
-      <a class="ghost" href="{{ url_for('onboarding.step', step='share') }}"><span>Skip for now</span><i class="ph ph-arrow-right" aria-hidden="true"></i></a>
+      <a class="ghost" href="{{ url_for('onboarding.step', step='dashboard') }}"><span>Skip for now</span><i class="ph ph-arrow-right" aria-hidden="true"></i></a>
       {% endif %}
     </div>
     {% else %}
@@ -270,7 +270,7 @@
 
     <div class="wizard-nav">
       <span></span>
-      <a class="primary" href="{{ url_for('onboarding.step', step='share') }}"><i class="ph ph-arrow-right" aria-hidden="true"></i><span>Next</span></a>
+      <a class="primary" href="{{ url_for('onboarding.step', step='dashboard') }}"><i class="ph ph-arrow-right" aria-hidden="true"></i><span>Next</span></a>
     </div>
     {% endif %}{# default_transport rest vs mqtt #}
 

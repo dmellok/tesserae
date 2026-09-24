@@ -331,3 +331,34 @@ def test_skip_marks_onboarded(app: Flask) -> None:
     resp = client.post("/onboarding/skip", follow_redirects=False)
     assert resp.location.endswith("/send")
     assert app.config["SETTINGS_STORE"].get_section("app").get("onboarded") is True
+
+
+def _step_links(body: str) -> list[str]:
+    import re
+
+    return re.findall(r'href="/onboarding/([a-z]+)"', body)
+
+
+@pytest.mark.parametrize("transport", ["rest", "mqtt"])
+def test_wizard_links_only_move_forward(app: Flask, transport: str) -> None:
+    """Every step's navigation links point to a later step, so moving a step in
+    STEPS can't leave a link that loops the wizard back on itself (#330)."""
+    from app.onboarding import STEPS
+
+    client = app.test_client()
+    _sign_in(client)
+    app.config["SETTINGS_STORE"].patch_section("app", {"default_transport": transport})
+    for i, step in enumerate(STEPS):
+        body = client.get(f"/onboarding/{step}").get_data(as_text=True)
+        for target in _step_links(body):
+            assert target in STEPS, f"{step} links to unknown step {target}"
+            assert STEPS.index(target) > i, f"{step} links back to {target}"
+
+
+def test_welcome_leads_to_share_and_device_leads_to_dashboard(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    welcome = client.get("/onboarding/welcome").get_data(as_text=True)
+    assert "share" in _step_links(welcome)
+    device = client.get("/onboarding/device").get_data(as_text=True)
+    assert _step_links(device) == ["dashboard"]
