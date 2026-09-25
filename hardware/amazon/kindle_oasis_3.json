@@ -1,0 +1,22 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "kindle_oasis_3",
+  "name": "Kindle Oasis (3rd gen)",
+  "vendor": "Amazon",
+  "url": "https://www.amazon.com/kindle",
+  "icon": "book-open",
+  "description": "Kindle Oasis (3rd gen), 1264x1680 16-level greyscale e-reader running KOReader with the Tesserae plugin. Needs a jailbreak to install KOReader.",
+  "protocol": "koreader_client",
+  "panel": {
+    "w": 1264,
+    "h": 1680,
+    "orientation": "portrait",
+    "name": "Kindle Oasis (3rd gen) screen",
+    "gamut": "gray_16",
+    "native_w": 1264,
+    "native_h": 1680
+  },
+  "refresh_floor_s": 60,
+  "image_format": "bin",
+  "notes_md": "Awaiting confirmed test on real hardware. Runs the Tesserae KOReader plugin (dmellok/tesserae-koreader) on a jailbroken Kindle. Pair from Tools -> Tesserae with a claim code; the plugin reports the real screen size, so this entry only fixes the default panel and the store listing."
+}

@@ -1,0 +1,22 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "kindle_scribe",
+  "name": "Kindle Scribe",
+  "vendor": "Amazon",
+  "url": "https://www.amazon.com/kindle",
+  "icon": "book-open",
+  "description": "Kindle Scribe, 1860x2480 16-level greyscale e-reader running KOReader with the Tesserae plugin. Needs a jailbreak to install KOReader.",
+  "protocol": "koreader_client",
+  "panel": {
+    "w": 1860,
+    "h": 2480,
+    "orientation": "portrait",
+    "name": "Kindle Scribe screen",
+    "gamut": "gray_16",
+    "native_w": 1860,
+    "native_h": 2480
+  },
+  "refresh_floor_s": 60,
+  "image_format": "bin",
+  "notes_md": "Awaiting confirmed test on real hardware. Runs the Tesserae KOReader plugin (dmellok/tesserae-koreader) on a jailbroken Kindle. Pair from Tools -> Tesserae with a claim code; the plugin reports the real screen size, so this entry only fixes the default panel and the store listing."
+}

@@ -232,6 +232,21 @@ Community-authored clients, contributed and maintained by their authors (not in 
 | [reMarkable 1](https://remarkable.com) | 1404×1872 (10.3" 16-level grey) | [tesserae.remarkable](https://github.com/partridgeworks/tesserae.remarkable) by [@partridgeworks](https://github.com/partridgeworks) | TBD |
 | [reMarkable Paper Pro](https://remarkable.com/products/remarkable-paper/pro) | 1620×2160 (11.8" colour) | [tesserae.remarkable](https://github.com/partridgeworks/tesserae.remarkable) by [@partridgeworks](https://github.com/partridgeworks) | TBD |
 
+### Kindle and Kobo (KOReader)
+
+E-readers running [KOReader](https://koreader.rocks) with the
+[Tesserae plugin](https://github.com/dmellok/tesserae-koreader). The plugin
+pairs with a claim code, decodes 16-level greyscale frames on the reader, and
+sleeps between refreshes where KOReader exposes the hardware alarm. Kindles need
+a jailbreak to run KOReader; Kobo does not.
+
+| Panel | Resolution | Client | Status |
+|---|---|---|---|
+| Kindle Paperwhite 2 (jailbroken) | 758×1024 | [tesserae-koreader](https://github.com/dmellok/tesserae-koreader) | TBD |
+| Kindle Paperwhite 3/4, Voyage, Basic 4 | 1072×1448 | [tesserae-koreader](https://github.com/dmellok/tesserae-koreader) | TBD |
+| Kindle Paperwhite 5, Oasis 3, Scribe | 1236×1648, 1264×1680, 1860×2480 | [tesserae-koreader](https://github.com/dmellok/tesserae-koreader) | TBD |
+| Kobo Clara HD, Libra 2, Sage, Aura | various | [tesserae-koreader](https://github.com/dmellok/tesserae-koreader) | TBD |
+
 ### TRMNL-compatible (HTTP pull)
 
 Any client implementing the [TRMNL BYOS spec](https://help.trmnl.com/en/articles/9510536-bring-your-own-server)
@@ -241,7 +256,7 @@ works against the `trmnl_png` renderer.
 |---|---|---|---|
 | [TRMNL OG](https://shop.trmnl.com/products/trmnl) | 800×480 | TRMNL firmware | TBD via BYOS |
 | [TRMNL X](https://shop.trmnl.com/products/trmnl-x) | 1872×1404 (10.3") | TRMNL firmware | TBD |
-| Amazon Kindle Paperwhite 2 (jailbroken) | 758×1024 | [KOReader trmnl-display plugin](https://github.com/koreader/koreader) | ✅ |
+| Amazon Kindle Paperwhite 2 (jailbroken) | 758×1024 | [KOReader trmnl-display plugin](https://github.com/koreader/koreader) (1-bit; see the KOReader section above for the Tesserae plugin) | ✅ |
 
 ### Custom panels
 

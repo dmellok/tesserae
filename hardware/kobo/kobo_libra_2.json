@@ -1,0 +1,22 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "kobo_libra_2",
+  "name": "Kobo Libra 2 / Libra H2O",
+  "vendor": "Kobo",
+  "url": "https://www.kobo.com/ereaders",
+  "icon": "book-open",
+  "description": "Kobo Libra 2 / Libra H2O, 1264x1680 16-level greyscale e-reader running KOReader with the Tesserae plugin. No jailbreak needed: KOReader installs alongside the stock firmware.",
+  "protocol": "koreader_client",
+  "panel": {
+    "w": 1264,
+    "h": 1680,
+    "orientation": "portrait",
+    "name": "Kobo Libra 2 / Libra H2O screen",
+    "gamut": "gray_16",
+    "native_w": 1264,
+    "native_h": 1680
+  },
+  "refresh_floor_s": 60,
+  "image_format": "bin",
+  "notes_md": "Awaiting confirmed test on real hardware. Runs the Tesserae KOReader plugin (dmellok/tesserae-koreader); KOReader's hardware wake (WakeupMgr) is native on Kobo, so the reader sleeps between refreshes. The plugin reports the real screen size at pairing, so this entry only fixes the default panel and the store listing."
+}

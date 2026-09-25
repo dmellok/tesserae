@@ -1,0 +1,22 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "kindle_paperwhite_3",
+  "name": "Kindle Paperwhite (3rd / 4th gen), Voyage",
+  "vendor": "Amazon",
+  "url": "https://www.amazon.com/kindle",
+  "icon": "book-open",
+  "description": "Kindle Paperwhite (3rd / 4th gen), Voyage, 1072x1448 16-level greyscale e-reader running KOReader with the Tesserae plugin. Needs a jailbreak to install KOReader.",
+  "protocol": "koreader_client",
+  "panel": {
+    "w": 1072,
+    "h": 1448,
+    "orientation": "portrait",
+    "name": "Kindle Paperwhite (3rd / 4th gen), Voyage screen",
+    "gamut": "gray_16",
+    "native_w": 1072,
+    "native_h": 1448
+  },
+  "refresh_floor_s": 60,
+  "image_format": "bin",
+  "notes_md": "Awaiting confirmed test on real hardware. Runs the Tesserae KOReader plugin (dmellok/tesserae-koreader) on a jailbroken Kindle. Pair from Tools -> Tesserae with a claim code; the plugin reports the real screen size, so this entry only fixes the default panel and the store listing."
+}

@@ -1,0 +1,22 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "kobo_aura_edition_2",
+  "name": "Kobo Aura (Edition 2) / Nia",
+  "vendor": "Kobo",
+  "url": "https://www.kobo.com/ereaders",
+  "icon": "book-open",
+  "description": "Kobo Aura (Edition 2) / Nia, 758x1024 16-level greyscale e-reader running KOReader with the Tesserae plugin. No jailbreak needed: KOReader installs alongside the stock firmware.",
+  "protocol": "koreader_client",
+  "panel": {
+    "w": 758,
+    "h": 1024,
+    "orientation": "portrait",
+    "name": "Kobo Aura (Edition 2) / Nia screen",
+    "gamut": "gray_16",
+    "native_w": 758,
+    "native_h": 1024
+  },
+  "refresh_floor_s": 60,
+  "image_format": "bin",
+  "notes_md": "Awaiting confirmed test on real hardware. Runs the Tesserae KOReader plugin (dmellok/tesserae-koreader); KOReader's hardware wake (WakeupMgr) is native on Kobo, so the reader sleeps between refreshes. The plugin reports the real screen size at pairing, so this entry only fixes the default panel and the store listing."
+}

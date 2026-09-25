@@ -17,6 +17,7 @@ device-registration flow described in [Set up a device](devices.md).
 | `tesserae-device-pi-bin` | MQTT | `pi_bin` | Plugged-in Pimoroni Inky Impression (fastest path) |
 | `tesserae-device-pi-png` | REST / MQTT | `pi_png` | Any inky-supported panel (2/3/6/7 colour) |
 | `tesserae-device-pico-bin` | MQTT | `pico_bin` | Pimoroni Pico-driven Inky Impression (4-bpp Spectra 6) |
+| [`tesserae-koreader`](https://github.com/dmellok/tesserae-koreader) | REST | `koreader_client` | Jailbroken Kindles, Kobo, and other e-readers running KOReader; 16-level greyscale, sleeps between refreshes |
 | [TRMNL stock firmware](https://github.com/usetrmnl/trmnl-firmware) or [KOReader plugin](https://github.com/koreader/koreader) | HTTP-pull (BYOS) | `trmnl` | TRMNL devices + KOReader-on-Kindle |
 
 See [Screens & compatibility](../compatibility.md) for which renderer feeds each
@@ -90,15 +91,41 @@ pHAT, wHAT, Impression 4"/5.7"/7.3"/13.3", in 2/3/6/7 colour. Quantising on the
 Pi every frame makes it the slower of the two Pi paths, but it stays
 wire-compatible with the inky-dash v3/v4 listener protocol.
 
+## tesserae-koreader (Kindle, Kobo, any KOReader e-reader)
+
+[:material-github: dmellok/tesserae-koreader](https://github.com/dmellok/tesserae-koreader)
+· pairs with the `esp32_gray_bin` renderer · default id `koreader_client`
+
+A KOReader plugin that makes an e-reader a Tesserae panel over the REST device
+protocol, the same one the ESP32 firmware speaks. Kindles need a jailbreak to
+run KOReader; Kobo, PocketBook and reMarkable do not.
+
+1. Copy `tesserae.koplugin/` from the [latest release](https://github.com/dmellok/tesserae-koreader/releases) into `koreader/plugins/` and restart KOReader.
+2. In Tesserae, **Settings → Devices → Add device → Pair with a code** to make a claim code.
+3. On the reader, **Tools → Tesserae → Pair with a claim code…**, enter your server's address and the code.
+4. Assign the new panel a dashboard, then **Tools → Tesserae → Show dashboard**.
+
+The plugin reports the reader's real screen size when it pairs, so one kind
+covers every model. Frames are packed at 4 bits per pixel (16 greys) and
+decoded on the reader; an unchanged dashboard answers `304` and costs no
+repaint. Where KOReader exposes the hardware alarm (Kobo, and Kindles on a
+recent KOReader build) the reader sleeps between refreshes and wakes for each
+one; elsewhere it stays awake on a timer with Wi-Fi off in between. The
+refresh interval is the panel's **Refresh interval** on the device card.
+
+Tesserae Cloud speaks the same protocol: enter `https://cloud.tesserae.ink`
+as the server and a claim code from **Settings › Panels**.
+
 ## TRMNL / KOReader (HTTP-pull)
 
 [:material-github: usetrmnl/trmnl-firmware](https://github.com/usetrmnl/trmnl-firmware)
 or [:material-github: koreader/koreader](https://github.com/koreader/koreader) (`trmnl-display` plugin)
 · pairs with the `trmnl_png` renderer · default id `trmnl`
 
-Tesserae doesn't ship its own client here. TRMNL devices already run
-TRMNL's stock firmware (which speaks the BYOS protocol Tesserae implements
-server-side), and Kindles use KOReader's `trmnl-display` plugin. Either
+TRMNL devices run TRMNL's stock firmware (which speaks the BYOS protocol
+Tesserae implements server-side); Kindles can use KOReader's `trmnl-display`
+plugin here too, though the `tesserae-koreader` plugin above is the better
+fit for an e-reader (16 greys, hardware wake, claim-code pairing). Either
 way, the device polls `GET /api/display` on a schedule, the response
 carries the next frame URL and the next-poll interval. No broker required,
 handy when you want a panel that "just talks to the internet".

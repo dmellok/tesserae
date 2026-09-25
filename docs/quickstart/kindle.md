@@ -1,47 +1,56 @@
-# Quickstart: Kindle Paperwhite + KOReader
+# Quickstart: Kindle + KOReader
 
-A jailbroken Kindle Paperwhite running [KOReader](https://github.com/koreader/koreader) with the `trmnl-display` plugin. KOReader polls Tesserae's BYOS endpoint and paints whatever frame is scheduled.
+A jailbroken Kindle running [KOReader](https://github.com/koreader/koreader) with the [Tesserae plugin](https://github.com/dmellok/tesserae-koreader). The reader pairs with a claim code, fetches 16-level greyscale frames on the interval you set, and sleeps in between.
 
 !!! warning "Requires jailbreak"
-    This path needs a jailbroken Kindle running KOReader. The jailbreak process is well-documented but Amazon does not endorse or support it. Tested on a Kindle Paperwhite 2 (DP75SDI, 758×1024); other generations work too if KOReader supports them.
+    This path needs a jailbroken Kindle running KOReader. The jailbreak process is well-documented but Amazon does not endorse or support it. The steps below apply to any Kindle KOReader supports; the plugin reports the real screen size when it pairs. Kobo readers run KOReader without a jailbreak and follow the same steps from 01 onward.
 
-## 01 — Install KOReader + trmnl-display plugin
+## 01 — Install KOReader and the Tesserae plugin
 
 If you don't already have KOReader on your Kindle, follow the [KOReader install guide](https://github.com/koreader/koreader/wiki/Installation-on-Kindle-devices). Once installed:
 
-1. SSH or USB-mount your Kindle.
-2. Drop the `trmnl-display` plugin into `koreader/plugins/`. See the [KOReader plugin docs](https://github.com/koreader/koreader/wiki/User-Plugins) for the file path on your model.
-3. Restart KOReader from the menu.
+1. Download `tesserae.koplugin` from the [latest release](https://github.com/dmellok/tesserae-koreader/releases) and unzip it.
+2. USB-mount the Kindle and copy the `tesserae.koplugin` folder into `koreader/plugins/`.
+3. Restart KOReader from its menu.
 
-In KOReader's plugin settings, set the BYOS endpoint:
+If KOReader's TRMNL plugin is installed and set to auto-refresh, switch it off. Two plugins repainting the same screen fight over it.
 
-- **Server URL**: `http://<your-server>:8765`
+## 02 — Make a claim code
 
-## 02 — It pairs itself
+In Tesserae: **Settings → Devices → Add device → Pair with a code**. The code is valid for a short while and works once.
 
-KOReader polls Tesserae's `/api/setup` and auto-provisions. The Kindle appears under **Settings → Devices** within seconds. No token to type.
+Tesserae Cloud users: **Settings › Panels › New claim code**.
 
-## 03 — Compose a dashboard
+## 03 — Pair the reader
 
-The Kindle Paperwhite 2 panel is 758×1024 portrait, 16-level greyscale. Tesserae fits the composed PNG to the panel size and dithers server-side.
+On the Kindle: **Tools → Tesserae → Pair with a claim code…**
+
+- **Server**: your Tesserae address, for example `http://192.168.1.20:8765`, or `https://cloud.tesserae.ink`.
+- **Claim code**: the digits from step 02.
+
+Within a few seconds the reader appears under **Settings → Devices** with its real resolution, for example 758×1024 for a Paperwhite 2 or 1072×1448 for a Paperwhite 3.
+
+## 04 — Compose a dashboard
+
+The Kindle is a tall portrait panel with 16 grey levels. Tesserae fits the composed page to the screen and dithers server-side; on the device card, **Picture quality** sets the dither and contrast.
 
 1. **Dashboards → New**.
-2. Build a tall portrait layout. The Paperwhite shines as a bedside dashboard, a hallway notice board, or a calendar surface.
+2. Build a tall portrait layout. A Kindle shines as a bedside dashboard, a hallway notice board, or a calendar surface.
 3. Bind the page to the Kindle in the device picker.
-4. Hit **Push**.
+4. On the Kindle: **Tools → Tesserae → Show dashboard**.
 
-KOReader paints the frame using its existing display routines. The 16-level greyscale handles dithered images reasonably well.
+Tap the dashboard at any time for Refresh now, Status, and Hide dashboard.
 
-## 04 — Set the refresh
+## 05 — Set the refresh
 
-The Kindle runs on a battery you can't replace easily, so cadence matters. In the dashboard's **Schedules** card:
+The reader runs on a battery, so cadence matters. On the device card, **Refresh interval** sets how long it sleeps between fetches; the plugin picks the new value up on its next check-in.
 
-- **Daily at a set time** is the natural fit: refresh once overnight while it charges.
-- **Smart sync** keeps the panel fresh without burning the battery on idle polls.
-
-A well-tuned Kindle Tesserae setup runs for weeks between charges, depending on cadence.
+- On a KOReader build with the hardware alarm (recent builds, Kobo out of the box) the Kindle suspends between refreshes and wakes for each one. The plugin's **Status** entry says which mode is in force.
+- Where the alarm is not available the reader stays awake with Wi-Fi off in between, which costs more but still runs for days.
+- A dashboard that has not changed costs one small request and no repaint, so a shorter interval on a slow-changing page is cheap.
 
 ## Next steps
 
-- [Quiet hours](../install/devices.md#per-device-settings) to skip overnight wakes if you're not on a daily cadence.
-- [Browse community widgets](https://tesserae.ink/catalog/). The Kindle's tall portrait aspect suits the calendar and news widgets particularly well.
+- [Quiet hours](../install/devices.md#per-device-settings) to skip overnight wakes.
+- [Browse community widgets](https://tesserae.ink/catalog/). The tall portrait aspect suits the calendar and news widgets particularly well.
+- KOReader's own `trmnl-display` plugin also works against Tesserae's TRMNL endpoint, at 1-bit, if you prefer it: see [Install a client](../install/clients.md#trmnl-koreader-http-pull).

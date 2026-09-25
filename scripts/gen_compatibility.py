@@ -39,6 +39,8 @@ VENDOR_ORDER: list[tuple[str, str]] = [
     ("trmnl", "TRMNL"),
     ("waveshare", "Waveshare"),
     ("xteink", "Xteink"),
+    ("amazon", "Amazon Kindle"),
+    ("kobo", "Kobo"),
     ("community", "Community"),
 ]
 
@@ -69,6 +71,8 @@ VENDOR_URL: dict[str, str] = {
     "trmnl": "https://usetrmnl.com/",
     "waveshare": "https://www.waveshare.com/",
     "xteink": "https://www.xteink.com/",
+    "amazon": "https://www.amazon.com/kindle",
+    "kobo": "https://www.kobo.com/ereaders",
 }
 
 # Vendor id -> intro paragraph. Rendered between the vendor heading and
@@ -118,6 +122,22 @@ VENDOR_INTRO: dict[str, str] = {
         "tablet's display stack, and deep-sleeps between polls on an RTC "
         "alarm. The reMarkable 2 is confirmed on hardware; the reMarkable 1 "
         "and Paper Pro entries are built but not yet confirmed."
+    ),
+    "amazon": (
+        "Kindles are e-readers, not dashboard panels, and need a jailbreak "
+        "before KOReader can be installed. With the "
+        "[Tesserae KOReader plugin](https://github.com/dmellok/tesserae-koreader) "
+        "a Kindle pairs with a claim code, fetches 16-level greyscale frames on "
+        "the interval the server sets, and sleeps in between on KOReader builds "
+        "that expose the hardware alarm. The plugin reports the real screen size "
+        "at pairing, so any Kindle KOReader runs on works; the models listed are "
+        "the ones with a store entry and a known resolution."
+    ),
+    "kobo": (
+        "Kobo readers run KOReader without a jailbreak. The same "
+        "[Tesserae KOReader plugin](https://github.com/dmellok/tesserae-koreader) "
+        "applies, and KOReader's hardware wake is native on Kobo, so the reader "
+        "sleeps between refreshes out of the box."
     ),
     "xteink": (
         "E-readers rather than dedicated dashboard panels. These run "

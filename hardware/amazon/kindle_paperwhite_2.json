@@ -1,0 +1,22 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "kindle_paperwhite_2",
+  "name": "Kindle Paperwhite (2nd gen)",
+  "vendor": "Amazon",
+  "url": "https://www.amazon.com/kindle",
+  "icon": "book-open",
+  "description": "Kindle Paperwhite (2nd gen), 758x1024 16-level greyscale e-reader running KOReader with the Tesserae plugin. Needs a jailbreak to install KOReader.",
+  "protocol": "koreader_client",
+  "panel": {
+    "w": 758,
+    "h": 1024,
+    "orientation": "portrait",
+    "name": "Kindle Paperwhite (2nd gen) screen",
+    "gamut": "gray_16",
+    "native_w": 758,
+    "native_h": 1024
+  },
+  "refresh_floor_s": 60,
+  "image_format": "bin",
+  "notes_md": "Awaiting confirmed test on real hardware with the Tesserae plugin. The same unit is confirmed through KOReader's TRMNL plugin (trmnl_png). Runs the Tesserae KOReader plugin (dmellok/tesserae-koreader) on a jailbroken Kindle. Pair from Tools -> Tesserae with a claim code; the plugin reports the real screen size, so this entry only fixes the default panel and the store listing."
+}

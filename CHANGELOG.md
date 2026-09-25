@@ -6,6 +6,19 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added
+
+- **KOReader e-readers as a device kind.** `koreader_client` pairs a jailbroken
+  Kindle, a Kobo, or any other e-reader running KOReader with the new
+  [Tesserae plugin](https://github.com/dmellok/tesserae-koreader) over the REST
+  device protocol. The reader reports its own screen size at pairing and takes
+  16-level greyscale frames from the `esp32_gray_bin` packer, decoded on the
+  device, with `If-None-Match` so an unchanged dashboard costs no repaint.
+  Hardware entries for six Kindle and four Kobo models fix the default panel
+  and store listing; all are awaiting a confirmed test on real hardware. The
+  Kindle quickstart and the clients page now lead with this plugin; KOReader's
+  TRMNL plugin remains documented as the 1-bit alternative.
+
 ### Fixed
 
 - **The first-run wizard no longer loops back to the opt-in step (#330).**

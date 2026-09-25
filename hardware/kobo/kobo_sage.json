@@ -1,0 +1,22 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "kobo_sage",
+  "name": "Kobo Sage",
+  "vendor": "Kobo",
+  "url": "https://www.kobo.com/ereaders",
+  "icon": "book-open",
+  "description": "Kobo Sage, 1440x1920 16-level greyscale e-reader running KOReader with the Tesserae plugin. No jailbreak needed: KOReader installs alongside the stock firmware.",
+  "protocol": "koreader_client",
+  "panel": {
+    "w": 1440,
+    "h": 1920,
+    "orientation": "portrait",
+    "name": "Kobo Sage screen",
+    "gamut": "gray_16",
+    "native_w": 1440,
+    "native_h": 1920
+  },
+  "refresh_floor_s": 60,
+  "image_format": "bin",
+  "notes_md": "Awaiting confirmed test on real hardware. Runs the Tesserae KOReader plugin (dmellok/tesserae-koreader); KOReader's hardware wake (WakeupMgr) is native on Kobo, so the reader sleeps between refreshes. The plugin reports the real screen size at pairing, so this entry only fixes the default panel and the store listing."
+}
