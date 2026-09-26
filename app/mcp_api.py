@@ -385,6 +385,23 @@ def _desc_summary(desc: str) -> str:
     return first[:_DESC_SUMMARY_MAX].rsplit(" ", 1)[0] + "…"
 
 
+def _catalog_query_terms(raw: str) -> list[str]:
+    """Lower-cased whitespace-separated terms of a ``?q=`` catalog filter."""
+    return raw.lower().split()
+
+
+def _catalog_matches(widget: dict[str, Any], terms: list[str]) -> bool:
+    """Whether every term appears in the widget's key, name or FULL description.
+
+    The full description, not the one-sentence summary the catalog carries: a
+    term that only appears in the second sentence still names what the widget
+    is for, and matching it costs nothing because the entry is filtered before
+    it is summarised.
+    """
+    haystack = " ".join(str(widget.get(k) or "") for k in ("key", "name", "desc")).lower()
+    return all(term in haystack for term in terms)
+
+
 @bp.get("/catalog")
 def catalog() -> Response:
     """Every renderable widget (with its fragments), the vendored code-element
@@ -397,8 +414,23 @@ def catalog() -> Response:
     fetch a widget's live data shape with ``POST /widgets/<key>/data`` instead.
     The full icon name list is searched via ``GET /icons?q=`` rather than inlined.
     ``desc`` is the first sentence only; ``GET /widgets/<key>/options`` returns
-    the widget's full description alongside its options."""
+    the widget's full description alongside its options.
+
+    Two optional filters let a caller that knows what it wants ask for less
+    (#257). ``?q=`` keeps the widgets whose key, name or full description
+    contains every whitespace-separated term, case-insensitively.
+    ``?fields=`` is a comma-separated list of per-widget fields to return;
+    ``key`` is always kept, so every entry can still be named in a follow-up
+    call, and an unknown field is a 400 that lists the valid ones rather than
+    an entry silently missing what was asked for. Either filter adds a
+    ``filter`` block reporting what was applied and how many of the catalog's
+    widgets matched, so an empty list reads as "nothing matched", not "no
+    widgets exist". Neither touches the other top-level blocks."""
     widgets = build_catalog(_pr._registry())
+    raw_q = (request.args.get("q") or "").strip()
+    raw_fields = (request.args.get("fields") or "").strip()
+    terms = _catalog_query_terms(raw_q)
+    matched = [w for w in widgets if _catalog_matches(w, terms)] if terms else widgets
     lean = [
         {
             **{k: v for k, v in w.items() if k != "sample"},
@@ -407,11 +439,33 @@ def catalog() -> Response:
             # per-widget call rather than riding along 36 times (#257).
             "desc": _desc_summary(str(w.get("desc") or "")),
         }
-        for w in widgets
+        for w in matched
     ]
+    fields: list[str] = []
+    if raw_fields:
+        fields = list(dict.fromkeys(f.strip() for f in raw_fields.split(",") if f.strip()))
+        valid = sorted({k for w in widgets for k in w if k != "sample"})
+        unknown = [f for f in fields if f not in valid]
+        if unknown:
+            return _err(
+                400,
+                f"unknown catalog field(s): {', '.join(unknown)}",
+                fields=valid,
+            )
+        keep = {"key", *fields}
+        lean = [{k: v for k, v in w.items() if k in keep} for w in lean]
+    body: dict[str, Any] = {}
+    if raw_q or raw_fields:
+        body["filter"] = {
+            "q": raw_q or None,
+            "fields": ["key", *(f for f in fields if f != "key")] if fields else None,
+            "matched": len(lean),
+            "total": len(widgets),
+        }
     appearance = _pr._appearance()
     return jsonify(
         {
+            **body,
             "widgets": lean,
             # Counts and an endpoint, not the lists (#257). Themes, styles and
             # fonts are ~14% of every catalog read and are only needed when
