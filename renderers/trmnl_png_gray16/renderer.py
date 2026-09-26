@@ -81,25 +81,47 @@ def _grey_ramp(settings: dict[str, Any]) -> tuple[tuple[int, int, int], ...]:
 
 
 def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> bytes:
-    """Fit + dither the composition PNG to the panel's exact dims, as a
+    """Fit + dither the composition PNG onto the device's buffer, as a
     16-level greyscale PNG.
 
-    The composition arrives at panel size already (the composer pre-sizes
-    pages to ``panel.w x panel.h``), so ``fit_to_panel`` is usually a
-    no-op; it only does real work on Send-page image pushes where the
-    input PNG isn't panel-sized, with the same per-push ``image_fit``
-    override the other renderers use.
+    The composition arrives at the composition dims already (the
+    composer pre-sizes pages to ``panel.w × panel.h``), so the first
+    ``fit_to_panel`` call is usually a no-op; it only does real work on
+    Send-page image pushes where the input PNG isn't panel-sized, with
+    the same per-push ``image_fit`` override the other renderers use.
+
+    Then the finished composition is mapped onto the native buffer the
+    client paints (a Kindle reports its physical screen via
+    ``png-width`` / ``png-height``, which app.trmnl_api persists as
+    ``native_w / native_h``): 90° CW when the composition aspect
+    disagrees with the buffer aspect, 180° more when ``panel.flip``,
+    and a final fit to the native dims. Without this a landscape
+    dashboard mounted on a portrait Kindle is stretched into a
+    squashed portrait by the client's scaler. Panels with no native
+    block fall back to the composition dims and behave exactly as
+    before.
     """
     img = Image.open(io.BytesIO(png_bytes))
-    target_w, target_h = panel.w, panel.h
+    fit = str(settings.get("image_fit") or "fit")
 
+    if img.size != (panel.w, panel.h):
+        img = fit_to_panel(img, target_w=panel.w, target_h=panel.h, scale=fit, bg="white")
+
+    native_w, native_h = panel.native_w, panel.native_h
+    if native_w is None or native_h is None:
+        native_w, native_h = panel.w, panel.h
+    if (native_w > native_h) != (panel.w > panel.h):
+        # Composition and client buffer disagree on aspect: turn the
+        # finished composition 90° CW so its left edge lands on the
+        # client's top edge. PIL ``rotate`` is counter-clockwise;
+        # ``-90`` gives CW.
+        img = img.rotate(-90, expand=True)
     if panel.flip:
         # Upside-down physical mount; turn 180 deg so it reads upright.
         img = img.rotate(180, expand=True)
 
-    if img.size != (target_w, target_h):
-        fit = str(settings.get("image_fit") or "fit")
-        img = fit_to_panel(img, target_w=target_w, target_h=target_h, scale=fit, bg="white")
+    if img.size != (native_w, native_h):
+        img = fit_to_panel(img, target_w=native_w, target_h=native_h, scale=fit, bg="white")
 
     if panel.underscan:
         img = underscan_image(img, underscan=panel.underscan)
