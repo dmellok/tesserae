@@ -272,6 +272,109 @@ def _requested_panel_dims(device: Device) -> tuple[int, int]:
     return int(panel.get("w") or 800), int(panel.get("h") or 480)
 
 
+def _adopt_reported_panel(device: Device, w: int, h: int) -> None:
+    """Persist the client's reported pixel size onto the device panel.
+
+    BYOS clients declare the exact buffer they paint on every poll
+    (KOReader sends ``png-width`` / ``png-height`` = the e-reader's
+    physical screen, e.g. 758×1024 on a Paperwhite 2; native TRMNL
+    firmware sends ``Width`` / ``Height``). The trmnl renderers need
+    that as the panel's ``native_w / native_h`` so they can turn the
+    composition onto the real screen: without it a portrait Kindle
+    stretched every landscape frame across its long axis, which is
+    exactly the squashed-landscape-into-portrait report.
+
+    On the first adoption (no native block yet) the composition dims
+    are seeded to the swapped pair matching the stored orientation, so
+    "Rotation: 90°" is an exact 90° turn of the composition onto the
+    reported buffer rather than a letterboxed stretch. Only the first
+    adoption touches the composition dims (and only when they still
+    equal the kind's defaults — a deliberate custom canvas wins);
+    later polls only keep the native block in sync.
+
+    Best-effort: any failure leaves the stored panel untouched and is
+    caught by the caller."""
+    # Tolerate the odd zero / garbage firmware header, cap e-reader
+    # sizes generously (largest known: Scribe 1860×2480).
+    if not w or not h or w <= 0 or h <= 0:
+        return
+    if w > 4096 or h > 4096:
+        return
+    panel = device.panel or {}
+    try:
+        cur_nw = int(panel["native_w"]) if panel.get("native_w") is not None else None
+        cur_nh = int(panel["native_h"]) if panel.get("native_h") is not None else None
+    except (TypeError, ValueError):
+        cur_nw = cur_nh = None
+    if cur_nw == w and cur_nh == h:
+        # Already adopted / nothing to sync. Keep the write out of the
+        # steady-state poll loop.
+        return
+
+    inst_file = device.path
+    try:
+        raw = json.loads(inst_file.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return
+    block = dict(raw.get("panel") or {})
+    if block.get("native_w") is None and block.get("native_h") is None:
+        # First report from this client. Seed the composition canvas to
+        # the swapped pair for the stored orientation, unless the user
+        # deliberately changed the dims from the kind's defaults.
+        defaults = _kind_default_panel_dims(device)
+        try:
+            cur_dims = (int(block["w"]), int(block["h"]))
+        except (KeyError, TypeError, ValueError):
+            cur_dims = None
+        orientation = str(block.get("orientation") or "landscape").lower()
+        # Composition canvas = the reported buffer re-ordered to the
+        # stored orientation's aspect: landscape -> wide, portrait ->
+        # tall. The renderer then turns that canvas onto the buffer (90°
+        # only when the two disagree on aspect), so a landscape
+        # orientation on a portrait Kindle seeds 1024×758, and a
+        # landscape TRMNL OG (800×480 buffer) keeps 800×480.
+        if orientation.startswith("portrait"):
+            desired = (h, w) if w > h else (w, h)
+        else:
+            desired = (h, w) if h > w else (w, h)
+        if cur_dims is None or cur_dims == defaults or cur_dims in ((w, h), (h, w)):
+            block["w"], block["h"] = desired
+    block["native_w"], block["native_h"] = w, h
+    raw["panel"] = block
+    try:
+        inst_file.write_text(json.dumps(raw, indent=2) + "\n", encoding="utf-8")
+    except OSError:
+        return
+    # Reload the instance in place so the push pipeline's
+    # ``device_panel`` sees the native block on its next render. The
+    # renderer clone set doesn't change (same kind, same renderers), so
+    # no clone churn.
+    devices = current_app.config.get("DEVICE_REGISTRY")
+    data_root = current_app.config.get("DEVICE_DATA_ROOT")
+    if devices is not None and data_root is not None:
+        from app import device_loader
+
+        devices.devices.pop(device.id, None)
+        device_loader.load_instance_file(devices, inst_file=inst_file, data_root=data_root)
+
+
+def _kind_default_panel_dims(device: Device) -> tuple[int, int] | None:
+    """The kind's shipped panel template dims, or None when the kind
+    doesn't declare a panel (so ``_adopt_reported_panel`` can tell a
+    still-default canvas from a deliberately custom one)."""
+    registry = current_app.config.get("DEVICE_REGISTRY")
+    if registry is None:
+        return None
+    kind = registry.devices.get(str(getattr(device, "kind_of", "") or ""))
+    if kind is None:
+        return None
+    kind_panel = kind.manifest.get("panel") or {}
+    try:
+        return int(kind_panel["w"]), int(kind_panel["h"])
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
 # -- status capture -----------------------------------------------------
 
 
@@ -407,6 +510,16 @@ def display() -> Response | tuple[Response, int]:
         logger.exception("trmnl: dynamic refresh_rate failed for device=%s", device.id)
         refresh_rate = configured_refresh
     w, h = _requested_panel_dims(device)
+    # The client just told us the pixel buffer it paints (png-width /
+    # png-height). Persist it as the panel's native dims so the trmnl
+    # renderers rotate the composition onto the real screen instead of
+    # serving a frame the client's scaler then stretches out of shape
+    # (squashed landscape on a portrait Kindle). Best-effort: a failure
+    # here must never break the poll.
+    try:
+        _adopt_reported_panel(device, w, h)
+    except Exception:
+        logger.exception("trmnl: panel adoption failed for device=%s", device.id)
 
     # Real render path: PushManager records the most recent successful
     # publish per device. Serve that artifact (already on disk under
