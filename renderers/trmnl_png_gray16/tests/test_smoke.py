@@ -53,6 +53,12 @@ def _levels(out: Image.Image) -> set[int]:
     return set(out.getdata())
 
 
+def _png_bytes(img: Image.Image) -> bytes:
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
+
+
 def test_manifest_matches_byos_wire_contract(trmnl_png_gray16) -> None:
     """The greyscale variant publishes to the same /frame/trmnl topic as
     the 1-bit renderer so both route through the same TRMNL BYOS
@@ -106,6 +112,38 @@ def test_calibration_gray_ramp_override_is_honoured(trmnl_png_gray16, compositio
     levels = _levels(out)
     assert min(levels) >= 0x20
     assert max(levels) <= 0xE0
+
+
+def test_landscape_composition_rotated_onto_portrait_buffer(trmnl_png_gray16) -> None:
+    """The Kindle case: a landscape dashboard composed at 200×100 for a
+    portrait 100×200 screen. Selecting "Rotation: 90" must turn the
+    frame onto the client's buffer, or the client's scaler squashes
+    the landscape into a portrait (issue reported against TRMNL on
+    Kindle)."""
+    img = Image.new("RGB", (200, 100), "white")
+    img.paste((0, 0, 0), (100, 0, 200, 100))
+    panel = Panel(w=200, h=100, native_w=100, native_h=200, gamut="gray_16")
+    artifact = trmnl_png_gray16.transform(
+        _png_bytes(img), panel=panel, settings=trmnl_png_gray16.settings_defaults()
+    )
+    out = Image.open(io.BytesIO(artifact))
+    assert out.size == (100, 200)
+    assert out.mode == "L"
+    # CW turn maps composition left (white) → output top, right (black)
+    # → output bottom. 16-level ramp keeps white ≈ 255 and black ≈ 0.
+    assert out.getpixel((50, 10)) >= 240
+    assert out.getpixel((50, 190)) <= 15
+
+
+def test_no_native_block_keeps_composition_dims(trmnl_png_gray16, composition_png) -> None:
+    """Legacy / custom panels with no native block keep the old
+    pass-through behaviour byte-for-byte: same dims, no rotation."""
+    panel = Panel(w=200, h=100, gamut="gray_16")
+    artifact = trmnl_png_gray16.transform(
+        composition_png, panel=panel, settings=trmnl_png_gray16.settings_defaults()
+    )
+    out = Image.open(io.BytesIO(artifact))
+    assert out.size == (200, 100)
 
 
 def test_payload_is_selfcontained_url(trmnl_png_gray16) -> None:

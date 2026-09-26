@@ -1,6 +1,6 @@
 """trmnl_png renderer.
 
-Composition PNG → 1-bit dithered PNG at the device's panel native
+Composition PNG → 1-bit dithered PNG at the device's reported buffer
 dims. Output is what the KOReader trmnl-display plugin (and TRMNL
 devices) paint directly, MuPDF on the Kindle side decodes a
 1-bit greyscale PNG cleanly when it's well-formed; we use Pillow's
@@ -8,12 +8,20 @@ devices) paint directly, MuPDF on the Kindle side decodes a
 the spec without any of the stride-padding traps a stdlib hand-rolled
 encoder can hit.
 
-Why no rotation logic like ``pi_bin`` / ``pi_png``: TRMNL clients
-tell us exactly what dims they want via ``png-width`` / ``png-height``
-headers, which app.trmnl_api persists onto the device's panel block.
-The composer already produces the page at the panel's dims, so we
-just fit + dither at that exact size. ``panel.flip`` still applies
-for an upside-down mount.
+Why a rotation step, rather than just "fit at the panel dims": the
+composer produces the page at the *composition* dims
+(``panel.w × panel.h``), but the client paints its own buffer — the
+e-reader's physical screen for a Kindle. ``app.trmnl_api`` persists
+the buffer the client declares via ``png-width`` / ``png-height``
+onto the panel block as ``native_w × native_h``. The two disagree
+on aspect exactly when a landscape dashboard is mounted on a
+portrait screen: composed at 1024×758, the Rotation control says 90°,
+so the frame has to be turned before the client's scaler stretches it
+into the squashed portrait. So ``transform()`` rotates the finished
+composition onto the native buffer (90° CW when the aspects differ,
+180° more for ``panel.flip``) and fits + dithers at that exact size.
+Panels with no native block (legacy / custom, never reported) fall
+back to the composition dims and behave exactly as before.
 
 The dither + contrast settings are flagged ``device_setting: true``
 so they live on the device card (Settings → Devices → Picture quality)
@@ -51,26 +59,46 @@ def _setting(settings: dict[str, Any], key: str) -> Any:
 
 
 def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> bytes:
-    """Fit + dither the composition PNG to the panel's exact dims.
+    """Fit + dither the composition PNG onto the device's buffer.
 
-    The composition arrives at panel size already (the composer pre-
-    sizes pages to ``panel.w × panel.h``), so the ``fit_to_panel`` call
-    is usually a no-op. It only does real work on Send-page image
-    pushes where the user's input PNG isn't panel-sized, same path
-    that the other renderers use, with the same per-push ``image_fit``
-    override (fit / fill / stretch / centre / blur).
+    The composition arrives at the composition dims already (the
+    composer pre-sizes pages to ``panel.w × panel.h``), so the first
+    ``fit_to_panel`` call is usually a no-op. It only does real work on
+    Send-page image pushes where the user's input PNG isn't
+    panel-sized, same path that the other renderers use, with the same
+    per-push ``image_fit`` override (fit / fill / stretch / centre /
+    blur).
+
+    Then the finished composition is mapped onto the native buffer the
+    client paints: 90° CW when the composition aspect disagrees with
+    the buffer aspect (the Rotation control's degrees are the turn
+    from that buffer), 180° more when ``panel.flip``, and a final fit
+    to the native dims. Same mapping ``esp32_bin`` uses for a
+    user-calibrated orientation that disagrees with the firmware row
+    stride.
     """
     img = Image.open(io.BytesIO(png_bytes))
-    target_w, target_h = panel.w, panel.h
+    fit = str(settings.get("image_fit") or "fit")
 
+    if img.size != (panel.w, panel.h):
+        img = fit_to_panel(img, target_w=panel.w, target_h=panel.h, scale=fit, bg="white")
+
+    native_w, native_h = panel.native_w, panel.native_h
+    if native_w is None or native_h is None:
+        native_w, native_h = panel.w, panel.h
+    if (native_w > native_h) != (panel.w > panel.h):
+        # Composition and client buffer disagree on aspect: turn the
+        # finished composition 90° CW so its left edge lands on the
+        # client's top edge. PIL ``rotate`` is counter-clockwise;
+        # ``-90`` gives CW.
+        img = img.rotate(-90, expand=True)
     if panel.flip:
         # Upside-down physical mount, turn the whole thing 180° so it
-        # reads upright on the wall.
+        # reads upright on the wall. Composes on top of the 90° turn.
         img = img.rotate(180, expand=True)
 
-    if img.size != (target_w, target_h):
-        fit = str(settings.get("image_fit") or "fit")
-        img = fit_to_panel(img, target_w=target_w, target_h=target_h, scale=fit, bg="white")
+    if img.size != (native_w, native_h):
+        img = fit_to_panel(img, target_w=native_w, target_h=native_h, scale=fit, bg="white")
 
     if panel.underscan:
         # Per-device underscan: inset the rendered content so it clears
