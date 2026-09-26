@@ -144,6 +144,17 @@ halftone, crosshatch, or none). Dither + contrast live on the device
 card so you can tune for the specific panel (Kindle Paperwhite 2,
 the TRMNL device's panel, etc.).
 
+The device reports its real screen on every poll (`png-width` /
+`png-height` on KOReader, `Width` / `Height` on native TRMNL
+firmware). Tesserae persists that as the panel's **native buffer** the
+first time it hears from a client, so a landscape dashboard mounted on
+a portrait e-reader is turned 90° server-side instead of being served
+at the wrong aspect and stretched by the client's scaler. The
+**Rotation** control on the device card is the turn from that reported
+buffer: 0° shows your composition as composed, 90° / 270° lay it
+across the screen's long axis (a landscape design filling a portrait
+Kindle), and the flipped variants add 180° for an upside-down mount.
+
 ## Browser-based "client" (no firmware, no native client)
 
 For old tablets, jailbroken Kindles in browser mode, kiosk PCs, or any

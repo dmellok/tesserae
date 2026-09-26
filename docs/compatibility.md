@@ -210,6 +210,6 @@ Honest status from the maintainer's own bench. Untested doesn't mean broken, it 
 | `pi_bin` | Pimoroni Inky Impression (Spectra 6 / Waveshare E6) | :material-check-circle: Tested | Fastest Pi path, packed buffer written straight to inky's _buf. |
 | `pi_png` | Pimoroni Inky Impression (via inky set_image) | :material-check-circle: Tested | Works on every inky-supported panel; quantises on the Pi each frame. |
 | `pico_bin` | - | :material-circle-outline: Not yet tested | - |
-| `trmnl_png` | Amazon Kindle Paperwhite 2 (jailbroken) via KOReader trmnl-display plugin + Seeed TRMNL 7.5" OG DIY Kit (XIAO 7.5" panel running the TRMNL firmware) + TRMNL X (stock firmware, 1872x1404) | :material-check-circle: Tested | 1-bit greyscale PNG fitted to the panel + dithered server-side. |
+| `trmnl_png` | Amazon Kindle Paperwhite 2 (jailbroken) via KOReader trmnl-display plugin + Seeed TRMNL 7.5" OG DIY Kit (XIAO 7.5" panel running the TRMNL firmware) + TRMNL X (stock firmware, 1872x1404) | :material-check-circle: Tested | 1-bit greyscale PNG fitted to the device's reported buffer (rotated onto it when the composition is mounted at 90°) + dithered server-side. |
 | `trmnl_png_color` | - | :material-circle-outline: Not yet tested | - |
 | `trmnl_png_gray16` | - | :material-circle-outline: Not yet tested | - |
