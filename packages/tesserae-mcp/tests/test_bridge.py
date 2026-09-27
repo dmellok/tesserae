@@ -397,6 +397,43 @@ def test_the_appearance_section_is_its_own_read(monkeypatch: pytest.MonkeyPatch)
     assert out["appearance"]["fonts"] == [{"id": "f"}]
 
 
+def test_q_and_fields_are_passed_to_the_catalog_route(monkeypatch: pytest.MonkeyPatch) -> None:
+    """list_widgets(q=, fields=) asks the server for less (#257) rather than
+    fetching everything and trimming locally; a fields-trimmed reply is
+    returned as served, since the local summary would drop any requested
+    field outside its own key list."""
+    import asyncio
+    from typing import Any
+
+    calls: list[str] = []
+
+    def fake_request(method: str, path: str, body: Any = None) -> tuple[int, bytes, str]:
+        calls.append(path)
+        return (
+            200,
+            b'{"filter":{"q":"weather forecast","fields":["key","icon"],"matched":1,"total":9},'
+            b'"widgets":[{"key":"weather_now","icon":"ph-sun"}],"libraries":{}}',
+            "application/json",
+        )
+
+    tool = bridge.build_server()._tool_manager.get_tool("list_widgets")
+    monkeypatch.setattr(bridge, "_request", fake_request)
+    out = asyncio.run(tool.fn(q="weather forecast", fields=["icon", " ", "icon"]))
+    assert calls == ["/catalog?q=weather+forecast&fields=icon%2Cicon"]
+    assert out["widgets"] == [{"key": "weather_now", "icon": "ph-sun"}]
+    assert out["filter"]["matched"] == 1
+    assert "summarised" not in out
+
+    calls.clear()
+    out = asyncio.run(tool.fn(q="weather", section="widgets"))
+    assert calls == ["/catalog?q=weather"]
+    assert set(out) == {"widgets", "filter"}
+
+    calls.clear()
+    asyncio.run(tool.fn())
+    assert calls == ["/catalog"]
+
+
 def test_slow_tool_calls_run_off_the_event_loop(monkeypatch: pytest.MonkeyPatch) -> None:
     """A blocking Tesserae call (a render can take tens of seconds) must not
     stall the server's event loop, so two calls in flight overlap rather than

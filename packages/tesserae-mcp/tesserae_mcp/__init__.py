@@ -21,10 +21,11 @@ import functools
 import json
 import os
 import urllib.error
+import urllib.parse
 import urllib.request
 from typing import Any
 
-__version__ = "0.17.1"
+__version__ = "0.18.0"
 
 _BASE = os.environ.get("TESSERAE_URL", "http://127.0.0.1:8765").rstrip("/")
 _TOKEN = os.environ.get("TESSERAE_MCP_TOKEN", "").strip()
@@ -646,7 +647,12 @@ def build_server() -> Any:
     """
     from mcp.server.fastmcp import FastMCP, Image
 
-    def list_widgets(section: str = "", full: bool = False) -> Any:
+    def list_widgets(
+        section: str = "",
+        full: bool = False,
+        q: str = "",
+        fields: list[str] | None = None,
+    ) -> Any:
         """List every widget that can be placed on a canvas (with its fragments), the
         vendored code-element libraries (Chart.js, canvas-gauges, dayjs, qrcode,
         marked, chroma, SVG.js, Phosphor), and descriptors for the icon set and the
@@ -658,6 +664,17 @@ def build_server() -> Any:
         widget's description only. That is enough to answer "which widget do I want";
         follow with get_widget_options(key) for one widget's full description and
         option schema, which is the call that actually matters before placing it.
+
+        When you already know roughly what you want, ask for less. "q" keeps only
+        the widgets whose key, name or full description contains every word
+        (case-insensitive, punctuation ignored): list_widgets(q="weather") is a
+        few widgets instead of forty. "fields" names the per-widget fields to
+        return, e.g. ["name", "desc"]; "key" is always included so the entry can
+        still be passed to get_widget_options. Valid fields are key, name, icon,
+        desc, fragments, updates_on_change, updates_on_schedule and strings; an
+        unknown one is an error listing them. A filtered result carries a
+        "filter" block with how many of the catalog's widgets matched, so an
+        empty list means nothing matched, not that there are no widgets.
 
         The theme / style / font lists are not in the default response: "appearance"
         carries only a count of each. Call list_widgets(section="appearance") to get
@@ -672,11 +689,26 @@ def build_server() -> Any:
             # behind their own read so a build that never restyles never pays
             # for them.
             return {"appearance": _json("GET", "/appearance")}
-        out = _json("GET", "/catalog")
+        params: dict[str, str] = {}
+        if q and q.strip():
+            params["q"] = q.strip()
+        wanted = [f.strip() for f in (fields or []) if isinstance(f, str) and f.strip()]
+        if wanted:
+            params["fields"] = ",".join(wanted)
+        path = "/catalog" + ("?" + urllib.parse.urlencode(params) if params else "")
+        out = _json("GET", path)
         if full or not isinstance(out, dict):
             return out
         if section:
-            return {section: out.get(section)}
+            narrowed: dict[str, Any] = {section: out.get(section)}
+            if "filter" in out:
+                narrowed["filter"] = out["filter"]
+            return narrowed
+        if wanted:
+            # The server already trimmed each entry to exactly the fields asked
+            # for (and summarised desc); the local summary would drop any of
+            # them that isn't in its own key list.
+            return out
         return _summarise_catalog(out)
 
     def add_font(

@@ -582,6 +582,17 @@ widget's description only. That is enough to answer "which widget do I want";
 follow with get_widget_options(key) for one widget's full description and
 option schema, which is the call that actually matters before placing it.
 
+When you already know roughly what you want, ask for less. "q" keeps only the
+widgets whose key, name or full description contains every word
+(case-insensitive, punctuation ignored): list_widgets(q="weather") is a few
+widgets instead of forty. "fields" names the per-widget fields to return, e.g.
+["name", "desc"]; "key" is always included so the entry can still be passed to
+get_widget_options. Valid fields are key, name, icon, desc, fragments,
+updates_on_change, updates_on_schedule and strings; an unknown one is an error
+listing them. A filtered result carries a "filter" block with how many of the
+catalog's widgets matched, so an empty list means nothing matched, not that
+there are no widgets.
+
 The theme / style / font lists are not in the default response: "appearance"
 carries only a count of each. Call list_widgets(section="appearance") to get
 the full lists when you are setting a page's theme or style, or when you want

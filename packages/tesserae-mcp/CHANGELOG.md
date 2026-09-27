@@ -16,6 +16,15 @@ main [CHANGELOG](../../CHANGELOG.md) for the server side of each change.
 
 ## [Unreleased]
 
+### Added
+
+- `list_widgets(q=, fields=)`. `q` asks Tesserae for only the widgets whose key,
+  name or full description contains every word, and `fields` for only the named
+  per-widget fields (`key` always included), so an agent that knows it wants
+  weather no longer pays for the whole catalog. Needs Tesserae 0.430.0 or later
+  for the server side; an older server ignores the parameters and returns the
+  usual summary.
+
 ### Fixed
 
 - A slow call no longer holds up every other tool call. Each tool ran directly

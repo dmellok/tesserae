@@ -8,6 +8,10 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **`list_widgets` can ask for less too (#257).** Bridge 0.18.0 passes `q` and
+  `fields` through to the catalog route, and the tool text explains when to use
+  them. `EXPECTED_VERSION` follows, so Settings → System → MCP offers the
+  upgrade.
 - **`/api/mcp/catalog` can be asked for less (#257).** `?q=` keeps the
   widgets whose key, name or full description contains every term,
   case-insensitively and ignoring punctuation, and `?fields=` trims each entry
