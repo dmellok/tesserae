@@ -29,7 +29,13 @@ Two sides to it:
    card → **General** → turn on **Touch input**. On battery boards this
    keeps the digitizer powered through deep sleep (a few mA), so it's off
    by default. **Touch linger** keeps the device awake briefly after a
-   touch so follow-up taps skip the deep-sleep wake latency.
+   touch so follow-up taps skip the deep-sleep wake latency. **Touch wake**
+   (reTerminal E1003 and Sticky, firmware 1.44.0 or later) chooses how the
+   controller waits: *Any tap* keeps it scanning so the first touch wakes
+   the panel; *Double tap or swipe* parks it in its low-power gesture mode,
+   about 1 mA instead of several, where a single first tap does nothing, a
+   double tap or a swipe wakes the panel, and taps then work as usual while
+   it is awake.
 
 ## Audible feedback
 

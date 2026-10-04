@@ -28,7 +28,23 @@
       "type": "boolean",
       "label": "Touch input",
       "default": false,
-      "help": "Wake on touch and dispatch taps/swipes against the dashboard's touch regions. Keeps the touch controller powered through deep sleep (a few mA continuous), which materially reduces battery life; best on USB power."
+      "help": "Wake on touch and dispatch taps/swipes against the dashboard's touch regions. Keeps the touch controller powered through deep sleep (a few mA continuous, or about 1 mA with Touch wake set to double tap or swipe), which reduces battery life; best on USB power."
+    },
+    "touch_wake": {
+      "type": "select",
+      "label": "Touch wake",
+      "default": "tap",
+      "choices": [
+        {
+          "value": "tap",
+          "label": "Any tap (controller scans through sleep)"
+        },
+        {
+          "value": "gesture",
+          "label": "Double tap or swipe (low power)"
+        }
+      ],
+      "help": "How the touch controller waits through deep sleep. Any tap keeps it scanning, so the first touch wakes the panel, at a few mA all the time. Double tap or swipe parks it in its gesture mode (about 1 mA): a single first tap does nothing, a double tap or a swipe wakes the panel, and taps then work as usual while it is awake. Only applies while touch input is enabled; needs firmware 1.44.0 or later."
     },
     "touch_linger_s": {
       "type": "int",

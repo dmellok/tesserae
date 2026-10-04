@@ -101,8 +101,9 @@ the window is told that touch is off, so the panel puts its touch controller
 to sleep as well. The first wake after the window turns touch back on. Your
 saved touch setting is never changed. A tap does nothing until the window
 ends; the physical buttons still wake the panel. Leave it off if you use the
-panel at night, for example as a bedside light switch. Always-on panels are
-unaffected. It pairs well with sleep-through, but works without it: the panel
+panel at night, for example as a bedside light switch; the panel's **Touch
+wake** setting (double tap or swipe) is the alternative that keeps a wake
+available at a lower cost. Always-on panels are unaffected. It pairs well with sleep-through, but works without it: the panel
 then parks its touchscreen on each wake inside the window. It needs firmware
 v1.40.0 or later on the panel; older firmware leaves the touch controller
 running, which is no worse than before. On the device page the switch only

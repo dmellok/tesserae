@@ -266,6 +266,24 @@ def test_papermono_is_its_own_kind_sharing_the_sticky_wire_contract(
     assert {"touch_enabled", "touch_linger_s", "frontlight_pct", "beep_enabled"} <= set(ext)
     assert (ext["frontlight_pct"]["min"], ext["frontlight_pct"]["max"]) == (0, 100)
 
+    # Touch wake (#327) is a GT911 mode: the Sticky and the E1003 offer it,
+    # the PaperMono's FocalTech controller has no such mode and never sees it.
+    sticky_ext = sticky.manifest["config_schema"]
+    assert sticky_ext["touch_wake"]["type"] == "select"
+    assert sticky_ext["touch_wake"]["default"] == "tap"
+    assert [c["value"] for c in sticky_ext["touch_wake"]["choices"]] == ["tap", "gesture"]
+    assert "touch_wake" not in ext
+    e1003 = registry.devices["seeed_reterminal_e1003"]
+    assert e1003.manifest["config_schema"]["touch_wake"]["default"] == "tap"
+    # The shared validator accepts the two modes and nothing else.
+    assert sticky.validate_config({"sleep_interval_s": 300, "touch_wake": "gesture"}) == (
+        True,
+        None,
+    )
+    assert sticky.validate_config({"sleep_interval_s": 300, "touch_wake": "tap"}) == (True, None)
+    ok, err = sticky.validate_config({"sleep_interval_s": 300, "touch_wake": "doze"})
+    assert ok is False and err is not None and "touch_wake" in err
+
 
 def test_discover_validates_schema(tmp_path: Path, hardware_schema_path: Path) -> None:
     """A hardware entry missing a required field surfaces as a LoaderError

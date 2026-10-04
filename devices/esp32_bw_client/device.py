@@ -45,6 +45,13 @@ SLEEP_INTERVAL_MAX_S = 7 * 24 * 60 * 60
 # Upper bound for the post-button stay-awake window (issue #123). Staying
 # awake longer than this to catch repeat presses is never worth the battery.
 BUTTON_WAKE_MAX_S = 60
+# Touch (#49, #327): the fields exist only on kinds whose hardware entry
+# extends the schema with them (reTerminal Sticky, M5Stack PaperMono);
+# ``touch_wake`` is how a GT911 waits through deep sleep, "tap" scanning so
+# any touch wakes the panel, "gesture" parked in its gesture mode where a
+# double tap or a swipe wakes it. Same rules as ``esp32_client``.
+TOUCH_LINGER_MAX_S = 60
+TOUCH_WAKE_MODES = ("tap", "gesture")
 
 # Buzzer feedback (#258). A tone name is a server-side convenience: the
 # names resolve to actual notes (``app.device_service.BEEP_PATTERNS``)
@@ -227,6 +234,19 @@ def validate_config(payload: dict[str, Any]) -> tuple[bool, str | None]:
             return False, "button_wake_s must be an integer"
         if not 0 <= wake <= BUTTON_WAKE_MAX_S:
             return False, f"button_wake_s must be 0..{BUTTON_WAKE_MAX_S} (got {wake})"
+    # Touch fields: optional here so the shared validator accepts every
+    # board's form; a kind without a digitiser never sends them.
+    if "touch_enabled" in payload and not isinstance(payload["touch_enabled"], bool):
+        return False, "touch_enabled must be a boolean"
+    if "touch_linger_s" in payload:
+        try:
+            linger = int(payload["touch_linger_s"])
+        except (TypeError, ValueError):
+            return False, "touch_linger_s must be an integer"
+        if not 0 <= linger <= TOUCH_LINGER_MAX_S:
+            return False, f"touch_linger_s must be 0..{TOUCH_LINGER_MAX_S} (got {linger})"
+    if "touch_wake" in payload and payload["touch_wake"] not in TOUCH_WAKE_MODES:
+        return False, "touch_wake must be one of: " + ", ".join(TOUCH_WAKE_MODES)
     # Buzzer feedback (#258): only on kinds whose hardware entry extends
     # the schema with it (the reTerminal E series), optional for the same
     # reason as the button window above.

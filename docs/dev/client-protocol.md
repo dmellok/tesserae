@@ -598,6 +598,15 @@ receiver pushes back. A lingering device collects that push in its
 `touch_linger_s` window; a device that sleeps straight away picks it up
 on its next timer wake, exactly as it would any other push.
 
+The status `config` block carries the touch settings for kinds whose
+hardware entry declares them: `touch_enabled` (boolean), `touch_linger_s`
+(0-60) and, since 0.443.0, `touch_wake`, either `"tap"` (the digitiser
+scans through deep sleep and any touch wakes the device) or `"gesture"`
+(the digitiser is parked in its gesture mode, a double tap or a swipe
+wakes it, at about a sixth of the current). A client that does not know
+`touch_wake` ignores it; a server that does not send it leaves the
+client's mode alone.
+
 Continuously powered clients that poll `/frame` on a timer can send
 the stroke out-of-band instead via `POST /api/v1/device/<id>/tap`
 with body `{"x0": …, "y0": …, "x1"?: …, "y1"?: …, "duration_ms"?: …,

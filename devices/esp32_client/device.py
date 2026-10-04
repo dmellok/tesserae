@@ -87,6 +87,10 @@ def parse_status(payload: bytes) -> dict[str, Any]:
 
 
 TOUCH_LINGER_MAX_S = 60
+# How a GT911 digitiser waits through deep sleep (#327): "tap" keeps it
+# scanning so any touch wakes the panel; "gesture" parks it in its gesture
+# mode, where a double tap or a swipe wakes it at about a sixth of the current.
+TOUCH_WAKE_MODES = ("tap", "gesture")
 
 # Upper bound for the post-button stay-awake window (issue #123). Staying
 # awake longer than this to catch repeat presses is never worth the battery.
@@ -217,6 +221,8 @@ def validate_config(payload: dict[str, Any]) -> tuple[bool, str | None]:
             return False, "touch_linger_s must be an integer"
         if not 0 <= linger <= TOUCH_LINGER_MAX_S:
             return False, f"touch_linger_s must be 0..{TOUCH_LINGER_MAX_S} (got {linger})"
+    if "touch_wake" in payload and payload["touch_wake"] not in TOUCH_WAKE_MODES:
+        return False, "touch_wake must be one of: " + ", ".join(TOUCH_WAKE_MODES)
     # Buzzer feedback (#258): only on kinds whose hardware entry extends the
     # schema with it (the reTerminal E series), optional here for the same
     # reason as the touch fields.

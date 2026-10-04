@@ -8,6 +8,14 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Touch wake** for the reTerminal E1003 and reTerminal Sticky (#327): a
+  third touch setting next to Touch input and Touch linger. *Any tap* keeps
+  the touch controller scanning through deep sleep as before; *Double tap or
+  swipe* parks it in its gesture mode, about 1 mA instead of several, where a
+  single first tap does nothing, a double tap or a swipe wakes the panel, and
+  taps then work as usual while it is awake. Sent to the device as
+  `touch_wake` (`tap` or `gesture`) in the status config block; needs device
+  firmware 1.44.0 or later, older firmware ignores it.
 - **Colour e-readers (E Ink Kaleido 3).** A KOReader reader that pairs with
   `gamut: "kaleido3"` (the plugin announces it for a Kobo Libra Colour or
   Clara Colour with colour rendering on) is served a 24-bit RGB PNG with

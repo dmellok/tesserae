@@ -342,6 +342,51 @@ def test_e1003_status_config_carries_touch_linger_default(app: Flask) -> None:
     assert config.get("touch_enabled") is False
 
 
+def test_e1003_status_config_carries_touch_wake(app: Flask) -> None:
+    """Touch wake (#327): the E1003 defaults to ``tap`` (the digitiser scans
+    through sleep, any touch wakes it) and an operator's ``gesture`` choice
+    (GT911 gesture mode, a double tap or swipe wakes it) reaches the
+    firmware through the same status config block as ``touch_enabled``."""
+    client = app.test_client()
+    _sign_in(client)
+    code = app.config["PAIRING_STORE"].issue(note="test").code
+    resp = client.post(
+        "/api/v1/device/register",
+        headers={"X-Pairing-Code": code, "Content-Type": "application/json"},
+        data=json.dumps(
+            {
+                "device_id": "hall_e1003",
+                "kind": "seeed_reterminal_e1003",
+                "panel_w": 1872,
+                "panel_h": 1404,
+                "fw_version": "1.44.0",
+            }
+        ),
+    )
+    assert resp.status_code == 201, resp.get_data(as_text=True)
+    token = resp.get_json()["device_token"]
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+
+    status = client.post(
+        "/api/v1/device/hall_e1003/status", headers=headers, data=json.dumps({"battery_pct": 80})
+    )
+    assert status.status_code == 200
+    assert status.get_json()["config"].get("touch_wake") == "tap"
+
+    store = app.config["SETTINGS_STORE"]
+    section = store.get_section("devices") or {}
+    entry = dict(section.get("hall_e1003") or {})
+    entry.update({"touch_enabled": True, "touch_wake": "gesture"})
+    store.patch_section("devices", {"hall_e1003": entry})
+
+    status = client.post(
+        "/api/v1/device/hall_e1003/status", headers=headers, data=json.dumps({"battery_pct": 80})
+    )
+    config = status.get_json()["config"]
+    assert config.get("touch_enabled") is True
+    assert config.get("touch_wake") == "gesture"
+
+
 # -- buzzer feedback config (#258) ----------------------------------------
 
 
