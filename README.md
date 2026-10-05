@@ -232,7 +232,9 @@ Community-authored clients, contributed and maintained by their authors (not in 
 | Panel | Resolution | Client | Status |
 |---|---|---|---|
 | [PicPak 4.2" BWRY](https://docs.tesserae.ink/hardware/picpak/) | 400×300 (4-colour BWRY) | [picpak-tesserae-client](https://github.com/varanu5/picpak-tesserae-client) by [@varanu5](https://github.com/varanu5) | ✅ |
-| [Soldered Inkplate 10](https://soldered.com/product/inkplate-10/) | 1200×825 (9.7" 16-level grey) | [tesserae.inkplate](https://github.com/partridgeworks/tesserae.inkplate) by [@partridgeworks](https://github.com/partridgeworks) | ✅ |
+| [Soldered Inkplate 10](https://soldered.com/products/inkplate-10) | 1200×825 (9.7" 16-level grey) | [tesserae.inkplate](https://github.com/partridgeworks/tesserae.inkplate) by [@partridgeworks](https://github.com/partridgeworks) | ✅ |
+| [Soldered Inkplate 6COLOR](https://soldered.com/products/inkplate-6color-e-paper-display) | 600×448 (5.85" 7-colour ACeP) | [inkplate-tesserae-driver](https://github.com/ripking/inkplate-tesserae-driver) by [@ripking](https://github.com/ripking) | ✅ |
+| [Soldered Inkplate 13SPECTRA](https://soldered.com/products/inkplate-13spectra) | 1600×1200 (13.3" Spectra 6) | [inkplate-tesserae-driver](https://github.com/ripking/inkplate-tesserae-driver) by [@ripking](https://github.com/ripking) | ✅ |
 | [Pimoroni Inky Frame 7.3"](https://shop.pimoroni.com/products/inky-frame-7-3) (7-colour ACeP) | 800×480 | [tesserae.inkyframe](https://github.com/partridgeworks/tesserae.inkyframe) by [@partridgeworks](https://github.com/partridgeworks) | ✅ |
 | Pimoroni Inky Frame 7.3" (6-colour Spectra 6) | 800×480 | [tesserae.inkyframe](https://github.com/partridgeworks/tesserae.inkyframe) by [@partridgeworks](https://github.com/partridgeworks) | TBD |
 | [reMarkable 2](https://remarkable.com/products/remarkable-2) | 1404×1872 (10.3" 16-level grey) | [tesserae.remarkable](https://github.com/partridgeworks/tesserae.remarkable) by [@partridgeworks](https://github.com/partridgeworks) | ✅ |

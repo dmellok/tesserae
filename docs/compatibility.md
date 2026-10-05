@@ -197,7 +197,9 @@ Hardware supported by community-authored firmware. Each SKU below links to the f
 
 | SKU | Panel | Gamut | Protocol / Renderer | Kind id |
 |---|---|---|---|---|
-| [Soldered Inkplate 10](https://soldered.com/product/inkplate-10/) | 1200×825 | `gray_16` | `esp32_bw_client` <br> `esp32_gray_bin` | `soldered_inkplate_10` |
+| [Soldered Inkplate 10](https://soldered.com/products/inkplate-10) | 1200×825 | `gray_16` | `esp32_bw_client` <br> `esp32_gray_bin` | `soldered_inkplate_10` |
+| [Soldered Inkplate 13SPECTRA](https://soldered.com/products/inkplate-13spectra) | 1600×1200 | `spectra_6` | `esp32_client` (inherit) | `soldered_inkplate_13spectra` |
+| [Soldered Inkplate 6COLOR](https://soldered.com/products/inkplate-6color-e-paper-display) | 600×448 | `inky_7colour` | `esp32_client` (inherit) | `soldered_inkplate_6color` |
 
 ## What's been tested on real hardware
 

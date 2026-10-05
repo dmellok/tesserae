@@ -3,7 +3,7 @@
   "id": "soldered_inkplate_10",
   "name": "Soldered Inkplate 10",
   "vendor": "Soldered Electronics",
-  "url": "https://soldered.com/product/inkplate-10/",
+  "url": "https://soldered.com/products/inkplate-10",
   "icon": "device-tablet",
   "description": "9.7 inch E Ink panel (1200x825, 16-level greyscale glass driven at the Inkplate library's 8 levels) on an ESP32-WROVER with Wi-Fi, battery charger, RTC, microSD, three capacitive touchpads and a wake button. Speaks Tesserae's v1 REST device API from the tesserae.inkplate firmware and paints the esp32_gray_bin 4-bpp packed frame directly into its framebuffer (16 levels halved to the 8 the firmware drives).",
   "protocol": "esp32_bw_client",
