@@ -1,0 +1,22 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "soldered_inkplate_6color",
+  "name": "Soldered Inkplate 6COLOR",
+  "vendor": "Soldered Electronics",
+  "url": "https://soldered.com/products/inkplate-6color-e-paper-display",
+  "icon": "device-tablet",
+  "description": "5.85 inch 7-colour ACeP panel (600x448) on an ESP32 with Wi-Fi, battery charger, RTC and microSD. Speaks Tesserae's v1 REST device API from the inkplate-tesserae-driver firmware and paints the esp32_bin 4-bpp palette-index frame straight into the Inkplate framebuffer.",
+  "protocol": "esp32_client",
+  "panel": {
+    "w": 600,
+    "h": 448,
+    "orientation": "landscape",
+    "name": "5.85 inch 7-colour ACeP (600x448)",
+    "gamut": "inky_7colour",
+    "native_w": 600,
+    "native_h": 448
+  },
+  "refresh_floor_s": 60,
+  "image_format": "bin",
+  "notes_md": "Community firmware by [ripking/inkplate-tesserae-driver](https://github.com/ripking/inkplate-tesserae-driver), run on real hardware by the author for several months. Full refresh takes about 20-30 s.\n\nWire format is exactly 134400 bytes (600*448/2), row-major from the top-left, high nibble = left pixel. Nibbles follow the Inky 7-colour order (0 black, 1 white, 2 green, 3 blue, 4 red, 5 yellow, 6 orange), which matches the Inkplate library's `INKPLATE_*` colour constants one to one. Servers before 0.415.0 sent nibbles 2-5 in a different order (#298); firmware tuned against those servers needs its palette table made a pass-through. The firmware can also pair under the stock `esp32_client` kind with `gamut` `inky_7colour`, which produces the same frame."
+}
