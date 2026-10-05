@@ -95,7 +95,7 @@ Data a widget fetches stays under its provider's terms. Where a provider asks to
 | [Bureau of Meteorology](https://www.bom.gov.au) | Australian weather | BoM terms | Weather data © Commonwealth of Australia, Bureau of Meteorology |
 | [US National Weather Service](https://www.weather.gov) | US forecasts | Public domain |  |
 | [Wikimedia](https://api.wikimedia.org) | On this day, featured articles and pictures | CC BY-SA and per-item licences | Content from Wikipedia and Wikimedia Commons, under their licences |
-| [NASA APOD](https://apod.nasa.gov) | Astronomy picture of the day | Mostly public domain; per-image credits | Image credits as given by NASA APOD |
+| [NASA APOD](https://science.nasa.gov/apod) | Astronomy picture of the day | Mostly public domain; per-image credits | Image credits as given by NASA APOD |
 | [The Metropolitan Museum of Art Collection API](https://metmuseum.github.io) | Artworks | CC0 (Open Access) |  |
 | [iNaturalist](https://www.inaturalist.org) | Nature observations | Per-observation Creative Commons licences | Observations and photos by iNaturalist contributors |
 | [Nominatim](https://nominatim.openstreetmap.org) | Turning a photo's GPS position into a place name for Tesserae Cloud's photo-frame captions | ODbL 1.0 (OpenStreetMap data) | Place names © OpenStreetMap contributors, via Nominatim |

@@ -212,7 +212,7 @@
   {
    "name": "NASA APOD",
    "licence": "Mostly public domain; per-image credits",
-   "url": "https://apod.nasa.gov",
+   "url": "https://science.nasa.gov/apod",
    "used_for": "Astronomy picture of the day",
    "credit": "Image credits as given by NASA APOD"
   },

@@ -330,7 +330,7 @@ The **37 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     ![picture_apod](../screenshots/widgets/picture_apod.png)
 
-    NASA's Astronomy Picture of the Day, full bleed. Walks back day-by-day past video entries so the cell always shows an image. Uses DEMO_KEY by default; paste your own key at https://api.nasa.gov for a higher rate limit.
+    NASA's Astronomy Picture of the Day, full bleed, from science.nasa.gov. Skips past video entries so the cell always shows an image. No API key needed.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** Stable
 
