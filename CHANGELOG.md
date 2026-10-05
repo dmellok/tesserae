@@ -134,6 +134,18 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **Picture, NASA APOD** shows the real picture again. NASA moved APOD to
+  science.nasa.gov on 2026-09-29, and the `api.nasa.gov/planetary/apod`
+  route the widget used now answers every date with the NASA logo. It now
+  reads `science.nasa.gov/wp-json/wp/v2/apod-basic`, which needs no API key
+  and has no quota, so the *NASA API key* setting is gone (a stored key is
+  ignored). One request for the last 14 entries replaces the day-by-day walk
+  past videos, falling back to a video's still frame when no image is in
+  reach; the HTML credit is flattened to text and shown without a © mark,
+  since it mixes agency credits with personal copyrights; the image is
+  requested at most 1200px through the asset host's resizer; and the
+  entry's alt text is carried to the `<img>`. The NASA APOD credit now links
+  to science.nasa.gov/apod.
 - History's Clear history control no longer asks "Delete the selected
   history?" when it is about to delete everything older than the chosen
   cutoff; the confirm now names the cutoff. With rows ticked, the same

@@ -1,7 +1,9 @@
 // picture_apod, Spectra full-bleed image. NASA's Astronomy Picture
-// of the Day fills the cell; a subtle bottom-gradient overlay
-// surfaces the title + date so a passer-by can read what the picture
-// is without crowding the photo.
+// of the Day (from science.nasa.gov) fills the cell; a subtle
+// bottom-gradient overlay surfaces the title + date so a passer-by can
+// read what the picture is without crowding the photo. The credit is
+// shown without a © mark: science.nasa.gov folds NASA / agency credits
+// and personal copyrights into the same field.
 
 function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({
@@ -35,12 +37,12 @@ export default function render(shadow, ctx) {
     return;
   }
 
-  const subBits = [data.date, data.copyright ? `© ${data.copyright}` : ""].filter(Boolean);
+  const subBits = [data.date, data.copyright].filter(Boolean);
 
   shadow.innerHTML = `
     ${css}
     <div class="w is-bleed" data-widget="picture_apod">
-      <img src="${escapeHtml(data.url)}" alt="${escapeHtml(data.title)}">
+      <img src="${escapeHtml(data.url)}" alt="${escapeHtml(data.alt || data.title)}">
       ${showCaption && (data.title || subBits.length)
         ? `<div class="img-overlay">
             ${data.title ? `<span class="title">${escapeHtml(data.title)}</span>` : ""}

@@ -25,7 +25,7 @@ ships a deliberate breaking change (which usually comes with notice).
 | `sky_aurora` *(marketplace)* | services.swpc.noaa.gov (NOAA Space Weather, documented) |
 | `sky_air_traffic` *(marketplace)* | opensky-network.org (rate-limited but documented) |
 | `public_transport_times` *(marketplace)* | timetableapi.ptv.vic.gov.au (official PTV API v3) |
-| `picture_apod` | api.nasa.gov |
+| `picture_apod` | science.nasa.gov (`wp-json/wp/v2/apod-basic`) |
 | `picture_unsplash` *(marketplace)* | api.unsplash.com |
 
 ## Best-effort

@@ -1,32 +1,77 @@
 {
   "tesserae_compat": "1.x",
   "name": "Picture, NASA APOD",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "kind": "widget",
-  "locales": ["en", "cs", "de", "es", "fr", "it", "lt", "nb", "nl", "pl", "pt", "sk", "sv", "zh-CN", "zh-TW"],
-  "description": "NASA's Astronomy Picture of the Day, full bleed. Walks back day-by-day past video entries so the cell always shows an image. Uses DEMO_KEY by default; paste your own key at https://api.nasa.gov for a higher rate limit.",
+  "locales": [
+    "en",
+    "cs",
+    "de",
+    "es",
+    "fr",
+    "it",
+    "lt",
+    "nb",
+    "nl",
+    "pl",
+    "pt",
+    "sk",
+    "sv",
+    "zh-CN",
+    "zh-TW"
+  ],
+  "description": "NASA's Astronomy Picture of the Day, full bleed, from science.nasa.gov. Skips past video entries so the cell always shows an image. No API key needed.",
   "icon": "ph-planet",
-  "supports": { "sizes": ["sm", "md", "lg"] },
+  "supports": {
+    "sizes": [
+      "sm",
+      "md",
+      "lg"
+    ]
+  },
   "cell_options": [
-    { "name": "show_caption", "type": "boolean", "label": "Show title + copyright overlay", "default": true },
-    { "name": "show_day_badge", "type": "boolean", "label": "Show day-of-month badge in the corner", "default": true },
+    {
+      "name": "show_caption",
+      "type": "boolean",
+      "label": "Show title + copyright overlay",
+      "default": true
+    },
+    {
+      "name": "show_day_badge",
+      "type": "boolean",
+      "label": "Show day-of-month badge in the corner",
+      "default": true
+    },
     {
       "name": "scale",
       "type": "select",
       "label": "Scale",
       "default": "fit",
       "choices": [
-        { "value": "fit",     "label": "Fit (letterbox)" },
-        { "value": "fill",    "label": "Fill (crop to cover)" },
-        { "value": "stretch", "label": "Stretch (distort to fill)" },
-        { "value": "blurred", "label": "Fit with blurred background" }
+        {
+          "value": "fit",
+          "label": "Fit (letterbox)"
+        },
+        {
+          "value": "fill",
+          "label": "Fill (crop to cover)"
+        },
+        {
+          "value": "stretch",
+          "label": "Stretch (distort to fill)"
+        },
+        {
+          "value": "blurred",
+          "label": "Fit with blurred background"
+        }
       ]
     }
   ],
-  "settings": [
-    { "name": "api_key", "type": "string", "label": "NASA API key", "secret": true, "default": "DEMO_KEY" }
-  ],
-  "render": { "dither": "floyd-steinberg", "needs_network": true, "full_bleed": true },
+  "render": {
+    "dither": "floyd-steinberg",
+    "needs_network": true,
+    "full_bleed": true
+  },
   "data_schema": {
     "color": "#3F2A6B",
     "fields": [
@@ -49,13 +94,19 @@
         "name": "url",
         "type": "str",
         "label": "Image URL"
+      },
+      {
+        "name": "permalink",
+        "type": "str",
+        "label": "Article link"
       }
     ],
     "sample": {
-      "title": "The Horsehead Nebula",
-      "date": "2026-07-10",
-      "copyright": "NASA / ESA",
-      "url": "https://apod.nasa.gov/apod/image/2607/horsehead.jpg"
+      "title": "Supernumerary Rainbows over New Jersey",
+      "date": "2026-10-04",
+      "copyright": "John Entwistle",
+      "url": "https://assets.science.nasa.gov/dynamicimage/assets/science/cds/apod/apod/2026/october/SupernumeraryRainbows_Entwistle_1362.jpg?w=1200&h=1200&fit=clip",
+      "permalink": "https://science.nasa.gov/image-article/apod-2026-october-4-supernumerary-rainbows-over-new-jersey/"
     }
   }
 }
