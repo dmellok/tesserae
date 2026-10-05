@@ -391,6 +391,32 @@ APP_FIELDS: list[dict[str, Any]] = [
         ),
     },
     {
+        # Also the instance name the companion API reports (app.companion_api).
+        "name": "instance_name",
+        "type": "string",
+        "label": "Server name",
+        "default": "",
+        "group": "server",
+        "placeholder": "dev",
+        "help": (
+            "A short name shown under the Tesserae wordmark and at the start of "
+            "the browser tab title, so you can tell this server from your others. "
+            "Leave blank for none."
+        ),
+    },
+    {
+        "name": "server_colour",
+        "type": "server_colour",
+        "label": "Server colour",
+        "default": "",
+        "group": "server",
+        "help": (
+            "Paints a thin stripe across the top of every page, tints the tab "
+            "icon, and becomes the accent for buttons and links. Pick None to "
+            "keep the usual look."
+        ),
+    },
+    {
         "name": "keep_browser_warm",
         "type": "switch",
         "label": "Keep the renderer browser warm",
@@ -469,6 +495,13 @@ APP_FIELD_GROUPS: list[dict[str, Any]] = [
         "title": "Display & performance",
         "description": "Tune how the admin UI and renderer behave.",
         "icon": "gauge",
+        "master": None,
+    },
+    {
+        "id": "server",
+        "title": "This server",
+        "description": "A name and colour that mark every page and browser tab, so dev, test and prod are easy to tell apart.",
+        "icon": "identification-badge",
         "master": None,
     },
     {

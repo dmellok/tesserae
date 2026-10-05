@@ -4,7 +4,9 @@
    standalone full-window page, so it carries its own copy of the pre-paint
    theme bootstrap from _base.html; keep the two in sync. #}
 {% set _paper = app_settings is defined and app_settings.get('ui_design') == 'paper' %}
-<html lang="en"{% if _paper %} data-ui="paper"{% endif %}>
+{% import "_server_mark.html" as server_mark %}
+{% set _si = server_identity if server_identity is defined else None %}
+<html lang="en"{% if _paper %} data-ui="paper"{% endif %}{{ server_mark.html_attr(_si) }}>
 <head>
   <meta charset="utf-8">
   {% if app_settings is defined and app_settings.get('mobile_zoom_lock', True) %}
@@ -12,8 +14,8 @@
   {% else %}
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   {% endif %}
-  <title>Canvas editor, Tesserae</title>
-  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='brand/icon.svg') }}">
+  <title>{{ server_mark.tab_prefix(_si) }}Canvas editor, Tesserae</title>
+  <link rel="icon" type="image/svg+xml" href="{{ server_mark.favicon_href(_si, url_for('static', filename='brand/icon.svg')) }}">
   <style>
     html { background: #f1f0ec; color-scheme: light; }
     html[data-theme="dark"] { background: #0e1015; color-scheme: dark; }
@@ -86,8 +88,10 @@
      choices actually render on the canvas. #}
   <style>{{ font_face_css|safe }}</style>
   <script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
+  {{ server_mark.head_style(_si) }}
 </head>
 <body class="ed-body">
+  {{ server_mark.strip(_si) }}
   {# Canvas (freeform) dashboard editor (issue #60). editor.js drives the
      interactive canvas (create / move / resize / bind / undo / autosave).
      Desktop: app rail (Paper), toolbar, a tabbed left sheet (Layers / Add /

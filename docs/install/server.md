@@ -212,6 +212,24 @@ Clients with their own captive portal (ESP32) use a different scheme:
 `tesserae-<device-id>.local` for the portal, then they connect out to
 the server URL you give them.
 
+## Running more than one server
+
+If you run several Tesserae servers, say dev, test and prod, give each one
+a name and a colour under **Settings → Server → This server**, so you can
+tell them apart at a glance:
+
+- The **server name** shows as a small label under the Tesserae wordmark
+  and at the start of every browser tab title (`dev · Dashboards`).
+- The **server colour** paints a thin stripe across the top of every page,
+  including the full-screen editor, tints the tab icon, and becomes the
+  accent for buttons and links. Pick one of the five presets (red,
+  yellow, green, blue and black, the Spectra 6 inks toned to match the
+  admin) or a custom colour.
+
+Both are saved on the server, so every browser and phone sees the same
+thing. Leave them blank and the admin looks as it always has. Panels never
+show either: they only mark the admin pages.
+
 ## Running the tests
 
 ```sh

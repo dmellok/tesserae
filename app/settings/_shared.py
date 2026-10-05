@@ -326,6 +326,10 @@ def coerce_form_value(field: dict[str, Any], raw: str | None) -> Any:
             if str(choice.get("value")) == raw:
                 return choice["value"]
         return raw
+    if ftype == "server_colour":
+        from app.server_identity import normalise_colour
+
+        return normalise_colour(raw)
     if ftype == "location_search":
         # v0.69.6 (issue #52 items 5 + 6): the location picker submits a
         # JSON-encoded dict in a hidden input. Parse it into a real dict
@@ -365,6 +369,12 @@ def values_from_form(fields: list[dict[str, Any]]) -> dict[str, Any]:
             # Unchecked checkboxes are absent from the form, present ones
             # send "on", bare presence is what we use.
             values[name] = field["name"] in request.form
+        elif field.get("type") == "server_colour":
+            # The custom swatch posts "custom"; its colour input carries the hex.
+            raw = request.form.get(name)
+            if raw == "custom":
+                raw = request.form.get(f"{name}__custom")
+            values[name] = coerce_form_value(field, raw)
         elif field.get("type") == "days":
             # A weekday picker submits one checkbox per ticked day plus a
             # marker input so "nothing ticked" is distinguishable from "the

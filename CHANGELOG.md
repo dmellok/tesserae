@@ -8,6 +8,16 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Server name and colour** (#350), for anyone running more than one
+  server. Settings → Server → This server takes a short name and a colour:
+  one of five presets (the Spectra 6 inks toned to match the admin's red,
+  each with a lighter step for dark mode) or a custom colour. The colour
+  paints a 4px stripe across the top of every admin page and the canvas
+  editor, tints the tab icon and the phone's toolbar, and becomes the
+  accent, in Paper and the classic design alike. The name shows as a chip
+  under the wordmark and leads the tab title (`dev · Dashboards`), and the
+  companion API reports it as the instance name. Nothing changes until one
+  is set, and panel renders never show either.
 - **Touch wake** for the reTerminal E1003 and reTerminal Sticky (#327): a
   third touch setting next to Touch input and Touch linger. *Any tap* keeps
   the touch controller scanning through deep sleep as before; *Double tap or

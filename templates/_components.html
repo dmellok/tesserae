@@ -219,6 +219,54 @@ macro here instead.
 </div>
 {%- endmacro -%}
 
+{#- Server colour picker (#350): None, the five Spectra presets, or a
+   custom colour. Radios share ``name``; the custom radio's value is
+   "custom" and the colour input beside it carries the hex as
+   ``<name>__custom`` (values_from_form folds the two together). Picking a
+   colour in the input ticks the custom radio. -#}
+{%- macro server_colour_field(field_id, name, label, value='', help=None) -%}
+{% set presets = server_colour_presets() %}
+{% set is_custom = value and value not in presets|map(attribute='id')|list %}
+<div class="field server-colour" role="radiogroup" aria-labelledby="{{ field_id }}-label" data-server-colour-field>
+  <label id="{{ field_id }}-label">{{ label }}{{ info_pop(help) }}</label>
+  <div class="server-colour-swatches">
+    <label class="server-colour-swatch is-none" title="None">
+      <input type="radio" name="{{ name }}" value="" {% if not value %}checked{% endif %}>
+      <span class="server-colour-chip" aria-hidden="true"></span>
+      <span class="server-colour-name">None</span>
+    </label>
+    {% for p in presets %}
+    <label class="server-colour-swatch" title="{{ p.label }}">
+      <input type="radio" name="{{ name }}" value="{{ p.id }}" {% if value == p.id %}checked{% endif %}>
+      <span class="server-colour-chip" aria-hidden="true" style="--c: {{ p.light }}; --c-dark: {{ p.dark }}"></span>
+      <span class="server-colour-name">{{ p.label }}</span>
+    </label>
+    {% endfor %}
+    <label class="server-colour-swatch is-custom" title="Custom">
+      <input type="radio" name="{{ name }}" value="custom" id="{{ field_id }}-custom" {% if is_custom %}checked{% endif %} data-server-colour-custom-radio>
+      {% set custom_hex = value if is_custom else '#6b4fa0' %}
+      <span class="server-colour-chip" style="--c: {{ custom_hex }}" data-server-colour-custom-chip>
+        <input type="color" name="{{ name }}__custom" id="{{ field_id }}" value="{{ custom_hex }}"
+               class="server-colour-native" aria-label="Custom colour" data-server-colour-custom>
+      </span>
+      <span class="server-colour-name">Custom</span>
+    </label>
+  </div>
+</div>
+<script>
+  (function () {
+    var root = document.currentScript.previousElementSibling;
+    var picker = root.querySelector('[data-server-colour-custom]');
+    var radio = root.querySelector('[data-server-colour-custom-radio]');
+    var chip = root.querySelector('[data-server-colour-custom-chip]');
+    picker.addEventListener('input', function () {
+      chip.style.setProperty('--c', picker.value);
+      if (!radio.checked) { radio.checked = true; radio.dispatchEvent(new Event('change', { bubbles: true })); }
+    });
+  })();
+</script>
+{%- endmacro -%}
+
 {%- macro textarea_field(field_id, name, label, value='', rows=3, placeholder='', help=None) -%}
 <div class="field">
   <label for="{{ field_id }}">{{ label }}{{ info_pop(help) }}</label>
@@ -607,6 +655,8 @@ macro here instead.
       {{ number_input(field_id, name, label, value=value if value is not none else spec.get('default', 0),
                       min=spec.get('min'), max=spec.get('max'), step=spec.get('step', 1), help=help_text, form=form) }}
     {% endif %}
+  {% elif ftype == 'server_colour' %}
+    {{ server_colour_field(field_id, name, label, value=value or '', help=help_text) }}
   {% elif ftype == 'color' %}
     {{ color_input(field_id, name, label, value=value or spec.get('default', '#000000'), help=help_text) }}
   {% elif ftype == 'days' %}

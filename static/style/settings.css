@@ -4384,3 +4384,26 @@ select.dx-input:hover {
 
 /* Pairing note beside the paired app name (Settings › Companion app). */
 .companion-note { font-weight: 500; color: var(--t-fg-soft); }
+
+/* Server colour picker (Settings › Server › This server, #350): None, the
+   five Spectra presets and a custom colour, as square swatches. */
+.server-colour-swatches { display: flex; flex-wrap: wrap; gap: 10px; }
+.server-colour-swatch { position: relative; display: grid; justify-items: center; gap: 4px; cursor: pointer; font-size: 12px; color: var(--t-fg-soft); }
+.server-colour-swatch input[type="radio"] { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+.server-colour-chip {
+  position: relative; width: 32px; height: 32px; border-radius: 2px; display: block;
+  background: var(--c, transparent); border: 1px solid var(--t-border-strong);
+}
+:root[data-theme="dark"] .server-colour-chip { background: var(--c-dark, var(--c, transparent)); }
+.server-colour-swatch.is-none .server-colour-chip { border-style: dashed; }
+/* The native colour input sits over the custom swatch, invisible, so a
+   click opens the system picker while the swatch draws like the presets. */
+.server-colour-swatches .server-colour-swatch input.server-colour-native {
+  position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 0;
+  opacity: 0; border: 0; cursor: pointer;
+}
+.server-colour-swatch:has(input[type="radio"]:checked) .server-colour-chip {
+  outline: 2px solid var(--t-fg); outline-offset: 2px;
+}
+.server-colour-swatch:has(input[type="radio"]:checked) .server-colour-name { color: var(--t-fg); font-weight: 600; }
+.server-colour-swatch:has(input:focus-visible) .server-colour-chip { outline: 2px solid var(--t-accent); outline-offset: 2px; }

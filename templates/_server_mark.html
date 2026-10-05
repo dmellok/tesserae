@@ -1,0 +1,72 @@
+{# Server name and colour (#350, app.server_identity). ``si`` is the
+   ``server_identity`` context value: None when neither is set, in which
+   case every macro here renders nothing and the page looks as it always
+   has. Used by _base.html and the full-screen panels editor; never by
+   compose.html, which is what panels render. #}
+
+{%- macro tab_prefix(si) -%}
+{%- if si and si.name -%}{{ si.name }} · {% endif -%}
+{%- endmacro -%}
+
+{%- macro favicon_href(si, default_href) -%}
+{{ si.colour.favicon if si and si.colour else default_href }}
+{%- endmacro -%}
+
+{%- macro html_attr(si) -%}
+{% if si and si.colour %} data-server-colour="{{ si.colour.id }}"{% endif %}
+{%- endmacro -%}
+
+{#- Loaded after every stylesheet so the accent wins over Paper's and the
+   classic dev-mode orange. Tokens are set on <body> as well as <html>
+   because dev mode sets its accent on body.dev-mode, which would otherwise
+   shadow the root value for everything inside it. -#}
+{%- macro head_style(si) -%}
+{% if si %}
+<style>
+  {% if si.colour %}
+  :root[data-server-colour], :root[data-server-colour] body {
+    --server-colour: {{ si.colour.light }};
+    --server-colour-fg: {{ si.colour.light_fg }};
+    --t-accent: var(--server-colour);
+    --t-accent-hover: color-mix(in oklab, var(--server-colour) 82%, #000);
+    --t-accent-soft: color-mix(in oklab, var(--server-colour) 16%, var(--t-surface));
+    --t-accent-tint: color-mix(in oklab, var(--server-colour) 16%, var(--t-surface));
+    --t-accent-fg: var(--server-colour-fg);
+    --t-accent-ink: color-mix(in oklab, var(--server-colour) 68%, #000);
+    --p-logo-a: var(--server-colour);
+  }
+  :root[data-server-colour][data-theme="dark"], :root[data-server-colour][data-theme="dark"] body {
+    --server-colour: {{ si.colour.dark }};
+    --server-colour-fg: {{ si.colour.dark_fg }};
+    --t-accent: var(--server-colour);
+    --t-accent-fg: var(--server-colour-fg);
+    --p-logo-a: var(--server-colour);
+    --t-accent-hover: color-mix(in oklab, var(--server-colour) 82%, #fff);
+    --t-accent-soft: color-mix(in oklab, var(--server-colour) 22%, var(--t-surface));
+    --t-accent-tint: color-mix(in oklab, var(--server-colour) 22%, var(--t-surface));
+    --t-accent-ink: color-mix(in oklab, var(--server-colour) 55%, #fff);
+  }
+  .server-strip {
+    position: fixed; top: 0; left: 0; right: 0; height: 4px;
+    background: var(--server-colour); z-index: 2147483000; pointer-events: none;
+  }
+  {% endif %}
+  .server-chip {
+    display: inline-flex; align-self: flex-start; align-items: center; max-width: 100%;
+    margin-top: 6px; padding: 4px 6px; border-radius: 2px;
+    font-size: 10px; font-weight: 700; line-height: 1; letter-spacing: .08em; text-transform: uppercase;
+    background: var(--server-colour, var(--t-accent)); color: var(--server-colour-fg, var(--t-accent-fg));
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  :root:not([data-ui="paper"]) .server-chip { margin: 0 0 0 8px; vertical-align: middle; }
+</style>
+{% endif %}
+{%- endmacro -%}
+
+{%- macro strip(si) -%}
+{% if si and si.colour %}<div class="server-strip" aria-hidden="true"></div>{% endif %}
+{%- endmacro -%}
+
+{%- macro chip(si) -%}
+{% if si and si.name %}<span class="server-chip" title="This server: {{ si.name }}">{{ si.name }}</span>{% endif %}
+{%- endmacro -%}

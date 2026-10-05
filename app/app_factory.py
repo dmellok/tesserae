@@ -48,6 +48,7 @@ from app import (
     renderer_loader,
     schedule_routes,
     send_routes,
+    server_identity,
     settings_routes,
     stats_routes,
     themes_routes,
@@ -1292,6 +1293,8 @@ def create_app(
             return None
         return status if status["update_available"] else None
 
+    app.jinja_env.globals["server_colour_presets"] = server_identity.presets_for_picker
+
     @app.context_processor
     def _inject_nav_data() -> dict[str, Any]:
         """Make the list of admin-equipped plugins available to every
@@ -1325,6 +1328,7 @@ def create_app(
                 "nav_batteries": [],
                 "nav_discovered": [],
                 "app_settings": app_settings,
+                "server_identity": server_identity.resolve(app_settings),
                 "marketplace_restart_pending": False,
                 "community_discussions_url": "https://github.com/dmellok/tesserae/discussions",
                 "community_discord_url": "https://discord.gg/6qmwkGhGR7",
@@ -1354,6 +1358,7 @@ def create_app(
             # links to the Devices tab with the register rows opened.
             "nav_discovered": _collect_discovered(app),
             "app_settings": app_settings,
+            "server_identity": server_identity.resolve(app_settings),
             # Lights the topbar "Restart required" button when set by
             # the marketplace install/uninstall routes. Cleared on
             # the next process start (Updater.restart re-execs).
