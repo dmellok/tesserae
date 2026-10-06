@@ -51,14 +51,16 @@ from werkzeug.wrappers import Response
 from app.composer import _hydrate_page
 from app.layouts import LAYOUTS, LAYOUTS_BY_SLUG, detect_layout, to_panel_pixels
 from app.panel import (
+    DESIGN_SIZES,
     device_panel,
     fit_cells_to_panel,
+    parse_design_size,
     preview_groups_for_page,
     resolve_panel_for_page,
     resolve_settings_panel,
 )
 from app.plugin_loader import Plugin, PluginRegistry
-from app.state.page_store import Cell, Page, PageStore
+from app.state.page_store import Cell, Page, PageStore, Panel
 from app.state.settings_store import SettingsStore
 
 logger = logging.getLogger(__name__)
@@ -1016,6 +1018,9 @@ def index() -> str:
         dash_groups=dash_groups,
         page_preview_tokens=page_preview_tokens,
         composer_enabled=experiments.is_enabled("composer"),
+        # No panel registered yet: the create form asks what the dashboard is for.
+        has_panels=any(d.kind_of is not None for d in devices.all()) if devices else False,
+        design_sizes=DESIGN_SIZES,
     )
 
 
@@ -1040,6 +1045,9 @@ def create() -> Response:
     Panel dims come from app settings, pages aren't panel-specific."""
     form = request.form
     name = (form.get("name") or "").strip() or "Untitled dashboard"
+    # Chosen on the create form when the install has no panel yet: the size to
+    # design at until the dashboard is bound to a device.
+    design = parse_design_size(form.get("design_size"))
 
     taken = {p.id for p in _store().list()}
     page_id = _random_page_id(taken)
@@ -1061,13 +1069,17 @@ def create() -> Response:
             theme=(form.get("theme") or "light"),
             style=(form.get("style") or "standard"),
             font=(form.get("font") or None),
-            canvas=CanvasLayout(),
+            canvas=CanvasLayout(w=design[0], h=design[1]) if design else CanvasLayout(),
         )
         _store().save(page)
         return redirect(url_for("panels.editor", canvas_id=page.id))
 
-    # Panel dims come from app settings; the new page inherits them.
+    # Panel dims come from app settings; the new page inherits them, unless a
+    # size was chosen for it, which it then keeps as its own panel.
     panel = resolve_settings_panel(_settings_store())
+    own_panel = Panel(w=design[0], h=design[1], gamut=panel.gamut) if design else None
+    if own_panel is not None:
+        panel = own_panel
     layout_slug = (form.get("layout") or "1_cell").strip()
     layout = LAYOUTS_BY_SLUG.get(layout_slug, LAYOUTS_BY_SLUG["1_cell"])
     initial_cells = [
@@ -1079,7 +1091,9 @@ def create() -> Response:
             id=page_id,
             name=name,
             # panel left None on purpose, derived from settings at render
-            # time so changing the panel in settings updates every page.
+            # time so changing the panel in settings updates every page;
+            # set only when a size was chosen for this dashboard.
+            panel=own_panel,
             cells=initial_cells,
             font=(form.get("font") or None),
             theme=(form.get("theme") or "light"),

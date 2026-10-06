@@ -97,6 +97,36 @@ PANEL_PRESET_CHOICES: list[dict[str, str]] = [
 
 DEFAULT_PRESET: str = "inky_13_3"
 
+# Sizes offered when a dashboard is made on an install with no panel yet, so it is
+# designed for the hardware the person is waiting for rather than the server's
+# default. Named by that hardware; the same list as Tesserae Cloud's.
+DESIGN_SIZES: list[dict[str, object]] = [
+    {"w": 800, "h": 480, "label": '7.3" / 7.5" landscape'},
+    {"w": 480, "h": 800, "label": '7.5" portrait, 4" sticky'},
+    {"w": 400, "h": 300, "label": '4.2" (PicPak, Waveshare)'},
+    {"w": 600, "h": 400, "label": '4" Inky Impression'},
+    {"w": 540, "h": 960, "label": '4.7" portrait (M5Paper)'},
+    {"w": 1072, "h": 1448, "label": '6" e-reader'},
+    {"w": 1872, "h": 1404, "label": '10.3" landscape'},
+    {"w": 1200, "h": 1600, "label": '13.3" portrait'},
+    {"w": 1600, "h": 1200, "label": '13.3" landscape'},
+]
+
+
+def parse_design_size(raw: str | None) -> tuple[int, int] | None:
+    """``"800x480"`` -> ``(800, 480)``; None for anything outside 100..4000."""
+    text = (raw or "").strip().lower()
+    if "x" not in text:
+        return None
+    a, _, b = text.partition("x")
+    try:
+        w, h = int(a), int(b)
+    except ValueError:
+        return None
+    if not (100 <= w <= 4000 and 100 <= h <= 4000):
+        return None
+    return w, h
+
 
 def _preset_composition_landscape(preset: PanelPreset) -> tuple[int, int]:
     """Return the (w, h) the panel takes when mounted **landscape**.

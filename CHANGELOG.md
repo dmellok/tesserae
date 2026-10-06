@@ -8,6 +8,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **What panel is this for?** Making a dashboard on an install with no panel
+  registered now asks for the size to design at: the common panel shapes
+  (7.5" landscape and portrait, 4.2", Inky Impression 4", M5Paper, 6"
+  e-reader, 10.3", 13.3" both ways). A grid dashboard keeps the chosen size
+  as its own panel and a canvas dashboard gets it as its artboard, instead of
+  the server's default panel or 600×400. Binding a device later switches it
+  to the device's size.
 - **Server name and colour** (#350), for anyone running more than one
   server. Settings → Server → This server takes a short name and a colour:
   one of five presets (the Spectra 6 inks toned to match the admin's red,

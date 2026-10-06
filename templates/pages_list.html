@@ -63,6 +63,19 @@
       </select>
     </div>
     {% endif %}
+    {% if not has_panels %}
+    {# No panel registered yet: ask what the dashboard is for, so it is designed
+       at that panel's size instead of the server default. Binding it to a
+       device later switches it to the device's own size. #}
+    <div class="dx-pair-input dx-dash-create-size">
+      <select name="design_size" class="dx-input" aria-label="What panel is this for?"
+              title="No panel yet: pick the size you'll show it on">
+        {% for s in design_sizes %}
+        <option value="{{ s.w }}x{{ s.h }}">{{ s.label }} · {{ s.w }}×{{ s.h }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
     <div class="dx-pair-action">
       <button type="submit" class="dx-btn-primary" data-new-dashboard-btn disabled>
         <i class="ph ph-plus" aria-hidden="true"></i><span>Create dashboard</span>
