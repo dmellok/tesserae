@@ -63,6 +63,35 @@ def test_online_features_toggle(app: Flask) -> None:
     assert store.get_section("app").get("online_features") is True
 
 
+@pytest.mark.parametrize(
+    ("path", "data"),
+    [
+        ("/settings/system/webhook/regenerate", {}),
+        ("/settings/system/webhook/set", {"clear": "1"}),
+        (
+            "/settings/system/webhook/set",
+            {"webhook_token": "a-token-of-my-own-choosing-0123456789"},
+        ),
+        ("/settings/system/mcp/clear", {}),
+    ],
+)
+def test_token_actions_leave_the_rest_of_app_alone(
+    app: Flask, path: str, data: dict[str, str]
+) -> None:
+    """Setting one token used to replace the whole app section, taking the
+    session secret (and with it every stored connector secret) along."""
+    client = app.test_client()
+    _sign_in(client)
+    store = app.config["SETTINGS_STORE"]
+    store.patch_section("app", {"timezone": "Europe/Berlin"})
+    before = store.get_section("app")
+    assert before.get("session_secret_secret")
+    client.post(path, data=data)
+    after = store.get_section("app")
+    assert after.get("session_secret_secret") == before["session_secret_secret"]
+    assert after.get("timezone") == "Europe/Berlin"
+
+
 def test_create_then_download_then_delete_backup(app: Flask, tmp_path: Path) -> None:
     client = app.test_client()
     _sign_in(client)

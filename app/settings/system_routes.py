@@ -286,7 +286,7 @@ def system_webhook_regenerate() -> Response:
     from app.webhook_routes import generate_token
 
     token = generate_token()
-    settings_store().update_section("app", {"webhook_token_secret": token})
+    settings_store().patch_section("app", {"webhook_token_secret": token})
     session["_webhook_token_reveal"] = token
     return system_redirect()
 
@@ -299,14 +299,14 @@ def system_webhook_set() -> Response:
     when an automation tool already has a specific secret and the user
     wants Tesserae to match it instead of issuing a fresh one."""
     if request.form.get("clear"):
-        settings_store().update_section("app", {"webhook_token_secret": ""})
+        settings_store().patch_section("app", {"webhook_token_secret": ""})
         flash("Webhook token cleared. POST /api/v1/push will return 503.", "ok")
         return system_redirect()
     token = (request.form.get("webhook_token") or "").strip()
     if not token:
         flash("Paste a token first, or use Clear to disable webhooks.", "error")
         return system_redirect()
-    settings_store().update_section("app", {"webhook_token_secret": token})
+    settings_store().patch_section("app", {"webhook_token_secret": token})
     flash("Webhook token saved.", "ok")
     return system_redirect()
 
@@ -370,7 +370,7 @@ def system_mcp_regenerate() -> Response:
 def system_mcp_clear() -> Response:
     """Clear the MCP token. Remote agents can no longer authenticate; loopback
     callers still work while the feature is on."""
-    settings_store().update_section("app", {"mcp_token_secret": ""})
+    settings_store().patch_section("app", {"mcp_token_secret": ""})
     flash("MCP token cleared. Remote agents can no longer authenticate.", "ok")
     return system_redirect()
 
