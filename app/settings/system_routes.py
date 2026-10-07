@@ -195,7 +195,11 @@ def system_data_export() -> Response:
 def system_data_import() -> Response:
     """Accept a zip uploaded from another Tesserae install and apply it
     in place of the current ``data/``. Same exclusions as restore
-    (the current gallery photos + cached renders stay put). Restarts
+    (the current gallery photos + cached renders stay put), and a
+    ``pre-import`` backup of the current data is taken first. Unless the
+    form opts in with ``take_identity=1``, this server keeps its own
+    password, login settings and identity (#349, see
+    :data:`app.backup.IDENTITY_SECTIONS`). Restarts
     the server afterwards on production; in --dev mode the os.execv
     restart fights the werkzeug reloader, so we extract the zip and
     leave it to the user to stop + start the dev server manually."""
@@ -246,11 +250,24 @@ def system_data_import() -> Response:
     ts = _time.strftime("%Y%m%d-%H%M%S")
     backups_dir = data_root() / _backup_mod.BACKUPS_SUBDIR
     backups_dir.mkdir(parents=True, exist_ok=True)
-    staged = backups_dir / f"{ts}-import.zip"
-    staged.write_bytes(raw)
+    # By default this server keeps its own password, login settings and
+    # identity (#349); the opt-in is for moving an install to a new host.
+    take_identity = request.form.get("take_identity") == "1"
     try:
+        # A snapshot of what's about to be replaced, in the Backups list
+        # so a wrong import is one Restore away. Taken before the upload
+        # is staged so it doesn't end up inside it.
         try:
-            _backup_mod.restore(data_root(), staged.stem)
+            pre = _backup_mod.create(
+                data_root(), label=_backup_mod.LABEL_PRE_IMPORT, note=(upload.filename or "")[:200]
+            )
+        except OSError as err:
+            flash(f"Import failed: couldn't take a pre-import backup ({err}).", "error")
+            return system_redirect()
+        staged = backups_dir / f"{ts}-import.zip"
+        staged.write_bytes(raw)
+        try:
+            result = _backup_mod.restore(data_root(), staged.stem, keep_identity=not take_identity)
         except (FileNotFoundError, ValueError, OSError) as err:
             flash(f"Import failed: {err}", "error")
             staged.unlink(missing_ok=True)
@@ -261,6 +278,17 @@ def system_data_import() -> Response:
     # of the backups dir during the rebuild). Drop it now so it doesn't
     # show up in the Backups list as a confusing one-time entry.
     staged.unlink(missing_ok=True)
+    flash(f"Took a backup of the previous data first: {pre.id}.", "ok")
+    if result.unreadable_secrets:
+        count = len(result.unreadable_secrets)
+        flash(
+            f"{count} imported secret{'s' if count != 1 else ''} couldn't be re-encrypted "
+            "for this server and will need re-entering "
+            f"({', '.join(result.unreadable_secrets[:5])}"
+            f"{', …' if count > 5 else ''}). The export most likely came from a server "
+            "with a different TESSERAE_SECRET_KEY.",
+            "error",
+        )
     if current_app.debug:
         flash(
             "Data imported. Stop and restart the --dev server (Ctrl-C, then "

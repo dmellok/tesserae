@@ -239,6 +239,113 @@ def test_backup_restore_runs_under_docker(
     assert f"Restored from {backup_id}" in body
 
 
+# -- import keeps this server's identity (#349) ------------------------
+
+_SECRET_FIELD = [{"name": "token", "secret": True}]
+
+
+def _make_app(root: Path) -> Flask:
+    a = create_app(
+        testing=True,
+        data_root=root,
+        plugins_dir=REPO_ROOT / "plugins",
+        renderers_dir=REPO_ROOT / "renderers",
+        devices_dir=REPO_ROOT / "devices",
+    )
+    a.config["TESTING"] = True
+    return a
+
+
+def _export_from_server_a(root: Path) -> bytes:
+    """Server A: password ``password-a``, a name, and a connector secret
+    wrapped with A's key. Returns its data export."""
+    a = _make_app(root)
+    client = a.test_client()
+    client.post("/setup", data={"password": "password-a", "password_confirm": "password-a"})
+    store = a.config["SETTINGS_STORE"]
+    store.patch_section("app", {"instance_name": "Server A"})
+    store.update_for_namespace("plugins", "probe", {"token": "tok-from-a"}, _SECRET_FIELD)
+    resp = client.get("/settings/system/data/export")
+    assert resp.status_code == 200
+    return resp.data
+
+
+def _import_into_server_b(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, take_identity: bool
+) -> tuple[Flask, str]:
+    """Export from A, import into B (password ``password-b``), then boot
+    B again the way the post-import restart would."""
+    from io import BytesIO
+
+    from app.updater import Updater
+
+    monkeypatch.delenv("TESSERAE_SECRET_KEY", raising=False)
+    monkeypatch.setattr(Updater, "restart", lambda self, **kw: None)
+    exported = _export_from_server_a(tmp_path / "a")
+
+    b_root = tmp_path / "b"
+    b = _make_app(b_root)
+    client = b.test_client()
+    client.post("/setup", data={"password": "password-b", "password_confirm": "password-b"})
+    form: dict[str, object] = {"archive": (BytesIO(exported), "tesserae-data.zip")}
+    if take_identity:
+        form["take_identity"] = "1"
+    resp = client.post(
+        "/settings/system/data/import",
+        data=form,
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "Data imported" in body
+    return _make_app(b_root), body
+
+
+def _logs_in(app: Flask, password: str) -> bool:
+    resp = app.test_client().post("/login", data={"password": password})
+    return resp.status_code == 302
+
+
+def test_data_import_keeps_this_servers_password_by_default(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    b, body = _import_into_server_b(tmp_path, monkeypatch, take_identity=False)
+    assert _logs_in(b, "password-b")
+    assert not _logs_in(b, "password-a")
+    store = b.config["SETTINGS_STORE"]
+    # B keeps its identity, the content (here a connector secret wrapped
+    # with A's key) comes across and still decrypts with B's key.
+    assert "instance_name" not in store.get_section("app")
+    assert store.unreadable_secrets("plugins", "probe") == set()
+    assert store.get_for_runtime("plugins", "probe", _SECRET_FIELD) == {"token": "tok-from-a"}
+    # A pre-import snapshot of B's own data is in the Backups list.
+    from app import backup as _backup_mod
+
+    labels = [x.label for x in _backup_mod.list_all(tmp_path / "b")]
+    assert labels == [_backup_mod.LABEL_PRE_IMPORT]
+    assert "couldn&#39;t be re-encrypted" not in body
+
+
+def test_data_import_can_take_the_exports_identity(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    b, _ = _import_into_server_b(tmp_path, monkeypatch, take_identity=True)
+    assert _logs_in(b, "password-a")
+    assert not _logs_in(b, "password-b")
+    store = b.config["SETTINGS_STORE"]
+    assert store.get_section("app").get("instance_name") == "Server A"
+    assert store.get_for_runtime("plugins", "probe", _SECRET_FIELD) == {"token": "tok-from-a"}
+
+
+def test_settings_page_offers_the_identity_opt_in(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    body = client.get("/settings/system").get_data(as_text=True)
+    assert 'name="take_identity"' in body
+    assert 'name="take_identity" value="1" checked' not in body
+
+
 # -- features card ------------------------------------------------------
 
 

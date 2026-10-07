@@ -778,7 +778,7 @@ docker compose up -d</code></pre>
        bypassing the Backups list. Useful when moving an install to a
        new host or replicating a setup. #}
     <p class="device-subhead">Migrate to another install</p>
-    <p class="field-help">Export the current data folder as a zip, or import a zip from another self-hosted Tesserae Server. Gallery photos and the render cache are skipped either way.</p>
+    <p class="field-help">Export the current data folder as a zip, or import a zip from another self-hosted Tesserae Server. Gallery photos and the render cache are skipped either way. An import keeps this server's password, login settings and identity (name, colour, public URL, MCP and webhook tokens, relay link, paired Companion apps) unless you tick the box below, and takes a pre-import backup first.</p>
     <p class="field-help">
       <i class="ph ph-key" aria-hidden="true"></i>
       <strong>If you set <code>TESSERAE_SECRET_KEY</code></strong> in your environment, set the same value on the new install before importing. Without it, connector secrets (HA tokens, API keys) won't decrypt and you'll need to re-enter them. The default setup (no env var) needs no extra steps.
@@ -794,7 +794,7 @@ docker compose up -d</code></pre>
             action="{{ url_for('auth.system_data_import') }}"
             class="migrate-import"
             enctype="multipart/form-data"
-            onsubmit="return confirm('Import this zip and restart? Current data/ will be replaced (gallery photos + cached renders stay put).');">
+            onsubmit="return confirm(this.take_identity.checked ? 'Import this zip and restart? Current data/ will be replaced, including this server\'s password, login settings and identity. A pre-import backup is taken first (gallery photos + cached renders stay put).' : 'Import this zip and restart? Current data/ will be replaced, but this server keeps its password, login settings and identity. A pre-import backup is taken first (gallery photos + cached renders stay put).');">
         <label class="migrate-file">
           <i class="ph ph-paperclip" aria-hidden="true"></i>
           <span data-migrate-file-label>Choose zip…</span>
@@ -803,6 +803,10 @@ docker compose up -d</code></pre>
                  onchange="this.parentNode.querySelector('[data-migrate-file-label]').textContent = (this.files[0] || {name:'Choose zip…'}).name">
         </label>
         {{ button('Import zip', icon='upload-simple', variant='ghost') }}
+        <label class="check-row migrate-identity">
+          <input type="checkbox" name="take_identity" value="1">
+          <span>Also take this export's password, login settings and server identity (moving to a new host).</span>
+        </label>
       </form>
     </div>
 
@@ -836,6 +840,7 @@ docker compose up -d</code></pre>
         max-width: 280px;
       }
       .migrate-file:hover { border-color: var(--accent, #0d8c7e); }
+      .migrate-identity { flex-basis: 100%; }
       .migrate-file input[type="file"] {
         position: absolute;
         width: 1px; height: 1px;

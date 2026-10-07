@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 import sqlite3
 from pathlib import Path
 
@@ -232,3 +233,193 @@ def test_restore_preserves_users_gallery_photos(tmp_path: Path) -> None:
     assert (root / "plugins" / "picture_gallery" / "holidays" / "sunset.jpg").exists()
     # Non-excluded file rolled back from the snapshot.
     assert (root / "core" / "settings.json").read_text() == '{"app":{"x":1}}'
+
+
+# ----- import keeps this server's identity (#349) ------------------------
+
+
+def _seed_server(root: Path, *, name: str, session: bytes, token: str) -> None:
+    """A data/ tree for one server: identity in settings + identity files,
+    content (devices, a plugin secret wrapped with this server's key)."""
+    import json
+
+    from app.secret_box import SecretBox
+
+    box = SecretBox.from_session_secret(session)
+    settings = {
+        "app": {
+            "session_secret_secret": session.hex(),
+            "instance_name": name,
+            "server_colour": "red" if name == "A" else "blue",
+            "public_url": f"http://{name.lower()}.lan:8765",
+            "mcp_token_secret": f"mcp-{name}",
+            "webhook_token_secret": f"hook-{name}",
+            "timezone": f"tz-{name}",
+        },
+        "auth": {"password_salt": f"salt-{name}", "password_hash_secret": f"hash-{name}"},
+        "relay": {"install_id": f"relay-{name}", "publisher_token_secret": box.wrap(name)},
+        "broker": {"embedded_password_secret": f"broker-{name}"},
+        "devices": {f"panel_{name}": {"name": name}},
+        "plugins": {"ha": {"token_secret": box.wrap(token)}},
+    }
+    (root / "core").mkdir(parents=True, exist_ok=True)
+    (root / "core" / "settings.json").write_text(json.dumps(settings), encoding="utf-8")
+    for rel in bk.IDENTITY_FILES:
+        (root / rel).write_text(f"{rel}-{name}", encoding="utf-8")
+    (root / "core" / "pages.json").write_text(f'{{"from":"{name}"}}', encoding="utf-8")
+
+
+def _hand_over(export: bk.Backup, root: Path) -> None:
+    """Put another server's export where restore() looks for it."""
+    dest = root / bk.BACKUPS_SUBDIR
+    dest.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(export.path, dest / export.path.name)
+
+
+def _import_a_into_b(tmp_path: Path, *, keep_identity: bool) -> tuple[Path, bk.RestoreResult]:
+    a, b = tmp_path / "a", tmp_path / "b"
+    _seed_server(a, name="A", session=b"A" * 32, token="tok-from-a")
+    _seed_server(b, name="B", session=b"B" * 32, token="tok-from-b")
+    export = bk.create(a, label="manual")
+    _hand_over(export, b)
+    return b, bk.restore(b, export.id, keep_identity=keep_identity)
+
+
+def _settings(root: Path) -> dict:
+    import json
+
+    return json.loads((root / "core" / "settings.json").read_text(encoding="utf-8"))
+
+
+def test_restore_keep_identity_keeps_this_servers_identity(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.secret_box import SecretBox
+
+    monkeypatch.delenv("TESSERAE_SECRET_KEY", raising=False)
+    b, result = _import_a_into_b(tmp_path, keep_identity=True)
+    s = _settings(b)
+
+    # Identity stays B's.
+    assert s["auth"] == {"password_salt": "salt-B", "password_hash_secret": "hash-B"}
+    assert s["relay"]["install_id"] == "relay-B"
+    for key in bk.IDENTITY_APP_KEYS:
+        assert s["app"][key] == _expected_b_app()[key], key
+    for rel in bk.IDENTITY_FILES:
+        assert (b / rel).read_text(encoding="utf-8") == f"{rel}-B"
+    # Content comes from A: devices, broker, other app settings, pages.
+    assert s["devices"] == {"panel_A": {"name": "A"}}
+    assert s["broker"] == {"embedded_password_secret": "broker-A"}
+    assert s["app"]["timezone"] == "tz-A"
+    assert (b / "core" / "pages.json").read_text(encoding="utf-8") == '{"from":"A"}'
+
+    # A's connector secret was re-wrapped so it decrypts with B's key, and
+    # B's own relay secret (kept as is) still decrypts too.
+    b_box = SecretBox.from_session_secret(b"B" * 32)
+    assert b_box.unwrap(s["plugins"]["ha"]["token_secret"]) == "tok-from-a"
+    assert b_box.unwrap(s["relay"]["publisher_token_secret"]) == "B"
+    assert result.unreadable_secrets == ()
+
+
+def _expected_b_app() -> dict[str, str]:
+    return {
+        "session_secret_secret": (b"B" * 32).hex(),
+        "instance_name": "B",
+        "server_colour": "blue",
+        "public_url": "http://b.lan:8765",
+        "mcp_token_secret": "mcp-B",
+        "webhook_token_secret": "hook-B",
+    }
+
+
+def test_restore_without_keep_identity_takes_everything(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The same-machine restore (and the import opt-in) is a plain restore."""
+    monkeypatch.delenv("TESSERAE_SECRET_KEY", raising=False)
+    b, result = _import_a_into_b(tmp_path, keep_identity=False)
+    s = _settings(b)
+    assert s["auth"]["password_hash_secret"] == "hash-A"
+    assert s["app"]["session_secret_secret"] == (b"A" * 32).hex()
+    assert s["app"]["instance_name"] == "A"
+    for rel in bk.IDENTITY_FILES:
+        assert (b / rel).read_text(encoding="utf-8") == f"{rel}-A"
+    assert result.unreadable_secrets == ()
+
+
+def test_restore_keep_identity_drops_identity_this_server_lacks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Identity the current server doesn't have isn't borrowed from the
+    export either: no name, no install id file, no relay link."""
+    import json
+
+    monkeypatch.delenv("TESSERAE_SECRET_KEY", raising=False)
+    a, b = tmp_path / "a", tmp_path / "b"
+    _seed_server(a, name="A", session=b"A" * 32, token="tok")
+    (b / "core").mkdir(parents=True)
+    (b / "core" / "settings.json").write_text(
+        json.dumps({"app": {"session_secret_secret": (b"B" * 32).hex()}}), encoding="utf-8"
+    )
+    export = bk.create(a)
+    _hand_over(export, b)
+    bk.restore(b, export.id, keep_identity=True)
+    s = _settings(b)
+    assert "auth" not in s and "relay" not in s
+    assert "instance_name" not in s["app"]
+    assert s["app"]["session_secret_secret"] == (b"B" * 32).hex()
+    for rel in bk.IDENTITY_FILES:
+        assert not (b / rel).exists()
+
+
+def test_restore_keep_identity_reports_secrets_it_cannot_rewrap(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A secret wrapped with a key neither the env nor the export's
+    session secret gives (an export from a server with its own
+    TESSERAE_SECRET_KEY) is left alone and reported."""
+    import json
+
+    from app.secret_box import SecretBox
+
+    monkeypatch.delenv("TESSERAE_SECRET_KEY", raising=False)
+    a, b = tmp_path / "a", tmp_path / "b"
+    _seed_server(a, name="A", session=b"A" * 32, token="tok")
+    _seed_server(b, name="B", session=b"B" * 32, token="tok")
+    settings = _settings(a)
+    stranger = SecretBox(b"Z" * 32).wrap("lost")
+    settings["plugins"]["other"] = {"api_key_secret": stranger}
+    (a / "core" / "settings.json").write_text(json.dumps(settings), encoding="utf-8")
+    export = bk.create(a)
+    _hand_over(export, b)
+    result = bk.restore(b, export.id, keep_identity=True)
+    assert result.unreadable_secrets == ("plugins.other.api_key_secret",)
+    s = _settings(b)
+    assert s["plugins"]["other"]["api_key_secret"] == stranger
+    b_box = SecretBox.from_session_secret(b"B" * 32)
+    assert b_box.unwrap(s["plugins"]["ha"]["token_secret"]) == "tok"
+
+
+def test_restore_keep_identity_with_shared_env_key(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Both servers on the same TESSERAE_SECRET_KEY: secrets wrapped with
+    it still open after the import."""
+    import json
+
+    from app.secret_box import SecretBox
+
+    key = "11" * 32
+    monkeypatch.setenv("TESSERAE_SECRET_KEY", key)
+    env_box = SecretBox(bytes.fromhex(key))
+    a, b = tmp_path / "a", tmp_path / "b"
+    _seed_server(a, name="A", session=b"A" * 32, token="tok")
+    _seed_server(b, name="B", session=b"B" * 32, token="tok")
+    settings = _settings(a)
+    settings["plugins"]["ha"]["token_secret"] = env_box.wrap("env-tok")
+    (a / "core" / "settings.json").write_text(json.dumps(settings), encoding="utf-8")
+    export = bk.create(a)
+    _hand_over(export, b)
+    result = bk.restore(b, export.id, keep_identity=True)
+    assert result.unreadable_secrets == ()
+    assert env_box.unwrap(_settings(b)["plugins"]["ha"]["token_secret"]) == "env-tok"

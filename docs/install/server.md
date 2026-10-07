@@ -192,10 +192,12 @@ Two related features under **Settings → System**, both admin-only:
 
 **Backups** (`Settings → System → Backups`) snapshot your full Tesserae state into a ZIP on disk under `data/core/backups/`. Use it for periodic local safety copies and rollback after a bad change. Endpoints: `/settings/system/backup/{create,restore,delete,download}`.
 
-**Data export / import** (`Settings → System → Data`) is the one-shot migration ZIP. Use it when moving to another self-hosted Tesserae Server, not for routine snapshots. The ZIP includes every page JSON, theme definition, font pick, device registration, and per-plugin settings (with secrets embedded, treat the file like a credential).
+**Data export / import** (`Settings → System → Backups → Migrate to another install`) is the one-shot migration ZIP. Use it to copy your setup to another self-hosted Tesserae Server, or to move an install to a new host, not for routine snapshots. The ZIP is the same as a backup: everything under `data/` except gallery photos and the render cache, including every page, theme, font pick, device registration and per-plugin settings (with secrets embedded, treat the file like a credential).
 
-- **Export:** clicks straight to a `tesserae-export-<timestamp>.zip` download.
-- **Import:** upload a ZIP from another self-hosted install. The server validates every file against the matching JSON Schema before writing, then replaces state atomically. On Docker / HA App installs the in-place restart happens automatically; on a venv install the page flashes a "stop and restart" hint so nothing is left mid-flight.
+- **Export:** clicks straight to a `tesserae-data-<timestamp>.zip` download.
+- **Import:** upload a ZIP from another self-hosted install. The server checks that it is a Tesserae export and that no path in it escapes `data/`, takes a `pre-import` backup of the current data (listed under Backups, so a wrong import is one Restore away), then replaces the contents of `data/` with the ZIP's. Gallery photos and the render cache on this server stay put. The server restarts afterwards; under `--dev` the page asks you to restart it yourself.
+- **What an import keeps:** by default this server keeps its own admin password and login settings (the password gate and trusted networks), its server name, colour and public URL, its MCP and webhook tokens, its relay link, its paired Companion apps, its install ID and its MQTT client ID. Everything else, devices and the broker settings they connect with included, comes from the ZIP. Connector secrets in the ZIP are re-encrypted for this server so they keep working. If the export came from a server with a different `TESSERAE_SECRET_KEY`, any secret that can't be decrypted is listed after the import and needs re-entering.
+- **Moving to a new host:** tick **Also take this export's password, login settings and server identity** to take all of the above from the ZIP too, so the new host signs in with the old password and carries on as the same server.
 
 Endpoints: `/settings/system/data/export` and `/settings/system/data/import`.
 
