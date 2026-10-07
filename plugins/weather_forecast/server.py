@@ -20,6 +20,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from app.location_time import location_now
 from app.plugin_http import fetch_json
 
 CACHE_TTL_S = 600
@@ -88,6 +89,15 @@ def fetch(
         fresh_label = options.get("label", "")
         cached["label"] = fresh_label
         cached["place"] = fresh_label
+        # ``time`` and each day's ``today`` flag follow the location's
+        # wall clock, not the weather reading, so recompute them on
+        # every hit instead of freezing them for the cache TTL.
+        now = location_now(cached.get("tz"), cached.get("utc_offset_seconds"))
+        cached["time"] = _hhmm_of(now)
+        today_iso = now.date().isoformat()
+        for day in cached.get("days") or []:
+            if isinstance(day, dict):
+                day["today"] = day.get("date") == today_iso
         return cached
 
     temp_unit = "fahrenheit" if units == "imperial" else "celsius"
@@ -111,7 +121,12 @@ def fetch(
 
     daily = payload.get("daily") or {}
     times: list[str] = daily.get("time") or []
-    today_iso = datetime.now().date().isoformat()
+    # Daily dates are in the location's zone (``timezone=auto``), so
+    # "today" has to be the location's today, not the server's (#351).
+    tz_name = payload.get("timezone")
+    utc_offset = payload.get("utc_offset_seconds")
+    now = location_now(tz_name, utc_offset)
+    today_iso = now.date().isoformat()
     days: list[dict[str, Any]] = []
     for i, date_iso in enumerate(times[:FORECAST_DAYS]):
         try:
@@ -173,7 +188,11 @@ def fetch(
         "days": days,
         # Structured top-level fields the new variants paint from.
         "place": options.get("label", ""),
-        "time": _now_hhmm(),
+        "time": _hhmm_of(now),
+        # The location's zone as Open-Meteo reports it, kept so a cache
+        # hit can recompute ``time`` / ``today`` in the same zone.
+        "tz": tz_name if isinstance(tz_name, str) else None,
+        "utc_offset_seconds": utc_offset,
         "rangeLo": range_lo,
         "rangeHi": range_hi,
     }
@@ -206,8 +225,7 @@ def _iso_to_min(iso: Any) -> int | None:
         return None
 
 
-def _now_hhmm() -> str:
-    n = datetime.now()
+def _hhmm_of(n: datetime) -> str:
     return f"{n.hour:02d}:{n.minute:02d}"
 
 

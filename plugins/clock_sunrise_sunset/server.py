@@ -9,6 +9,7 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
+from app.location_time import location_now
 from app.plugin_http import decode_body
 
 CACHE_TTL_S = 6 * 3600  # sunrise/set don't change intraday
@@ -47,14 +48,15 @@ def fetch(
     if cache.exists() and time.time() - cache.stat().st_mtime < CACHE_TTL_S:
         try:
             cached = json.loads(cache.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            cached = None
+        if isinstance(cached, dict) and _is_for_today(cached):
             # ``label`` is a UI string from the cell editor, not part
             # of the upstream API response. Overlay current label so
             # a rename on the same ``(lat, lon)`` shows up on the
             # next preview instead of waiting for the cache TTL.
             cached["label"] = options.get("label") or ""
             return cached
-        except (json.JSONDecodeError, OSError):
-            pass
 
     url = (
         "https://api.open-meteo.com/v1/forecast"
@@ -79,7 +81,13 @@ def fetch(
 
     result = {
         "label": options.get("label") or "",
-        "tz": payload.get("timezone") or "UTC",
+        # The location's zone; sunrise / sunset are wall-clock times in
+        # it and the client takes "now" in it too (#351).
+        "tz": payload.get("timezone") or None,
+        "utc_offset_seconds": payload.get("utc_offset_seconds"),
+        # The location-local date these values are for; the cache is
+        # only reused while it is still this date at the location.
+        "date": (daily.get("time") or [None])[0],
         "sunrise": sunrise,
         "sunset": sunset,
         "daylight_seconds": daylight_s,
@@ -87,3 +95,21 @@ def fetch(
     with contextlib.suppress(OSError):
         cache.write_text(json.dumps(result), encoding="utf-8")
     return result
+
+
+def _is_for_today(cached: dict[str, Any]) -> bool:
+    """True when the cached sunrise is for the location's current date.
+
+    The cache lives up to six hours, which can straddle the location's
+    midnight and would otherwise keep painting yesterday's sunrise and
+    sunset (#351). Uses the response's daily date, else the sunrise's
+    date part; an entry with neither is treated as stale.
+    """
+    day = cached.get("date")
+    if not isinstance(day, str) or not day:
+        sunrise = cached.get("sunrise")
+        if not isinstance(sunrise, str) or "T" not in sunrise:
+            return False
+        day = sunrise.split("T", 1)[0]
+    now = location_now(cached.get("tz"), cached.get("utc_offset_seconds"))
+    return day[:10] == now.date().isoformat()

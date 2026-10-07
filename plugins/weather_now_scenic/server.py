@@ -109,10 +109,16 @@ def fetch(
     is_day = bool(current.get("is_day", 1))
     cond, icon = _condition(code, is_day)
     preset = _preset(icon, is_day)
+    tz_name = payload.get("timezone")
 
     result: dict[str, Any] = {
         "label": options.get("label", ""),
         "units": units,
+        # The location's zone as Open-Meteo reports it. The client
+        # paints the clock and date in this zone rather than the
+        # render browser's (#351).
+        "tz": tz_name if isinstance(tz_name, str) else None,
+        "utc_offset_seconds": payload.get("utc_offset_seconds"),
         "temp": current.get("temperature_2m"),
         "code": code,
         "is_day": is_day,

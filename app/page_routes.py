@@ -50,6 +50,7 @@ from werkzeug.wrappers import Response
 
 from app.composer import _hydrate_page
 from app.layouts import LAYOUTS, LAYOUTS_BY_SLUG, detect_layout, to_panel_pixels
+from app.location_time import is_iana_zone
 from app.panel import (
     DESIGN_SIZES,
     device_panel,
@@ -261,7 +262,7 @@ def _coerce_cell_option(field: dict[str, Any], raw: str | None, all_form: Any) -
     if ftype == "location_search":
         # Stored as a JSON-encoded dict in the hidden input. The shape
         # mirrors Open-Meteo's geocoding response:
-        #   {name, country, admin1, latitude, longitude}
+        #   {name, country, admin1, latitude, longitude, timezone?}
         # Empty / malformed strings fall back to {}, not the manifest
         # default (which is "" by convention; we want a real dict so
         # downstream code can do ``loc.get("latitude")`` without a
@@ -282,6 +283,11 @@ def _coerce_cell_option(field: dict[str, Any], raw: str | None, all_form: Any) -
             val = parsed.get(key)
             if isinstance(val, str) and val.strip():
                 out_loc[key] = val.strip()
+        # Optional IANA zone from the geocoder (#351). Dropped unless
+        # zoneinfo can load it, so junk never reaches the widgets.
+        tz_val = parsed.get("timezone")
+        if is_iana_zone(tz_val):
+            out_loc["timezone"] = str(tz_val).strip()
         import contextlib
 
         for key in ("latitude", "longitude"):

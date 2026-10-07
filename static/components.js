@@ -485,8 +485,8 @@
   //   { results: [
   //       { id, name, latitude, longitude, country, admin1, admin2, ... }
   //   ]}
-  // We keep only ``{name, country, admin1, latitude, longitude}`` server
-  // side, see ``_coerce_cell_option`` in app/page_routes.py.
+  // We keep only ``{name, country, admin1, latitude, longitude}`` plus
+  // an optional IANA ``timezone`` server side, see ``_coerce_cell_option`` in app/page_routes.py.
   function attachLocationSearch(root) {
     const fields = root.querySelectorAll("[data-location-search]:not([data-location-bound])");
     fields.forEach((field) => {
@@ -704,13 +704,20 @@
             const i = parseInt(row.dataset.idx || "0", 10);
             const r = list[i];
             if (!r) return;
-            selectResult({
+            const picked = {
               name: r.name,
               country: r.country || "",
               admin1: r.admin1 || "",
               latitude: r.latitude,
               longitude: r.longitude,
-            });
+            };
+            // The geocoder's IANA zone for the place, so widgets can
+            // show the location's own time (#351). Pasted coordinates
+            // have none and leave it absent.
+            if (typeof r.timezone === "string" && r.timezone) {
+              picked.timezone = r.timezone;
+            }
+            selectResult(picked);
           });
           row.addEventListener("keydown", (ev) => {
             if (ev.key === "Enter") {

@@ -38,6 +38,7 @@ from werkzeug.wrappers import Response as WerkzeugResponse
 from app import widget_next_change
 from app.bindings import apply_binding
 from app.locale_resolve import resolve_locale
+from app.location_time import is_iana_zone
 from app.panel import PANEL_PRESETS, panel_groups_for_push, resolve_panel_for_page
 from app.plugin_http import fetch_json
 from app.plugin_loader import Font, PluginRegistry
@@ -173,7 +174,7 @@ def _parse_lat_lon(text: str) -> dict[str, Any] | None:
 
 
 def _geocode(query: str) -> dict[str, Any] | None:
-    """Resolve free-text into ``{latitude, longitude, name}``.
+    """Resolve free-text into ``{latitude, longitude, name, timezone?}``.
 
     Tolerant of three canonical shapes: a bare place name
     (``"South Morang"``), a ``"City, CC"`` form (``"Paris, FR"``), or a
@@ -226,6 +227,11 @@ def _geocode(query: str) -> dict[str, Any] | None:
             "longitude": float(lon),
             "name": str(top.get("name") or q),
         }
+        # The geocoder's IANA zone for the place (#351), kept like the
+        # editor's picker does so widgets can show the location's time.
+        tz_name = top.get("timezone")
+        if is_iana_zone(tz_name):
+            resolved["timezone"] = str(tz_name).strip()
         _GEOCODE_CACHE[key] = resolved
         return resolved
 
@@ -371,6 +377,12 @@ def _resolved_options(plugin_id: str, raw: dict[str, Any]) -> dict[str, Any]:
         # API (or restored from a backup) without the editor running.
         if isinstance(loc_name, str) and loc_name and not merged.get("label"):
             merged["label"] = loc_name
+        # The resolved dict replaces a geocoded string or an empty pick, so a
+        # widget reading ``location`` (its ``timezone`` above all, #351) sees
+        # the place the coordinates came from. Only where the widget has a
+        # ``location`` option: one that doesn't never asked for the key.
+        if "location" in merged:
+            merged["location"] = location
     return merged
 
 

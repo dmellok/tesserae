@@ -29,18 +29,33 @@ function fmtTemp(v) {
   return `${Math.round(Number(v))}°`;
 }
 
-function fmtDate() {
-  // Avoid locale surprises (panels in non-English locales rendering
-  // half-translated dates). Server-side rendering uses the container's
-  // system locale; we pin to a stable "Mon DD" form so the visual
-  // matches across panels.
+// The clock and date belong to the weather's location, not the render
+// browser: a server in Berlin showing Melbourne must paint Melbourne's
+// time (#351). ``tz`` is the IANA zone Open-Meteo reports for the
+// location; when it is missing or the browser rejects it, fall back to
+// the browser's own zone.
+function formatNow(locale, tz, opts) {
   const now = new Date();
-  return now.toLocaleDateString("en-US", { month: "long", day: "numeric" });
+  if (tz) {
+    try {
+      return new Intl.DateTimeFormat(locale, { ...opts, timeZone: tz }).format(now);
+    } catch (_err) {
+      // Unknown zone or locale: fall through to the local clock.
+    }
+  }
+  try {
+    return new Intl.DateTimeFormat(locale, opts).format(now);
+  } catch (_err) {
+    return new Intl.DateTimeFormat("en", opts).format(now);
+  }
 }
 
-function fmtTime() {
-  const now = new Date();
-  return now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
+function fmtDate(locale, tz) {
+  return formatNow(locale, tz, { month: "long", day: "numeric" });
+}
+
+function fmtTime(locale, tz) {
+  return formatNow(locale, tz, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 }
 
 // --- preset table ---------------------------------------------------
@@ -329,8 +344,9 @@ export default function render(shadow, ctx) {
   const condKey = COND_KEY_BY_CODE[data.code];
   const cond = condKey ? t(condKey, data.cond || "") : (data.cond || "");
   const label = data.label || "";
-  const time = fmtTime();
-  const date = fmtDate();
+  const locale = ctx?.locale || "en";
+  const time = fmtTime(locale, data.tz);
+  const date = fmtDate(locale, data.tz);
   const scene = preset.scene ? preset.scene() : "";
 
   const layout = `

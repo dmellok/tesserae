@@ -13,6 +13,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from app.location_time import location_now
 from app.plugin_http import fetch_json
 
 CACHE_TTL_S = 600
@@ -77,6 +78,12 @@ def fetch(
         # way out before). Overlay the current options' label so
         # renames take effect on the next preview.
         cached["label"] = options.get("label", "")
+        # ``nowMin`` is the location's wall clock, not part of the
+        # weather reading, so recompute it on every hit instead of
+        # freezing it for the cache TTL.
+        sun = cached.get("sun")
+        if isinstance(sun, dict):
+            sun["nowMin"] = _now_min(cached.get("tz"), cached.get("utc_offset_seconds"))
         return cached
 
     temp_unit = "fahrenheit" if units == "imperial" else "celsius"
@@ -119,7 +126,9 @@ def fetch(
     sunset_iso = _first(daily.get("sunset"))
     rise_min = _iso_to_min(sunrise_iso)
     set_min = _iso_to_min(sunset_iso)
-    now_min = _now_min()
+    tz_name = payload.get("timezone")
+    utc_offset = payload.get("utc_offset_seconds")
+    now_min = _now_min(tz_name, utc_offset)
 
     speed_unit = "mph" if units == "imperial" else "km/h"
     rain_chance = _first(daily.get("precipitation_probability_max"))
@@ -144,6 +153,10 @@ def fetch(
     result: dict[str, Any] = {
         "label": options.get("label", ""),
         "units": units,
+        # The location's zone as Open-Meteo reports it; ``sunrise`` /
+        # ``sunset`` are wall-clock times in this zone.
+        "tz": tz_name if isinstance(tz_name, str) else None,
+        "utc_offset_seconds": utc_offset,
         # Legacy fields, the old client.js render path still uses these.
         "temp": current.get("temperature_2m"),
         "feels": current.get("apparent_temperature"),
@@ -238,14 +251,13 @@ def _hhmm(iso: Any) -> str:
         return ""
 
 
-def _now_min() -> int:
-    """Wall-clock minutes-since-midnight. Open-Meteo with ``timezone=auto``
-    aligns rise/set to the panel's local time, so we use system local
-    too, server and panel are typically in the same TZ for a
-    single-household Tesserae install."""
-    from datetime import datetime as _dt
-
-    n = _dt.now()
+def _now_min(tz_name: Any = None, utc_offset_seconds: Any = None) -> int:
+    """Wall-clock minutes-since-midnight at the location. Open-Meteo with
+    ``timezone=auto`` gives rise/set in the location's zone, so "now"
+    has to be taken in that zone too, a server in Berlin showing
+    Melbourne would otherwise put the sun marker hours out (#351).
+    Falls back to server local time when the zone is unknown."""
+    n = location_now(tz_name, utc_offset_seconds)
     return n.hour * 60 + n.minute
 
 

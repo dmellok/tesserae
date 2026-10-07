@@ -28,6 +28,7 @@ from werkzeug.wrappers import Response
 from app import updater as _updater_mod
 from app.device_loader import Device, DeviceRegistry
 from app.discovery import DiscoveredDevice, DiscoveryCache
+from app.location_time import is_iana_zone
 from app.plugin_loader import PluginRegistry
 from app.push import PushManager
 from app.renderer_loader import RendererRegistry
@@ -351,6 +352,11 @@ def coerce_form_value(field: dict[str, Any], raw: str | None) -> Any:
             val = parsed.get(key)
             if isinstance(val, str) and val.strip():
                 out_loc[key] = val.strip()
+        # Optional IANA zone from the geocoder (#351). Dropped unless
+        # zoneinfo can load it, so junk never reaches the widgets.
+        tz_val = parsed.get("timezone")
+        if is_iana_zone(tz_val):
+            out_loc["timezone"] = str(tz_val).strip()
         for key in ("latitude", "longitude"):
             val = parsed.get(key)
             if val is None:

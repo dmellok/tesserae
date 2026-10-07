@@ -119,6 +119,51 @@ def test_enter_inside_the_debounce_picks_the_pair(page) -> None:  # type: ignore
     loc = _picked(page)
     assert loc["latitude"] == -37.85079727704507
     assert page.evaluate("() => window.__submitted") is False
+    # Pasted coordinates have no geocoder zone, so none is stored (#351).
+    assert "timezone" not in loc
+
+
+def test_a_geocoded_pick_keeps_the_timezone(page) -> None:  # type: ignore[no-untyped-def]
+    """Issue #351: the geocoder's IANA zone rides along inside the saved
+    location value so widgets can show the location's own time."""
+    body = json.dumps(
+        {
+            "results": [
+                {
+                    "id": 2158177,
+                    "name": "Melbourne",
+                    "country": "Australia",
+                    "admin1": "Victoria",
+                    "latitude": -37.814,
+                    "longitude": 144.96332,
+                    "timezone": "Australia/Melbourne",
+                    "elevation": 25,
+                }
+            ]
+        }
+    )
+    page.unroute("**/geocoding-api.open-meteo.com/**")
+    page.route(
+        "**/geocoding-api.open-meteo.com/**",
+        lambda route: route.fulfill(
+            status=200,
+            content_type="application/json",
+            headers={"Access-Control-Allow-Origin": "*"},
+            body=body,
+        ),
+    )
+    page.fill("[data-location-display]", "Melbourne")
+    page.wait_for_selector("[data-idx]")
+    page.click("[data-idx]")
+    loc = _picked(page)
+    assert loc == {
+        "name": "Melbourne",
+        "country": "Australia",
+        "admin1": "Victoria",
+        "latitude": -37.814,
+        "longitude": 144.96332,
+        "timezone": "Australia/Melbourne",
+    }
 
 
 def test_a_city_name_is_not_mistaken_for_coordinates(page) -> None:  # type: ignore[no-untyped-def]

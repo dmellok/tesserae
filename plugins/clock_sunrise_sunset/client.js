@@ -34,6 +34,29 @@ function minsFromIso(iso) {
   return h * 60 + m;
 }
 
+// Minutes since midnight on the location's wall clock. Sunrise and
+// sunset arrive in the location's zone (Open-Meteo timezone=auto), so
+// "now" has to be read in that zone too, not the render browser's: a
+// server in Berlin showing Melbourne would otherwise put the sun marker
+// hours out (#351). Falls back to the browser's clock when the zone is
+// missing or unknown.
+function nowMinutesIn(tz) {
+  const now = new Date();
+  if (tz) {
+    try {
+      const parts = new Intl.DateTimeFormat("en-US", {
+        timeZone: tz, hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+      }).formatToParts(now);
+      const h = Number(parts.find((p) => p.type === "hour")?.value);
+      const m = Number(parts.find((p) => p.type === "minute")?.value);
+      if (Number.isFinite(h) && Number.isFinite(m)) return (h % 24) * 60 + m;
+    } catch (_err) {
+      // Unknown zone: fall through to the local clock.
+    }
+  }
+  return now.getHours() * 60 + now.getMinutes();
+}
+
 // Polar → cartesian on the semicircle. angleDeg in standard math
 // convention (0° east, 90° north / top, 180° west). Returns SVG
 // coordinates (y axis flipped, centred at cx, cy).
@@ -198,8 +221,7 @@ export default function render(shadow, ctx) {
   const sunset = hhmmFromIso(data.sunset);
   const daylight = fmtDaylight(data.daylight_seconds);
 
-  const now = new Date();
-  const minsNow = now.getHours() * 60 + now.getMinutes();
+  const minsNow = nowMinutesIn(data.tz);
   const riseMin = minsFromIso(data.sunrise);
   const setMin = minsFromIso(data.sunset);
   const inDay = riseMin != null && setMin != null && minsNow >= riseMin && minsNow < setMin;
