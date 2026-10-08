@@ -4,7 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ page.name|default("Compose") }}</title>
-  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='brand/icon.svg') }}">
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='brand/favicon.svg') }}">
+  <link rel="alternate icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='brand/favicon-32.png') }}">
   <!-- Phosphor icon webfont, widgets reference icons via <i class="ph ph-xxx">
        (regular) or <i class="ph-bold ph-xxx"> (bold) or <i class="ph-fill ph-xxx">
        (fill, discouraged). The weight class + icon-name class form a compound

@@ -41,6 +41,10 @@ def test_classic_by_default_with_switch_offered(app: Flask) -> None:
     assert "Try the new design" in body
     assert 'aria-checked="false"' in body
     assert "style/paper.css" in body  # loaded everywhere; inert without data-ui
+    # Both designs draw the same server mark and lockup.
+    assert '<span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 256 256"' in body
+    assert 'class="brand-edge"' in body
+    assert '<span class="brand-tag">Server</span>' in body
 
 
 def test_switch_on_then_off_returns_to_the_page(app: Flask) -> None:
@@ -52,7 +56,7 @@ def test_switch_on_then_off_returns_to_the_page(app: Flask) -> None:
     body = client.get("/history").get_data(as_text=True)
     assert '<html lang="en" data-ui="paper">' in body
     assert 'aria-checked="true"' in body
-    assert "brand-label" in body  # sidebar wordmark carries the product label
+    assert '<span class="brand-tag">Server</span>' in body  # the self-hosted lockup
 
     client.post("/settings/ui-design", data={"ui_design": "classic", "next": "/history"})
     assert _ui(app) == "classic"

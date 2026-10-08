@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Tesserae self-hosted server mark: ink tile, red top right, paper bottom left. Never follows the theme. Tab icon: only the hairline follows the system theme.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256"><style>.hd{display:none}@media (prefers-color-scheme: dark){.hd{display:inline}}</style><defs><clipPath id="t"><rect width="256" height="256" rx="72"/></clipPath></defs><rect width="256" height="256" rx="72" fill="#1C1B19"/><rect class="hd" width="256" height="256" rx="72" fill="none" stroke="#EDE9DF" stroke-opacity="0.3" stroke-width="2" vector-effect="non-scaling-stroke" clip-path="url(#t)"/><path d="M128 55H174A27 27 0 0 1 201 82V128H128Z" fill="#D0493C"/><path d="M55 128H128V201H82A27 27 0 0 1 55 174Z" fill="#FFFDF8"/></svg>

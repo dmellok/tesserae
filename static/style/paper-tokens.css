@@ -33,10 +33,7 @@
   --p-subnav: #F6F3EC;
   --p-red: #B8352A;
   --p-focus: #2B4E9B;
-  --p-logo-tile: #FFFDF8;
-  --p-logo-edge: #1C1B19;
-  --p-logo-a: #B8352A;
-  --p-logo-b: #1C1B19;
+  /* The server mark's --p-logo-* tokens live in base.css: they never flip. */
   --p-ease: cubic-bezier(.2, .7, .2, 1);
 
   --t-accent: #B8352A;
@@ -114,10 +111,6 @@
   --p-subnav: #1B1A18;
   --p-red: #E06A5C;
   --p-focus: #7C9BE0;
-  --p-logo-tile: #22211E;
-  --p-logo-edge: #EDE9DF;
-  --p-logo-a: #D0493C;
-  --p-logo-b: #EDE9DF;
 
   --t-accent: #D0493C;
   --t-accent-hover: #E05A4C;

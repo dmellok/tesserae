@@ -4,6 +4,8 @@ icon, and leaves the admin untouched while neither is set."""
 
 from __future__ import annotations
 
+from urllib.parse import unquote
+
 from flask import Flask
 from flask.testing import FlaskClient
 
@@ -47,6 +49,23 @@ def test_presets_carry_a_dark_step_and_readable_text() -> None:
     assert custom is not None and custom["colour"] is not None
     assert custom["colour"]["light"] == custom["colour"]["dark"] == "#6b4fa0"
     assert custom["colour"]["favicon"].startswith("data:image/svg+xml,")
+    # The tab icon tints the on-ink step: blue's lighter one.
+    blue = server_identity.resolve({"server_colour": "blue"})
+    assert blue is not None and blue["colour"] is not None
+    assert unquote(blue["colour"]["favicon"]) == unquote(
+        server_identity.favicon_data_uri("#8FA8E0")
+    )
+
+
+def test_tinted_favicon_keeps_the_ink_tile() -> None:
+    svg = unquote(server_identity.favicon_data_uri("#8FA8E0"))
+    # Ink tile, server colour top right, paper bottom left.
+    assert '<rect width="256" height="256" rx="72" fill="#1C1B19"/>' in svg
+    assert '<path d="M128 55H174A27 27 0 0 1 201 82V128H128Z" fill="#8FA8E0"/>' in svg
+    assert '<path d="M55 128H128V201H82A27 27 0 0 1 55 174Z" fill="#FFFDF8"/>' in svg
+    # Only the hairline follows a dark tab strip, never the tile.
+    assert "@media (prefers-color-scheme: dark){.hd{display:inline}}" in svg
+    assert 'class="hd"' in svg and 'vector-effect="non-scaling-stroke"' in svg
 
 
 def test_unset_leaves_the_admin_alone(app: Flask, client: FlaskClient) -> None:
@@ -55,7 +74,7 @@ def test_unset_leaves_the_admin_alone(app: Flask, client: FlaskClient) -> None:
     assert "data-server-colour" not in html
     assert 'class="server-strip"' not in html
     assert 'class="server-chip"' not in html
-    assert "brand/icon.svg" in html
+    assert "brand/favicon.svg" in html
 
 
 def test_name_and_colour_mark_the_page(app: Flask, client: FlaskClient) -> None:
@@ -70,6 +89,8 @@ def test_name_and_colour_mark_the_page(app: Flask, client: FlaskClient) -> None:
     assert "--server-colour: #8FA8E0;" in html
     assert 'rel="icon" type="image/svg+xml" href="data:image/svg+xml,' in html
     assert '<meta name="theme-color" content="#2B4E9B"' in html
+    # The nav mark keeps its ink tile and takes the on-ink step in both themes.
+    assert "--p-logo-a: #8FA8E0;" in html
 
 
 def test_name_alone_shows_the_chip_without_a_stripe(app: Flask, client: FlaskClient) -> None:

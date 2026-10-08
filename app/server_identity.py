@@ -3,8 +3,8 @@
 Someone running more than one Tesserae (dev, test, prod) sets a short name
 and a colour under Settings › Server › This server. The colour paints a 4px
 stripe across the top of every page and becomes the accent; the name shows
-as a chip under the wordmark and leads the browser tab title. The tab icon
-takes the colour too. Both are install-wide settings in the ``app`` section,
+as a chip under the wordmark and leads the browser tab title. The server
+mark's top-right square, in the nav and the tab icon, takes the colour too. Both are install-wide settings in the ``app`` section,
 so every browser and phone sees the same thing.
 
 Nothing changes until one is set: with no name and no colour the admin looks
@@ -81,14 +81,24 @@ def text_on(hex_colour: str) -> str:
 
 
 def favicon_data_uri(hex_colour: str) -> str:
-    """The Tesserae mark as an SVG data URI, filled with ``hex_colour``."""
-    fg = text_on(hex_colour)
+    """The server mark as an SVG data URI with ``hex_colour`` in its top-right
+    square.
+
+    The tile stays ink and the bottom-left square paper, so a tinted tab
+    still reads as a self-hosted server; only the red square takes the
+    server colour. As in static/brand/favicon.svg, the tile never follows
+    the system theme and a dark tab strip only adds the 1 px light
+    hairline. Pass the colour's on-ink (dark) step."""
     svg = (
         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">'
-        f'<rect width="256" height="256" rx="72" fill="{hex_colour}"/>'
-        f'<g fill="{fg}" fill-opacity="0.9">'
-        '<path d="M128 55H174A27 27 0 0 1 201 82V128H128Z"/>'
-        '<path d="M55 128H128V201H82A27 27 0 0 1 55 174Z"/></g></svg>'
+        "<style>.hd{display:none}@media (prefers-color-scheme: dark){.hd{display:inline}}</style>"
+        '<defs><clipPath id="t"><rect width="256" height="256" rx="72"/></clipPath></defs>'
+        '<rect width="256" height="256" rx="72" fill="#1C1B19"/>'
+        '<rect class="hd" width="256" height="256" rx="72" fill="none" stroke="#EDE9DF"'
+        ' stroke-opacity="0.3" stroke-width="2" vector-effect="non-scaling-stroke"'
+        ' clip-path="url(#t)"/>'
+        f'<path d="M128 55H174A27 27 0 0 1 201 82V128H128Z" fill="{hex_colour}"/>'
+        '<path d="M55 128H128V201H82A27 27 0 0 1 55 174Z" fill="#FFFDF8"/></svg>'
     )
     return "data:image/svg+xml," + quote(svg, safe="")
 
@@ -116,7 +126,7 @@ def resolve(app_settings: dict[str, Any] | None) -> dict[str, Any] | None:
             "light_fg": text_on(light),
             "dark": dark,
             "dark_fg": text_on(dark),
-            "favicon": favicon_data_uri(light),
+            "favicon": favicon_data_uri(dark),
         }
     return {"name": name, "colour": colour}
 

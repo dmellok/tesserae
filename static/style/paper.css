@@ -48,18 +48,12 @@
 :root[data-ui="paper"] .topnav .nav-dropdown[open] summary { color: var(--t-fg); background: var(--p-selected); }
 :root[data-ui="paper"] :focus-visible { outline: 2px solid var(--p-focus); outline-offset: 2px; }
 
-/* ----- Brand mark: the Tesserae tile, recoloured ---------------------- */
+/* ----- Brand: the server mark and lockup (shell.css, base.css) -------- */
 
 :root[data-ui="paper"] .brand { color: var(--t-fg); font-weight: 700; letter-spacing: -0.015em; }
 :root[data-ui="paper"] .brand:hover { color: var(--t-fg); }
-:root[data-ui="paper"] .brand-mark {
-  width: 28px; height: 28px; border-radius: 0; background: none; box-shadow: none;
-  transition: transform 220ms var(--p-ease);
-}
-:root[data-ui="paper"] .brand-mark::before { content: none; }
-:root[data-ui="paper"] .brand-mark svg { width: 28px; height: 28px; display: block; }
+:root[data-ui="paper"] .brand-mark { transition: transform 220ms var(--p-ease); }
 :root[data-ui="paper"] .brand:hover .brand-mark { transform: rotate(-6deg); }
-.brand-label { display: none; }
 
 /* ----- Shell: left sidebar on desktop -------------------------------- */
 
@@ -82,16 +76,7 @@
   }
   :root[data-ui="paper"] .topbar::before { content: none; }
   :root[data-ui="paper"] .brand { padding: 0 var(--t-space-2) var(--t-space-5); gap: 10px; }
-  :root[data-ui="paper"] .brand-label {
-    display: block;
-    font-family: var(--t-font-mono);
-    font-size: 10px;
-    font-weight: 400;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--t-fg-soft);
-    margin-top: 2px;
-  }
+    /* "Tesserae" and its SERVER tag on one line, the #350 name chip below. */
   :root[data-ui="paper"] .brand-name { display: flex; flex-direction: column; line-height: 1.1; font-size: 17px; }
 
   :root[data-ui="paper"] .topnav {

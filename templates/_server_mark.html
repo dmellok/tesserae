@@ -33,14 +33,15 @@
     --t-accent-tint: color-mix(in oklab, var(--server-colour) 16%, var(--t-surface));
     --t-accent-fg: var(--server-colour-fg);
     --t-accent-ink: color-mix(in oklab, var(--server-colour) 68%, #000);
-    --p-logo-a: var(--server-colour);
+    {#- The server mark's tile is ink in both themes, so its top-right
+        square always takes the colour's on-ink (dark) step. #}
+    --p-logo-a: {{ si.colour.dark }};
   }
   :root[data-server-colour][data-theme="dark"], :root[data-server-colour][data-theme="dark"] body {
     --server-colour: {{ si.colour.dark }};
     --server-colour-fg: {{ si.colour.dark_fg }};
     --t-accent: var(--server-colour);
     --t-accent-fg: var(--server-colour-fg);
-    --p-logo-a: var(--server-colour);
     --t-accent-hover: color-mix(in oklab, var(--server-colour) 82%, #fff);
     --t-accent-soft: color-mix(in oklab, var(--server-colour) 22%, var(--t-surface));
     --t-accent-tint: color-mix(in oklab, var(--server-colour) 22%, var(--t-surface));
@@ -58,7 +59,12 @@
     background: var(--server-colour, var(--t-accent)); color: var(--server-colour-fg, var(--t-accent-fg));
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  :root:not([data-ui="paper"]) .server-chip { margin: 0 0 0 8px; vertical-align: middle; }
+  {#- Beside the SERVER tag in the classic top bar and Paper's phone top bar;
+      under it in Paper's desktop sidebar. #}
+  :root:not([data-ui="paper"]) .server-chip { margin: 0 0 0 8px; align-self: center; }
+  @media (max-width: 900px) {
+    :root[data-ui="paper"] .server-chip { margin: 0 0 0 8px; align-self: center; }
+  }
 </style>
 {% endif %}
 {%- endmacro -%}

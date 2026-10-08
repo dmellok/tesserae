@@ -1,0 +1,11 @@
+{# The self-hosted server mark, drawn inline so a server colour (#350) can
+   recolour the top-right square through --p-logo-a. Tokens and the hairline
+   rule live in static/style/base.css: the ink tile never follows the theme,
+   and the 1 px light hairline (stroke 2, non-scaling, clipped to the tile,
+   so 1 CSS px at any size) shows only in the dark theme. Used by both
+   designs in _base.html and by the canvas editor; never by compose.html,
+   which is what panels render. ``clip_id`` must be unique on the page. #}
+
+{%- macro mark(clip_id="brand-clip") -%}
+<svg viewBox="0 0 256 256" focusable="false" aria-hidden="true"><defs><clipPath id="{{ clip_id }}"><rect width="256" height="256" rx="72"/></clipPath></defs><rect width="256" height="256" rx="72" style="fill: var(--p-logo-tile)"/><rect class="brand-edge" width="256" height="256" rx="72" fill="none" stroke-width="2" stroke-opacity="0.3" vector-effect="non-scaling-stroke" clip-path="url(#{{ clip_id }})" style="stroke: var(--p-logo-edge)"/><path d="M128 55H174A27 27 0 0 1 201 82V128H128Z" style="fill: var(--p-logo-a)"/><path d="M55 128H128V201H82A27 27 0 0 1 55 174Z" style="fill: var(--p-logo-b)"/></svg>
+{%- endmacro -%}

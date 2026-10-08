@@ -54,36 +54,46 @@
 .brand:hover { color: var(--t-accent); }
 .brand:hover .brand-mark { transform: rotate(8deg) scale(1.06); }
 
+/* The server mark (templates/_brand_mark.html), the same inline SVG in
+   both designs; its colours are the --p-logo-* tokens in base.css. */
 .brand-mark {
-  display: inline-grid;
-  place-items: center;
+  display: inline-block;
+  flex: none;
   width: 28px;
   height: 28px;
-  border-radius: 8px;
-  background: linear-gradient(135deg, var(--t-accent), var(--t-accent-hover));
-  color: var(--t-accent-fg);
-  font-size: 16px;
-  position: relative;
-  /* Soft glow + inset highlight so the mark feels lit, not pasted on. */
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,.35),
-    0 1px 3px color-mix(in oklab, var(--t-accent) 35%, transparent),
-    0 6px 16px color-mix(in oklab, var(--t-accent) 18%, transparent);
   transition: transform 220ms var(--t-ease-spring);
 }
-/* Tessellated dot pattern, pure CSS, no image. */
-.brand-mark::before {
-  content: "";
-  position: absolute;
-  inset: 6px;
-  background:
-    conic-gradient(from 0deg at 50% 50%, currentColor 0 25%, transparent 0 50%,
-                   currentColor 0 75%, transparent 0 100%);
-  opacity: 0.85;
-  border-radius: 3px;
-}
+.brand-mark svg { width: 100%; height: 100%; display: block; }
 
-.brand-name { font-size: var(--t-size-lg); }
+/* The self-hosted lockup: "Tesserae" in Inter 700 at -0.02em, then the
+   SERVER tag, uppercase Inter 700 at 0.12em in an ink pill with paper
+   text (light pill, ink text in the dark theme). The brand sheet sets the
+   tag at ~0.35x the wordmark; at nav sizes that would be ~6px, so it
+   holds a 9px floor and keeps the sheet's pill proportions. */
+.brand-name { display: inline-flex; align-items: center; font-size: var(--t-size-lg); }
+.brand-word {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  font-family: "Inter", var(--t-font);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+.brand-tag {
+  display: inline-block;
+  padding: 3px 5px 3px 6px;
+  border-radius: 3px;
+  background: #1C1B19;
+  color: #FFFDF8;
+  font-family: "Inter", var(--t-font);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+:root[data-theme="dark"] .brand-tag { background: #EDE9DF; color: #1C1B19; }
 
 .topnav {
   display: flex;

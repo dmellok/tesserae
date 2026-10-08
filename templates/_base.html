@@ -3,6 +3,7 @@
    static/style/paper.css. The switch lives in the header (below). #}
 {% from "_ui_switch.html" import ui_switch with context %}
 {% import "_server_mark.html" as server_mark %}
+{% import "_brand_mark.html" as brand_mark %}
 {% set _si = server_identity if server_identity is defined else None %}
 {% set _paper = app_settings is defined and app_settings.get('ui_design') == 'paper' %}
 <html lang="en"{% if _paper %} data-ui="paper"{% endif %}{{ server_mark.html_attr(_si) }}>
@@ -21,7 +22,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   {% endif %}
   <title>{{ server_mark.tab_prefix(_si) }}{% block title %}Tesserae{% endblock %}</title>
-  <link rel="icon" type="image/svg+xml" href="{{ server_mark.favicon_href(_si, url_for('static', filename='brand/icon.svg')) }}">
+  <link rel="icon" type="image/svg+xml" href="{{ server_mark.favicon_href(_si, url_for('static', filename='brand/favicon.svg')) }}">
   <link rel="alternate icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='brand/favicon-32.png') }}">
   <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='brand/icon-192.png') }}">
   <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='brand/apple-touch-icon.png') }}">
@@ -170,13 +171,9 @@
   {{ server_mark.strip(_si) }}
   <header class="topbar">
     <a class="brand" href="{{ url_for('index') }}">
-      {% if _paper %}
-      <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 256 256" focusable="false"><rect width="256" height="256" rx="72" style="fill: var(--p-logo-tile)"/><rect x="3" y="3" width="250" height="250" rx="69" fill="none" stroke-width="6" style="stroke: var(--p-logo-edge); stroke-opacity: 0.22"/><path d="M128 55H174A27 27 0 0 1 201 82V128H128Z" style="fill: var(--p-logo-a)"/><path d="M55 128H128V201H82A27 27 0 0 1 55 174Z" style="fill: var(--p-logo-b)"/></svg></span>
-      <span class="brand-name">Tesserae<span class="brand-label">Self-hosted</span>{{ server_mark.chip(_si) }}</span>
-      {% else %}
-      <span class="brand-mark" aria-hidden="true"></span>
-      <span class="brand-name">Tesserae{{ server_mark.chip(_si) }}</span>
-      {% endif %}
+      {# The self-hosted lockup: server mark, "Tesserae", SERVER tag. #}
+      <span class="brand-mark" aria-hidden="true">{{ brand_mark.mark() }}</span>
+      <span class="brand-name"><span class="brand-word">Tesserae <span class="brand-tag">Server</span></span>{{ server_mark.chip(_si) }}</span>
     </a>
     {# Locked shell (sign-in / first-run setup without a session): no nav,
        no battery popover, no update badge, no opt-in prompt. See

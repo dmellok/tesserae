@@ -386,7 +386,22 @@ code, pre, .mono, .meta dd, .field-id, [data-mono] {
 a { color: var(--t-accent); text-decoration: none; }
 a:hover { color: var(--t-accent-hover); }
 
-/* ----- Icons (Phosphor) ----------------------------------------------
+/* ----- Server mark ----------------------------------------------------
+   The self-hosted mark (templates/_brand_mark.html): ink tile, red top
+   right, paper bottom left, in both designs and both themes. The tile
+   never follows the theme; a dark theme only adds a 1 px light hairline
+   inside the tile edge. A server colour (#350) replaces --p-logo-a. */
+
+:root {
+  --p-logo-tile: #1C1B19;
+  --p-logo-a: #D0493C;
+  --p-logo-b: #FFFDF8;
+  --p-logo-edge: #EDE9DF;
+}
+.brand-edge { display: none; }
+:root[data-theme="dark"] .brand-edge { display: inline; }
+
+/* ----- Icons (Phosphor)----------------------------------------------
    Inline icons inherit colour + sit on the baseline. Standalone icons
    (in card-head, empty states) bump up via .ph-lg / .ph-2x classes. */
 

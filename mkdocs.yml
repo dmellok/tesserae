@@ -21,6 +21,10 @@ theme:
   # away from Umami. Docs traffic is the only signal collected; the
   # app itself sends no phone-home telemetry.
   custom_dir: overrides
+  # The self-hosted server mark (ink tile). The favicon keeps the tile in
+  # both themes; only a 1 px hairline follows a dark tab strip.
+  logo: assets/brand/icon.svg
+  favicon: assets/brand/favicon.svg
   icon:
     repo: fontawesome/brands/github
   features:
