@@ -4,6 +4,7 @@ all running against a real (empty) data_dir seeded by the test fixture."""
 from __future__ import annotations
 
 import importlib.util
+import io
 from pathlib import Path
 
 from flask import Flask
@@ -19,6 +20,12 @@ def _load_server():
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
+
+
+def _jpeg_bytes() -> bytes:
+    buf = io.BytesIO()
+    Image.new("RGB", (80, 60), (255, 200, 0)).save(buf, format="JPEG")
+    return buf.getvalue()
 
 
 def _seed_image(folder_path: Path, name: str, size=(80, 60)) -> Path:
@@ -88,6 +95,31 @@ def test_create_internal_folder_then_view_it(app: Flask, client: FlaskClient) ->
     resp2 = client.get("/plugins/picture_gallery/folders/trips")
     assert resp2.status_code == 200
     assert b"trips" in resp2.data
+
+
+def test_an_imported_folder_without_its_directory_comes_back(
+    app: Flask, client: FlaskClient
+) -> None:
+    # A backup carries .folders.json but neither the photos nor the empty
+    # directories, so an import leaves the folder in the metadata only (#355).
+    plugin = app.config["PLUGIN_REGISTRY"].get("picture_gallery")
+    plugin.data_dir.mkdir(parents=True, exist_ok=True)
+    (plugin.data_dir / ".folders.json").write_text(
+        '{"trips": {"label": "trips", "external_path": null}}', encoding="utf-8"
+    )
+    with client.session_transaction() as sess:
+        sess["authed"] = True
+    resp = client.get("/plugins/picture_gallery/")
+    assert resp.status_code == 200
+    assert b"trips" in resp.data
+    assert (plugin.data_dir / "trips").is_dir()
+    resp = client.post(
+        "/plugins/picture_gallery/folders/trips/upload",
+        data={"file": (io.BytesIO(_jpeg_bytes()), "beach.jpg")},
+        content_type="multipart/form-data",
+    )
+    assert resp.status_code == 302
+    assert (plugin.data_dir / "trips" / "beach.jpg").is_file()
 
 
 def test_create_folder_rejects_bad_name(app: Flask, client: FlaskClient) -> None:

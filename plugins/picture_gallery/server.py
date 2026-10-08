@@ -139,7 +139,23 @@ def _list_internal_folders(data_dir: Path) -> list[str]:
     )
 
 
+def _restore_missing_internal_dirs(data_dir: Path) -> None:
+    """Recreate the directory of every internal folder ``.folders.json``
+    knows about. A backup keeps ``.folders.json`` but not the photos, and a
+    zip holds no empty directories, so importing one on another server
+    left folders that were listed nowhere yet blocked their own names
+    (#355). They come back empty, ready for the photos again."""
+    for name, entry in _load_meta(data_dir).items():
+        if entry.get("external_path") or not _FOLDER_NAME_RE.match(name):
+            continue
+        path = data_dir / name
+        if not path.exists():
+            with contextlib.suppress(OSError):
+                path.mkdir(parents=True)
+
+
 def _all_folder_names(data_dir: Path) -> list[str]:
+    _restore_missing_internal_dirs(data_dir)
     internal = set(_list_internal_folders(data_dir))
     meta = _load_meta(data_dir)
     external = {n for n, m in meta.items() if m.get("external_path")}
