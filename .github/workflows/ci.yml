@@ -148,8 +148,11 @@ jobs:
           python-version: "3.11"
           cache: pip
       - name: Install app + scanners
+        # setuptools is upgraded with pip: the copy the interpreter ships is a
+        # build tool nothing here imports, and it was the one finding left
+        # once the runtime graph audited clean (#142).
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install --upgrade pip setuptools
           pip install -e . bandit pip-audit
       - name: bandit
         # Hard gate on high-severity, high-confidence findings only (0 today).
@@ -157,12 +160,11 @@ jobs:
         # are too noisy to block the build on.
         run: bandit -r app -q --severity-level high --confidence-level high
       - name: pip-audit
-        # Advisory. The pillow + cryptography advisories that motivated #142 are
-        # resolved (pins lifted to <13 / <51). What remains is setuptools on the
-        # runner, a build tool rather than a runtime dependency. Kept
-        # non-blocking so an unresolvable transitive doesn't red main; promote
-        # to a hard gate once the runtime graph audits clean.
-        continue-on-error: true
+        # A hard gate since #142: the pillow and cryptography advisories that
+        # motivated it are resolved (pins lifted to <13 / <51, uv.lock on
+        # pillow 12), and with setuptools upgraded above nothing else is
+        # reported. A new advisory now fails the build until it is upgraded
+        # past or ignored here with --ignore-vuln and a reason.
         run: pip-audit --progress-spinner off
 
   mypy:

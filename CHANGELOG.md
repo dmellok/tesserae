@@ -187,6 +187,12 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Security
 
+- `uv.lock` resolves Pillow 12.3 (and pillow-heif 1.8), urllib3 2.8 and
+  Werkzeug 3.1.9, which carry the fixes for the advisories `pip-audit`
+  reported against 11.3, 2.7 and 3.1.8. The version caps were already lifted;
+  the lock had kept the old versions. Every renderer and every dither mode on
+  every gamut renders pixel-identical output on Pillow 11.3 and 12.3. The
+  `pip-audit` step in CI is now a hard gate (#142).
 - A client could set `X-Forwarded-For` to pass for this machine or for
   the local network. From the network, claiming `127.0.0.1` opened the
   pages kept for the built-in renderer (`/compose/`, the theme
