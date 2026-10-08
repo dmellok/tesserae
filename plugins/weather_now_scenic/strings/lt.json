@@ -1,6 +1,7 @@
 {
   "weather": "Orai",
   "cond_sunny": "Saulėta",
+  "cond_clear": "Giedra",
   "cond_mostly_clear": "Beveik giedra",
   "cond_partly_cloudy": "Mažai debesuota",
   "cond_cloudy": "Debesuota",

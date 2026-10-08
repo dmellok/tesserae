@@ -1,6 +1,7 @@
 {
   "weather": "天氣",
   "cond_sunny": "晴",
+  "cond_clear": "晴",
   "cond_mostly_clear": "晴時多雲",
   "cond_partly_cloudy": "局部多雲",
   "cond_cloudy": "多雲",

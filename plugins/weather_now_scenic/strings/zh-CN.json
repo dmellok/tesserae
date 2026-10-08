@@ -1,6 +1,7 @@
 {
   "weather": "天气",
   "cond_sunny": "晴",
+  "cond_clear": "晴",
   "cond_mostly_clear": "少云",
   "cond_partly_cloudy": "多云",
   "cond_cloudy": "阴",

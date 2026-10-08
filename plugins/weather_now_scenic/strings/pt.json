@@ -1,6 +1,7 @@
 {
   "weather": "Tempo",
   "cond_sunny": "Sol",
+  "cond_clear": "Céu limpo",
   "cond_mostly_clear": "Quase limpo",
   "cond_partly_cloudy": "Pouco nublado",
   "cond_cloudy": "Nublado",

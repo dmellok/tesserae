@@ -1,6 +1,7 @@
 {
   "weather": "Počasí",
   "cond_sunny": "Slunečno",
+  "cond_clear": "Jasno",
   "cond_mostly_clear": "Skoro jasno",
   "cond_partly_cloudy": "Polojasno",
   "cond_cloudy": "Oblačno",

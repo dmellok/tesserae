@@ -184,6 +184,9 @@ def _condition(code: Any, is_day: bool) -> tuple[str, str]:
     if entry is None:
         return ("Cloudy", "cloud")
     label, day_icon, night_icon = entry
+    if c == 0 and not is_day:
+        # Nobody calls a clear night sunny (#351).
+        label = "Clear"
     return (label, day_icon if is_day else night_icon)
 
 

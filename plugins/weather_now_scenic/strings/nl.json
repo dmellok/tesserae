@@ -1,6 +1,7 @@
 {
   "weather": "Weer",
   "cond_sunny": "Zonnig",
+  "cond_clear": "Helder",
   "cond_mostly_clear": "Licht bewolkt",
   "cond_partly_cloudy": "Half bewolkt",
   "cond_cloudy": "Bewolkt",

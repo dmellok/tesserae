@@ -1,6 +1,7 @@
 {
   "weather": "Meteo",
   "cond_sunny": "Soleggiato",
+  "cond_clear": "Sereno",
   "cond_mostly_clear": "Poco nuvoloso",
   "cond_partly_cloudy": "Parz. nuvoloso",
   "cond_cloudy": "Nuvoloso",

@@ -1,6 +1,7 @@
 {
   "weather": "Pogoda",
   "cond_sunny": "Słonecznie",
+  "cond_clear": "Bezchmurnie",
   "cond_mostly_clear": "Prawie bezchmurnie",
   "cond_partly_cloudy": "Częściowo pochmurno",
   "cond_cloudy": "Pochmurno",

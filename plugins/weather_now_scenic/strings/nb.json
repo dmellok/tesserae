@@ -1,6 +1,7 @@
 {
   "weather": "Vær",
   "cond_sunny": "Sol",
+  "cond_clear": "Klarvær",
   "cond_mostly_clear": "Lettskyet",
   "cond_partly_cloudy": "Delvis skyet",
   "cond_cloudy": "Skyet",

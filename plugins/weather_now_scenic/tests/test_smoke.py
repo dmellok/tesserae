@@ -15,7 +15,7 @@ from unittest.mock import patch
 import pytest
 from flask.testing import FlaskClient
 
-from plugins.weather_now_scenic.server import _preset
+from plugins.weather_now_scenic.server import _condition, _preset
 
 _FAKE_PAYLOAD = json.dumps(
     {
@@ -67,6 +67,13 @@ class _FakeResp:
 )
 def test_preset_mapping(icon: str, is_day: bool, expected: str) -> None:
     assert _preset(icon, is_day) == expected
+
+
+def test_a_clear_night_is_not_sunny() -> None:
+    # #351: code 0 read "Sunny" over the moon scene.
+    assert _condition(0, True) == ("Sunny", "sun")
+    assert _condition(0, False) == ("Clear", "moon")
+    assert _condition(1, False) == ("Mostly clear", "moon")
 
 
 @pytest.mark.parametrize("size", ["sm", "md", "lg"])

@@ -1,6 +1,7 @@
 {
   "weather": "Väder",
   "cond_sunny": "Soligt",
+  "cond_clear": "Klart",
   "cond_mostly_clear": "Mest klart",
   "cond_partly_cloudy": "Halvklart",
   "cond_cloudy": "Molnigt",

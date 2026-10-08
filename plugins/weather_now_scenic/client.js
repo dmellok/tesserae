@@ -341,7 +341,8 @@ export default function render(shadow, ctx) {
   const presetName = PRESETS[data.preset] ? data.preset : "cloudy_day";
   const preset = PRESETS[presetName] || FALLBACK;
   const temp = fmtTemp(data.temp);
-  const condKey = COND_KEY_BY_CODE[data.code];
+  // A clear night is "Clear", not "Sunny" (#351), as server.py labels it.
+  const condKey = data.code === 0 && data.is_day === false ? "cond_clear" : COND_KEY_BY_CODE[data.code];
   const cond = condKey ? t(condKey, data.cond || "") : (data.cond || "");
   const label = data.label || "";
   const locale = ctx?.locale || "en";
