@@ -183,6 +183,9 @@ def wiring(tmp_path: Path):
         rotation_store=rotation_store,
         push_manager=lambda: push_manager,
         page_exists=lambda _pid: True,  # tests use fake page_ids
+        # The times below are UTC; without a zone the scheduler reads the
+        # host's, so these passed only on a host that runs in UTC.
+        timezone_provider=lambda: UTC,
     )
     return scheduler, push_manager, rotation_store
 
@@ -438,6 +441,7 @@ def _smart_wiring(tmp_path: Path, *, device_ids, telemetry):
         page_exists=lambda _pid: True,
         device_ids_for_page=lambda page_id: device_ids.get(page_id, []),
         device_telemetry=telemetry,
+        timezone_provider=lambda: UTC,
     )
     return scheduler, push_manager, rotation_store
 
