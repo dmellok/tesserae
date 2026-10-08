@@ -610,9 +610,9 @@ def _maybe_switch_wire_format(device_id: str, body: dict[str, Any]) -> None:
     just re-declaring ``format`` on its next ``/register`` or ``/discover``
     (a memory-constrained CircuitPython client dropping PNG's zlib inflate
     for the uncompressed BMP path), no delete + re-create. When the
-    renderer actually moves, the device's cached render is invalidated so
-    ``/frame`` reports 204 until the next push repaints it in the new
-    format, rather than serving the stale old-format frame. Best-effort:
+    renderer actually moves, the device's cached render is dropped and repainted
+    in the new format straight away (the next push no longer has to do
+    it), rather than serving the stale old-format frame. Best-effort:
     any failure is logged and swallowed so it never breaks the poll."""
     wire_format = body.get("format")
     if not wire_format:
@@ -630,7 +630,7 @@ def _maybe_switch_wire_format(device_id: str, body: dict[str, Any]) -> None:
         if changed:
             push_mgr = current_app.config.get("PUSH_MANAGER")
             if push_mgr is not None:
-                push_mgr.invalidate_latest_render(device_id)
+                push_mgr.invalidate_and_repaint(device_id)
     except Exception:
         current_app.logger.exception("rest: wire-format switch failed for device=%s", device_id)
 
@@ -645,9 +645,8 @@ def _maybe_heal_gamut(device_id: str, body: dict[str, Any]) -> None:
     the panel block alone. ``update_instance_gamut`` only acts when a
     dedicated renderer is involved (``kaleido_png`` either way), so a
     client restating a gamut its default renderer already serves is
-    still a no-op. When the device moves, its cached render is dropped so
-    ``/frame`` reports 204 until the next push repaints it in the new
-    format. Best-effort: any failure is logged and swallowed so it never
+    still a no-op. When the device moves, its cached render is dropped and
+    repainted in the new format straight away. Best-effort: any failure is logged and swallowed so it never
     breaks the poll."""
     declared = body.get("gamut")
     if not isinstance(declared, str) or not declared.strip():
@@ -665,7 +664,7 @@ def _maybe_heal_gamut(device_id: str, body: dict[str, Any]) -> None:
         if changed:
             push_mgr = current_app.config.get("PUSH_MANAGER")
             if push_mgr is not None:
-                push_mgr.invalidate_latest_render(device_id)
+                push_mgr.invalidate_and_repaint(device_id)
     except Exception:
         current_app.logger.exception("rest: gamut heal failed for device=%s", device_id)
 
@@ -684,8 +683,9 @@ def _maybe_heal_kind(device_id: str, body: dict[str, Any]) -> None:
 
     Same-protocol siblings only; the service layer enforces that. When
     the instance actually moves, the cached render is invalidated (the
-    new kind may carry different panel dims / renderer) so ``/frame``
-    reports 204 until the next push repaints. Best-effort: any failure
+    new kind may carry different panel dims / renderer) and the page
+    behind it is pushed again; a frame with no page behind it waits for
+    the next push, since its composition may be the wrong size. Best-effort: any failure
     is logged and swallowed so it never breaks pairing."""
     declared = body.get("kind")
     if not isinstance(declared, str) or not declared.strip():
@@ -703,7 +703,7 @@ def _maybe_heal_kind(device_id: str, body: dict[str, Any]) -> None:
         if changed:
             push_mgr = current_app.config.get("PUSH_MANAGER")
             if push_mgr is not None:
-                push_mgr.invalidate_latest_render(device_id)
+                push_mgr.invalidate_and_repaint(device_id, reencode=False)
     except Exception:
         current_app.logger.exception("rest: kind heal failed for device=%s", device_id)
 

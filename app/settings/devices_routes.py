@@ -1214,7 +1214,7 @@ def devices_update_combined(instance_id: str) -> Response:
         elif rp_changed and rp_result.device is not None:
             pm = current_app.config.get("PUSH_MANAGER")
             if pm is not None:
-                pm.invalidate_latest_render(instance_id)
+                pm.invalidate_and_repaint(instance_id)
             device = rp_result.device
             renderer_loader.seed_device_settings_from_base(renderers(), store)
             ok_messages.append("renderer switched")

@@ -314,8 +314,74 @@ def test_reregister_switches_wire_format_and_invalidates_render(app: Flask) -> N
     assert switched.status_code == 200
     assert switched.get_json()["reused_existing"] is True
     assert devices.get("cp_fmt").renderer_ids == ["circuitpython_bmp__cp_fmt"]
-    # Stale png render dropped -> /frame will 204 until the next push.
+    # Stale png render dropped; with no composition behind it there is
+    # nothing to repaint from, so /frame waits for the next push.
     assert push_mgr.latest_render_for("cp_fmt") is None
+
+
+def _register_cp(client, app, device_id: str, **extra: Any):
+    code = _issue_pairing(app)
+    body = {"device_id": device_id, "kind": "circuitpython_generic", **extra}
+    return client.post(
+        "/api/v1/device/register",
+        headers={"X-Pairing-Code": code, "Content-Type": "application/json"},
+        data=json.dumps(body),
+    )
+
+
+def test_format_switch_repaints_the_last_composition_in_the_new_format(app: Flask) -> None:
+    """A switched device used to sit on 204 until the next push, which never
+    comes for a page with no schedule. The last composition is re-encoded
+    for the new renderer instead."""
+    import time
+
+    client = app.test_client()
+    _sign_in(client)
+    assert _register_cp(client, app, "cp_rep", panel_w=400, panel_h=300).status_code == 201
+    push_mgr = app.config["PUSH_MANAGER"]
+    comp = "c0ffee" * 4
+    push_mgr._renders_dir.mkdir(parents=True, exist_ok=True)
+    (push_mgr._renders_dir / f"{comp}.png").write_bytes(_solid_png(400, 300, (0, 0, 0)))
+    push_mgr._latest_renders["cp_rep"] = {
+        "digest": "old",
+        "ext": "png",
+        "filename": "old.png",
+        "composition_digest": comp,
+    }
+    assert _register_cp(client, app, "cp_rep", format="bmp").status_code == 200
+    deadline = time.monotonic() + 20
+    while time.monotonic() < deadline:
+        latest = push_mgr.latest_render_for("cp_rep")
+        if latest is not None:
+            break
+        time.sleep(0.05)
+    assert latest is not None, "no repaint after the format switch"
+    assert latest["ext"] == "bmp"
+
+
+def test_format_switch_pushes_the_page_behind_the_frame(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import threading
+
+    client = app.test_client()
+    _sign_in(client)
+    assert _register_cp(client, app, "cp_page", panel_w=400, panel_h=300).status_code == 201
+    push_mgr = app.config["PUSH_MANAGER"]
+    push_mgr._latest_renders["cp_page"] = {"digest": "old", "ext": "png", "page_id": "kitchen"}
+    called = threading.Event()
+    seen: dict[str, Any] = {}
+
+    def fake_push(page_id: str, **kw: Any) -> None:
+        seen.update(page_id=page_id, **kw)
+        called.set()
+
+    monkeypatch.setattr(push_mgr, "push", fake_push)
+    assert _register_cp(client, app, "cp_page", format="bmp").status_code == 200
+    assert called.wait(10)
+    assert seen["page_id"] == "kitchen"
+    assert seen["device_ids"] == {"cp_page"}
+    assert seen["force_publish"] is True
 
 
 def _register_koreader(client, app, device_id: str, *, gamut: str, w: int = 1264, h: int = 1680):

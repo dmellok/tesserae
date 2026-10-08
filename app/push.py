@@ -837,6 +837,50 @@ class PushManager:
 
     # -- deck pre-render cache (Decks feature) ---------------------------
 
+    def invalidate_and_repaint(self, device_id: str, *, reencode: bool = True) -> bool:
+        """Drop a device's latest render (see :meth:`invalidate_latest_render`)
+        and repaint it in the background through its current renderer.
+
+        Invalidating alone leaves ``/frame`` at 204 until the next push, and
+        a device on a page with no schedule or rotation never gets one: a
+        CircuitPython client switching png -> bmp sat on 204 until somebody
+        pressed Send. The page behind the frame is pushed again when it is
+        known, so the frame is rendered for the device's panel as it is now;
+        otherwise the stored composition is re-encoded, which needs the panel
+        size unchanged, so a caller whose change can move it (a kind switch)
+        passes ``reencode=False``. Returns True when a repaint was started."""
+        with self._lock:
+            entry = dict(self._latest_renders.get(device_id) or {})
+        self.invalidate_latest_render(device_id)
+        page_id = str(entry.get("page_id") or "")
+        comp_digest = str(entry.get("composition_digest") or "")
+        comp_path = self._renders_dir / f"{comp_digest}.png" if comp_digest else None
+        if not page_id and not (reencode and comp_path is not None and comp_path.exists()):
+            return False
+
+        def _repaint() -> None:
+            try:
+                if page_id:
+                    self.push(
+                        page_id,
+                        device_ids={device_id},
+                        source="resend",
+                        bypass_coalesce=True,
+                        force_publish=True,
+                    )
+                elif comp_path is not None:
+                    self.push_image(
+                        comp_path.read_bytes(),
+                        source_label="format change",
+                        device_id=device_id,
+                        source="resend",
+                    )
+            except Exception:
+                logger.exception("repaint after renderer change failed for device=%s", device_id)
+
+        threading.Thread(target=_repaint, name=f"repaint-{device_id}", daemon=True).start()
+        return True
+
     def warm_deck_page(self, page_id: str, device_id: str) -> bool:
         """Render a deck page for a device into the pre-render cache WITHOUT
         changing the frame the device is currently serving. Returns True when a
