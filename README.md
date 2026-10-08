@@ -263,7 +263,7 @@ a jailbreak to run KOReader; Kobo does not.
 
 ### TRMNL-compatible (HTTP pull)
 
-Any client implementing the [TRMNL BYOS spec](https://help.trmnl.com/en/articles/9510536-bring-your-own-server)
+Any client implementing the [TRMNL BYOS spec](https://help.trmnl.com/en/articles/12263392-connect-your-device-to-terminus-byos)
 works against the `trmnl_png` renderer.
 
 | Panel | Resolution | Client | Status |
