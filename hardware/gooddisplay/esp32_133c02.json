@@ -1,0 +1,26 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "gooddisplay_esp32_133c02",
+  "name": "Good Display ESP32-133C02 (13.3\")",
+  "vendor": "Good Display",
+  "url": "https://www.good-display.com/product/546.html",
+  "icon": "device-tablet",
+  "description": "Good Display ESP32-133C02 controller board for the 13.3 inch GDEP133C02 Spectra 6 panel. ESP32-S3-WROOM-1-N16R8 with 16 MB flash and 8 MB PSRAM, 1200x1600 portrait-native dual-controller glass, optional Ref2 buttons SW2/SW3/SW4, and an onboard microSD slot on a separate SPI bus. Speaks Tesserae's v1 REST device API through the tesserae-device-firmware build env `gooddisplay-esp32-133c02`; server-side pack via esp32_bin produces the same 960000-byte 4-bpp Spectra 6 frame used by the Seeed EE02/E1004 targets.",
+  "protocol": "esp32_client",
+  "renderers": ["esp32_bin"],
+  "panel": {
+    "w": 1200,
+    "h": 1600,
+    "orientation": "portrait",
+    "name": "Good Display GDEP133C02 Spectra 6 (1200x1600)",
+    "gamut": "spectra_6",
+    "native_w": 1200,
+    "native_h": 1600
+  },
+  "protocol_config": {
+    "model_header": "GoodDisplay_ESP32_133C02"
+  },
+  "refresh_floor_s": 60,
+  "image_format": "bin",
+  "notes_md": "Tested on physical Good Display ESP32-133C02 hardware with the matching tesserae-device-firmware env `gooddisplay-esp32-133c02` and board header `boards/gooddisplay_esp32_133c02.h`. Uses the T133A01/GDEP133C02 dual-controller driver shared with Seeed E1004/EE02 and the pin map from philippwaller/esphome-epaper-spectra6-133. Wire format is exactly 960000 bytes (1200*1600/2), two pixels per byte with high nibble = LEFT/even column and low nibble = RIGHT/odd column, row-major, 600 bytes per row, top-left origin. Palette nibbles match Tesserae's Spectra 6 constants (black=0x0, white=0x1, yellow=0x2, red=0x3, blue=0x5, green=0x6; 0x4 and 0x7 reserved). Ref2 buttons SW2/SW3/SW4 are wired as active-high GPIO12/13/14 and mapped to refresh/left/right; Ref1 boards simply leave those pins unused. The onboard microSD slot is on dedicated SPI pins (CLK=8, MOSI=3, MISO=5, CS=15). GPIO45 is the active-high panel power enable and a strapping pin, so external circuitry must not force it low during boot."
+}
