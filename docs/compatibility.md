@@ -185,6 +185,12 @@ Kobo readers run KOReader without a jailbreak. The same [Tesserae KOReader plugi
 | [Kobo Libra Colour](https://www.kobo.com/ereaders) | 1264×1680 portrait | `kaleido3` | `koreader_client` <br> `kaleido_png`, `esp32_gray_bin`, `esp32_gray2_bin`, `esp32_bw_bin` | `kobo_libra_colour` |
 | [Kobo Sage](https://www.kobo.com/ereaders) | 1440×1920 portrait | `gray_16` | `koreader_client` (inherit) | `kobo_sage` |
 
+### [Good Display](https://www.good-display.com/)
+
+| SKU | Panel | Gamut | Protocol / Renderer | Kind id |
+|---|---|---|---|---|
+| [Good Display ESP32-133C02 (13.3")](https://www.good-display.com/product/546.html) | 1200×1600 portrait | `spectra_6` | `esp32_client` <br> `esp32_bin` | `gooddisplay_esp32_133c02` |
+
 ### Community
 
 Hardware supported by community-authored firmware. Each SKU below links to the firmware repo that talks Tesserae's device API on that hardware; credit sits with the firmware's author on the linked repo.
