@@ -42,6 +42,7 @@ VENDOR_ORDER: list[tuple[str, str]] = [
     ("amazon", "Amazon Kindle"),
     ("kobo", "Kobo"),
     ("gooddisplay", "Good Display"),
+    ("epdiy", "epdiy"),
     ("community", "Community"),
 ]
 
@@ -75,6 +76,7 @@ VENDOR_URL: dict[str, str] = {
     "amazon": "https://www.amazon.com/kindle",
     "kobo": "https://www.kobo.com/ereaders",
     "gooddisplay": "https://www.good-display.com/",
+    "epdiy": "https://github.com/vroland/epdiy",
 }
 
 # Vendor id -> intro paragraph. Rendered between the vendor heading and

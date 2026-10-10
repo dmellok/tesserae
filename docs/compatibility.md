@@ -144,6 +144,7 @@ E-ink writing tablets running the [tesserae.remarkable](https://github.com/partr
 | [Waveshare 4.2" B/W e-paper](https://www.waveshare.com/4.2inch-e-paper-module.htm) | 400×300 | `mono` | `esp32_bw_client` (inherit) | `waveshare_4_2_bw` |
 | [Waveshare 10.85" e-Paper HAT+ (G) (ESP32-S3 Zero)](https://www.waveshare.com/10.85inch-e-paper-hat-plus-g.htm) | 1360×480 | `bwry_4` | `esp32_client` (inherit) | `waveshare_1085g` |
 | [Waveshare 13.3" Spectra E6 (ESP32-S3)](https://www.waveshare.com/esp32-s3-epaper-13.3e6.htm) | 1200×1600 portrait | `waveshare_e6` | `esp32_client` (inherit) | `waveshare_133e6` |
+| [Waveshare 7.3" e-Paper (F) on an ESP32-S3](https://www.waveshare.com/7.3inch-e-paper-hat-f.htm) | 800×480 | `inky_7colour` | `esp32_client` (inherit) | `waveshare_epaper_73f` |
 | [Waveshare E-Paper ESP32 Driver Board + 7.5" B/W](https://www.waveshare.com/e-paper-esp32-driver-board.htm) | 800×480 | `mono` | `esp32_bw_client` (inherit) | `waveshare_esp32_driver_75` |
 
 ### [Xteink](https://www.xteink.com/)
@@ -190,6 +191,12 @@ Kobo readers run KOReader without a jailbreak. The same [Tesserae KOReader plugi
 | SKU | Panel | Gamut | Protocol / Renderer | Kind id |
 |---|---|---|---|---|
 | [Good Display ESP32-133C02 (13.3")](https://www.good-display.com/product/546.html) | 1200×1600 portrait | `spectra_6` | `esp32_client` <br> `esp32_bin` | `gooddisplay_esp32_133c02` |
+
+### [epdiy](https://github.com/vroland/epdiy)
+
+| SKU | Panel | Gamut | Protocol / Renderer | Kind id |
+|---|---|---|---|---|
+| [epdiy v7 + ED133UT2 13.3"](https://github.com/vroland/epdiy) | 1600×1200 | `gray_16` | `esp32_client` <br> `esp32_gray_bin` | `epdiy_v7_ed133ut2` |
 
 ### Community
 

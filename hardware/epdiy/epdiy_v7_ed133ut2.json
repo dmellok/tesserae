@@ -1,0 +1,29 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "epdiy_v7_ed133ut2",
+  "name": "epdiy v7 + ED133UT2 13.3\"",
+  "vendor": "epdiy (open hardware)",
+  "url": "https://github.com/vroland/epdiy",
+  "icon": "device-tablet",
+  "description": "The open-hardware epdiy v7 driver board (ESP32-S3, TPS65185 panel power) with an ED133UT2 13.3 inch panel, 1600x1200 at 16 grey levels. Speaks Tesserae's v1 REST device API; esp32_gray_bin packs a raw 4-bpp linear greyscale buffer (960000 bytes) that the firmware hands to the epdiy library.",
+  "protocol": "esp32_client",
+  "renderers": [
+    "esp32_gray_bin"
+  ],
+  "panel": {
+    "w": 1600,
+    "h": 1200,
+    "orientation": "landscape",
+    "name": "13.3 inch ePaper (16-level greyscale, 1600x1200)",
+    "gamut": "gray_16",
+    "native_w": 1600,
+    "native_h": 1200
+  },
+  "protocol_config": {
+    "model_header": "EPDiy_V7"
+  },
+  "refresh_floor_s": 60,
+  "image_format": "bin",
+  "touch": false,
+  "notes_md": "**UNVERIFIED ON HARDWARE.** Firmware support is the `epdiy-v7-ed133ut2` build in tesserae-device-firmware; flash `epdiy-v7-ed133ut2-selftest` first and check that the 16 grey bars step evenly from black on the left to white on the right.\n\nWire format is exactly 960000 bytes (1600*1200/2), row-major, top-left origin; high nibble = left pixel, 0x0 = black, 0xF = white. The same shape as the PaperS3 and the reTerminal E1003, at a larger size.\n\nThe firmware drives the panel through the epdiy library (pinned to one release) rather than its own parallel driver, because the v7 board's panel power and control lines sit behind a TPS65185 and a PCA9555 that epdiy's board definition already handles. The panel's VCOM is printed on its flex cable and is a build setting (`EPD_EPDIY_VCOM_MV`); a wrong value gives washed-out greys, not a blank panel. The waveform is also a build setting, for tuning blacks.\n\nPartial refresh is in a separate `-partialtest` build until it has been seen on glass. With it, the board advertises the overlay capability, so a small change such as a clock can arrive as a rect instead of a full frame.\n\nNo battery, buttons or touch."
+}

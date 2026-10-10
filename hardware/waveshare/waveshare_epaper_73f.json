@@ -1,0 +1,25 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "waveshare_epaper_73f",
+  "name": "Waveshare 7.3\" e-Paper (F) on an ESP32-S3",
+  "vendor": "Waveshare",
+  "url": "https://www.waveshare.com/7.3inch-e-paper-hat-f.htm",
+  "icon": "device-tablet",
+  "description": "Waveshare's 7.3 inch 7-colour ACeP panel (800x480, AC073TC1A) wired to an ESP32-S3 with octal PSRAM. Speaks Tesserae's v1 REST device API and paints a 4-bpp palette-index frame (192000 bytes) in the panel's own colour order, so the firmware sends it to the controller unchanged.",
+  "protocol": "esp32_client",
+  "panel": {
+    "w": 800,
+    "h": 480,
+    "orientation": "landscape",
+    "name": "7.3 inch 7-colour ACeP ePaper (800x480)",
+    "gamut": "inky_7colour",
+    "native_w": 800,
+    "native_h": 480
+  },
+  "protocol_config": {
+    "model_header": "Waveshare_73F"
+  },
+  "refresh_floor_s": 60,
+  "image_format": "bin",
+  "notes_md": "**UNVERIFIED ON HARDWARE.** Firmware support is the `waveshare-epaper-73f` build in tesserae-device-firmware; flash `waveshare-epaper-73f-selftest` first and check the seven colour bands (black, white, yellow, red, blue, green, orange, top to bottom).\n\nWire format is exactly 192000 bytes (800*480/2), row-major from the top-left, high nibble = left pixel. Nibbles follow the ACeP controller's order (0 black, 1 white, 2 green, 3 blue, 4 red, 5 yellow, 6 orange), the same packing as the Inkplate 6COLOR and the original Inky Frame 7.3\". This is the older 7-colour glass; Waveshare's newer 7.3 inch (E) panel is Spectra 6 and is a different kind (the PhotoPainter uses it).\n\n**Pins.** There is no single board for this panel, so the build carries a default pin map for an ESP32-S3-DevKitC-1 (SCLK 12, MOSI 11, CS 10, DC 9, RST 8, BUSY 7) and each pin can be overridden at build time. The build targets a 16 MB flash, 8 MB octal PSRAM module (N16R8).\n\nNo battery reporting and no buttons."
+}
