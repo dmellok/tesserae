@@ -794,6 +794,8 @@ docker compose up -d</code></pre>
             action="{{ url_for('auth.system_data_import') }}"
             class="migrate-import"
             enctype="multipart/form-data"
+            data-chunk-url="{{ url_for('auth.system_data_import_chunk') }}"
+            data-finish-url="{{ url_for('auth.system_data_import_finish') }}"
             onsubmit="return confirm(this.take_identity.checked ? 'Import this zip and restart? Current data/ will be replaced, including this server\'s password, login settings and identity. A pre-import backup is taken first (gallery photos + cached renders stay put).' : 'Import this zip and restart? Current data/ will be replaced, but this server keeps its password, login settings and identity. A pre-import backup is taken first (gallery photos + cached renders stay put).');">
         <label class="migrate-file">
           <i class="ph ph-paperclip" aria-hidden="true"></i>
@@ -807,8 +809,71 @@ docker compose up -d</code></pre>
           <input type="checkbox" name="take_identity" value="1">
           <span>Also take this export's password, login settings and server identity (moving to a new host).</span>
         </label>
+        <span class="field-help" data-migrate-progress hidden></span>
       </form>
     </div>
+    <script>
+      /* A zip over 8 MiB goes up in 8 MiB pieces, then one request joins and
+         imports them. Home Assistant's ingress proxy refuses any request body
+         over 16 MiB, so through the HA sidebar a big export would otherwise
+         never arrive (system_data_import_chunk). Smaller zips, and browsers
+         without fetch, keep the plain form post. */
+      (function () {
+        const form = document.querySelector('form.migrate-import');
+        if (!form || !window.fetch || !window.crypto) return;
+        const CHUNK = 8 * 1024 * 1024;
+        const progress = form.querySelector('[data-migrate-progress]');
+        form.addEventListener('submit', async (ev) => {
+          if (ev.defaultPrevented) return;              /* the confirm was declined */
+          const file = form.archive.files[0];
+          if (!file || file.size <= CHUNK) return;      /* small: the plain post */
+          ev.preventDefault();
+          const id = Array.from(crypto.getRandomValues(new Uint8Array(16)),
+                                (b) => b.toString(16).padStart(2, '0')).join('');
+          const parts = Math.ceil(file.size / CHUNK);
+          const button = form.querySelector('button[type="submit"], button:not([type])');
+          if (button) button.disabled = true;
+          progress.hidden = false;
+          try {
+            for (let i = 0; i < parts; i++) {
+              progress.textContent = 'Uploading ' + Math.round((i / parts) * 100) + '%…';
+              const url = form.dataset.chunkUrl + '?upload=' + id + '&index=' + i;
+              const res = await fetch(url, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/octet-stream' },
+                body: file.slice(i * CHUNK, (i + 1) * CHUNK),
+              });
+              if (!res.ok) {
+                let msg = res.status + ' ' + res.statusText;
+                try { msg = (await res.json()).error || msg; } catch (e) { /* not JSON */ }
+                throw new Error(msg);
+              }
+            }
+          } catch (err) {
+            progress.textContent = 'Upload failed: ' + err.message;
+            if (button) button.disabled = false;
+            return;
+          }
+          progress.textContent = 'Importing…';
+          const done = document.createElement('form');
+          done.method = 'post';
+          done.action = form.dataset.finishUrl;
+          done.hidden = true;
+          const fields = { upload: id, parts: String(parts), filename: file.name };
+          if (form.take_identity.checked) fields.take_identity = '1';
+          for (const [name, value] of Object.entries(fields)) {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = name;
+            input.value = value;
+            done.appendChild(input);
+          }
+          document.body.appendChild(done);
+          done.submit();
+        });
+      })();
+    </script>
 
     <style>
       .migrate-row {

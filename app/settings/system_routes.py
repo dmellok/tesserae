@@ -10,8 +10,12 @@ tree-mutating operation.
 from __future__ import annotations
 
 import io
+import re
+import tempfile
+import time
+from pathlib import Path
 
-from flask import current_app, flash, redirect, request, send_file, session
+from flask import current_app, flash, jsonify, redirect, request, send_file, session
 from werkzeug.wrappers import Response
 
 from app import backup as _backup_mod
@@ -207,8 +211,101 @@ def system_data_import() -> Response:
     if upload is None or not upload.filename:
         flash("Pick a Tesserae export zip to import.", "error")
         return system_redirect()
+    return _apply_import(
+        upload.read(), upload.filename or "", request.form.get("take_identity") == "1"
+    )
 
-    raw = upload.read()
+
+# A zip over this size is sent in pieces (system_data_import_chunk). Home
+# Assistant's ingress proxy refuses any request body over 16 MiB, and an
+# export from a server with plugin caches in it (GTFS feeds, say) passes that
+# easily, so through the HA sidebar a one-request upload of a big export never
+# reaches us. The pieces stay well under the cap; the import itself is the same.
+IMPORT_CHUNK_BYTES = 8 * 1024 * 1024
+_IMPORT_CHUNK_MAX = 12 * 1024 * 1024
+_IMPORT_TOTAL_MAX = 4 * 1024 * 1024 * 1024
+_IMPORT_PARTS_MAX = _IMPORT_TOTAL_MAX // IMPORT_CHUNK_BYTES
+_IMPORT_STALE_S = 3600
+_UPLOAD_ID_RE = re.compile(r"^[0-9a-f]{32}$")
+
+
+def _import_parts_dir() -> Path:
+    """Pieces wait outside data/, which the import replaces and every backup
+    snapshots, in the system temp dir."""
+    d = Path(tempfile.gettempdir()) / "tesserae-import"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _drop_stale_parts(d: Path) -> None:
+    cutoff = time.time() - _IMPORT_STALE_S
+    for f in d.iterdir():
+        try:
+            if f.stat().st_mtime < cutoff:
+                f.unlink()
+        except OSError:
+            pass
+
+
+def _chunk_refused(status: int, error: str) -> Response:
+    resp = jsonify(ok=False, error=error)
+    resp.status_code = status
+    return resp
+
+
+@bp.post("/settings/system/data/import/chunk")
+def system_data_import_chunk() -> Response:
+    """One piece of a large import zip, as the raw request body. The page
+    names the upload with a random id and numbers the pieces from 0;
+    system_data_import_finish joins them once all have arrived."""
+    upload_id = (request.args.get("upload") or "").strip()
+    try:
+        index = int(request.args.get("index", ""))
+    except ValueError:
+        index = -1
+    if not _UPLOAD_ID_RE.match(upload_id) or not 0 <= index < _IMPORT_PARTS_MAX:
+        return _chunk_refused(400, "bad upload id or piece number")
+    body = request.get_data(cache=False)
+    if not body or len(body) > _IMPORT_CHUNK_MAX:
+        return _chunk_refused(400, "piece is empty or too large")
+    d = _import_parts_dir()
+    _drop_stale_parts(d)
+    held = sum(f.stat().st_size for f in d.glob(f"{upload_id}.*"))
+    if held + len(body) > _IMPORT_TOTAL_MAX:
+        return _chunk_refused(413, "upload is too large")
+    (d / f"{upload_id}.{index:06d}").write_bytes(body)
+    return jsonify(ok=True, index=index)
+
+
+@bp.post("/settings/system/data/import/finish")
+def system_data_import_finish() -> Response:
+    """Join the pieces of a large import zip and import it exactly as
+    system_data_import would a single upload."""
+    upload_id = (request.form.get("upload") or "").strip()
+    try:
+        count = int(request.form.get("parts", ""))
+    except ValueError:
+        count = 0
+    if not _UPLOAD_ID_RE.match(upload_id) or not 0 < count <= _IMPORT_PARTS_MAX:
+        flash("Import failed: the upload didn't arrive whole. Try again.", "error")
+        return system_redirect()
+    d = _import_parts_dir()
+    parts = [d / f"{upload_id}.{i:06d}" for i in range(count)]
+    try:
+        if not all(p.is_file() for p in parts):
+            flash("Import failed: part of the upload is missing. Try again.", "error")
+            return system_redirect()
+        raw = b"".join(p.read_bytes() for p in parts)
+    finally:
+        for f in d.glob(f"{upload_id}.*"):
+            f.unlink(missing_ok=True)
+    filename = (request.form.get("filename") or "")[:200]
+    return _apply_import(raw, filename, request.form.get("take_identity") == "1")
+
+
+def _apply_import(raw: bytes, filename: str, take_identity: bool) -> Response:
+    """Validate an export zip and import it over data/; shared by the
+    one-request upload and the joined pieces of a large one."""
     if not raw:
         flash("Uploaded file was empty.", "error")
         return system_redirect()
@@ -245,21 +342,18 @@ def system_data_import() -> Response:
     if not push_mgr._lock.acquire(blocking=True, timeout=10):
         flash("Another push is in flight, try again in a moment.", "error")
         return system_redirect()
-    import time as _time
-
-    ts = _time.strftime("%Y%m%d-%H%M%S")
+    ts = time.strftime("%Y%m%d-%H%M%S")
     backups_dir = data_root() / _backup_mod.BACKUPS_SUBDIR
     backups_dir.mkdir(parents=True, exist_ok=True)
     # By default this server keeps its own password, login settings and
     # identity (#349); the opt-in is for moving an install to a new host.
-    take_identity = request.form.get("take_identity") == "1"
     try:
         # A snapshot of what's about to be replaced, in the Backups list
         # so a wrong import is one Restore away. Taken before the upload
         # is staged so it doesn't end up inside it.
         try:
             pre = _backup_mod.create(
-                data_root(), label=_backup_mod.LABEL_PRE_IMPORT, note=(upload.filename or "")[:200]
+                data_root(), label=_backup_mod.LABEL_PRE_IMPORT, note=filename[:200]
             )
         except OSError as err:
             flash(f"Import failed: couldn't take a pre-import backup ({err}).", "error")

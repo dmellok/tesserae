@@ -338,6 +338,103 @@ def test_data_import_can_take_the_exports_identity(
     assert store.get_for_runtime("plugins", "probe", _SECRET_FIELD) == {"token": "tok-from-a"}
 
 
+def _chunked_import(client: FlaskClient, data: bytes, pieces: int, **form: str) -> str:
+    """Send ``data`` the way the page does for a big zip: numbered pieces as
+    raw bodies, then one form post that joins and imports them."""
+    upload = "0123456789abcdef0123456789abcdef"
+    size = -(-len(data) // pieces)
+    for i in range(pieces):
+        resp = client.post(
+            f"/settings/system/data/import/chunk?upload={upload}&index={i}",
+            data=data[i * size : (i + 1) * size],
+            content_type="application/octet-stream",
+        )
+        assert resp.status_code == 200, resp.get_data(as_text=True)
+    resp = client.post(
+        "/settings/system/data/import/finish",
+        data={"upload": upload, "parts": str(pieces), "filename": "big.zip", **form},
+        follow_redirects=True,
+    )
+    assert resp.status_code == 200
+    return resp.get_data(as_text=True)
+
+
+def test_data_import_in_pieces_matches_a_single_upload(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A zip too big for one request through Home Assistant's ingress proxy
+    (16 MiB) arrives in pieces and imports exactly as a single upload."""
+    import tempfile
+
+    from app.updater import Updater
+
+    monkeypatch.delenv("TESSERAE_SECRET_KEY", raising=False)
+    monkeypatch.setattr(Updater, "restart", lambda self, **kw: None)
+    monkeypatch.setattr(tempfile, "tempdir", str(tmp_path / "tmp"))
+    (tmp_path / "tmp").mkdir()
+    exported = _export_from_server_a(tmp_path / "a")
+    b = _make_app(tmp_path / "b")
+    client = b.test_client()
+    client.post("/setup", data={"password": "password-b", "password_confirm": "password-b"})
+
+    body = _chunked_import(client, exported, 3)
+    assert "Data imported" in body
+    b = _make_app(tmp_path / "b")
+    assert _logs_in(b, "password-b")
+    store = b.config["SETTINGS_STORE"]
+    assert store.get_for_runtime("plugins", "probe", _SECRET_FIELD) == {"token": "tok-from-a"}
+    # The pieces are gone once joined.
+    assert not list((tmp_path / "tmp" / "tesserae-import").iterdir())
+
+
+def test_data_import_pieces_refuse_bad_input(
+    app: Flask, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import tempfile
+
+    monkeypatch.setattr(tempfile, "tempdir", str(tmp_path / "tmp"))
+    (tmp_path / "tmp").mkdir()
+    client = app.test_client()
+    _sign_in(client)
+    good = "0123456789abcdef0123456789abcdef"
+    for query in ("upload=../../etc&index=0", f"upload={good}&index=-1", f"upload={good}&index=x"):
+        resp = client.post(
+            f"/settings/system/data/import/chunk?{query}",
+            data=b"x",
+            content_type="application/octet-stream",
+        )
+        assert resp.status_code == 400, query
+    resp = client.post(
+        f"/settings/system/data/import/chunk?upload={good}&index=0",
+        data=b"x" * (12 * 1024 * 1024 + 1),
+        content_type="application/octet-stream",
+    )
+    assert resp.status_code == 400
+    # A missing piece is refused and nothing is imported.
+    client.post(
+        f"/settings/system/data/import/chunk?upload={good}&index=0",
+        data=b"part",
+        content_type="application/octet-stream",
+    )
+    resp = client.post(
+        "/settings/system/data/import/finish",
+        data={"upload": good, "parts": "2"},
+        follow_redirects=True,
+    )
+    body = resp.get_data(as_text=True)
+    assert "part of the upload is missing" in body
+    assert "Data imported" not in body
+    assert not list((tmp_path / "tmp" / "tesserae-import").iterdir())
+
+
+def test_settings_page_offers_chunked_import(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    body = client.get("/settings/system").get_data(as_text=True)
+    assert "data-chunk-url=" in body and "/settings/system/data/import/chunk" in body
+    assert "data-finish-url=" in body
+
+
 def test_settings_page_offers_the_identity_opt_in(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
