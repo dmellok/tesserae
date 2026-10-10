@@ -5,7 +5,7 @@
   "vendor": "epdiy (open hardware)",
   "url": "https://github.com/vroland/epdiy",
   "icon": "device-tablet",
-  "description": "The open-hardware epdiy v7 driver board (ESP32-S3, TPS65185 panel power) with an ED133UT2 13.3 inch panel, 1600x1200 at 16 grey levels. Speaks Tesserae's v1 REST device API; esp32_gray_bin packs a raw 4-bpp linear greyscale buffer (960000 bytes) that the firmware hands to the epdiy library.",
+  "description": "The open-hardware epdiy v7 driver board (ESP32-S3, TPS65185 panel power) with an ED133UT2 13.3 inch panel, 1600x1200 at 16 grey levels. Speaks Tesserae's v1 REST device API; esp32_gray_bin packs a raw 4-bpp linear greyscale buffer (960000 bytes) that the firmware drives onto the panel's parallel bus.",
   "protocol": "esp32_client",
   "renderers": [
     "esp32_gray_bin"
@@ -25,5 +25,5 @@
   "refresh_floor_s": 60,
   "image_format": "bin",
   "touch": false,
-  "notes_md": "**UNVERIFIED ON HARDWARE.** Firmware support is the `epdiy-v7-ed133ut2` build in tesserae-device-firmware; flash `epdiy-v7-ed133ut2-selftest` first and check that the 16 grey bars step evenly from black on the left to white on the right.\n\nWire format is exactly 960000 bytes (1600*1200/2), row-major, top-left origin; high nibble = left pixel, 0x0 = black, 0xF = white. The same shape as the PaperS3 and the reTerminal E1003, at a larger size.\n\nThe firmware drives the panel through the epdiy library (pinned to one release) rather than its own parallel driver, because the v7 board's panel power and control lines sit behind a TPS65185 and a PCA9555 that epdiy's board definition already handles. The panel's VCOM is printed on its flex cable and is a build setting (`EPD_EPDIY_VCOM_MV`); a wrong value gives washed-out greys, not a blank panel. The waveform is also a build setting, for tuning blacks.\n\nPartial refresh is in a separate `-partialtest` build until it has been seen on glass. With it, the board advertises the overlay capability, so a small change such as a clock can arrive as a rect instead of a full frame.\n\nNo battery, buttons or touch."
+  "notes_md": "**UNVERIFIED ON HARDWARE.** Firmware support is the `epdiy-v7-ed133ut2` build in tesserae-device-firmware; flash `epdiy-v7-ed133ut2-selftest` first. It paints a lettered, scrambled sheet of the 16 grey levels, then the same bars in order with black at the left, and the serial log names the letter order a tuned matrix gives.\n\nWire format is exactly 960000 bytes (1600*1200/2), row-major, top-left origin; high nibble = left pixel, 0x0 = black, 0xF = white. The same shape as the PaperS3 and the reTerminal E1003, at a larger size.\n\nThe firmware drives the panel with the same parallel driver as the PaperS3, a port of bitbank2's FastEPD, with the v7's TPS65185 power path and gate timing from FastEPD. The grey matrix and VCOM (-2.28 V) are the ED133UT2 tuning from bitbank2/FastEPD#44. Greyscale tuning is a table in the board header, and a panel whose flex cable gives a different VCOM is a one-line change.\n\nNo partial refresh yet. No battery, buttons or touch."
 }
