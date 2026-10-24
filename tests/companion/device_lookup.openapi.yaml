@@ -1,0 +1,55 @@
+# Known-MAC lookup extension copied from charmmmz/tesserae-companion-ios
+# Contracts/app-v1.openapi.yaml at 79e6d18367e946b237cc0c14569781541d4c5a74.
+# Layered through contract_errata.py; the vendored OpenAPI stays unchanged.
+paths:
+  /api/app/v1/devices/lookup:
+    post:
+      tags:
+      - Devices
+      operationId: lookupCompanionDevice
+      summary: Resolve a MAC already known from authenticated Bluetooth
+      description: Requires devices:read. Returns only a unique matching device ID,
+        or null for unknown/ambiguous identities. Never enumerates MACs, returns firmware
+        credentials, claims a device, or changes its state. The MAC is in the body
+        to avoid URL query logs. Older servers return 404 or 405.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceLookupRequest'
+      responses:
+        '200':
+          description: Unique match, or null.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceLookupResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+schemas:
+  DeviceLookupRequest:
+    type: object
+    additionalProperties: false
+    required:
+    - mac
+    properties:
+      mac:
+        type: string
+        minLength: 1
+        description: Complete MAC already obtained from authenticated Bluetooth; never
+          a broadcast suffix.
+  DeviceLookupResponse:
+    type: object
+    additionalProperties: false
+    required:
+    - device_id
+    properties:
+      device_id:
+        type: string
+        nullable: true
+        description: Unique matching server device ID, or null when unknown or ambiguous.

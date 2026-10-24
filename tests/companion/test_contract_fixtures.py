@@ -18,6 +18,9 @@ import pytest
 from ._schema import FIXTURES_DIR, SPEC, schema_for
 
 CASES = {
+    "device-lookup-request.json": "DeviceLookupRequest",
+    "device-lookup-response.json": "DeviceLookupResponse",
+    "device-lookup-unmatched-response.json": "DeviceLookupResponse",
     "capabilities-personal-data-retention.json": "Capabilities",
     "personal-data-reminders-never.json": "PersonalDataSnapshot",
     "personal-data-status-never.json": "PersonalDataSourceStatus",
@@ -102,6 +105,7 @@ def test_openapi_shape_and_operation_ids_are_stable() -> None:
         "/api/app/v1/personal-data/status",
         "/api/app/v1/personal-data/{source_id}",
         "/api/app/v1/devices",
+        "/api/app/v1/devices/lookup",
         "/api/app/v1/devices/{device_id}/preview",
         "/api/app/v1/gallery/folders",
         "/api/app/v1/gallery/folders/{folder_id}",

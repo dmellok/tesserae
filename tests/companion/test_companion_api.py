@@ -359,6 +359,73 @@ def test_devices_listing_is_contract_valid(app: Flask) -> None:
     assert isinstance(device["icon"], str) and device["icon"]
 
 
+@pytest.mark.parametrize("mac", ["F8-5B-1B-4F-E8-44", "f85b1b4fe844", "f8:5b:1b:4f:e8:44"])
+def test_device_lookup_only_resolves_known_mac_without_claiming(app: Flask, mac: str) -> None:
+    import copy
+
+    device_id = _seed_device(app)
+    device = app.config["DEVICE_REGISTRY"].get(device_id)
+    device.manifest["mac"] = "F8:5B:1B:4F:E8:44"
+    before = copy.deepcopy(device.manifest)
+    headers = {"Authorization": f"Bearer {_token(app)}"}
+    client = app.test_client()
+    listed = client.get("/api/app/v1/devices", headers=headers).get_json()
+    _validate(listed, "DevicesResponse")
+    assert all("mac" not in item and "access_token" not in item for item in listed["devices"])
+    response = client.post("/api/app/v1/devices/lookup", headers=headers, json={"mac": mac})
+    assert response.status_code == 200
+    assert response.get_json() == {"device_id": device_id}
+    _validate(response.get_json(), "DeviceLookupResponse")
+    assert device.manifest == before  # no token rotation, counter reset or kind change
+    assert client.post(
+        "/api/app/v1/devices/lookup", headers=headers, json={"mac": "f8:5b:1b:00:00:01"}
+    ).get_json() == {"device_id": None}
+    # A second instance claiming the same identity must not choose arbitrarily.
+    from dataclasses import replace
+
+    duplicate = replace(device, id="duplicate", manifest={**device.manifest, "id": "duplicate"})
+    app.config["DEVICE_REGISTRY"].devices[duplicate.id] = duplicate
+    assert client.post(
+        "/api/app/v1/devices/lookup", headers=headers, json={"mac": mac}
+    ).get_json() == {"device_id": None}
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        None,
+        [],
+        {},
+        {"mac": None},
+        {"mac": "None"},
+        {"mac": "00:00:00:00:00:00"},
+        {"mac": "ff:ff:ff:ff:ff:ff"},
+        {"mac": ""},
+        {"mac": "x", "extra": True},
+    ],
+)
+def test_device_lookup_rejects_placeholders_and_malformed_requests(app: Flask, body: Any) -> None:
+    headers = {"Authorization": f"Bearer {_token(app)}"}
+    assert (
+        app.test_client().post("/api/app/v1/devices/lookup", headers=headers, json=body).status_code
+        == 400
+    )
+
+
+def test_device_lookup_requires_devices_read(app: Flask) -> None:
+    client = app.test_client()
+    assert (
+        client.post("/api/app/v1/devices/lookup", json={"mac": "f85b1b4fe844"}).status_code == 401
+    )
+    token, _ = app.config["COMPANION_TOKENS"].issue(client=_CLIENT, scopes=["dashboards:read"])
+    response = client.post(
+        "/api/app/v1/devices/lookup",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"mac": "f85b1b4fe844"},
+    )
+    assert response.status_code == 403
+
+
 def test_devices_listing_reports_a_pending_rest_render_until_frame_is_served(app: Flask) -> None:
     device_id = _seed_device(app)
     manager = app.config["PUSH_MANAGER"]

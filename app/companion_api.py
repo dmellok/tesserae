@@ -1021,6 +1021,34 @@ def list_devices() -> Any:
     return jsonify({"devices": devices})
 
 
+@bp.post("/devices/lookup")
+@_require_companion("devices:read")
+def lookup_device() -> Any:
+    """Resolve an already-known MAC without exposing device credentials.
+
+    The firmware API uses MACs as claim credentials. Never enumerate them in
+    Companion responses. This is a read-only lookup, not a discover/claim call.
+    """
+    from app.device_service import usable_mac
+
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict) or set(body) != {"mac"}:
+        return _error("invalid_request", "Supply a known device MAC.", 400)
+    mac = usable_mac(body["mac"])
+    if mac is None:
+        return _error("invalid_request", "Supply a known device MAC.", 400)
+    target = mac.lower().replace(":", "").replace("-", "")
+    matches = [
+        device.id
+        for device in _devices().all()
+        if device.kind_of is not None
+        and (stored := usable_mac(device.manifest.get("mac"))) is not None
+        and stored.lower().replace(":", "").replace("-", "") == target
+    ]
+    # Duplicate registry identities cannot establish an association either.
+    return jsonify({"device_id": matches[0] if len(matches) == 1 else None})
+
+
 # -- device timeline -----------------------------------------------------
 
 
