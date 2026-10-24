@@ -1,0 +1,37 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "Picture, National Geographic Photo of the Day",
+  "version": "0.1.0",
+  "kind": "widget",
+  "locales": ["en", "cs", "de", "es", "fr", "it", "lt", "nb", "nl", "pl", "pt", "sk", "sv", "zh-CN", "zh-TW"],
+  "description": "National Geographic's Photo of the Day, full bleed, with the date and, on larger cells, the caption and the show it comes from. Read from National Geographic TV's Photo of the Day feed; no API key needed.",
+  "icon": "ph-camera",
+  "supports": { "sizes": ["xs", "sm", "md", "lg"] },
+  "cell_options": [
+    { "name": "show_caption", "type": "boolean", "label": "Show caption band (medium and large cells)", "default": true }
+  ],
+  "render": { "dither": "floyd-steinberg", "needs_network": true, "full_bleed": true },
+  "requires": [
+    "network:feeds.feedburner.com",
+    "network:www.natgeotv.com",
+    "network:assets-natgeotv.fnghub.com",
+    "network:assets-natgeotv.techops.disn.io"
+  ],
+  "data_schema": {
+    "color": "#FFCE00",
+    "fields": [
+      { "name": "date", "type": "str", "label": "Date" },
+      { "name": "caption", "type": "str", "label": "Caption" },
+      { "name": "source", "type": "str", "label": "Show" },
+      { "name": "url", "type": "str", "label": "Image URL" },
+      { "name": "link", "type": "str", "label": "Article link" }
+    ],
+    "sample": {
+      "date": "2026-10-24",
+      "caption": "Two of Kio's brothers sit upright, raising their heads and shaking their manes to dry off after the rain.",
+      "source": "Lion",
+      "url": "/plugins/picture_natgeo/photos/18230.jpg",
+      "link": "https://www.natgeotv.com/ca/photo-of-the-day/2026/october/24"
+    }
+  }
+}

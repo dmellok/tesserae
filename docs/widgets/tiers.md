@@ -37,6 +37,7 @@ enough that breakage would be a notable event. Failure mode is usually
 | Widget | Why best-effort |
 |---|---|
 | `finance_stock` *(marketplace)* | Yahoo Finance's `/v8/finance/chart/` endpoint isn't officially documented. Has been stable for 7+ years and is what most "free stock API" libraries reach for. |
+| `picture_natgeo` | National Geographic TV Canada's Photo of the Day RSS feed (feedburner) is public but undocumented as an API. The full-size frame is read off the article page (`<a id="POD<day>"><img>`), a scrape; if that markup changes the widget falls back to the feed's 300px thumbnail rather than erroring. |
 | `picture_apple_album` *(marketplace)* | Reverse-engineered iCloud Shared Album endpoints. The shape has held up for ~10 years; Apple has shifted partitioning twice without breaking the protocol. |
 
 ## Fragile

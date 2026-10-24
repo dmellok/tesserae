@@ -217,6 +217,13 @@
    "credit": "Image credits as given by NASA APOD"
   },
   {
+   "name": "National Geographic Photo of the Day",
+   "licence": "© National Geographic; shown as published in its feed",
+   "url": "https://www.natgeotv.com/ca/photo-of-the-day",
+   "used_for": "Photo of the day",
+   "credit": "Photos © National Geographic"
+  },
+  {
    "name": "The Metropolitan Museum of Art Collection API",
    "licence": "CC0 (Open Access)",
    "url": "https://metmuseum.github.io",

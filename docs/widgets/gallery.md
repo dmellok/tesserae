@@ -2,7 +2,7 @@
 
 # Widget gallery
 
-The **37 widgets** that ship with Tesserae. Each is a drop-a-folder widget under `plugins/<id>/`; drop your own in and it shows up in the editor's picker. Want to build one? See [Build a widget with AI](../dev/writing-a-widget.md).
+The **38 widgets** that ship with Tesserae. Each is a drop-a-folder widget under `plugins/<id>/`; drop your own in and it shows up in the editor's picker. Want to build one? See [Build a widget with AI](../dev/writing-a-widget.md).
 
 !!! tip "Looking for more widgets?"
     Browse the full community catalog at [tesserae.ink/catalog](https://tesserae.ink/catalog/): widgets, themes, and dashboard templates, all installable from **Settings → Widgets → Browse catalog** inside the app.
@@ -343,6 +343,16 @@ The **37 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
     Folder-based image rotation, full bleed. Manage folders + uploads at Widgets → Gallery. Supports internal folders (uploaded to the appliance) and external pointers to any directory on the host. Optional orientation filter + random or sequential rotation.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** Local
+
+-   **Picture, National Geographic Photo of the Day** &middot; `picture_natgeo`
+
+    ---
+
+    ![picture_natgeo](../screenshots/widgets/picture_natgeo.png)
+
+    National Geographic's Photo of the Day, full bleed, with the date and, on larger cells, the caption and the show it comes from. Read from National Geographic TV's Photo of the Day feed; no API key needed.
+
+    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** Best-effort
 
 </div>
 

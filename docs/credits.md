@@ -96,6 +96,7 @@ Data a widget fetches stays under its provider's terms. Where a provider asks to
 | [US National Weather Service](https://www.weather.gov) | US forecasts | Public domain |  |
 | [Wikimedia](https://api.wikimedia.org) | On this day, featured articles and pictures | CC BY-SA and per-item licences | Content from Wikipedia and Wikimedia Commons, under their licences |
 | [NASA APOD](https://science.nasa.gov/apod) | Astronomy picture of the day | Mostly public domain; per-image credits | Image credits as given by NASA APOD |
+| [National Geographic Photo of the Day](https://www.natgeotv.com/ca/photo-of-the-day) | Photo of the day | © National Geographic; shown as published in its feed | Photos © National Geographic |
 | [The Metropolitan Museum of Art Collection API](https://metmuseum.github.io) | Artworks | CC0 (Open Access) |  |
 | [iNaturalist](https://www.inaturalist.org) | Nature observations | Per-observation Creative Commons licences | Observations and photos by iNaturalist contributors |
 | [Nominatim](https://nominatim.openstreetmap.org) | Turning a photo's GPS position into a place name for Tesserae Cloud's photo-frame captions | ODbL 1.0 (OpenStreetMap data) | Place names © OpenStreetMap contributors, via Nominatim |

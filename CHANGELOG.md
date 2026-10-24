@@ -6,6 +6,19 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added
+
+- **Picture, National Geographic Photo of the Day** (`picture_natgeo`): the
+  day's photo from National Geographic TV's Photo of the Day feed, full
+  bleed, with the date as a solid accent block. Medium and large cells add
+  a caption band (the caption and an "Image from <show>" chip), which the
+  *Show caption band* option turns off. The feed only carries a 300px
+  thumbnail, so the full frame is read off the photo's article page,
+  downloaded once, downscaled to 1600px and served from the widget's own
+  `/plugins/picture_natgeo/photos/` route; if the page can't be read the
+  thumbnail is shown instead. The feed answer is cached for 10 minutes and
+  the newest seven photos are kept on disk. Credited on the Credits page.
+
 ## [0.475.0], 2026-10-24
 
 ### Added
