@@ -159,6 +159,18 @@ widget per cell**.
    cycling between several dashboards on one device, use
    **Rotations** instead (also in the top nav), shipped in 0.45.0.
 
+### Dashboard refresh settings
+
+In **Dashboards**, expand a dashboard and find **Refresh settings** below
+its status tiles. **Content updates** controls how often Tesserae updates
+the dashboard content; **Device wake-up interval** controls how often a
+display wakes to check for new content. A dashboard in a Lineup uses the
+Lineup's background refresh cadence instead.
+
+Choose a preset to save immediately, or choose **custom**, enter minutes
+for content updates or seconds for device wake-up, and press **Set**.
+Choose **device's own interval** to leave wake timing to the device.
+
 ## Multiple panels
 
 Running more than one display? Repeat with a distinct `device-id` per client.

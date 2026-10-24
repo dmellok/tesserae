@@ -353,15 +353,63 @@
 }
 .dx-dashquick-meta > .dx-dash-mono { overflow-wrap: anywhere; }
 .dx-dashtable .dx-dashquick-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.dx-dashquick-ctls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 20px;
-  min-width: 0;
+/* Status tiles report the cadence; this section edits it. */
+.dx-refresh {
+  container: refresh-settings / inline-size;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-radius-sm);
+  background: var(--t-surface);
 }
-.dx-dashquick-ctls .dx-updates-ctl { margin-left: 0; flex: 0 1 auto; flex-wrap: wrap; min-width: 0; }
-.dx-dashquick-ctls .dx-updates-ctl select { max-width: 100%; min-width: 0; }
+.dx-refresh-title,
+.dx-refresh-lead,
+.dx-refresh-inputs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.dx-refresh-title { grid-column: 1 / -1; margin: 0; font-size: 14px; font-weight: 600; }
+.dx-refresh .ph { flex: none; font-size: 20px; }
+.dx-refresh-field {
+  display: grid;
+  grid-row: span 2;
+  grid-template-rows: subgrid;
+  align-items: start;
+  gap: 10px;
+  min-width: 0;
+  margin: 0;
+}
+.dx-refresh-lead { align-items: flex-start; min-width: 0; font-size: 13px; }
+.dx-refresh-help { display: block; margin-top: 3px; font-size: 12px; line-height: 1.35; color: var(--t-fg-soft); }
+.dx-refresh-inputs { display: grid; grid-template-columns: minmax(0, 1fr); align-self: start; max-width: 100%; margin-left: 28px; }
+.dx-refresh-inputs:has([data-updates-custom]:not([hidden])) { grid-template-columns: minmax(0, 1fr) auto auto auto; }
+.dx-refresh select,
+.dx-refresh input[type="number"] {
+  box-sizing: border-box;
+  min-height: 40px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-radius-sm);
+  background: var(--t-bg);
+  color: var(--t-fg);
+  font: inherit;
+  font-size: 14px;
+}
+.dx-refresh input[type="number"] { width: 5rem; }
+.dx-refresh-unit { font-size: 13px; color: var(--t-fg-soft); }
+.dx-refresh-set { min-height: 40px; padding-inline: 12px; }
+.dx-refresh [hidden] { display: none; }
+@container refresh-settings (max-width: 49rem) {
+  .dx-refresh-inputs:has([data-updates-custom]:not([hidden])) { grid-template-columns: auto auto minmax(0, 1fr); }
+  .dx-refresh-inputs > select { grid-column: 1 / -1; }
+  .dx-refresh-set { justify-self: start; }
+}
 .dx-dashquick-actions { min-width: 0; }
 .dx-dashquick-actions .dx-devquick-open { margin-left: auto; }
 
@@ -372,6 +420,8 @@
   .dx-dc-wake { display: none; }
 }
 @container dashtable (max-width: 860px) {
+  .dx-refresh { grid-template-columns: minmax(0, 1fr); }
+  .dx-refresh-field + .dx-refresh-field { padding-top: 12px; border-top: 1px solid var(--t-border); }
   .dx-dashtable-head,
   .dx-dashrow { grid-template-columns: 20px minmax(0, 2.2fr) 88px 116px 124px 32px; }
   .dx-dc-updates { display: none; }
@@ -444,8 +494,7 @@
 
   .dx-dashtable .dx-dashquick { padding: 14px; }
   .dx-dashquick-preview { max-width: none; }
-  .dx-dashquick-ctls { flex-direction: column; align-items: stretch; gap: 8px; }
-  .dx-dashquick-ctls .dx-updates-ctl > select { flex: 1 1 0; }
+  .dx-refresh-inputs { margin-left: 0; }
   .dx-dashquick-actions .dx-devquick-open { margin-left: 0; flex: 1 1 100%; justify-content: center; }
   /* The strip wraps here, so an unused settings slot would only leave a hole. */
   .dx-dashquick-actions .dx-action-slot:not(:has(*)) { display: none; }

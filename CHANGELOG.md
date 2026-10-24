@@ -6,6 +6,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Changed
+
+- Dashboard update and device wake intervals are grouped under **Refresh
+  settings**, with descriptive labels, help text, and readable custom
+  controls on narrower screens. The existing dashboard layout and interval
+  behavior are unchanged.
+
 ## [0.475.0], 2026-10-24
 
 ### Added

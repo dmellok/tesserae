@@ -768,7 +768,9 @@
 :root[data-ui="paper"] .dx-dashgroup-fold,
 :root[data-ui="paper"] .dx-dashgroup-link { color: var(--t-fg); }
 :root[data-ui="paper"] .dx-dashgroup-meta { color: var(--t-fg-soft); }
-:root[data-ui="paper"] .dx-dashquick-ctls .dx-updates-ctl select { border-color: var(--t-border-strong); }
+:root[data-ui="paper"] .dx-refresh { border-radius: 2px; }
+:root[data-ui="paper"] .dx-refresh select,
+:root[data-ui="paper"] .dx-refresh input[type="number"] { border-color: var(--t-border-strong); background: var(--t-surface); }
 @container dashtable (max-width: 720px) {
   :root[data-ui="paper"] .dx-dashquick-preview { height: auto; aspect-ratio: 5 / 3; max-height: 220px; }
 }

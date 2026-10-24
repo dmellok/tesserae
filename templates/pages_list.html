@@ -307,10 +307,15 @@
         </div>
       </div>
       {% if not archived_tab %}
-      <div class="dx-dashquick-ctls">
+      <section class="dx-refresh" aria-labelledby="refresh-{{ _rid }}">
+        <h2 class="dx-refresh-title" id="refresh-{{ _rid }}"><i class="ph ph-gear-six" aria-hidden="true"></i> Refresh settings</h2>
         <form method="post" action="{{ url_for('pages.update', page_id=page.id) }}"
-              class="dx-updates-ctl" title="How often this page's content re-renders while it's on a panel. Delivery respects quiet hours; battery panels pick changes up at their next wake.">
-          <span class="dx-meta-k">Updates</span>
+              class="dx-refresh-field" title="How often this page's content re-renders while it's on a panel. Delivery respects quiet hours; battery panels pick changes up at their next wake.">
+          <label class="dx-refresh-lead" for="refresh_minutes-{{ _rid }}">
+            <i class="ph ph-arrows-clockwise" aria-hidden="true"></i>
+            <span><strong>Content updates</strong><span class="dx-refresh-help" id="refresh_minutes-help-{{ _rid }}">How often Tesserae updates the dashboard content.</span></span>
+          </label>
+          <div class="dx-refresh-inputs">
           {# The presets cover the common cadences; "custom" reveals a minutes
              box for anything else, which matters when a dashboard has to line
              up with a battery panel's own wake interval (a 20 or 45 minute
@@ -319,7 +324,7 @@
              renders as itself rather than falling back to the first option. #}
           {% set refresh_presets = [0, 1, 5, 15, 30, 60, 1440] %}
           {% set is_custom = page.refresh_minutes not in refresh_presets %}
-          <select name="refresh_minutes" data-updates-preset aria-label="How often this dashboard re-renders"
+          <select name="refresh_minutes" id="refresh_minutes-{{ _rid }}" data-updates-preset aria-describedby="refresh_minutes-help-{{ _rid }}"
                   title="While this dashboard is in a Lineup, the Lineup's background refresh cadence takes over">
             <option value="0" {% if page.refresh_minutes == 0 %}selected{% endif %}>only when pushed</option>
             <option value="1" {% if page.refresh_minutes == 1 %}selected{% endif %}>every minute</option>
@@ -334,14 +339,19 @@
                  value="{{ page.refresh_minutes }}" data-updates-custom
                  aria-label="Update frequency in minutes"
                  {% if not is_custom %}hidden{% endif %}>
-          <span class="dx-updates-unit" data-updates-unit {% if not is_custom %}hidden{% endif %}>min</span>
-          <button type="submit" class="ghost dx-updates-set" data-updates-set
+          <span class="dx-refresh-unit" data-updates-unit {% if not is_custom %}hidden{% endif %}>minutes</span>
+          <button type="submit" class="ghost dx-refresh-set" data-updates-set
                   {% if not is_custom %}hidden{% endif %}>Set</button>
           <noscript><button type="submit" class="ghost">Set</button></noscript>
+          </div>
         </form>
         <form method="post" action="{{ url_for('pages.update', page_id=page.id) }}"
-              class="dx-updates-ctl" title="How often a panel showing this dashboard wakes to collect a new frame. Leave on the device's own interval unless this dashboard changes on its own schedule.">
-          <span class="dx-meta-k">Wake</span>
+              class="dx-refresh-field" title="How often a panel showing this dashboard wakes to collect a new frame. Leave on the device's own interval unless this dashboard changes on its own schedule.">
+          <label class="dx-refresh-lead" for="sleep_interval_s-{{ _rid }}">
+            <i class="ph ph-power" aria-hidden="true"></i>
+            <span><strong>Device wake-up interval</strong><span class="dx-refresh-help" id="sleep_interval_s-help-{{ _rid }}">How often your display wakes up to check for new content.</span></span>
+          </label>
+          <div class="dx-refresh-inputs">
           {# The other half of "Updates": that one is how often the frame is
              re-rendered, this is how often a panel comes to fetch it. They are
              independent: a page that re-renders hourly and is polled daily
@@ -351,7 +361,7 @@
              knows what its firmware accepts. #}
           {% set wake_presets = [120, 900, 1800, 3600, 21600, 43200, 86400] %}
           {% set wake_custom = page.sleep_interval_s is not none and page.sleep_interval_s not in wake_presets %}
-          <select name="sleep_interval_s" data-updates-preset aria-label="How often a panel showing this dashboard wakes">
+          <select name="sleep_interval_s" id="sleep_interval_s-{{ _rid }}" data-updates-preset aria-describedby="sleep_interval_s-help-{{ _rid }}">
             <option value="" {% if page.sleep_interval_s is none %}selected{% endif %}>device's own interval</option>
             <option value="120" {% if page.sleep_interval_s == 120 %}selected{% endif %}>every 2 min</option>
             <option value="900" {% if page.sleep_interval_s == 900 %}selected{% endif %}>every 15 min</option>
@@ -366,12 +376,13 @@
                  value="{{ page.sleep_interval_s or '' }}" data-updates-custom
                  aria-label="Wake interval in seconds"
                  {% if not wake_custom %}hidden{% endif %}>
-          <span class="dx-updates-unit" data-updates-unit {% if not wake_custom %}hidden{% endif %}>s</span>
-          <button type="submit" class="ghost dx-updates-set" data-updates-set
+          <span class="dx-refresh-unit" data-updates-unit {% if not wake_custom %}hidden{% endif %}>seconds</span>
+          <button type="submit" class="ghost dx-refresh-set" data-updates-set
                   {% if not wake_custom %}hidden{% endif %}>Set</button>
           <noscript><button type="submit" class="ghost">Set</button></noscript>
+          </div>
         </form>
-      </div>
+      </section>
       {% endif %}
       <div class="dx-devquick-actions dx-discovered-actions dx-dashquick-actions">
         {% if archived_tab %}

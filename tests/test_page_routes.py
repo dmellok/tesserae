@@ -2179,10 +2179,21 @@ def test_dashboards_list_is_a_table_with_toolbar_and_opening_rows(app: Flask) ->
     loose = body[body.index('id="dash-loose"') :]
     assert 'data-panels="-"' in loose[:2000]
     assert "not on a panel" in loose and "No panel" in loose and "every 15 min" in loose
-    # Opened-row panel: tiles, Updates / Wake forms, actions, Open in editor.
+    # Opened-row panel: status tiles, the refresh-settings band, actions.
     panel = body[body.index('id="dashq-bound"') : body.index('id="dash-loose"')]
     for label in ("On the panel", "Last pushed", "Updates", "Lineups"):
         assert f'<span class="dx-qtile-label">{label}</span>' in panel
+    assert "Refresh settings" in panel
+    assert "Content updates" in panel
+    assert "Device wake-up interval" in panel
+    refresh = panel[panel.index('<section class="dx-refresh"') : panel.index("</section>")]
+    assert refresh.count("<form ") == 2
+    assert (
+        panel.index("data-dashquick-preview")
+        < panel.index("dx-dashquick-tiles")
+        < panel.index("dx-refresh")
+        < panel.index("dx-dashquick-actions")
+    )
     assert 'name="refresh_minutes"' in panel and 'name="sleep_interval_s"' in panel
     assert 'action="/pages/bound"' in panel
     assert 'action="/pages/bound/duplicate"' in panel
