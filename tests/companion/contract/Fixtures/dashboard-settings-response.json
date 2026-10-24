@@ -1,0 +1,59 @@
+{
+  "dashboard_id": "pantry",
+  "kind": "canvas",
+  "revision": "28ab95c241f3",
+  "can_edit": true,
+  "settings": {
+    "name": "Pantry",
+    "icon": "ph-house",
+    "device_ids": [
+      "kitchen"
+    ],
+    "refresh_minutes": 15,
+    "sleep_interval_s": 300,
+    "theme": "light",
+    "style": "standard",
+    "font": null
+  },
+  "options": {
+    "themes": [
+      {
+        "value": "light",
+        "label": "Light"
+      }
+    ],
+    "styles": [
+      {
+        "value": "standard",
+        "label": "Standard"
+      }
+    ],
+    "fonts": []
+  },
+  "inputs": [
+    {
+      "name": "location",
+      "label": "Location",
+      "type": "string",
+      "required": true,
+      "help": "City to show",
+      "choices": [],
+      "secret": false,
+      "configured": true,
+      "editable": true,
+      "value": "Shanghai"
+    },
+    {
+      "name": "token",
+      "label": "API token",
+      "type": "string",
+      "required": false,
+      "help": "",
+      "choices": [],
+      "secret": true,
+      "configured": true,
+      "editable": true
+    }
+  ],
+  "web_url": "/pages/canvas/c/pantry/configure"
+}

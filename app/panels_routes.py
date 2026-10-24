@@ -640,7 +640,7 @@ def send(canvas_id: str) -> Response:
     return jsonify({"sent": sent, "errors": errors})
 
 
-def _appearance() -> dict[str, Any]:
+def appearance_options() -> dict[str, Any]:
     """Theme / style / font options for the editor's appearance pickers,
     reusing the grid editor's registries so the lists match everywhere."""
     from app.composer import _MATRIX_STYLES
@@ -686,7 +686,7 @@ def catalog() -> Response:
     return jsonify(
         {
             "widgets": build_catalog(_registry(), locale),
-            "appearance": _appearance(),
+            "appearance": appearance_options(),
             "locale": locale,
         }
     )

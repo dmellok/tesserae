@@ -149,6 +149,8 @@ FEATURES = (
     "device_setup",
     "dashboards",
     "dashboard_push",
+    "dashboard_settings",
+    "dashboard_component_settings",
     "image_push",
     "image_url_push",
     "jobs",
@@ -194,7 +196,7 @@ def _cors_preflight() -> Response | None:
 @bp.after_request
 def _cors_headers(resp: Response) -> Response:
     resp.headers["Access-Control-Allow-Origin"] = "*"
-    resp.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+    resp.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
     resp.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type, Idempotency-Key"
     resp.headers["Access-Control-Expose-Headers"] = "Location, Retry-After, ETag"
     resp.headers["Access-Control-Max-Age"] = "86400"
@@ -1151,6 +1153,119 @@ def list_dashboards() -> Any:
             }
         )
     return jsonify({"dashboards": out})
+
+
+@bp.get("/dashboards/<dashboard_id>/settings")
+@_require_companion("dashboards:read")
+def get_dashboard_settings(dashboard_id: str) -> Any:
+    from app import companion_dashboard_settings as settings_api
+
+    page = _pages().get(dashboard_id)
+    if page is None:
+        return _error("not_found", "No dashboard with that id.", 404)
+    return jsonify(
+        settings_api.response(
+            page,
+            can_edit="dashboards:write" in g.companion.scopes,
+            options=settings_api.appearance_options(),
+            registry=current_app.config.get("PLUGIN_REGISTRY"),
+        )
+    )
+
+
+@bp.patch("/dashboards/<dashboard_id>/settings")
+@_require_companion("dashboards:write")
+def patch_dashboard_settings(dashboard_id: str) -> Any:
+    from app import companion_dashboard_settings as settings_api
+    from app.companion_component_settings import SchemaConflict
+    from app.state.page_store import PageRevisionConflict
+
+    body = request.get_json(silent=True)
+    if (
+        not isinstance(body, dict)
+        or set(body)
+        - {"revision", "settings", "inputs", "schema_revision", "component_values", "reset_fields"}
+        or not isinstance(body.get("revision"), str)
+        or not body["revision"]
+    ):
+        return _error("invalid_request", "Supply a revision and changed settings or inputs.", 400)
+    options = settings_api.appearance_options()
+    registry = current_app.config.get("PLUGIN_REGISTRY")
+    try:
+        updated = _pages().update_if_revision(
+            dashboard_id,
+            body["revision"],
+            lambda page: settings_api.apply_patch(
+                page,
+                body,
+                options=options,
+                device_ids={device.id for device in _devices().all()},
+                registry=registry,
+            ),
+        )
+    except PageRevisionConflict:
+        return _error(
+            "revision_conflict", "This dashboard changed. Reload its settings before saving.", 409
+        )
+    except SchemaConflict:
+        return _error(
+            "schema_conflict", "The field definitions changed. Reload settings before saving.", 409
+        )
+    except settings_api.InvalidSettings as exc:
+        return _error("invalid_request", str(exc), 400, fields=exc.fields)
+    if updated is None:
+        return _error("not_found", "No dashboard with that id.", 404)
+    # Discard the web editor's unsaved preview, as its save route does too.
+    current_app.config.get("PREVIEW_CACHE", {}).pop(dashboard_id, None)
+    # Companion's content-keyed token changes with the saved page. Never push.
+    return jsonify(
+        settings_api.response(updated, can_edit=True, options=options, registry=registry)
+    )
+
+
+@bp.get("/dashboards/<dashboard_id>/settings/fields/<field_id>/choices")
+@_require_companion("dashboards:read")
+def dashboard_settings_choices(dashboard_id: str, field_id: str) -> Any:
+    from app.companion_component_settings import Schema
+
+    page = _pages().get(dashboard_id)
+    if page is None:
+        return _error("not_found", "No dashboard with that id.", 404)
+    schema = Schema(page, current_app.config.get("PLUGIN_REGISTRY"))
+    record = schema.fields.get(field_id)
+    if record is None or record.view["secret"]:
+        return _error("not_found", "No selectable field with that id.", 404)
+    if request.args.get("schema_revision", schema.revision) != schema.revision:
+        return _error("schema_conflict", "The field definitions changed. Reload settings.", 409)
+    try:
+        limit = max(1, min(100, int(request.args.get("limit", 50))))
+        offset = max(0, int(request.args.get("offset", 0)))
+    except ValueError:
+        return _error("invalid_request", "Use whole numbers for limit and offset.", 400)
+    choices, ready = schema.choices(record)
+    query = request.args.get("q", "").casefold()
+    if query:
+        choices = [
+            c
+            for c in choices
+            if query in str(c["value"]).casefold() or query in c["label"].casefold()
+        ]
+    total = len(choices)
+    return jsonify(
+        {
+            "field_id": field_id,
+            "schema_revision": schema.revision,
+            "status": "ready" if ready else "unavailable",
+            "choices": choices[offset : offset + limit],
+            "total": total,
+            "offset": offset,
+            "limit": limit,
+            "has_more": offset + limit < total,
+            "message": None
+            if ready
+            else "Choices are unavailable. Check the widget connection and retry.",
+        }
+    )
 
 
 # -- lineups -------------------------------------------------------------

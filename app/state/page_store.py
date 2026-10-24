@@ -10,6 +10,7 @@ mypy --strict applies to this module, see pyproject.toml.
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import json
 import logging
 import re
@@ -359,6 +360,16 @@ class Page(BaseModel):
         return value
 
 
+def page_revision(page: Page) -> str:
+    """Opaque revision of the whole saved page, including web/MCP-only fields."""
+    encoded = json.dumps(page.model_dump(mode="json"), sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(encoded.encode()).hexdigest()
+
+
+class PageRevisionConflict(Exception):
+    """The page changed after the caller read it."""
+
+
 class PageStore:
     """Thread-safe, file-backed dictionary of pages.
 
@@ -451,9 +462,35 @@ class PageStore:
 
     def save(self, page: Page) -> None:
         with self._lock:
-            self._pages[page.id] = page
+            self._pages[page.id] = page.model_copy(deep=True)
             self._flush()
         self._notify()
+
+    def update_if_revision(
+        self, page_id: str, revision: str, transform: Callable[[Page], Page]
+    ) -> Page | None:
+        """Compare and patch under the same lock used by every save/delete.
+
+        The transform gets a detached copy; a rejected edit cannot mutate the
+        saved page. Listeners run outside the lock, as for ordinary saves.
+        """
+        with self._lock:
+            current = self._pages.get(page_id)
+            if current is None:
+                return None
+            if page_revision(current) != revision:
+                raise PageRevisionConflict
+            updated = transform(current.model_copy(deep=True))
+            if updated.id != page_id:
+                raise ValueError("A page update cannot change its id")
+            self._pages[page_id] = updated
+            try:
+                self._flush()
+            except Exception:
+                self._pages[page_id] = current
+                raise
+        self._notify()
+        return updated.model_copy(deep=True)
 
     def delete(self, page_id: str) -> bool:
         with self._lock:

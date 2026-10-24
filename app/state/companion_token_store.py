@@ -89,6 +89,7 @@ COMPANION_SCOPES: tuple[str, ...] = (
 # time, which is a stronger action than putting a photo in a library and a
 # different one from pushing a frame (#230).
 OPTIONAL_SCOPES: tuple[str, ...] = (
+    "dashboards:write",
     "lineups:write",
     "offline_albums:write",
     "device_setup:write",

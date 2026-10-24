@@ -41,6 +41,7 @@ SCOPE_LABELS: dict[str, str] = {
     "devices:read": "See your displays",
     "device_setup:write": "Set up a nearby display",
     "dashboards:read": "See your dashboards",
+    "dashboards:write": "Edit dashboard settings",
     "push:write": "Send dashboards to a display",
     "media:write": "Send photos and images",
     "personal_data:write": "Publish selected personal data from the phone",

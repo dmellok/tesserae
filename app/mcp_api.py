@@ -491,7 +491,7 @@ def catalog() -> Response:
             "matched": len(lean),
             "total": len(widgets),
         }
-    appearance = _pr._appearance()
+    appearance = _pr.appearance_options()
     return jsonify(
         {
             **out,
@@ -532,7 +532,7 @@ def appearance() -> Response:
     how many of each exist and points here, so an agent that does need them
     knows they are there.
     """
-    return jsonify(_pr._appearance())
+    return jsonify(_pr.appearance_options())
 
 
 @bp.get("/icons")

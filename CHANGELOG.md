@@ -6,6 +6,23 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added
+
+- Companion apps can open native Dashboard settings to edit names, icons,
+  display bindings, content/wake intervals, appearance and declared Canvas
+  configuration fields. Operators grant **Edit dashboard settings** separately
+  in Settings → Companion. Secret values remain hidden, saves detect conflicting
+  web/editor changes, and saving does not push a frame. Grid dashboards support
+  common settings; advanced layout and code editing stay in the web editor.
+
+- Dashboard settings now discover supported widget fields per Grid cell, Canvas
+  element, Code data source and binding. Apps can search dynamic choices, retain
+  unavailable selections, order media-player priorities and reset individual
+  overrides to widget defaults. Shared Canvas inputs keep their author-defined
+  grouping, and saves reject stale definitions or overlapping updates atomically.
+  Location search, sliders, native colors and conditional fields still use the
+  web editor.
+
 ## [0.475.0], 2026-10-24
 
 ### Added

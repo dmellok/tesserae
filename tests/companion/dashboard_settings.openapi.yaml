@@ -1,0 +1,428 @@
+# Dashboard settings extension copied from charmmmz/tesserae-companion-ios
+# Contracts/app-v1.openapi.yaml at 30b32d42dec5db2a318b9dccfba2fa214d7325a6.
+# Layered through contract_errata.py; keep the vendored contract verbatim.
+paths:
+  /api/app/v1/dashboards/{dashboard_id}/settings:
+    parameters:
+    - $ref: '#/components/parameters/DashboardID'
+    get:
+      tags:
+      - Dashboards
+      operationId: getCompanionDashboardSettings
+      summary: Read dashboard settings and its declared inputs
+      description: Requires dashboards:read. can_edit reflects optional dashboards:write
+        permission.
+      responses:
+        '200':
+          description: Saved dashboard settings; does not render or push.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardSettingsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+      - Dashboards
+      operationId: patchCompanionDashboardSettings
+      summary: Save changed dashboard settings without pushing
+      description: Requires optional dashboards:write, granted in Settings > Companion.
+        Atomic revision check covers metadata and layout edits through all server
+        surfaces. Omitted fields and inputs are preserved.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DashboardSettingsPatchRequest'
+      responses:
+        '200':
+          description: Saved dashboard settings; does not render or push.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardSettingsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '400':
+          description: Invalid field value; error.fields maps field paths to safe
+            messages.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: 'revision_conflict or schema_conflict: reload before saving.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/app/v1/dashboards/{dashboard_id}/settings/fields/{field_id}/choices:
+    parameters:
+    - $ref: '#/components/parameters/DashboardID'
+    - in: path
+      name: field_id
+      required: true
+      schema:
+        type: string
+    get:
+      tags:
+      - Dashboards
+      operationId: getCompanionDashboardSettingsChoices
+      summary: Search current dashboard field choices (dashboards:read)
+      parameters:
+      - in: query
+        name: q
+        schema:
+          type: string
+      - in: query
+        name: limit
+        schema:
+          type: integer
+      - in: query
+        name: offset
+        schema:
+          type: integer
+      - in: query
+        name: schema_revision
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Available choices or a safe unavailable status; empty ready
+            differs from provider failure.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardSettingsChoicesResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: 'schema_conflict: reload definitions.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+schemas:
+  DashboardSettingsChoice:
+    type: object
+    additionalProperties: false
+    required:
+    - value
+    - label
+    properties:
+      value: {}
+      label:
+        type: string
+  DashboardSettingsValues:
+    type: object
+    additionalProperties: false
+    properties:
+      name:
+        type: string
+        minLength: 1
+        maxLength: 200
+      icon:
+        type: string
+        nullable: true
+        maxLength: 100
+      device_ids:
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+      refresh_minutes:
+        type: integer
+        minimum: 0
+        maximum: 1440
+      sleep_interval_s:
+        type: integer
+        nullable: true
+        minimum: 1
+        maximum: 604800
+      theme:
+        type: string
+      style:
+        type: string
+      font:
+        type: string
+        nullable: true
+  DashboardSettingsInput:
+    type: object
+    additionalProperties: false
+    required:
+    - name
+    - label
+    - type
+    - required
+    - help
+    - choices
+    - secret
+    - configured
+    - editable
+    properties:
+      name:
+        type: string
+      label:
+        type: string
+      type:
+        type: string
+      required:
+        type: boolean
+      help:
+        type: string
+      choices:
+        type: array
+        items:
+          $ref: '#/components/schemas/DashboardSettingsChoice'
+      secret:
+        type: boolean
+        description: Secret values and defaults are never returned.
+      configured:
+        type: boolean
+      editable:
+        type: boolean
+        description: False for unsupported types or unresolved targets; use the web
+          editor.
+      value: {}
+      field_id:
+        type: string
+      dynamic_choices:
+        type: boolean
+      value_state:
+        type: string
+        enum:
+        - uniform
+        - mixed
+        - unset
+      has_override:
+        type: boolean
+      can_clear:
+        type: boolean
+      can_reset:
+        type: boolean
+      readonly_reason:
+        type: string
+        nullable: true
+      minimum:
+        type: number
+      maximum:
+        type: number
+      step:
+        type: number
+      default: {}
+  DashboardSettingsResponse:
+    type: object
+    additionalProperties: false
+    required:
+    - dashboard_id
+    - kind
+    - revision
+    - can_edit
+    - settings
+    - options
+    - inputs
+    - web_url
+    properties:
+      dashboard_id:
+        type: string
+      kind:
+        type: string
+        enum:
+        - grid
+        - canvas
+      revision:
+        type: string
+      can_edit:
+        type: boolean
+      settings:
+        allOf:
+        - $ref: '#/components/schemas/DashboardSettingsValues'
+        - required:
+          - name
+          - icon
+          - device_ids
+          - refresh_minutes
+          - sleep_interval_s
+          - theme
+          - style
+          - font
+      options:
+        type: object
+        additionalProperties: false
+        required:
+        - themes
+        - styles
+        - fonts
+        properties:
+          themes:
+            type: array
+            items:
+              $ref: '#/components/schemas/DashboardSettingsChoice'
+          styles:
+            type: array
+            items:
+              $ref: '#/components/schemas/DashboardSettingsChoice'
+          fonts:
+            type: array
+            items:
+              $ref: '#/components/schemas/DashboardSettingsChoice'
+      inputs:
+        type: array
+        items:
+          $ref: '#/components/schemas/DashboardSettingsInput'
+      web_url:
+        type: string
+      schema_revision:
+        type: string
+      components:
+        type: array
+        items:
+          $ref: '#/components/schemas/DashboardSettingsComponent'
+      coverage:
+        $ref: '#/components/schemas/DashboardSettingsCoverage'
+  DashboardSettingsPatchRequest:
+    type: object
+    additionalProperties: false
+    required:
+    - revision
+    properties:
+      revision:
+        type: string
+        minLength: 1
+      settings:
+        $ref: '#/components/schemas/DashboardSettingsValues'
+      inputs:
+        type: object
+        additionalProperties: {}
+        description: Only changed declared inputs. Omitted values stay unchanged;
+          null explicitly clears an optional input. Required inputs cannot be cleared.
+      schema_revision:
+        type: string
+      component_values:
+        type: object
+        additionalProperties: {}
+        description: Changed component fields keyed by server field_id. Null clears;
+          omission preserves. Requires schema_revision.
+      reset_fields:
+        type: array
+        uniqueItems: true
+        items:
+          type: string
+        description: Declared or component field IDs to remove overrides and restore
+          defaults. Requires schema_revision.
+  DashboardSettingsComponent:
+    type: object
+    additionalProperties: false
+    required:
+    - id
+    - label
+    - widget_id
+    - kind
+    - available
+    - fragment
+    - source_name
+    - fields
+    properties:
+      id:
+        type: string
+      label:
+        type: string
+      widget_id:
+        type: string
+      kind:
+        type: string
+        enum:
+        - grid_cell
+        - canvas_element
+        - code_source
+        - binding
+      available:
+        type: boolean
+      fragment:
+        type: string
+        nullable: true
+      source_name:
+        type: string
+        nullable: true
+      fields:
+        type: array
+        items:
+          $ref: '#/components/schemas/DashboardSettingsInput'
+  DashboardSettingsCoverage:
+    type: object
+    additionalProperties: false
+    required:
+    - status
+    - editable_fields
+    - readonly_fields
+    - unavailable_components
+    properties:
+      status:
+        type: string
+        enum:
+        - complete
+        - partial
+        - none
+      editable_fields:
+        type: integer
+      readonly_fields:
+        type: integer
+      unavailable_components:
+        type: integer
+  DashboardSettingsChoicesResponse:
+    type: object
+    additionalProperties: false
+    required:
+    - field_id
+    - schema_revision
+    - status
+    - choices
+    - total
+    - offset
+    - limit
+    - has_more
+    - message
+    properties:
+      field_id:
+        type: string
+      schema_revision:
+        type: string
+      status:
+        type: string
+        enum:
+        - ready
+        - unavailable
+      choices:
+        type: array
+        items:
+          $ref: '#/components/schemas/DashboardSettingsChoice'
+      total:
+        type: integer
+      offset:
+        type: integer
+      limit:
+        type: integer
+      has_more:
+        type: boolean
+      message:
+        type: string
+        nullable: true
+error_fields:
+  fields:
+    type: object
+    additionalProperties:
+      type: string
+    description: Field paths and validation messages; submitted values are never echoed.

@@ -511,6 +511,7 @@ def _materialize_cell_options(plugins: list[Any]) -> dict[str, list[dict[str, An
     empty-list fallback silently rendered an empty picker which was
     impossible to diagnose from the UI, see issue #29."""
     from app.secret_box import SecretBoxError
+    from app.widget_choices import choice_rows
 
     out: dict[str, list[dict[str, Any]]] = {}
     for plugin in plugins:
@@ -523,7 +524,7 @@ def _materialize_cell_options(plugins: list[Any]) -> dict[str, list[dict[str, An
             source = spec.pop("choices_from", None)
             if source and callable(resolver):
                 try:
-                    spec["choices"] = list(resolver(source))
+                    spec["choices"] = choice_rows(plugin, opt)
                 except SecretBoxError:
                     logger.warning(
                         "plugin %s: choices(%r) hit SecretBoxError, the stored "

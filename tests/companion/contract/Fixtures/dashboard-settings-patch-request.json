@@ -1,0 +1,11 @@
+{
+  "revision": "28ab95c241f3",
+  "settings": {
+    "name": "Kitchen",
+    "sleep_interval_s": null
+  },
+  "inputs": {
+    "location": "Beijing",
+    "token": null
+  }
+}

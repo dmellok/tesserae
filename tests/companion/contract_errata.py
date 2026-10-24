@@ -31,7 +31,10 @@ against it at all.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
+
+import yaml
 
 
 @dataclass(frozen=True)
@@ -63,7 +66,29 @@ class SchemaErratum:
     why: str = ""
 
 
+_DASHBOARD_SETTINGS = yaml.safe_load(
+    Path(__file__).with_name("dashboard_settings.openapi.yaml").read_text(encoding="utf-8")
+)
+
 ERRATA: tuple[Erratum, ...] = (
+    Erratum(
+        pointer="components/schemas/Capabilities/properties/features/items/enum",
+        values=("dashboard_settings", "dashboard_component_settings"),
+        since="vNext (unreleased)",
+        why="Native Dashboard editing; iOS contract 30b32d42dec5db2a318b9dccfba2fa214d7325a6.",
+    ),
+    Erratum(
+        pointer="components/schemas/CompanionSessionAuthorization/properties/scopes/items/enum",
+        values=("dashboards:write",),
+        since="vNext (unreleased)",
+        why="Optional Dashboard edit grant; never included in default pairing scopes.",
+    ),
+    Erratum(
+        pointer="components/schemas/ErrorResponse/properties/error/properties/code/enum",
+        values=("revision_conflict", "schema_conflict"),
+        since="vNext (unreleased)",
+        why="Concurrent page/schema edits require a fresh settings read before saving.",
+    ),
     Erratum(
         pointer="components/schemas/Capabilities/properties/features/items/enum",
         values=("device_timeline",),
@@ -88,6 +113,24 @@ ERRATA: tuple[Erratum, ...] = (
 )
 
 SCHEMA_ERRATA: tuple[SchemaErratum, ...] = (
+    SchemaErratum(
+        pointer="paths",
+        patch=_DASHBOARD_SETTINGS["paths"],
+        since="vNext (unreleased)",
+        why="Scoped settings and field choices endpoints from the pinned iOS contract.",
+    ),
+    SchemaErratum(
+        pointer="components/schemas",
+        patch=_DASHBOARD_SETTINGS["schemas"],
+        since="vNext (unreleased)",
+        why="Settings models from iOS 30b32d42dec5db2a318b9dccfba2fa214d7325a6.",
+    ),
+    SchemaErratum(
+        pointer="components/schemas/ErrorResponse/properties/error/properties",
+        patch=_DASHBOARD_SETTINGS["error_fields"],
+        since="vNext (unreleased)",
+        why="Safe field validation errors from the same pinned iOS contract; never echo secrets.",
+    ),
     SchemaErratum(
         pointer="components/schemas/Panel/properties",
         patch={

@@ -18,6 +18,11 @@ import pytest
 from ._schema import FIXTURES_DIR, SPEC, schema_for
 
 CASES = {
+    "dashboard-component-settings-response.json": "DashboardSettingsResponse",
+    "dashboard-component-settings-patch.json": "DashboardSettingsPatchRequest",
+    "dashboard-settings-choices-response.json": "DashboardSettingsChoicesResponse",
+    "dashboard-settings-response.json": "DashboardSettingsResponse",
+    "dashboard-settings-patch-request.json": "DashboardSettingsPatchRequest",
     "capabilities-personal-data-retention.json": "Capabilities",
     "personal-data-reminders-never.json": "PersonalDataSnapshot",
     "personal-data-status-never.json": "PersonalDataSourceStatus",
@@ -115,6 +120,8 @@ def test_openapi_shape_and_operation_ids_are_stable() -> None:
         "/api/app/v1/lineups/{lineup_id}/actions",
         "/api/app/v1/dashboards",
         "/api/app/v1/dashboards/{dashboard_id}/preview",
+        "/api/app/v1/dashboards/{dashboard_id}/settings",
+        "/api/app/v1/dashboards/{dashboard_id}/settings/fields/{field_id}/choices",
         "/api/app/v1/dashboards/{dashboard_id}/push",
         "/api/app/v1/images",
         "/api/app/v1/image-urls",

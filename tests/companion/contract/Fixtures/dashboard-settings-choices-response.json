@@ -1,0 +1,16 @@
+{
+  "field_id": "f_fcf65dbd66146dc61423",
+  "schema_revision": "c10b6ded3350208ebe63c1ccba06ec251a516be96d10c46aa7727924284c94e5",
+  "status": "ready",
+  "choices": [
+    {
+      "value": "a",
+      "label": "Alpha"
+    }
+  ],
+  "total": 2,
+  "offset": 0,
+  "limit": 1,
+  "has_more": true,
+  "message": null
+}
