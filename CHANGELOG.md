@@ -6,6 +6,16 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.484.1], 2026-10-28
+
+### Fixed
+
+- Outbound fetches that refuse private addresses (picture imports, page
+  assets, fonts, REST widgets, the companion and relay checks) check the
+  host the socket will actually reach. Encoded hosts like `127%2e0%2e0%2e1`,
+  numeric spellings like `2130706433`, IPv4 inside IPv6 and a DNS answer
+  that changes between the check and the connection no longer get through.
+
 ## [0.484.0], 2026-10-28
 
 ### Added

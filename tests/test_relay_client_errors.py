@@ -26,6 +26,16 @@ def _http_error(status: int, payload: object) -> urllib.error.HTTPError:
     )
 
 
+@pytest.fixture(autouse=True)
+def _relay_resolves(monkeypatch: pytest.MonkeyPatch) -> None:
+    """relay.example doesn't exist; the URL guard now refuses a host that
+    doesn't resolve, so give it a public address."""
+    from app import net_guard
+
+    public = [(2, 1, 6, "", ("93.184.216.34", 0))]
+    monkeypatch.setattr(net_guard.socket, "getaddrinfo", lambda *a, **k: public)
+
+
 def _raise(monkeypatch: pytest.MonkeyPatch, err: urllib.error.HTTPError) -> None:
     def _boom(*_args: object, **_kwargs: object) -> None:
         raise err

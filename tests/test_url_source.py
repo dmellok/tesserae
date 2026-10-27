@@ -88,7 +88,9 @@ def test_fetch_json_enforces_size_cap() -> None:
         def open(self, *a: object, **k: object) -> _Resp:
             return _Resp()
 
+    public = [(2, 1, 6, "", ("93.184.216.34", 0))]
     with (
+        patch("app.net_guard.socket.getaddrinfo", return_value=public),
         patch("app.net_guard.urllib.request.build_opener", return_value=_Opener()),
         pytest.raises(ValueError, match="cap"),
     ):
