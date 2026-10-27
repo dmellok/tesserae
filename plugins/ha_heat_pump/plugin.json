@@ -1,0 +1,104 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "HA Heat Pump",
+  "version": "0.1.0",
+  "kind": "widget",
+  "description": "Heat-pump compressor status, temperatures, and electricity consumption from Home Assistant.",
+  "icon": "ph-thermometer-hot",
+  "category": "home-assistant",
+  "locales": ["en", "de"],
+  "supports": {
+    "sizes": ["xs", "sm", "md", "lg"]
+  },
+  "cell_options": [
+    {
+      "name": "compressor_entity",
+      "type": "select",
+      "label": "Compressor status",
+      "default": "binary_sensor.e3_vitocal_17_kompressor",
+      "choices_from": "binary_sensor"
+    },
+    {
+      "name": "flow_entity",
+      "type": "select",
+      "label": "Heating temperature",
+      "default": "sensor.e3_vitocal_17_vorlauftemperatur",
+      "choices_from": "sensor"
+    },
+    {
+      "name": "hot_water_temperature_entity",
+      "type": "select",
+      "label": "Hot-water temperature",
+      "default": "sensor.e3_vitocal_17_ww_speichertemperatur",
+      "choices_from": "sensor"
+    },
+    {
+      "name": "power_entity",
+      "type": "select",
+      "label": "Current energy consumption",
+      "default": "",
+      "choices_from": "sensor"
+    },
+    {
+      "name": "heating_entity",
+      "type": "select",
+      "label": "Heating climate entity",
+      "default": "climate.e3_vitocal_17_heizung",
+      "choices_from": "heating",
+      "advanced": true,
+      "help": "Used as a fallback if the heating temperature sensor is unavailable."
+    },
+    {
+      "name": "hot_water_entity",
+      "type": "select",
+      "label": "Hot-water entity",
+      "default": "water_heater.e3_vitocal_17_warmwasser",
+      "choices_from": "hot_water",
+      "advanced": true,
+      "help": "Used as a fallback if the hot-water temperature sensor is unavailable."
+    },
+    {
+      "name": "daily_energy_entity",
+      "type": "select",
+      "label": "Total daily electricity",
+      "default": "sensor.keller_e3_vitocal_17_strom_taglich",
+      "choices_from": "sensor",
+      "advanced": true
+    },
+    {
+      "name": "heating_energy_entity",
+      "type": "select",
+      "label": "Heating daily electricity",
+      "default": "sensor.keller_e3_vitocal_17_vitocal_heizung_taglich",
+      "choices_from": "sensor",
+      "advanced": true
+    },
+    {
+      "name": "hot_water_energy_entity",
+      "type": "select",
+      "label": "Hot-water daily electricity",
+      "default": "sensor.keller_e3_vitocal_17_vitocal_warmwasser_taglich",
+      "choices_from": "sensor",
+      "advanced": true
+    },
+    {
+      "name": "overall_spf_entity",
+      "type": "select",
+      "label": "Overall seasonal performance",
+      "default": "sensor.e3_vitocal_17_saisonale_arbeitszahl",
+      "choices_from": "sensor",
+      "advanced": true
+    },
+    {
+      "name": "label",
+      "type": "string",
+      "label": "Title",
+      "default": "Heat pump",
+      "advanced": true
+    }
+  ],
+  "render": {
+    "dither": "none",
+    "needs_network": false
+  }
+}
