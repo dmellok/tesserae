@@ -204,7 +204,10 @@ def test_push_page_command_calls_push(tmp_path: Path) -> None:
     pm.push.return_value = PushResult(status="sent", page_id="home")
     ha.start()
     ha._on_push_page_cmd(CMD_TOPIC_PUSH_PAGE, b"home")
-    pm.push.assert_called_once_with("home", source="home_assistant")
+    assert ha._wait_commands_idle()
+    pm.push.assert_called_once_with(
+        "home", source="home_assistant", lock_timeout_s=60.0, settle_max_s=30.0
+    )
     # Busy gets tipped on for the duration.
     assert b"1" in list(_payloads_for(client, STATE_TOPIC_BUSY))
 
@@ -276,6 +279,60 @@ def test_toggle_on_via_settings_starts_discovery(app: Flask, tmp_path: Path) -> 
     assert store.get_section("app")["ha_discovery_enabled"] is True
 
 
+def test_publish_toggles_save_and_reach_a_fresh_publisher(app: Flask, tmp_path: Path) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    page = client.get("/settings/server").get_data(as_text=True)
+    # Rendered as ticked switches on a fresh install (default on).
+    for name in ("ha_discovery_lineup_controls", "ha_discovery_dashboard_buttons"):
+        assert f'id="server-{name}"' in page
+        tag = page[page.index(f'id="server-{name}"') :].split(">", 1)[0]
+        assert "checked" in tag
+    base = {"base_url": "http://lan.test:8000", "ha_discovery_enabled": "on"}
+    # Browsers don't submit an unticked switch: both groups off.
+    client.post("/settings/app", data=base)
+    first = app.config["HA_DISCOVERY"]
+    assert first is not None
+    section = app.config["SETTINGS_STORE"].get_section("app")
+    assert section["ha_discovery_lineup_controls"] is False
+    assert section["ha_discovery_dashboard_buttons"] is False
+    assert first._lineup_controls_on() is False
+    assert first._dashboard_buttons_on() is False
+    client.post(
+        "/settings/app",
+        data={**base, "ha_discovery_lineup_controls": "on", "ha_discovery_dashboard_buttons": "on"},
+    )
+    # The save rebuilt the publisher (the old one stopped, blanking what it
+    # had published), and the new one reads the saved values.
+    second = app.config["HA_DISCOVERY"]
+    assert second is not None and second is not first
+    assert first._started is False
+    assert second._lineup_controls_on() is True
+    assert second._dashboard_buttons_on() is True
+
+
+def test_discovery_started_at_boot_has_the_button_service_hooks(tmp_path: Path) -> None:
+    (tmp_path / "core").mkdir(parents=True, exist_ok=True)
+    SettingsStore(tmp_path / "core" / "settings.json").update_section(
+        "app", {"ha_discovery_enabled": True}
+    )
+    booted = create_app(
+        testing=False,
+        data_root=tmp_path,
+        plugins_dir=REPO_ROOT / "plugins",
+        renderers_dir=REPO_ROOT / "renderers",
+        devices_dir=REPO_ROOT / "devices",
+    )
+    ha = booted.config["HA_DISCOVERY"]
+    assert ha is not None
+    # The Input event entity and its listener need the service; it used to
+    # be built after the first transport wiring, so a restart left both out
+    # until the next settings save.
+    assert ha._hooks.button_service is booted.config["BUTTON_SERVICE"]
+    assert ha._hooks.step_device_fn is not None
+    ha.stop()
+
+
 # -- Multi-head: per-display HA devices --------------------------------
 
 
@@ -314,7 +371,10 @@ def test_per_device_push_command_targets_single_display(tmp_path: Path) -> None:
     store.save(Page(id="m", name="Morning", panel=Panel(w=100, h=100), device_ids=["lounge"]))
     ha.start()
     ha._on_device_push_cmd("tesserae/ha/dev/lounge/cmd/push", b"Morning")
-    pm.push.assert_called_once_with("m", device_ids={"lounge"}, source="home_assistant")
+    assert ha._wait_commands_idle()
+    pm.push.assert_called_once_with(
+        "m", device_ids={"lounge"}, source="home_assistant", lock_timeout_s=60.0, settle_max_s=30.0
+    )
 
 
 def test_push_result_updates_per_device_state(tmp_path: Path) -> None:

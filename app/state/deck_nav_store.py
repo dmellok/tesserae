@@ -13,9 +13,11 @@ mypy --strict applies via re-export through app.state.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import threading
 import time
+from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +26,22 @@ class DeckNavStore:
     def __init__(self, path: Path) -> None:
         self._path = path
         self._lock = threading.Lock()
+        self._device_locks: dict[str, threading.RLock] = {}
+        self._device_locks_guard = threading.Lock()
+
+    def device_lock(self, device_id: str) -> threading.RLock:
+        """The lock that serialises one device's navigation: read its
+        position, deliver the next page, record the new position. Every
+        path that moves a panel within a lineup (button presses, Home
+        Assistant's Next / Previous, the scheduler's lineup advances and
+        home returns) holds it across all three, so two of them can't
+        interleave into "the glass shows one page, the record names
+        another". Re-entrant, so a path that takes it can call another."""
+        with self._device_locks_guard:
+            lock = self._device_locks.get(device_id)
+            if lock is None:
+                lock = self._device_locks[device_id] = threading.RLock()
+            return lock
 
     def _load_raw(self) -> dict[str, dict[str, Any]]:
         if not self._path.exists():
@@ -74,3 +92,34 @@ class DeckNavStore:
             del raw[device_id]
             self._save_raw(raw)
             return True
+
+
+@contextlib.contextmanager
+def navigation_locked(
+    nav: Any, device_ids: Iterable[str], *, timeout: float | None = None
+) -> Iterator[bool]:
+    """Hold :meth:`DeckNavStore.device_lock` for every device in
+    ``device_ids`` (sorted, so two callers locking overlapping sets can't
+    deadlock) for the body. Yields True once all are held; with a
+    ``timeout``, yields False (holding none) when one isn't free in time.
+    A nav store without per-device locks (a test fake) yields True and
+    locks nothing."""
+    factory = getattr(nav, "device_lock", None) if nav is not None else None
+    if not callable(factory):
+        yield True
+        return
+    held: list[Any] = []
+    try:
+        for device_id in sorted(set(device_ids)):
+            lock = factory(device_id)
+            acquired = lock.acquire(timeout=timeout) if timeout is not None else lock.acquire()
+            if not acquired:
+                break
+            held.append(lock)
+        else:
+            yield True
+            return
+        yield False
+    finally:
+        for lock in reversed(held):
+            lock.release()

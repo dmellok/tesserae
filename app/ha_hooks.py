@@ -23,24 +23,33 @@ from typing import Any
 
 from flask import Flask
 
-from app.ha_discovery import HaHooks
+from app.ha_discovery import HA_PUSH_LOCK_TIMEOUT_S, HA_SETTLE_MAX_S, HaHooks
+from app.push import DELIVERED_STATUSES
 
 logger = logging.getLogger(__name__)
 
 
-def _invalidate_deck(app: Flask, deck: Any) -> None:
+def _invalidate_deck(app: Flask, deck: Any) -> str | None:
     """Same as ``deck_routes._invalidate``: drop warmed frames + nav
     position for the deck's devices so a toggled / rebound lineup doesn't
-    leave a stale frame or a dangling position behind."""
+    leave a stale frame or a dangling position behind. The cache clear
+    waits at most ``HA_PUSH_LOCK_TIMEOUT_S`` for the render lock (this runs
+    on Home Assistant's command worker); a display it couldn't clear is
+    named in the returned error."""
     push = app.config.get("PUSH_MANAGER")
     nav = app.config.get("DECK_NAV_STORE")
+    busy: list[str] = []
     for device_id in getattr(deck, "device_ids", []) or []:
         if push is not None and hasattr(push, "clear_deck_cache"):
             with _quiet("deck cache clear"):
-                push.clear_deck_cache(device_id)
+                if push.clear_deck_cache(device_id, lock_timeout_s=HA_PUSH_LOCK_TIMEOUT_S) is False:
+                    busy.append(device_id)
         if nav is not None:
             with _quiet("deck nav clear"):
                 nav.clear(device_id)
+    if busy:
+        return f"renderer busy; warmed frames for {', '.join(busy)} not cleared"
+    return None
 
 
 class _quiet:
@@ -367,18 +376,51 @@ def _notify(app: Flask, device_id: str | None, message: str) -> str | None:
                 device_id=device.id,
                 fit="fit",
                 source="home_assistant",
+                lock_timeout_s=HA_PUSH_LOCK_TIMEOUT_S,
             )
         except Exception as exc:
             logger.exception("HA hooks: notify render/push failed for %s", device.id)
             errors.append(f"{device.display_name}: {exc}")
             continue
-        if result.status == "failed":
-            errors.append(f"{device.display_name}: {result.error or 'push failed'}")
+        if result.status in ("failed", "busy"):
+            errors.append(f"{device.display_name}: {result.error or f'push {result.status}'}")
         else:
             sent += 1
     if errors and not sent:
         return "; ".join(errors)[:240]
     return None
+
+
+def _step_device(app: Flask, device_id: str, delta: int) -> str | None:
+    """Step one display a page forward (``delta > 0``) or back through the
+    button service, the same path a physical next / previous press takes
+    (see ``ButtonService.step`` for what differs and why).
+
+    The service is looked up per call, not when the hooks are built, so
+    the buttons never hold on to a missing one: the hooks are built
+    whenever the transport is rewired, which at boot used to happen
+    before the service existed."""
+    svc = app.config.get("BUTTON_SERVICE")
+    step = getattr(svc, "step", None)
+    if not callable(step):
+        return "Button service not ready."
+    device = app.config["DEVICE_REGISTRY"].get(device_id)
+    if device is None or device.kind_of is None:
+        return f"Unknown device {device_id!r}."
+    result = step(
+        device_id=device_id,
+        forward=delta > 0,
+        source="home_assistant",
+        lock_timeout_s=HA_PUSH_LOCK_TIMEOUT_S,
+        settle_max_s=HA_SETTLE_MAX_S,
+    )
+    error = getattr(result, "error", None)
+    push = getattr(result, "push_result", None)
+    if not error and push is not None and push.status not in DELIVERED_STATUSES:
+        # Anything but sent / no_change left the panel where it was:
+        # failed, superseded by a newer push, page gone, ...
+        error = push.error or f"push {push.status}"
+    return f"{device.display_name}: {error}" if error else None
 
 
 def build_ha_hooks(app: Flask) -> HaHooks:
@@ -413,4 +455,5 @@ def build_ha_hooks(app: Flask) -> HaHooks:
         ),
         notify_fn=lambda device_id, message: _notify(app, device_id, message),
         expected_interval_fn=lambda device_id: _expected_interval(app, device_id),
+        step_device_fn=lambda device_id, delta: _step_device(app, device_id, delta),
     )

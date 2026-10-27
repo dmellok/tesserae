@@ -57,6 +57,16 @@ class DeviceRotationState(BaseModel):
     # scheduler.
     override_until: datetime | None = None
 
+    # UTC timestamp; while ``datetime.now(UTC) < automation_hold_until``
+    # the scheduler delivers nothing automated to this display (lineup
+    # steps, daily / interval fires, rotations, schedules, page refreshes,
+    # home returns), the per-display counterpart of the global Automation
+    # pause. Manual sends and Next / Previous still go through. Set by
+    # Home Assistant's Hold number; a lapsed value is cleared by the
+    # scheduler, which then brings the display back into its lineup.
+    # Unlike ``override_until`` it isn't tied to a rotation.
+    automation_hold_until: datetime | None = None
+
     # Debounce fingerprints for the last processed button event.
     # ``last_button_event_id`` is the monotonic counter the firmware
     # sends; incoming events with an id ``<= last_button_event_id``

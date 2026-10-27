@@ -423,6 +423,59 @@ def test_push_not_found_when_page_missing(tmp_path: Path, composition_png: bytes
     assert result.status == "not_found"
 
 
+@pytest.mark.parametrize("bypass_coalesce", [True, False])
+def test_push_image_reports_busy_when_render_lock_deadline_expires(
+    tmp_path: Path, composition_png: bytes, bypass_coalesce: bool
+) -> None:
+    manager, client, _ = _wired(tmp_path, composition_png, [])
+    results = []
+    manager.add_listener(results.append)
+    manager._lock.acquire()
+    try:
+        result = manager.push_image(
+            composition_png,
+            source_label="notice",
+            lock_timeout_s=0.05,
+            bypass_coalesce=bypass_coalesce,
+        )
+        assert manager._lock.locked()
+    finally:
+        manager._lock.release()
+    assert result.status == "busy"
+    assert result.page_id == "notice"
+    assert "renderer busy" in result.error
+    assert results == [result]
+    assert client.published == []
+
+
+def test_push_image_default_waits_until_render_lock_is_released(
+    tmp_path: Path, composition_png: bytes
+) -> None:
+    import threading
+
+    renderers = [_make_renderer(tmp_path, "esp32_bin", "bin", retain=False)]
+    manager, _, _ = _wired(tmp_path, composition_png, renderers)
+    started, finished = threading.Event(), threading.Event()
+    results = []
+
+    def fire() -> None:
+        started.set()
+        results.append(manager.push_image(composition_png, source_label="file"))
+        finished.set()
+
+    manager._lock.acquire()
+    thread = threading.Thread(target=fire)
+    thread.start()
+    try:
+        assert started.wait(2)
+        assert not finished.wait(0.1)
+    finally:
+        manager._lock.release()
+        thread.join(5)
+    assert finished.is_set()
+    assert results[0].status == "sent"
+
+
 def test_push_image_supersedes_older_pending_for_same_device(
     tmp_path: Path, composition_png: bytes
 ) -> None:

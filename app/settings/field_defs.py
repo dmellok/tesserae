@@ -180,6 +180,36 @@ APP_FIELDS: list[dict[str, Any]] = [
         ),
     },
     {
+        # Read by app/ha_discovery.py (SETTING_LINEUP_CONTROLS). Default on
+        # so installs that never saved it keep every entity they had.
+        "name": "ha_discovery_lineup_controls",
+        "type": "switch",
+        "label": "Publish lineup controls to Home Assistant",
+        "default": True,
+        "group": "network",
+        "help": (
+            "With Home Assistant discovery on, give HA a switch for each lineup "
+            "plus Push now, Next and Previous buttons, and a Lineup picker on each "
+            "display. Turn off to keep HA to the per-display controls (Next and "
+            "Previous step whatever a display is showing); HA drops the lineup "
+            "entities when you save."
+        ),
+    },
+    {
+        # Read by app/ha_discovery.py (SETTING_DASHBOARD_BUTTONS).
+        "name": "ha_discovery_dashboard_buttons",
+        "type": "switch",
+        "label": "Publish a button per dashboard to Home Assistant",
+        "default": True,
+        "group": "network",
+        "help": (
+            "With Home Assistant discovery on, give HA a button for every saved "
+            "dashboard. Turn off to pick dashboards from the Active dashboard and "
+            "per-display Dashboard dropdowns only; HA drops the buttons when you "
+            "save."
+        ),
+    },
+    {
         "name": "mdns_enabled",
         "type": "switch",
         "label": "Advertise tesserae.local over mDNS",

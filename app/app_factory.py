@@ -988,34 +988,14 @@ def create_app(
         # order. atexit fires for waitress + the dev reloader child alike.
         _stop_at_exit(_browser_pool.stop)
 
-    # Transport + push manager are (re)built from current broker settings.
-    # Holding the rebuilder in app.config lets settings_routes call it on a
-    # broker change without restarting the process. Device subscriptions
-    # are re-issued on every rebuild because the transport instance changes.
-    def rebuild_transport() -> None:
-        _rebuild_transport(
-            app,
-            settings,
-            renderers,
-            devices,
-            status_cache,
-            discovery_cache,
-            page_store,
-            event_log,
-            renders_dir,
-            testing=testing,
-            dev=dev,
-        )
-
-    app.config["REBUILD_TRANSPORT"] = rebuild_transport
-    if not is_watcher:
-        rebuild_transport()
-
-    # Physical button service. Wired after rebuild_transport() so
-    # PUSH_MANAGER exists and button-driven page changes can push
-    # synchronously; the REST /frame + /status handlers pull it from
-    # app.config on every button-carrying wake. Falls back to a
-    # push-less service in the watcher path so imports work.
+    # Physical button service. Built before the first rebuild_transport():
+    # that call starts HA discovery, whose hooks capture BUTTON_SERVICE for
+    # the per-display Input event entity, and built after it the entity
+    # stayed unpublished until the next settings save. The push manager
+    # is a getter, so PUSH_MANAGER needn't exist yet: button-driven page
+    # changes still push synchronously once it does. The REST /frame +
+    # /status handlers pull the service from app.config on every
+    # button-carrying wake.
     from app.button_service import ButtonService
 
     app.config["BUTTON_SERVICE"] = ButtonService(
@@ -1044,6 +1024,29 @@ def create_app(
         # Resolved lazily: the resolver is registered further down.
         timezone_provider=lambda: _resolve_app_timezone(app),
     )
+
+    # Transport + push manager are (re)built from current broker settings.
+    # Holding the rebuilder in app.config lets settings_routes call it on a
+    # broker change without restarting the process. Device subscriptions
+    # are re-issued on every rebuild because the transport instance changes.
+    def rebuild_transport() -> None:
+        _rebuild_transport(
+            app,
+            settings,
+            renderers,
+            devices,
+            status_cache,
+            discovery_cache,
+            page_store,
+            event_log,
+            renders_dir,
+            testing=testing,
+            dev=dev,
+        )
+
+    app.config["REBUILD_TRANSPORT"] = rebuild_transport
+    if not is_watcher:
+        rebuild_transport()
 
     # Docker bridge networking gives us an internal IP that LAN
     # clients can't reach. If TESSERAE_HOST_IP isn't set and the

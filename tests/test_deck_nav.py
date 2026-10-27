@@ -33,7 +33,9 @@ class FakePush:
         source: str = "page",
     ) -> PushResult:
         self.pushes.append((page_id, source))
-        return PushResult(status="pushed", page_id=page_id)
+        # "sent", the real success status: navigation only records a page
+        # that reached the panel.
+        return PushResult(status="sent", page_id=page_id)
 
     def promote_deck_page(self, device_id: str, page_id: str) -> bool:
         if (device_id, page_id) in self.warmed:

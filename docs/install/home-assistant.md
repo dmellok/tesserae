@@ -75,7 +75,9 @@ MQTT**.
 Under the **Tesserae hub** device:
 
 - One **button** per saved dashboard, pressing it re-renders that
-  page and fans the frame out to every device the page is bound to.
+  page and fans the frame out to every device the page is bound to
+  (unless you switch them off, see [Trimming what's
+  published](#trimming-whats-published)).
 - A **select** named *Active dashboard*, same as the buttons, but as
   a single dropdown (handy for HA Lovelace UIs).
 - An **image** entity named *Last render*, the composition PNG of
@@ -92,7 +94,9 @@ Under the **Tesserae hub** device:
 - One **switch** per lineup, mirroring its enabled flag. Lineups with
   a bound display also get a *Push now* **button** (warm every page and
   send the entry page), and lineups with more than one page get *Next*
-  and *Previous* **buttons** that step every bound display.
+  and *Previous* **buttons** that step every bound display. These can
+  be switched off, see [Trimming what's
+  published](#trimming-whats-published).
 - A **notify** entity named *Notify all displays*: call
   `notify.send_message` on it and the text is rendered as a
   black-on-white card onto every display.
@@ -113,10 +117,18 @@ to the hub via `via_device`):
   display to *only* this display.
 - **select** *Lineup*, which lineup the display follows. Picking one
   binds the display to it and makes it live there; *(none)* unbinds
-  it from every lineup.
-- **number** *Hold* (minutes). Set it to hold the page currently on the
-  glass against the rotation for that long; 0 clears the hold. Counts
-  down as the hold runs.
+  it from every lineup. Goes with the lineup controls when those are
+  switched off.
+- **number** *Hold* (minutes), a pause for this display only: for that
+  long nothing automated reaches it (lineup steps, daily and interval
+  lineups, rotations, schedules, page refreshes, returns to a lineup's
+  home page), the same things the hub's *Automation* switch pauses for
+  every display. Manual sends, *Next* / *Previous* and the Play / Fire
+  now buttons still go through. Setting it replaces any hold already
+  there; 0 ends it. When it ends, the display gets what it missed, on
+  that display only: its lineup's current page, or a daily or interval
+  fire it sat out that day if that came later. If it ends in quiet hours,
+  that waits until they're over. Counts down as the hold runs.
 - **switch** *Quiet hours override*, the per-display quiet-hours
   override. Turning it on without stored times copies the app-level
   window.
@@ -126,6 +138,29 @@ to the hub via `via_device`):
   the display's wake interval (two missed intervals means offline).
 - **button** *Refresh now*, re-render whatever the display is showing
   and force a repaint.
+- **buttons** *Next* and *Previous*, step whatever this display is
+  following right now, one page, on this display only. They work like
+  the panel's own left / right buttons, with these differences:
+    - The lineup is the one on the glass. When several lineups are bound
+      (one per time slot, say), it's the one whose page the display is
+      showing, the same one the *Lineup* select shows.
+    - Within it, the page's link for that button wins, else the next or
+      previous page in lineup order, wrapping round. A pre-rendered frame
+      is used when there is one. There's no hold: a timed lineup carries
+      on from its next step as usual.
+    - A one-page lineup has nowhere to go, so the press does nothing
+      (History shows it as a no-op). With no lineup, the press steps the
+      display's rotation, if one reaches it, and holds it the way a
+      physical button press does. With neither, it does nothing.
+    - After a manually sent dashboard, *Next* goes to the page after the
+      one the lineup was on.
+    - They still work while *Automation* is off, during quiet hours, and
+      while a *Hold* is running (the hold stays as it was), like other
+      manual sends. If the page doesn't reach the display (it fails to
+      render, a newer send for the display wins, the dashboard is gone),
+      the display stays where it was and the reason shows on *Last
+      error*. A remapped panel button doesn't change them, and they don't
+      fire the *Input* event.
 - **event** *Input*, fires for physical buttons (`button`) and touch
   gestures (`tap`, `swipe`, `slide`) with the button name, gesture,
   action, slider value and the page landed on as attributes. Use it as
@@ -144,6 +179,24 @@ to the hub via `via_device`):
   **Temperature**, **Humidity**, **Uptime**, plus **Low battery**
   (against the Settings → Server → Low-battery warnings threshold) and **Next wake** (the
   server's wake prediction).
+
+### Trimming what's published
+
+Two switches under **Settings → App**, next to the discovery toggle,
+leave whole groups out. Both are on by default:
+
+- **Publish lineup controls to Home Assistant**: the per-lineup switch,
+  *Push now*, *Next* and *Previous* on the hub, and each display's
+  *Lineup* select. With lots of lineups (one per time slot, say) these
+  crowd HA out; the per-display *Next* / *Previous* stay, and they
+  step whichever lineup is on the glass.
+- **Publish a button per dashboard to Home Assistant**: the hub's
+  dashboard buttons. The hub's *Active dashboard* select and each
+  display's *Dashboard* select stay.
+
+Saving removes the entities from HA straight away (Tesserae publishes
+empty retained configs for them), and turning a switch back on brings
+them back. No restart needed.
 
 ### Use cases
 

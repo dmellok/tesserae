@@ -6,6 +6,71 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.486.0], 2026-10-28
+
+### Added
+
+- Each display gets *Next* and *Previous* buttons in Home Assistant. They
+  step whatever that display is showing right now, on that display only,
+  the way its own left and right buttons do. On a display with several
+  lineups bound (one per time slot, say), they step the lineup whose page
+  is on the glass. A one-page lineup, or a display that follows nothing,
+  is left alone. They work while automation is paused and during quiet
+  hours, like other manual sends.
+- Two switches next to the Home Assistant discovery toggle, both on by
+  default: **Publish lineup controls to Home Assistant** (each lineup's
+  switch, Push now, Next and Previous, and the displays' Lineup picker)
+  and **Publish a button per dashboard to Home Assistant**. Turning one
+  off removes those entities from HA when you save; the Active dashboard
+  and per-display Dashboard pickers stay.
+
+### Changed
+
+- Home Assistant's per-display *Hold* number pauses that display: while it
+  runs, nothing automated reaches it (lineup steps, daily and interval
+  lineups, rotations, schedules, page refreshes, returns to a lineup's
+  home page), while manual sends and Next / Previous still go. When it
+  ends, or is set to 0, the display gets what it missed: its lineup's
+  current page, or a daily or interval fire it sat out that day if that
+  came later, waiting for quiet hours to end if need be (not one whose
+  lineup or schedule was deleted, turned off or moved off the display
+  meanwhile). The other displays aren't repainted. Until now it only held a rotation the panel
+  had been paged away from by a button, so lineups kept advancing through
+  it.
+
+### Fixed
+
+- Home Assistant's per-display Input event (physical buttons and touch)
+  works after a restart; until now it only appeared after the next
+  settings save.
+- Home Assistant commands that render or wait on a render (dashboard
+  buttons and pickers, Refresh, Next and Previous, the lineup buttons and
+  picker, notifications, firmware install) run one after another in the
+  background, in the order they arrived, so a slow one no longer holds up
+  Home Assistant's other commands or its connection to Tesserae. Anything
+  that doesn't land shows on Last error, and so does one still running
+  after two minutes. A Home Assistant send gives up as busy after waiting a
+  minute for another render, and waits at most 30 seconds for its widgets
+  to finish; the same limits cover showing a pre-rendered page, Push now's
+  pre-renders and clearing a lineup's pre-rendered pages. A send that gave
+  up no longer makes an earlier one that was still waiting count as
+  replaced. Commands still waiting when discovery stops (on a settings
+  save) are cancelled and named on Last error. Hold and the app switches
+  still apply at once.
+- A display's lineup position follows daily and interval lineups too, so a
+  button press or Next after one of them fires steps that lineup rather
+  than the one that showed before it.
+- A page that doesn't reach the display (a failed render, a newer send
+  that took its place, a deleted dashboard) no longer moves the display's
+  lineup position, whether it came from a button, a lineup advance or
+  Home Assistant, and a button press, a lineup advance and Home
+  Assistant's Next or Previous on the same display wait for each other,
+  so the position always names the page on the glass.
+- Removing a display or a lineup no longer takes Home Assistant entities
+  from another one whose id starts the same way (deleting `kitchen` used to
+  remove `kitchen_2`'s entities too, its battery and signal sensors until
+  the next restart).
+
 ## [0.484.0], 2026-10-28
 
 ### Added

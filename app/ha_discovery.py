@@ -9,7 +9,7 @@ Hub device entities:
 
 * **button** per saved dashboard, pressing it calls
   ``PushManager.push(page_id)`` (fans out to every display the dashboard
-  is bound to).
+  is bound to). Off with ``ha_discovery_dashboard_buttons``.
 * **select** ``active dashboard``, same, driven by a dropdown.
 * **image** ``last render``, the composition PNG of the most-recent
   push (covers the legacy / virtual-panel case with no devices).
@@ -19,7 +19,8 @@ Hub device entities:
   automated push holds) and **switch** ``Quiet hours`` (the app-level
   window toggle).
 * **switch** per lineup (its ``enabled`` flag) plus **buttons** to push
-  the lineup live and step it forward / back.
+  the lineup live and step it forward / back. Off, together with the
+  per-display ``Lineup`` select, with ``ha_discovery_lineup_controls``.
 * **notify** ``Notify all displays``: HA's ``notify.send_message`` renders
   the text onto every display.
 
@@ -32,11 +33,14 @@ via ``via_device``):
   ``Next change`` (the next projected visible update).
 * **select** ``Dashboard`` (push one bound dashboard to *only* this
   display) and **select** ``Lineup`` (which lineup the display follows).
-* **number** ``Hold`` (minutes to hold the current page against the
-  rotation) and, when the kind carries one, ``Wake interval``.
+* **number** ``Hold`` (minutes this display sits out every automated
+  delivery, a per-display Automation pause) and, when the kind carries
+  one, ``Wake interval``.
 * **switch** ``Quiet hours override`` and **binary_sensors** ``In quiet
   hours``, ``Online``, ``Low battery``.
-* **button** ``Refresh now``, **event** ``Input`` (physical buttons and
+* **button** ``Refresh now``, **buttons** ``Next`` / ``Previous`` (step
+  whatever the display follows right now, for this display only, see
+  ``ButtonService.step``), **event** ``Input`` (physical buttons and
   touch gestures), **notify** (text onto this display) and, once the
   device advertises OTA, an **update** entity for its firmware.
 * lazily, where the heartbeat provides them: **Battery**, **Signal**,
@@ -51,7 +55,11 @@ that depend on it, so the module stays testable with fakes.
 
 The same MQTT broker the rest of Tesserae publishes to is reused, no
 second connection. Default-off in settings; users opt in by toggling
-``ha_discovery_enabled`` in the App section.
+``ha_discovery_enabled`` in the App section. Two more App switches, both
+default on, trim what gets published: ``ha_discovery_lineup_controls``
+and ``ha_discovery_dashboard_buttons``. Turning one off blanks those
+entities' retained configs, so HA drops them live; the command topics
+behind them keep working for anything that publishes to them directly.
 
 mypy --strict applies to this module, see pyproject.toml.
 """
@@ -61,7 +69,9 @@ from __future__ import annotations
 import contextlib
 import json
 import logging
+import queue
 import threading
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta, tzinfo
@@ -69,7 +79,8 @@ from typing import Any
 
 from app import background_loops
 from app.device_loader import DeviceRegistry
-from app.push import PushManager, PushResult
+from app.push import DELIVERED_STATUSES, PushManager, PushResult
+from app.state.deck_nav_store import navigation_locked
 from app.state.page_store import PageStore
 from app.transport import MqttTransport
 
@@ -105,6 +116,37 @@ LINEUP_NONE = "(none)"
 
 # Hold entity bounds (minutes). 0 clears the hold.
 HOLD_MAX_MINUTES = 720
+
+# Home Assistant commands waiting for the command worker (anything that
+# renders or may wait on a render: pushes, Refresh, Next / Previous, lineup
+# actions, notify, firmware install). A press can wait up to the button
+# service's navigation-lock timeout behind a render, so a few dozen queued
+# is plenty; more are refused with a Last error.
+COMMAND_QUEUE_MAX = 32
+
+# A command still running after this long is reported on Last error (it
+# keeps running; nothing is abandoned). What actually bounds a command is
+# the deadline on each thing it can wait for: the push lock and settle caps
+# below, the button service's navigation-lock timeout (30 s), and the
+# render's own timeouts (Playwright navigation 15 s, compose signal 25 s,
+# 3 attempts, the browser pool's per-request budget).
+COMMAND_TIME_LIMIT_S = 120.0
+# Home Assistant's pushes give up as "busy" after waiting this long for the
+# push manager's render lock, and wait at most this long for widgets to
+# settle (the default allows 300 s; follow-ups finish a page sent early).
+HA_PUSH_LOCK_TIMEOUT_S = 60.0
+HA_SETTLE_MAX_S = 30.0
+# Push now warms every page of the lineup first; together those warms get
+# this long before the entry page is pushed anyway.
+HA_WARM_BUDGET_S = 60.0
+# How long a stop waits for the command in progress before returning.
+COMMAND_STOP_WAIT_S = 10.0
+
+# App-section switches (Settings -> Server -> Network & integrations) that
+# trim what's published. Both default ON when absent, so an install that
+# never saved them keeps every entity it had.
+SETTING_LINEUP_CONTROLS = "ha_discovery_lineup_controls"
+SETTING_DASHBOARD_BUTTONS = "ha_discovery_dashboard_buttons"
 
 # A display counts as online while its last heartbeat is younger than
 # ``max(2 x interval + grace, floor)``; sleepy panels legitimately go
@@ -174,7 +216,7 @@ class HaHooks:
     * ``settings_store``: ``get_section`` / ``patch_section``, for the
       automation pause + quiet-hours toggles.
     * ``scheduler``: ``upcoming_for_device`` (Next change sensor).
-    * ``rotation_state_store``: per-display ``override_until`` (Hold).
+    * ``rotation_state_store``: per-display ``automation_hold_until`` (Hold).
     * ``telemetry``: ``get(device_id).predicted_next_wake_at``.
     * ``button_service``: ``add_listener`` / ``remove_listener`` for the
       input ``event`` entity.
@@ -190,6 +232,9 @@ class HaHooks:
     * ``notify_fn(device_id | None, message) -> error``: render text onto one
       display (``None`` = every display).
     * ``expected_interval_fn(device_id) -> seconds`` between heartbeats.
+    * ``step_device_fn(device_id, delta) -> error``: step what the display
+      follows one page forward (``delta > 0``) or back, as a physical next
+      / previous press would (``ButtonService.step``).
     """
 
     deck_store: Any = None
@@ -200,7 +245,7 @@ class HaHooks:
     telemetry: Any = None
     button_service: Any = None
     timezone_fn: Callable[[], tzinfo | None] | None = None
-    invalidate_deck_fn: Callable[[Any], None] | None = None
+    invalidate_deck_fn: Callable[[Any], str | None] | None = None
     set_device_quiet_override_fn: Callable[[str, bool], str | None] | None = None
     device_config_fn: Callable[[str], dict[str, Any]] | None = None
     set_device_config_fn: Callable[[str, dict[str, Any]], str | None] | None = None
@@ -208,6 +253,18 @@ class HaHooks:
     firmware_install_fn: Callable[[str], str | None] | None = None
     notify_fn: Callable[[str | None, str], str | None] | None = None
     expected_interval_fn: Callable[[str], int | None] | None = None
+    step_device_fn: Callable[[str, int], str | None] | None = None
+
+
+def _switch_on(section: dict[str, Any], key: str) -> bool:
+    """A default-ON App switch: absent / None reads as on, a stored bool
+    as itself, a hand-edited string by the usual truthy spellings."""
+    value = section.get(key)
+    if value is None:
+        return True
+    if isinstance(value, str):
+        return value.strip().lower() in ("1", "true", "yes", "on")
+    return bool(value)
 
 
 def _iso(epoch_or_dt: float | datetime) -> str:
@@ -648,6 +705,28 @@ def build_device_configs(
             ),
         ),
         (
+            _discovery_topic("button", f"dev_{device_id}_next"),
+            _entity(
+                f"dev_{device_id}_next",
+                "Next",
+                dev,
+                command_topic=_dev_cmd(device_id, "action"),
+                payload_press="next",
+                icon="mdi:skip-next",
+            ),
+        ),
+        (
+            _discovery_topic("button", f"dev_{device_id}_prev"),
+            _entity(
+                f"dev_{device_id}_prev",
+                "Previous",
+                dev,
+                command_topic=_dev_cmd(device_id, "action"),
+                payload_press="prev",
+                icon="mdi:skip-previous",
+            ),
+        ),
+        (
             _discovery_topic("event", f"dev_{device_id}_input"),
             _entity(
                 f"dev_{device_id}_input",
@@ -798,13 +877,31 @@ class HomeAssistantDiscovery:
         # we can tear down entities for pages / devices since removed.
         self._published_button_ids: set[str] = set()
         self._published_device_ids: set[str] = set()
-        self._published_lineup_ids: set[str] = set()
         # (device_id, dyn-key) pairs whose lazy sensor config we've sent.
         self._published_dyn: set[tuple[str, str]] = set()
         # Every (component, object_id) config we've published this session,
         # so teardown never has to enumerate entity kinds by hand.
         self._published_configs: set[tuple[str, str]] = set()
+        # (component, object_id) -> device id, for every per-display config,
+        # recorded at publish time so teardown never guesses from ids.
+        self._config_owner: dict[tuple[str, str], str] = {}
         self._stop_event = threading.Event()
+        # Commands that render (or may wait on a render) run on one worker
+        # thread, in arrival order: Paho calls the handlers on its network
+        # thread, and waiting there would stall every other command,
+        # heartbeat and keepalive. Cheap settings toggles stay inline.
+        self._commands: queue.Queue[tuple[str, Callable[[], str | None]] | None] = queue.Queue(
+            maxsize=COMMAND_QUEUE_MAX
+        )
+        # The one thread that owns the queue; it clears this itself on exit.
+        self._command_worker: threading.Thread | None = None
+        self._command_worker_lock = threading.Lock()
+        self._commands_stopping = threading.Event()
+        self._command_time_limit_s = COMMAND_TIME_LIMIT_S
+        # Token of the job running now, so a late watchdog never reports
+        # on the job after it.
+        self._job_seq = 0
+        self._running_job: int | None = None
         self._ticker: threading.Thread | None = None
 
     # -- device helpers -------------------------------------------------
@@ -880,7 +977,8 @@ class HomeAssistantDiscovery:
     def _lineup_for_device(self, device_id: str) -> Any | None:
         """The lineup a display is following: the one it's navigating (nav
         store) when that deck still binds it, else the first enabled deck
-        bound to it."""
+        bound to it. Keep in step with ``ButtonService.following_deck``,
+        which applies the same rule to choose what Next / Previous step."""
         decks = self._decks()
         nav = self._hooks.deck_nav_store
         if nav is not None:
@@ -914,6 +1012,15 @@ class HomeAssistantDiscovery:
         except Exception:
             return {}
         return dict(section) if isinstance(section, dict) else {}
+
+    def _lineup_controls_on(self) -> bool:
+        """Whether the per-lineup hub entities and the per-display Lineup
+        select are published. On without a settings store or the key."""
+        return _switch_on(self._app_settings(), SETTING_LINEUP_CONTROLS)
+
+    def _dashboard_buttons_on(self) -> bool:
+        """Whether the hub publishes a button per saved dashboard."""
+        return _switch_on(self._app_settings(), SETTING_DASHBOARD_BUTTONS)
 
     # -- lifecycle ------------------------------------------------------
 
@@ -978,6 +1085,7 @@ class HomeAssistantDiscovery:
             self._started = False
         logger.info("HA discovery: stopping")
         self._stop_event.set()
+        self._stop_command_worker()
         ticker, self._ticker = self._ticker, None
         if ticker is not None and ticker.is_alive():
             ticker.join(timeout=2.0)
@@ -998,9 +1106,9 @@ class HomeAssistantDiscovery:
             self._publish_str(_discovery_topic(component, object_id), "", retain=True)
         self._published_button_ids.clear()
         self._published_device_ids.clear()
-        self._published_lineup_ids.clear()
         self._published_dyn.clear()
         self._published_configs.clear()
+        self._config_owner.clear()
         self._publish_str(AVAILABILITY_TOPIC, "offline", retain=True)
 
     def refresh_entity_configs(self) -> None:
@@ -1152,7 +1260,7 @@ class HomeAssistantDiscovery:
                 topic, payload = build_dynamic_sensor_config(
                     device_id, device.display_name, self._device_model(device), key
                 )
-                self._publish_config(topic, payload)
+                self._publish_config(topic, payload, owner=device_id)
                 self._published_dyn.add((device_id, key))
             self._publish_str(_dev_state(device_id, spec["object"]), str(value), retain=True)
         self._publish_low_battery(device_id, device, adjusted.get("battery_pct"))
@@ -1173,7 +1281,7 @@ class HomeAssistantDiscovery:
             topic, payload = build_low_battery_config(
                 device_id, device.display_name, self._device_model(device)
             )
-            self._publish_config(topic, payload)
+            self._publish_config(topic, payload, owner=device_id)
             self._published_dyn.add((device_id, "low_battery"))
         self._publish_str(
             _dev_state(device_id, "low_battery"),
@@ -1221,16 +1329,14 @@ class HomeAssistantDiscovery:
     # -- hub commands ---------------------------------------------------
 
     def _on_push_page_cmd(self, _topic: str, payload: bytes) -> None:
+        """A hub dashboard button: queue the push to every display the
+        dashboard is bound to."""
         page_id = payload.decode("utf-8", errors="ignore").strip()
         if not page_id:
             return
         logger.info("HA discovery: HA requested push of page %r", page_id)
-        self._publish_str(STATE_TOPIC_BUSY, "1", retain=True)
-        try:
-            self._push_manager.push(page_id, source="home_assistant")
-        except Exception:
-            self._publish_str(STATE_TOPIC_BUSY, "0", retain=True)
-            raise
+        label = self._page_name(page_id)
+        self._enqueue(label, lambda: self._push_and_report(page_id))
 
     def _on_active_page_cmd(self, topic: str, payload: bytes) -> None:
         name = payload.decode("utf-8", errors="ignore").strip()
@@ -1239,6 +1345,21 @@ class HomeAssistantDiscovery:
             return
         self._publish_str(STATE_TOPIC_ACTIVE_PAGE, name, retain=True)
         self._on_push_page_cmd(topic, page_id.encode("utf-8"))
+
+    def _push_and_report(self, page_id: str, **kwargs: Any) -> str | None:
+        """Push from the command worker; the reason when it didn't reach a
+        display (failed, superseded, page gone, bound to nothing, the
+        renderer busy past ``HA_PUSH_LOCK_TIMEOUT_S``...)."""
+        result = self._push_manager.push(
+            page_id,
+            source="home_assistant",
+            lock_timeout_s=HA_PUSH_LOCK_TIMEOUT_S,
+            settle_max_s=HA_SETTLE_MAX_S,
+            **kwargs,
+        )
+        if result.status in DELIVERED_STATUSES:
+            return None
+        return result.error or f"push {result.status}"
 
     @staticmethod
     def _on_off(payload: bytes) -> bool | None:
@@ -1283,20 +1404,12 @@ class HomeAssistantDiscovery:
         self._notify(None, message)
 
     def _notify(self, device_id: str | None, message: str) -> None:
+        """Queue a text card onto one display (or all of them)."""
         fn = self._hooks.notify_fn
         if fn is None or not message:
             return
         logger.info("HA discovery: notify %s", device_id or "all displays")
-        self._publish_str(STATE_TOPIC_BUSY, "1", retain=True)
-        try:
-            err = fn(device_id, message)
-        except Exception:
-            logger.exception("HA discovery: notify failed")
-            err = "notify failed"
-        finally:
-            self._publish_str(STATE_TOPIC_BUSY, "0", retain=True)
-        if err:
-            self._publish_str(STATE_TOPIC_LAST_ERROR, err[:240], retain=True)
+        self._enqueue("Notify", lambda: fn(device_id, message))
 
     # -- lineup commands ------------------------------------------------
 
@@ -1315,105 +1428,165 @@ class HomeAssistantDiscovery:
             if leaf == "enabled":
                 on = self._on_off(payload)
                 if on is not None:
-                    self._set_lineup_enabled(deck, on)
+                    # Invalidating the lineup's warmed frames takes the push
+                    # manager's render lock: on the worker, not inline.
+                    self._enqueue(
+                        str(deck.name), lambda: self._set_lineup_enabled_by_id(deck_id, on)
+                    )
             elif leaf == "action":
+                label = str(deck.name)
                 if text == "push":
-                    self._lineup_go_live(deck, set(deck.device_ids))
+                    self._enqueue(label, lambda: self._lineup_go_live_by_id(deck_id))
                 elif text in ("next", "prev"):
-                    self._lineup_step(deck, 1 if text == "next" else -1)
+                    delta = 1 if text == "next" else -1
+                    self._enqueue(label, lambda: self._lineup_step_by_id(deck_id, delta))
         except Exception:
             logger.exception("HA discovery: lineup command %s/%s failed", deck_id, leaf)
 
-    def _set_lineup_enabled(self, deck: Any, enabled: bool) -> None:
+    def _lineup_go_live_by_id(self, deck_id: str) -> str | None:
+        """Push now, on the worker: re-read the lineup (it may have changed
+        or gone while the command waited)."""
+        deck = self._deck(deck_id)
+        return self._lineup_go_live(deck, set(deck.device_ids)) if deck is not None else None
+
+    def _lineup_step_by_id(self, deck_id: str, delta: int) -> str | None:
+        deck = self._deck(deck_id)
+        return self._lineup_step(deck, delta) if deck is not None else None
+
+    def _set_lineup_enabled_by_id(self, deck_id: str, enabled: bool) -> str | None:
+        deck = self._deck(deck_id)
+        return self._set_lineup_enabled(deck, enabled) if deck is not None else None
+
+    def _set_lineup_enabled(self, deck: Any, enabled: bool) -> str | None:
+        """Lineup switch; returns why its warmed frames couldn't be dropped,
+        if they couldn't (the renderer stayed busy past its deadline)."""
         store = self._hooks.deck_store
         if store is None or bool(deck.enabled) == enabled:
-            return
+            return None
         logger.info("HA discovery: lineup %r %s", deck.id, "enabled" if enabled else "disabled")
         updated = deck.model_copy(update={"enabled": enabled})
         store.upsert(updated)
-        if self._hooks.invalidate_deck_fn is not None:
-            with contextlib.suppress(Exception):
-                self._hooks.invalidate_deck_fn(updated)
+        error = self._invalidate(updated)
         # The store listener republishes configs + states; publish the
         # switch state directly too so a store without listeners still
         # reflects the change immediately.
         self._publish_str(
             _lineup_state(str(deck.id), "enabled"), "ON" if enabled else "OFF", retain=True
         )
+        return error
 
-    def _lineup_go_live(self, deck: Any, device_ids: set[str]) -> None:
+    def _invalidate(self, deck: Any) -> str | None:
+        fn = self._hooks.invalidate_deck_fn
+        if fn is None:
+            return None
+        try:
+            return fn(deck)
+        except Exception:
+            logger.exception("HA discovery: invalidating lineup %r failed", deck.id)
+            return "couldn't drop the lineup's warmed frames"
+
+    def _lineup_go_live(self, deck: Any, device_ids: set[str]) -> str | None:
         """Warm every page for the devices, push the entry page, and record
         the nav position: the same "make this lineup live" action the Lineups
-        page offers."""
+        page offers. Returns why the entry page didn't land, if it didn't."""
         if not device_ids or not deck.pages:
-            return
+            return None
         pusher = self._push_manager
-        self._publish_str(STATE_TOPIC_BUSY, "1", retain=True)
+        error: str | None = None
         try:
             warm = getattr(pusher, "warm_deck_page", None)
             if callable(warm):
+                # One budget for all the warms (each waits only for what's
+                # left of it): past it the rest are skipped, the lineup's
+                # background warm fills them in, and the push goes ahead.
+                warm_deadline = time.monotonic() + HA_WARM_BUDGET_S
                 for device_id in device_ids:
                     for page in deck.pages:
+                        left = warm_deadline - time.monotonic()
+                        if left <= 0:
+                            logger.info("HA discovery: lineup %r warm budget spent", deck.id)
+                            break
                         with contextlib.suppress(Exception):
-                            warm(page.page_id, device_id)
+                            warm(page.page_id, device_id, lock_timeout_s=left)
             entry = getattr(deck, "resolved_entry_page_id", None) or deck.pages[0].page_id
-            pusher.push(
-                entry,
-                device_ids=set(device_ids),
-                respect_quiet_hours=False,
-                force_publish=True,
-                source="home_assistant",
-            )
             nav = self._hooks.deck_nav_store
-            if nav is not None:
-                for device_id in device_ids:
-                    with contextlib.suppress(Exception):
-                        nav.set(device_id, deck.id, entry)
-        except Exception:
-            self._publish_str(STATE_TOPIC_BUSY, "0", retain=True)
-            raise
-        for device_id in device_ids:
-            device = self._device(device_id)
-            if device is not None:
-                self._publish_device_runtime(device)
+            # Deliver and record together under the displays' navigation
+            # locks; record only when the entry page reached them.
+            with navigation_locked(nav, device_ids):
+                result = pusher.push(
+                    entry,
+                    device_ids=set(device_ids),
+                    respect_quiet_hours=False,
+                    force_publish=True,
+                    source="home_assistant",
+                    lock_timeout_s=HA_PUSH_LOCK_TIMEOUT_S,
+                    settle_max_s=HA_SETTLE_MAX_S,
+                )
+                if nav is not None and result.status in DELIVERED_STATUSES:
+                    for device_id in device_ids:
+                        with contextlib.suppress(Exception):
+                            nav.set(device_id, deck.id, entry)
+                elif result.status not in DELIVERED_STATUSES:
+                    error = result.error or f"push {result.status}"
+        finally:
+            for device_id in device_ids:
+                device = self._device(device_id)
+                if device is not None:
+                    self._publish_device_runtime(device)
+        return error
 
-    def _lineup_step(self, deck: Any, delta: int) -> None:
+    def _lineup_step(self, deck: Any, delta: int) -> str | None:
         """Move each bound display one page through the lineup order,
         promoting the warmed frame when there is one (mirrors the Lineups
-        page stepper)."""
+        page stepper). Returns why a display didn't move, if one didn't."""
         if not deck.device_ids or not deck.pages:
-            return
+            return None
+        error: str | None = None
         order = [dp.page_id for dp in deck.pages]
         nav = self._hooks.deck_nav_store
         pusher = self._push_manager
         for device_id in deck.device_ids:
-            rec = None
-            if nav is not None:
-                with contextlib.suppress(Exception):
-                    rec = nav.get(device_id)
-            current = rec.get("page_id") if rec and rec.get("deck_id") == deck.id else None
-            try:
-                idx = order.index(current) if current is not None else (-delta if delta > 0 else 0)
-            except ValueError:
-                idx = 0
-            target = order[(idx + delta) % len(order)]
-            promoter = getattr(pusher, "promote_deck_page", None)
-            promoted = bool(callable(promoter) and promoter(device_id, target))
-            if not promoted:
-                result = pusher.push(
-                    target,
-                    device_ids={device_id},
-                    respect_quiet_hours=False,
-                    source="home_assistant",
+            # Read, deliver and record under the display's navigation lock.
+            with navigation_locked(nav, [device_id]):
+                rec = None
+                if nav is not None:
+                    with contextlib.suppress(Exception):
+                        rec = nav.get(device_id)
+                current = rec.get("page_id") if rec and rec.get("deck_id") == deck.id else None
+                try:
+                    idx = (
+                        order.index(current)
+                        if current is not None
+                        else (-delta if delta > 0 else 0)
+                    )
+                except ValueError:
+                    idx = 0
+                target = order[(idx + delta) % len(order)]
+                promoter = getattr(pusher, "promote_deck_page", None)
+                promoted = bool(
+                    callable(promoter)
+                    and promoter(device_id, target, lock_timeout_s=HA_PUSH_LOCK_TIMEOUT_S)
                 )
-                if result.status == "failed":
-                    continue
-            if nav is not None:
-                with contextlib.suppress(Exception):
-                    nav.set(device_id, deck.id, target)
+                if not promoted:
+                    result = pusher.push(
+                        target,
+                        device_ids={device_id},
+                        respect_quiet_hours=False,
+                        source="home_assistant",
+                        lock_timeout_s=HA_PUSH_LOCK_TIMEOUT_S,
+                        settle_max_s=HA_SETTLE_MAX_S,
+                    )
+                    if result.status not in DELIVERED_STATUSES:
+                        # The panel didn't move: leave its position alone.
+                        error = error or result.error or f"push {result.status}"
+                        continue
+                if nav is not None:
+                    with contextlib.suppress(Exception):
+                        nav.set(device_id, deck.id, target)
             device = self._device(device_id)
             if device is not None:
                 self._publish_device_runtime(device)
+        return error
 
     # -- per-display commands -------------------------------------------
 
@@ -1431,9 +1604,11 @@ class HomeAssistantDiscovery:
         if device is None:
             return
         text = payload.decode("utf-8", errors="ignore").strip()
+        label = str(device.display_name)
         try:
             if leaf == "lineup":
-                self._set_device_lineup(device, text)
+                # Binds and goes live (renders): on the worker.
+                self._enqueue(label, lambda: self._set_device_lineup_by_id(device_id, text))
             elif leaf == "hold":
                 self._set_device_hold(device, text)
             elif leaf == "quiet_override":
@@ -1441,12 +1616,21 @@ class HomeAssistantDiscovery:
                 if on is not None:
                     self._set_device_quiet_override(device, on)
             elif leaf == "action":
-                if text == "refresh":
-                    self._refresh_device(device)
+                # Exact press payloads only: undecodable bytes don't get
+                # stripped down into a valid action.
+                try:
+                    action = payload.decode("utf-8").strip()
+                except UnicodeDecodeError:
+                    action = ""
+                if action == "refresh":
+                    self._enqueue(label, lambda: self._refresh_device_by_id(device_id))
+                elif action in ("next", "prev"):
+                    self._step_device(device, 1 if action == "next" else -1)
             elif leaf == "wake_interval":
                 self._set_wake_interval(device, text)
             elif leaf == "firmware_install":
-                self._install_firmware(device)
+                # May fetch the newest release online first: on the worker.
+                self._enqueue(label, lambda: self._install_firmware_by_id(device_id))
             elif leaf == "notify":
                 self._notify(device.id, text)
         except Exception:
@@ -1464,60 +1648,84 @@ class HomeAssistantDiscovery:
         if page_id is None:
             return
         logger.info("HA discovery: push %r to display %r", name, device_id)
-        self._publish_str(STATE_TOPIC_BUSY, "1", retain=True)
-        try:
-            self._push_manager.push(page_id, device_ids={device_id}, source="home_assistant")
-        except Exception:
-            self._publish_str(STATE_TOPIC_BUSY, "0", retain=True)
-            raise
+        device = self._device(device_id)
+        label = str(device.display_name) if device is not None else device_id
+        self._enqueue(label, lambda: self._push_and_report(page_id, device_ids={device_id}))
 
-    def _set_device_lineup(self, device: Any, name: str) -> None:
+    def _set_device_lineup_by_id(self, device_id: str, name: str) -> str | None:
+        device = self._device(device_id)
+        return self._set_device_lineup(device, name) if device is not None else None
+
+    def _refresh_device_by_id(self, device_id: str) -> str | None:
+        device = self._device(device_id)
+        return self._refresh_device(device) if device is not None else None
+
+    def _install_firmware_by_id(self, device_id: str) -> str | None:
+        device = self._device(device_id)
+        return self._install_firmware(device) if device is not None else None
+
+    def _set_device_lineup(self, device: Any, name: str) -> str | None:
         """Lineup select: bind the display to the named lineup and make it
-        live there; ``(none)`` unbinds it from every lineup."""
+        live there; ``(none)`` unbinds it from every lineup. Returns why the
+        lineup's entry page didn't land, if it didn't."""
         store = self._hooks.deck_store
         if store is None:
-            return
+            return None
         device_id = str(device.id)
         if name == LINEUP_NONE:
+            error: str | None = None
             for deck in self._decks():
                 if device_id in deck.device_ids:
                     updated = deck.model_copy(
                         update={"device_ids": [d for d in deck.device_ids if d != device_id]}
                     )
                     store.upsert(updated)
-                    if self._hooks.invalidate_deck_fn is not None:
-                        with contextlib.suppress(Exception):
-                            self._hooks.invalidate_deck_fn(deck)
+                    error = self._invalidate(deck) or error
             nav = self._hooks.deck_nav_store
             if nav is not None:
                 with contextlib.suppress(Exception):
                     nav.clear(device_id)
             self._publish_device_runtime(device)
-            return
+            return error
         deck = self._deck_by_name(name)
         if deck is None:
-            return
+            return None
         logger.info("HA discovery: display %r follows lineup %r", device_id, deck.id)
         if device_id not in deck.device_ids:
             deck = deck.model_copy(update={"device_ids": [*deck.device_ids, device_id]})
             store.upsert(deck)
-        self._lineup_go_live(deck, {device_id})
+        return self._lineup_go_live(deck, {device_id})
 
     def _set_device_hold(self, device: Any, text: str) -> None:
-        """Hold number: N minutes holds the current page against the
-        rotation (``override_until``); 0 clears the hold."""
+        """Hold number: a per-display Automation pause. N minutes keeps every
+        automated delivery off this display (lineup steps, daily / interval
+        fires, rotations, schedules, page refreshes, home returns) until
+        then; manual sends and Next / Previous still go through. It replaces
+        any hold already there, a button press's included. 0 ends it now:
+        the scheduler's next tick puts the display back into its lineup."""
         store = self._hooks.rotation_state_store
         if store is None:
             return
         try:
             minutes = max(0, min(int(float(text)), HOLD_MAX_MINUTES))
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             return
-        from app.state.device_rotation_state_model import DeviceRotationState
+        now = datetime.now(UTC)
+        fields = {
+            # A lapsed (not cleared) value on 0, so the scheduler sees the
+            # hold end and catches the display up.
+            "automation_hold_until": now + timedelta(minutes=minutes),
+            "override_until": None,
+        }
+        if hasattr(store, "patch"):
+            # Only the hold fields, so a button press rendering right now
+            # can't be undone by (or undo) this write.
+            store.patch(device.id, fields)
+        else:
+            from app.state.device_rotation_state_model import DeviceRotationState
 
-        state = store.get(device.id) or DeviceRotationState(device_id=device.id)
-        until = datetime.now(UTC) + timedelta(minutes=minutes) if minutes > 0 else None
-        store.upsert(state.model_copy(update={"override_until": until}))
+            state = store.get(device.id) or DeviceRotationState(device_id=device.id)
+            store.upsert(state.model_copy(update=fields))
         logger.info("HA discovery: hold %r for %d min", device.id, minutes)
         self._publish_device_runtime(device)
 
@@ -1532,8 +1740,9 @@ class HomeAssistantDiscovery:
         fresh = self._device(device.id) or device
         self._publish_device_runtime(fresh)
 
-    def _refresh_device(self, device: Any) -> None:
-        """Re-render whatever the display is showing and force a repaint."""
+    def _refresh_device(self, device: Any) -> str | None:
+        """Re-render whatever the display is showing and force a repaint.
+        Returns why it didn't reach the display, if it didn't."""
         page_id: str | None = None
         latest = getattr(self._push_manager, "latest_render_for", None)
         if callable(latest):
@@ -1552,20 +1761,176 @@ class HomeAssistantDiscovery:
             bound = self._pages_for_device(device.id)
             page_id = str(bound[0].id) if bound else None
         if page_id is None or self._page_store.get(page_id) is None:
-            return
+            return None
         logger.info("HA discovery: refresh %r on display %r", page_id, device.id)
+        return self._push_and_report(
+            page_id, device_ids={device.id}, force_publish=True, bypass_coalesce=True
+        )
+
+    def _step_device(self, device: Any, delta: int) -> None:
+        """Next / Previous button: queue a step of what this display follows
+        right now, one page, for this display only. The worker runs the
+        physical-button path (``ButtonService.step``)."""
+        if self._hooks.step_device_fn is None:
+            return
+        device_id = str(device.id)
+        self._enqueue(str(device.display_name), lambda: self._run_step(device_id, delta))
+
+    # -- command worker ------------------------------------------------
+
+    def _enqueue(self, label: str, job: Callable[[], str | None]) -> None:
+        """Queue a slow command and return at once (this runs on the MQTT
+        network thread). One worker runs them in arrival order, so a
+        display's commands land in the order Home Assistant sent them. The
+        job returns an error (or raises); either reaches Last error as
+        ``"<label>: <reason>"``."""
+        self._ensure_command_worker()
+        try:
+            self._commands.put_nowait((label, job))
+        except queue.Full:
+            logger.warning("HA discovery: command queue full; dropping %s", label)
+            self._publish_str(
+                STATE_TOPIC_LAST_ERROR,
+                f"{label}: too many Home Assistant commands waiting; try again."[:240],
+                retain=True,
+            )
+
+    def _ensure_command_worker(self) -> None:
+        """Make sure a worker owns the queue. A worker that is shutting down
+        but hasn't exited yet is taken back (the stop is cancelled) rather
+        than run alongside a replacement, so commands keep their order
+        across a stop / start."""
+        with self._command_worker_lock:
+            worker = self._command_worker
+            if worker is not None and worker.is_alive():
+                self._commands_stopping.clear()
+                return
+            self._commands_stopping.clear()
+            worker = threading.Thread(
+                target=self._command_worker_loop, name="ha-discovery-commands", daemon=True
+            )
+            self._command_worker = worker
+            worker.start()
+
+    def _stop_command_worker(self) -> None:
+        """Stop the worker: commands still queued are cancelled (and named on
+        Last error), the one in progress gets up to ``COMMAND_STOP_WAIT_S``
+        to finish. Stopping is an Event, so a full queue can't swallow it,
+        and the worker keeps owning the queue until it has exited (a start
+        before then takes it back rather than running a second one)."""
+        with self._command_worker_lock:
+            worker = self._command_worker
+            self._commands_stopping.set()
+        cancelled: list[str] = []
+        while True:
+            try:
+                item = self._commands.get_nowait()
+            except queue.Empty:
+                break
+            if item is not None:
+                cancelled.append(item[0])
+            self._commands.task_done()
+        if cancelled:
+            logger.warning(
+                "HA discovery: stopping; cancelled %d queued command(s): %s",
+                len(cancelled),
+                ", ".join(cancelled),
+            )
+            self._publish_str(
+                STATE_TOPIC_LAST_ERROR,
+                f"Cancelled when Home Assistant discovery stopped: {', '.join(cancelled)}"[:240],
+                retain=True,
+            )
+        if worker is None or not worker.is_alive():
+            return
+        with contextlib.suppress(queue.Full):
+            self._commands.put_nowait(None)  # wakes an idle worker sooner
+        worker.join(timeout=COMMAND_STOP_WAIT_S)
+
+    def _command_worker_loop(self) -> None:
+        me = threading.current_thread()
+        while True:
+            try:
+                item = self._commands.get(timeout=0.2)
+            except queue.Empty:
+                with self._command_worker_lock:
+                    if self._commands_stopping.is_set() and self._command_worker is me:
+                        self._command_worker = None
+                        return
+                continue
+            try:
+                if item is not None:
+                    self._run_command(*item)
+            except Exception:
+                logger.exception("HA discovery: command worker failed")
+            finally:
+                self._commands.task_done()
+
+    def _run_command(self, label: str, job: Callable[[], str | None]) -> None:
+        with self._command_worker_lock:
+            self._job_seq += 1
+            token = self._running_job = self._job_seq
+        watchdog = threading.Timer(
+            self._command_time_limit_s, self._command_overran, (token, label)
+        )
+        watchdog.daemon = True
+        watchdog.start()
         self._publish_str(STATE_TOPIC_BUSY, "1", retain=True)
         try:
-            self._push_manager.push(
-                page_id,
-                device_ids={device.id},
-                force_publish=True,
-                bypass_coalesce=True,
-                source="home_assistant",
-            )
+            err = job()
         except Exception:
+            logger.exception("HA discovery: %s failed", label)
+            err = "failed"
+        finally:
+            watchdog.cancel()
+            with self._command_worker_lock:
+                self._running_job = None
             self._publish_str(STATE_TOPIC_BUSY, "0", retain=True)
-            raise
+        if err:
+            # Hooks that already name the display don't get it twice.
+            message = err if err.startswith(f"{label}:") else f"{label}: {err}"
+            self._publish_str(STATE_TOPIC_LAST_ERROR, message[:240], retain=True)
+
+    def _command_overran(self, token: int, label: str) -> None:
+        """Watchdog, report only: the job ``token`` names is still running
+        past the time limit. Checked under the worker lock, so a timer that
+        fires late never speaks for the job after it."""
+        with self._command_worker_lock:
+            if self._running_job != token:
+                return
+            logger.warning(
+                "HA discovery: %s still running after %.0fs", label, self._command_time_limit_s
+            )
+            self._publish_str(
+                STATE_TOPIC_LAST_ERROR,
+                f"{label}: still running after {self._command_time_limit_s:.0f}s"[:240],
+                retain=True,
+            )
+
+    def _wait_commands_idle(self, timeout: float = 5.0) -> bool:
+        """Block until every queued command has run (tests, shutdown)."""
+        deadline = time.monotonic() + timeout
+        with self._commands.all_tasks_done:
+            while self._commands.unfinished_tasks:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    return False
+                self._commands.all_tasks_done.wait(remaining)
+        return True
+
+    def _run_step(self, device_id: str, delta: int) -> str | None:
+        """One queued Next / Previous: the hook's error, if any."""
+        fn = self._hooks.step_device_fn
+        device = self._device(device_id)
+        if fn is None or device is None:
+            return None  # the display was removed while the step waited
+        logger.info(
+            "HA discovery: %s on display %r", "next" if delta > 0 else "previous", device_id
+        )
+        try:
+            return fn(device_id, delta)
+        finally:
+            self._publish_device_runtime(self._device(device_id) or device)
 
     def _set_wake_interval(self, device: Any, text: str) -> None:
         fn = self._hooks.set_device_config_fn
@@ -1582,15 +1947,14 @@ class HomeAssistantDiscovery:
             self._publish_str(STATE_TOPIC_LAST_ERROR, err[:240], retain=True)
         self._publish_device_runtime(device)
 
-    def _install_firmware(self, device: Any) -> None:
+    def _install_firmware(self, device: Any) -> str | None:
         fn = self._hooks.firmware_install_fn
         if fn is None:
-            return
+            return None
         logger.info("HA discovery: firmware install requested for %r", device.id)
         err = fn(device.id)
-        if err:
-            self._publish_str(STATE_TOPIC_LAST_ERROR, err[:240], retain=True)
         self._publish_device_runtime(device)
+        return err
 
     # -- state publishing -----------------------------------------------
 
@@ -1610,6 +1974,9 @@ class HomeAssistantDiscovery:
         )
 
     def _publish_lineup_states(self) -> None:
+        # No lineup switches published, so no one to read their state.
+        if not self._lineup_controls_on():
+            return
         for deck in self._decks():
             self._publish_str(
                 _lineup_state(str(deck.id), "enabled"),
@@ -1650,7 +2017,7 @@ class HomeAssistantDiscovery:
         name, model = device.display_name, self._device_model(device)
         now = datetime.now(UTC)
 
-        if self._hooks.deck_store is not None:
+        if self._hooks.deck_store is not None and self._lineup_controls_on():
             deck = self._lineup_for_device(device_id)
             self._publish_str(
                 _dev_state(device_id, "lineup"),
@@ -1659,14 +2026,18 @@ class HomeAssistantDiscovery:
             )
 
         if self._hooks.rotation_state_store is not None:
+            # The display's own hold, or a button press's (whichever runs
+            # longer): what setting the number would replace.
             remaining = 0
             with contextlib.suppress(Exception):
                 state = self._hooks.rotation_state_store.get(device_id)
-                until = getattr(state, "override_until", None) if state is not None else None
-                if isinstance(until, datetime):
-                    if until.tzinfo is None:
-                        until = until.replace(tzinfo=UTC)
-                    remaining = max(0, int((until - now).total_seconds() // 60))
+                for field in ("automation_hold_until", "override_until"):
+                    until = getattr(state, field, None) if state is not None else None
+                    if isinstance(until, datetime):
+                        if until.tzinfo is None:
+                            until = until.replace(tzinfo=UTC)
+                        left = max(0, int((until - now).total_seconds() // 60))
+                        remaining = max(remaining, left)
             self._publish_str(_dev_state(device_id, "hold"), str(remaining), retain=True)
 
         if self._hooks.settings_store is not None:
@@ -1716,7 +2087,7 @@ class HomeAssistantDiscovery:
             if isinstance(predicted, (int, float)):
                 if (device_id, "next_wake") not in self._published_dyn:
                     topic, payload = build_next_wake_config(device_id, name, model)
-                    self._publish_config(topic, payload)
+                    self._publish_config(topic, payload, owner=device_id)
                     self._published_dyn.add((device_id, "next_wake"))
                 self._publish_str(_dev_state(device_id, "next_wake"), _iso(predicted), retain=True)
 
@@ -1726,7 +2097,7 @@ class HomeAssistantDiscovery:
                 topic, payload = build_wake_interval_config(
                     device_id, name, model, minimum=bounds[0], maximum=bounds[1]
                 )
-                self._publish_config(topic, payload)
+                self._publish_config(topic, payload, owner=device_id)
                 self._published_dyn.add((device_id, "wake_interval"))
             current: Any = None
             with contextlib.suppress(Exception):
@@ -1742,7 +2113,7 @@ class HomeAssistantDiscovery:
             if isinstance(info, dict) and info.get("capable"):
                 if (device_id, "firmware") not in self._published_dyn:
                     topic, payload = build_update_config(device_id, name, model)
-                    self._publish_config(topic, payload)
+                    self._publish_config(topic, payload, owner=device_id)
                     self._published_dyn.add((device_id, "firmware"))
                 installed = info.get("installed_version")
                 latest = info.get("latest_version") or installed
@@ -1774,21 +2145,35 @@ class HomeAssistantDiscovery:
 
         We collect retained configs for a short window, identify which
         ones reference current devices/pages/lineups, and blank everything
-        else under our discovery namespace."""
+        else under our discovery namespace. The same goes for entity groups
+        switched off in settings while Tesserae wasn't publishing (the
+        per-dashboard buttons, the lineup controls) and for Next / Previous
+        without their hook: this session won't publish them, so nothing
+        else would ever retire them. Other hook-gated entities are left
+        alone: some hooks are built before their service exists at boot
+        (the scheduler behind Next change), and blanking would drop those
+        entities from HA on every restart."""
         import time
 
-        live_device_ids = {d.id for d in self._bindable_devices()}
-        live_page_ids = {p.id for p in self._page_store.list_active()}
-        live_deck_ids = {str(d.id) for d in self._decks()}
+        live_device_ids = {str(d.id) for d in self._bindable_devices()}
+        live_page_ids = (
+            {p.id for p in self._page_store.list_active()}
+            if self._dashboard_buttons_on()
+            else set()
+        )
+        lineups_on = self._lineup_controls_on()
+        base = self._base_url()
+        live_lineup_objects = (
+            {
+                topic.split("/")[3]
+                for deck in self._decks()
+                for topic, _payload in build_lineup_configs(deck, base_url=base)
+            }
+            if lineups_on
+            else set()
+        )
+        skip_leaves = self._device_skip_leaves(lineups_on) & {"lineup", "next", "prev"}
         to_blank: set[str] = set()
-
-        def lineup_is_live(rest: str) -> bool:
-            if rest in live_deck_ids:
-                return True
-            for suffix in ("_push", "_next", "_prev"):
-                if rest.endswith(suffix) and rest[: -len(suffix)] in live_deck_ids:
-                    return True
-            return False
 
         def on_config(topic: str, payload: bytes) -> None:
             if not payload:
@@ -1805,24 +2190,29 @@ class HomeAssistantDiscovery:
             device = cfg.get("device") or {}
             ids = device.get("identifiers") if isinstance(device, dict) else None
             primary = ids[0] if isinstance(ids, list) and ids else None
+            obj = cfg.get("object_id")
+            obj = obj.removeprefix("tesserae_") if isinstance(obj, str) else None
             if primary == "tesserae":
                 # Hub-owned entity. The hub entities that come and go are the
                 # per-dashboard buttons (``page_<page_id>``) and the per-lineup
                 # switch + buttons (``lineup_<deck_id>[_push|_next|_prev]``);
                 # the fixed ones always belong, so leave them alone.
-                obj = cfg.get("object_id")
-                if not isinstance(obj, str):
+                if obj is None:
                     return
-                obj = obj.removeprefix("tesserae_")
                 if obj.startswith("page_"):
                     if obj[len("page_") :] not in live_page_ids:
                         to_blank.add(topic)
-                elif obj.startswith("lineup_") and not lineup_is_live(obj[len("lineup_") :]):
+                elif obj.startswith("lineup_") and obj not in live_lineup_objects:
                     to_blank.add(topic)
                 return
             if isinstance(primary, str) and primary.startswith("tesserae_dev_"):
                 device_id = primary[len("tesserae_dev_") :]
-                if device_id not in live_device_ids:
+                # A display that's gone, or its Lineup select / Next /
+                # Previous when this session won't publish them.
+                unpublished = (
+                    obj is not None and obj.removeprefix(f"dev_{device_id}_") in skip_leaves
+                )
+                if device_id not in live_device_ids or unpublished:
                     to_blank.add(topic)
                 return
             # Unknown identifier shape under our prefix, leave it; HA will
@@ -1847,19 +2237,27 @@ class HomeAssistantDiscovery:
             logger.info("HA discovery: cleared %d stale retained config(s)", len(to_blank))
 
     def _publish_entity_configs(self) -> None:
-        # Archived dashboards drop their button and leave the select options;
-        # the blank-what-we-no-longer-see pass below retires them on the broker.
+        """Publish every entity config we want right now and blank the ones
+        we published before but no longer want: archived / deleted
+        dashboards, deleted lineups (or ones that lost the displays / pages
+        their buttons need), deleted displays, and whole groups switched
+        off in settings (the per-dashboard buttons, the lineup controls).
+        Stale configs are blanked before the live ones go out, so blanking
+        one can never take a live entity with it."""
         pages = self._page_store.list_active()
         decks = self._decks()
         base = self._base_url()
+        lineups_on = self._lineup_controls_on()
 
-        seen_ids: set[str] = set()
-        for page in pages:
-            topic, payload = build_button_config(page.id, page.name, base_url=base)
-            self._publish_config(topic, payload)
-            seen_ids.add(page.id)
+        # Hub: one button per saved dashboard, unless switched off. The
+        # Active dashboard select below stays either way.
+        seen_ids: set[str] = {p.id for p in pages} if self._dashboard_buttons_on() else set()
         for page_id in self._published_button_ids - seen_ids:
             self._blank_config("button", f"page_{page_id}")
+        for page in pages:
+            if page.id in seen_ids:
+                topic, payload = build_button_config(page.id, page.name, base_url=base)
+                self._publish_config(topic, payload)
         self._published_button_ids = seen_ids
 
         page_names = sorted({p.name for p in pages})
@@ -1879,66 +2277,87 @@ class HomeAssistantDiscovery:
                     continue
                 self._publish_config(topic, payload)
 
-        # Per-lineup hub entities.
-        seen_decks: set[str] = set()
-        for deck in decks:
-            for topic, payload in build_lineup_configs(deck, base_url=base):
-                self._publish_config(topic, payload)
-            seen_decks.add(str(deck.id))
-        for deck_id in self._published_lineup_ids - seen_decks:
-            self._blank_configs_with_prefix(f"lineup_{deck_id}")
-        # A lineup that lost its displays / pages drops its action buttons.
-        live_lineup_objects = {
-            topic.split("/")[3]
-            for deck in decks
-            for topic, _payload in build_lineup_configs(deck, base_url=base)
-        }
-        for component, object_id in list(self._published_configs):
+        # Per-lineup hub entities, unless switched off. Matching exact object
+        # ids covers deleted lineups, lineups that lost their displays /
+        # pages (their action buttons go) and the switch-off alike, without
+        # the prefix overlap of ids like ``a`` / ``a_b``.
+        lineup_configs = [
+            config
+            for deck in (decks if lineups_on else [])
+            for config in build_lineup_configs(deck, base_url=base)
+        ]
+        live_lineup_objects = {topic.split("/")[3] for topic, _payload in lineup_configs}
+        for component, object_id in sorted(self._published_configs):
             if object_id.startswith("lineup_") and object_id not in live_lineup_objects:
                 self._blank_config(component, object_id)
-        self._published_lineup_ids = seen_decks
+        for topic, payload in lineup_configs:
+            self._publish_config(topic, payload)
 
-        # Per-display devices.
-        lineup_names = sorted({str(d.name) for d in decks}) if self._hooks.deck_store else None
-        seen_devices: set[str] = set()
-        for device in self._bindable_devices():
-            bound = sorted({p.name for p in self._pages_for_device(device.id)})
-            configs = build_device_configs(
-                device.id, device.display_name, self._device_model(device), bound, lineup_names
-            )
-            for topic, payload in configs:
-                # Entities that need a hook to do anything stay unpublished
-                # without it, so a bare install doesn't show dead controls.
-                object_id = topic.split("/")[3]
-                if object_id.endswith("_lineup") and self._hooks.deck_store is None:
-                    continue
-                if object_id.endswith("_hold") and self._hooks.rotation_state_store is None:
-                    continue
-                if (
-                    object_id.endswith(("_quiet_override", "_quiet_now"))
-                    and self._hooks.settings_store is None
-                ):
-                    continue
-                if object_id.endswith("_next_change") and self._hooks.scheduler is None:
-                    continue
-                if object_id.endswith("_notify") and self._hooks.notify_fn is None:
-                    continue
-                if object_id.endswith("_input") and self._hooks.button_service is None:
-                    continue
-                self._publish_config(topic, payload)
-            seen_devices.add(device.id)
-        # Tear down displays that no longer exist (incl. their dyn sensors).
-        for device_id in self._published_device_ids - seen_devices:
-            self._blank_configs_with_prefix(f"dev_{device_id}_")
+        # Per-display devices. Tear down displays that no longer exist
+        # first (incl. their lazily published sensors).
+        devices = self._bindable_devices()
+        seen_devices = {str(d.id) for d in devices}
+        removed = self._published_device_ids - seen_devices
+        if removed:
+            self._blank_removed_device_configs(removed)
         self._published_dyn = {pair for pair in self._published_dyn if pair[0] in seen_devices}
+        lineup_names = sorted({str(d.name) for d in decks}) if self._hooks.deck_store else None
+        # Entities that need a hook (or a setting) to do anything stay
+        # unpublished without it, so a bare install doesn't show dead
+        # controls; one published earlier is blanked.
+        skip_leaves = self._device_skip_leaves(lineups_on)
+        for device in devices:
+            device_id = str(device.id)
+            bound = sorted({p.name for p in self._pages_for_device(device_id)})
+            configs = build_device_configs(
+                device_id, device.display_name, self._device_model(device), bound, lineup_names
+            )
+            prefix = f"dev_{device_id}_"
+            for topic, payload in configs:
+                component, object_id = topic.split("/")[1], topic.split("/")[3]
+                if object_id.removeprefix(prefix) in skip_leaves:
+                    if (component, object_id) in self._published_configs:
+                        self._blank_config(component, object_id)
+                    continue
+                self._publish_config(topic, payload, owner=device_id)
         self._published_device_ids = seen_devices
 
+    def _device_skip_leaves(self, lineups_on: bool) -> set[str]:
+        """Leaves of the always-present per-display entities
+        (``dev_<id>_<leaf>``) that this session doesn't publish: their hook
+        is missing, or (the Lineup select) lineup controls are off."""
+        skip: set[str] = set()
+        if self._hooks.deck_store is None or not lineups_on:
+            skip.add("lineup")
+        if self._hooks.rotation_state_store is None:
+            skip.add("hold")
+        if self._hooks.settings_store is None:
+            skip.update(("quiet_override", "quiet_now"))
+        if self._hooks.scheduler is None:
+            skip.add("next_change")
+        if self._hooks.notify_fn is None:
+            skip.add("notify")
+        if self._hooks.button_service is None:
+            skip.add("input")
+        if self._hooks.step_device_fn is None:
+            skip.update(("next", "prev"))
+        return skip
+
+    def _blank_removed_device_configs(self, removed: set[str]) -> None:
+        """Blank every config a removed display owns. Ownership is recorded
+        when each config is published (``_publish_config(owner=...)``), not
+        read back from object ids, which can't tell ``a``'s
+        ``dev_a_next_change`` from an ``a_next`` display's entities."""
+        for (component, object_id), owner in sorted(self._config_owner.items()):
+            if owner in removed:
+                self._blank_config(component, object_id)
+
     def _device_config_topics(self, device_id: str) -> list[str]:
-        prefix = f"dev_{device_id}_"
+        """Discovery topics of every config ``device_id`` owns."""
         return [
             _discovery_topic(component, object_id)
-            for component, object_id in sorted(self._published_configs)
-            if object_id.startswith(prefix)
+            for (component, object_id), owner in sorted(self._config_owner.items())
+            if owner == device_id
         ]
 
     def _seed_device_state(self) -> None:
@@ -1965,21 +2384,23 @@ class HomeAssistantDiscovery:
 
     # -- publish wrappers ----------------------------------------------
 
-    def _publish_config(self, topic: str, payload: dict[str, Any]) -> None:
-        """Publish a retained discovery config and remember its identity."""
+    def _publish_config(
+        self, topic: str, payload: dict[str, Any], *, owner: str | None = None
+    ) -> None:
+        """Publish a retained discovery config and remember its identity,
+        plus, for a per-display entity, the display that owns it."""
         parts = topic.split("/")
         if len(parts) >= 4:
-            self._published_configs.add((parts[1], parts[3]))
+            key = (parts[1], parts[3])
+            self._published_configs.add(key)
+            if owner is not None:
+                self._config_owner[key] = owner
         self._publish_json(topic, payload, retain=True)
 
     def _blank_config(self, component: str, object_id: str) -> None:
         self._published_configs.discard((component, object_id))
+        self._config_owner.pop((component, object_id), None)
         self._publish_str(_discovery_topic(component, object_id), "", retain=True)
-
-    def _blank_configs_with_prefix(self, prefix: str) -> None:
-        for component, object_id in sorted(self._published_configs):
-            if object_id.startswith(prefix):
-                self._blank_config(component, object_id)
 
     def _publish_json(self, topic: str, payload: dict[str, Any], *, retain: bool = True) -> None:
         if not self._transport.connected:
