@@ -80,6 +80,11 @@ The window has three parts:
 - **Quiet all day**: weekdays that are quiet from midnight to midnight
   whatever the window says.
 
+The window follows the server's time zone, including daylight-saving changes.
+A window that ends in the hour a spring change skips, or in the hour an autumn
+change repeats, ends at the first real moment after its End, and the End minute
+itself is still quiet.
+
 An office that empties at night and closes at the weekend is Start 20:00, End
 08:00, Monday to Friday ticked under *Window applies on*, and Saturday and
 Sunday ticked under *Quiet all day*: quiet from Friday 20:00 straight through

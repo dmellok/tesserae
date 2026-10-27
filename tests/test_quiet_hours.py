@@ -17,6 +17,8 @@ from datetime import UTC, datetime, time, timedelta
 from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 
+import pytest
+
 from app.quiet_hours import (
     QuietHoursWindow,
     device_is_quiet,
@@ -196,15 +198,9 @@ def test_push_with_respect_quiet_hours_skips_when_all_devices_quiet(
     from app.state.settings_store import SettingsStore
     from app.transport import BrokerConfig, MqttTransport
 
-    # A window that reliably contains "now". A fixed 00:00-23:59 window
-    # looks all-day but leaves the final 59 s of the day uncovered:
-    # is_in_window compares at HH:MM granularity inclusively, so
-    # 23:59:00-23:59:59 falls outside and this test flaked when CI ran it
-    # in that minute. Centre a two-hour window on the current local time
-    # instead (the push path resolves no timezone here, so it evaluates
-    # naive datetime.now()); now then sits ~1 h from either boundary,
-    # clear of the boundary-minute gap. is_in_window handles the midnight
-    # wrap when the window straddles 00:00.
+    # Centre a two-hour window on the current local time (the push path
+    # resolves no timezone here, so it evaluates naive datetime.now()).
+    # is_in_window handles the midnight wrap when it straddles 00:00.
     now_local = _datetime.now()
     settings = SettingsStore(Path(tmp_path) / "settings.json")  # type: ignore[arg-type]
     settings.update_section(
@@ -408,3 +404,61 @@ def test_quiet_ends_at_resolves_in_the_given_zone() -> None:
     # 2026-09-07 13:00 UTC = 23:00 Melbourne (AEST, UTC+10): inside.
     ends = quiet_ends_at(window, datetime(2026, 9, 7, 13, 0, tzinfo=UTC), melbourne)
     assert ends == datetime(2026, 9, 8, 7, 1, tzinfo=melbourne).astimezone(UTC)
+
+
+@pytest.mark.parametrize("zone", ["America/New_York", "America/Phoenix"])
+@pytest.mark.parametrize(
+    "day,now_hm,fold,start,end,expected_hm,expected_fold,next_day",
+    [
+        ("2026-03-08", "01:45", 0, "23:00", "02:29", "03:00", 0, False),
+        ("2026-11-01", "01:15", 0, "23:00", "01:29", "01:30", 0, False),
+        ("2026-11-01", "01:15", 1, "23:00", "01:29", "01:30", 1, False),
+        # The rollback itself leaves a window that starts in the repeated hour.
+        ("2026-11-01", "01:50", 0, "01:30", "02:29", "01:00", 1, False),
+        ("2026-03-08", "01:50", 0, "01:30", "02:29", "03:00", 0, False),
+        ("2026-02-08", "01:45", 0, "23:00", "02:29", "02:30", 0, False),
+        ("2026-03-07", "23:45", 0, "23:00", "02:29", "03:00", 0, True),
+    ],
+)
+def test_quiet_end_is_the_first_real_instant_outside(
+    zone, day, now_hm, fold, start, end, expected_hm, expected_fold, next_day
+) -> None:
+    tz = ZoneInfo(zone)
+    now = datetime.fromisoformat(f"{day}T{now_hm}:37").replace(tzinfo=tz, fold=fold)
+    expected = datetime.fromisoformat(f"{day}T{expected_hm}")
+    if next_day:
+        expected += timedelta(days=1)
+    if zone == "America/Phoenix":
+        expected = datetime.combine(expected.date(), time.fromisoformat(end)) + timedelta(minutes=1)
+    expected = expected.replace(tzinfo=tz, fold=expected_fold).astimezone(UTC)
+    window = QuietHoursWindow(time.fromisoformat(start), time.fromisoformat(end))
+    assert quiet_ends_at(window, now, tz) == expected
+    assert expected > now.astimezone(UTC)
+    assert not is_in_window(window, expected, tz)
+    assert is_in_window(window, expected - timedelta(microseconds=1), tz)
+
+
+@pytest.mark.parametrize("fold", [0, 1])
+@pytest.mark.parametrize("zone", ["America/New_York", "America/Phoenix"])
+def test_device_stays_quiet_through_the_entire_end_minute(zone, fold) -> None:
+    tz = ZoneInfo(zone)
+    settings = {
+        "quiet_hours_enabled": True,
+        "quiet_hours_start": "23:00",
+        "quiet_hours_end": "01:29",
+    }
+    now = datetime(2026, 11, 1, 1, 29, 59, 999999, tzinfo=tz, fold=fold)
+    assert device_is_quiet(settings, _device(None), now, tz)
+
+
+def test_quiet_end_preserves_naive_datetimes() -> None:
+    window = QuietHoursWindow(time(23), time(2, 29))
+    assert quiet_ends_at(window, datetime(2026, 3, 8, 1, 45), None) == datetime(2026, 3, 8, 2, 30)
+
+
+def test_quiet_end_uses_the_inputs_zone_without_an_explicit_zone() -> None:
+    tz = ZoneInfo("America/New_York")
+    now = datetime(2026, 11, 1, 1, 15, tzinfo=tz, fold=1)
+    assert quiet_ends_at(QuietHoursWindow(time(23), time(1, 29)), now, None) == datetime(
+        2026, 11, 1, 6, 30, tzinfo=UTC
+    )

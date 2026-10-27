@@ -204,7 +204,8 @@ def is_in_window(window: QuietHoursWindow, now: datetime, tz: tzinfo | None) -> 
         return True
     if weekday not in window.days:
         return False
-    current = local.time()
+    # Settings have minute precision, including the whole end minute.
+    current = local.time().replace(second=0, microsecond=0)
     if window.start <= window.end:
         return window.start <= current <= window.end
     # Wrap-around window, by this day's clock: the early morning up to
@@ -212,14 +213,40 @@ def is_in_window(window: QuietHoursWindow, now: datetime, tz: tzinfo | None) -> 
     return current >= window.start or current <= window.end
 
 
+def _boundary_instants(wall: datetime) -> set[datetime]:
+    """Resolve both folds and any clock transition straddling a wall boundary.
+
+    ZoneInfo permits imaginary gap times. Their two UTC projections bracket
+    the jump; repeated times bracket the rollback. The jump itself can leave
+    a quiet window before either projected boundary, so include it too.
+    All comparisons and arithmetic here use real UTC instants.
+    """
+    if wall.tzinfo is None:
+        return {wall}
+    first = wall.replace(fold=0).astimezone(UTC)
+    second = wall.replace(fold=1).astimezone(UTC)
+    instants = {first, second}
+    if first != second:
+        lo, hi = sorted(instants)
+        offset = lo.astimezone(wall.tzinfo).utcoffset()
+        while hi - lo > timedelta(microseconds=1):
+            mid = lo + (hi - lo) // 2
+            if mid.astimezone(wall.tzinfo).utcoffset() == offset:
+                lo = mid
+            else:
+                hi = mid
+        instants.add(hi)
+    return instants
+
+
 def quiet_ends_at(window: QuietHoursWindow, now: datetime, tz: tzinfo | None) -> datetime | None:
     """The first instant at or after ``now`` that is outside ``window``,
     or ``None`` when the window never opens within the next week (a
     device configured quiet every day, all day).
 
-    Quietness only changes at three kinds of boundary: a minute past the
-    window's end (the test is inclusive of its end minute), the window's
-    start, and midnight, where the day's own rule takes over. Walking
+    Quietness changes at wall-clock boundaries or a timezone transition:
+    a minute past the window's end (inclusive of its end minute), the
+    window's start, and midnight, where the day's own rule takes over. Walking
     those boundaries in order and returning the first that is not quiet
     is exact, and cheap. ``now`` itself is returned unchanged when it is
     already outside the window. Aware input yields UTC; naive stays naive."""
@@ -231,18 +258,17 @@ def quiet_ends_at(window: QuietHoursWindow, now: datetime, tz: tzinfo | None) ->
         datetime.combine(datetime(2000, 1, 1).date(), window.end) + timedelta(minutes=1)
     ).time()
     marks = (time(0, 0), end_plus, window.start)
-    candidates: list[datetime] = []
+    candidates: set[datetime] = set()
     for offset in range(_ENDS_SEARCH_DAYS + 1):
         day = day0 + timedelta(days=offset)
         for mark in marks:
-            # Built from date + wall time so a zone's DST fold or gap
-            # resolves through the tzinfo rather than by arithmetic.
-            candidates.append(datetime.combine(day, mark, tzinfo=local.tzinfo))
+            candidates.update(_boundary_instants(datetime.combine(day, mark, tzinfo=local.tzinfo)))
+    instant = local.astimezone(UTC) if local.tzinfo is not None else local
     for candidate in sorted(candidates):
-        if candidate <= local:
+        if candidate <= instant:
             continue
-        if not is_in_window(window, candidate, tz):
-            return candidate.astimezone(UTC) if candidate.tzinfo is not None else candidate
+        if not is_in_window(window, candidate, local.tzinfo):
+            return candidate
     return None
 
 

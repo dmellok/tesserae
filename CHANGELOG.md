@@ -6,6 +6,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.484.3], 2026-10-28
+
+### Fixed
+
+- Quiet hours end at the right time across daylight-saving changes. A
+  window ending inside the skipped hour, or in the hour that repeats, used
+  to wake the device early or late. Devices also stay quiet through the
+  whole configured end minute, so device sleep and push gating agree.
+
 ## [0.484.0], 2026-10-28
 
 ### Added
