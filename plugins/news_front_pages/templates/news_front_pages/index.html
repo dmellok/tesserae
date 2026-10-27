@@ -1,0 +1,412 @@
+{% extends "_base.html" %}
+{% from "_components.html" import section_card %}
+{% block title %}Newspapers, Tesserae{% endblock %}
+
+{#- Everything here works as plain forms: no script is needed to add, edit,
+    switch off, move or remove a paper, to check a code (Verify) or to fetch.
+    The script at the bottom only makes it smoother. -#}
+
+{#- Verify for one paper: a button and the place its result lands. With the
+    script it posts just the code and shows the answer in place; without, it
+    posts the whole form (``verify`` names the row) and the page comes back
+    as posted, with the answer here. Either way nothing is saved. -#}
+{% macro verify_tools(target, result) -%}
+  <div class="nx-verify" data-nx-verify>
+    <button type="submit" class="dx-btn-ghost-sm" name="verify" value="{{ target }}"
+            formaction="{{ verify_url }}" data-nx-verify-btn>
+      <i class="ph ph-seal-check" aria-hidden="true"></i><span>Verify code</span>
+    </button>
+    <span class="field-help nx-verify-hint">Downloads the newest page for the code as typed. Nothing is saved.</span>
+    <div class="nx-verify-result" data-nx-verify-result role="status" aria-live="polite"{% if not result %} hidden{% endif %}>
+      {%- if result %}
+        {%- if result.thumb %}<img src="{{ result.thumb }}" alt="Top of the page that downloaded" class="nx-thumb">{% endif %}
+        <div class="nx-verify-words">
+          {%- if result.chip %}<span class="tg tg--sm{% if result.tone %} tg--{{ result.tone }}{% endif %} nx-chip">{{ result.chip }}</span>{% endif %}
+          <p>{{ result.message }}</p>
+        </div>
+      {%- endif %}
+    </div>
+  </div>
+{%- endmacro %}
+
+{% macro field_error(message, id) -%}
+  {%- if message %}<p class="nx-error" id="{{ id }}" role="alert"><i class="ph-bold ph-warning-circle" aria-hidden="true"></i> {{ message }}</p>{% endif %}
+{%- endmacro %}
+
+{% block main %}
+<div class="page-head">
+  <h1><i class="ph ph-newspaper" aria-hidden="true"></i> Newspapers</h1>
+  <p class="page-blurb">Today's front pages from the Freedom Forum archive, one paper per render. Open a paper to change its code or crop, or to check that its code works.</p>
+</div>
+
+<div class="settings-section-list">
+<form method="post" action="{{ url_for(plugin_id ~ '.save_papers') }}" id="nx-papers" class="nx-form" data-nx-form>
+  {#- Enter in a field saves: the first submit button is the one implicit
+      submission presses, so it can't be a row's move or remove. -#}
+  <button type="submit" name="op" value="save" class="sr-only" tabindex="-1" aria-hidden="true">Save</button>
+  <input type="hidden" name="count" value="{{ rows|length }}">
+
+  {% call section_card(icon='newspaper', title='Papers', id='papers',
+                       description="The papers to rotate through, in order: one per render, moving on at most every four minutes. Switch a paper off to leave it out of the rotation without losing its row; a cell pinned to it still shows it.") %}
+  {% if rows %}
+  <div class="nx-list-head" aria-hidden="true"><span>Paper</span><span>In rotation</span></div>
+  <ol class="nx-rows">
+    {% for row in rows %}
+    {%- set i = row.index -%}
+    <li class="nx-row{% if not row.enabled %} is-off{% endif %}{% if row.errors %} has-error{% endif %}" id="paper-{{ i }}" data-nx-row data-index="{{ i }}">
+      <details class="nx-row-main"{% if row.open %} open{% endif %}>
+        <summary class="nx-row-head">
+          <span class="nx-row-title" data-nx-title>{{ row.title }}</span>
+          <span class="nx-row-meta" data-nx-meta>{{ row.meta }}</span>
+          {%- if row.errors %}<span class="tg tg--sm tg--bad nx-chip">Check</span>
+          {%- elif row.status %}<span class="tg tg--sm{% if row.status.tone %} tg--{{ row.status.tone }}{% endif %} nx-chip">{{ row.status.chip }}</span>{% endif %}
+          <i class="ph ph-caret-right nx-chev" aria-hidden="true"></i>
+        </summary>
+        <div class="nx-row-body">
+          <div class="nx-fields">
+            <div class="field">
+              <label for="row-{{ i }}-code">Paper code</label>
+              <input type="text" id="row-{{ i }}-code" name="row-{{ i }}-code" value="{{ row.code }}"
+                     placeholder="NY_NYT" autocapitalize="characters" autocomplete="off" spellcheck="false"
+                     data-nx-code{% if row.errors.code %} aria-invalid="true" aria-describedby="row-{{ i }}-code-error"{% endif %}>
+              {{ field_error(row.errors.code, 'row-' ~ i ~ '-code-error') }}
+              <p class="field-help">Freedom Forum's code for the paper, as in its front page addresses (frontpages.freedomforum.org/newspapers/ny_nyt-The_New_York_Times is NY_NYT). The paper picker on a cell lists them all.</p>
+            </div>
+            <div class="field">
+              <label for="row-{{ i }}-css">Crop and appearance (CSS)</label>
+              <textarea id="row-{{ i }}-css" name="row-{{ i }}-css" rows="2" class="nx-mono" spellcheck="false"
+                        placeholder="optional, e.g. filter: contrast(1.15)" data-nx-css{% if row.errors.css %} aria-invalid="true" aria-describedby="row-{{ i }}-css-error"{% endif %}>{{ row.css }}</textarea>
+              {{ field_error(row.errors.css, 'row-' ~ i ~ '-css-error') }}
+              {%- if row.css_note %}<p class="nx-css-note">{{ row.css_note }}</p>{% endif %}
+              <p class="field-help">Styles this paper's page image only. Move up: transform: translateY(-3%) (positive moves down). Zoom: transform: scale(1.2). Wider: width: 110%. Darker: filter: contrast(1.2). Several: separate with ;</p>
+            </div>
+          </div>
+          {%- if row.status %}<p class="nx-status-line">{{ row.status.line }}</p>{% endif %}
+          {{ verify_tools(i, row.verify) }}
+          <div class="nx-row-actions">
+            <button type="submit" name="op" value="remove:{{ i }}" class="dx-btn-ghost-sm nx-remove">
+              <i class="ph ph-trash" aria-hidden="true"></i><span>Remove</span>
+            </button>
+          </div>
+        </div>
+      </details>
+      <div class="nx-row-tools">
+        <span class="nx-moves">
+          <button type="submit" name="op" value="up:{{ i }}" class="dx-btn-ghost-sm dx-btn-icon-only"
+                  title="Move up" aria-label="Move {{ row.title }} up"{% if loop.first %} disabled{% endif %}>
+            <i class="ph ph-arrow-up" aria-hidden="true"></i>
+          </button>
+          <button type="submit" name="op" value="down:{{ i }}" class="dx-btn-ghost-sm dx-btn-icon-only"
+                  title="Move down" aria-label="Move {{ row.title }} down"{% if loop.last %} disabled{% endif %}>
+            <i class="ph ph-arrow-down" aria-hidden="true"></i>
+          </button>
+        </span>
+        <label class="switch nx-switch" title="In rotation">
+          <input type="checkbox" name="row-{{ i }}-enabled" aria-label="{{ row.title }}: In rotation" data-nx-enabled{% if row.enabled %} checked{% endif %}>
+          <span class="switch-track"><span class="switch-thumb"></span></span>
+        </label>
+      </div>
+    </li>
+    {% endfor %}
+  </ol>
+  {% else %}
+  <p class="nx-none">No papers yet. Add one below; the widget needs at least one.</p>
+  {% endif %}
+
+  {% if can_add %}
+  <fieldset class="nx-add{% if new.errors %} has-error{% endif %}" id="paper-new">
+    <legend>Add a paper</legend>
+    <div class="nx-fields">
+      <div class="field">
+        <label for="new-code">Paper code</label>
+        <input type="text" id="new-code" name="new-code" value="{{ new.code }}" placeholder="NY_NYT"
+               autocapitalize="characters" autocomplete="off" spellcheck="false"
+               data-nx-code{% if new.errors.code %} aria-invalid="true" aria-describedby="new-code-error"{% endif %}>
+        {{ field_error(new.errors.code, 'new-code-error') }}
+      </div>
+      <div class="field">
+        <label for="new-css">Crop and appearance (CSS)</label>
+        <textarea id="new-css" name="new-css" rows="2" class="nx-mono" spellcheck="false"
+                  placeholder="optional, e.g. filter: contrast(1.15)"{% if new.errors.css %} aria-invalid="true" aria-describedby="new-css-error"{% endif %}>{{ new.css }}</textarea>
+        {{ field_error(new.errors.css, 'new-css-error') }}
+      </div>
+    </div>
+    <div class="nx-add-foot">
+      <label class="switch nx-switch nx-switch--labelled">
+        <input type="checkbox" name="new-enabled"{% if new.enabled %} checked{% endif %}>
+        <span class="switch-track"><span class="switch-thumb"></span></span>
+        <span class="switch-label">In rotation</span>
+      </label>
+      <button type="submit" name="op" value="add" class="dx-btn-ghost-sm" data-nx-add>
+        <i class="ph ph-plus" aria-hidden="true"></i><span>Add paper</span>
+      </button>
+    </div>
+    {{ verify_tools('new', new.verify) }}
+  </fieldset>
+  {% else %}
+  <p class="nx-none">The list holds at most {{ max_papers }} papers. Remove one to add another.</p>
+  {% endif %}
+
+  <div class="field nx-fit">
+    <label for="nx-small-screens">On smaller screens</label>
+    <select id="nx-small-screens" name="small_screens">
+      <option value="top"{% if small_screens == 'top' %} selected{% endif %}>The top of the page, large enough to read (masthead and headlines)</option>
+      <option value="whole"{% if small_screens == 'whole' %} selected{% endif %}>The whole page, smaller</option>
+    </select>
+    <p class="field-help">A big portrait screen shows the page full width from the top. A smaller or landscape screen can't show the whole page at a readable size: by default it shows the top of the page, the masthead and the main headlines, at a size you can read; or choose the whole page, smaller.</p>
+  </div>
+
+  <div class="nx-save">
+    <button type="reset" class="dx-btn-ghost-sm" data-nx-discard>Discard changes</button>
+    <button type="submit" name="op" value="save" class="dx-btn-primary" data-nx-save>
+      <i class="ph ph-floppy-disk" aria-hidden="true"></i><span>Save</span>
+    </button>
+  </div>
+  {% endcall %}
+</form>
+
+{% call section_card(icon='list-checks', title='Fetches', id='fetches',
+                     description="Pages aren't fetched on a timer. A paper is fetched the first time a frame shows it each day, then checked every " ~ recheck_min ~ " minutes until that day's edition is out. Meanwhile the frame keeps the newest page it has.") %}
+  <div class="nx-fetch-head">
+    <div class="nx-status">{% for line in view.status %}<p>{{ line }}</p>{% endfor %}</div>
+    <form method="post" action="{{ url_for(plugin_id ~ '.fetch_now') }}" class="nx-fetch" data-nx-reload>
+      {% if view.running %}
+        <button type="button" class="dx-btn-ghost-sm" disabled><i class="ph ph-arrows-clockwise" aria-hidden="true"></i><span>Fetching…</span></button>
+      {% else %}
+        <button type="submit" class="dx-btn-ghost-sm" title="Fetch today's page for every paper that doesn't have it yet"><i class="ph ph-arrows-clockwise" aria-hidden="true"></i><span>Fetch now</span></button>
+      {% endif %}
+    </form>
+  </div>
+  {% if view.log %}
+  <pre class="dx-code dx-log-view nx-log" data-nx-log aria-label="Fetch log, newest last">
+    {%- for e in view.log %}<span class="nx-line">{{ e.when }}  {{ e.code }}  <span class="nx-out{% if e.tone %} nx-out--{{ e.tone }}{% endif %}">{{ e.outcome }}</span> {{ e.text }}</span>{% if not loop.last %}{{ '\n' }}{% endif %}{% endfor -%}
+  </pre>
+  <p class="field-help nx-log-help">Newest last. OK is a page saved; MISSING is an edition Freedom Forum doesn't have (not out yet, or not printed that day); ERROR is Freedom Forum not answering. Verify checks are logged too.</p>
+  {% else %}
+  <p class="nx-empty">No fetches yet. The first frame that shows a newspaper starts them, or press Fetch now.</p>
+  {% endif %}
+{% endcall %}
+</div>
+
+<script>
+  (function () {
+    var form = document.getElementById('nx-papers');
+    if (!form) return;
+    var url = {{ verify_url | tojson }};
+    var dirty = false;
+
+    // Rows' heads follow their fields as they're typed; a switched-off row dims.
+    form.addEventListener('input', function (ev) {
+      dirty = true;
+      var row = ev.target.closest('[data-nx-row]');
+      if (!row) return;
+      if (ev.target.matches('[data-nx-code]')) {
+        var title = ev.target.value.trim().toUpperCase() || 'New paper';
+        row.querySelector('[data-nx-title]').textContent = title;
+        var toggle = row.querySelector('[data-nx-enabled]');
+        if (toggle) toggle.setAttribute('aria-label', title + ': In rotation');
+      } else if (ev.target.matches('[data-nx-css]')) {
+        row.querySelector('[data-nx-meta]').textContent = ev.target.value.split(/\s+/).join(' ').trim();
+      }
+    });
+    form.addEventListener('change', function (ev) {
+      dirty = true;
+      if (ev.target.matches('[data-nx-enabled]')) {
+        ev.target.closest('[data-nx-row]').classList.toggle('is-off', !ev.target.checked);
+      }
+    });
+    form.addEventListener('reset', function () {
+      setTimeout(function () {
+        dirty = false;
+        form.querySelectorAll('[data-nx-row]').forEach(function (row) {
+          var toggle = row.querySelector('[data-nx-enabled]');
+          row.classList.toggle('is-off', !toggle.checked);
+          row.querySelector('[data-nx-code]').dispatchEvent(new Event('input', { bubbles: true }));
+          row.querySelector('[data-nx-css]').dispatchEvent(new Event('input', { bubbles: true }));
+        });
+        dirty = false;
+      }, 0);
+    });
+
+    // A row's buttons reload the page: rows open now stay open there.
+    form.addEventListener('submit', function () {
+      form.querySelectorAll('input[name="open"]').forEach(function (el) { el.remove(); });
+      form.querySelectorAll('[data-nx-row]').forEach(function (row) {
+        if (!row.querySelector('details').open) return;
+        var keep = document.createElement('input');
+        keep.type = 'hidden';
+        keep.name = 'open';
+        keep.value = row.dataset.index;
+        form.appendChild(keep);
+      });
+      dirty = false;
+    });
+
+    function show(box, data) {
+      box.hidden = false;
+      box.replaceChildren();
+      var words = document.createElement('div');
+      words.className = 'nx-verify-words';
+      if (data.chip) {
+        var tag = document.createElement('span');
+        tag.className = 'tg tg--sm nx-chip' + (data.tone ? ' tg--' + data.tone : '');
+        tag.textContent = data.chip;
+        words.appendChild(tag);
+      }
+      var text = document.createElement('p');
+      text.textContent = data.message || '';
+      words.appendChild(text);
+      if (data.thumb) {
+        var img = document.createElement('img');
+        img.src = data.thumb;
+        img.alt = 'Top of the page that downloaded';
+        img.className = 'nx-thumb';
+        box.appendChild(img);
+      }
+      box.appendChild(words);
+    }
+
+    // Verify in place: post the code as typed, show the answer, stay put.
+    form.addEventListener('click', function (ev) {
+      var btn = ev.target.closest('[data-nx-verify-btn]');
+      if (!btn) return;
+      ev.preventDefault();
+      if (btn.getAttribute('aria-disabled') === 'true') return;
+      var scope = btn.closest('[data-nx-row], .nx-add');
+      var input = scope ? scope.querySelector('[data-nx-code]') : null;
+      var box = btn.closest('[data-nx-verify]').querySelector('[data-nx-verify-result]');
+      var label = btn.querySelector('span');
+      btn.setAttribute('aria-disabled', 'true');
+      btn.classList.add('is-busy');
+      label.textContent = 'Checking…';
+      box.hidden = false;
+      box.replaceChildren();
+      var wait = document.createElement('p');
+      wait.className = 'nx-verify-wait';
+      wait.textContent = 'Asking Freedom Forum for the newest page. This can take up to a minute.';
+      box.appendChild(wait);
+      var body = new FormData();
+      body.append('code', input ? input.value : '');
+      fetch(url, { method: 'POST', body: body, credentials: 'same-origin' })
+        .then(function (resp) {
+          return resp.json().catch(function () {
+            return { ok: false, tone: 'bad', chip: 'Error', message: 'The server answered ' + resp.status + '.' };
+          });
+        })
+        .catch(function () {
+          return { ok: false, tone: 'bad', chip: 'Error', message: "Couldn't reach Tesserae. Check the connection and try again." };
+        })
+        .then(function (data) {
+          show(box, data);
+          btn.removeAttribute('aria-disabled');
+          btn.classList.remove('is-busy');
+          label.textContent = 'Verify code';
+        });
+    });
+
+    // Fetch now reloads the page: ask before dropping unsaved changes.
+    document.querySelectorAll('form[data-nx-reload]').forEach(function (other) {
+      other.addEventListener('submit', function (ev) {
+        if (dirty && !window.confirm('This reloads the page, so your unsaved changes to the papers are dropped. Go ahead?')) {
+          ev.preventDefault();
+        }
+      });
+    });
+
+    // The log opens on its newest lines.
+    var log = document.querySelector('[data-nx-log]');
+    if (log) log.scrollTop = log.scrollHeight;
+  })();
+</script>
+
+<style>
+  .nx-form { margin: 0; }
+  /* The column head over the rows: mono, quiet, ending over the switches. */
+  .nx-list-head { display: flex; justify-content: space-between; gap: 12px; padding: 0 12px 8px; font-family: var(--t-font-mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--t-muted); }
+  .nx-rows { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--t-border); }
+  .nx-row { position: relative; border-bottom: 1px solid var(--t-border); transition: background var(--t-trans-fast, 120ms); }
+  .nx-row:hover, .nx-row:has(> details[open]) { background: var(--t-surface-soft); }
+  .nx-row.has-error { box-shadow: inset 3px 0 0 var(--t-danger); }
+  /* The head: title, CSS summary, status chip and caret; the move buttons and
+     the switch sit over its right end, outside the summary, so they never
+     open or close the row. */
+  .nx-row-head { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 8px 172px 8px 12px; cursor: pointer; list-style: none; }
+  .nx-row-head::-webkit-details-marker { display: none; }
+  .nx-row-head:focus-visible { outline: 2px solid var(--t-accent); outline-offset: -2px; }
+  .nx-row-title { flex: none; max-width: 50%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 650; letter-spacing: -0.005em; color: var(--t-fg); }
+  .nx-row-meta { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--t-font-mono); font-size: 12px; color: var(--t-muted); }
+  .nx-row.is-off .nx-row-title { color: var(--t-muted); }
+  .nx-chip { flex: none; }
+  .nx-chev { flex: none; font-size: 16px; color: var(--t-muted); transition: transform 180ms ease-out; }
+  .nx-row-head:hover .nx-chev { color: var(--t-fg); }
+  details[open] > .nx-row-head .nx-chev { transform: rotate(90deg); }
+  .nx-row-tools { position: absolute; top: 0; right: 12px; height: 56px; display: flex; align-items: center; gap: 12px; }
+  .nx-moves { display: inline-flex; gap: 2px; }
+  .nx-moves .dx-btn-icon-only { opacity: 0.55; }
+  .nx-row:hover .nx-moves .dx-btn-icon-only, .nx-moves .dx-btn-icon-only:focus-visible { opacity: 1; }
+  .nx-moves .dx-btn-icon-only:disabled { visibility: hidden; }
+  .nx-switch { display: inline-flex; align-items: center; gap: var(--t-space-3, 12px); margin: 0; cursor: pointer; }
+  .nx-switch input { position: absolute; width: 0; height: 0; opacity: 0; }
+  .nx-row-body { padding: 4px 12px 16px; }
+  .nx-fields { display: grid; grid-template-columns: minmax(150px, 220px) minmax(0, 1fr); align-items: start; gap: 12px 16px; }
+  .dx-section-body .nx-fields > .field { min-width: 0; padding: 0; margin: 0; border-top: 0; }
+  .nx-fields .field-help { overflow-wrap: anywhere; }
+  .dx-section-body .nx-fields .field label { margin-bottom: 4px; }
+  :root .dx-section-body .nx-fields .field textarea.nx-mono { font-family: var(--t-font-mono, ui-monospace, monospace); font-size: 13px; line-height: 1.5; }
+  .nx-error { margin: 6px 0 0; font-size: 12.5px; color: var(--t-danger); }
+  .nx-css-note { margin: 6px 0 0; font-size: 12px; color: color-mix(in oklab, var(--t-warn) 75%, var(--t-fg)); }
+  .nx-row-actions { display: flex; justify-content: flex-end; margin-top: 12px; }
+  .nx-remove:hover { color: var(--t-danger); }
+  .nx-none { margin: 12px 0 0; padding: 12px; font-size: 13px; color: var(--t-muted); background: var(--t-surface-soft); border: 1px dashed var(--t-border); border-radius: var(--t-radius-sm); text-align: center; }
+  .nx-add { margin: 16px 0 0; padding: 12px; border: 1px dashed var(--t-border); border-radius: var(--t-radius-sm); }
+  .nx-add.has-error { border-color: var(--t-danger); }
+  .nx-add legend { padding: 0 6px; font-size: 12.5px; font-weight: 600; color: var(--t-fg-soft); }
+  .nx-add-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; }
+  .nx-switch--labelled .switch-label { font-size: 13px; color: var(--t-fg-soft); }
+  .dx-section-body .nx-fit { margin-top: 16px; border-top: 1px solid var(--t-border); padding-top: 16px; }
+  .nx-save { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 16px; }
+  .nx-status-line { margin: 12px 0 0; font-size: 12.5px; color: var(--t-fg-soft); max-width: 75ch; }
+  .nx-verify { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; margin-top: 12px; }
+  .nx-verify-hint { margin: 0; flex: 1 1 220px; }
+  .nx-verify .is-busy { opacity: 0.7; cursor: progress; }
+  .nx-verify .is-busy i { animation: nx-spin 1.2s linear infinite; }
+  @keyframes nx-spin { to { transform: rotate(360deg); } }
+  .nx-verify-result { flex: 1 1 100%; display: flex; align-items: flex-start; gap: 14px; padding: 12px; border: 1px solid var(--t-border); border-radius: var(--t-radius-md); background: var(--t-surface-sunk); }
+  .nx-verify-result[hidden] { display: none; }
+  .nx-verify-result p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--t-fg-soft); max-width: 70ch; }
+  .nx-verify-words { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-width: 0; }
+  .nx-verify-wait { font-style: italic; }
+  .nx-thumb { flex: none; width: 80px; height: auto; border: 1px solid var(--t-border); background: #fff; }
+  .nx-fetch-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px 16px; flex-wrap: wrap; }
+  .nx-status { flex: 1 1 320px; font-size: 14px; color: var(--t-fg-soft); }
+  .nx-status p { margin: 0 0 4px; max-width: 75ch; }
+  .nx-status:empty { display: none; }
+  .nx-fetch { margin: 0; flex: none; }
+  .nx-log { margin-top: 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .nx-log-help { margin: 8px 0 0; }
+  /* A wrapped entry hangs under its first line, so entries stay apart. */
+  .nx-line { display: inline-block; width: 100%; padding-left: 4ch; text-indent: -4ch; }
+  .nx-out { font-weight: 600; }
+  .nx-out--ok { color: color-mix(in oklab, var(--t-ok) 75%, var(--t-fg)); }
+  .nx-out--warn { color: color-mix(in oklab, var(--t-warn) 75%, var(--t-fg)); }
+  .nx-out--bad { color: color-mix(in oklab, var(--t-danger) 80%, var(--t-fg)); }
+  .nx-empty { margin: 14px 0 0; font-size: 13px; color: var(--t-muted); }
+  @media (max-width: 640px) {
+    .nx-fields { grid-template-columns: minmax(0, 1fr); }
+    /* Room for the title: a closed row shows its moves only once opened. */
+    .nx-row:not(:has(> details[open])) .nx-moves { display: none; }
+    .nx-row:not(:has(> details[open])) .nx-row-head { padding-right: 72px; }
+    .nx-row-head { padding-left: 8px; padding-right: 160px; }
+    .nx-row-tools { right: 8px; }
+    .nx-row-body, .nx-list-head { padding-inline: 8px; }
+  }
+  @media (max-width: 520px) {
+    .nx-verify-hint { flex-basis: 100%; }
+    .nx-thumb { width: 64px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .nx-chev { transition: none; }
+    .nx-verify .is-busy i { animation: none; }
+  }
+</style>
+{% endblock %}

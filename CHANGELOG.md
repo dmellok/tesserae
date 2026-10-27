@@ -6,6 +6,22 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.488.0], 2026-10-28
+
+### Added
+
+- **News, Newspapers** widget: today's front pages from the Freedom Forum
+  archive, a large catalog of newspapers worldwide (The New York Times, The
+  Wall Street Journal, USA Today and many more), one paper per render,
+  filling the cell's width. The papers live on the widget's own admin page
+  (Widgets > News, Newspapers): add, remove, reorder or switch them off, give
+  each optional CSS, and check a code with Verify, which downloads today's
+  page from the address that code points to and saves nothing. Pages come
+  from the archive's PDFs, drawn 1440 px wide with pypdfium2 (a new
+  dependency), because they are far sharper than the archive's 700 px JPEG,
+  which is only the fallback. The last good page stays up while a paper isn't
+  out yet. No API key needed.
+
 ## [0.484.0], 2026-10-28
 
 ### Added

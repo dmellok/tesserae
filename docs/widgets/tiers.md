@@ -49,6 +49,7 @@ serve stale data.
 |---|---|
 | `weather_pollen_count` (Melbourne fallback) *(marketplace)* | Scrapes melbournepollen.com.au's home page when Open-Meteo's pollen data is null (it's Europe-only). Any DOM redesign on their end breaks this path. The Open-Meteo path is stable. |
 | `news_reddit` | Reads Reddit's per-subreddit RSS feed (`/r/<sub>/<sort>.rss`). The public `.json` API now 403-blocks server-side reads outright, so RSS is the remaining no-auth path, it carries titles/authors/times but **no** score or comment counts, and could itself be locked down. |
+| `news_front_pages` | Downloads each paper's PDF from Freedom Forum's CDN, whose path and the paper list on frontpages.freedomforum.org aren't a documented API. The archive clears each day's file after a couple of days, and a paper that isn't out yet shows yesterday's. |
 
 ## Tier policy
 

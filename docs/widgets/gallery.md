@@ -2,7 +2,7 @@
 
 # Widget gallery
 
-The **37 widgets** that ship with Tesserae. Each is a drop-a-folder widget under `plugins/<id>/`; drop your own in and it shows up in the editor's picker. Want to build one? See [Build a widget with AI](../dev/writing-a-widget.md).
+The **38 widgets** that ship with Tesserae. Each is a drop-a-folder widget under `plugins/<id>/`; drop your own in and it shows up in the editor's picker. Want to build one? See [Build a widget with AI](../dev/writing-a-widget.md).
 
 !!! tip "Looking for more widgets?"
     Browse the full community catalog at [tesserae.ink/catalog](https://tesserae.ink/catalog/): widgets, themes, and dashboard templates, all installable from **Settings → Widgets → Browse catalog** inside the app.
@@ -132,6 +132,16 @@ The **37 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
 <div class="grid cards" markdown>
 
+-   **News, Newspapers** &middot; `news_front_pages`
+
+    ---
+
+    ![news_front_pages](../screenshots/widgets/news_front_pages.png)
+
+    Today's newspaper front pages from the Freedom Forum archive, one paper per render, filling the cell's width from the top. Rotates through the papers listed on its admin page (Widgets → News, Newspapers), each with its own optional CSS, or shows one pinned paper. The rotation moves on at most once every four minutes, so a send prepared ahead of time and its follow-ups show one paper; that approximates one paper per shown frame, and two sends within four minutes repeat a paper. Pages download in the background as PDFs, drawn 1440 px wide so body text stays readable (Freedom Forum's 700 px JPEG stands in when a PDF can't be had), and the last good page stays up while a paper isn't out yet. No API key needed.
+
+    **Sizes:** `sm` `md` `lg` &middot; **Tier:** Fragile
+
 -   **News, Hacker News** &middot; `news_hacker_news`
 
     ---
@@ -234,7 +244,7 @@ The **37 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     ![ha_energy](../screenshots/widgets/ha_energy.png)
 
-    Live solar / grid / battery / house-consumption snapshot from your HA energy dashboard, with today's totals and a 24-hour sparkline. Wires to the same sensor.* entities you've already configured under HA's Energy panel.
+    Live solar / grid / battery / house-consumption snapshot from your HA energy dashboard, with today's totals, optional yesterday's solar total, and a 24-hour sparkline. Wires to the same sensor.* entities you've already configured under HA's Energy panel.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** Local
 

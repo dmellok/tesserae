@@ -1,0 +1,37 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "News, Newspapers",
+  "version": "0.3.0",
+  "kind": "widget",
+  "locales": ["en"],
+  "description": "Today's newspaper front pages from the Freedom Forum archive, one paper per render, filling the cell's width from the top. Rotates through the papers listed on its admin page (Widgets → News, Newspapers), each with its own optional CSS, or shows one pinned paper. The rotation moves on at most once every four minutes, so a send prepared ahead of time and its follow-ups show one paper; that approximates one paper per shown frame, and two sends within four minutes repeat a paper. Pages download in the background as PDFs, drawn 1440 px wide so body text stays readable (Freedom Forum's 700 px JPEG stands in when a PDF can't be had), and the last good page stays up while a paper isn't out yet. No API key needed.",
+  "icon": "ph-newspaper",
+  "category": "reading",
+  "supports": {
+    "sizes": ["sm", "md", "lg"]
+  },
+  "cell_options": [
+    {
+      "name": "paper",
+      "type": "select",
+      "label": "Paper",
+      "default": "",
+      "choices_from": "papers",
+      "help": "One paper every time, or the next paper from the list on the widget's admin page on each render."
+    }
+  ],
+  "updates": {
+    "on_schedule": [{ "kind": "daily", "suggested_at": "06:00" }]
+  },
+  "render": {
+    "dither": "floyd-steinberg",
+    "needs_network": true,
+    "full_bleed": true,
+    "warm_ahead_s": 60
+  },
+  "requires": [
+    "network:cdn.freedomforum.org",
+    "network:frontpages.freedomforum.org",
+    "settings:plugin"
+  ]
+}
