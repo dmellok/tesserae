@@ -1,0 +1,43 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "Comics",
+  "version": "0.3.0",
+  "kind": "widget",
+  "locales": [
+    "en"
+  ],
+  "description": "Today's comics on one page: The Far Side's daily panels in a row with their captions, then GoComics strips (Garfield, Calvin and Hobbes, Pearls Before Swine, or any other) and an archived Dilbert, full width and in your order. As many rows as fit without cutting one off. Pick the comics on its admin page, Widgets → Admin pages → Comics, and every cell shows them. Fetched in the background once a day (or with Fetch now); when a site blocks a download the last good strip stays up, a small note says so, and you can upload or import that day's strip.",
+  "icon": "ph-smiley",
+  "category": "reading",
+  "supports": {
+    "sizes": [
+      "sm",
+      "md",
+      "lg"
+    ]
+  },
+  "render": {
+    "per_placement": true,
+    "dither": "floyd-steinberg",
+    "needs_network": true,
+    "full_bleed": true,
+    "warm_ahead_s": 120
+  },
+  "updates": {
+    "on_schedule": [
+      {
+        "kind": "daily",
+        "suggested_at": "06:15"
+      }
+    ]
+  },
+  "requires": [
+    "network:www.gocomics.com",
+    "network:featureassets.gocomics.com",
+    "network:assets.amuniversal.com",
+    "network:featureassets.amuniversal.com",
+    "network:www.thefarside.com",
+    "network:dilbert-viewer.herokuapp.com",
+    "network:web.archive.org"
+  ]
+}

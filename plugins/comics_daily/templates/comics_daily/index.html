@@ -1,0 +1,410 @@
+{% extends "_base.html" %}
+{% from "_components.html" import button, info_pop, number_input, section_card, select_field, text_input with context %}
+{% block title %}Comics, Tesserae{% endblock %}
+{% block head_extra %}<script src="{{ url_for('plugins.plugin_asset', plugin_id='comics_daily', asset='static/admin.js') }}" defer></script>{% endblock %}
+
+{#- Every change on this page is a plain form that posts, saves and comes
+    back to the card it came from, so it all works without JavaScript;
+    static/admin.js only swaps the preview in place, asks before a strip
+    is removed and starts the log on its newest line. -#}
+
+{#- A source's state as the app's small chip. -#}
+{% macro chip(item) -%}
+  {%- if item.chip %}<span class="tg tg--sm{% if item.tone %} tg--{{ item.tone }}{% endif %} cx-chip">{{ item.chip }}</span>{% endif -%}
+{%- endmacro %}
+
+{#- A switch as the settings cards draw one: label and line on the left,
+    the switch on the right. Unticked, the browser posts nothing for it,
+    which the save reads as off. -#}
+{% macro toggle_row(field_id, name, label, desc, checked, extra_class='') -%}
+  <div class="dx-toggle-row{% if extra_class %} {{ extra_class }}{% endif %}">
+    <div class="dx-toggle-row-text">
+      <label class="dx-toggle-row-label" for="{{ field_id }}">{{ label }}</label>
+      {%- if desc %}<p class="dx-toggle-row-desc">{{ desc }}</p>{% endif %}
+    </div>
+    <label class="dx-toggle-switch" for="{{ field_id }}">
+      <input id="{{ field_id }}" type="checkbox" name="{{ name }}" value="on"{% if checked %} checked{% endif %}>
+      <span class="dx-toggle-track" aria-hidden="true"><span class="dx-toggle-knob"></span></span>
+    </label>
+  </div>
+{%- endmacro %}
+
+{% macro cookie_hint(item) -%}
+  {%- if item.cookies_help %} <a href="#cookies">Paste GoComics cookies</a> to get past it, or upload today's strip.{% endif -%}
+{%- endmacro %}
+
+{% block main %}
+<div class="page-head">
+  <h1><i class="ph ph-smiley" aria-hidden="true"></i> Comics</h1>
+  <p class="page-blurb">The Far Side's daily panels and your strips, fetched once a day for every comics cell. When a site blocks a download, the last good strip stays up and you can upload or import the day's picture.</p>
+</div>
+
+<div class="settings-section-list">
+{% call section_card(icon='smiley', title="Today's comics", id='today') %}
+  <div class="cx-today-head">
+    <p class="lede">{{ view.lede }}</p>
+    <form method="post" action="{{ url_for('comics_daily_media.fetch_now') }}" class="cx-fetch">
+      {% if view.running %}
+        <button type="button" class="ghost" disabled><i class="ph ph-arrows-clockwise" aria-hidden="true"></i><span>Fetching…</span></button>
+      {% else %}
+        {{ button('Fetch now', icon='arrows-clockwise') }}
+      {% endif %}
+    </form>
+  </div>
+  <div class="cx-today">
+  {#- The preview: one screen at a time, the user's own first. All are
+      drawn; the picker shows one (in place with JavaScript, else its
+      Show button reloads the page on that screen). -#}
+  {%- set default = view.screen_default %}
+  <aside class="cx-onscreen" aria-labelledby="cx-screen-pick-label">
+    <form method="get" action="{{ url_for('comics_daily_media.index') }}" class="cx-screen-form">
+      <label class="cx-onscreen-label" id="cx-screen-pick-label" for="cx-screen-pick">Preview on</label>
+      <div class="cx-screen-pick-row">
+        <select id="cx-screen-pick" name="screen" class="dx-input cx-screen-pick" data-screen-pick>
+          {%- for group in ['Your screens', 'Reference screens'] %}
+          {%- set screens = view.screens | selectattr('group', 'equalto', group) | list %}
+          {%- if screens %}
+          <optgroup label="{{ group }}">
+            {%- for sc in screens %}
+            <option value="{{ sc.id }}"{% if sc.id == default %} selected{% endif %}>{{ sc.name }} ({{ sc.w }}×{{ sc.h }})</option>
+            {%- endfor %}
+          </optgroup>
+          {%- endif %}
+          {%- endfor %}
+        </select>
+        <noscript><button type="submit" class="dx-btn-ghost-sm">Show</button></noscript>
+      </div>
+    </form>
+    {%- for sc in view.screens %}
+    <figure class="cx-screen" data-screen="{{ sc.id }}"{% if sc.id != default %} hidden{% endif %}>
+      <div class="cx-screen-frame" style="--sw: {{ sc.w }}; --sh: {{ sc.h }}">
+        {%- for item in sc.shown %}
+          {%- if item.farside %}
+          <div class="cx-screen-panels">{% for p in item.pictures[:4] %}<img src="{{ request.script_root }}{{ p.src }}" alt="" loading="lazy">{% endfor %}</div>
+          {%- else %}
+          <img class="cx-screen-strip" src="{{ request.script_root }}{{ item.pictures[0].src }}" alt="{{ item.label }}" loading="lazy">
+          {%- endif %}
+        {%- endfor %}
+      </div>
+      <figcaption>{{ sc.text }}</figcaption>
+    </figure>
+    {%- endfor %}
+    <p class="cx-onscreen-note">Comics never shrink past reading size or get cut off. When they don't all fit, they take turns.</p>
+  </aside>
+  <div class="cx-preview">
+    {% if view.farside %}
+    <section class="cx-source" aria-label="The Far Side">
+      <p class="cx-source-head"><strong>The Far Side</strong>{{ chip(view.farside) }}<span class="cx-source-line">{{ view.farside.line }}</span></p>
+      {% if view.farside.pictures %}
+      <div class="cx-panels">
+        {% for p in view.farside.pictures %}
+        <figure>
+          <img src="{{ request.script_root }}{{ p.src }}" alt="The Far Side, panel {{ loop.index }}" width="{{ p.w }}" height="{{ p.h }}" loading="lazy">
+          {% if p.caption %}<figcaption>{{ p.caption }}</figcaption>{% endif %}
+        </figure>
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% if view.farside.warning %}<div class="dx-warn-band cx-warn"><i class="ph ph-warning" aria-hidden="true"></i><p>{{ view.farside.warning }}</p></div>{% endif %}
+    </section>
+    {% endif %}
+    {% for item in view.preview %}
+    <section class="cx-source" aria-label="{{ item.label }}">
+      <p class="cx-source-head"><strong>{{ item.label }}</strong>{{ chip(item) }}<span class="cx-source-line">{{ item.line }}</span></p>
+      {% if item.pictures %}
+      <img class="cx-strip" src="{{ request.script_root }}{{ item.pictures[0].src }}" alt="{{ item.label }}" width="{{ item.pictures[0].w }}" height="{{ item.pictures[0].h }}" loading="lazy">
+      {% endif %}
+      {% if item.warning %}<div class="dx-warn-band cx-warn"><i class="ph ph-warning" aria-hidden="true"></i><p>{{ item.warning }}{{ cookie_hint(item) }}</p></div>{% endif %}
+    </section>
+    {% endfor %}
+    {% for p in view.problems %}
+    <section class="cx-source" aria-label="{{ p.name }}">
+      <p class="cx-source-head"><strong>{{ p.name }}</strong><span class="tg tg--sm tg--bad cx-chip">Can't show</span><span class="cx-source-line">{{ p.message }}</span></p>
+    </section>
+    {% endfor %}
+  </div>
+  </div>
+{% endcall %}
+
+{% call section_card(icon='cow', title='The Far Side', id='farside', extra_class='cx-farside',
+                     description="The daily panels from thefarside.com.") %}
+  <form method="post" action="{{ url_for('comics_daily_media.save_far_side') }}" class="cx-card-form">
+    {{ toggle_row('cx-far_side', 'far_side', 'Show The Far Side', "Today's panels, in a row above the strips.", values.far_side) }}
+    {%- set _, _, lo, hi = numbers.far_side_count %}
+    <div class="dx-toggle-row cx-dep">
+      <div class="dx-toggle-row-text">
+        <span class="dx-toggle-row-label" id="cx-far_side_count-label">Panels</span>
+        <p class="dx-toggle-row-desc">How many in the row. A narrow cell shows fewer.</p>
+      </div>
+      <div class="seg cx-seg" role="radiogroup" aria-labelledby="cx-far_side_count-label">
+        {%- for n in range(lo, hi + 1) %}
+        <label class="seg-item"><input type="radio" class="sr-only" name="far_side_count" value="{{ n }}"{% if n == values.far_side_count %} checked{% endif %}><span>{{ n }}</span></label>
+        {%- endfor %}
+      </div>
+    </div>
+    {{ toggle_row('cx-captions', 'captions', 'Captions', 'The caption under each panel.', values.captions, extra_class='cx-dep') }}
+    <div class="cx-card-actions">{{ button('Save', icon='floppy-disk') }}</div>
+  </form>
+{% endcall %}
+
+{% call section_card(icon='film-strip', title='GoComics', id='gocomics',
+                     description="Your strips, top to bottom under the Far Side. Switch one off to keep it in the list without showing it. Dilbert comes from an archive of old strips and sits in the same list.") %}
+  <ol class="cx-rows">
+  {%- for row in rows %}
+    {%- set st = view.strips.get(row.slug) or {'label': row.label or row.slug, 'chip': '', 'line': '', 'warning': '', 'kind': ''} %}
+    {%- set label = row.label or st.label %}
+    {%- set fid = 'cx-strip-' ~ row.slug %}
+    <li class="cx-row{% if not row.enabled %} cx-row--off{% endif %}" id="strip-{{ row.slug }}" data-strip="{{ row.slug }}">
+      <div class="cx-row-head">
+        <span class="cx-row-num" aria-hidden="true">{{ loop.index }}</span>
+        <p class="cx-row-title"><strong>{{ label }}</strong><span class="cx-row-slug">{{ row.slug }}</span>{{ chip(st) }}</p>
+        <form method="post" action="{{ url_for('comics_daily_media.move_strip', slug=row.slug) }}" class="cx-row-ops">
+          <button type="submit" name="direction" value="up" class="dx-btn-ghost-sm dx-btn-icon-only" title="Move up" aria-label="Move {{ label }} up"{% if loop.first %} disabled{% endif %}><i class="ph ph-arrow-up" aria-hidden="true"></i></button>
+          <button type="submit" name="direction" value="down" class="dx-btn-ghost-sm dx-btn-icon-only" title="Move down" aria-label="Move {{ label }} down"{% if loop.last %} disabled{% endif %}><i class="ph ph-arrow-down" aria-hidden="true"></i></button>
+          {%- if row.enabled %}
+          <button type="submit" formaction="{{ url_for('comics_daily_media.switch_strip', slug=row.slug) }}" name="enabled" value="off" class="dx-btn-ghost-sm" aria-label="Switch {{ label }} off"><i class="ph ph-eye-slash" aria-hidden="true"></i><span>Switch off</span></button>
+          {%- else %}
+          <button type="submit" formaction="{{ url_for('comics_daily_media.switch_strip', slug=row.slug) }}" name="enabled" value="on" class="dx-btn-ghost-sm" aria-label="Switch {{ label }} on"><i class="ph ph-eye" aria-hidden="true"></i><span>Switch on</span></button>
+          {%- endif %}
+          {%- if row.slug != fixed_slug %}
+          <button type="submit" formaction="{{ url_for('comics_daily_media.remove_strip', slug=row.slug) }}" class="dx-btn-ghost-sm dx-btn-icon-only cx-remove" title="Remove" aria-label="Remove {{ label }}" data-confirm="Remove {{ label }} from the list?"><i class="ph ph-trash" aria-hidden="true"></i></button>
+          {%- endif %}
+        </form>
+      </div>
+      <p class="cx-status-line">{% if st.kind %}<span class="cx-kind">{{ st.kind }}</span>{% endif %}{{ st.line }}</p>
+      {%- if st.warning %}
+      <div class="dx-warn-band cx-warn"><i class="ph ph-warning" aria-hidden="true"></i><p>{{ st.warning }}{{ cookie_hint(st) }}</p></div>
+      {%- endif %}
+      <details class="dx-disclosure cx-edit"{% if st.warning %} open{% endif %}>
+        <summary><i class="ph ph-caret-right" aria-hidden="true"></i><span>Edit, upload or import</span></summary>
+        <div class="dx-disclosure-body">
+          <form method="post" action="{{ url_for('comics_daily_media.edit_strip', slug=row.slug) }}" class="cx-edit-form">
+            <div class="field-grid">
+              {{ text_input(fid ~ '-label', 'label', 'Label', row.label, placeholder=st.label, help="The name the page's notes use. Leave it blank for the strip's own name.") }}
+              {{ text_input(fid ~ '-slug', 'slug', 'Strip', row.slug, required=True, readonly=(row.slug == fixed_slug), autocapitalize='off',
+                            help=("Dilbert comes from the Dilbert archive and is built into the list: switch it off rather than remove it." if row.slug == fixed_slug else "The GoComics name, as in gocomics.com/<name>, or its address.")) }}
+              {{ select_field(fid ~ '-mode', 'mode', 'Source', row.mode, mode_choices,
+                              help="Automatic downloads the strip each day. Manual upload shows the picture you uploaded or imported until you switch back to Automatic. Direct image URL downloads the Image URL each day instead (comic sites only: GoComics, amuniversal.com, The Far Side).") }}
+              {{ text_input(fid ~ '-image_url', 'image_url', 'Image URL', row.image_url, placeholder='https://…', autocapitalize='off',
+                            help="For Direct image URL, or for Import URL: any picture address on the web, downloaded once now and kept as a manual upload.") }}
+            </div>
+            <div class="cx-edit-actions">
+              <button type="submit" class="dx-btn-ghost-sm"><i class="ph ph-floppy-disk" aria-hidden="true"></i><span>Save strip</span></button>
+              <button type="submit" formaction="{{ url_for('comics_daily_media.import_strip', slug=row.slug) }}" class="dx-btn-ghost-sm"><i class="ph ph-download-simple" aria-hidden="true"></i><span>Import URL</span></button>
+            </div>
+          </form>
+          <form method="post" enctype="multipart/form-data" action="{{ url_for('comics_daily_media.upload_strip', slug=row.slug) }}" class="cx-tools">
+            <input type="file" name="file" id="{{ fid }}-file" class="cx-file"
+                   accept="image/png,image/jpeg,image/gif,image/webp" aria-label="Picture to upload for {{ label }}">
+            <button type="submit" class="dx-btn-ghost-sm"><i class="ph ph-upload-simple" aria-hidden="true"></i><span>Upload strip</span></button>
+          </form>
+          <p class="field-help cx-tools-help">Upload or import a picture to show it as this strip (Manual upload) until you switch back to Automatic. PNG, JPEG, GIF or WebP, up to {{ upload_mb }} MB.</p>
+        </div>
+      </details>
+    </li>
+  {%- endfor %}
+  </ol>
+
+  {#- Add a GoComics strip by its address or name. The server checks the
+      name with GoComics. -#}
+  {%- if rows | length < max_strips %}
+  <form method="post" action="{{ url_for('comics_daily_media.add_strip') }}" class="cx-add">
+    <label class="sr-only" for="cx-add-input">GoComics address or strip name</label>
+    <input type="text" id="cx-add-input" name="strip" required
+           placeholder="https://www.gocomics.com/peanuts, or peanuts"
+           autocomplete="off" autocapitalize="off" spellcheck="false">
+    <button type="submit" class="dx-btn-ghost-sm"><i class="ph ph-plus" aria-hidden="true"></i><span>Add strip</span></button>
+  </form>
+  {%- else %}
+  <p class="field-help cx-add-full">The list holds at most {{ max_strips }} strips: remove one to add another.</p>
+  {%- endif %}
+
+  <div class="cx-cookies" id="cookies">
+    <p class="device-subhead cx-subhead">Browser check</p>
+    <p class="cx-note">GoComics checks for a real browser before it serves a strip. Tesserae passes the check by itself and keeps the session, so usually there's nothing to do. If GoComics blocks it anyway, you need a free GoComics account: sign in and paste its cookies here.</p>
+    <dl class="cx-cookie-status">
+      <dt>Session</dt>
+      <dd>{{ chip(view.session) }}<span>{{ view.session.line }}</span></dd>
+      <dt>Pasted</dt>
+      <dd>{{ chip(view.cookies) }}<span>{{ view.cookies.line }}</span></dd>
+    </dl>
+    <details class="dx-disclosure cx-paste"{% if view.cookies.set or view.session.chip != 'Saved' or view.preview | selectattr('cookies_help') | list %} open{% endif %}>
+      <summary><i class="ph ph-caret-right" aria-hidden="true"></i><span>{{ 'Replace pasted cookies' if view.cookies.set else 'Paste cookies' }}</span></summary>
+      <div class="dx-disclosure-body">
+        <ol class="cx-steps">
+          <li>Make a free account at <a href="https://www.gocomics.com/" target="_blank" rel="noopener noreferrer">gocomics.com</a> and sign in, in Chrome.</li>
+          <li>Add the <a href="https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc" target="_blank" rel="noopener noreferrer">Get cookies.txt Locally</a> extension.</li>
+          <li>On gocomics.com, click the extension, choose Copy All and paste it below.</li>
+        </ol>
+        <form method="post" action="{{ url_for('comics_daily_media.save_cookies') }}" id="cx-cookie-form">
+          <div class="field cx-cookie-field">
+            <label for="cx-cookies" class="sr-only">Cookies</label>
+            <textarea id="cx-cookies" name="cookies" rows="3" required
+                      autocomplete="off" autocapitalize="off" spellcheck="false"
+                      placeholder="Stored encrypted and never shown again."></textarea>
+            <p class="field-help">A JSON cookie export or a Cookie header works too.</p>
+          </div>
+          <div class="cx-cookie-actions">
+            <button type="submit" class="dx-btn-ghost-sm"><i class="ph ph-floppy-disk" aria-hidden="true"></i><span>Save cookies</span></button>
+            {% if view.cookies.set %}
+            <button type="submit" class="dx-btn-ghost-sm cx-clear" formaction="{{ url_for('comics_daily_media.clear_cookies') }}" formnovalidate><i class="ph ph-x" aria-hidden="true"></i><span>Clear</span></button>
+            {% endif %}
+          </div>
+        </form>
+      </div>
+    </details>
+  </div>
+{% endcall %}
+
+{% call section_card(icon='layout', title='Layout', id='layout',
+                     description="How the comics share a cell, in every comics cell.") %}
+  <form method="post" action="{{ url_for('comics_daily_media.save_layout') }}" class="cx-card-form">
+    {{ select_field('cx-small_screens', 'small_screens', 'On small screens', values.small_screens, small_screen_choices,
+                    help="When a screen is too small (or too wide) to show every comic at a size you can read. Comics never shrink or get cut off; instead they take turns, a new set each refresh. The preview at the top shows what each screen gets.") }}
+    <fieldset class="cx-space">
+      <legend class="cx-space-legend">Space between comics <span class="cx-unit">px</span>{{ info_pop("The empty space between one comic and the next, in pixels on a 1440 px wide screen; narrower cells scale it down. It sits at Usual, grows toward Largest when there's height to spare, and shrinks toward Smallest to fit one more comic.") }}</legend>
+      <div class="cx-gaps">
+        {%- for name, short in [('gap_min', 'Smallest'), ('gap', 'Usual'), ('gap_max', 'Largest')] %}
+        {%- set _, _, lo, hi = numbers[name] %}
+        {{ number_input('cx-' ~ name, name, short, value=values[name], min=lo, max=hi, step=1) }}
+        {%- endfor %}
+      </div>
+    </fieldset>
+    {{ toggle_row('cx-status_note', 'status_note', 'Out-of-date note', "A small line at the foot of the comics naming any that couldn't be updated today.", values.status_note) }}
+    <div class="cx-card-actions">{{ button('Save', icon='floppy-disk') }}</div>
+  </form>
+{% endcall %}
+
+{% call section_card(icon='list-checks', title='Fetches', id='log',
+                     description="Every fetch (OK, stale, blocked or error) with its date, size and time taken, and every upload, import and added strip. Newest at the bottom.") %}
+  {% if view.log %}
+  <div class="dx-code dx-log-view cx-log" data-log-tail tabindex="0" aria-label="Fetch log">
+    {%- for e in view.log %}
+    <div class="cx-log-line{% if e.tone %} cx-log-line--{{ e.tone }}{% endif %}"><span class="cx-log-when">{{ e.when }}</span><span class="cx-log-source">{{ e.source }}</span><span class="cx-log-outcome">{{ e.outcome | upper }}</span><span class="cx-log-text">{{ e.text }}</span></div>
+    {%- endfor %}
+  </div>
+  {% else %}
+  <p class="field-help">Nothing fetched yet.</p>
+  {% endif %}
+{% endcall %}
+</div>
+
+<style>
+  .cx-today-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .cx-today-head .lede { margin: 0; flex: 1 1 320px; }
+  .cx-fetch { margin: 0; flex: none; }
+  /* Today: the preview of one screen on the left (about 30%), the comics
+     one by one on the right. On a phone the preview comes first. */
+  .cx-today { display: grid; grid-template-columns: minmax(264px, 3fr) minmax(0, 7fr); gap: 32px; align-items: start; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--t-border); }
+  .cx-onscreen { position: sticky; top: 16px; display: flex; flex-direction: column; gap: 12px; padding: 14px; background: var(--t-surface-sunk); border: 1px solid var(--t-border); border-radius: var(--t-radius); }
+  .cx-screen-form { display: flex; flex-direction: column; gap: 6px; margin: 0; }
+  .cx-screen-pick-row { display: flex; gap: 8px; align-items: center; }
+  .cx-screen-pick-row .cx-screen-pick { flex: 1 1 auto; min-width: 0; }
+  .cx-onscreen-label { font-family: var(--t-font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--t-muted); }
+  .cx-screen-pick.dx-input { padding: 8px 30px 8px 11px; font-size: 13px; text-overflow: ellipsis; border-radius: var(--t-radius); }
+  .cx-screen { margin: 0; }
+  /* The screen at its own shape, as tall as the window allows. */
+  .cx-screen-frame { --fit: min(62vh, 560px); box-sizing: border-box; aspect-ratio: var(--sw) / var(--sh); width: min(100%, calc(var(--fit) * var(--sw) / var(--sh))); margin: 0 auto; padding: 4px; overflow: hidden; display: flex; flex-direction: column; justify-content: center; gap: 4px; background: #fff; border: 1px solid var(--t-border-strong); }
+  .cx-screen-panels { display: flex; gap: 2px; }
+  .cx-screen-panels img { flex: 1 1 0; min-width: 0; height: auto; }
+  .cx-screen-strip { display: block; width: 100%; height: auto; min-height: 0; object-fit: contain; }
+  .cx-screen figcaption { margin-top: 10px; font-size: 12.5px; line-height: 1.5; color: var(--t-fg-soft); }
+  .cx-onscreen-note { margin: 0; padding-top: 10px; border-top: 1px solid var(--t-border); font-size: 12px; line-height: 1.5; color: var(--t-muted); }
+  .cx-source { padding: 14px 0; border-bottom: 1px solid var(--t-border); }
+  .cx-preview > .cx-source:first-child { padding-top: 0; }
+  .cx-source:last-child { border-bottom: 0; padding-bottom: 0; }
+  .cx-source-head { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; margin: 0 0 10px; font-size: 14px; }
+  .cx-source-line { font-size: 12.5px; color: var(--t-muted); }
+  .cx-chip { flex: none; }
+  .cx-panels { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 140px)); gap: 12px; }
+  .cx-panels figure { margin: 0; }
+  .cx-panels img, .cx-strip { display: block; width: 100%; height: auto; background: #fff; border: 1px solid var(--t-border); }
+  .cx-strip { max-width: 460px; }
+  .cx-panels figcaption { margin-top: 6px; font-size: 12px; color: var(--t-fg-soft); }
+  .cx-warn { margin: 10px 0 0; }
+  /* A card's own form: its rows ruled like the settings cards' rows. */
+  .cx-card-form { display: flex; flex-direction: column; margin: 0; }
+  .cx-card-form > .dx-toggle-row { border-bottom: 0; }
+  .cx-card-form > * + :not(.cx-card-actions) { border-top: 1px solid var(--dx-border-faint, #f1f0eb); }
+  .cx-card-actions { display: flex; justify-content: flex-end; padding-top: 14px; }
+  /* Panels, 1 to 4: radios drawn as a segmented control. */
+  .cx-seg { flex: none; }
+  .cx-seg .seg-item { min-width: 34px; justify-content: center; font-variant-numeric: tabular-nums; cursor: pointer; }
+  .cx-seg .seg-item:has(input:checked) { background: var(--t-surface); color: var(--t-fg); box-shadow: 0 1px 2px rgba(0, 0, 0, .12); }
+  .cx-seg .seg-item:has(input:focus-visible) { outline: 2px solid var(--t-accent); outline-offset: 1px; }
+  /* With the Far Side off, its options fade (still saved as set). */
+  .cx-dep { transition: opacity 150ms ease-out; }
+  .cx-farside:has(#cx-far_side:not(:checked)) .cx-dep { opacity: 0.45; }
+  /* The strips: a row each, in order, its tools under a disclosure. */
+  .cx-rows { list-style: none; margin: 4px 0 0; padding: 0; }
+  .cx-row { padding: 14px 0; border-bottom: 1px solid var(--dx-border-faint, #f1f0eb); scroll-margin-top: 24px; }
+  .settings-section-list > .dx-section-card { scroll-margin-top: 16px; }
+  .cx-row:first-child { padding-top: 4px; }
+  .cx-row-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .cx-row-num { flex: none; width: 22px; font-family: var(--t-font-mono); font-size: 12px; color: var(--t-muted); font-variant-numeric: tabular-nums; }
+  .cx-row-title { flex: 1 1 220px; min-width: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; margin: 0; font-size: 14px; }
+  .cx-row-slug { font-family: var(--t-font-mono); font-size: 11.5px; color: var(--t-muted); }
+  .cx-row--off .cx-row-title strong { color: var(--t-muted); }
+  .cx-row-ops { display: flex; align-items: center; gap: 6px; margin: 0; flex: none; }
+  .cx-remove:hover { color: var(--t-danger); }
+  .cx-row > .cx-status-line, .cx-row > .cx-warn { margin-left: 32px; }
+  .cx-status-line { margin: 6px 0 0; font-size: 12.5px; color: var(--t-fg-soft); }
+  .cx-kind { font-family: var(--t-font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--t-muted); margin-right: 8px; }
+  .cx-edit { margin: 10px 0 0 32px; border-top: 0; padding-top: 0; }
+  .cx-edit-form { margin: 0; }
+  .cx-edit-form .field-grid { margin-top: 0; }
+  .cx-edit-form .field-grid > .field { margin-top: 0; padding: 4px 0; border-top: 0; }
+  .cx-edit-form input[readonly] { color: var(--t-muted); }
+  .cx-edit-actions, .cx-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 10px 0 0; }
+  .cx-tools { padding-top: 10px; border-top: 1px solid var(--dx-border-faint, #f1f0eb); }
+  /* Not a text box: outranks the settings body's input style. */
+  .dx-section-body .cx-tools input.cx-file { width: auto; max-width: 100%; height: auto; min-height: 0; padding: 0; border: 0; background: none; font-size: 12.5px; }
+  .cx-tools-help { margin: 6px 0 0; }
+  .cx-add { display: flex; align-items: center; gap: 8px; margin: 14px 0 0; }
+  .cx-add input { flex: 1 1 auto; min-width: 0; }
+  .cx-add-full { margin: 14px 0 0; }
+  .cx-cookies { margin-top: 20px; padding-top: 4px; border-top: 1px solid var(--t-border); }
+  .cx-subhead { margin: 14px 0 0; }
+  .cx-note { margin: 4px 0 14px; max-width: 72ch; font-size: 13px; line-height: 1.5; color: var(--t-fg-soft); }
+  .cx-cookie-status { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 10px 16px; align-items: start; margin: 0; font-size: 13px; color: var(--t-fg-soft); }
+  .cx-cookie-status dt { padding-top: 5px; font-family: var(--t-font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--t-muted); }
+  .cx-cookie-status dd { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; margin: 0; }
+  .cx-paste { margin-top: 14px; }
+  .cx-steps { margin: 0 0 4px; padding-left: 20px; font-size: 13px; line-height: 1.6; color: var(--t-fg-soft); }
+  .cx-steps li + li { margin-top: 2px; }
+  .dx-section-body .cx-cookie-field { padding-bottom: 0; }
+  #cx-cookies { font-family: var(--t-font-mono); font-size: 12.5px; }
+  .cx-cookie-actions { display: flex; gap: 8px; margin-top: 10px; }
+  .cx-clear:hover { color: var(--t-danger); }
+  /* The log: one grid, a row per entry (when, source, outcome, what), so
+     the columns line up and a long line wraps in its own column. On a
+     phone the what drops under the other three. */
+  .cx-log { display: grid; grid-template-columns: max-content max-content max-content minmax(0, 1fr); column-gap: 2ch; row-gap: 3px; align-content: start; margin: 4px 0 0; max-height: 360px; white-space: normal; }
+  .cx-log-line { display: contents; }
+  .cx-log-when, .cx-log-outcome { color: var(--t-muted); white-space: nowrap; }
+  .cx-log-source { white-space: nowrap; }
+  .cx-log-text { overflow-wrap: anywhere; }
+  .cx-log-line--bad .cx-log-outcome { color: var(--t-danger); font-weight: 600; }
+  .cx-log-line--warn .cx-log-outcome { color: color-mix(in oklab, var(--t-warn) 80%, var(--t-fg)); font-weight: 600; }
+  .cx-log:focus-visible { outline: 2px solid var(--t-accent); outline-offset: 2px; }
+  /* Space between comics: one ruled row, a legend over three short
+     fields side by side. */
+  .cx-space { margin: 0; padding: 14px 0 0; border-left: 0; border-right: 0; border-bottom: 0; min-width: 0; }
+  .cx-space-legend { float: left; width: 100%; display: flex; align-items: center; gap: 6px; padding: 0; font-size: 13px; font-weight: 600; color: var(--t-fg); }
+  .cx-gaps { clear: both; display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); column-gap: 16px; align-items: end; }
+  .cx-gaps > .field { padding-top: 8px; margin-top: 0; border-top: 0; }
+  .cx-unit { font-family: var(--t-font-mono); font-size: 11px; font-weight: 400; color: var(--t-muted); }
+  @media (max-width: 900px) {
+    .cx-today { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+    .cx-onscreen { position: static; }
+    .cx-screen-frame { --fit: 340px; }
+  }
+  @media (max-width: 640px) {
+    .cx-log { grid-template-columns: max-content minmax(0, 1fr) max-content; row-gap: 0; font-size: 11.5px; }
+    .cx-log-text { grid-column: 1 / -1; margin-bottom: 8px; }
+    .cx-log-source { overflow: hidden; text-overflow: ellipsis; }
+    .cx-row > .cx-status-line, .cx-row > .cx-warn, .cx-edit { margin-left: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) { .cx-dep { transition: none; } }
+</style>
+{% endblock %}

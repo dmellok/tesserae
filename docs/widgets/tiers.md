@@ -49,6 +49,7 @@ serve stale data.
 |---|---|
 | `weather_pollen_count` (Melbourne fallback) *(marketplace)* | Scrapes melbournepollen.com.au's home page when Open-Meteo's pollen data is null (it's Europe-only). Any DOM redesign on their end breaks this path. The Open-Meteo path is stable. |
 | `news_reddit` | Reads Reddit's per-subreddit RSS feed (`/r/<sub>/<sort>.rss`). The public `.json` API now 403-blocks server-side reads outright, so RSS is the remaining no-auth path, it carries titles/authors/times but **no** score or comment counts, and could itself be locked down. |
+| `comics_daily` | GoComics sits behind a bot check. The widget keeps a browser session (or pasted cookies) and solves the proof of work, and a blocked download leaves the last good strip up with a note. The Far Side and Dilbert are read from their public pages. |
 
 ## Tier policy
 

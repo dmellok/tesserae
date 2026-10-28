@@ -163,6 +163,7 @@ def _captured_target(app: Flask, page: Page, query: str) -> str:
         target_w: int,
         target_h: int,
         target_device_id: str = "",
+        page_id: str = "",
         fresh: bool = False,
         # Whether the render is headed for a panel. Not what this test is
         # about, but the route passes it, so the double has to accept it.

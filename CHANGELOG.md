@@ -6,6 +6,22 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.489.0], 2026-10-28
+
+### Added
+
+- **Comics** widget: today's comics on one page. The Far Side's daily
+  panels with their captions, then GoComics strips (Garfield, Calvin and
+  Hobbes, or any other) and an archived Dilbert, in your order, as many as
+  fit without cutting one off. Its admin page (Widgets > Admin pages >
+  Comics) picks and orders the strips, previews the page on any of your
+  screens and keeps a Fetches log. Fetched once a day in the background;
+  when a site blocks a download the last good strip stays up with a small
+  note, and that day's strip can be uploaded or imported.
+- A widget's `fetch()` gets the placement it is filling (page, cell and
+  device) as `ctx["placement_id"]`, so a widget that rotates or fits per
+  cell keeps each placement apart.
+
 ## [0.484.1], 2026-10-28
 
 ### Fixed

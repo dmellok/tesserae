@@ -593,6 +593,7 @@ def _parallel_fetch_plugin_data(
     target_device_id: str = "",
     page_name: str = "",
     page_icon: str = "",
+    page_id: str = "",
 ) -> dict[int, Any]:
     """Run each cell's ``server.py`` fetch() in a worker thread.
 
@@ -605,7 +606,7 @@ def _parallel_fetch_plugin_data(
     """
     import concurrent.futures
 
-    indexed: list[tuple[int, str, dict[str, Any], int, int]] = []
+    indexed: list[tuple[int, str, dict[str, Any], int, int, str]] = []
     sample_results: dict[int, Any] = {}
     for idx, meta in enumerate(cells_meta):
         plugin_id = meta["plugin_id"]
@@ -630,7 +631,10 @@ def _parallel_fetch_plugin_data(
         cell = meta.get("cell") or {}
         cell_w = int(cell.get("w") or 0)
         cell_h = int(cell.get("h") or 0)
-        indexed.append((idx, plugin_id, meta["resolved_options"], cell_w, cell_h))
+        placement = f"{page_id}/{cell.get('id') or idx}" if page_id else ""
+        if placement and target_device_id:
+            placement += f"@{target_device_id}"
+        indexed.append((idx, plugin_id, meta["resolved_options"], cell_w, cell_h, placement))
 
     if not indexed:
         return sample_results
@@ -640,7 +644,9 @@ def _parallel_fetch_plugin_data(
     # local proxy and won't follow us off the request thread.
     app = current_app._get_current_object()  # type: ignore[attr-defined]
 
-    def _worker(plugin_id: str, options: dict[str, Any], cell_w: int, cell_h: int) -> Any:
+    def _worker(
+        plugin_id: str, options: dict[str, Any], cell_w: int, cell_h: int, placement: str
+    ) -> Any:
         with app.app_context():
             return _fetch_plugin_data(
                 plugin_id,
@@ -655,6 +661,7 @@ def _parallel_fetch_plugin_data(
                 target_device_id=target_device_id,
                 page_name=page_name,
                 page_icon=page_icon,
+                placement=placement,
             )
 
     results: dict[int, Any] = {}
@@ -679,8 +686,8 @@ def _parallel_fetch_plugin_data(
     pool = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
     try:
         futures = {
-            pool.submit(_worker, plugin_id, options, cw, ch): idx
-            for idx, plugin_id, options, cw, ch in indexed
+            pool.submit(_worker, plugin_id, options, cw, ch, placement): idx
+            for idx, plugin_id, options, cw, ch, placement in indexed
         }
         try:
             for fut in concurrent.futures.as_completed(futures, timeout=_HYDRATE_OVERALL_TIMEOUT_S):
@@ -723,7 +730,7 @@ def _parallel_fetch_plugin_data(
     # returned error states), stash it under its (plugin, options,
     # panel) key. If we synthesised the error (executor exception or
     # overall timeout), try to serve the previous successful result.
-    for idx, plugin_id, options, _cw, _ch in indexed:
+    for idx, plugin_id, options, _cw, _ch, _placement in indexed:
         result = results.get(idx)
         if result is None:
             continue
@@ -755,6 +762,7 @@ def _fetch_plugin_data(
     target_device_id: str = "",
     page_name: str = "",
     page_icon: str = "",
+    placement: str = "",
 ) -> Any:
     """Call the plugin's server.py fetch() if present. Returns None on miss.
 
@@ -826,6 +834,12 @@ def _fetch_plugin_data(
         "cell_id": cell_id_of(plugin_id, _client_safe_options(plugin_id, options)),
         "settled": (not preview) if settled is None else settled,
     }
+    # Which placement this is (page, cell, device), when the caller knows:
+    # unlike ``cell_id``, two identical cells on different pages or screens
+    # get different ones, so per-placement state (a rotation's turn) doesn't
+    # collide between a big panel and a small one.
+    if placement:
+        ctx["placement_id"] = placement
     # ``fresh`` (from ?fresh=1 on the probe / render) tells a widget to bypass
     # its own data_dir cache, so an edit to server.py is instantly verifiable.
     # Widgets opt in by checking ctx.get("fresh"); the field is absent otherwise
@@ -1060,6 +1074,7 @@ def _hydrate_page(
         target_device_id=str(page_dict.get("target_device_id") or ""),
         page_name=str(page_dict.get("name") or ""),
         page_icon=str(page_dict.get("icon") or ""),
+        page_id=str(page_dict.get("id") or ""),
     )
 
     # #243: remember when a widget says its own output goes stale, so the
@@ -1177,6 +1192,7 @@ def _build_canvas_els(
     ch: int,
     *,
     target_device_id: str = "",
+    page_id: str = "",
     fresh: bool = False,
     preview: bool = True,
 ) -> list[dict[str, Any]]:
@@ -1218,8 +1234,18 @@ def _build_canvas_els(
     # the same place explicitly.
     fetch_memo: dict[str, Any] = {}
 
-    def _shared_fetch(plugin_id: str, opts: dict[str, Any], cell_w: int, cell_h: int) -> Any:
+    def _shared_fetch(
+        plugin_id: str, opts: dict[str, Any], cell_w: int, cell_h: int, element_id: str
+    ) -> Any:
+        placement = f"{page_id}/{element_id}" if page_id else element_id
+        if target_device_id:
+            placement += f"@{target_device_id}"
         memo_key = f"{plugin_id}::{json.dumps(opts, sort_keys=True, default=str)}"
+        plugin = registry.get(plugin_id)
+        # Fitted payloads and rotation state belong to this placement. Ordinary
+        # data sources still share one fetch across widgets, fields and binds.
+        if plugin and plugin.manifest.get("render", {}).get("per_placement"):
+            memo_key += f"::{placement}::{cell_w}x{cell_h}"
         if memo_key in fetch_memo:
             return fetch_memo[memo_key]
         try:
@@ -1233,6 +1259,7 @@ def _build_canvas_els(
                 cell_h=cell_h,
                 fresh=fresh,
                 target_device_id=target_device_id,
+                placement=placement,
             )
         except Exception:
             fetched = None
@@ -1240,14 +1267,14 @@ def _build_canvas_els(
         return fetched
 
     def _resolve_source(
-        plugin_id: str, raw_options: dict[str, Any], cell_w: int, cell_h: int
+        plugin_id: str, raw_options: dict[str, Any], cell_w: int, cell_h: int, element_id: str
     ) -> tuple[dict[str, Any], Any, str]:
         """Resolve options + fetch, classifying the result as ``live`` (real
         fetch), ``sample`` (demo fallback because nothing was configured), or
         ``error``. The classification is carried into the DOM so the render
         report can tell the agent which it got."""
         opts = _resolved_options(plugin_id, raw_options)
-        data = _shared_fetch(plugin_id, opts, cell_w, cell_h)
+        data = _shared_fetch(plugin_id, opts, cell_w, cell_h, element_id)
         if isinstance(data, dict) and not data.get("error"):
             return opts, data, "live"
         if not _location_configured(raw_options):
@@ -1278,7 +1305,7 @@ def _build_canvas_els(
         for b in getattr(el, "bind", None) or []:
             if not b.source:
                 continue
-            _, bdata, _ = _resolve_source(b.source, b.options, el.w, el.h)
+            _, bdata, _ = _resolve_source(b.source, b.options, el.w, el.h, el.id)
             patch = apply_binding(b, bdata)
             if patch:
                 out.update(patch)
@@ -1293,7 +1320,7 @@ def _build_canvas_els(
             ddata: Any = None
             dsrc = "none"
             if e.source:
-                _, ddata, dsrc = _resolve_source(e.source, e.options, e.w, e.h)
+                _, ddata, dsrc = _resolve_source(e.source, e.options, e.w, e.h, e.id)
             els_out.append(
                 {
                     "id": e.id,
@@ -1343,7 +1370,7 @@ def _build_canvas_els(
                     sdata, sstate = _resolve_url_source(s.url, getattr(s, "headers", {}) or {})
                     cdata[s.name or "data"] = sdata
                 elif s.key:
-                    _, sdata, sstate = _resolve_source(s.key, s.options, e.w, e.h)
+                    _, sdata, sstate = _resolve_source(s.key, s.options, e.w, e.h, e.id)
                     cdata[s.name or s.key] = sdata
                 else:
                     continue
@@ -1456,7 +1483,7 @@ def _build_canvas_els(
             "strings": {},
         }
         if e.widget:
-            opts, data, wsrc = _resolve_source(e.widget, e.options, e.w, e.h)
+            opts, data, wsrc = _resolve_source(e.widget, e.options, e.w, e.h, e.id)
             item["options"] = opts
             item["data"] = data
             item["data_source"] = wsrc
@@ -1505,6 +1532,7 @@ def _render_canvas(
     target_w: int,
     target_h: int,
     target_device_id: str = "",
+    page_id: str = "",
     fresh: bool = False,
     preview: bool = True,
 ) -> str:
@@ -1530,7 +1558,13 @@ def _render_canvas(
     registry = current_app.config["PLUGIN_REGISTRY"]
     font = _resolve_font(layout.font or None, registry)
     els = _build_canvas_els(
-        layout.els, cw, ch, target_device_id=target_device_id, fresh=fresh, preview=preview
+        layout.els,
+        cw,
+        ch,
+        target_device_id=target_device_id,
+        page_id=page_id,
+        fresh=fresh,
+        preview=preview,
     )
     return render_template(
         "panels_compose.html",
@@ -1722,6 +1756,7 @@ def compose(page_id: str) -> Response:
         return _uncacheable(
             _render_canvas(
                 page.canvas,
+                page_id=page.id,
                 target_w=target_w,
                 target_h=target_h,
                 target_device_id=target_device_id,
@@ -2068,7 +2103,7 @@ def compose_canvas(canvas_id: str) -> str:
     doc = store.get(canvas_id) if store is not None else None
     if doc is None:
         abort(404)
-    return _render_canvas(doc.to_layout(), target_w=doc.w, target_h=doc.h)
+    return _render_canvas(doc.to_layout(), target_w=doc.w, target_h=doc.h, page_id=doc.id)
 
 
 @bp.get("/_test/render")

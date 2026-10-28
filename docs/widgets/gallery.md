@@ -2,7 +2,7 @@
 
 # Widget gallery
 
-The **37 widgets** that ship with Tesserae. Each is a drop-a-folder widget under `plugins/<id>/`; drop your own in and it shows up in the editor's picker. Want to build one? See [Build a widget with AI](../dev/writing-a-widget.md).
+The **38 widgets** that ship with Tesserae. Each is a drop-a-folder widget under `plugins/<id>/`; drop your own in and it shows up in the editor's picker. Want to build one? See [Build a widget with AI](../dev/writing-a-widget.md).
 
 !!! tip "Looking for more widgets?"
     Browse the full community catalog at [tesserae.ink/catalog](https://tesserae.ink/catalog/): widgets, themes, and dashboard templates, all installable from **Settings → Widgets → Browse catalog** inside the app.
@@ -234,7 +234,7 @@ The **37 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     ![ha_energy](../screenshots/widgets/ha_energy.png)
 
-    Live solar / grid / battery / house-consumption snapshot from your HA energy dashboard, with today's totals and a 24-hour sparkline. Wires to the same sensor.* entities you've already configured under HA's Energy panel.
+    Live solar / grid / battery / house-consumption snapshot from your HA energy dashboard, with today's totals, optional yesterday's solar total, and a 24-hour sparkline. Wires to the same sensor.* entities you've already configured under HA's Energy panel.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** Local
 
@@ -391,6 +391,22 @@ The **37 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
     Embed an external URL in a cell. The composer captures whatever the iframe renders, handy for status pages, public dashboards, or any site that doesn't deny embedding. A URL that points straight at an image (PNG, GIF, JPEG, WebP, SVG) is drawn as an image and scaled to the cell rather than embedded, so tall charts keep their bottom edge. Same headless-render path as the Send tab is used when the panel renders. Pages that fetch their data with JavaScript get a short settle delay after load so the content is captured, not a blank frame; raise it for slow pages. Sites that set X-Frame-Options:DENY or strict CSP cannot be embedded. A page behind header-based auth (bearer token, API key) can be reached by setting Request headers; the server attaches them when the panel renders, scoped to that URL's own origin only.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
+
+</div>
+
+## Comics
+
+<div class="grid cards" markdown>
+
+-   **Comics** &middot; `comics_daily`
+
+    ---
+
+    ![comics_daily](../screenshots/widgets/comics_daily.png)
+
+    Today's comics on one page: The Far Side's daily panels in a row with their captions, then GoComics strips (Garfield, Calvin and Hobbes, Pearls Before Swine, or any other) and an archived Dilbert, full width and in your order. As many rows as fit without cutting one off. Pick the comics on its admin page, Widgets → Admin pages → Comics, and every cell shows them. Fetched in the background once a day (or with Fetch now); when a site blocks a download the last good strip stays up, a small note says so, and you can upload or import that day's strip.
+
+    **Sizes:** `sm` `md` `lg` &middot; **Tier:** Fragile
 
 </div>
 
