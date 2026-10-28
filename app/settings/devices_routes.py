@@ -180,6 +180,14 @@ def _make_rest_instance(device: Any) -> str | None:
     return str(token)
 
 
+def _undo_add(device: Any, problem: str, verb: str) -> Response:
+    """Remove a device created moments ago whose config couldn't be stored
+    (another request bound its sign first), and say why."""
+    device_service.delete_instance(devices=devices(), renderers=renderers(), instance_id=device.id)
+    flash(f"Device not {verb}. {problem}", "error")
+    return redirect(url_for("auth.settings_area", area="devices"))
+
+
 @bp.post("/settings/devices/add")
 def devices_add() -> Response:
     """Create a new device instance from the Devices-tab form. No restart
@@ -187,6 +195,28 @@ def devices_add() -> Response:
     Target-device dropdown."""
     form = request.form
     target_id = form.get("id") or ""
+    # Check the config values the form supplies before anything is created
+    # (or an orphan's state wiped). They used to be validated after the
+    # device existed and quietly dropped when invalid, which turned a
+    # mistyped identifier into a blank device. A kind's own rules (its
+    # ``config_conflict`` hook in ``device_service``) are checked here too.
+    kind = devices().get((form.get("kind") or "").strip())
+    if kind is not None:
+        offered = [
+            f for f in config_fields_from_schema(kind.config_schema) if f["name"] in request.form
+        ]
+        if offered:
+            ok, err = kind.validate_config(values_from_form(offered))
+            problem = (
+                f"Invalid {kind.name} config: {err}"
+                if not ok
+                else device_service.config_conflict(
+                    devices(), settings_store(), kind, values_from_form(offered)
+                )
+            )
+            if problem:
+                flash(f"Device not added. {problem}", "error")
+                return redirect(url_for("auth.settings_area", area="devices"))
     # v0.71.x (issue #48 follow-up): manual add doesn't know the
     # incoming MAC (the form doesn't collect one), so the MAC-differs
     # heuristic the discovery path uses can't fire. Users typing an id
@@ -254,9 +284,12 @@ def devices_add() -> Response:
         values = values_from_form(present_fields)
         ok, _err = result.device.validate_config(values)
         if ok:
-            settings_store().update_for_namespace(
-                "devices", result.device.id, values, present_fields
+            problem = device_service.save_device_config(
+                settings_store(), devices(), result.device, values, present_fields
             )
+            if problem:
+                return _undo_add(result.device, problem, "added")
+    device_service.device_added(settings_store(), result.device)
     # New device's clones inherit picture-quality (dither/saturation/
     # contrast) from the user's existing base-renderer values where
     # available, so a freshly-added device matches the rest of the
@@ -695,6 +728,28 @@ def devices_register_discovered(discovered_id: str) -> Response:
             "error",
         )
         return redirect(url_for("auth.settings_area", area="devices"))
+    # Some kinds announce config values in their discovery payload (a
+    # Visionect sign's UUID), which the new device is given below. Refuse
+    # before creating anything when they are invalid or its kind's rules
+    # (``device_service.config_conflict``) turn them down.
+    announced_kind = devices().get(kind_id)
+    announced = (
+        device_service.discovered_config(announced_kind, entry.parsed)
+        if announced_kind is not None
+        else {}
+    )
+    if announced and announced_kind is not None:
+        ok, err = announced_kind.validate_config(announced)
+        problem = (
+            f"Invalid {announced_kind.name} config: {err}"
+            if not ok
+            else device_service.config_conflict(
+                devices(), settings_store(), announced_kind, announced
+            )
+        )
+        if problem:
+            flash(f"Device not registered. {problem}", "error")
+            return redirect(url_for("auth.settings_area", area="devices"))
 
     # Did the user pick a different variant from the picker (issue #82)?
     # The two 4" Inky panels share the pi_bin protocol but differ in gamut
@@ -836,6 +891,20 @@ def devices_register_discovered(discovered_id: str) -> Response:
         flash(result.error or "Failed to register device.", "error")
         return redirect(url_for("auth.settings_area", area="devices"))
     cache.forget(discovered_id)
+    # Give the new device the config values the discovery announced, before
+    # the transport rebuild, whatever id the device was given.
+    announced_fields = [
+        f for f in config_fields_from_schema(result.device.config_schema) if f["name"] in announced
+    ]
+    if announced_fields:
+        ok, _err = result.device.validate_config(announced)
+        if ok:
+            problem = device_service.save_device_config(
+                settings_store(), devices(), result.device, announced, announced_fields
+            )
+            if problem:
+                return _undo_add(result.device, problem, "registered")
+    device_service.device_added(settings_store(), result.device)
     # Same picture-quality seeding as the manual add-device path.
     renderer_loader.seed_device_settings_from_base(renderers(), settings_store())
     rebuild_transport_fn()()
@@ -1268,8 +1337,18 @@ def devices_update_combined(instance_id: str) -> Response:
     if schema_fields:
         values = values_from_form(schema_fields)
         ok, err = device.validate_config(values)
+        # Stored here for every branch below (checked against the device
+        # kind's own rules and stored atomically, see
+        # ``device_service.save_device_config``); the branches only deliver it.
+        conflict = (
+            device_service.save_device_config(store, devices(), device, values, schema_fields)
+            if ok
+            else None
+        )
         if not ok:
             flash(f"Invalid {device.name} config: {err}", "error")
+        elif conflict:
+            flash(f"{device.name} config not saved. {conflict}", "error")
         elif device.transport == "relay":
             # Relay devices have no broker and no direct poll against this
             # server: save, then nudge the relay publisher so the sealed
@@ -1277,18 +1356,15 @@ def devices_update_combined(instance_id: str) -> Response:
             # wake. The device may retain dormant MQTT topics (kind
             # manifests declare them), so this branch must come before the
             # config_topic check.
-            store.update_for_namespace("devices", instance_id, values, schema_fields)
             publisher = current_app.config.get("RELAY_PUBLISHER")
             if publisher is not None:
                 publisher.on_config_change(instance_id)
             ok_messages.append("config saved and queued for the relay")
             any_change = True
         elif device.transport == "rest" or device.config_topic is None:
-            store.update_for_namespace("devices", instance_id, values, schema_fields)
             ok_messages.append("config saved")
             any_change = True
         else:
-            store.update_for_namespace("devices", instance_id, values, schema_fields)
             tr = transport()
             try:
                 tr.publish(

@@ -12,6 +12,7 @@ Covers the three slices independently:
 
 from __future__ import annotations
 
+import threading
 import time
 from pathlib import Path
 
@@ -387,3 +388,395 @@ def test_topbar_chip_lists_unregistered_devices(app: Flask) -> None:
     cache.forget("pi_hall")
     body = client.get("/settings/server").get_data(as_text=True)
     assert "topbar-discovered" not in body
+
+
+def test_register_discovered_visionect_sign_keeps_its_uuid(app: Flask) -> None:
+    # A Visionect sign announces its UUID. Registering it, even under a
+    # custom id, must bind that device to that sign, not to whichever
+    # unknown sign happens to connect next.
+    cache = app.config["DISCOVERY_CACHE"]
+    cache.record(
+        "visionect_6a7e40",
+        b'{"kind":"visionect","transport":"visionect",'
+        b'"uuid":"aabbccdd-0000-1111-2222-333344445555","panel_w":1024,"panel_h":758}',
+    )
+    client = app.test_client()
+    _sign_in(client)
+    resp = client.post(
+        "/settings/devices/discovery/visionect_6a7e40/register",
+        data={"id": "desk_joan", "name": "Desk Joan"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    dev = app.config["DEVICE_REGISTRY"].get("desk_joan")
+    assert dev is not None
+    assert dev.kind_of == "visionect"
+    assert dev.transport == "push"
+    section = app.config["SETTINGS_STORE"].get_section("devices")
+    assert section["desk_joan"]["uuid"] == "aabbccdd-0000-1111-2222-333344445555"
+
+
+def test_adding_a_visionect_sign_with_a_bad_uuid_creates_nothing(app: Flask) -> None:
+    # A mistyped UUID used to be dropped after the device was created,
+    # leaving a blank device that binds whichever unknown sign connects next.
+    client = app.test_client()
+    _sign_in(client)
+    resp = client.post(
+        "/settings/devices/add",
+        data={"kind": "visionect", "id": "hall_sign", "name": "Hall", "uuid": "36002000-1247"},
+        follow_redirects=True,
+    )
+    assert resp.status_code == 200
+    assert "Device not added" in resp.get_data(as_text=True)
+    assert app.config["DEVICE_REGISTRY"].get("hall_sign") is None
+    section = app.config["SETTINGS_STORE"].get_section("devices")
+    assert "hall_sign" not in section
+
+
+def test_one_sign_uuid_binds_one_device(app: Flask) -> None:
+    sign = "aabbccdd-0000-1111-2222-333344445555"
+    client = app.test_client()
+    _sign_in(client)
+    resp = client.post(
+        "/settings/devices/add",
+        data={"kind": "visionect", "id": "hall_sign", "name": "Hall", "uuid": sign.upper()},
+    )
+    assert resp.status_code == 302
+    assert app.config["DEVICE_REGISTRY"].get("hall_sign") is not None
+    # The same sign again, written without dashes: refused.
+    resp = client.post(
+        "/settings/devices/add",
+        data={
+            "kind": "visionect",
+            "id": "lobby_sign",
+            "name": "Lobby",
+            "uuid": sign.replace("-", ""),
+        },
+        follow_redirects=True,
+    )
+    assert "already bound to device &#39;hall_sign&#39;" in resp.get_data(as_text=True)
+    assert app.config["DEVICE_REGISTRY"].get("lobby_sign") is None
+    # Registering a discovered entry that claims the same sign: refused too.
+    app.config["DISCOVERY_CACHE"].record(
+        "visionect_aa11bb22cc33dd44ee55",
+        ('{"kind":"visionect","transport":"visionect","uuid":"' + sign + '"}').encode(),
+    )
+    resp = client.post(
+        "/settings/devices/discovery/visionect_aa11bb22cc33dd44ee55/register",
+        data={"id": "desk_sign", "name": "Desk"},
+        follow_redirects=True,
+    )
+    assert "Device not registered" in resp.get_data(as_text=True)
+    assert app.config["DEVICE_REGISTRY"].get("desk_sign") is None
+    # Nor can a device card's Save move a bound sign onto a second device.
+    client.post(
+        "/settings/devices/add", data={"kind": "visionect", "id": "spare_sign", "name": "Spare"}
+    )
+    resp = client.post(
+        "/settings/devices/spare_sign/save", data={"uuid": sign}, follow_redirects=True
+    )
+    assert "already bound to device &#39;hall_sign&#39;" in resp.get_data(as_text=True)
+    section = app.config["SETTINGS_STORE"].get_section("devices")
+    assert not (section.get("spare_sign") or {}).get("uuid")
+
+
+def test_visionect_device_band_says_whether_auto_bind_is_open_and_shows_refusals(
+    app: Flask, monkeypatch
+) -> None:
+    import time as _time
+    from types import SimpleNamespace
+
+    from app import visionect
+    from app.settings import visionect_routes
+
+    client = app.test_client()
+    _sign_in(client)
+    client.post("/settings/devices/add", data={"kind": "visionect", "id": "hall", "name": "Hall"})
+    device = app.config["DEVICE_REGISTRY"].get("hall")
+    state = {"uuid": "", "open": True, "view": {}}
+    fake = SimpleNamespace(
+        running=True,
+        port=11113,
+        start_error=None,
+        device_uuid=lambda _d: state["uuid"],
+        auto_bind_open=lambda _d: state["open"],
+        sign_view=lambda _u: state["view"],
+    )
+    monkeypatch.setattr(visionect, "service", lambda: fake)
+    with app.test_request_context():
+        assert "within an hour" in visionect_routes.setup_band(device)["body"]
+        state["open"] = False
+        assert "listed under discovered devices" in visionect_routes.setup_band(device)["body"]
+        state["uuid"] = "aabbccdd-0000-1111-2222-333344445555"
+        state["view"] = {
+            "connected": True,
+            "remote": "10.0.0.5",
+            "in_sync": True,
+            "refused": {"remote": "10.0.0.66", "at": _time.time()},
+        }
+        band = visionect_routes.setup_band(device)
+    assert "from 10.0.0.66 claimed this frame's UUID and was refused" in band["body"]
+    assert band["ok"] is False
+
+
+def test_visionect_device_page_shows_the_signs_report_and_its_actions(
+    app: Flask, monkeypatch
+) -> None:
+    """A bound sign's last report (firmware, battery, Wi-Fi, check-in) and
+    its Report in / Full refresh / Reboot buttons, which go to the service
+    and say why when it can't."""
+    import time as _time
+    from types import SimpleNamespace
+
+    from app import visionect
+
+    client = app.test_client()
+    _sign_in(client)
+    client.post("/settings/devices/add", data={"kind": "visionect", "id": "hall", "name": "Hall"})
+    asked: list[tuple[str, str]] = []
+    state: dict[str, str | None] = {"problem": None}
+
+    def request_action(device_id: str, action: str) -> str | None:
+        asked.append((device_id, action))
+        return state["problem"]
+
+    fake = SimpleNamespace(
+        running=True,
+        port=11113,
+        start_error=None,
+        device_uuid=lambda _d: "aabbccdd-0000-1111-2222-333344445555",
+        auto_bind_open=lambda _d: False,
+        sign_view=lambda _u: {
+            "connected": True,
+            "in_sync": True,
+            "connected_at": _time.time(),
+            "connect_reason": "wakeup",
+            "status": {"firmware": "6.17.4168", "battery_pct": 61, "rssi": -53},
+            "heartbeat_min": 5,
+            "sleep_disabled": 1,
+            "wifi": "home-wifi",
+            "param_error": "",
+            "action": {"kind": "refresh", "at": _time.time()},
+            "exchanges": [
+                (_time.time(), "out", "picture abc123"),
+                (_time.time(), "in", "ack: picture"),
+            ],
+        },
+        request_action=request_action,
+        on_push=lambda *_a: None,
+    )
+    monkeypatch.setattr(visionect, "service", lambda: fake)
+    page = client.get("/settings/devices/hall").get_data(as_text=True)
+    for text in (
+        "6.17.4168",
+        "61%",
+        "home-wifi · -53 dBm",
+        "Every 5 min",
+        "Off (stays awake)",
+        "Full refresh asked",
+        "Check-in interval",
+        "Sleep between check-ins",
+    ):
+        assert text in page, text
+    for action in ("status", "refresh", "reboot"):
+        assert f"/settings/devices/hall/visionect/{action}" in page
+    # The frame log replaces the diagnostics that only repeated the report.
+    assert "Frame log" in page and "→  picture abc123" in page and "←  ack: picture" in page
+    assert "Advanced diagnostics" not in page
+    resp = client.post("/settings/devices/hall/visionect/reboot", follow_redirects=True)
+    assert asked == [("hall", "reboot")]
+    assert "Sent Hall a reboot" in resp.get_data(as_text=True)
+    state["problem"] = "The frame isn't connected right now."
+    resp = client.post("/settings/devices/hall/visionect/status", follow_redirects=True)
+    assert "The frame isn&#39;t connected right now." in resp.get_data(as_text=True)
+
+
+def test_every_config_save_checks_the_sign_binding_and_adding_arms_auto_bind(
+    app: Flask,
+) -> None:
+    from app import visionect
+
+    sign = "aabbccdd-0000-1111-2222-333344445555"
+    client = app.test_client()
+    _sign_in(client)
+    client.post(
+        "/settings/devices/add",
+        data={"kind": "visionect", "id": "hall_sign", "name": "Hall", "uuid": sign},
+    )
+    client.post("/settings/devices/add", data={"kind": "visionect", "id": "spare", "name": "Spare"})
+    section = app.config["SETTINGS_STORE"].get_section("devices")
+    # A blank device just added opens its auto-bind window; a bound one doesn't.
+    assert isinstance(section["spare"].get(visionect.AUTO_BIND_KEY), float)
+    assert not section["hall_sign"].get(visionect.AUTO_BIND_KEY)
+    # The generic device settings route refuses a sign already bound elsewhere.
+    resp = client.post("/settings/device-spare", data={"uuid": sign}, follow_redirects=True)
+    assert "already bound to device &#39;hall_sign&#39;" in resp.get_data(as_text=True)
+    section = app.config["SETTINGS_STORE"].get_section("devices")
+    assert not section["spare"].get("uuid")
+
+
+def test_registering_a_discovered_visionect_sign_runs_the_added_hook(app: Flask) -> None:
+    """The added hook fires for a device registered from the discovery strip
+    too: a blank one (a discovery that announced no UUID) arms auto-bind, one
+    registered with its announced UUID does not."""
+    from app import visionect
+
+    sign = "aabbccdd-0000-1111-2222-333344445555"
+    cache = app.config["DISCOVERY_CACHE"]
+    cache.record("visionect_blank01", b'{"kind":"visionect","transport":"visionect"}')
+    cache.record(
+        "visionect_bound01",
+        ('{"kind":"visionect","transport":"visionect","uuid":"' + sign + '"}').encode(),
+    )
+    client = app.test_client()
+    _sign_in(client)
+    for discovered_id, device_id in (
+        ("visionect_blank01", "blank"),
+        ("visionect_bound01", "bound"),
+    ):
+        resp = client.post(
+            f"/settings/devices/discovery/{discovered_id}/register",
+            data={"id": device_id, "name": device_id.title()},
+        )
+        assert resp.status_code == 302
+    section = app.config["SETTINGS_STORE"].get_section("devices")
+    assert not section["blank"].get("uuid")
+    assert isinstance(section["blank"].get(visionect.AUTO_BIND_KEY), float)
+    assert section["bound"]["uuid"] == sign
+    assert not section["bound"].get(visionect.AUTO_BIND_KEY)
+
+
+def test_a_config_save_does_not_wait_for_the_listener_to_start(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The kind's saved hook runs under CONFIG_SAVE_LOCK. Starting the stopped
+    listener there waits for the bind (up to five seconds) and holds every
+    other config save; the hook defers the start to its own thread instead."""
+    from app import device_service, visionect
+
+    client = app.test_client()
+    _sign_in(client)
+    client.post("/settings/devices/add", data={"kind": "visionect", "id": "hall", "name": "Hall"})
+    svc = visionect.VisionectService(port=0)
+    starting = threading.Event()
+    release = threading.Event()
+    started_on: list[threading.Thread] = []
+
+    def slow_start() -> bool:
+        started_on.append(threading.current_thread())
+        starting.set()
+        release.wait(10)
+        return True
+
+    monkeypatch.setattr(svc, "maybe_start", slow_start)
+    monkeypatch.setattr(visionect, "service", lambda: svc)
+    registry, store = app.config["DEVICE_REGISTRY"], app.config["SETTINGS_STORE"]
+    sign = "aabbccdd-0000-1111-2222-333344445555"
+    try:
+        problem = device_service.save_device_config(
+            store, registry, registry.get("hall"), {"uuid": sign}, [{"name": "uuid"}]
+        )
+        # The save returned (and released the lock) while the start is still
+        # in progress, on another thread.
+        assert problem is None
+        assert not release.is_set()
+        assert starting.wait(5)
+        assert started_on[0] is not threading.current_thread()
+        assert device_service.CONFIG_SAVE_LOCK.acquire(blocking=False)
+        device_service.CONFIG_SAVE_LOCK.release()
+    finally:
+        release.set()
+        for thread in started_on:
+            thread.join(5)
+
+
+def test_a_place_and_play_32_device_page_has_no_button_or_touch_controls(app: Flask) -> None:
+    """The Place & Play 32" has no buttons and no touch: its device page has
+    no Controls section (button map, touch monitor), while a device that may
+    have buttons keeps it."""
+    client = app.test_client()
+    _sign_in(client)
+    client.post(
+        "/settings/devices/add",
+        data={"kind": "visionect_place_and_play_32", "id": "hall", "name": "Hall"},
+    )
+    client.post(
+        "/settings/devices/add", data={"kind": "esp32_client", "id": "attic", "name": "Attic"}
+    )
+    registry = app.config["DEVICE_REGISTRY"]
+    assert registry.get("attic") is not None
+    sign = client.get("/settings/devices/hall").get_data(as_text=True)
+    other = client.get("/settings/devices/attic").get_data(as_text=True)
+    assert 'id="controls"' not in sign and "Button map" not in sign
+    assert 'href="#controls"' not in sign
+    assert 'id="controls"' in other and "Button map" in other
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"refresh_mode": "full"},
+        {"button_map_json": '{"left": "refresh"}'},
+        {"wake_align_mode": "interval", "wake_align_anchor": "06:00"},
+    ],
+    ids=["refresh mode", "button map", "wake alignment"],
+)
+def test_a_device_save_cant_write_back_a_sign_binding_moved_meanwhile(
+    app: Flask, fields: dict[str, str]
+) -> None:
+    """Sol's sequence: device A's save reads A's entry (bound to sign X);
+    meanwhile X is cleared from A and bound to B; A's save then writes its
+    one key. It used to write the whole copied entry back, leaving both
+    devices bound to X."""
+    from app import device_service, visionect
+
+    sign = "aabbccdd-0000-1111-2222-333344445555"
+    client = app.test_client()
+    _sign_in(client)
+    client.post(
+        "/settings/devices/add",
+        data={"kind": "visionect", "id": "hall", "name": "Hall", "uuid": sign},
+    )
+    client.post("/settings/devices/add", data={"kind": "visionect", "id": "spare", "name": "S"})
+    store = app.config["SETTINGS_STORE"]
+    registry = app.config["DEVICE_REGISTRY"]
+    fields_uuid = [{"name": "uuid"}]
+    moved: list[bool] = []
+
+    def _move_the_sign() -> None:
+        if moved:
+            return
+        moved.append(True)
+        hall, spare = registry.get("hall"), registry.get("spare")
+        assert (
+            device_service.save_device_config(store, registry, hall, {"uuid": ""}, fields_uuid)
+            is None
+        )
+        assert (
+            device_service.save_device_config(store, registry, spare, {"uuid": sign}, fields_uuid)
+            is None
+        )
+
+    real_update, real_patch = store.update_item, store.patch_section
+
+    def _update_item(namespace: str, item_id: str, values: dict, **kw: object) -> None:
+        if namespace == "devices" and item_id == "hall":
+            _move_the_sign()
+        real_update(namespace, item_id, values, **kw)
+
+    def _patch_section(name: str, values: dict) -> None:
+        if name == "devices" and "hall" in values:
+            _move_the_sign()
+        real_patch(name, values)
+
+    store.update_item, store.patch_section = _update_item, _patch_section
+    try:
+        resp = client.post("/settings/devices/hall/save", data={"uuid": sign, **fields})
+    finally:
+        store.update_item, store.patch_section = real_update, real_patch
+    assert resp.status_code == 302 and moved
+    section = store.get_section("devices")
+    bound = [
+        d for d in ("hall", "spare") if visionect.normalise_uuid(section[d].get("uuid")) == sign
+    ]
+    assert bound == ["spare"]

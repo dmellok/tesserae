@@ -114,6 +114,7 @@ nav:
       - Waveshare 4.2" B/W (ESP32): quickstart/waveshare-bw-4-2.md
       - TRMNL OG / TRMNL X: quickstart/trmnl.md
       - Bloomin8 Canvas: quickstart/bloomin8.md
+      - Visionect signs: quickstart/visionect.md
       - Seeed ePaper devices (unified firmware): quickstart/seeed-unified.md
       - Seeed reTerminal E-Series (TRMNL BYOS): quickstart/seeed-reterminal.md
       - Seeed XIAO 7.5" (TRMNL BYOS): quickstart/seeed-xiao.md

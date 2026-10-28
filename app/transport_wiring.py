@@ -548,6 +548,11 @@ def record_status_heartbeat(
         awake_poll_s = awake_poll_interval_s(device_settings)
         if awake_poll_s is not None:
             configured_sleep_s = awake_poll_s
+        # A frame whose own sleep mode is "awake" (Visionect) is reachable
+        # continuously: no wake to predict, whatever interval is configured.
+        stays_awake = parsed.get("stays_awake") is True
+        if stays_awake:
+            configured_sleep_s = None
         try:
             telemetry.record_heartbeat(
                 device.id,
@@ -556,7 +561,7 @@ def record_status_heartbeat(
                 configured_sleep_s=(
                     int(configured_sleep_s) if configured_sleep_s is not None else None
                 ),
-                always_on=awake_poll_s is not None,
+                always_on=awake_poll_s is not None or stays_awake,
             )
         except Exception:
             logger.exception("telemetry: record_heartbeat failed for %s", device.id)
@@ -1017,6 +1022,16 @@ def _rebuild_transport(
         opendisplay_ha.register(app)
     except Exception:
         logger.exception("wiring OpenDisplay-HA publisher")
+
+    # Visionect signs: the TCP 11113 listener survives rebuilds (the signs
+    # hold their sockets open); register() re-attaches it to the fresh
+    # PUSH_MANAGER and starts / stops it as visionect devices come and go.
+    try:
+        from app import visionect
+
+        visionect.register(app)
+    except Exception:
+        logger.exception("wiring Visionect listener")
 
     # Cloud relay (remote panels): seal-and-upload publisher + rendezvous
     # pairing poller. Both no-op until the install is linked to a relay, so

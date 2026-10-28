@@ -1,0 +1,26 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "Visionect frame",
+  "icon": "frame-corners",
+  "version": "0.1.0",
+  "description": "A Visionect e-paper frame (Place & Play 32\", Joan, the 13\" boards) driven directly, with no Visionect Software Suite. The frame dials the server address in its flash on TCP 11113; Tesserae listens there, renders a 16-level grey picture and pushes it over the frame's own protocol (pyvisionect). Point the frame at this host: run Tesserae where the old Visionect server ran, or set the address over the frame's USB console. The protocol has no authentication, so keep port 11113 on your LAN. Leave the UUID blank to bind the first unknown frame that connects within an hour. Quiet hours with sleep-through put the frame into deep sleep until the window ends.",
+  "renderers": ["trmnl_png_gray16"],
+  "transport": "push",
+  "panel": {
+    "w": 1440,
+    "h": 2560,
+    "orientation": "portrait",
+    "name": "Visionect Place & Play 32\" (1440x2560, 16 greys)",
+    "gamut": "gray_16",
+    "native_w": 1440,
+    "native_h": 2560
+  },
+  "config_schema": {
+    "uuid": {
+      "type": "string",
+      "label": "Frame UUID",
+      "default": "",
+      "help": "The frame's UUID, e.g. 36002000-1247-3830-3933-303600000000 (on the label, or in the old Visionect server's device list). Leave blank and the first unknown frame that connects within an hour of adding the device (or clearing this field) is bound to it; later ones are listed as discovered devices."
+    }
+  }
+}

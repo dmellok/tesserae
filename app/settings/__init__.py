@@ -26,6 +26,8 @@ Layout:
 * ``devices_routes``, ``/settings/devices/*`` (every device CRUD).
 * ``diagnostics_routes``, ``/settings/diagnostics/*`` (test broker,
                            test push).
+* ``visionect_routes``, the Visionect sign actions and the status the
+                         Add device card and device page show for them.
 """
 
 from __future__ import annotations
@@ -59,6 +61,7 @@ def register(app: Flask) -> None:
         rooms_routes,
         system_routes,
         update_routes,
+        visionect_routes,
     )
 
     app.register_blueprint(bp)

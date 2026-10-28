@@ -96,6 +96,128 @@ def awake_poll_interval_s(stored: Any) -> int | None:
     return max(AWAKE_POLL_MIN_S, min(poll, AWAKE_POLL_MAX_S))
 
 
+# -- per-kind hooks ----------------------------------------------------------
+#
+# A device kind that has rules of its own (a protocol where one physical
+# device may be bound to only one Tesserae device, say) registers a
+# :class:`KindHooks` here, from its own module. The settings routes, the Home
+# Assistant config setter and the add / register / remove flows then call the
+# functions below for every device and never name the kind.
+
+# Held around a device's config check + store, so two saves can't both pass a
+# check that only one of them should, and so a background writer that must
+# agree with the checks (the Visionect auto-bind) can take it too.
+CONFIG_SAVE_LOCK = threading.RLock()
+
+
+@dataclass(frozen=True)
+class KindHooks:
+    """Callbacks for the devices (and kinds) ``applies_to`` accepts. Every
+    callback is optional. The ``store`` is the settings store.
+
+    * ``config_conflict(devices, store, device, values, exclude)``: why
+      ``values`` can't be stored for ``device`` (a device or a kind), or None.
+      ``exclude`` is the id of the device being saved.
+    * ``config_saved(store, device, values, previous)``: ``values`` were
+      stored; ``previous`` is the device's stored config from before.
+    * ``device_added(store, device)``: a device of this kind was just created.
+    * ``discovered_config(parsed)``: the config values a discovery entry
+      (its parsed payload) announces for the device registered from it.
+    * ``device_removed(device)``: the device was deleted.
+    """
+
+    applies_to: Callable[[Any], bool]
+    config_conflict: (
+        Callable[[DeviceRegistry, Any, Any, dict[str, Any], str], str | None] | None
+    ) = None
+    config_saved: Callable[[Any, Any, dict[str, Any], dict[str, Any]], None] | None = None
+    device_added: Callable[[Any, Any], None] | None = None
+    discovered_config: Callable[[dict[str, Any]], dict[str, Any]] | None = None
+    device_removed: Callable[[Any], None] | None = None
+
+
+_KIND_HOOKS: dict[str, KindHooks] = {}
+
+
+def register_kind_hooks(name: str, hooks: KindHooks) -> None:
+    """Register (or replace) the hooks called ``name``."""
+    _KIND_HOOKS[name] = hooks
+
+
+def _hooks_for(device: Any) -> list[KindHooks]:
+    return [h for h in list(_KIND_HOOKS.values()) if h.applies_to(device)]
+
+
+def config_conflict(
+    devices: DeviceRegistry,
+    store: Any,
+    device: Any,
+    values: dict[str, Any],
+    *,
+    exclude: str = "",
+) -> str | None:
+    """Why ``values`` can't be stored for ``device`` (a device or a kind), or
+    None. For an early refusal before anything is created; ``save_device_config``
+    checks again, atomically."""
+    for hook in _hooks_for(device):
+        if hook.config_conflict is not None:
+            problem = hook.config_conflict(devices, store, device, values, exclude)
+            if problem:
+                return problem
+    return None
+
+
+def save_device_config(
+    store: Any,
+    devices: DeviceRegistry,
+    device: Any,
+    values: dict[str, Any],
+    fields: list[dict[str, Any]],
+) -> str | None:
+    """Store a device's validated config values, as
+    ``store.update_for_namespace("devices", ...)`` does, after its kind's
+    ``config_conflict`` hooks agree, atomically with that check. Returns why
+    nothing was stored, or None."""
+    with CONFIG_SAVE_LOCK:
+        problem = config_conflict(devices, store, device, values, exclude=device.id)
+        if problem:
+            return problem
+        hooks = _hooks_for(device)
+        previous: dict[str, Any] = {}
+        if any(h.config_saved for h in hooks):
+            stored = (store.get_section("devices") or {}).get(device.id)
+            previous = dict(stored) if isinstance(stored, dict) else {}
+        store.update_for_namespace("devices", device.id, values, fields)
+        for hook in hooks:
+            if hook.config_saved is not None:
+                _run_hook(hook.config_saved, store, device, values, previous)
+    return None
+
+
+def device_added(store: Any, device: Any) -> None:
+    """Tell the device's kind hooks it was just created."""
+    for hook in _hooks_for(device):
+        if hook.device_added is not None:
+            _run_hook(hook.device_added, store, device)
+
+
+def discovered_config(kind: Any, parsed: dict[str, Any]) -> dict[str, Any]:
+    """The config values a discovery entry announces for a ``kind`` device."""
+    out: dict[str, Any] = {}
+    for hook in _hooks_for(kind):
+        if hook.discovered_config is not None:
+            out.update(hook.discovered_config(parsed))
+    return out
+
+
+def _run_hook(fn: Callable[..., None], *args: Any) -> None:
+    """A hook that runs after the fact must not undo what it follows."""
+    try:
+        fn(*args)
+    except Exception:
+        logger.exception("device kind hook %s failed", getattr(fn, "__name__", fn))
+
+
 @dataclass(frozen=True)
 class InstanceResult:
     """Outcome of a lifecycle op. ``error`` is None on success and the
@@ -1883,6 +2005,9 @@ def delete_instance(
         device.path.unlink()
     devices.devices.pop(instance_id, None)
     _drop_clones(renderers, instance_id)
+    for hook in _hooks_for(device):
+        if hook.device_removed is not None:
+            _run_hook(hook.device_removed, device)
     return InstanceResult(device)
 
 

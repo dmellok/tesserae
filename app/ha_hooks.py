@@ -132,6 +132,7 @@ def _set_device_config(app: Flask, device_id: str, values: dict[str, Any]) -> st
     validate the merged document, persist it, and deliver it (MQTT
     ``config_topic`` publish, relay mailbox, or wait for the next REST
     poll). Also re-derives the wake prediction on an interval change."""
+    from app import device_service
     from app.settings._shared import config_fields_from_schema
 
     devices = app.config["DEVICE_REGISTRY"]
@@ -145,7 +146,9 @@ def _set_device_config(app: Flask, device_id: str, values: dict[str, Any]) -> st
     if not ok:
         return f"Invalid config: {err}"
     store = app.config["SETTINGS_STORE"]
-    store.update_for_namespace("devices", device_id, merged, fields)
+    problem = device_service.save_device_config(store, devices, device, merged, fields)
+    if problem:
+        return problem
     if device.transport == "relay":
         publisher = app.config.get("RELAY_PUBLISHER")
         if publisher is not None:

@@ -33,6 +33,7 @@ from app.network import detect_local_ip, docker_bridge_ip_warning, is_docker_bri
 from app.panel import PANEL_PRESET_CHOICES, PANEL_PRESETS
 from app.state.settings_store import SECRET_MASK
 
+from . import visionect_routes
 from ._shared import (
     AREA_KINDS,
     AREAS,
@@ -260,6 +261,10 @@ def settings_area(area: str) -> str | Response:
         broker_configured = False
         kind_default_rows = []
 
+    visionect_kinds, visionect_listener = (
+        visionect_routes.add_card_context() if area == "devices" else ([], None)
+    )
+
     return render_template(
         "settings.html",
         sections=sections,
@@ -273,6 +278,8 @@ def settings_area(area: str) -> str | Response:
         discovered_rest=discovered_rest,
         discovered_mqtt=discovered_mqtt,
         discovered_sig=discovered_sig,
+        visionect_kinds=visionect_kinds,
+        visionect_listener=visionect_listener,
         default_transport=default_transport,
         broker_configured=broker_configured,
         # Drives the OpenDisplay transport branch: HA add-on gets the
@@ -1205,6 +1212,9 @@ def _build_device_section(store: Any, device: Device) -> dict[str, Any] | None:
         # the HA add-on and points at the integration (HA path) or
         # the bridge (standalone). None for non-OpenDisplay kinds.
         "opendisplay_setup": _opendisplay_setup(device),
+        # Visionect status band: listener up or port busy, and what the
+        # bound sign is doing. None for other kinds.
+        "visionect_setup": visionect_routes.setup_band(device),
         # The Display-name field reads ``device_name`` (raw) for
         # the input's value, separately from ``title`` (which gets
         # a "Device: " prefix for the card heading). Instance-only;
@@ -1893,11 +1903,13 @@ def _transport_badge(device: Device) -> str:
     Returns "HTTP" for legacy TRMNL devices (access-token + MQTT)
     so the header still reads cleanly when the card is collapsed, and
     "HA" for push devices (OpenDisplay-via-HA) delivered through a Home
-    Assistant service call rather than a broker."""
+    Assistant service call rather than a broker. Visionect signs are push
+    devices too, over their own TCP protocol rather than through HA, so
+    they read "TCP" (the kind column names them)."""
     if device.transport == "rest":
         return "REST"
     if device.transport == "push":
-        return "HA"
+        return "TCP" if visionect_routes.is_visionect_device(device) else "HA"
     if device.transport == "relay":
         # Before the access-token branch: relay devices carry a device token
         # too, but it authenticates against the relay, not this server.

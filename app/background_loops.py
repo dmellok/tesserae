@@ -43,6 +43,7 @@ LOOP_THREAD_NAMES: frozenset[str] = frozenset(
         "relay-pairing",
         "opendisplay-ha-telemetry",
         "ha-discovery-ticker",
+        "visionect-listener",
     }
 )
 

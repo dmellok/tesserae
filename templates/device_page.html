@@ -159,7 +159,59 @@
         </div>
         {% endif %}
 
-        {% if section.status.parsed %}
+        {# VISIONECT LISTENER + SIGN STATE #}
+        {% if section.visionect_setup %}
+        {% set vs = section.visionect_setup %}
+        <div class="{% if vs.ok %}dx-hint-band{% else %}dx-warn-band{% endif %}" style="margin-top: 14px;">
+          <i class="ph {% if vs.ok %}ph-info{% else %}ph-warning{% endif %}" aria-hidden="true"></i>
+          <p><strong>{{ vs.title }}</strong><br>{{ vs.body }} <a href="{{ vs.link.url }}" target="_blank" rel="noopener noreferrer">{{ vs.link.label }}</a>.</p>
+        </div>
+        {% if vs.sign %}
+        {#- What the bound sign last reported, and what it can be asked to do
+            (devices_visionect_action; only while it is connected). -#}
+        <div class="dx-visionect-sign">
+          {% if vs.sign.rows %}
+          <dl class="status-fields">
+            {% for label, value in vs.sign.rows %}
+            <div><dt>{{ label }}</dt><dd>{{ value }}</dd></div>
+            {% endfor %}
+          </dl>
+          {% endif %}
+          {% if vs.sign.error %}
+          <div class="dx-warn-band" style="margin-top: 10px;"><i class="ph ph-warning" aria-hidden="true"></i><p>{{ vs.sign.error }}</p></div>
+          {% endif %}
+          <div class="dx-visionect-actions">
+            {% for action, icon, label, title in [
+                ('status', 'heartbeat', 'Report in', 'Ask the frame for its battery, signal and state now'),
+                ('refresh', 'arrows-clockwise', 'Full refresh', 'Repaint the picture it shows from scratch, to clear ghosting'),
+                ('reboot', 'power', 'Reboot', 'Restart the frame; it reconnects in a minute or two')] %}
+            <form method="post" action="{{ url_for('auth.devices_visionect_action', instance_id=section.device_id, action=action) }}"
+                  {% if action == 'reboot' %}onsubmit="return confirm('Reboot the frame? It reconnects in a minute or two and then gets the latest picture.');"{% endif %}>
+              <button type="submit" class="dx-btn-ghost-sm" title="{{ title }}"{% if not vs.sign.connected %} disabled{% endif %}>
+                <i class="ph ph-{{ icon }}" aria-hidden="true"></i><span>{{ label }}</span>
+              </button>
+            </form>
+            {% endfor %}
+            {% if vs.sign.note %}<span class="field-help">{{ vs.sign.note }}</span>
+            {% elif not vs.sign.connected %}<span class="field-help">The frame takes these while it's connected.</span>{% endif %}
+          </div>
+        </div>
+        {% endif %}
+        {% endif %}
+
+        {% if section.visionect_setup and section.visionect_setup.sign %}
+        {#- A Visionect frame's report is all shown above; what helps instead
+            is what went each way between Tesserae and the frame. -#}
+        <details class="dx-advanced-diag">
+          <summary><i class="ph ph-caret-right" aria-hidden="true"></i><span>Frame log</span></summary>
+          {% if section.visionect_setup.sign.log %}
+          <pre class="dx-code dx-log-view dx-log-view--wrap" data-log-tail>{{ section.visionect_setup.sign.log | join('\n') }}</pre>
+          <p class="field-help">→ Tesserae to the frame, ← the frame to Tesserae; the last {{ section.visionect_setup.sign.log | length }} since Tesserae started.</p>
+          {% else %}
+          <p class="field-help">Nothing yet: the frame hasn't connected since Tesserae started.</p>
+          {% endif %}
+        </details>
+        {% elif section.status.parsed %}
         <details class="dx-advanced-diag">
           <summary><i class="ph ph-caret-right" aria-hidden="true"></i><span>Advanced diagnostics</span></summary>
           <dl class="status-fields">

@@ -23,6 +23,42 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   tesserae-device-firmware, confirmed on real hardware by its contributor on a
   Pro Lite. Not auto-selected from a relay self-report, since on the wire it
   matches the PaperS3.
+- Visionect e-paper signs, driven directly with no Visionect Software Suite.
+  Tesserae listens on TCP 11113, where the sign dials in, and pushes each
+  frame as 16 greys over the sign's own protocol through the `pyvisionect`
+  library.
+  - **Adding a sign:** Add device has a new Visionect tab. Leave the UUID blank
+    and the first unknown sign that connects within the hour is bound. Any
+    other sign shows up in the discovered devices banner, ready to register.
+  - **Models:** the catalog has the Place & Play 32" and 13", Joan 6 and 13,
+    and the 9.7" boards. Each sign reports its own screen size on connect, and
+    the device adopts it. The Place & Play 32" declares `"buttons": false`, so
+    its device page has no Controls section and Home Assistant gets no Input
+    entity for it.
+  - **Delivery:** one frame is in flight at a time and is tracked by the sign's
+    ACK. Refusals are retried. Quiet hours with sleep-through send the sign to
+    deep sleep only after the latest frame has landed.
+  - **Status:** the device page shows whether Tesserae is listening and what
+    the sign is doing, with Report in, Full refresh and Reboot buttons. Battery,
+    signal, temperature and firmware reach the device card and Home Assistant.
+    The sign's check-in interval and sleep mode are shown but not changed.
+  - **Next wake:** the device page estimates when the sign will check in next:
+    its last check-in plus its own check-in interval, or the end of a
+    quiet-hours sleep Tesserae just ordered. Sleep cycle, last offset and the
+    smart sync confidence follow from real check-ins. A sign set to stay awake
+    has no estimate.
+  - **Port and address:** the listener runs while a Visionect device exists. It
+    binds the web server's address (`TESSERAE_BIND_HOST`), and
+    `TESSERAE_VISIONECT_PORT` moves it off 11113. The protocol has no
+    authentication, so keep the port on your LAN.
+
+  See the Visionect quickstart.
+- Device kinds can register hooks in `app.device_service` (a check before a
+  device's config is stored, a callback after it is stored, when a device is
+  added from a discovery or removed), so the settings routes and the Home
+  Assistant config setter apply a kind's own rules without naming the kind.
+- Adding a device now checks the config values the form supplies before the
+  device is created, instead of dropping invalid ones afterwards.
 
 ### Fixed
 
