@@ -70,6 +70,14 @@ def _clear_ephemeral_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
+def _no_visionect_listener(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep ``app.visionect.register`` from binding TCP 11113 for any test app
+    that holds a Visionect device. Tests that need a listener start one
+    themselves on a port of their own."""
+    monkeypatch.setattr("app.visionect.AUTOSTART", False)
+
+
+@pytest.fixture(autouse=True)
 def _stop_background_loops() -> Any:
     """Stop every tracked background loop after each test and fail the test
     that leaked one.

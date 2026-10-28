@@ -334,6 +334,55 @@ def test_smart_sync_holds_when_trusted_device_not_in_lead_window(
     assert sched.find_due(now) == []
 
 
+def test_smart_sync_on_a_visionect_frame_aims_at_its_checkin_and_never_sticks(
+    tmp_path, store: ScheduleStore, push_manager
+) -> None:
+    """A Visionect frame's next wake is its last check-in plus its interval
+    (app.visionect.status_heartbeat sends it as ``next_sleep_s``). Once it
+    has earned trust with three on-time check-ins, smart sync holds a
+    15-minute schedule mid-cycle, fires inside the lead window, and never
+    holds once the frame is overdue."""
+    from app.state.device_telemetry import TelemetryStore
+
+    telemetry = TelemetryStore(tmp_path / "telemetry.json")
+    t0 = datetime(2026, 6, 1, 10, tzinfo=UTC).timestamp()
+    for n in range(4):
+        telemetry.record_heartbeat(
+            "frame",
+            received_at=t0 + n * 1800 + n,
+            parsed={"next_sleep_s": 1800},
+            configured_sleep_s=None,
+        )
+    last = t0 + 3 * 1800 + 3
+    entry = telemetry.get("frame")
+    assert entry is not None and entry.is_trusted and entry.predicted_next_wake_at == last + 1800
+    sched = _make_smart_scheduler(
+        store, push_manager, device_ids={"home": ["frame"]}, telemetry=telemetry
+    )
+    store.upsert(
+        Schedule(
+            id="a",
+            name="A",
+            page_id="home",
+            type="interval",
+            interval_minutes=15,
+            smart_sync=True,
+            smart_sync_lead_s=10,
+        )
+    )
+
+    def due_at(offset_s: float) -> list[str]:
+        return [s.id for s in sched.find_due(datetime.fromtimestamp(last + offset_s, UTC))]
+
+    assert due_at(600) == []  # mid-cycle: held for the frame's wake
+    assert due_at(1795) == ["a"]  # inside the lead window: the picture is waiting
+    # Overdue: the prediction is in the past, so nothing is held.
+    sched2 = _make_smart_scheduler(
+        store, push_manager, device_ids={"home": ["frame"]}, telemetry=telemetry
+    )
+    assert [s.id for s in sched2.find_due(datetime.fromtimestamp(last + 2400, UTC))] == ["a"]
+
+
 def test_smart_sync_never_holds_for_an_always_on_device(store: ScheduleStore, push_manager) -> None:
     """The panel is reachable right now, so there is no wake to aim at.
     Holding would only delay a frame it could already have collected."""

@@ -1,0 +1,25 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "visionect_joan_6",
+  "name": "Joan 6",
+  "vendor": "Joan",
+  "url": "https://getjoan.com/",
+  "icon": "frame-corners",
+  "description": "Joan 6, Visionect's 6\" battery e-paper display, 1024x758 with 16 grey levels, driven over the Visionect protocol on TCP 11113 with no Visionect Software Suite.",
+  "protocol": "visionect",
+  "renderers": [
+    "trmnl_png_gray16"
+  ],
+  "panel": {
+    "w": 1024,
+    "h": 758,
+    "orientation": "landscape",
+    "name": "Joan 6, 6\" 16-level greyscale",
+    "gamut": "gray_16",
+    "native_w": 1024,
+    "native_h": 758
+  },
+  "refresh_floor_s": 60,
+  "image_format": "png",
+  "notes_md": "UNVERIFIED ON HARDWARE: the protocol and this panel geometry come from pyvisionect, which was verified on the 32\" sign only. The sign reports its own display type on connect and Tesserae adopts that buffer size, so a mismatch here corrects itself. Point the sign at Tesserae on TCP 11113 (the old Visionect server's address, or over its USB console with `server_tcp_set`). Tesserae doesn't read this model's button or touch presses yet."
+}

@@ -63,6 +63,7 @@ The bundled client kinds Tesserae knows how to talk to. A flashed client announc
 | `pico_bin_client` | 1600×1200 | `pico_bin` | Battery-powered Pico Plus 2 firmware (RP2350) driving a Pimoroni Inky-style Spectra 6 panel over SPI. |
 | `picpak_client` | 400×300 | `esp32_bin` | Battery-powered PicPak 4.2" 4-colour BWRY e-paper frame. |
 | `trmnl_client` | 800×480 | `trmnl_png`, `trmnl_png_gray16`, `trmnl_png_gray4` | HTTP-polled e-paper client compatible with the TRMNL BYOS protocol. |
+| `visionect` | 1440×2560 | `trmnl_png_gray16` | A Visionect e-paper frame (Place & Play 32", Joan, the 13" boards) driven directly, with no Visionect Software Suite. |
 
 ## Hardware SKUs
 
@@ -235,6 +236,16 @@ Hardware supported by community-authored firmware. Each SKU below links to the f
 | [Soldered Inkplate 10](https://soldered.com/products/inkplate-10) | 1200×825 | `gray_8` | `esp32_bw_client` <br> `esp32_gray_bin` | `soldered_inkplate_10` |
 | [Soldered Inkplate 13SPECTRA](https://soldered.com/products/inkplate-13spectra) | 1600×1200 | `spectra_6` | `esp32_client` (inherit) | `soldered_inkplate_13spectra` |
 | [Soldered Inkplate 6COLOR](https://soldered.com/products/inkplate-6color-e-paper-display) | 600×448 | `inky_7colour` | `esp32_client` (inherit) | `soldered_inkplate_6color` |
+
+### Visionect
+
+| SKU | Panel | Gamut | Protocol / Renderer | Kind id |
+|---|---|---|---|---|
+| [Joan 13](https://getjoan.com/) | 1600×1200 | `gray_16` | `visionect` <br> `trmnl_png_gray16` | `visionect_joan_13` |
+| [Joan 6](https://getjoan.com/) | 1024×758 | `gray_16` | `visionect` <br> `trmnl_png_gray16` | `visionect_joan_6` |
+| [Visionect Place & Play 13"](https://www.visionect.com/) | 1600×1200 | `gray_16` | `visionect` <br> `trmnl_png_gray16` | `visionect_place_and_play_13` |
+| [Visionect Place & Play 32"](https://www.visionect.com/) | 1440×2560 portrait | `gray_16` | `visionect` <br> `trmnl_png_gray16` | `visionect_place_and_play_32` |
+| [Visionect 9.7" board](https://www.visionect.com/) | 1200×825 | `gray_16` | `visionect` <br> `trmnl_png_gray16` | `visionect_v_tablet_9_7` |
 
 ## What's been tested on real hardware
 

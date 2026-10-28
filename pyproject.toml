@@ -63,6 +63,12 @@ dependencies = [
     # Used by the recipes widget to render a scannable link back to
     # the source recipe page in the card's bottom-right corner.
     "segno>=1.6,<2",
+    # Visionect e-paper sign protocol (app.visionect, devices/visionect):
+    # a clean-room, sans-io reimplementation of the vendor gateway, so
+    # Tesserae can drive the signs with no Visionect Software Suite. MIT;
+    # the imaging extra reuses the numpy + Pillow above and adds only the
+    # cramjam (LZ4) and xxhash wheels.
+    "pyvisionect[imaging]>=0.1.1,<0.2",
 ]
 
 [project.scripts]
@@ -160,6 +166,7 @@ module = [
     "app.device_loader",
     "app.renderer",
     "app.render_signing",
+    "app.visionect",
 ]
 strict = true
 

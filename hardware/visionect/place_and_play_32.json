@@ -1,0 +1,25 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "visionect_place_and_play_32",
+  "name": "Visionect Place & Play 32\"",
+  "vendor": "Visionect",
+  "url": "https://www.visionect.com/",
+  "icon": "frame-corners",
+  "description": "Visionect's 31.2\" e-paper sign, 1440x2560 with 16 grey levels, on battery or mains. Tesserae replaces the Visionect Software Suite: it listens on TCP 11113, where the sign dials in, and pushes frames over the sign's own protocol.",
+  "protocol": "visionect",
+  "renderers": ["trmnl_png_gray16"],
+  "panel": {
+    "w": 1440,
+    "h": 2560,
+    "orientation": "portrait",
+    "name": "Visionect 31.2\" e-paper, 16-level greyscale",
+    "gamut": "gray_16",
+    "native_w": 1440,
+    "native_h": 2560
+  },
+  "buttons": false,
+  "touch": false,
+  "refresh_floor_s": 60,
+  "image_format": "png",
+  "notes_md": "Confirmed on real hardware: a Place & Play 32 (HardwareNameID 8, firmware 6.17.4168) drew a frame pushed by pyvisionect with no Visionect server running. The sign dials the server address stored in its flash on TCP 11113, so either run Tesserae on the host the old Visionect server used, or set the address over the sign's micro-USB console (`server_tcp_set <ip> 11113`, then `flash_save`). The protocol has no authentication: keep 11113 on your LAN. If the image arrives upside down, set Rotation to 270° on the device page."
+}

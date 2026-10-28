@@ -38,6 +38,10 @@ Devices that speak the TRMNL BYOS protocol. The TRMNL flagship hardware ships re
 
 - [Bloomin8 Canvas](bloomin8.md): point the Canvas's Schedule Pull upstream at Tesserae. Built against Bloomin8's spec, not yet tested on hardware.
 
+## Visionect signs
+
+- [Visionect signs](visionect.md): Tesserae replaces the Visionect Software Suite and pushes frames to the sign over its own protocol on TCP 11113. Tested on a Place & Play 32.
+
 ## Kindle
 
 Jailbroken Kindles can act as a Tesserae panel via the KOReader plugin path.

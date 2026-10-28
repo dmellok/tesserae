@@ -64,6 +64,13 @@
                 aria-selected="false">
           <i class="ph ph-bluetooth" aria-hidden="true"></i><span>OpenDisplay</span>
         </button>
+        <button type="button"
+                class="dx-segmented-btn"
+                data-segmented-btn="visionect"
+                role="tab"
+                aria-selected="false">
+          <i class="ph ph-frame-corners" aria-hidden="true"></i><span>Visionect</span>
+        </button>
       </div>
       <p class="dx-segmented-help" data-segmented-help-rest{% if default_transport != 'rest' %} hidden{% endif %}>
         REST is the recommended default, devices pair with a one-time code, no broker required.
@@ -73,6 +80,9 @@
       </p>
       <p class="dx-segmented-help" data-segmented-help-opendisplay hidden>
         OpenDisplay BLE tags, driven through Home Assistant or the standalone bridge.
+      </p>
+      <p class="dx-segmented-help" data-segmented-help-visionect hidden>
+        Visionect and Joan e-paper signs, over their own protocol on TCP {{ visionect_listener.port if visionect_listener else 11113 }}.
       </p>
     </div>
 
@@ -284,6 +294,57 @@
         </p>
       </div>
       {% endif %}
+    </div>
+
+    {# Visionect branch: signs that dial this server on TCP 11113 (the
+       vendor server's port). No pairing: the sign's UUID binds it, typed
+       here or taken from the first unknown sign that connects. #}
+    <div class="dx-add-branch dx-add-branch--visionect"
+         data-transport-branch="visionect"
+         hidden>
+      <div class="dx-hint-band">
+        <i class="ph ph-info" aria-hidden="true"></i>
+        <p>
+          <strong>Tesserae replaces the Visionect server.</strong> The sign dials the address in
+          its flash on TCP {{ visionect_listener.port if visionect_listener else 11113 }}: run
+          Tesserae on the old Visionect server's address, or set the address over the frame's USB
+          console. Leave the UUID blank and the first unknown sign that connects within the hour is
+          bound to this device; the sign reports its own screen size. The protocol has no authentication, so
+          keep the port on your LAN.
+        </p>
+      </div>
+      {% if visionect_listener and visionect_listener.error %}
+      <div class="dx-warn-band" role="alert">
+        <i class="ph ph-warning" aria-hidden="true"></i>
+        <p>
+          Port {{ visionect_listener.port }} is in use ({{ visionect_listener.error }}). Stop the
+          old Visionect server on this host; Tesserae retries every half minute.
+        </p>
+      </div>
+      {% endif %}
+      <form method="post" action="{{ url_for('auth.devices_add') }}" class="form">
+        {% if visionect_kinds|length > 1 %}
+        {{ select_field('add-vx-kind', 'kind', 'Model', value=visionect_kinds[0].value, options=visionect_kinds,
+                        help='Sets the starting panel size. The frame reports its real size when it connects.') }}
+        {% else %}
+        <input type="hidden" name="kind" value="visionect">
+        {% endif %}
+        {{ text_input('add-vx-id', 'id', 'Device id', value='', placeholder='hallway_sign', required=True,
+                      help='Lowercase, no spaces.') }}
+        {{ text_input('add-vx-name', 'name', 'Display name', value='', placeholder='Hallway frame') }}
+        {{ text_input('add-vx-uuid', 'uuid', 'Frame UUID', value='', placeholder='36002000-1247-3830-3933-303600000000',
+                      help="Optional. On the frame's label or in the old Visionect server's device list. Blank binds the first unknown frame that connects within the hour.") }}
+        {{ select_field('add-vx-orientation', 'panel_orientation', 'Rotation', value='',
+                        blank_label='Model default',
+                        options=[{'value':'landscape','label':'0°'},
+                                 {'value':'portrait','label':'90°'},
+                                 {'value':'landscape_flipped','label':'180°'},
+                                 {'value':'portrait_flipped','label':'270°'}],
+                        help='Clockwise turn applied to match how the frame is mounted.') }}
+        <div class="dx-actions-right">
+          <button type="submit" class="dx-btn-primary"><i class="ph ph-plus" aria-hidden="true"></i><span>Add Visionect frame</span></button>
+        </div>
+      </form>
     </div>
 
   </div>
