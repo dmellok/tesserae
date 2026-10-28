@@ -6,6 +6,17 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added
+
+- Each display gets a *Pause* number in Home Assistant (minutes). While it
+  runs, nothing automated reaches that display: lineup steps, daily and
+  interval lineups, rotations, schedules, page refreshes and returns to a
+  lineup's home page. Manual sends and physical buttons still go through.
+  When the pause ends, or is set to 0, the display gets what it missed
+  (waiting for quiet hours to end if need be), and is left alone if
+  nothing was missed. The other displays aren't repainted. *Hold* keeps its
+  existing meaning.
+
 ## [0.488.1], 2026-10-28
 
 ### Added

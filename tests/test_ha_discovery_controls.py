@@ -446,6 +446,104 @@ def test_hold_state_reflects_existing_override(tmp_path: Path) -> None:
     assert _payload_for(client, "tesserae/ha/dev/lounge/state/hold") in (b"29", b"30")
 
 
+# ---------- pause (separate from hold) ----------
+
+
+def test_pause_number_is_a_separate_entity_next_to_hold(tmp_path: Path) -> None:
+    rot_state = DeviceRotationStateStore(tmp_path / "rot.json")
+    ha, client, _pm, _ = _wire(
+        tmp_path,
+        devices=_FakeRegistry([_FakeDevice("lounge", "Lounge")]),
+        hooks=HaHooks(rotation_state_store=rot_state),
+    )
+    ha.start()
+    topics = _topics(client)
+    assert "homeassistant/number/tesserae/dev_lounge_hold/config" in topics
+    assert "homeassistant/number/tesserae/dev_lounge_pause/config" in topics
+    pause = json.loads(
+        _payload_for(client, "homeassistant/number/tesserae/dev_lounge_pause/config")
+    )
+    assert pause["name"] == "Pause"
+    assert pause["command_topic"] == "tesserae/ha/dev/lounge/cmd/pause"
+    assert pause["state_topic"] == "tesserae/ha/dev/lounge/state/pause"
+    assert (pause["min"], pause["max"], pause["unit_of_measurement"]) == (0, 720, "min")
+    hold = json.loads(_payload_for(client, "homeassistant/number/tesserae/dev_lounge_hold/config"))
+    assert hold["name"] == "Hold"
+    assert hold["command_topic"] == "tesserae/ha/dev/lounge/cmd/hold"
+
+
+def test_pause_number_absent_without_the_state_store(tmp_path: Path) -> None:
+    ha, client, _pm, _ = _wire(
+        tmp_path, devices=_FakeRegistry([_FakeDevice("lounge", "Lounge")]), hooks=HaHooks()
+    )
+    ha.start()
+    assert "homeassistant/number/tesserae/dev_lounge_pause/config" not in _topics(client)
+
+
+def test_pause_number_sets_and_ends_the_pause_without_touching_hold(tmp_path: Path) -> None:
+    rot_state = DeviceRotationStateStore(tmp_path / "rot.json")
+    hold_until = datetime.now(UTC) + timedelta(minutes=45)
+    rot_state.upsert(DeviceRotationState(device_id="lounge", override_until=hold_until))
+    ha, client, _pm, _ = _wire(
+        tmp_path,
+        devices=_FakeRegistry([_FakeDevice("lounge", "Lounge")]),
+        hooks=HaHooks(rotation_state_store=rot_state),
+    )
+    ha.start()
+    assert _payload_for(client, "tesserae/ha/dev/lounge/state/pause") == b"0"
+    ha._on_device_cmd("tesserae/ha/dev/lounge/cmd/pause", b"90")
+    state = rot_state.get("lounge")
+    assert state is not None and state.automation_pause_until is not None
+    remaining = (state.automation_pause_until - datetime.now(UTC)).total_seconds()
+    assert 88 * 60 < remaining <= 90 * 60
+    assert state.override_until == hold_until  # Hold's own field is untouched
+    assert _payload_for(client, "tesserae/ha/dev/lounge/state/pause") == b"90"
+    # Hold keeps reporting its own minutes, not the pause's.
+    assert _payload_for(client, "tesserae/ha/dev/lounge/state/hold") in (b"44", b"45")
+    ha._on_device_cmd("tesserae/ha/dev/lounge/cmd/pause", b"0")
+    state = rot_state.get("lounge")
+    # A lapsed value is stored (the scheduler's next tick sees the pause end).
+    assert state is not None and state.automation_pause_until is not None
+    assert state.automation_pause_until <= datetime.now(UTC)
+    assert state.override_until == hold_until
+    assert _payload_for(client, "tesserae/ha/dev/lounge/state/pause") == b"0"
+
+
+def test_hold_number_never_writes_the_pause(tmp_path: Path) -> None:
+    rot_state = DeviceRotationStateStore(tmp_path / "rot.json")
+    ha, _client, _pm, _ = _wire(
+        tmp_path,
+        devices=_FakeRegistry([_FakeDevice("lounge", "Lounge")]),
+        hooks=HaHooks(rotation_state_store=rot_state),
+    )
+    ha.start()
+    ha._on_device_cmd("tesserae/ha/dev/lounge/cmd/hold", b"30")
+    state = rot_state.get("lounge")
+    assert state is not None and state.override_until is not None
+    assert state.automation_pause_until is None
+    ha._on_device_cmd("tesserae/ha/dev/lounge/cmd/hold", b"0")
+    state = rot_state.get("lounge")
+    assert state is not None and state.override_until is None
+    assert state.automation_pause_until is None
+
+
+def test_pause_state_reflects_an_existing_pause(tmp_path: Path) -> None:
+    rot_state = DeviceRotationStateStore(tmp_path / "rot.json")
+    rot_state.upsert(
+        DeviceRotationState(
+            device_id="lounge", automation_pause_until=datetime.now(UTC) + timedelta(minutes=30)
+        )
+    )
+    ha, client, _pm, _ = _wire(
+        tmp_path,
+        devices=_FakeRegistry([_FakeDevice("lounge", "Lounge")]),
+        hooks=HaHooks(rotation_state_store=rot_state),
+    )
+    ha.start()
+    assert _payload_for(client, "tesserae/ha/dev/lounge/state/pause") == b"30"
+    assert _payload_for(client, "tesserae/ha/dev/lounge/state/hold") == b"0"
+
+
 # ---------- wake interval ----------
 
 

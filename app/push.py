@@ -1885,6 +1885,7 @@ class PushManager:
         settle: bool = True,
         lock_timeout_s: float | None = None,
         settle_max_s: float | None = None,
+        exclude_device_ids: set[str] | None = None,
     ) -> PushResult:
         """Render a saved Page through the composer and publish.
 
@@ -1916,7 +1917,13 @@ class PushManager:
         waiting it out (a render is bounded by its own timeouts, but a queue
         of them isn't). ``settle_max_s`` caps the settle wait below
         ``SETTLE_MAX_S``. Home Assistant's commands pass both so a command
-        can't block its worker indefinitely."""
+        can't block its worker indefinitely.
+
+        ``exclude_device_ids`` (optional): devices to leave out of the
+        fan-out, after binding and quiet-hours resolution. The scheduler
+        passes the displays whose automation is paused. When nothing is
+        left the push returns ``status="held"`` without rendering or
+        writing a History row (the caller retries on its own cadence)."""
         waited: tuple[float, int] = (0.0, 0)
         if settle and followup == 0 and source not in ("follow-up", "deck_warm", "album_warm"):
             waited = self.settle_page(page_id, max_s=settle_max_s)
@@ -1959,6 +1966,7 @@ class PushManager:
                     force_publish=force_publish,
                     followup=followup,
                     waited=waited,
+                    exclude_device_ids=exclude_device_ids,
                 )
             finally:
                 self._lock.release()
@@ -2586,6 +2594,7 @@ class PushManager:
         stamp_into: dict[str, dict[str, Any]] | None = None,
         followup: int = 0,
         waited: tuple[float, int] = (0.0, 0),
+        exclude_device_ids: set[str] | None = None,
     ) -> PushResult:
         started = time.monotonic()
         refresh_wanted = 0
@@ -2633,6 +2642,26 @@ class PushManager:
                 # and return, not a failure (the user intent is
                 # respected) but not a successful push either.
                 return self._log_quiet_skip(page_id, source=source)
+        if exclude_device_ids:
+            narrowed = [
+                (panel, [d for d in dids if d not in exclude_device_ids]) for panel, dids in groups
+            ]
+            # A group that only had paused displays goes; the legacy virtual
+            # group (no devices) has nothing to pause and stays.
+            kept = [
+                (panel, dids)
+                for (panel, dids), (_p, before) in zip(narrowed, groups, strict=True)
+                if dids or not before
+            ]
+            if not kept:
+                return PushResult(
+                    status="held", page_id=page_id, error="every target display is paused"
+                )
+            if kept != groups:
+                groups = kept
+                # Follow-ups re-send to ``device_ids``; keep them off the
+                # paused displays too.
+                device_ids = {d for _panel, dids in groups for d in dids}
 
         all_renderers: list[RendererResult] = []
         group_results: list[PushResult] = []
