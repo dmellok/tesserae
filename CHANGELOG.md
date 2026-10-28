@@ -6,6 +6,8 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.489.0], 2026-10-29
+
 ### Added
 
 - Each display gets a *Pause* number in Home Assistant (minutes). While it
