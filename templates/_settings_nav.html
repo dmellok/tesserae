@@ -35,9 +35,13 @@
 {#- Which of those the current page belongs to, by path (a device's own
    page under /settings/devices/<id> is Devices), or "". -#}
 {%- set _req_path = request.path if request is defined else '' -%}
+{%- set _root = request.script_root if request is defined else '' -%}
 {%- set _here = namespace(slug='') -%}
 {%- for slug, _label, _icon, href in settings_nav_items -%}
+  {#- href carries the app's URL prefix (Home Assistant's ingress path, a
+      reverse proxy's mount point); request.path does not. -#}
   {%- set _path = href.split('?')[0] -%}
+  {%- if _root and _path.startswith(_root) -%}{%- set _path = _path[_root|length:] -%}{%- endif -%}
   {%- if not _here.slug and (_req_path == _path or _req_path.startswith(_path.rstrip('/') ~ '/')) -%}
     {%- set _here.slug = slug -%}
   {%- endif -%}
