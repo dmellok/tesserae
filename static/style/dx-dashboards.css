@@ -180,6 +180,20 @@
   background: #fff;
 }
 .dx-dash-thumb.is-empty img { display: none; }
+/* With the dashboard's size known the box keeps its shape instead of cropping
+   a portrait render into a landscape one. It sits centred in the same 64 px
+   slot, so the names stay lined up; a portrait one is a little taller. */
+.dx-dash-thumb[style*="--thumb-r"] {
+  --slot: 64px;
+  --th: 40px;
+  --tw: min(var(--slot), calc(var(--th) * var(--thumb-r)));
+  width: var(--tw);
+  height: auto;
+  aspect-ratio: var(--thumb-ar);
+  margin-inline: calc((var(--slot) - var(--tw)) / 2);
+}
+.dx-dash-thumb.is-portrait[style*="--thumb-r"] { --th: 52px; }
+.dx-dash-thumb[style*="--thumb-r"] img { object-fit: contain; }
 .dx-dash-name {
   min-width: 0;
   overflow: hidden;
@@ -323,6 +337,10 @@
   place-items: center;
 }
 .dx-dashquick-preview.is-empty { aspect-ratio: 5 / 3; }
+/* With the dashboard's size known the box keeps its shape at a fixed height
+   (taller for a portrait dashboard) instead of a 260 px square-ish box. */
+.dx-dashquick-preview[style*="aspect-ratio"] { width: auto; height: 200px; min-height: 0; max-height: none; max-width: 420px; }
+.dx-dashquick-preview.is-portrait[style*="aspect-ratio"] { height: 260px; }
 .dx-dashquick-preview img {
   position: absolute;
   inset: 0;
@@ -427,6 +445,8 @@
   .dx-dc-updates { display: none; }
   .dx-dashtable .dx-dashquick-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .dx-dashquick-preview { width: 220px; max-height: 220px; }
+  .dx-dashquick-preview[style*="aspect-ratio"] { width: auto; height: 180px; max-height: none; }
+  .dx-dashquick-preview.is-portrait[style*="aspect-ratio"] { height: 220px; }
 }
 @container dashtable (max-width: 760px) {
   .dx-dashtable-head,
@@ -440,6 +460,8 @@
   .dx-dc-pushed { display: none; }
   .dx-dashtable .dx-dashquick { flex-direction: column; gap: 14px; }
   .dx-dashquick-preview { width: 100%; max-width: 360px; max-height: 240px; }
+  .dx-dashquick-preview[style*="aspect-ratio"] { width: auto; height: 200px; max-height: none; max-width: 100%; }
+  .dx-dashquick-preview.is-portrait[style*="aspect-ratio"] { height: 240px; }
 }
 
 /* Phone: two lines per row (name, then panel · size · last pushed · state). */
@@ -469,6 +491,8 @@
   .dx-dc-name { grid-column: 2; grid-row: 1; gap: 8px; }
   .dx-dc-chev { grid-column: 3; grid-row: 1 / span 2; }
   .dx-dash-thumb { width: 48px; height: 30px; font-size: 14px; }
+  .dx-dash-thumb[style*="--thumb-r"] { --slot: 48px; --th: 30px; }
+  .dx-dash-thumb.is-portrait[style*="--thumb-r"] { --th: 40px; }
   .dx-dc-meta {
     grid-column: 2;
     grid-row: 2;

@@ -113,6 +113,12 @@
 
     const thumb = document.createElement("div");
     thumb.className = "dxe-thumb";
+    // Keep the dashboard's own shape instead of cropping it into a landscape box.
+    if (p.w > 0 && p.h > 0) {
+      thumb.style.setProperty("--thumb-ar", p.w + " / " + p.h);
+      thumb.style.setProperty("--thumb-r", (p.w / p.h).toFixed(4));
+      if (p.h > p.w) thumb.classList.add("is-portrait");
+    }
     if (p.thumb) {
       const img = document.createElement("img");
       img.src = p.thumb;

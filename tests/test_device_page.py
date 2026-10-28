@@ -347,3 +347,133 @@ def test_phone_telemetry_fills_existing_columns_without_changing_heartbeat(
     report["battery"] = {"percent": 0, "observed_at": "2026-01-02T03:04:07Z"}
     app.config["DEVICE_FACTS"].record_mode_observation(dev, report)
     assert "0%" in client.get("/settings/devices").get_data(as_text=True)
+
+
+def _thumb(app: Flask, panel: dict[str, int] | None, *, has_render: bool = True) -> str:
+    section = {
+        "overview": {"has_render": has_render},
+        "preview_url": "/preview/lounge.png",
+        "device_name": "Lounge",
+        "panel": panel,
+    }
+    with app.test_request_context("/"):
+        return app.jinja_env.from_string(
+            '{% from "_device_parts.html" import render_thumb with context %}'
+            '{{ render_thumb(section, "dx-thumb--quick") }}'
+        ).render(section=section)
+
+
+def test_the_thumbnail_keeps_the_screens_shape(app: Flask) -> None:
+    """A portrait screen's latest render used to sit in a fixed 4:3 box and
+    be cropped to its middle. The box now takes the panel's aspect ratio."""
+    portrait = _thumb(app, {"w": 1440, "h": 2560})
+    assert 'style="--thumb-ar: 1440 / 2560"' in portrait
+    assert "dx-thumb--portrait" in portrait
+    landscape = _thumb(app, {"w": 800, "h": 480})
+    assert 'style="--thumb-ar: 800 / 480"' in landscape
+    assert "dx-thumb--portrait" not in landscape
+
+
+def test_the_thumbnail_falls_back_to_the_fixed_box_without_a_panel_or_render(
+    app: Flask,
+) -> None:
+    assert "--thumb-ar" not in _thumb(app, None)
+    assert "--thumb-ar" not in _thumb(app, {"w": 1440, "h": 2560}, has_render=False)
+
+
+def test_an_opened_dashboard_preview_keeps_the_dashboards_shape(app: Flask) -> None:
+    """The Dashboards list's opened row used to fix the preview at 260 px wide,
+    so a portrait dashboard sat in a squarish box. The box now carries the
+    dashboard's own aspect ratio, and a portrait one is marked for a taller
+    box."""
+    client = app.test_client()
+    _sign_in(client)
+    for name, w, h in (("Tall", 1440, 2560), ("Wide", 800, 480)):
+        resp = client.post("/api/mcp/pages", json={"name": name, "w": w, "h": h})
+        assert resp.status_code == 200
+    body = client.get("/pages").get_data(as_text=True)
+    previews = re.findall(r'<div class="dx-dashquick-preview([^"]*)"\s+style="([^"]*)"', body)
+    by_ratio = {style: cls for cls, style in previews}
+    assert "is-portrait" in by_ratio["aspect-ratio: 1440 / 2560"]
+    assert "is-portrait" not in by_ratio["aspect-ratio: 800 / 480"]
+
+
+def _tall_and_wide_pages(client) -> dict[str, str]:
+    ids = {}
+    for name, w, h in (("Tall", 1440, 2560), ("Wide", 800, 480)):
+        resp = client.post("/api/mcp/pages", json={"name": name, "w": w, "h": h})
+        assert resp.status_code == 200
+        ids[name] = resp.get_json()["id"]
+    return ids
+
+
+def test_the_dashboards_row_thumbnail_keeps_the_dashboards_shape(app: Flask) -> None:
+    """The small thumbnail on each Dashboards row was a fixed 64 x 40 box that
+    cropped a portrait render to its middle. It now carries the dashboard's own
+    aspect ratio, and a portrait one is marked."""
+    client = app.test_client()
+    _sign_in(client)
+    _tall_and_wide_pages(client)
+    body = client.get("/pages").get_data(as_text=True)
+    thumbs = re.findall(r'<span class="dx-dash-thumb([^"]*)"\s+style="([^"]*)"', body)
+    by_ratio = {style.split(";")[0]: cls for cls, style in thumbs}
+    assert "is-portrait" in by_ratio["--thumb-ar: 1440 / 2560"]
+    assert "is-portrait" not in by_ratio["--thumb-ar: 800 / 480"]
+    # The width the box is clamped to needs the plain ratio too.
+    assert any("--thumb-r: 0.5625" in style for _, style in thumbs)
+    assert any("--thumb-r: 1.6667" in style for _, style in thumbs)
+
+
+def _lineup_of(client, name: str, page_ids: list[str]) -> str:
+    resp = client.post(
+        "/decks/new/lineup",
+        data={"intent": "cycle", "name": name, "page_ids": page_ids, "interval_minutes": "30"},
+    )
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    return resp.get_json()["id"]
+
+
+def test_the_lineups_page_screens_keep_each_dashboards_shape(app: Flask) -> None:
+    """Each dashboard card on the Lineups page was a fixed 150 x 92 box with
+    object-fit: cover, so a portrait render was cropped to its middle. The
+    frame now carries the dashboard's aspect ratio and a portrait one is
+    marked for a taller card, while a landscape one stays landscape."""
+    client = app.test_client()
+    _sign_in(client)
+    ids = _tall_and_wide_pages(client)
+    _lineup_of(client, "Mixed", [ids["Tall"], ids["Wide"]])
+    body = client.get("/decks").get_data(as_text=True)
+    frames = re.findall(r'<div class="dk-screen-frame([^"]*)"\s+style="([^"]*)"', body)
+    by_ratio = {style.split(";")[0]: cls for cls, style in frames}
+    assert "is-portrait" in by_ratio["--thumb-ar: 1440 / 2560"]
+    assert "is-portrait" not in by_ratio["--thumb-ar: 800 / 480"]
+    assert any("--thumb-r: 0.5625" in style for _, style in frames)
+
+
+def test_the_lineup_editor_hands_the_page_cards_each_dashboards_size(app: Flask) -> None:
+    """The editor's page cards are drawn client-side from this data; they need
+    the dashboard's size to keep its shape instead of cropping it."""
+    client = app.test_client()
+    _sign_in(client)
+    ids = _tall_and_wide_pages(client)
+    lineup = _lineup_of(client, "Mixed", [ids["Tall"], ids["Wide"]])
+    body = client.get(f"/decks/{lineup}/edit").get_data(as_text=True)
+    assert re.search(r'"h":\s*2560', body) and re.search(r'"w":\s*1440', body)
+    assert re.search(r'"h":\s*480', body) and re.search(r'"w":\s*800', body)
+    js = (REPO_ROOT / "static" / "deck_editor.js").read_text()
+    assert "--thumb-ar" in js and "is-portrait" in js
+
+
+def test_every_thumbnail_style_fits_instead_of_cropping() -> None:
+    """None of the thumbnails that carry a ratio may crop: their images fit
+    (object-fit: contain) inside a box with the dashboard's shape."""
+    css = REPO_ROOT / "static" / "style"
+    decks = (css / "dx-decks.css").read_text()
+    dashboards = (css / "dx-dashboards.css").read_text()
+    assert re.search(
+        r'\.dk-screen-frame\[style\*="--thumb-r"\] img\s*{[^}]*object-fit: contain', decks
+    )
+    assert re.search(r'\.dxe-thumb\[style\*="--thumb-r"\] img\s*{[^}]*object-fit: contain', decks)
+    assert re.search(
+        r'\.dx-dash-thumb\[style\*="--thumb-r"\] img\s*{[^}]*object-fit: contain', dashboards
+    )

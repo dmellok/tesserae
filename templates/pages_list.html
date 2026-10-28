@@ -223,7 +223,8 @@
     </span>
     <span class="dx-dc dx-dc-name">
       <span class="dx-dot dx-dash-dot is-{{ _state }}" aria-hidden="true"></span>
-      <span class="dx-dash-thumb{% if not (pv_w and pv_h) %} is-empty{% endif %}" aria-hidden="true">
+      <span class="dx-dash-thumb{% if not (pv_w and pv_h) %} is-empty{% elif pv_h > pv_w %} is-portrait{% endif %}"
+            {% if pv_w and pv_h %}style="--thumb-ar: {{ pv_w }} / {{ pv_h }}; --thumb-r: {{ '%.4f'|format(pv_w / pv_h) }}"{% endif %} aria-hidden="true">
         {% if pv_w and pv_h %}<img src="{{ _png }}" alt="" loading="lazy" decoding="async" data-dash-thumb>{% endif %}
         <i class="ph ph-{{ page.icon or 'cube' }}"></i>
       </span>
@@ -258,7 +259,7 @@
 
   {# OPENED ROW: preview, four figures, then the row's controls. #}
   <div class="dx-devquick dx-dashquick" id="dashq-{{ _rid }}" data-dashquick data-lf-tail{% if not _open %} hidden{% endif %}>
-    <div class="dx-dashquick-preview{% if not (pv_w and pv_h) %} is-empty{% endif %}"
+    <div class="dx-dashquick-preview{% if not (pv_w and pv_h) %} is-empty{% elif pv_h > pv_w %} is-portrait{% endif %}"
          {% if pv_w and pv_h %}style="aspect-ratio: {{ pv_w }} / {{ pv_h }}"{% endif %} data-dashquick-preview>
       <span class="dx-thumb-empty"><i class="ph ph-image" aria-hidden="true"></i><span>{{ 'Rendering preview' if pv_w and pv_h else 'No preview' }}</span></span>
     </div>
@@ -523,7 +524,7 @@
   .dx-bulk-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .dx-bulk-actions .form { margin: 0; }
   .dx-dash-preview iframe { border: 0; transform-origin: top left; pointer-events: none; background: #fff; }
-  .dx-dash-preview img { display: block; width: 100%; height: 100%; object-fit: cover; background: #fff; }
+  .dx-dash-preview img { display: block; width: 100%; height: 100%; object-fit: contain; background: #fff; }
   @media (hover: none), (max-width: 720px) { .dx-dash-preview { display: none; } }
 </style>
 <script>
@@ -767,7 +768,8 @@
   (function () {
     const rows = document.querySelectorAll('[data-preview-src]');
     if (!rows.length || !window.matchMedia('(hover: hover)').matches) return;
-    const PW = 300;               // preview width in px
+    const PW = 300;               // widest preview, px
+    const PH = 420;               // tallest preview, px (a portrait panel is much taller than wide)
     const DELAY = 350;            // hover-intent delay
     let pop, img, frame, timer, current, imgSrc = '', frameSrc = '';
     const failed = new Set();     // preview URLs that 202'd / errored this session
@@ -795,12 +797,20 @@
       document.body.appendChild(pop);
     }
 
+    // The size the preview takes: the dashboard's own shape, inside PW x PH
+    // and the viewport, so a portrait one is tall rather than cropped.
+    function fit(w, h) {
+      const vh = document.documentElement.clientHeight;
+      const scale = Math.min(PW / w, Math.min(PH, vh - 16) / h);
+      return { scale: scale, w: Math.round(w * scale), h: Math.round(h * scale) };
+    }
+
     function showIframe(row) {
       const src = row.getAttribute('data-preview-src');
       const w = parseInt(row.getAttribute('data-preview-w') || '0', 10);
       const h = parseInt(row.getAttribute('data-preview-h') || '0', 10);
       if (!src || !w || !h) return;
-      const scale = PW / w;
+      const scale = fit(w, h).scale;
       frame.style.display = '';
       frame.style.width = w + 'px';
       frame.style.height = h + 'px';
@@ -814,9 +824,9 @@
       const h = parseInt(row.getAttribute('data-preview-h') || '0', 10);
       if (!w || !h) return;
       build();
-      const ph = Math.round(h * (PW / w));
-      pop.style.width = PW + 'px';
-      pop.style.height = ph + 'px';
+      const box = fit(w, h);
+      pop.style.width = box.w + 'px';
+      pop.style.height = box.h + 'px';
       if (png && !failed.has(png)) {
         img.style.display = '';
         frame.style.display = 'none';
@@ -825,18 +835,18 @@
         img.style.display = 'none';
         showIframe(row);
       }
-      position(anchor, ph);
+      position(anchor, box.w, box.h);
       pop.classList.add('is-visible');
     }
 
-    function position(anchor, ph) {
+    function position(anchor, pw, ph) {
       const r = anchor.getBoundingClientRect();
       const gap = 12;
       const vw = document.documentElement.clientWidth;
       const vh = document.documentElement.clientHeight;
       let left = r.right + gap;
-      if (left + PW > vw) left = r.left - PW - gap;         // flip to the left
-      left = Math.max(8, Math.min(left, vw - PW - 8));
+      if (left + pw > vw) left = r.left - pw - gap;         // flip to the left
+      left = Math.max(8, Math.min(left, vw - pw - 8));
       let top = r.top;
       if (top + ph > vh - 8) top = Math.max(8, vh - ph - 8); // clamp to viewport
       pop.style.left = (left + window.scrollX) + 'px';

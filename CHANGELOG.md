@@ -6,6 +6,19 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Thumbnails keep the screen's shape instead of cropping a portrait picture to
+  its middle. The latest-render thumbnail on the Devices list and the device
+  page was a fixed 4:3 box; it now follows the panel's aspect ratio (taller for
+  portrait, wider for landscape) and the whole picture fits.
+- The same goes for the Dashboards list (the small thumbnail on each row and
+  the hover preview, as well as the opened row's preview) and the Lineups page
+  (the dashboard cards, including "on the panel", and the page cards in the
+  lineup editor): a portrait dashboard is a tall card, a landscape one stays
+  wide, in the classic and Paper designs and at phone widths. The History
+  thumbnails fit rather than crop too.
+
 ## [0.493.0], 2026-10-29
 
 ### Added

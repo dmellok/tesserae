@@ -3947,6 +3947,10 @@ select.dx-input:hover {
   background: var(--t-surface);
   overflow: hidden;
   display: grid;
+  /* One definite cell, so the image's width / height 100% resolve against
+     the box. With an auto track a tall picture kept its natural height and
+     was cropped to the middle instead of fitting. */
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
   place-items: center;
 }
 .dx-thumb img { width: 100%; height: 100%; object-fit: contain; display: block; background: #fff; }
@@ -3961,6 +3965,11 @@ select.dx-input:hover {
 .dx-thumb-empty .ph { font-size: 22px; }
 .dx-thumb--quick { width: 180px; height: 135px; }
 .dx-thumb--page { width: 220px; height: 165px; }
+/* A thumbnail with a known panel shape keeps that shape at the same height:
+   a portrait screen gets a narrow box, a landscape one a wide box. */
+.dx-thumb[style*="--thumb-ar"] { aspect-ratio: var(--thumb-ar); width: auto; min-width: 64px; max-width: 240px; }
+.dx-thumb--quick.dx-thumb--portrait[style*="--thumb-ar"] { height: 190px; }
+.dx-thumb--page.dx-thumb--portrait[style*="--thumb-ar"] { height: 260px; }
 
 /* Headline tiles (showing / battery / firmware / next wake). */
 .dx-qtile {
@@ -4313,6 +4322,7 @@ select.dx-input:hover {
   .dx-devquick { padding-left: 16px; }
   .dx-overview { grid-template-columns: 180px minmax(0, 1fr); }
   .dx-thumb--page { width: 180px; height: 135px; }
+  .dx-thumb--page[style*="--thumb-ar"] { width: auto; }
   .dx-overview-tiles,
   .dx-devquick-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
@@ -4369,6 +4379,8 @@ select.dx-input:hover {
   .dx-devrow-chev { align-self: center; }
   .dx-devquick { flex-direction: column; gap: 14px; padding: 14px; }
   .dx-thumb--quick { width: 100%; max-width: 320px; height: auto; aspect-ratio: 4 / 3; }
+  .dx-thumb--quick[style*="--thumb-ar"] { width: auto; height: 160px; max-width: 100%; }
+  .dx-thumb--quick.dx-thumb--portrait[style*="--thumb-ar"] { height: 200px; }
   .dx-devquick-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .dx-devquick-lineups { flex-basis: 100%; margin-left: 0; white-space: normal; }
   .dx-devquick-open { margin-left: 0; }
@@ -4379,6 +4391,8 @@ select.dx-input:hover {
   .dx-devhead-name { font-size: 20px; white-space: normal; }
   .dx-overview { grid-template-columns: 1fr; }
   .dx-thumb--page { width: 100%; max-width: 320px; height: auto; aspect-ratio: 4 / 3; }
+  .dx-thumb--page[style*="--thumb-ar"] { width: auto; height: 180px; max-width: 100%; }
+  .dx-thumb--page.dx-thumb--portrait[style*="--thumb-ar"] { height: 240px; }
   .dx-devsec .dx-section-head { flex-wrap: wrap; }
   .dx-conn-grid--page > div { flex-direction: column; align-items: flex-start; gap: 4px; }
   .dx-conn-grid--page dd { justify-content: flex-start; text-align: left; }
