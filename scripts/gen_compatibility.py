@@ -33,6 +33,7 @@ OUT = REPO_ROOT / "docs" / "compatibility.md"
 VENDOR_ORDER: list[tuple[str, str]] = [
     ("seeed", "Seeed Studio"),
     ("m5stack", "M5Stack"),
+    ("lilygo", "LILYGO"),
     ("paperlesspaper", "paperlesspaper"),
     ("pimoroni", "Pimoroni"),
     ("remarkable", "reMarkable"),

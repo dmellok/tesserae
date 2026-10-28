@@ -1,0 +1,27 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "lilygo_t5s3_pro",
+  "name": "LILYGO T5 E-Paper S3 Pro / Pro Lite",
+  "vendor": "LILYGO",
+  "url": "https://lilygo.cc/products/t5-e-paper-s3-pro",
+  "icon": "device-tablet",
+  "description": "4.7 inch 16-level greyscale ePaper board (T5 E-Paper S3 Pro and Pro Lite, H752-01): ESP32-S3-WROOM-1-N16R8 with 16 MB flash and 8 MB octal PSRAM, TPS65185 panel power behind a PCA9535 expander, 960x540 glass used landscape. The same ED047TC1 panel and parallel bus as the PaperS3, on the epdiy v7 pin map. Speaks Tesserae's v1 REST device API from the tesserae-device-firmware build (env lilygo-t5s3-pro) and paints the esp32_gray_bin 4-bpp greyscale frame straight onto the panel's parallel bus.",
+  "protocol": "esp32_client",
+  "renderers": [
+    "esp32_gray_bin"
+  ],
+  "panel": {
+    "w": 960,
+    "h": 540,
+    "orientation": "landscape",
+    "name": "4.7 inch ePaper (16-level greyscale, 960x540, landscape)",
+    "gamut": "gray_16",
+    "native_w": 960,
+    "native_h": 540
+  },
+  "refresh_floor_s": 60,
+  "image_format": "bin",
+  "touch": false,
+  "auto_select": false,
+  "notes_md": "Confirmed on real hardware by the firmware's contributor on one T5 E-Paper S3 Pro Lite (2026-10-28): the self-test powers the TPS65185 rails with no power-good errors and paints the 16 grey bands in order, and the production build joins Wi-Fi, registers as this kind, and paints server-composed 960x540 dashboards upright on the glass. The server's telemetry records the board's wake cycles. Not yet measured: battery life and charging, and OTA on this board (the first firmware build ships with OTA off).\n\nWire format is exactly 259200 bytes (960*540/2), row-major from the top-left, high nibble = left pixel, 0x0 = black .. 0xF = white, byte-identical to `m5stack_papers3` and `m5stack_paperdiy`. The board is used landscape and the firmware turns nothing on the device, so the composition is the same 960x540 as the glass and the frame packs straight through; for a portrait mount set the device's orientation in Settings -> Devices.\n\nThe Pro and the Pro Lite share one schematic and one PCB (the Lite omits the LoRa radio and GPS, so its back is still silkscreened LORA); the firmware is the same. The panel path is the epdiy v7's pin for pin, with the TPS65185 + PCA9535 power path, so it runs the existing `parallel_epd_gray` driver with no changes. This is not the older T5-4.7 S3 / S3 Lite (a 74HCT4094 shift-register board) and not the H752 (no TPS65185): those wire the panel differently and need other firmware.\n\nNot auto-selected from a relay self-report: on the wire it reports the same protocol, gamut and geometry as the PaperS3, so it is only ever set by the firmware declaring it at register / discover, or by the operator.\n\nNot wired up in the firmware: the GT911 touch panel, the side button, the RTC, the microSD slot, LoRa/GPS on the Pro, and partial refresh. The 60 s refresh floor is the PaperS3's and is worth revisiting once a duty cycle has been measured."
+}

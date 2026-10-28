@@ -188,6 +188,48 @@ def test_ee03_is_its_own_kind_sharing_the_e1003_gray_wire_contract(
     assert e1003.manifest.get("touch") is True
 
 
+def test_lilygo_t5s3_pro_is_its_own_kind_sharing_the_papers3_wire_contract(
+    tmp_path: Path, device_schema_path: Path, hardware_schema_path: Path
+) -> None:
+    """The T5 E-Paper S3 Pro / Pro Lite drives the PaperS3's ED047TC1 glass,
+    so it packs the identical 4-bpp grayscale frame via esp32_gray_bin and is
+    used landscape (the composition is the glass's own 960x540). It still
+    needs its own kind because the kind id names the OTA lineage and the
+    firmware images are not interchangeable, and it must carry
+    auto_select: false so relay pairing never infers it over the PaperS3
+    (identical protocol, gamut, and byte count on the wire)."""
+    registry = device_loader.discover(
+        REPO_ROOT / "devices",
+        schema_path=device_schema_path,
+        data_root=tmp_path,
+        hardware_dir=REPO_ROOT / "hardware",
+        hardware_schema_path=hardware_schema_path,
+    )
+    assert registry.errors == []
+
+    t5 = registry.devices["lilygo_t5s3_pro"]
+    papers3 = registry.devices["m5stack_papers3"]
+
+    # Distinct kinds, not an alias.
+    assert t5.id != papers3.id
+    assert t5.kind_of is None and papers3.kind_of is None
+
+    # Same wire contract: protocol, renderer, gamut and bytes per frame.
+    assert t5.manifest["_catalog_entry"]["protocol"] == "esp32_client"
+    assert t5.manifest["renderers"] == papers3.manifest["renderers"] == ["esp32_gray_bin"]
+    assert t5.panel is not None
+    assert (t5.panel["w"], t5.panel["h"]) == (960, 540)
+    assert t5.panel["orientation"] == "landscape"
+    assert t5.panel["gamut"] == "gray_16"
+    assert t5.panel["w"] * t5.panel["h"] // 2 == 259200
+
+    # Indistinguishable on the wire -> inference must stay off.
+    assert t5.manifest["_catalog_entry"]["auto_select"] is False
+
+    # The firmware does not wire up the GT911 touch panel.
+    assert t5.manifest.get("touch") is not True
+
+
 def test_kobo_colour_readers_take_the_kaleido_png_renderer_first(
     tmp_path: Path, hardware_schema_path: Path, device_schema_path: Path
 ) -> None:
