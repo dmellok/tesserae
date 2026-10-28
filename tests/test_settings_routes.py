@@ -1422,6 +1422,34 @@ def test_settings_pages_highlight_the_settings_nav_item(
     assert [c.strip() for c in current] == [area]
 
 
+@pytest.mark.parametrize(
+    ("path", "area"),
+    [
+        ("/settings/server", "Server"),
+        ("/settings/devices", "Devices"),
+        ("/settings/relay", "Cloud relay"),
+        ("/themes", "Themes"),
+    ],
+)
+def test_settings_nav_item_stays_highlighted_behind_a_url_prefix(
+    app_with_gate: Flask, path: str, area: str
+) -> None:
+    """Behind Home Assistant's ingress path or a reverse proxy's mount point
+    every nav link carries the prefix but ``request.path`` doesn't, so the
+    comparison that marks the current area never matched and nothing was
+    highlighted."""
+    client = app_with_gate.test_client()
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+    body = client.get(path, environ_overrides={"SCRIPT_NAME": "/tesserae"}).get_data(as_text=True)
+    assert 'href="/tesserae/settings/server"' in body  # the prefix is on the links
+    current = re.findall(
+        r'<a class="nav-dropdown-link is-active"[^>]*aria-current="page">\s*'
+        r"<i[^>]*></i>([^<]+)</a>",
+        body,
+    )
+    assert [c.strip() for c in current] == [area]
+
+
 def test_classic_design_keeps_the_settings_link(app_with_gate: Flask) -> None:
     app_with_gate.config["SETTINGS_STORE"].patch_section("app", {"ui_design": "classic"})
     client = app_with_gate.test_client()
