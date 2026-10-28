@@ -60,6 +60,46 @@ class DeviceRotationStateStore:
             raw[state.device_id] = state.model_dump(mode="json", exclude_none=True)
             self._save_raw(raw)
 
+    def patch(
+        self,
+        device_id: str,
+        fields: dict[str, Any],
+        *,
+        expect: dict[str, Any] | None = None,
+    ) -> DeviceRotationState | None:
+        """Change only ``fields`` of a device's record (creating it when
+        missing), in one locked read-modify-write, so every other field
+        keeps the value stored right now. Writers own disjoint fields: a
+        button press its dedup fingerprint and position, Home Assistant's
+        Pause its pause field, the scheduler the pauses it releases. Writing
+        back a whole record read earlier would undo whatever another writer
+        stored in between (a Pause set while a press was rendering).
+
+        With ``expect``, the write happens only while those fields still
+        hold the given values (compare-and-set): a release of a lapsed
+        pause must not clear a newer one. Returns the stored state, or None
+        when the expectation no longer held."""
+        with self._lock:
+            raw = self._load_raw()
+            current: DeviceRotationState | None = None
+            if device_id in raw:
+                try:
+                    current = DeviceRotationState.model_validate(raw[device_id])
+                except Exception:
+                    current = None
+            if current is None:
+                current = DeviceRotationState(device_id=device_id)
+            if expect is not None and any(
+                getattr(current, key) != value for key, value in expect.items()
+            ):
+                return None
+            updated = DeviceRotationState.model_validate(
+                {**current.model_dump(), **fields, "device_id": device_id}
+            )
+            raw[device_id] = updated.model_dump(mode="json", exclude_none=True)
+            self._save_raw(raw)
+            return updated
+
     def delete(self, device_id: str) -> bool:
         """Remove a device's manual state so time-based rotation resumes
         immediately. Returns True if a record existed."""

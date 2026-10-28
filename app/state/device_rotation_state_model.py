@@ -38,7 +38,10 @@ from pydantic import BaseModel, ConfigDict, Field
 class DeviceRotationState(BaseModel):
     """One device's manual rotation position + button dedup state."""
 
-    model_config = ConfigDict(extra="forbid")
+    # A record carrying a field this version doesn't know (written by a newer
+    # server, then read after a downgrade) still loads, instead of reading as
+    # missing and losing the hold / position beside it.
+    model_config = ConfigDict(extra="ignore")
 
     device_id: str = Field(min_length=1)
 
@@ -56,6 +59,17 @@ class DeviceRotationState(BaseModel):
     # ``None`` means "never overridden", i.e. always fall through to
     # scheduler.
     override_until: datetime | None = None
+
+    # UTC timestamp; while ``datetime.now(UTC) < automation_pause_until``
+    # the scheduler delivers nothing automated to this display (lineup
+    # steps, daily / interval fires, rotations, schedules, page refreshes,
+    # home returns), the per-display counterpart of the global Automation
+    # pause. Manual sends still go through. Set by Home Assistant's Pause
+    # number; a lapsed value is cleared by the scheduler, which then
+    # catches the display up on what it missed. Separate from
+    # ``override_until`` (a button's hold, and the Hold number), which
+    # it never touches.
+    automation_pause_until: datetime | None = None
 
     # Debounce fingerprints for the last processed button event.
     # ``last_button_event_id`` is the monotonic counter the firmware

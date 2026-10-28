@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -83,3 +84,66 @@ def test_corrupt_json_reads_as_empty(tmp_path: Path) -> None:
     store = DeviceRotationStateStore(path)
     assert store.get("kitchen") is None
     assert store.all() == {}
+
+
+def test_patch_changes_only_the_given_fields(tmp_path: Path) -> None:
+    store = DeviceRotationStateStore(tmp_path / "state.json")
+    store.upsert(_sample())
+    until = datetime(2026, 7, 5, tzinfo=UTC)
+    store.patch("kitchen", {"automation_pause_until": until})
+    got = store.get("kitchen")
+    assert got is not None
+    assert got.automation_pause_until == until
+    assert got.override_until == datetime(2026, 7, 4, tzinfo=UTC)
+    assert (got.rotation_id, got.step_index, got.last_button_event_id) == ("kitchen_rot", 2, 42)
+
+
+def test_patch_creates_a_missing_record(tmp_path: Path) -> None:
+    store = DeviceRotationStateStore(tmp_path / "state.json")
+    until = datetime(2026, 7, 5, tzinfo=UTC)
+    created = store.patch("hall", {"automation_pause_until": until})
+    assert created is not None and created.device_id == "hall"
+    assert store.get("hall") == created
+
+
+def test_patch_with_expect_is_a_compare_and_set(tmp_path: Path) -> None:
+    store = DeviceRotationStateStore(tmp_path / "state.json")
+    old = datetime(2026, 7, 5, tzinfo=UTC)
+    new = datetime(2026, 7, 6, tzinfo=UTC)
+    store.patch("kitchen", {"automation_pause_until": new})
+    # A release of the lapsed value must not clear the newer pause.
+    assert (
+        store.patch(
+            "kitchen",
+            {"automation_pause_until": None},
+            expect={"automation_pause_until": old},
+        )
+        is None
+    )
+    got = store.get("kitchen")
+    assert got is not None and got.automation_pause_until == new
+    cleared = store.patch(
+        "kitchen", {"automation_pause_until": None}, expect={"automation_pause_until": new}
+    )
+    assert cleared is not None and cleared.automation_pause_until is None
+
+
+def test_a_record_with_a_field_this_version_does_not_know_still_loads(tmp_path: Path) -> None:
+    # Written by a newer server, read after a downgrade: the hold and position
+    # beside the unknown field must not read as missing.
+    path = tmp_path / "state.json"
+    path.write_text(
+        json.dumps(
+            {
+                "kitchen": {
+                    "device_id": "kitchen",
+                    "rotation_id": "kitchen_rot",
+                    "step_index": 3,
+                    "from_the_future": True,
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    got = DeviceRotationStateStore(path).get("kitchen")
+    assert got is not None and got.rotation_id == "kitchen_rot" and got.step_index == 3

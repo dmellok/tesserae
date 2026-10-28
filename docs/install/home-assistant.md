@@ -129,6 +129,17 @@ to the hub via `via_device`):
 - **number** *Hold* (minutes). Set it to hold the page currently on the
   glass against the rotation for that long; 0 clears the hold. Counts
   down as the hold runs.
+- **number** *Pause* (minutes). Stops every automated delivery to *this*
+  display for that long: lineup steps, daily and interval lineups,
+  rotations, schedules, page refreshes and returns to a lineup's home
+  page. Manual sends and physical buttons still go through. When the
+  pause ends, or you set it to 0, the display gets what it missed (the
+  lineup's current page, or a daily or interval fire it sat out that day
+  if that came later, waiting for quiet hours to end if need be), and
+  only if something was missed; other displays are left alone. Counts
+  down as the pause runs. It is separate from *Hold*, which only keeps a
+  page on the glass against the rotation after a button press and is
+  unchanged.
 - **switch** *Quiet hours override*, the per-display quiet-hours
   override. Turning it on without stored times copies the app-level
   window.
@@ -210,7 +221,8 @@ them back. No restart needed.
   while guests are staying so nothing rotates overnight.
 - **Guest mode / focus mode.** Set *Hold* to 120 on the office display
   when a calendar event starts, so the agenda page stays put through
-  the meeting.
+  the meeting, or set *Pause* on a display while guests use it so
+  nothing automated lands on it until they are done.
 - **Physical buttons as HA triggers.** Trigger on the *Input* event
   entity: a `swipe` on the hall panel toggles the porch light, a
   `button` press named `refresh` re-runs a script.

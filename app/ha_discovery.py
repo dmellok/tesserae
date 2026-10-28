@@ -34,7 +34,9 @@ via ``via_device``):
 * **select** ``Dashboard`` (push one bound dashboard to *only* this
   display) and **select** ``Lineup`` (which lineup the display follows).
 * **number** ``Hold`` (minutes to hold the current page against the
-  rotation) and, when the kind carries one, ``Wake interval``.
+  rotation), **number** ``Pause`` (minutes this display sits out every
+  automated delivery, then gets what it missed) and, when the kind
+  carries one, ``Wake interval``.
 * **switch** ``Quiet hours override`` and **binary_sensors** ``In quiet
   hours``, ``Online``, ``Low battery``.
 * **button** ``Refresh now``, **buttons** ``Next`` / ``Previous`` (step
@@ -115,6 +117,8 @@ LINEUP_NONE = "(none)"
 
 # Hold entity bounds (minutes). 0 clears the hold.
 HOLD_MAX_MINUTES = 720
+# Pause entity bounds (minutes). 0 ends the pause now.
+PAUSE_MAX_MINUTES = 720
 
 # App-section switches (Settings -> Server -> Network & integrations) that
 # trim what's published. Both default ON when absent, so an install that
@@ -219,7 +223,8 @@ class HaHooks:
     * ``settings_store``: ``get_section`` / ``patch_section``, for the
       automation pause + quiet-hours toggles.
     * ``scheduler``: ``upcoming_for_device`` (Next change sensor).
-    * ``rotation_state_store``: per-display ``override_until`` (Hold).
+    * ``rotation_state_store``: per-display ``override_until`` (Hold) and
+      ``automation_pause_until`` (Pause).
     * ``telemetry``: ``get(device_id).predicted_next_wake_at``.
     * ``button_service``: ``add_listener`` / ``remove_listener`` for the
       input ``event`` entity.
@@ -658,6 +663,22 @@ def build_device_configs(
             ),
         ),
         (
+            _discovery_topic("number", f"dev_{device_id}_pause"),
+            _entity(
+                f"dev_{device_id}_pause",
+                "Pause",
+                dev,
+                command_topic=_dev_cmd(device_id, "pause"),
+                state_topic=_dev_state(device_id, "pause"),
+                min=0,
+                max=PAUSE_MAX_MINUTES,
+                step=5,
+                mode="box",
+                unit_of_measurement="min",
+                icon="mdi:motion-pause-outline",
+            ),
+        ),
+        (
             _discovery_topic("switch", f"dev_{device_id}_quiet_override"),
             _entity(
                 f"dev_{device_id}_quiet_override",
@@ -848,7 +869,7 @@ class HomeAssistantDiscovery:
     hand off to PushManager.push() which has its own lock so reentry is
     safe. State publishes are best-effort, broker outages just mean
     stale HA sensors, not a crashed app. A small ticker thread refreshes
-    the time-derived states (online, in quiet hours, hold remaining, next
+    the time-derived states (online, in quiet hours, hold and pause remaining, next
     change) every ``state_refresh_s`` seconds.
     """
 
@@ -1614,6 +1635,8 @@ class HomeAssistantDiscovery:
                 self._enqueue(label, lambda: self._set_device_lineup_by_id(device_id, text))
             elif leaf == "hold":
                 self._set_device_hold(device, text)
+            elif leaf == "pause":
+                self._set_device_pause(device, text)
             elif leaf == "quiet_override":
                 on = self._on_off(payload)
                 if on is not None:
@@ -1715,6 +1738,36 @@ class HomeAssistantDiscovery:
         until = datetime.now(UTC) + timedelta(minutes=minutes) if minutes > 0 else None
         store.upsert(state.model_copy(update={"override_until": until}))
         logger.info("HA discovery: hold %r for %d min", device.id, minutes)
+        self._publish_device_runtime(device)
+
+    def _set_device_pause(self, device: Any, text: str) -> None:
+        """Pause number: a per-display Automation pause. N minutes keeps every
+        automated delivery off this display (lineup steps, daily / interval
+        fires, rotations, schedules, page refreshes, home returns) until
+        then; manual sends still go through. 0 ends it now and the
+        scheduler's next tick catches the display up on anything it missed.
+        Touches only the pause: a physical button's hold (and the Hold
+        number) keep their own ``override_until``."""
+        store = self._hooks.rotation_state_store
+        if store is None:
+            return
+        try:
+            minutes = max(0, min(int(float(text)), PAUSE_MAX_MINUTES))
+        except (TypeError, ValueError, OverflowError):
+            return
+        # Only the pause field, patched into the stored record, so a button
+        # press rendering right now can't be undone by (or undo) this write.
+        # On 0 a lapsed (not cleared) value is stored, so the scheduler sees
+        # the pause end and catches the display up.
+        fields = {"automation_pause_until": datetime.now(UTC) + timedelta(minutes=minutes)}
+        if hasattr(store, "patch"):
+            store.patch(device.id, fields)
+        else:
+            from app.state.device_rotation_state_model import DeviceRotationState
+
+            state = store.get(device.id) or DeviceRotationState(device_id=device.id)
+            store.upsert(state.model_copy(update=fields))
+        logger.info("HA discovery: pause %r for %d min", device.id, minutes)
         self._publish_device_runtime(device)
 
     def _set_device_quiet_override(self, device: Any, enabled: bool) -> None:
@@ -2042,6 +2095,16 @@ class HomeAssistantDiscovery:
                         until = until.replace(tzinfo=UTC)
                     remaining = max(0, int((until - now).total_seconds() // 60))
             self._publish_str(_dev_state(device_id, "hold"), str(remaining), retain=True)
+            paused_for = 0
+            with contextlib.suppress(Exception):
+                state = self._hooks.rotation_state_store.get(device_id)
+                until = getattr(state, "automation_pause_until", None) if state else None
+                if isinstance(until, datetime):
+                    if until.tzinfo is None:
+                        until = until.replace(tzinfo=UTC)
+                    # Rounded up: a 5 minute pause reads 5, not 4, once set.
+                    paused_for = max(0, int(-(-(until - now).total_seconds() // 60)))
+            self._publish_str(_dev_state(device_id, "pause"), str(paused_for), retain=True)
 
         if self._hooks.settings_store is not None:
             from app.quiet_hours import device_is_quiet
@@ -2337,7 +2400,7 @@ class HomeAssistantDiscovery:
         if self._hooks.deck_store is None or not lineups_on:
             skip.add("lineup")
         if self._hooks.rotation_state_store is None:
-            skip.add("hold")
+            skip.update(("hold", "pause"))
         if self._hooks.settings_store is None:
             skip.update(("quiet_override", "quiet_now"))
         if self._hooks.scheduler is None:
