@@ -45,6 +45,7 @@ from typing import Any
 from flask import current_app
 
 from app.device_loader import Device
+from app.state.device_telemetry import known_sleep_cycle_s
 
 # Capability names, matching the keys firmware advertises in its
 # register / heartbeat body.
@@ -89,6 +90,11 @@ def freshness_threshold_s(device: Device) -> float:
         spec = schema.get("sleep_interval_s") if isinstance(schema, dict) else None
         if isinstance(spec, dict) and isinstance(spec.get("default"), int):
             interval = int(spec["default"])
+    # The configured interval can lag the one the device is really on (a
+    # smart-sync or quiet-hours stretch); telemetry has the observed cycle.
+    observed = known_sleep_cycle_s(current_app.config.get("DEVICE_TELEMETRY"), device.id)
+    if observed is not None:
+        interval = max(interval, int(observed))
     return max(interval * _FRESHNESS_CYCLES, _FRESHNESS_FLOOR_S)
 
 

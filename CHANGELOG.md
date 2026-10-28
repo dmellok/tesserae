@@ -6,6 +6,19 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed
+
+- The status dot on the Devices list, the device page header, the Dashboards
+  list's per-display dot and the dashboards' device chips follows a sleeping
+  device's own cycle. It went red 5 minutes after a heartbeat, so a battery
+  e-paper frame that wakes every 30 minutes read as stale for most of each
+  cycle. When the device's sleep cycle is known the dot stays green until a
+  little past one cycle, amber for a couple more, and red after that (and the
+  "online", "quiet" and "stale" wording beside it agrees). The Companion API's
+  `freshness` flag and Home Assistant's online state use the same observed
+  cycle instead of only the configured interval. Devices with no known cycle,
+  and always-on ones, keep the old bands.
+
 ## [0.493.0], 2026-10-29
 
 ### Added

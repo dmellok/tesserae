@@ -176,8 +176,10 @@ def _set_device_config(app: Flask, device_id: str, values: dict[str, Any]) -> st
 
 def _expected_interval(app: Flask, device_id: str) -> int | None:
     """Seconds between heartbeats for a display: the awake poll cadence
-    when it stays on, else the stored / default sleep interval."""
+    when it stays on, else the stored / default sleep interval, stretched to
+    the cycle telemetry has actually seen when that is longer."""
     from app.device_service import awake_poll_interval_s
+    from app.state.device_telemetry import known_sleep_cycle_s
 
     device = app.config["DEVICE_REGISTRY"].get(device_id)
     if device is None:
@@ -187,13 +189,18 @@ def _expected_interval(app: Flask, device_id: str) -> int | None:
     awake = awake_poll_interval_s(stored)
     if awake is not None:
         return awake
+    configured: int | None = None
     if isinstance(stored, dict) and isinstance(stored.get("sleep_interval_s"), int):
-        return int(stored["sleep_interval_s"])
-    schema = device.config_schema or {}
-    spec = schema.get("sleep_interval_s") if isinstance(schema, dict) else None
-    if isinstance(spec, dict) and isinstance(spec.get("default"), int):
-        return int(spec["default"])
-    return None
+        configured = int(stored["sleep_interval_s"])
+    else:
+        schema = device.config_schema or {}
+        spec = schema.get("sleep_interval_s") if isinstance(schema, dict) else None
+        if isinstance(spec, dict) and isinstance(spec.get("default"), int):
+            configured = int(spec["default"])
+    observed = known_sleep_cycle_s(app.config.get("DEVICE_TELEMETRY"), device_id)
+    if observed is not None:
+        return max(configured or 0, int(observed))
+    return configured
 
 
 def _ota_capable(app: Flask, device_id: str) -> bool:

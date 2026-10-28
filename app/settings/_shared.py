@@ -32,6 +32,7 @@ from app.location_time import is_iana_zone
 from app.plugin_loader import PluginRegistry
 from app.push import PushManager
 from app.renderer_loader import RendererRegistry
+from app.state.device_telemetry import known_sleep_cycle_s
 from app.state.event_log import EventLog
 from app.state.settings_store import SettingsStore
 from app.transport import MqttTransport
@@ -42,6 +43,31 @@ from app.transport import MqttTransport
 # last value is still informative.
 STATUS_FRESH_S: int = 90
 STATUS_WARN_S: int = 5 * 60
+
+
+def health_for_age(device_id: str, age: float) -> str:
+    """ok / warn / stale for a heartbeat ``age`` seconds old.
+
+    The fixed bands above suit a device that reports every minute or so. A
+    device that sleeps between check-ins (a battery e-paper frame waking every
+    30 minutes) is "stale" for most of each cycle by those bands, so its dot
+    stayed red while nothing was wrong. When telemetry knows the device's
+    sleep cycle the bands stretch to it: fresh until a little past one cycle,
+    warn until a couple of cycles, stale after that."""
+    fresh, warn = float(STATUS_FRESH_S), float(STATUS_WARN_S)
+    try:
+        cycle_s = known_sleep_cycle_s(current_app.config.get("DEVICE_TELEMETRY"), device_id)
+    except Exception:
+        cycle_s = None
+    if cycle_s is not None:
+        fresh = max(fresh, cycle_s * 1.25 + 60)
+        warn = max(warn, cycle_s * 2.5 + 60)
+    if age <= fresh:
+        return "ok"
+    if age <= warn:
+        return "warn"
+    return "stale"
+
 
 # Blueprint name is "auth" for backward compatibility, 71+ templates
 # reference url_for("auth.xxx"). Renaming would be a mass rename across
