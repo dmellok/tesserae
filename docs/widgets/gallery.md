@@ -2,7 +2,7 @@
 
 # Widget gallery
 
-The **37 widgets** that ship with Tesserae. Each is a drop-a-folder widget under `plugins/<id>/`; drop your own in and it shows up in the editor's picker. Want to build one? See [Build a widget with AI](../dev/writing-a-widget.md).
+The **38 widgets** that ship with Tesserae. Each is a drop-a-folder widget under `plugins/<id>/`; drop your own in and it shows up in the editor's picker. Want to build one? See [Build a widget with AI](../dev/writing-a-widget.md).
 
 !!! tip "Looking for more widgets?"
     Browse the full community catalog at [tesserae.ink/catalog](https://tesserae.ink/catalog/): widgets, themes, and dashboard templates, all installable from **Settings → Widgets → Browse catalog** inside the app.
@@ -142,6 +142,16 @@ The **37 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** Stable
 
+-   **AI Illustrated News** &middot; `news_illustrated`
+
+    ---
+
+    ![news_illustrated](../screenshots/widgets/news_illustrated.png)
+
+    Once a day, the top story of each of your feeds, summarised by an AI and drawn as a satirical ink cartoon (kie.ai, Gemini, Pollinations or HuggingFace). Shows one story at a time, poster style, moving to the next on each refresh.
+
+    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** Best-effort
+
 -   **News, Reddit** &middot; `news_reddit`
 
     ---
@@ -234,7 +244,7 @@ The **37 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     ![ha_energy](../screenshots/widgets/ha_energy.png)
 
-    Live solar / grid / battery / house-consumption snapshot from your HA energy dashboard, with today's totals and a 24-hour sparkline. Wires to the same sensor.* entities you've already configured under HA's Energy panel.
+    Live solar / grid / battery / house-consumption snapshot from your HA energy dashboard, with today's totals, optional yesterday's solar total, and a 24-hour sparkline. Wires to the same sensor.* entities you've already configured under HA's Energy panel.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** Local
 

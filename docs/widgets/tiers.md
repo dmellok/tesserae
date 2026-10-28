@@ -38,6 +38,7 @@ enough that breakage would be a notable event. Failure mode is usually
 |---|---|
 | `finance_stock` *(marketplace)* | Yahoo Finance's `/v8/finance/chart/` endpoint isn't officially documented. Has been stable for 7+ years and is what most "free stock API" libraries reach for. |
 | `picture_apple_album` *(marketplace)* | Reverse-engineered iCloud Shared Album endpoints. The shape has held up for ~10 years; Apple has shifted partitioning twice without breaking the protocol. |
+| `news_illustrated` | Summaries come from Groq or Gemini and pictures from kie.ai, Gemini, Pollinations or HuggingFace, tried in your order. Free tiers and credit pricing change, and a feed that fails or returns junk is skipped without failing the run. |
 
 ## Fragile
 

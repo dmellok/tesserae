@@ -6,6 +6,18 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.490.0], 2026-10-28
+
+### Added
+
+- **AI Illustrated News** widget: once a day, the top story of each of your
+  feeds, summarised by Groq and drawn as a satirical ink cartoon (kie.ai,
+  Gemini, Pollinations or HuggingFace, tried in the order you drag them
+  into). Shows one story at a time, poster style, moving on at each refresh.
+  Its own page shows today's stories as the frame draws them, the last run's
+  log with token and credit use, and its settings; the API keys stay under
+  Settings > Widgets. A feed that fails is skipped, not the run.
+
 ## [0.484.1], 2026-10-28
 
 ### Fixed

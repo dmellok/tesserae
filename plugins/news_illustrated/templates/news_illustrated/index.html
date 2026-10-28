@@ -1,0 +1,400 @@
+{% extends "_base.html" %}
+{% from "_components.html" import auto_field, button, empty_state, info_pop, section_card with context %}
+{% block title %}AI Illustrated News, Tesserae{% endblock %}
+{% block head_extra %}
+<script src="{{ url_for('static', filename='pages/settings.js') }}" defer></script>
+<script type="module" src="{{ url_for('news_illustrated_admin.admin_js') }}"></script>
+{% endblock %}
+
+{#- A text box, select, time or number for a setting, labelled ``label``
+    (the setting's own label otherwise) with ``help`` in its info button. -#}
+{% macro text_setting(name, label=none, help=none) -%}
+  {%- set spec = dict(fields[name], label=label or fields[name].label) -%}
+  {{ auto_field('ain-' ~ name, name, spec, values[name], help=help) }}
+{%- endmacro %}
+
+{#- A prompt: the textarea with its info button and a reset-to-default
+    button beside it. -#}
+{% macro prompt_setting(name, rows) -%}
+  {%- set spec = fields[name] -%}
+  {%- set fid = 'ain-' ~ name -%}
+  <div class="field ain-prompt">
+    <label for="{{ fid }}">{{ spec.label }}{{ info_pop(spec.help) }}<button type="button" class="ain-reset" data-ain-reset="{{ fid }}" title="Reset to the default prompt" aria-label="Reset {{ spec.label }} to the default"><i class="ph ph-arrow-counter-clockwise" aria-hidden="true"></i></button></label>
+    <textarea id="{{ fid }}" name="{{ name }}" rows="{{ rows }}" data-default="{{ spec.default }}">{{ values[name] }}</textarea>
+  </div>
+{%- endmacro %}
+
+{#- Whether an API key is set. Keys are kept encrypted with the app's
+    settings and changed under Settings > Widgets; this page never sees one. -#}
+{% macro key_status(name, label, help) -%}
+  {%- set key = keys[name] -%}
+  <div class="field ain-key">
+    <span class="ain-label">{{ label }}{{ info_pop(help) }}</span>
+    <p class="ain-key-state" data-ain-key="{{ name }}" data-state="{{ key.state }}">
+      <span class="tg tg--sm{% if key.tone %} {{ key.tone }}{% endif %}">{{ key.words }}</span>
+      <a href="{{ keys_url }}">{{ {'unset': 'Add it', 'unreadable': 'Enter it again'}.get(key.state, 'Change it') }} under Settings › Widgets</a>
+    </p>
+  </div>
+{%- endmacro %}
+
+{% block main %}
+<div class="page-head">
+  <h1><i class="ph ph-newspaper-clipping" aria-hidden="true"></i> AI Illustrated News</h1>
+  <p class="lede">Each day, the top story from each of your feeds, summarised and drawn as an ink cartoon. Frames show one story at a time and move to the next on each refresh.</p>
+</div>
+
+<div class="settings-section-list">
+{% call section_card(icon='newspaper-clipping', title="Today's stories", id='stories') %}
+  <div class="ain-head">
+    <p class="lede">
+      {% if running %}
+        A run is going now; the job tray shows which story it is on.
+      {% elif edition_done %}
+        Today's stories are made. The next ones come after {{ cfg.run_at }} tomorrow.
+      {% else %}
+        Today's stories are made at the first frame update after {{ cfg.run_at }}.
+      {% endif %}
+    </p>
+    {% if running %}
+      <form method="post" action="{{ url_for('news_illustrated_admin.stop') }}" class="ain-run">
+        {{ button('Stop', variant='secondary', icon='stop') }}
+      </form>
+    {% else %}
+      <form method="post" action="{{ url_for('news_illustrated_admin.run_now') }}" class="ain-run"
+            onsubmit="return confirm('Make new stories now? Each picture is a paid call to the image provider.');">
+        {{ button('Generate now', icon='sparkle') }}
+      </form>
+    {% endif %}
+  </div>
+  <dl class="ain-using">
+    <dt>Summaries</dt>
+    <dd>
+      {% if cfg.summary_service == 'off' %}<span class="tg tg--sm">Off</span> the article's opening words
+      {% elif cfg.groq_key %}<span class="tg tg--sm tg--ok">Groq</span> <span class="ain-mono">{{ cfg.groq_model }}</span>
+      {% else %}<span class="tg tg--sm tg--warn">No Groq key</span> the article's opening words{% endif %}
+    </dd>
+    <dt>Pictures</dt>
+    <dd>
+      {% for p in cfg.painters_ready %}<span class="tg tg--sm tg--ok">{{ names[p] }}</span>{% if not loop.last %}<i class="ph ph-arrow-right ain-then" aria-label="then"></i>{% endif %}{% else %}<span class="tg tg--sm tg--warn">None</span> no provider is on with a key, so stories are text only{% endfor %}
+    </dd>
+    <dt>Shape</dt>
+    <dd><span><span class="ain-mono">{{ aspect }}</span>{% if frame.seen %}, for your {{ frame.w }}×{{ frame.h }} frame{% elif cfg.image_shape == 'auto' %}, until a frame shows the widget{% endif %}</span></dd>
+  </dl>
+  {% if previews %}
+  <ul class="ain-stories" data-ain-stories>
+    {% for p in previews %}
+    {% set s = stories[loop.index0] %}
+    <li class="ain-story">
+      <button type="button" class="ain-shot" data-ain-open="{{ loop.index0 }}"
+              aria-label="{{ p.title }}: open it as the frame shows it">
+        <span class="ain-screen" style="aspect-ratio: {{ frame.w }} / {{ frame.h }}">
+          <span class="ain-host" data-ain-host="{{ loop.index0 }}">
+            {%- if p.image %}<img src="{{ url_for('news_illustrated_admin.image', name=s.image) }}" alt="" loading="lazy">{% endif -%}
+          </span>
+        </span>
+      </button>
+      <p class="ain-story-title">{% if p.url.startswith(('http://', 'https://')) %}<a href="{{ p.url }}" rel="noopener noreferrer" target="_blank">{{ p.title }}<i class="ph ph-arrow-up-right" aria-hidden="true"></i></a>{% else %}{{ p.title }}{% endif %}</p>
+      {% set used = story_usage(s) %}
+      <p class="ain-story-meta">{{ p.source }} · {{ ('Picture by ' ~ names.get(s.provider, s.provider)) if s.provider else 'No picture' }}{% if used %} · {{ used }}{% endif %}</p>
+    </li>
+    {% endfor %}
+  </ul>
+  <p class="field-help ain-note">As on {{ 'your' if frame.seen else 'a' }} {{ frame.w }}×{{ frame.h }} frame. Click a story to see it large.</p>
+  {% else %}
+    {{ empty_state('newspaper-clipping', 'No stories yet', 'They are made at the first frame update after ' ~ cfg.run_at ~ ', or now with Generate now.') }}
+  {% endif %}
+  <script type="application/json" id="ain-data">{{ {'stories': previews, 'look': look, 'frame': frame, 'prefix': request.script_root, 'client': request.script_root ~ '/plugins/news_illustrated/client.js', 'recommended': recommended} | tojson }}</script>
+{% endcall %}
+
+{% if last %}
+{% call section_card(icon='list-checks', title='Last run', id='last-run') %}
+  <p class="lede">
+    {{ 'By hand' if last.reason == 'manual' else ('Collecting a paid picture' if last.reason == 'collect' else 'Scheduled') }}, {{ when(last.started) }} to {{ when(last.finished) }}:
+    {{ last.outcome or 'nothing made' }}{% if last.stopped %} (stopped){% endif %}.
+  </p>
+  {% set used = usage_sentence(last.usage or {}) %}
+  <p class="ain-used"><i class="ph ph-coins" aria-hidden="true"></i><span>{% if used %}Used: {{ used }}.{% else %}No usage reported for this run. Groq and Gemini report tokens and kie.ai its credits; Pollinations and HuggingFace say nothing.{% endif %}</span></p>
+  {% if last.log %}
+  <details class="dx-disclosure">
+    <summary><i class="ph ph-caret-right" aria-hidden="true"></i><span>Log</span></summary>
+    <div class="dx-disclosure-body">
+      <pre class="dx-code dx-log-view ain-log" data-ain-log>{{ last.log | join('\n') }}</pre>
+    </div>
+  </details>
+  {% endif %}
+  {% if runs|length > 1 %}
+  <details class="dx-disclosure">
+    <summary><i class="ph ph-caret-right" aria-hidden="true"></i><span>Earlier runs</span></summary>
+    <div class="dx-disclosure-body">
+      <pre class="dx-code dx-log-view ain-log">{% for r in runs %}{{ when(r.started) }}  {{ 'By hand  ' if r.reason == 'manual' else ('Collect  ' if r.reason == 'collect' else 'Scheduled') }}  {{ ('FAILED ' if r.failed else '') ~ (r.outcome or 'nothing made') }}{% set u = usage_sentence(r.usage or {}) %}{% if u %}  ({{ u }}){% endif %}
+{% endfor %}</pre>
+    </div>
+  </details>
+  {% endif %}
+{% endcall %}
+{% endif %}
+
+{#- The settings: one form over four cards, saved together. -#}
+<form method="post" action="{{ url_for('news_illustrated_admin.save_settings') }}" id="settings"
+      class="form dx-legacy-server-form settings-section-list ain-settings" data-dirty-form data-ain-settings>
+
+{% call section_card(icon='rss', title='Stories', id='ain-set-stories') %}
+  {{ text_setting('sources') }}
+  <p class="field-help ain-feeds-tip"><span>Looking for feeds? <a href="https://rss.feedspot.com/?_src=logo&amp;_origin=news_rss_feeds" target="_blank" rel="noopener noreferrer">Feedspot</a> lists good RSS feeds by topic and country; copy a feed's address into a line here.</span></p>
+  {% if source_problems %}
+  <div class="dx-warn-band ain-warn"><i class="ph ph-warning" aria-hidden="true"></i><p>{% for p in source_problems %}{{ p }}.{% if not loop.last %}<br>{% endif %}{% endfor %}</p></div>
+  {% endif %}
+  <div class="ain-row ain-when">
+    {{ text_setting('run_at') }}
+    {{ text_setting('summary_words') }}
+  </div>
+{% endcall %}
+
+{% call section_card(icon='text-align-left', title='Summaries', id='ain-set-summaries') %}
+  {% set service = values.summary_service %}
+  <div class="ain-choice">
+    <span class="ain-label" id="ain-service-label">Written by{{ info_pop(fields.summary_service.help) }}</span>
+    <div class="seg" role="radiogroup" aria-labelledby="ain-service-label">
+      <label class="seg-item"><input type="radio" class="ain-radio" name="summary_service" value="groq"{% if service != 'off' %} checked{% endif %}>Groq<span class="ain-rec">Recommended</span></label>
+      <label class="seg-item"><input type="radio" class="ain-radio" name="summary_service" value="off"{% if service == 'off' %} checked{% endif %}>Off</label>
+    </div>
+  </div>
+  <div class="ain-svc" data-ain-groq data-has-key="{{ '1' if cfg.groq_key else '0' }}">
+    <div class="ain-svc-head">
+      <strong>Groq</strong>
+      <span class="tg tg--sm" data-ain-status></span>
+    </div>
+    <div class="ain-pair">
+      {{ text_setting('groq_model', label='Model', help=link_help('groq', 'models')) }}
+      {{ key_status('groq_api_key', 'API key', link_help('groq', 'keys')) }}
+    </div>
+  </div>
+  {{ prompt_setting('summary_prompt', 3) }}
+  <p class="field-help ain-off-note" data-ain-off-note>Summaries are off: each story shows the opening words of its article.</p>
+{% endcall %}
+
+{% call section_card(icon='paint-brush', title='Pictures', id='ain-set-pictures') %}
+  <div class="ain-choice">
+    <span class="ain-label" id="ain-setup-label">Image providers{{ info_pop('Recommended uses kie.ai first, then Gemini, Pollinations and HuggingFace, each with its usual model. Only providers with a key are tried; the first picture wins, and a story has 150 seconds for its picture across all of them.') }}</span>
+    <div class="seg" role="group" aria-labelledby="ain-setup-label">
+      <button type="button" class="seg-item" data-ain-setup="recommended" aria-pressed="false">Recommended</button>
+      <button type="button" class="seg-item" data-ain-setup="custom" aria-pressed="false">Custom</button>
+    </div>
+  </div>
+  <div class="ain-order" data-ain-order>
+    <span class="ain-label" id="ain-order-label">Tried in this order</span>
+    <ol class="ain-chips" data-ain-chips aria-labelledby="ain-order-label"></ol>
+    <p class="field-help ain-order-help">Drag to reorder, or focus one and use the arrow keys.</p>
+    <span class="sr-only" aria-live="polite" data-ain-order-status></span>
+    <input type="hidden" name="provider_order" value="{{ values.provider_order }}" data-ain-order-input>
+  </div>
+  <div class="ain-provs">
+    {% for p in providers %}
+    <div class="ain-svc ain-prov" data-ain-prov="{{ p.id }}" data-name="{{ p.name }}" data-has-key="{{ '1' if p.has_key else '0' }}">
+      <div class="ain-svc-head">
+        <label class="tile ain-tile">
+          <input type="checkbox" data-ain-enable="{{ p.id }}"{% if p.on %} checked{% endif %}>
+          <span class="tile-check" aria-hidden="true"><i class="ph-bold ph-check"></i></span>
+          <span class="tile-body">{{ p.name }}</span>
+        </label>
+        <span class="tg tg--sm" data-ain-status></span>
+      </div>
+      <div class="ain-pair">
+        {{ text_setting(p.id ~ '_model', label='Model', help=p.model_help) }}
+        {{ key_status(p.id ~ '_api_key', 'Token' if p.id == 'huggingface' else 'API key', p.key_help) }}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {{ text_setting('image_shape') }}
+  {{ prompt_setting('image_prompt', 10) }}
+{% endcall %}
+
+{% call section_card(icon='frame-corners', title='On the frame', id='ain-set-frame') %}
+  <div class="ain-row ain-colours">
+    {% for name in ('caption_bg', 'caption_fg') %}
+    {% set fid = 'ain-' ~ name %}
+    <div class="field">
+      <label for="{{ fid }}">{{ fields[name].label }}{{ info_pop(fields[name].help) }}</label>
+      <span class="ain-colour"><input type="color" id="{{ fid }}" name="{{ name }}" value="{{ values[name] }}" data-ain-look><code data-ain-hex>{{ values[name] }}</code></span>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="ain-show">
+    <span class="ain-label" id="ain-show-label">Show{{ info_pop("A placement's own Summary and Source and date options can hide these on one frame.") }}</span>
+    <div class="ain-tiles" role="group" aria-labelledby="ain-show-label">
+      {% for name in ('show_tag', 'show_date', 'show_count', 'show_headline', 'show_summary') %}
+      {% set on = values[name] %}
+      <label class="tile">
+        <input type="checkbox" name="{{ name }}" value="on"{% if on %} checked{% endif %} data-ain-look>
+        <span class="tile-check" aria-hidden="true"><i class="ph-bold ph-check"></i></span>
+        <span class="tile-body">{{ fields[name].label }}</span>
+      </label>
+      {% endfor %}
+    </div>
+  </div>
+  {% if previews %}<p class="field-help">The stories above follow these as you change them; save to use them on the frame.</p>{% endif %}
+{% endcall %}
+
+  <div class="dx-save-bar dx-save-bar--server" data-save-bar hidden>
+    <span class="dx-save-bar-msg">You have unsaved changes</span>
+    <div class="dx-save-bar-actions">
+      <button type="reset" class="dx-save-bar-discard">Discard</button>
+      <button type="submit" class="dx-save-bar-save">
+        <i class="ph ph-floppy-disk" aria-hidden="true"></i>
+        <span>Save changes</span>
+      </button>
+    </div>
+  </div>
+  <noscript><div class="actions"><button type="submit" class="primary">Save changes</button></div></noscript>
+</form>
+</div>
+
+<style>
+  /* Under the Sources box: in its column where the label sits beside it. */
+  .ain-feeds-tip { margin: 2px 0 16px; }
+  @media (min-width: 1180px) {
+    :root[data-ui="paper"] .ain-feeds-tip { display: grid; grid-template-columns: minmax(200px, 300px) minmax(0, 1fr); column-gap: 32px; }
+    :root[data-ui="paper"] .ain-feeds-tip > span { grid-column: 2; }
+  }
+  .ain-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px 16px; flex-wrap: wrap; }
+  .ain-head .lede { margin: 0; flex: 1 1 320px; }
+  .ain-run { margin: 0; flex: none; }
+  .ain-mono { font-family: var(--t-font-mono); font-size: 12px; color: var(--t-fg-soft); }
+  .ain-using { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 16px; margin: 14px 0 0; font-size: 13px; color: var(--t-fg-soft); }
+  .ain-using dt { padding-top: 4px; font-family: var(--t-font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--t-muted); }
+  .ain-using dd { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; margin: 0; min-height: 22px; }
+  .ain-then { font-size: 11px; color: var(--t-muted); }
+
+  .ain-stories { list-style: none; margin: 18px 0 0; padding: 18px 0 0; border-top: 1px solid var(--t-border);
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 22px 18px; align-items: start; }
+  .ain-story { margin: 0; min-width: 0; }
+  .ain-shot { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; border-radius: 2px; }
+  .ain-shot:focus-visible { outline: 2px solid var(--t-accent); outline-offset: 3px; }
+  .ain-screen { position: relative; display: block; width: 100%; max-height: 420px; overflow: hidden; background: #111; border: 1px solid var(--t-border-strong); transition: transform 160ms cubic-bezier(.22, 1, .36, 1), box-shadow 160ms ease-out; }
+  .ain-shot:hover .ain-screen { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0, 0, 0, .14); }
+  /* The frame's page around the widget: nothing the admin page sets (a
+     button's nowrap, its font) may leak into the render. */
+  .ain-host { position: absolute; left: 0; top: 0; transform-origin: top left; container-type: size;
+    --font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-family: var(--font-family);
+    font-size: 16px; font-weight: 400; line-height: normal; letter-spacing: normal; text-align: start;
+    text-transform: none; white-space: normal; color: #000; }
+  .ain-host > img { width: 100%; height: 100%; object-fit: contain; }
+  .ain-story-meta { margin: 4px 0 0; font-size: 12px; line-height: 1.4; color: var(--t-fg-soft); }
+  .ain-story-title { margin: 10px 0 0; font-size: 13.5px; font-weight: 600; line-height: 1.35; color: var(--t-fg); }
+  .ain-story-title a { color: inherit; text-decoration: none; }
+  .ain-story-title a:hover { text-decoration: underline; }
+  .ain-story-title .ph { margin-left: 3px; font-size: 11px; color: var(--t-muted); }
+  .ain-note { margin: 16px 0 0; }
+
+  .ain-used { display: flex; align-items: flex-start; gap: 8px; margin: 10px 0 4px; font-size: 13px; color: var(--t-fg-soft); }
+  .ain-used .ph { margin-top: 2px; color: var(--t-muted); }
+  /* The run log's lines are long sentences: wrap them. */
+  .ain-log { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+  /* Settings */
+  .dx-section-body > .ain-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); column-gap: 16px; align-items: end; }
+  .dx-section-body .ain-row > .field + .field { border-top: 0; }
+  .dx-section-body > .field + .ain-row,
+  .dx-section-body > .ain-warn + .ain-row,
+  .dx-section-body > .ain-row + .field { border-top: 1px solid var(--dx-border-faint, var(--t-border)); }
+  .ain-key .ain-label { margin-bottom: 6px; }
+  .ain-key-state { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; margin: 0; min-height: 34px; font-size: 13px; color: var(--t-fg-soft); }
+  .ain-key-state a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+  .ain-choice, .ain-show { padding: 12px 0; }
+  .ain-choice + .ain-svc, .ain-show { border-top: 1px solid var(--dx-border-faint, var(--t-border)); }
+  .seg-item { position: relative; }
+  .ain-choice .seg .ain-radio { position: absolute; opacity: 0; width: 1px; height: 1px; padding: 0; margin: 0; border: 0; pointer-events: none; }
+  .ain-label { display: flex; align-items: center; gap: 2px; font-size: 12.5px; font-weight: 600; color: var(--dx-ink-soft, var(--t-fg-soft)); margin-bottom: 8px; }
+  .ain-choice .seg { align-self: flex-start; justify-self: start; }
+  .seg-item:has(input:checked) { background: var(--t-surface); color: var(--t-fg); box-shadow: 0 1px 2px rgba(0, 0, 0, .12); }
+  .seg-item:has(input:focus-visible) { outline: 2px solid var(--t-accent); outline-offset: 1px; }
+  .seg-item[aria-pressed="true"] { background: var(--t-surface); color: var(--t-fg); box-shadow: 0 1px 2px rgba(0, 0, 0, .12); }
+  .ain-rec { margin-left: 2px; padding: 3px 6px; border-radius: 4px; font-size: 10.5px; font-weight: 700; letter-spacing: .02em; background: color-mix(in oklab, var(--t-ok) 16%, var(--t-surface)); color: color-mix(in oklab, var(--t-ok) 70%, var(--t-fg)); }
+  .ain-svc { padding: 14px 0 6px; border-top: 1px solid var(--dx-border-faint, var(--t-border)); }
+  .ain-svc-head { display: flex; align-items: center; gap: 10px; min-height: 30px; }
+  .ain-svc-head > strong { font-size: 14px; }
+  .ain-svc-head .tg:empty { display: none; }
+  .ain-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 16px; }
+  .dx-section-body .ain-pair > .field { padding-block: 10px 8px; }
+  .dx-section-body .ain-pair > .field + .field { border-top: 0; }
+  .ain-svc.is-off .ain-pair { opacity: .55; }
+  .ain-tile { height: 34px; padding: 0 12px 0 9px; }
+  .ain-prov { display: grid; grid-template-columns: minmax(180px, 220px) minmax(0, 1fr); column-gap: 24px; align-items: start; padding: 10px 0 4px; }
+  .ain-prov .ain-svc-head { flex-direction: column; align-items: flex-start; gap: 6px; padding-top: 30px; }
+  .ain-provs { border-bottom: 1px solid var(--dx-border-faint, var(--t-border)); margin-bottom: 4px; }
+  .ain-provs .ain-prov:first-child { border-top: 0; }
+  .ain-off-note { display: none; }
+  [data-ain-settings].is-summary-off .ain-off-note { display: block; margin: 0 0 8px; }
+  [data-ain-settings].is-summary-off [data-ain-groq] .ain-pair,
+  [data-ain-settings].is-summary-off .ain-prompt:has([name="summary_prompt"]) { opacity: .55; }
+
+  .ain-order { padding: 4px 0 14px; }
+  .ain-chips { list-style: none; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; padding: 0; min-height: 34px; }
+  .ain-chip { display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 11px 0 7px; border: 1px solid var(--t-border-strong); border-radius: 6px; background: var(--t-surface); color: var(--t-fg); font: inherit; font-size: 13px; font-weight: 600; cursor: grab; touch-action: none; user-select: none; }
+  .ain-chip:focus-visible { outline: 2px solid var(--t-accent); outline-offset: 2px; }
+  .ain-chip .ph { color: var(--t-muted); font-size: 14px; }
+  .ain-chip-n { display: inline-grid; place-items: center; min-width: 18px; height: 18px; border-radius: 4px; background: var(--t-fg); color: var(--t-surface); font-family: var(--t-font-mono); font-size: 11px; font-weight: 600; }
+  .ain-chip.is-dragging { cursor: grabbing; opacity: .5; }
+  .ain-chip.no-key { border-style: dashed; color: var(--t-fg-soft); }
+  .ain-chips-empty { font-size: 13px; color: var(--t-fg-soft); }
+  .ain-order-help { margin: 8px 0 0; }
+
+  .ain-prompt label { display: flex; align-items: center; gap: 2px; }
+  .ain-reset { display: inline-grid; place-items: center; width: 24px; height: 24px; margin-left: 2px; padding: 0; border: 0; border-radius: 4px; background: none; color: var(--t-muted); cursor: pointer; font-size: 14px; }
+  .ain-reset:hover { color: var(--t-fg); background: color-mix(in oklab, var(--t-fg) 7%, transparent); }
+  .ain-reset:focus-visible { outline: 2px solid var(--t-accent); }
+  .ain-reset[disabled] { opacity: .35; cursor: default; background: none; }
+  .ain-prompt textarea { font-size: 13px; line-height: 1.5; }
+
+  .ain-colour { display: inline-flex; align-items: center; gap: 10px; }
+  .dx-section-body .field .ain-colour input[type="color"] { width: 44px; height: 34px; padding: 2px; cursor: pointer; }
+  .ain-colour code { font-family: var(--t-font-mono); font-size: 12px; color: var(--t-fg-soft); }
+  .ain-tiles { display: flex; flex-wrap: wrap; gap: 8px; }
+  .ain-tiles .tile { height: 36px; }
+  .ain-warn { margin: 4px 0 8px; }
+  .ain-settings > .dx-save-bar { margin-top: 0; }
+
+  /* The paper design lays settings out label-left on wide screens: line
+     the custom rows up with that column. */
+  @media (min-width: 1180px) {
+    :root[data-ui="paper"] .ain-settings .dx-section-body > .ain-choice,
+    :root[data-ui="paper"] .ain-settings .dx-section-body > .ain-order,
+    :root[data-ui="paper"] .ain-settings .dx-section-body > .ain-show {
+      display: grid; grid-template-columns: minmax(200px, 300px) minmax(0, 1fr); column-gap: 32px; align-items: start;
+    }
+    :root[data-ui="paper"] .ain-settings .dx-section-body > :is(.ain-choice, .ain-order, .ain-show) > .ain-label { grid-row: 1 / span 4; padding-top: 8px; }
+    :root[data-ui="paper"] .ain-settings .dx-section-body > :is(.ain-choice, .ain-order, .ain-show) > :not(.ain-label) { grid-column: 2; }
+    :root[data-ui="paper"] .ain-settings .dx-section-body > .ain-row.ain-colours { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (min-width: 1180px) {
+    :root[data-ui="paper"] .ain-prov { grid-template-columns: minmax(200px, 300px) minmax(0, 1fr); column-gap: 32px; }
+  }
+  @media (max-width: 760px) {
+    .ain-prov { grid-template-columns: minmax(0, 1fr); }
+    .ain-prov .ain-svc-head { flex-direction: row; align-items: center; padding-top: 4px; }
+  }
+  @media (max-width: 640px) {
+    .dx-section-body > .ain-row.ain-when { grid-template-columns: minmax(0, 1fr); }
+    .dx-section-body .ain-when > .field + .field { padding-top: 0; }
+    .ain-pair { grid-template-columns: minmax(0, 1fr); }
+    .dx-section-body .ain-pair > .field + .field { padding-top: 0; }
+    .ain-stories { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 12px; }
+  }
+
+  /* The lightbox: the shell's backdrop, a story at the frame's shape. */
+  .lightbox.ain-lb { grid-template-rows: minmax(0, 1fr) auto; gap: 14px; padding: 56px 20px 18px; background: rgba(14, 13, 11, 0.95); }
+  .ain-lb-stage { position: relative; align-self: center; justify-self: center; overflow: hidden; background: #000; box-shadow: 0 12px 48px rgba(0, 0, 0, .5); }
+  .ain-lb-bar { display: flex; align-items: center; justify-content: center; gap: 14px; color: #f2f0ea; font-size: 13px; max-width: min(720px, 100%); justify-self: center; text-align: center; }
+  .ain-lb-bar a { color: inherit; }
+  .ain-lb-nav { display: grid; place-items: center; width: 40px; height: 40px; border: 0; border-radius: 4px; background: rgba(255, 255, 255, .12); color: #fff; font-size: 20px; cursor: pointer; flex: none; }
+  .ain-lb-nav:hover { background: rgba(255, 255, 255, .22); }
+  .ain-lb-nav:focus-visible, .lightbox.ain-lb .lightbox-close:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+  .ain-lb-text { min-width: 0; }
+  .ain-lb-text span { display: block; opacity: .7; font-size: 12px; margin-top: 2px; }
+  @media (prefers-reduced-motion: reduce) {
+    .ain-screen { transition: none; }
+    .ain-shot:hover .ain-screen { transform: none; }
+  }
+</style>
+{% endblock %}

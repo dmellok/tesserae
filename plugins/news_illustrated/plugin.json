@@ -1,0 +1,142 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "AI Illustrated News",
+  "version": "0.3.0",
+  "kind": "widget",
+  "locales": [
+    "en"
+  ],
+  "description": "Once a day, the top story of each of your feeds, summarised by an AI and drawn as a satirical ink cartoon (kie.ai, Gemini, Pollinations or HuggingFace). Shows one story at a time, poster style, moving to the next on each refresh.",
+  "icon": "ph-newspaper-clipping",
+  "category": "reading",
+  "supports": {
+    "sizes": [
+      "xs",
+      "sm",
+      "md",
+      "lg"
+    ]
+  },
+  "cell_options": [
+    {
+      "name": "show_summary",
+      "type": "boolean",
+      "label": "Summary",
+      "default": true,
+      "help": "The story's summary under the headline, where the cell has room for it."
+    },
+    {
+      "name": "show_source",
+      "type": "boolean",
+      "label": "Source and date",
+      "default": true,
+      "help": "The feed's label, the story's date and which story of how many."
+    }
+  ],
+  "settings": [
+    {
+      "name": "groq_api_key",
+      "type": "string",
+      "label": "Groq API key",
+      "secret": true,
+      "default": "",
+      "help": "Writes the summaries. Without it a story shows the opening words of the article. Get one at console.groq.com/keys."
+    },
+    {
+      "name": "kie_api_key",
+      "type": "string",
+      "label": "kie.ai API key",
+      "secret": true,
+      "default": "",
+      "help": "Draws the pictures with kie.ai. Get one at kie.ai/api-key."
+    },
+    {
+      "name": "gemini_api_key",
+      "type": "string",
+      "label": "Gemini API key",
+      "secret": true,
+      "default": "",
+      "help": "Draws the pictures with Gemini. Get one at aistudio.google.com/apikey."
+    },
+    {
+      "name": "pollinations_api_key",
+      "type": "string",
+      "label": "Pollinations API key",
+      "secret": true,
+      "default": "",
+      "help": "Draws the pictures with Pollinations. Get one at enter.pollinations.ai."
+    },
+    {
+      "name": "huggingface_api_key",
+      "type": "string",
+      "label": "HuggingFace token",
+      "secret": true,
+      "default": "",
+      "help": "Draws the pictures with HuggingFace. Get one at huggingface.co/settings/tokens."
+    }
+  ],
+  "requires": [
+    "network:*",
+    "settings:plugin"
+  ],
+  "render": {
+    "needs_network": true,
+    "full_bleed": true,
+    "dither": "floyd-steinberg",
+    "warm_ahead_s": 150
+  },
+  "updates": {
+    "on_schedule": [
+      {
+        "kind": "daily",
+        "suggested_at": "06:05"
+      }
+    ]
+  },
+  "design": {
+    "palette": "extended"
+  },
+  "data_schema": {
+    "color": "#1F1F1F",
+    "fields": [
+      {
+        "name": "title",
+        "type": "str",
+        "label": "Headline"
+      },
+      {
+        "name": "summary",
+        "type": "str",
+        "label": "Summary"
+      },
+      {
+        "name": "source",
+        "type": "str",
+        "label": "Source"
+      },
+      {
+        "name": "date",
+        "type": "str",
+        "label": "Date"
+      },
+      {
+        "name": "image",
+        "type": "str",
+        "label": "Illustration URL"
+      },
+      {
+        "name": "url",
+        "type": "str",
+        "label": "Article link"
+      }
+    ],
+    "sample": {
+      "title": "Ukraine says Starlink connection 'now stable' after network limits",
+      "summary": "Ukraine's defence minister said the country now has a stable Starlink connection after days of limited satellite internet that hampered military operations.",
+      "source": "Global",
+      "date": "2026-10-24",
+      "image": "",
+      "url": "https://www.bbc.co.uk/news/articles/cwkg5md14j8go"
+    }
+  }
+}
