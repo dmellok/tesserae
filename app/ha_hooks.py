@@ -20,6 +20,7 @@ import json
 import logging
 import textwrap
 from datetime import tzinfo
+from pathlib import Path
 from typing import Any
 
 from flask import Flask
@@ -327,6 +328,59 @@ def _firmware_install(app: Flask, device_id: str) -> str | None:
     return None
 
 
+# Notification fonts, tried in order: the bundled Inter, then system fonts
+# with wider coverage (Liberation and DejaVu for Latin, Greek and Cyrillic,
+# WenQuanYi and Noto for CJK; the Docker image ships Liberation and
+# WenQuanYi), then macOS. The first that has every character of the
+# message wins, so umlauts and CJK draw instead of empty boxes.
+_NOTICE_FONTS = (
+    str(Path(__file__).resolve().parent.parent / "plugins/fonts_core/static/inter/700.woff2"),
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
+    "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
+    "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+    "/System/Library/Fonts/PingFang.ttc",
+)
+
+
+def _covers(font: Any, text: str) -> bool:
+    """Whether ``font`` has a glyph for every visible character of ``text``.
+    A missing glyph draws as the font's .notdef box, which is what a
+    private-use noncharacter draws as too."""
+    notdef = font.getmask("\U0010ffff")
+    blank = (notdef.size, bytes(notdef))
+    for ch in set(text):
+        if ch.isspace() or not ch.isprintable():
+            continue
+        mask = font.getmask(ch)
+        if (mask.size, bytes(mask)) == blank:
+            return False
+    return True
+
+
+def _notice_font(text: str, size: int) -> Any:
+    """The first of ``_NOTICE_FONTS`` that covers ``text``, else the first
+    that loads, else Pillow's built-in font."""
+    from PIL import ImageFont
+
+    first = None
+    for path in _NOTICE_FONTS:
+        try:
+            font = ImageFont.truetype(path, size=size)
+        except (OSError, ValueError):
+            continue
+        if _covers(font, text):
+            return font
+        first = first or font
+    if first is not None:
+        return first
+    try:
+        return ImageFont.load_default(size=size)
+    except TypeError:  # pragma: no cover - Pillow < 10.1
+        return ImageFont.load_default()
+
+
 def render_notice(message: str, width: int, height: int) -> bytes:
     """A plain black-on-white text card sized to the panel, as PNG bytes.
 
@@ -334,7 +388,7 @@ def render_notice(message: str, width: int, height: int) -> bytes:
     normal image push so each renderer fits, quantises and packs it for
     its own panel; a notification should read from across the room, not
     win a design award."""
-    from PIL import Image, ImageDraw, ImageFont
+    from PIL import Image, ImageDraw
 
     width = max(64, int(width))
     height = max(64, int(height))
@@ -344,13 +398,16 @@ def render_notice(message: str, width: int, height: int) -> bytes:
     size = max(18, min(width, height) // 9)
     text = message.strip() or " "
     while True:
-        try:
-            font = ImageFont.load_default(size=size)
-        except TypeError:  # pragma: no cover - Pillow < 10.1
-            font = ImageFont.load_default()
+        font = _notice_font(text, size)
         # Wrap by measured width: a character budget derived from the font's
         # average advance keeps long words from spilling past the margin.
-        avg = max(1.0, draw.textlength("abcdefghijklmnopqrstuvwxyz", font=font) / 26)
+        # The message's own average counts too, so wide CJK characters,
+        # which wrap without spaces, still fit.
+        avg = max(
+            1.0,
+            draw.textlength("abcdefghijklmnopqrstuvwxyz", font=font) / 26,
+            draw.textlength(text, font=font) / max(1, len(text)),
+        )
         budget = max(8, int((width - 2 * margin) / avg))
         lines = [
             wrapped

@@ -41,6 +41,21 @@ def test_render_notice_shrinks_long_text_to_fit() -> None:
     assert Image.open(io.BytesIO(png)).size == (296, 128)
 
 
+def test_render_notice_draws_umlauts_not_empty_boxes() -> None:
+    font = ha_hooks._notice_font("Grüße, Äpfel für 5 €", 40)
+    assert ha_hooks._covers(font, "Grüße, Äpfel für 5 €")
+    # The bundled Inter is enough for Latin text.
+    assert str(getattr(font, "path", "")).endswith("inter/700.woff2")
+
+
+def test_notice_coverage_check_spots_a_missing_glyph() -> None:
+    from PIL import ImageFont
+
+    inter = ImageFont.truetype(ha_hooks._NOTICE_FONTS[0], size=40)
+    assert ha_hooks._covers(inter, "abc")
+    assert not ha_hooks._covers(inter, "晚饭")
+
+
 # ---------- device config / interval / firmware ----------
 
 

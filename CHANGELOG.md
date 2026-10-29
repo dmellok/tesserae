@@ -6,6 +6,16 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.494.1], 2026-10-30
+
+### Fixed
+
+- Home Assistant notifications draw umlauts, accented letters, the euro sign
+  and Chinese or Japanese text instead of empty boxes. The notice card used
+  Pillow's built-in font, which only has ASCII; it now uses the bundled Inter,
+  falling back to a system font that has every character of the message.
+  Per #420.
+
 ## [0.494.0], 2026-10-30
 
 ### Added
