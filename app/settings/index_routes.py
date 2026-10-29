@@ -22,7 +22,7 @@ from flask import current_app, flash, redirect, render_template, request, sessio
 from werkzeug.wrappers import Response
 
 from app import backup as _backup_mod
-from app import device_service, device_timetable, palette_profiles, test_patterns
+from app import device_service, device_timetable, next_update, palette_profiles, test_patterns
 from app import firmware_check as firmware_check_module
 from app import install_id as install_id_module
 from app import updater as _updater_mod
@@ -1505,11 +1505,22 @@ def _device_overview(device: Device, section: dict[str, Any]) -> dict[str, Any]:
     else:
         fw_sub = ""
     ss = status["smart_sync"] or {}
-    interval_s = ss.get("interval_s") or section["state"].get("sleep_interval_s")
-    next_sub = ""
-    if isinstance(interval_s, (int, float)) and interval_s > 0:
-        next_sub = f"sleeps {_format_duration(float(interval_s))}"
-    predicted = ss.get("predicted_rel")
+    nu = ss.get("next_update")
+    if nu:
+        # One number that already weighs the server's next push against when
+        # the frame can take it (connected now, or its next check-in).
+        next_wake = {
+            "value": nu["when"] or "None scheduled",
+            "sub": nu["detail"],
+            "muted": not nu["when"],
+        }
+    else:
+        interval_s = ss.get("interval_s") or section["state"].get("sleep_interval_s")
+        next_sub = ""
+        if isinstance(interval_s, (int, float)) and interval_s > 0:
+            next_sub = f"sleeps {_format_duration(float(interval_s))}"
+        predicted = ss.get("predicted_rel")
+        next_wake = {"value": predicted or "-", "sub": next_sub, "muted": not predicted}
     return {
         "has_render": bool(latest),
         "showing": showing,
@@ -1520,11 +1531,7 @@ def _device_overview(device: Device, section: dict[str, Any]) -> dict[str, Any]:
             "muted": power.get("label") == "Mains",
         },
         "firmware": {"value": fw_value, "sub": fw_sub, "muted": not fw_current},
-        "next_wake": {
-            "value": predicted or "-",
-            "sub": next_sub,
-            "muted": not predicted,
-        },
+        "next_wake": next_wake,
     }
 
 
@@ -2175,6 +2182,22 @@ def _status_tiles(parsed: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _add_next_update(device: Device, ss: dict[str, Any]) -> None:
+    """Attach the one "next update" estimate (push time and check-in
+    together, see :mod:`app.next_update`) to the smart-sync block, and say
+    "connected" instead of counting down a wake for a frame that holds a live
+    connection. Best effort: the block renders without it."""
+    if ss.get("state") == "off":
+        return
+    try:
+        timing = next_update.DeviceTiming(device)
+        ss["next_update"] = timing.view()
+    except Exception:
+        return
+    if timing.reach.live:
+        ss["predicted_rel"] = "connected"
+
+
 def _smart_sync_header(ss: dict[str, Any]) -> dict[str, Any]:
     """Build the inline header pill + meter fields for the Smart Sync
     panel: a short tag ("Trusted" / "Warming up · 2 of 3 wakes" /
@@ -2245,6 +2268,7 @@ def _status_view(device: Device) -> dict[str, Any]:
     cache = device_status().get(device.id)
     parsed, phone_readings = _phone_status_readings(device.id, cache)
     smart_sync = _smart_sync_view(device.id)
+    _add_next_update(device, smart_sync)
     base: dict[str, Any] = {
         "health": "unknown",
         "relative": "no heartbeat received yet",

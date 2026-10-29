@@ -170,6 +170,7 @@
         <div class="dk-next"><span>next advance</span><strong>{{ c.next_advance }}</strong></div>
         {% endif %}
       </div>
+      {% if c.next_update %}<p class="dk-next-update" data-next-update>{{ c.next_update.text }}</p>{% endif %}
       {% if c.dwell_pct is not none %}
       <div class="dk-progress" role="progressbar" aria-label="Time through the current dwell" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ c.dwell_pct }}">
         <div class="dk-progress-track"><div class="dk-progress-fill" style="width: {{ c.dwell_pct }}%"></div></div>
@@ -196,7 +197,7 @@
     <div class="dk-next dk-count" title="Fires this schedule projects for today, the marks on the rail."><span>refreshes today</span><strong class="is-ink">{{ c.refreshes_today }}</strong></div>
     {% endif %}
     {% if c.next_fire %}
-    <div class="dk-next"><span>next push</span><strong class="is-ink">{{ c.next_fire }}</strong></div>
+    <div class="dk-next"><span>next push</span><strong class="is-ink">{{ c.next_fire }}</strong>{% if c.next_update %}<span class="dk-next-update" data-next-update>{{ c.next_update.text }}</span>{% endif %}</div>
     {% endif %}
   </div>
   {% else %}

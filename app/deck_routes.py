@@ -33,6 +33,7 @@ from werkzeug.wrappers import Response
 
 from app.deck_suggest import graph_for_pages, suggest_decks
 from app.lineup_authoring import build_lineup
+from app.next_update import DeviceTiming, reach_for_device
 from app.state.deck_model import Deck, DeckPage
 from app.state.deck_store import DeckStore
 from app.state.page_store import PageStore
@@ -323,7 +324,12 @@ def _panel_states(devices: list[Any]) -> dict[str, dict[str, Any]]:
                 page_id = latest.get("page_id")
                 at = latest.get("timestamp")
         next_wake: float | None = None
-        if telemetry is not None:
+        connected = False
+        try:
+            connected = reach_for_device(d, now=now_ts).live
+        except Exception:
+            connected = False
+        if telemetry is not None and not connected:
             try:
                 entry = telemetry.get(d.id)
             except Exception:
@@ -336,6 +342,7 @@ def _panel_states(devices: list[Any]) -> dict[str, dict[str, Any]]:
             "at": float(at) if isinstance(at, (int, float)) else None,
             "verb": "fetched" if pull else "sent",
             "next_wake": next_wake,
+            "connected": connected,
         }
     return out
 
@@ -523,12 +530,32 @@ def _design_cards(
             label += f" · resumes {card['next_advance']}"
         return label
 
+    device_objs = {d.id: d for d in devices}
+    timings: dict[str, Any] = {}
+
+    def next_update_for(device_id: str | None, push_at: Any) -> dict[str, Any] | None:
+        """When this display actually gets the card's next push: the push
+        time weighed against when the frame can take it (connected now, or
+        its next check-in) and any quiet-hours / pause hold. ``None`` when
+        the card has no next push or the display is unknown."""
+        device = device_objs.get(device_id) if device_id else None
+        if device is None or not isinstance(push_at, (int, float)):
+            return None
+        try:
+            if device.id not in timings:
+                timings[device.id] = DeviceTiming(device, now=now_ts)
+            return cast("dict[str, Any]", timings[device.id].view(float(push_at)))
+        except Exception:
+            return None
+
     def cycle_for_display(card: dict[str, Any], device_id: str | None) -> dict[str, Any]:
         """A rotation row as one display sees it: the frame on that panel,
         and whether the step the server intends has reached it yet. The
         planned strip marks the intended step live when the panel shows
         it, waiting when it does not; a panel whose page the server cannot
         name raises no alarm. Other kinds pass through unchanged."""
+        if card["kind"] == "send":
+            return {**card, "next_update": next_update_for(device_id, card["next_fire_epoch"])}
         if card["kind"] != "cycle":
             return card
         state = panel_states.get(device_id) if device_id else None
@@ -550,7 +577,12 @@ def _design_cards(
         if waiting and isinstance(start, (int, float)):
             behind = max(0, int((now_ts - start) // 60))
         next_poll = None
-        if waiting and state is not None and state["next_wake"] is not None:
+        if (
+            waiting
+            and state is not None
+            and state["next_wake"] is not None
+            and not state["connected"]
+        ):
             next_poll = _hhmm(state["next_wake"], tz)
         out = dict(card)
         out["screens"] = [
@@ -567,6 +599,7 @@ def _design_cards(
         out["behind_minutes"] = behind
         out["behind_label"] = f"{_mins_label(behind)} behind" if behind is not None else None
         out["next_poll_label"] = next_poll
+        out["next_update"] = next_update_for(device_id, card["next_advance_epoch"])
         out["paused_reason"] = paused_reason(card, device_id)
         return out
 
@@ -739,6 +772,9 @@ def _design_cards(
                 "step_index": step_index,
                 "live_name": page_names.get(current_page, current_page) if playing else None,
                 "next_advance": next_advance,
+                "next_advance_epoch": float(nxt)
+                if active and isinstance(nxt, (int, float))
+                else None,
                 "refreshes_today": len(_cycle_fires_on(r, day_start)) if r.enabled else None,
                 "fire_url": url_for("rotations.fire", rotation_id=r.id),
                 "play_url": url_for("rotations.play", rotation_id=r.id, step_index=play_next),
@@ -795,6 +831,7 @@ def _design_cards(
                     else f"every {s.interval_minutes} min"
                 ),
                 "next_fire": next_fire,
+                "next_fire_epoch": upcoming[0].timestamp() if upcoming else None,
                 "refreshes_today": len(fires_today) if s.enabled else None,
                 "fire_url": url_for("schedules.fire", schedule_id=s.id),
                 "edit_url": url_for("decks.index", sedit=s.id) + "#schedule-form-card",

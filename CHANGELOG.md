@@ -6,6 +6,24 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed
+
+- The Devices page, the device page and the Lineups page now agree on when a
+  frame actually gets its next update. They used to show two numbers that
+  contradicted each other ("Next wake in 24 min" on one, "next advance in 1
+  min" on the other, when the push was in fact taken within seconds). The
+  *Next update* is the server's next push (lineup step, schedule, timer
+  advance, page refresh) weighed against when the frame can take it: a frame
+  holding a live connection or staying awake gets it right away, a sleeping
+  frame gets it at its first check-in at or after the push. Quiet hours and
+  pauses show as "held until 07:00". The Devices tile and Smart sync card read
+  e.g. "Next update ~18:24 (frame sleeps; next check-in ~18:24)", and every
+  lineup card with a next push says the same under "next advance".
+- Visionect signs: the check-in estimate follows the gap actually observed
+  between the sign's statuses instead of the configured interval (a 32" set to
+  30 min reports about every 15), so the prediction earns trust. A sign with a
+  live connection reads "connected" instead of counting down a wake.
+
 ## [0.493.0], 2026-10-29
 
 ### Added
