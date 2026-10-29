@@ -6,7 +6,7 @@
 <article class="aw-card" data-name="{{ (b.title ~ ' ' ~ b.key ~ ' ' ~ (b.facet_label or ''))|lower }}">
   {% if b.file %}
   <a href="{{ url_for('artwork.file', plugin_id=plugin.id, name=c.name, filename=b.file) }}" data-lightbox class="aw-pic"><img src="{{ url_for('artwork.file', plugin_id=plugin.id, name=c.name, filename=b.file) }}" alt="{{ b.title }}" loading="lazy"></a>
-  {% else %}<div class="aw-pic aw-none"><span>{% if b.painting %}painting…{% elif b.held %}waiting for Paint now{% else %}not painted yet{% endif %}</span></div>{% endif %}
+  {% else %}<div class="aw-pic aw-none"><span>{% if b.painting %}painting…{% elif b.held %}waiting for Paint now{% elif b.versions %}deleted; its earlier versions are below{% else %}not painted yet{% endif %}</span></div>{% endif %}
   <h3>{{ b.title }}</h3>
   <p class="aw-line">{% if b.facet_label %}<span class="aw-tag">{{ b.facet_label }}</span>{% endif %}{% if b.painting %}<span class="aw-tag aw-tag--run">painting…</span>{% endif %}{% if b.meta and b.meta.credit %}<span class="aw-credit">{{ b.meta.credit }}</span>{% endif %}</p>
   {% if b.meta and b.meta.impression %}<p class="aw-ref"><i class="ph ph-pencil-line" aria-hidden="true"></i> An impression: painted from a description, not a picture</p>{% endif %}

@@ -544,7 +544,13 @@ class Collection:
         f = self.folder(data_dir)
         arch = f / "archive"
         arch.mkdir(parents=True, exist_ok=True)
-        stamp = time.strftime("%Y%m%d-%H%M%S")
+        # the stamp is to the second: a second archive within it (paint again, then use the
+        # earlier version) takes the next free name rather than writing over the first
+        base = time.strftime("%Y%m%d-%H%M%S")
+        stamp, n = base, 1
+        while any((arch / f"{key}__{stamp}{ext}").exists() for ext in (".jpg", ".png", ".json")):
+            stamp = f"{base}-{n}"
+            n += 1
         for ext in (".jpg", ".png", ".json"):
             with contextlib.suppress(OSError):
                 os.replace(f / f"{key}{ext}", arch / f"{key}__{stamp}{ext}")
@@ -671,6 +677,42 @@ class Collection:
                             "error": self.why_failed(key, data_dir),
                         }
                     )
+        # a picture deleted but kept as an earlier version has no current file: it stays on the
+        # page as a card with its versions, so one of them can be made current again or dropped
+        have = {e["key"] for e in out}
+        arch = f / "archive"
+        with contextlib.suppress(OSError):
+            for p in sorted(arch.iterdir()):
+                if p.suffix not in (".jpg", ".png") or "__" not in p.stem:
+                    continue
+                key, stamp = p.stem.rsplit("__", 1)
+                if key in have:
+                    continue
+                have.add(key)
+                meta = _read_json(arch / f"{p.stem}.json", {})
+                meta = meta if isinstance(meta, dict) else {}
+                versions = self.versions(key, data_dir)
+                try:
+                    made = int(time.mktime(time.strptime(versions[-1]["made"], "%Y%m%d-%H%M%S")))
+                except (ValueError, IndexError, OverflowError):
+                    made = int(p.stat().st_mtime)
+                out.append(
+                    {
+                        "key": key,
+                        "file": "",
+                        "made": made,
+                        "meta": meta,
+                        "title": str(
+                            meta.get("title") or meta.get("name") or meta.get("reg") or key
+                        ),
+                        "facet": str(meta.get(self.facet) or "") if self.facet else "",
+                        "facet_label": self.facet_label(str(meta.get(self.facet) or ""))
+                        if self.facet
+                        else "",
+                        "versions": versions,
+                        "error": self.why_failed(key, data_dir),
+                    }
+                )
         out.sort(key=lambda e: -e["made"])
         return out
 

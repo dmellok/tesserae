@@ -201,6 +201,20 @@ def test_render_now_repaint_versions_and_purge(tmp_path, fake_fal):
         c.use_version(stem, tmp_path) == "robin--gould"
         and c.path("robin--gould", tmp_path).read_bytes() == first
     )
+    # deleted but kept: no current file, still on the page with both versions, title and all,
+    # and one of them can be made current again
+    c.archive("robin--gould", tmp_path)
+    assert c.path("robin--gould", tmp_path) is None
+    gone = c.listing(tmp_path)
+    assert (
+        len(gone) == 1
+        and gone[0]["key"] == "robin--gould"
+        and gone[0]["file"] == ""
+        and gone[0]["title"] == "Robin"
+        and len(gone[0]["versions"]) == 2
+    )
+    assert c.use_version(gone[0]["versions"][-1]["stem"], tmp_path) == "robin--gould"
+    assert c.path("robin--gould", tmp_path) is not None
     prog = c.progress(tmp_path, SETTINGS)
     assert prog["used_text"] == "US$0.08" and prog["cap_text"] == "US$1.00"
     assert (

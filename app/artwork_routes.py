@@ -85,7 +85,7 @@ def gallery(c: artwork.Collection, data_dir: Path) -> dict[str, Any]:
                         "title": title,
                         "file": "",
                         "meta": {},
-                        "versions": [],
+                        "versions": c.versions(k, data_dir),
                         "facet_label": "",
                         "error": errors.get(k, {}).get("why", ""),
                         "painting": k in running,
