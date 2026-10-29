@@ -77,6 +77,7 @@ from app import (
 )
 from app import mcp_bridge as _mcp_bridge
 from app import version_check as _version_check
+from app import widget_updates as _widget_updates
 from app.discovery import DiscoveryCache
 from app.ha_discovery import HomeAssistantDiscovery
 from app.scheduler import Scheduler
@@ -1447,6 +1448,7 @@ def create_app(
                 "community_sponsor_url": "https://github.com/sponsors/dmellok",
                 "update_status": None,
                 "mcp_bridge_update": None,
+                "nav_widget_updates": None,
                 "agent_watch_enabled": False,
                 "agent_editor_enabled": False,
             }
@@ -1494,6 +1496,12 @@ def create_app(
             # card in the topbar so an operator notices without opening
             # Settings; None (no badge) whenever there is nothing to do.
             "mcp_bridge_update": _mcp_bridge_update(store),
+            # Installed catalog widgets with a newer release in the index, for
+            # the count on the sidebar's Widgets entry. Answers from the
+            # marketplace's cached index and refreshes it in the background;
+            # None when online features or the badge itself are off, or when
+            # everything is current. See app/widget_updates.
+            "nav_widget_updates": _widget_updates.status(app),
             # Whether the admin shell should watch for agent activity (the
             # follow toast). Needs the MCP surface on (so the poll never hits
             # a route that would 404) and an agent to have connected at least

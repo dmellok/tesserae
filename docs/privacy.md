@@ -162,6 +162,16 @@ heartbeat. No IP address or User-Agent is stored; only a coarse country
 lookup plus the query params. Both are off when Online features is off,
 and the widget chip is additionally off per placement by default.
 
+### Widget update count (sidebar badge)
+
+The Widgets entry in the sidebar counts installed catalog widgets with a
+newer release. The only request behind it is the catalog index itself
+(`widgets.json` on GitHub, the same file Browse catalog reads), fetched in
+the background at most once an hour and compared against what is installed
+locally. Nothing about your install is sent; GitHub sees an ordinary fetch
+of a public file. Off when Online features is off, and
+**Settings → Widgets → Catalog updates** hides the count on its own.
+
 ### Device firmware check
 
 Tesserae looks up the latest known firmware version for each of your

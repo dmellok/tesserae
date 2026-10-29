@@ -29,6 +29,18 @@ If your dashboard is missing a widget that used to be in the bundle
 Uninstalling is the same flow in reverse, with the option to keep or
 delete the plugin's data dir.
 
+## Updates
+
+When the catalog lists a newer release of a widget you installed, its row
+on Browse catalog shows **Update to vX**, and **Update all** in the toolbar
+runs every pending update in one go (a release that needs a newer Tesserae
+than yours is skipped and says so). The sidebar's **Widgets** entry carries
+a count of widgets with an update waiting; it comes from the catalog index
+Tesserae refreshes in the background at most once an hour, so it needs
+**Online features** on. **Settings → Widgets → Catalog updates** turns the
+count off; Browse catalog still marks each widget. A restart loads the new
+versions, same as after an install.
+
 ## Trust model
 
 Audit-only review: every catalog entry is a PR to

@@ -314,6 +314,155 @@ def test_restart_pending_flag_surfaces_in_topbar(app: Flask) -> None:
     assert b"Restart required" in resp.data
 
 
+# -- update all + the sidebar count ------------------------------------
+
+
+def _installed(catalog_id: str, version: str) -> Any:
+    from app.marketplace import InstalledRecord
+
+    return InstalledRecord(
+        catalog_id=catalog_id,
+        version=version,
+        installed_at="2026-01-01T00:00:00+00:00",
+        folders=[catalog_id],
+        sha256="0" * 64,
+        source=None,
+    )
+
+
+def _entry_v(catalog_id: str, version: str, tesserae_min: str | None = None) -> CatalogEntry:
+    return dataclasses.replace(
+        _fake_entry(catalog_id), release_version=version, tesserae_min=tesserae_min
+    )
+
+
+def test_update_all_installs_every_row_that_is_behind(app: Flask) -> None:
+    """One post updates each installed widget the index lists a newer release
+    for, skips the ones that are current or need a newer Tesserae, lights the
+    restart flag, and answers the catalog page with what it did."""
+    client = app.test_client()
+    _sign_in(client)
+    mkt, updater = _inject_mocks(app)
+    mkt.fetch_index.return_value = [
+        _entry_v("old", "2.0.0"),
+        _entry_v("fresh", "1.0.0"),
+        _entry_v("future", "3.0.0", tesserae_min="99.0.0"),
+        _entry_v("absent", "1.0.0"),
+    ]
+    mkt.installed.return_value = {
+        "old": _installed("old", "1.0.0"),
+        "fresh": _installed("fresh", "1.0.0"),
+        "future": _installed("future", "1.0.0"),
+    }
+    mkt.install.return_value = InstallResult(plugin_id="old", version="2.0.0")
+    resp = client.post("/plugins/browse/update-all", headers={"X-Requested-With": "tesserae-fetch"})
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["ok"] is True
+    assert [u["id"] for u in body["updated"]] == ["old"]
+    assert body["failed"] == []
+    assert "Restart required" in body["message"]
+    assert [c.args[0].id for c in mkt.install.call_args_list] == ["old"]
+    mkt.fetch_index.assert_called_with(force=True)
+    updater.restart.assert_not_called()
+    assert app.config.get("MARKETPLACE_RESTART_PENDING") is True
+
+
+def test_update_all_with_nothing_due_is_a_quiet_success(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    mkt, _ = _inject_mocks(app)
+    mkt.fetch_index.return_value = [_entry_v("fresh", "1.0.0")]
+    mkt.installed.return_value = {"fresh": _installed("fresh", "1.0.0")}
+    resp = client.post("/plugins/browse/update-all", headers={"X-Requested-With": "tesserae-fetch"})
+    assert resp.status_code == 200
+    assert resp.get_json()["updated"] == []
+    mkt.install.assert_not_called()
+    assert not app.config.get("MARKETPLACE_RESTART_PENDING")
+
+
+def test_update_all_keeps_going_past_one_failure(app: Flask) -> None:
+    from app.marketplace import InstallRefused
+
+    client = app.test_client()
+    _sign_in(client)
+    mkt, _ = _inject_mocks(app)
+    mkt.fetch_index.return_value = [_entry_v("a", "2.0.0"), _entry_v("b", "2.0.0")]
+    mkt.installed.return_value = {"a": _installed("a", "1.0.0"), "b": _installed("b", "1.0.0")}
+
+    def _install(entry: CatalogEntry) -> InstallResult:
+        if entry.id == "a":
+            raise InstallRefused("folder collision")
+        return InstallResult(plugin_id=entry.id, version="2.0.0")
+
+    mkt.install.side_effect = _install
+    body = client.post(
+        "/plugins/browse/update-all", headers={"X-Requested-With": "tesserae-fetch"}
+    ).get_json()
+    assert body["ok"] is True
+    assert [u["id"] for u in body["updated"]] == ["b"]
+    assert body["failed"] == [{"id": "a", "name": "Sample", "message": "folder collision"}]
+    assert app.config.get("MARKETPLACE_RESTART_PENDING") is True
+
+
+def test_update_all_form_post_redirects_to_browse(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    mkt, _ = _inject_mocks(app)
+    mkt.fetch_index.return_value = [_entry_v("old", "2.0.0")]
+    mkt.installed.return_value = {"old": _installed("old", "1.0.0")}
+    resp = client.post("/plugins/browse/update-all", follow_redirects=False)
+    assert resp.status_code == 302
+    assert resp.headers["Location"].endswith("/plugins/browse")
+
+
+def test_browse_offers_update_all(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    mkt, _ = _inject_mocks(app)
+    mkt.index_url.return_value = "https://catalog.invalid/widgets.json"
+    mkt.cached_index.return_value = [_fake_entry()]
+    mkt.installed.return_value = {}
+    mkt.screenshots_base.return_value = ""
+    mkt.plugins_dir.return_value = None
+    html = client.get("/plugins/browse").get_data(as_text=True)
+    assert "data-cat-update-all" in html
+    assert "/plugins/browse/update-all" in html
+
+
+def test_sidebar_counts_widgets_with_updates(app: Flask, monkeypatch: object) -> None:
+    """The Widgets nav entry carries the count app/widget_updates reports,
+    site-wide, and drops it when the operator switches it off."""
+    from app import widget_updates
+
+    client = app.test_client()
+    _sign_in(client)
+    _inject_mocks(app)
+    monkeypatch.setattr(  # type: ignore[attr-defined]
+        widget_updates, "status", lambda app: {"count": 3, "ids": ["a", "b", "c"]}
+    )
+    html = client.get("/events", follow_redirects=True).get_data(as_text=True)
+    assert "data-widget-updates-count" in html
+    assert "3 widget updates available" in html
+    monkeypatch.setattr(widget_updates, "status", lambda app: None)  # type: ignore[attr-defined]
+    html = client.get("/events", follow_redirects=True).get_data(as_text=True)
+    assert "data-widget-updates-count" not in html
+
+
+def test_the_badge_switch_lives_on_the_widgets_settings_area(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    html = client.get("/settings/plugins", follow_redirects=True).get_data(as_text=True)
+    assert 'name="widget_update_badge"' in html and "checked" in html
+    resp = client.post("/settings/widgets/update-badge/toggle", data={}, follow_redirects=False)
+    assert resp.status_code == 302
+    assert app.config["SETTINGS_STORE"].get_section("app")["widget_update_badge"] is False
+    html = client.get("/settings/plugins", follow_redirects=True).get_data(as_text=True)
+    assert 'name="widget_update_badge" value="1"\n               checked' not in html
+    client.post("/settings/widgets/update-badge/toggle", data={"widget_update_badge": "1"})
+    assert app.config["SETTINGS_STORE"].get_section("app")["widget_update_badge"] is True
+
+
 # -- shadowed duplicate cleanup (Widgets page) ------------------------
 #
 # Scan order is bundled -> data/authored -> data/marketplace, first id wins.

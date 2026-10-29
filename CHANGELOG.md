@@ -6,6 +6,22 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.490.0], 2026-10-29
+
+### Added
+
+- *Update all* on Browse catalog: one click updates every installed catalog
+  widget that the index lists a newer release for, skipping any whose new
+  release needs a newer Tesserae. One failure doesn't stop the rest; the
+  outcome names what was updated and what wasn't. Restart stays a separate
+  click, as for a single install.
+- The sidebar's Widgets entry carries a count of installed catalog widgets
+  with an update waiting, the way a phone's store icon does. It answers from
+  the catalog index the server already caches and refreshes that index in the
+  background at most once an hour, never on the request. Needs Online
+  features on. Settings → Widgets → *Catalog updates* switches the count off;
+  Browse catalog still marks each widget.
+
 ## [0.489.0], 2026-10-29
 
 ### Added

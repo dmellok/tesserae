@@ -82,6 +82,7 @@
      data-catalog
      data-install-url="{{ url_for('marketplace.install') }}"
      data-uninstall-url="{{ url_for('marketplace.uninstall') }}"
+     data-update-all-url="{{ url_for('marketplace.update_all') }}"
      data-refresh-url="{{ url_for('marketplace.browse', refresh=1) }}"
      data-templates-url="{{ url_for('template_market.index') if templates_enabled else '' }}"
      data-online-settings-url="{{ url_for('auth.settings_area', area='system') }}#online-features">
@@ -131,6 +132,12 @@
       </form>
       <div class="cat-toolbar-divider" aria-hidden="true"></div>
       <span class="cat-mono cat-count" data-cat-count aria-live="polite"></span>
+      {# Lit only while installed widgets have a newer release the server can
+         run; one click runs the same install as each row's "Update to vX". #}
+      <button type="button" class="cat-btn cat-btn--primary cat-update-all" data-cat-update-all hidden>
+        <i class="ph-bold ph-arrow-circle-up" aria-hidden="true"></i>
+        <span data-cat-update-all-label>Update all</span>
+      </button>
       {# Row roominess. Cozy leads because the screenshot is the thing being
          shopped for and a 152px thumb showed too little of it; Compact is for
          scanning a long catalog by name. Persisted per browser, so the choice
@@ -178,6 +185,11 @@
       Filtering, sorting and the detail sheet need JavaScript. The full
       catalog is listed below and installs still work.
     </p>
+    {% if entries | selectattr('update_available') | rejectattr('too_new') | list %}
+    <form method="post" action="{{ url_for('marketplace.update_all') }}" class="inline">
+      <button type="submit" class="dx-btn-primary">Update all installed widgets</button>
+    </form>
+    {% endif %}
     <ul class="cat-noscript">
       {% for e in entries %}
       <li>
@@ -188,6 +200,11 @@
         <form method="post" action="{{ url_for('marketplace.install') }}" class="inline">
           <input type="hidden" name="catalog_id" value="{{ e.id }}">
           <button type="submit" class="dx-btn-primary">Install</button>
+        </form>
+        {% elif e.update_available and not e.too_new %}
+        <form method="post" action="{{ url_for('marketplace.install') }}" class="inline">
+          <input type="hidden" name="catalog_id" value="{{ e.id }}">
+          <button type="submit" class="dx-btn-primary">Update to v{{ e.version }}</button>
         </form>
         {% else %}
         <form method="post" action="{{ url_for('marketplace.uninstall') }}" class="inline">

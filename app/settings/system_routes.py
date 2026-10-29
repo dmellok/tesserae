@@ -24,6 +24,7 @@ from flask import (
     request,
     send_file,
     session,
+    url_for,
 )
 from werkzeug.wrappers import Response
 
@@ -577,6 +578,25 @@ def system_online_features_toggle() -> Response:
     if nxt.startswith("/") and not nxt.startswith("//"):
         return redirect(nxt)
     return system_redirect()
+
+
+@bp.post("/settings/widgets/update-badge/toggle", endpoint="settings_widget_update_badge_toggle")
+def widget_update_badge_toggle() -> Response:
+    """Flip ``settings.app.widget_update_badge``: whether the sidebar's
+    Widgets entry carries a count of installed catalog widgets with a newer
+    release. On by default. Off hides the count only; the Browse page still
+    marks each row and offers Update all. Checkbox absent means unchecked."""
+    enabled = request.form.get("widget_update_badge") in ("1", "true", "on")
+    settings_store().patch_section("app", {"widget_update_badge": enabled})
+    flash(
+        (
+            "The sidebar shows how many widgets have updates."
+            if enabled
+            else "The sidebar no longer counts widget updates. Browse catalog still lists them."
+        ),
+        "ok",
+    )
+    return redirect(url_for("auth.settings_area", area="plugins"))
 
 
 @bp.post("/settings/ui-design", endpoint="settings_ui_design")

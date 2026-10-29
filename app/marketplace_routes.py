@@ -517,6 +517,76 @@ def install() -> Response | tuple[Response, int]:
     )
 
 
+@bp.post("/browse/update-all")
+def update_all() -> Response:
+    """Update every installed catalog widget that the index lists a newer
+    release for, in one go. The same install path as a single "Update to
+    vX" click, run over every row that button would be lit on: entries
+    whose installed version differs from the catalog's, skipping any whose
+    new release needs a newer Tesserae than this one. The index is
+    re-fetched first so the set is decided on what the catalog serves right
+    now, not on a stale tab.
+
+    One failure does not stop the rest; the answer names what was updated,
+    what failed and why. Restart stays a separate click, as it does for a
+    single install, so the operator can finish other catalog work first."""
+    from app import widget_updates
+
+    mkt = _marketplace()
+    try:
+        entries = mkt.fetch_index(force=True)
+    except IndexUnavailable as err:
+        return _outcome(False, f"Couldn't refresh the catalog: {err}", status=502)
+    host = str(current_app.config.get("APP_VERSION") or "") or None
+    behind = widget_updates.applicable_updates(entries, mkt.installed(), host)
+    if not behind:
+        return _outcome(
+            True,
+            "Every installed widget is already on its latest release.",
+            updated=[],
+            failed=[],
+        )
+    updated: list[dict[str, str]] = []
+    failed: list[dict[str, str]] = []
+    for entry in behind:
+        try:
+            result = mkt.install(entry)
+        except (InstallRefused, TarballRejected) as err:
+            failed.append({"id": entry.id, "name": entry.name, "message": str(err)})
+            continue
+        except Exception:
+            logger.exception("marketplace: unexpected update failure for %s", entry.id)
+            failed.append(
+                {
+                    "id": entry.id,
+                    "name": entry.name,
+                    "message": "unexpected error (see server log)",
+                }
+            )
+            continue
+        updated.append({"id": entry.id, "name": entry.name, "version": result.version})
+        _report_install(entry)
+    if updated:
+        _mark_restart_pending()
+    names = ", ".join(f"{u['name']} v{u['version']}" for u in updated)
+    if updated and not failed:
+        message = (
+            f"Updated {len(updated)} widget{'s' if len(updated) != 1 else ''}: {names}. "
+            'Click "Restart required" in the top bar to load the new versions.'
+        )
+    elif updated:
+        message = (
+            f"Updated {len(updated)} ({names}); {len(failed)} failed: "
+            + "; ".join(f"{f['name']}: {f['message']}" for f in failed)
+            + '. Click "Restart required" in the top bar to load the ones that worked.'
+        )
+    else:
+        message = "No widget could be updated: " + "; ".join(
+            f"{f['name']}: {f['message']}" for f in failed
+        )
+    return _outcome(bool(updated), message, status=400, updated=updated, failed=failed)
+
+
 @bp.post("/browse/uninstall")
 def uninstall() -> Response:
     """Uninstall a marketplace-installed catalog entry. For bundle

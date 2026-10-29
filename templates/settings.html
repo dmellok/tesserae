@@ -43,6 +43,28 @@
    ``[data-device-card]`` elements (eg the System or Events tabs). #}
 <script src="{{ url_for('static', filename='pages/settings.js') }}"></script>
 
+{% if active_area == 'plugins' %}
+{# The sidebar's Widgets entry counts installed catalog widgets with a newer
+   release (app/widget_updates). The count needs Online features on, since
+   the index lives on GitHub; this switch hides the count only. #}
+{% set _badge_on = app_settings is defined and app_settings.get('widget_update_badge', True) not in (False, 0, '0', 'false', 'off', 'no') %}
+{% call section_card(id='widget-update-badge', icon='arrow-circle-up', title='Catalog updates',
+                     description="When an installed catalog widget has a newer release, the Widgets entry in the sidebar shows how many are waiting, and Browse catalog offers Update all. This switch hides the sidebar count; Browse catalog still marks each widget. The count needs Online features on (Settings → System), because the catalog index is fetched from GitHub in the background, at most once an hour.") %}
+  <div class="section-body">
+    <form method="post" action="{{ url_for('auth.settings_widget_update_badge_toggle') }}"
+          class="form form--inline field--switch">
+      <label class="switch">
+        <input type="checkbox" name="widget_update_badge" value="1"
+               {% if _badge_on %}checked{% endif %}
+               onchange="this.form.submit()">
+        <span class="switch-track"><span class="switch-thumb"></span></span>
+        <span class="switch-label">Show the number of widget updates on the sidebar</span>
+      </label>
+    </form>
+  </div>
+{% endcall %}
+{% endif %}
+
 {% if not sections and active_area in ('renderers', 'plugins') %}
 {# Only useful on tabs whose entire purpose IS the per-section list
    (Renderers, Widgets/Plugins). System + Events render their own

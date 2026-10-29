@@ -254,6 +254,31 @@
   box-shadow: 0 0 0 2px var(--t-surface, #fff);
   pointer-events: none;
 }
+/* Widget-updates count on the nav's Widgets entry: a phone-style badge, a
+   filled circle with the number, red so it reads as "something waiting"
+   next to the plain links. Rendered only when app/widget_updates found
+   installed catalog widgets behind the index; the inline copy sits after
+   "Browse catalog" inside the dropdown. */
+.nav-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--t-danger, #dc2626);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 0 0 2px var(--t-surface, #fff);
+  pointer-events: none;
+}
+.nav-dropdown summary .nav-count { margin-left: auto; }
+.nav-dropdown-link .nav-count--inline { margin-left: auto; }
 /* "New devices" tag: heard-but-unregistered devices, a .tg tg--teal
    tg--lg (chips.css) with the count as .tg-count. Sits first in the
    right-hand cluster, so it takes the auto margin and hands the tight

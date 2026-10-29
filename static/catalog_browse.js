@@ -105,6 +105,8 @@
   var elSearch = root.querySelector("[data-cat-search]");
   var elSearchForm = root.querySelector("[data-cat-search-form]");
   var elCount = root.querySelector("[data-cat-count]");
+  var elUpdateAll = root.querySelector("[data-cat-update-all]");
+  var elUpdateAllLabel = root.querySelector("[data-cat-update-all-label]");
   var elSort = root.querySelector("[data-cat-sort]");
   var elSortLabel = root.querySelector("[data-cat-sort-label]");
   var elDensity = root.querySelector("[data-cat-density]");
@@ -917,6 +919,7 @@
     renderRail(tokens);
     elCount.textContent = vis.length + " shown";
     elSortLabel.textContent = sortLabel();
+    renderUpdateAll();
     renderResults(groupsFor(vis), tokens);
     if (state.selectedId) renderSheet();
     syncUrl();
@@ -1132,6 +1135,93 @@
     });
   }
 
+  // -- update all --------------------------------------------------------
+  //
+  // The rows the server would update: installed, behind the catalog, and
+  // runnable on this Tesserae. Counted over every item, not the visible
+  // slice, so a filter never hides the button from an operator who came to
+  // update things.
+
+  function updatable() {
+    var out = [];
+    for (var i = 0; i < items.length; i++) {
+      var it = items[i];
+      if (it.kind !== "template" && it.updateAvailable && !it.tooNew) out.push(it);
+    }
+    return out;
+  }
+
+  function renderUpdateAll() {
+    if (!elUpdateAll) return;
+    var due = updatable();
+    if (!due.length) {
+      elUpdateAll.hidden = true;
+      return;
+    }
+    elUpdateAll.hidden = false;
+    var busy = state.pending.__all__;
+    elUpdateAll.disabled = !!busy;
+    elUpdateAllLabel.textContent = busy
+      ? "Updating " + due.length + "…"
+      : "Update all (" + due.length + ")";
+  }
+
+  function updateAll() {
+    if (state.pending.__all__) return;
+    var due = updatable();
+    if (!due.length) return;
+    state.pending.__all__ = "install";
+    due.forEach(function (it) {
+      state.pending[it.id] = "install";
+    });
+    render();
+    post(root.getAttribute("data-update-all-url"), new FormData()).then(
+      function (r) {
+        delete state.pending.__all__;
+        due.forEach(function (it) {
+          delete state.pending[it.id];
+        });
+        var updated = (r.body && r.body.updated) || [];
+        updated.forEach(function (u) {
+          var it = byId(u.id);
+          if (!it) return;
+          it.installed = true;
+          it.updateAvailable = false;
+          it.installedVersion = u.version || it.version;
+          it.installs += 1;
+        });
+        flash(r.body.message || (r.ok ? "Updated." : "Update failed."), r.ok ? "ok" : "error");
+        if (updated.length) {
+          showRestartAffordance();
+          syncSidebarCount();
+        }
+        render();
+      },
+      function () {
+        delete state.pending.__all__;
+        due.forEach(function (it) {
+          delete state.pending[it.id];
+        });
+        flash("Update failed: network error.", "error");
+        render();
+      }
+    );
+  }
+
+  // The sidebar's Widgets count was rendered by the server; after an update
+  // here it would overstate until the next page load, so it follows the
+  // rows that still have one.
+  function syncSidebarCount() {
+    var left = updatable().length;
+    var pills = document.querySelectorAll("[data-widget-updates-count]");
+    for (var i = 0; i < pills.length; i++) {
+      if (left) pills[i].textContent = String(left);
+      else pills[i].remove();
+    }
+  }
+
+  if (elUpdateAll) elUpdateAll.addEventListener("click", updateAll);
+
   function install(item, btn) {
     state.pending[item.id] = "install";
     btn.disabled = true;
@@ -1156,6 +1246,7 @@
         item.installs += 1;
         flash(r.body.message, "ok");
         showRestartAffordance();
+        syncSidebarCount();
         render();
       },
       function () {
