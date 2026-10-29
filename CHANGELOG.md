@@ -6,8 +6,22 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added
+
+- Home Assistant gets a **Next update** sensor per display, the same time the
+  Devices and Lineups pages show for when the next change reaches the frame
+  (push time weighed against a live connection or the frame's next check-in,
+  held by quiet hours or a pause). Its attributes carry the `reason`
+  (`connected`, `check-in`, `held by quiet hours`, ...) and the next check-in.
+
 ### Fixed
 
+- Home Assistant's **Next wake** sensor no longer shows the raw telemetry
+  prediction, which read 24 minutes for a Visionect sign that was connected and
+  took pushes within seconds. It now means the next expected check-in of a
+  sleeping frame (from the cycle it has actually been seen to keep), and reads
+  unknown while the frame is connected or stays awake. A stale time left
+  retained from an earlier session is cleared.
 - The Devices page, the device page and the Lineups page now agree on when a
   frame actually gets its next update. They used to show two numbers that
   contradicted each other ("Next wake in 24 min" on one, "next advance in 1

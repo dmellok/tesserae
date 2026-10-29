@@ -340,3 +340,78 @@ def test_scheduler_reports_a_display_pause_and_the_global_pause() -> None:
     assert sched.pause_hold_for_device("c", now) == (False, None)
     sched._paused_provider = lambda: True
     assert sched.pause_hold_for_device("c", now) == (True, None)
+
+
+# -- Home Assistant: Next update + Next wake sensors -------------------------
+
+
+def test_reason_phrases() -> None:
+    sleepy = nu.Reach(nu.MODE_SLEEPS, next_checkin_at=NOW + 5 * MIN, gap_s=15 * MIN)
+    live = nu.Reach(nu.MODE_CONNECTED, live=True)
+    assert nu.reason_for(_compute(NOW + MIN, sleepy), sleepy) == "check-in"
+    assert nu.reason_for(_compute(NOW + MIN, live), live) == "connected"
+    held = _compute(NOW + MIN, live, nu.Hold(NOW + 30 * MIN, "quiet hours"))
+    assert nu.reason_for(held, live) == "held by quiet hours"
+    paused = _compute(NOW + MIN, live, nu.Hold(None, "a pause"))
+    assert nu.reason_for(paused, live) == "held by the automation pause"
+
+
+def test_ha_state_for_a_sleeping_frame_has_a_checkin_and_a_check_in_reason(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    _register(app, client, "panel")
+    _seed_loop(app, "panel")
+    _beat(app, "panel", wake_in_s=40 * 60)
+    from app.ha_hooks import build_ha_hooks
+
+    state = build_ha_hooks(app).next_update_fn("panel")
+    assert state["reason"] == "check-in" and state["mode"] == nu.MODE_SLEEPS
+    assert state["checkin_at"] == pytest.approx(time.time() + 40 * 60, abs=5)
+    assert state["at"] >= state["checkin_at"]  # arrives on a check-in
+
+
+def test_ha_state_for_a_connected_visionect_sign_has_no_wake(app: Flask, monkeypatch) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    _register(app, client, "panel")
+    _seed_loop(app, "panel")
+    _beat(app, "panel", wake_in_s=24 * 60)  # the bogus telemetry prediction
+    monkeypatch.setattr(
+        nu, "reach_for_device", lambda d, now=None: nu.Reach(nu.MODE_CONNECTED, live=True)
+    )
+    from app.ha_hooks import build_ha_hooks
+
+    state = build_ha_hooks(app).next_update_fn("panel")
+    assert state["checkin_at"] is None
+    assert state["reason"] == "connected"
+    assert state["at"] is not None  # the scheduled push time, not a wake
+
+
+def test_ha_state_is_held_by_pause_hours(app: Flask) -> None:
+    from datetime import datetime, timedelta
+
+    now = datetime.now()
+    app.config["SETTINGS_STORE"].update_section(
+        "app",
+        {
+            "quiet_hours_enabled": True,
+            "quiet_hours_start": (now - timedelta(hours=1)).strftime("%H:%M"),
+            "quiet_hours_end": (now + timedelta(hours=1)).strftime("%H:%M"),
+            "timezone": "system",
+        },
+    )
+    client = app.test_client()
+    _sign_in(client)
+    _register(app, client, "panel")
+    _seed_loop(app, "panel")
+    _beat(app, "panel", wake_in_s=5 * 60)
+    from app.ha_hooks import build_ha_hooks
+
+    state = build_ha_hooks(app).next_update_fn("panel")
+    assert state["reason"] == "held by quiet hours" and state["held"] is True
+
+
+def test_ha_hook_is_none_for_an_unknown_display(app: Flask) -> None:
+    from app.ha_hooks import build_ha_hooks
+
+    assert build_ha_hooks(app).next_update_fn("ghost") is None

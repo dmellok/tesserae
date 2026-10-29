@@ -158,9 +158,27 @@ def _clock(epoch: float, tz: tzinfo | None, now: float) -> str:
     return moment.strftime("%a %H:%M")
 
 
+def reason_for(nu: NextUpdate, reach: Reach) -> str:
+    """The one-phrase reason for a ``NextUpdate``: a hold wins (``held by
+    quiet hours``, ``held by a pause``, ``held by the automation pause``),
+    else ``connected`` (arrives right away), ``check-in`` (waits for the
+    sleeping frame's next check-in) or ``scheduled`` (nothing known about
+    reach, the push time stands)."""
+    if nu.held_indefinitely:
+        return "held by the automation pause"
+    if nu.held_until is not None:
+        return f"held by {nu.held_reason}"
+    if nu.mode == MODE_CONNECTED:
+        return "connected"
+    if nu.mode == MODE_SLEEPS:
+        return "check-in"
+    return "scheduled"
+
+
 def describe(nu: NextUpdate, reach: Reach, *, tz: tzinfo | None, now: float) -> dict[str, Any]:
     """Plain words for a ``NextUpdate``: ``when`` (``~18:24``), ``detail`` (the
-    reason in brackets, short) and ``text`` (the whole sentence)."""
+    reason in brackets, short), ``reason`` (the one-phrase version) and
+    ``text`` (the whole sentence)."""
     parts: list[str] = []
     if nu.held_indefinitely:
         parts.append("automation is paused")
@@ -189,6 +207,7 @@ def describe(nu: NextUpdate, reach: Reach, *, tz: tzinfo | None, now: float) -> 
         "detail": detail,
         "text": text,
         "mode": nu.mode,
+        "reason": reason_for(nu, reach),
         "held": nu.held_until is not None or nu.held_indefinitely,
     }
 
@@ -383,6 +402,24 @@ class DeviceTiming:
                 hold = Hold(ends.timestamp() if ends is not None else None, "quiet hours")
         nu = compute_next_update(push, self.reach, now=self.now, hold=hold)
         return describe(nu, self.reach, tz=self.tz, now=self.now)
+
+    def next_checkin(self) -> float | None:
+        """The next time the display is expected to check in, or ``None``
+        when it is reachable all the time (a live connection, an awake and
+        polling frame) or nothing is known. This is what "wake" means."""
+        if self.reach.mode != MODE_SLEEPS:
+            return None
+        return _checkin_at_or_after(self.reach, self.now)
+
+
+def ha_state_for_device(device: Any) -> dict[str, Any]:
+    """What Home Assistant's *Next update* and *Next wake* sensors publish:
+    the ``view`` dict plus ``checkin_at`` (epoch of the next check-in, or
+    ``None`` when the frame needs none)."""
+    timing = DeviceTiming(device)
+    out = timing.view()
+    out["checkin_at"] = timing.next_checkin()
+    return out
 
 
 def view_for_device(device: Any) -> dict[str, Any] | None:

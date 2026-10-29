@@ -30,7 +30,10 @@ via ``via_device``):
 * **image** ``Frame``, the composition PNG currently published to that
   display (URL-only; HA fetches the bytes).
 * **sensor** ``Current dashboard``, ``Last updated``, ``Last seen``,
-  ``Next change`` (the next projected visible update).
+  ``Next change`` (the next projected visible update) and ``Next update``
+  (when that update actually reaches the frame: the push time weighed
+  against a live connection or the frame's next check-in, held by pause
+  hours / a pause; its attributes carry the ``reason``).
 * **select** ``Dashboard`` (push one bound dashboard to *only* this
   display) and **select** ``Lineup`` (which lineup the display follows).
 * **number** ``Hold`` (minutes to hold the current page against the
@@ -46,7 +49,8 @@ via ``via_device``):
   device advertises OTA, an **update** entity for its firmware.
 * lazily, where the heartbeat provides them: **Battery**, **Signal**,
   **IP address**, **Firmware**, **Temperature**, **Humidity**,
-  **Uptime**, **Next wake**.
+  **Uptime**, **Next wake** (the frame's next expected check-in; unknown
+  while it is connected or stays awake and so is reachable all the time).
 
 Everything that needs app internals beyond the push manager and the
 stores (settings, scheduler, OTA, device config) arrives through
@@ -225,7 +229,12 @@ class HaHooks:
     * ``scheduler``: ``upcoming_for_device`` (Next change sensor).
     * ``rotation_state_store``: per-display ``override_until`` (Hold) and
       ``automation_pause_until`` (Pause).
-    * ``telemetry``: ``get(device_id).predicted_next_wake_at``.
+    * ``telemetry``: ``get(device_id).predicted_next_wake_at`` (only the
+      fallback for Next wake when ``next_update_fn`` is missing).
+    * ``next_update_fn(device_id) -> dict``: the corrected next-update view
+      (``app.next_update.ha_state_for_device``: ``at``, ``checkin_at``,
+      ``reason``, ``detail``, ``mode``, ``held``) behind the Next update and
+      Next wake sensors.
     * ``button_service``: ``add_listener`` / ``remove_listener`` for the
       input ``event`` entity.
     * ``timezone_fn``: the scheduler's timezone (quiet-hours evaluation).
@@ -262,6 +271,7 @@ class HaHooks:
     notify_fn: Callable[[str | None, str], str | None] | None = None
     expected_interval_fn: Callable[[str], int | None] | None = None
     step_device_fn: Callable[[str, int], str | None] | None = None
+    next_update_fn: Callable[[str], dict[str, Any] | None] | None = None
 
 
 def _switch_on(section: dict[str, Any], key: str) -> bool:
@@ -644,6 +654,18 @@ def build_device_configs(
                 state_topic=_dev_state(device_id, "next_change"),
                 device_class="timestamp",
                 icon="mdi:timer-sand",
+            ),
+        ),
+        (
+            _discovery_topic("sensor", f"dev_{device_id}_next_update"),
+            _entity(
+                f"dev_{device_id}_next_update",
+                "Next update",
+                dev,
+                state_topic=_dev_state(device_id, "next_update"),
+                json_attributes_topic=_dev_state(device_id, "next_update_attrs"),
+                device_class="timestamp",
+                icon="mdi:update",
             ),
         ),
         (
@@ -2144,18 +2166,7 @@ class HomeAssistantDiscovery:
                 logger.debug("HA discovery: upcoming projection failed for %s", device_id)
             self._publish_str(_dev_state(device_id, "next_change"), next_change, retain=True)
 
-        telemetry = self._hooks.telemetry
-        if telemetry is not None:
-            predicted = None
-            with contextlib.suppress(Exception):
-                rec = telemetry.get(device_id)
-                predicted = getattr(rec, "predicted_next_wake_at", None) if rec else None
-            if isinstance(predicted, (int, float)):
-                if (device_id, "next_wake") not in self._published_dyn:
-                    topic, payload = build_next_wake_config(device_id, name, model)
-                    self._publish_config(topic, payload, owner=device_id)
-                    self._published_dyn.add((device_id, "next_wake"))
-                self._publish_str(_dev_state(device_id, "next_wake"), _iso(predicted), retain=True)
+        self._publish_next_update_and_wake(device_id, device, name, model)
 
         bounds = self._wake_interval_bounds(device)
         if bounds is not None and self._hooks.device_config_fn is not None:
@@ -2192,6 +2203,65 @@ class HomeAssistantDiscovery:
                 if info.get("release_url"):
                     fw_state["release_url"] = str(info["release_url"])
                 self._publish_json(_dev_state(device_id, "firmware"), fw_state, retain=True)
+
+    def _publish_next_update_and_wake(
+        self, device_id: str, device: Any, name: str, model: str
+    ) -> None:
+        """The *Next update* sensor (when the next change reaches the frame,
+        with the reason as attributes) and *Next wake* (the frame's next
+        expected check-in).
+
+        Both come from ``next_update_fn``. Next wake is only a time while the
+        frame sleeps between check-ins; a connected or always-awake frame is
+        reachable all the time, so it reads unknown rather than a made-up
+        time. Without that hook Next wake falls back to the raw telemetry
+        prediction."""
+        view: dict[str, Any] | None = None
+        fn = self._hooks.next_update_fn
+        if fn is not None:
+            with contextlib.suppress(Exception):
+                view = fn(device_id)
+            if view is not None:
+                at = view.get("at")
+                self._publish_str(
+                    _dev_state(device_id, "next_update"),
+                    _iso(at) if isinstance(at, (int, float)) else _UNKNOWN,
+                    retain=True,
+                )
+                checkin = view.get("checkin_at")
+                attrs: dict[str, Any] = {
+                    "reason": str(view.get("reason") or ""),
+                    "detail": str(view.get("detail") or ""),
+                    "mode": str(view.get("mode") or ""),
+                    "held": bool(view.get("held")),
+                    "next_check_in": _iso(checkin) if isinstance(checkin, (int, float)) else None,
+                }
+                self._publish_json(_dev_state(device_id, "next_update_attrs"), attrs, retain=True)
+
+        wake: float | None = None
+        if view is not None:
+            checkin = view.get("checkin_at")
+            wake = float(checkin) if isinstance(checkin, (int, float)) else None
+        elif fn is None and self._hooks.telemetry is not None:
+            with contextlib.suppress(Exception):
+                rec = self._hooks.telemetry.get(device_id)
+                predicted = getattr(rec, "predicted_next_wake_at", None) if rec else None
+                if isinstance(predicted, (int, float)):
+                    wake = float(predicted)
+        if wake is None and (device_id, "next_wake") not in self._published_dyn:
+            # Never had a check-in to show this session: no entity, but clear
+            # a bogus time a previous session left retained on the broker.
+            self._publish_str(_dev_state(device_id, "next_wake"), _UNKNOWN, retain=True)
+            return
+        if (device_id, "next_wake") not in self._published_dyn:
+            topic, payload = build_next_wake_config(device_id, name, model)
+            self._publish_config(topic, payload, owner=device_id)
+            self._published_dyn.add((device_id, "next_wake"))
+        self._publish_str(
+            _dev_state(device_id, "next_wake"),
+            _iso(wake) if wake is not None else _UNKNOWN,
+            retain=True,
+        )
 
     # -- discovery publishing ------------------------------------------
 
@@ -2405,6 +2475,8 @@ class HomeAssistantDiscovery:
             skip.update(("quiet_override", "quiet_now"))
         if self._hooks.scheduler is None:
             skip.add("next_change")
+        if self._hooks.next_update_fn is None:
+            skip.add("next_update")
         if self._hooks.notify_fn is None:
             skip.add("notify")
         if self._hooks.button_service is None:

@@ -619,6 +619,128 @@ def test_update_entity_only_for_ota_capable_and_install_calls_hook(tmp_path: Pat
     assert installs == ["lounge"]
 
 
+# ---------- next update / next wake ----------
+
+_NOW = 1_900_000_000.0
+
+
+def _view(**kw) -> dict:
+    base = {
+        "at": _NOW + 600,
+        "checkin_at": None,
+        "reason": "connected",
+        "detail": "frame connected, arrives right away",
+        "mode": "connected",
+        "held": False,
+    }
+    base.update(kw)
+    return base
+
+
+def _next_update_rig(tmp_path: Path, views: dict, devices=None):
+    return _wire(
+        tmp_path,
+        devices=devices or _FakeRegistry([_FakeDevice("lounge", "Lounge")]),
+        hooks=HaHooks(next_update_fn=lambda device_id: views.get(device_id)),
+    )
+
+
+def test_next_update_sensor_publishes_time_and_reason_attributes(tmp_path: Path) -> None:
+    views = {"lounge": _view()}
+    ha, client, _pm, _ = _next_update_rig(tmp_path, views)
+    ha.start()
+    cfg = json.loads(
+        _payload_for(client, "homeassistant/sensor/tesserae/dev_lounge_next_update/config")
+    )
+    assert cfg["name"] == "Next update" and cfg["device_class"] == "timestamp"
+    assert cfg["json_attributes_topic"] == "tesserae/ha/dev/lounge/state/next_update_attrs"
+    state = _payload_for(client, "tesserae/ha/dev/lounge/state/next_update")
+    assert state and state != b"None"
+    attrs = json.loads(_payload_for(client, "tesserae/ha/dev/lounge/state/next_update_attrs"))
+    assert attrs["reason"] == "connected" and attrs["next_check_in"] is None
+
+
+def test_next_update_sensor_needs_its_hook(tmp_path: Path) -> None:
+    ha, client, _pm, _ = _wire(tmp_path, devices=_FakeRegistry([_FakeDevice("lounge", "Lounge")]))
+    ha.start()
+    assert "homeassistant/sensor/tesserae/dev_lounge_next_update/config" not in _topics(client)
+
+
+def test_connected_sign_has_no_next_wake_even_with_a_bogus_telemetry_prediction(
+    tmp_path: Path,
+) -> None:
+    class _Telemetry:
+        def get(self, _id):
+            return type("R", (), {"predicted_next_wake_at": _NOW + 24 * 60})()
+
+    ha, client, _pm, _ = _wire(
+        tmp_path,
+        devices=_FakeRegistry([_FakeDevice("lounge", "Lounge")]),
+        hooks=HaHooks(telemetry=_Telemetry(), next_update_fn=lambda _id: _view()),
+    )
+    ha.start()
+    assert "homeassistant/sensor/tesserae/dev_lounge_next_wake/config" not in _topics(client)
+    # A time a previous session left retained is cleared.
+    assert _payload_for(client, "tesserae/ha/dev/lounge/state/next_wake") == b"None"
+
+
+def test_sleepy_frame_next_wake_is_the_checkin_and_goes_unknown_when_it_connects(
+    tmp_path: Path,
+) -> None:
+    views = {
+        "lounge": _view(
+            at=_NOW + 1800,
+            checkin_at=_NOW + 900,
+            reason="check-in",
+            mode="sleeps",
+        )
+    }
+    ha, client, _pm, _ = _next_update_rig(tmp_path, views)
+    ha.start()
+    cfg = json.loads(
+        _payload_for(client, "homeassistant/sensor/tesserae/dev_lounge_next_wake/config")
+    )
+    assert cfg["object_id"] == "tesserae_dev_lounge_next_wake"
+    assert cfg["unique_id"] == "tesserae_dev_lounge_next_wake"
+    wake = _payload_for(client, "tesserae/ha/dev/lounge/state/next_wake")
+    assert wake and wake != b"None"
+    attrs = json.loads(_payload_for(client, "tesserae/ha/dev/lounge/state/next_update_attrs"))
+    assert attrs["reason"] == "check-in" and attrs["next_check_in"] is not None
+    # The schedule changes (the sign connects): both sensors refresh on the tick.
+    views["lounge"] = _view()
+    ha.refresh_state()
+    assert _payload_for(client, "tesserae/ha/dev/lounge/state/next_wake") == b"None"
+    attrs = json.loads(_payload_for(client, "tesserae/ha/dev/lounge/state/next_update_attrs"))
+    assert attrs["reason"] == "connected"
+
+
+def test_held_frame_reports_the_hold_reason_and_nothing_scheduled_is_unknown(
+    tmp_path: Path,
+) -> None:
+    views = {"lounge": _view(reason="held by quiet hours", held=True)}
+    ha, client, _pm, _ = _next_update_rig(tmp_path, views)
+    ha.start()
+    attrs = json.loads(_payload_for(client, "tesserae/ha/dev/lounge/state/next_update_attrs"))
+    assert attrs["reason"] == "held by quiet hours" and attrs["held"] is True
+    views["lounge"] = _view(at=None, reason="held by the automation pause", held=True)
+    ha.refresh_state()
+    assert _payload_for(client, "tesserae/ha/dev/lounge/state/next_update") == b"None"
+
+
+def test_removing_a_display_blanks_its_next_update_and_next_wake(tmp_path: Path) -> None:
+    views = {"lounge": _view(checkin_at=_NOW + 900, mode="sleeps", reason="check-in")}
+    registry = _FakeRegistry([_FakeDevice("lounge", "Lounge"), _FakeDevice("hall", "Hall")])
+    ha, client, _pm, _ = _next_update_rig(tmp_path, views, devices=registry)
+    ha.start()
+    wake = "homeassistant/sensor/tesserae/dev_lounge_next_wake/config"
+    update = "homeassistant/sensor/tesserae/dev_lounge_next_update/config"
+    assert _payload_for(client, wake) and _payload_for(client, update)
+    del registry._d["lounge"]
+    ha.refresh_entity_configs()
+    assert _payload_for(client, wake) == b"" and _payload_for(client, update) == b""
+    assert ("lounge", "next_wake") not in ha._published_dyn
+
+
 # ---------- input events, notify, refresh ----------
 
 
