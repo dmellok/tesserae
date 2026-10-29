@@ -89,3 +89,19 @@ def test_dev_keeps_bundled_fonts_revalidated(tmp_path: Path) -> None:
         200,
         "no-cache",
     )
+
+
+def test_the_version_changes_with_the_static_files(tmp_path: Path) -> None:
+    """A branch build keeps the package version, so the files themselves
+    must move the version, or browsers hold the old stylesheets for a year."""
+    from app.app_factory import _static_digest
+
+    root = tmp_path / "static"
+    (root / "style").mkdir(parents=True)
+    css = root / "style" / "a.css"
+    css.write_text("a{}")
+    before = _static_digest(root)
+    assert before and before == _static_digest(root)
+    css.write_text("a{color:red}")
+    assert _static_digest(root) != before
+    assert _make(tmp_path / "app", dev=False).config["STATIC_VERSION"].count("-") >= 1

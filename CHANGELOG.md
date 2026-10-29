@@ -6,6 +6,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed
+
+- A build that keeps the same version number (a branch, or a fork's add-on) no
+  longer serves stale stylesheets and scripts. The static URLs carried only
+  the package version and were cached for a year, so a changed CSS file never
+  reached a browser that had loaded the old one. The cache-busting version now
+  also carries a short digest of the static files, which changes whenever any
+  of them does.
+
 ## [0.493.0], 2026-10-29
 
 ### Added
