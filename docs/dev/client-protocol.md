@@ -815,7 +815,10 @@ increasing uint the firmware maintains per device (persist across
 deep sleep, e.g. in NVS). Retries send the same id, and the server
 treats an id equal to the last processed one as a duplicate (a
 *lower* id is taken as a counter restart after a power cycle and
-still dispatches). A firmware without a monotonic counter can omit
+still dispatches). An id of `0` marks a counter that has started over:
+it is never an id duplicate, and a resend of it is caught by the
+time-window debounce below. A client that can't keep its counter across
+a restart can start at `0` on every boot. A firmware without a monotonic counter can omit
 `button_event_id` and fall back to the server's time-window
 debounce (default 3 seconds, overridable via
 `settings.app.button_debounce_s`).

@@ -245,6 +245,18 @@ class TouchHandleResult:
     value: int | None = None
 
 
+def _same_event_id(state: DeviceRotationState, event_id: int | None) -> bool:
+    """Equality-only id dedup, as ``ButtonService._is_duplicate``: a retry
+    resends the same id. Id 0 marks a counter that started over and never
+    matches."""
+    return (
+        event_id is not None
+        and event_id != 0
+        and state.last_button_event_id is not None
+        and event_id == state.last_button_event_id
+    )
+
+
 class ButtonService:
     def __init__(
         self,
@@ -1099,11 +1111,7 @@ class ButtonService:
         state = self._state.get(device_id) or DeviceRotationState(device_id=device_id)
         diag = stroke or TouchStroke(x0=0, y0=0, x1=0, y1=0)
 
-        if (
-            event_id is not None
-            and state.last_button_event_id is not None
-            and event_id == state.last_button_event_id
-        ):
+        if _same_event_id(state, event_id):
             result = TouchHandleResult(
                 outcome="deduped", gesture=None, base=self.snapshot(device_id)
             )
@@ -1293,11 +1301,7 @@ class ButtonService:
         now = self._clock()
         state = self._state.get(device_id) or DeviceRotationState(device_id=device_id)
         diag = TouchStroke(x0=0, y0=0, x1=0, y1=0)
-        if (
-            event_id is not None
-            and state.last_button_event_id is not None
-            and event_id == state.last_button_event_id
-        ):
+        if _same_event_id(state, event_id):
             result = TouchHandleResult(
                 outcome="deduped", gesture=None, base=self.snapshot(device_id)
             )
@@ -1482,11 +1486,7 @@ class ButtonService:
         # retry resends the SAME id, while a lower id means the RTC
         # counter restarted on a power cycle or the offline queue is
         # replaying a stroke, both of which must dispatch.
-        if (
-            event_id is not None
-            and state.last_button_event_id is not None
-            and event_id == state.last_button_event_id
-        ):
+        if _same_event_id(state, event_id):
             log.info(
                 "touch dedup: device=%s event_id=%s (last=%s)",
                 device_id,
@@ -2588,10 +2588,14 @@ class ButtonService:
         # offline touch queue can replay older-id strokes after a WiFi
         # outage; both must dispatch. (Pre-v0.187.2 this was ``<=`` and
         # a power-cycled panel had every event swallowed until re-pair.)
-        if event_id is not None and state.last_button_event_id is not None:
+        # An id of 0 is a client starting its counter over (a CircuitPython
+        # client counts from 0 on every boot): never an id duplicate, so it
+        # can't collide with the last id from before the restart, and it is
+        # recorded as the new last id. Retries of it fall to the time window.
+        if event_id is not None and event_id != 0 and state.last_button_event_id is not None:
             return event_id == state.last_button_event_id
-        # Fallback for firmwares that don't send an id: same button
-        # within the configured window (default 3s).
+        # Fallback for firmwares that don't send an id, and for id 0: same
+        # button within the configured window (default 3s).
         if state.last_button == button and state.last_button_at is not None:
             window = timedelta(seconds=self._debounce_seconds())
             if now - state.last_button_at <= window:

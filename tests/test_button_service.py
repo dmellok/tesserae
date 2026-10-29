@@ -470,6 +470,43 @@ def test_lower_event_id_is_a_counter_restart_not_a_retry(
     assert push_manager.calls == []
 
 
+def test_event_id_zero_is_a_counter_reset(
+    rotation_store: RotationStore,
+    state_store: DeviceRotationStateStore,
+    settings_store: SettingsStore,
+    page_store: PageStore,
+    push_manager: StubPushManager,
+    clock: FakeClock,
+) -> None:
+    """A client that counts from 0 on every boot sends id 0 first. It never
+    matches the last id, even when that was also 0 from before a restart,
+    and the next id after it is compared against 0. A quick resend of 0
+    falls to the time window."""
+    _seed_rotation(rotation_store)
+    svc = _wire(
+        rotation_store=rotation_store,
+        state_store=state_store,
+        settings_store=settings_store,
+        page_store=page_store,
+        push_manager=push_manager,
+        clock=clock,
+    )
+
+    svc.handle_button(device_id="kitchen", button="right", event_id=0)
+    svc.handle_button(device_id="kitchen", button="right", event_id=1)
+    clock.tick(30.0)
+    # Restart: counting from 0 again, then 1 again.
+    push_manager.calls.clear()
+    assert svc.handle_button(device_id="kitchen", button="right", event_id=0).dedup is False
+    assert svc.handle_button(device_id="kitchen", button="right", event_id=1).dedup is False
+    assert len(push_manager.calls) == 2
+    # A resend of 0 within the window is still a retry.
+    clock.tick(30.0)
+    svc.handle_button(device_id="kitchen", button="left", event_id=0)
+    clock.tick(1.0)
+    assert svc.handle_button(device_id="kitchen", button="left", event_id=0).dedup is True
+
+
 def test_missing_event_id_uses_time_window_dedup(
     rotation_store: RotationStore,
     state_store: DeviceRotationStateStore,

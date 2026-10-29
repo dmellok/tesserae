@@ -6,6 +6,17 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.495.0], 2026-10-30
+
+### Added
+
+- A button or touch event with `button_event_id=0` resets the device's
+  stored event id: it is never dropped as a repeat of the last id, so a
+  client that counts from 0 on every boot (the CircuitPython client) doesn't
+  lose the first press after a restart. A quick resend of 0 is still caught
+  by the time-window debounce. ESP32 firmware starts its ids at a random
+  point and is unaffected.
+
 ## [0.494.1], 2026-10-30
 
 ### Fixed
