@@ -20,6 +20,7 @@ clients can hit /settings without juggling sessions.
 from __future__ import annotations
 
 import atexit
+import hashlib
 import logging
 import mimetypes
 import os
@@ -250,6 +251,20 @@ def _stop_at_exit(method: Callable[[], object]) -> None:
     atexit.register(_call)
 
 
+def _static_digest(root: Path) -> str:
+    """A short digest of every file under ``root`` (relative path, size and
+    modification time), for the static URLs' cache-busting version. Empty
+    when there is nothing to read."""
+    h = hashlib.sha256()
+    try:
+        for path in sorted(p for p in root.rglob("*") if p.is_file()):
+            st = path.stat()
+            h.update(f"{path.relative_to(root)}\0{st.st_size}\0{st.st_mtime_ns}\n".encode())
+    except OSError:
+        return ""
+    return h.hexdigest()[:10]
+
+
 def create_app(
     *,
     testing: bool = False,
@@ -467,11 +482,17 @@ def create_app(
     pkg_version = _resolve_pkg_version()
     app.config["APP_VERSION"] = pkg_version
 
-    # Bust browser caches on every ship. In prod the version alone is
-    # enough (every release bumps it). In dev we suffix the startup time
-    # so each `--dev` restart also breaks the cache without the user
-    # having to hard-reload after editing client.js / .css.
-    static_version = pkg_version if not dev else f"{pkg_version}-{int(time.time())}"
+    # Bust browser caches on every ship. A release bumps the version, but a
+    # build from a branch doesn't, and its stylesheets would then be held
+    # for a year: so the version also carries a digest of the static files
+    # (path, size and modification time), which changes with any of them.
+    # In dev we suffix the startup time so each `--dev` restart also breaks
+    # the cache without the user having to hard-reload after editing
+    # client.js / .css.
+    static_digest = _static_digest(Path(app.static_folder or ""))
+    static_version = (
+        f"{pkg_version}-{static_digest}" if not dev else f"{pkg_version}-{int(time.time())}"
+    )
     app.config["STATIC_VERSION"] = static_version
 
     @app.url_defaults
