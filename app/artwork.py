@@ -685,7 +685,7 @@ class Collection:
             for p in sorted(arch.iterdir()):
                 if p.suffix not in (".jpg", ".png") or "__" not in p.stem:
                     continue
-                key, stamp = p.stem.rsplit("__", 1)
+                key = p.stem.rsplit("__", 1)[0]
                 if key in have:
                     continue
                 have.add(key)
