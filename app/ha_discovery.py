@@ -32,7 +32,7 @@ via ``via_device``):
 * **sensor** ``Current dashboard``, ``Last updated``, ``Last seen``,
   ``Next change`` (the next projected visible update) and ``Next update``
   (when that update actually reaches the frame: the push time weighed
-  against a live connection or the frame's next check-in, held by pause
+  against a live connection or the frame's next check-in, held by quiet
   hours / a pause; its attributes carry the ``reason``).
 * **select** ``Dashboard`` (push one bound dashboard to *only* this
   display) and **select** ``Lineup`` (which lineup the display follows).

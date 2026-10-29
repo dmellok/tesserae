@@ -63,34 +63,34 @@ changing this setting.
 The setting is per device, so one panel can be pinned to full refresh while
 the rest stay on Auto.
 
-### Pause hours
+### Quiet hours
 
-**Pause hours** hold automated pushes (schedules, lineups, webhooks) during a
+**Quiet hours** hold automated pushes (schedules, lineups, webhooks) during a
 daily window so a panel does not repaint a dark room. The window is set once in
-**Settings → Server → App → Pause hours** and any device can override it on its
+**Settings → Server → App → Quiet hours** and any device can override it on its
 card. Manual sends, Push-now buttons, and physical buttons ignore it.
 
 The window has three parts:
 
 - **Start** and **End**. End earlier than Start wraps midnight, so 22:00 → 07:00
   is overnight.
-- **Pause window on**: the weekdays the Start/End window is in force. Each
+- **Window applies on**: the weekdays the Start/End window is in force. Each
   day is judged by its own clock: on a ticked day an overnight window covers
   that morning up to End and that evening from Start.
-- **Paused all day**: weekdays that are paused from midnight to midnight
+- **Quiet all day**: weekdays that are quiet from midnight to midnight
   whatever the window says.
 
 The window follows the server's time zone, including daylight-saving changes.
 A window that ends in the hour a spring change skips, or in the hour an autumn
 change repeats, ends at the first real moment after its End, and the End minute
-itself is still paused.
+itself is still quiet.
 
 An office that empties at night and closes at the weekend is Start 20:00, End
-08:00, Monday to Friday ticked under *Pause window on*, and Saturday and
-Sunday ticked under *Paused all day*: paused from Friday 20:00 straight through
+08:00, Monday to Friday ticked under *Window applies on*, and Saturday and
+Sunday ticked under *Quiet all day*: quiet from Friday 20:00 straight through
 to Monday 08:00.
 
-**Sleep through pause hours** goes one step further for battery panels. By
+**Sleep through quiet hours** goes one step further for battery panels. By
 default a device keeps waking on its interval inside the window, finds nothing
 new, and goes back to sleep; with this on, the server tells it to sleep until
 the window ends instead, which is where the battery saving is. The trade is
@@ -99,7 +99,7 @@ Devices that never sleep (always-on kiosks) are unaffected. Any client that
 honours `next_poll_s` gets this for free; there is nothing to configure on the
 device.
 
-**Touch off during pause hours** is for touch panels. With touch on, the
+**Touch off during quiet hours** is for touch panels. With touch on, the
 touch controller stays awake through every sleep so that a tap can wake the
 panel, and that costs battery all night. With this switch on, a wake inside
 the window is told that touch is off, so the panel puts its touch controller

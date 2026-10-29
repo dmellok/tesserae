@@ -405,14 +405,14 @@
         </div>
         {% endif %}
 
-        {# Pause hours override: toggle row + dependent fields. #}
+        {# Quiet hours override: toggle row + dependent fields. #}
         {% if section.quiet_hours_endpoint %}
         <hr class="dx-divider">
         <div class="dx-quiet-hours" data-dep-group>
           <div class="dx-toggle-row">
             <div class="dx-toggle-row-text">
-              <label class="dx-toggle-row-label" for="{{ section.id }}-qh-enabled">Override the server's pause hours</label>
-              <p class="dx-toggle-row-desc">On, this display uses only the hours below and the server's pause hours don't apply to it. Off, it follows Settings › Server › Pause hours.</p>
+              <label class="dx-toggle-row-label" for="{{ section.id }}-qh-enabled">Override the server's quiet hours</label>
+              <p class="dx-toggle-row-desc">On, this display uses only the hours below and the server's quiet hours don't apply to it. Off, it follows Settings › Server › Quiet hours.</p>
             </div>
             <label class="dx-toggle-switch" for="{{ section.id }}-qh-enabled">
               <input id="{{ section.id }}-qh-enabled" type="checkbox" name="quiet_hours_enabled"
@@ -426,7 +426,7 @@
               when both fit, stacked otherwise. -#}
           <div class="dx-field-grid dx-qh-days" data-dep-target>
             <div class="dx-qh-window">
-              {{ days_field(section.id ~ '-qh-days', 'quiet_hours_days', 'Pause window on',
+              {{ days_field(section.id ~ '-qh-days', 'quiet_hours_days', 'Window applies on',
                   value=section.quiet_hours.get('days', ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']),
                   help='The days the Start to End window runs, each by its own clock: an overnight window covers that morning up to End and that evening from Start.',
                   form=_combined_form_id) }}
@@ -437,17 +437,17 @@
                     value=section.quiet_hours.get('end', ''), placeholder='HH:MM', type='time', form=_combined_form_id) }}
               </div>
             </div>
-            {{ days_field(section.id ~ '-qh-all-day', 'quiet_hours_all_day', 'Paused all day on',
+            {{ days_field(section.id ~ '-qh-all-day', 'quiet_hours_all_day', 'Quiet all day',
                 value=section.quiet_hours.get('all_day', []),
-                help='No scheduled or automatic pictures from midnight to midnight on these days; the display keeps what it shows, and sending one yourself still works. With Sleep through pause hours on, it sleeps all day.',
+                help='No scheduled or automatic pictures from midnight to midnight on these days; the display keeps what it shows, and sending one yourself still works. With Sleep through quiet hours on, it sleeps all day.',
                 form=_combined_form_id) }}
           </div>
           {#- Toggle rows like the override above: what it does, in words, beside its switch. -#}
-          {% set qh_toggles = [(section.id ~ '-qh-sleep', 'quiet_hours_sleep', 'Sleep through pause hours',
+          {% set qh_toggles = [(section.id ~ '-qh-sleep', 'quiet_hours_sleep', 'Sleep through quiet hours',
                 'The display sleeps until the window ends instead of waking on its usual interval inside it. Saves power; a picture sent during the window shows when it ends.',
                 section.quiet_hours.get('sleep', False))] %}
           {% if section.quiet_hours_touch %}
-          {% set qh_toggles = qh_toggles + [(section.id ~ '-qh-touch-off', 'quiet_hours_touch_off', 'Touch off during pause hours',
+          {% set qh_toggles = qh_toggles + [(section.id ~ '-qh-touch-off', 'quiet_hours_touch_off', 'Touch off during quiet hours',
                 'The touchscreen sleeps with the panel, so a tap does nothing until the window ends; the buttons still wake it.',
                 section.quiet_hours.get('touch_off', False))] %}
           {% endif %}

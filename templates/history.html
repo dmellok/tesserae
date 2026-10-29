@@ -81,10 +81,10 @@
     </nav>
     <span class="dx-hist-filter-divider" aria-hidden="true"></span>
     <nav class="seg dx-hist-toggles" aria-label="View options">
-      {# Skipped pushes (pause hours, condition holds) are hidden by default. #}
+      {# Skipped pushes (quiet hours, condition holds) are hidden by default. #}
       <a href="{{ url_for('history.index', **dict(filter_args, include_skipped=(None if include_skipped else 1))) }}"
          class="seg-item{% if include_skipped %} is-on{% endif %}" aria-pressed="{{ 'true' if include_skipped else 'false' }}"
-         title="{{ 'Hide pushes skipped by pause hours or condition holds' if include_skipped else 'Show pushes skipped by pause hours or condition holds' }}">
+         title="{{ 'Hide pushes skipped by quiet hours or condition holds' if include_skipped else 'Show pushes skipped by quiet hours or condition holds' }}">
         <i class="ph ph-{{ 'eye' if include_skipped else 'eye-closed' }}" aria-hidden="true"></i><span>Show skipped</span>
       </a>
       {# Background work (deck / album warms) never repaints a panel. #}

@@ -57,7 +57,8 @@ class Reach:
 @dataclass(frozen=True)
 class Hold:
     """Automated pushes to this display are held. ``until`` is ``None`` for
-    a hold with no end (the global automation pause)."""
+    a hold with no end (the global automation pause, or quiet hours that
+    never open within the week)."""
 
     until: float | None
     reason: str
@@ -165,6 +166,8 @@ def reason_for(nu: NextUpdate, reach: Reach) -> str:
     sleeping frame's next check-in) or ``scheduled`` (nothing known about
     reach, the push time stands)."""
     if nu.held_indefinitely:
+        if nu.held_reason == "quiet hours":
+            return "held by quiet hours"
         return "held by the automation pause"
     if nu.held_until is not None:
         return f"held by {nu.held_reason}"
@@ -181,7 +184,9 @@ def describe(nu: NextUpdate, reach: Reach, *, tz: tzinfo | None, now: float) -> 
     ``text`` (the whole sentence)."""
     parts: list[str] = []
     if nu.held_indefinitely:
-        parts.append("automation is paused")
+        parts.append(
+            "quiet hours all week" if nu.held_reason == "quiet hours" else "automation is paused"
+        )
     elif nu.held_until is not None:
         parts.append(f"held until {_clock(nu.held_until, tz, now)} by {nu.held_reason}")
     if nu.mode == MODE_CONNECTED:

@@ -130,6 +130,8 @@ def test_wording_when_held_and_when_nothing_is_scheduled() -> None:
     assert said["text"] == (
         "No update scheduled (automation is paused · frame connected, arrives right away)"
     )
+    said = _say(NOW + 5 * MIN, reach, nu.Hold(None, "quiet hours"))
+    assert said["detail"].startswith("quiet hours all week")
 
 
 # -- Visionect: the observed check-in gap ---------------------------------
@@ -354,6 +356,8 @@ def test_reason_phrases() -> None:
     assert nu.reason_for(held, live) == "held by quiet hours"
     paused = _compute(NOW + MIN, live, nu.Hold(None, "a pause"))
     assert nu.reason_for(paused, live) == "held by the automation pause"
+    quiet_week = _compute(NOW + MIN, live, nu.Hold(None, "quiet hours"))
+    assert nu.reason_for(quiet_week, live) == "held by quiet hours"
 
 
 def test_ha_state_for_a_sleeping_frame_has_a_checkin_and_a_check_in_reason(app: Flask) -> None:

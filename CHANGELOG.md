@@ -6,6 +6,8 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.494.0], 2026-10-30
+
 ### Added
 
 - Home Assistant gets a **Next update** sensor per display, the same time the
@@ -14,7 +16,7 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   held by quiet hours or a pause). Its attributes carry the `reason`
   (`connected`, `check-in`, `held by quiet hours`, ...) and the next check-in.
 
-### Fixed
+### Changed
 
 - Home Assistant's **Next wake** sensor no longer shows the raw telemetry
   prediction, which read 24 minutes for a Visionect sign that was connected and
@@ -22,6 +24,9 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   sleeping frame (from the cycle it has actually been seen to keep), and reads
   unknown while the frame is connected or stays awake. A stale time left
   retained from an earlier session is cleared.
+
+### Fixed
+
 - The Devices page, the device page and the Lineups page now agree on when a
   frame actually gets its next update. They used to show two numbers that
   contradicted each other ("Next wake in 24 min" on one, "next advance in 1
@@ -37,23 +42,6 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   between the sign's statuses instead of the configured interval (a 32" set to
   30 min reports about every 15), so the prediction earns trust. A sign with a
   live connection reads "connected" instead of counting down a wake.
-
-### Changed
-
-- "Quiet hours" is now called "Pause hours" in the Settings, device page, history
-  and docs. A display isn't loud at any hour; the window is when automated
-  pictures are held back, which is what "pause" says. Nothing stored changes:
-  saved windows, the per-device override, the API fields and Home Assistant
-  entities keep their names.
-
-### Fixed
-
-- The Timing block on the device page reads more clearly: the day pickers are
-  "Pause window on" and "Paused all day on", with Start and End under the
-  window's days, and the override toggle says what On and Off mean.
-
-### Fixed
-
 - The status dot on the Devices list, the device page header, the Dashboards
   list's per-display dot and the dashboards' device chips follows a sleeping
   device's own cycle. It went red 5 minutes after a heartbeat, so a battery
@@ -64,7 +52,6 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   `freshness` flag and Home Assistant's online state use the same observed
   cycle instead of only the configured interval. Devices with no known cycle,
   and always-on ones, keep the old bands.
-
 - Thumbnails keep the screen's shape instead of cropping a portrait picture to
   its middle. The latest-render thumbnail on the Devices list and the device
   page was a fixed 4:3 box; it now follows the panel's aspect ratio (taller for
@@ -75,13 +62,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   lineup editor): a portrait dashboard is a tall card, a landscape one stays
   wide, in the classic and Paper designs and at phone widths. The History
   thumbnails fit rather than crop too.
-
 - A build that keeps the same version number (a branch, or a fork's add-on) no
   longer serves stale stylesheets and scripts. The static URLs carried only
   the package version and were cached for a year, so a changed CSS file never
   reached a browser that had loaded the old one. The cache-busting version now
   also carries a short digest of the static files, which changes whenever any
   of them does.
+- The Timing block on the device page reads more clearly: Start and End sit
+  under the days the window applies on, the switches explain themselves, and
+  the override toggle says what On and Off mean.
 
 ## [0.493.1], 2026-10-29
 

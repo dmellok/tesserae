@@ -284,7 +284,7 @@ def test_push_with_respect_quiet_hours_skips_when_all_devices_quiet(
         result = manager.push("home", respect_quiet_hours=True)
 
     assert result.status == "quiet"
-    assert "pause hours" in (result.error or "").lower()
+    assert "quiet hours" in (result.error or "").lower()
 
 
 # ----- weekday windows, all-day days, sleep-through (#299) -----------
