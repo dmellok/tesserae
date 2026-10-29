@@ -31,12 +31,18 @@
 {# Lineups page: one section per display, one row per deck inside it, with a
    kind-specific body: screen cards for every dashboard, a 24h rail for
    schedules, steppers for by-hand. #}
+{# The frame keeps the dashboard's own shape when its size is known: the
+   aspect ratio rides on the element as custom properties, a portrait one is
+   marked so it gets the taller box. Without a size it stays the fixed box. #}
+{% macro dk_frame_attrs(w, h) -%}
+{%- if w and h %} style="--thumb-ar: {{ w }} / {{ h }}; --thumb-r: {{ '%.4f'|format(w / h) }}"{% endif -%}
+{%- endmacro %}
 {% macro dk_screen(s, total=None, edit_url=None, behind=None, poll=None) %}
 {# ``s.waiting``: the step the server intends, which this display has not
    fetched yet. The frame gets the dashed amber outline and a WAITING ribbon,
    and one line under the caption says how far behind the panel is. #}
 <figure class="dk-screen{% if s.live %} is-live{% endif %}{% if s.waiting %} is-waiting{% endif %}">
-  <div class="dk-screen-frame">
+  <div class="dk-screen-frame{% if s.w and s.h and s.h > s.w %} is-portrait{% endif %}"{{ dk_frame_attrs(s.w, s.h) }}>
     {% if s.thumb %}<img src="{{ s.thumb }}" alt="" loading="lazy">{% else %}<i class="ph ph-monitor" aria-hidden="true"></i>{% endif %}
     {% if s.live %}<span class="dk-screen-wash" aria-hidden="true"></span>{% endif %}
     {% if s.waiting %}<span class="tg tg--sm tg--upper tg--warn dk-ribbon">waiting</span>{% endif %}
@@ -62,7 +68,7 @@
 {% macro dk_on_panel(c) %}
 {% if c.on_panel %}
 <figure class="dk-screen dk-screen--panel is-live">
-  <div class="dk-screen-frame">
+  <div class="dk-screen-frame{% if c.on_panel.w and c.on_panel.h and c.on_panel.h > c.on_panel.w %} is-portrait{% endif %}"{{ dk_frame_attrs(c.on_panel.w, c.on_panel.h) }}>
     {% if c.on_panel.thumb %}<img src="{{ c.on_panel.thumb }}" alt="" loading="lazy">{% else %}<i class="ph ph-monitor" aria-hidden="true"></i>{% endif %}
     <span class="dk-screen-wash" aria-hidden="true"></span>
     <span class="tg tg--sm tg--upper tg--teal dk-ribbon">on the panel</span>

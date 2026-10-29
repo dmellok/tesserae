@@ -164,6 +164,26 @@ def _page_thumbs(pages: list[Any]) -> dict[str, str]:
     return out
 
 
+def _page_shapes(pages: list[Any]) -> dict[str, tuple[int, int]]:
+    """Width and height each dashboard renders at, so a screen card can keep
+    the dashboard's own shape (a portrait panel's card is tall, not a cropped
+    landscape box). A dashboard whose size can't be resolved is left out and
+    its card falls back to the fixed box."""
+    from app.composer import preview_dims
+
+    devices_reg = current_app.config.get("DEVICE_REGISTRY")
+    settings = current_app.config.get("SETTINGS_STORE")
+    out: dict[str, tuple[int, int]] = {}
+    for p in pages:
+        try:
+            w, h = preview_dims(p, devices_reg, settings)
+        except Exception:
+            continue
+        if w > 0 and h > 0:
+            out[p.id] = (w, h)
+    return out
+
+
 def _live_map() -> dict[str, tuple[str | None, str | None]]:
     """device_id -> (deck_id or None, page_id) currently on glass, from the
     nav record first (deck-driven displays) then the last served render."""
@@ -470,6 +490,7 @@ def _design_cards(
     device_names = {d.id: d.display_name for d in devices}
     deck_devices = deck_devices or {}
     thumbs = _page_thumbs(pages)
+    shapes = _page_shapes(pages)
     live = _live_map()
     panel_states = _panel_states(devices)
     nav = _nav_store()
@@ -542,6 +563,8 @@ def _design_cards(
                 "page_id": pid,
                 "name": page_names.get(pid, pid),
                 "thumb": thumbs.get(pid, ""),
+                "w": shapes.get(pid, (0, 0))[0],
+                "h": shapes.get(pid, (0, 0))[1],
                 "at_label": f"{state['verb']} {_hhmm(at, tz)}" if at is not None else None,
             }
             waiting = intended is not None and pid != intended
@@ -616,6 +639,8 @@ def _design_cards(
             "id": pid,
             "name": page_names.get(pid, pid),
             "thumb": thumbs.get(pid, ""),
+            "w": shapes.get(pid, (0, 0))[0],
+            "h": shapes.get(pid, (0, 0))[1],
             "index": index,
             "live": is_live,
             # The step the server intends, before any display's view of it
@@ -1260,11 +1285,15 @@ def editor(deck_id: str | None = None) -> str | Response:
     page_meta = []
     for p in pages:
         try:
-            token = page_preview_token(p, preview_dims(p, devices_reg, settings))
+            dims = preview_dims(p, devices_reg, settings)
+            token = page_preview_token(p, dims)
         except Exception:
+            dims = (0, 0)
             token = ""
         page_meta.append(
             {
+                "w": dims[0],
+                "h": dims[1],
                 "id": p.id,
                 "name": p.name,
                 "thumb": url_for("composer.compose_preview", page_id=p.id)

@@ -32,7 +32,7 @@
 {# Latest-render thumbnail, or a placeholder when nothing has been
    pushed yet. The size is set by the caller's CSS class. #}
 {%- macro render_thumb(section, extra_class='') -%}
-<div class="dx-thumb {{ extra_class }}">
+<div class="dx-thumb {{ extra_class }}{% if section.panel and section.panel.h and section.panel.w and section.panel.h > section.panel.w %} dx-thumb--portrait{% endif %}"{% if section.overview.has_render and section.panel and section.panel.w and section.panel.h %} style="--thumb-ar: {{ section.panel.w }} / {{ section.panel.h }}"{% endif %}>
   {% if section.overview.has_render %}
   <img src="{{ section.preview_url }}" alt="Latest render on {{ section.device_name }}" loading="lazy">
   {% else %}

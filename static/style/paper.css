@@ -703,6 +703,7 @@
 :root[data-ui="paper"] .dx-dashquick-preview { border-radius: 2px; }
 :root[data-ui="paper"] .dx-dashtable .dx-dashquick { background: var(--t-surface-soft); border-bottom: 1px solid var(--t-border); }
 :root[data-ui="paper"] .dx-dashquick-preview { height: 160px; max-height: none; min-height: 0; aspect-ratio: auto; }
+:root[data-ui="paper"] .dx-dashquick-preview.is-portrait[style*="aspect-ratio"] { height: 240px; }
 :root[data-ui="paper"] .dx-dashtable .dx-qtile {
   background: var(--t-surface-sunk);
   border: 0;
@@ -726,6 +727,8 @@
 :root[data-ui="paper"] .dx-refresh input[type="number"] { border-color: var(--t-border-strong); background: var(--t-surface); }
 @container dashtable (max-width: 720px) {
   :root[data-ui="paper"] .dx-dashquick-preview { height: auto; aspect-ratio: 5 / 3; max-height: 220px; }
+  :root[data-ui="paper"] .dx-dashquick-preview[style*="aspect-ratio"] { height: 160px; max-height: none; width: auto; max-width: 100%; }
+  :root[data-ui="paper"] .dx-dashquick-preview.is-portrait[style*="aspect-ratio"] { height: 220px; }
 }
 /* Stats: one sheet holding a strip of figures with hairline dividers. */
 :root[data-ui="paper"] .dx-stat-tiles {
