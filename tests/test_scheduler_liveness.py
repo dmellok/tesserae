@@ -122,7 +122,7 @@ def test_quiet_hours_skip_is_logged(wiring, caplog) -> None:
     store.upsert(_deck())
     with caplog.at_level(logging.INFO, logger="app.scheduler"):
         scheduler._tick_once(T0)
-    assert "deck timer advance skipped: device=panel deck=d1 -> a (quiet hours)" in caplog.text
+    assert "deck timer advance skipped: device=panel deck=d1 -> a (pause hours)" in caplog.text
 
 
 # -- tick liveness ---------------------------------------------------------

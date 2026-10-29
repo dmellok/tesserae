@@ -84,7 +84,7 @@
 <div class="settings-section-list {% if active_area == 'server' %}dx-server-area{% endif %}">
 
 {# Server tab: render the seven grouped section cards (Network &
-   integrations / Location & time / Quiet hours / Low-battery /
+   integrations / Location & time / Pause hours / Low-battery /
    Display & performance / Marketplace / Privacy) ahead of the
    remaining Broker + Virtual-panel cards. ``app_field_groups`` is
    None on other tabs so this falls through cleanly. #}
@@ -358,31 +358,31 @@
        setting. Disabling (or clearing all fields) drops the block and
        the device falls back to the global default. #}
     <div class="device-subsection">
-      <p class="device-subhead">Quiet hours override</p>
+      <p class="device-subhead">Pause hours override</p>
       {{ switch(section.id ~ '-qh-enabled', 'quiet_hours_enabled', 'Override the global quiet-hours window for this device',
                 checked=section.quiet_hours.get('enabled', False),
-                help='When off, the device follows whatever Settings → Server → App says (or has no quiet hours if that is off too).') }}
+                help='When off, the device follows whatever Settings → Server → App says (or has no pause hours if that is off too).') }}
       <div class="field-grid">
         {{ text_input(section.id ~ '-qh-start', 'quiet_hours_start', 'Start',
                       value=section.quiet_hours.get('start', ''),
                       placeholder='HH:MM', type='time',
-                      help='When this device goes quiet. Honours the app timezone.') }}
+                      help='When the pause window begins for this device. Honours the app timezone.') }}
         {{ text_input(section.id ~ '-qh-end', 'quiet_hours_end', 'End',
                       value=section.quiet_hours.get('end', ''),
                       placeholder='HH:MM', type='time',
                       help='When this device wakes up. End < start wraps midnight (e.g. 22:00 → 07:00 = overnight).') }}
       </div>
-      {{ days_field(section.id ~ '-qh-days', 'quiet_hours_days', 'Window applies on',
+      {{ days_field(section.id ~ '-qh-days', 'quiet_hours_days', 'Pause window on',
                     value=section.quiet_hours.get('days', ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']),
                     help='Weekdays the start/end window is in force, each judged by its own clock: on a ticked day an overnight window covers that morning up to End and that evening from Start.') }}
-      {{ days_field(section.id ~ '-qh-all-day', 'quiet_hours_all_day', 'Quiet all day',
+      {{ days_field(section.id ~ '-qh-all-day', 'quiet_hours_all_day', 'Paused all day on',
                     value=section.quiet_hours.get('all_day', []),
-                    help='Weekdays that are quiet from midnight to midnight regardless of the window.') }}
-      {{ switch(section.id ~ '-qh-sleep', 'quiet_hours_sleep', 'Sleep through quiet hours',
+                    help='Weekdays that are paused from midnight to midnight regardless of the window.') }}
+      {{ switch(section.id ~ '-qh-sleep', 'quiet_hours_sleep', 'Sleep through pause hours',
                 checked=section.quiet_hours.get('sleep', False),
                 help='Sleep until the window ends instead of waking on the usual interval inside it. A manual push during the window is not seen until it ends.') }}
       {% if section.quiet_hours_touch %}
-      {{ switch(section.id ~ '-qh-touch-off', 'quiet_hours_touch_off', 'Touch off during quiet hours',
+      {{ switch(section.id ~ '-qh-touch-off', 'quiet_hours_touch_off', 'Touch off during pause hours',
                 checked=section.quiet_hours.get('touch_off', False),
                 help='Switch the touchscreen off inside the window so the touch controller sleeps with the panel. A tap does nothing until the window ends; the buttons still wake it.') }}
       {% endif %}
@@ -1026,7 +1026,7 @@ docker compose up -d</code></pre>
   -H "Authorization: Bearer &lt;your-token&gt;" \
   -H "Content-Type: application/json" \
   -d '{"page_id": "hallway"}'</code></pre>
-      <p class="field-help"><code>device_ids</code> (optional array) restricts the fan-out; omit to push to every device the page is bound to. Quiet hours apply, a call hitting all-quiet devices returns 202 with <code>status: "quiet"</code>.</p>
+      <p class="field-help"><code>device_ids</code> (optional array) restricts the fan-out; omit to push to every device the page is bound to. Pause hours apply, a call hitting all-quiet devices returns 202 with <code>status: "quiet"</code>.</p>
     </details>
 
     <form method="post" action="{{ url_for('auth.system_webhook_regenerate') }}" class="form" onsubmit="return confirm('Generate a new token? Any automation using the old token will stop working.');">
