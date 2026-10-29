@@ -897,7 +897,7 @@ def _device_health(device_id: str) -> str:
     """ok / warn / stale / unknown from the last heartbeat, the same
     freshness bands as the Devices table's status dot."""
     try:
-        from app.settings._shared import STATUS_FRESH_S, STATUS_WARN_S, device_status
+        from app.settings._shared import device_status, health_for_age
 
         cache = device_status().get(device_id)
     except Exception:
@@ -905,11 +905,7 @@ def _device_health(device_id: str) -> str:
     if not cache:
         return "unknown"
     age = max(0.0, time.time() - float(cache.get("received_at", 0) or 0))
-    if age <= STATUS_FRESH_S:
-        return "ok"
-    if age <= STATUS_WARN_S:
-        return "warn"
-    return "stale"
+    return health_for_age(device_id, age)
 
 
 @bp.get("")

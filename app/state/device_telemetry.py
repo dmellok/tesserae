@@ -125,6 +125,24 @@ class DeviceTelemetry:
         return asdict(self)
 
 
+def known_sleep_cycle_s(store: Any, device_id: str) -> float | None:
+    """The device's own sleep cycle in seconds, as telemetry last saw it, or
+    ``None`` when it is unknown, zero, or the device stays awake between
+    polls. Every "is this device late?" check that wants to follow a
+    sleeper's real cadence (status dots, the companion freshness flag, the
+    Home Assistant online flag) reads it here so they cannot disagree."""
+    try:
+        entry = store.get(device_id) if store is not None else None
+        cycle = getattr(entry, "last_sleep_interval_s", None)
+        if entry is None or getattr(entry, "always_on", False):
+            return None
+        if isinstance(cycle, bool) or not isinstance(cycle, (int, float)) or cycle <= 0:
+            return None
+        return float(cycle)
+    except Exception:
+        return None
+
+
 @dataclass
 class _State:
     devices: dict[str, DeviceTelemetry] = field(default_factory=dict)

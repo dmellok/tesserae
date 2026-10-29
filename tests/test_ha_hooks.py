@@ -106,6 +106,21 @@ def test_set_device_config_validates_persists_publishes_and_reprojects(tmp_path:
     assert ha_hooks._expected_interval(app, "lounge") == 1800
 
 
+def test_expected_interval_stretches_to_the_cycle_telemetry_has_seen(tmp_path: Path) -> None:
+    """HA's online flag keys off this, so a frame that really wakes every 30
+    minutes is not reported offline because its configured default is shorter."""
+    from types import SimpleNamespace
+
+    app = _app(tmp_path, _Device("lounge"))
+    assert ha_hooks._expected_interval(app, "lounge") == 900
+    seen = SimpleNamespace(last_sleep_interval_s=1800, always_on=False)
+    app.config["DEVICE_TELEMETRY"] = SimpleNamespace(get=lambda _id: seen)
+    assert ha_hooks._expected_interval(app, "lounge") == 1800
+    shorter = SimpleNamespace(last_sleep_interval_s=300, always_on=False)
+    app.config["DEVICE_TELEMETRY"] = SimpleNamespace(get=lambda _id: shorter)
+    assert ha_hooks._expected_interval(app, "lounge") == 900  # never tightens
+
+
 def test_set_device_config_rejects_invalid_and_unknown(tmp_path: Path) -> None:
     device = _Device("lounge")
     app = _app(tmp_path, device)

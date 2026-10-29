@@ -37,8 +37,6 @@ from . import visionect_routes
 from ._shared import (
     AREA_KINDS,
     AREAS,
-    STATUS_FRESH_S,
-    STATUS_WARN_S,
     bp,
     config_fields_from_schema,
     device_kinds,
@@ -47,6 +45,7 @@ from ._shared import (
     discovery_cache,
     format_discovered,
     format_relative,
+    health_for_age,
     mark_unreadable_secrets,
     note_refresh_floor,
     plugins,
@@ -2266,12 +2265,7 @@ def _status_view(device: Device) -> dict[str, Any]:
     if cache is None:
         return base
     age = max(0.0, time.time() - float(cache.get("received_at", 0)))
-    if age <= STATUS_FRESH_S:
-        health = "ok"
-    elif age <= STATUS_WARN_S:
-        health = "warn"
-    else:
-        health = "stale"
+    health = health_for_age(device.id, age)
     base.update(
         {
             "health": health,
