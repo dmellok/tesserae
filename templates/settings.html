@@ -204,6 +204,12 @@
             <dd>{{ ss.predicted_rel }}</dd>
           </div>
           {% endif %}
+          {% if ss.next_update %}
+          <div>
+            <dt>next update</dt>
+            <dd>{{ ss.next_update.text|replace('Next update ', '') }}</dd>
+          </div>
+          {% endif %}
           {% if ss.interval_s %}
           <div>
             <dt>sleep cycle</dt>

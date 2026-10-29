@@ -6,6 +6,38 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added
+
+- Home Assistant gets a **Next update** sensor per display, the same time the
+  Devices and Lineups pages show for when the next change reaches the frame
+  (push time weighed against a live connection or the frame's next check-in,
+  held by quiet hours or a pause). Its attributes carry the `reason`
+  (`connected`, `check-in`, `held by quiet hours`, ...) and the next check-in.
+
+### Fixed
+
+- Home Assistant's **Next wake** sensor no longer shows the raw telemetry
+  prediction, which read 24 minutes for a Visionect sign that was connected and
+  took pushes within seconds. It now means the next expected check-in of a
+  sleeping frame (from the cycle it has actually been seen to keep), and reads
+  unknown while the frame is connected or stays awake. A stale time left
+  retained from an earlier session is cleared.
+- The Devices page, the device page and the Lineups page now agree on when a
+  frame actually gets its next update. They used to show two numbers that
+  contradicted each other ("Next wake in 24 min" on one, "next advance in 1
+  min" on the other, when the push was in fact taken within seconds). The
+  *Next update* is the server's next push (lineup step, schedule, timer
+  advance, page refresh) weighed against when the frame can take it: a frame
+  holding a live connection or staying awake gets it right away, a sleeping
+  frame gets it at its first check-in at or after the push. Quiet hours and
+  pauses show as "held until 07:00". The Devices tile and Smart sync card read
+  e.g. "Next update ~18:24 (frame sleeps; next check-in ~18:24)", and every
+  lineup card with a next push says the same under "next advance".
+- Visionect signs: the check-in estimate follows the gap actually observed
+  between the sign's statuses instead of the configured interval (a 32" set to
+  30 min reports about every 15), so the prediction earns trust. A sign with a
+  live connection reads "connected" instead of counting down a wake.
+
 ### Changed
 
 - "Quiet hours" is now called "Pause hours" in the Settings, device page, history

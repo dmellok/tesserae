@@ -900,6 +900,22 @@ class Scheduler:
             if _pause_active(getattr(s, "automation_pause_until", None), now)
         }
 
+    def pause_hold_for_device(self, device_id: str, now: datetime) -> tuple[bool, datetime | None]:
+        """Whether automation is paused for ``device_id`` right now, and until
+        when: ``(True, None)`` for the global pause (no end time),
+        ``(True, until)`` for the display's own pause, ``(False, None)``
+        otherwise. Read-only; the next-update estimate uses it to say a push
+        is being held."""
+        if self.is_paused():
+            return True, None
+        for state in self._pause_states().values():
+            if str(getattr(state, "device_id", "")) != device_id:
+                continue
+            until = getattr(state, "automation_pause_until", None)
+            if isinstance(until, datetime) and _pause_active(until, now):
+                return True, until if until.tzinfo is not None else until.replace(tzinfo=UTC)
+        return False, None
+
     def _release_lapsed_pauses(self, now: datetime, states: dict[str, Any]) -> None:
         """Clear pauses that ran out (or were set to zero) and queue each
         display's catch-up (``_run_pause_catchups``): the current step of

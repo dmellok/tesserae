@@ -51,9 +51,10 @@ import os
 import threading
 import time
 from collections import deque
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from itertools import pairwise
 from pathlib import Path
 from typing import Any
 
@@ -149,6 +150,11 @@ PARAM_FLASH_SAVE = 53
 PARAM_WIFI_SSID = 65
 READ_PARAMS = (PARAM_HEARTBEAT, PARAM_SLEEP_DISABLE, PARAM_WIFI_SSID)
 HEARTBEAT_MAX_MINUTES = 24 * 60
+# Gaps between consecutive statuses that count as a check-in cadence (see
+# ``observed_status_gap_s``), and how many status times are kept to measure it.
+STATUS_GAP_MIN_S = 30.0
+STATUS_GAP_MAX_S = HEARTBEAT_MAX_MINUTES * 60.0
+STATUS_TIMES_KEPT = 5
 # Lines kept per frame of what went each way, for the device page.
 EXCHANGE_LOG_LINES = 60
 # How long a picture waits for the frame to answer a settings packet.
@@ -202,6 +208,7 @@ def status_heartbeat(
     interval_min: int | None = None,
     stays_awake: bool = False,
     sleep_until: float | None = None,
+    observed_gap_s: float | None = None,
 ) -> dict[str, Any]:
     """Map a decoded status packet onto Tesserae's heartbeat keys.
 
@@ -210,10 +217,12 @@ def status_heartbeat(
 
     The next-wake estimate rides along as the keys telemetry already reads:
     ``sleep_until`` when Tesserae has just told the sign to sleep until then,
-    else ``next_sleep_s`` from the sign's own check-in interval (``interval_min``,
-    TCLV 29; the status packet's ``NextStatus`` when that hasn't been read yet).
-    A sign that stays awake gets ``stays_awake`` and no estimate: it has no
-    wake to predict."""
+    else ``next_sleep_s``: the gap actually observed between the sign's recent
+    statuses (``observed_gap_s``) when there is one, because a real 32" reports
+    about every 15 min whatever its check-in setting says; otherwise the sign's
+    own check-in interval (``interval_min``, TCLV 29; the status packet's
+    ``NextStatus`` when that hasn't been read yet). A sign that stays awake gets
+    ``stays_awake`` and no estimate: it has no wake to predict."""
     out: dict[str, Any] = {"uuid": uuid, "connect_reason": connect_reason}
 
     def _int(name: str) -> int | None:
@@ -248,11 +257,27 @@ def status_heartbeat(
         out["stays_awake"] = True
     elif sleep_until is not None:
         out["sleep_until"] = sleep_until
+    elif observed_gap_s is not None and STATUS_GAP_MIN_S <= observed_gap_s <= STATUS_GAP_MAX_S:
+        out["next_sleep_s"] = round(observed_gap_s)
     else:
         minutes = interval_min if interval_min else _int("NextStatus")
         if minutes is not None and 1 <= minutes <= HEARTBEAT_MAX_MINUTES:
             out["next_sleep_s"] = minutes * 60
     return out
+
+
+def observed_status_gap_s(times: Sequence[float]) -> float | None:
+    """The typical gap between a sign's consecutive statuses, from the wall
+    clock times it was recorded at (oldest first): the median of the gaps
+    that look like check-ins. Gaps under ``STATUS_GAP_MIN_S`` are a
+    reconnect's second status or a requested one; over ``STATUS_GAP_MAX_S``
+    is a sign that was off. ``None`` until there is one such gap."""
+    gaps = [b - a for a, b in pairwise(times)]
+    usable = sorted(g for g in gaps if STATUS_GAP_MIN_S <= g <= STATUS_GAP_MAX_S)
+    if not usable:
+        return None
+    mid = len(usable) // 2
+    return usable[mid] if len(usable) % 2 else (usable[mid - 1] + usable[mid]) / 2
 
 
 def desired_params(cfg: dict[str, Any]) -> dict[int, int]:
@@ -446,6 +471,10 @@ class _Sign:
     # recorded with the sign's own cadence.
     known_interval_min: int | None = None
     known_sleep_disabled: bool | None = None
+    # Wall clock times of the sign's recent statuses, newest last. The gap
+    # between them is its real check-in cadence, which the configured interval
+    # (TCLV 29) is not: a 32" set to 30 min reports about every 15.
+    status_times: deque[float] = field(default_factory=lambda: deque(maxlen=STATUS_TIMES_KEPT))
     remote: str = ""  # the connection's peer address
     pending_status: tuple[Any, Any] | None = None  # (device, StatusPacket) to record
     status_task: asyncio.Task[None] | None = None  # records pending_status, latest wins
@@ -1774,6 +1803,7 @@ class VisionectService:
         ctx = self._ctx
         if ctx is None:
             return
+        sign.status_times.append(time.time())
         heartbeat = status_heartbeat(
             status.fields(),
             uuid=sign.uuid,
@@ -1781,6 +1811,7 @@ class VisionectService:
             interval_min=sign.known_interval_min,
             stays_awake=sign.known_sleep_disabled is True,
             sleep_until=sign.asleep_until if sign.asleep_until > time.time() else None,
+            observed_gap_s=observed_status_gap_s(sign.status_times),
         )
         loop = asyncio.get_running_loop()
         try:

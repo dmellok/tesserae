@@ -203,6 +203,23 @@ def _expected_interval(app: Flask, device_id: str) -> int | None:
     return configured
 
 
+def _next_update_state(app: Flask, device_id: str) -> dict[str, Any] | None:
+    """The corrected next-update / next-check-in numbers for a display (the
+    same ones the Devices and Lineups pages show), for the Next update and
+    Next wake sensors. ``None`` for an unknown display or on any failure."""
+    from app.next_update import ha_state_for_device
+
+    device = app.config["DEVICE_REGISTRY"].get(device_id)
+    if device is None:
+        return None
+    try:
+        with app.app_context():
+            return ha_state_for_device(device)
+    except Exception:
+        logger.debug("HA hooks: next update failed for %s", device_id, exc_info=True)
+        return None
+
+
 def _ota_capable(app: Flask, device_id: str) -> bool:
     status = (app.config.get("DEVICE_STATUS") or {}).get(device_id) or {}
     if status.get("ota_schema") is not None:
@@ -475,4 +492,5 @@ def build_ha_hooks(app: Flask) -> HaHooks:
         notify_fn=lambda device_id, message: _notify(app, device_id, message),
         expected_interval_fn=lambda device_id: _expected_interval(app, device_id),
         step_device_fn=lambda device_id, delta: _step_device(app, device_id, delta),
+        next_update_fn=lambda device_id: _next_update_state(app, device_id),
     )

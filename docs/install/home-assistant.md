@@ -120,6 +120,13 @@ to the hub via `via_device`):
 - **sensor** *Last seen*, when it last sent a heartbeat.
 - **sensor** *Next change*, when the next visible update is projected
   to land (rotation step, schedule firing, page refresh).
+- **sensor** *Next update*, when that change actually reaches the frame:
+  the same time the Devices and Lineups pages show. A frame holding a live
+  connection (a Visionect sign) or one that stays awake gets it at the push
+  time; a sleeping battery frame gets it at its next check-in; quiet hours
+  or a pause hold it to their end. The sensor's attributes say why:
+  `reason` (`connected`, `check-in`, `held by quiet hours`, ...), plus
+  `detail`, `mode`, `held` and `next_check_in`.
 - **select** *Dashboard*, push one of the dashboards bound to *this*
   display to *only* this display.
 - **select** *Lineup*, which lineup the display follows. Picking one
@@ -188,8 +195,11 @@ to the hub via `via_device`):
 - Lazily (when the device's heartbeat carries them): **Battery**,
   **Battery voltage**, **Signal**, **IP address**, **Firmware**,
   **Temperature**, **Humidity**, **Uptime**, plus **Low battery**
-  (against the Settings → Server → Low-battery warnings threshold) and **Next wake** (the
-  server's wake prediction).
+  (against the Settings → Server → Low-battery warnings threshold) and **Next wake** (when a
+  sleeping frame is next expected to check in, from the cycle it has actually
+  been seen to keep; it reads unknown while the frame is connected or stays
+  awake, since it is reachable all the time. For when a change will arrive,
+  use *Next update*).
 
 ### Trimming what's published
 
