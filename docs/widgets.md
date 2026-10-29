@@ -990,6 +990,16 @@ reason, exactly as a widget's own budget behaves; a widget's budget still
 applies inside the ceiling. A widget needs nothing for this: it comes with
 `app.artwork`.
 
+The page also takes an OpenAI key (`app.openai.api_key`, else
+`OPENAI_API_KEY`). With one, a `gpt_image` call goes straight to OpenAI's
+Images API instead of through fal.ai, and is charged and logged as
+`gpt_image_openai` at OpenAI's price. With an OpenAI key and no fal.ai key,
+`fal.painting_key` answers `fal.OPENAI_ONLY`, every gate that asks for a key
+passes, and every edit or text-to-picture call goes to GPT Image on OpenAI
+whatever model the widget chose; a background cut-out (`birefnet`) still
+needs fal.ai. A widget calls `job.fal.generate` exactly as before; reference
+pictures that are URLs are fetched through `app.net_guard`.
+
 ### Pictures from Wikimedia Commons: `app.commons`
 
 A widget that paints a real thing wants a free picture of it to paint from.

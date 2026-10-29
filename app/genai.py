@@ -1,7 +1,10 @@
 """Settings › Generative AI: the fal.ai account every painting widget shares,
 one spending ceiling over all of them, and the ledger of what was spent.
 
-The key is stored as ``app.fal.api_key`` (where :func:`app.fal.resolve_key`
+An OpenAI key, for GPT Image straight from OpenAI, is stored as
+``app.openai.api_key`` (:mod:`app.openai_images`).
+
+The fal.ai key is stored as ``app.fal.api_key`` (where :func:`app.fal.resolve_key`
 already looks after a widget's own key). The ceilings are US dollars a day
 and a month over every :class:`app.artwork.Collection` together; a widget's
 own daily budget still applies inside them. The ledger is one line per
@@ -56,9 +59,15 @@ def for_admin(store: Any) -> dict[str, Any]:
     """The same with the key masked, for the form."""
     vals = store.get_for_runtime("app", "fal", FIELDS)
     masked = store.get_for_admin("app", "fal", FIELDS)
+    from app import openai_images
+
+    o_vals = store.get_for_runtime("app", "openai", openai_images.FIELDS)
+    o_masked = store.get_for_admin("app", "openai", openai_images.FIELDS)
     return {
         "api_key": str(masked.get("api_key") or ""),
         "has_key": bool(str(vals.get("api_key") or "").strip()),
+        "openai_api_key": str(o_masked.get("api_key") or ""),
+        "has_openai_key": bool(str(o_vals.get("api_key") or "").strip()),
         "daily_usd": _usd(vals.get("daily_usd")),
         "monthly_usd": _usd(vals.get("monthly_usd")),
         "contact": " ".join(str(vals.get("contact") or "").split())[:120],
@@ -76,6 +85,15 @@ def save(store: Any, form: dict[str, Any]) -> None:
     if "contact" in form:
         values["contact"] = " ".join(str(form.get("contact") or "").split())[:120]
     store.update_for_namespace("app", "fal", values, FIELDS)
+    if "openai_api_key" in form:
+        from app import openai_images
+
+        store.update_for_namespace(
+            "app",
+            "openai",
+            {"api_key": str(form.get("openai_api_key") or "").strip()},
+            openai_images.FIELDS,
+        )
 
 
 def ceilings(store: Any) -> tuple[int, int]:

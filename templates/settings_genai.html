@@ -6,7 +6,7 @@
 <header class="page-head">
   <h1><i class="ph ph-sparkle" aria-hidden="true"></i> Generative AI</h1>
   <p class="lede">
-    One fal.ai account for every widget that paints, a ceiling over all of them together,
+    The fal.ai and OpenAI accounts every widget that paints shares, a ceiling over all of them together,
     and what the paintings cost. A widget may still carry a key and a budget of its own;
     its budget applies inside the ceiling.
   </p>
@@ -19,7 +19,7 @@
 {# ---- Account --------------------------------------------------------- #}
 <section class="card">
   {{ card_head('Account', icon_name='key') }}
-  <p class="lede">The key is kept on this server and sent only to fal.ai. Widgets without a key of their own use it.</p>
+  <p class="lede">Keys are kept on this server and sent only to the service they belong to. Widgets without a key of their own use them.</p>
   <form method="post" action="{{ url_for('auth.genai_save') }}" class="form" id="genai-form">
     <div class="field">
       <label for="genai-key">fal.ai API key</label>
@@ -38,6 +38,26 @@
           <span class="dx-pill is-neutral">From the environment</span> FAL_KEY is set for this server; a key saved here takes its place.
         {% else %}
           <span class="dx-pill is-warn">No key</span> Keys come from <a href="https://fal.ai/dashboard/keys" target="_blank" rel="noopener">fal.ai</a>; a widget with its own key paints without one here.
+        {% endif %}
+      </p>
+    </div>
+    <div class="field">
+      <label for="genai-openai-key">OpenAI API key</label>
+      <div class="dx-genai-keyrow">
+        <input id="genai-openai-key" type="password" name="openai_api_key" value="{{ form.openai_api_key }}"
+               autocomplete="off" spellcheck="false" placeholder="sk-…">
+        <button type="submit" class="btn" formaction="{{ url_for('auth.genai_check_openai') }}">Check</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+      <p class="help">
+        {% if checked_openai %}
+          <span class="dx-pill {{ 'is-ok' if check_openai_ok else 'is-danger' }}">{{ 'Accepted' if check_openai_ok else 'Refused' }}</span> {{ checked_openai }}
+        {% elif form.has_openai_key %}
+          <span class="dx-pill is-ok">Key set</span> GPT Image goes straight to OpenAI instead of through fal.ai{% if not form.has_key %}, and with no fal.ai key every painting uses GPT Image{% endif %}.
+        {% elif env_openai %}
+          <span class="dx-pill is-neutral">From the environment</span> OPENAI_API_KEY is set for this server; a key saved here takes its place.
+        {% else %}
+          <span class="dx-pill is-neutral">Optional</span> With a key from <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">OpenAI</a>, GPT Image is painted there directly, and an install with no fal.ai key can still paint.
         {% endif %}
       </p>
     </div>

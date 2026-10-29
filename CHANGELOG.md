@@ -6,6 +6,18 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.493.0], 2026-10-29
+
+### Added
+
+- OpenAI as a second provider for AI pictures. Settings › Generative AI takes
+  an OpenAI key next to the fal.ai one, with a Check that lists the account's
+  models without painting anything. With it, GPT Image is painted straight
+  by OpenAI instead of being relayed by fal.ai; an install with only an
+  OpenAI key can now paint, every picture going to GPT Image. Charges and
+  the ledger show it as "GPT Image 2 (OpenAI)" at OpenAI's price, inside the
+  same daily and monthly ceilings. Widgets need no change.
+
 ## [0.490.0], 2026-10-29
 
 ### Added

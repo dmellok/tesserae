@@ -3,13 +3,14 @@ painting widget, what was spent and where it went."""
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
 from flask import current_app, flash, redirect, render_template, request, url_for
 from werkzeug.wrappers import Response
 
-from app import artwork, commons, fal, genai
+from app import artwork, commons, fal, genai, openai_images
 from app.state.settings_store import SECRET_MASK
 
 from ._shared import bp, plugins, settings_store
@@ -119,11 +120,17 @@ def genai_index() -> str:
     summary = _ledger().summary()
     who, went = _rows(summary)
     env_key = fal.resolve_key({}) if not form["has_key"] else ""
+    env_openai = (
+        bool(os.environ.get("OPENAI_API_KEY", "").strip()) if not form["has_openai_key"] else False
+    )
     return render_template(
         "settings_genai.html",
         active="genai",
         form=form,
         env_key=bool(env_key),
+        env_openai=env_openai,
+        checked_openai=request.args.get("checked_openai", ""),
+        check_openai_ok=request.args.get("ok_openai") == "1",
         daily=daily,
         monthly=monthly,
         summary=summary,
@@ -159,6 +166,20 @@ def genai_check() -> Response:
         genai.save(settings_store(), {"api_key": posted})
         note += " Saved."
     return redirect(url_for("auth.genai_index", checked=note, ok="1" if ok else "0"))
+
+
+@bp.post("/settings/genai/check-openai")
+def genai_check_openai() -> Response:
+    """Check the OpenAI key by listing the account's models, which costs
+    nothing; a new key OpenAI accepts is saved, as with the fal.ai key."""
+    posted = str(request.form.get("openai_api_key") or "").strip()
+    fresh = bool(posted) and posted != SECRET_MASK
+    key = posted if fresh else openai_images.resolve_key()
+    ok, note = openai_images.check_key(key)
+    if ok and fresh:
+        genai.save(settings_store(), {"openai_api_key": posted})
+        note += " Saved."
+    return redirect(url_for("auth.genai_index", checked_openai=note, ok_openai="1" if ok else "0"))
 
 
 @bp.post("/settings/genai/reset")

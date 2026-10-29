@@ -111,7 +111,7 @@ def gallery(c: artwork.Collection, data_dir: Path) -> dict[str, Any]:
 @bp.get("/<plugin_id>/artwork/<name>/")
 def index(plugin_id: str, name: str) -> str:
     c, plugin, data_dir, settings = _lookup(plugin_id, name)
-    key = fal.resolve_key(settings)
+    key = fal.painting_key(settings)
     extra: dict[str, Any] = {}
     if c.extra_context is not None:
         try:
@@ -161,10 +161,10 @@ def stop_all(plugin_id: str, name: str) -> WerkzeugResponse:
 @bp.post("/<plugin_id>/artwork/<name>/render-now")
 def render_now(plugin_id: str, name: str) -> WerkzeugResponse:
     c, _plugin, data_dir, settings = _lookup(plugin_id, name)
-    key = fal.resolve_key(settings)
+    key = fal.painting_key(settings)
     if not key:
         flash(
-            "No fal.ai key: add one under Settings › Generative AI, or to this widget's settings.",
+            "No AI key: add a fal.ai or OpenAI key under Settings › Generative AI, or a fal.ai key to this widget's settings.",
             "warn",
         )
         return _back(plugin_id, name)
@@ -184,9 +184,9 @@ def render_now(plugin_id: str, name: str) -> WerkzeugResponse:
 @bp.post("/<plugin_id>/artwork/<name>/paint-held")
 def paint_held(plugin_id: str, name: str) -> WerkzeugResponse:
     c, _plugin, data_dir, settings = _lookup(plugin_id, name)
-    key = fal.resolve_key(settings)
+    key = fal.painting_key(settings)
     if not key:
-        flash("No fal.ai key yet.", "warn")
+        flash("No AI key yet: add a fal.ai or OpenAI key under Settings › Generative AI.", "warn")
         return _back(plugin_id, name)
     n = c.start_held(data_dir, key, settings, str(request.form.get("subject") or ""))
     flash(
@@ -220,9 +220,9 @@ def budget_reset(plugin_id: str, name: str) -> WerkzeugResponse:
 @bp.post("/<plugin_id>/artwork/<name>/<key>/repaint")
 def repaint(plugin_id: str, name: str, key: str) -> WerkzeugResponse:
     c, _plugin, data_dir, settings = _lookup(plugin_id, name)
-    fal_key = fal.resolve_key(settings)
+    fal_key = fal.painting_key(settings)
     if not fal_key:
-        flash("No fal.ai key yet.", "warn")
+        flash("No AI key yet: add a fal.ai or OpenAI key under Settings › Generative AI.", "warn")
     elif c.repaint(key, data_dir, fal_key, settings):
         flash("Painting it again; the current one is kept as an earlier version.", "ok")
     else:

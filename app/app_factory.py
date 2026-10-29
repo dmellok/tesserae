@@ -1217,6 +1217,9 @@ def create_app(
     deck_routes.register(app)
     send_routes.register(app)
     history_routes.register(app)
+    from app import openai_images
+
+    openai_images.bind_store(app.config.get("SETTINGS_STORE"))
     artwork_routes.register(app)
     artwork.host_configure(
         ledger=genai.Ledger(Path(app.config["DATA_ROOT"]) / "artwork"),

@@ -11,6 +11,11 @@ A :class:`FalClient` is bound to a key and to a ``charge`` callback, so a
 budget (``app.artwork``) is debited the model's listed price on every call
 before the request goes out: a painting that is paid for is counted whether
 or not it comes back.
+
+GPT Image can also go straight to OpenAI (:mod:`app.openai_images`): with an
+OpenAI key set, a ``gpt_image`` call is sent there and charged at OpenAI's
+price, and with no fal.ai key at all every edit or text-to-picture call
+falls back to GPT Image on OpenAI.
 """
 
 from __future__ import annotations
@@ -83,6 +88,26 @@ MODELS: dict[str, dict[str, Any]] = {
         "kind": "t2i",
         "refs": 0,
     },
+    # GPT Image sent straight to OpenAI rather than relayed by fal.ai. Not
+    # offered in pickers (``direct``); a client routes to them on its own.
+    # Prices: medium quality at 1536x1024 plus the reference pictures' input
+    # tokens, rounded up (October 2026).
+    "gpt_image_openai": {
+        "endpoint": "openai:images/edits",
+        "label": "GPT Image 2 (OpenAI)",
+        "cents": 8,
+        "kind": "edit",
+        "refs": 16,
+        "direct": True,
+    },
+    "gpt_image_openai_t2i": {
+        "endpoint": "openai:images/generations",
+        "label": "GPT Image 2 (OpenAI)",
+        "cents": 6,
+        "kind": "t2i",
+        "refs": 0,
+        "direct": True,
+    },
     "birefnet": {
         "endpoint": "fal-ai/birefnet/v2",
         "label": "BiRefNet",
@@ -92,7 +117,11 @@ MODELS: dict[str, dict[str, Any]] = {
     },
 }
 DEFAULT_EDIT_MODEL = "nano_banana"
-EDIT_MODELS = tuple(k for k, v in MODELS.items() if v["kind"] == "edit")
+EDIT_MODELS = tuple(k for k, v in MODELS.items() if v["kind"] == "edit" and not v.get("direct"))
+# What :func:`painting_key` answers when there is no fal.ai key but an OpenAI
+# key: truthy, so every "is there a key" gate passes, and a client built with
+# it knows it has no fal.ai key.
+OPENAI_ONLY = "openai-only"
 
 
 class FalError(Exception):
@@ -129,6 +158,18 @@ def resolve_key(settings: dict[str, Any] | None = None) -> str:
     except Exception:
         pass
     return os.environ.get("FAL_KEY", "").strip() or os.environ.get("FAL_API_KEY", "").strip()
+
+
+def painting_key(settings: dict[str, Any] | None = None) -> str:
+    """What a painting is started with: the fal.ai key from
+    :func:`resolve_key`, else :data:`OPENAI_ONLY` when an OpenAI key is set
+    (every picture then goes to GPT Image on OpenAI), else empty."""
+    key = resolve_key(settings)
+    if key:
+        return key
+    from app import openai_images
+
+    return OPENAI_ONLY if openai_images.resolve_key() else ""
 
 
 def request_body(
@@ -268,8 +309,14 @@ class FalClient:
         charge: Callable[[int, str], None] | None = None,
         stop: threading.Event | None = None,
         timeout: float = TIMEOUT_S,
+        openai_key: str | None = None,
     ) -> None:
-        self.key = key
+        self.key = "" if key == OPENAI_ONLY else key
+        if openai_key is None:
+            from app import openai_images
+
+            openai_key = openai_images.resolve_key()
+        self.openai_key = openai_key
         self._charge = charge
         self._stop = stop
         self._timeout = timeout
@@ -290,12 +337,22 @@ class FalClient:
     ) -> bytes:
         """One picture from ``model``: a JPEG or PNG as bytes. Raises
         :class:`FalError` with a sentence when there is none."""
-        if not self.key:
-            raise FalError("no fal.ai key")
         model = model_of(model)
         spec = MODELS[model]
         if spec["kind"] != "t2i" and not refs:
             raise FalError("no reference picture to paint from")
+        direct = self.direct_model(model)
+        if direct is not None:
+            return self._generate_openai(direct, prompt, refs, aspect, retries)
+        if not self.key:
+            raise FalError(
+                "no fal.ai key"
+                + (
+                    f" ({label_of(model)} is only on fal.ai; an OpenAI key paints with GPT Image)"
+                    if self.openai_key
+                    else ""
+                )
+            )
         refs = list(refs)[: max(1, int(spec["refs"]))] if spec["refs"] else []
         body = request_body(model, prompt, refs, aspect)
         url = f"{API_BASE}/{spec['endpoint']}"
@@ -327,4 +384,46 @@ class FalClient:
             if raw:
                 return raw
             last = "fal.ai sent an empty picture"
+        raise FalError(last if retries == 0 else f"{last} (after {retries + 1} tries)")
+
+    def direct_model(self, model: str) -> str | None:
+        """The OpenAI model a call for ``model`` goes to, or None for fal.ai:
+        GPT Image whenever there is an OpenAI key, and any edit or
+        text-to-picture model when there is no fal.ai key to run it."""
+        if not self.openai_key:
+            return None
+        spec = MODELS[model_of(model)]
+        if spec.get("direct"):
+            return model_of(model)
+        if model == "gpt_image" or not self.key:
+            if spec["kind"] == "edit":
+                return "gpt_image_openai"
+            if spec["kind"] == "t2i":
+                return "gpt_image_openai_t2i"
+        return None
+
+    def _generate_openai(
+        self, model: str, prompt: str, refs: Sequence[str], aspect: str, retries: int
+    ) -> bytes:
+        from app import openai_images
+
+        spec = MODELS[model]
+        refs = list(refs)[: int(spec["refs"])] if spec["refs"] else []
+        last = "no answer"
+        for _attempt in range(retries + 1):
+            if self.stopped:
+                raise FalError("stopped")
+            if self._charge is not None:
+                self._charge(int(spec["cents"]), model)
+            self.spent_cents += int(spec["cents"])
+            try:
+                raw = openai_images.generate(self.openai_key, prompt, refs=refs, aspect=aspect)
+            except openai_images.OpenAIError as err:
+                last = str(err)
+                if err.auth:
+                    raise FalError(last) from err
+                continue
+            if self.stopped:
+                raise FalError("stopped")
+            return raw
         raise FalError(last if retries == 0 else f"{last} (after {retries + 1} tries)")

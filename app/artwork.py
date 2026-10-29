@@ -1350,7 +1350,7 @@ class Collection:
         settings = settings or {}
         self.configure(settings)
         data_dir = Path(ctx.get("data_dir") or ".")
-        key = fal.resolve_key(settings)
+        key = fal.painting_key(settings)
         if key:
             self.resume(data_dir, key)
         preview = bool(ctx.get("preview"))
@@ -1498,7 +1498,7 @@ class Art:
         s = self.states
         if s.get("no_key"):
             out.append(
-                "AI pictures need a fal.ai key: this widget's own, or the app's under Settings."
+                "AI pictures need a key: this widget's own fal.ai key, or a fal.ai or OpenAI key under Settings › Generative AI."
             )
         if s.get("capped"):
             out.append(
