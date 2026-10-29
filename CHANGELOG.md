@@ -6,6 +6,14 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.493.1], 2026-10-29
+
+### Fixed
+
+- The widget-update check no longer lets a refresh started before a reset
+  mark the catalog as freshly fetched afterwards. Only the test suite reset
+  it, where the coverage job could see the next check skip its fetch.
+
 ## [0.493.0], 2026-10-29
 
 ### Added

@@ -48,6 +48,10 @@ _lock = threading.Lock()
 _fetched_at = 0.0
 _refreshing = False
 _thread: threading.Thread | None = None
+# Bumped by reset(): a refresh started before it must not write its result
+# into the state that came after (tests reset between cases while a thread
+# from the previous case may still be finishing).
+_generation = 0
 
 
 def badge_enabled(settings: Any) -> bool:
@@ -115,7 +119,10 @@ def status(app: Any) -> dict[str, Any] | None:
         if stale and not _refreshing:
             _refreshing = True
             _thread = threading.Thread(
-                target=_refresh, args=(mkt,), name="tesserae-widget-updates", daemon=True
+                target=_refresh,
+                args=(mkt, _generation),
+                name="tesserae-widget-updates",
+                daemon=True,
             )
             _thread.start()
     if not entries:
@@ -131,30 +138,29 @@ def status(app: Any) -> dict[str, Any] | None:
     return {"count": len(behind), "ids": [e.id for e in behind]}
 
 
-def _refresh(mkt: Marketplace) -> None:
+def _refresh(mkt: Marketplace, generation: int = 0) -> None:
     """Pull the index into the marketplace's cache off the request thread.
     A failure is logged at debug and leaves whatever was cached in place;
     the next stale render tries again."""
     global _refreshing, _fetched_at
     try:
         mkt.fetch_index()
-        with _lock:
-            _fetched_at = time.time()
     except Exception:
+        # Back off below: a failed fetch still counts as an attempt, so an
+        # offline install isn't retried on every page render.
         logger.debug("widget update check failed", exc_info=True)
-        with _lock:
-            # Back off: a failed fetch still counts as an attempt, so an
-            # offline install isn't retried on every page render.
-            _fetched_at = time.time()
     finally:
         with _lock:
-            _refreshing = False
+            if generation == _generation:
+                _fetched_at = time.time()
+                _refreshing = False
 
 
 def reset() -> None:
     """Forget the cache (tests)."""
-    global _fetched_at, _refreshing, _thread
+    global _fetched_at, _refreshing, _thread, _generation
     with _lock:
+        _generation += 1
         _fetched_at = 0.0
         _refreshing = False
         _thread = None

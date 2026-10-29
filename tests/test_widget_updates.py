@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import dataclasses
+import time
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock
@@ -158,3 +159,21 @@ def test_entries_are_plain_dataclasses() -> None:
         "release_version",
         "tesserae_min",
     }
+
+
+def test_a_refresh_still_running_from_before_a_reset_does_not_mark_the_cache_fresh() -> None:
+    """A thread from an earlier status() finishing after reset() used to
+    stamp the fetch time, so the next status() skipped its fetch."""
+    import threading
+
+    release = threading.Event()
+    slow = _mkt(None, {})
+    slow.fetch_index.side_effect = lambda: release.wait(3)
+    widget_updates.status(_app(mkt=slow))
+    widget_updates.reset()
+    release.set()
+    time.sleep(0.05)
+    mkt = _mkt(None, {})
+    widget_updates.status(_app(mkt=mkt))
+    widget_updates.join_for_test()
+    assert mkt.fetch_index.call_count == 1
