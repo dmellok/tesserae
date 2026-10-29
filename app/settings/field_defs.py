@@ -284,7 +284,7 @@ APP_FIELDS: list[dict[str, Any]] = [
     {
         "name": "quiet_hours_enabled",
         "type": "switch",
-        "label": "Quiet hours",
+        "label": "Pause hours",
         "default": False,
         "group": "quiet_hours",
         "group_role": "master",
@@ -292,65 +292,67 @@ APP_FIELDS: list[dict[str, Any]] = [
             "Suppress automated pushes (scheduler firings, webhook calls) during "
             "a daily time window, typical use is to stop the panel waking the room "
             "overnight. Manual pushes from the Send page or Push-now buttons still go "
-            "through; quiet hours filter automation, not deliberate user intent. "
+            "through; pause hours filter automation, not deliberate user intent. "
             "Each device can override the window in Settings → Devices."
         ),
     },
     {
         "name": "quiet_hours_start",
         "type": "time",
-        "label": "Quiet hours start",
+        "label": "Pause hours start",
         "default": "22:00",
         "group": "quiet_hours",
         "group_role": "dependent",
-        "help": "When the daily quiet window begins. Honours Settings → Server → App → Timezone.",
+        "help": "When the daily pause window begins. Honours Settings → Server → App → Timezone.",
     },
     {
         "name": "quiet_hours_end",
         "type": "time",
-        "label": "Quiet hours end",
+        "label": "Pause hours end",
         "default": "07:00",
         "group": "quiet_hours",
         "group_role": "dependent",
         "help": (
-            "When the daily quiet window ends. If end < start, the window wraps "
+            "When the daily pause window ends. If end < start, the window wraps "
             "across midnight (e.g. 22:00 → 07:00 = overnight)."
         ),
     },
     {
         "name": "quiet_hours_days",
         "type": "days",
-        "label": "Window applies on",
+        "label": "Pause window on",
         "default": ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
         "group": "quiet_hours",
         "group_role": "dependent",
         "help": (
-            "Weekdays the start/end window is in force. Each day is judged by its "
-            "own clock: on a ticked day an overnight window covers that morning up "
-            "to the end time and that evening from the start time."
+            "The days the start to end window runs. Each day is judged by its own "
+            "clock: an overnight window covers that morning up to the end time and "
+            "that evening from the start time."
         ),
     },
     {
         "name": "quiet_hours_all_day",
         "type": "days",
-        "label": "Quiet all day",
+        "label": "Paused all day on",
         "default": [],
         "group": "quiet_hours",
         "group_role": "dependent",
         "help": (
-            "Weekdays that are quiet from midnight to midnight regardless of the "
-            "window, for example the weekend in an office that is closed."
+            "No scheduled or automatic pictures from midnight to midnight on these "
+            "days, whatever the window says (the weekend in an office that is "
+            "closed, say). Displays keep what they show, and sending one yourself "
+            "still works."
         ),
     },
     {
         "name": "quiet_hours_sleep",
         "type": "switch",
-        "label": "Sleep through quiet hours",
+        "label": "Sleep through pause hours",
         "default": False,
         "group": "quiet_hours",
         "group_role": "dependent",
         "help": (
-            "Tell battery panels to sleep until the quiet window ends instead of "
+            "Tell battery panels to sleep until the pause window ends instead of "
             "waking on their usual interval inside it. Saves the wakes that would "
             "have found nothing new, at the cost that a manual push during the "
             "window is not seen until it ends. Devices that never sleep are unaffected."
@@ -359,12 +361,12 @@ APP_FIELDS: list[dict[str, Any]] = [
     {
         "name": "quiet_hours_touch_off",
         "type": "switch",
-        "label": "Touch off during quiet hours",
+        "label": "Touch off during pause hours",
         "default": False,
         "group": "quiet_hours",
         "group_role": "dependent",
         "help": (
-            "Switch touch panels' touchscreens off inside the quiet window, so the "
+            "Switch touch panels' touchscreens off inside the pause window, so the "
             "touch controller sleeps with the panel instead of staying awake to "
             "catch a tap. A tap does nothing until the window ends; the buttons "
             "still wake the panel. Always-on panels are unaffected."
@@ -478,7 +480,7 @@ APP_FIELDS: list[dict[str, Any]] = [
 
 # Server tab section cards. Order here is the render order; each entry
 # names a card. ``master`` is the field name whose switch lives in the
-# section header and dims the rest of the card when off (Quiet hours +
+# section header and dims the rest of the card when off (Pause hours +
 # Low-battery use this); None for cards with no master toggle.
 # ``meta`` is a small read-only chip pinned to the section header
 # (currently used by the Network card for ``NETWORK IP``).
@@ -507,7 +509,7 @@ APP_FIELD_GROUPS: list[dict[str, Any]] = [
     },
     {
         "id": "quiet_hours",
-        "title": "Quiet hours",
+        "title": "Pause hours",
         "description": "Pause automated pushes during a nightly window, on the days you pick. Devices can override.",
         "icon": "moon",
         "master": "quiet_hours_enabled",

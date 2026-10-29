@@ -1948,7 +1948,7 @@ class Scheduler:
         pusher = self._push_factory()
         quiet_check = getattr(pusher, "device_in_quiet_hours", None)
         if callable(quiet_check) and quiet_check(device_id):
-            self._log_deck_skip(device_id, deck.id, target, "quiet hours")
+            self._log_deck_skip(device_id, deck.id, target, "pause hours")
             return False
         promoter = getattr(pusher, "promote_deck_page", None)
         promoted = (
@@ -2769,7 +2769,7 @@ class Scheduler:
             if result.status == "failed":
                 self._rotation_last_reason[rotation.id] = result.error or "push failed"
             elif result.status == "quiet":
-                self._rotation_last_reason[rotation.id] = "all devices in quiet hours"
+                self._rotation_last_reason[rotation.id] = "all devices in pause hours"
             else:
                 self._rotation_last_reason[rotation.id] = None
         if self._event_log is not None:
@@ -3044,7 +3044,7 @@ class Scheduler:
             elif result.status == "failed":
                 self._last_reason[schedule.id] = result.error or "push failed"
             elif result.status == "quiet":
-                self._last_reason[schedule.id] = "all devices in quiet hours"
+                self._last_reason[schedule.id] = "all devices in pause hours"
             else:
                 self._last_reason[schedule.id] = None
         if self._event_log is not None:

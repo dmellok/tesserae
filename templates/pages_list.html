@@ -310,7 +310,7 @@
       <section class="dx-refresh" aria-labelledby="refresh-{{ _rid }}">
         <h2 class="dx-refresh-title" id="refresh-{{ _rid }}"><i class="ph ph-gear-six" aria-hidden="true"></i> Refresh settings</h2>
         <form method="post" action="{{ url_for('pages.update', page_id=page.id) }}"
-              class="dx-refresh-field" title="How often this page's content re-renders while it's on a panel. Delivery respects quiet hours; battery panels pick changes up at their next wake.">
+              class="dx-refresh-field" title="How often this page's content re-renders while it's on a panel. Delivery respects pause hours; battery panels pick changes up at their next wake.">
           <label class="dx-refresh-lead" for="refresh_minutes-{{ _rid }}">
             <i class="ph ph-arrows-clockwise" aria-hidden="true"></i>
             <span><strong>Content updates</strong><span class="dx-refresh-help" id="refresh_minutes-help-{{ _rid }}">How often Tesserae updates the dashboard content.</span></span>

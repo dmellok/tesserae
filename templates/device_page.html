@@ -404,14 +404,14 @@
         </div>
         {% endif %}
 
-        {# Quiet hours override: toggle row + dependent fields. #}
+        {# Pause hours override: toggle row + dependent fields. #}
         {% if section.quiet_hours_endpoint %}
         <hr class="dx-divider">
         <div class="dx-quiet-hours" data-dep-group>
           <div class="dx-toggle-row">
             <div class="dx-toggle-row-text">
-              <label class="dx-toggle-row-label" for="{{ section.id }}-qh-enabled">Override the server's quiet hours</label>
-              <p class="dx-toggle-row-desc">Off means this display follows Settings › Server › Quiet hours.</p>
+              <label class="dx-toggle-row-label" for="{{ section.id }}-qh-enabled">Override the server's pause hours</label>
+              <p class="dx-toggle-row-desc">On, this display uses only the hours below and the server's pause hours don't apply to it. Off, it follows Settings › Server › Pause hours.</p>
             </div>
             <label class="dx-toggle-switch" for="{{ section.id }}-qh-enabled">
               <input id="{{ section.id }}-qh-enabled" type="checkbox" name="quiet_hours_enabled"
@@ -420,32 +420,49 @@
               <span class="dx-toggle-track" aria-hidden="true"><span class="dx-toggle-knob"></span></span>
             </label>
           </div>
-          <div class="dx-field-grid" data-dep-target>
-            {{ text_input(section.id ~ '-qh-start', 'quiet_hours_start', 'Start',
-                value=section.quiet_hours.get('start', ''), placeholder='HH:MM', type='time', form=_combined_form_id) }}
-            {{ text_input(section.id ~ '-qh-end', 'quiet_hours_end', 'End',
-                value=section.quiet_hours.get('end', ''), placeholder='HH:MM', type='time', form=_combined_form_id) }}
-          </div>
-          <div data-dep-target>
-            {{ days_field(section.id ~ '-qh-days', 'quiet_hours_days', 'Window applies on',
-                value=section.quiet_hours.get('days', ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']),
-                help='Weekdays the start/end window is in force, each judged by its own clock: on a ticked day an overnight window covers that morning up to End and that evening from Start.',
-                form=_combined_form_id) }}
-            {{ days_field(section.id ~ '-qh-all-day', 'quiet_hours_all_day', 'Quiet all day',
+          {#- Left: the window's days with its Start and End under them, no
+              wider than the day chips; right: the all-day days. Side by side
+              when both fit, stacked otherwise. -#}
+          <div class="dx-field-grid dx-qh-days" data-dep-target>
+            <div class="dx-qh-window">
+              {{ days_field(section.id ~ '-qh-days', 'quiet_hours_days', 'Pause window on',
+                  value=section.quiet_hours.get('days', ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']),
+                  help='The days the Start to End window runs, each by its own clock: an overnight window covers that morning up to End and that evening from Start.',
+                  form=_combined_form_id) }}
+              <div class="dx-qh-times">
+                {{ text_input(section.id ~ '-qh-start', 'quiet_hours_start', 'Start',
+                    value=section.quiet_hours.get('start', ''), placeholder='HH:MM', type='time', form=_combined_form_id) }}
+                {{ text_input(section.id ~ '-qh-end', 'quiet_hours_end', 'End',
+                    value=section.quiet_hours.get('end', ''), placeholder='HH:MM', type='time', form=_combined_form_id) }}
+              </div>
+            </div>
+            {{ days_field(section.id ~ '-qh-all-day', 'quiet_hours_all_day', 'Paused all day on',
                 value=section.quiet_hours.get('all_day', []),
-                help='Weekdays that are quiet from midnight to midnight regardless of the window.',
+                help='No scheduled or automatic pictures from midnight to midnight on these days; the display keeps what it shows, and sending one yourself still works. With Sleep through pause hours on, it sleeps all day.',
                 form=_combined_form_id) }}
-            {{ switch(section.id ~ '-qh-sleep', 'quiet_hours_sleep', 'Sleep through quiet hours',
-                checked=section.quiet_hours.get('sleep', False),
-                help='Sleep until the window ends instead of waking on the usual interval inside it. A manual push during the window is not seen until it ends.',
-                form=_combined_form_id) }}
-            {% if section.quiet_hours_touch %}
-            {{ switch(section.id ~ '-qh-touch-off', 'quiet_hours_touch_off', 'Touch off during quiet hours',
-                checked=section.quiet_hours.get('touch_off', False),
-                help='Switch the touchscreen off inside the window so the touch controller sleeps with the panel. A tap does nothing until the window ends; the buttons still wake it.',
-                form=_combined_form_id) }}
-            {% endif %}
           </div>
+          {#- Toggle rows like the override above: what it does, in words, beside its switch. -#}
+          {% set qh_toggles = [(section.id ~ '-qh-sleep', 'quiet_hours_sleep', 'Sleep through pause hours',
+                'The display sleeps until the window ends instead of waking on its usual interval inside it. Saves power; a picture sent during the window shows when it ends.',
+                section.quiet_hours.get('sleep', False))] %}
+          {% if section.quiet_hours_touch %}
+          {% set qh_toggles = qh_toggles + [(section.id ~ '-qh-touch-off', 'quiet_hours_touch_off', 'Touch off during pause hours',
+                'The touchscreen sleeps with the panel, so a tap does nothing until the window ends; the buttons still wake it.',
+                section.quiet_hours.get('touch_off', False))] %}
+          {% endif %}
+          {% for toggle_id, toggle_name, toggle_label, toggle_desc, toggle_on in qh_toggles %}
+          <div class="dx-toggle-row" data-dep-target>
+            <div class="dx-toggle-row-text">
+              <label class="dx-toggle-row-label" for="{{ toggle_id }}">{{ toggle_label }}</label>
+              <p class="dx-toggle-row-desc">{{ toggle_desc }}</p>
+            </div>
+            <label class="dx-toggle-switch" for="{{ toggle_id }}">
+              <input id="{{ toggle_id }}" type="checkbox" name="{{ toggle_name }}"
+                     form="{{ _combined_form_id }}" {% if toggle_on %}checked{% endif %}>
+              <span class="dx-toggle-track" aria-hidden="true"><span class="dx-toggle-knob"></span></span>
+            </label>
+          </div>
+          {% endfor %}
         </div>
         {% endif %}
       </div>

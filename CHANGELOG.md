@@ -6,6 +6,20 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Changed
+
+- "Quiet hours" is now called "Pause hours" in the Settings, device page, history
+  and docs. A display isn't loud at any hour; the window is when automated
+  pictures are held back, which is what "pause" says. Nothing stored changes:
+  saved windows, the per-device override, the API fields and Home Assistant
+  entities keep their names.
+
+### Fixed
+
+- The Timing block on the device page reads more clearly: the day pickers are
+  "Pause window on" and "Paused all day on", with Start and End under the
+  window's days, and the override toggle says what On and Off mean.
+
 ## [0.493.0], 2026-10-29
 
 ### Added

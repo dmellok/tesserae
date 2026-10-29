@@ -3859,12 +3859,12 @@ class PushManager:
             source=source,
             target=page_id,
             status="quiet",
-            error="all bound devices in quiet hours",
+            error="all bound devices in pause hours",
         )
         return PushResult(
             status="quiet",
             page_id=page_id,
-            error="all bound devices in quiet hours",
+            error="all bound devices in pause hours",
             event_id=event_id,
         )
 

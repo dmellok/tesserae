@@ -1068,17 +1068,17 @@ def devices_update_quiet_hours(instance_id: str) -> Response:
         **_quiet_days_from_form(form),
     )
     if not result.ok or result.device is None:
-        flash(result.error or "Couldn't save quiet hours.", "error")
+        flash(result.error or "Couldn't save pause hours.", "error")
         return _device_page_redirect(instance_id, anchor)
     qh = (result.device.manifest.get("quiet_hours") or {}) if result.device else {}
     if qh.get("enabled") and qh.get("start") and qh.get("end"):
         flash(
-            f"Saved quiet hours for {result.device.name!r}: {qh.get('start')} → {qh.get('end')}.",
+            f"Saved pause hours for {result.device.name!r}: {qh.get('start')} → {qh.get('end')}.",
             "ok",
         )
     else:
         flash(
-            f"Cleared per-device quiet hours for {result.device.name!r} "
+            f"Cleared per-device pause hours for {result.device.name!r} "
             f"(falls back to app setting).",
             "ok",
         )
@@ -1496,9 +1496,9 @@ def devices_update_combined(instance_id: str) -> Response:
             **_quiet_days_from_form(form),
         )
         if not qh_result.ok:
-            flash(qh_result.error or "Couldn't save quiet hours.", "error")
+            flash(qh_result.error or "Couldn't save pause hours.", "error")
         else:
-            ok_messages.append("quiet hours saved")
+            ok_messages.append("pause hours saved")
             any_change = True
 
     # 5. Battery-display offset. The two inputs always submit on the
