@@ -6,7 +6,7 @@
 <header class="page-head">
   <h1><i class="ph ph-sparkle" aria-hidden="true"></i> Generative AI</h1>
   <p class="lede">
-    The fal.ai and OpenAI accounts every widget that paints shares, a ceiling over all of them together,
+    The fal.ai, OpenAI and Gemini accounts every widget that paints shares, a ceiling over all of them together,
     and what the paintings cost. A widget may still carry a key and a budget of its own;
     its budget applies inside the ceiling.
   </p>
@@ -53,11 +53,31 @@
         {% if checked_openai %}
           <span class="dx-pill {{ 'is-ok' if check_openai_ok else 'is-danger' }}">{{ 'Accepted' if check_openai_ok else 'Refused' }}</span> {{ checked_openai }}
         {% elif form.has_openai_key %}
-          <span class="dx-pill is-ok">Key set</span> GPT Image goes straight to OpenAI instead of through fal.ai{% if not form.has_key %}, and with no fal.ai key every painting uses GPT Image{% endif %}.
+          <span class="dx-pill is-ok">Key set</span> GPT Image goes straight to OpenAI instead of through fal.ai{% if not form.has_key and not form.has_gemini_key %}, and with no fal.ai key every painting uses GPT Image{% endif %}.
         {% elif env_openai %}
           <span class="dx-pill is-neutral">From the environment</span> OPENAI_API_KEY is set for this server; a key saved here takes its place.
         {% else %}
           <span class="dx-pill is-neutral">Optional</span> With a key from <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">OpenAI</a>, GPT Image is painted there directly, and an install with no fal.ai key can still paint.
+        {% endif %}
+      </p>
+    </div>
+    <div class="field">
+      <label for="genai-gemini-key">Gemini API key</label>
+      <div class="dx-genai-keyrow">
+        <input id="genai-gemini-key" type="password" name="gemini_api_key" value="{{ form.gemini_api_key }}"
+               autocomplete="off" spellcheck="false" placeholder="AIza…">
+        <button type="submit" class="btn" formaction="{{ url_for('auth.genai_check_gemini') }}">Check</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+      <p class="help">
+        {% if checked_gemini %}
+          <span class="dx-pill {{ 'is-ok' if check_gemini_ok else 'is-danger' }}">{{ 'Accepted' if check_gemini_ok else 'Refused' }}</span> {{ checked_gemini }}
+        {% elif form.has_gemini_key %}
+          <span class="dx-pill is-ok">Key set</span> Nano Banana and Nano Banana Pro go straight to Google instead of through fal.ai{% if not form.has_key %}, and with no fal.ai key every other painting uses Nano Banana{% if form.has_openai_key %} (GPT Image still goes to OpenAI){% endif %}{% endif %}.
+        {% elif env_gemini %}
+          <span class="dx-pill is-neutral">From the environment</span> GEMINI_API_KEY or GOOGLE_API_KEY is set for this server; a key saved here takes its place.
+        {% else %}
+          <span class="dx-pill is-neutral">Optional</span> With a key from <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>, Nano Banana is painted there directly, and an install with no fal.ai key can still paint.
         {% endif %}
       </p>
     </div>

@@ -2,7 +2,9 @@
 one spending ceiling over all of them, and the ledger of what was spent.
 
 An OpenAI key, for GPT Image straight from OpenAI, is stored as
-``app.openai.api_key`` (:mod:`app.openai_images`).
+``app.openai.api_key`` (:mod:`app.openai_images`), and a Gemini key, for
+Nano Banana straight from Google, as ``app.gemini.api_key``
+(:mod:`app.gemini_images`).
 
 The fal.ai key is stored as ``app.fal.api_key`` (where :func:`app.fal.resolve_key`
 already looks after a widget's own key). The ceilings are US dollars a day
@@ -59,15 +61,19 @@ def for_admin(store: Any) -> dict[str, Any]:
     """The same with the key masked, for the form."""
     vals = store.get_for_runtime("app", "fal", FIELDS)
     masked = store.get_for_admin("app", "fal", FIELDS)
-    from app import openai_images
+    from app import gemini_images, openai_images
 
     o_vals = store.get_for_runtime("app", "openai", openai_images.FIELDS)
     o_masked = store.get_for_admin("app", "openai", openai_images.FIELDS)
+    g_vals = store.get_for_runtime("app", "gemini", gemini_images.FIELDS)
+    g_masked = store.get_for_admin("app", "gemini", gemini_images.FIELDS)
     return {
         "api_key": str(masked.get("api_key") or ""),
         "has_key": bool(str(vals.get("api_key") or "").strip()),
         "openai_api_key": str(o_masked.get("api_key") or ""),
         "has_openai_key": bool(str(o_vals.get("api_key") or "").strip()),
+        "gemini_api_key": str(g_masked.get("api_key") or ""),
+        "has_gemini_key": bool(str(g_vals.get("api_key") or "").strip()),
         "daily_usd": _usd(vals.get("daily_usd")),
         "monthly_usd": _usd(vals.get("monthly_usd")),
         "contact": " ".join(str(vals.get("contact") or "").split())[:120],
@@ -93,6 +99,15 @@ def save(store: Any, form: dict[str, Any]) -> None:
             "openai",
             {"api_key": str(form.get("openai_api_key") or "").strip()},
             openai_images.FIELDS,
+        )
+    if "gemini_api_key" in form:
+        from app import gemini_images
+
+        store.update_for_namespace(
+            "app",
+            "gemini",
+            {"api_key": str(form.get("gemini_api_key") or "").strip()},
+            gemini_images.FIELDS,
         )
 
 

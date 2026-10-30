@@ -14,8 +14,11 @@ or not it comes back.
 
 GPT Image can also go straight to OpenAI (:mod:`app.openai_images`): with an
 OpenAI key set, a ``gpt_image`` call is sent there and charged at OpenAI's
-price, and with no fal.ai key at all every edit or text-to-picture call
-falls back to GPT Image on OpenAI.
+price. Nano Banana can likewise go straight to Google
+(:mod:`app.gemini_images`): with a Gemini key set, ``nano_banana``,
+``nano_banana_pro`` and ``nano_banana_t2i`` calls are sent there. With no
+fal.ai key at all, every edit or text-to-picture call falls back to Nano
+Banana on Google when there is a Gemini key, else GPT Image on OpenAI.
 """
 
 from __future__ import annotations
@@ -89,16 +92,16 @@ MODELS: dict[str, dict[str, Any]] = {
         "refs": 0,
     },
     # GPT Image sent straight to OpenAI rather than relayed by fal.ai. Not
-    # offered in pickers (``direct``); a client routes to them on its own.
-    # Prices: medium quality at 1536x1024 plus the reference pictures' input
-    # tokens, rounded up (October 2026).
+    # offered in pickers (``direct`` names the provider); a client routes to
+    # them on its own. Prices: medium quality at 1536x1024 plus the reference
+    # pictures' input tokens, rounded up (October 2026).
     "gpt_image_openai": {
         "endpoint": "openai:images/edits",
         "label": "GPT Image 2 (OpenAI)",
         "cents": 8,
         "kind": "edit",
         "refs": 16,
-        "direct": True,
+        "direct": "openai",
     },
     "gpt_image_openai_t2i": {
         "endpoint": "openai:images/generations",
@@ -106,7 +109,34 @@ MODELS: dict[str, dict[str, Any]] = {
         "cents": 6,
         "kind": "t2i",
         "refs": 0,
-        "direct": True,
+        "direct": "openai",
+    },
+    # Nano Banana sent straight to Google the same way. Prices: one 1K
+    # picture plus the reference pictures' input tokens, rounded up
+    # (October 2026).
+    "nano_banana_gemini": {
+        "endpoint": "gemini:gemini-2.5-flash-image",
+        "label": "Nano Banana (Google)",
+        "cents": 4,
+        "kind": "edit",
+        "refs": 3,
+        "direct": "gemini",
+    },
+    "nano_banana_pro_gemini": {
+        "endpoint": "gemini:gemini-3-pro-image",
+        "label": "Nano Banana Pro (Google)",
+        "cents": 14,
+        "kind": "edit",
+        "refs": 6,
+        "direct": "gemini",
+    },
+    "nano_banana_gemini_t2i": {
+        "endpoint": "gemini:gemini-2.5-flash-image",
+        "label": "Nano Banana (Google)",
+        "cents": 4,
+        "kind": "t2i",
+        "refs": 0,
+        "direct": "gemini",
     },
     "birefnet": {
         "endpoint": "fal-ai/birefnet/v2",
@@ -119,9 +149,24 @@ MODELS: dict[str, dict[str, Any]] = {
 DEFAULT_EDIT_MODEL = "nano_banana"
 EDIT_MODELS = tuple(k for k, v in MODELS.items() if v["kind"] == "edit" and not v.get("direct"))
 # What :func:`painting_key` answers when there is no fal.ai key but an OpenAI
-# key: truthy, so every "is there a key" gate passes, and a client built with
-# it knows it has no fal.ai key.
-OPENAI_ONLY = "openai-only"
+# or Gemini key: truthy, so every "is there a key" gate passes, and a client
+# built with it knows it has no fal.ai key.
+DIRECT_ONLY = "direct-only"
+OPENAI_ONLY = DIRECT_ONLY
+# Which direct model a fal.ai model goes to when its provider has a key.
+_SAME_ON = {
+    "gemini": {
+        "nano_banana": "nano_banana_gemini",
+        "nano_banana_pro": "nano_banana_pro_gemini",
+        "nano_banana_t2i": "nano_banana_gemini_t2i",
+    },
+    "openai": {"gpt_image": "gpt_image_openai"},
+}
+# What any other edit or text-to-picture call goes to with no fal.ai key.
+_FALLBACK = {
+    "gemini": {"edit": "nano_banana_gemini", "t2i": "nano_banana_gemini_t2i"},
+    "openai": {"edit": "gpt_image_openai", "t2i": "gpt_image_openai_t2i"},
+}
 
 
 class FalError(Exception):
@@ -162,14 +207,14 @@ def resolve_key(settings: dict[str, Any] | None = None) -> str:
 
 def painting_key(settings: dict[str, Any] | None = None) -> str:
     """What a painting is started with: the fal.ai key from
-    :func:`resolve_key`, else :data:`OPENAI_ONLY` when an OpenAI key is set
-    (every picture then goes to GPT Image on OpenAI), else empty."""
+    :func:`resolve_key`, else :data:`DIRECT_ONLY` when an OpenAI or Gemini
+    key is set (every picture then goes straight to one of them), else empty."""
     key = resolve_key(settings)
     if key:
         return key
-    from app import openai_images
+    from app import gemini_images, openai_images
 
-    return OPENAI_ONLY if openai_images.resolve_key() else ""
+    return DIRECT_ONLY if (gemini_images.resolve_key() or openai_images.resolve_key()) else ""
 
 
 def request_body(
@@ -310,13 +355,19 @@ class FalClient:
         stop: threading.Event | None = None,
         timeout: float = TIMEOUT_S,
         openai_key: str | None = None,
+        gemini_key: str | None = None,
     ) -> None:
-        self.key = "" if key == OPENAI_ONLY else key
+        self.key = "" if key == DIRECT_ONLY else key
         if openai_key is None:
             from app import openai_images
 
             openai_key = openai_images.resolve_key()
+        if gemini_key is None:
+            from app import gemini_images
+
+            gemini_key = gemini_images.resolve_key()
         self.openai_key = openai_key
+        self.gemini_key = gemini_key
         self._charge = charge
         self._stop = stop
         self._timeout = timeout
@@ -343,13 +394,13 @@ class FalClient:
             raise FalError("no reference picture to paint from")
         direct = self.direct_model(model)
         if direct is not None:
-            return self._generate_openai(direct, prompt, refs, aspect, retries)
+            return self._generate_direct(direct, prompt, refs, aspect, retries)
         if not self.key:
             raise FalError(
                 "no fal.ai key"
                 + (
-                    f" ({label_of(model)} is only on fal.ai; an OpenAI key paints with GPT Image)"
-                    if self.openai_key
+                    f" ({label_of(model)} is only on fal.ai)"
+                    if self.openai_key or self.gemini_key
                     else ""
                 )
             )
@@ -386,28 +437,36 @@ class FalClient:
             last = "fal.ai sent an empty picture"
         raise FalError(last if retries == 0 else f"{last} (after {retries + 1} tries)")
 
+    def _direct_key(self, provider: str) -> str:
+        return {"openai": self.openai_key, "gemini": self.gemini_key}.get(provider) or ""
+
     def direct_model(self, model: str) -> str | None:
-        """The OpenAI model a call for ``model`` goes to, or None for fal.ai:
-        GPT Image whenever there is an OpenAI key, and any edit or
-        text-to-picture model when there is no fal.ai key to run it."""
-        if not self.openai_key:
-            return None
-        spec = MODELS[model_of(model)]
+        """The direct model a call for ``model`` goes to, or None for fal.ai:
+        Nano Banana on Google whenever there is a Gemini key, GPT Image on
+        OpenAI whenever there is an OpenAI key, and any other edit or
+        text-to-picture model when there is no fal.ai key to run it (Google
+        first, else OpenAI)."""
+        model = model_of(model)
+        spec = MODELS[model]
         if spec.get("direct"):
-            return model_of(model)
-        if model == "gpt_image" or not self.key:
-            if spec["kind"] == "edit":
-                return "gpt_image_openai"
-            if spec["kind"] == "t2i":
-                return "gpt_image_openai_t2i"
+            return model
+        for provider, same in _SAME_ON.items():
+            if model in same and self._direct_key(provider):
+                return same[model]
+        if not self.key:
+            for provider, fallback in _FALLBACK.items():
+                if self._direct_key(provider) and spec["kind"] in fallback:
+                    return fallback[spec["kind"]]
         return None
 
-    def _generate_openai(
+    def _generate_direct(
         self, model: str, prompt: str, refs: Sequence[str], aspect: str, retries: int
     ) -> bytes:
-        from app import openai_images
+        from app import gemini_images, openai_images
 
         spec = MODELS[model]
+        provider = str(spec["direct"])
+        key = self._direct_key(provider)
         refs = list(refs)[: int(spec["refs"])] if spec["refs"] else []
         last = "no answer"
         for _attempt in range(retries + 1):
@@ -417,8 +476,17 @@ class FalClient:
                 self._charge(int(spec["cents"]), model)
             self.spent_cents += int(spec["cents"])
             try:
-                raw = openai_images.generate(self.openai_key, prompt, refs=refs, aspect=aspect)
-            except openai_images.OpenAIError as err:
+                if provider == "gemini":
+                    raw = gemini_images.generate(
+                        key,
+                        prompt,
+                        refs=refs,
+                        aspect=aspect,
+                        model=str(spec["endpoint"]).removeprefix("gemini:"),
+                    )
+                else:
+                    raw = openai_images.generate(key, prompt, refs=refs, aspect=aspect)
+            except (openai_images.OpenAIError, gemini_images.GeminiError) as err:
                 last = str(err)
                 if err.auth:
                     raise FalError(last) from err

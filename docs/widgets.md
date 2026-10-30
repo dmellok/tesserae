@@ -994,11 +994,21 @@ The page also takes an OpenAI key (`app.openai.api_key`, else
 `OPENAI_API_KEY`). With one, a `gpt_image` call goes straight to OpenAI's
 Images API instead of through fal.ai, and is charged and logged as
 `gpt_image_openai` at OpenAI's price. With an OpenAI key and no fal.ai key,
-`fal.painting_key` answers `fal.OPENAI_ONLY`, every gate that asks for a key
+`fal.painting_key` answers `fal.DIRECT_ONLY`, every gate that asks for a key
 passes, and every edit or text-to-picture call goes to GPT Image on OpenAI
 whatever model the widget chose; a background cut-out (`birefnet`) still
-needs fal.ai. A widget calls `job.fal.generate` exactly as before; reference
-pictures that are URLs are fetched through `app.net_guard`.
+needs fal.ai.
+
+A Gemini key (`app.gemini.api_key`, else `GEMINI_API_KEY` or
+`GOOGLE_API_KEY`) does the same for Nano Banana: `nano_banana`,
+`nano_banana_pro` and `nano_banana_t2i` go straight to Google's Gemini API
+and are charged and logged as `nano_banana_gemini`,
+`nano_banana_pro_gemini` and `nano_banana_gemini_t2i`. With no fal.ai key,
+any other edit or text-to-picture call goes to Nano Banana on Google when
+there is a Gemini key, else to GPT Image on OpenAI; `gpt_image` still goes to
+OpenAI when both keys are set. A widget calls `job.fal.generate` exactly as
+before; reference pictures that are URLs are fetched through
+`app.net_guard`.
 
 ### Pictures from Wikimedia Commons: `app.commons`
 

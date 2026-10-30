@@ -1498,7 +1498,7 @@ class Art:
         s = self.states
         if s.get("no_key"):
             out.append(
-                "AI pictures need a key: this widget's own fal.ai key, or a fal.ai or OpenAI key under Settings › Generative AI."
+                "AI pictures need a key: this widget's own fal.ai key, or a fal.ai, OpenAI or Gemini key under Settings › Generative AI."
             )
         if s.get("capped"):
             out.append(

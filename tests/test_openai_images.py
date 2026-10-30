@@ -14,7 +14,7 @@ from typing import Any
 import pytest
 from flask import Flask
 
-from app import fal, genai, openai_images
+from app import fal, gemini_images, genai, openai_images
 from app.main import REPO_ROOT, create_app
 
 JPEG = b"\xff\xd8\xff\xe0fake-jpeg"
@@ -23,9 +23,10 @@ REF = "data:image/png;base64," + base64.b64encode(b"\x89PNG\r\n\x1a\nref").decod
 
 @pytest.fixture(autouse=True)
 def _no_env_keys(monkeypatch: pytest.MonkeyPatch) -> None:
-    for name in ("OPENAI_API_KEY", "FAL_KEY", "FAL_API_KEY"):
+    for name in ("OPENAI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY", "FAL_KEY", "FAL_API_KEY"):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setattr(openai_images, "_BOUND_STORE", None)
+    monkeypatch.setattr(gemini_images, "_BOUND_STORE", None)
 
 
 @pytest.fixture
@@ -101,7 +102,9 @@ def test_sizes_follow_the_aspect(aspect: str, size: str) -> None:
 
 
 def _client(fal_key: str, openai_key: str, charged: list[tuple[int, str]]) -> fal.FalClient:
-    return fal.FalClient(fal_key, openai_key=openai_key, charge=lambda c, m: charged.append((c, m)))
+    return fal.FalClient(
+        fal_key, openai_key=openai_key, gemini_key="", charge=lambda c, m: charged.append((c, m))
+    )
 
 
 def test_gpt_image_goes_to_openai_when_there_is_an_openai_key(
@@ -129,7 +132,7 @@ def test_with_only_an_openai_key_every_painting_uses_gpt_image(
     posted: list[dict[str, Any]],
 ) -> None:
     charged: list[tuple[int, str]] = []
-    client = _client(fal.OPENAI_ONLY, "sk-test", charged)
+    client = _client(fal.DIRECT_ONLY, "sk-test", charged)
     client.generate("nano_banana", "p", refs=[REF])
     client.generate("flux_schnell", "p")
     assert [c[1] for c in charged] == ["gpt_image_openai", "gpt_image_openai_t2i"]
@@ -141,7 +144,7 @@ def test_with_only_an_openai_key_every_painting_uses_gpt_image(
 
 def test_no_key_at_all_is_still_refused() -> None:
     with pytest.raises(fal.FalError, match=r"no fal\.ai key"):
-        fal.FalClient("", openai_key="").generate("nano_banana", "p", refs=[REF])
+        fal.FalClient("", openai_key="", gemini_key="").generate("nano_banana", "p", refs=[REF])
 
 
 def test_direct_models_are_not_offered_in_pickers() -> None:
@@ -169,7 +172,7 @@ def test_painting_key_accepts_an_openai_only_install(app: Flask) -> None:
     with app.app_context():
         assert fal.painting_key({}) == ""
         genai.save(store, {"openai_api_key": "sk-test"})
-        assert fal.painting_key({}) == fal.OPENAI_ONLY
+        assert fal.painting_key({}) == fal.DIRECT_ONLY
         assert fal.painting_key({"fal_api_key": "own"}) == "own"
     # A painting thread without an app context still finds the key.
     assert openai_images.resolve_key() == "sk-test"

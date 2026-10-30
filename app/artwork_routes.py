@@ -164,7 +164,7 @@ def render_now(plugin_id: str, name: str) -> WerkzeugResponse:
     key = fal.painting_key(settings)
     if not key:
         flash(
-            "No AI key: add a fal.ai or OpenAI key under Settings › Generative AI, or a fal.ai key to this widget's settings.",
+            "No AI key: add a fal.ai, OpenAI or Gemini key under Settings › Generative AI, or a fal.ai key to this widget's settings.",
             "warn",
         )
         return _back(plugin_id, name)
@@ -186,7 +186,10 @@ def paint_held(plugin_id: str, name: str) -> WerkzeugResponse:
     c, _plugin, data_dir, settings = _lookup(plugin_id, name)
     key = fal.painting_key(settings)
     if not key:
-        flash("No AI key yet: add a fal.ai or OpenAI key under Settings › Generative AI.", "warn")
+        flash(
+            "No AI key yet: add a fal.ai, OpenAI or Gemini key under Settings › Generative AI.",
+            "warn",
+        )
         return _back(plugin_id, name)
     n = c.start_held(data_dir, key, settings, str(request.form.get("subject") or ""))
     flash(
@@ -222,7 +225,10 @@ def repaint(plugin_id: str, name: str, key: str) -> WerkzeugResponse:
     c, _plugin, data_dir, settings = _lookup(plugin_id, name)
     fal_key = fal.painting_key(settings)
     if not fal_key:
-        flash("No AI key yet: add a fal.ai or OpenAI key under Settings › Generative AI.", "warn")
+        flash(
+            "No AI key yet: add a fal.ai, OpenAI or Gemini key under Settings › Generative AI.",
+            "warn",
+        )
     elif c.repaint(key, data_dir, fal_key, settings):
         flash("Painting it again; the current one is kept as an earlier version.", "ok")
     else:

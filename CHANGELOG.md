@@ -6,6 +6,19 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.496.0], 2026-10-30
+
+### Added
+
+- Gemini as a third provider for AI pictures. Settings › Generative AI takes
+  a Gemini API key from Google AI Studio, with a Check that lists the
+  models the key can use without painting anything. With it, Nano Banana
+  and Nano Banana Pro are painted straight by Google instead of being
+  relayed by fal.ai; an install with only a Gemini key can now paint, every
+  picture going to Nano Banana. Charges and the ledger show them as "Nano
+  Banana (Google)" and "Nano Banana Pro (Google)" at Google's price, inside
+  the same daily and monthly ceilings. Widgets need no change.
+
 ## [0.495.0], 2026-10-30
 
 ### Added
