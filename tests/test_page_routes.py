@@ -2318,6 +2318,8 @@ def test_create_form_sits_behind_new_dashboard(app: Flask) -> None:
     assert 'id="dash-create" data-create-panel>' in client.get("/pages?create=1").get_data(
         as_text=True
     )
+    # The head button only opens the form; it never toggles it shut.
+    assert "panel.hidden = false;" in body
 
 
 def test_a_select_with_pictures_is_a_picture_picker(app: Flask) -> None:

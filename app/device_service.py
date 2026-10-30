@@ -717,7 +717,8 @@ def create_instance(
     isn't one of the kind's renderers. When unset, the kind's first
     renderer is used, so single-renderer kinds are unaffected. Caller
     rebuilds the transport on success."""
-    instance_id = instance_id.strip().lower()
+    # "Kitchen panel" reads as kitchen_panel rather than failing the id rule.
+    instance_id = re.sub(r"\s+", "_", instance_id.strip().lower())
     if not DEVICE_ID_RE.match(instance_id):
         return InstanceResult(
             None,

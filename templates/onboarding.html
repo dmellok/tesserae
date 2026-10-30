@@ -78,7 +78,7 @@
           <input type="radio" name="transport" value="mqtt" {% if default_transport == 'mqtt' %}checked{% endif %} data-transport-mqtt>
           <span class="transport-radio-body">
             <strong>MQTT</strong>
-            <span class="muted">Devices subscribe to a broker for frame announces. Lower latency, but you need a broker (built-in or external).</span>
+            <span class="muted">Devices subscribe to a broker for frame announces. Lower latency, but you need a broker (built-in or external). Suits always-on clients such as a Raspberry Pi; battery ESP32 boards sleep between frames and should use REST.</span>
           </span>
         </label>
       </fieldset>
@@ -154,7 +154,7 @@
     {% elif step == 'device' %}
     {% if default_transport == 'rest' %}
     <h1>Pair a device</h1>
-    <p class="lede">Flash a Tesserae client for your panel, then generate a pairing code below. The firmware POSTs the code to <code>/api/v1/device/register</code> and the device is registered. The code is single-use and expires in 10 minutes.</p>
+    <p class="lede">Flash a Tesserae client for your panel with the <a href="https://tesserae.ink/flash" target="_blank" rel="noopener">web flasher</a>, then generate a pairing code below. The firmware POSTs the code to <code>/api/v1/device/register</code> and the device is registered. The code is single-use and expires in 10 minutes.</p>
 
     {% if pairing_reveal %}
     <div class="pair-reveal" role="status" aria-live="polite">
@@ -210,7 +210,7 @@
     </div>
     {% else %}
     <h1>Register a device</h1>
-    <p class="lede">Flash a client for your panel (see the README). When it publishes a heartbeat it appears below for one-click registration, or add one by hand.</p>
+    <p class="lede">Flash a client for your panel with the <a href="https://tesserae.ink/flash" target="_blank" rel="noopener">web flasher</a>. When it publishes a heartbeat it appears below for one-click registration. There's nothing to create here first: a flashed panel registers itself.</p>
     {# Live discovery: refresh when a client announces itself so the user
        doesn't have to reload while waiting for the first heartbeat. #}
     <span data-discovered-poll="{{ discovered_sig }}" hidden></span>
@@ -240,10 +240,13 @@
     {% endif %}
 
     {% if device_kinds %}
-    <details class="wizard-manual" {% if not discovered %}open{% endif %}>
+    {# Closed by default: a device added here before anything is flashed is
+       a placeholder the real panel won't use (it announces its own id). #}
+    <details class="wizard-manual">
       <summary>Add a device by hand</summary>
+      <p class="field-help">Only for a client that can't announce itself. The id must match the one set in its firmware.</p>
       <form method="post" action="{{ url_for('onboarding.add_device') }}" class="form wizard-add-device-form">
-        {{ text_input('dev-id', 'id', 'Device id', value='', placeholder='esp32_hallway', required=True, help='Lowercase letters, digits, underscore, hyphen. Becomes the MQTT topic prefix.') }}
+        {{ text_input('dev-id', 'id', 'Device id', value='', placeholder='esp32_hallway', required=True, help='Lowercase letters, digits, underscore, hyphen; spaces become underscores. Becomes the MQTT topic prefix.') }}
         {% set kind_opts = [] %}{% for k in device_kinds %}{% set _ = kind_opts.append({'value': k.id, 'label': k.name}) %}{% endfor %}
         {{ select_field('dev-kind', 'kind', 'Kind', value=device_kinds[0].id, options=kind_opts) }}
         {{ select_field('dev-preset', 'panel_preset', 'Panel size', value='', options=panel_preset_choices,

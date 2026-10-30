@@ -77,6 +77,20 @@ def test_create_instance_derives_topics_and_clones(registries) -> None:
     assert (data_root / "esp32_lab.json").exists()
 
 
+def test_create_instance_turns_spaces_into_underscores(registries) -> None:
+    """A name typed with spaces becomes a valid id instead of an error."""
+    devices, renderers, data_root = registries
+    result = device_service.create_instance(
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="  Kitchen  Panel ",
+        kind_id="esp32_client",
+    )
+    assert result.ok, result.error
+    assert result.device is not None and result.device.id == "kitchen_panel"
+
+
 def test_renderer_id_for_format_matches_extension(registries) -> None:
     devices, renderers, _ = registries
     kind = devices.get("circuitpython_generic")
@@ -941,9 +955,9 @@ def test_update_quiet_hours_clearing_drops_block(registries) -> None:
 
 def test_create_instance_rejects_bad_id_and_unknown_kind(registries) -> None:
     devices, renderers, data_root = registries
-    # Mixed case is forgivingly lowercased, but a leading digit / spaces
-    # / too-short are genuinely rejected.
-    for bad in ("1leading_digit", "a", "has space"):
+    # Mixed case is forgivingly lowercased and spaces become underscores,
+    # but a leading digit / other punctuation / too-short are rejected.
+    for bad in ("1leading_digit", "a", "has.dot"):
         res = device_service.create_instance(
             devices=devices,
             renderers=renderers,

@@ -43,6 +43,8 @@
   align-items: center;
 }
 .dx-dash-create-kind { flex: 0 0 auto; }
+.dx-dash-create-help { margin: 8px 0 0; font-size: 13px; color: var(--t-muted, inherit); }
+.dx-dash-create-help:empty { display: none; }
 
 /* Push button widens to fit "Push to N"; pin a min-width big enough for
    "Push to 99" so rows keep the same footprint. */

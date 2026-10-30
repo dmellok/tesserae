@@ -6,6 +6,20 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.496.1], 2026-10-31
+
+### Fixed
+
+- Dashboards: New dashboard no longer hides the create form when it is
+  already open (an empty list, or `?create=1`); it opens the form and
+  focuses the name. The Grid / Freeform picker now says what each kind is.
+- A device id typed with spaces ("Kitchen Panel") becomes `kitchen_panel`
+  instead of being rejected, in the setup wizard and Settings › Devices.
+- Setup wizard: the device step links to the web flasher, the MQTT choice
+  notes that battery ESP32 boards should use REST, and "Add a device by
+  hand" starts collapsed with a note that a flashed panel registers itself.
+  The empty Devices list links to the web flasher too.
+
 ## [0.496.0], 2026-10-30
 
 ### Added

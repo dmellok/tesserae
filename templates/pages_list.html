@@ -57,7 +57,7 @@
     {% if composer_enabled %}
     {# Grid = preset-cell layout (default); Freeform = the composer canvas. #}
     <div class="dx-pair-input dx-dash-create-kind">
-      <select name="layout_kind" class="dx-input" aria-label="Layout">
+      <select name="layout_kind" class="dx-input" aria-label="Layout" data-layout-kind>
         <option value="grid">Grid layout</option>
         <option value="canvas"{% if request.args.get('layout_kind') == 'canvas' %} selected{% endif %}>Freeform canvas</option>
       </select>
@@ -82,6 +82,9 @@
       </button>
     </div>
   </form>
+  {% if composer_enabled %}<p class="dx-dash-create-help" data-layout-kind-help aria-live="polite"
+     data-help-grid="Grid: split the panel into cells from a preset and give each cell one widget."
+     data-help-canvas="Freeform: drag widgets, text and shapes anywhere on the panel and size them by hand."></p>{% endif %}
 </div>
 {% endif %}
 
@@ -539,19 +542,31 @@
   })();
 
   // New dashboard: the head button reveals the create form and focuses it.
+  // It only ever opens: the form already shows on an empty list and with
+  // ?create=1, and a toggle there hid the fields the click was asking for.
   (function () {
     const panel = document.querySelector('[data-create-panel]');
     const btn = document.querySelector('[data-create-toggle]');
     if (!panel || !btn) return;
     btn.addEventListener('click', function () {
-      const open = panel.hidden;
-      panel.hidden = !open;
-      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-      if (open) {
-        const input = panel.querySelector('[data-new-dashboard-input]');
-        if (input) input.focus();
-      }
+      panel.hidden = false;
+      btn.setAttribute('aria-expanded', 'true');
+      panel.scrollIntoView({ block: 'nearest' });
+      const input = panel.querySelector('[data-new-dashboard-input]');
+      if (input) input.focus();
     });
+  })();
+
+  // Layout kind: say what each choice gives you under the picker.
+  (function () {
+    const sel = document.querySelector('[data-layout-kind]');
+    const help = document.querySelector('[data-layout-kind-help]');
+    if (!sel || !help) return;
+    const sync = () => {
+      help.textContent = help.getAttribute('data-help-' + sel.value) || '';
+    };
+    sel.addEventListener('change', sync);
+    sync();
   })();
 
   // Updates control: a preset submits straight away, "custom" reveals a
