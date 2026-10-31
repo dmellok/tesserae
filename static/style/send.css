@@ -467,7 +467,8 @@
   object-fit: cover;
   /* Overscale so the blur's soft edge doesn't reveal the frame border. */
   transform: scale(1.08);
-  filter: blur(18px) saturate(1.15);
+  --preview-effects: blur(18px) saturate(1.15);
+  filter: var(--preview-effects);
   z-index: 0;
 }
 .preview-frame > img.preview-bg[hidden] { display: none !important; }

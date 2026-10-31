@@ -19,6 +19,19 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   Home Assistant sensors, the REST/companion API, JSON fields, ISO stamps,
   logs, saved settings and time inputs keep the 24-hour form.
 
+### Changed
+
+- Display-accurate previews: thumbnails show what the display can actually
+  show. A black-and-white screen previews in black and white instead of full
+  color, a grey screen in greyscale, and a color screen is unchanged. A
+  black-and-white display with a dithering mode previews as smooth grey, since
+  dithering averages out at thumbnail size; only dither `none` uses the hard
+  black and white threshold. Covers the Devices list and device page,
+  Dashboards list, History, Events, Send, the dashboard editor preview and the
+  lineup editor. Dashboards with no display, or shared across displays that
+  differ, stay in color. Previews only; what is sent to the panel is
+  unchanged. See `docs/thumbnail-color.md`.
+
 ## [0.496.1], 2026-10-31
 
 ### Fixed

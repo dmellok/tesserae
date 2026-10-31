@@ -1,3 +1,4 @@
+{% from "_preview_color.html" import attrs as color_attrs with context %}
 {% extends "_base.html" %}
 
 {% block title %}{{ deck.name if deck else 'New deck' }} · Lineups{% endblock %}
@@ -207,7 +208,7 @@
             <select name="device_ids" id="dxe-device">
               <option value="">Choose a display…</option>
               {% for d in device_meta %}
-              <option value="{{ d.id }}" {% if deck and d.id in deck.device_ids %}selected{% endif %}>{{ d.name }}</option>
+              <option value="{{ d.id }}" {{ color_attrs(d.id) }} {% if deck and d.id in deck.device_ids %}selected{% endif %}>{{ d.name }}</option>
               {% endfor %}
             </select>
             <p class="dxe-help">Only dashboards bound to this display can be added to the deck.</p>

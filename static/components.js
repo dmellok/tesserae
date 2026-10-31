@@ -625,7 +625,7 @@
       document.body.classList.remove("lightbox-open");
     }
 
-    function open(src, label) {
+    function open(src, label, source) {
       close();
       const overlay = document.createElement("div");
       overlay.className = "lightbox";
@@ -645,6 +645,11 @@
           close();
         }
       });
+      const color = source && source.closest("[data-gamut]");
+      if (color) {
+        img.dataset.gamut = color.dataset.gamut;
+        img.dataset.greyLevels = color.dataset.greyLevels;
+      }
       document.body.appendChild(overlay);
       document.body.classList.add("lightbox-open");
     }
@@ -656,7 +661,7 @@
       const src = a.getAttribute("href");
       if (!src) return;
       const img = a.querySelector("img");
-      open(src, (img && img.alt) || a.getAttribute("aria-label") || "");
+      open(src, (img && img.alt) || a.getAttribute("aria-label") || "", a);
     });
 
     document.addEventListener("keydown", (ev) => {

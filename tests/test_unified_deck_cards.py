@@ -394,7 +394,10 @@ def test_deleted_display_lineup_remains_manageable(
     # plain save would unbind the deck; the schedule form would preselect
     # the first dashboard once the wiped page vanished from the list.
     if intent in ("manual", "cycle"):
-        assert '<option value="kobo" selected>kobo (unavailable)</option>' in editor_html
+        # Preview attributes may sit between the value and ``selected``.
+        assert re.search(
+            r'<option value="kobo"[^>]* selected>kobo \(unavailable\)</option>', editor_html
+        )
         saved = client.post(
             "/decks/editor-save",
             data={

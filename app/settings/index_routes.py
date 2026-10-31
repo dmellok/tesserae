@@ -1529,6 +1529,9 @@ def _device_overview(device: Device, section: dict[str, Any]) -> dict[str, Any]:
         next_wake = {"value": predicted or "-", "sub": next_sub, "muted": not predicted}
     return {
         "has_render": bool(latest),
+        # /preview serves composition PNGs, except legacy entries without one:
+        # those fall back to the renderer artifact and must not be quantised again.
+        "preview_is_artifact": bool(latest and not latest.get("composition_digest")),
         "showing": showing,
         "battery": {
             "value": power.get("label") or "-",
