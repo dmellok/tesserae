@@ -3971,6 +3971,59 @@ select.dx-input:hover {
 .dx-thumb--quick.dx-thumb--portrait[style*="--thumb-ar"] { height: 190px; }
 .dx-thumb--page.dx-thumb--portrait[style*="--thumb-ar"] { height: 260px; }
 
+/* The glass thumbnail with, under it, the image queued for the next check-in. */
+.dx-thumbs { flex: none; max-width: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.dx-live { display: contents; }
+.dx-thumb-q {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  font-family: var(--dx-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dx-warn-text);
+}
+.dx-thumb-q img {
+  display: block;
+  height: 64px;
+  width: auto;
+  max-width: 110px;
+  object-fit: contain;
+  background: #fff;
+  border: 1px dashed var(--dx-warn);
+  border-radius: 6px;
+}
+.dx-thumb-q figcaption { display: inline-flex; align-items: center; gap: 4px; }
+.dx-thumb-q-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--dx-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dx-warn-text);
+}
+/* A line across the tile grid, so it reads as a status of the whole panel. */
+.dx-queued {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 10px 14px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border-radius: 10px;
+  background: var(--dx-warn-bg);
+  color: var(--t-fg);
+  font-size: 13px;
+  line-height: 1.4;
+}
+.dx-queued .ph { flex: none; margin-top: 2px; font-size: 16px; color: var(--dx-warn-text); }
+.dx-queued.is-live .ph { color: var(--dx-ok); }
+
 /* Headline tiles (showing / battery / firmware / next wake). */
 .dx-qtile {
   padding: 13px 14px;
@@ -4317,6 +4370,8 @@ select.dx-input:hover {
 :root[data-theme="dark"] .dx-devquick { background: var(--t-surface-sunk); border-bottom-color: var(--t-border); }
 :root[data-theme="dark"] .dx-qtile { background: var(--t-surface-soft); border: 1px solid var(--t-border); }
 :root[data-theme="dark"] .dx-thumb { background: var(--t-surface-soft); }
+:root[data-theme="dark"] .dx-queued { background: color-mix(in oklab, var(--dx-warn) 16%, var(--t-surface-soft)); border: 1px solid color-mix(in oklab, var(--dx-warn) 40%, transparent); }
+:root[data-theme="dark"] .dx-thumb-q img { background: var(--t-surface-soft); }
 :root[data-theme="dark"] .dx-disc-banner { background: var(--t-surface); border-color: var(--t-border-strong); }
 :root[data-theme="dark"] .dx-disc-row { border-top-color: var(--t-border-strong); }
 :root[data-theme="dark"] .dx-subnav-link:hover { background: var(--t-surface-soft); }

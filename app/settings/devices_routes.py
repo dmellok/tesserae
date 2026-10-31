@@ -46,6 +46,7 @@ from ._shared import (
     orientation_label,
     push_manager,
     rebuild_transport_fn,
+    render_sync_sig,
     renderers,
     settings_store,
     transport,
@@ -688,6 +689,19 @@ def devices_discovered_json() -> Response:
         if d["id"] not in devices().devices
     ]
     return current_app.response_class(json.dumps({"devices": items}), mimetype="application/json")
+
+
+@bp.get("/settings/devices/render-state.json")
+def devices_render_state_json() -> Response:
+    """Per device ``<newest digest>|<fetched digest>``. The Devices list and
+    the device page poll this and refresh a thumbnail whose signature moved,
+    so a push (or the frame fetching it) shows without a manual reload."""
+    state = {did: render_sync_sig(did) for did in devices().devices}
+    return current_app.response_class(
+        json.dumps({"devices": state}),
+        mimetype="application/json",
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @bp.get("/settings/devices/ha-devices.json")

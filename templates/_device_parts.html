@@ -21,23 +21,47 @@
 {% endif %}
 {%- endmacro -%}
 
-{# The four tiles every overview shows, in the order the mockups fix. #}
+{# The four tiles every overview shows, in the order the mockups fix, then
+   the Queued line when a pull frame has a newer image waiting. The wrapper
+   is ``display: contents`` so the tiles stay grid items; the sync script
+   swaps it when the device's newest or fetched render changes. #}
 {%- macro overview_tiles(section) -%}
+<div class="dx-live" data-render-sync="tiles:{{ section.get('device_id') }}">
 {{ stat_tile('Showing', section.overview.showing) }}
 {{ stat_tile('Battery', section.overview.battery) }}
 {{ stat_tile('Firmware', section.overview.firmware) }}
 {{ stat_tile('Next update', section.overview.next_wake) }}
+{%- if section.overview.queued %}
+<p class="dx-queued{% if section.overview.queued.live %} is-live{% endif %}" role="status" data-device-queued>
+  <i class="ph ph-clock-countdown" aria-hidden="true"></i>
+  <span><strong>{{ section.overview.queued.title }}.</strong> {{ section.overview.queued.text }}</span>
+</p>
+{%- endif %}
+</div>
 {%- endmacro -%}
 
-{# Latest-render thumbnail, or a placeholder when nothing has been
-   pushed yet. The size is set by the caller's CSS class. #}
+{# Thumbnail of what the frame holds, or a placeholder when nothing has been
+   pushed yet. For a pull frame with a newer image waiting, the glass stays
+   the big thumbnail and the queued image sits under it, labelled. The size
+   is set by the caller's CSS class; the URLs carry the render digest so a
+   cached older frame can never stand in for a newer one. #}
 {%- macro render_thumb(section, extra_class='') -%}
+<div class="dx-thumbs" data-render-sync="thumb:{{ section.get('device_id') }}" data-render-sig="{{ section.overview.sync_sig }}">
 <div class="dx-thumb {{ extra_class }}{% if section.panel and section.panel.h and section.panel.w and section.panel.h > section.panel.w %} dx-thumb--portrait{% endif %}"{% if section.overview.has_render and section.panel and section.panel.w and section.panel.h %} style="--thumb-ar: {{ section.panel.w }} / {{ section.panel.h }}"{% endif %}>
   {% if section.overview.has_render %}
-  <img src="{{ section.preview_url }}" alt="Latest render on {{ section.device_name }}" loading="lazy">
+  <img src="{{ section.overview.thumb_url }}" alt="{{ 'Last image fetched by' if section.overview.queued and not section.overview.queued_is_only_thumb else 'Latest render on' }} {{ section.device_name }}" loading="lazy">
   {% else %}
   <span class="dx-thumb-empty"><i class="ph ph-image" aria-hidden="true"></i><span>No render yet</span></span>
   {% endif %}
+</div>
+{% if section.overview.queued_thumb_url %}
+<figure class="dx-thumb-q" data-device-queued-thumb>
+  <img src="{{ section.overview.queued_thumb_url }}" alt="Queued image for {{ section.device_name }}" loading="lazy">
+  <figcaption><i class="ph ph-clock-countdown" aria-hidden="true"></i>Queued</figcaption>
+</figure>
+{% elif section.overview.queued_is_only_thumb %}
+<span class="dx-thumb-q-tag" data-device-queued-thumb><i class="ph ph-clock-countdown" aria-hidden="true"></i>Queued, not fetched yet</span>
+{% endif %}
 </div>
 {%- endmacro -%}
 

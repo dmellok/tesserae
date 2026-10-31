@@ -139,6 +139,21 @@ def device_status() -> dict[str, dict[str, Any]]:
     return current_app.config["DEVICE_STATUS"]  # type: ignore[no-any-return]
 
 
+def render_sync_sig(device_id: str) -> str:
+    """``<newest digest>|<last fetched digest>`` for a device: changes when a
+    push lands or the frame fetches, which is when its thumbnail and Queued
+    line go out of date. Empty before any render."""
+    push_mgr = current_app.config.get("PUSH_MANAGER")
+    if push_mgr is None:
+        return ""
+    live = push_mgr.latest_render_for(device_id)
+    held_fn = getattr(push_mgr, "held_render_for", None)
+    newest = (held_fn(device_id) if callable(held_fn) else None) or live
+    if not newest:
+        return ""
+    return f"{newest.get('digest') or ''}|{(live or {}).get('last_served_digest') or ''}"
+
+
 def transport() -> MqttTransport:
     return current_app.config["MQTT_TRANSPORT"]  # type: ignore[no-any-return]
 

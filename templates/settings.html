@@ -36,6 +36,7 @@
    discovered yet, so polling catches the first one. #}
 <span data-discovered-poll="{{ discovered_sig }}" hidden></span>
 <script src="{{ url_for('static', filename='discovery-poll.js') }}"></script>
+<script src="{{ url_for('static', filename='render-sync.js') }}"></script>
 {% endif %}
 
 {# Settings page controller (handoff redesign): drives the device card
