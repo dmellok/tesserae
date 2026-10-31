@@ -610,19 +610,47 @@
     });
   }
 
+  // Page scroll lock for overlays. Counted, so nested or re-opened overlays
+  // never leave the page stuck; the scrollbar's width is added back as
+  // padding so the layout does not shift. Every lock() needs one unlock().
+  const scrollLock = { count: 0, padding: "" };
+  function lockScroll() {
+    const root = document.documentElement;
+    if (scrollLock.count++ > 0) return;
+    const bar = window.innerWidth - root.clientWidth;
+    scrollLock.padding = root.style.paddingRight;
+    if (bar > 0) {
+      const base = parseFloat(getComputedStyle(root).paddingRight) || 0;
+      root.style.paddingRight = base + bar + "px";
+    }
+    root.classList.add("scroll-locked");
+  }
+  function unlockScroll() {
+    if (scrollLock.count === 0 || --scrollLock.count > 0) return;
+    const root = document.documentElement;
+    root.classList.remove("scroll-locked");
+    root.style.paddingRight = scrollLock.padding;
+  }
+  window.TesseraeScrollLock = { lock: lockScroll, unlock: unlockScroll };
+
   // Lightbox, delegated click handler that intercepts any
   // `<a data-lightbox href="...">` and shows the image in an in-page
-  // overlay instead of a new tab. ESC or backdrop click closes.
+  // overlay instead of a new tab. The image opens fit to the screen;
+  // clicking it toggles a full-size view that pans inside the overlay.
+  // ESC or (in the fit view) a backdrop click closes.
   function attachLightbox() {
     if (document.body.dataset.lightboxBound) return;
     document.body.dataset.lightboxBound = "1";
 
+    let current = null;
+
     function close() {
-      const overlay = document.querySelector(".lightbox");
+      const overlay = current;
       if (!overlay) return;
+      current = null;
       if (window.TesseraeMorph) window.TesseraeMorph.remove(overlay);
       else overlay.remove();
-      document.body.classList.remove("lightbox-open");
+      unlockScroll();
     }
 
     function open(src, label, source) {
@@ -635,15 +663,37 @@
       overlay.innerHTML =
         '<button type="button" class="lightbox-close" aria-label="Close">' +
         '<i class="ph ph-x" aria-hidden="true"></i></button>' +
-        '<img class="lightbox-img" alt="" />';
+        '<img class="lightbox-img" alt="" tabindex="0" role="button" />';
       const img = overlay.querySelector(".lightbox-img");
       img.src = src;
       if (label) img.alt = label;
-      overlay.addEventListener("click", (ev) => {
-        // Backdrop click closes; clicks on the image itself do not.
-        if (ev.target === overlay || ev.target.closest(".lightbox-close")) {
-          close();
+      // Only an image that fit-to-screen shrinks has a larger view to show.
+      const fitsNaturally = () =>
+        img.naturalWidth <= img.clientWidth + 1 && img.naturalHeight <= img.clientHeight + 1;
+      const markZoomable = () => {
+        if (overlay.classList.contains("is-large")) return;
+        overlay.classList.toggle("is-zoomable", !fitsNaturally());
+      };
+      const toggle = () => {
+        if (overlay.classList.contains("is-large")) {
+          overlay.classList.remove("is-large");
+          overlay.scrollTo(0, 0);
+          markZoomable();
+        } else if (!fitsNaturally()) {
+          overlay.classList.add("is-large");
         }
+      };
+      img.addEventListener("load", markZoomable);
+      img.addEventListener("click", toggle);
+      img.addEventListener("keydown", (ev) => {
+        if (ev.key !== "Enter" && ev.key !== " ") return;
+        ev.preventDefault();
+        toggle();
+      });
+      overlay.addEventListener("click", (ev) => {
+        // Backdrop click closes in the fit view only; the image toggles.
+        const backdrop = ev.target === overlay && !overlay.classList.contains("is-large");
+        if (backdrop || ev.target.closest(".lightbox-close")) close();
       });
       const color = source && source.closest("[data-gamut]");
       if (color) {
@@ -651,7 +701,9 @@
         img.dataset.greyLevels = color.dataset.greyLevels;
       }
       document.body.appendChild(overlay);
-      document.body.classList.add("lightbox-open");
+      current = overlay;
+      lockScroll();
+      img.focus({ preventScroll: true });
     }
 
     document.addEventListener("click", (ev) => {

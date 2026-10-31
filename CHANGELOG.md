@@ -77,6 +77,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   `page_in_lineups` with the lineup names (and `would_delete_lineups`) until repeated with
   `remove_from_lineups=true`. Before, the lineup kept a step pointing at a
   dashboard that no longer existed.
+- The image lightbox (gallery, history, events, artwork) no longer scrolls the
+  page behind it: page scroll is locked while it is open (scrollbar width
+  compensated, no layout shift, position kept on close) and released on every
+  close path. Images now open fit to the screen; click, tap or Enter/Space
+  toggles a full-size view that pans inside the overlay, and a second click
+  returns to fit. Backdrop click closes in the fit view only; Escape always
+  closes.
 
 ## [0.496.1], 2026-10-31
 
