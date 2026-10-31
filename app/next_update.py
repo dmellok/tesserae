@@ -417,6 +417,65 @@ class DeviceTiming:
         return _checkin_at_or_after(self.reach, self.now)
 
 
+def pending_delivery(device: Any, *, now: float | None = None) -> dict[str, Any]:
+    """Whether a newer image is queued for a pull device, and when it lands.
+
+    A REST frame fetches its picture at its own check-in, so after a push
+    the server holds a render the frame has not fetched yet. That is
+    ``queued``: the newest render (the parked one while a patch divert holds
+    the live slot) differs from the frame the device last fetched. Devices
+    that are not REST pull devices (MQTT, push, relay) are never queued here;
+    they receive a push on publish and record no fetch to compare against.
+
+    Returns ``{queued, queued_at, expected_at, expected_when, live, mode}``:
+
+    * ``queued_at``: epoch the queued render was made, ``None`` when not queued;
+    * ``expected_at``: epoch it should reach the frame (the same estimate as
+      the Next update tile: the next check-in for a sleeping frame, right away
+      for a connected one, after any quiet-hours hold), ``None`` when unknown
+      or held with no end; ``expected_when`` is its ``~15:48`` label;
+    * ``live``: the frame holds a live connection ("delivering now");
+    * ``mode``: ``connected`` / ``sleeps`` / ``unknown``.
+
+    Reads the push manager and device timing; changes nothing.
+    """
+    from flask import current_app
+
+    idle: dict[str, Any] = {
+        "queued": False,
+        "queued_at": None,
+        "expected_at": None,
+        "expected_when": "",
+        "live": False,
+        "mode": MODE_UNKNOWN,
+    }
+    push_mgr = current_app.config.get("PUSH_MANAGER")
+    if push_mgr is None or getattr(device, "transport", "") != "rest":
+        return idle
+    live_entry = push_mgr.latest_render_for(device.id)
+    held_fn = getattr(push_mgr, "held_render_for", None)
+    newest = (held_fn(device.id) if callable(held_fn) else None) or live_entry
+    if not newest or not newest.get("digest"):
+        return idle
+    served = (live_entry or {}).get("last_served_digest")
+    if newest.get("digest") == served:
+        return idle
+    stamp = newest.get("timestamp")
+    out = {**idle, "queued": True}
+    out["queued_at"] = float(stamp) if isinstance(stamp, (int, float)) and stamp > 0 else None
+    now = time.time() if now is None else now
+    try:
+        timing = DeviceTiming(device, now=now)
+        view = timing.view(now)
+    except Exception:
+        return out
+    out["expected_at"] = view.get("at")
+    out["expected_when"] = str(view.get("when") or "")
+    out["live"] = bool(timing.reach.live)
+    out["mode"] = timing.reach.mode
+    return out
+
+
 def ha_state_for_device(device: Any) -> dict[str, Any]:
     """What Home Assistant's *Next update* and *Next wake* sensors publish:
     the ``view`` dict plus ``checkin_at`` (epoch of the next check-in, or
