@@ -70,6 +70,7 @@
          data-el-id="{{ e.id }}"
          data-data-source="{{ e.data_source }}"
          data-plugin="{{ e.widget }}"
+         {% if e.disabled_name %}data-disabled="{{ e.disabled_name }}"{% endif %}
          data-fragment="{{ e.fragment }}"
          data-parts='{{ e.parts|tojson }}'
          data-options='{{ e.options|tojson }}'

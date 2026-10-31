@@ -137,6 +137,7 @@
          data-cell-id="{{ cell.id }}"
          data-cell-index="{{ loop.index }}"
          data-plugin="{{ cell.plugin }}"
+         {% if cell.disabled_name %}data-disabled="{{ cell.disabled_name }}"{% endif %}
          data-fragment="{{ cell.fragment | default('full', true) }}"
          data-options='{{ cell.options|tojson }}'
          data-data='{{ cell.data|tojson }}'

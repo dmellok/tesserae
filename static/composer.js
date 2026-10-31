@@ -100,6 +100,28 @@ function applyCustomCss(shadow) {
   shadow.appendChild(st);
 }
 
+// A widget the operator switched off keeps its place on the dashboard as a
+// quiet labelled box; its saved options are untouched. Inline styles because
+// the shadow root has no stylesheet of its own.
+function paintDisabled(cell, shadow, name) {
+  const box = document.createElement("div");
+  box.setAttribute("role", "note");
+  box.style.cssText =
+    "box-sizing:border-box;width:100%;height:100%;display:flex;flex-direction:column;" +
+    "align-items:center;justify-content:center;gap:2px;padding:8px;text-align:center;" +
+    "font:600 12px/1.3 var(--font-family, system-ui, sans-serif);color:var(--ink-2, #6b6b6b);" +
+    "border:1px dashed currentColor;border-radius:6px;overflow:hidden;";
+  const title = document.createElement("span");
+  title.textContent = `Widget ${name} is disabled`;
+  const hint = document.createElement("span");
+  hint.style.cssText = "font-weight:400;font-size:11px;opacity:.8;";
+  hint.textContent = "Enable it on the Widgets page";
+  box.append(title, hint);
+  shadow.replaceChildren(box);
+  cell.classList.add("cell--disabled");
+  cell.dataset.rendered = "true";
+}
+
 function reportError(cell, shadow, pluginId, err) {
   cell.classList.add("error");
   cell.dataset.error = err.message || String(err);
@@ -172,6 +194,11 @@ async function mountCell(cell) {
   const host = cell.querySelector(".cell-content") || cell;
   const shadow = host.attachShadow({ mode: "open" });
   const ctx = buildCtx(cell, options, pluginData, fontFamily);
+
+  if (cell.dataset.disabled) {
+    paintDisabled(cell, shadow, cell.dataset.disabled);
+    return;
+  }
 
   try {
     const prefix = window.TESSERAE_URL_PREFIX || "";

@@ -171,7 +171,9 @@ def test_remove_never_touches_a_bundled_widget(app: Flask) -> None:
 def test_bundled_rows_have_no_remove_button(app: Flask) -> None:
     body = _client(app).get("/plugins/").get_data(as_text=True)
     assert "Upload widget" in body
-    assert 'name="plugin_id" value="clock_analog"' not in body
+    # The Disable form posts the same hidden plugin_id; only Remove is barred.
+    assert body.count('action="/plugins/widgets/remove"') == 0
+    assert "Remove" not in body.split('data-sort-id="clock_analog"', 1)[1].split("</li>", 1)[0]
 
 
 # -- zip repack guards --------------------------------------------------

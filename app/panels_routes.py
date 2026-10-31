@@ -220,6 +220,7 @@ def editor(canvas_id: str) -> str:
         # Bundled + cached webfonts, same lists the /compose render uses, so
         # the editor preview paints the same faces a device push does.
         font_face_css=_all_font_face_css(_registry()),
+        disabled_widgets={pid: pl.name for pid, pl in _registry().disabled.items()},
         code_fonts=[{"id": f.id, "name": f.name} for f in _registry().fonts.values()]
         + _cached_code_fonts(),
         templates_enabled=experiments.is_enabled("templates"),
