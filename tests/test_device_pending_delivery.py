@@ -111,9 +111,11 @@ def test_latest_newer_than_served_is_queued(app: Flask, client) -> None:
     assert out["live"] is False
 
 
-def test_never_served_is_queued(app: Flask, client) -> None:
+def test_never_served_is_not_queued(app: Flask, client) -> None:
+    # Only /frame records a fetch; a device on /frame.bmp or a deck route
+    # never would, so without one there is nothing to call queued.
     _push(app, _render("A", "compA"))
-    assert _pending(app)["queued"] is True
+    assert _pending(app)["queued"] is False
 
 
 def test_nothing_pushed_is_not_queued(app: Flask, client) -> None:
@@ -217,12 +219,12 @@ def test_row_queued_shows_the_glass_and_the_queued_image(app: Flask, client) -> 
     assert showing.group(2).startswith("fetched ")
 
 
-def test_row_never_fetched_marks_the_only_thumbnail_queued(app: Flask, client) -> None:
+def test_row_never_fetched_shows_the_latest_render(app: Flask, client) -> None:
     _push(app, _render("A", "compA"))
     html = _devices_html(client)
     assert 'src="/preview/door.png?v=compA"' in html
-    assert "Queued, not fetched yet" in html
-    assert "Waiting for the frame" in html
+    assert "Queued, not fetched yet" not in html
+    assert "Waiting for the frame" not in html
 
 
 def test_row_names_the_page_that_is_on_the_glass(app: Flask, client) -> None:

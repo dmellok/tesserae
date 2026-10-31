@@ -484,7 +484,10 @@ def pending_delivery(device: Any, *, now: float | None = None) -> dict[str, Any]
     if not newest or not newest.get("digest"):
         return idle
     served = (live_entry or {}).get("last_served_digest")
-    if newest.get("digest") == served:
+    # No /frame fetch on record means nothing to compare against: the device
+    # may pull /frame.bmp (CrossPoint readers) or a deck or album route,
+    # none of which record one, so it would read as queued for ever.
+    if not served or newest.get("digest") == served:
         return idle
     stamp = newest.get("timestamp")
     out = {**idle, "queued": True}
@@ -496,7 +499,8 @@ def pending_delivery(device: Any, *, now: float | None = None) -> dict[str, Any]
     except Exception:
         return out
     out["expected_at"] = view.get("at")
-    out["expected_when"] = str(view.get("when") or "")
+    # A page label, so the app's clock style rather than HA's 24-hour one.
+    out["expected_when"] = str(view.get("when_display") or view.get("when") or "")
     out["live"] = bool(timing.reach.live)
     out["mode"] = timing.reach.mode
     return out

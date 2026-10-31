@@ -192,3 +192,34 @@ def test_settings_devices_next_update_tile_follows_the_locale(app: Flask, client
     _locale(app, "en-GB")
     value = tile()
     assert re.fullmatch(r"~?(?:\w{3} )?\d\d:\d\d", value), value
+
+
+@pytest.mark.parametrize(
+    ("locale", "env", "cycle"),
+    [
+        (None, {}, "h23"),  # a container on C.UTF-8 with no locale set
+        ("system", {"LANG": "en_US.UTF-8"}, "h12"),
+        (None, {"LANG": "en_GB.UTF-8"}, "h23"),
+        ("en-US", {}, "h12"),
+    ],
+)
+def test_app_cycle_keeps_24_hour_when_no_locale_is_set(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    locale: str | None,
+    env: dict[str, str],
+    cycle: str,
+) -> None:
+    from app.clock_text import app_cycle
+
+    for var in ("LC_ALL", "LC_MESSAGES", "LANG"):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv("LC_ALL", "C.UTF-8")
+    for var, value in env.items():
+        monkeypatch.delenv("LC_ALL", raising=False)
+        monkeypatch.setenv(var, value)
+    app = create_app(testing=True, data_root=tmp_path, plugins_dir=REPO_ROOT / "plugins")
+    if locale is not None:
+        app.config["SETTINGS_STORE"].patch_section("app", {"locale": locale})
+    with app.app_context():
+        assert app_cycle() == cycle

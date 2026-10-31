@@ -120,7 +120,9 @@ def test_send_card_wires_schedule_endpoints_and_next_fire(app: Flask) -> None:
 
 @pytest.mark.parametrize(
     ("locale", "fires", "now_label"),
-    [("en-US", "fires 3:48\u202fPM", "\u202fPM"), ("en-GB", "fires 15:48", ":")],
+    # The live "now" label depends on the time the test runs, so it is only
+    # checked for its form: a narrow space before AM/PM, or a 24-hour colon.
+    [("en-US", "fires 3:48\u202fPM", "\u202f"), ("en-GB", "fires 15:48", ":")],
 )
 def test_lineups_page_clock_times_follow_the_locale(
     app: Flask, locale: str, fires: str, now_label: str

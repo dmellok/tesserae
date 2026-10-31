@@ -24,7 +24,9 @@ _MONTH_ABBR = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "O
 
 def app_cycle() -> str:
     """``h12`` / ``h23`` from the app-wide locale (Settings, else the host's).
-    ``h23`` outside an app context."""
+    ``h23`` outside an app context, and when no locale is set anywhere: the
+    bare ``en`` fallback a container (``C.UTF-8``) lands on would otherwise
+    read 12-hour, and installs kept 24-hour times before locales chose."""
     from flask import current_app, has_app_context
 
     from app.locale_resolve import resolve_locale, time_cycle
@@ -33,7 +35,16 @@ def app_cycle() -> str:
         return "h23"
     store = current_app.config.get("SETTINGS_STORE")
     app_section = (store.get_section("app") if store is not None else None) or {}
+    raw = str(app_section.get("locale") or "system").strip().lower()
+    if raw == "system" and not _host_locale():
+        return "h23"
     return time_cycle(resolve_locale(app_section))
+
+
+def _host_locale() -> str | None:
+    from app.locale_resolve import _system_locale
+
+    return _system_locale()
 
 
 def clock_of(moment: datetime | dt_time, cycle: str | None = None, *, seconds: bool = False) -> str:
