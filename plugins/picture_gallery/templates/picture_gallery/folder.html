@@ -37,7 +37,7 @@
     {% for img in images %}
     <div class="pg-tile">
       <a href="{{ url_for('picture_gallery_admin.serve_image', folder=folder_id, filename=img.name) }}" data-lightbox aria-label="{{ img.name }}">
-        <img src="{{ url_for('picture_gallery_admin.serve_thumbnail', folder=folder_id, filename=img.name) }}" alt="{{ img.name }}" loading="lazy">
+        <img src="{{ url_for('picture_gallery_admin.serve_thumbnail', folder=folder_id, filename=img.name, v=img.thumb_v) }}" alt="{{ img.name }}" loading="lazy">
       </a>
       <div class="pg-tile-row">
         <span class="pg-tile-name" title="{{ img.name }}">{{ img.name }}</span>
