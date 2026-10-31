@@ -84,6 +84,11 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   toggles a full-size view that pans inside the overlay, and a second click
   returns to fit. Backdrop click closes in the fit view only; Escape always
   closes.
+### Added
+
+- Visionect setup has an app-wide Server port setting (1024–65535), with
+  environment and optional Home Assistant add-on overrides, immediate listener
+  rebinding, and instructions that show the configured port. Default: 11113.
 
 ## [0.496.1], 2026-10-31
 

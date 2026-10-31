@@ -82,7 +82,7 @@
         OpenDisplay BLE tags, driven through Home Assistant or the standalone bridge.
       </p>
       <p class="dx-segmented-help" data-segmented-help-visionect hidden>
-        Visionect and Joan e-paper signs, over their own protocol on TCP {{ visionect_listener.port if visionect_listener else 11113 }}.
+        Visionect and Joan e-paper signs, over their own protocol on TCP {{ visionect_listener.port if visionect_listener and visionect_listener.port else 'the configured port' }}.
       </p>
     </div>
 
@@ -296,8 +296,8 @@
       {% endif %}
     </div>
 
-    {# Visionect branch: signs that dial this server on TCP 11113 (the
-       vendor server's port). No pairing: the sign's UUID binds it, typed
+    {# Visionect branch: signs that dial this server's configured TCP port.
+       One listener serves all signs. No pairing: the sign's UUID binds it, typed
        here or taken from the first unknown sign that connects. #}
     <div class="dx-add-branch dx-add-branch--visionect"
          data-transport-branch="visionect"
@@ -306,9 +306,11 @@
         <i class="ph ph-info" aria-hidden="true"></i>
         <p>
           <strong>Tesserae replaces the Visionect server.</strong> The sign dials the address in
-          its flash on TCP {{ visionect_listener.port if visionect_listener else 11113 }}: run
-          Tesserae on the old Visionect server's address, or set the address over the frame's USB
-          console. Leave the UUID blank and the first unknown sign that connects within the hour is
+          its flash. In the sign's configurator, open Settings &gt; Advanced connectivity:
+          set <strong>Server IP / Domain</strong> to this server's LAN IP or domain and
+          <strong>Server port</strong>: {{ visionect_listener.port if visionect_listener and visionect_listener.port else 'choose a valid port below' }}.
+          Over USB, run <code>server_tcp_set &lt;tesserae-ip&gt; {{ visionect_listener.port if visionect_listener and visionect_listener.port else '&lt;server-port&gt;' }}</code>,
+          then <code>flash_save</code> and <code>reboot</code>. Leave the UUID blank and the first unknown sign that connects within the hour is
           bound to this device; the sign reports its own screen size. The protocol has no authentication, so
           keep the port on your LAN.
         </p>
@@ -317,11 +319,21 @@
       <div class="dx-warn-band" role="alert">
         <i class="ph ph-warning" aria-hidden="true"></i>
         <p>
-          Port {{ visionect_listener.port }} is in use ({{ visionect_listener.error }}). Stop the
-          old Visionect server on this host; Tesserae retries every half minute.
+          {{ visionect_listener.error }}
+          Choose a free Server port below, or correct the environment / add-on option.
+          Tesserae retries bind failures every half minute.
         </p>
       </div>
       {% endif %}
+      <form method="post" action="{{ url_for('auth.visionect_port_save') }}" class="form">
+        {{ number_input('visionect-server-port', 'port', 'Server port', value=visionect_listener.port if visionect_listener and visionect_listener.port else '', min=1024, max=65535,
+                        help='One listener for all Visionect frames. Default 11113. Saving reconnects signs immediately; update each sign and container port mapping to match.') }}
+        {% if visionect_listener and visionect_listener.env_override %}
+        <p class="muted">Controlled by <code>TESSERAE_VISIONECT_PORT</code> or the add-on option; change it there and restart Tesserae.</p>
+        {% else %}
+        <div class="dx-actions-right"><button type="submit" class="dx-btn-secondary">Save Server port</button></div>
+        {% endif %}
+      </form>
       <form method="post" action="{{ url_for('auth.devices_add') }}" class="form">
         {% if visionect_kinds|length > 1 %}
         {{ select_field('add-vx-kind', 'kind', 'Model', value=visionect_kinds[0].value, options=visionect_kinds,

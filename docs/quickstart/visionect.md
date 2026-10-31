@@ -1,26 +1,94 @@
 # Quickstart: Visionect signs
 
-Visionect's e-paper signs (the 32" Place & Play, Joan, the 13" boards) are thin clients. The sign dials a server address stored in its flash on TCP port 11113 and draws whatever framebuffer the server pushes. Normally that server is the Visionect Software Suite (VSS), which needs a paid licence from version 7.7. Tesserae can be that server instead: it listens on 11113 and speaks the sign's protocol directly, through [pyvisionect](https://github.com/schlarpc/pyvisionect). No VSS, no Visionect account, no flashing.
+Visionect's e-paper signs (the 32" Place & Play, Joan, the 13" boards) are thin clients. The sign dials a server address stored in its flash on a configured TCP port (11113 by default) and draws whatever framebuffer the server pushes. Normally that server is the Visionect Software Suite (VSS), which needs a paid licence from version 7.7. Tesserae can be that server instead: it listens on the configured port and speaks the sign's protocol directly, through [pyvisionect](https://github.com/schlarpc/pyvisionect). No VSS, no Visionect account, no flashing.
 
 !!! note "Tested on one sign so far"
     A Place & Play 32 (HardwareNameID 8, firmware 6.17.4168) has drawn frames pushed over this protocol by pyvisionect. Joan 6, Joan 13, the 13" Place & Play and the 9.7" boards use the same protocol and are in the catalog, but haven't been tried on hardware yet.
 
 !!! warning "No authentication"
-    The protocol has none: anything that can reach port 11113 can claim to be any sign. Keep 11113 on your LAN and don't forward it from the internet. Tesserae limits the damage: while a sign is connected, a second connection claiming its UUID from another address is refused (and shown on the device page), oversized or over-compressed frames are dropped, and so are connections that don't identify within 20 seconds.
+    The protocol has none: anything that can reach the listener port can claim to be any sign. Keep that port on your LAN and don't forward it from the internet. Tesserae limits the damage: while a sign is connected, a second connection claiming its UUID from another address is refused (and shown on the device page), oversized or over-compressed frames are dropped, and so are connections that don't identify within 20 seconds.
 
 ## 01 — Point the sign at Tesserae
 
-The sign has no discovery and no network setting you can change remotely. It dials the address in its flash, so pick one:
+The sign dials the address and port stored in its flash. First choose the listener
+port in **Settings → Devices → Add device → Visionect → Server port** and save.
+It defaults to **11113**; leave it unchanged for an existing sign already dialing
+that port. The setting applies to every Visionect frame, rather than a single
+device record. Ports must be integers from **1024 to 65535**, distinct from
+Tesserae's web port (usually 8765) and other listeners. Occupied ports are refused
+before saving; a later bind failure appears in setup and on the device page
+without stopping Tesserae, and is retried every half minute.
 
-- **Use the old server's address.** If Tesserae runs on the same host as your old Visionect server, stop VSS so port 11113 is free. The sign reconnects to Tesserae within a minute or two, or at its next check-in. To go back, stop Tesserae's listener and start VSS again.
-- **Set the address over USB.** Connect the board's micro-USB port (an FTDI serial console, 115200 8N1) and run `server_tcp_set <tesserae-ip> 11113`, then `flash_save` and `reboot`.
+Saving causes an immediate **rebind**: existing sign connections close and the
+listener opens the new port. It only listens while a Visionect device exists.
+Reconfigure every sign to reconnect to the new port. An environment override
+requires a Tesserae restart and takes precedence over the saved setting:
 
-Tesserae must be reachable on 11113:
+```sh
+TESSERAE_VISIONECT_PORT=12000 tesserae
+```
 
-- **Docker:** the compose file uses host networking on Linux, so nothing extra is needed. With port mappings (macOS, Windows), add `"11113:11113"`.
-- **Home Assistant App:** not wired up yet. The App doesn't publish 11113/tcp today, so a sign can't reach Tesserae through it. Run Tesserae elsewhere (Docker or a plain install) for now.
-- **Other port:** set `TESSERAE_VISIONECT_PORT` (or `visionect_port` in the app settings) and point the sign at that port instead.
-- **Address:** the listener binds the same address as the web server, `TESSERAE_BIND_HOST` (all interfaces unless you set it). If you bind the web server to one address, point the sign at that address.
+The stored setting is `app.visionect_port` in `data/core/settings.json`. Without
+an override or saved setting the default remains 11113. Invalid explicit values
+show an error and disable the listener until corrected; they never silently
+fall back to another port.
+
+Point the sign at Tesserae using either method:
+
+- **Configurator:** in the sign's **Settings > Advanced connectivity**, set
+  **Server IP / Domain** to Tesserae's LAN IP or domain and **Server port** to
+  the port shown in Tesserae's Visionect setup. Save the sign's configuration.
+- **USB console:** connect micro-USB (FTDI serial, 115200 8N1), then run
+  `server_tcp_set <tesserae-ip> <server-port>`, `flash_save`, and `reboot`.
+  For example, with Server port 12000: `server_tcp_set 192.168.1.50 12000`.
+- **Existing server address:** with the default port unchanged, stop VSS on the
+  old server and run Tesserae at that address. The sign reconnects at its next
+  check-in. To go back, stop Tesserae's listener and start VSS again.
+
+The sign must reach the configured port:
+
+- **Docker host networking:** the compose default on Linux needs no mapping.
+  Set the port in the UI or export `TESSERAE_VISIONECT_PORT` in compose.
+- **Docker bridge networking:** publish the actual listener port. With port
+  12000, use `"12000:12000"`; the default is `"11113:11113"`. Changing the
+  app setting does not change Docker's mappings; recreate the container with
+  the matching mapping. `Dockerfile EXPOSE` is documentation, not publication.
+- **Home Assistant add-on:** use the UI setting even on existing installations
+  whose manifest has no `visionect_port` option. If that optional option is
+  available, it overrides the UI through the container entrypoint; restart the
+  add-on after changing it. In the add-on **Network** tab, the host port must
+  match what the sign dials. Supervisor declares container ports statically:
+  `ports: {"11113/tcp": 11113}` forwards to container port 11113 even when you
+  change its host port. For host port 12000 mapped to container 11113, leave
+  Tesserae's listener on 11113 and enter 12000 in the sign's **Server port**.
+  To change the listener *inside* the container to 12000, the add-on must use
+  host networking or declare `"12000/tcp": 12000` in its manifest, and its
+  Network tab mapping must match. An option cannot dynamically rewrite that
+  manifest. This checkout does not contain the separately maintained add-on
+  `config.yaml` or translations; deployments that edit only `version:` must
+  preserve those port declarations. Do not assume a new option publishes a
+  new container port.
+- **Bind address:** `TESSERAE_BIND_HOST` selects the same address as the web
+  server (all interfaces by default). Point the sign at a reachable address.
+
+For maintainers of the separate HA add-on, the optional manifest fields are:
+
+```yaml
+ports:
+  11113/tcp: 11113
+ports_description:
+  11113/tcp: Visionect frames (LAN only)
+# Merge into existing options/schema; do not replace other fields.
+# Omit the option to retain settings-store control on existing installs.
+schema:
+  visionect_port: int(1024,65535)?
+```
+
+An optional `options.visionect_port` value is read from `/data/options.json`.
+Its English translation under `configuration.visionect_port` should use
+`name: Visionect Server port` and describe the listener port, restart requirement,
+and static Network mapping above. Avoid adding a default option of 11113 to an
+existing installation that uses UI settings: an option overrides the saved port.
 
 ## 02 — Add the sign in Tesserae
 

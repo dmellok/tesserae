@@ -155,7 +155,9 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh && \
 # HTTP admin / renders endpoint. The embedded MQTT broker (if the
 # user enables it via Settings → Server → MQTT) listens on 1883 -
 # that port only matters if the operator publishes it from compose.
-EXPOSE 8765
+# Documentation only: EXPOSE does not publish ports. Custom Visionect ports
+# need matching bridge mappings (or host networking); see the quickstart.
+EXPOSE 8765 11113
 
 ENTRYPOINT ["docker-entrypoint.sh"]
 # `tesserae` is the console script declared in pyproject [project.scripts].

@@ -471,7 +471,8 @@ def test_configured_port_env_then_setting_then_default(monkeypatch) -> None:
     monkeypatch.setenv("TESSERAE_VISIONECT_PORT", "12001")
     assert visionect.configured_port(settings) == 12001
     monkeypatch.setenv("TESSERAE_VISIONECT_PORT", "nonsense")
-    assert visionect.configured_port(FakeSettings({})) == visionect.DEFAULT_PORT
+    with pytest.raises(ValueError, match=r"1024.*65535"):
+        visionect.configured_port(FakeSettings({}))
 
 
 def test_artifact_path_stays_inside_the_renders_dir(tmp_path: Path) -> None:
@@ -2356,3 +2357,57 @@ def test_the_exchange_log_records_what_went_each_way(tmp_path: Path) -> None:
             sign.close()
     finally:
         h.svc.stop()
+
+
+def test_port_change_rebinds_real_listener_and_closes_old_sockets(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(visionect, "_SERVICE", None)
+    monkeypatch.setattr(visionect, "AUTOSTART", True)
+    monkeypatch.delenv("TESSERAE_VISIONECT_PORT", raising=False)
+    monkeypatch.setenv("TESSERAE_BIND_HOST", "127.0.0.1")
+    h = Harness(tmp_path)
+    listeners: list[Any] = []
+    h.app.config.update(
+        PUSH_MANAGER=SimpleNamespace(
+            latest_render_for=lambda _d: None,
+            add_listener=listeners.append,
+            remove_listener=listeners.remove,
+        ),
+        DEVICE_REGISTRY=h.registry,
+        RENDERS_DIR=h.renders,
+    )
+    old_port = free_port()
+    h.settings.sections["app"]["visionect_port"] = old_port
+    visionect.register(h.app)
+    first = visionect.service()
+    assert first is not None and first.running
+    sign = FakeSign(old_port)
+    probe: socket.socket | None = None
+    try:
+        sign.status()
+        # Let the first listener accept and answer before it is retired.
+        assert sign.wait_for(lambda s: bool(s.frames), timeout=10)
+        new_port = free_port()
+        h.settings.sections["app"]["visionect_port"] = new_port
+        visionect.register(h.app)
+        second = visionect.service()
+        assert second is not None and second.running and second.port == new_port
+        assert not first.running and not first.autostart
+        assert listeners == [second.on_push]
+        with pytest.raises(OSError):
+            socket.create_connection(("127.0.0.1", old_port), timeout=1)
+        # Held open until the listener is stopped: macOS fails the accept of
+        # a connection whose peer already hung up (EINVAL on TCP_NODELAY), and
+        # asyncio then leaks that socket as a ResourceWarning.
+        probe = socket.create_connection(("127.0.0.1", new_port), timeout=1)
+        assert _wait(lambda: getattr(second._server, "_open", 0) == 1, timeout=10)
+        assert _closed_soon(sign.sock, timeout=10)
+    finally:
+        sign.close()
+        svc = visionect.service()
+        if svc is not None:
+            svc.autostart = False
+            svc.stop()
+        if probe is not None:
+            probe.close()

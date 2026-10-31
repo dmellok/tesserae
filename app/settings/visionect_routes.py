@@ -8,10 +8,12 @@ hooks). Only the page builders in ``index_routes`` call into this module."""
 
 from __future__ import annotations
 
+import os
+import socket
 import time
 from typing import Any
 
-from flask import flash, redirect, url_for
+from flask import current_app, flash, redirect, request, url_for
 from werkzeug.wrappers import Response
 
 from app import visionect
@@ -37,10 +39,16 @@ def add_card_context() -> tuple[list[dict[str, str]], dict[str, Any]]:
     )
     options = [{"value": d.id, "label": str(d.name)} for d in kinds]
     svc = visionect.service()
+    try:
+        port = visionect.configured_port(settings_store())
+        error = svc.start_error if svc is not None and not svc.running else None
+    except ValueError as exc:
+        port, error = None, str(exc)
     listener = {
         "running": bool(svc is not None and svc.running),
-        "port": svc.port if svc is not None else visionect.configured_port(settings_store()),
-        "error": svc.start_error if svc is not None and not svc.running else None,
+        "port": port,
+        "error": error,
+        "env_override": bool(os.environ.get("TESSERAE_VISIONECT_PORT")),
     }
     return options, listener
 
@@ -145,7 +153,15 @@ def _visionect_band(device: Device) -> dict[str, Any] | None:
     if not device.kind_of or not visionect.is_visionect_device(device):
         return None
     svc = visionect.service()
-    port = svc.port if svc is not None else visionect.configured_port(settings_store())
+    try:
+        port = visionect.configured_port(settings_store())
+    except ValueError as exc:
+        return {
+            "ok": False,
+            "title": "Visionect port needs attention",
+            "body": str(exc),
+            "link": _VISIONECT_DOCS,
+        }
     if svc is None or not svc.running:
         reason = f" ({svc.start_error})" if svc is not None and svc.start_error else ""
         return {
@@ -229,6 +245,50 @@ def _visionect_band(device: Device) -> dict[str, Any] | None:
         ),
         "link": _VISIONECT_DOCS,
     }
+
+
+@bp.post("/settings/visionect/port")
+def visionect_port_save() -> Response:
+    """One app-wide port for every Visionect sign; rebind immediately."""
+    redirect_to = redirect(url_for("auth.settings_area", area="devices"))
+    if os.environ.get("TESSERAE_VISIONECT_PORT"):
+        flash(
+            "Server port is controlled by TESSERAE_VISIONECT_PORT (or the add-on option). Change it there and restart Tesserae.",
+            "error",
+        )
+        return redirect_to
+    try:
+        port = visionect.validate_port(request.form.get("port", ""))
+        svc = visionect.service()
+        # An unchanged, live listener already owns this socket. Otherwise
+        # probe before saving, so an occupied port leaves settings untouched.
+        if svc is None or not svc.running or svc.port != port:
+            host = visionect.configured_host()
+            family = socket.AF_INET6 if ":" in host else socket.AF_INET
+            try:
+                with socket.create_server((host, port), family=family):
+                    pass
+            except OSError as exc:
+                raise ValueError(
+                    f"Cannot listen on Server port {port}: it may be in use or unavailable ({exc})."
+                ) from exc
+    except ValueError as exc:
+        flash(str(exc), "error")
+        return redirect_to
+    settings_store().patch_section("app", {"visionect_port": port})
+    visionect.register(current_app._get_current_object())  # type: ignore[attr-defined]
+    svc = visionect.service()
+    if svc is not None and svc.autostart and not svc.running:
+        flash(
+            f"Saved Server port {port}, but the listener could not bind: {svc.start_error or 'still starting'}. Tesserae retries every half minute.",
+            "error",
+        )
+    else:
+        flash(
+            f"Saved Server port {port}. The listener rebinds immediately when a Visionect device exists; reconnect every sign using this port. Update container port mappings too.",
+            "ok",
+        )
+    return redirect_to
 
 
 _VISIONECT_ACTION_DONE = {

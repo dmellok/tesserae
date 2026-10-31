@@ -59,6 +59,10 @@ services:
       # app), move the web port here, no CMD override needed:
       # TESSERAE_BIND_PORT: "8766"
 
+      # Visionect signs: default 11113, shared by all signs. Omit this to
+      # configure it in Settings > Devices > Add device > Visionect instead.
+      # TESSERAE_VISIONECT_PORT: "12000"
+
       # Listen on IPv6 (dual-stack where the OS supports it):
       # TESSERAE_BIND_HOST: "::"
 
@@ -69,6 +73,7 @@ services:
     #
     # ports:
     #   - "8765:8765"
+    #   - "11113:11113"        # Visionect: match BOTH sides to the configured port
     #   - "1883:1883"          # only if using the built-in MQTT broker
     # environment:
     #   TESSERAE_IN_DOCKER: "1"
