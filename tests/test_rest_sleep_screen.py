@@ -516,3 +516,70 @@ def test_the_frames_index_url_triggers_a_render(app: Flask) -> None:
 
     assert "button=refresh" in url
     assert "button_event_id=" in url
+
+
+# -- dashboards in the picker ----------------------------------------------
+
+
+def test_frames_index_lists_the_dashboards_bound_to_this_device(app: Flask) -> None:
+    """After ``current``, one item per dashboard bound to the device and not
+    archived. Titles are folded to ASCII for the picker's font."""
+    from app.state.page_store import Page
+
+    client = app.test_client()
+    token = _register(app, client)
+    pages = app.config["PAGE_STORE"]
+    pages.save(Page(id="kitchen", name="Küche – morning", device_ids=["reader"]))
+    pages.save(Page(id="elsewhere", name="Study", device_ids=["study"]))
+    pages.save(Page(id="unbound", name="Unbound"))
+    pages.save(Page(id="parked", name="Parked", device_ids=["reader"], archived=True))
+
+    resp = client.get(
+        "/api/v1/device/reader/frames.json", headers={"Authorization": f"Bearer {token}"}
+    )
+    items = resp.get_json()["items"]
+    assert [i["id"] for i in items] == ["current", "page:kitchen"]
+    assert items[1]["title"] == "Kuche morning"
+    assert "/api/v1/device/reader/frame.bmp?page=kitchen" in items[1]["url"]
+    assert "k=" in items[1]["url"]
+    assert "button_event_id" not in items[1]["url"]
+
+
+class _RecordingMenu(_RecordingButtons):
+    def show_page(self, *, device_id: str, page_id: str, event_id: int | None):
+        self.calls.append({"device_id": device_id, "page": page_id, "event_id": event_id})
+        return self.handle_button(device_id=device_id, button="", event_id=event_id)
+
+
+def test_a_page_pick_is_dispatched_and_its_frame_is_the_one_served(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client = app.test_client()
+    token = _register(app, client)
+    _seed_frame(app)
+    before = client.get(
+        "/api/v1/device/reader/frame.bmp", headers={"Authorization": f"Bearer {token}"}
+    ).get_data()
+
+    stub = _install_buttons(app, monkeypatch, cls=_RecordingMenu)
+    after = client.get(
+        "/api/v1/device/reader/frame.bmp?page=kitchen",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert after.status_code == 200
+    assert stub.calls[0] == {"device_id": "reader", "page": "kitchen", "event_id": None}
+    assert after.get_data() != before
+
+
+def test_a_page_pick_on_the_frame_envelope_dispatches(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client = app.test_client()
+    token = _register(app, client)
+    _seed_frame(app)
+    stub = _install_buttons(app, monkeypatch, cls=_RecordingMenu)
+    client.get(
+        "/api/v1/device/reader/frame?page=kitchen&button_event_id=7",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert stub.calls[0] == {"device_id": "reader", "page": "kitchen", "event_id": 7}

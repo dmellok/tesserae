@@ -32,7 +32,7 @@ import logging
 import threading
 import time
 import urllib.request
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta, tzinfo
 from typing import Any
@@ -56,7 +56,7 @@ from app.state.deck_store import DeckStore
 from app.state.device_rotation_state_model import DeviceRotationState
 from app.state.device_rotation_state_store import DeviceRotationStateStore
 from app.state.event_log import EventLog
-from app.state.page_store import PageStore
+from app.state.page_store import Page, PageStore
 from app.state.rotation_model import Rotation
 from app.state.settings_store import SettingsStore
 from app.touch_regions import (
@@ -257,6 +257,14 @@ def _same_event_id(state: DeviceRotationState, event_id: int | None) -> bool:
     )
 
 
+def menu_pages(pages: Iterable[Page], device_id: str) -> list[Page]:
+    """The dashboards a panel's own menu may offer: those bound to the
+    device and not archived, in dashboard-list order. Binding is what lets a
+    push reach a device at all, and a bound dashboard already renders at that
+    device's panel size, so nothing else is listed."""
+    return [p for p in pages if not p.archived and device_id in p.device_ids]
+
+
 class ButtonService:
     def __init__(
         self,
@@ -431,6 +439,90 @@ class ButtonService:
             result = self._handle_button(device_id=device_id, button=button, event_id=event_id)
         self._emit_button(device_id, button, result)
         return result
+
+    def show_page(
+        self,
+        *,
+        device_id: str,
+        page_id: str,
+        event_id: int | None,
+    ) -> ButtonHandleResult:
+        """A dashboard picked from the panel's own menu: the same path as a
+        button bound to ``page:<id>``, minus the button map. Only a dashboard
+        :func:`menu_pages` lists for the device is accepted, since a push
+        reaches bound devices only; anything else is recorded as an error and
+        the wake serves the current frame. The trigger label carries the page
+        id, so the no-id dedup window can't swallow a second, different pick."""
+        trigger = f"menu:{page_id}"
+        with navigation_locked(self._deck_nav, [device_id], timeout=NAV_LOCK_TIMEOUT_S) as held:
+            if not held:
+                log.warning(
+                    "menu pick: device=%s navigation still busy after %.0fs; going ahead",
+                    device_id,
+                    NAV_LOCK_TIMEOUT_S,
+                )
+            result = self._show_page(
+                device_id=device_id, page_id=page_id, trigger=trigger, event_id=event_id
+            )
+        self._emit_button(device_id, trigger, result)
+        return result
+
+    def _show_page(
+        self, *, device_id: str, page_id: str, trigger: str, event_id: int | None
+    ) -> ButtonHandleResult:
+        now = self._clock()
+        rotation = self._resolve_rotation(device_id)
+        state = self._state.get(device_id) or DeviceRotationState(device_id=device_id)
+        current_step_index, manual = self._effective_step_index(rotation, state)
+        origin_extra: dict[str, object] = {"button": trigger, "button_event_id": event_id}
+        if self._is_duplicate(state, button=trigger, event_id=event_id, now=now):
+            result_dedup = ButtonHandleResult(
+                device_id=device_id,
+                dedup=True,
+                unmapped=False,
+                action_spec=None,
+                action_description="duplicate; ignored",
+                rotation_id=rotation.id if rotation is not None else None,
+                step_index=current_step_index,
+                step_page_id=(
+                    rotation.steps[current_step_index].page_id if rotation is not None else None
+                ),
+                step_count=len(rotation.steps) if rotation is not None else 0,
+                manual_override=manual,
+                override_until=state.override_until if manual else None,
+                pushed_page_id=None,
+                push_result=None,
+            )
+            self._emit_history_row(
+                result=result_dedup, origin="button", origin_extra=origin_extra, status="deduped"
+            )
+            return result_dedup
+
+        # An unlisted id goes through as an unknown page so the action layer
+        # refuses it and the refusal lands in History like any bad mapping.
+        listed = {p.id for p in menu_pages(self._pages.list(), device_id)}
+        ctx = ActionContext(
+            device_id=device_id,
+            current_step_index=current_step_index,
+            rotation_step_count=len(rotation.steps) if rotation is not None else 0,
+            rotation_id=rotation.id if rotation is not None else None,
+            known_page_ids=frozenset(listed),
+            page_ids_by_name={},
+        )
+        return self._dispatch_spec(
+            device_id=device_id,
+            spec=f"page:{page_id}",
+            ctx=ctx,
+            rotation=rotation,
+            state=state,
+            now=now,
+            current_step_index=current_step_index,
+            manual=manual,
+            trigger_label=trigger,
+            event_id=event_id,
+            origin="button",
+            origin_extra=origin_extra,
+        )
 
     def following_deck(self, device_id: str) -> Deck | None:
         """The lineup a display is following right now.

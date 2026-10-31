@@ -22,7 +22,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from app.button_service import ButtonService
+from app.button_service import ButtonService, menu_pages
 from app.push import PushResult
 from app.state.device_rotation_state_store import DeviceRotationStateStore
 from app.state.event_log import EventLog
@@ -676,6 +676,99 @@ def test_page_action_shortcut_pushes_target_without_moving_position(
     assert persisted is not None
     assert persisted.step_index == 0
     assert persisted.override_until is None
+
+
+def test_menu_pages_lists_bound_dashboards_that_are_not_archived() -> None:
+    pages = [
+        Page(id="a", name="A", device_ids=["kitchen"]),
+        Page(id="b", name="B", device_ids=["study"]),
+        Page(id="c", name="C"),
+        Page(id="d", name="D", device_ids=["kitchen", "study"], archived=True),
+        Page(id="e", name="E", device_ids=["study", "kitchen"]),
+    ]
+    assert [p.id for p in menu_pages(pages, "kitchen")] == ["a", "e"]
+
+
+def test_show_page_pushes_a_bound_dashboard_without_moving_position(
+    rotation_store: RotationStore,
+    state_store: DeviceRotationStateStore,
+    settings_store: SettingsStore,
+    page_store: PageStore,
+    push_manager: StubPushManager,
+    clock: FakeClock,
+) -> None:
+    _seed_rotation(rotation_store)
+    svc = _wire(
+        rotation_store=rotation_store,
+        state_store=state_store,
+        settings_store=settings_store,
+        page_store=page_store,
+        push_manager=push_manager,
+        clock=clock,
+    )
+
+    result = svc.show_page(device_id="kitchen", page_id="evening", event_id=None)
+    assert result.pushed_page_id == "evening"
+    assert push_manager.calls[0]["device_ids"] == {"kitchen"}
+    persisted = state_store.get("kitchen")
+    assert persisted is not None
+    assert persisted.step_index == 0
+    assert persisted.override_until is None
+
+
+def test_show_page_refuses_a_dashboard_not_bound_to_the_device(
+    rotation_store: RotationStore,
+    state_store: DeviceRotationStateStore,
+    settings_store: SettingsStore,
+    page_store: PageStore,
+    push_manager: StubPushManager,
+    clock: FakeClock,
+) -> None:
+    """Only what the menu lists can be picked: a push would not reach an
+    unbound device anyway, and the id must not let a panel reach other
+    dashboards."""
+    page_store.save(Page(id="study_only", name="Study", device_ids=["study"]))
+    svc = _wire(
+        rotation_store=rotation_store,
+        state_store=state_store,
+        settings_store=settings_store,
+        page_store=page_store,
+        push_manager=push_manager,
+        clock=clock,
+    )
+
+    result = svc.show_page(device_id="kitchen", page_id="study_only", event_id=None)
+    assert result.unmapped is True
+    assert result.pushed_page_id is None
+    assert push_manager.calls == []
+
+
+def test_show_page_two_different_picks_in_a_row_both_dispatch(
+    rotation_store: RotationStore,
+    state_store: DeviceRotationStateStore,
+    settings_store: SettingsStore,
+    page_store: PageStore,
+    push_manager: StubPushManager,
+    clock: FakeClock,
+) -> None:
+    """With no event id the time-window dedup applies, but per dashboard:
+    a second, different pick inside the window is not a retry."""
+    svc = _wire(
+        rotation_store=rotation_store,
+        state_store=state_store,
+        settings_store=settings_store,
+        page_store=page_store,
+        push_manager=push_manager,
+        clock=clock,
+    )
+
+    svc.show_page(device_id="kitchen", page_id="morning", event_id=None)
+    clock.tick(1)
+    svc.show_page(device_id="kitchen", page_id="evening", event_id=None)
+    clock.tick(1)
+    repeat = svc.show_page(device_id="kitchen", page_id="evening", event_id=None)
+    assert [c["page_id"] for c in push_manager.calls] == ["morning", "evening"]
+    assert repeat.dedup is True
 
 
 # -- envelope shape -----------------------------------------------

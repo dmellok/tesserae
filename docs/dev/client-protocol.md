@@ -562,6 +562,25 @@ artefact with `200`, without triggering a render or push. On a
 cached `ETag` before making the request so the server always returns
 `200` with a full frame rather than `304`.
 
+**Dashboard picks** — a device with its own menu can show any dashboard
+bound to it by adding `?page=<dashboard id>` instead of `?button=`. The
+ids come from [`frames.json`](#get-apiv1deviceidframesjson). The pick
+runs the same `page:<id>` action a button can be mapped to: the dashboard
+is rendered for this device and served on the same response, and it does
+not move the rotation or lineup position, so the next timer wake carries
+on from where the schedule is. A dashboard that is not bound to the
+device, or is archived, is refused and the current frame is served.
+`button_event_id` is optional here. Without it, repeats of the same pick
+within the debounce window are treated as retries, and a different pick
+is not.
+
+```
+GET /api/v1/device/kitchen/frame?page=morning_briefing
+```
+
+A dashboard that has not rendered recently is rendered on the spot, so
+the first pick can take a few seconds.
+
 #### Touch wakes
 
 Touch-capable devices report a raw stroke on the frame request instead
@@ -1027,10 +1046,24 @@ fetch a dashboard on demand without a computer in the loop.
       "title": "Current dashboard",
       "subtitle": "Download as sleep screen",
       "url": "http://<server>/api/v1/device/<id>/frame.bmp?k=<token>"
+    },
+    {
+      "id": "page:morning_briefing",
+      "title": "Morning briefing",
+      "subtitle": "Show on this device",
+      "url": "http://<server>/api/v1/device/<id>/frame.bmp?page=morning_briefing&k=<token>"
     }
   ]
 }
 ```
+
+After `current` comes one item per dashboard bound to this device that is
+not archived, in dashboard-list order. Binding is what decides it: a
+dashboard reaches only the devices it is bound to, and a bound dashboard
+already renders at this device's panel size. The text after `page:` in
+the `id` is the dashboard id, which a client using the `/frame` envelope
+passes as [`?page=`](#get-apiv1deviceidframe). Downloading a dashboard
+item shows that dashboard on the device as well as returning it.
 
 `items` is always a JSON array; clients cast it to one, so an object
 would silently yield an empty picker. Each `url` is absolute and directly

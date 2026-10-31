@@ -8,6 +8,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- A device with its own menu can list the dashboards bound to it and show
+  any of them. `frames.json` now lists, after "Current dashboard", one item per
+  dashboard bound to the device that is not archived, with an ASCII title.
+  Picking one, or adding `?page=<id>` to `/frame` or `/frame.bmp`, shows that
+  dashboard on the device without moving its rotation or lineup position, the
+  same as a button mapped to `page:<id>`. A dashboard not bound to the device is
+  refused.
 - The Dashboards list has a By display | All switch in its toolbar. All shows
   every dashboard once, A to Z, with a chip for each display it is on (or
   Unbound), instead of repeating it under each display; search, the Active and

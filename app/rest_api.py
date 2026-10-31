@@ -51,6 +51,7 @@ import logging
 import secrets
 import threading
 import time
+import unicodedata
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlencode
@@ -59,7 +60,7 @@ from flask import Blueprint, Flask, current_app, jsonify, request
 from werkzeug.wrappers import Response
 
 from app import device_poll
-from app.button_service import ButtonService, TouchStroke
+from app.button_service import ButtonService, TouchStroke, menu_pages
 from app.device_loader import Device, DeviceRegistry
 from app.device_service import (
     create_instance,
@@ -402,7 +403,8 @@ def _wants_first_byte(range_header: str | None) -> bool:
 
 def _dispatch_query_button(device: Device, *, route: str) -> Any | None:
     """Dispatch a ``?button=`` wake through the button service, or None when
-    there is no button on this request.
+    there is no button on this request. ``?page=<id>`` without a button is a
+    pick from the device's own menu and shows that dashboard.
 
     Shared by ``/frame`` and ``/frame.bmp`` so the two cannot drift. Both
     dispatch BEFORE selecting the artefact: a rotate or refresh action
@@ -417,8 +419,22 @@ def _dispatch_query_button(device: Device, *, route: str) -> Any | None:
     """
     svc = _button_service()
     button_raw = request.args.get("button", "").strip()
-    if svc is None or not button_raw:
+    page_raw = request.args.get("page", "").strip()
+    if svc is None or not (button_raw or page_raw):
         return None
+    if not button_raw:
+        # A dashboard picked from the panel's own menu (frames.json items).
+        try:
+            return svc.show_page(
+                device_id=device.id,
+                page_id=page_raw,
+                event_id=_parse_button_event_id(request.args.get("button_event_id")),
+            )
+        except Exception:
+            current_app.logger.exception(
+                "rest %s: menu pick failed for device=%s page=%s", route, device.id, page_raw
+            )
+            return None
     try:
         # ``button_event_id`` is the canonical client-protocol parameter.
         # Firmware through v1.5.0 sent the same monotonic counter as ``event``
@@ -1108,7 +1124,7 @@ def get_frame(device_id: str) -> Response:
     button_raw = request.args.get("button", "").strip()
     touch_stroke = _parse_touch_query()
     if button_svc is not None:
-        if button_raw:
+        if button_raw or request.args.get("page", "").strip():
             button_result = _dispatch_query_button(device, route="/frame")
         elif touch_stroke is not None:
             # Touch wake (issue #49): same shape as a button wake. The
@@ -1573,18 +1589,39 @@ def get_frames_index(device_id: str) -> Response:
     # ASCII only in the display strings: the target's e-ink UI font has no
     # guaranteed coverage for arrows, dashes or symbols, and a missing
     # glyph is a tofu box on a screen with no way to report it.
-    return jsonify(
+    items: list[dict[str, str]] = [
         {
-            "items": [
-                {
-                    "id": "current",
-                    "title": "Current dashboard",
-                    "subtitle": "Download as sleep screen",
-                    "url": frame_url,
-                }
-            ]
+            "id": "current",
+            "title": "Current dashboard",
+            "subtitle": "Download as sleep screen",
+            "url": frame_url,
         }
-    )
+    ]
+    # Then every dashboard bound to this device; picking one shows it here
+    # (``page:<id>``) and serves the new frame. No ``button_event_id``: every
+    # item in one listing would share it, so the second pick would read as a
+    # retry of the first. The per-page trigger label dedups retries instead.
+    page_store = current_app.config.get("PAGE_STORE")
+    for page in menu_pages(page_store.list() if page_store is not None else [], device.id):
+        page_params: dict[str, Any] = {"page": page.id}
+        if token:
+            page_params[TOKEN_QUERY_PARAM] = token
+        items.append(
+            {
+                "id": f"page:{page.id}",
+                "title": _ascii_title(page.name) or page.id,
+                "subtitle": "Show on this device",
+                "url": f"{base}/api/v1/device/{device.id}/frame.bmp?{urlencode(page_params)}",
+            }
+        )
+    return jsonify({"items": items})
+
+
+def _ascii_title(name: str) -> str:
+    """A dashboard name the picker's font can draw: accents folded to their
+    base letter, anything else outside printable ASCII dropped."""
+    folded = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode("ascii")
+    return " ".join("".join(c for c in folded if c.isprintable()).split())
 
 
 # -- tap -----------------------------------------------------------------
