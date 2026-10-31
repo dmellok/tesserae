@@ -75,6 +75,7 @@
 {% set disabled_plugins = disabled_plugins if disabled_plugins is defined else [] %}
 {% set plugin_usage = plugin_usage if plugin_usage is defined else {} %}
 {% set disableable_kinds = disableable_kinds if disableable_kinds is defined else ['widget', 'data'] %}
+{% set always_on_ids = always_on_ids if always_on_ids is defined else [] %}
 {% if not plugins and not disabled_plugins %}
 {% call section_card(icon='puzzle-piece', title='No widgets loaded',
                      description='Drop a folder under plugins/&lt;id&gt;/ and restart, or install community ones via Browse.') %}
@@ -140,7 +141,7 @@
           <span class="dx-widget-name">{{ plugin.name }}</span>
           <code class="dx-widget-id">{{ plugin.id }} · v{{ plugin.manifest.version }}</code>
           {% if plugin.has_admin %}<span class="dx-pill is-ok"><i class="ph ph-gear-six" aria-hidden="true"></i> admin page</span>{% endif %}
-          {% if plugin_sources.get(plugin.id, 'bundled') == 'bundled' and plugin.kind in disableable_kinds %}<span class="dx-pill" title="Ships with Tesserae. It can be disabled but not removed.">Bundled</span>{% endif %}
+          {% if plugin_sources.get(plugin.id, 'bundled') == 'bundled' and plugin.kind in disableable_kinds and plugin.id not in always_on_ids %}<span class="dx-pill" title="Ships with Tesserae. It can be disabled but not removed.">Bundled</span>{% endif %}
         </div>
         {% if plugin.manifest.description %}
         <p class="dx-widget-desc">{{ plugin.manifest.description }}</p>
@@ -161,7 +162,7 @@
           </button>
         </form>
         {% endif %}
-        {% if plugin.kind in disableable_kinds %}
+        {% if plugin.kind in disableable_kinds and plugin.id not in always_on_ids %}
         {% set used = plugin_usage.get(plugin.id) %}
         <form method="post" action="{{ url_for('plugins.disable_plugin') }}" class="form form--inline"
               {% if used %}data-confirm="{% if used.dashboards %}Used in {{ used.dashboards|length }} dashboard{{ '' if used.dashboards|length == 1 else 's' }}: {{ used.dashboards|join(', ') }}. They will show a placeholder until you enable it again.{% endif %}{% if used.dependents %}{{ '&#10;&#10;' if used.dashboards }}Other widgets rely on it and stop getting data until you enable it again: {{ used.dependents|join(', ') }}.{% endif %}&#10;&#10;Disable {{ plugin.name }}?"
@@ -211,6 +212,15 @@
             <i class="ph ph-power" aria-hidden="true"></i><span>Enable</span>
           </button>
         </form>
+        {% if plugin_sources.get(plugin.id) == 'authored' %}
+        <form method="post" action="{{ url_for('marketplace.remove_uploaded_widget') }}" class="form form--inline"
+              onsubmit="return confirm('Remove {{ plugin.id }}?\n\nDashboards that use it lose that widget.');">
+          <input type="hidden" name="plugin_id" value="{{ plugin.id }}">
+          <button type="submit" class="dx-btn-ghost-sm">
+            <i class="ph ph-trash" aria-hidden="true"></i><span>Remove</span>
+          </button>
+        </form>
+        {% endif %}
       </div>
     </li>
     {% endfor %}

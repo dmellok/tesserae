@@ -414,3 +414,52 @@ def test_unknown_ids_in_settings_are_ignored(tmp_path: Path) -> None:
     app.config["SETTINGS_STORE"].patch_section(plugin_loader.DISABLED_SECTION, {"ghost": True})
     reg = app.config["REDISCOVER_PLUGINS"]()
     assert reg.disabled == {} and "gtfs" in reg.plugins
+
+
+def test_core_data_plugins_stay_on(real_app: Flask, real: FlaskClient) -> None:
+    for plugin_id in plugin_loader.ALWAYS_ON_IDS:
+        res = real.post(
+            "/plugins/disable",
+            data={"plugin_id": plugin_id},
+            headers={"Accept": "application/json"},
+        )
+        assert res.status_code == 400
+        assert res.get_json()["ok"] is False
+    reg = real_app.config["PLUGIN_REGISTRY"]
+    assert not set(reg.disabled) & plugin_loader.ALWAYS_ON_IDS
+    reg.apply_disabled(plugin_loader.ALWAYS_ON_IDS)
+    assert not reg.disabled
+    body = real.get("/plugins/").get_data(as_text=True)
+    assert 'name="plugin_id" value="ha_core"' not in body
+
+
+def test_plugin_usage_counts_data_and_code_elements() -> None:
+    def el(kind: str, **fields: Any) -> Any:
+        return types.SimpleNamespace(kind=kind, **fields)
+
+    def page(name: str, els: list[Any]) -> Any:
+        return types.SimpleNamespace(name=name, cells=[], canvas=types.SimpleNamespace(els=els))
+
+    src = types.SimpleNamespace
+    pages = [
+        page("Data", [el("data", source="alpha")]),
+        page("Code", [el("code", source="", sources=[src(key="beta"), src(key="alpha")])]),
+        page("Legacy", [el("code", source="alpha", sources=[])]),
+        page("Url", [el("code", source="", sources=[src(key="", url="https://x")])]),
+    ]
+    assert plugin_loader.plugin_usage("alpha", pages) == ["Data", "Code", "Legacy"]
+
+
+def test_disabled_plugin_page_sends_a_signed_out_visitor_to_log_in(tmp_path: Path) -> None:
+    app = create_app(
+        testing=False,
+        data_root=tmp_path,
+        plugins_dir=REPO_ROOT / "plugins",
+        renderers_dir=REPO_ROOT / "renderers",
+        devices_dir=REPO_ROOT / "devices",
+    )
+    app.config["TESTING"] = True
+    app.config["PLUGIN_REGISTRY"].set_disabled("gtfs", True)
+    res = app.test_client().get("/plugins/gtfs/", headers={"Accept": "text/html"})
+    assert res.status_code == 302
+    assert res.headers["Location"].endswith("/setup")

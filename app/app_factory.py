@@ -1207,7 +1207,7 @@ def create_app(
 
         heartbeat.start(app)
 
-    plugin_loader.register_routes(app, plugins)
+    plugin_loader.register_routes(app, plugins, gate=False)
     # Marketplace mounts at /plugins/browse, AFTER plugin_loader's
     # blueprint so the static path wins over plugin_loader's
     # /<plugin_id>/<asset> parametric route by Flask's specificity
@@ -1327,6 +1327,9 @@ def create_app(
 
     if not testing:
         auth.install_gate(app, settings)
+    # After the login gate, so a signed-out visitor to a disabled plugin's
+    # page is sent to log in first.
+    plugin_loader.install_disabled_gate(app, plugins)
 
     @app.before_request
     def _capture_http_port() -> None:

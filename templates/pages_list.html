@@ -482,7 +482,8 @@
   (function () {
     var folded = [];
     try { folded = JSON.parse(localStorage.getItem('tesserae-dash-groups') || '[]') || []; } catch (e) { folded = []; }
-    var groups = document.querySelectorAll('[data-dash-group]');
+    // The All view's single flat group has no fold control, so it never folds.
+    var groups = document.querySelectorAll('[data-dash-group]:not(.is-flat)');
     for (var i = 0; i < groups.length; i++) {
       var g = groups[i];
       if (folded.indexOf(g.getAttribute('data-dash-group')) === -1 || g.querySelector('.dx-dashrow.is-open')) continue;
@@ -739,7 +740,7 @@
 
     // Groups fold one by one (remembered), or all at once from the toolbar.
     const KEY = 'tesserae-dash-groups';
-    const groups = Array.prototype.slice.call(table.querySelectorAll('[data-dash-group]'));
+    const groups = Array.prototype.slice.call(table.querySelectorAll('[data-dash-group]:not(.is-flat)'));
     const allBtn = table.querySelector('[data-dash-groups-toggle]');
     function isFolded(g) { return g.classList.contains('is-folded'); }
     function setFolded(g, folded) {

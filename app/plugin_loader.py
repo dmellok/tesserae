@@ -85,6 +85,16 @@ REMOVABLE_ROOTS: tuple[str, ...] = ("authored", "marketplace")
 # load-bearing for every dashboard, so they stay on.
 DISABLEABLE_KINDS: frozenset[str] = frozenset({"widget", "data"})
 
+# Data plugins the app itself looks up by id (touch-button and condition HA
+# calls, Rooms, the REST API, OpenDisplay), so switching one off would break
+# features well beyond its widgets. They stay on.
+ALWAYS_ON_IDS: frozenset[str] = frozenset({"ha_core", "weather_core", "calendar_core"})
+
+
+def can_disable(plugin: Plugin) -> bool:
+    return plugin.kind in DISABLEABLE_KINDS and plugin.id not in ALWAYS_ON_IDS
+
+
 # Settings section holding the switched-off ids as a flat ``{plugin_id: True}``
 # map (the shape ``renderers_enabled`` uses). Absent means every plugin is on,
 # so an existing install is unchanged.
@@ -304,16 +314,20 @@ class PluginRegistry:
         the toggle takes effect on the next request with no re-import and no
         restart. False when there is nothing to do (unknown id, a kind that
         cannot be disabled, or already in that state)."""
+        # Swap in fresh dicts rather than mutating, so a request thread
+        # iterating ``plugins.values()`` meanwhile never sees it change size.
         if disabled:
             plugin = self.plugins.get(plugin_id)
-            if plugin is None or plugin.kind not in DISABLEABLE_KINDS:
+            if plugin is None or not can_disable(plugin):
                 return False
-            self.disabled[plugin_id] = self.plugins.pop(plugin_id)
+            self.disabled = {**self.disabled, plugin_id: plugin}
+            self.plugins = {k: v for k, v in self.plugins.items() if k != plugin_id}
             return True
-        plugin = self.disabled.pop(plugin_id, None)
+        plugin = self.disabled.get(plugin_id)
         if plugin is None:
             return False
-        self.plugins[plugin_id] = plugin
+        self.plugins = {**self.plugins, plugin_id: plugin}
+        self.disabled = {k: v for k, v in self.disabled.items() if k != plugin_id}
         return True
 
     def apply_disabled(self, plugin_ids: Collection[str]) -> None:
@@ -671,40 +685,94 @@ def disabled_ids(store: Any) -> set[str]:
     return {str(pid) for pid, off in raw.items() if off is True}
 
 
+def _element_uses(el: Any, plugin_id: str) -> bool:
+    """A canvas element that places ``plugin_id`` or reads its data: a widget
+    element, a data element's source, or one of a code element's sources."""
+    if el.kind == "widget":
+        return bool(el.widget == plugin_id)
+    if el.kind == "data":
+        return bool(getattr(el, "source", "") == plugin_id)
+    if el.kind == "code":
+        if getattr(el, "source", "") == plugin_id:
+            return True
+        return any(
+            getattr(src, "key", "") == plugin_id for src in getattr(el, "sources", None) or []
+        )
+    return False
+
+
 def plugin_usage(plugin_id: str, pages: Any) -> list[str]:
-    """Names of the dashboards that place ``plugin_id``, grid cells and canvas
-    widget elements alike, for the "in use" warning before a disable."""
+    """Names of the dashboards that place ``plugin_id`` or read its data (grid
+    cells and canvas widget, data and code elements), for the "in use" warning
+    before a disable."""
     names: list[str] = []
     for page in pages:
         used = any(cell.plugin == plugin_id for cell in page.cells)
         canvas = getattr(page, "canvas", None)
         if not used and canvas is not None:
-            used = any(el.kind == "widget" and el.widget == plugin_id for el in canvas.els)
+            used = any(_element_uses(el, plugin_id) for el in canvas.els)
         if used:
             names.append(str(page.name))
     return names
 
 
-def plugin_dependents(plugin_id: str, registry: PluginRegistry) -> list[str]:
+def _server_sources(registry: PluginRegistry) -> dict[str, str]:
+    """Each enabled plugin's ``server.py`` text, read once per page view."""
+    out: dict[str, str] = {}
+    for other in registry.plugins.values():
+        try:
+            out[other.id] = (other.path / "server.py").read_text(encoding="utf-8")
+        except OSError:
+            continue
+    return out
+
+
+def plugin_dependents(
+    plugin_id: str, registry: PluginRegistry, sources: dict[str, str] | None = None
+) -> list[str]:
     """Names of enabled plugins whose server code looks this one up by id, so
     switching a data plugin off can warn what quietly stops working. A plain
-    text match on the quoted id is crude but errs toward warning."""
+    text match on the quoted id is crude but errs toward warning. Pass
+    ``sources`` from :func:`_server_sources` to check many ids in one pass."""
+    if sources is None:
+        sources = _server_sources(registry)
     needles = (f'"{plugin_id}"', f"'{plugin_id}'")
     out: list[str] = []
     for other in registry.plugins.values():
         if other.id == plugin_id:
             continue
-        try:
-            source = (other.path / "server.py").read_text(encoding="utf-8")
-        except OSError:
-            continue
-        if any(n in source for n in needles):
+        source = sources.get(other.id)
+        if source is not None and any(n in source for n in needles):
             out.append(other.name)
     return sorted(out, key=str.lower)
 
 
-def register_routes(app: Flask, registry: PluginRegistry) -> None:
-    """Register per-plugin static asset routes and any plugin-provided blueprints."""
+def install_disabled_gate(app: Flask, registry: PluginRegistry) -> None:
+    """A disabled plugin's admin page and routes answer 404 with a friendly
+    page instead of its own handler. Browser navigations get the page;
+    scripted and asset requests get a plain 404. Flask runs ``before_request``
+    hooks in registration order, so install this after the login gate."""
+
+    @app.before_request
+    def _gate_disabled_plugin() -> Response | tuple[str, int] | None:
+        if not request.path.startswith("/plugins/"):
+            return None
+        plugin_id = request.path.split("/", 3)[2]
+        live: PluginRegistry = current_app.config.get("PLUGIN_REGISTRY", registry)
+        plugin = live.disabled.get(plugin_id)
+        if plugin is None:
+            return None
+        if "text/html" in request.headers.get("Accept", ""):
+            return render_template("plugin_disabled.html", plugin=plugin), 404
+        return Response("plugin disabled", status=404, mimetype="text/plain")
+
+
+def register_routes(app: Flask, registry: PluginRegistry, *, gate: bool = True) -> None:
+    """Register per-plugin static asset routes and any plugin-provided blueprints.
+
+    ``gate=False`` leaves the disabled-plugin gate for the caller to install
+    with :func:`install_disabled_gate`, after the login gate, so a signed-out
+    visitor is sent to log in rather than shown the disabled page."""
     bp = Blueprint("plugins", __name__)
 
     # The route closures capture ``registry`` at startup, but an in-process
@@ -726,11 +794,12 @@ def register_routes(app: Flask, registry: PluginRegistry) -> None:
         pages_store = current_app.config.get("PAGE_STORE")
         pages = pages_store.list() if pages_store is not None else []
         usage: dict[str, dict[str, list[str]]] = {}
+        sources = _server_sources(reg)
         for p in reg.plugins.values():
-            if p.kind not in DISABLEABLE_KINDS:
+            if not can_disable(p):
                 continue
             dashboards = plugin_usage(p.id, pages)
-            dependents = plugin_dependents(p.id, reg) if p.kind == "data" else []
+            dependents = plugin_dependents(p.id, reg, sources) if p.kind == "data" else []
             if dashboards or dependents:
                 usage[p.id] = {"dashboards": dashboards, "dependents": dependents}
         return render_template(
@@ -738,6 +807,7 @@ def register_routes(app: Flask, registry: PluginRegistry) -> None:
             plugins=sorted(reg.plugins.values(), key=lambda p: (p.kind, p.name.lower())),
             disabled_plugins=sorted(reg.disabled.values(), key=lambda p: p.name.lower()),
             disableable_kinds=DISABLEABLE_KINDS,
+            always_on_ids=ALWAYS_ON_IDS,
             plugin_usage=usage,
             errors=[_describe_error(err, reg, data_root) for err in reg.errors],
             plugin_sources={p.id: _plugin_source(p, data_root) for p in everything},
@@ -761,6 +831,12 @@ def register_routes(app: Flask, registry: PluginRegistry) -> None:
             return done(
                 False,
                 f"{known.name} is a {known.kind} plugin; only widgets and data plugins can be disabled.",
+                400,
+            )
+        if disable and known.id in ALWAYS_ON_IDS:
+            return done(
+                False,
+                f"{known.name} is used by Tesserae itself, so it stays on.",
                 400,
             )
         store = current_app.config.get("SETTINGS_STORE")
@@ -804,20 +880,8 @@ def register_routes(app: Flask, registry: PluginRegistry) -> None:
 
     app.register_blueprint(bp, url_prefix="/plugins")
 
-    @app.before_request
-    def _gate_disabled_plugin() -> Response | tuple[str, int] | None:
-        """A disabled plugin's admin page and routes answer 404 with a
-        friendly page instead of its own handler. Browser navigations get
-        the page; scripted and asset requests get a plain 404."""
-        if not request.path.startswith("/plugins/"):
-            return None
-        plugin_id = request.path.split("/", 3)[2]
-        plugin = _live_registry().disabled.get(plugin_id)
-        if plugin is None:
-            return None
-        if "text/html" in request.headers.get("Accept", ""):
-            return render_template("plugin_disabled.html", plugin=plugin), 404
-        return Response("plugin disabled", status=404, mimetype="text/plain")
+    if gate:
+        install_disabled_gate(app, registry)
 
     # Endpoints a plugin declares safe to serve during a loopback render with
     # no session (see app/auth.py). A widget whose markup references its own
