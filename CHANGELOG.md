@@ -43,6 +43,12 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   it up ("Delivering now" for a connected frame). Thumbnail URLs carry the
   render digest, and the open page follows pushes and fetches on its own.
 
+### Fixed
+
+- Picture Gallery: replacing an image with a new file of the same name now
+  shows the new thumbnail. Thumbnail URLs carry a `?v=<mtime>-<size>` version;
+  a link without it is revalidated rather than cached for a year.
+
 ## [0.496.1], 2026-10-31
 
 ### Fixed
