@@ -50,7 +50,7 @@
     ['.info-pop-content', (p) => p.previousElementSibling],
     ['[data-icon-popover]', (p) => { const w = p.closest('[data-icon-picker]'); return w && w.querySelector('[data-icon-trigger]'); }],
     ['[data-location-results]', (p) => { const w = p.parentElement; return w && w.querySelector('input'); }],
-    ['.dk-more-menu', summaryOf],
+    ['.lu-more-menu', summaryOf],
     ['.dx-hist-more-menu', summaryOf],
     ['.cat-sort-menu', summaryOf],
     ['#panels-devices-pop', () => document.getElementById('panels-devices-btn')],

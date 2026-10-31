@@ -443,11 +443,12 @@ def test_the_lineups_page_screens_keep_each_dashboards_shape(app: Flask) -> None
     ids = _tall_and_wide_pages(client)
     _lineup_of(client, "Mixed", [ids["Tall"], ids["Wide"]])
     body = client.get("/decks").get_data(as_text=True)
-    frames = re.findall(r'<div class="dk-screen-frame([^"]*)"\s+style="([^"]*)"', body)
-    by_ratio = {style.split(";")[0]: cls for cls, style in frames}
-    assert "is-portrait" in by_ratio["--thumb-ar: 1440 / 2560"]
-    assert "is-portrait" not in by_ratio["--thumb-ar: 800 / 480"]
-    assert any("--thumb-r: 0.5625" in style for _, style in frames)
+    # Each step tile carries its dashboard's own ratio (the strip sizes it by
+    # height from --arw/--arh), never a fixed crop box.
+    ratios = set(
+        re.findall(r'<span class="lu-thumb [pl]" style="--ar:(\d+/\d+);--arw:\d+;--arh:\d+"', body)
+    )
+    assert {"1440/2560", "800/480"} <= ratios
 
 
 def test_the_lineup_editor_hands_the_page_cards_each_dashboards_size(app: Flask) -> None:
@@ -469,10 +470,10 @@ def test_every_thumbnail_style_fits_instead_of_cropping() -> None:
     (object-fit: contain) inside a box with the dashboard's shape."""
     css = REPO_ROOT / "static" / "style"
     decks = (css / "dx-decks.css").read_text()
+    lineups = (css / "dx-lineups.css").read_text()
     dashboards = (css / "dx-dashboards.css").read_text()
-    assert re.search(
-        r'\.dk-screen-frame\[style\*="--thumb-r"\] img\s*{[^}]*object-fit: contain', decks
-    )
+    assert re.search(r"\.lu \.lu-thumb img\s*{[^}]*object-fit: contain", lineups)
+    assert re.search(r"\.lu \.lu-thumb\s*{[^}]*aspect-ratio: var\(--ar\)", lineups)
     assert re.search(r'\.dxe-thumb\[style\*="--thumb-r"\] img\s*{[^}]*object-fit: contain', decks)
     assert re.search(
         r'\.dx-dash-thumb\[style\*="--thumb-r"\] img\s*{[^}]*object-fit: contain', dashboards

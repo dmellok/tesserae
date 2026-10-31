@@ -6,6 +6,25 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Changed
+
+- Lineups redesign, part 2 of 3: the Lineups page is rebuilt on the view model
+  from part 1. Each display gets a header that says what is on screen (the
+  picture itself), what is queued and when it lands, and when the frame next
+  wakes. Lineups show as Cards (a strip of each lineup's dashboards with Push
+  now on every step) or as a Timeline (one track per display across the day,
+  with repeated updates of one dashboard collapsed into one thumbnail and a
+  "x N updates" badge). Each lineup has a day bar with ticks for every
+  advance, instant tooltips, an "Update in N min" flag on the next one, start
+  labels under busy bars and a hatched strip where quiet hours cut into an
+  all-day block. Today | All switches between today's rows and every row; Fold
+  all, a settings gear by each display name, a span icon for the Full cycle
+  chip, drag and keyboard editing of windows and days, and a deleted
+  dashboard shown as a flagged step with Remove (also in the lineup editor).
+  Times follow the app locale's 12/24-hour style. Settings > Devices shows one
+  "Now" line per display (the live lineup and until when, or the next one)
+  instead of every lineup name.
+
 ### Added
 
 - Lineups redesign, part 1 of 3: a view model for the Lineups page and the

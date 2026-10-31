@@ -3938,6 +3938,46 @@ select.dx-input:hover {
   white-space: nowrap;
 }
 .dx-devquick-open { margin-left: auto; }
+/* What's on now: one line, linking to this display on Lineups. */
+.dx-devnow {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-left: 8px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 6px 10px;
+  border-radius: 8px;
+  color: var(--dx-ink-soft);
+  font-size: 13px;
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.dx-devnow:hover { background: color-mix(in oklab, var(--t-fg) 6%, transparent); color: var(--t-fg); }
+.dx-devnow:focus-visible { outline: 2px solid var(--t-accent); outline-offset: 2px; }
+.dx-devnow-dot {
+  flex: none;
+  align-self: center;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--t-muted);
+}
+.dx-devnow.is-running .dx-devnow-dot {
+  background: var(--t-ok);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--t-ok) 22%, transparent);
+}
+.dx-devnow-label {
+  font: 600 10.5px/1 var(--t-font-mono, ui-monospace, monospace);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--t-muted);
+}
+.dx-devnow-name { color: var(--t-fg); font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+.dx-devnow-meta { overflow: hidden; text-overflow: ellipsis; }
+.dx-devnow .ph { flex: none; align-self: center; font-size: 13px; color: var(--t-muted); }
+.dx-devnow:hover .ph { color: var(--t-fg); }
 
 /* Thumbnail (quick panel 180×135, page 220×165). */
 .dx-thumb {
@@ -4452,6 +4492,11 @@ select.dx-input:hover {
   .dx-thumb--quick.dx-thumb--portrait[style*="--thumb-ar"] { height: 200px; }
   .dx-devquick-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .dx-devquick-lineups { flex-basis: 100%; margin-left: 0; white-space: normal; }
+  /* Inline flow so a wrapped line keeps the arrow after the last word. */
+  .dx-devnow { display: block; flex-basis: 100%; margin-left: 0; padding-inline: 4px; white-space: normal; line-height: 1.5; }
+  .dx-devnow > * { margin-right: 6px; }
+  .dx-devnow-dot { display: inline-block; vertical-align: middle; }
+  .dx-devnow .ph { vertical-align: -1px; }
   .dx-devquick-open { margin-left: 0; }
   .dx-disc-banner-row { flex-wrap: wrap; }
   .dx-disc-banner-actions { margin-left: 0; width: 100%; }

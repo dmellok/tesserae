@@ -124,6 +124,8 @@ def test_cold_dashboard_is_placeholder_then_cached_snapshot(
     c = app.test_client()
     vm = c.get("/decks/view.json").get_json()
     assert vm["unassigned"][0]["steps"][0]["thumb_url"] == ""
+    body = c.get("/decks").get_data(as_text=True)
+    assert 'class="lu-thumb-ph"' in body and "<iframe" not in body
     assert queued and all(not q.get("force") for q in queued)
     task = queued[0]
     task["cache_path"].parent.mkdir(parents=True, exist_ok=True)

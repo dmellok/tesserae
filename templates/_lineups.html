@@ -1,0 +1,281 @@
+{#- Lineups page (/decks), redesign round 7: macros that draw the view-model
+   from app/lineups_view.py (``vm`` = LineupsView.to_dict()).
+
+   static/lineups_render.js draws the same markup from the same dict (the
+   day picker, Timeline view, pending edits and the auto-refresh), so any
+   change here needs the matching change there; tests/test_lineups_browser.py
+   compares the two. Every class is lu-prefixed and every rule in
+   static/style/dx-lineups.css is scoped under .lu, so the app's global
+   button/list rules never leak in. -#}
+
+{%- set LU_ICONS = {
+  'caret': '<path d="M4 6l4 4 4-4"/>',
+  'funnel': '<path d="M2.5 3h11l-4.2 5v4.5l-2.6 1V8z"/>',
+  'dots': '<circle cx="3.5" cy="8" r=".9" fill="currentColor"/><circle cx="8" cy="8" r=".9" fill="currentColor"/><circle cx="12.5" cy="8" r=".9" fill="currentColor"/>',
+  'refresh': '<path d="M13.2 8a5.2 5.2 0 1 1-1.6-3.8M13.2 2.5v3h-3"/>',
+  'portrait': '<rect x="4" y="1.5" width="8" height="13" rx="1"/>',
+  'landscape': '<rect x="1.5" y="3" width="13" height="8.5" rx="1"/><path d="M6 14h4"/>',
+  'clock': '<circle cx="8" cy="8" r="6"/><path d="M8 4.8V8l2.2 1.4"/>',
+  'moon': '<path d="M13 9.6A5.5 5.5 0 1 1 6.4 3a4.4 4.4 0 0 0 6.6 6.6z"/>',
+  'pause': '<rect x="4" y="3" width="2.6" height="10" rx=".6"/><rect x="9.4" y="3" width="2.6" height="10" rx=".6"/>',
+  'chev': '<path d="M6 3.5 10.5 8 6 12.5"/>',
+  'check': '<path d="M3.5 8.5 6.5 11.5 12.5 4.5"/>',
+  'skip': '<path d="M4 3.5v9l6-4.5z" fill="currentColor" stroke="none"/><path d="M12.5 3.5v9"/>',
+  'signal': '<path d="M3 13v-2M6.3 13V9M9.7 13V6.5M13 13V4"/>',
+  'layers': '<path d="M8 2.2 13.8 5 8 7.8 2.2 5z"/><path d="M2.2 8 8 10.8 13.8 8M2.2 11 8 13.8 13.8 11"/>',
+  'timer': '<circle cx="8" cy="9" r="5"/><path d="M8 9V6.4M6.4 1.8h3.2"/>',
+  'loop': '<path d="M3 7.5a5 5 0 0 1 8.7-3.2l1.1 1.2M12.8 2.6v2.9H9.9M13 8.5a5 5 0 0 1-8.7 3.2l-1.1-1.2M3.2 13.4v-2.9h2.9"/>',
+  'span': '<path d="M5 3.5H3.2v9H5M11 3.5h1.8v9H11M6.4 8h3.2"/>',
+  'cal': '<rect x="2.5" y="3.5" width="11" height="10" rx="1.5"/><path d="M2.5 6.5h11M5.5 2v3M10.5 2v3"/>',
+  'send': '<path d="M14 2 7 9M14 2l-4.5 12L7 9 2 6.5z"/>',
+  'info': '<circle cx="8" cy="8" r="6"/><path d="M8 7.2v3.6M8 5.2v.1"/>',
+  'gear': '<path d="M6.6 1.8h2.8l.4 1.7 1.1.6 1.7-.5 1.4 2.4-1.3 1.2v1.6l1.3 1.2-1.4 2.4-1.7-.5-1.1.6-.4 1.7H6.6l-.4-1.7-1.1-.6-1.7.5-1.4-2.4 1.3-1.2V6.5L2 5.3l1.4-2.4 1.7.5 1.1-.6z"/><circle cx="8" cy="8" r="1.9"/>',
+  'x': '<path d="M4 4l8 8M12 4l-8 8"/>',
+  'play': '<path d="M5 3.5v9l7-4.5z" fill="currentColor" stroke="none"/>',
+  'screen': '<rect x="1.5" y="2.5" width="13" height="9" rx="1.5"/><path d="M6.5 5.2v3.6L9.6 7z" fill="currentColor"/><path d="M5.5 14h5"/>',
+  'pausec': '<circle cx="8" cy="8" r="6"/><path d="M6.5 5.5v5M9.5 5.5v5"/>',
+  'plus': '<path d="M8 3v10M3 8h10"/>',
+  'search': '<circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/>',
+  'foldall': '<path d="M8 1.5v4M6 3.8 8 5.6l2-1.8M8 14.5v-4M6 12.2l2-1.8 2 1.8M2.5 8h11"/>',
+  'updown': '<path d="M5 6l3-3 3 3M5 10l3 3 3-3"/>',
+  'hand': '<path d="M5.5 8V3.2a1 1 0 0 1 2 0V7.5M7.5 7V2.5a1 1 0 0 1 2 0V7.5M9.5 7.5V3.5a1 1 0 0 1 2 0V9c0 3-1.6 5-4.2 5-1.8 0-2.8-.9-3.7-2.4L2.4 9.3a1 1 0 0 1 1.7-1L5.5 10"/>',
+} -%}
+
+{% macro ico(name, cls='') -%}
+<svg class="lu-ico{% if cls %} {{ cls }}{% endif %}" viewBox="0 0 16 16" aria-hidden="true">{{ LU_ICONS[name]|safe }}</svg>
+{%- endmacro %}
+
+{#- A dashboard thumbnail in its real shape, never cropped. ``aspect`` is
+   "w/h"; with no picture yet it shows the dashboard's initial. -#}
+{% macro thumb(name, url, aspect, orientation, cls='', title=None, priority=false, display=None, extra='') -%}
+{%- set ar = (aspect or '16/10').split('/') -%}
+<span class="lu-thumb {{ orientation or 'l' }}{% if cls %} {{ cls }}{% endif %}" style="--ar:{{ ar[0] }}/{{ ar[1] }};--arw:{{ ar[0] }};--arh:{{ ar[1] }}" title="{{ title if title is not none else name }}" data-gamut="{{ display.gamut|default('color', true) if display else 'color' }}" data-grey-levels="{{ display.grey_levels|default(0) if display else 0 }}">
+{%- if url %}<img src="{{ url }}" alt="" width="{{ ar[0] }}" height="{{ ar[1] }}" loading="{{ 'eager' if priority else 'lazy' }}" decoding="async"{% if priority %} fetchpriority="high"{% endif %}>{% else %}<span class="lu-thumb-ph" aria-hidden="true">{{ '!' if 'missing' in cls else (name or '?')[:1] }}</span>{% endif -%}{{ extra|safe }}
+</span>
+{%- endmacro %}
+
+{% macro im(icon, value, title, cls='') -%}
+<span class="lu-im{% if cls %} {{ cls }}{% endif %}" title="{{ title }}" aria-label="{{ title }}">{{ ico(icon) }}<span>{{ value }}</span></span>
+{%- endmacro %}
+
+{# ---------------------------------------------------------------------
+   Day bar: one day as a rounded track. Windows sit on a thin rod, holds
+   tint the rod, Quiet hours hatch it with a moon, a now mark on today.
+   --------------------------------------------------------------------- #}
+{% macro day_track(d, day, editable_ids, tall=True) -%}
+{#- The next advance, if any, gets an "Update in 5 min" flag above its line
+   (static/lineups_render.js dayTrack draws the same). -#}
+{%- set nx = namespace(s=none, t=none) -%}
+{%- if tall %}{% for s in day.segments if s.kind == 'window' %}{% for t in s.ticks if t.next and t.in_label %}{% set nx.s = s %}{% set nx.t = t %}{% endfor %}{% endfor %}{% endif -%}
+<div class="lu-trk{% if tall %} tall{% endif %}{% if nx.t %} flagged{% endif %}" role="group" aria-label="{{ day.aria_label }}" data-day="{{ day.weekday }}">
+{%- for s in day.segments %}
+{%- set hold = s.kind == 'hold' -%}
+{%- set push = s.kind == 'push' -%}
+{%- set ed = tall and not hold and s.lineup_id in editable_ids -%}
+<div class="lu-blk{% if hold %} hold{% endif %}{% if push %} push{% endif %}{% if s.live %} live{% endif %}{% if s.planned and tall %} plan{% endif %}" style="left:{{ s.left_pct }}%;width:{{ s.width_pct }}%" data-lineup="{{ s.lineup_id }}" data-display="{{ d.id }}" title="{{ s.title }}"
+{%- if ed %} data-edit tabindex="0" role="button" aria-label="{{ s.title }}. Drag or use arrow keys to move{% if not push %}, Shift+arrows to resize the end, Alt+Shift+arrows the start{% endif %}. Click to open."{% else %} role="group" aria-label="{{ s.title }}"{% endif %}>
+{%- if ed and not push %}<i class="lu-h" data-h="l" aria-hidden="true"></i><i class="lu-h" data-h="r" aria-hidden="true"></i>{% endif -%}
+{%- if not hold and not push %}{% for t in s.ticks if t.next or not (day.is_today and day.now_min is not none) or t.minute > day.now_min %}{% if t.next %}<i class="lu-tick next" style="left:{{ t.pct }}%" data-tip="Next refresh {{ t.label }}" aria-hidden="true"></i>{% else %}<i class="lu-tick" style="left:{{ t.pct }}%" data-tip="Refresh {{ t.label }}" aria-hidden="true"></i>{% endif %}{% endfor %}<span class="lu-blk-l">{{ s.label }}</span>{% endif -%}
+</div>
+{%- if push and tall %}<span class="lu-blk-side" style="left:calc({{ s.left_pct }}% + 9px)" title="{{ s.title }}">{{ s.label }}</span>{% endif %}
+{%- endfor %}
+{%- for p in day.pause %}<i class="lu-pz" style="left:{{ p.left_pct }}%;width:{{ p.width_pct }}%" title="{{ p.title }}">{{ ico('moon') }}</i>{% for o in p.over %}<i class="lu-pz-over" style="left:{{ o.left_pct }}%;width:{{ o.width_pct }}%" title="{{ p.title }}"></i>{% endfor %}{% endfor %}
+{%- if nx.t %}<span class="lu-nflag" style="--bl:{{ nx.s.left_pct }};--bw:{{ nx.s.width_pct }};--tp:{{ nx.t.pct }}" data-in="{{ nx.t.in_sec }}">{{ nx.t.in_label }}</span>{% endif -%}
+{%- if day.is_today and day.now_pct is not none %}<i class="lu-nowm" style="left:{{ day.now_pct }}%" title="Now {{ day.now_label }}"></i>{% endif -%}
+</div>
+{%- endmacro %}
+
+{% macro scale(hours, short=True, cycle='h23') -%}
+<div class="lu-scale" aria-hidden="true">{% for h in hours %}<span style="left:{{ (h / 24 * 100)|round(4) }}%">{% if cycle == 'h12' %}{{ h % 12 or 12 }}&#8239;{{ 'AM' if h % 24 < 12 else 'PM' }}{% else %}{{ '%02d'|format(h) }}{% if not short %}:00{% endif %}{% endif %}</span>{% endfor %}</div>
+{%- endmacro %}
+
+{#- The day bar's scale: with more than two blocks, each block's start time
+   under its left edge (day.starts, start_labels in app/lineups_view.py);
+   otherwise the plain 00-24 axis. -#}
+{% macro day_scale(day, cycle='h23') -%}
+{%- if day.starts -%}
+<div class="lu-scale st" aria-hidden="true">{% for t in day.starts %}<span{% if t.hide %} class="{{ t.hide }}"{% endif %} style="--x:{{ t.pct }}%;--n:{{ t.n }}">{{ t.label }}</span>{% endfor %}</div>
+{%- else %}{{ scale([0, 6, 12, 18, 24], cycle=cycle) }}{% endif -%}
+{%- endmacro %}
+
+{% macro day_pick(d, day, today) -%}
+{%- set label = day.label ~ ' · ' ~ day.relative -%}
+<div class="lu-dpick">
+{%- if day.relative != 'today' %}<button type="button" class="lu-dp-label" data-day="{{ today }}" data-display="{{ d.id }}" title="Showing {{ label }}. Click to go back to today">{{ label }}{{ ico('x') }}</button>{% endif -%}
+<button type="button" class="lu-ibtn sm lu-dp-btn" data-dpick="{{ d.id }}" aria-haspopup="dialog" aria-expanded="false" aria-label="Pick a day; showing {{ label }}" title="Pick a day">{{ ico('cal') }}</button>
+</div>
+{%- endmacro %}
+
+{# ---------------------------------------------------------------------
+   Lineup row
+   --------------------------------------------------------------------- #}
+{% macro win_button(l) -%}
+{%- if l.window -%}
+<span class="lu-hs-win">{{ ico('clock') }}<button type="button" class="lu-win" data-win-edit="{{ l.id }}" title="Time window. Click to edit">{{ l.window.label }}</button>
+{%- if l.window.overlaps_pause %}<span class="lu-im warn" title="{{ l.window.pause_title }}" aria-label="Overlaps Quiet hours">{{ ico('moon') }}</span>{% endif -%}
+</span>
+{%- endif -%}
+{%- endmacro %}
+
+{% macro row_state(l) -%}
+{%- set sep = '<span class="lu-sep-dot">·</span>'|safe -%}
+{%- if l.status == 'live' and l.progress -%}
+<div class="lu-hs" title="{{ l.progress.title }}"><span class="lu-hs-line">{{ win_button(l) }}{% if l.window %}{{ sep }}{% endif %}<span>ends in <b>{{ l.progress.ends_in_label }}</b></span></span>
+<span class="lu-hs-bar" role="progressbar" aria-label="Time through this window" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ l.progress.window_pct }}"><i style="width:{{ l.progress.window_pct }}%"></i></span>
+{%- if l.live_now %}<span class="lu-hs-now">
+{%- if l.live_now.in_sync %}{{ ico('play', 'acc') }}<span class="lu-hn live" title="On screen now">{{ l.live_now.scheduled_name }}</span>
+{%- else %}<span class="lu-hn q" title="Scheduled, queued: lands {{ l.live_now.lands or '' }}">{{ l.live_now.scheduled_name }}</span>{% if l.live_now.on_screen_name %}<span class="lu-hn dim" title="Still on screen">{{ l.live_now.on_screen_name }} on screen</span>{% endif %}{% endif -%}
+</span>{% endif -%}
+</div>
+{%- elif l.status == 'live' -%}
+<div class="lu-hs"><span class="lu-hs-line">{{ win_button(l) }}{% if l.window %}{{ sep }}{% endif %}<span>{{ 'playing now' if l.kind == 'manual' else 'live' }}</span></span></div>
+{%- elif l.status == 'later_today' -%}
+<div class="lu-hs" title="{{ (l.progress.title if l.progress else '') or (l.next_run.note if l.next_run else '') }}"><span class="lu-hs-line">{{ win_button(l) }}{% if l.window %}{{ sep }}{% endif %}<span>in <b>{{ l.progress.starts_in_label if l.progress else '' }}</b></span></span></div>
+{%- elif l.status == 'off' -%}
+<div class="lu-hs" title="Switched off; nothing runs until it is enabled"><span class="lu-hs-line">{{ win_button(l) }}{% if l.window %}{{ sep }}{% endif %}<span>off</span></span></div>
+{%- elif l.kind == 'manual' -%}
+<div class="lu-hs" title="Runs by hand or on a tap; no schedule"><span class="lu-hs-line"><span>by hand or tap</span></span></div>
+{%- else -%}
+<div class="lu-hs" title="{{ (l.next_run.note if l.next_run.held else 'Next run ' ~ l.next_run.main) if l.next_run else '' }}"><span class="lu-hs-line">{{ win_button(l) }}{% if l.next_run %}{{ sep }}<span>next {{ l.next_run.day_label }}</span>{% endif %}</span></div>
+{%- endif -%}
+{%- endmacro %}
+
+{% macro missing_chip(l) -%}
+{%- if l.missing_count %}{{ im('layers', '+' ~ l.missing_count ~ ' missing', l.missing_count ~ ' deleted dashboard' ~ ('' if l.missing_count == 1 else 's') ~ ' still in this lineup; remove ' ~ ('it' if l.missing_count == 1 else 'them'), 'warn') }}{% endif -%}
+{%- endmacro %}
+
+{% macro row_chips(l) -%}
+{%- if l.kind == 'daily' -%}
+{{ im('layers', '1', '1 dashboard: ' ~ (l.steps[0].name if l.steps else '') ~ ', pushed once, then held') }}{{ missing_chip(l) }}
+{%- elif l.kind == 'manual' -%}
+{{ im('layers', l.step_count, l.step_count ~ ' dashboard' ~ ('' if l.step_count == 1 else 's')) }}{{ missing_chip(l) }}{{ im('hand', 'by hand', 'Moves on a tap or by hand') }}
+{%- else -%}
+{{ im('layers', l.step_count, l.step_count ~ ' dashboard' ~ ('' if l.step_count == 1 else 's')) }}{{ missing_chip(l) }}
+{%- if l.step_label %}{{ im('timer', l.step_label, ('Advances every ' ~ l.step_minutes ~ ' min') if l.step_minutes else ('Advances every ' ~ l.step_label)) }}{% endif -%}
+{%- if l.kind == 'cycle' and l.cycle_label %}{{ im('span', l.cycle_label, 'Full cycle ' ~ l.cycle_label, 'opt') }}{% endif -%}
+{%- endif -%}
+{%- endmacro %}
+
+{% macro day_tiles(l) -%}
+{%- set letters = ['M', 'T', 'W', 'T', 'F', 'S', 'S'] -%}
+{%- set names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] -%}
+<span class="lu-days" role="group" aria-label="Days {{ l.name }} runs">
+{%- for c in letters %}{% set on = l.days[loop.index0] %}<button type="button" class="lu-dt{% if on %} on{% endif %}{% if loop.index0 == l.today_index %} is-today{% endif %}" data-toggle-day="{{ l.id }}:{{ loop.index0 }}" aria-pressed="{{ 'true' if on else 'false' }}" title="{{ names[loop.index0] }}: {{ 'runs. Click to remove' if on else 'off. Click to add' }}">{{ c }}</button>{% endfor -%}
+</span>
+{%- endmacro %}
+
+{% macro row_actions(l, assigned=True) -%}
+{%- set a = l.actions -%}
+{%- set icon = {'skip': 'skip', 'play': 'play', 'push': 'play'}[a.primary] -%}
+{%- set url = (a.fire_url if a.primary == 'push' else a.play_url) or a.fire_url or a.play_url -%}
+{%- if not assigned %}{% set url = '' %}{% endif -%}
+<div class="lu-row-actions">
+{% if assigned %}<form method="post" action="{{ url }}" class="lu-inline">
+<button class="lu-ibtn{% if l.status == 'live' %} is-primary{% endif %}" type="submit" title="{{ a.primary_label }}" aria-label="{{ a.primary_label }}"{% if not url %} disabled{% endif %}>{{ ico(icon) }}</button>
+</form>{% endif %}
+<details class="lu-more"><summary title="More" aria-label="More actions for {{ l.name }}">{{ ico('dots') }}</summary>
+<div class="lu-more-menu">
+{%- if a.edit_url %}<a href="{{ a.edit_url }}">Edit</a>{% endif -%}
+{%- if assigned and l.kind == 'cycle' and a.fire_url %}<form method="post" action="{{ a.fire_url }}" class="lu-inline"><button type="submit">Push now</button></form>{% endif -%}
+{%- if a.toggle_url %}<form method="post" action="{{ a.toggle_url }}" class="lu-inline"><button type="submit">{{ 'Disable' if l.enabled else 'Enable' }}</button></form>{% endif -%}
+{%- if a.delete_url %}<form method="post" action="{{ a.delete_url }}" class="lu-inline" data-confirm="Delete {{ l.name }}?"><button type="submit" class="danger">Delete</button></form>{% endif -%}
+</div></details>
+</div>
+{%- endmacro %}
+
+{% macro step(d, l, s) -%}
+{%- set cls = 'is-next' if s.next else ('is-waiting' if (s.current and not s.on_screen and s.pill) else ('is-now' if s.on_screen else '')) -%}
+<li class="lu-step{% if cls %} {{ cls }}{% endif %}{% if s.missing %} is-missing{% endif %}" data-step="{{ s.index }}"{% if s.missing %} title="This dashboard was deleted; remove it from the lineup"{% endif %}><figure><span class="lu-slot">
+{%- if s.pill %}<span class="lu-pill p-{{ s.pill.kind }}" title="{{ s.pill.title }}">{% if s.pill.kind == 'now' %}{{ ico('play') }}{% endif %}{{ s.pill.label }}</span>{% endif -%}
+</span>
+<span class="lu-tile{% if s.item_count > 1 %} stacked{% endif %}">{{ thumb(s.name, s.thumb_url, s.aspect, d.orientation if d.orientation else s.orientation, cls='missing' if s.missing else '', display=d) }}<span class="lu-scrim" aria-hidden="true"></span>
+{%- if d.id and l.actions.push_step_url and not s.missing %}<form method="post" action="{{ l.actions.push_step_url }}" class="lu-push-form"><input type="hidden" name="index" value="{{ s.index }}"><input type="hidden" name="display_id" value="{{ d.id }}"><input type="hidden" name="page_id" value="{{ s.dashboard_id }}"><input type="hidden" name="composition_digest" value="{{ s.composition_digest or '' }}"><button type="submit" class="lu-push-ov" data-push="{{ l.id }}:{{ s.index }}" title="{{ s.push_title }}" aria-label="{{ s.push_title }}"><i>{{ ico('send') }}</i><span>Push now</span></button></form>{% endif -%}
+<span class="lu-pushed-msg" aria-hidden="true"></span>
+{%- if s.item_count > 1 %}<button type="button" class="lu-count" data-peek="{{ l.id }}:{{ s.index }}" aria-haspopup="dialog" aria-expanded="false" title="{{ s.item_count }} items in this step. Show them">×{{ s.item_count }}</button>{% endif -%}
+</span>
+<figcaption><span class="lu-step-name">{{ s.name }}</span><span class="lu-step-meta">{{ s.position }}{% if s.conditional %} <span title="Shows only while its conditions pass">{{ ico('funnel') }}</span>{% endif %}</span></figcaption></figure>
+{%- if s.separator == 'arrow' %}<span class="lu-sep" aria-hidden="true">{{ ico('chev') }}</span>
+{%- elif s.separator == 'loop' %}<span class="lu-sep loop" title="Loops back to {{ l.steps[0].name }}">{{ ico('loop') }}</span>{% endif -%}
+</li>
+{%- endmacro %}
+
+{#- A lineup on several displays draws once per display; the first copy
+   keeps the plain id (anchors, ?hl=), the others add the display. -#}
+{% macro row(d, l, seen=none) -%}
+{%- set uid = l.id if seen is none or l.id not in seen.ids else l.id ~ '--' ~ d.id -%}
+{%- if seen is not none %}{% set seen.ids = seen.ids + [l.id] %}{% endif -%}
+{%- set state_cls = {'live': 'is-live', 'later_today': 'is-later', 'not_today': 'is-off', 'off': 'is-off is-disabled'}[l.status] -%}
+{%- set tag_cls = {'live': 'live', 'later_today': 'later', 'not_today': 'off', 'off': 'off'}[l.status] -%}
+{%- set is_new = request and request.args.get('hl') == l.id -%}
+<li class="lu-row {{ state_cls }}{% if l.folded and not is_new %} is-folded{% endif %}{% if is_new %} is-new{% endif %}" id="lu-row-{{ uid }}" data-lineup="{{ l.id }}" data-display="{{ d.id }}" data-kind="{{ l.kind }}" data-status="{{ l.status }}">
+<div class="lu-row-head">
+<span class="lu-row-tag"><span class="lu-tag-st {{ tag_cls }}">{% if l.status == 'live' %}<i class="lu-dot pulse"></i>{% endif %}{{ l.status_label }}</span></span>
+<div class="lu-row-title"><span class="lu-row-name">{{ l.name }}</span><span class="lu-row-meta" title="{{ l.mode_label }}, {{ l.days_text }}">{% if l.window %}{{ day_tiles(l) }}{% endif %}{{ row_chips(l) }}</span>{% for warning in l.warnings %}<span class="lu-row-warning">{{ ico('info') }}{{ warning }}</span>{% endfor %}{% if l.display_removed %}<span class="lu-row-warning">{{ ico('info') }}Display removed</span>{% endif %}</div>
+<div class="lu-row-state">{{ row_state(l) }}</div>
+{{ row_actions(l, d.id) }}
+<button class="lu-fold" type="button" aria-expanded="{{ 'false' if l.folded and not is_new else 'true' }}" aria-controls="lu-body-{{ uid }}" aria-label="{{ l.name }}: show or hide dashboards" data-fold="{{ l.id }}">{{ ico('caret') }}</button>
+</div>
+<div class="lu-row-body" id="lu-body-{{ uid }}">
+<div class="lu-strip-scroll" tabindex="0" role="region" aria-label="Dashboards in {{ l.name }}; scrolls sideways"><ol class="lu-strip{% if l.status == 'live' %} has-now{% endif %} {{ d.orientation or 'l' }}">
+{%- for s in l.steps %}{{ step(d, l, s) }}{% endfor -%}
+</ol></div>
+</div>
+</li>
+{%- endmacro %}
+
+{# ---------------------------------------------------------------------
+   Display: one bordered card, header over its lineups
+   --------------------------------------------------------------------- #}
+{% macro display(vm, d, seen=none) -%}
+{%- set editable_ids = [] -%}
+{%- for l in d.lineups if l.window and l.window.editable and not l.window.wraps and l.enabled %}{% set _ = editable_ids.append(l.id) %}{% endfor -%}
+{%- set op = d.on_screen -%}
+<section class="lu-ds" data-display="{{ d.id }}" id="display-{{ d.id }}">
+<div class="lu-ds-card">
+<header class="lu-ds-hdr">
+{%- set fr = d.frame if not op else none -%}
+{%- set ph = d.placeholder -%}
+{%- set qb = d.queued_badge -%}
+{%- set qb_html -%}{% if qb %}<span class="lu-qbadge" title="{{ qb.title }}" aria-label="{{ qb.title }}">{{ ico('clock') }}<span>{{ qb.label }}</span></span>{% endif %}{%- endset -%}
+<figure class="lu-now-thumb" title="{{ qb.title if qb else (ph.title if ph and ph.state == 'delivering' else ('On screen: ' ~ op.name if op else (fr.title if fr else ph.title))) }}">{% if op and not (ph and ph.state == 'delivering') %}{{ thumb(op.name, op.thumb_url, op.aspect, op.orientation, priority=(vm.displays[0].id == d.id), display=d, extra=qb_html) }}{% elif fr and fr.thumb_url %}{{ thumb(fr.label, fr.thumb_url, (d.width or 16) ~ '/' ~ (d.height or 10), d.orientation, title=fr.title, priority=(vm.displays[0].id == d.id), display=d, extra=qb_html) }}{% else %}<span class="lu-thumb {{ d.orientation or 'l' }} empty note-{{ ph.state }}" style="--ar:{{ d.width or 16 }}/{{ d.height or 10 }};--arw:{{ d.width or 16 }};--arh:{{ d.height or 10 }}" role="img" aria-label="{{ ph.title }}" title="{{ ph.title }}"><span class="lu-thumb-note">{{ ico({'queued': 'clock', 'delivering': 'send', 'unavailable': 'info'}.get(ph.state, 'screen')) }}<b>{{ ph.label }}</b>{% if ph.sub %}<small>{{ ph.sub }}</small>{% endif %}</span></span>{% endif %}</figure>
+<div class="lu-ds-name-row"><div class="lu-ds-title"><h2>{{ d.name }}</h2>{% if d.settings_url %}<a class="lu-gear" href="{{ d.settings_url }}" title="{{ d.name }} settings" aria-label="{{ d.name }} settings">{{ ico('gear') }}</a>{% endif %}</div>
+<span class="lu-ds-tags">
+{%- set link_icon = {'connected': 'signal', 'sleeps': 'clock'}.get(d.link.mode, 'info') -%}
+<span class="lu-im" title="{{ d.link.title }}">{{ ico(link_icon) }}<span>{{ d.link.label }}</span></span>
+{%- if d.size_label %}<span class="lu-im" title="{{ d.spec }}">{{ ico('portrait' if d.orientation == 'p' else 'landscape') }}<span>{{ d.size_label }}</span></span>{% endif -%}
+{%- if d.pause %}<span class="lu-im" title="{{ d.pause.title }}">{{ ico('moon') }}<span>{{ d.pause.label }}</span></span>{% endif -%}
+<span class="lu-im" title="{{ d.refreshes_today }} refreshes projected today">{{ ico('refresh') }}<span>{{ d.refreshes_today }}</span></span>
+</span></div>
+<div class="lu-ds-state">
+{%- if op %}<p class="lu-show {{ 'sync' if d.in_sync else 'queued' }}" title="{{ d.show_title }}"><i class="lu-sdot" aria-hidden="true" title="{{ d.status_title or d.show_title }}"></i><span class="lu-sr-only">{{ 'Synced' if d.in_sync else 'Waiting to land' }}</span><span class="k">Showing</span><b>{{ op.name }}</b>{% if d.show_suffix %}<span class="k">{{ d.show_suffix }}</span>{% endif %}</p>
+{%- elif fr %}<p class="lu-show frame" title="{{ d.show_title }}"><i class="lu-sdot" aria-hidden="true"></i><span class="k">Showing</span><b>{{ fr.label }}</b>{% if fr.since %}<span class="k">since {{ fr.since }}</span>{% endif %}</p>
+{%- elif d.nothing_sent %}<p class="lu-show unknown" title="{{ d.show_title }}"><i class="lu-sdot" aria-hidden="true"></i><b>Nothing sent yet</b></p>
+{%- else %}<p class="lu-show unknown" title="{{ d.show_title }}"><i class="lu-sdot" aria-hidden="true"></i><span class="k">Showing</span><b>unknown</b>{% if d.show_note %}<span class="k">{{ d.show_note }}</span>{% endif %}</p>{% endif -%}
+<p class="lu-nextl" title="{{ d.next_line.title }}">{{ d.next_line.before }}{% if d.next_line.at %} <b>{{ d.next_line.at }}</b>{% endif %}{% if d.next_line.after %} {{ d.next_line.after }}{% endif %}</p>
+</div>
+<div class="lu-today"><div class="lu-today-bar">{{ day_track(d, d.day, editable_ids) }}{{ day_scale(d.day, vm.time_cycle) }}</div>{{ day_pick(d, d.day, vm.now.weekday) }}</div>
+<button class="lu-fold lu-ds-fold" type="button" data-collapse="{{ d.id }}" aria-expanded="true" aria-controls="lu-dsb-{{ d.id }}" aria-label="{{ d.name }}: collapse or expand">{{ ico('caret') }}</button>
+</header>
+<div class="lu-ds-body" id="lu-dsb-{{ d.id }}">
+<div class="lu-sched">{% if d.lineups %}<ol class="lu-rows">{% for l in d.lineups %}{{ row(d, l, seen) }}{% endfor %}</ol>{% else %}<p class="lu-none">No lineups on this display yet.</p>{% endif %}</div>
+</div>
+</div>
+</section>
+{%- endmacro %}
+
+{#- Lineups that target no display: rows only, under a plain header. -#}
+{% macro unassigned(vm, seen=none) -%}
+{%- for removed in [false, true] -%}
+{%- set lineups = vm.unassigned|selectattr('display_removed', 'equalto', removed)|list -%}
+{%- if lineups -%}
+{%- set label = 'Display removed' if removed else 'Not on a display yet' -%}
+{%- set d = {'id': '', 'orientation': 'l', 'name': label} -%}
+<section class="lu-ds lu-ds--orphans" data-display="">
+<div class="lu-ds-card">
+<header class="lu-ds-hdr lu-ds-hdr--plain"><div class="lu-ds-name-row"><h2>{{ label }}</h2><span class="lu-ds-tags"><span class="lu-im">{{ ico('info') }}<span>Pick a display in the editor to schedule these</span></span></span></div></header>
+<div class="lu-ds-body"><div class="lu-sched"><ol class="lu-rows">{% for l in lineups %}{{ row(d, l, seen) }}{% endfor %}</ol></div></div>
+</div>
+</section>
+{%- endif -%}
+{%- endfor -%}
+{%- endmacro %}

@@ -56,7 +56,7 @@
   {% endif %}
 </div>
 {% if section.overview.queued_thumb_url %}
-<figure class="dx-thumb-q" data-device-queued-thumb>
+<figure {{ color_attrs(section.get("device_id")) }} class="dx-thumb-q" data-device-queued-thumb>
   <img src="{{ section.overview.queued_thumb_url }}" alt="Queued image for {{ section.device_name }}" loading="lazy">
   <figcaption><i class="ph ph-clock-countdown" aria-hidden="true"></i>Queued</figcaption>
 </figure>

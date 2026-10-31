@@ -4,7 +4,7 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
-from flask import Flask
+from flask import Flask, render_template
 
 from app.main import REPO_ROOT, create_app
 
@@ -54,6 +54,21 @@ def test_renderer_override_and_grey_levels(app: Flask) -> None:
         pinned = replace(device, manifest={**device.manifest, "_renderer_gamut": gamut})
         color = display_color_mode(pinned)
         assert (color.gamut, color.levels) == (mode, levels)
+
+
+def test_lineups_modes_are_additive_and_per_display(app: Flask) -> None:
+    from app.lineups_view import sample_view_model
+
+    vm = sample_view_model().to_dict()
+    assert vm["schema_version"] == 1
+    assert [(d["gamut"], d["grey_levels"]) for d in vm["displays"]] == [
+        ("grey16", 16),
+        ("color", 0),
+    ]
+    with app.test_request_context("/decks"):
+        body = render_template("decks.html", vm=vm, automation_url="#")
+    assert 'data-gamut="grey16" data-grey-levels="16"' in body
+    assert 'data-gamut="color" data-grey-levels="0"' in body
 
 
 def test_devices_dashboards_send_and_editor_color(app: Flask) -> None:

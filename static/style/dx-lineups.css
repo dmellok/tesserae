@@ -1,0 +1,3237 @@
+/* ============================================================
+ *  /decks: the Lineups page (redesign round 7)
+ *
+ *  One bordered card per display: a header (what is on screen,
+ *  what comes next, the day bar) over its lineup rows, each row
+ *  folding to its head over a sideways-scrolling strip of steps.
+ *
+ *  Everything is scoped under .lu so the app's global button,
+ *  list and link rules never leak in (forms.css styles every
+ *  <button>); component rules are therefore two classes deep.
+ *
+ *  Colour: the accent is the app's own --t-accent family, so it
+ *  follows the server colour (server_identity / _server_mark) in
+ *  light and dark. lineups.js nudges --lu-acc until the text on
+ *  it reaches 4.5:1 and flags warm accents (.acc-warm), which
+ *  switch Quiet hours to an ink cross-hatch and queued dots to
+ *  rings. Amber (--t-warn) stays for pause/queued, red
+ *  (--t-danger) for errors, neutral for scheduled blocks.
+ * ============================================================ */
+
+/* ----- Page column: left-aligned, capped at 1480px of content --------- */
+main.page.lu-page {
+  max-width: calc(1480px + 2 * var(--t-space-6));
+  margin-inline: 0;
+}
+
+.lu {
+  container: lu-page / inline-size;
+  --lu-acc: var(--t-accent);
+  --lu-acc-fg: var(--t-accent-fg);
+  --lu-acc-hover: var(--t-accent-hover);
+  --lu-acc-soft: color-mix(in oklab, var(--lu-acc) 16%, var(--t-surface));
+  --lu-acc-text: var(--t-accent-ink);
+  --lu-r: var(--t-radius-sm);
+  --lu-fold-w: 28px;
+  --lu-tl-lab: 54px;
+  --lu-r-card: var(--t-radius-md);
+  --lu-r-pill: 10px;
+  --lu-r-xs: 4px;
+  --lu-wb-gap: 6px; /* between the thumbs in an open timeline block */
+  --lu-live-wash: color-mix(in oklab, var(--lu-acc) 6%, var(--t-surface));
+  --lu-sched-bg: var(--t-surface-sunk);
+  --lu-blk-bg: color-mix(in oklab, var(--t-border-strong) 60%, var(--t-border));
+  --lu-blk-fg: var(--t-fg);
+  --lu-blk-edge: color-mix(in oklab, var(--t-fg) 12%, var(--lu-blk-bg));
+  --lu-on-warn: var(--t-surface);
+  /* A dark rim round the Quiet hours moon and the hatched edge on a block. */
+  --lu-pz-edge: color-mix(in oklab, var(--t-warn) 35%, var(--t-fg));
+  --lu-warn-text: color-mix(in oklab, var(--t-warn) 80%, var(--t-fg));
+  --lu-shadow-pop: var(--t-shadow-md);
+  --lu-paper: #f2efe7; /* an e-paper sheet behind a thumbnail */
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--t-fg);
+}
+:root[data-theme="dark"] .lu {
+  --lu-acc-soft: color-mix(in oklab, var(--lu-acc) 22%, var(--t-surface));
+  --lu-acc-text: var(--t-accent-ink);
+  --lu-live-wash: color-mix(in oklab, var(--lu-acc) 8%, var(--t-surface-soft));
+  --lu-blk-bg: color-mix(in oklab, var(--t-fg) 6%, var(--t-border-strong));
+  --lu-on-warn: var(--t-bg);
+  --lu-pz-edge: color-mix(in oklab, var(--t-warn) 25%, var(--t-bg));
+}
+:root[data-ui="paper"] .lu {
+  --lu-r: 2px;
+  --lu-r-card: 2px;
+  --lu-r-pill: 2px;
+  --lu-r-xs: 2px;
+}
+/* Paper dark's default accent (#D0493C under white) sits at 4.39:1; one
+   step darker passes. lineups.js does this for any other colour. */
+:root[data-ui="paper"][data-theme="dark"]:not([data-server-colour]) .lu {
+  --lu-acc: #c8463a;
+}
+
+/* Reset the app's global control styles inside the page. */
+.lu button,
+.lu summary {
+  font: inherit;
+  color: inherit;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  transform: none;
+  min-height: 0;
+  height: auto;
+  line-height: inherit;
+  gap: 0;
+  white-space: normal;
+  transition: none;
+  text-align: inherit;
+  user-select: auto;
+  display: inline-block;
+}
+.lu button:hover,
+.lu button:active {
+  background: none;
+  box-shadow: none;
+  transform: none;
+  border-color: transparent;
+}
+.lu button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+.lu :focus-visible,
+.lu button:focus-visible {
+  outline: 2px solid var(--lu-acc);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+.lu ol,
+.lu ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.lu h1,
+.lu h2,
+.lu p,
+.lu figure {
+  margin: 0;
+}
+.lu form.lu-inline,
+.lu .lu-push-form {
+  display: contents;
+  margin: 0;
+}
+.lu [hidden] {
+  display: none !important;
+}
+
+.lu .lu-ico {
+  width: 1em;
+  height: 1em;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vertical-align: -0.125em;
+}
+.lu .lu-ico.acc {
+  color: var(--lu-acc);
+}
+.lu .lu-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.lu .lu-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
+  display: inline-block;
+}
+.lu .lu-dot.pulse {
+  animation: lu-pulse 2.4s ease-in-out infinite;
+}
+@keyframes lu-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* ----- Page head ------------------------------------------------------- */
+.lu .lu-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px 24px;
+  margin-bottom: 22px;
+}
+.lu .lu-head > div {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+.lu .lu-head h1 {
+  margin: 0 0 4px;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.lu .lu-head h1 .lu-ico {
+  color: var(--lu-acc);
+  font-size: 0.8em;
+}
+.lu .lu-lede {
+  margin: 0;
+  color: var(--t-muted);
+  font-size: 13.5px;
+}
+.lu .lu-hint-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--t-muted);
+  text-decoration: none;
+}
+.lu .lu-hint-link:hover {
+  color: var(--lu-acc-text);
+  text-decoration: underline;
+}
+.lu .lu-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--lu-acc);
+  border-radius: var(--lu-r);
+  background: var(--lu-acc);
+  color: var(--lu-acc-fg);
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.lu .lu-btn-primary:hover {
+  background: var(--lu-acc-hover);
+  border-color: var(--lu-acc-hover);
+  color: var(--lu-acc-fg);
+}
+.lu .lu-paused-band {
+  margin-bottom: 18px;
+}
+
+/* ----- Toolbar ---------------------------------------------------------- */
+.lu .lu-tb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+.lu .lu-tb-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  flex: 0 1 240px;
+  min-width: 160px;
+  padding: 0 12px;
+  border: 1px solid var(--t-border-strong);
+  border-radius: var(--lu-r);
+  background: var(--t-surface);
+  color: var(--t-muted);
+}
+.lu .lu-tb-search:focus-within {
+  border-color: var(--lu-acc);
+}
+.lu .lu-tb-search input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  outline: none;
+  box-shadow: none;
+  font: inherit;
+  font-size: 13px;
+  color: var(--t-fg);
+}
+.lu .lu-tb-select {
+  height: 36px;
+  max-width: 100%;
+  padding: 0 28px 0 11px;
+  border: 1px solid var(--t-border-strong);
+  border-radius: var(--lu-r);
+  background-color: var(--t-surface);
+  color: var(--t-fg);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--t-fg-soft) 50%),
+    linear-gradient(135deg, var(--t-fg-soft) 50%, transparent 50%);
+  background-position:
+    calc(100% - 15px) 50%,
+    calc(100% - 10px) 50%;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+}
+.lu .lu-tb-select:hover {
+  border-color: var(--t-fg-soft);
+}
+.lu .lu-seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  height: 36px;
+  border-radius: calc(var(--lu-r) + 3px);
+  background: color-mix(in oklab, var(--t-fg) 8%, var(--t-surface));
+}
+.lu .lu-seg button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 11px;
+  border-radius: var(--lu-r);
+  color: var(--t-fg-soft);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.lu .lu-seg button:hover {
+  color: var(--t-fg);
+}
+.lu .lu-seg button[aria-pressed="true"] {
+  background: var(--t-surface);
+  color: var(--t-fg);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+}
+:root[data-ui="paper"] .lu .lu-seg button[aria-pressed="true"] {
+  box-shadow: inset 0 0 0 1px var(--t-border-strong);
+}
+:root[data-ui="paper"] .lu :is(.lu-tb-search, .lu-tb-select, .lu-seg) {
+  height: 40px;
+}
+.lu .lu-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: var(--lu-r);
+  color: var(--t-fg-soft);
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.lu .lu-btn-ghost:hover {
+  color: var(--lu-acc-text);
+  background: color-mix(in oklab, var(--t-fg) 6%, transparent);
+}
+.lu .lu-tb-count {
+  margin-left: auto;
+  font: 12px var(--t-font-mono);
+  color: var(--t-muted);
+}
+@container lu-page (max-width: 700px) {
+  .lu .lu-tb-search {
+    flex: 1 1 100%;
+  }
+  .lu .lu-tb-select {
+    flex: 1 1 calc(50% - 4px);
+    min-width: 0;
+  }
+  .lu .lu-tb-count {
+    margin-left: 0;
+  }
+}
+
+/* ----- Display card ------------------------------------------------------ */
+.lu .lu-ds {
+  margin-bottom: 32px;
+}
+.lu .lu-ds-card {
+  container: lu-ds / inline-size;
+  background: var(--t-surface);
+  border: 1px solid var(--t-border);
+  border-radius: var(--lu-r-card);
+}
+.lu .lu-ds-hdr {
+  display: grid;
+  grid-template-columns: auto minmax(0, 0.85fr) minmax(0, 1.15fr) var(--lu-fold-w);
+  grid-template-areas: "thumb name bar chev" "thumb state bar chev";
+  column-gap: 18px;
+  row-gap: 12px;
+  padding: 20px 12px 20px 22px;
+  align-items: start;
+  cursor: pointer;
+}
+.lu .lu-ds-hdr--plain {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "name";
+  cursor: auto;
+}
+.lu .lu-ds-hdr .lu-today {
+  grid-area: bar;
+  align-self: center;
+  margin-left: 10px;
+}
+@container lu-ds (max-width: 1000px) {
+  .lu .lu-ds-hdr {
+    grid-template-columns: auto minmax(0, 1fr) var(--lu-fold-w);
+    grid-template-areas: "thumb name chev" "thumb state chev" "bar bar bar";
+  }
+  .lu .lu-ds-hdr .lu-today {
+    margin: 6px 0 0;
+  }
+}
+@container lu-ds (max-width: 560px) {
+  .lu .lu-ds-hdr {
+    grid-template-columns: auto minmax(0, 1fr) var(--lu-fold-w);
+    grid-template-areas: "name name chev" "thumb state state" "bar bar bar";
+    padding: 14px 8px 14px 16px;
+    column-gap: 12px;
+  }
+  .lu .lu-ds-hdr .lu-now-thumb {
+    --slot: 92px;
+  }
+}
+.lu .lu-ds-hdr .lu-ds-fold {
+  grid-area: chev;
+  margin: 0;
+}
+.lu .lu-ds-hdr .lu-now-thumb {
+  grid-area: thumb;
+}
+.lu .lu-ds-name-row {
+  grid-area: name;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  min-width: 0;
+}
+.lu .lu-ds-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+/* The gear to the display's settings: out of the way until the header is
+   hovered or focused, always shown where there is no hover. */
+.lu .lu-gear {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  color: var(--t-muted);
+  opacity: 0;
+  transition:
+    opacity 150ms ease-out,
+    color 150ms ease-out,
+    background-color 150ms ease-out;
+}
+.lu .lu-gear .lu-ico {
+  width: 16px;
+  height: 16px;
+}
+.lu .lu-ds-hdr:hover .lu-gear,
+.lu .lu-gear:focus-visible {
+  opacity: 1;
+}
+.lu .lu-gear:hover {
+  color: var(--t-fg);
+  background: color-mix(in oklab, var(--t-fg) 10%, transparent);
+}
+@media (hover: none) {
+  .lu .lu-gear {
+    opacity: 0.75;
+  }
+}
+@media (pointer: coarse) {
+  .lu .lu-gear {
+    width: 44px;
+    height: 44px;
+  }
+}
+.lu .lu-ds-name-row h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.lu .lu-ds-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  min-width: 0;
+}
+.lu .lu-ds-tags .lu-im {
+  font-size: 11.5px;
+  white-space: normal;
+  color: var(--t-muted);
+}
+.lu .lu-ds-tags .lu-im .lu-ico {
+  font-size: 13px;
+  opacity: 0.7;
+}
+.lu .lu-ds-state {
+  grid-area: state;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  margin-top: 8px;
+}
+.lu .lu-ds.is-collapsed .lu-ds-fold .lu-ico {
+  transform: rotate(-90deg);
+}
+.lu .lu-ds-hdr :is(a, .lu-today) {
+  cursor: auto;
+}
+
+/* What is on the panel: a fixed slot, the picture in its own shape. */
+.lu .lu-now-thumb {
+  margin: 0;
+  flex: none;
+  width: var(--slot, 132px);
+  height: var(--slot, 132px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.lu .lu-now-thumb .lu-thumb {
+  max-width: 100%;
+  max-height: 100%;
+  border: 1px solid var(--lu-acc);
+  box-shadow: 0 0 0 3px var(--lu-acc-soft);
+}
+.lu .lu-now-thumb .lu-thumb.p {
+  height: var(--slot, 132px);
+  width: calc(var(--slot, 132px) * var(--arw) / var(--arh));
+}
+.lu .lu-now-thumb .lu-thumb.l {
+  width: var(--slot, 132px);
+  height: calc(var(--slot, 132px) * var(--arh) / var(--arw));
+}
+.lu .lu-now-thumb .lu-thumb.empty {
+  border-style: dashed;
+  border-color: var(--t-border-strong);
+  box-shadow: none;
+  background: transparent;
+}
+/* The dashed box says what is going on instead of a bare glyph. */
+.lu .lu-thumb-note {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 100%;
+  height: 100%;
+  padding: 4px;
+  box-sizing: border-box;
+  text-align: center;
+  color: var(--t-muted);
+  overflow: hidden;
+}
+.lu .lu-thumb-note .lu-ico {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+.lu .lu-thumb-note b {
+  font: 600 11.5px/1.2 var(--t-font);
+  color: var(--t-fg);
+}
+.lu .lu-thumb-note small {
+  font: 10px/1.25 var(--t-font);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.lu .lu-thumb.note-queued {
+  border-color: var(--lu-acc);
+}
+.lu .lu-thumb.note-queued .lu-thumb-note .lu-ico {
+  color: var(--lu-acc);
+}
+/* A newer frame waits behind the one shown. */
+.lu .lu-qbadge {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 5px 1px 3px;
+  border-radius: 999px;
+  font: 600 10px/1.3 var(--t-font);
+  color: var(--t-fg);
+  background: color-mix(in oklab, var(--t-surface, #fff) 92%, transparent);
+  border: 1px solid var(--lu-acc);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.25);
+}
+.lu .lu-qbadge .lu-ico {
+  width: 11px;
+  height: 11px;
+  color: var(--lu-acc);
+}
+/* The phone slot is too small for the sub-line; the tooltip and aria-label
+   carry the full sentence and the header's next line gives the time. */
+@media (max-width: 480px) {
+  .lu .lu-thumb-note small {
+    display: none;
+  }
+}
+:root:not([data-ui="paper"]) .lu .lu-now-thumb .lu-thumb {
+  border-width: 2px;
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--lu-acc) 16%, transparent);
+}
+
+.lu .lu-im {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font: 11.5px/1.3 var(--t-font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--t-muted);
+  white-space: nowrap;
+}
+.lu .lu-im .lu-ico {
+  font-size: 14px;
+  stroke-width: 1.4;
+  opacity: 0.8;
+}
+.lu .lu-im.warn {
+  color: var(--lu-warn-text);
+}
+.lu .lu-show {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0 7px;
+  font-size: 16px;
+  line-height: 1.3;
+  cursor: default;
+}
+.lu .lu-show .k {
+  color: var(--t-muted);
+  font-weight: 400;
+}
+.lu .lu-show b {
+  font-weight: 650;
+  color: var(--t-fg);
+  overflow-wrap: anywhere;
+}
+.lu .lu-sdot {
+  align-self: center;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--lu-acc);
+  flex: none;
+}
+.lu .lu-show.queued .lu-sdot {
+  background: var(--t-warn);
+}
+.lu .lu-show.unknown .lu-sdot {
+  background: transparent;
+  box-shadow: inset 0 0 0 2px var(--t-muted);
+}
+.lu .lu-show.unknown b {
+  color: var(--t-fg-soft);
+}
+.lu.acc-warm .lu-show.queued .lu-sdot {
+  background: transparent;
+  box-shadow: inset 0 0 0 2px var(--t-warn);
+}
+.lu .lu-nextl {
+  margin: 0;
+  font-size: 13px;
+  color: var(--t-muted);
+  cursor: help;
+  overflow-wrap: anywhere;
+}
+.lu .lu-nextl b {
+  color: var(--t-fg-soft);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Inner schedule area: the display's content, one shade off the card. */
+.lu .lu-sched {
+  margin: 0 10px 10px;
+  padding: 14px 12px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: var(--lu-sched-bg);
+  border-radius: var(--lu-r);
+}
+@container lu-ds (max-width: 560px) {
+  .lu .lu-sched {
+    margin: 0 6px 6px;
+    padding: 10px 6px 6px;
+    gap: 10px;
+  }
+}
+.lu .lu-none {
+  margin: 4px 6px;
+  font-size: 13px;
+  color: var(--t-muted);
+}
+
+/* ----- Day bar + day picker ---------------------------------------------- */
+.lu .lu-today {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 6px 14px;
+}
+.lu .lu-today-bar {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.lu .lu-dpick {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 1px;
+}
+.lu .lu-dp-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 6px;
+  border-radius: var(--lu-r);
+  font: 11px var(--t-font-mono);
+  color: var(--lu-acc-text);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.lu .lu-dp-label .lu-ico {
+  font-size: 10px;
+  opacity: 0.7;
+}
+.lu .lu-dp-label:hover {
+  background: color-mix(in oklab, var(--t-fg) 7%, transparent);
+}
+.lu .lu-dp-pop {
+  position: absolute;
+  z-index: 30;
+  right: 0;
+  top: calc(100% + 6px);
+  padding: 8px;
+  background: var(--t-surface);
+  border: 1px solid var(--t-border-strong);
+  border-radius: var(--lu-r);
+  box-shadow: var(--lu-shadow-pop);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.lu .lu-dp-days {
+  display: grid;
+  grid-template-columns: repeat(7, 38px);
+  gap: 2px;
+}
+.lu .lu-dp-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  height: 40px;
+  border-radius: var(--lu-r);
+  color: var(--t-fg-soft);
+  cursor: pointer;
+}
+.lu .lu-dp-day b {
+  font: 600 12px var(--t-font-mono);
+}
+.lu .lu-dp-day span {
+  font: 9.5px var(--t-font-mono);
+  color: var(--t-muted);
+  min-height: 11px;
+}
+.lu .lu-dp-day:hover {
+  background: color-mix(in oklab, var(--t-fg) 8%, transparent);
+  color: var(--t-fg);
+}
+.lu .lu-dp-day.is-today b {
+  color: var(--lu-acc-text);
+}
+.lu .lu-dp-day[aria-pressed="true"],
+.lu .lu-dp-day[aria-pressed="true"]:hover {
+  background: var(--t-fg);
+  color: var(--t-bg);
+}
+.lu .lu-dp-day[aria-pressed="true"] b,
+.lu .lu-dp-day[aria-pressed="true"] span {
+  color: inherit;
+}
+.lu .lu-dp-today {
+  height: 26px;
+  border-radius: var(--lu-r);
+  background: color-mix(in oklab, var(--t-fg) 7%, transparent);
+  color: var(--t-fg-soft);
+  font: 600 12px var(--t-font);
+  cursor: pointer;
+  text-align: center;
+}
+.lu .lu-dp-today:hover {
+  color: var(--t-fg);
+}
+@container lu-ds (max-width: 560px) {
+  .lu .lu-today {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .lu .lu-today .lu-dpick {
+    grid-row: 1;
+    justify-self: end;
+  }
+}
+
+/* The bar: a plain slot with a thin rod; lineup blocks sit on top of it,
+   holds and Quiet hours colour only the rod. */
+.lu .lu-trk {
+  position: relative;
+  height: 24px;
+  --rod: 8px;
+}
+.lu .lu-trk::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(50% - var(--rod) / 2);
+  height: var(--rod);
+  border-radius: calc(var(--rod) / 2);
+  background: color-mix(in oklab, var(--t-fg) 8%, transparent);
+}
+.lu .lu-trk.tall {
+  height: 34px;
+  --rod: 10px;
+}
+.lu .lu-blk {
+  position: absolute;
+  z-index: 1;
+  top: 2px;
+  bottom: 2px;
+  display: flex;
+  align-items: center;
+  padding: 0 7px;
+  overflow: hidden;
+  border-radius: 6px;
+  font: 600 11px/1 var(--t-font);
+  white-space: nowrap;
+  cursor: pointer;
+  background: var(--lu-blk-bg);
+  color: var(--lu-blk-fg);
+  box-shadow: inset 0 0 0 1px var(--lu-blk-edge);
+  /* A hairline of track between neighbouring blocks, so they never touch:
+     half a pixel of transparent border each side, with the fill kept inside. */
+  border-inline: 0.5px solid transparent;
+  background-clip: padding-box;
+  transition:
+    filter 150ms ease-out,
+    box-shadow 150ms ease-out;
+}
+.lu .lu-trk:not(.tall) .lu-blk {
+  border-radius: 5px;
+}
+.lu .lu-blk.live {
+  background: var(--lu-acc);
+  color: var(--lu-acc-fg);
+  box-shadow: none;
+}
+.lu .lu-blk.hold {
+  top: calc(50% - var(--rod) / 2);
+  bottom: auto;
+  height: var(--rod);
+  border-radius: calc(var(--rod) / 2);
+  background: color-mix(in oklab, var(--t-fg) 16%, transparent);
+  color: var(--t-muted);
+  box-shadow: none;
+  cursor: default;
+}
+.lu .lu-blk.hold.live {
+  background: color-mix(in oklab, var(--lu-acc) 30%, transparent);
+}
+.lu .lu-blk.push {
+  min-width: 5px;
+  padding: 0;
+}
+.lu .lu-blk:not(.hold):hover,
+.lu .lu-blk.is-linked {
+  box-shadow:
+    inset 0 0 0 1px var(--lu-blk-edge),
+    0 0 0 2px var(--t-fg);
+  z-index: 2;
+}
+.lu .lu-blk.live:not(.hold):hover,
+.lu .lu-blk.live.is-linked {
+  box-shadow:
+    0 0 0 2px var(--lu-acc),
+    0 0 0 4px var(--t-surface);
+}
+.lu .lu-blk.dim {
+  opacity: 0.25;
+}
+.lu .lu-blk-l {
+  position: relative;
+  z-index: 1;
+  /* Let hovers and presses reach the advance ticks beneath it. */
+  pointer-events: none;
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font: 600 12px/1.2 var(--t-font);
+  color: var(--lu-blk-fg);
+}
+.lu .lu-blk.live .lu-blk-l {
+  color: var(--lu-acc-fg);
+}
+.lu .lu-blk-side {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  transform: translateY(-50%);
+  font: 11px var(--t-font-mono);
+  color: var(--t-fg-soft);
+  white-space: nowrap;
+  cursor: default;
+}
+.lu .lu-blk-side.gone,
+.lu .lu-blk-l.gone {
+  visibility: hidden;
+}
+/* Advance ticks: hairlines from both edges, leaving the label band clear;
+   the next one is the same line, only stronger and 2px. The element is a 9px
+   hover zone (the instant tooltip comes from lineups.js, data-tip) with the
+   visible line in ::before; the resize handles sit above it. On hover the line
+   thickens, brightens and its gap fills in (::after), by transform and
+   opacity only. lineups.js thins them (.thin) where they would crowd. */
+.lu .lu-tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 9px;
+  margin-left: -4px;
+  --k: 3;
+}
+.lu .lu-tick.next {
+  --k: 2;
+}
+.lu .lu-tick::before,
+.lu .lu-tick::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  width: 1px;
+  background: currentColor;
+  transition:
+    transform 120ms cubic-bezier(0.25, 1, 0.5, 1),
+    opacity 120ms cubic-bezier(0.25, 1, 0.5, 1);
+}
+.lu .lu-tick::before {
+  top: 0;
+  bottom: 0;
+  background: linear-gradient(currentColor 0 30%, transparent 30% 70%, currentColor 70%);
+  opacity: 0.28;
+}
+/* The gap in the split line, shown only while hovered. */
+.lu .lu-tick::after {
+  top: 30%;
+  bottom: 30%;
+  opacity: 0;
+}
+.lu .lu-tick.next::before,
+.lu .lu-tick.next::after {
+  width: 2px;
+  left: 3.5px;
+}
+.lu .lu-tick.next::before {
+  opacity: 0.7;
+}
+.lu .lu-tick:hover::before,
+.lu .lu-tick:hover::after {
+  transform: scaleX(var(--k));
+}
+.lu .lu-tick:hover::before {
+  opacity: 0.95;
+}
+.lu .lu-tick:hover::after {
+  opacity: 0.95;
+}
+.lu .lu-tick.thin,
+.lu .lu-blk.open .lu-tick {
+  display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lu .lu-tick::before,
+  .lu .lu-tick::after {
+    transition: none;
+  }
+}
+/* "Update in 5 min": a pill with an arrow over the next advance, in the live
+   block's colour. lineups.js centres it on the line, keeps it inside the bar
+   and moves it clear of the now marker (.lift: above its knob); --ax is where the arrow points. The
+   bar gets headroom for it (.flagged); it never takes a click. */
+.lu .lu-trk.flagged {
+  margin-top: 30px;
+}
+.lu .lu-nflag {
+  position: absolute;
+  /* The line's place on the bar: the block's left and width and the line's
+     share of it, all in percent; lineups.js refines it in pixels. */
+  left: calc((var(--bl) + var(--tp) * var(--bw) / 100) * 1%);
+  bottom: calc(100% + 5px);
+  z-index: 4;
+  padding: 3px 7px;
+  border-radius: 6px;
+  background: var(--lu-acc);
+  color: var(--lu-acc-fg);
+  font: 600 11px/1.2 var(--t-font);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.lu .lu-nflag.lift {
+  bottom: calc(100% + 10px);
+}
+.lu .lu-nflag:not(.placed) {
+  transform: translateX(-50%);
+}
+.lu .lu-nflag[hidden],
+.lu .lu-nflag.gone {
+  display: none;
+}
+.lu .lu-nflag::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: var(--ax, 50%);
+  width: 8px;
+  height: 4px;
+  margin-left: -4px;
+  background: inherit;
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+/* The tick tooltip lives in <body>, outside every clipped bar and the .lu
+   scope: the same ink chip as the drag tip. */
+.lu-tip {
+  position: fixed;
+  z-index: 900;
+  padding: 5px 9px;
+  border-radius: var(--lu-r, var(--t-radius-sm, 6px));
+  background: var(--t-fg);
+  color: var(--t-bg);
+  font: 11.5px/1.2 var(--t-font-mono);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.lu-tip[hidden] {
+  display: none;
+}
+/* Quiet hours tint the rod: amber hatch with a moon. */
+.lu .lu-pz {
+  position: absolute;
+  top: calc(50% - var(--rod) / 2);
+  height: var(--rod);
+  border-radius: calc(var(--rod) / 2);
+  z-index: 0;
+  cursor: help;
+  background:
+    repeating-linear-gradient(45deg, var(--t-warn) 0 1.5px, transparent 1.5px 5px),
+    color-mix(in oklab, var(--t-warn) 50%, transparent);
+}
+:root:not([data-theme="dark"]) .lu .lu-pz {
+  background:
+    repeating-linear-gradient(45deg, var(--t-warn) 0 1.5px, transparent 1.5px 5px),
+    color-mix(in oklab, var(--t-warn) 40%, transparent);
+}
+.lu .lu-pz-over {
+  /* Quiet hours under a lineup's own block: a hatched edge along its foot, so
+     a lineup that runs all day still shows when it is held. */
+  position: absolute;
+  z-index: 2;
+  bottom: 2px;
+  height: 6px;
+  border-radius: 0 0 5px 5px;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(45deg, var(--t-warn) 0 1.5px, transparent 1.5px 5px),
+    color-mix(in oklab, var(--t-warn) 55%, transparent);
+  /* A thin dark rim keeps it apart from the green, grey or hatched block under it. */
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--lu-pz-edge) 70%, transparent);
+}
+.lu .lu-pz .lu-ico {
+  position: absolute;
+  left: 4px;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  margin-top: -8px;
+  padding: 2.5px;
+  border-radius: 50%;
+  background: var(--t-warn);
+  color: var(--lu-on-warn);
+  fill: currentColor;
+  stroke: none;
+  /* Rim so the yellow moon reads apart from the yellow hatching it sits on. */
+  box-shadow: 0 0 0 1px var(--lu-pz-edge);
+}
+.lu .lu-trk:not(.tall) .lu-pz .lu-ico {
+  width: 14px;
+  height: 14px;
+  margin-top: -7px;
+  padding: 2px;
+}
+.lu .lu-pz.noicon .lu-ico {
+  display: none;
+}
+/* Warm accents: Quiet hours switch to an ink cross-hatch so they never
+   read as the accent. */
+.lu.acc-warm .lu-pz,
+:root:not([data-theme="dark"]) .lu.acc-warm .lu-pz {
+  background:
+    repeating-linear-gradient(
+      45deg,
+      color-mix(in oklab, var(--t-fg) 55%, transparent) 0 1px,
+      transparent 1px 5px
+    ),
+    repeating-linear-gradient(
+      -45deg,
+      color-mix(in oklab, var(--t-fg) 55%, transparent) 0 1px,
+      transparent 1px 5px
+    ),
+    color-mix(in oklab, var(--t-warn) 35%, transparent);
+}
+.lu.acc-warm .lu-pz .lu-ico {
+  background: var(--t-fg);
+  color: var(--t-bg);
+}
+.lu .lu-nowm {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--t-fg);
+  border-radius: 2px;
+  pointer-events: none;
+  z-index: 3;
+}
+.lu .lu-nowm::before {
+  content: "";
+  position: absolute;
+  top: -3px;
+  left: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--t-fg);
+}
+.lu .lu-scale {
+  position: relative;
+  height: 14px;
+  font: 10.5px var(--t-font-mono);
+  color: var(--t-muted);
+}
+.lu .lu-scale span {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+.lu .lu-scale span:first-child {
+  transform: none;
+}
+.lu .lu-scale span:last-child {
+  transform: translateX(-100%);
+}
+/* Block starts in place of the axis (more than two blocks): a short stem
+   down from each block's left edge, the time under it. Tiers are in the
+   mono font's ch; a label near the end slides left to stay on the bar, and
+   .h0-.h17 drop it at the bar widths where it would touch another
+   (SCALE_TIERS in app/lineups_view.py). */
+.lu .lu-scale.st {
+  container: lu-scale / inline-size;
+}
+.lu .lu-scale.st span {
+  left: 0;
+  right: 0;
+  display: flex;
+  transform: none;
+}
+/* A spacer as wide as the block's offset that gives way when the label
+   would run off the end, so the time ends flush with the bar at its real
+   width (12-hour labels carry a narrow space, under 1ch). */
+.lu .lu-scale.st span::after {
+  content: "";
+  order: -1;
+  flex: 0 1 var(--x);
+}
+.lu .lu-scale.st span::before {
+  content: "";
+  position: absolute;
+  top: -5px;
+  left: var(--x);
+  width: 1px;
+  height: 5px;
+  background: currentColor;
+  opacity: 0.6;
+}
+@container lu-scale (width < 40ch) {
+  .lu .lu-scale.st .h0 {
+    display: none;
+  }
+}
+@container lu-scale (40ch <= width < 44ch) {
+  .lu .lu-scale.st .h1 {
+    display: none;
+  }
+}
+@container lu-scale (44ch <= width < 48ch) {
+  .lu .lu-scale.st .h2 {
+    display: none;
+  }
+}
+@container lu-scale (48ch <= width < 52ch) {
+  .lu .lu-scale.st .h3 {
+    display: none;
+  }
+}
+@container lu-scale (52ch <= width < 56ch) {
+  .lu .lu-scale.st .h4 {
+    display: none;
+  }
+}
+@container lu-scale (56ch <= width < 60ch) {
+  .lu .lu-scale.st .h5 {
+    display: none;
+  }
+}
+@container lu-scale (60ch <= width < 64ch) {
+  .lu .lu-scale.st .h6 {
+    display: none;
+  }
+}
+@container lu-scale (64ch <= width < 68ch) {
+  .lu .lu-scale.st .h7 {
+    display: none;
+  }
+}
+@container lu-scale (68ch <= width < 72ch) {
+  .lu .lu-scale.st .h8 {
+    display: none;
+  }
+}
+@container lu-scale (72ch <= width < 76ch) {
+  .lu .lu-scale.st .h9 {
+    display: none;
+  }
+}
+@container lu-scale (76ch <= width < 80ch) {
+  .lu .lu-scale.st .h10 {
+    display: none;
+  }
+}
+@container lu-scale (80ch <= width < 84ch) {
+  .lu .lu-scale.st .h11 {
+    display: none;
+  }
+}
+@container lu-scale (84ch <= width < 88ch) {
+  .lu .lu-scale.st .h12 {
+    display: none;
+  }
+}
+@container lu-scale (88ch <= width < 92ch) {
+  .lu .lu-scale.st .h13 {
+    display: none;
+  }
+}
+@container lu-scale (92ch <= width < 96ch) {
+  .lu .lu-scale.st .h14 {
+    display: none;
+  }
+}
+@container lu-scale (96ch <= width < 108ch) {
+  .lu .lu-scale.st .h15 {
+    display: none;
+  }
+}
+@container lu-scale (108ch <= width < 120ch) {
+  .lu .lu-scale.st .h16 {
+    display: none;
+  }
+}
+@container lu-scale (width >= 120ch) {
+  .lu .lu-scale.st .h17 {
+    display: none;
+  }
+}
+
+/* Editing on the bar: drag, resize, keyboard. */
+.lu .lu-blk[data-edit] {
+  cursor: grab;
+  touch-action: none;
+}
+.lu .lu-blk[data-edit]:focus-visible {
+  outline: 2px solid var(--t-fg);
+  outline-offset: 2px;
+  z-index: 4;
+}
+.lu .lu-h {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 9px;
+  z-index: 2;
+  cursor: ew-resize;
+}
+.lu .lu-h[data-h="l"] {
+  left: 0;
+}
+.lu .lu-h[data-h="r"] {
+  right: 0;
+}
+.lu .lu-blk[data-edit]:hover .lu-h::after,
+.lu .lu-blk.is-drag .lu-h::after {
+  content: "";
+  position: absolute;
+  top: 28%;
+  bottom: 28%;
+  left: 3px;
+  width: 2px;
+  border-radius: 1px;
+  background: currentColor;
+  opacity: 0.7;
+}
+.lu .lu-blk.is-drag,
+.lu .lu-blk.is-drag:hover {
+  cursor: grabbing;
+  z-index: 5;
+  box-shadow: 0 0 0 2px var(--t-fg);
+  transition: none;
+}
+.lu .lu-blk.is-drag.is-stopped {
+  box-shadow: 0 0 0 2px var(--t-warn);
+}
+.lu .lu-blk.is-pending {
+  outline: 1.5px dashed var(--t-warn);
+  outline-offset: 1px;
+}
+.lu .lu-drag-tip {
+  position: absolute;
+  top: calc(100% + 6px);
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 9px;
+  border-radius: var(--lu-r);
+  background: var(--t-fg);
+  color: var(--t-bg);
+  font: 11.5px var(--t-font-mono);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.lu .lu-tip-stop {
+  opacity: 0.75;
+}
+.lu .lu-tip-warn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  border-radius: var(--lu-r);
+  background: var(--t-warn);
+  color: var(--lu-on-warn);
+  font-weight: 700;
+}
+@container lu-ds (max-width: 560px) {
+  .lu .lu-h {
+    display: none;
+  }
+  .lu .lu-blk[data-edit] {
+    cursor: pointer;
+  }
+}
+
+/* Unsaved changes bar */
+.lu .lu-pending {
+  position: sticky;
+  bottom: 0;
+  z-index: 7;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  padding: 10px 18px calc(10px + env(safe-area-inset-bottom)) 22px;
+  border-top: 1px solid var(--t-border);
+  background: color-mix(in oklab, var(--t-fg) 3%, var(--t-surface));
+  border-radius: 0 0 var(--lu-r-card) var(--lu-r-card);
+  font-size: 13px;
+}
+.lu .lu-pend-msg {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 100%;
+  color: var(--t-fg-soft);
+}
+.lu .lu-pend-msg.err {
+  color: var(--t-danger);
+}
+.lu .lu-pend-msg:only-child {
+  flex: 1 1 auto;
+}
+.lu .lu-pend-count {
+  display: inline-flex;
+  align-items: center;
+  margin-right: auto;
+  font-weight: 600;
+}
+.lu .lu-pend-count .lu-edot {
+  margin: 0 8px 0 0;
+}
+.lu .lu-btn-ghost.sm {
+  height: 30px;
+}
+.lu .lu-btn-save {
+  height: 30px;
+  padding: 0 14px;
+  border: 1px solid var(--lu-acc);
+  border-radius: var(--lu-r);
+  background: var(--lu-acc);
+  color: var(--lu-acc-fg);
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+}
+.lu .lu-btn-save:hover {
+  background: var(--lu-acc-hover);
+}
+.lu .lu-btn-save[aria-busy="true"] {
+  opacity: 0.6;
+  cursor: progress;
+}
+@container lu-ds (max-width: 560px) {
+  .lu .lu-pending {
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+  }
+}
+.lu .lu-edot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-left: 8px;
+  border-radius: 50%;
+  background: var(--t-warn);
+  vertical-align: middle;
+}
+
+/* ----- Lineup rows ------------------------------------------------------- */
+/* The row just created or acted on (?hl=): one accent pulse. */
+.lu .lu-row.is-new {
+  animation: lu-new 1.6s ease-out 1;
+}
+@keyframes lu-new {
+  from {
+    box-shadow: inset 0 0 0 2px var(--lu-acc);
+  }
+  to {
+    box-shadow: inset 0 0 0 2px transparent;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lu .lu-row.is-new {
+    animation: none;
+    box-shadow: inset 0 0 0 2px var(--lu-acc);
+  }
+}
+.lu .lu-rows {
+  display: flex;
+  flex-direction: column;
+}
+.lu .lu-row {
+  border-radius: var(--lu-r);
+  transition: background-color 150ms ease-out;
+}
+.lu .lu-row + .lu-row {
+  border-top: 1px solid color-mix(in oklab, var(--t-border) 70%, transparent);
+}
+.lu .lu-row.is-live + .lu-row,
+.lu .lu-row + .lu-row.is-live {
+  border-top-color: transparent;
+}
+.lu .lu-row:hover,
+.lu .lu-row.is-linked {
+  background: color-mix(in oklab, var(--t-fg) 3%, transparent);
+}
+.lu .lu-row.is-live {
+  background: var(--lu-live-wash);
+}
+.lu .lu-row.is-live:hover,
+.lu .lu-row.is-live.is-linked {
+  background: color-mix(in oklab, var(--lu-acc) 12%, var(--t-surface-soft));
+}
+/* Not on the panel today: quiet, greyed, no accent. */
+.lu .lu-row.is-off {
+  background: transparent;
+}
+.lu .lu-row.is-off:hover {
+  background: color-mix(in oklab, var(--t-fg) 2.5%, transparent);
+}
+.lu .lu-row.is-off .lu-row-name {
+  color: var(--t-muted);
+  font-weight: 600;
+  transition: color 150ms ease-out;
+}
+.lu .lu-row.is-off .lu-row-meta,
+.lu .lu-row.is-off .lu-hs-line,
+.lu .lu-row.is-off .lu-hs-line b {
+  color: color-mix(in oklab, var(--t-muted) 75%, transparent);
+}
+.lu .lu-row.is-off .lu-days .lu-dt.on {
+  background: color-mix(in oklab, var(--t-fg) 7%, var(--t-surface));
+  color: var(--t-muted);
+}
+.lu .lu-row.is-off .lu-days .lu-dt.is-today {
+  box-shadow: inset 0 -2px 0 color-mix(in oklab, var(--t-muted) 60%, transparent);
+}
+.lu .lu-row.is-off :is(.lu-ibtn, .lu-fold, .lu-more summary) {
+  color: color-mix(in oklab, var(--t-muted) 80%, transparent);
+}
+.lu .lu-row.is-off .lu-strip {
+  filter: grayscale(0.9);
+  opacity: 0.7;
+}
+.lu .lu-row.is-off:hover .lu-row-name,
+.lu .lu-row.is-off:not(.is-folded) .lu-row-name {
+  color: var(--t-fg-soft);
+}
+.lu .lu-row.is-off:hover :is(.lu-row-meta, .lu-hs-line),
+.lu .lu-row.is-off:not(.is-folded) :is(.lu-row-meta, .lu-hs-line) {
+  color: var(--t-muted);
+}
+.lu .lu-row[hidden] {
+  display: none;
+}
+
+.lu .lu-row-head {
+  display: grid;
+  align-items: center;
+  column-gap: 14px;
+  row-gap: 6px;
+  padding: 11px 8px 11px 16px;
+  cursor: pointer;
+  grid-template-columns: 112px minmax(0, 1fr) minmax(220px, 290px) auto var(--lu-fold-w);
+  grid-template-areas: "tag title state actions fold";
+}
+.lu .lu-row-head :is(.lu-days, .lu-win, .lu-win-edit, .lu-row-actions) {
+  cursor: auto;
+}
+.lu .lu-fold {
+  grid-area: fold;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--lu-r);
+  color: var(--t-muted);
+  cursor: pointer;
+  font-size: 15px;
+}
+.lu .lu-fold:hover,
+.lu .lu-row-head:hover .lu-fold,
+.lu .lu-ds-hdr:hover .lu-ds-fold {
+  color: var(--lu-acc-text);
+  background: color-mix(in oklab, var(--t-fg) 7%, transparent);
+}
+.lu .lu-fold .lu-ico {
+  transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.lu .lu-row.is-folded .lu-fold .lu-ico {
+  transform: rotate(-90deg);
+}
+.lu .lu-row-tag {
+  grid-area: tag;
+  justify-self: start;
+}
+.lu .lu-tag-st {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: var(--lu-r);
+  font: 700 10px/1 var(--t-font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.lu .lu-tag-st.live {
+  background: var(--lu-acc);
+  color: var(--lu-acc-fg);
+}
+.lu .lu-tag-st.live .lu-dot {
+  background: var(--lu-acc-fg);
+}
+.lu .lu-tag-st.later {
+  background: color-mix(in oklab, var(--t-fg) 8%, transparent);
+  color: var(--t-fg);
+}
+.lu .lu-tag-st.off {
+  padding: 0;
+  color: var(--t-muted);
+}
+.lu .lu-tag-st.off::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: color-mix(in oklab, var(--t-muted) 60%, transparent);
+}
+.lu .lu-row-title {
+  grid-area: title;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.lu .lu-row-name {
+  font-size: 15.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+.lu .lu-row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 12px;
+  font: 11.5px var(--t-font-mono);
+  color: var(--t-muted);
+}
+.lu .lu-row-state {
+  grid-area: state;
+  min-width: 0;
+}
+.lu .lu-row-err {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 3px;
+  font-size: 12.5px;
+  color: var(--t-danger);
+  overflow-wrap: anywhere;
+}
+.lu .lu-hs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  cursor: default;
+}
+.lu .lu-hs-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 6px;
+  font: 12px var(--t-font-mono);
+  color: var(--t-muted);
+}
+.lu .lu-hs-line b {
+  color: var(--t-fg);
+  font-weight: 700;
+}
+.lu .lu-row.is-live .lu-hs-line b {
+  color: var(--lu-acc-text);
+}
+.lu .lu-hs-win {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--t-fg);
+}
+.lu .lu-hs-win > .lu-ico {
+  font-size: 14px;
+  color: var(--t-muted);
+  stroke-width: 1.4;
+}
+.lu .lu-hs-win .lu-win {
+  font-weight: 700;
+  color: var(--t-fg);
+  font-variant-numeric: tabular-nums;
+}
+.lu .lu-row.is-off .lu-hs-win,
+.lu .lu-row.is-off .lu-hs-win .lu-win {
+  color: var(--t-muted);
+  font-weight: 600;
+}
+.lu .lu-sep-dot {
+  opacity: 0.6;
+}
+.lu .lu-hs-bar {
+  position: relative;
+  display: block;
+  height: 3px;
+  border-radius: 3px;
+  background: color-mix(in oklab, var(--t-fg) 12%, var(--t-surface));
+  overflow: hidden;
+  max-width: 220px;
+}
+.lu .lu-hs-bar i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--lu-acc);
+  border-radius: 3px;
+}
+.lu .lu-hs-now {
+  display: none;
+  align-items: center;
+  gap: 4px 8px;
+  flex-wrap: wrap;
+  font-size: 12.5px;
+  min-width: 0;
+}
+.lu .lu-row.is-folded .lu-hs-now {
+  display: flex;
+}
+.lu .lu-hn {
+  overflow-wrap: anywhere;
+}
+.lu .lu-hn.live {
+  color: var(--t-fg);
+  font-weight: 600;
+}
+.lu .lu-hn.q {
+  color: var(--lu-warn-text);
+  font-weight: 600;
+  text-decoration: underline dashed;
+  text-underline-offset: 3px;
+}
+.lu .lu-hn.dim {
+  color: var(--t-muted);
+  font-size: 12px;
+}
+
+/* Day tiles, window, facts */
+.lu .lu-days {
+  display: inline-flex;
+  gap: 2px;
+}
+.lu .lu-days .lu-dt {
+  width: 16px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border-radius: 3px;
+  font: 600 9.5px var(--t-font-mono);
+  color: color-mix(in oklab, var(--t-fg) 30%, transparent);
+  cursor: pointer;
+  text-align: center;
+}
+:root[data-ui="paper"] .lu .lu-days .lu-dt {
+  border-radius: 2px;
+}
+.lu .lu-days .lu-dt.on {
+  background: color-mix(in oklab, var(--t-fg) 13%, var(--t-surface));
+  color: var(--t-fg);
+}
+.lu .lu-days .lu-dt.is-today {
+  box-shadow: inset 0 -2px 0 var(--lu-acc);
+}
+.lu .lu-days .lu-dt:hover {
+  outline: 1px solid var(--t-fg-soft);
+  outline-offset: 0;
+  color: var(--t-fg);
+}
+.lu .lu-days .lu-dt.is-edited {
+  box-shadow: inset 0 0 0 1px var(--t-warn);
+}
+@container lu-ds (max-width: 560px) {
+  .lu .lu-days {
+    gap: 3px;
+  }
+  .lu .lu-days .lu-dt {
+    width: 24px;
+    height: 26px;
+    font-size: 11px;
+  }
+}
+.lu .lu-win {
+  padding: 1px 4px;
+  margin: 0 -2px 0 -4px;
+  border-radius: 4px;
+  cursor: text;
+}
+.lu .lu-win:hover {
+  background: color-mix(in oklab, var(--t-fg) 8%, transparent);
+  color: var(--t-fg);
+}
+.lu .lu-win-edit {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.lu .lu-win-edit input {
+  height: 26px !important;
+  min-height: 0 !important;
+  width: 96px;
+  padding: 0 4px;
+  border: 1px solid var(--t-border-strong);
+  border-radius: var(--lu-r);
+  background: var(--t-surface);
+  color: var(--t-fg);
+  font: 12px var(--t-font-mono) !important;
+  box-shadow: none;
+}
+.lu .lu-win-edit input:focus {
+  outline: none;
+  border-color: var(--lu-acc);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--lu-acc) 25%, transparent);
+}
+.lu .lu-win-err {
+  color: var(--t-danger);
+  font: 12px var(--t-font);
+}
+.lu .lu-win-err:empty {
+  display: none;
+}
+@container lu-ds (max-width: 560px) {
+  .lu .lu-im.opt {
+    display: none;
+  }
+}
+
+/* Actions */
+.lu .lu-row-actions {
+  grid-area: actions;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+}
+.lu .lu-ibtn {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--lu-r);
+  color: var(--t-fg-soft);
+  cursor: pointer;
+  font-size: 15px;
+}
+.lu .lu-ibtn.sm {
+  width: 26px;
+  height: 26px;
+  font-size: 13px;
+}
+.lu .lu-ibtn:not(:disabled):hover {
+  color: var(--lu-acc-text);
+  background: color-mix(in oklab, var(--t-fg) 7%, transparent);
+}
+.lu .lu-ibtn.is-primary {
+  color: var(--lu-acc-text);
+}
+.lu .lu-ibtn.is-primary:not(:disabled):hover {
+  background: color-mix(in oklab, var(--lu-acc) 14%, transparent);
+}
+.lu .lu-more {
+  position: relative;
+}
+.lu .lu-more summary {
+  list-style: none;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--lu-r);
+  color: var(--t-muted);
+  cursor: pointer;
+  font-size: 16px;
+}
+.lu .lu-more summary::-webkit-details-marker {
+  display: none;
+}
+.lu .lu-more summary:hover {
+  color: var(--t-fg);
+  background: color-mix(in oklab, var(--t-fg) 7%, transparent);
+}
+.lu .lu-more-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 20;
+  min-width: 150px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  background: var(--t-surface);
+  border: 1px solid var(--t-border-strong);
+  border-radius: var(--lu-r);
+  box-shadow: var(--lu-shadow-pop);
+}
+.lu .lu-more-menu :is(a, button) {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 7px 10px;
+  border-radius: var(--lu-r);
+  font-size: 13px;
+  color: var(--t-fg);
+  text-decoration: none;
+  cursor: pointer;
+}
+.lu .lu-more-menu :is(a, button):hover {
+  background: color-mix(in oklab, var(--t-fg) 7%, transparent);
+  color: var(--t-fg);
+}
+.lu .lu-more-menu .danger,
+.lu .lu-more-menu .danger:hover {
+  color: var(--t-danger);
+}
+
+/* Medium: title spans two lines; state under it. */
+@container lu-ds (max-width: 860px) {
+  .lu .lu-row-head {
+    grid-template-columns: auto minmax(0, 1fr) auto var(--lu-fold-w);
+    grid-template-areas: "tag title actions fold" ".   state state .";
+  }
+}
+@container lu-ds (max-width: 860px) and (min-width: 561px) {
+  .lu .lu-row-head {
+    grid-template-areas: "tag title actions fold" ".   state .  .";
+  }
+}
+/* Narrow: tag + actions, then title, then the state line. */
+@container lu-ds (max-width: 560px) {
+  .lu .lu-row-head {
+    padding: 9px 4px 9px 10px;
+    column-gap: 8px;
+    grid-template-columns: minmax(0, 1fr) auto var(--lu-fold-w);
+    grid-template-areas: "tag actions fold" "title title title" "state state state";
+  }
+}
+
+.lu .lu-row-body {
+  position: relative;
+  padding: 4px 16px 18px;
+}
+.lu .lu-row.is-folded .lu-row-body {
+  display: none;
+}
+.lu .lu-row.just-opened:not(.is-folded) .lu-row-body,
+.lu .lu-ds.just-opened .lu-sched {
+  animation: lu-reveal 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes lu-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+@container lu-ds (max-width: 560px) {
+  .lu .lu-row-body {
+    padding: 4px 10px 14px;
+  }
+}
+
+/* ----- Step strip: one line that scrolls sideways; fades show more. ----- */
+.lu .lu-strip-scroll {
+  position: relative;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  margin: 0 -16px;
+  padding: 12px 24px 14px 16px;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  outline-offset: -2px;
+}
+.lu .lu-strip-scroll:hover,
+.lu .lu-strip-scroll:focus-visible {
+  scrollbar-color: var(--t-border-strong) transparent;
+}
+@media (hover: none) {
+  .lu .lu-strip-scroll {
+    scrollbar-color: var(--t-border-strong) transparent;
+  }
+}
+.lu .lu-strip-scroll.fade-r {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent);
+}
+.lu .lu-strip-scroll.fade-l {
+  -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 40px), transparent);
+  mask-image: linear-gradient(to left, #000 calc(100% - 40px), transparent);
+}
+.lu .lu-strip-scroll.fade-l.fade-r {
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 40px,
+    #000 calc(100% - 40px),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 40px,
+    #000 calc(100% - 40px),
+    transparent
+  );
+}
+@container lu-ds (max-width: 560px) {
+  .lu .lu-strip-scroll {
+    margin: 0 -10px;
+    padding: 12px 16px 14px 10px;
+  }
+}
+.lu .lu-strip {
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  gap: 0;
+  width: max-content;
+  --th: var(--tile-h, 132px);
+}
+.lu .lu-strip.l {
+  --th: calc(var(--tile-h, 132px) * 0.62);
+}
+.lu .lu-strip:not(.has-now) {
+  --slot-h: 0px;
+}
+.lu .lu-strip:not(.has-now) .lu-slot:empty {
+  display: none;
+}
+.lu .lu-step {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: flex-start;
+  transition: opacity 150ms ease-out;
+}
+.lu .lu-strip.has-now .lu-step:not(.is-now):not(:hover):not(:focus-within) {
+  opacity: 0.55;
+}
+.lu .lu-strip.has-now .lu-step:is(.is-next, .is-waiting):not(:hover) {
+  opacity: 0.85;
+}
+.lu .lu-step figure {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: var(--fig-min, 84px);
+  align-items: flex-start;
+}
+.lu .lu-slot {
+  height: 20px;
+  display: flex;
+  align-items: center;
+}
+.lu .lu-tile {
+  position: relative;
+  display: block;
+  flex: none;
+}
+.lu .lu-step .lu-thumb {
+  height: var(--th);
+  width: calc(var(--th) * var(--arw) / var(--arh));
+  transition: border-color 150ms ease-out;
+}
+.lu .lu-step:hover .lu-thumb {
+  border-color: var(--t-fg-soft);
+}
+@container lu-ds (max-width: 700px) {
+  .lu .lu-strip {
+    --tile-h: 100px;
+    --fig-min: 66px;
+  }
+  .lu .lu-sep {
+    width: 28px;
+  }
+}
+
+/* Thumbnails: the display's real aspect ratio, never cropped. */
+.lu .lu-thumb {
+  position: relative;
+  display: block;
+  flex: none;
+  aspect-ratio: var(--ar);
+  border-radius: var(--lu-r-xs);
+  overflow: hidden;
+  border: 1px solid var(--t-border-strong);
+  background: var(--lu-paper);
+}
+.lu .lu-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.lu .lu-thumb-ph {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  font: 700 20px var(--t-font);
+  color: #a7a297;
+}
+/* A step whose dashboard was deleted: warning rim and glyph, no thumbnail. */
+.lu .lu-thumb.missing {
+  outline: 2px dashed var(--lu-warn-text);
+  outline-offset: -2px;
+}
+.lu .lu-thumb.missing .lu-thumb-ph {
+  color: var(--lu-warn-text);
+}
+.lu .lu-step.is-missing .lu-step-name {
+  color: var(--lu-warn-text);
+  font-style: italic;
+}
+
+/* Several items in one step: two offset sheets behind the tile + a count. */
+.lu .lu-tile.stacked {
+  margin: 0 8px 0 0;
+}
+.lu .lu-tile.stacked::before,
+.lu .lu-tile.stacked::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--lu-r-xs);
+  border: 1px solid var(--t-border-strong);
+  background: color-mix(in oklab, var(--lu-paper) 80%, var(--t-surface));
+}
+.lu .lu-tile.stacked::before {
+  transform: translate(8px, -8px);
+  opacity: 0.45;
+}
+.lu .lu-tile.stacked::after {
+  transform: translate(4px, -4px);
+  opacity: 0.8;
+}
+.lu .lu-tile.stacked .lu-thumb {
+  z-index: 1;
+}
+.lu .lu-count {
+  position: absolute;
+  z-index: 2;
+  right: -6px;
+  bottom: -6px;
+  height: 20px;
+  min-width: 28px;
+  padding: 0 6px;
+  border-radius: var(--lu-r-pill);
+  background: var(--t-fg);
+  color: var(--t-bg);
+  font: 700 11px/20px var(--t-font-mono);
+  text-align: center;
+  cursor: pointer;
+}
+.lu .lu-count:hover,
+.lu .lu-count[aria-expanded="true"] {
+  background: var(--lu-acc);
+  color: var(--lu-acc-fg);
+}
+
+/* Hover / focus: push this dashboard now. */
+.lu .lu-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: var(--lu-r-xs);
+  background: rgba(21, 20, 18, 0.55);
+  opacity: 0;
+  transition: opacity 150ms ease-out;
+  pointer-events: none;
+}
+.lu .lu-push-ov {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: #fffdf8;
+  font: 600 10.5px/1.1 var(--t-font);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 150ms ease-out;
+  white-space: nowrap;
+}
+.lu .lu-push-ov:hover {
+  transform: translate(-50%, -50%);
+}
+.lu .lu-push-ov i {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--lu-acc);
+  color: var(--lu-acc-fg);
+  font-size: 14px;
+}
+.lu .lu-push-ov:hover i {
+  background: var(--lu-acc-hover);
+}
+.lu .lu-push-ov:focus-visible {
+  outline: none;
+}
+.lu .lu-push-ov:focus-visible i {
+  outline: 2px solid #fffdf8;
+  outline-offset: 2px;
+}
+.lu .lu-tile:hover .lu-scrim,
+.lu .lu-tile:focus-within .lu-scrim,
+.lu .lu-tile.reveal .lu-scrim,
+.lu .lu-tile.pushed .lu-scrim {
+  opacity: 1;
+}
+.lu .lu-tile:hover .lu-push-ov,
+.lu .lu-tile:focus-within .lu-push-ov,
+.lu .lu-tile.reveal .lu-push-ov {
+  opacity: 1;
+}
+.lu .lu-tile.pushed .lu-push-ov {
+  opacity: 0;
+  transition: none;
+  visibility: hidden;
+}
+.lu .lu-pushed-msg {
+  position: absolute;
+  z-index: 3;
+  left: 4px;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: none;
+  text-align: center;
+  font: 600 10.5px/1.3 var(--t-font);
+  color: #fffdf8;
+  overflow-wrap: anywhere;
+}
+.lu .lu-tile.pushed .lu-pushed-msg {
+  display: block;
+}
+.lu .lu-tile.push-failed .lu-pushed-msg {
+  color: #ffd9d2;
+}
+
+/* Current step: ring; next: quiet dashed outline; queued: amber dash. */
+.lu .lu-step.is-now .lu-thumb {
+  border: 2px solid var(--lu-acc);
+  box-shadow: 0 0 0 4px var(--lu-acc-soft);
+}
+:root[data-theme="dark"] .lu .lu-step.is-now .lu-thumb {
+  box-shadow:
+    0 0 0 4px var(--lu-acc-soft),
+    0 0 22px color-mix(in oklab, var(--lu-acc) 35%, transparent);
+}
+.lu .lu-step.is-next .lu-thumb {
+  outline: 1.5px dashed color-mix(in oklab, var(--t-fg) 45%, transparent);
+  outline-offset: 3px;
+}
+.lu .lu-step.is-waiting .lu-thumb {
+  outline: 2px dashed var(--t-warn);
+  outline-offset: 3px;
+}
+.lu .lu-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: var(--lu-r-pill);
+  font: 700 10px/1 var(--t-font-mono);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.lu .lu-pill.p-now {
+  background: var(--lu-acc);
+  color: var(--lu-acc-fg);
+}
+.lu .lu-pill.p-next {
+  color: var(--t-fg-soft);
+  background: color-mix(in oklab, var(--t-fg) 8%, transparent);
+}
+.lu .lu-pill.p-queued {
+  background: color-mix(in oklab, var(--t-warn) 18%, var(--t-surface));
+  color: color-mix(in oklab, var(--t-warn) 75%, var(--t-fg));
+}
+.lu .lu-step figcaption {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-width: 132px;
+}
+.lu .lu-step-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--t-fg);
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.lu .lu-step.is-now .lu-step-name {
+  color: var(--lu-acc-text);
+  font-weight: 700;
+}
+.lu .lu-step-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font: 11px var(--t-font-mono);
+  color: var(--t-muted);
+}
+.lu .lu-step-meta .lu-ico {
+  font-size: 11px;
+}
+.lu .lu-sep {
+  align-self: flex-start;
+  margin-top: calc(var(--slot-h, 27px) + var(--th) / 2 - 10px);
+  width: 34px;
+  display: grid;
+  place-items: center;
+  color: var(--t-muted);
+  font-size: 19px;
+}
+.lu .lu-sep .lu-ico {
+  stroke-width: 2;
+}
+.lu .lu-step.is-now .lu-sep {
+  color: var(--lu-acc-text);
+}
+.lu .lu-sep.loop {
+  width: 30px;
+  font-size: 16px;
+  opacity: 0.85;
+}
+
+/* Peek popover: a mini grid of a step's items. */
+.lu .lu-peek {
+  position: absolute;
+  z-index: 30;
+  width: min(380px, 100%);
+  padding: 12px;
+  background: var(--t-surface);
+  border: 1px solid var(--t-border-strong);
+  border-radius: var(--lu-r-card);
+  box-shadow: var(--lu-shadow-pop);
+}
+.lu .lu-peek-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.lu .lu-peek-head b {
+  font-size: 13.5px;
+}
+.lu .lu-peek-head .lu-mono {
+  font: 11px var(--t-font-mono);
+  color: var(--t-muted);
+}
+.lu .lu-peek-head .lu-ibtn {
+  margin-left: auto;
+  width: 28px;
+  height: 28px;
+}
+.lu .lu-peek-grid {
+  display: grid;
+  gap: 8px;
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 2px;
+}
+.lu .lu-peek-grid.p {
+  grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+}
+.lu .lu-peek-grid.l {
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+}
+.lu .lu-peek-grid .lu-thumb {
+  width: 100%;
+  height: auto;
+}
+.lu .lu-pk-item {
+  position: relative;
+}
+.lu .lu-push-mini {
+  position: absolute;
+  z-index: 2;
+  right: 3px;
+  bottom: 3px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--lu-acc);
+  color: var(--lu-acc-fg);
+  font-size: 11px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 150ms ease-out;
+}
+.lu .lu-push-mini:hover {
+  background: var(--lu-acc-hover);
+}
+.lu .lu-pk-item:hover .lu-push-mini,
+.lu .lu-pk-item:focus-within .lu-push-mini,
+.lu .lu-pk-item.pushed .lu-push-mini {
+  opacity: 1;
+}
+.lu .lu-pk-item.pushed::after {
+  content: "Pushed";
+  position: absolute;
+  z-index: 1;
+  inset: auto 0 0 0;
+  padding: 2px 0;
+  text-align: center;
+  font: 600 9.5px var(--t-font);
+  color: #fffdf8;
+  background: rgba(21, 20, 18, 0.7);
+}
+@media (hover: none) {
+  .lu .lu-push-mini {
+    opacity: 1;
+  }
+}
+
+/* ----- Timeline view: the week as a grid ---------------------------------
+   One row per day: the day bar's rod with Quiet hours, lineup blocks (the
+   same draggable .lu-blk) and held frames as a quiet arrow. Rows start
+   folded; an open row grows and every block shows its steps inside it
+   (lineups.js places them), today's live block its next advance. The grid
+   scrolls sideways inside its card with the day labels pinned. */
+.lu .lu-tl {
+  padding: 4px 12px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.lu .lu-tl-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+}
+.lu .lu-tl-hint {
+  font-size: 12px;
+  color: var(--t-muted);
+}
+.lu .lu-lbl {
+  margin: 0;
+  font: 600 10.5px/1.2 var(--t-font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--t-muted);
+}
+.lu .lu-ds-hdr .lu-today--tl {
+  display: flex;
+  justify-self: end;
+  align-self: start;
+}
+.lu .lu-tl-all {
+  margin-left: auto;
+  height: 30px;
+  font-size: 12.5px;
+}
+.lu .lu-tl-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pan-y;
+  scrollbar-width: thin;
+  padding-bottom: 4px;
+}
+.lu .lu-tlg {
+  min-width: 720px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.lu .lu-tlg-head,
+.lu .lu-tlg-row {
+  display: grid;
+  grid-template-columns: var(--lu-tl-lab) minmax(0, 1fr);
+  column-gap: 10px;
+  align-items: center;
+  padding: 3px 8px 3px 0;
+}
+.lu .lu-tlg-head {
+  padding-bottom: 6px;
+}
+.lu .lu-tlg-corner {
+  align-self: stretch;
+}
+.lu .lu-tlg-row {
+  border-radius: var(--lu-r);
+  cursor: pointer;
+}
+.lu .lu-tlg-row.is-today {
+  background: var(--lu-live-wash);
+}
+:root:not([data-theme="dark"]) .lu .lu-tlg-row.is-today {
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--lu-acc) 30%, transparent);
+}
+.lu .lu-tlg-row.is-sel .lu-trk.tl {
+  box-shadow: 0 0 0 1px var(--t-border-strong);
+  border-radius: 2px;
+}
+/* Pinned day labels: padded, on the grid's background, edged. */
+.lu .lu-tlg-corner,
+.lu .lu-tlg-lab {
+  position: sticky;
+  left: 0;
+  z-index: 6;
+  background: var(--lu-sched-bg);
+  box-shadow: 1px 0 0 var(--t-border);
+}
+.lu .lu-tlg-lab {
+  display: flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 6px 0 12px;
+  font: 600 11.5px var(--t-font-mono);
+  color: var(--t-muted);
+  text-align: left;
+  cursor: pointer;
+}
+.lu .lu-tlg-lab:hover {
+  color: var(--t-fg);
+}
+.lu .lu-tlg-row.is-today .lu-tlg-lab {
+  background: var(--lu-live-wash);
+  color: var(--lu-acc-text);
+}
+.lu .lu-tlg-row.is-open .lu-tlg-lab {
+  color: var(--t-fg);
+}
+.lu .lu-tlg-head .lu-scale {
+  margin: 0;
+}
+
+.lu .lu-trk.tl {
+  transition: height 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.lu .lu-trk.tl.xopen.p {
+  height: 76px;
+}
+.lu .lu-trk.tl.xopen.l {
+  height: 62px;
+}
+.lu .lu-trk.tl .lu-blk.open {
+  top: 2px;
+  bottom: 2px;
+  align-items: flex-start;
+  padding-top: 6px;
+}
+.lu .lu-trk.tl.xopen .lu-blk:not(.open):not(.hold):not(.push) {
+  top: calc(50% - 10px);
+  bottom: auto;
+  height: 20px;
+}
+/* A single push is a dot on the rod. */
+.lu .lu-trk.tl .lu-blk.push {
+  min-width: 0;
+  width: 10px !important;
+  height: 10px;
+  top: calc(50% - 5px);
+  bottom: auto;
+  margin-left: -5px;
+  padding: 0;
+  border-radius: 50%;
+}
+/* Held frames: a quiet arrow from the previous block's last item; solid
+   once under way, dashed ahead, the accent while it follows the live block. */
+.lu .lu-harrow {
+  position: absolute;
+  top: 50%;
+  height: 0;
+  margin-top: -0.75px;
+  border-top: 1.5px solid var(--t-muted);
+  z-index: 2;
+  color: var(--t-muted);
+  opacity: 0.75;
+  pointer-events: auto;
+}
+.lu .lu-harrow::after {
+  content: "";
+  position: absolute;
+  right: -2px;
+  top: -4px;
+  border-left: 5px solid currentColor;
+  border-top: 3px solid transparent;
+  border-bottom: 3px solid transparent;
+}
+.lu .lu-harrow.dash {
+  border-top-style: dashed;
+}
+.lu .lu-harrow.acc {
+  border-top-color: var(--lu-acc-text);
+  color: var(--lu-acc-text);
+}
+.lu .lu-wb-hold {
+  position: absolute;
+  top: calc(50% - var(--rod) / 2 - 28px);
+  z-index: 2;
+  display: none;
+  align-items: center;
+  gap: 5px;
+  font: 11px/1 var(--t-font);
+  color: var(--t-muted);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.lu .lu-wb-hold .lu-thumb {
+  height: 20px;
+  width: calc(20px * var(--arw) / var(--arh));
+  border-radius: 2px;
+}
+.lu .lu-trk.l .lu-wb-hold .lu-thumb {
+  height: 14px;
+  width: calc(14px * var(--arw) / var(--arh));
+}
+.lu .lu-trk.xopen .lu-wb-hold {
+  display: inline-flex;
+}
+.lu .lu-trk.xopen .lu-wb-hold.gone {
+  display: none;
+}
+.lu .lu-trk.dragging :is(.lu-wb-hold, .lu-harrow) {
+  visibility: hidden;
+}
+@container lu-ds (max-width: 600px) {
+  .lu .lu-trk:not(.xopen) .lu-harrow {
+    display: none;
+  }
+}
+/* Steps inside an open block. */
+.lu .lu-wb-th {
+  position: absolute;
+  bottom: 6px;
+  z-index: 1;
+  display: none;
+}
+.lu .lu-blk.open .lu-wb-th:not([hidden]) {
+  display: block;
+}
+.lu .lu-trk.p .lu-wb-th .lu-thumb {
+  height: 44px;
+  width: calc(44px * var(--arw) / var(--arh));
+}
+.lu .lu-trk.l .lu-wb-th .lu-thumb {
+  height: 30px;
+  width: calc(30px * var(--arw) / var(--arh));
+}
+.lu .lu-wb-th.r-now .lu-thumb {
+  box-shadow: 0 0 0 2px var(--lu-acc-fg);
+}
+.lu .lu-wb-th.r-waiting .lu-thumb {
+  outline: 2px dashed var(--t-warn);
+  outline-offset: 1px;
+}
+.lu .lu-wb-more,
+.lu .lu-wb-rep {
+  position: absolute;
+  bottom: 6px;
+  z-index: 1;
+  height: 20px;
+  min-width: 26px;
+  padding: 0 5px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--lu-r-pill);
+  background: color-mix(in oklab, currentColor 18%, transparent);
+  font: 700 10.5px var(--t-font-mono);
+  white-space: nowrap;
+  cursor: help;
+}
+/* "×N updates" beside a block's one repeated thumbnail. */
+.lu .lu-wb-rep {
+  display: none;
+}
+.lu .lu-blk.open .lu-wb-rep:not([hidden]) {
+  display: block;
+  line-height: 20px;
+  text-align: center;
+}
+.lu .lu-wb-rep.short .lu-wb-rep-w {
+  display: none;
+}
+.lu .lu-tnext,
+.lu .lu-tnext-l {
+  display: none;
+}
+.lu .lu-blk.open .lu-tnext {
+  display: block;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-left: 2px dashed currentColor;
+  z-index: 2;
+  pointer-events: none;
+}
+.lu .lu-blk.open .lu-tnext-l {
+  display: inline-flex;
+  position: absolute;
+  top: 5px;
+  z-index: 3;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--lu-acc-fg);
+  color: var(--lu-acc);
+  font: 700 10.5px/1.3 var(--t-font-mono);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.lu .lu-blk:not(.live).open .lu-tnext-l {
+  background: var(--t-fg);
+  color: var(--t-bg);
+}
+@container lu-ds (max-width: 560px) {
+  .lu .lu-tnext-l .lu-nx-d {
+    display: none;
+  }
+}
+.lu .lu-blk-l.gone {
+  visibility: hidden;
+}
+/* Dragging in the grid: the same change, ghosted on the lineup's other days. */
+.lu .lu-ghost {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  z-index: 4;
+  border: 1.5px dashed var(--t-fg-soft);
+  border-radius: 6px;
+  pointer-events: none;
+}
+:root[data-ui="paper"] .lu .lu-ghost {
+  border-radius: 2px;
+}
+.lu .lu-trk.tl .lu-blk[tabindex]:focus-visible {
+  outline: 2px solid var(--t-fg);
+  outline-offset: 2px;
+  z-index: 4;
+}
+@container lu-ds (max-width: 560px) {
+  .lu {
+    --lu-tl-lab: 52px;
+  }
+  .lu .lu-tlg-head,
+  .lu .lu-tlg-row {
+    column-gap: 6px;
+    padding-right: 4px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lu .lu-trk.tl {
+    transition: none;
+  }
+}
+
+/* ----- Empty, error, no match ------------------------------------------- */
+.lu .lu-empty {
+  padding: 48px 20px;
+  text-align: center;
+  color: var(--t-muted);
+  border: 1px dashed var(--t-border-strong);
+  border-radius: var(--lu-r-card);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.lu .lu-empty > .lu-ico {
+  font-size: 32px;
+  color: var(--lu-acc);
+}
+.lu .lu-empty h2 {
+  font-size: 18px;
+  color: var(--t-fg);
+}
+.lu .lu-none-match {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--t-muted);
+  border: 1px dashed var(--t-border-strong);
+  border-radius: var(--lu-r-card);
+}
+.lu .lu-render-error {
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  border: 1px solid var(--t-danger);
+  border-radius: var(--lu-r);
+  background: color-mix(in oklab, var(--t-danger) 12%, var(--t-surface));
+  color: var(--t-fg);
+  font-size: 13px;
+}
+.lu .lu-render-error b {
+  color: var(--t-danger);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lu .lu-dot.pulse {
+    animation: none;
+  }
+  .lu .lu-fold .lu-ico,
+  .lu .lu-step .lu-thumb,
+  .lu .lu-row,
+  .lu .lu-blk,
+  .lu .lu-step,
+  .lu .lu-scrim,
+  .lu .lu-push-ov,
+  .lu .lu-push-mini {
+    transition: none;
+  }
+  .lu .lu-row.just-opened .lu-row-body,
+  .lu .lu-ds.just-opened .lu-sched {
+    animation: none;
+  }
+}
+
+/* ----- Live row edge (Paper light) ---------------------------------------
+   On the light surface the live wash alone blends in, so the live row (and
+   only it) gets an accent hairline and a 3px accent left edge. Dark keeps
+   the wash. */
+:root:not([data-theme="dark"]) .lu .lu-row.is-live {
+  box-shadow:
+    inset 0 0 0 1px var(--lu-live-edge),
+    inset 3px 0 0 var(--lu-acc);
+}
+:root:not([data-theme="dark"]) .lu {
+  --lu-live-edge: color-mix(in oklab, var(--lu-acc) 82%, var(--t-surface));
+}
+:root:not([data-theme="dark"]) .lu .lu-row.is-live + .lu-row {
+  border-top-color: transparent;
+}
+
+/* ----- Touch: phones and tablets ------------------------------------------
+   Every control is at least 44px; nothing needs hover (Push now shows its
+   button on the tile, the first tap opens it, the second pushes); inputs
+   are 16px so iOS does not zoom; the strip scrolls with momentum. */
+.lu .lu-strip-scroll,
+.lu .lu-tl-scroll {
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pan-y;
+}
+.lu .lu-dp-close {
+  display: none;
+}
+.lu .lu-sheet-scrim {
+  display: none;
+}
+@media (pointer: coarse) {
+  .lu .lu-trk.tl:not(.xopen) {
+    height: 44px;
+    --rod: 10px;
+  }
+  .lu .lu-trk.tl:not(.xopen) .lu-blk:not(.hold):not(.push) {
+    top: 0;
+    bottom: 0;
+  }
+  .lu .lu-tlg-lab {
+    height: 44px;
+    min-width: 44px;
+  }
+  .lu .lu-tl-all {
+    height: 44px;
+    min-height: 44px;
+  }
+  .lu {
+    --lu-hit: 44px;
+    --lu-fold-w: 44px;
+  }
+  .lu .lu-btn-primary,
+  .lu .lu-btn-ghost,
+  .lu .lu-btn-ghost.sm,
+  .lu .lu-btn-save {
+    height: 44px;
+    min-height: 44px;
+  }
+  .lu .lu-hint-link {
+    min-height: 44px;
+  }
+  .lu .lu-tb-search,
+  .lu .lu-tb-select {
+    height: 44px;
+  }
+  .lu .lu-seg,
+  :root[data-ui="paper"] .lu .lu-seg {
+    height: 50px;
+  }
+  :root[data-ui="paper"] .lu :is(.lu-tb-search, .lu-tb-select) {
+    height: 44px;
+  }
+  .lu .lu-seg button {
+    min-width: 44px;
+  }
+  .lu input,
+  .lu select,
+  .lu .lu-tb-search input,
+  .lu .lu-win-edit input {
+    font-size: 16px !important;
+  }
+  .lu .lu-win-edit input {
+    height: 44px !important;
+    width: 116px;
+  }
+  .lu .lu-fold,
+  .lu .lu-ibtn,
+  .lu .lu-ibtn.sm,
+  .lu .lu-more summary {
+    width: 44px;
+    height: 44px;
+  }
+  .lu .lu-more-menu :is(a, button) {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+  }
+  .lu .lu-win {
+    min-height: 44px;
+    padding: 0 6px;
+  }
+  .lu .lu-dp-label {
+    height: 44px;
+  }
+  .lu .lu-days {
+    display: flex;
+    flex: 1 1 100%;
+    min-width: min(100%, 320px);
+    gap: 2px;
+  }
+  .lu .lu-days .lu-dt {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+    max-width: 48px;
+    height: 44px;
+    font-size: 12px;
+  }
+  .lu .lu-dp-day {
+    height: 48px;
+    min-width: 44px;
+  }
+  .lu .lu-dp-today {
+    height: 44px;
+  }
+  .lu .lu-trk.tall {
+    height: 44px;
+    --rod: 12px;
+  }
+  .lu .lu-trk.tall .lu-blk:not(.hold) {
+    top: 0;
+    bottom: 0;
+  }
+  /* A sliver for a single push is hard to hit; widen its target. */
+  .lu .lu-blk.push[data-edit]::after {
+    content: "";
+    position: absolute;
+    inset: 0 -20px;
+  }
+  .lu .lu-blk.push[data-edit] {
+    overflow: visible;
+  }
+  /* ×N: a 44px target in the tile's top-right corner, the badge inside it. */
+  .lu .lu-count {
+    right: -8px;
+    bottom: auto;
+    top: -10px;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    padding: 0 4px 0 0;
+    border-radius: 0;
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-end;
+    background: linear-gradient(var(--t-fg), var(--t-fg)) no-repeat right top / 32px 20px;
+    color: var(--t-bg);
+    line-height: 20px;
+  }
+  :root:not([data-ui="paper"]) .lu .lu-count {
+    border-radius: 0;
+  }
+  .lu .lu-count:hover,
+  .lu .lu-count[aria-expanded="true"] {
+    background: linear-gradient(var(--lu-acc), var(--lu-acc)) no-repeat right top / 32px 20px;
+    color: var(--lu-acc-fg);
+  }
+  /* Push now: always there in the bottom-left corner; label after the first tap. */
+  .lu .lu-push-ov,
+  .lu .lu-push-ov:hover {
+    opacity: 1;
+    left: 0;
+    top: auto;
+    bottom: 0;
+    transform: none;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 6px;
+    min-width: 44px;
+    height: 44px;
+    padding: 0 0 0 6px;
+  }
+  .lu .lu-push-ov span {
+    display: none;
+  }
+  .lu .lu-tile.reveal .lu-push-ov span {
+    display: inline;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  }
+  .lu .lu-tile:hover .lu-scrim,
+  .lu .lu-tile:focus-within .lu-scrim {
+    opacity: 0;
+  }
+  .lu .lu-tile.reveal .lu-scrim,
+  .lu .lu-tile.pushed .lu-scrim {
+    opacity: 1;
+  }
+  .lu .lu-push-mini {
+    width: 44px;
+    height: 44px;
+    right: 0;
+    bottom: 0;
+    opacity: 1;
+  }
+  .lu .lu-peek-grid.p {
+    grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  }
+  .lu .lu-peek-grid.l {
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  }
+  .lu .lu-peek-head .lu-ibtn {
+    width: 44px;
+    height: 44px;
+  }
+  .lu .lu-dp-close {
+    width: 44px;
+    height: 44px;
+  }
+}
+/* Narrow cards on touch: the row head gives the day tiles a full line. */
+@container lu-ds (max-width: 560px) {
+  @media (pointer: coarse) {
+    .lu .lu-row-head {
+      padding: 6px 2px 9px 8px;
+    }
+    .lu .lu-row-meta {
+      gap: 6px 12px;
+    }
+    .lu .lu-ds-hdr {
+      padding: 10px 4px 14px 14px;
+    }
+    .lu .lu-sched {
+      margin: 0 4px 4px;
+      padding: 8px 4px 4px;
+    }
+  }
+}
+/* A read-only bar (phones, narrow cards): taps scroll the page, not the bar. */
+.lu.bar-ro .lu-blk {
+  pointer-events: none;
+  touch-action: auto;
+  cursor: default;
+}
+.lu.bar-ro .lu-h {
+  display: none;
+}
+
+/* Popovers become bottom sheets on phones: on screen, scroll-locked, with a
+   close button and a scrim that closes on tap. */
+@media (max-width: 600px), (pointer: coarse) and (max-height: 500px) {
+  .lu .lu-dp-pop,
+  .lu .lu-peek {
+    position: fixed;
+    z-index: 2000;
+    left: 0 !important;
+    right: 0;
+    top: auto !important;
+    bottom: 0;
+    width: auto;
+    transform: none !important;
+    max-height: min(75vh, 560px);
+    max-height: min(75dvh, 560px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 14px 14px calc(14px + env(safe-area-inset-bottom));
+    border-radius: 12px 12px 0 0;
+    border-width: 1px 0 0;
+    box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.25);
+  }
+  :root[data-ui="paper"] .lu :is(.lu-dp-pop, .lu-peek) {
+    border-radius: 2px 2px 0 0;
+  }
+  .lu .lu-peek-grid {
+    max-height: none;
+  }
+  .lu .lu-dp-days {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+  .lu .lu-dp-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .lu .lu-dp-close {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border-radius: var(--lu-r);
+    color: var(--t-fg-soft);
+    cursor: pointer;
+  }
+  .lu .lu-sheet-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 1999;
+    background: rgba(0, 0, 0, 0.35);
+  }
+}
+.lu .lu-dp-head {
+  display: none;
+}
+@media (max-width: 600px), (pointer: coarse) and (max-height: 500px) {
+  .lu .lu-dp-head {
+    display: flex;
+  }
+  .lu .lu-dp-head b {
+    font-size: 14px;
+  }
+}
+
+/* Unsaved changes: the bar sticks to the bottom of the screen while the card
+   is in view, above the home indicator; it steps aside for the keyboard. */
+.lu.kb-open .lu-pending {
+  position: static;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lu .lu-sheet-scrim {
+    transition: none;
+  }
+}
+
+/* Quiet delivery notes stay with the lineup in either rendering path. */
+.lu .lu-row-warning {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  color: var(--t-muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+.lu .lu-row-warning .lu-ico {
+  flex-shrink: 0;
+  align-self: center;
+}
+
+.lu [data-lu-count] {
+  white-space: nowrap;
+}
+.lu .lu-tlg-row.is-today.is-open .lu-tlg-lab {
+  color: var(--lu-acc-text);
+}
+
+@container lu-page (min-width: 1000px) and (max-width: 1250px) {
+  .lu .lu-tb-search {
+    flex-basis: 170px;
+  }
+  .lu .lu-tb-select {
+    padding-right: 24px;
+    padding-left: 8px;
+    font-size: 12px;
+  }
+  .lu .lu-tb {
+    column-gap: 6px;
+  }
+  .lu .lu-ds-hdr {
+    grid-template-columns: auto minmax(0, 1fr) minmax(0, 1.25fr) var(--lu-fold-w);
+    column-gap: 12px;
+  }
+  .lu .lu-ds-tags {
+    column-gap: 8px;
+  }
+  .lu .lu-ds-tags .lu-im {
+    font-size: 10.5px;
+    white-space: nowrap;
+  }
+}
+
+.lu .lu-today .lu-blk {
+  padding-inline: 4px;
+}
+.lu .lu-today .lu-blk-l {
+  font-size: 11px;
+}
+
+/* ----- Today | All ------------------------------------------------------- */
+.lu .lu-seg[hidden] {
+  display: none;
+}
+/* First paint only: the inline script in decks.html sets the attribute from
+   the remembered choice; lineups.js removes it and filters the rows itself
+   (by the day the bar shows, which this rule cannot know). Mirrors the
+   default "today" rule: only live and later-today rows stay, so every muted
+   row (finished today, not today, switched off) goes; by-hand rows aside. */
+.lu[data-lu-boot-scope="today"] .lu-row.is-off:not([data-kind="manual"]) {
+  display: none;
+}
+.lu .lu-scope-empty {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+}

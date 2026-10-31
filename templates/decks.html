@@ -1,421 +1,97 @@
 {% extends "_base.html" %}
+{% import "_lineups.html" as lu %}
 {% block title %}Lineups, Tesserae{% endblock %}
+{% block page_class %}lu-page{% endblock %}
 
 {% block main %}
-<header class="page-head">
-  <h1><i class="ph ph-monitor-play" aria-hidden="true"></i> Lineups</h1>
-  <p class="lede">What each display shows, and when it changes.</p>
-  <p class="deck-actions-row">
-    <button type="button" class="button primary" data-open-timed-wizard>
-      <i class="ph ph-magic-wand" aria-hidden="true"></i><span>Set up a display</span>
-    </button>
-    {# The pause switch stays under Settings > Server > Automation because it
-       also halts schedules and buttons; this page only points at it. #}
-    {% if not automation_paused %}
-    <a class="dk-automation-hint" href="{{ automation_url }}" data-automation-hint>
-      <i class="ph ph-pause-circle" aria-hidden="true"></i><span>Pause everything from Settings › Server › Automation</span>
-    </a>
-    {% endif %}
-  </p>
+{#- Lineups page, redesign round 7. ``vm`` is app.lineups_view.LineupsView
+   .to_dict(): every display as a header (what is on screen, what comes next,
+   a day bar) over its lineups. The markup is complete without JavaScript;
+   static/lineups.js adds folding, the day picker, inline edits with
+   Save/Undo, Push now, the Timeline view and the auto-refresh, re-drawing
+   from /decks/view.json with static/lineups_render.js. -#}
+{#- The route passes it as ``lineups_view``; None means it failed to build,
+    which the page says (with a retry) rather than drawing nothing. -#}
+{%- if vm is not defined or not vm %}{% set vm = lineups_view if lineups_view is defined else none %}{% endif -%}
+{%- set has_vm = vm is not none and vm -%}
+{%- set displays = vm.displays if has_vm else [] -%}
+{%- set orphans = vm.unassigned if has_vm else [] -%}
+<script type="application/json" data-lu-icons>{{ lu.LU_ICONS|tojson }}</script>
+<div class="lu" data-lu
+     data-view-url="{{ request.script_root }}/decks/view.json"
+     data-edits-url="{{ request.script_root }}/decks/edits"
+     data-events-url="{{ url_for('events.stream') }}">
+{#- Today/All: apply a remembered "today" before first paint so the rows that
+    do not run today never flash. lineups.js takes over (and drops the
+    boot attribute) once it runs; storage may be blocked. -#}
+<script>try{if(localStorage.getItem("tesserae.lineups.scope")==="today")document.currentScript.parentNode.setAttribute("data-lu-boot-scope","today")}catch(e){}</script>
+<header class="lu-head">
+  <div>
+    <h1>{{ lu.ico('screen') }}Lineups</h1>
+    <p class="lu-lede">What each display shows, and when it changes.</p>
+  </div>
+  {#- The pause switch stays under Settings > Server > Automation because it
+      also halts schedules and buttons; this page only points at it. #}
+  {% if not automation_paused %}
+  <a class="lu-hint-link" href="{{ automation_url }}" data-automation-hint title="Pause everything from Settings › Server › Automation">{{ lu.ico('pausec') }}Pause everything</a>
+  {% endif %}
+  <button type="button" class="lu-btn-primary" data-open-timed-wizard>{{ lu.ico('plus') }}<span>Set up a display</span></button>
 </header>
 {% if automation_paused %}
-<div class="dx-warn-band dk-paused-band" role="status" data-automation-paused>
+<div class="dx-warn-band lu-paused-band" role="status" data-automation-paused>
   <i class="ph-fill ph-warning" aria-hidden="true"></i>
   <p>Automation is paused. Nothing on this page will push until it is resumed.
     <a href="{{ automation_url }}">Resume in Settings</a></p>
 </div>
 {% endif %}
-{% include "_timed_wizard.html" %}
-{% include "_legacy_migration_notice.html" %}
 
-{# Lineups page: one section per display, one row per deck inside it, with a
-   kind-specific body: screen cards for every dashboard, a 24h rail for
-   schedules, steppers for by-hand. #}
-{# The frame keeps the dashboard's own shape when its size is known: the
-   aspect ratio rides on the element as custom properties, a portrait one is
-   marked so it gets the taller box. Without a size it stays the fixed box. #}
-{% macro dk_frame_attrs(w, h) -%}
-{%- if w and h %} style="--thumb-ar: {{ w }} / {{ h }}; --thumb-r: {{ '%.4f'|format(w / h) }}"{% endif -%}
-{%- endmacro %}
-{% macro dk_screen(s, total=None, edit_url=None, behind=None, poll=None) %}
-{# ``s.waiting``: the step the server intends, which this display has not
-   fetched yet. The frame gets the dashed amber outline and a WAITING ribbon,
-   and one line under the caption says how far behind the panel is. #}
-<figure class="dk-screen{% if s.live %} is-live{% endif %}{% if s.waiting %} is-waiting{% endif %}">
-  <div class="dk-screen-frame{% if s.w and s.h and s.h > s.w %} is-portrait{% endif %}"{{ dk_frame_attrs(s.w, s.h) }}>
-    {% if s.thumb %}<img src="{{ s.thumb }}" alt="" loading="lazy">{% else %}<i class="ph ph-monitor" aria-hidden="true"></i>{% endif %}
-    {% if s.live %}<span class="dk-screen-wash" aria-hidden="true"></span>{% endif %}
-    {% if s.waiting %}<span class="tg tg--sm tg--upper tg--warn dk-ribbon">waiting</span>{% endif %}
-  </div>
-  <figcaption>
-    {% if s.live %}<i class="ph-fill ph-play" aria-hidden="true"></i>{% endif %}
-    <span class="dk-screen-name">{{ s.name }}</span>
-    {% if s.cond %}
-    {% if edit_url %}<a class="dk-cond" href="{{ edit_url }}" title="Shows only while its conditions pass. Edit them."><i class="ph-bold ph-funnel" aria-hidden="true"></i></a>
-    {% else %}<span class="dk-cond" title="Shows only while its conditions pass"><i class="ph-bold ph-funnel" aria-hidden="true"></i></span>{% endif %}
-    {% endif %}
-    {% if total and s.index is not none %}<span class="dk-step-ix">{{ s.index + 1 }}/{{ total }}</span>{% endif %}
-  </figcaption>
-  {% if s.waiting and behind %}
-  <span class="dk-behind">{{ behind }}{% if poll %} · poll ≈ {{ poll }}{% endif %}</span>
+{% if displays or orphans %}
+{#- The toolbar only filters and switches what is already drawn, so it
+    waits for the script (lineups.js unhides it). -#}
+<div class="lu-tb" role="search" data-lu-toolbar hidden>
+  <label class="lu-tb-search">{{ lu.ico('search') }}
+    <input type="search" placeholder="Search lineups" aria-label="Search lineups" autocomplete="off" spellcheck="false" data-lu-q></label>
+  {% if displays|length > 1 %}
+  <select class="lu-tb-select" aria-label="Filter by display" data-lu-filter="display"><option value="">All displays</option>{% for d in displays %}<option value="{{ d.id }}">{{ d.name }}</option>{% endfor %}</select>
   {% endif %}
-</figure>
-{% endmacro %}
-
-{# The frame a display last fetched (REST) or was last sent (MQTT): the
-   left column of a rotation row. The group header already names the
-   display, so the ribbon only says which side of the divider this is. #}
-{% macro dk_on_panel(c) %}
-{% if c.on_panel %}
-<figure class="dk-screen dk-screen--panel is-live">
-  <div class="dk-screen-frame{% if c.on_panel.w and c.on_panel.h and c.on_panel.h > c.on_panel.w %} is-portrait{% endif %}"{{ dk_frame_attrs(c.on_panel.w, c.on_panel.h) }}>
-    {% if c.on_panel.thumb %}<img src="{{ c.on_panel.thumb }}" alt="" loading="lazy">{% else %}<i class="ph ph-monitor" aria-hidden="true"></i>{% endif %}
-    <span class="dk-screen-wash" aria-hidden="true"></span>
-    <span class="tg tg--sm tg--upper tg--teal dk-ribbon">on the panel</span>
-  </div>
-  <figcaption>
-    <i class="ph-fill ph-play" aria-hidden="true"></i>
-    <span class="dk-screen-name">{{ c.on_panel.name }}</span>
-    {% if c.on_panel.at_label %}<span class="dk-screen-at">{{ c.on_panel.at_label }}</span>{% endif %}
-  </figcaption>
-</figure>
-{% else %}
-<figure class="dk-screen dk-screen--panel is-empty">
-  <div class="dk-screen-frame">
-    <i class="ph ph-monitor" aria-hidden="true"></i>
-    <span class="tg tg--sm tg--upper tg--teal dk-ribbon">on the panel</span>
-  </div>
-  <figcaption><span class="dk-screen-name">{{ c.panel_empty_label }}</span></figcaption>
-</figure>
-{% endif %}
-{% endmacro %}
-
-{% macro dk_row(c, row_id, show_chips=False, group_id='') %}
-<article class="dk-row{% if c.playing %} is-playing{% endif %}{% if not c.enabled %} is-off{% endif %}{% if c.is_new %} is-new{% endif %}"
-         data-kind="{{ c.kind }}"{% if row_id %} id="udeck-{{ c.id }}"{% endif %}
-         data-lf-item data-lf-uid="{{ c.id }}"
-         data-lf-text="{{ (c.name ~ ' ' ~ c.badge ~ ' ' ~ (c.device_names|join(' ')) ~ ' ' ~ (c.screens|map(attribute='name')|join(' ')))|lower }}"
-         data-lf-display="{{ group_id or '-' }}" data-lf-kind="{{ c.kind }}"
-         data-lf-state="{{ ('playing on' if c.playing else 'on') if c.enabled else 'off' }}"
-         data-sort-name="{{ c.name }}" data-sort-kind="{{ c.badge }}"
-         data-sort-screens="{{ c.screens|length }}">
-  <div class="dk-row-head">
-    <span class="tg tg--upper dk-badge{% if c.playing and c.kind == 'cycle' %} tg--teal{% endif %}">
-      {% if c.playing and c.kind == 'cycle' %}<i class="ph-fill ph-play" aria-hidden="true"></i>{% else %}<i class="ph-bold ph-{{ c.badge_icon }}" aria-hidden="true"></i>{% endif %}{{ c.badge }}
-    </span>
-    <span class="dk-name">{{ c.name }}</span>
-    {# The section header names the display; rows repeat it only in the
-       groups that have no display of their own. #}
-    {% if show_chips %}
-    {% for dn in c.device_names %}
-    <span class="tg dk-devchip"><i class="ph ph-monitor" aria-hidden="true"></i>{{ dn }}</span>
-    {% endfor %}
-    {% endif %}
-    <span class="dk-meta">{{ c.meta }}</span>
-    {# An enabled rotation that is not playing says what the display holds
-       instead and when it takes the panel back (#280). #}
-    {% if c.paused_reason %}
-    <span class="tg tg--warn dk-paused" title="This rotation is enabled but the display is showing something else">
-      <i class="ph ph-pause" aria-hidden="true"></i>{{ c.paused_reason }}
-    </span>
-    {% endif %}
-    <div class="dk-actions">
-      {% if c.kind == 'cycle' and c.play_url %}
-      <form method="post" action="{{ c.play_url }}" class="inline">
-        <button type="submit" class="dk-act is-primary">Advance</button>
-      </form>
-      {% else %}
-      <form method="post" action="{{ c.fire_url }}" class="inline">
-        <button type="submit" class="dk-act is-primary">Push now</button>
-      </form>
-      {% endif %}
-      <a class="dk-act" href="{{ c.edit_url }}">Edit</a>
-      <details class="dk-more">
-        <summary aria-label="More actions for {{ c.name }}"><i class="ph-bold ph-dots-three" aria-hidden="true"></i></summary>
-        <div class="dk-more-menu">
-          {% if c.kind == 'cycle' %}
-          <form method="post" action="{{ c.fire_url }}" class="inline">
-            <button type="submit" class="dk-more-item">Push now</button>
-          </form>
-          {% endif %}
-          <form method="post" action="{{ c.toggle_url }}" class="inline">
-            <button type="submit" class="dk-more-item">{{ 'Disable' if c.enabled else 'Enable' }}</button>
-          </form>
-          <form method="post" action="{{ c.delete_url }}" class="inline"
-                onsubmit="return confirm('Delete {{ c.name }}?');">
-            <button type="submit" class="dk-more-item is-danger">Delete</button>
-          </form>
-        </div>
-      </details>
-    </div>
-  </div>
-
-  {% if c.warning %}
-  <p class="dk-warn"><i class="ph-fill ph-warning" aria-hidden="true"></i>{{ c.warning }}</p>
-  {% endif %}
-
-  {% if c.kind == 'cycle' %}
-  {# Two truths side by side: what the panel holds, then the planned strip
-     with the intended step marked (live once the panel shows it, waiting
-     until then), and the dwell countdown on the right. #}
-  <div class="dk-body dk-body--cycle">
-    <div class="dk-panel">{{ dk_on_panel(c) }}</div>
-    <span class="dk-divider" aria-hidden="true"></span>
-    <div class="dk-strip">
-      {% for s in c.screens %}
-      {% if not loop.first %}<i class="ph-bold ph-caret-right dk-chevron" aria-hidden="true"></i>{% endif %}
-      {{ dk_screen(s, total=c.steps_total, edit_url=c.edit_url, behind=c.behind_label, poll=c.next_poll_label) }}
-      {% endfor %}
-    </div>
-    <div class="dk-timing">
-      <div class="dk-stats">
-        {% if c.refreshes_today is not none %}
-        <div class="dk-next dk-count" title="Dwell windows this rotation opens today. Conditions and the minimum hold can skip some."><span>refreshes today</span><strong class="is-ink">{{ c.refreshes_today }}</strong></div>
-        {% endif %}
-        {% if c.next_advance %}
-        <div class="dk-next"><span>next advance</span><strong>{{ c.next_advance }}</strong></div>
-        {% endif %}
-      </div>
-      {% if c.next_update %}<p class="dk-next-update" data-next-update>{{ c.next_update.text_display }}</p>{% endif %}
-      {% if c.dwell_pct is not none %}
-      <div class="dk-progress" role="progressbar" aria-label="Time through the current dwell" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ c.dwell_pct }}">
-        <div class="dk-progress-track"><div class="dk-progress-fill" style="width: {{ c.dwell_pct }}%"></div></div>
-        <div class="dk-progress-labels"><span>{{ c.dwell_start_label }}</span><span>{{ c.next_in_label }}</span></div>
-      </div>
-      {% endif %}
-    </div>
-  </div>
-  {% elif c.kind == 'send' %}
-  <div class="dk-body dk-body--send">
-    {% for s in c.screens %}{{ dk_screen(s, edit_url=c.edit_url) }}{% endfor %}
-    <div class="dk-rail-wrap">
-      <div class="dk-rail-scale"><span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>24:00</span></div>
-      <div class="dk-rail">
-        {% for m in c.marks %}<span class="dk-rail-fire" style="left: {{ m }}%"></span>{% endfor %}
-        <span class="dk-rail-now" data-now-mark style="left: {{ c.now_pct }}%"></span>
-      </div>
-      <div class="dk-rail-legend">
-        <span><i class="dk-swatch" aria-hidden="true"></i>{{ c.fires_label }}</span>
-        <span><i class="dk-hairline" aria-hidden="true"></i>now <span data-now-label>{{ now_label }}</span></span>
-      </div>
-    </div>
-    {% if c.refreshes_today is not none %}
-    <div class="dk-next dk-count" title="Fires this schedule projects for today, the marks on the rail."><span>refreshes today</span><strong class="is-ink">{{ c.refreshes_today }}</strong></div>
-    {% endif %}
-    {% if c.next_fire %}
-    <div class="dk-next"><span>next push</span><strong class="is-ink">{{ c.next_fire }}</strong>{% if c.next_update %}<span class="dk-next-update" data-next-update>{{ c.next_update.text_display }}</span>{% endif %}</div>
-    {% endif %}
-  </div>
-  {% else %}
-  <div class="dk-body dk-body--nav">
-    {% for s in c.screens %}{{ dk_screen(s, edit_url=c.edit_url) }}{% endfor %}
-    {% if c.advance == 'both' %}
-    <span class="dk-nav-note"><i class="ph ph-clock-clockwise" aria-hidden="true"></i>advances on its timer, or on a press</span>
-    {% else %}
-    <span class="dk-nav-note"><i class="ph ph-hand-tap" aria-hidden="true"></i>waiting on a press, no timer</span>
-    {% endif %}
-    {% if c.refreshes_today is not none %}
-    <div class="dk-next dk-count" title="Timer advances this deck projects for today. Taps are extra."><span>refreshes today</span><strong class="is-ink">{{ c.refreshes_today }}</strong></div>
-    {% endif %}
-    <div class="dk-steppers">
-      <form method="post" action="{{ c.step_url }}" class="inline">
-        <input type="hidden" name="dir" value="prev">
-        <button type="submit" class="dk-stepper" aria-label="Step back one dashboard"><i class="ph ph-caret-left" aria-hidden="true"></i></button>
-      </form>
-      <form method="post" action="{{ c.step_url }}" class="inline">
-        <input type="hidden" name="dir" value="next">
-        <button type="submit" class="dk-stepper" aria-label="Step forward one dashboard"><i class="ph ph-caret-right" aria-hidden="true"></i></button>
-      </form>
-    </div>
-  </div>
-  {% endif %}
-</article>
-{% endmacro %}
-
-{# Everything inside data-lineups-live is re-fetched and swapped in place by
-   the live-refresh loop below; keep interactive elements that hold JS
-   listeners (the wizard, the schedule forms) OUTSIDE it. The toolbar sits
-   outside too; the list helper re-applies it to every refreshed region. #}
-<div data-lf="lineups">
-{% if groups %}
-{% set _cards = namespace(ids=[], n=0) %}
-{% for g in groups %}{% for c in g.cards %}{% if c.id not in _cards.ids %}{% set _cards.ids = _cards.ids + [c.id] %}{% endif %}{% endfor %}{% endfor %}
-<div class="lf-tb dk-tb">
-  <label class="dx-devtb-search">
-    <i class="ph ph-magnifying-glass" aria-hidden="true"></i>
-    <input type="search" placeholder="Search lineups" aria-label="Search lineups"
-           autocomplete="off" spellcheck="false" data-lf-search>
-  </label>
-  {% if groups|length > 1 %}
-  <select class="dx-devtb-select" aria-label="Filter by display" data-lf-filter="display">
-    <option value="">All displays</option>
-    {% for g in groups %}<option value="{{ g.id or '-' }}">{{ g.name }}</option>{% endfor %}
-  </select>
-  {% endif %}
-  <select class="dx-devtb-select" aria-label="Filter by kind" data-lf-filter="kind">
-    <option value="">Every kind</option>
-    <option value="cycle">Rotations</option>
-    <option value="send">Schedules</option>
-    <option value="nav">By hand or tap</option>
-  </select>
-  <select class="dx-devtb-select" aria-label="Filter by state" data-lf-filter="state">
-    <option value="">On or off</option>
-    <option value="playing">Playing now</option>
-    <option value="on">On</option>
-    <option value="off">Off</option>
-  </select>
-  <select class="dx-devtb-select" aria-label="Sort" data-lf-sort>
-    <option value="">Display order</option>
-    <option value="name:asc">Name A to Z</option>
-    <option value="name:desc">Name Z to A</option>
-    <option value="kind:asc">Kind</option>
-    <option value="screens:desc" data-type="num">Most dashboards</option>
-  </select>
-  <span class="lf-count" data-lf-count data-lf-noun="lineup" aria-live="polite">{{ _cards.ids|length }} lineup{{ '' if _cards.ids|length == 1 else 's' }}</span>
+  <select class="lu-tb-select" aria-label="Filter by kind" data-lu-filter="kind"><option value="">Every kind</option><option value="cycle">Rotations</option><option value="send">Schedules</option><option value="nav">By hand or tap</option></select>
+  <select class="lu-tb-select" aria-label="Filter by state" data-lu-filter="state"><option value="">Live, waiting or off</option><option value="live">Live now</option><option value="wait">Waiting</option><option value="off">Off</option></select>
+  <select class="lu-tb-select" aria-label="Order" data-lu-filter="sort"><option value="next">Next to play</option><option value="name">Name A to Z</option><option value="kind">Kind</option><option value="screens">Most dashboards</option></select>
+  <div class="lu-seg" role="group" aria-label="View"><button type="button" data-view="cards" aria-pressed="true">Cards</button><button type="button" data-view="timeline" aria-pressed="false">Timeline</button></div>
+  <div class="lu-seg" role="group" aria-label="Rows to show" data-lu-scope-seg><button type="button" data-scope="today" aria-pressed="false" title="Only what is live now or still to run on the day shown">Today</button><button type="button" data-scope="all" aria-pressed="true" title="Every lineup, including the ones that run on other days">All</button></div>
+  <button type="button" class="lu-btn-ghost" data-fold-all data-mode="fold">{{ lu.ico('foldall') }}<span>Fold all</span></button>
+  <span class="lu-tb-count" data-lu-count aria-live="polite">{{ vm.lineup_count }} lineup{{ '' if vm.lineup_count == 1 else 's' }}</span>
 </div>
 {% endif %}
-<div data-lineups-live>
-{% if groups %}
-{% set seen = namespace(ids=[]) %}
-{% for g in groups %}
-<section class="dk-group"{% if g.id %} id="display-{{ g.id }}"{% endif %} data-lf-group>
-  <header class="dk-group-head">
-    <span class="dk-group-icon" aria-hidden="true"><i class="ph ph-{{ g.icon }}"></i></span>
-    <h2 class="dk-group-name">{{ g.name }}</h2>
-    {% if g.showing %}
-    <span class="dk-group-live"{% if g.showing_title %} title="{{ g.showing_title }}"{% endif %}><span class="dk-live-dot" aria-hidden="true"></span>showing {{ g.showing }}</span>
-    {% endif %}
-    {% if g.refreshes_today is not none %}
-    <span class="dk-group-count" title="Pushes the schedules and timers on this display project for today. Taps, Push now and data-change refreshes are extra."><i class="ph ph-arrows-clockwise" aria-hidden="true"></i>{{ g.refreshes_today }} refresh{{ 'es' if g.refreshes_today != 1 else '' }} today</span>
-    {% endif %}
-  </header>
-  <div class="dk-rows">
-    {% for c in g.cards %}
-    {# A row targeting several displays repeats per section; only its first
-       appearance carries the anchor id the post-action redirects land on. #}
-    {% set first_here = c.id not in seen.ids %}
-    {% if first_here %}{% set seen.ids = seen.ids + [c.id] %}{% endif %}
-    {{ dk_row(c, first_here, show_chips=not g.id, group_id=g.id) }}
-    {% endfor %}
-  </div>
-</section>
-{% endfor %}
-{% else %}
-<div class="dk-empty">
-  <i class="ph ph-monitor-play" aria-hidden="true"></i>
+
+<p class="lu-sr-only" data-lu-live role="status" aria-live="polite"></p>
+<div class="lu-displays" data-lu-displays data-fold-default="{{ 1 if has_vm and vm.fold_default else 0 }}">
+{%- set seen = namespace(ids=[]) -%}
+{%- for d in displays %}{{ lu.display(vm, d, seen) }}{% endfor -%}
+{%- if orphans %}{{ lu.unassigned(vm, seen) }}{% endif -%}
+{%- if not has_vm %}
+<div class="lu-render-error" role="alert" data-lu-load-error>
+  <b>The lineups could not be loaded.</b> Your displays keep running; this page could not draw them.
+  <a href="{{ request.full_path if request.query_string else request.path }}">Try again</a>
+</div>
+{%- elif not displays and not orphans %}
+<div class="lu-empty">
+  {{ lu.ico('screen') }}
   <h2>Nothing on your displays yet</h2>
   <p>The setup wizard walks you through what to show and when.</p>
-  <button type="button" class="button primary" data-open-timed-wizard>
-    <i class="ph ph-magic-wand" aria-hidden="true"></i><span>Set up a display</span>
-  </button>
+  <button type="button" class="lu-btn-primary" data-open-timed-wizard>{{ lu.ico('plus') }}<span>Set up a display</span></button>
 </div>
-{% endif %}
-{% if groups %}<div class="lf-empty dk-lf-empty" data-lf-empty hidden>No lineups match.</div>{% endif %}
+{%- endif %}
 </div>
+<div class="lu-none-match" data-lu-nomatch hidden>No lineups match.</div>
+{% if has_vm %}<script type="application/json" data-lu-vm>{{ vm|tojson }}</script>{% endif %}
 </div>
-<script>
-  (function () {
-    // One-shot push animation when we just landed from an action (?hl=).
-    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches
-        && new URLSearchParams(location.search).has('hl')) {
-      document.querySelectorAll('.dk-row.is-new .dk-screen.is-live .dk-screen-wash')
-        .forEach((wash) => wash.classList.add('do-push'));
-    }
-    // Tick the now marks each minute so the rails stay honest.
-    //
-    // In the configured timezone, not the browser's. The server anchors
-    // now_pct to settings.app.timezone; a browser somewhere else recomputing
-    // from its own clock made the marker jump by the offset a minute after
-    // load, which is the bug #143 / #164 / #170 fixed server-side arriving
-    // again from the client (#165). An empty name means the server could not
-    // resolve one, and the browser's clock is then the best guess available.
-    const tzName = {{ now_tz_name | tojson }};
-    const hhmmParts = () => {
-      const now = new Date();
-      if (!tzName) return [now.getHours(), now.getMinutes()];
-      const parts = new Intl.DateTimeFormat('en-GB', {
-        timeZone: tzName, hour: '2-digit', minute: '2-digit', hour12: false,
-      }).formatToParts(now);
-      const get = (t) => Number(parts.find((p) => p.type === t)?.value ?? 0);
-      return [get('hour') % 24, get('minute')];
-    };
-    const tick = () => {
-      const [hh, mm] = hhmmParts();
-      const pct = ((hh * 60 + mm) / 1440) * 100;
-      document.querySelectorAll('[data-now-mark]').forEach((m) => { m.style.left = pct + '%'; });
-      const label = window.tesseraeComponents.clockTime(new Date(2000, 0, 1, hh, mm));
-      document.querySelectorAll('[data-now-label]').forEach((l) => { l.textContent = label; });
-    };
-    // Land on the minute rather than 60s after load, so the marker moves when
-    // the clock does instead of on an offset of whenever the page opened.
-    setTimeout(() => { tick(); setInterval(tick, 60000); }, (60 - new Date().getSeconds()) * 1000);
-    // A click anywhere outside an open ⋯ menu closes it.
-    document.addEventListener('click', (e) => {
-      document.querySelectorAll('details.dk-more[open]').forEach((d) => {
-        if (!d.contains(e.target)) d.open = false;
-      });
-    });
 
-    // A thumbnail that isn't rendered yet comes back 202/empty and fires the
-    // img error handler; retry with backoff until the background render lands.
-    document.addEventListener('error', (e) => {
-      const img = e.target;
-      if (!(img instanceof HTMLImageElement) || !img.closest('.dk-screen-frame')) return;
-      const tries = Number(img.dataset.retries || 0);
-      if (tries >= 5) return;
-      img.dataset.retries = String(tries + 1);
-      setTimeout(() => {
-        const u = new URL(img.src, location.href);
-        u.searchParams.set('r', String(tries + 1));
-        img.src = u.toString();
-      }, 3000 * (tries + 1));
-    }, true);
-
-    // Live status: re-fetch the page and swap the Lineups region when the
-    // scheduler fires something (SSE, debounced) and on a slow fallback poll,
-    // so the playing badge, current step, next-advance time and thumbnails
-    // track reality without a manual reload. Swaps are skipped while the
-    // user is mid-interaction so nothing closes under the pointer.
-    const region = document.querySelector('[data-lineups-live]');
-    let refreshing = false;
-    const busy = () => {
-      const wizard = document.getElementById('timed-wizard');
-      return document.hidden
-        || (wizard && wizard.open)
-        || (region && region.querySelector('details.dk-more[open]'))
-        || (region && region.contains(document.activeElement)
-            && document.activeElement !== document.body);
-    };
-    const refresh = () => {
-      if (!region || refreshing || busy()) return;
-      refreshing = true;
-      fetch(location.pathname, { headers: { Accept: 'text/html' } })
-        .then((r) => (r.ok ? r.text() : Promise.reject(new Error('bad status'))))
-        .then((html) => {
-          const next = new DOMParser().parseFromString(html, 'text/html')
-            .querySelector('[data-lineups-live]');
-          if (!next || busy()) return;
-          // The empty state's wizard button carries a listener a swap would
-          // drop; if emptiness flipped, take the full reload instead.
-          const emptyNow = Boolean(region.querySelector('.dk-empty'));
-          const emptyNext = Boolean(next.querySelector('.dk-empty'));
-          if (emptyNow !== emptyNext) { location.reload(); return; }
-          region.replaceChildren(...next.childNodes);
-        })
-        .catch(() => {})
-        .finally(() => { refreshing = false; });
-    };
-    setInterval(refresh, 60000);
-    let sseTimer = null;
-    if (typeof EventSource === 'function') {
-      const es = new EventSource({{ url_for('events.stream')|tojson }});
-      es.addEventListener('log', () => {
-        clearTimeout(sseTimer);
-        sseTimer = setTimeout(refresh, 1500);
-      });
-    }
-  })();
-</script>
+{% include "_timed_wizard.html" %}
+{% include "_legacy_migration_notice.html" %}
+<script src="{{ url_for('static', filename='lineups_api.js') }}" defer></script>
+<script src="{{ url_for('static', filename='lineups_render.js') }}" defer></script>
+<script src="{{ url_for('static', filename='lineups.js') }}" defer></script>
 
 {# Schedule forms (new + edit): the rows above carry the timing
    visualisation; the include holds forms only. #}

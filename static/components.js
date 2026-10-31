@@ -1293,8 +1293,8 @@
   // A clock time in the app's style (window.TESSERAE_TIME_CYCLE, from the
   // locale): "3:48 PM" / "15:48"; whole hours drop ":00" in 12-hour ("11 PM"),
   // a narrow no-break space before AM/PM. Mirrors clock_of() in
-  // app/clock_text.py; change them together. Display only: inputs and saved
-  // values stay 24-hour.
+  // app/clock_text.py (and clock() in app/lineups_view.py); change them
+  // together. Display only: inputs and saved values stay 24-hour.
   const MONTHS = [
     "Jan",
     "Feb",
