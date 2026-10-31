@@ -508,7 +508,7 @@
   };
 
   // ----- create ------------------------------------------------------------
-  const submit = () => {
+  const submit = (bind) => {
     const body = new FormData();
     body.set('respond', 'json');
     body.set('name', state.name.trim() || autoName());
@@ -531,6 +531,14 @@
       else body.set('interval_minutes', String(state.interval));
     }
 
+    // Consent the user gave in the bind prompt on the previous attempt.
+    if (bind) {
+      bind.pages.forEach((p) => {
+        body.append('bind_pages', p.id);
+        if (bind.mode === 'also') body.append('bind_also', p.id);
+      });
+    }
+
     state.pending = true;
     state.error = '';
     render(false);
@@ -538,6 +546,21 @@
       .then((resp) => resp.json().then((data) => ({ ok: resp.ok, data })))
       .then(({ ok, data }) => {
         state.pending = false;
+        // The picked dashboard is bound to another display: ask, then retry
+        // with consent. Cancelling creates nothing.
+        if (!ok && data && data.code === 'pages_not_bound' && window.TesseraeBindPrompt) {
+          render(false);
+          window.TesseraeBindPrompt.ask({ display: data.display, pages: data.unbound_pages })
+            .then((mode) => {
+              if (mode) {
+                submit({ mode, pages: data.unbound_pages });
+              } else {
+                state.error = 'Nothing was created: the dashboard is not bound to this display.';
+                render(false);
+              }
+            });
+          return;
+        }
         if (!ok || !data.ok) {
           state.error = (data && data.error) || 'Something went wrong. Please try again.';
           render(false);

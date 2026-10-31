@@ -457,6 +457,19 @@ class DeviceTiming:
         return _checkin_at_or_after(self.reach, self.now)
 
 
+def pickup_label(
+    at: float, *, reach: Reach, tz: tzinfo | None, now: float, cycle: str | None = None
+) -> str:
+    """``~3:48 PM`` / ``~15:48`` (``Tue`` for another day): the pickup time a
+    queued frame is told with, in the app's clock style. The same words the
+    push notice (:mod:`app.push_delivery`) and the Lineups header use; ``~``
+    marks a predicted check-in."""
+    from app.push_delivery import _clock_cycle, _time_label
+
+    label = _time_label(at, tz=tz, now=now, cycle=cycle or _clock_cycle())
+    return ("~" if reach.mode == MODE_SLEEPS else "") + label
+
+
 def pending_delivery(device: Any, *, now: float | None = None) -> dict[str, Any]:
     """Whether a newer image is queued for a pull device, and when it lands.
 
@@ -473,7 +486,8 @@ def pending_delivery(device: Any, *, now: float | None = None) -> dict[str, Any]
     * ``expected_at``: epoch it should reach the frame (the same estimate as
       the Next update tile: the next check-in for a sleeping frame, right away
       for a connected one, after any quiet-hours hold), ``None`` when unknown
-      or held with no end; ``expected_when`` is its ``~15:48`` label;
+      or held with no end; ``expected_when`` is its ``~3:48 PM`` label
+      (:func:`pickup_label`);
     * ``live``: the frame holds a live connection ("delivering now");
     * ``mode``: ``connected`` / ``sleeps`` / ``unknown``.
 
@@ -509,8 +523,10 @@ def pending_delivery(device: Any, *, now: float | None = None) -> dict[str, Any]
         view = timing.view(now)
     except Exception:
         return out
-    out["expected_at"] = view.get("at")
-    out["expected_when"] = str(view.get("when") or "")
+    at = view.get("at")
+    out["expected_at"] = at
+    if isinstance(at, (int, float)):
+        out["expected_when"] = pickup_label(at, reach=timing.reach, tz=timing.tz, now=now)
     out["live"] = bool(timing.reach.live)
     out["mode"] = timing.reach.mode
     return out

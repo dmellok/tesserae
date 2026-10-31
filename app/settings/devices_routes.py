@@ -33,6 +33,7 @@ from app.button_actions import (
 )
 from app.calibration import build_calibration_card, target_orientation
 from app.panel import panel_overrides_from_form
+from app.push_delivery import flash_delivery
 from app.state.deleted_device_markers import DeletedDeviceMarkers
 
 from ._shared import (
@@ -1828,6 +1829,7 @@ def devices_push_now(instance_id: str) -> Response:
     )
     if result.status == "sent":
         flash(f"Pushed {page_id!r} to {device.name!r}.", "ok")
+        flash_delivery([instance_id])
     else:
         flash(f"Push {result.status}: {result.error or '(no detail)'}", "error")
     return _device_page_redirect(instance_id, anchor)
@@ -1968,6 +1970,7 @@ def devices_calibrate(instance_id: str) -> Response:
     )
     if result.status == "sent":
         flash("Calibration card sent, look at your panel, then answer below.", "ok")
+        flash_delivery([instance_id])
     else:
         flash(f"Calibration push {result.status}: {result.error or '(no detail)'}", "error")
     # ?calibrating=<id> makes the device page render the answer form
@@ -2032,6 +2035,7 @@ def devices_calibrate_apply(instance_id: str) -> Response:
         "upright in that orientation. Re-sent the card to confirm; adjust Rotation below if needed.",
         "ok",
     )
+    flash_delivery([instance_id])
     return _device_page_redirect(instance_id, anchor)
 
 
@@ -2199,6 +2203,7 @@ def devices_send_test_pattern(instance_id: str) -> Response:
     )
     if result.status == "sent":
         flash(f"Sent {pattern_id.replace('_', ' ')} to the panel.", "ok")
+        flash_delivery([instance_id])
     else:
         flash(
             f"Test-pattern push {result.status}: {result.error or '(no detail)'}",

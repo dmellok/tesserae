@@ -33,6 +33,7 @@ from flask import (
 from pydantic import ValidationError
 from werkzeug.wrappers import Response
 
+from app.lineup_binding import Consent, apply_consent, flash_text, guard_change, refusal
 from app.scheduler import Scheduler, compute_current_step
 from app.state.page_store import PageStore
 from app.state.rotation_model import Rotation, RotationStep
@@ -392,7 +393,16 @@ def create() -> Response:
             return _json_error(msg)
         flash(msg, "error")
         return redirect(url_for("rotations.index"))
+    consent = Consent.from_form(request.form)
+    shown = [st.page_id for st in rotation.steps]
+    stranded = guard_change(rotation.device_ids, shown, consent)
+    if stranded:
+        if wants_json:
+            return refusal(rotation.device_ids, stranded)
+        flash(flash_text(rotation.device_ids, stranded), "error")
+        return redirect(url_for("rotations.index"))
     _store().upsert(rotation)
+    apply_consent(rotation.device_ids, shown, consent)
     # A picked dashboard that isn't on any display yet binds to the
     # rotation's display, mirroring the deck editor's save behaviour, so a
     # bound rotation can always render every step.
@@ -427,7 +437,20 @@ def update(rotation_id: str) -> Response:
         # the top of the page.
         return redirect(url_for("rotations.index", edit=rotation_id) + f"#rotation-{rotation_id}")
     rotation = rotation.model_copy(update={"id": rotation_id})
+    consent = Consent.from_form(request.form)
+    shown = [st.page_id for st in rotation.steps]
+    stranded = guard_change(
+        rotation.device_ids,
+        shown,
+        consent,
+        old_displays=existing.device_ids,
+        old_pages=[st.page_id for st in existing.steps],
+    )
+    if stranded:
+        flash(flash_text(rotation.device_ids, stranded), "error")
+        return redirect(url_for("rotations.index", edit=rotation_id) + f"#rotation-{rotation_id}")
     _store().upsert(rotation)
+    apply_consent(rotation.device_ids, shown, consent)
     flash(f"Rotation {rotation.name!r} updated.", "ok")
     # Scroll back to the just-saved rotation's card so the user lands
     # on the read view of what they just changed, instead of the top

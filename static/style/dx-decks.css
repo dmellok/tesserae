@@ -242,6 +242,10 @@
 .dxe-pcard.is-missing .dxe-pcard-name { white-space: normal; color: var(--t-fg); }
 .dxe-missing-id { display: block; font-size: 11px; font-weight: 400; color: var(--t-muted, var(--t-fg)); opacity: .7; overflow: hidden; text-overflow: ellipsis; }
 .dxe-remove-missing { margin-left: auto; padding: 3px 8px; }
+/* A step bound to another display: same dashed warning rim as a deleted one,
+   but the thumbnail stays (it is a real dashboard) and the tag says why. */
+.dxe-pcard.is-offdisplay { border: 1px dashed var(--t-warn); background: color-mix(in oklab, var(--t-warn) 8%, var(--t-surface)); }
+.dxe-offdisplay { flex-shrink: 0; font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 999px; background: color-mix(in oklab, var(--t-warn) 18%, var(--t-surface)); color: color-mix(in oklab, var(--t-warn) 75%, var(--t-fg)); }
 .dxe-pcard-foot { display: flex; align-items: center; gap: 8px; padding: 9px 3px 2px; }
 .dxe-pcard-name { flex: 1; font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dxe-star { color: var(--t-fg); font-size: 12px; }
@@ -282,6 +286,24 @@
 .dxe-chip { color: var(--t-fg); }
 .dxe-chip:hover { background: color-mix(in oklab, var(--t-fg) 12%, var(--t-surface)); filter: none; }
 .dxe-chip-plus { color: var(--t-fg-soft); }
+.dxe-avail-other { flex-basis: 100%; margin: 6px 0 0; }
+.dxe-chip--other { border: 1px dashed var(--t-border-strong); background: transparent; }
+.dxe-chip-where { margin-left: 6px; font-size: 11px; font-weight: 400; color: var(--t-fg-soft); }
+
+/* "Bind to this display?" prompt (static/bind_prompt.js), on the wizard's
+   dialog shell. */
+.bind-dialog { width: min(460px, calc(100vw - 24px)); }
+.bind-dialog .wizard-head-icon { background: color-mix(in oklab, var(--t-warn) 16%, var(--t-surface)); color: color-mix(in oklab, var(--t-warn) 75%, var(--t-fg)); }
+.bind-dialog-body { display: flex; flex-direction: column; gap: 8px; padding: 2px 18px 16px; font-size: 13.5px; line-height: 1.5; }
+.bind-dialog-body p { margin: 0; max-width: 62ch; }
+.bind-dialog-note { color: var(--t-fg-soft); font-size: 12.5px; }
+.bind-dialog-list { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; }
+@media (max-width: 480px) {
+  .bind-dialog .wizard-footer { flex-wrap: wrap; }
+  .bind-dialog .wizard-footer-spacer { display: none; }
+  .bind-dialog .wizard-footer button { flex: 1 1 100%; }
+  .bind-dialog .wizard-footer .ghost { order: 3; }
+}
 
 /* form controls reuse the app's field styling, all one height */
 .dxe input[type="text"]:not(.dxe-title-input),

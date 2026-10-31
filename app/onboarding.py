@@ -493,6 +493,9 @@ def push_starter(page_id: str) -> Response:
     result = _push().push(page_id)
     if result.status == "sent":
         flash("Pushed, your panel should paint shortly.", "ok")
+        from app.push_delivery import flash_delivery, page_targets
+
+        flash_delivery(page_targets(page_id))
     elif result.status == "no_change":
         flash("Your panel is already showing this dashboard, nothing to repaint.", "ok")
     else:

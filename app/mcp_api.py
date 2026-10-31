@@ -2624,7 +2624,12 @@ def push(page_id: str) -> Response:
                     ),
                 }
             )
-    return jsonify({"sent": sent, "errors": errors})
+    from app.push_delivery import delivery_notices
+
+    # ``delivery``: per device, whether it shows the push now or only at its
+    # next check-in (a sleeping frame), so a caller doesn't read silence as
+    # failure.
+    return jsonify({"sent": sent, "errors": errors, "delivery": delivery_notices(sent)})
 
 
 @bp.post("/pages/<page_id>/devices")
@@ -2665,6 +2670,17 @@ def bind_devices(page_id: str) -> Response:
 # field-level details on a bad shape, so the agent can correct and retry.
 
 
+def _bind_consent() -> tuple[Any, dict[str, Any]]:
+    """The caller's explicit ``bind_pages`` / ``bind_also`` consent and the
+    record body without them (neither key belongs to the model)."""
+    from app.lineup_binding import Consent
+
+    raw = request.get_json(silent=True)
+    body = raw if isinstance(raw, dict) else {}
+    consent = Consent.from_json(body)
+    return consent, {k: v for k, v in body.items() if k not in ("bind_pages", "bind_also")}
+
+
 def _model_errors(exc: ValidationError) -> list[dict[str, Any]]:
     return [
         {"loc": ".".join(str(x) for x in e.get("loc", ())), "msg": e.get("msg", "invalid")}
@@ -2687,11 +2703,26 @@ def mcp_create_rotation() -> Response:
     (``{id, name, device_ids, steps:[{page_id, dwell_minutes}], anchor?, ...}``)."""
     from app.state.rotation_model import Rotation
 
+    consent, body = _bind_consent()
     try:
-        rotation = Rotation.model_validate(request.get_json(silent=True) or {})
+        rotation = Rotation.model_validate(body)
     except ValidationError as exc:
         return _err(422, "invalid rotation", details=_model_errors(exc))
+    from app.lineup_binding import apply_consent, guard_change, refusal
+
+    existing = current_app.config["ROTATION_STORE"].get(rotation.id)
+    shown = [st.page_id for st in rotation.steps]
+    stranded = guard_change(
+        rotation.device_ids,
+        shown,
+        consent,
+        old_displays=existing.device_ids if existing else None,
+        old_pages=[st.page_id for st in existing.steps] if existing else (),
+    )
+    if stranded:
+        return refusal(rotation.device_ids, stranded)
     current_app.config["ROTATION_STORE"].upsert(rotation)
+    apply_consent(rotation.device_ids, shown, consent)
     return jsonify({"ok": True, "id": rotation.id})
 
 
@@ -2717,11 +2748,28 @@ def mcp_create_schedule() -> Response:
     (``{id, page_id, type, ...}``, e.g. an interval or daily push)."""
     from app.state.schedule_model import Schedule
 
+    consent, body = _bind_consent()
     try:
-        schedule = Schedule.model_validate(request.get_json(silent=True) or {})
+        schedule = Schedule.model_validate(body)
     except ValidationError as exc:
         return _err(422, "invalid schedule", details=_model_errors(exc))
+    from app.lineup_binding import apply_consent, guard_change, refusal
+
+    existing = current_app.config["SCHEDULE_STORE"].get(schedule.id)
+    shown = [p for p in (schedule.page_id, schedule.fallback_page_id) if p]
+    stranded = guard_change(
+        schedule.device_ids,
+        shown,
+        consent,
+        old_displays=existing.device_ids if existing else None,
+        old_pages=[p for p in (existing.page_id, existing.fallback_page_id) if p]
+        if existing
+        else (),
+    )
+    if stranded:
+        return refusal(schedule.device_ids, stranded)
     current_app.config["SCHEDULE_STORE"].upsert(schedule)
+    apply_consent(schedule.device_ids, shown, consent)
     return jsonify({"ok": True, "id": schedule.id})
 
 
@@ -2756,10 +2804,23 @@ def mcp_create_deck() -> Response:
     A submitted graph is used verbatim."""
     from app.state.deck_model import Deck
 
+    consent, body = _bind_consent()
     try:
-        deck = Deck.model_validate(request.get_json(silent=True) or {})
+        deck = Deck.model_validate(body)
     except ValidationError as exc:
         return _err(422, "invalid deck", details=_model_errors(exc))
+    from app.lineup_binding import apply_consent, guard_change, refusal
+
+    existing = current_app.config["DECK_STORE"].get(deck.id)
+    stranded = guard_change(
+        deck.device_ids,
+        deck.page_ids,
+        consent,
+        old_displays=existing.device_ids if existing else None,
+        old_pages=existing.page_ids if existing else (),
+    )
+    if stranded:
+        return refusal(deck.device_ids, stranded)
     if not any(p.links for p in deck.pages):
         from app.deck_suggest import graph_for_pages
 
@@ -2779,6 +2840,7 @@ def mcp_create_deck() -> Response:
                 }
             )
     current_app.config["DECK_STORE"].upsert(deck)
+    apply_consent(deck.device_ids, deck.page_ids, consent)
     return jsonify({"ok": True, "id": deck.id, "links_derived": any(p.links for p in deck.pages)})
 
 

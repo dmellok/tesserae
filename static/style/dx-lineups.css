@@ -2130,6 +2130,47 @@ main.page.lu-page {
   font-style: italic;
 }
 
+/* A step whose dashboard is bound to another display: it can never show
+   here, so no thumbnail from the other panel, a warning rim, a plain label
+   and a one-click fix. */
+.lu .lu-thumb.offdisplay {
+  outline: 2px dashed var(--lu-warn-text);
+  outline-offset: -2px;
+  background: color-mix(in oklab, var(--t-warn) 9%, var(--t-surface));
+}
+.lu .lu-thumb.offdisplay .lu-thumb-ph {
+  color: var(--lu-warn-text);
+}
+.lu .lu-step-off {
+  margin-top: 3px;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--lu-warn-text);
+}
+.lu .lu-bind {
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 4px 9px;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.25;
+  white-space: normal;
+  text-align: left;
+  color: var(--lu-warn-text);
+  background: color-mix(in oklab, var(--t-warn) 14%, var(--t-surface));
+  border-color: color-mix(in oklab, var(--t-warn) 45%, var(--t-border));
+}
+.lu .lu-bind:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+@media (pointer: coarse) {
+  .lu .lu-bind {
+    min-height: 44px;
+  }
+}
+
 /* Several items in one step: two offset sheets behind the tile + a count. */
 .lu .lu-tile.stacked {
   margin: 0 8px 0 0;
@@ -2436,6 +2477,9 @@ main.page.lu-page {
   font: 600 9.5px var(--t-font);
   color: #fffdf8;
   background: rgba(21, 20, 18, 0.7);
+}
+.lu .lu-pk-item.pushed.push-queued::after {
+  content: "Queued";
 }
 @media (hover: none) {
   .lu .lu-push-mini {

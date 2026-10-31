@@ -57,6 +57,7 @@ from app.image_upload import (
     validate_image,
 )
 from app.push import PushManager
+from app.push_delivery import delivery_notices, page_targets
 from app.quiet_hours import device_is_quiet
 from app.state.settings_store import SettingsStore
 
@@ -188,13 +189,20 @@ def push() -> tuple[Response, int] | Response:
         "not_found": 404,
         "failed": 500,
     }.get(result.status, 500)
-    payload = {
+    payload: dict[str, Any] = {
         "status": result.status,
         "page_id": result.page_id,
         "duration_s": result.duration_s,
         "event_id": result.event_id,
         "error": result.error,
     }
+    if result.status == "sent":
+        targets = sorted(device_ids) if device_ids else page_targets(page_id)
+        quiet_fn = getattr(_push_manager(), "device_in_quiet_hours", None)
+        # Quiet displays were skipped (this push respects quiet hours).
+        payload["delivery"] = delivery_notices(
+            d for d in targets if not (callable(quiet_fn) and quiet_fn(d) is True)
+        )
     return jsonify(payload), http_status
 
 
@@ -366,7 +374,15 @@ def push_image() -> tuple[Response, int] | Response:
         http_status = 202
         status = "quiet"
     return (
-        jsonify({"status": status, "sent": sent, "quiet": quiet, "failed": failed}),
+        jsonify(
+            {
+                "status": status,
+                "sent": sent,
+                "quiet": quiet,
+                "failed": failed,
+                "delivery": delivery_notices(sent),
+            }
+        ),
         http_status,
     )
 

@@ -6,6 +6,27 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added
+
+- Lineups redesign, part 3 of 3: a push to a sleeping frame says so. Every
+  push surface (Send, Push now on the Dashboards list and device page, the
+  canvas editor's Send, lineup steps and Push, History resend, calibration
+  and test patterns, the setup wizard) adds a notice per waiting display,
+  such as "Hallway Frame is asleep: it will pick this up at its next check-in
+  (~3:48 PM)", or names quiet hours, an overdue check-in or a lost
+  connection. The webhook, REST, canvas and MCP push responses gain an
+  additive `delivery` list with the same words and `expected_at`, and a
+  Lineups step reads "Queued · picks up ~3:48 PM". Pickup times use one
+  formatter everywhere.
+- Putting a dashboard on a display it is not bound to now asks first. The
+  lineup editor, setup wizard and schedule form show a Bind to this display
+  prompt (move it, or keep its other display too); the save binds in the
+  same write. Without consent every write path refuses: forms flash why,
+  JSON and MCP answer 409 `pages_not_bound` with the dashboards and a
+  `bind_pages` fix, and the companion API returns 400. Lineups already in
+  that state show a flagged "Not on this display" step with a one-click
+  Bind button.
+
 ### Changed
 
 - Lineups redesign, part 2 of 3: the Lineups page is rebuilt on the view model

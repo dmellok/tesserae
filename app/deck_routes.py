@@ -36,6 +36,13 @@ from app.clock_text import app_cycle, clock_of, clock_time
 from app.deck_suggest import graph_for_pages, suggest_decks
 from app.display_color import display_color_mode
 from app.lineup_authoring import build_lineup
+from app.lineup_binding import (
+    Consent,
+    apply_consent,
+    flash_text,
+    guard_change,
+    refusal,
+)
 from app.lineups_view import (
     Clash,
     DashboardInfo,
@@ -1116,6 +1123,7 @@ def _lineup_input(
             push_step=url_for("decks.push_step", deck_id=deck.id),
             window=url_for("decks.edit_window", deck_id=deck.id),
             days=url_for("decks.edit_days", deck_id=deck.id),
+            bind=url_for("decks.bind_pages", deck_id=deck.id),
         )
     return LineupInput(
         id=deck.id,
@@ -1132,7 +1140,17 @@ def _lineup_input(
         urls=urls,
         priority=deck.advance_priority,
         last_fired=last_fired,
+        explicit_display=bool(deck.device_ids),
     )
+
+
+def _display_label(devices_reg: Any, device_id: str) -> str:
+    """``Frame (480×800)`` for a display id; the bare id when it is gone."""
+    device = devices_reg.get(device_id) if devices_reg is not None else None
+    if device is None:
+        return device_id
+    w, h, _spec = _device_size(device)
+    return f"{device.display_name} ({w}×{h})" if w and h else str(device.display_name)
 
 
 def _deck_displays(deck: Deck, page_devices: dict[str, list[str]]) -> list[str]:
@@ -1430,10 +1448,13 @@ def _build_lineups_view(
         page = page_by_id.get(pid)
         count, items = _step_items(page) if page is not None else (1, ())
         w, h = shapes.get(pid, (0, 0))
+        bound_ids = tuple(page.device_ids) if page is not None else ()
         dashboards[pid] = DashboardInfo(
             id=pid,
             name=page.name if page is not None else pid,
             missing=page is None,
+            bound_ids=bound_ids,
+            bound_labels=tuple(_display_label(devices_reg, did) for did in bound_ids),
             thumb_url=thumbs.get(pid, ""),
             composition_digest=compositions.get(pid),
             width=w,
@@ -2146,6 +2167,7 @@ def push_step(deck_id: str) -> Response:
     coalescing, not held by quiet hours. The lineup's own schedule is not
     changed; its next advance replaces the frame as usual."""
     from app.next_update import DeviceTiming
+    from app.push_delivery import delivery_notices, flash_delivery
     from app.send_routes import _run_in_background
 
     plain_form = (
@@ -2251,13 +2273,22 @@ def push_step(deck_id: str) -> Response:
             label = "lands now"
         lands.append({"display_id": did, "name": known[did].display_name, "lands": label})
     first = lands[0]
-    message = (
-        "Sent a fresh render, the earlier picture is no longer stored"
-        if digest and fresh
-        else f"Pushed {name} to {first['name']}, {first['lands']}."
-    )
+    # A sleeping frame only fetches the step at its next check-in: say so
+    # rather than "lands now", or the push looks like it did nothing.
+    delivery = delivery_notices(targets, now=now_ts)
+    first_notice = next((n for n in delivery if n["device_id"] == first["display_id"]), None)
+    if digest and fresh:
+        message = "Sent a fresh render, the earlier picture is no longer stored"
+    elif first_notice is not None and first_notice["mode"] != "live":
+        message = f"Queued {name} for {first['name']}. {first_notice['text']}"
+    else:
+        message = f"Pushed {name} to {first['name']}, {first['lands']}."
     if plain_form:
-        flash(message, "success")
+        queued = (
+            first_notice is not None and first_notice["mode"] != "live" and not (digest and fresh)
+        )
+        flash(f"Pushed {name} to {first['name']}." if queued else message, "success")
+        flash_delivery(targets, now=now_ts)
         return redirect(url_for("decks.index", hl=deck_id))
     return jsonify(
         {
@@ -2270,6 +2301,7 @@ def push_step(deck_id: str) -> Response:
             "lands": first["lands"],
             "message": message,
             "fresh": fresh,
+            "delivery": delivery,
         }
     )
 
@@ -2293,7 +2325,15 @@ def create() -> Response:
             return _json_error(msg)
         flash(msg, "error")
         return redirect(url_for("decks.index"))
+    consent = Consent.from_form(request.form)
+    stranded = guard_change(deck.device_ids, deck.page_ids, consent)
+    if stranded:
+        if wants_json:
+            return refusal(deck.device_ids, stranded)
+        flash(flash_text(deck.device_ids, stranded), "error")
+        return redirect(url_for("decks.index"))
     _store().upsert(deck)
+    apply_consent(deck.device_ids, deck.page_ids, consent)
     _invalidate(deck)
     flash(f"Deck {deck.name!r} saved.", "ok")
     if wants_json:
@@ -2348,7 +2388,12 @@ def create_lineup() -> Response:
     except (ValidationError, ValueError) as exc:
         msg = _first_error(exc) if isinstance(exc, ValidationError) else str(exc)
         return _json_error(f"Invalid lineup: {msg}")
+    consent = Consent.from_form(form)
+    stranded = guard_change(deck.device_ids, deck.page_ids, consent)
+    if stranded:
+        return refusal(deck.device_ids, stranded)
     _store().upsert(deck)
+    apply_consent(deck.device_ids, deck.page_ids, consent)
     _invalidate(deck)
     # A dashboard picked here that isn't on any display yet binds to this
     # Lineup's display, so a freshly-created Lineup can actually render every
@@ -2431,7 +2476,19 @@ def update(deck_id: str) -> Response:
         )
     except (ValidationError, ValueError) as exc:
         return _edit_error(deck_id, exc)
+    consent = Consent.from_form(form)
+    stranded = guard_change(
+        deck.device_ids,
+        deck.page_ids,
+        consent,
+        old_displays=existing.device_ids,
+        old_pages=existing.page_ids,
+    )
+    if stranded:
+        flash(flash_text(deck.device_ids, stranded), "error")
+        return redirect(url_for("decks.index", edit=deck_id) + f"#deck-{deck_id}")
     _store().upsert(deck)
+    apply_consent(deck.device_ids, deck.page_ids, consent)
     _invalidate(deck)
     flash(f"Deck {deck.name!r} updated.", "ok")
     return redirect(url_for("decks.index") + f"#deck-{deck_id}")
@@ -2483,7 +2540,19 @@ def edit_graph(deck_id: str) -> Response:
         )
     except (ValidationError, ValueError, json.JSONDecodeError) as exc:
         return _edit_error(deck_id, exc)
+    consent = Consent.from_form(request.form)
+    stranded = guard_change(
+        deck.device_ids,
+        deck.page_ids,
+        consent,
+        old_displays=existing.device_ids,
+        old_pages=existing.page_ids,
+    )
+    if stranded:
+        flash(flash_text(deck.device_ids, stranded), "error")
+        return redirect(url_for("decks.index", edit=deck_id) + f"#deck-{deck_id}")
     _store().upsert(deck)
+    apply_consent(deck.device_ids, deck.page_ids, consent)
     _invalidate(deck)
     flash(f"Deck {deck.name!r} graph updated.", "ok")
     return redirect(url_for("decks.index") + f"#deck-{deck_id}")
@@ -2558,7 +2627,8 @@ def editor(deck_id: str | None = None) -> str | Response:
         for d in devices_reg.all():
             if d.kind_of is None:
                 continue
-            device_meta.append({"id": d.id, "name": d.display_name})
+            dw, dh, _spec = _device_size(d)
+            device_meta.append({"id": d.id, "name": d.display_name, "w": dw, "h": dh})
             if deck is not None and d.id in deck.device_ids and d.manifest.get("touch") is True:
                 touch_bound = True
     # A binding to a display that has since been deleted still needs an
@@ -2838,7 +2908,20 @@ def editor_save() -> Response:
         return redirect(
             url_for("decks.editor", deck_id=deck_id) if existing else url_for("decks.index")
         )
+    # The editor prompts before it submits; a save that still carries steps
+    # bound to another display (no JS, a stale tab, a crafted POST) is refused
+    # rather than stored as a lineup that can never render.
+    consent = Consent.from_form(form)
+    stranded = guard_change(deck.device_ids, ordered, consent)
+    if stranded:
+        flash(flash_text(deck.device_ids, stranded), "error")
+        return redirect(
+            url_for("decks.editor", deck_id=deck_id)
+            if existing
+            else (request.referrer or url_for("decks.editor"))
+        )
     _store().upsert(deck)
+    apply_consent(deck.device_ids, ordered, consent)
     # An unassigned dashboard added to the deck binds to the deck's display, so
     # the "only dashboards bound to this display" invariant holds next time.
     display = deck.device_ids[0] if deck.device_ids else None
@@ -2851,6 +2934,53 @@ def editor_save() -> Response:
     flash(f"Deck {deck.name!r} saved.", "ok")
     # Every editor exit lands back on Lineups, highlighting the saved row.
     return redirect(url_for("decks.index", hl=deck.id) + f"#udeck-{deck.id}")
+
+
+@bp.post("/bind-check")
+def bind_check() -> Response:
+    """Which of ``page_ids`` are bound only to displays other than
+    ``device_ids``: the dashboards a form must get consent to bind before it
+    can save. Read-only; the forms that call it re-post with ``bind_pages``."""
+    from app.lineup_binding import display_info, stranded_pages
+
+    body = _json_body()
+    raw_pages = body.get("page_ids")
+    raw_devices = body.get("device_ids")
+    page_ids = [str(p) for p in raw_pages if p] if isinstance(raw_pages, list) else []
+    device_ids = [str(d) for d in raw_devices if d] if isinstance(raw_devices, list) else []
+    stranded = stranded_pages(device_ids, page_ids)
+    return jsonify(
+        {
+            "ok": True,
+            "display": display_info(device_ids[0]) if device_ids else None,
+            "unbound_pages": [s.to_dict() for s in stranded],
+        }
+    )
+
+
+@bp.post("/<deck_id>/bind-pages")
+def bind_pages(deck_id: str) -> Response:
+    """Bind a lineup's off-display steps to its display (the Lineups page's
+    one-click fix). ``page_ids`` must be steps of this lineup; ``display_id``
+    picks which of its displays; ``also`` keeps the dashboards' other
+    displays instead of moving them."""
+    deck = _store().get(deck_id)
+    if deck is None:
+        return _json_error(f"No deck with id {deck_id!r}.")
+    body = _json_body()
+    raw = body.get("page_ids")
+    page_ids = [str(p) for p in raw if p] if isinstance(raw, list) else []
+    if not page_ids or not set(page_ids) <= set(deck.page_ids):
+        return _json_error("page_ids must name steps of this lineup.")
+    display = str(body.get("display_id") or "")
+    displays = [display] if display in deck.device_ids else list(deck.device_ids)
+    if not displays:
+        return _json_error("This lineup has no display to bind to.")
+    ids = frozenset(page_ids)
+    consent = Consent(ids, ids if body.get("also") else frozenset())
+    apply_consent(displays, page_ids, consent)
+    _invalidate(deck)
+    return jsonify({"ok": True, "bound": page_ids, "display_id": displays[0]})
 
 
 @bp.post("/<deck_id>/step")
@@ -2871,6 +3001,7 @@ def step(deck_id: str) -> Response:
     nav = _nav_store()
     pusher = current_app.config.get("PUSH_MANAGER")
     moved = 0
+    stepped: list[str] = []
     for device_id in deck.device_ids:
         rec = None
         if nav is not None:
@@ -2896,8 +3027,13 @@ def step(deck_id: str) -> Response:
             with contextlib.suppress(Exception):
                 nav.set(device_id, deck.id, target)
         moved += 1
+        stepped.append(device_id)
     if not moved:
         flash("No display took the step; see the events log.", "error")
+    else:
+        from app.push_delivery import flash_delivery
+
+        flash_delivery(stepped)
     return redirect(url_for("decks.index", hl=deck.id) + f"#udeck-{deck.id}")
 
 
@@ -2950,6 +3086,10 @@ def push(deck_id: str) -> Response:
         )
     else:
         flash(f"Deck pushed: entry page sent, {warmed} frame(s) warmed.", "ok")
+    if result.status != "failed":
+        from app.push_delivery import flash_delivery
+
+        flash_delivery(deck.device_ids)
     return redirect(url_for("decks.index") + f"#deck-{deck_id}")
 
 

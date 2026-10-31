@@ -66,6 +66,14 @@
         `${PREFIX}/decks/${encodeURIComponent(lineup.id)}/days`;
       return send("POST", url, { days });
     },
+    /** POST /decks/<id>/bind-pages {page_ids, display_id, also}: bind off-display steps to
+        the display they sit under, keeping their other displays (the click is the consent). */
+    bindPages(lineup, pageIds, displayId) {
+      const url =
+        (lineup.actions && lineup.actions.bind_url) ||
+        `${PREFIX}/decks/${encodeURIComponent(lineup.id)}/bind-pages`;
+      return send("POST", url, { page_ids: pageIds, display_id: displayId, also: true });
+    },
     /** POST /decks/<id>/push-step {index, composition_digest, display_id?}: push one step now.
         Replies {lands: "lands now" | "lands ~18:18", message, fresh}. */
     pushStep(lineup, step, displayId) {

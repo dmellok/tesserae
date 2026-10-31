@@ -1050,23 +1050,50 @@
     try {
       const res = await API.pushStep(found.l, step, found.d ? found.d.id : "");
       const lands = (res && res.lands) || (found.d ? found.d.push_lands : "");
-      const msg = (res && res.message) || `Pushed${lands ? " · " + lands : ""}`;
+      // A sleeping frame only fetches it at its next check-in: the tile says
+      // "Queued · picks up ~3:48 PM", the live region the whole sentence.
+      const waits = ((res && res.delivery) || []).filter((n) => n.mode !== "live");
+      const mine = waits.find((n) => found.d && n.device_id === found.d.id) || waits[0];
+      const msg = mine ? mine.short : (res && res.message) || `Pushed${lands ? " · " + lands : ""}`;
       tile.classList.remove("push-failed");
+      tile.classList.toggle("push-queued", !!mine);
       tile.classList.add("pushed");
       if (msgEl) msgEl.textContent = msg;
-      say(msg);
+      const fresh = res && res.fresh && step.composition_digest ? res.message : "";
+      say(mine ? [fresh, ...waits.map((n) => n.text)].filter(Boolean).join(" ") : msg);
       scheduleRefresh(2500);
     } catch (err) {
+      tile.classList.remove("push-queued");
       tile.classList.add("pushed", "push-failed");
       if (msgEl) msgEl.textContent = "Could not push";
       say(`Could not push ${step.name}: ${err.message}`);
     } finally {
       btn.disabled = false;
       clearTimeout(tile._luPushT);
+      // A queued note stays up longer: it carries a time to read.
       tile._luPushT = setTimeout(
-        () => tile.classList.remove("pushed", "push-failed", "reveal"),
-        2400
+        () => tile.classList.remove("pushed", "push-failed", "push-queued", "reveal"),
+        tile.classList.contains("push-queued") ? 6000 : 2400
       );
+    }
+  }
+
+  // A step whose dashboard is bound to another display can never show here.
+  // The button is the consent: it adds this display to the dashboard's
+  // bindings (its other display keeps working) and the page redraws.
+  async function bindStep(btn) {
+    const [lid, i] = btn.dataset.bind.split(":");
+    const found = lineupOf(lid, displayOf(btn));
+    if (!found || !found.d) return;
+    const step = found.l.steps[Number(i)];
+    btn.disabled = true;
+    try {
+      await API.bindPages(found.l, [step.dashboard_id], found.d.id);
+      say(`${step.name} is now bound to ${found.d.name}`);
+      scheduleRefresh(0);
+    } catch (err) {
+      btn.disabled = false;
+      say(`Could not bind ${step.name}: ${err.message}`);
     }
   }
 
@@ -1429,6 +1456,10 @@
       return;
     }
     const ds = t.dataset;
+    if (ds.bind) {
+      bindStep(t);
+      return;
+    }
     if (ds.view) {
       st.view = ds.view === "timeline" ? "timeline" : "cards";
       store.set(VIEW_KEY, st.view);
@@ -1665,7 +1696,10 @@
       document.hidden ||
       !!drag ||
       (wizard && wizard.open) ||
-      !!root.querySelector(".lu-peek, .lu-dp-pop, details.lu-more[open], .lu-win-edit") ||
+      // A tile's "Queued · picks up ~3:48 PM" note is read before a redraw drops it.
+      !!root.querySelector(
+        ".lu-peek, .lu-dp-pop, details.lu-more[open], .lu-win-edit, .lu-tile.push-queued"
+      ) ||
       Object.values(st.saving).some(Boolean)
     );
   };

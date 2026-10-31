@@ -634,7 +634,9 @@ def send(canvas_id: str) -> Response:
                     ),
                 }
             )
-    return jsonify({"sent": sent, "errors": errors})
+    from app.push_delivery import delivery_notices
+
+    return jsonify({"sent": sent, "errors": errors, "delivery": delivery_notices(sent)})
 
 
 def appearance_options() -> dict[str, Any]:

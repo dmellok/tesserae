@@ -1469,9 +1469,13 @@ def _build_device_section(store: Any, device: Device) -> dict[str, Any] | None:
 
 
 def _clock_hhmm(epoch: Any) -> str:
-    if isinstance(epoch, (int, float)) and epoch > 0:
-        return time.strftime("%H:%M", time.localtime(float(epoch)))
-    return ""
+    """``3:48 PM`` / ``15:48`` (``Tue 7 AM`` another day) in the app's time
+    zone and clock style, as the push notices and Lineups write it."""
+    if not (isinstance(epoch, (int, float)) and epoch > 0):
+        return ""
+    from app.push_delivery import _clock_cycle, _time_label
+
+    return _time_label(float(epoch), tz=next_update._tz(), now=time.time(), cycle=_clock_cycle())
 
 
 def _page_name(page_id: str) -> str:

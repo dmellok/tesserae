@@ -881,7 +881,18 @@ dwell_minutes}] and device_ids.""",
 Create or replace a rotation. 'rotation' is a full object:
 {id, name, device_ids, steps:[{page_id, dwell_minutes}], anchor?
 ("HH:MM"), days_of_week?}. Bind the step pages to the devices first
-(bind_devices). Returns {ok, id}, or 422 with "details" on a bad shape.""",
+(bind_devices). Returns {ok, id}, or 422 with "details" on a bad shape.
+
+A dashboard bound only to OTHER displays cannot show on this record's
+display_ids, so it is refused with 409 {code:"pages_not_bound",
+unbound_pages:[{id, name, bound_to}], fix:{bind_pages:[ids]}} and nothing
+is saved or bound. To proceed, either bind the dashboards to the display
+first (bind_devices), or repeat the call with consent in the same object:
+"bind_pages": [ids] moves them to this display, and "bind_also": [ids]
+binds them to it while keeping their other display. Never bind a
+dashboard on your own initiative: it may belong to another lineup, so ask
+the user (or pick a dashboard already on this display). A dashboard bound
+to no display is allowed as before.""",
     "delete_rotation": """\
 Delete a rotation by id.""",
     "list_schedules": """\
@@ -896,7 +907,18 @@ fires_at?, days_of_week?, priority?}. Returns {ok, id}, or 422 with
 'name' is REQUIRED alongside 'id' and must be non-empty; omitting it
 422s. A daily schedule's 'fires_at' is a FULL datetime, not "HH:MM":
 only the time-of-day is used, so the date is a placeholder and
-"2000-01-01T06:00:00" is the conventional way to write 6am.""",
+"2000-01-01T06:00:00" is the conventional way to write 6am.
+
+A dashboard bound only to OTHER displays cannot show on this record's
+display_ids, so it is refused with 409 {code:"pages_not_bound",
+unbound_pages:[{id, name, bound_to}], fix:{bind_pages:[ids]}} and nothing
+is saved or bound. To proceed, either bind the dashboards to the display
+first (bind_devices), or repeat the call with consent in the same object:
+"bind_pages": [ids] moves them to this display, and "bind_also": [ids]
+binds them to it while keeping their other display. Never bind a
+dashboard on your own initiative: it may belong to another lineup, so ask
+the user (or pick a dashboard already on this display). A dashboard bound
+to no display is allowed as before.""",
     "delete_schedule": """\
 Delete a schedule by id.""",
     "list_decks": """\
@@ -920,7 +942,18 @@ server derives the graph from the pages' page:<id> tap/swipe links, and
 pages still link-less after that get default prev/next (left/right)
 navigation on-device, so a plain {id, name, device_ids, pages:[{page_id}]}
 deck navigates out of the box. Returns {ok, id, links_derived}, or 422
-on a bad shape.""",
+on a bad shape.
+
+A dashboard bound only to OTHER displays cannot show on this record's
+display_ids, so it is refused with 409 {code:"pages_not_bound",
+unbound_pages:[{id, name, bound_to}], fix:{bind_pages:[ids]}} and nothing
+is saved or bound. To proceed, either bind the dashboards to the display
+first (bind_devices), or repeat the call with consent in the same object:
+"bind_pages": [ids] moves them to this display, and "bind_also": [ids]
+binds them to it while keeping their other display. Never bind a
+dashboard on your own initiative: it may belong to another lineup, so ask
+the user (or pick a dashboard already on this display). A dashboard bound
+to no display is allowed as before.""",
     "delete_deck": """\
 Delete a deck by id.""",
 }

@@ -50,6 +50,12 @@
 
   let selected = null;
   let dirty = false;
+  // Dashboards the user agreed to bind to the chosen display: id -> "move"
+  // (this display only) or "also" (keep its other display). Per display, so a
+  // consent given for one display never carries to another.
+  let consent = {};
+  let consentDevice = deviceSel.value;
+  let lastDevice = deviceSel.value;
   const markDirty = () => {
     dirty = true;
     renderStatus();
@@ -74,6 +80,64 @@
     return checked && ids.includes(checked.value) ? checked.value : ids[0] || "";
   };
   const advanceMode = () => (form.querySelector('input[name="advance"]:checked') || {}).value || "manual";
+
+  // -- binding ----------------------------------------------------------------
+  const deviceInfo = (id) => {
+    const d = (data.devices || []).find((x) => x.id === id) || { id, name: id };
+    return { id: d.id, name: d.name, width: d.w || 0, height: d.h || 0 };
+  };
+  // A member is stranded when it is bound, but not to the chosen display.
+  const strandedFor = (id, dev) => {
+    const p = pagesById[id];
+    return Boolean(dev && p && !p.missing && (p.devices || []).length && !p.devices.includes(dev));
+  };
+  const strandedPage = (id) => ({
+    id,
+    name: pagesById[id].name,
+    bound_to: pagesById[id].devices.map(deviceInfo),
+  });
+  const needsConsent = (ids, dev) => {
+    if (consentDevice !== dev) {
+      consent = {};
+      consentDevice = dev;
+    }
+    return ids.filter((id) => strandedFor(id, dev) && !consent[id]);
+  };
+  // Ask once for these dashboards; true when the user agreed (consent is
+  // recorded), false when they cancelled.
+  async function confirmBind(ids, dev) {
+    const need = needsConsent(ids, dev);
+    if (!need.length) return true;
+    const mode = await window.TesseraeBindPrompt.ask({
+      display: deviceInfo(dev),
+      pages: need.map(strandedPage),
+    });
+    if (!mode) return false;
+    need.forEach((id) => (consent[id] = mode));
+    return true;
+  }
+  async function addOtherDisplay(id) {
+    if (await confirmBind([id], deviceSel.value)) addMember(id);
+  }
+  // Consent travels with the form: the server binds exactly these, atomically
+  // with the save, and refuses the save for any stranded step not listed.
+  function syncConsent() {
+    form.querySelectorAll("input[data-bind-consent]").forEach((n) => n.remove());
+    const dev = deviceSel.value;
+    orderedIds().forEach((id) => {
+      if (!strandedFor(id, dev) || !consent[id]) return;
+      [["bind_pages", id], ...(consent[id] === "also" ? [["bind_also", id]] : [])].forEach(
+        ([name, value]) => {
+          const inp = document.createElement("input");
+          inp.type = "hidden";
+          inp.name = name;
+          inp.value = value;
+          inp.dataset.bindConsent = "1";
+          form.appendChild(inp);
+        }
+      );
+    });
+  }
 
   function addMember(id) {
     if (!memberBox(id)) return;
@@ -173,6 +237,15 @@
         removeMember(id);
       });
       foot.appendChild(rm);
+    }
+    if (strandedFor(id, deviceSel.value)) {
+      c.classList.add("is-offdisplay");
+      const tag = document.createElement("span");
+      tag.className = "dxe-offdisplay";
+      tag.textContent = "Not on this display";
+      tag.title =
+        "This dashboard is bound to another display. You will be asked to bind it when you save.";
+      foot.appendChild(tag);
     }
     if (homeId() === id) {
       const star = document.createElement("span");
@@ -352,9 +425,20 @@
         ((p.devices || []).includes(dev) || (p.devices || []).length === 0)
     );
   }
+  // Dashboards bound only to other displays: not offered by default, but never
+  // hidden. Adding one asks to bind it first.
+  function elsewhere() {
+    const dev = deviceSel.value;
+    const inDeck = new Set(members());
+    if (!dev) return [];
+    return (data.pages || []).filter(
+      (p) => !p.missing && !inDeck.has(p.id) && strandedFor(p.id, dev)
+    );
+  }
   function renderAvailable() {
     avail.innerHTML = "";
     const list = addable();
+    const other = elsewhere();
     availCount.textContent = list.length ? `${list.length} available` : "none left";
     const dev = deviceSel.options[deviceSel.selectedIndex];
     const devName = dev ? dev.textContent : "this display";
@@ -367,6 +451,21 @@
       chip.className = "tg tg--lg dxe-chip";
       chip.innerHTML = `<i class="ph-bold ph-plus dxe-chip-plus" aria-hidden="true"></i>${escape(p.name)}`;
       chip.addEventListener("click", () => addMember(p.id));
+      avail.appendChild(chip);
+    });
+    if (!other.length) return;
+    const head = document.createElement("p");
+    head.className = "dxe-help dxe-avail-other";
+    head.textContent = "On other displays (adding one asks to bind it here)";
+    avail.appendChild(head);
+    other.forEach((p) => {
+      const names = p.devices.map((d) => deviceInfo(d).name).join(", ");
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "tg tg--lg dxe-chip dxe-chip--other";
+      chip.title = `Bound to ${names}`;
+      chip.innerHTML = `<i class="ph-bold ph-plus dxe-chip-plus" aria-hidden="true"></i>${escape(p.name)}<span class="dxe-chip-where">${escape(names)}</span>`;
+      chip.addEventListener("click", () => addOtherDisplay(p.id));
       avail.appendChild(chip);
     });
   }
@@ -452,9 +551,22 @@
   if (titleInput) titleInput.addEventListener("input", markDirty);
   if (enabledBox) enabledBox.addEventListener("change", () => { markDirty(); renderStatus(); });
   form.querySelectorAll('input[name="advance"]').forEach((r) => r.addEventListener("change", () => { markDirty(); render(); }));
-  [el("dxe-interval"), deviceSel, returnSel].forEach(
+  [el("dxe-interval"), returnSel].forEach(
     (c) => c && c.addEventListener("change", () => { markDirty(); render(); })
   );
+  // Switching display keeps the steps, so any bound elsewhere need a decision
+  // now; cancelling puts the previous display back and changes nothing.
+  deviceSel.addEventListener("change", async () => {
+    const dev = deviceSel.value;
+    if (!(await confirmBind(orderedIds(), dev))) {
+      deviceSel.value = lastDevice;
+      render();
+      return;
+    }
+    lastDevice = dev;
+    markDirty();
+    render();
+  });
   // Background-refresh slider <-> number box, kept in sync; 0 = manual only.
   function syncCadence(from) {
     if (!cadenceRange || !cadenceNum) return;
@@ -480,7 +592,26 @@
       window.location.assign(discard.dataset.lineupsUrl || "/decks");
     });
   }
-  form.addEventListener("submit", () => (pagesField.value = orderedIds().join(",")));
+  // Last gate before the save: steps that were already on the wrong display
+  // when the lineup was opened get the same question.
+  let submitting = false;
+  form.addEventListener("submit", (e) => {
+    pagesField.value = orderedIds().join(",");
+    if (submitting) {
+      syncConsent();
+      return;
+    }
+    if (!needsConsent(orderedIds(), deviceSel.value).length) {
+      syncConsent();
+      return;
+    }
+    e.preventDefault();
+    confirmBind(orderedIds(), deviceSel.value).then((ok) => {
+      if (!ok) return;
+      submitting = true;
+      form.requestSubmit();
+    });
+  });
 
   // The wizard's "Create and open the editor" escape lands here with
   // ?open=conditions; the fold is server-rendered open, bring it into view.

@@ -56,6 +56,7 @@ from app.note_render import (
 )
 from app.panel import device_panel, resolve_settings_panel
 from app.push import PushManager, PushResult
+from app.push_delivery import flash_delivery, page_targets
 from app.state.community_themes import emit_css as emit_community_css
 from app.state.event_log import EventLog
 from app.state.page_store import PageStore
@@ -320,6 +321,7 @@ def _push_to_targets(
         f"Watch the History tab for {target_count} render{'s' if target_count != 1 else ''}.",
         "ok",
     )
+    flash_delivery(targets)
 
 
 _FIT_MODES: frozenset[str] = frozenset({"fit", "fill", "stretch", "center", "blur"})
@@ -439,6 +441,7 @@ def send_page() -> Response:
             f"Sending {page_name!r}. The History tab will update when the render lands.",
             "ok",
         )
+    flash_delivery(page_targets(page_id))
     return _redirect_after_page_push(page_id)
 
 
@@ -461,6 +464,7 @@ def send_pages() -> Response:
     for pid in ids:
         _run_in_background(functools.partial(_push_one_page, pid), label=f"page:{pid}")
     flash(f"Sending {len(ids)} dashboard{'s' if len(ids) != 1 else ''}.", "ok")
+    flash_delivery(did for pid in ids for did in page_targets(pid))
     return redirect(url_for("pages.index"))
 
 
@@ -667,6 +671,10 @@ def resend(event_id: int) -> Response:
         f"Resending #{event_id}. The History tab will update when the render lands.",
         "ok",
     )
+    row = _events().get(event_id)
+    snapshot = row.extra.get("device_ids") if row is not None else None
+    if isinstance(snapshot, list):
+        flash_delivery(str(d) for d in snapshot)
     return redirect(url_for("history.index"))
 
 

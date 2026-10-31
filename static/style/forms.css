@@ -1104,6 +1104,13 @@ code {
 .flash--error .flash-icon { color: var(--t-danger); }
 .flash--warn  { border-color: color-mix(in oklab, var(--t-warn) 45%, transparent); }
 .flash--warn  .flash-icon { color: var(--t-warn); }
+/* A push the display picks up later (a sleeping frame): informational, not
+   success and not a problem. One line per waiting display. */
+/* Night blue: the accent is red in Paper (reads as an error) and teal in
+   Classic (reads as success); chart-1 is the one calm hue in both designs. */
+.flash--queued { border-color: color-mix(in oklab, var(--t-chart-1) 45%, transparent); }
+.flash--queued .flash-icon { color: var(--t-chart-1); align-self: flex-start; margin-top: 1px; }
+.flash--queued .flash-msg { white-space: pre-line; }
 
 /* Solid fallback when the browser can't blur, so flashes never wash out. */
 @supports not (backdrop-filter: blur(1px)) {

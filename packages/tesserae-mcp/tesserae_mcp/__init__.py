@@ -1129,7 +1129,10 @@ def build_server() -> Any:
         list_devices), each fitted/quantised to its own panel by the server.
         device_ids is required and may list many panels -- pushing is always
         explicit. This is a one-off; use bind_devices to remember the target set
-        for scheduling. Returns {sent: [...], errors: [...]}."""
+        for scheduling. Returns {sent: [...], errors: [...], delivery: [...]};
+        each delivery entry says whether that device shows it now (mode "live")
+        or only at its next check-in (a sleeping frame: mode "queued", with
+        expected_at and a plain-words text to relay to the user)."""
         return _json("POST", f"/pages/{page_id}/push", {"device_ids": device_ids})
 
     def bind_devices(page_id: str, device_ids: list[str]) -> Any:

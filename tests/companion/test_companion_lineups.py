@@ -717,6 +717,25 @@ def test_binding_unassigned_dashboards_is_opt_in(app: Flask) -> None:
     assert app.config["PAGE_STORE"].get("pantry").device_ids == [device]
 
 
+def test_creating_with_a_dashboard_bound_to_another_display_is_refused(app: Flask) -> None:
+    """The app contract has no consent field, so the server refuses (and
+    names the fix) rather than moving the dashboard or storing a Lineup that
+    can never render."""
+    here = _seed_device(app, "here")
+    there = _seed_device(app, "there")
+    _seed_pages(app, [there], ("pantry",))
+    token = _token(app)
+    _grant_write(app)
+    resp = _create(
+        app, token, intent="interval", name="Wrong", page_ids=["pantry"], device_ids=[here]
+    )
+    assert resp.status_code == 400
+    error = resp.get_json()["error"]
+    assert error["code"] == "invalid_request" and "not bound to" in error["message"]
+    assert app.config["PAGE_STORE"].get("pantry").device_ids == [there]
+    assert app.config["DECK_STORE"].all() == []
+
+
 def _etag(app: Flask, token: str, lineup_id: str = "morning") -> str:
     resp = app.test_client().get(f"/api/app/v1/lineups/{lineup_id}", headers=_auth(token))
     return str(resp.headers["ETag"]).strip('"')

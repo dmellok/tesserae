@@ -34,6 +34,7 @@ from pydantic import ValidationError
 from werkzeug.wrappers import Response
 
 from app.clock_text import clock_of
+from app.lineup_binding import Consent, apply_consent, flash_text, guard_change, refusal
 from app.scheduler import Scheduler
 from app.state.page_store import PageStore
 from app.state.schedule_model import Schedule
@@ -543,7 +544,16 @@ def create() -> Response:
             return _json_error(msg)
         flash(msg, "error")
         return redirect(_next_with_error(nxt, "new") if nxt else url_for("schedules.index"))
+    consent = Consent.from_form(request.form)
+    shown = [p for p in (schedule.page_id, schedule.fallback_page_id) if p]
+    stranded = guard_change(schedule.device_ids, shown, consent)
+    if stranded:
+        if wants_json:
+            return refusal(schedule.device_ids, stranded)
+        flash(flash_text(schedule.device_ids, stranded), "error")
+        return redirect(_next_with_error(nxt, "new") if nxt else url_for("schedules.index"))
     _store().upsert(schedule)
+    apply_consent(schedule.device_ids, shown, consent)
     flash(f"Schedule {schedule.name!r} saved.", "ok")
     # Land on the unified list with the new card highlighted (#167).
     url = nxt or (url_for("decks.index", hl=schedule.id) + f"#udeck-{schedule.id}")
@@ -574,7 +584,22 @@ def update(schedule_id: str) -> Response:
     # form, an API caller) leaves the display bindings as they were.
     if not request.form.get("device_ids_present") and not schedule.device_ids:
         schedule = schedule.model_copy(update={"device_ids": list(existing.device_ids)})
+    consent = Consent.from_form(request.form)
+    shown = [p for p in (schedule.page_id, schedule.fallback_page_id) if p]
+    stranded = guard_change(
+        schedule.device_ids,
+        shown,
+        consent,
+        old_displays=existing.device_ids,
+        old_pages=[p for p in (existing.page_id, existing.fallback_page_id) if p],
+    )
+    if stranded:
+        flash(flash_text(schedule.device_ids, stranded), "error")
+        if nxt:
+            return redirect(_next_with_error(nxt, schedule_id))
+        return redirect(url_for("schedules.index", edit=schedule_id))
     _store().upsert(schedule)
+    apply_consent(schedule.device_ids, shown, consent)
     flash(f"Schedule {schedule.name!r} updated.", "ok")
     return redirect(nxt or url_for("schedules.index"))
 

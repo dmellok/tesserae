@@ -185,15 +185,17 @@
 
 {% macro step(d, l, s) -%}
 {%- set cls = 'is-next' if s.next else ('is-waiting' if (s.current and not s.on_screen and s.pill) else ('is-now' if s.on_screen else '')) -%}
-<li class="lu-step{% if cls %} {{ cls }}{% endif %}{% if s.missing %} is-missing{% endif %}" data-step="{{ s.index }}"{% if s.missing %} title="This dashboard was deleted; remove it from the lineup"{% endif %}><figure><span class="lu-slot">
+<li class="lu-step{% if cls %} {{ cls }}{% endif %}{% if s.missing %} is-missing{% endif %}{% if s.off_display %} is-offdisplay{% endif %}" data-step="{{ s.index }}"{% if s.missing %} title="This dashboard was deleted; remove it from the lineup"{% elif s.off_display %} title="{{ s.off_display_note }}"{% endif %}><figure><span class="lu-slot">
 {%- if s.pill %}<span class="lu-pill p-{{ s.pill.kind }}" title="{{ s.pill.title }}">{% if s.pill.kind == 'now' %}{{ ico('play') }}{% endif %}{{ s.pill.label }}</span>{% endif -%}
 </span>
-<span class="lu-tile{% if s.item_count > 1 %} stacked{% endif %}">{{ thumb(s.name, s.thumb_url, s.aspect, d.orientation if d.orientation else s.orientation, cls='missing' if s.missing else '', display=d) }}<span class="lu-scrim" aria-hidden="true"></span>
-{%- if d.id and l.actions.push_step_url and not s.missing %}<form method="post" action="{{ l.actions.push_step_url }}" class="lu-push-form"><input type="hidden" name="index" value="{{ s.index }}"><input type="hidden" name="display_id" value="{{ d.id }}"><input type="hidden" name="page_id" value="{{ s.dashboard_id }}"><input type="hidden" name="composition_digest" value="{{ s.composition_digest or '' }}"><button type="submit" class="lu-push-ov" data-push="{{ l.id }}:{{ s.index }}" title="{{ s.push_title }}" aria-label="{{ s.push_title }}"><i>{{ ico('send') }}</i><span>Push now</span></button></form>{% endif -%}
+<span class="lu-tile{% if s.item_count > 1 %} stacked{% endif %}">{{ thumb(s.name, s.thumb_url, s.aspect, d.orientation if d.orientation else s.orientation, cls='missing' if s.missing else ('offdisplay' if s.off_display else ''), display=d) }}<span class="lu-scrim" aria-hidden="true"></span>
+{%- if d.id and l.actions.push_step_url and not s.missing and not s.off_display %}<form method="post" action="{{ l.actions.push_step_url }}" class="lu-push-form"><input type="hidden" name="index" value="{{ s.index }}"><input type="hidden" name="display_id" value="{{ d.id }}"><input type="hidden" name="page_id" value="{{ s.dashboard_id }}"><input type="hidden" name="composition_digest" value="{{ s.composition_digest or '' }}"><button type="submit" class="lu-push-ov" data-push="{{ l.id }}:{{ s.index }}" title="{{ s.push_title }}" aria-label="{{ s.push_title }}"><i>{{ ico('send') }}</i><span>Push now</span></button></form>{% endif -%}
 <span class="lu-pushed-msg" aria-hidden="true"></span>
 {%- if s.item_count > 1 %}<button type="button" class="lu-count" data-peek="{{ l.id }}:{{ s.index }}" aria-haspopup="dialog" aria-expanded="false" title="{{ s.item_count }} items in this step. Show them">×{{ s.item_count }}</button>{% endif -%}
 </span>
-<figcaption><span class="lu-step-name">{{ s.name }}</span><span class="lu-step-meta">{{ s.position }}{% if s.conditional %} <span title="Shows only while its conditions pass">{{ ico('funnel') }}</span>{% endif %}</span></figcaption></figure>
+<figcaption><span class="lu-step-name">{{ s.name }}</span><span class="lu-step-meta">{{ s.position }}{% if s.conditional %} <span title="Shows only while its conditions pass">{{ ico('funnel') }}</span>{% endif %}</span>
+{%- if s.off_display %}<span class="lu-step-off" title="{{ s.off_display_note }}">Not on this display</span>{% if d.id and l.actions.bind_url %}<button type="button" class="lu-bind" data-bind="{{ l.id }}:{{ s.index }}" title="{{ s.off_display_note }}. Bind it to {{ d.name }} too so it can show here.">Bind to {{ d.name }}</button>{% endif %}{% endif -%}
+</figcaption></figure>
 {%- if s.separator == 'arrow' %}<span class="lu-sep" aria-hidden="true">{{ ico('chev') }}</span>
 {%- elif s.separator == 'loop' %}<span class="lu-sep loop" title="Loops back to {{ l.steps[0].name }}">{{ ico('loop') }}</span>{% endif -%}
 </li>

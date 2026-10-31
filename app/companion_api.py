@@ -1533,6 +1533,9 @@ def create_lineup() -> Any:
     except (ValidationError, ValueError, TypeError) as err:
         return _error("invalid_request", f"Invalid lineup: {err}", 400)
 
+    refused = _unbound_refusal(deck.device_ids, deck.page_ids)
+    if refused is not None:
+        return refused
     store.upsert(deck)
     # Binding an unassigned dashboard is the server's job, and opt-in: the
     # app asks for it rather than the server deciding, so a dashboard that
@@ -1600,8 +1603,41 @@ def update_lineup(lineup_id: str) -> Any:
     except (ValidationError, ValueError, TypeError) as err:
         return _error("invalid_request", f"Invalid lineup: {err}", 400)
 
+    refused = _unbound_refusal(
+        updated.device_ids,
+        updated.page_ids,
+        old_displays=deck.device_ids,
+        old_pages=deck.page_ids,
+    )
+    if refused is not None:
+        return refused
     store.upsert(updated)
     return _lineup_response(updated)
+
+
+def _unbound_refusal(
+    display_ids: list[str],
+    page_ids: list[str],
+    *,
+    old_displays: list[str] | None = None,
+    old_pages: Iterable[str] = (),
+) -> tuple[Response, int] | None:
+    """Refuse a Lineup whose dashboards are bound only to other displays: it
+    could never render. The app contract has no consent field, so the app is
+    told which dashboards to bind (on the web) instead of the server moving
+    them (#203)."""
+    from app.lineup_binding import Consent, flash_text, guard_change
+
+    stranded = guard_change(
+        display_ids, page_ids, Consent(), old_displays=old_displays, old_pages=old_pages
+    )
+    if not stranded:
+        return None
+    return _error(
+        "invalid_request",
+        flash_text(display_ids, stranded, retry=False),
+        400,
+    )
 
 
 def _unique_lineup_id(store: Any, name: str) -> str:

@@ -3720,7 +3720,13 @@
       .then(function (res) {
         if (!status) return;
         var n = res.ok && res.j.sent ? res.j.sent.length : 0;
-        status.textContent = n ? ("sent to " + n + " panel" + (n > 1 ? "s" : "")) : (res.j && res.j.error) || "send failed";
+        // A sleeping frame only fetches it at its next check-in: say so.
+        var waiting = ((res.ok && res.j.delivery) || []).filter(function (d) { return d.mode !== "live"; });
+        var sent = n ? ("sent to " + n + " panel" + (n > 1 ? "s" : "")) : (res.j && res.j.error) || "send failed";
+        if (waiting.length === 1) sent = waiting[0].short + " (" + waiting[0].name + ")";
+        else if (waiting.length) sent += " · " + waiting.length + " asleep, they pick it up at their next check-in";
+        status.textContent = sent;
+        status.title = waiting.map(function (d) { return d.text; }).join("\n");
       })
       .catch(function () { if (status) status.textContent = "send failed"; });
   }
