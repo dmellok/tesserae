@@ -6,6 +6,18 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added
+
+- Widgets and data plugins, bundled ones included, can be disabled from the
+  Widgets page, and enabled again, without a restart. A disabled plugin leaves
+  the Admin pages menu and the add-a-widget pickers, its admin page and routes
+  answer 404 with a friendly page, and it moves to a Disabled section with an
+  Enable button. Dashboards that use it keep their settings and show a
+  "Widget X is disabled" placeholder. Disabling something in use asks first and
+  names the dashboards. Fonts, themes, renderers and devices cannot be
+  disabled. Bundled plugins now carry a Bundled tag, since they can be
+  disabled but not removed.
+
 ## [0.496.1], 2026-10-31
 
 ### Fixed

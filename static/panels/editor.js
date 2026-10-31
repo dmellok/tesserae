@@ -567,6 +567,16 @@
   function mountWidget(e, host) {
     var shadow = host.attachShadow({ mode: "open" });
     if (!e.widget) return;
+    var off = (window.__TESSERAE_DISABLED_WIDGETS || {})[e.widget];
+    if (off) {
+      shadow.innerHTML =
+        '<div role="note" style="box-sizing:border-box;width:100%;height:100%;display:flex;' +
+        'flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:8px;' +
+        'text-align:center;font:600 12px/1.3 system-ui;color:#6b6b6b;border:1px dashed currentColor;' +
+        'border-radius:6px;overflow:hidden"><span>Widget ' + esc(off) + ' is disabled</span>' +
+        '<span style="font-weight:400;font-size:11px;opacity:.8">Enable it on the Widgets page</span></div>';
+      return;
+    }
     var prefix = window.TESSERAE_URL_PREFIX || "";
     import(prefix + "/plugins/" + e.widget + "/client.js")
       .then(function (mod) {

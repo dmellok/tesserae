@@ -26,7 +26,7 @@ import json
 import logging
 import re
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import ModuleType
@@ -38,9 +38,14 @@ from flask import (
     Flask,
     abort,
     current_app,
+    flash,
     has_app_context,
+    jsonify,
+    redirect,
     render_template,
+    request,
     send_from_directory,
+    url_for,
 )
 from werkzeug.wrappers import Response
 
@@ -74,6 +79,16 @@ DUPLICATE_ID_MESSAGE = "duplicate plugin id"
 # therefore offer to clean up. Bundled plugins ship with the image and are
 # never removable from the UI.
 REMOVABLE_ROOTS: tuple[str, ...] = ("authored", "marketplace")
+
+
+# Kinds an operator can switch off. Fonts, themes, renderers and devices are
+# load-bearing for every dashboard, so they stay on.
+DISABLEABLE_KINDS: frozenset[str] = frozenset({"widget", "data"})
+
+# Settings section holding the switched-off ids as a flat ``{plugin_id: True}``
+# map (the shape ``renderers_enabled`` uses). Absent means every plugin is on,
+# so an existing install is unchanged.
+DISABLED_SECTION = "plugins_disabled"
 
 
 @dataclass(frozen=True)
@@ -273,9 +288,39 @@ class PluginRegistry:
     plugins: dict[str, Plugin] = field(default_factory=dict)
     errors: list[LoaderError] = field(default_factory=list)
     fonts: dict[str, Font] = field(default_factory=dict)
+    # Loaded but switched off. Kept out of ``plugins`` so every lookup, picker
+    # and background job skips them without knowing the feature exists; the
+    # Widgets page and the cell placeholder read this map instead.
+    disabled: dict[str, Plugin] = field(default_factory=dict)
 
     def get(self, plugin_id: str) -> Plugin | None:
         return self.plugins.get(plugin_id)
+
+    def is_disabled(self, plugin_id: str) -> bool:
+        return plugin_id in self.disabled
+
+    def set_disabled(self, plugin_id: str, disabled: bool) -> bool:
+        """Move one plugin between ``plugins`` and ``disabled`` in place, so
+        the toggle takes effect on the next request with no re-import and no
+        restart. False when there is nothing to do (unknown id, a kind that
+        cannot be disabled, or already in that state)."""
+        if disabled:
+            plugin = self.plugins.get(plugin_id)
+            if plugin is None or plugin.kind not in DISABLEABLE_KINDS:
+                return False
+            self.disabled[plugin_id] = self.plugins.pop(plugin_id)
+            return True
+        plugin = self.disabled.pop(plugin_id, None)
+        if plugin is None:
+            return False
+        self.plugins[plugin_id] = plugin
+        return True
+
+    def apply_disabled(self, plugin_ids: Collection[str]) -> None:
+        """Switch off every loaded, disableable plugin named in
+        ``plugin_ids``; ids that are unknown or of another kind are ignored."""
+        for plugin_id in plugin_ids:
+            self.set_disabled(plugin_id, True)
 
     def widgets(self) -> list[Plugin]:
         return [p for p in self.plugins.values() if p.kind == "widget"]
@@ -373,6 +418,7 @@ def discover(
     schema_path: Path,
     data_root: Path,
     additional_plugins_dirs: list[Path] | None = None,
+    disabled_ids: Collection[str] = (),
 ) -> PluginRegistry:
     """Walk ``plugins_dir`` and ``additional_plugins_dirs`` (if any) and
     return a registry of validated plugins.
@@ -387,6 +433,10 @@ def discover(
     an error so the user can resolve it (the bundled adoption of a
     previously-marketplace widget is the only way this happens in
     practice).
+
+    ``disabled_ids`` are the plugins the operator switched off. They are
+    fully loaded (so enabling one later needs no re-import) but parked in
+    ``registry.disabled`` rather than ``registry.plugins``.
     """
     registry = PluginRegistry()
     schema = _load_schema(schema_path)
@@ -407,10 +457,11 @@ def discover(
     # widget that names it, so binding at parse time would depend on
     # directory order.
     def _delegate(plugin_id: str) -> Capabilities | None:
-        target = registry.get(plugin_id)
+        target = registry.get(plugin_id) or registry.disabled.get(plugin_id)
         return target.capabilities if target is not None else None
 
     set_delegate_resolver(_delegate)
+    registry.apply_disabled(disabled_ids)
     return registry
 
 
@@ -608,6 +659,50 @@ def _plugin_source(plugin: Plugin, data_root: Path) -> str:
     return "catalog" if rel.parts[:1] == ("marketplace",) else "authored"
 
 
+def disabled_ids(store: Any) -> set[str]:
+    """Plugin ids switched off in the ``plugins_disabled`` settings section.
+    A missing store or section means none, which is every existing install."""
+    if store is None:
+        return set()
+    try:
+        raw = store.get_section(DISABLED_SECTION)
+    except Exception:
+        return set()
+    return {str(pid) for pid, off in raw.items() if off is True}
+
+
+def plugin_usage(plugin_id: str, pages: Any) -> list[str]:
+    """Names of the dashboards that place ``plugin_id``, grid cells and canvas
+    widget elements alike, for the "in use" warning before a disable."""
+    names: list[str] = []
+    for page in pages:
+        used = any(cell.plugin == plugin_id for cell in page.cells)
+        canvas = getattr(page, "canvas", None)
+        if not used and canvas is not None:
+            used = any(el.kind == "widget" and el.widget == plugin_id for el in canvas.els)
+        if used:
+            names.append(str(page.name))
+    return names
+
+
+def plugin_dependents(plugin_id: str, registry: PluginRegistry) -> list[str]:
+    """Names of enabled plugins whose server code looks this one up by id, so
+    switching a data plugin off can warn what quietly stops working. A plain
+    text match on the quoted id is crude but errs toward warning."""
+    needles = (f'"{plugin_id}"', f"'{plugin_id}'")
+    out: list[str] = []
+    for other in registry.plugins.values():
+        if other.id == plugin_id:
+            continue
+        try:
+            source = (other.path / "server.py").read_text(encoding="utf-8")
+        except OSError:
+            continue
+        if any(n in source for n in needles):
+            out.append(other.name)
+    return sorted(out, key=str.lower)
+
+
 def register_routes(app: Flask, registry: PluginRegistry) -> None:
     """Register per-plugin static asset routes and any plugin-provided blueprints."""
     bp = Blueprint("plugins", __name__)
@@ -627,12 +722,64 @@ def register_routes(app: Flask, registry: PluginRegistry) -> None:
         """Top-level page listing every loaded plugin + loader errors."""
         reg = _live_registry()
         data_root = Path(current_app.config["DATA_ROOT"])
+        everything = [*reg.plugins.values(), *reg.disabled.values()]
+        pages_store = current_app.config.get("PAGE_STORE")
+        pages = pages_store.list() if pages_store is not None else []
+        usage: dict[str, dict[str, list[str]]] = {}
+        for p in reg.plugins.values():
+            if p.kind not in DISABLEABLE_KINDS:
+                continue
+            dashboards = plugin_usage(p.id, pages)
+            dependents = plugin_dependents(p.id, reg) if p.kind == "data" else []
+            if dashboards or dependents:
+                usage[p.id] = {"dashboards": dashboards, "dependents": dependents}
         return render_template(
             "plugins_index.html",
             plugins=sorted(reg.plugins.values(), key=lambda p: (p.kind, p.name.lower())),
+            disabled_plugins=sorted(reg.disabled.values(), key=lambda p: p.name.lower()),
+            disableable_kinds=DISABLEABLE_KINDS,
+            plugin_usage=usage,
             errors=[_describe_error(err, reg, data_root) for err in reg.errors],
-            plugin_sources={p.id: _plugin_source(p, data_root) for p in reg.plugins.values()},
+            plugin_sources={p.id: _plugin_source(p, data_root) for p in everything},
         )
+
+    def _toggle(disable: bool) -> Response | tuple[Response, int]:
+        plugin_id = (request.form.get("plugin_id") or "").strip()
+        reg = _live_registry()
+        wants_json = request.accept_mimetypes.best == "application/json"
+
+        def done(ok: bool, message: str, status: int = 200) -> Response | tuple[Response, int]:
+            if wants_json:
+                return jsonify({"ok": ok, "message": message}), status
+            flash(message, "ok" if ok else "error")
+            return redirect(url_for("plugins.plugins_index"))
+
+        known = reg.plugins.get(plugin_id) or reg.disabled.get(plugin_id)
+        if known is None:
+            return done(False, f"No plugin {plugin_id!r} is loaded.", 404)
+        if known.kind not in DISABLEABLE_KINDS:
+            return done(
+                False,
+                f"{known.name} is a {known.kind} plugin; only widgets and data plugins can be disabled.",
+                400,
+            )
+        store = current_app.config.get("SETTINGS_STORE")
+        if store is None:
+            return done(False, "Settings are unavailable.", 503)
+        store.patch_section(DISABLED_SECTION, {plugin_id: disable})
+        reg.set_disabled(plugin_id, disable)
+        if disable:
+            return done(True, f"{known.name} is disabled. Enable it again from this page.")
+        return done(True, f"{known.name} is enabled.")
+
+    @bp.post("/disable")
+    def disable_plugin() -> Response | tuple[Response, int]:
+        """Switch a widget or data plugin off without removing it."""
+        return _toggle(True)
+
+    @bp.post("/enable")
+    def enable_plugin() -> Response | tuple[Response, int]:
+        return _toggle(False)
 
     @bp.get("/<plugin_id>/<path:asset>")
     def plugin_asset(plugin_id: str, asset: str) -> Response:
@@ -657,13 +804,30 @@ def register_routes(app: Flask, registry: PluginRegistry) -> None:
 
     app.register_blueprint(bp, url_prefix="/plugins")
 
+    @app.before_request
+    def _gate_disabled_plugin() -> Response | tuple[str, int] | None:
+        """A disabled plugin's admin page and routes answer 404 with a
+        friendly page instead of its own handler. Browser navigations get
+        the page; scripted and asset requests get a plain 404."""
+        if not request.path.startswith("/plugins/"):
+            return None
+        plugin_id = request.path.split("/", 3)[2]
+        plugin = _live_registry().disabled.get(plugin_id)
+        if plugin is None:
+            return None
+        if "text/html" in request.headers.get("Accept", ""):
+            return render_template("plugin_disabled.html", plugin=plugin), 404
+        return Response("plugin disabled", status=404, mimetype="text/plain")
+
     # Endpoints a plugin declares safe to serve during a loopback render with
     # no session (see app/auth.py). A widget whose markup references its own
     # plugin's media route needs this, or the panel renders with broken
     # images; everything undeclared stays behind the password gate.
     render_safe: set[str] = set()
 
-    for plugin in registry.plugins.values():
+    # Disabled plugins mount too: enabling one later is then instant, and the
+    # gate above keeps their routes dark meanwhile.
+    for plugin in [*registry.plugins.values(), *registry.disabled.values()]:
         if plugin.server_module is None:
             continue
         blueprint_fn: Callable[[], Blueprint] | None = getattr(
@@ -688,5 +852,5 @@ def register_routes(app: Flask, registry: PluginRegistry) -> None:
     # Plugins whose blueprint serves its index, for Plugin.has_admin.
     rules = {rule.rule for rule in app.url_map.iter_rules()}
     app.config["PLUGIN_ADMIN_IDS"] = frozenset(
-        pid for pid in registry.plugins if f"/plugins/{pid}/" in rules
+        pid for pid in [*registry.plugins, *registry.disabled] if f"/plugins/{pid}/" in rules
     )

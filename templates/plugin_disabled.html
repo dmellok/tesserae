@@ -1,0 +1,26 @@
+{% extends "_base.html" %}
+{% from "_components.html" import section_card %}
+{% block title %}{{ plugin.name }} is disabled, Tesserae{% endblock %}
+
+{% block main %}
+<header class="page-head">
+  <h1><i class="ph ph-puzzle-piece"></i> {{ plugin.name }}</h1>
+  <p class="lede">This {{ plugin.kind }} is switched off, so its pages are not available.</p>
+</header>
+{% call section_card(icon='prohibit', title='Disabled') %}
+  <div class="dx-empty">
+    <div class="dx-empty-icon"><i class="ph ph-prohibit" aria-hidden="true"></i></div>
+    <p class="dx-empty-title">{{ plugin.name }} is disabled</p>
+    <p class="dx-empty-help">Dashboards that use it show a placeholder and keep their settings. Enable it on the Widgets page to bring it back.</p>
+    <form method="post" action="{{ url_for('plugins.enable_plugin') }}" class="form form--inline">
+      <input type="hidden" name="plugin_id" value="{{ plugin.id }}">
+      <button type="submit" class="dx-btn-primary">
+        <i class="ph ph-power" aria-hidden="true"></i><span>Enable {{ plugin.name }}</span>
+      </button>
+      <a class="dx-btn-ghost-sm" href="{{ url_for('plugins.plugins_index') }}">
+        <i class="ph ph-puzzle-piece" aria-hidden="true"></i><span>Back to Widgets</span>
+      </a>
+    </form>
+  </div>
+{% endcall %}
+{% endblock %}

@@ -317,6 +317,12 @@ def _client_safe_options(plugin_id: str | None, resolved: dict[str, Any]) -> dic
     return {key: value for key, value in resolved.items() if key not in secret_names}
 
 
+def _disabled_name(plugin_id: str | None, registry: PluginRegistry) -> str:
+    """Display name of ``plugin_id`` when the operator switched it off, else ""."""
+    plugin = registry.disabled.get(plugin_id) if plugin_id else None
+    return plugin.name if plugin is not None else ""
+
+
 def _resolved_options(plugin_id: str, raw: dict[str, Any]) -> dict[str, Any]:
     plugin = _registry().get(plugin_id)
     if plugin is None:
@@ -1158,6 +1164,9 @@ def _hydrate_page(
                 # then falls through to client.js's own hardcoded text.
                 "locale": locale,
                 "strings": plugin.strings_for(locale) if plugin else {},
+                # Name of the switched-off widget this cell uses, "" otherwise;
+                # composer.js paints a placeholder instead of importing it.
+                "disabled_name": _disabled_name(plugin_id, registry),
                 # Touch attributes (issue #49): stamped on the cell
                 # container so the render-time extractor picks the whole
                 # cell up as a region. Cell override wins over the
@@ -1519,6 +1528,7 @@ def _build_canvas_els(
             item["data_source"] = wsrc
             plugin = registry.get(e.widget)
             item["strings"] = plugin.strings_for(locale) if plugin else {}
+            item["disabled_name"] = _disabled_name(e.widget, registry)
         _apply_binds(e, item)
         _stamp_touch(item, e)
         els_out.append(item)

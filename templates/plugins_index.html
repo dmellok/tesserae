@@ -14,7 +14,7 @@
 {% block main %}
 <header class="page-head">
   <h1><i class="ph ph-puzzle-piece"></i> Widgets</h1>
-  <p class="lede">Every loaded widget, plus the supporting fonts + data plugins that back them. Browse the catalog to install more.</p>
+  <p class="lede">Every loaded widget, plus the supporting fonts + data plugins that back them. Browse the catalog to install more. Bundled plugins ship with Tesserae: you can disable them, not remove them.</p>
   <div class="page-head-cta">
     <a class="dx-btn-primary" href="{{ url_for('marketplace.browse') }}">
       <i class="ph ph-storefront" aria-hidden="true"></i>
@@ -72,7 +72,10 @@
 {% endcall %}
 {% endif %}
 
-{% if not plugins %}
+{% set disabled_plugins = disabled_plugins if disabled_plugins is defined else [] %}
+{% set plugin_usage = plugin_usage if plugin_usage is defined else {} %}
+{% set disableable_kinds = disableable_kinds if disableable_kinds is defined else ['widget', 'data'] %}
+{% if not plugins and not disabled_plugins %}
 {% call section_card(icon='puzzle-piece', title='No widgets loaded',
                      description='Drop a folder under plugins/&lt;id&gt;/ and restart, or install community ones via Browse.') %}
   <div class="dx-empty">
@@ -114,7 +117,7 @@
     <option value="name:desc">Name Z to A</option>
     <option value="id:asc">Id</option>
   </select>
-  <span class="lf-count" data-lf-count data-lf-noun="plugin" aria-live="polite">{{ plugins|length }} plugin{{ '' if plugins|length == 1 else 's' }}</span>
+  <span class="lf-count" data-lf-count data-lf-noun="plugin" aria-live="polite">{% set _total = plugins|length + disabled_plugins|length %}{{ _total }} plugin{{ '' if _total == 1 else 's' }}</span>
 </div>
 {% for kind, items in kinds %}
 <div class="dx-widgets-group" data-lf-group>
@@ -137,6 +140,7 @@
           <span class="dx-widget-name">{{ plugin.name }}</span>
           <code class="dx-widget-id">{{ plugin.id }} · v{{ plugin.manifest.version }}</code>
           {% if plugin.has_admin %}<span class="dx-pill is-ok"><i class="ph ph-gear-six" aria-hidden="true"></i> admin page</span>{% endif %}
+          {% if plugin_sources.get(plugin.id, 'bundled') == 'bundled' and plugin.kind in disableable_kinds %}<span class="dx-pill" title="Ships with Tesserae. It can be disabled but not removed.">Bundled</span>{% endif %}
         </div>
         {% if plugin.manifest.description %}
         <p class="dx-widget-desc">{{ plugin.manifest.description }}</p>
@@ -157,6 +161,17 @@
           </button>
         </form>
         {% endif %}
+        {% if plugin.kind in disableable_kinds %}
+        {% set used = plugin_usage.get(plugin.id) %}
+        <form method="post" action="{{ url_for('plugins.disable_plugin') }}" class="form form--inline"
+              {% if used %}data-confirm="{% if used.dashboards %}Used in {{ used.dashboards|length }} dashboard{{ '' if used.dashboards|length == 1 else 's' }}: {{ used.dashboards|join(', ') }}. They will show a placeholder until you enable it again.{% endif %}{% if used.dependents %}{{ '&#10;&#10;' if used.dashboards }}Other widgets rely on it and stop getting data until you enable it again: {{ used.dependents|join(', ') }}.{% endif %}&#10;&#10;Disable {{ plugin.name }}?"
+              onsubmit="return confirm(this.dataset.confirm);"{% endif %}>
+          <input type="hidden" name="plugin_id" value="{{ plugin.id }}">
+          <button type="submit" class="dx-btn-ghost-sm" data-act="disable">
+            <i class="ph ph-prohibit" aria-hidden="true"></i><span>Disable</span>
+          </button>
+        </form>
+        {% endif %}
       </div>
     </li>
     {% endfor %}
@@ -164,6 +179,45 @@
 {% endcall %}
 </div>
 {% endfor %}
+{% if disabled_plugins %}
+<div class="dx-widgets-group" data-lf-group data-lf-section="disabled">
+{% call section_card(icon='prohibit', title='Disabled',
+                     description='Switched off: hidden from the menus and pickers, and not run. Dashboards that use one show a placeholder and keep their settings.',
+                     meta={'label': '', 'value': disabled_plugins|length}) %}
+  <ul class="dx-discovered-list">
+    {% for plugin in disabled_plugins %}
+    <li class="dx-inset-row dx-widget-row is-disabled" data-lf-item
+        data-lf-text="{{ (plugin.name ~ ' ' ~ plugin.id ~ ' ' ~ (plugin.manifest.description or ''))|lower }}"
+        data-lf-kind="{{ plugin.kind }}" data-lf-admin="no"
+        data-lf-source="{{ plugin_sources.get(plugin.id, 'bundled') }}"
+        data-sort-name="{{ plugin.name }}" data-sort-id="{{ plugin.id }}">
+      <span class="dx-section-icon dx-widget-icon" aria-hidden="true">
+        <i class="ph ph-{{ plugin.icon or KIND_ICONS.get(plugin.kind, 'puzzle-piece') }}"></i>
+      </span>
+      <div class="dx-widget-text">
+        <div class="dx-widget-head">
+          <span class="dx-widget-name">{{ plugin.name }}</span>
+          <code class="dx-widget-id">{{ plugin.id }} · v{{ plugin.manifest.version }}</code>
+          <span class="dx-pill">{{ plugin.kind|capitalize }}</span>
+        </div>
+        {% if plugin.manifest.description %}
+        <p class="dx-widget-desc">{{ plugin.manifest.description }}</p>
+        {% endif %}
+      </div>
+      <div class="dx-discovered-actions">
+        <form method="post" action="{{ url_for('plugins.enable_plugin') }}" class="form form--inline">
+          <input type="hidden" name="plugin_id" value="{{ plugin.id }}">
+          <button type="submit" class="dx-btn-primary" data-act="enable">
+            <i class="ph ph-power" aria-hidden="true"></i><span>Enable</span>
+          </button>
+        </form>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+{% endcall %}
+</div>
+{% endif %}
 <div class="lf-empty dx-section-card" data-lf-empty hidden>No widgets match.</div>
 </div>
 {% endif %}
