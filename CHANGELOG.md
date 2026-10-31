@@ -37,6 +37,10 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   tagged "Queued", and a line says when it was queued and when the frame picks
   it up ("Delivering now" for a connected frame). Thumbnail URLs carry the
   render digest, and the open page follows pushes and fetches on its own.
+- The Mirror page (`/mirror/<device>`) loads its image behind a URL prefix
+  such as Home Assistant's sidebar panel. The image URL was root-absolute, so
+  under ingress it never loaded and the page stayed black; it now carries the
+  prefix. The device name on the page is HTML-escaped too.
 
 ## [0.496.1], 2026-10-31
 
