@@ -860,6 +860,8 @@ class PushManager:
         return {
             "digest": digest,
             "preview_digest": entry.get("last_served_preview_digest"),
+            "composition_digest": entry.get("last_served_composition_digest"),
+            "page_id": entry.get("last_served_page_id"),
             "served_at": float(served_at) if isinstance(served_at, (int, float)) else None,
         }
 
@@ -892,6 +894,18 @@ class PushManager:
             current["last_served_digest"] = digest
             if changed:
                 current["last_served_at"] = time.time()
+            # What the served frame was, so the admin can still draw the
+            # glass once a newer render replaces it in the live slot.
+            for key, value in (
+                ("last_served_composition_digest", render.get("composition_digest")),
+                ("last_served_page_id", render.get("page_id")),
+            ):
+                if isinstance(value, str) and value:
+                    changed = changed or current.get(key) != value
+                    current[key] = value
+                elif key in current:
+                    changed = True
+                    current.pop(key, None)
             if isinstance(preview_digest, str) and preview_digest:
                 changed = changed or current.get("last_served_preview_digest") != preview_digest
                 current["last_served_preview_digest"] = preview_digest
@@ -922,6 +936,8 @@ class PushManager:
         for key in (
             "last_served_digest",
             "last_served_preview_digest",
+            "last_served_composition_digest",
+            "last_served_page_id",
             "last_served_at",
         ):
             replacement.pop(key, None)
@@ -2507,7 +2523,9 @@ class PushManager:
                 "digest",
                 "composition_digest",
                 "preview_digest",
+                "last_served_digest",
                 "last_served_preview_digest",
+                "last_served_composition_digest",
             ):
                 value = entry.get(key)
                 if isinstance(value, str) and value:

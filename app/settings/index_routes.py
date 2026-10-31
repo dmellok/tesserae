@@ -51,6 +51,7 @@ from ._shared import (
     note_refresh_floor,
     plugins,
     render_for_admin,
+    render_sync_sig,
     renderers,
     settings_store,
 )
@@ -1466,32 +1467,99 @@ def _build_device_section(store: Any, device: Device) -> dict[str, Any] | None:
     return section
 
 
+def _clock_hhmm(epoch: Any) -> str:
+    if isinstance(epoch, (int, float)) and epoch > 0:
+        return time.strftime("%H:%M", time.localtime(float(epoch)))
+    return ""
+
+
+def _page_name(page_id: str) -> str:
+    if not page_id:
+        return ""
+    page_store = current_app.config.get("PAGE_STORE")
+    page = page_store.get(page_id) if page_store is not None else None
+    return str(getattr(page, "name", "") or page_id)
+
+
+def _queued_note(pending: dict[str, Any]) -> dict[str, Any]:
+    """The "Queued" line for a pull device with a newer image waiting: when
+    it was queued and when the frame will take it, in the same words the
+    Next update tile uses."""
+    at = _clock_hhmm(pending.get("queued_at"))
+    queued = f"New image queued at {at}" if at else "New image queued"
+    when = str(pending.get("expected_when") or "")
+    if pending.get("live"):
+        text = f"{queued}. Delivering now."
+    elif pending.get("mode") == next_update.MODE_CONNECTED:
+        text = f"{queued}. The frame picks it up on its next poll."
+    elif when and pending.get("mode") == next_update.MODE_SLEEPS:
+        text = f"{queued}. The frame picks it up at its next check-in {when}."
+    else:
+        text = f"{queued}. The frame picks it up when it next checks in."
+    return {"title": "Waiting for the frame", "text": text, "live": bool(pending.get("live"))}
+
+
 def _device_overview(device: Device, section: dict[str, Any]) -> dict[str, Any]:
     """The four headline tiles (showing / battery / firmware / next wake)
     shared by the Devices table's quick panel and the device page's
-    Overview section, plus whether a render exists for the thumbnail."""
+    Overview section, plus the thumbnail(s) and, for a pull device with a
+    newer image waiting, the queued note.
+
+    A pull (REST) frame fetches its picture at its own check-in, so what the
+    server holds newest and what is on the glass differ after a push. The
+    thumbnail then shows the glass (the last frame the device fetched) and a
+    second, smaller one the queued image; ``showing`` describes the glass."""
     push_mgr = current_app.config.get("PUSH_MANAGER")
     latest: dict[str, Any] | None = None
+    live_entry: dict[str, Any] | None = None
     if push_mgr is not None:
+        live_entry = push_mgr.latest_render_for(device.id)
         held_fn = getattr(push_mgr, "held_render_for", None)
         latest = held_fn(device.id) if callable(held_fn) else None
         if not latest:
-            latest = push_mgr.latest_render_for(device.id)
-    showing: dict[str, Any] = {"value": "Nothing yet", "sub": "no frame pushed", "muted": True}
+            latest = live_entry
+    pending: dict[str, Any] = {"queued": False}
     if latest:
-        page_id = str(latest.get("page_id") or "")
-        name = ""
-        if page_id:
-            page_store = current_app.config.get("PAGE_STORE")
-            page = page_store.get(page_id) if page_store is not None else None
-            name = str(getattr(page, "name", "") or page_id)
+        try:
+            pending = next_update.pending_delivery(device)
+        except Exception:
+            pending = {"queued": False}
+    queued = bool(pending.get("queued"))
+    # Digest-versioned URLs: the bytes behind /preview/<id>.png change with
+    # every push, so the URL carries the digest and a cached copy of an older
+    # frame can never be shown for a newer one.
+    newest_ver = str((latest or {}).get("composition_digest") or (latest or {}).get("digest") or "")
+    newest_url = url_for("preview_png", device_id=device.id, v=newest_ver) if newest_ver else None
+    # The frame the device last fetched, as a composition still on disk.
+    glass_url: str | None = None
+    served_digest = str((live_entry or {}).get("last_served_digest") or "")
+    if queued and served_digest and push_mgr is not None:
+        comp = str((live_entry or {}).get("last_served_composition_digest") or "")
+        if not comp:
+            comp = push_mgr.composition_for_digest(device.id, served_digest) or ""
+        if comp:
+            glass_url = url_for("renders", filename=f"{comp}.png", w=480)
+    thumb_url = glass_url or newest_url
+    showing: dict[str, Any] = {"value": "Nothing yet", "sub": "no frame pushed", "muted": True}
+    if latest and queued:
+        served_at = (live_entry or {}).get("last_served_at")
+        if served_digest:
+            name = _page_name(str((live_entry or {}).get("last_served_page_id") or ""))
+            sub = f"fetched {_clock_hhmm(served_at)}" if _clock_hhmm(served_at) else ""
+            showing = {"value": name or "Last image", "sub": sub, "muted": False}
+        else:
+            showing = {"value": "Nothing yet", "sub": "frame has not fetched one", "muted": True}
+    elif latest:
+        name = _page_name(str(latest.get("page_id") or ""))
         served_at = latest.get("last_served_at")
         stamp = served_at if isinstance(served_at, (int, float)) else latest.get("timestamp")
         sub = ""
         if isinstance(stamp, (int, float)) and stamp > 0:
             verb = "fetched" if isinstance(served_at, (int, float)) else "rendered"
-            sub = f"{verb} {clock_of(datetime.fromtimestamp(float(stamp)))}"
+            sub = f"{verb} {_clock_hhmm(stamp)}"
         showing = {"value": name or "Latest render", "sub": sub, "muted": False}
+    # What a refresh script compares to know the thumbnail is out of date.
+    sync_sig = render_sync_sig(device.id)
     status = section["status"]
     power = status["tiles"]["power"]
     pct = status["parsed"].get("battery_pct")
@@ -1529,9 +1597,18 @@ def _device_overview(device: Device, section: dict[str, Any]) -> dict[str, Any]:
         next_wake = {"value": predicted or "-", "sub": next_sub, "muted": not predicted}
     return {
         "has_render": bool(latest),
+        "thumb_url": thumb_url,
+        # The queued image next to the glass, only while the two differ and
+        # the glass is known; otherwise the lone thumbnail IS the queued one.
+        "queued_thumb_url": newest_url if (queued and glass_url) else None,
+        "queued": _queued_note(pending) if queued else None,
+        "queued_is_only_thumb": bool(queued and not glass_url),
+        "sync_sig": sync_sig,
         # /preview serves composition PNGs, except legacy entries without one:
         # those fall back to the renderer artifact and must not be quantised again.
-        "preview_is_artifact": bool(latest and not latest.get("composition_digest")),
+        "preview_is_artifact": bool(
+            latest and not glass_url and not latest.get("composition_digest")
+        ),
         "showing": showing,
         "battery": {
             "value": power.get("label") or "-",

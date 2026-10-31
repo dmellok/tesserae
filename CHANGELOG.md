@@ -32,6 +32,17 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   differ, stay in color. Previews only; what is sent to the panel is
   unchanged. See `docs/thumbnail-color.md`.
 
+### Fixed
+
+- Settings > Devices and the device page no longer show a stale or mislabelled
+  preview for a pull (REST) frame after a push. The page used to keep the old
+  thumbnail until reloaded, and after a reload showed the newest image under
+  "Showing" with the old image's fetch time. The thumbnail is now what the
+  frame last fetched, the image waiting for its next check-in sits under it
+  tagged "Queued", and a line says when it was queued and when the frame picks
+  it up ("Delivering now" for a connected frame). Thumbnail URLs carry the
+  render digest, and the open page follows pushes and fetches on its own.
+
 ## [0.496.1], 2026-10-31
 
 ### Fixed
