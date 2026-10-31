@@ -110,12 +110,29 @@ def test_dither_none_keeps_sixteen_greys_and_renderer_pin_wins(app: Flask) -> No
     assert display_color_mode(mono).gamut == "mono-dither"
 
 
-def test_history_uses_display_modes(app: Flask) -> None:
+def test_live_lineups_and_history_use_display_modes(app: Flask) -> None:
     import re
 
     client = app.test_client()
     for did, kind in [("grey", "visionect_place_and_play_32"), ("color", "esp32_client")]:
         client.post("/settings/devices/add", data={"id": did, "kind": kind})
+    from app.state.deck_model import Deck, DeckPage
+    from app.state.page_store import Page
+
+    app.config["PAGE_STORE"].save(Page(id="demo", name="Demo", device_ids=["grey", "color"]))
+    app.config["DECK_STORE"].upsert(
+        Deck(
+            id="shared",
+            name="Shared",
+            device_ids=["grey", "color"],
+            pages=[DeckPage(page_id="demo")],
+        )
+    )
+    response = client.get("/decks/view.json")
+    assert response.status_code == 200
+    displays = {d["id"]: d for d in response.get_json()["displays"]}
+    assert (displays["grey"]["gamut"], displays["grey"]["grey_levels"]) == ("grey16", 16)
+    assert displays["color"]["gamut"] == "color"
     for ids in [["grey"], ["grey", "removed"], ["grey", "color"]]:
         app.config["EVENT_LOG"].record(
             type="push",
@@ -149,7 +166,7 @@ def test_latest_composition_is_filtered_but_legacy_artifact_is_preserved(
         if composition:
             latest["composition_digest"] = "fedcba9876543210"
         body = client.get("/settings/devices/grey").get_data(as_text=True)
-        thumb = re.search(r'<img src="/preview/grey.png"[^>]*>', body)
+        thumb = re.search(r'<img src="/preview/grey.png(?:\?v=[^"]*)?"[^>]*>', body)
         assert thumb is not None
         assert ("data-device-quantised" in thumb.group()) is not composition
 

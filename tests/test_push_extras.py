@@ -278,3 +278,35 @@ def test_push_url_image_rejects_non_http_schemes(tmp_path: Path, panel_png: byte
     result = manager.push_url_image("file:///etc/passwd")
     assert result.status == "failed"
     assert event_log.list(type="push")[0].error.startswith("fetch:")
+
+
+def test_republish_composition_preserves_upright_bytes_and_digest(
+    tmp_path: Path, panel_png: bytes
+) -> None:
+    import hashlib
+
+    clone = _stub_renderer(tmp_path, "pi_png__new", "png", False, device="new")
+    manager, events, client, renders = _wire(tmp_path, panel_png, renderers=[clone])
+    # A resized/rotated target still receives the upright source through its
+    # normal transform, exactly once, rather than reprocessing an artifact.
+    with (
+        patch.object(
+            manager, "_panel_dims_for_send", return_value={"w": 40, "h": 30, "rotation": 180}
+        ),
+        patch("app.push.capture_composed", side_effect=AssertionError("must not render")),
+        patch.object(clone.module, "transform", wraps=clone.module.transform) as transform,
+    ):
+        result = manager.republish_composition(panel_png, page_id="home", device_ids={"new"})
+    assert transform.call_args.kwargs["panel"].w == 40
+    assert transform.call_args.kwargs["panel"].h == 30
+    assert transform.call_count == 1
+    digest = hashlib.sha256(panel_png).hexdigest()[:16]
+    assert result.status == "sent" and result.composition_digest == digest
+    row = events.list(type="push")[0]
+    assert row.source == "resend" and row.target == "home"
+    assert row.digest == digest
+    assert row.extra["device_ids"] == ["new"]
+    latest = manager.latest_render_for("new")
+    assert latest["composition_digest"] == digest and latest["force_refetch"] is True
+    assert (renders / latest["filename"]).read_bytes() == panel_png + b"::pi_png__new"
+    assert len(client.published) == 1

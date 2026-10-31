@@ -2458,37 +2458,49 @@ class PushManager:
                     if isinstance(fit_candidate, str) and fit_candidate in _IMAGE_FIT_MODES
                     else None
                 )
-                # Republish is a user-initiated resend from the History
-                # page; treat it as user intent (bypass coalescing) so
-                # the user's re-send never gets silently superseded.
-                resending = set(selected_ids) or self._broadcast_recipients()
-                self._mark_rendering(resending, +1)
-                self._lock.acquire()
-                try:
-                    # ``force_publish=True``: resend is an explicit user
-                    # action from the History page; even when the same
-                    # composition is already the panel's current frame,
-                    # honour the click and re-publish (v0.71.x content-
-                    # checksum skip otherwise would collapse this into
-                    # ``no_change`` and swallow the user's intent).
-                    # Devices in one push row share a panel group, so the
-                    # first id resolves the group's dims (base-kind topic
-                    # prefixes miss the device lookup and fall back to the
-                    # virtual panel, same as the original unbound push).
-                    result = self._fan_out(
-                        comp_path.read_bytes(),
-                        self._panel_dims_for_send(selected_ids[0] if selected_ids else None),
-                        source="resend",
-                        target=record.target,
-                        started=time.monotonic(),
-                        device_filters=set(selected_ids) if selected_ids else None,
-                        image_fit=original_fit,
-                        force_publish=True,
-                        force_client_refetch=True,
-                    )
-                finally:
-                    self._lock.release()
-                    self._mark_rendering(resending, -1)
+                return self.republish_composition(
+                    comp_path.read_bytes(),
+                    page_id=record.target,
+                    device_ids=set(selected_ids) if selected_ids else None,
+                    image_fit=original_fit,
+                )
+        self._notify(result)
+        return result
+
+    def republish_composition(
+        self,
+        composition_png: bytes,
+        *,
+        page_id: str,
+        device_ids: set[str] | None,
+        image_fit: str | None = None,
+    ) -> PushResult:
+        """Send an upright saved composition through History's resend pipeline.
+
+        Callers validate provenance before supplying the PNG. Targets must
+        share panel dimensions, as in a History push row; Lineups invokes this
+        once per display. The normal renderer fits the saved pixels to the
+        target panel, then applies its physical rotation exactly once. No
+        widget is rendered again. Explicit sends bypass coalescing and quiet
+        hours, force publishing and a client refetch, and log the same digest.
+        """
+        resending = device_ids or self._broadcast_recipients()
+        self._mark_rendering(resending, +1)
+        try:
+            with self._lock:
+                result = self._fan_out(
+                    composition_png,
+                    self._panel_dims_for_send(sorted(device_ids)[0] if device_ids else None),
+                    source="resend",
+                    target=page_id,
+                    started=time.monotonic(),
+                    device_filters=device_ids,
+                    image_fit=image_fit,
+                    force_publish=True,
+                    force_client_refetch=True,
+                )
+        finally:
+            self._mark_rendering(resending, -1)
         self._notify(result)
         return result
 

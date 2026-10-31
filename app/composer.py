@@ -1911,6 +1911,13 @@ def page_preview_token(page: Page, dims: tuple[int, int]) -> str:
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
 
 
+@bp.get("/compose/thumbs/v1/<kind>/<key>.<ext>")
+def lineup_thumbnail(kind: str, key: str, ext: str) -> WerkzeugResponse:
+    from app.lineup_thumbs import serve
+
+    return serve(kind, key, ext)
+
+
 @bp.get("/compose/<page_id>/preview.png")
 def compose_preview(page_id: str) -> WerkzeugResponse:
     """A cached PNG preview of a dashboard, for the dashboards-list hover.

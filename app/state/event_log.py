@@ -327,6 +327,20 @@ class EventLog:
             rows = conn.execute(sql, params).fetchall()
         return [_row_to_event(r) for r in rows]
 
+    def latest_pushes(self, targets: Sequence[str]) -> dict[str, EventRow]:
+        """Latest successful push per dashboard in one query, including its digest."""
+        if not targets:
+            return {}
+        placeholders = ",".join("?" * len(targets))
+        sql = (
+            "SELECT * FROM events WHERE id IN (SELECT MAX(id) FROM events "
+            "WHERE type = 'push' AND status IN ('sent', 'ok') "
+            f"AND target IN ({placeholders}) GROUP BY target)"
+        )
+        with self._lock, self._conn() as conn:
+            rows = conn.execute(sql, list(targets)).fetchall()
+        return {str(row["target"]): _row_to_event(row) for row in rows}
+
     def last_event_by_target(
         self,
         *,

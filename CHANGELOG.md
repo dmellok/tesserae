@@ -8,6 +8,24 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- Lineups redesign, part 1 of 3: a view model for the Lineups page and the
+  endpoints the new page edits through. `GET /decks/view.json` describes every
+  display (what is on screen, what is queued and when a sleeping frame picks it
+  up, the real wake time, quiet hours, a day bar per lineup, each step with a
+  small thumbnail). `POST /decks/<id>/window`, `/days` and `/edits` change a
+  lineup's time window and weekdays in one locked write, refuse a change that
+  makes two lineups on one display overlap (409) and warn when a run falls in
+  quiet hours. `POST /decks/<id>/push-step` pushes one step now; with the
+  step's `composition_digest` it resends the saved picture the tile shows
+  instead of rendering again. Step thumbnails are small immutable WebP
+  snapshots keyed by the pushed composition, looked up in one query per page;
+  a dashboard never pushed is rendered once in the background. Lineup steps
+  whose dashboard was deleted are flagged (`missing`) and the lineup editor
+  lists them so they can be removed. Additive: the current Lineups page is
+  unchanged apart from using the same small thumbnails.
+
+### Added
+
 - Every clock time in the app follows the language and region setting
   (Settings › Server › App › Locale, the host's when unset) through one
   formatter: `3:48 PM` in a 12-hour locale, `15:48` in a 24-hour one. That

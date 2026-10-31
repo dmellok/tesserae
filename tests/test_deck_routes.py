@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -579,3 +580,59 @@ def test_auto_advancing_save_without_a_timeout_stores_zero(app: Flask) -> None:
     d = _decks(app)[0]
     assert d.advance == "both"
     assert d.home_timeout_minutes == 0
+
+
+def _deck_with_deleted_page(app: Flask) -> None:
+    from app.state.deck_model import Deck, DeckPage
+
+    app.config["DECK_STORE"].upsert(
+        Deck(
+            id="rot",
+            name="Rotation",
+            pages=[
+                DeckPage(page_id="gone123", dwell_minutes=7),
+                DeckPage(page_id="overview"),
+            ],
+            advance="timer",
+            advance_interval_minutes=30,
+        )
+    )
+
+
+def test_editor_lists_a_deleted_dashboard_as_a_flagged_removable_step(app: Flask) -> None:
+    _deck_with_deleted_page(app)
+    client = app.test_client()
+    _sign_in(client)
+    html = client.get("/decks/rot/edit").get_data(as_text=True)
+    assert 'data-page="gone123"' in html and "Missing dashboard (deleted)" in html
+    # Position 1 of 2, as stored (the rail sorts by these order inputs).
+    assert re.search(r'name="order\[gone123\]"[^>]*value="1"', html)
+    assert re.search(r'name="order\[overview\]"[^>]*value="2"', html)
+    # Its stored dwell is preserved in the form, so an untouched save keeps it.
+    assert 'name="dwell[gone123]"' in html and 'value="7"' in html
+
+
+def test_saving_the_editor_unchanged_keeps_a_deleted_step_and_remove_persists(
+    app: Flask,
+) -> None:
+    _deck_with_deleted_page(app)
+    client = app.test_client()
+    _sign_in(client)
+    keep = client.post(
+        "/decks/editor-save",
+        data={"deck_id": "rot", "name": "Rotation", "pages": "gone123,overview",
+              "advance": "timer", "advance_interval_minutes": "30"},
+        follow_redirects=True,
+    )  # fmt: skip
+    assert keep.status_code == 200
+    deck = app.config["DECK_STORE"].get("rot")
+    assert [p.page_id for p in deck.pages] == ["gone123", "overview"]
+    assert deck.page("gone123").dwell_minutes == 7
+    # The Remove button drops it from the posted order; that is what persists.
+    client.post(
+        "/decks/editor-save",
+        data={"deck_id": "rot", "name": "Rotation", "pages": "overview",
+              "advance": "timer", "advance_interval_minutes": "30"},
+        follow_redirects=True,
+    )  # fmt: skip
+    assert [p.page_id for p in app.config["DECK_STORE"].get("rot").pages] == ["overview"]

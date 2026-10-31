@@ -78,8 +78,9 @@ def test_every_shape_renders_as_a_unified_card(app: Flask) -> None:
     assert "Rotation" in body and "Schedule" in body and "By hand" in body
     # Kind-specific bodies: cycle chevrons, send 24h rail, nav steppers.
     assert "dk-body--cycle" in body and "dk-rail" in body and "dk-stepper" in body
-    # Screen cards carry composer thumbnails.
-    assert "/compose/" in body
+    # Screen cards use the small versioned snapshots; a cold one shows the
+    # monitor icon while a background snapshot is prepared.
+    assert "preview.png?" not in body
     # The old listings stay gone.
     assert "Saved schedules" not in body
     assert 'class="card deck-card"' not in body
@@ -567,8 +568,8 @@ def test_lineups_page_carries_live_refresh_hooks(app: Flask) -> None:
     assert "data-lineups-live" in body
     assert "/events/stream" in body
     assert "EventSource" in body
-    # Thumbnails opt into content freshness (see compose_preview ?refresh).
-    assert "refresh=300" in body
+    # Unchanged snapshots are versioned, so they no longer need ?refresh.
+    assert "refresh=300" not in body
 
 
 def test_both_advance_deck_is_not_labelled_by_hand(app: Flask) -> None:

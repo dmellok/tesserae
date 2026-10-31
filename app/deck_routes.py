@@ -14,7 +14,8 @@ import json
 import math
 import re
 import time
-from datetime import datetime, timedelta, tzinfo
+from datetime import UTC, datetime, timedelta, tzinfo
+from pathlib import Path
 from typing import Any, Literal, cast
 
 from flask import (
@@ -31,9 +32,35 @@ from flask import (
 from pydantic import ValidationError
 from werkzeug.wrappers import Response
 
-from app.clock_text import clock_of, clock_time
+from app.clock_text import app_cycle, clock_of, clock_time
 from app.deck_suggest import graph_for_pages, suggest_decks
+from app.display_color import display_color_mode
 from app.lineup_authoring import build_lineup
+from app.lineups_view import (
+    Clash,
+    DashboardInfo,
+    DisplayInput,
+    FrameInput,
+    ItemInfo,
+    LineupInput,
+    LineupKind,
+    LineupsView,
+    LineupUrls,
+    OnScreenInput,
+    PauseInput,
+    PublishedInput,
+    RuntimeStep,
+    StepInput,
+    UpcomingInput,
+    build_view,
+    clash_keys,
+    clock_range,
+    parse_hhmm,
+    resolve_day,
+    using_time_cycle,
+    window_label,
+    window_overlaps_pause,
+)
 from app.next_update import DeviceTiming, reach_for_device
 from app.state.deck_model import Deck, DeckPage
 from app.state.deck_store import DeckStore
@@ -138,32 +165,20 @@ def _ago(epoch: Any, now_ts: float) -> str | None:
     return f"{delta // 86_400} d ago"
 
 
-def _page_thumbs(pages: list[Any]) -> dict[str, str]:
-    """Composer live-preview URL per dashboard (the design's screen cards).
+def _page_compositions(pages: list[Any]) -> dict[str, str]:
+    """Latest successful composition per dashboard (one batched query)."""
+    from app.lineup_thumbs import page_compositions
 
-    ``sent=1`` makes the card show the composition actually pushed for that
-    dashboard, which is what its screen is displaying. A re-render can't match
-    a dashboard whose output moves on its own (a fractal draws differently
-    every time), so re-rendering here shows something the panel never had.
+    return page_compositions(pages)
 
-    ``refresh=300`` still covers the fallback path, for a dashboard that has
-    never been pushed and therefore has no frame to show: the preview token
-    only changes on edits, so without it such a card would show the first
-    render forever."""
-    from app.composer import page_preview_token, preview_dims
 
-    devices_reg = current_app.config.get("DEVICE_REGISTRY")
-    settings = current_app.config.get("SETTINGS_STORE")
-    out: dict[str, str] = {}
-    for p in pages:
-        try:
-            token = page_preview_token(p, preview_dims(p, devices_reg, settings))
-        except Exception:
-            token = ""
-        out[p.id] = (
-            url_for("composer.compose_preview", page_id=p.id) + f"?v={token}&refresh=300&sent=1"
-        )
-    return out
+def _page_thumbs(pages: list[Any], compositions: dict[str, str] | None = None) -> dict[str, str]:
+    """Versioned small snapshots, shared across every use of a dashboard.
+    Saved thumbnails are keyed by the same composition digest that the
+    step's Push now sends."""
+    from app.lineup_thumbs import page_thumbs
+
+    return page_thumbs(pages, compositions)
 
 
 def _page_shapes(pages: list[Any]) -> dict[str, tuple[int, int]]:
@@ -286,6 +301,96 @@ def _frame_origin(
             return str(name) if name else "another rotation"
         return "a schedule" if source == "scheduler" else "another rotation"
     return None
+
+
+#: How the header names a frame no dashboard explains, by push source.
+_FRAME_SOURCE_LABELS = {
+    "file": "an uploaded file",
+    "url": "an image from a link",
+    "webpage": "a webpage",
+    "note": "a note",
+}
+_FRAME_BY_HAND = "a frame sent by hand"
+#: A push row names the frame only when it is this close to the render.
+_FRAME_SOURCE_WINDOW_S = 300.0
+
+
+def _frame_state(device: Any) -> tuple[FrameInput | None, bool]:
+    """``(frame, nothing_sent)`` for a display no dashboard explains.
+
+    The frame is the composition actually on the glass: what a REST display
+    last fetched (its latest render when it never fetched), the latest push
+    for every other transport. It is resolved to a composition digest so the
+    thumbnail is the same immutable one every card uses; a served frame whose
+    composition can no longer be named falls back to its device preview.
+    ``nothing_sent`` is true only when no render exists at all."""
+    from app.lineup_thumbs import sent_thumb_url
+
+    push = current_app.config.get("PUSH_MANAGER")
+    latest_fn = getattr(push, "latest_render_for", None)
+    latest = latest_fn(device.id) if callable(latest_fn) else None
+    if not isinstance(latest, dict):
+        return None, callable(latest_fn)
+    at = latest.get("timestamp")
+    digest = latest.get("composition_digest")
+    preview = latest.get("preview_digest")
+    if getattr(device, "transport", "mqtt") == "rest":
+        served_fn = getattr(push, "last_served_render_for", None)
+        served = served_fn(device.id) if callable(served_fn) else None
+        if isinstance(served, dict):
+            at = served.get("served_at") or at
+            if served.get("digest") == latest.get("digest"):
+                preview = served.get("preview_digest") or preview
+            else:
+                resolve = getattr(push, "composition_for_digest", None)
+                digest = resolve(device.id, served["digest"]) if callable(resolve) else None
+                preview = served.get("preview_digest")
+    thumb_url = sent_thumb_url(digest) or sent_thumb_url(preview)
+    label = _FRAME_BY_HAND
+    events = current_app.config.get("EVENT_LOG")
+    if events is not None:
+        try:
+            rows = events.list(type="push", statuses=("sent",), limit=25)
+        except Exception:
+            rows = []
+        row = next((ev for ev in rows if device.id in (ev.extra.get("device_ids") or [])), None)
+        if (
+            row is not None
+            and isinstance(at, (int, float))
+            and abs(float(at) - row.timestamp) <= _FRAME_SOURCE_WINDOW_S
+        ):
+            label = _FRAME_SOURCE_LABELS.get(row.source, _FRAME_BY_HAND)
+    return FrameInput(
+        label=label, thumb_url=thumb_url, at=float(at) if isinstance(at, (int, float)) else None
+    ), False
+
+
+def _frame_pending(device: Any) -> bool:
+    """True when a REST display has a render it has not fetched yet: its
+    latest digest differs from the last one served (or none was served)."""
+    if getattr(device, "transport", "mqtt") != "rest":
+        return False
+    push = current_app.config.get("PUSH_MANAGER")
+    latest_fn = getattr(push, "latest_render_for", None)
+    latest = latest_fn(device.id) if callable(latest_fn) else None
+    if not isinstance(latest, dict) or not latest.get("digest"):
+        return False
+    served_fn = getattr(push, "last_served_render_for", None)
+    served = served_fn(device.id) if callable(served_fn) else None
+    return not isinstance(served, dict) or served.get("digest") != latest.get("digest")
+
+
+def _heard_from(device: Any) -> tuple[float | None, bool]:
+    """``(last heartbeat epoch, recent for its wake interval)``."""
+    from app.device_capability import heartbeat_freshness
+
+    status = (current_app.config.get("DEVICE_STATUS") or {}).get(device.id)
+    try:
+        freshness, _ = heartbeat_freshness(device, status)
+    except Exception:
+        return None, False
+    seen = status.get("received_at") if isinstance(status, dict) else None
+    return (float(seen) if isinstance(seen, (int, float)) else None), freshness == "fresh"
 
 
 def _mins_label(minutes: int) -> str:
@@ -640,29 +745,7 @@ def _design_cards(
         return list(seen)
 
     def binding_warning(explicit: list[str], page_ids: list[str]) -> str | None:
-        """Delivery gaps worth flagging on the card: an unbound multi-page
-        record whose members live on different displays sends each page to
-        its own panel, so no display plays the set as a unit; a bound record
-        can't render members that are bound to a different display."""
-        if not explicit:
-            if len(page_ids) > 1 and len(resolve_devices([], page_ids)) > 1:
-                return (
-                    "These dashboards are on different displays, so no single "
-                    "display plays the whole set. Edit it and pick one display."
-                )
-            return None
-        stranded = [
-            page_names.get(pid, pid)
-            for pid in page_ids
-            if page_devices.get(pid) and not (set(page_devices[pid]) & set(explicit))
-        ]
-        if stranded:
-            listed = ", ".join(stranded[:3]) + (" and more" if len(stranded) > 3 else "")
-            return (
-                f"{listed} belong{'s' if len(stranded) == 1 else ''} to a different "
-                "display and cannot show here. Rebind the dashboard or remove it."
-            )
-        return None
+        return _binding_warning(explicit, page_ids, page_devices, page_names)
 
     def screen(
         pid: str,
@@ -958,6 +1041,567 @@ def _design_cards(
     }
 
 
+def _fold_by_default(groups: list[dict[str, Any]]) -> bool:
+    """Whether Lineups rows start folded: more than one display has a
+    lineup with several items. One busy display keeps today's open look;
+    with several, the page is mostly thumbnails and folds to headers."""
+    busy = sum(
+        1
+        for g in groups
+        if g.get("id") and any(len(c.get("screens") or []) > 1 for c in g["cards"])
+    )
+    return busy > 1
+
+
+# -- Lineups redesign: view-model adapter ------------------------------------
+#
+# ``app.lineups_view`` is pure; everything below reads the stores and the
+# live state and turns them into its inputs.
+
+#: Items listed for a multi-item step (a gallery folder): enough for the peek
+#: grid, without walking a folder of thousands of photos into the page.
+MAX_STEP_ITEMS = 60
+
+
+def _lineup_kind(deck: Deck) -> LineupKind:
+    if deck.advance == "manual":
+        return "manual"
+    return deck.advance_trigger
+
+
+def _lineup_input(
+    deck: Deck,
+    *,
+    runtime: RuntimeStep | None = None,
+    playing: bool = False,
+    with_urls: bool = True,
+    last_fired: float | None = None,
+) -> LineupInput:
+    """A deck as the view-model's lineup: its window, days and steps in the
+    shape its trigger runs them (see ``app.lineups_view``)."""
+    kind = _lineup_kind(deck)
+    start: str | None
+    end: str | None
+    if kind == "cycle":
+        start, end = deck.advance_anchor, deck.advance_end_at
+    elif kind == "interval":
+        start, end = deck.advance_window_start, deck.advance_window_end
+    elif kind == "daily":
+        start, end = deck.advance_fires_at, None
+    else:
+        start = end = None
+    steps = tuple(
+        StepInput(
+            dashboard_id=p.page_id,
+            dwell_minutes=p.effective_dwell_minutes(deck.advance_interval_minutes),
+            conditional=bool(p.conditions),
+        )
+        for p in deck.pages
+    )
+    urls = LineupUrls()
+    if with_urls:
+        from app.state.legacy_projections import is_cycle_view_deck, is_timed_view_deck
+
+        if is_cycle_view_deck(deck):
+            fire = url_for("rotations.fire", rotation_id=deck.id)
+        elif is_timed_view_deck(deck):
+            fire = url_for("schedules.fire", schedule_id=deck.id)
+        else:
+            fire = url_for("decks.push", deck_id=deck.id)
+        urls = LineupUrls(
+            edit=url_for("decks.editor", deck_id=deck.id),
+            toggle=url_for("decks.toggle", deck_id=deck.id),
+            delete=url_for("decks.delete", deck_id=deck.id),
+            fire=fire,
+            push_step=url_for("decks.push_step", deck_id=deck.id),
+            window=url_for("decks.edit_window", deck_id=deck.id),
+            days=url_for("decks.edit_days", deck_id=deck.id),
+        )
+    return LineupInput(
+        id=deck.id,
+        name=deck.name,
+        kind=kind,
+        steps=steps,
+        enabled=deck.enabled,
+        days=tuple(deck.advance_days_of_week),
+        start=start,
+        end=end,
+        interval_minutes=deck.advance_interval_minutes if kind == "interval" else 0,
+        runtime=runtime,
+        playing=playing,
+        urls=urls,
+        priority=deck.advance_priority,
+        last_fired=last_fired,
+    )
+
+
+def _deck_displays(deck: Deck, page_devices: dict[str, list[str]]) -> list[str]:
+    """Displays a lineup lands on: its own binding, else the union of its
+    pages' bindings (delivery falls through the same way)."""
+    if deck.device_ids:
+        return list(deck.device_ids)
+    seen: dict[str, None] = {}
+    for p in deck.pages:
+        for did in page_devices.get(p.page_id, []):
+            seen.setdefault(did, None)
+    return list(seen)
+
+
+def _pause_input(device: Any) -> PauseInput | None:
+    from app.quiet_hours import resolve_quiet_hours
+
+    settings = current_app.config.get("SETTINGS_STORE")
+    try:
+        window = resolve_quiet_hours(
+            (settings.get_section("app") if settings else None) or {}, device
+        )
+    except Exception:
+        return None
+    if window is None:
+        return None
+    return PauseInput(
+        start_min=window.start.hour * 60 + window.start.minute,
+        end_min=window.end.hour * 60 + window.end.minute,
+        days=tuple(sorted(window.days)),
+        all_day=tuple(sorted(window.all_day)),
+    )
+
+
+def _device_size(device: Any) -> tuple[int, int, str]:
+    """Panel width, height and a spec line (``7.5in · 800×480``)."""
+    w = h = 0
+    name = ""
+    try:
+        from app.panel import device_panel
+
+        panel = device_panel(device)
+        if panel is not None:
+            w, h = int(panel.w), int(panel.h)
+    except Exception:
+        panel = None
+    block = getattr(device, "panel", None)
+    if isinstance(block, dict):
+        if not (w and h):
+            w, h = int(block.get("w") or 0), int(block.get("h") or 0)
+        name = str(block.get("name") or "")
+    size = f"{w}×{h}" if w and h else ""
+    spec = " · ".join(x for x in (name, size) if x)
+    return w, h, spec
+
+
+#: folder -> (stamp, total count, first MAX_STEP_ITEMS names). The stamp is
+#: the folder's mtime (adding or removing a photo changes it), or a one-minute
+#: bucket when the folder path can't be resolved, so a polling page doesn't
+#: list a large folder on every refresh.
+_GALLERY_CACHE: dict[str, tuple[float, int, tuple[str, ...]]] = {}
+
+
+def _gallery_files(module: Any, folder: str) -> tuple[int, tuple[str, ...]] | None:
+    stamp: float = float(int(time.time() // 60))
+    resolve = getattr(module, "_folder_path", None)
+    data_dir = getattr(module, "_data_dir", None)
+    if callable(resolve) and callable(data_dir):
+        try:
+            path = resolve(folder, data_dir())
+            if path is not None:
+                stamp = -float(path.stat().st_mtime_ns)
+        except Exception:
+            pass
+    cached = _GALLERY_CACHE.get(folder)
+    if cached is not None and cached[0] == stamp:
+        return cached[1], cached[2]
+    lister = getattr(module, "list_folder_files", None)
+    if not callable(lister):
+        return None
+    try:
+        files = [str(f) for f in lister(folder)]
+    except Exception:
+        return None
+    entry = (stamp, len(files), tuple(files[:MAX_STEP_ITEMS]))
+    _GALLERY_CACHE[folder] = entry
+    return entry[1], entry[2]
+
+
+def _step_items(page: Any) -> tuple[int, tuple[ItemInfo, ...]]:
+    """Items a dashboard shows one per visit: a page whose only widget with
+    a source is a Picture Gallery cell walks that folder's photos. Anything
+    else is one item."""
+    cells = [c for c in getattr(page, "cells", []) or [] if getattr(c, "plugin", None)]
+    galleries = [c for c in cells if c.plugin == "picture_gallery"]
+    if len(galleries) != 1:
+        return 1, ()
+    folder = str(galleries[0].options.get("folder") or "")
+    reg = current_app.config.get("PLUGIN_REGISTRY")
+    plugin = reg.get("picture_gallery") if reg is not None else None
+    module = getattr(plugin, "server_module", None) if plugin is not None else None
+    listed = _gallery_files(module, folder) if module is not None else None
+    if listed is None or listed[0] <= 1:
+        return 1, ()
+    count, names = listed
+    version = getattr(module, "thumb_version", None)
+    items: list[ItemInfo] = []
+    for i, name in enumerate(names):
+        try:
+            thumb = url_for(
+                "picture_gallery_admin.serve_thumbnail",
+                folder=folder or "_root",
+                filename=name,
+                v=str(version(folder, name)) if callable(version) else None,
+            )
+        except Exception:
+            thumb = ""
+        items.append(ItemInfo(i, name, thumb))
+    return count, tuple(items)
+
+
+def _upcoming_inputs(device: Any, now_utc: datetime) -> tuple[UpcomingInput, ...] | None:
+    """The scheduler's own projection of the display's next updates
+    (``Scheduler.upcoming_for_device``), or ``None`` when it can't be read."""
+    from app.quiet_hours import resolve_quiet_hours
+
+    scheduler = current_app.config.get("SCHEDULER")
+    fn = getattr(scheduler, "upcoming_for_device", None)
+    if not callable(fn):
+        return None
+    settings = current_app.config.get("SETTINGS_STORE")
+    try:
+        window = resolve_quiet_hours(
+            (settings.get_section("app") if settings else None) or {}, device
+        )
+        # A week and a day, so a once-a-week lineup still shows up; the
+        # projection caps its own walk per record, and the limit caps the rest.
+        events = fn(device.id, now=now_utc, hours=8 * 24, limit=12, quiet_window=window)
+    except Exception:
+        # Logged, then the view falls back to its own schedule model.
+        current_app.logger.exception("lineups: projection failed for %s", device.id)
+        return None
+    return tuple(
+        UpcomingInput(
+            at=ev.scheduled_at.timestamp(),
+            lineup_id=ev.lineup_id,
+            dashboard_id=ev.dashboard_id,
+        )
+        for ev in events
+    )
+
+
+def _published_state(device: Any) -> tuple[PublishedInput | None, bool]:
+    """The frame last published for the display (its latest render), which
+    a sleeping display picks up at its next check-in, and whether that answer
+    is known: ``(None, True)`` means nothing was published, ``(None, False)``
+    that the push manager could not be asked."""
+    push = current_app.config.get("PUSH_MANAGER")
+    latest_fn = getattr(push, "latest_render_for", None)
+    if not callable(latest_fn):
+        return None, False
+    try:
+        latest = latest_fn(device.id)
+    except Exception:
+        current_app.logger.exception("lineups: latest render unreadable for %s", device.id)
+        return None, False
+    if not isinstance(latest, dict):
+        return None, True
+    page_id = latest.get("page_id")
+    if not isinstance(page_id, str) or not page_id:
+        return None, True
+    at = latest.get("timestamp")
+    return PublishedInput(page_id, float(at) if isinstance(at, (int, float)) else None), True
+
+
+def build_lineups_view(
+    selected_day: str | None = None, display_id: str | None = None
+) -> LineupsView:
+    """Cached per request (``flask.g``), so a page that asks twice builds
+    once. Edit responses build after the write, a fresh request state."""
+    from flask import g
+
+    cache: dict[tuple[str | None, str | None], LineupsView] = g.setdefault(
+        "_lineups_view_cache", {}
+    )
+    key = (selected_day, display_id)
+    if key not in cache:
+        cache[key] = _build_lineups_view(selected_day, display_id)
+    return cache[key]
+
+
+def _time_cycle() -> str:
+    """The Lineups page's clock style (``h12`` / ``h23``) from the app-wide
+    locale (Settings, else the host's): one page shows every display, so it
+    reads in one style rather than each display's own locale."""
+    return app_cycle()
+
+
+def _binding_warning(
+    explicit: list[str],
+    page_ids: list[str],
+    page_devices: dict[str, list[str]],
+    page_names: dict[str, str],
+) -> str | None:
+    """Delivery gaps worth flagging on the card: an unbound multi-page
+    record whose members live on different displays sends each page to
+    its own panel, so no display plays the set as a unit; a bound record
+    can't render members that are bound to a different display."""
+    if not explicit:
+        if (
+            len(page_ids) > 1
+            and len({did for pid in page_ids for did in page_devices.get(pid, [])}) > 1
+        ):
+            return (
+                "These dashboards are on different displays, so no single "
+                "display plays the whole set. Edit it and pick one display."
+            )
+        return None
+    stranded = [
+        page_names.get(pid, pid)
+        for pid in page_ids
+        if page_devices.get(pid) and not (set(page_devices[pid]) & set(explicit))
+    ]
+    if stranded:
+        listed = ", ".join(stranded[:3]) + (" and more" if len(stranded) > 3 else "")
+        return (
+            f"{listed} belong{'s' if len(stranded) == 1 else ''} to a different "
+            "display and cannot show here. Rebind the dashboard or remove it."
+        )
+    return None
+
+
+def _build_lineups_view(
+    selected_day: str | None = None, display_id: str | None = None
+) -> LineupsView:
+    """The Lineups page view-model from the live stores (see
+    ``app.lineups_view``). ``selected_day`` is the raw ``?day=`` value;
+    ``display_id`` builds just that display (and no unassigned lineups)."""
+    from app.next_update import Reach, hold_for_device, reach_for_device
+    from app.rotation_routes import _current_step_for_each
+    from app.tz_resolve import app_timezone
+
+    tz = app_timezone()
+    now = datetime.now(tz)
+    now_ts = now.timestamp()
+    devices_reg = current_app.config.get("DEVICE_REGISTRY")
+    devices = [d for d in (devices_reg.all() if devices_reg is not None else []) if d.kind_of]
+    if display_id:
+        devices = [d for d in devices if d.id == display_id]
+    decks = _store().all()
+    pages = _pages().list()
+    page_by_id = {p.id: p for p in pages}
+    page_devices = {p.id: list(p.device_ids) for p in pages}
+
+    rotations = current_app.config["ROTATION_STORE"].all()
+    try:
+        current = _current_step_for_each(rotations)
+    except Exception:
+        current = {}
+    panel_states = _panel_states(devices)
+    live = _live_map()
+
+    known = {d.id for d in devices}
+    scheduler = current_app.config.get("SCHEDULER")
+    last_fired_map: dict[str, Any] = {}
+    status_fn = getattr(scheduler, "status", None)
+    if callable(status_fn):
+        try:
+            last_fired_map = {
+                k: v.get("last_fired") for k, v in status_fn().items() if isinstance(v, dict)
+            }
+        except Exception:
+            current_app.logger.exception("lineups: scheduler status unreadable")
+
+    def lands_here(deck: Deck) -> bool:
+        if not display_id:
+            return True
+        return any(t in known for t in _deck_displays(deck, page_devices))
+
+    used: dict[str, None] = {}
+    for deck in decks:
+        if not lands_here(deck):
+            continue
+        for p in deck.pages:
+            used.setdefault(p.page_id, None)
+    for state in panel_states.values():
+        if state.get("page_id"):
+            used.setdefault(state["page_id"], None)
+    used_pages = [page_by_id[pid] for pid in used if pid in page_by_id]
+    compositions = _page_compositions(used_pages)
+    thumbs = _page_thumbs(used_pages, compositions)
+    shapes = _page_shapes(used_pages)
+    dashboards: dict[str, DashboardInfo] = {}
+    for pid in used:
+        page = page_by_id.get(pid)
+        count, items = _step_items(page) if page is not None else (1, ())
+        w, h = shapes.get(pid, (0, 0))
+        dashboards[pid] = DashboardInfo(
+            id=pid,
+            name=page.name if page is not None else pid,
+            missing=page is None,
+            thumb_url=thumbs.get(pid, ""),
+            composition_digest=compositions.get(pid),
+            width=w,
+            height=h,
+            item_count=count,
+            items=items,
+        )
+
+    by_display: dict[str, list[LineupInput]] = {d.id: [] for d in devices}
+    unassigned: list[LineupInput] = []
+    for deck in decks:
+        if not lands_here(deck):
+            continue
+        fired = last_fired_map.get(deck.id)
+        last_fired = float(fired) if isinstance(fired, (int, float)) else None
+        cur = current.get(deck.id) or {}
+        runtime = None
+        if cur.get("active") and isinstance(cur.get("step_index"), int):
+            since = cur.get("step_started_epoch")
+            nxt = cur.get("next_transition_epoch")
+            runtime = RuntimeStep(
+                step_index=int(cur["step_index"]),
+                since=float(since) if isinstance(since, (int, float)) else None,
+                next_at=float(nxt) if isinstance(nxt, (int, float)) else None,
+            )
+        targets = [t for t in _deck_displays(deck, page_devices) if t in known]
+        if not targets:
+            if not display_id:
+                unassigned.append(_lineup_input(deck, runtime=runtime, last_fired=last_fired))
+            continue
+        for did in targets:
+            rec = live.get(did)
+            playing = bool(rec and rec[0] == deck.id)
+            by_display[did].append(
+                _lineup_input(deck, runtime=runtime, playing=playing, last_fired=last_fired)
+            )
+
+    inputs: list[DisplayInput] = []
+    for d in devices:
+        lineups = by_display.get(d.id) or []
+        if not lineups:
+            continue
+        try:
+            reach = reach_for_device(d, now=now_ts)
+        except Exception:
+            reach = Reach("unknown")
+        try:
+            hold = hold_for_device(d, now=now_ts)
+        except Exception:
+            hold = None
+        state = panel_states.get(d.id) or {}
+        on_screen = None
+        on_pid: str | None = state.get("page_id")
+        # A display that fetches its frames holds what it last fetched; when
+        # that can't be named the glass is unknown, and the nav record or the
+        # latest render (what the server *meant* it to show) must not stand
+        # in for it, or a queued step would read as already delivered.
+        if not on_pid and state.get("verb") != "fetched":
+            rec = live.get(d.id)
+            on_pid = rec[1] if rec else None
+        if on_pid:
+            on_screen = OnScreenInput(
+                dashboard_id=on_pid,
+                since=state.get("at"),
+                verb=str(state.get("verb") or "sent"),
+            )
+        frame, nothing_sent = _frame_state(d) if not on_pid else (None, False)
+        last_seen, heard = _heard_from(d)
+        pending = _frame_pending(d)
+        w, h, spec = _device_size(d)
+        published, published_known = _published_state(d)
+        color = display_color_mode(
+            d, current_app.config.get("RENDERER_REGISTRY"), current_app.config.get("SETTINGS_STORE")
+        )
+        inputs.append(
+            DisplayInput(
+                id=d.id,
+                name=d.display_name,
+                width=w,
+                height=h,
+                icon=d.icon,
+                spec=spec,
+                reach=reach,
+                lineups=tuple(lineups),
+                pause=_pause_input(d),
+                on_screen=on_screen,
+                hold=hold,
+                upcoming=_upcoming_inputs(d, datetime.now(UTC)),
+                published=published,
+                published_known=published_known,
+                settings_url=url_for("auth.device_page", instance_id=d.id),
+                gamut=color.gamut,
+                grey_levels=color.levels,
+                dither=color.dither,
+                frame=frame,
+                nothing_sent=nothing_sent,
+                last_seen=last_seen,
+                heard=heard,
+                pending=pending,
+            )
+        )
+    today = now.weekday()
+    view = build_view(
+        inputs,
+        dashboards,
+        now=now,
+        selected_day=resolve_day(selected_day, today),
+        unassigned=unassigned,
+        tz_name=getattr(tz, "key", "") or "",
+        time_cycle=_time_cycle(),
+    )
+
+    deck_by_id = {deck.id: deck for deck in decks}
+    page_names = {p.id: p.name for p in pages}
+    for lineup in [*(row for d in view.displays for row in d.lineups), *view.unassigned]:
+        deck = deck_by_id[lineup.id]
+        warning = _binding_warning(deck.device_ids, deck.page_ids, page_devices, page_names)
+        lineup.warnings = [warning] if warning else []
+        lineup.display_removed = bool(_deck_displays(deck, page_devices)) and not any(
+            t in known for t in _deck_displays(deck, page_devices)
+        )
+        if deck.advance == "both":
+            lineup.mode_label += " + by hand"
+    nav = _nav_store()
+    lineup_names = {deck.id: deck.name for deck in decks}
+    for display in view.displays:
+        state = panel_states.get(display.id) or {}
+        live_lineup = next(
+            (
+                row
+                for row in display.lineups
+                if display.scheduled and row.id == display.scheduled.lineup_id
+            ),
+            None,
+        )
+        behind_schedule = bool(
+            display.scheduled
+            and display.on_screen
+            and display.scheduled.dashboard_id != display.on_screen.dashboard_id
+        )
+        if display.on_screen:
+            nav_rec = nav.get(display.id) if nav is not None else None
+            origin = _frame_origin(
+                display.id,
+                display.on_screen.dashboard_id,
+                own_id="",  # The header names the source, rather than comparing one row to another.
+                nav_rec=nav_rec,
+                lineup_names=lineup_names,
+            )
+            if origin:
+                display.show_suffix = f"from {origin}"
+                live_runtime = current.get(live_lineup.id, {}) if live_lineup else {}
+                resume = live_runtime.get("next_transition_epoch")
+                if behind_schedule and isinstance(resume, (int, float)):
+                    display.show_suffix += f" · resumes {_hhmm(resume, tz)}"
+        diagnostics = [display.show_title]
+        if behind_schedule and live_lineup:
+            live_runtime = current.get(live_lineup.id) or {}
+            since = live_runtime.get("step_started_epoch")
+            if isinstance(since, (int, float)):
+                diagnostics.append(f"{max(0, int((now_ts - since) // 60))} min behind")
+            poll = state.get("next_wake")
+            if not state.get("connected") and isinstance(poll, (int, float)):
+                diagnostics.append(f"poll ≈{_hhmm(poll, tz)}")
+        display.status_title = " · ".join(diagnostics)
+    return view
+
+
 @bp.get("")
 def index() -> str:
     # #167 Phase 3: the one surface for everything a display shows over
@@ -1038,6 +1682,14 @@ def index() -> str:
         deck_devices={d.id: list(d.device_ids) for d in all_decks},
         highlight_id=request.args.get("hl"),
     )
+    # The redesigned page renders from one view-model; a failure building it
+    # must not take the page down while the classic list still renders.
+    lineups_view: dict[str, Any] | None
+    try:
+        lineups_view = build_lineups_view(request.args.get("day")).to_dict()
+    except Exception:
+        current_app.logger.exception("lineups view-model failed")
+        lineups_view = None
     # The pause switch lives under Settings > Server > Automation because it
     # also stops schedules and buttons; this page only points at it.
     settings = current_app.config.get("SETTINGS_STORE")
@@ -1074,6 +1726,8 @@ def index() -> str:
         prefill_fires_at_dt=prefill_fires_at_dt,
         prefill_name=prefill_name,
         show_migration_notice=migration_notice_visible(),
+        # -- Lineups redesign view-model (app.lineups_view) ----------------
+        lineups_view=lineups_view,
     )
 
 
@@ -1081,6 +1735,543 @@ def _json_error(msg: str) -> Response:
     resp = jsonify({"ok": False, "error": msg})
     resp.status_code = 400
     return resp
+
+
+# -- Lineups redesign: JSON view + inline edits --------------------------------
+
+
+@bp.get("/view.json")
+def view_json() -> Response:
+    """The Lineups view-model (``app.lineups_view``) as JSON, for the day
+    picker and live refresh. ``?day=`` is a weekday ``0``-``6`` (``day=1`` is
+    Tuesday), ``today``, ``tomorrow`` or an offset (``day=%2B1``; or use
+    ``?offset=1``, which needs no encoding); ``?display=<id>`` keeps one
+    display. A failure answers JSON ``{ok: false, error}`` with 500."""
+    only = (request.args.get("display") or "").strip() or None
+    day = request.args.get("day")
+    offset = (request.args.get("offset") or "").strip()
+    if offset:
+        if not offset.lstrip("+-").isascii() or not offset.lstrip("+-").isdigit():
+            return _edit_error_json(_EditError("offset must be a whole number of days."))
+        day = offset if offset[0] in "+-" else "+" + offset
+    try:
+        data = build_lineups_view(day, display_id=only).to_dict()
+    except Exception:
+        current_app.logger.exception("lineups view.json failed")
+        resp = jsonify({"ok": False, "error": "The Lineups view could not be built."})
+        resp.status_code = 500
+        return resp
+    resp = jsonify(data)
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
+class _EditError(ValueError):
+    """An inline edit the server refuses: ``status`` 400 (bad input), 404
+    (unknown lineup) or 409 (clashes with another lineup)."""
+
+    def __init__(self, message: str, status: int = 400, lineup_id: str | None = None) -> None:
+        super().__init__(message)
+        self.status = status
+        self.lineup_id = lineup_id
+
+
+_UNSET: Any = object()
+
+
+def _json_body() -> dict[str, Any]:
+    data = request.get_json(silent=True)
+    return data if isinstance(data, dict) else {}
+
+
+def _clean_time(raw: Any, what: str, deck_id: str | None = None) -> str:
+    """``HH:MM`` (``24:00`` allowed) or an ``_EditError`` naming the lineup."""
+    if not isinstance(raw, str) or parse_hhmm(raw) is None:
+        raise _EditError(f"{what} must be a time like 06:30.", 400, deck_id)
+    h, m = raw.strip().split(":")
+    return f"{int(h):02d}:{int(m):02d}"
+
+
+def _edited_deck(deck: Deck, *, start: Any = _UNSET, end: Any = _UNSET, days: Any = None) -> Deck:
+    """``deck`` with a new time window and/or weekday set, in the fields its
+    trigger runs on. Raises ``_EditError`` for input the deck can't take."""
+    kind = _lineup_kind(deck)
+    changes: dict[str, Any] = {}
+    if start is not _UNSET or end is not _UNSET:
+        if kind == "manual":
+            raise _EditError(f"{deck.name} runs by hand; it has no time window.", 400, deck.id)
+        if kind == "daily":
+            s = _clean_time(
+                start if start is not _UNSET else deck.advance_fires_at, "Start", deck.id
+            )
+            if s == "24:00":
+                raise _EditError("Start must be before 24:00.", 400, deck.id)
+            changes["advance_fires_at"] = s
+        elif kind == "cycle":
+            s = _clean_time(start if start is not _UNSET else deck.advance_anchor, "Start", deck.id)
+            raw_end = end if end is not _UNSET else deck.advance_end_at
+            e = None if raw_end in (None, "") else _clean_time(raw_end, "End", deck.id)
+            s_min = parse_hhmm(s) or 0
+            e_min = 1440 if e is None else (parse_hhmm(e) or 0)
+            if s == "24:00":
+                raise _EditError("Start must be before 24:00.", 400, deck.id)
+            if e_min <= s_min:
+                raise _EditError("End must be after start.", 400, deck.id)
+            changes["advance_anchor"] = s
+            changes["advance_end_at"] = None if e in (None, "24:00") else e
+        else:  # interval: a window that may wrap past midnight
+            raw_start = start if start is not _UNSET else deck.advance_window_start
+            raw_end = end if end is not _UNSET else deck.advance_window_end
+            if raw_start in (None, "") and raw_end in (None, ""):
+                changes["advance_window_start"] = None
+                changes["advance_window_end"] = None
+            else:
+                # An unset end runs to the end of the day (the scheduler reads
+                # it as 23:59:59), so "24:00" is stored as no end; "00:00"
+                # would wrap past midnight instead.
+                s_val = (
+                    None if raw_start in (None, "") else _clean_time(raw_start, "Start", deck.id)
+                )
+                e_val = None if raw_end in (None, "") else _clean_time(raw_end, "End", deck.id)
+                if s_val == "24:00":
+                    raise _EditError("Start must be before 24:00.", 400, deck.id)
+                if e_val == "24:00":
+                    e_val = None
+                if s_val is not None and e_val is not None and s_val == e_val:
+                    raise _EditError("Start and end must differ.", 400, deck.id)
+                changes["advance_window_start"] = s_val
+                changes["advance_window_end"] = e_val
+    if days is not None:
+        if not isinstance(days, list) or not all(
+            isinstance(d, int) and not isinstance(d, bool) and 0 <= d <= 6 for d in days
+        ):
+            raise _EditError("Days must be a list of weekdays 0 (Mon) to 6 (Sun).", 400, deck.id)
+        if not days:
+            raise _EditError(f"{deck.name} needs at least one day.", 400, deck.id)
+        changes["advance_days_of_week"] = sorted(set(days))
+    if not changes:
+        return deck
+    try:
+        return _merged_deck(deck, **changes)
+    except ValidationError as exc:
+        raise _EditError(_first_error(exc), 400, deck.id) from exc
+
+
+def _check_batch(
+    before: dict[str, Deck],
+    after: dict[str, Deck],
+    order: list[str],
+    page_devices: dict[str, list[str]],
+) -> None:
+    """Refuse (``_EditError`` 409) a batch that makes two lineups on a shared
+    display meet. The clash sets of the whole snapshot before and the whole
+    snapshot after are compared, so two windows that both move into each
+    other are caught, while a clash that already existed (the scheduler
+    settles overlaps by priority) does not block an unrelated edit."""
+    displays = {d.id: set(_deck_displays(d, page_devices)) for d in after.values()}
+    touched: set[str] = set()
+    for deck_id in order:
+        touched |= displays.get(deck_id, set())
+    relevant = {i for i, ds in displays.items() if ds & touched}
+
+    def shares(a: str, b: str) -> bool:
+        return bool(displays.get(a, set()) & displays.get(b, set()))
+
+    def inputs(snapshot: dict[str, Deck]) -> list[LineupInput]:
+        return [
+            _lineup_input(d, with_urls=False)
+            for i, d in snapshot.items()
+            if i in relevant and d.advance != "manual"
+        ]
+
+    final = {lu.id: lu for lu in inputs(after)}
+    new = clash_keys(list(final.values()), shares) - clash_keys(inputs(before), shares)
+    for deck_id in order:
+        mine = sorted(k for k in new if deck_id in k[:2])
+        if not mine:
+            continue
+        a, b, day = mine[0]
+        clash = Clash(final[b if a == deck_id else a], day)
+        added = set(after[deck_id].advance_days_of_week) - set(before[deck_id].advance_days_of_week)
+        msg = clash.message_for_day() if day in added else clash.message_for_window()
+        raise _EditError(msg, 409, deck_id)
+
+
+def _pause_warnings(deck: Deck, page_devices: dict[str, list[str]]) -> list[str]:
+    """One warning per display whose quiet hours a lineup's run falls in."""
+    targets = set(_deck_displays(deck, page_devices))
+    candidate = _lineup_input(deck, with_urls=False)
+    warnings: list[str] = []
+    devices_reg = current_app.config.get("DEVICE_REGISTRY")
+    for device in devices_reg.all() if devices_reg is not None else []:
+        if device.id not in targets:
+            continue
+        pause = _pause_input(device)
+        if pause is not None and window_overlaps_pause(pause, candidate):
+            label = clock_range(pause.start_min, pause.end_min)
+            warnings.append(
+                f"Part of {deck.name} ({window_label(candidate)}) falls in "
+                f"{device.display_name}'s Quiet hours ({label}); nothing is pushed then."
+            )
+    return warnings
+
+
+def _edit_result(
+    saved: list[Deck], warnings: list[str], page_devices: dict[str, list[str]], day: Any
+) -> Response:
+    touched: set[str] = set()
+    for deck in saved:
+        touched.update(_deck_displays(deck, page_devices))
+    displays: list[dict[str, Any]] = []
+    refresh_warning: str | None = None
+    try:
+        view = build_lineups_view(str(day) if day is not None else None).to_dict()
+        displays = [d for d in view["displays"] if d["id"] in touched]
+    except Exception:
+        # The edit is saved; say so rather than answer 500 and invite a retry.
+        current_app.logger.exception("lineups: view rebuild after an edit failed")
+        refresh_warning = "Saved, but the page could not be refreshed. Reload to see it."
+    return jsonify(
+        {
+            "ok": True,
+            "warning": refresh_warning,
+            "ids": [d.id for d in saved],
+            "lineups": [
+                {
+                    "id": d.id,
+                    "window": window_label(_lineup_input(d, with_urls=False)),
+                    "days": sorted(d.advance_days_of_week),
+                }
+                for d in saved
+            ],
+            "warnings": warnings,
+            "pause_overlap": bool(warnings),
+            "displays": displays,
+        }
+    )
+
+
+def _edit_error_json(exc: _EditError) -> Response:
+    resp = jsonify({"ok": False, "error": str(exc), "id": exc.lineup_id})
+    resp.status_code = exc.status
+    return resp
+
+
+def _is_int(value: Any) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
+def _check_weekday(value: Any, what: str, deck_id: str | None) -> int:
+    """An int weekday 0-6: type first (``"1"``, ``True``, ``[]`` refused),
+    then range."""
+    if not _is_int(value):
+        raise _EditError(f"{what} must be a whole number 0 (Mon) to 6 (Sun).", 400, deck_id)
+    if not 0 <= value <= 6:
+        raise _EditError(f"{what} must be 0 (Mon) to 6 (Sun).", 400, deck_id)
+    return int(value)
+
+
+_EDIT_FIELDS = frozenset({"id", "start", "end", "days", "toggle_day", "on"})
+
+
+def _validated_edit(raw: Any, *, require_on: bool = False) -> dict[str, Any]:
+    """One edit with every field type-checked, then range-checked, before
+    anything reads or changes a lineup. ``require_on`` makes a day toggle
+    say which way (``on``), so a retried request can't flip it back."""
+    if not isinstance(raw, dict):
+        raise _EditError("Each edit must be an object.")
+    deck_id = raw.get("id")
+    if not isinstance(deck_id, str) or not deck_id:
+        raise _EditError("Each edit needs a lineup id.")
+    unknown = sorted(str(k) for k in raw if k not in _EDIT_FIELDS)
+    if unknown:
+        raise _EditError(f"Unknown field {unknown[0]!r}.", 400, deck_id)
+    for key in ("start", "end"):
+        if key in raw and raw[key] is not None and not isinstance(raw[key], str):
+            raise _EditError(f"{key.title()} must be a time like 06:30.", 400, deck_id)
+    if raw.get("days") is not None:
+        days = raw["days"]
+        if not isinstance(days, list):
+            raise _EditError("Days must be a list of weekdays 0 (Mon) to 6 (Sun).", 400, deck_id)
+        for d in days:
+            _check_weekday(d, "Each day", deck_id)
+    if "toggle_day" in raw:
+        if raw.get("days") is not None:
+            raise _EditError("Send days or a day to toggle, not both.", 400, deck_id)
+        _check_weekday(raw["toggle_day"], "Day", deck_id)
+    if require_on and "toggle_day" in raw and not isinstance(raw.get("on"), bool):
+        raise _EditError("A day toggle in a batch needs 'on': true or false.", 400, deck_id)
+    if "on" in raw:
+        if "toggle_day" not in raw:
+            raise _EditError("'on' goes with a day to toggle.", 400, deck_id)
+        if raw["on"] is not None and not isinstance(raw["on"], bool):
+            raise _EditError("'on' must be true or false.", 400, deck_id)
+    return dict(raw)
+
+
+def _body_view_day(body: dict[str, Any], *, day_alias: bool) -> Any:
+    """The selected day for the refreshed view: ``view_day`` on every edit
+    route; ``day`` is accepted as the same thing where it isn't the weekday
+    being toggled (``/window`` and ``/edits``, not ``/days``)."""
+    if "view_day" in body:
+        return body["view_day"]
+    return body.get("day") if day_alias else None
+
+
+def _view_day(raw: Any) -> str | None:
+    """The selected day for the refreshed view in an edit response: absent,
+    a weekday 0-6, or a word/offset ``resolve_day`` reads."""
+    if raw is None:
+        return None
+    if isinstance(raw, str):
+        return raw
+    return str(_check_weekday(raw, "Day", None))
+
+
+def _apply_edits(edits: list[Any], day: Any, *, require_on: bool = False) -> Response:
+    """Apply a batch of edits as one transaction under the deck store's
+    lock: read, validate every edit against the state after all of them,
+    write. Any refusal saves nothing, and a concurrent edit is either fully
+    before or fully after this one (never lost, never validated against a
+    stale read)."""
+    try:
+        checked = [_validated_edit(e, require_on=require_on) for e in edits]
+        view_day = _view_day(day)
+    except _EditError as exc:
+        return _edit_error_json(exc)
+    page_devices = {p.id: list(p.device_ids) for p in _pages().list()}
+    cycle = _time_cycle()
+
+    def plan(
+        decks: dict[str, Deck],
+    ) -> tuple[list[Deck], tuple[list[Deck], list[Deck], list[str]]]:
+        after = dict(decks)
+        order: list[str] = []
+        for edit in checked:
+            deck_id = str(edit["id"])
+            current = after.get(deck_id)
+            if current is None:
+                raise _EditError(f"No lineup with id {deck_id!r}.", 404, deck_id or None)
+            days = edit.get("days")
+            if days is None and "toggle_day" in edit:
+                # A single-day toggle reads the days inside the transaction,
+                # so two quick toggles both land.
+                d = edit["toggle_day"]
+                have = set(current.advance_days_of_week)
+                on = edit.get("on")
+                turn_on = (d not in have) if on is None else bool(on)
+                days = sorted(have | {d}) if turn_on else sorted(have - {d})
+            after[deck_id] = _edited_deck(
+                current,
+                start=edit.get("start", _UNSET),
+                end=edit.get("end", _UNSET),
+                days=days,
+            )
+            if deck_id not in order:
+                order.append(deck_id)
+        warnings: list[str] = []
+        with using_time_cycle(cycle):
+            _check_batch(decks, after, order, page_devices)
+            for deck_id in order:
+                warnings.extend(_pause_warnings(after[deck_id], page_devices))
+        changed = [after[i] for i in order if after[i] != decks[i]]
+        return changed, (changed, [after[i] for i in order], warnings)
+
+    try:
+        _changed, edited, warnings = _store().transaction(plan)
+    except _EditError as exc:
+        return _edit_error_json(exc)
+    # Window and day edits change when a lineup plays, never its pages, so
+    # the warmed frames and nav positions stay valid: no ``_invalidate``.
+    return _edit_result(edited, warnings, page_devices, view_day)
+
+
+@bp.post("/<deck_id>/window")
+def edit_window(deck_id: str) -> Response:
+    """Inline edit of a lineup's time window. JSON ``{"start": "HH:MM",
+    "end": "HH:MM" | null}`` (``end`` ``24:00`` or null = until midnight
+    for a rotation; ignored for a daily push). Refuses (409) a window that
+    meets another lineup of the same display on a shared day; a window in
+    quiet hours saves with a warning."""
+    body = _json_body()
+    edit: dict[str, Any] = {"id": deck_id}
+    for key in ("start", "end"):
+        if key in body:
+            edit[key] = body[key]
+    if "start" not in edit and "end" not in edit:
+        return _edit_error_json(_EditError("Send a start and/or end time.", 400, deck_id))
+    return _apply_edits([edit], _body_view_day(body, day_alias=True))
+
+
+@bp.post("/<deck_id>/days")
+def edit_days(deck_id: str) -> Response:
+    """Inline edit of a lineup's weekdays. JSON ``{"days": [0, 1, 2]}`` sets
+    them; ``{"day": 3, "on": true}`` toggles one (``on`` omitted flips it).
+    At least one day must remain; a day that clashes is refused (409)."""
+    body = _json_body()
+    edit: dict[str, Any] = {"id": deck_id}
+    if body.get("days") is not None:
+        edit["days"] = body["days"]
+    elif "day" in body:
+        # Passed through untouched; _validated_edit refuses "1", true, [] and
+        # a non-boolean "on" before anything changes.
+        edit["toggle_day"] = body["day"]
+        if "on" in body:
+            edit["on"] = body["on"]
+    else:
+        return _edit_error_json(_EditError("Send days or a day to toggle.", 400, deck_id))
+    return _apply_edits([edit], _body_view_day(body, day_alias=False))
+
+
+@bp.post("/edits")
+def save_edits() -> Response:
+    """The pending-edits Save: JSON ``{"edits": [{"id", "start"?, "end"?,
+    "days"?}, ...]}``. Every edit is checked against the others (two moved
+    windows may only clash with each other), then all save in one write or
+    none do."""
+    body = _json_body()
+    edits = body.get("edits")
+    if not isinstance(edits, list) or not edits:
+        return _edit_error_json(_EditError("Send a non-empty list of edits."))
+    return _apply_edits(edits, _body_view_day(body, day_alias=True), require_on=True)
+
+
+@bp.post("/<deck_id>/push-step")
+def push_step(deck_id: str) -> Response:
+    """Push one dashboard of a lineup to its display now (the step tile's
+    "Push now"). JSON ``{"index": n}`` or ``{"page_id": id}``, optional
+    ``composition_digest`` pins the shown upright composition, and optional
+    ``display_id`` (else every display the lineup lands on). Same path and
+    rules as a manual send from the Send page: force-published, no
+    coalescing, not held by quiet hours. The lineup's own schedule is not
+    changed; its next advance replaces the frame as usual."""
+    from app.next_update import DeviceTiming
+    from app.send_routes import _run_in_background
+
+    plain_form = (
+        not request.is_json
+        and request.headers.get("X-Requested-With") != "XMLHttpRequest"
+        and "application/json" not in request.headers.get("Accept", "")
+    )
+
+    def fail(err: _EditError) -> Response:
+        if plain_form:
+            flash(str(err), "error")
+            return redirect(url_for("decks.index", hl=deck_id))
+        return _edit_error_json(err)
+
+    body: dict[str, Any] = _json_body()
+    if not body and request.form:
+        # The no-JS form posts strings; only a plain digit string is an index.
+        body = dict[str, Any](request.form.to_dict())
+        if isinstance(body.get("index"), str) and body["index"].isdigit():
+            body["index"] = int(body["index"])
+    digest = body.get("composition_digest")
+    if digest is not None and (
+        not isinstance(digest, str) or (digest != "" and not re.fullmatch(r"[0-9a-fA-F]+", digest))
+    ):
+        return fail(_EditError("composition_digest must be a hex digest.", 400, deck_id))
+    for key in ("page_id", "display_id"):
+        if body.get(key) is not None and not isinstance(body[key], str):
+            return fail(_EditError(f"{key} must be a string.", 400, deck_id))
+    if "index" in body and body["index"] is not None and not _is_int(body["index"]):
+        return fail(_EditError("index must be a whole number.", 400, deck_id))
+    deck = _store().get(deck_id)
+    if deck is None:
+        return fail(_EditError(f"No lineup with id {deck_id!r}.", 404, deck_id))
+    page_id = str(body.get("page_id") or "")
+    if not page_id:
+        raw_index = body.get("index")
+        if not isinstance(raw_index, int) or isinstance(raw_index, bool):
+            return fail(_EditError("Send a step index or page_id.", 400, deck_id))
+        index = raw_index
+        if not 0 <= index < len(deck.pages):
+            return fail(_EditError(f"Step {index + 1} doesn't exist.", 400, deck_id))
+        page_id = deck.pages[index].page_id
+    elif page_id not in deck.page_ids:
+        return fail(_EditError("That dashboard isn't in this lineup.", 400, deck_id))
+    page_devices = {p.id: list(p.device_ids) for p in _pages().list()}
+    devices_reg = current_app.config.get("DEVICE_REGISTRY")
+    known = {d.id: d for d in (devices_reg.all() if devices_reg is not None else [])}
+    targets = [t for t in _deck_displays(deck, page_devices) if t in known]
+    only = str(body.get("display_id") or "")
+    if only:
+        if only not in targets:
+            return fail(_EditError("This lineup doesn't play on that display.", 400, deck_id))
+        targets = [only]
+    if not targets:
+        return fail(_EditError("Bind a display to this lineup first.", 400, deck_id))
+    pusher = current_app.config.get("PUSH_MANAGER")
+    if pusher is None:
+        return fail(_EditError("Push pipeline not ready.", 503, deck_id))
+    page = _pages().get(page_id)
+    name = page.name if page is not None else page_id
+    composition: bytes | None = None
+    if digest:
+        events = current_app.config.get("EVENT_LOG")
+        rows = (
+            events.list(
+                type="push",
+                target=page_id,
+                statuses=("sent", "ok"),
+                limit=events.count(type="push"),
+            )
+            if events is not None
+            else []
+        )
+        if not any((row.extra.get("composition_digest") or row.digest) == digest for row in rows):
+            return fail(
+                _EditError("That composition does not belong to this dashboard.", 409, deck_id)
+            )
+        with contextlib.suppress(FileNotFoundError):
+            # Read on the request thread so GC cannot evict it between
+            # accepting the click and the background send. Never read an artifact.
+            composition = (Path(current_app.config["RENDERS_DIR"]) / f"{digest}.png").read_bytes()
+    fresh = composition is None
+
+    def send_step() -> None:
+        if composition is None:
+            pusher.push(page_id, device_ids=set(targets), bypass_coalesce=True, force_publish=True)
+        else:
+            # History's normal per-device transform handles resizing and
+            # physical rotation. Resolve each target's own panel dimensions.
+            for did in targets:
+                pusher.republish_composition(composition, page_id=page_id, device_ids={did})
+
+    _run_in_background(send_step, label=f"lineup-step:{deck_id}:{page_id}")
+    now_ts = time.time()
+    lands: list[dict[str, Any]] = []
+    for did in targets:
+        label = "lands now"
+        try:
+            view = DeviceTiming(known[did], now=now_ts).view(now_ts)
+            if view.get("mode") != "connected" and view.get("when"):
+                label = f"lands {view['when_display']}"
+        except Exception:
+            label = "lands now"
+        lands.append({"display_id": did, "name": known[did].display_name, "lands": label})
+    first = lands[0]
+    message = (
+        "Sent a fresh render, the earlier picture is no longer stored"
+        if digest and fresh
+        else f"Pushed {name} to {first['name']}, {first['lands']}."
+    )
+    if plain_form:
+        flash(message, "success")
+        return redirect(url_for("decks.index", hl=deck_id))
+    return jsonify(
+        {
+            "ok": True,
+            "queued": True,
+            "id": deck_id,
+            "page_id": page_id,
+            "name": name,
+            "displays": lands,
+            "lands": first["lands"],
+            "message": message,
+            "fresh": fresh,
+        }
+    )
 
 
 @bp.post("/new")
@@ -1342,6 +2533,25 @@ def editor(deck_id: str | None = None) -> str | Response:
             }
         )
 
+    # Steps whose dashboard was deleted still belong to the lineup. List them,
+    # flagged, in their own position so they can be seen and removed; hiding
+    # them would silently keep the step on every save.
+    library = {p.id for p in pages}
+    for dp in deck.pages if deck is not None else []:
+        if dp.page_id not in library and not any(m["id"] == dp.page_id for m in page_meta):
+            page_meta.append(
+                {
+                    "w": 0,
+                    "h": 0,
+                    "id": dp.page_id,
+                    "name": "Missing dashboard (deleted)",
+                    "thumb": "",
+                    "devices": [],
+                    "kind": "",
+                    "missing": True,
+                }
+            )
+
     device_meta = []
     touch_bound = False
     if devices_reg is not None:
@@ -1425,7 +2635,7 @@ def editor(deck_id: str | None = None) -> str | Response:
         dwell_map=dwell_map,
         editor_state=editor_state,
         advance_default=advance_default,
-        page_names={p.id: p.name for p in pages},
+        page_names={m["id"]: m["name"] for m in page_meta},
     )
 
 
