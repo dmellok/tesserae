@@ -109,6 +109,9 @@
     // relative URLs from inside the ingress iframe would otherwise resolve
     // to the HA host root, not the add-on.
     window.TESSERAE_URL_PREFIX = {{ request.script_root|tojson }};
+    // The app's clock style from its locale ("h12" / "h23"); what
+    // tesseraeComponents.clockTime reads. Display only, data stays 24-hour.
+    window.TESSERAE_TIME_CYCLE = {{ (time_cycle or 'h23')|tojson }};
   </script>
   {% if app_settings is defined and app_settings.get('mobile_zoom_lock', True) %}
   <script>

@@ -271,7 +271,9 @@ def test_last_fired_abs_uses_configured_timezone(app: Flask) -> None:
     from app.schedule_routes import _last_fired_view
 
     with app.app_context():
-        app.config["SETTINGS_STORE"].update_section("app", {"timezone": "Asia/Hong_Kong"})
+        app.config["SETTINGS_STORE"].update_section(
+            "app", {"timezone": "Asia/Hong_Kong", "locale": "en-GB"}
+        )
         # 1609459200 == 2021-01-01 00:00 UTC == 08:00 in Hong Kong (+8).
         view = _last_fired_view(1609459200.0)
 

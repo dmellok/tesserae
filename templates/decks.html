@@ -176,7 +176,7 @@
         <div class="dk-next"><span>next advance</span><strong>{{ c.next_advance }}</strong></div>
         {% endif %}
       </div>
-      {% if c.next_update %}<p class="dk-next-update" data-next-update>{{ c.next_update.text }}</p>{% endif %}
+      {% if c.next_update %}<p class="dk-next-update" data-next-update>{{ c.next_update.text_display }}</p>{% endif %}
       {% if c.dwell_pct is not none %}
       <div class="dk-progress" role="progressbar" aria-label="Time through the current dwell" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ c.dwell_pct }}">
         <div class="dk-progress-track"><div class="dk-progress-fill" style="width: {{ c.dwell_pct }}%"></div></div>
@@ -196,14 +196,14 @@
       </div>
       <div class="dk-rail-legend">
         <span><i class="dk-swatch" aria-hidden="true"></i>{{ c.fires_label }}</span>
-        <span><i class="dk-hairline" aria-hidden="true"></i>now <span data-now-label>{{ now_hhmm }}</span></span>
+        <span><i class="dk-hairline" aria-hidden="true"></i>now <span data-now-label>{{ now_label }}</span></span>
       </div>
     </div>
     {% if c.refreshes_today is not none %}
     <div class="dk-next dk-count" title="Fires this schedule projects for today, the marks on the rail."><span>refreshes today</span><strong class="is-ink">{{ c.refreshes_today }}</strong></div>
     {% endif %}
     {% if c.next_fire %}
-    <div class="dk-next"><span>next push</span><strong class="is-ink">{{ c.next_fire }}</strong>{% if c.next_update %}<span class="dk-next-update" data-next-update>{{ c.next_update.text }}</span>{% endif %}</div>
+    <div class="dk-next"><span>next push</span><strong class="is-ink">{{ c.next_fire }}</strong>{% if c.next_update %}<span class="dk-next-update" data-next-update>{{ c.next_update.text_display }}</span>{% endif %}</div>
     {% endif %}
   </div>
   {% else %}
@@ -343,7 +343,7 @@
       const [hh, mm] = hhmmParts();
       const pct = ((hh * 60 + mm) / 1440) * 100;
       document.querySelectorAll('[data-now-mark]').forEach((m) => { m.style.left = pct + '%'; });
-      const label = String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0');
+      const label = window.tesseraeComponents.clockTime(new Date(2000, 0, 1, hh, mm));
       document.querySelectorAll('[data-now-label]').forEach((l) => { l.textContent = label; });
     };
     // Land on the minute rather than 60s after load, so the marker moves when

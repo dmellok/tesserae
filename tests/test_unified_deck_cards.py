@@ -25,6 +25,8 @@ def app(tmp_path: Path) -> Flask:
         renderers_dir=REPO_ROOT / "renderers",
     )
     a.config["TESTING"] = True
+    # Times read 24-hour whatever the host's own locale is.
+    a.config["SETTINGS_STORE"].patch_section("app", {"locale": "en-GB"})
     for pid in ("kitchen", "hall"):
         a.config["PAGE_STORE"].save(Page(id=pid, name=pid.title()))
     return a
@@ -114,6 +116,35 @@ def test_send_card_wires_schedule_endpoints_and_next_fire(app: Flask) -> None:
     assert "Kitchen · every 30 min" in body
     # The 24h rail replaces the old timeline panel.
     assert "dk-rail-scale" in body and "Next 24 hours" not in body
+
+
+@pytest.mark.parametrize(
+    ("locale", "fires", "now_label"),
+    [("en-US", "fires 3:48\u202fPM", "\u202fPM"), ("en-GB", "fires 15:48", ":")],
+)
+def test_lineups_page_clock_times_follow_the_locale(
+    app: Flask, locale: str, fires: str, now_label: str
+) -> None:
+    from datetime import datetime
+
+    app.config["SETTINGS_STORE"].patch_section("app", {"locale": locale})
+    app.config["SCHEDULE_STORE"].upsert(
+        Schedule(
+            id="late",
+            name="Afternoon",
+            page_id="kitchen",
+            type="daily",
+            fires_at=datetime(2026, 1, 1, 15, 48),
+        )
+    )
+    client = app.test_client()
+    _sign_in(client)
+    body = client.get("/decks").get_data(as_text=True)
+    assert fires in body
+    assert "daily at " + fires.removeprefix("fires ") in body
+    now = re.search(r"data-now-label>([^<]*)<", body)
+    assert now and now_label in now.group(1)
+    assert ("PM" in now.group(1) or "AM" in now.group(1)) == (locale == "en-US")
 
 
 def test_edit_paths_open_the_right_editor(app: Flask) -> None:

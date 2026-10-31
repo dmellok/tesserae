@@ -640,10 +640,10 @@
               {% if s.type == 'interval' %}
                 every {{ s.interval_minutes }} min
                 {% if s.time_of_day_start or s.time_of_day_end %}
-                  · {{ s.time_of_day_start or '00:00' }}–{{ s.time_of_day_end or '23:59' }}
+                  · {{ (s.time_of_day_start or '00:00')|clock_time }}–{{ (s.time_of_day_end or '23:59')|clock_time }}
                 {% endif %}
               {% else %}
-                daily {{ s.fires_at.strftime('%H:%M') if s.fires_at else '??:??' }}
+                daily {{ (s.fires_at|clock_time) if s.fires_at else '??:??' }}
               {% endif %}
               {% if s.smart_sync %}<span class="tg tg--sm tg--slate" title="Smart sync on">JIT</span>{% endif %}
             </div>

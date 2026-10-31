@@ -71,16 +71,10 @@
     );
   }
 
-  // Match the server-side fmt_time filter: "Jun  1 14:23:45" (local).
-  const MONTHS = [
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-  ];
+  // Match the server-side fmt_time filter: "Jun 1 2:23:45 PM" / "Jun 1 14:23:45"
+  // (local, in the app's clock style).
   function fmtTime(ts) {
-    const d = new Date(Number(ts) * 1000);
-    if (Number.isNaN(d.getTime())) return "";
-    const pad = (n) => String(n).padStart(2, "0");
-    return `${MONTHS[d.getMonth()]} ${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    return window.tesseraeComponents.clockTime(Number(ts), { seconds: true, date: true });
   }
 
   function statusPill(status) {

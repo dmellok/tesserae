@@ -237,9 +237,9 @@
       <span class="room-cell">
         {% if view.next_event %}
           {% if view.next_event.state == 'busy' %}
-          Busy until {{ view.next_event.until.strftime('%H:%M') }}
+          Busy until {{ view.next_event.until|clock_time }}
           {% elif view.next_event.until %}
-          Free until {{ view.next_event.until.strftime('%H:%M') }}
+          Free until {{ view.next_event.until|clock_time }}
           {% else %}
           <span class="is-off">Free all day</span>
           {% endif %}
@@ -296,8 +296,8 @@
           </span>
           {% if view.next_event %}
           <span><b>Next</b>
-            {%- if view.next_event.state == 'busy' %} busy until {{ view.next_event.until.strftime('%H:%M') }}
-            {%- elif view.next_event.until %} free until {{ view.next_event.until.strftime('%H:%M') }}
+            {%- if view.next_event.state == 'busy' %} busy until {{ view.next_event.until|clock_time }}
+            {%- elif view.next_event.until %} free until {{ view.next_event.until|clock_time }}
             {%- else %} free all day{% endif %}
           </span>
           {% endif %}

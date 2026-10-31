@@ -256,7 +256,7 @@
                 ticks: { stepSize: stepMs, color: mutedHex, font: { size: 11 }, padding: 6,
                   callback: function (v) {
                     var d = new Date(v);
-                    if (displayedDays <= 1) return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+                    if (displayedDays <= 1) return window.tesseraeComponents.clockTime(d);
                     return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
                   } },
                 grid: { display: false }, border: { color: toRgba(mutedHex, 0.35) } },
@@ -273,7 +273,7 @@
                 callbacks: {
                   title: function (items) {
                     if (!items.length) return "";
-                    return new Date(items[0].parsed.x).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+                    return window.tesseraeComponents.clockTime(items[0].parsed.x, { date: true });
                   },
                   label: function (item) { return item.parsed.y + "%"; },
                 },
