@@ -113,6 +113,9 @@
 
     const thumb = document.createElement("div");
     thumb.className = "dxe-thumb";
+    const target = deviceSel.options[deviceSel.selectedIndex];
+    thumb.dataset.gamut = (target && target.dataset.gamut) || "color";
+    thumb.dataset.greyLevels = (target && target.dataset.greyLevels) || "0";
     // Keep the dashboard's own shape instead of cropping it into a landscape box.
     if (p.w > 0 && p.h > 0) {
       thumb.style.setProperty("--thumb-ar", p.w + " / " + p.h);

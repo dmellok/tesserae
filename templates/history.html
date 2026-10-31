@@ -1,3 +1,4 @@
+{% from "_preview_color.html" import attrs as color_attrs with context %}
 {% extends "_base.html" %}
 {% block title %}History, Tesserae{% endblock %}
 
@@ -213,10 +214,10 @@
         <span class="dx-hist-dot{% if ev.failed %} is-bad{% endif %}" aria-hidden="true"></span>
         <input type="checkbox" class="dx-hist-select" value="{{ ev.ids|join(',') }}"
                aria-label="Select entry #{{ ev.id }}" title="Select for bulk delete">
-        <a class="dx-hist-time" {% if ev.preview_digest %}href="{{ url_for('renders', filename=ev.preview_digest ~ '.png') }}" data-lightbox aria-label="Push #{{ ev.id }}"{% endif %} title="{{ ev.abs }} ({{ ev.rel }})">{{ ev.time }}</a>
+        <a class="dx-hist-time" {% if ev.preview_digest %}href="{{ url_for('renders', filename=ev.preview_digest ~ '.png') }}" {{ color_attrs(ev.preview_device_ids|default(ev.device_ids)) }} data-lightbox aria-label="Push #{{ ev.id }}"{% endif %} title="{{ ev.abs }} ({{ ev.rel }})">{{ ev.time }}</a>
         {% if ev.preview_digest %}
-        <a class="dx-hist-thumb" href="{{ url_for('renders', filename=ev.preview_digest ~ '.png') }}" data-lightbox aria-label="Open render for push #{{ ev.id }}">
-          <img src="{{ url_for('renders', filename=ev.preview_digest ~ '.png', w=180) }}" alt="" width="64" height="48" loading="lazy" decoding="async">
+        <a class="dx-hist-thumb" href="{{ url_for('renders', filename=ev.preview_digest ~ '.png') }}" {{ color_attrs(ev.preview_device_ids|default(ev.device_ids)) }} data-lightbox aria-label="Open render for push #{{ ev.id }}">
+          <img src="{{ url_for('renders', filename=ev.preview_digest ~ '.png', w=180) }}" {{ color_attrs(ev.preview_device_ids|default(ev.device_ids)) }} alt="" width="64" height="48" loading="lazy" decoding="async">
         </a>
         {% else %}
         <span class="dx-hist-thumb dx-hist-thumb--empty{% if ev.failed %} is-bad{% endif %}" aria-hidden="true">no frame</span>
@@ -248,7 +249,7 @@
             <summary aria-label="More actions for entry #{{ ev.id }}" title="More"><i class="ph-bold ph-dots-three" aria-hidden="true"></i></summary>
             <div class="dx-hist-more-menu">
               {% if ev.preview_digest %}
-              <a class="dx-hist-more-item" href="{{ url_for('renders', filename=ev.preview_digest ~ '.png') }}" data-lightbox>Open frame</a>
+              <a class="dx-hist-more-item" href="{{ url_for('renders', filename=ev.preview_digest ~ '.png') }}" {{ color_attrs(ev.preview_device_ids|default(ev.device_ids)) }} data-lightbox>Open frame</a>
               {% endif %}
               {# A folded row deletes both of its halves through the bulk endpoint. #}
               {% if ev.ids|length > 1 %}
@@ -274,7 +275,7 @@
           {% for fu in ev.followups %}
           {% set _ftone = STATUS_META.get(fu.status, ('', 'bad'))[1] %}
           <li class="dx-hist-fu-row{% if fu.failed %} is-bad{% elif _ftone == 'ok' %} is-ok{% endif %}" data-history-followup="{{ fu.id }}">
-            <a class="dx-hist-time" {% if fu.preview_digest %}href="{{ url_for('renders', filename=fu.preview_digest ~ '.png') }}" data-lightbox{% endif %} title="{{ fu.abs }} ({{ fu.rel }})">{{ fu.time }}</a>
+            <a class="dx-hist-time" {% if fu.preview_digest %}href="{{ url_for('renders', filename=fu.preview_digest ~ '.png') }}" {{ color_attrs(fu.preview_device_ids|default(fu.device_ids)) }} data-lightbox{% endif %} title="{{ fu.abs }} ({{ fu.rel }})">{{ fu.time }}</a>
             {{ source_tag(fu.source) }}
             {{ status_tag(fu.status) }}
             <span class="dx-hist-dur">{% if fu.duration_s %}{{ '%.1f'|format(fu.duration_s) }}s{% endif %}</span>

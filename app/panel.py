@@ -377,10 +377,12 @@ def preview_groups_for_page(
                 "w": panel.w,
                 "h": panel.h,
                 "devices": [],
+                "device_ids": [],
                 "gamut": str(getattr(panel, "gamut", None) or "waveshare_e6"),
             },
         )
         grp["devices"].append(device.display_name)
+        grp["device_ids"].append(device.id)
     out: list[dict[str, Any]] = []
     for (aw, ah), grp in groups.items():
         shape = (

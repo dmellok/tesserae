@@ -1432,6 +1432,9 @@ def create_app(
         return f"{request.scheme}://{request.host}"
 
     app.jinja_env.globals["device_base_url"] = _device_base_url
+    from app.display_color import register_preview_color
+
+    register_preview_color(app)
 
     @app.context_processor
     def _inject_nav_data() -> dict[str, Any]:

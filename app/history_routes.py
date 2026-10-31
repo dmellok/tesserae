@@ -265,6 +265,7 @@ def history_view(rows: list[EventRow], *, fold_presses: bool = False) -> list[di
                 "target_devices": target_devices,
                 # Raw ids behind the chips, for the per-display filter.
                 "device_ids": [d["id"] for d in target_devices],
+                "preview_device_ids": device_ids,
                 "rel": _relative(ev.timestamp),
                 # v0.69.6 (issue #52 item 2): render in the user's configured
                 # timezone rather than the container's local (UTC on Docker /

@@ -129,6 +129,7 @@
     html, body { touch-action: manipulation; }
   </style>
   {% endif %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='style/preview-color.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/regular/style.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/bold/style.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/fill/style.css') }}">
@@ -175,6 +176,7 @@
   {{ server_mark.head_style(_si) }}
 </head>
 <body class="admin{% if config.DEV_MODE %} dev-mode{% endif %}">
+{% include "_preview_filters.html" %}
   {{ server_mark.strip(_si) }}
   <header class="topbar">
     <a class="brand" href="{{ url_for('index') }}">

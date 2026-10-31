@@ -1,3 +1,4 @@
+{% from "_preview_color.html" import attrs as color_attrs with context %}
 {% extends "_base.html" %}
 {% block title %}Dashboards, Tesserae{% endblock %}
 {% block main %}
@@ -206,6 +207,7 @@
   {% set _others = _names|length - (1 if g.device else 0) %}
   {% set _link_count = _names|length %}
   <div class="dx-dashrow dx-dashboard-row is-{{ _state }}{% if _open %} is-open{% endif %}"
+       {{ color_attrs(page.device_ids) }}
        id="dash-{{ _rid }}" data-dashrow data-page-id="{{ page.id }}"
        data-panels="{{ (page_device_ids.get(page.id) or ['-'])|join(' ') }}"
        data-live="{{ '1' if _live else '0' }}"
@@ -228,7 +230,7 @@
       <span class="dx-dot dx-dash-dot is-{{ _state }}" aria-hidden="true"></span>
       <span class="dx-dash-thumb{% if not (pv_w and pv_h) %} is-empty{% elif pv_h > pv_w %} is-portrait{% endif %}"
             {% if pv_w and pv_h %}style="--thumb-ar: {{ pv_w }} / {{ pv_h }}; --thumb-r: {{ '%.4f'|format(pv_w / pv_h) }}"{% endif %} aria-hidden="true">
-        {% if pv_w and pv_h %}<img src="{{ _png }}" alt="" loading="lazy" decoding="async" data-dash-thumb>{% endif %}
+        {% if pv_w and pv_h %}<img src="{{ _png }}" alt="" loading="lazy" decoding="async" {{ color_attrs(page.device_ids) }} data-dash-thumb>{% endif %}
         <i class="ph ph-{{ page.icon or 'cube' }}"></i>
       </span>
       <a class="dx-dash-name" href="{{ url_for('pages.edit', page_id=page.id) }}" title="{{ page.name }}">{{ page.name }}</a>
@@ -263,7 +265,7 @@
   {# OPENED ROW: preview, four figures, then the row's controls. #}
   <div class="dx-devquick dx-dashquick" id="dashq-{{ _rid }}" data-dashquick data-lf-tail{% if not _open %} hidden{% endif %}>
     <div class="dx-dashquick-preview{% if not (pv_w and pv_h) %} is-empty{% elif pv_h > pv_w %} is-portrait{% endif %}"
-         {% if pv_w and pv_h %}style="aspect-ratio: {{ pv_w }} / {{ pv_h }}"{% endif %} data-dashquick-preview>
+         {% if pv_w and pv_h %}style="aspect-ratio: {{ pv_w }} / {{ pv_h }}"{% endif %} {{ color_attrs(page.device_ids) }} data-dashquick-preview>
       <span class="dx-thumb-empty"><i class="ph ph-image" aria-hidden="true"></i><span>{{ 'Rendering preview' if pv_w and pv_h else 'No preview' }}</span></span>
     </div>
     <div class="dx-devquick-body">
@@ -839,6 +841,8 @@
       const h = parseInt(row.getAttribute('data-preview-h') || '0', 10);
       if (!w || !h) return;
       build();
+      pop.dataset.gamut = row.dataset.gamut;
+      pop.dataset.greyLevels = row.dataset.greyLevels;
       const box = fit(w, h);
       pop.style.width = box.w + 'px';
       pop.style.height = box.h + 'px';

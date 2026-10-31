@@ -1,3 +1,4 @@
+{% from "_preview_color.html" import attrs as color_attrs with context %}
 {% extends "_base.html" %}
 {% from "_components.html" import text_input, slider, switch, select_field, color_input, button, auto_field, card_head, textarea_field, options_more_open, options_more_close %}
 {% from "_schedule_form.html" import schedule_form, schedule_form_scripts %}
@@ -310,6 +311,7 @@
       <p class="preview-group-label">{{ g.label }}</p>
       {% endif %}
       <div class="preview-frame"
+           {{ color_attrs(g.device_ids|default([])) }}
            data-fit-preview
            data-panel-w="{{ g.w }}"
            data-panel-h="{{ g.h }}"
@@ -331,7 +333,7 @@
         {# Panel view target: quantised PNG for this group's gamut. Its src is
            set lazily by editor.js when Panel view is active (kept out of the
            DOM src so it doesn't render until asked). #}
-        <img class="preview-panel-img" data-panel-preview
+        <img class="preview-panel-img" data-panel-preview data-device-quantised
              data-panel-src="{{ url_for('composer.compose_panel_preview', page_id=page.id) }}?gamut={{ g.gamut }}&amp;dither=floyd-steinberg&amp;w={{ g.w }}&amp;h={{ g.h }}"
              alt="Panel view (quantised)" hidden>
       </div>
