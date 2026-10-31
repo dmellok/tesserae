@@ -15,6 +15,7 @@ from flask import flash, redirect, url_for
 from werkzeug.wrappers import Response
 
 from app import visionect
+from app.clock_text import clock_of
 from app.device_loader import Device
 
 from ._shared import bp, device_kinds, devices, settings_store
@@ -71,7 +72,8 @@ def _visionect_sign(view: dict[str, Any]) -> dict[str, Any]:
 
     def clock(ts: Any) -> str:
         try:
-            return datetime.fromtimestamp(float(ts), tz=tz).strftime("%b %d %H:%M")
+            moment = datetime.fromtimestamp(float(ts), tz=tz)
+            return f"{moment:%b %d} {clock_of(moment)}"
         except (TypeError, ValueError, OverflowError, OSError):
             return ""
 
@@ -179,7 +181,7 @@ def _visionect_band(device: Device) -> dict[str, Any] | None:
 
         from app.tz_resolve import app_timezone
 
-        when = datetime.fromtimestamp(refused_at, tz=app_timezone()).strftime("%H:%M")
+        when = clock_of(datetime.fromtimestamp(refused_at, tz=app_timezone()))
         refused_note = (
             f" At {when} a connection from {refused.get('remote') or 'another address'} "
             "claimed this frame's UUID and was refused."
@@ -209,7 +211,7 @@ def _visionect_band(device: Device) -> dict[str, Any] | None:
 
         from app.tz_resolve import app_timezone
 
-        until = datetime.fromtimestamp(asleep, tz=app_timezone()).strftime("%H:%M")
+        until = clock_of(datetime.fromtimestamp(asleep, tz=app_timezone()))
         return {
             "ok": True,
             "title": "Frame asleep",

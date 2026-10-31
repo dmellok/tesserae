@@ -150,8 +150,13 @@ def compute_next_update(
     )
 
 
-def _clock(epoch: float, tz: tzinfo | None, now: float) -> str:
-    """``18:24`` for today, ``Tue 07:00`` for another day."""
+def _clock(epoch: float, tz: tzinfo | None, now: float, cycle: str | None = None) -> str:
+    """``18:24`` for today, ``Tue 07:00`` for another day; with ``cycle``
+    ``h12`` the app's 12-hour form (``6:24 PM``, ``Tue 7 AM``)."""
+    if cycle == "h12":
+        from app.clock_text import epoch_label
+
+        return epoch_label(epoch, tz=tz, now=now, cycle=cycle)
     moment = datetime.fromtimestamp(epoch, tz=tz)
     today = datetime.fromtimestamp(now, tz=tz).date()
     if moment.date() == today:
@@ -178,17 +183,25 @@ def reason_for(nu: NextUpdate, reach: Reach) -> str:
     return "scheduled"
 
 
-def describe(nu: NextUpdate, reach: Reach, *, tz: tzinfo | None, now: float) -> dict[str, Any]:
+def describe(
+    nu: NextUpdate,
+    reach: Reach,
+    *,
+    tz: tzinfo | None,
+    now: float,
+    cycle: str | None = None,
+) -> dict[str, Any]:
     """Plain words for a ``NextUpdate``: ``when`` (``~18:24``), ``detail`` (the
     reason in brackets, short), ``reason`` (the one-phrase version) and
-    ``text`` (the whole sentence)."""
+    ``text`` (the whole sentence). Times read 24-hour unless ``cycle`` is
+    ``h12`` (``~6:24 PM``)."""
     parts: list[str] = []
     if nu.held_indefinitely:
         parts.append(
             "quiet hours all week" if nu.held_reason == "quiet hours" else "automation is paused"
         )
     elif nu.held_until is not None:
-        parts.append(f"held until {_clock(nu.held_until, tz, now)} by {nu.held_reason}")
+        parts.append(f"held until {_clock(nu.held_until, tz, now, cycle)} by {nu.held_reason}")
     if nu.mode == MODE_CONNECTED:
         parts.append(
             "frame connected, arrives right away"
@@ -197,11 +210,11 @@ def describe(nu: NextUpdate, reach: Reach, *, tz: tzinfo | None, now: float) -> 
         )
     elif nu.mode == MODE_SLEEPS:
         if nu.checkin_at is not None:
-            parts.append(f"frame sleeps; next check-in ~{_clock(nu.checkin_at, tz, now)}")
+            parts.append(f"frame sleeps; next check-in ~{_clock(nu.checkin_at, tz, now, cycle)}")
         else:
             parts.append("frame sleeps")
     detail = " · ".join(parts)
-    when = f"~{_clock(nu.at, tz, now)}" if nu.at is not None else ""
+    when = f"~{_clock(nu.at, tz, now, cycle)}" if nu.at is not None else ""
     if nu.at is not None:
         text = f"Next update {when}" + (f" ({detail})" if detail else "")
     else:
@@ -218,6 +231,12 @@ def describe(nu: NextUpdate, reach: Reach, *, tz: tzinfo | None, now: float) -> 
 
 
 # -- reading the app ------------------------------------------------------
+
+
+def _app_cycle() -> str:
+    from app.clock_text import app_cycle
+
+    return app_cycle()
 
 
 def _tz() -> tzinfo:
@@ -406,7 +425,14 @@ class DeviceTiming:
                 ends = quiet_ends_at(self._window, when, self.tz)
                 hold = Hold(ends.timestamp() if ends is not None else None, "quiet hours")
         nu = compute_next_update(push, self.reach, now=self.now, hold=hold)
-        return describe(nu, self.reach, tz=self.tz, now=self.now)
+        out = describe(nu, self.reach, tz=self.tz, now=self.now)
+        # ``when`` / ``detail`` / ``text`` stay 24-hour: Home Assistant's
+        # sensors publish them. The pages read the ``*_display`` twins, in the
+        # app's clock style.
+        shown = describe(nu, self.reach, tz=self.tz, now=self.now, cycle=_app_cycle())
+        for key in ("when", "detail", "text"):
+            out[f"{key}_display"] = shown[key]
+        return out
 
     def next_checkin(self) -> float | None:
         """The next time the display is expected to check in, or ``None``

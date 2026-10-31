@@ -26,6 +26,8 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from app.clock_text import clock_of
+
 FIELDS: list[dict[str, Any]] = [
     {"name": "api_key", "secret": True},
     {"name": "daily_usd", "type": "number", "default": 0},
@@ -304,5 +306,5 @@ class Ledger:
             "strip_to": strip[-1]["day"] if strip else "",
             "by_widget": by_widget,
             "by_model": by_model,
-            "reset_at": datetime.fromtimestamp(after).strftime("%H:%M") if after else "",
+            "reset_at": clock_of(datetime.fromtimestamp(after)) if after else "",
         }

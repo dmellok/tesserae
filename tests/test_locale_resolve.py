@@ -82,3 +82,43 @@ def test_no_env_vars_falls_back_to_en(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("LANG", raising=False)
     assert resolve_locale({}, None) == "en"
     assert DEFAULT_LOCALE == "en"
+
+
+@pytest.mark.parametrize(
+    ("locale", "cycle"),
+    [
+        ("en-US", "h12"),
+        ("en", "h12"),
+        ("en_US.UTF-8", "h12"),
+        ("en-CA", "h12"),
+        ("en-AU", "h12"),
+        ("en-IN", "h12"),
+        ("es-MX", "h12"),
+        ("es-419", "h12"),
+        ("zh-Hant", "h12"),
+        ("zh-TW", "h12"),
+        ("ko", "h12"),
+        ("en-GB", "h23"),
+        ("en-IE", "h23"),
+        ("en-150", "h23"),
+        ("de", "h23"),
+        ("de-DE", "h23"),
+        ("fr", "h23"),
+        ("fr-CA", "h23"),
+        ("es", "h23"),
+        ("pt-BR", "h23"),
+        ("ja", "h23"),
+        ("zh", "h23"),
+        ("sr-Latn-RS", "h23"),
+        ("en-US-u-hc-h23", "h23"),
+        ("de-DE-u-ca-gregory-hc-h12", "h12"),
+        ("", "h23"),
+        (None, "h23"),
+    ],
+)
+def test_time_cycle_matches_intl(locale: str | None, cycle: str) -> None:
+    """The browser's ``Intl.DateTimeFormat(locale, {hour: "numeric"})``
+    hourCycle for the same tag (ICU 74)."""
+    from app.locale_resolve import time_cycle
+
+    assert time_cycle(locale) == cycle

@@ -16,6 +16,7 @@ from flask import current_app, flash, redirect, render_template, request, url_fo
 from werkzeug.wrappers import Response
 
 from app import device_service
+from app.clock_text import clock_of
 from app.relay_client import RelayError
 from app.relay_config import DEFAULT_BASE_URL, base_url, build_client, is_linked, relay_config
 from app.relay_pairing import mint_remote_panel_code, register_this_install
@@ -42,7 +43,7 @@ def _throttled_panels() -> list[dict[str, Any]]:
     rows = []
     for entry in throttled():
         until = datetime.fromtimestamp(entry["until"]).astimezone()
-        rows.append({**entry, "until_label": f"{until:%H:%M} on {until.day} {until:%b}"})
+        rows.append({**entry, "until_label": f"{clock_of(until)} on {until.day} {until:%b}"})
     return rows
 
 

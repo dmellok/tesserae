@@ -90,3 +90,93 @@ def resolve_locale(app_settings: dict[str, Any], device: Any | None = None) -> s
     if raw and raw.lower() != "system":
         return raw
     return _system_locale() or DEFAULT_LOCALE
+
+
+# -- clock style ---------------------------------------------------------------
+#
+# Whether a locale reads times on a 12-hour clock ("6:30 PM") or a 24-hour
+# one ("18:30"), matching what a browser's
+# ``Intl.DateTimeFormat(locale, {hour: "numeric"}).resolvedOptions().hourCycle``
+# picks (taken from ICU 74's CLDR data). The server decides once and the page
+# receives the answer, so the server's markup and the client's redraw never
+# disagree. Each language has a default and the regions that flip it; a
+# language not listed reads 24-hour.
+_H12_LANGUAGES: frozenset[str] = frozenset(
+    {
+        "am",
+        "ar",
+        "bn",
+        "el",
+        "en",
+        "fil",
+        "gu",
+        "hi",
+        "km",
+        "kn",
+        "ko",
+        "ml",
+        "mr",
+        "ms",
+        "pa",
+        "so",
+        "sq",
+        "ta",
+        "te",
+        "tl",
+        "ur",
+    }
+)
+_FLIP_REGIONS: dict[str, frozenset[str]] = {
+    lang: frozenset(regions.split())
+    for lang, regions in {
+        "af": "NA",
+        "ar": "IL KM MA",
+        "en": "150 AI AT BE BI BW BZ CC CH CK CM CX CZ DD DE DG DK EE ES FI FK FR FX GB "
+        "GE GG GI GS HU ID IE IL IM IO IT JE JP KE LT LV MG MS MT MU MV NF NG NL NO NR NU "
+        "PL PN PT RH RO RW SC SE SH SI SK SX TK TV TZ UA UG UK ZA ZW",
+        "es": "419 AR BO CL CO CR CU DO EC GT HN MX NI PA PE PH PR PY SV US UY VE",
+        "fr": "DJ DZ MR NH SY TD TN VU",
+        "ha": "GH",
+        "ko": "CN",
+        "ms": "ID",
+        "ne": "IN",
+        "pt": "MO",
+        "so": "KE",
+        "sq": "MK",
+        "ta": "LK",
+        "tr": "CY",
+        "zh": "HK MO MY SG TW",
+    }.items()
+}
+
+
+def time_cycle(locale: str | None) -> str:
+    """``"h12"`` or ``"h23"`` for a BCP-47-ish tag (``en-US`` -> h12,
+    ``en-GB`` / ``de`` -> h23). A ``-u-hc-`` extension wins; ``zh-Hant``
+    without a region reads as Taiwan, as Intl does."""
+    parts = str(locale or "").replace("_", "-").split("-")
+    lowered = [p.lower() for p in parts]
+    if "u" in lowered:
+        ext = lowered[lowered.index("u") + 1 :]
+        if "hc" in ext[:-1]:
+            hc = ext[ext.index("hc") + 1]
+            if hc in ("h11", "h12"):
+                return "h12"
+            if hc in ("h23", "h24"):
+                return "h23"
+        parts = parts[: lowered.index("u")]
+    lang = parts[0].lower() if parts else ""
+    region = next(
+        (
+            p.upper()
+            for p in parts[1:]
+            if (len(p) == 2 and p.isalpha()) or (len(p) == 3 and p.isdigit())
+        ),
+        "",
+    )
+    if not region and lang == "zh" and any(p.lower() == "hant" for p in parts[1:]):
+        region = "TW"
+    h12 = lang in _H12_LANGUAGES
+    if region in _FLIP_REGIONS.get(lang, ()):
+        h12 = not h12
+    return "h12" if h12 else "h23"

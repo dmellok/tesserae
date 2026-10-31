@@ -68,17 +68,26 @@ def test_history_abs_renders_in_configured_timezone(app: Flask) -> None:
         duration_s=0.0,
         extra={},
     )
-    app.config["SETTINGS_STORE"].update_section("app", {"timezone": "Australia/Melbourne"})
+    app.config["SETTINGS_STORE"].update_section(
+        "app", {"timezone": "Australia/Melbourne", "locale": "en-GB"}
+    )
     with app.app_context():
         shaped = history_view([row])
     assert shaped[0]["abs"] == "2026-07-05 13:15:00"
 
     # Same row, UTC config: UTC clock time (proof the setting is what
     # switched it, not a stray import).
-    app.config["SETTINGS_STORE"].update_section("app", {"timezone": "Etc/UTC"})
+    app.config["SETTINGS_STORE"].update_section("app", {"timezone": "Etc/UTC", "locale": "en-GB"})
     with app.app_context():
         shaped_utc = history_view([row])
     assert shaped_utc[0]["abs"] == "2026-07-05 03:15:00"
+
+    # A 12-hour locale reads the same moment in its own clock style.
+    app.config["SETTINGS_STORE"].update_section("app", {"timezone": "Etc/UTC", "locale": "en-US"})
+    with app.app_context():
+        shaped_us = history_view([row])
+    assert shaped_us[0]["abs"] == "2026-07-05 3:15:00\u202fAM"
+    assert shaped_us[0]["time"] == "3:15:00\u202fAM"
 
 
 def test_history_abs_survives_dst_boundary(app: Flask) -> None:
@@ -121,7 +130,9 @@ def test_history_abs_survives_dst_boundary(app: Flask) -> None:
             extra={},
         ),
     ]
-    app.config["SETTINGS_STORE"].update_section("app", {"timezone": "Australia/Melbourne"})
+    app.config["SETTINGS_STORE"].update_section(
+        "app", {"timezone": "Australia/Melbourne", "locale": "en-GB"}
+    )
     with app.app_context():
         shaped = history_view(rows)
     assert shaped[0]["abs"] == "2026-04-06 01:59:00"

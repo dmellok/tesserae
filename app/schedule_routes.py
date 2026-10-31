@@ -33,6 +33,7 @@ from flask import (
 from pydantic import ValidationError
 from werkzeug.wrappers import Response
 
+from app.clock_text import clock_of
 from app.scheduler import Scheduler
 from app.state.page_store import PageStore
 from app.state.schedule_model import Schedule
@@ -312,9 +313,10 @@ def _last_fired_view(epoch: float | None) -> dict[str, str] | None:
     ``None`` when the schedule has never fired."""
     if not epoch:
         return None
+    moment = datetime.fromtimestamp(epoch, app_timezone())
     return {
         "rel": _relative(epoch),
-        "abs": datetime.fromtimestamp(epoch, app_timezone()).strftime("%Y-%m-%d %H:%M"),
+        "abs": f"{moment:%Y-%m-%d} {clock_of(moment)}",
     }
 
 

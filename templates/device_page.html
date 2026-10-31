@@ -123,7 +123,7 @@
             <div class="dx-smart-sync-meter-fill dx-tone-{{ ssh.tone }}" style="width: {{ ssh.confidence_pct }}%;"></div>
           </div>
           <p class="dx-smart-sync-explainer">{{ ssh.explainer }}</p>
-          {% if ss.next_update %}<p class="dx-smart-sync-explainer" data-next-update>{{ ss.next_update.text }}</p>{% endif %}
+          {% if ss.next_update %}<p class="dx-smart-sync-explainer" data-next-update>{{ ss.next_update.text_display }}</p>{% endif %}
           <dl class="dx-smart-sync-grid">
             <div><dt>Last heartbeat</dt><dd>{{ ss.last_heartbeat_rel or section.status.relative }}</dd></div>
             <div><dt>Next wake</dt><dd>{{ ss.predicted_rel or '-' }}</dd></div>

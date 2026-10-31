@@ -1285,6 +1285,45 @@
     });
   })();
 
+  // A clock time in the app's style (window.TESSERAE_TIME_CYCLE, from the
+  // locale): "3:48 PM" / "15:48"; whole hours drop ":00" in 12-hour ("11 PM"),
+  // a narrow no-break space before AM/PM. Mirrors clock_of() in
+  // app/clock_text.py; change them together. Display only: inputs and saved
+  // values stay 24-hour.
+  const MONTHS = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
+  function clockTime(value, opts) {
+    const d =
+      value instanceof Date
+        ? value
+        : new Date(typeof value === "number" && value < 1e12 ? value * 1000 : value);
+    if (Number.isNaN(d.getTime())) return "";
+    const o = opts || {};
+    const pad = (n) => String(n).padStart(2, "0");
+    const h = d.getHours();
+    const m = d.getMinutes();
+    let label;
+    if (window.TESSERAE_TIME_CYCLE === "h12") {
+      const hm = o.seconds || m ? `${h % 12 || 12}:${pad(m)}` : String(h % 12 || 12);
+      label = `${o.seconds ? `${hm}:${pad(d.getSeconds())}` : hm}\u202f${h < 12 ? "AM" : "PM"}`;
+    } else {
+      label = `${pad(h)}:${pad(m)}${o.seconds ? ":" + pad(d.getSeconds()) : ""}`;
+    }
+    return o.date ? `${MONTHS[d.getMonth()]} ${d.getDate()} ${label}` : label;
+  }
+
   // Observe future additions (the page editor swaps cell forms in/out on
   // plugin change). Skipping mutation observer for now since editor.js
   // currently full-reloads on plugin change, re-init isn't needed mid-page.
@@ -1297,5 +1336,6 @@
     attachMultiSelect,
     attachShowIf,
     fitPreview,
+    clockTime,
   };
 })();

@@ -31,6 +31,7 @@ from flask import (
 from pydantic import ValidationError
 from werkzeug.wrappers import Response
 
+from app.clock_text import clock_of, clock_time
 from app.deck_suggest import graph_for_pages, suggest_decks
 from app.lineup_authoring import build_lineup
 from app.next_update import DeviceTiming, reach_for_device
@@ -299,7 +300,8 @@ def _mins_label(minutes: int) -> str:
 
 
 def _hhmm(epoch: float, tz: tzinfo) -> str:
-    return datetime.fromtimestamp(epoch, tz=tz).strftime("%H:%M")
+    """``3:48 PM`` / ``15:48`` in the app's clock style (display text only)."""
+    return clock_of(datetime.fromtimestamp(epoch, tz=tz))
 
 
 def _panel_states(devices: list[Any]) -> dict[str, dict[str, Any]]:
@@ -738,11 +740,7 @@ def _design_cards(
         step_index = cur.get("step_index") if active else None
         current_page = cur.get("page_id") if active else None
         nxt = cur.get("next_transition_epoch")
-        next_advance = (
-            datetime.fromtimestamp(nxt, tz=tz).strftime("%H:%M")
-            if active and isinstance(nxt, (int, float))
-            else None
-        )
+        next_advance = _hhmm(nxt, tz) if active and isinstance(nxt, (int, float)) else None
         playing = active and any(
             rec[1] == current_page and (rec[0] in (r.id, None)) for rec in live.values()
         )
@@ -824,11 +822,11 @@ def _design_cards(
                 s, day_start + timedelta(hours=24), day_start + timedelta(hours=48)
             )
             upcoming = tomorrow[:1]
-        next_fire = upcoming[0].strftime("%H:%M") if upcoming else None
+        next_fire = clock_of(upcoming[0]) if upcoming else None
         cadence = (
             f"every {s.interval_minutes} min"
             if s.type == "interval"
-            else f"daily at {s.fires_at.strftime('%H:%M') if s.fires_at else '?'}"
+            else f"daily at {clock_time(s.fires_at) if s.fires_at else '?'}"
         )
         showing = any(rec[1] == s.page_id for rec in live.values())
         last = (schedule_status.get(s.id) or {}).get("last_fired")
@@ -851,7 +849,7 @@ def _design_cards(
                 "marks": _thin_marks(marks),
                 "now_pct": round(now_pct, 2),
                 "fires_label": (
-                    f"fires {s.fires_at.strftime('%H:%M')}"
+                    f"fires {clock_time(s.fires_at)}"
                     if s.type == "daily" and s.fires_at
                     else f"every {s.interval_minutes} min"
                 ),
@@ -955,6 +953,7 @@ def _design_cards(
         "cards": cards,
         "groups": groups,
         "now_hhmm": now_tz.strftime("%H:%M"),
+        "now_label": clock_of(now_tz),
         "now_tz_name": tz_name,
     }
 
@@ -1060,6 +1059,7 @@ def index() -> str:
         cards=design["cards"],
         groups=design["groups"],
         now_hhmm=design["now_hhmm"],
+        now_label=design["now_label"],
         now_tz_name=design.get("now_tz_name", ""),
         # -- schedules forms ----------------------------------------------
         schedules=schedules,

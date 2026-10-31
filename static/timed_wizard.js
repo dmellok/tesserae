@@ -158,9 +158,7 @@
   // ----- derived values -------------------------------------------------
   const prettyTime = () => {
     const [h, m] = (state.time || '07:00').split(':').map(Number);
-    const ap = h >= 12 ? 'PM' : 'AM';
-    const hh = h % 12 === 0 ? 12 : h % 12;
-    return hh + ':' + String(m).padStart(2, '0') + ' ' + ap;
+    return window.tesseraeComponents.clockTime(new Date(2000, 0, 1, h, m));
   };
 
   const loopMinutes = () => state.picks.reduce((a, id) => a + Number(state.mins[id] || 5), 0);

@@ -51,6 +51,7 @@ from app import (
     artwork_routes,
     auth,
     bloomin8_api,
+    clock_text,
     commons,
     composer,
     device_battery_routes,
@@ -529,12 +530,16 @@ def create_app(
     def _fmt_time(ts: float | int) -> str:
         from datetime import datetime as _dt
 
+        from app.clock_text import clock_of
+
         try:
-            return _dt.fromtimestamp(float(ts)).strftime("%b %e %H:%M:%S").replace("  ", " ")
+            moment = _dt.fromtimestamp(float(ts))
         except (TypeError, ValueError, OSError):
             return ""
+        return f"{moment:%b} {moment.day} {clock_of(moment, seconds=True)}"
 
     app.jinja_env.filters["fmt_time"] = _fmt_time
+    clock_text.register(app)
 
     # Surfaced to templates so the admin UI can flag a --dev instance
     # (reddish-orange accent) and the mDNS advertiser picks tesserae-dev.local.
@@ -1463,9 +1468,11 @@ def create_app(
         # installed version reaches the template, so the login page can't
         # leak them to whoever can reach the port. Skipping the collectors
         # also keeps the unauthenticated path cheap.
+        time_cycle = clock_text.app_cycle()
         if auth.shell_locked():
             return {
                 "shell_locked": True,
+                "time_cycle": time_cycle,
                 "online_features_unanswered": False,
                 "nav_admin_plugins": [],
                 "nav_batteries": [],
@@ -1492,6 +1499,7 @@ def create_app(
                 online_unanswered = False
         return {
             "shell_locked": False,
+            "time_cycle": time_cycle,
             "online_features_unanswered": online_unanswered,
             "nav_admin_plugins": sorted(
                 (p for p in registry.plugins.values() if p.has_admin),

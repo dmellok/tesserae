@@ -14,6 +14,7 @@ from typing import Any
 
 from flask import Blueprint, Flask, current_app, render_template, request
 
+from app.clock_text import clock_of
 from app.device_loader import DeviceRegistry
 from app.renderer_loader import RendererRegistry
 from app.state.event_log import EventLog, EventRow
@@ -271,8 +272,8 @@ def history_view(rows: list[EventRow], *, fold_presses: bool = False) -> list[di
                 # MicroCloud defaults). Falls back to system-local when the
                 # setting is empty or "system"; see ``app_timezone`` for the
                 # resolution ladder.
-                "abs": local_dt.strftime("%Y-%m-%d %H:%M:%S"),
-                "time": local_dt.strftime("%H:%M:%S"),
+                "abs": f"{local_dt:%Y-%m-%d} {clock_of(local_dt, seconds=True)}",
+                "time": clock_of(local_dt, seconds=True),
                 "timestamp": ev.timestamp,
                 "duration_s": ev.duration_s or (push_ev.duration_s if push_ev is not None else 0.0),
                 "error": ev.error or (push_ev.error if push_ev is not None else None),

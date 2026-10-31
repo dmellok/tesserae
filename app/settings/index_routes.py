@@ -27,6 +27,7 @@ from app import firmware_check as firmware_check_module
 from app import install_id as install_id_module
 from app import updater as _updater_mod
 from app.button_actions import DEFAULT_BUTTON_MAP, registered_actions
+from app.clock_text import clock_of
 from app.device_loader import Device, has_buttons
 from app.ha_options import is_ha_addon
 from app.network import detect_local_ip, docker_bridge_ip_warning, is_docker_bridge_ip, url_host
@@ -1040,7 +1041,7 @@ def _mode_observation_view(device_id: str) -> dict[str, str] | None:
         observed = datetime.fromisoformat(observation["observed_at"].replace("Z", "+00:00"))
         if observed.tzinfo is None:
             return None
-        observed_label = observed.astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")
+        observed_label = _stamp_label(observed.astimezone())
     except (ValueError, OverflowError, OSError):
         return None
     return {
@@ -1049,6 +1050,12 @@ def _mode_observation_view(device_id: str) -> dict[str, str] | None:
         "observed_at": observation["observed_at"],
         "observed_label": observed_label,
     }
+
+
+def _stamp_label(moment: datetime) -> str:
+    """``2026-10-30 3:04:05 PM PDT`` / ``2026-10-30 15:04:05 PDT``: a dated
+    reading in the app's clock style (display only)."""
+    return f"{moment:%Y-%m-%d} {clock_of(moment, seconds=True)} {moment:%Z}"
 
 
 def _build_device_section(store: Any, device: Device) -> dict[str, Any] | None:
@@ -1462,7 +1469,7 @@ def _build_device_section(store: Any, device: Device) -> dict[str, Any] | None:
 
 def _clock_hhmm(epoch: Any) -> str:
     if isinstance(epoch, (int, float)) and epoch > 0:
-        return time.strftime("%H:%M", time.localtime(float(epoch)))
+        return clock_of(datetime.fromtimestamp(float(epoch)))
     return ""
 
 
@@ -1577,8 +1584,8 @@ def _device_overview(device: Device, section: dict[str, Any]) -> dict[str, Any]:
         # One number that already weighs the server's next push against when
         # the frame can take it (connected now, or its next check-in).
         next_wake = {
-            "value": nu["when"] or "None scheduled",
-            "sub": nu["detail"],
+            "value": nu["when_display"] or "None scheduled",
+            "sub": nu["detail_display"],
             "muted": not nu["when"],
         }
     else:
@@ -2422,7 +2429,7 @@ def _phone_status_readings(
         if field == "battery":
             parsed.pop("battery_mv", None)
             parsed.pop("power_plugged", None)
-        labels[field] = "Bluetooth · " + stamp.astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")
+        labels[field] = "Bluetooth · " + _stamp_label(stamp.astimezone())
     return parsed, labels
 
 

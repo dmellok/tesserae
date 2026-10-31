@@ -41,6 +41,18 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   such as Home Assistant's sidebar panel. The image URL was root-absolute, so
   under ingress it never loaded and the page stayed black; it now carries the
   prefix. The device name on the page is HTML-escaped too.
+### Added
+
+- Every clock time in the app follows the language and region setting
+  (Settings › Server › App › Locale, the host's when unset) through one
+  formatter: `3:48 PM` in a 12-hour locale, `15:48` in a 24-hour one. That
+  covers the Settings › Devices "Next update" tile and detail, the device page
+  and smart-sync line, the Lineups page (next advance, next push, fires, now),
+  History and Events timestamps, rooms "busy until", schedule times, the
+  battery chart axis and tooltip, the timed-lineup wizard, Visionect and relay
+  notes, the generative-AI reset time and the Bluetooth/Wi-Fi reading stamps.
+  Home Assistant sensors, the REST/companion API, JSON fields, ISO stamps,
+  logs, saved settings and time inputs keep the 24-hour form.
 
 ## [0.496.1], 2026-10-31
 
