@@ -717,7 +717,10 @@ start. Then build the layout (add an empty code element + append_code, or
 set_canvas).""",
     "delete_canvas_page": """\
 Delete a canvas dashboard by id (e.g. a throwaway QA page). Returns
-{ok: true} on success, or 404 if it isn't a canvas page.""",
+{ok: true} on success, or 404 if it isn't a canvas page. If a lineup uses the
+page it is NOT deleted: you get HTTP 409 {error: "page_in_lineups", lineups:
+[...names]}. Repeat with remove_from_lineups=true to delete it and take it out
+of those lineups (a lineup left with no other dashboard is deleted too).""",
     "get_canvas": """\
 Get the full canvas document (size, appearance, and every element) for a
 page, plus "rev" / "updated_at" / "updated_by". Keep the "rev" and pass it as

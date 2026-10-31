@@ -2419,3 +2419,258 @@ def test_cell_widget_picker_replaces_the_select(app: Flask, tmp_path: Path) -> N
     picker = json.loads(blob)
     assert {c["id"] for c in picker["categories"]} >= {"utility", "time"}
     assert {w["id"] for w in picker["widgets"]} == {"widget_a", "widget_b", "widget_c"}
+
+
+# -- delete asks first when a lineup uses the dashboard ----------
+
+
+def _deck(app: Flask, deck_id: str):
+    return app.config["DECK_STORE"].get(deck_id)
+
+
+def _linked_lineup(app: Flask, a: str, b: str, c: str) -> None:
+    """A lineup over a, b, c: a links to b, b links to a and c, home is b,
+    and a is the advance fallback."""
+    from app.state.deck_model import Deck, DeckLink, DeckPage
+
+    app.config["DECK_STORE"].upsert(
+        Deck(
+            id="hall",
+            name="Hall",
+            pages=[
+                DeckPage(page_id=a, links=[DeckLink(target_page_id=b, button="right")]),
+                DeckPage(
+                    page_id=b,
+                    links=[
+                        DeckLink(target_page_id=a, button="left"),
+                        DeckLink(target_page_id=c, button="right"),
+                    ],
+                ),
+                DeckPage(page_id=c),
+            ],
+            home_page_id=b,
+            entry_page_id=b,
+            advance_fallback_page_id=b,
+        )
+    )
+
+
+def test_delete_warns_without_consent_and_deletes_nothing(app: Flask, tmp_path: Path) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    pid = _new(client, name="In rotation")
+    _add_lineup(app, "rot", "Rotation", [pid])
+    resp = client.post(f"/pages/{pid}/delete")
+    html = resp.get_data(as_text=True)
+    assert resp.status_code == 200
+    assert _store(tmp_path).get(pid) is not None and _deck(app, "rot") is not None
+    # The no-JavaScript second step names the lineup and posts the consent.
+    assert "In rotation" in html and "Rotation" in html
+    assert 'name="remove_from_lineups" value="1"' in html
+    assert f'name="page_ids" value="{pid}"' in html
+
+
+def test_confirm_page_form_deletes_and_removes_from_the_lineup(app: Flask, tmp_path: Path) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    keep = _new(client, name="Keep")
+    pid = _new(client, name="Doomed")
+    _add_lineup(app, "rot", "Rotation", [keep, pid])
+    resp = client.post(
+        "/pages/bulk/delete",
+        data={"page_ids": [pid], "remove_from_lineups": "1"},
+        follow_redirects=True,
+    )
+    assert _store(tmp_path).get(pid) is None
+    assert _deck(app, "rot").page_ids == [keep]
+    assert "Removed from the lineup &#39;Rotation&#39;" in resp.get_data(as_text=True)
+
+
+def test_single_delete_with_consent_cleans_links_home_and_fallback(
+    app: Flask, tmp_path: Path
+) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    a, b, c = (_new(client, name=n) for n in ("A", "B", "C"))
+    _linked_lineup(app, a, b, c)
+    client.post(f"/pages/{b}/delete", data={"remove_from_lineups": "1"})
+    assert _store(tmp_path).get(b) is None
+    deck = _deck(app, "hall")
+    assert deck.page_ids == [a, c]
+    assert all(link.target_page_id != b for p in deck.pages for link in p.links)
+    # Home, entry and fallback pointed at b; they fall back to the first page.
+    assert deck.home_page_id is None and deck.entry_page_id is None
+    assert deck.advance_fallback_page_id is None
+    assert deck.resolved_home_page_id == a
+
+
+def test_delete_that_empties_a_lineup_deletes_the_lineup_and_says_so(
+    app: Flask, tmp_path: Path
+) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    only = _new(client, name="Only")
+    _add_lineup(app, "solo", "Solo", [only])
+    resp = client.post(
+        f"/pages/{only}/delete", data={"remove_from_lineups": "1"}, follow_redirects=True
+    )
+    assert _store(tmp_path).get(only) is None
+    assert _deck(app, "solo") is None
+    assert "Solo" in resp.get_data(as_text=True) and "deleted too" in resp.get_data(as_text=True)
+
+
+def test_delete_forgets_a_display_parked_on_the_page(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    a, b = _new(client, name="A"), _new(client, name="B")
+    _add_lineup(app, "rot", "Rotation", [a, b])
+    nav = app.config["DECK_NAV_STORE"]
+    nav.set("kobo", "rot", b)
+    nav.set("other", "rot", a)
+    client.post(f"/pages/{b}/delete", data={"remove_from_lineups": "1"})
+    assert nav.get("kobo") is None and nav.current_page("other", "rot") == a
+
+
+def test_bulk_delete_with_a_lineup_member_warns_for_the_whole_selection(
+    app: Flask, tmp_path: Path
+) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    free = _new(client, name="Free A")
+    used = _new(client, name="Used B")
+    _add_lineup(app, "hall", "Hall lineup", [used])
+    resp = client.post("/pages/bulk/delete", data={"page_ids": [free, used]})
+    html = resp.get_data(as_text=True)
+    assert resp.status_code == 200
+    store = _store(tmp_path)
+    assert store.get(free) is not None and store.get(used) is not None
+    assert "Hall lineup" in html and "is in no lineup" in html
+
+
+def test_bulk_delete_with_consent_deletes_free_and_used_pages(app: Flask, tmp_path: Path) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    free = _new(client, name="Free A")
+    used = _new(client, name="Used B")
+    other = _new(client, name="Other")
+    _add_lineup(app, "hall", "Hall lineup", [used, other])
+    resp = client.post(
+        "/pages/bulk/delete",
+        data={"page_ids": [free, used], "remove_from_lineups": "1"},
+        follow_redirects=True,
+    )
+    store = _store(tmp_path)
+    assert store.get(free) is None and store.get(used) is None and store.get(other) is not None
+    assert _deck(app, "hall").page_ids == [other]
+    assert "Deleted 2 dashboards." in resp.get_data(as_text=True)
+
+
+def test_bulk_delete_of_free_pages_needs_no_consent(app: Flask, tmp_path: Path) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    a, b = _new(client, name="Free A"), _new(client, name="Free B")
+    client.post("/pages/bulk/delete", data={"page_ids": [a, b]})
+    assert _store(tmp_path).get(a) is None and _store(tmp_path).get(b) is None
+
+
+def test_delete_cleans_dangling_references_when_the_page_is_already_gone(
+    app: Flask, tmp_path: Path
+) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    keep = _new(client, name="Keep")
+    gone = _new(client, name="Gone")
+    _add_lineup(app, "rot", "Rotation", [keep, gone])
+    _store(tmp_path).delete(gone)  # dangling in the lineup now
+    resp = client.post(f"/pages/{gone}/delete", data={"remove_from_lineups": "1"})
+    assert resp.status_code == 302
+    assert _deck(app, "rot").page_ids == [keep]
+    # Twice is harmless.
+    assert (
+        client.post(f"/pages/{gone}/delete", data={"remove_from_lineups": "1"}).status_code == 302
+    )
+
+
+def test_delete_button_asks_for_confirmation_naming_the_lineups(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    used = _new(client, name="Used B")
+    free = _new(client, name="Free A")
+    _add_lineup(app, "hall", "Hall lineup", [used])
+    html = client.get("/pages").get_data(as_text=True)
+    assert "Used B is in the lineup Hall lineup. Delete it and remove it from it?" in html
+    assert 'data-lineups="Hall lineup"' in html and 'data-page-name="Used B"' in html
+    assert f"/pages/{free}/delete" in html and "Delete this dashboard?" in html
+
+
+def test_canvas_delete_needs_consent_then_removes_from_lineups(app: Flask) -> None:
+    from app.state.page_store import Page
+
+    client = app.test_client()
+    _sign_in(client)
+    app.config["PAGE_STORE"].save(Page(id="used", name="Used", layout_kind="canvas"))
+    app.config["PAGE_STORE"].save(Page(id="keep", name="Keep", layout_kind="canvas"))
+    _add_lineup(app, "rot", "Rotation", ["used", "keep"])
+    resp = client.post("/pages/canvas/c/used/delete")
+    body = resp.get_json()
+    assert resp.status_code == 409 and body["deleted"] is False
+    assert body["error"] == "page_in_lineups" and body["lineups"] == ["Rotation"]
+    assert body["would_delete_lineups"] == []
+    assert app.config["PAGE_STORE"].get("used") is not None
+    ok = client.post("/pages/canvas/c/used/delete?remove_from_lineups=true").get_json()
+    assert ok["deleted"] is True and ok["removed_from_lineups"] == ["Rotation"]
+    assert app.config["PAGE_STORE"].get("used") is None
+    assert _deck(app, "rot").page_ids == ["keep"]
+
+
+def test_delete_button_warns_about_a_lineup_it_would_delete(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    only = _new(client, name="Only one")
+    shared = _new(client, name="Shared")
+    other = _new(client, name="Other")
+    _add_lineup(app, "solo", "Solo", [only])
+    _add_lineup(app, "pair", "Pair", [shared, other])
+    html = client.get("/pages").get_data(as_text=True)
+    assert (
+        "Only one is in the lineup Solo. Delete it and remove it from it? "
+        "Lineup Solo has no other dashboard and will be deleted too."
+    ) in html
+    # Pair keeps Other, so deleting Shared deletes no lineup.
+    shared_msg = html.split("Shared is in the lineup Pair.", 1)[1].split('"', 1)[0]
+    assert "will be deleted too" not in shared_msg
+    # The bulk confirm reads each lineup's members to see what a selection empties.
+    blob = html.split('id="dx-lineup-members">', 1)[1].split("</script>", 1)[0]
+    assert {"name": "Pair", "pages": [shared, other]} in json.loads(blob)
+
+
+def test_confirm_page_names_lineups_a_single_delete_would_take_down(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    only = _new(client, name="Only one")
+    _add_lineup(app, "solo", "Solo", [only])
+    html = client.post(f"/pages/{only}/delete").get_data(as_text=True)
+    assert "Lineup &#39;Solo&#39; has no other dashboard and will be deleted too." in html
+
+
+def test_confirm_page_bulk_counts_a_lineup_emptied_by_the_whole_selection(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    a, b, c = (_new(client, name=n) for n in ("A", "B", "C"))
+    _add_lineup(app, "both", "Both", [a, b])
+    _add_lineup(app, "keeps", "Keeps", [b, c])
+    html = client.post("/pages/bulk/delete", data={"page_ids": [a, b]}).get_data(as_text=True)
+    # Both loses A and B (empty); Keeps still has C.
+    assert "Lineup &#39;Both&#39; has no other dashboard and will be deleted too." in html
+    assert "Keeps&#39; has" not in html
+
+
+def test_confirm_page_has_no_emptied_line_when_every_lineup_keeps_a_dashboard(
+    app: Flask,
+) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    a, b = _new(client, name="A"), _new(client, name="B")
+    _add_lineup(app, "pair", "Pair", [a, b])
+    html = client.post(f"/pages/{a}/delete").get_data(as_text=True)
+    assert "will be deleted too" not in html and "data-delete-emptied" not in html

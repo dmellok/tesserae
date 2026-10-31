@@ -50,6 +50,7 @@ from werkzeug.wrappers import Response
 
 from app.composer import _hydrate_page
 from app.layouts import LAYOUTS, LAYOUTS_BY_SLUG, detect_layout, to_panel_pixels
+from app.lineup_cascade import CascadeResult, emptied_by, remove_page_from_lineups
 from app.location_time import is_iana_zone
 from app.panel import (
     DESIGN_SIZES,
@@ -843,8 +844,9 @@ def _lineups_by_page() -> dict[str, list[str]]:
     """Lineup names keyed by every page id they reference: members and the
     advance fallback. Timer lineups (the migrated schedules and rotations)
     count too, since they push their pages just the same. An archived
-    dashboard would be a member a lineup can no longer offer, so the
-    Archive action is refused for anything listed here."""
+    dashboard would be a member a lineup can no longer offer, so Archive is
+    refused for anything listed here; Delete warns first and, once approved,
+    takes the page out of these lineups."""
     deck_store = current_app.config.get("DECK_STORE")
     if deck_store is None:
         return {}
@@ -1013,6 +1015,7 @@ def index() -> str:
         p.id: page_preview_token(p, preview_dims(p, devices, settings)) for p in pages
     }
 
+    lineup_members = _lineup_members() if tab == "active" else []
     return render_template(
         "pages_list.html",
         pages=pages,
@@ -1020,6 +1023,11 @@ def index() -> str:
         active_count=active_count,
         archived_count=archived_count,
         page_lineups=_lineups_by_page() if tab == "active" else {},
+        lineup_members=lineup_members,
+        page_emptied={
+            pid: [m["name"] for m in lineup_members if m["pages"] and set(m["pages"]) == {pid}]
+            for pid in {p for m in lineup_members for p in m["pages"]}
+        },
         page_dims=page_dims,
         page_devices=page_devices,
         page_groups=page_groups,
@@ -1223,31 +1231,160 @@ def update(page_id: str) -> Response:
     return _flash_save(True, "Page saved.")
 
 
-@bp.post("/<page_id>/delete")
-def delete(page_id: str) -> Response:
+_TRUE_VALUES: Final = frozenset({"1", "true", "yes", "on"})
+
+
+def remove_consent() -> bool:
+    """Whether the caller approved taking the dashboard out of the lineups that
+    use it: ``remove_from_lineups`` as a form field, a query argument or a JSON
+    body key."""
+    body = request.get_json(silent=True)
+    raw = (
+        request.form.get("remove_from_lineups")
+        or request.args.get("remove_from_lineups")
+        or (body.get("remove_from_lineups") if isinstance(body, dict) else None)
+    )
+    return str(raw).strip().lower() in _TRUE_VALUES
+
+
+def lineups_using(page_id: str) -> list[str]:
+    """Names of the lineups that reference the dashboard (steps and fallback)."""
+    return _lineups_by_page().get(page_id, [])
+
+
+def would_delete_lineups(page_ids: list[str]) -> list[str]:
+    """Names of the lineups that deleting ``page_ids`` would leave with no
+    dashboard, and so delete too."""
+    return emptied_by(current_app.config.get("DECK_STORE"), page_ids)
+
+
+def _lineup_members() -> list[dict[str, Any]]:
+    """Each lineup's name and dashboard ids, for the list page's delete
+    confirms (a lineup is taken down when every one of its dashboards is)."""
+    deck_store = current_app.config.get("DECK_STORE")
+    if deck_store is None:
+        return []
+    try:
+        return [{"name": d.name, "pages": d.page_ids} for d in deck_store.all()]
+    except Exception:
+        current_app.logger.exception("deck store: listing lineups for the delete confirm failed")
+        return []
+
+
+def lineup_refusal(names: list[str], would_delete: list[str]) -> dict[str, Any]:
+    """The JSON body for a delete refused until the caller consents, shared by
+    the MCP and canvas routes."""
+    return {
+        "error": "page_in_lineups",
+        "lineups": names,
+        "would_delete_lineups": would_delete,
+        "fix": "repeat with remove_from_lineups=true to delete it and remove it from them",
+    }
+
+
+def remove_page(page_id: str) -> tuple[bool, CascadeResult]:
+    """Delete the dashboard after taking it out of every lineup that uses it,
+    so nothing is left pointing at it. Callers have already got the user's
+    consent. Running it again on a page that is gone just tidies leftovers."""
+    result = remove_page_from_lineups(
+        current_app.config.get("DECK_STORE"), current_app.config.get("DECK_NAV_STORE"), page_id
+    )
     current_app.config.get("PREVIEW_CACHE", {}).pop(page_id, None)
-    if _store().delete(page_id):
-        flash("Page deleted.", "ok")
+    return _store().delete(page_id), result
+
+
+def cascade_note(result: CascadeResult) -> str:
+    """The sentence(s) appended to a delete flash for what happened to lineups."""
+
+    def listed(names: list[str]) -> str:
+        return ", ".join(f"'{n}'" for n in names)
+
+    parts: list[str] = []
+    if result.edited:
+        plural = len(result.edited) != 1
+        parts.append(f"Removed from the lineup{'s' if plural else ''} {listed(result.edited)}.")
+    if result.removed:
+        plural = len(result.removed) != 1
+        parts.append(
+            f"Lineup{'s' if plural else ''} {listed(result.removed)} had no other dashboard, "
+            f"so {'they were' if plural else 'it was'} deleted too."
+        )
+    return " ".join(parts)
+
+
+def emptied_note(would_delete: list[str]) -> str:
+    """The warning for lineups the delete would take down with it."""
+    if not would_delete:
+        return ""
+    names = ", ".join(f"'{n}'" for n in would_delete)
+    if len(would_delete) == 1:
+        return f"Lineup {names} has no other dashboard and will be deleted too."
+    return f"Lineups {names} have no other dashboard and will be deleted too."
+
+
+def _confirm_delete(page_ids: list[str]) -> Response | str:
+    """The no-JavaScript second step: nothing is deleted yet; the page names the
+    lineups and a form posts the same ids back with ``remove_from_lineups=1``."""
+    lineups = _lineups_by_page()
+    rows = []
+    for pid in page_ids:
+        page = _store().get(pid)
+        rows.append(
+            {
+                "id": pid,
+                "name": page.name if page is not None else pid,
+                "lineups": lineups.get(pid, []),
+            }
+        )
+    return render_template(
+        "pages_delete_confirm.html",
+        rows=rows,
+        emptied=emptied_note(would_delete_lineups(page_ids)),
+    )
+
+
+@bp.post("/<page_id>/delete")
+def delete(page_id: str) -> Response | str:
+    """Delete one dashboard. One a lineup uses is not deleted until the caller
+    consents (``remove_from_lineups=1``, which the list's confirm dialog sends
+    and the no-JavaScript confirm page posts); then it also leaves the lineups."""
+    if lineups_using(page_id) and not remove_consent():
+        return _confirm_delete([page_id])
+    deleted, result = remove_page(page_id)
+    if deleted:
+        flash(" ".join(filter(None, ["Page deleted.", cascade_note(result)])), "ok")
     else:
         flash(f"No page with id {page_id!r}.", "error")
     return redirect(url_for("pages.index"))
 
 
 @bp.post("/bulk/delete")
-def bulk_delete() -> Response:
+def bulk_delete() -> Response | str:
     """Delete several dashboards at once (multi-select on the Dashboards page).
-    Body: repeated ``page_ids`` form fields. Deletes each and flashes a count."""
+    Body: repeated ``page_ids`` form fields. If any is in a lineup nothing is
+    deleted until the caller consents with ``remove_from_lineups=1``; then all
+    go, and the ones in lineups leave them too."""
     ids = [i.strip() for i in request.form.getlist("page_ids") if i.strip()]
-    cache = current_app.config.get("PREVIEW_CACHE", {})
+    lineups = _lineups_by_page()
+    if any(pid in lineups for pid in ids) and not remove_consent():
+        return _confirm_delete(ids)
     deleted = 0
+    edited: list[str] = []
+    removed: list[str] = []
     for pid in ids:
-        cache.pop(pid, None)
-        if _store().delete(pid):
-            deleted += 1
+        ok, result = remove_page(pid)
+        deleted += ok
+        edited += [n for n in result.edited if n not in edited]
+        removed += [n for n in result.removed if n not in removed]
+    parts: list[str] = []
     if deleted:
-        flash(f"Deleted {deleted} dashboard{'s' if deleted != 1 else ''}.", "ok")
+        parts.append(f"Deleted {deleted} dashboard{'s' if deleted != 1 else ''}.")
+        note = cascade_note(CascadeResult(edited=edited, removed=removed))
+        if note:
+            parts.append(note)
     else:
-        flash("No dashboards deleted.", "error")
+        parts.append("No dashboards deleted.")
+    flash(" ".join(parts), "ok" if deleted else "error")
     return redirect(url_for("pages.index"))
 
 

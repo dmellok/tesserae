@@ -84,6 +84,18 @@ class DeckNavStore:
             }
             self._save_raw(raw)
 
+    def forget_page(self, page_id: str) -> int:
+        """Drop every device record parked on ``page_id`` (the page was
+        deleted), so those devices restart at their lineup's entry page.
+        Returns how many records went."""
+        with self._lock:
+            raw = self._load_raw()
+            kept = {k: v for k, v in raw.items() if v.get("page_id") != page_id}
+            if len(kept) == len(raw):
+                return 0
+            self._save_raw(kept)
+            return len(raw) - len(kept)
+
     def clear(self, device_id: str) -> bool:
         with self._lock:
             raw = self._load_raw()

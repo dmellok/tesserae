@@ -476,8 +476,30 @@ def duplicate(canvas_id: str) -> Response:
 def delete(canvas_id: str) -> Response:
     """Delete a canvas dashboard (only canvas pages via this route)."""
     _guard()
-    deleted = _get_canvas(canvas_id) is not None and _pages().delete(canvas_id)
-    return jsonify({"status": "ok", "deleted": bool(deleted)})
+    from app import page_routes
+
+    if _get_canvas(canvas_id) is None:
+        return jsonify({"status": "ok", "deleted": False})
+    names = page_routes.lineups_using(canvas_id)
+    if names and not page_routes.remove_consent():
+        refused = jsonify(
+            {
+                "status": "error",
+                "deleted": False,
+                **page_routes.lineup_refusal(names, page_routes.would_delete_lineups([canvas_id])),
+            }
+        )
+        refused.status_code = 409
+        return refused
+    deleted, cascade = page_routes.remove_page(canvas_id)
+    return jsonify(
+        {
+            "status": "ok",
+            "deleted": bool(deleted),
+            "removed_from_lineups": cascade.edited,
+            "deleted_lineups": cascade.removed,
+        }
+    )
 
 
 # -- per-dashboard image assets (the editor's Assets drawer) --------------
