@@ -3609,10 +3609,33 @@
 
   function deleteCanvas(c) {
     if (!window.confirm('Delete "' + c.name + '"? This cannot be undone.')) return;
-    fetch(compUrl(c.id, "delete"), { method: "POST" }).then(function () {
+    function done() {
       if (c.id === S.cfg.canvasId) { location.href = S.cfg.compBase + "/"; return; }
       var m = document.querySelector(".canvas-menu");
       if (m) loadCanvasList(m.querySelector(".cm-list"));
+    }
+    function post(consent) {
+      var url = compUrl(c.id, "delete") + (consent ? "?remove_from_lineups=1" : "");
+      return fetch(url, { method: "POST", headers: { Accept: "application/json" } });
+    }
+    post(false).then(function (r) {
+      if (r.status !== 409) { done(); return; }
+      // In a lineup: the server refuses until it is told to take it out too.
+      return r.json().catch(function () { return {}; }).then(function (body) {
+        var names = (body && body.lineups) || [];
+        var gone = (body && body.would_delete_lineups) || [];
+        var msg = '"' + c.name + '" is in the lineup' + (names.length === 1 ? " " : "s ") +
+          names.join(", ") + ". Delete it and remove it from " + (names.length === 1 ? "it" : "them") + "?";
+        if (gone.length) {
+          msg += " " + (gone.length === 1 ? "Lineup " : "Lineups ") + gone.join(", ") +
+            (gone.length === 1 ? " has" : " have") + " no other dashboard and will be deleted too.";
+        }
+        if (!window.confirm(msg)) return;
+        return post(true).then(function (r2) {
+          if (r2.ok || r2.redirected) done();
+          else window.alert("Could not delete \"" + c.name + "\".");
+        });
+      });
     });
   }
 

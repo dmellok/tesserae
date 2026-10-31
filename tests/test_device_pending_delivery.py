@@ -124,6 +124,8 @@ def test_nothing_pushed_is_not_queued(app: Flask, client) -> None:
 
 def test_live_device_is_delivering_now(app: Flask, client, monkeypatch: pytest.MonkeyPatch) -> None:
     _push(app, _render("A", "compA"))
+    _fetch(app)
+    _push(app, _render("B", "compB"))
     monkeypatch.setattr(
         next_update,
         "reach_for_device",
@@ -141,6 +143,8 @@ def test_sleeping_device_uses_the_next_checkin(
     app: Flask, client, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _push(app, _render("A", "compA"))
+    _fetch(app)
+    _push(app, _render("B", "compB"))
     checkin = time.time() + 3000
     monkeypatch.setattr(
         next_update,

@@ -10,14 +10,12 @@ deleted and reported.
 
 Tolerant of already-dangling data and safe to run twice: nothing to remove
 means nothing written.
-
-mypy --strict applies via re-export through app.state.
 """
 
 from __future__ import annotations
 
 import logging
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -94,11 +92,17 @@ def deck_without_page(deck: Deck, page_id: str) -> Deck | None:
 
 
 def remove_page_from_lineups(
-    deck_store: Any | None, nav_store: Any | None, page_id: str
+    deck_store: Any | None,
+    nav_store: Any | None,
+    page_id: str,
+    *,
+    on_change: Callable[[Any], None] | None = None,
 ) -> CascadeResult:
     """Rewrite every lineup that references ``page_id`` so nothing dangles.
     ``nav_store`` (optional) forgets displays parked on the page, so they
-    restart at their lineup's entry page."""
+    restart at their lineup's entry page. ``on_change`` (optional) is called
+    with each lineup as it was before being rewritten or deleted, so the
+    caller can drop its warmed frames."""
     edited: list[str] = []
     removed: list[str] = []
     if deck_store is not None:
@@ -115,6 +119,11 @@ def remove_page_from_lineups(
             except Exception:
                 logger.exception("lineup cascade: could not rewrite lineup %s", deck.id)
                 continue
+            if on_change is not None:
+                try:
+                    on_change(deck)
+                except Exception:
+                    logger.exception("lineup cascade: invalidating lineup %s failed", deck.id)
             if rewritten is None:
                 deck_store.delete(deck.id)
                 removed.append(deck.name)

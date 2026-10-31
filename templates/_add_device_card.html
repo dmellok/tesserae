@@ -320,7 +320,7 @@
         <i class="ph ph-warning" aria-hidden="true"></i>
         <p>
           {{ visionect_listener.error }}
-          Choose a free Server port below, or correct the environment / add-on option.
+          Choose a free Server port below, or correct the environment variable or Home Assistant App option.
           Tesserae retries bind failures every half minute.
         </p>
       </div>
@@ -329,7 +329,7 @@
         {{ number_input('visionect-server-port', 'port', 'Server port', value=visionect_listener.port if visionect_listener and visionect_listener.port else '', min=1024, max=65535,
                         help='One listener for all Visionect frames. Default 11113. Saving reconnects signs immediately; update each sign and container port mapping to match.') }}
         {% if visionect_listener and visionect_listener.env_override %}
-        <p class="muted">Controlled by <code>TESSERAE_VISIONECT_PORT</code> or the add-on option; change it there and restart Tesserae.</p>
+        <p class="muted">Controlled by <code>TESSERAE_VISIONECT_PORT</code> or the Home Assistant App option; change it there and restart Tesserae.</p>
         {% else %}
         <div class="dx-actions-right"><button type="submit" class="dx-btn-secondary">Save Server port</button></div>
         {% endif %}

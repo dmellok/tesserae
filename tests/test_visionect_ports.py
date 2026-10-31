@@ -100,7 +100,6 @@ def test_quickstart_documents_configurator_and_mapping() -> None:
     for text in (
         "Server IP / Domain",
         "Server port",
-        "Network",
         "rebind",
         "1024",
         "visionect_port",
@@ -136,6 +135,29 @@ def test_optional_addon_option(tmp_path: Path, option: Any, override: str, expec
         check=True,
     )
     assert result.stdout == expected
+
+
+@pytest.mark.parametrize("content", ["{not json", "[12000]"])
+def test_malformed_addon_options_do_not_stop_the_entrypoint(tmp_path: Path, content: str) -> None:
+    import os
+    import subprocess
+    import sys
+
+    options = tmp_path / "options.json"
+    options.write_text(content)
+    entrypoint = (Path(__file__).parents[1] / "docker-entrypoint.sh").read_text()
+    block = entrypoint.split("set -e", 1)[1].split("# Fail with a message", 1)[0]
+    block = "set -e\n" + block.replace("/data/options.json", str(options))
+    env = {k: v for k, v in os.environ.items() if k != "TESSERAE_VISIONECT_PORT"}
+    env["PATH"] = f"{Path(sys.executable).parent}:{os.environ['PATH']}"
+    result = subprocess.run(
+        ["sh", "-c", block + '\nprintf "ok:%s" "${TESSERAE_VISIONECT_PORT:-}"'],
+        env=env,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    assert result.stdout == "ok:"
 
 
 @pytest.mark.parametrize("width", [390, 1440])

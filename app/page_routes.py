@@ -726,6 +726,9 @@ def _editor_context(page: Page) -> dict[str, Any]:
 
     return {
         "page": page,
+        # The delete button names the lineups it would leave, in one confirm.
+        "page_lineups": lineups_using(page.id),
+        "page_emptied_lineups": would_delete_lineups([page.id]),
         "panel": panel,
         "plugins": widgets,
         "widget_picker": {
@@ -1325,8 +1328,13 @@ def remove_page(page_id: str) -> tuple[bool, CascadeResult]:
     """Delete the dashboard after taking it out of every lineup that uses it,
     so nothing is left pointing at it. Callers have already got the user's
     consent. Running it again on a page that is gone just tidies leftovers."""
+    from app.deck_routes import _invalidate
+
     result = remove_page_from_lineups(
-        current_app.config.get("DECK_STORE"), current_app.config.get("DECK_NAV_STORE"), page_id
+        current_app.config.get("DECK_STORE"),
+        current_app.config.get("DECK_NAV_STORE"),
+        page_id,
+        on_change=_invalidate,
     )
     current_app.config.get("PREVIEW_CACHE", {}).pop(page_id, None)
     return _store().delete(page_id), result

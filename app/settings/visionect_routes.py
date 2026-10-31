@@ -253,7 +253,7 @@ def visionect_port_save() -> Response:
     redirect_to = redirect(url_for("auth.settings_area", area="devices"))
     if os.environ.get("TESSERAE_VISIONECT_PORT"):
         flash(
-            "Server port is controlled by TESSERAE_VISIONECT_PORT (or the add-on option). Change it there and restart Tesserae.",
+            "Server port is controlled by TESSERAE_VISIONECT_PORT (or the Home Assistant App option). Change it there and restart Tesserae.",
             "error",
         )
         return redirect_to

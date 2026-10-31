@@ -70,3 +70,13 @@ def test_emptied_by_names_lineups_whose_pages_are_all_selected(tmp_path: Path) -
     assert emptied_by(decks, ["a"]) == ["Solo"]
     assert emptied_by(decks, ["a", "b"]) == ["Solo", "Pair"]
     assert emptied_by(decks, ["z"]) == [] and emptied_by(None, ["a"]) == []
+
+
+def test_cascade_reports_each_changed_lineup_for_invalidation(tmp_path: Path) -> None:
+    decks = DeckStore(tmp_path / "decks.json")
+    decks.upsert(_linked())
+    decks.upsert(Deck(id="solo", name="Solo", pages=[DeckPage(page_id="b")]))
+    decks.upsert(Deck(id="free", name="Free", pages=[DeckPage(page_id="x")]))
+    seen: list[str] = []
+    remove_page_from_lineups(decks, None, "b", on_change=lambda deck: seen.append(deck.id))
+    assert sorted(seen) == ["d", "solo"]

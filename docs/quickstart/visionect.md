@@ -53,42 +53,11 @@ The sign must reach the configured port:
   12000, use `"12000:12000"`; the default is `"11113:11113"`. Changing the
   app setting does not change Docker's mappings; recreate the container with
   the matching mapping. `Dockerfile EXPOSE` is documentation, not publication.
-- **Home Assistant add-on:** use the UI setting even on existing installations
-  whose manifest has no `visionect_port` option. If that optional option is
-  available, it overrides the UI through the container entrypoint; restart the
-  add-on after changing it. In the add-on **Network** tab, the host port must
-  match what the sign dials. Supervisor declares container ports statically:
-  `ports: {"11113/tcp": 11113}` forwards to container port 11113 even when you
-  change its host port. For host port 12000 mapped to container 11113, leave
-  Tesserae's listener on 11113 and enter 12000 in the sign's **Server port**.
-  To change the listener *inside* the container to 12000, the add-on must use
-  host networking or declare `"12000/tcp": 12000` in its manifest, and its
-  Network tab mapping must match. An option cannot dynamically rewrite that
-  manifest. This checkout does not contain the separately maintained add-on
-  `config.yaml` or translations; deployments that edit only `version:` must
-  preserve those port declarations. Do not assume a new option publishes a
-  new container port.
+- **Home Assistant App:** not wired up yet. The App doesn't publish 11113/tcp
+  today, so a sign can't reach Tesserae through it, whatever the Server port
+  is set to. Run Tesserae elsewhere (Docker or a plain install) for now.
 - **Bind address:** `TESSERAE_BIND_HOST` selects the same address as the web
   server (all interfaces by default). Point the sign at a reachable address.
-
-For maintainers of the separate HA add-on, the optional manifest fields are:
-
-```yaml
-ports:
-  11113/tcp: 11113
-ports_description:
-  11113/tcp: Visionect frames (LAN only)
-# Merge into existing options/schema; do not replace other fields.
-# Omit the option to retain settings-store control on existing installs.
-schema:
-  visionect_port: int(1024,65535)?
-```
-
-An optional `options.visionect_port` value is read from `/data/options.json`.
-Its English translation under `configuration.visionect_port` should use
-`name: Visionect Server port` and describe the listener port, restart requirement,
-and static Network mapping above. Avoid adding a default option of 11113 to an
-existing installation that uses UI settings: an option overrides the saved port.
 
 ## 02 — Add the sign in Tesserae
 

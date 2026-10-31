@@ -6,11 +6,6 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
-### Fixed
-
-- Picture Gallery: replacing an image with a new file of the same name now
-  shows the new thumbnail. Thumbnail URLs carry a `?v=<mtime>-<size>` version;
-  a link without it is revalidated rather than cached for a year.
 ### Added
 
 - The Dashboards list has a By display | All switch in its toolbar. All shows
@@ -18,8 +13,6 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   Unbound), instead of repeating it under each display; search, the Active and
   Archived tabs and bulk actions work as before. By display stays the default.
   `?view=all` links straight to it, and the choice is remembered.
-### Added
-
 - Widgets and data plugins, bundled ones included, can be disabled from the
   Widgets page, and enabled again, without a restart. A disabled plugin leaves
   the Admin pages menu and the add-a-widget pickers, its admin page and routes
@@ -27,22 +20,9 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   Enable button. Dashboards that use it keep their settings and show a
   "Widget X is disabled" placeholder. Disabling something in use asks first and
   names the dashboards. Fonts, themes, renderers and devices cannot be
-  disabled. Bundled plugins now carry a Bundled tag, since they can be
+  disabled, nor can Home Assistant, Weather and Calendar, which the app itself
+  relies on. Bundled plugins now carry a Bundled tag, since they can be
   disabled but not removed.
-- Settings > Devices and the device page no longer show a stale or mislabelled
-  preview for a pull (REST) frame after a push. The page used to keep the old
-  thumbnail until reloaded, and after a reload showed the newest image under
-  "Showing" with the old image's fetch time. The thumbnail is now what the
-  frame last fetched, the image waiting for its next check-in sits under it
-  tagged "Queued", and a line says when it was queued and when the frame picks
-  it up ("Delivering now" for a connected frame). Thumbnail URLs carry the
-  render digest, and the open page follows pushes and fetches on its own.
-- The Mirror page (`/mirror/<device>`) loads its image behind a URL prefix
-  such as Home Assistant's sidebar panel. The image URL was root-absolute, so
-  under ingress it never loaded and the page stayed black; it now carries the
-  prefix. The device name on the page is HTML-escaped too.
-### Added
-
 - Every clock time in the app follows the language and region setting
   (Settings › Server › App › Locale, the host's when unset) through one
   formatter: `3:48 PM` in a 12-hour locale, `15:48` in a 24-hour one. That
@@ -52,7 +32,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   battery chart axis and tooltip, the timed-lineup wizard, Visionect and relay
   notes, the generative-AI reset time and the Bluetooth/Wi-Fi reading stamps.
   Home Assistant sensors, the REST/companion API, JSON fields, ISO stamps,
-  logs, saved settings and time inputs keep the 24-hour form.
+  logs, saved settings and time inputs keep the 24-hour form. With no locale
+  set and none from the host (the usual container), times stay 24-hour.
+- Visionect setup has an app-wide Server port setting (1024–65535), with
+  environment and optional Home Assistant App option overrides, immediate listener
+  rebinding, and instructions that show the configured port. Default: 11113.
+  A port below 1024 or an unreadable `TESSERAE_VISIONECT_PORT` now turns the
+  listener off with an error on the setup card, where it used to fall back to
+  11113 silently. The Home Assistant App does not publish the port yet.
+
 ### Changed
 
 - Display-accurate previews: thumbnails show what the display can actually
@@ -65,6 +53,26 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   lineup editor. Dashboards with no display, or shared across displays that
   differ, stay in color. Previews only; what is sent to the panel is
   unchanged. See `docs/thumbnail-color.md`.
+
+### Fixed
+
+- Settings > Devices and the device page no longer show a stale or mislabelled
+  preview for a pull (REST) frame after a push. The page used to keep the old
+  thumbnail until reloaded, and after a reload showed the newest image under
+  "Showing" with the old image's fetch time. The thumbnail is now what the
+  frame last fetched, the image waiting for its next check-in sits under it
+  tagged "Queued", and a line says when it was queued and when the frame picks
+  it up ("Delivering now" for a connected frame). Thumbnail URLs carry the
+  render digest, and the open page follows pushes and fetches on its own.
+  Frames that fetch through another route (CrossPoint readers on
+  `/frame.bmp`, deck and album clients) show the latest render as before.
+- The Mirror page (`/mirror/<device>`) loads its image behind a URL prefix
+  such as Home Assistant's sidebar panel. The image URL was root-absolute, so
+  under ingress it never loaded and the page stayed black; it now carries the
+  prefix. The device name on the page is HTML-escaped too.
+- Picture Gallery: replacing an image with a new file of the same name now
+  shows the new thumbnail. Thumbnail URLs carry a `?v=<mtime>-<size>` version;
+  a link without it is revalidated rather than cached for a year.
 - Deleting a dashboard that a lineup uses now asks first, naming the lineups
   ("X is in the lineups A, B. Delete it and remove it from them?"), and once
   approved it also takes the dashboard out of them: its step, any link to it,
@@ -75,8 +83,10 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   the whole selection; without JavaScript a confirm page does the same). The
   canvas editor's delete route and the MCP `DELETE /pages/<id>` answer 409
   `page_in_lineups` with the lineup names (and `would_delete_lineups`) until repeated with
-  `remove_from_lineups=true`. Before, the lineup kept a step pointing at a
-  dashboard that no longer existed.
+  `remove_from_lineups=true`; the canvas editor's own Delete asks the same
+  question. MCP bridge 0.19.0 adds `remove_from_lineups` to
+  `delete_canvas_page`. Before, the lineup kept a step pointing at a dashboard
+  that no longer existed.
 - The image lightbox (gallery, history, events, artwork) no longer scrolls the
   page behind it: page scroll is locked while it is open (scrollbar width
   compensated, no layout shift, position kept on close) and released on every
@@ -84,11 +94,6 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   toggles a full-size view that pans inside the overlay, and a second click
   returns to fit. Backdrop click closes in the fit view only; Escape always
   closes.
-### Added
-
-- Visionect setup has an app-wide Server port setting (1024–65535), with
-  environment and optional Home Assistant add-on overrides, immediate listener
-  rebinding, and instructions that show the configured port. Default: 11113.
 
 ## [0.496.1], 2026-10-31
 

@@ -23,13 +23,23 @@ set -e
 # environment value wins. Do this before dropping privileges (/data/options.json
 # is Supervisor-owned). Validation and visible errors live in app.visionect.
 if [ -z "${TESSERAE_VISIONECT_PORT:-}" ] && [ -r /data/options.json ]; then
+    # A malformed options file must not stop the container under set -e:
+    # it reads as "no option" and the saved setting stands.
     TESSERAE_VISIONECT_PORT=$(python -c '
 import json
-with open("/data/options.json") as source:
-    value = json.load(source).get("visionect_port")
+try:
+    with open("/data/options.json") as source:
+        options = json.load(source)
+    value = options.get("visionect_port") if isinstance(options, dict) else None
+except (OSError, ValueError):
+    value = None
 print("" if value is None else value)
-')
-    export TESSERAE_VISIONECT_PORT
+' 2>/dev/null || true)
+    if [ -n "$TESSERAE_VISIONECT_PORT" ]; then
+        export TESSERAE_VISIONECT_PORT
+    else
+        unset TESSERAE_VISIONECT_PORT
+    fi
 fi
 
 # Fail with a message instead of a bare "Illegal instruction". numpy's x86-64

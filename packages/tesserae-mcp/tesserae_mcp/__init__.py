@@ -26,7 +26,7 @@ import urllib.parse
 import urllib.request
 from typing import Any
 
-__version__ = "0.18.1"
+__version__ = "0.19.0"
 
 _BASE = os.environ.get("TESSERAE_URL", "http://127.0.0.1:8765").rstrip("/")
 _TOKEN = os.environ.get("TESSERAE_MCP_TOKEN", "").strip()

@@ -149,7 +149,7 @@ def test_latest_composition_is_filtered_but_legacy_artifact_is_preserved(
         if composition:
             latest["composition_digest"] = "fedcba9876543210"
         body = client.get("/settings/devices/grey").get_data(as_text=True)
-        thumb = re.search(r'<img src="/preview/grey.png"[^>]*>', body)
+        thumb = re.search(r'<img src="/preview/grey.png(?:\?[^"]*)?"[^>]*>', body)
         assert thumb is not None
         assert ("data-device-quantised" in thumb.group()) is not composition
 

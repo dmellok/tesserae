@@ -16,6 +16,15 @@ main [CHANGELOG](../../CHANGELOG.md) for the server side of each change.
 
 ## [Unreleased]
 
+## [0.19.0]
+
+### Added
+
+- `delete_canvas_page` takes `remove_from_lineups`. Tesserae now refuses to
+  delete a dashboard a lineup uses (HTTP 409 `page_in_lineups`, naming the
+  lineups); repeating the call with `remove_from_lineups=true` deletes it and
+  takes it out of them.
+
 ## [0.18.1], 2026-10-02
 
 ### Changed
