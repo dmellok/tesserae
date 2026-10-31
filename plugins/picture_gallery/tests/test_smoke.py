@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import importlib.util
 import io
+import os
+import re
 from pathlib import Path
 
 from flask import Flask
@@ -156,6 +158,46 @@ def test_serve_image_and_thumbnail(app: Flask, client: FlaskClient) -> None:
         assert thumb.get_data()
     finally:
         thumb.close()
+
+
+def _thumb_urls(client: FlaskClient, folder: str) -> list[str]:
+    page = client.get(f"/plugins/picture_gallery/folders/{folder}")
+    html = page.get_data(as_text=True)
+    return re.findall(r'src="([^"]+/thumb[^"]*)"', html)
+
+
+def test_thumbnail_url_is_versioned_and_changes_on_replace(app: Flask, client: FlaskClient) -> None:
+    with client.session_transaction() as sess:
+        sess["authed"] = True
+    plugin = app.config["PLUGIN_REGISTRY"].get("picture_gallery")
+    path = _seed_image(plugin.data_dir / "x", "same.jpg", size=(120, 90))
+    (before,) = _thumb_urls(client, "x")
+    assert re.search(r"/same\.jpg/thumb\?v=\d+-\d+$", before)
+    _seed_image(plugin.data_dir / "x", "same.jpg", size=(320, 240))
+    os.utime(path, (path.stat().st_atime, path.stat().st_mtime + 10))
+    (after,) = _thumb_urls(client, "x")
+    assert after != before
+
+
+def test_thumbnail_caching_depends_on_version(app: Flask, client: FlaskClient) -> None:
+    with client.session_transaction() as sess:
+        sess["authed"] = True
+    plugin = app.config["PLUGIN_REGISTRY"].get("picture_gallery")
+    _seed_image(plugin.data_dir / "x", "c.jpg", size=(120, 90))
+    (url,) = _thumb_urls(client, "x")
+    versioned = client.get(url.replace("&amp;", "&"))
+    bare = client.get("/plugins/picture_gallery/folders/x/c.jpg/thumb")
+    full = client.get("/plugins/picture_gallery/folders/x/c.jpg")
+    try:
+        assert "immutable" in versioned.headers["Cache-Control"]
+        assert "immutable" not in bare.headers["Cache-Control"]
+        assert "must-revalidate" in bare.headers["Cache-Control"]
+        assert "immutable" not in full.headers.get("Cache-Control", "")
+        assert full.headers.get("ETag")
+    finally:
+        versioned.close()
+        bare.close()
+        full.close()
 
 
 # -- sequential cursor (#209) -------------------------------------------

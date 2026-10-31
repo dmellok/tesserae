@@ -174,6 +174,16 @@ def _thumb_path(data_dir: Path, folder_name: str, filename: str, source: Path) -
     return data_dir / THUMB_DIR / f"{folder_name}__{safe}__{mtime}.jpg"
 
 
+def _thumb_version(source: Path) -> str:
+    """Cache-busting token for a thumbnail URL: changes when the source file
+    is replaced, even under the same name."""
+    try:
+        st = source.stat()
+    except OSError:
+        return "0"
+    return f"{int(st.st_mtime)}-{st.st_size}"
+
+
 def _ensure_thumbnail(source: Path, dest: Path) -> Path | None:
     if dest.exists():
         return dest
@@ -682,9 +692,14 @@ def blueprint() -> Blueprint:
             except OSError:
                 abort(404)
         response = send_file(result, mimetype="image/jpeg", conditional=True)
-        # The thumbnail URL embeds the source mtime, so the browser can
-        # cache aggressively, a re-upload will hit a different URL.
-        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        if request.args.get("v"):
+            # Versioned URLs (``?v=<mtime>-<size>``) change when the source
+            # file does, so the browser can keep them for good.
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        else:
+            # An unversioned link (old bookmark, stale page) can't tell a
+            # replaced file from the original: always revalidate.
+            response.headers["Cache-Control"] = "public, max-age=0, must-revalidate"
         return response
 
     # ----- admin pages -----
@@ -773,7 +788,7 @@ def blueprint() -> Blueprint:
             folder_name="(root)" if folder == ROOT_FOLDER_VALUE else folder,
             external=external,
             external_path=external_path,
-            images=[{"name": p.name} for p in images],
+            images=[{"name": p.name, "thumb_v": _thumb_version(p)} for p in images],
             allowed_exts=sorted(ALLOWED_SUFFIXES),
             max_upload_mb=MAX_UPLOAD_BYTES // (1024 * 1024),
             devices=_bindable_devices(),

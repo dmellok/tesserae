@@ -6,6 +6,12 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Picture Gallery: replacing an image with a new file of the same name now
+  shows the new thumbnail. Thumbnail URLs carry a `?v=<mtime>-<size>` version;
+  a link without it is revalidated rather than cached for a year.
+
 ## [0.496.1], 2026-10-31
 
 ### Fixed
