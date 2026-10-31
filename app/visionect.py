@@ -2122,18 +2122,38 @@ _SERVICE: VisionectService | None = None
 _SERVICE_LOCK = threading.Lock()
 
 
+def validate_port(raw: Any) -> int:
+    """Validate an unprivileged listener port without truncating floats."""
+    if isinstance(raw, bool) or not isinstance(raw, (str, int)):
+        raise ValueError("Visionect Server port must be an integer from 1024 to 65535.")
+    try:
+        port = int(raw)
+    except ValueError:
+        raise ValueError("Visionect Server port must be an integer from 1024 to 65535.") from None
+    if not 1024 <= port <= 65535:
+        raise ValueError("Visionect Server port must be an integer from 1024 to 65535.")
+    web_raw = os.environ.get("TESSERAE_BIND_PORT", "").strip()
+    web_port = int(web_raw) if web_raw.isdigit() else 8765
+    if port == web_port:
+        raise ValueError(
+            f"Visionect Server port {port} is Tesserae's web port; choose another port."
+        )
+    return port
+
+
 def configured_port(settings: Any) -> int:
+    """Environment (including the optional HA option), app setting, then default.
+
+    Invalid explicit values stop the listener with a visible configuration
+    error, rather than silently listening on a different port.
+    """
     raw: Any = os.environ.get("TESSERAE_VISIONECT_PORT")
     if not raw:
         try:
             raw = (settings.get_section("app") or {}).get("visionect_port")
         except Exception:
             raw = None
-    try:
-        port = int(raw) if raw not in (None, "") else DEFAULT_PORT
-    except (TypeError, ValueError):
-        return DEFAULT_PORT
-    return port if 0 < port < 65536 else DEFAULT_PORT
+    return validate_port(raw if raw not in (None, "") else DEFAULT_PORT)
 
 
 def configured_host() -> str:
@@ -2160,10 +2180,20 @@ def register(app: Flask) -> None:
     if push_mgr is None or devices is None or settings is None or renders_dir is None:
         return
     wanted = bool(visionect_devices(devices))
-    port = configured_port(settings)
     host = configured_host()
     with _SERVICE_LOCK:
         svc = _SERVICE
+        try:
+            port = configured_port(settings)
+        except ValueError as exc:
+            if svc is not None:
+                svc.autostart = False
+                push_mgr.remove_listener(svc.on_push)
+                svc.stop()
+            _SERVICE = None
+            app.config["VISIONECT_SERVICE"] = None
+            logger.error("visionect: %s", exc)
+            return
         if svc is not None and (svc.port != port or svc.host != host):
             # Retired for good: a push still reaching its listener must not
             # bring it back up on the old address.
@@ -2174,6 +2204,7 @@ def register(app: Flask) -> None:
         if svc is None:
             if not wanted:
                 _SERVICE = None
+                app.config["VISIONECT_SERVICE"] = None
                 return
             svc = VisionectService(host=host, port=port)
             _SERVICE = svc

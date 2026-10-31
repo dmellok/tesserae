@@ -18,6 +18,20 @@
 # first time); already-correct case works (chown is a no-op).
 set -e
 
+# HA's optional visionect_port option. Existing installs need no manifest
+# update: absence leaves the settings-store/default path intact. An explicit
+# environment value wins. Do this before dropping privileges (/data/options.json
+# is Supervisor-owned). Validation and visible errors live in app.visionect.
+if [ -z "${TESSERAE_VISIONECT_PORT:-}" ] && [ -r /data/options.json ]; then
+    TESSERAE_VISIONECT_PORT=$(python -c '
+import json
+with open("/data/options.json") as source:
+    value = json.load(source).get("visionect_port")
+print("" if value is None else value)
+')
+    export TESSERAE_VISIONECT_PORT
+fi
+
 # Fail with a message instead of a bare "Illegal instruction". numpy's x86-64
 # wheels need a 2009-or-newer CPU (x86-64-v2: SSE4.2, POPCNT) from 2.4 on. An
 # older CPU, or a VM given a basic CPU model (Proxmox's default kvm64), either

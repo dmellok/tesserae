@@ -1023,7 +1023,7 @@ def _rebuild_transport(
     except Exception:
         logger.exception("wiring OpenDisplay-HA publisher")
 
-    # Visionect signs: the TCP 11113 listener survives rebuilds (the signs
+    # Visionect signs: the configured TCP listener survives rebuilds (the signs
     # hold their sockets open); register() re-attaches it to the fresh
     # PUSH_MANAGER and starts / stops it as visionect devices come and go.
     try:
