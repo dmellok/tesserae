@@ -11,6 +11,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 - Picture Gallery: replacing an image with a new file of the same name now
   shows the new thumbnail. Thumbnail URLs carry a `?v=<mtime>-<size>` version;
   a link without it is revalidated rather than cached for a year.
+### Added
+
+- The Dashboards list has a By display | All switch in its toolbar. All shows
+  every dashboard once, A to Z, with a chip for each display it is on (or
+  Unbound), instead of repeating it under each display; search, the Active and
+  Archived tabs and bulk actions work as before. By display stays the default.
+  `?view=all` links straight to it, and the choice is remembered.
 
 ## [0.496.1], 2026-10-31
 

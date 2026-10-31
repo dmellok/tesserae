@@ -101,6 +101,19 @@
       {% for did, dname in panel_filters %}<option value="{{ did }}">{{ dname }}</option>{% endfor %}
       <option value="-">Not on a panel</option>
     </select>
+    {# By display (a section per display, a dashboard under each of its
+       displays) or All (one flat list, each dashboard once). A plain GET
+       form, so it works without script: ?view= is read by the server, which
+       remembers the choice in a cookie. #}
+    <form class="dx-dashtb-view" method="get" action="{{ url_for('pages.index') }}">
+      {% if archived_tab %}<input type="hidden" name="tab" value="archived">{% endif %}
+      <span class="seg" role="group" aria-label="Group dashboards">
+        <button type="submit" name="view" value="groups" class="seg-item{% if view != 'all' %} is-on{% endif %}"
+                aria-pressed="{{ 'false' if view == 'all' else 'true' }}" title="One section per display">By display</button>
+        <button type="submit" name="view" value="all" class="seg-item{% if view == 'all' %} is-on{% endif %}"
+                aria-pressed="{{ 'true' if view == 'all' else 'false' }}" title="Every dashboard once, A to Z">All</button>
+      </span>
+    </form>
     <nav class="dx-dashtb-tabs" aria-label="Dashboard list">
       <span class="seg" role="tablist">
         <a href="{{ url_for('pages.index') }}" role="tab" aria-selected="{{ 'false' if archived_tab else 'true' }}"
@@ -158,8 +171,9 @@
      later ones a per-group suffix. Rows sort inside their own group. #}
   {% set seen = namespace(ids=[]) %}
   {% for g in dash_groups %}
-  <div class="dx-dashgroup" role="rowgroup" data-lf-group data-dash-group="{{ g.key }}"
+  <div class="dx-dashgroup{% if g.flat %} is-flat{% endif %}" role="rowgroup" data-lf-group data-dash-group="{{ g.key }}"
        aria-label="{{ g.name }}">
+    {% if not g.flat %}
     <div class="dx-dashgroup-head">
       <button type="button" class="dx-dashgroup-fold" data-dash-group-fold aria-expanded="true"
               aria-controls="dashg-{{ g.key }}" aria-label="Fold {{ g.name }}">
@@ -183,6 +197,7 @@
       </a>
       {% endif %}
     </div>
+    {% endif %}
     <div class="dx-dashgroup-rows" id="dashg-{{ g.key }}">
   {% for page in g.pages %}
   {% set _first = page.id not in seen.ids %}
@@ -201,9 +216,9 @@
   {% set _lineups = page_lineups.get(page.id) or [] %}
   {% set _open = _first and _opened == page.id %}
   {# On a display's group, "on the panel" means that display shows it. #}
-  {% set _live_here = (page.id in page_live_ids and g.key in page_live_ids[page.id]) if g.device else (_live and not _names) %}
+  {% set _live_here = (page.id in page_live_ids and g.key in page_live_ids[page.id]) if g.device else (_live if g.flat else (_live and not _names)) %}
   {% set _state = 'archived' if archived_tab else ('live' if _live_here else ('lineup' if _lineups else ('nopanel' if not _names else 'idle'))) %}
-  {% set _others = _names|length - (1 if g.device else 0) %}
+  {% set _others = 0 if g.flat else _names|length - (1 if g.device else 0) %}
   {% set _link_count = _names|length %}
   <div class="dx-dashrow dx-dashboard-row is-{{ _state }}{% if _open %} is-open{% endif %}"
        id="dash-{{ _rid }}" data-dashrow data-page-id="{{ page.id }}"
@@ -232,7 +247,11 @@
         <i class="ph ph-{{ page.icon or 'cube' }}"></i>
       </span>
       <a class="dx-dash-name" href="{{ url_for('pages.edit', page_id=page.id) }}" title="{{ page.name }}">{{ page.name }}</a>
-      {% if _others > 0 %}
+      {% if g.flat %}
+      <span class="dx-dash-chips">
+        {% for _n in _names %}<span class="tg tg--sm">{{ _n }}</span>{% else %}<span class="tg tg--sm">Unbound</span>{% endfor %}
+      </span>
+      {% elif _others > 0 %}
       {% set _other_names = _names|reject('equalto', g.name)|list if g.device else _names %}
       <span class="dx-dash-more" title="Also on {{ _other_names|join(', ') }}">+{{ _others }} panel{{ '' if _others == 1 else 's' }}</span>
       {% endif %}

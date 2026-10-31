@@ -70,6 +70,8 @@
 .dx-dashtb-filter { flex: 0 1 auto; min-width: 0; max-width: 220px; text-overflow: ellipsis; }
 .dx-dashtb-tabs { display: flex; flex: none; }
 .dx-dashtb-fold { flex: none; }
+.dx-dashtb-view { display: flex; flex: none; margin: 0; }
+.dx-dashtb-view .seg-item { font-family: inherit; }
 .dx-dashtb-count {
   margin-left: auto;
   font-family: var(--dx-mono);
@@ -311,6 +313,8 @@
 .dx-dashgroup.is-folded .dx-dashgroup-rows { display: none; }
 .dx-dashgroup-rows .dx-dashrow:last-child { border-bottom: 1px solid var(--dx-border-soft); }
 .dx-dc-name .dx-dash-more { flex: none; }
+/* All view: the displays a dashboard is on, as chips after its name. */
+.dx-dash-chips { display: flex; flex: 0 1 auto; flex-wrap: wrap; gap: 4px; min-width: 0; }
 @media (prefers-reduced-motion: reduce) {
   .dx-dashgroup-fold .ph { transition: none; }
 }
@@ -491,6 +495,9 @@
   }
   .dx-dc-sel { grid-column: 1; grid-row: 1 / span 2; }
   .dx-dc-name { grid-column: 2; grid-row: 1; gap: 8px; }
+  /* All view: the display chips drop to their own line so the name keeps its width. */
+  .dx-dc-name:has(.dx-dash-chips) { flex-wrap: wrap; row-gap: 4px; }
+  .dx-dash-chips { flex-basis: 100%; padding-left: 18px; }
   .dx-dc-chev { grid-column: 3; grid-row: 1 / span 2; }
   .dx-dash-thumb { width: 48px; height: 30px; font-size: 14px; }
   .dx-dash-thumb[style*="--thumb-r"] { --slot: 48px; --th: 30px; }
