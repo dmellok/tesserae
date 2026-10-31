@@ -1,0 +1,15 @@
+/* Apply only to preview media, never to labels, buttons or color controls.
+   Real quantised panel previews already have their renderer's exact palette.
+   Grey ramps stay smooth at thumbnail size; CSS cannot reproduce dithering.
+   Mono with any dithering averages to grey, so only dither "none" thresholds. */
+:is(img, iframe)[data-gamut^="grey"]:not([data-device-quantised]),
+[data-gamut^="grey"] > :is(img, iframe):not([data-device-quantised]),
+:is(img, iframe)[data-gamut="mono-dither"]:not([data-device-quantised]),
+[data-gamut="mono-dither"] > :is(img, iframe):not([data-device-quantised]) {
+  filter: var(--preview-effects,) grayscale(1) !important;
+}
+
+:is(img, iframe)[data-gamut="mono"]:not([data-device-quantised]),
+[data-gamut="mono"] > :is(img, iframe):not([data-device-quantised]) {
+  filter: var(--preview-effects,) url("#tess-mono") !important;
+}

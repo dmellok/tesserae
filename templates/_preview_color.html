@@ -1,0 +1,5 @@
+{# Color metadata belongs on the media or its immediate wrapper. #}
+{% macro attrs(device_ids=None) -%}
+{%- set color = preview_color(device_ids) -%}
+data-gamut="{{ color.gamut }}" data-grey-levels="{{ color.levels }}"
+{%- endmacro %}

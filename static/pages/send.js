@@ -295,6 +295,9 @@
   function applyDims() {
     const { w, h, name } = previewSize();
     if (!frame || !w || !h) return;
+    const opt = previewDevice && previewDevice.selectedOptions[0];
+    frame.dataset.gamut = opt ? opt.dataset.gamut : "color";
+    frame.dataset.greyLevels = opt ? opt.dataset.greyLevels : "0";
     frame.dataset.panelW = String(w);
     frame.dataset.panelH = String(h);
     frame.style.aspectRatio = `${w} / ${h}`;

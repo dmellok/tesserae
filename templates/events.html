@@ -1,3 +1,4 @@
+{% from "_preview_color.html" import attrs as color_attrs with context %}
 {% extends "_base.html" %}
 {% from "_components.html" import section_card, settings_tabs %}
 {% block title %}Events, Tesserae{% endblock %}
@@ -213,7 +214,7 @@
         <p class="dx-event-empty-payload">No payload recorded for this event.</p>
         {% endif %}
         {% if ev.type == 'push' and ev.digest %}
-        <a class="dx-event-thumb-link" href="{{ url_for('renders', filename=ev.digest ~ '.png') }}" data-lightbox>
+        <a class="dx-event-thumb-link" href="{{ url_for('renders', filename=ev.digest ~ '.png') }}" {{ color_attrs(ev.extra.get("device_ids")) }} data-lightbox>
           <img src="{{ url_for('renders', filename=ev.digest ~ '.png', w=240) }}"
                alt="" width="120" height="90" loading="lazy" decoding="async">
         </a>

@@ -1540,6 +1540,7 @@ def _device_overview(device: Device, section: dict[str, Any]) -> dict[str, Any]:
         if comp:
             glass_url = url_for("renders", filename=f"{comp}.png", w=480)
     thumb_url = glass_url or newest_url
+    newest_is_artifact = bool(latest and not latest.get("composition_digest"))
     showing: dict[str, Any] = {"value": "Nothing yet", "sub": "no frame pushed", "muted": True}
     if latest and queued:
         served_at = (live_entry or {}).get("last_served_at")
@@ -1604,6 +1605,11 @@ def _device_overview(device: Device, section: dict[str, Any]) -> dict[str, Any]:
         "queued": _queued_note(pending) if queued else None,
         "queued_is_only_thumb": bool(queued and not glass_url),
         "sync_sig": sync_sig,
+        # /preview serves composition PNGs, except legacy entries without one:
+        # those fall back to the renderer artifact and must not be quantised
+        # again. The glass thumbnail is always a composition PNG.
+        "preview_is_artifact": bool(not glass_url and newest_is_artifact),
+        "queued_is_artifact": newest_is_artifact,
         "showing": showing,
         "battery": {
             "value": power.get("label") or "-",
