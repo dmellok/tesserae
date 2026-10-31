@@ -176,3 +176,29 @@ def test_mirror_carries_no_cache_header(app: Flask) -> None:
     client = app.test_client()
     resp = client.get("/mirror/kit")
     assert resp.headers.get("Cache-Control") == "no-store, max-age=0"
+
+
+def test_mirror_image_carries_ingress_prefix(app: Flask) -> None:
+    """Behind Home Assistant ingress the app lives under a path prefix, so a
+    root-absolute ``/preview/<id>.png`` never loads and the page is black."""
+    _stub_device(app, "kitchen_inky")
+    prefix = "/api/hassio_ingress/tok123"
+    resp = app.test_client().get("/mirror/kitchen_inky", headers={"X-Ingress-Path": prefix})
+    body = resp.get_data(as_text=True)
+    assert resp.status_code == 200
+    assert f'src="{prefix}/preview/kitchen_inky.png?_=' in body
+    assert 'src="/preview/' not in body
+
+
+def test_mirror_image_unprefixed_without_ingress(app: Flask) -> None:
+    _stub_device(app, "kitchen_inky")
+    body = app.test_client().get("/mirror/kitchen_inky").get_data(as_text=True)
+    assert 'src="/preview/kitchen_inky.png?_=' in body
+
+
+def test_mirror_escapes_device_name(app: Flask) -> None:
+    _stub_device(app, "kit", name='<script>x</script>"&')
+    body = app.test_client().get("/mirror/kit").get_data(as_text=True)
+    assert "<script>x</script>" not in body
+    assert "&lt;script&gt;x&lt;/script&gt;" in body
+    assert 'alt="&lt;script&gt;x&lt;/script&gt;&#34;&amp;"' in body

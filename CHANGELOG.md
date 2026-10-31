@@ -6,6 +6,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed
+
+- The Mirror page (`/mirror/<device>`) loads its image behind a URL prefix
+  such as Home Assistant's sidebar panel. The image URL was root-absolute, so
+  under ingress it never loaded and the page stayed black; it now carries the
+  prefix. The device name on the page is HTML-escaped too.
+
 ## [0.496.1], 2026-10-31
 
 ### Fixed

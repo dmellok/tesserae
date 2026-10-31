@@ -42,6 +42,7 @@ from flask import (
     url_for,
 )
 from flask.json.provider import DefaultJSONProvider
+from markupsafe import escape
 from pydantic import BaseModel
 from werkzeug.wrappers import Response
 
@@ -1765,7 +1766,10 @@ def create_app(
         import time as _time
 
         ts = int(_time.time())
-        img_src = f"/preview/{device_id}.png?_={ts}"
+        # ``request.script_root`` carries the ingress prefix (Home Assistant
+        # serves the app under ``/api/hassio_ingress/<token>``), so the image
+        # resolves there too instead of the server root.
+        img_src = f"{request.script_root.rstrip('/')}/preview/{device_id}.png?_={ts}"
 
         # Inline template; no Jinja partial needed for ~25 lines of HTML.
         # The rotation transforms a square viewport, so the parent has to
@@ -1782,7 +1786,8 @@ def create_app(
         elif rotate == 180:
             rotate_css = "img { transform: rotate(180deg); }"
 
-        device_name = device.name or device.id
+        device_name = escape(device.name or device.id)
+        img_src = escape(img_src)
         html = (
             "<!DOCTYPE html>\n"
             '<html lang="en">\n'
