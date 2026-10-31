@@ -819,6 +819,32 @@ def _group_pages_for_index(pages: list[Page], devices: Any) -> list[tuple[Any, l
     return out
 
 
+def _flat_pages_for_index(pages: list[Page]) -> list[Page]:
+    """Every dashboard exactly once, alphabetical by name (case-insensitive,
+    tie-break on id), for the Dashboards list's "All" view. Where
+    ``_group_pages_for_index`` repeats a dashboard under each display it is
+    bound to, this ignores bindings altogether; the row's chips name them."""
+    return sorted(pages, key=lambda p: (p.name.casefold(), p.id))
+
+
+# The Dashboards list's grouping choice outlives the page: ?view= picks it and
+# is remembered in this cookie, so a plain /pages comes back the way it was
+# left, with no flash since the server renders it.
+_DASH_VIEW_COOKIE = "tesserae_dashboards_view"
+_DASH_VIEWS = ("groups", "all")
+
+
+def _dashboards_view() -> tuple[str, bool]:
+    """``(view, from_query)``: "groups" (one section per display, today's
+    layout and the default) or "all" (one flat list). An explicit ``?view=``
+    wins over the remembered cookie; anything unrecognised is ignored."""
+    asked = request.args.get("view")
+    if asked in _DASH_VIEWS:
+        return asked, True
+    remembered = request.cookies.get(_DASH_VIEW_COOKIE)
+    return (remembered if remembered in _DASH_VIEWS else "groups"), False
+
+
 def _humanise_age(seconds: float) -> str:
     """Compact relative-time formatter for the dashboards list. Same
     flavour as the device-card freshness text: "2 min ago",
@@ -909,8 +935,9 @@ def _device_health(device_id: str) -> str:
 
 
 @bp.get("")
-def index() -> str:
+def index() -> Response:
     tab = "archived" if request.args.get("tab") == "archived" else "active"
+    view, remember_view = _dashboards_view()
     all_pages = _store().list()
     archived_count = sum(1 for p in all_pages if p.archived)
     active_count = len(all_pages) - archived_count
@@ -946,6 +973,8 @@ def index() -> str:
             if page.id not in seen_rows:
                 seen_rows.add(page.id)
                 rows.append(page)
+    if view == "all":
+        rows = _flat_pages_for_index(pages)
     panel_filters = [(d.id, d.display_name) for d, _group in page_groups if d is not None]
     page_device_ids: dict[str, list[str]] = {}
     for page in pages:
@@ -963,7 +992,12 @@ def index() -> str:
     # One group per display the list's dashboards are bound to (a dashboard
     # bound to several shows under each), then "Not on a panel".
     dash_groups: list[dict[str, Any]] = []
-    for device, group in page_groups:
+    if view == "all":
+        # One headless group: every dashboard once, its displays shown as chips.
+        dash_groups.append(
+            {"key": "all", "device": None, "name": "All dashboards", "flat": True, "pages": rows}
+        )
+    for device, group in [] if view == "all" else page_groups:
         if device is None:
             dash_groups.append(
                 {"key": "-", "device": None, "name": "Not on a panel", "pages": group}
@@ -1013,8 +1047,9 @@ def index() -> str:
         p.id: page_preview_token(p, preview_dims(p, devices, settings)) for p in pages
     }
 
-    return render_template(
+    html = render_template(
         "pages_list.html",
+        view=view,
         pages=pages,
         tab=tab,
         active_count=active_count,
@@ -1037,6 +1072,10 @@ def index() -> str:
         has_panels=any(d.kind_of is not None for d in devices.all()) if devices else False,
         design_sizes=DESIGN_SIZES,
     )
+    response = current_app.response_class(html)
+    if remember_view:
+        response.set_cookie(_DASH_VIEW_COOKIE, view, max_age=365 * 86400, samesite="Lax")
+    return response
 
 
 @bp.get("/new")

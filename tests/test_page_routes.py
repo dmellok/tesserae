@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -1599,6 +1600,30 @@ def test_group_pages_sorts_by_device_then_name() -> None:
     assert [p.id for p in groups[1][1]] == ["s1", "s2"]
 
 
+def test_flat_pages_lists_each_dashboard_once_alphabetically() -> None:
+    """The "All" view: a dashboard bound to two displays is one entry (the
+    grouped view repeats it), unbound ones are included, and the order is
+    case-insensitive by name with the id as tie-break."""
+    from app.page_routes import _flat_pages_for_index, _group_pages_for_index
+
+    registry = _StubRegistry(
+        [
+            _StubDevice("kitchen", display_name="Kitchen"),
+            _StubDevice("studio", display_name="Studio"),
+        ]
+    )
+    pages = [
+        _page("z", "zebra"),
+        _page("both", "Both", ["kitchen", "studio"]),
+        _page("b2", "apple", ["studio"]),
+        _page("b1", "Apple", ["kitchen"]),
+    ]
+    grouped = [p.id for _d, group in _group_pages_for_index(pages, registry) for p in group]
+    assert grouped.count("both") == 2
+    flat = _flat_pages_for_index(pages)
+    assert [p.id for p in flat] == ["b1", "b2", "both", "z"]
+
+
 def test_group_pages_unbound_sorts_last() -> None:
     """An unbound page (no device_ids) lands in a None-keyed Unbound
     group that always sits after every bound device group."""
@@ -2299,6 +2324,82 @@ def test_dashboards_list_groups_rows_by_display(app: Flask, monkeypatch) -> None
     opened = client.get("/pages?opened=both").get_data(as_text=True)
     assert 'id="dashq-both" data-dashquick data-lf-tail>' in opened
     assert 'id="dashq-both--study" data-dashquick data-lf-tail hidden' in opened
+
+
+def _view_toggle(body: str) -> dict[str, str]:
+    """aria-pressed of each By display / All button, keyed by its ?view= value."""
+    found = re.findall(r'name="view" value="(\w+)"[^>]*?aria-pressed="(\w+)"', body)
+    return dict(found)
+
+
+def _remembered(response) -> str | None:
+    """The Dashboards view cookie this response sets, if any."""
+    for header in response.headers.getlist("Set-Cookie"):
+        if header.startswith("tesserae_dashboards_view="):
+            return header.split(";", 1)[0].split("=", 1)[1]
+    return None
+
+
+def _seed_view_pages(app: Flask) -> Flask:
+    from app.state.page_store import Page
+
+    client = app.test_client()
+    _sign_in(client)
+    for did, name in (("lounge", "Lounge"), ("study", "Study")):
+        client.post("/settings/devices/add", data={"id": did, "kind": "esp32_client", "name": name})
+    store = app.config["PAGE_STORE"]
+    store.save(Page(id="both", name="Both", device_ids=["lounge", "study"]))
+    store.save(Page(id="alpha", name="alpha", device_ids=["study"]))
+    store.save(Page(id="loose", name="Loose"))
+    return client
+
+
+def test_dashboards_list_all_view_lists_each_dashboard_once(app: Flask) -> None:
+    """?view=all: one headless list, every dashboard once and A to Z, chips for
+    its displays ("Unbound" for none), the count and select-all counting
+    dashboards; the toggle says which view is on."""
+    client = _seed_view_pages(app)
+    body = client.get("/pages?view=all").get_data(as_text=True)
+    assert 'data-dash-group="all"' in body and "data-dash-group-fold aria" not in body
+    assert '<div class="dx-dashgroup-head">' not in body
+    assert "data-dash-groups-toggle title" not in body
+    for pid in ("both", "alpha", "loose"):
+        assert body.count(f'data-page-id="{pid}"') == 1
+        assert body.count(f'data-lf-uid="{pid}"') == 1
+    order = [body.index(f'id="dash-{pid}"') for pid in ("alpha", "both", "loose")]
+    assert order == sorted(order)
+    both = body[body.index('id="dash-both"') : body.index('id="dashq-both"')]
+    assert both.index(">Lounge<") < both.index(">Study<") and "+1 panel" not in both
+    assert ">Unbound<" in body[body.index('id="dash-loose"') : body.index('id="dashq-loose"')]
+    assert "3 dashboards" in body
+    assert _view_toggle(body) == {"groups": "false", "all": "true"}
+    # Bulk select: one box per dashboard, so a selection can't double up.
+    assert body.count("data-dash-select") == 3
+    assert "data-dash-selall" in body
+
+
+def test_dashboards_list_by_display_stays_the_default(app: Flask) -> None:
+    client = _seed_view_pages(app)
+    for url in ("/pages", "/pages?view=groups", "/pages?view=nonsense"):
+        body = client.get(url).get_data(as_text=True)
+        assert 'data-dash-group="lounge"' in body and 'data-dash-group="all"' not in body
+        assert body.count('data-page-id="both"') == 2
+        assert _view_toggle(body) == {"groups": "true", "all": "false"}
+
+
+def test_dashboards_list_remembers_the_view(app: Flask) -> None:
+    """An explicit ?view= wins and is remembered; a bare /pages then comes back
+    the way it was left, the Archived tab included; a bad value is ignored."""
+    client = _seed_view_pages(app)
+    assert _remembered(client.get("/pages")) is None
+    assert _remembered(client.get("/pages?view=all")) == "all"
+    assert 'data-dash-group="all"' in client.get("/pages").get_data(as_text=True)
+    archived = client.get("/pages?tab=archived").get_data(as_text=True)
+    assert _view_toggle(archived)["all"] == "true" and 'name="tab" value="archived"' in archived
+    assert _remembered(client.get("/pages?view=nonsense")) is None
+    assert 'data-dash-group="all"' in client.get("/pages?view=nonsense").get_data(as_text=True)
+    client.get("/pages?view=groups")
+    assert 'data-dash-group="lounge"' in client.get("/pages").get_data(as_text=True)
 
 
 def test_create_form_sits_behind_new_dashboard(app: Flask) -> None:

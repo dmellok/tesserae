@@ -6,6 +6,14 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added
+
+- The Dashboards list has a By display | All switch in its toolbar. All shows
+  every dashboard once, A to Z, with a chip for each display it is on (or
+  Unbound), instead of repeating it under each display; search, the Active and
+  Archived tabs and bulk actions work as before. By display stays the default.
+  `?view=all` links straight to it, and the choice is remembered.
+
 ## [0.496.1], 2026-10-31
 
 ### Fixed
