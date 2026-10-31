@@ -558,6 +558,32 @@ def test_delete_page(app: Flask) -> None:
     assert client.delete("/api/mcp/pages/grid9").status_code == 404
 
 
+def test_delete_page_in_a_lineup_is_409_until_remove_from_lineups(app: Flask) -> None:
+    from app.state.deck_model import Deck, DeckPage
+
+    _enable(app)
+    client = app.test_client()
+    pid = _create_page(client)
+    other = _create_page(client)
+    app.config["DECK_STORE"].upsert(
+        Deck(id="rot", name="Rotation", pages=[DeckPage(page_id=pid), DeckPage(page_id=other)])
+    )
+    resp = client.delete(f"/api/mcp/pages/{pid}")
+    body = resp.get_json()
+    assert resp.status_code == 409
+    assert body["error"] == "page_in_lineups" and body["lineups"] == ["Rotation"]
+    assert "remove_from_lineups=true" in body["fix"]
+    assert body["would_delete_lineups"] == []
+    solo = _create_page(client)
+    app.config["DECK_STORE"].upsert(Deck(id="solo", name="Solo", pages=[DeckPage(page_id=solo)]))
+    assert client.delete(f"/api/mcp/pages/{solo}").get_json()["would_delete_lineups"] == ["Solo"]
+    assert app.config["PAGE_STORE"].get(pid) is not None
+    ok = client.delete(f"/api/mcp/pages/{pid}?remove_from_lineups=true")
+    assert ok.status_code == 200 and ok.get_json()["removed_from_lineups"] == ["Rotation"]
+    assert app.config["PAGE_STORE"].get(pid) is None
+    assert app.config["DECK_STORE"].get("rot").page_ids == [other]
+
+
 def test_set_canvas_compact_and_return_doc(app: Flask) -> None:
     _enable(app)
     client = app.test_client()

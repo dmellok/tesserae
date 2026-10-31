@@ -65,6 +65,18 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   lineup editor. Dashboards with no display, or shared across displays that
   differ, stay in color. Previews only; what is sent to the panel is
   unchanged. See `docs/thumbnail-color.md`.
+- Deleting a dashboard that a lineup uses now asks first, naming the lineups
+  ("X is in the lineups A, B. Delete it and remove it from them?"), and once
+  approved it also takes the dashboard out of them: its step, any link to it,
+  the home, entry and fallback pointers, and a display's saved position on it.
+  A lineup left with no other dashboard is deleted, and the confirm names it
+  beforehand.
+  It applies to Delete and bulk delete on the Dashboards list (one confirm for
+  the whole selection; without JavaScript a confirm page does the same). The
+  canvas editor's delete route and the MCP `DELETE /pages/<id>` answer 409
+  `page_in_lineups` with the lineup names (and `would_delete_lineups`) until repeated with
+  `remove_from_lineups=true`. Before, the lineup kept a step pointing at a
+  dashboard that no longer existed.
 
 ## [0.496.1], 2026-10-31
 

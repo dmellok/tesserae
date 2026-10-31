@@ -1,0 +1,26 @@
+{% extends "_base.html" %}
+{% block title %}Delete dashboards, Tesserae{% endblock %}
+{% block main %}
+{# The no-JavaScript second step of a delete: shown when a dashboard a lineup
+   uses is deleted without consent. Nothing is deleted yet; the form posts the
+   same ids back with remove_from_lineups=1. #}
+<div class="dx-delete-confirm">
+  <h1>Delete {{ 'this dashboard' if rows|length == 1 else 'these dashboards' }}?</h1>
+  <ul>
+    {% for r in rows %}
+    <li data-delete-row="{{ r.id }}">
+      <strong>{{ r.name }}</strong>
+      {% if r.lineups %}is in the lineup{{ '' if r.lineups|length == 1 else 's' }} {{ r.lineups|join(', ') }}.{% else %}is in no lineup.{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  <p>Deleting removes {{ 'it' if rows|length == 1 else 'them' }} from those lineups too. This cannot be undone.</p>
+  {% if emptied %}<p data-delete-emptied><strong>{{ emptied }}</strong></p>{% endif %}
+  <form method="post" action="{{ url_for('pages.bulk_delete') }}" class="form form--inline">
+    {% for r in rows %}<input type="hidden" name="page_ids" value="{{ r.id }}">{% endfor %}
+    <input type="hidden" name="remove_from_lineups" value="1">
+    <button type="submit" class="dx-btn-primary-sm"><i class="ph ph-trash" aria-hidden="true"></i><span>Delete and remove from lineups</span></button>
+    <a class="dx-btn-ghost-sm" href="{{ url_for('pages.index') }}">Cancel</a>
+  </form>
+</div>
+{% endblock %}

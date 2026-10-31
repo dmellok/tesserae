@@ -239,6 +239,7 @@
        {% if pv_w and pv_h %}data-preview-src="{{ url_for('composer.compose', page_id=page.id) }}" data-preview-png="{{ _png }}" data-preview-w="{{ pv_w }}" data-preview-h="{{ pv_h }}"{% endif %}>
     <span class="dx-dc dx-dc-sel">
       <input type="checkbox" class="dx-dash-select" value="{{ page.id }}" data-dash-select
+             data-page-name="{{ page.name }}"{% if _lineups %} data-lineups="{{ _lineups|join(', ') }}"{% endif %}
              aria-label="Select {{ page.name }}" title="{{ 'Select for bulk restore / delete' if archived_tab else 'Select for bulk push / archive / delete' }}">
     </span>
     <span class="dx-dc dx-dc-name">
@@ -458,8 +459,12 @@
           </button>
         </form>
         {% endif %}
+        {# A lineup member asks first, naming the lineups; approving sends
+           remove_from_lineups=1 so the delete also takes it out of them.
+           Without JavaScript the server answers with its own confirm page. #}
         <form method="post" action="{{ url_for('pages.delete', page_id=page.id) }}" class="form form--inline"
-              onsubmit="return confirm('Delete this dashboard?');">
+              {% if _lineups %}data-confirm-lineups="{{ page.name }} is in the lineup{{ '' if _lineups|length == 1 else 's' }} {{ _lineups|join(', ') }}. Delete it and remove it from {{ 'it' if _lineups|length == 1 else 'them' }}?{% set _emptied = page_emptied.get(page.id) or [] %}{% if _emptied %} {{ 'Lineup' if _emptied|length == 1 else 'Lineups' }} {{ _emptied|join(', ') }} {{ 'has' if _emptied|length == 1 else 'have' }} no other dashboard and will be deleted too.{% endif %}"{% else %}onsubmit="return confirm('Delete this dashboard?');"{% endif %}>
+          {% if _lineups %}<input type="hidden" name="remove_from_lineups" value="">{% endif %}
           <button type="submit" class="dx-btn-ghost-sm dx-btn-icon-only" title="Delete dashboard" aria-label="Delete">
             <i class="ph ph-trash" aria-hidden="true"></i>
           </button>
@@ -496,6 +501,8 @@
   })();
 </script>
 
+<script type="application/json" id="dx-lineup-members">{{ lineup_members|tojson }}</script>
+
 {# Bulk action bar: floats in once >=1 dashboard is checked. The push /
    delete forms live here (not nested in the per-row action forms) and are
    populated with the checked page_ids by JS on submit. #}
@@ -514,8 +521,8 @@
       <button type="submit" class="dx-btn-ghost-sm dx-btn-push" title="Archive the selected dashboards. Any still in a lineup is skipped."><i class="ph ph-archive" aria-hidden="true"></i><span>Archive selected</span></button>
     </form>
     {% endif %}
-    <form method="post" action="{{ url_for('pages.bulk_delete') }}" id="dx-bulk-delete-form" class="form form--inline"
-          onsubmit="return confirm('Delete the selected dashboards? This cannot be undone.');">
+    <form method="post" action="{{ url_for('pages.bulk_delete') }}" id="dx-bulk-delete-form" class="form form--inline">
+      <input type="hidden" name="remove_from_lineups" value="">
       <button type="submit" class="dx-btn-ghost-sm dx-btn-push"><i class="ph ph-trash" aria-hidden="true"></i><span>Delete selected</span></button>
     </form>
     <button type="button" id="dx-bulk-clear" class="dx-btn-ghost-sm">Clear selection</button>
@@ -967,7 +974,40 @@
     });
     document.addEventListener('dash-filter', sync);
     if (pushForm) pushForm.addEventListener('submit', function () { inject(pushForm); });
-    if (delForm) delForm.addEventListener('submit', function () { inject(delForm); });
+    if (delForm) {
+      // One confirm for the whole selection; dashboards in lineups are named
+      // so the user sees what leaves them. Approving sends remove_from_lineups.
+      delForm.addEventListener('submit', function (e) {
+        const used = selected().filter(function (b) { return b.dataset.lineups; });
+        let msg = 'Delete the selected dashboards? This cannot be undone.';
+        if (used.length) {
+          // A lineup goes too when every dashboard in it is selected.
+          const ids = {};
+          selected().forEach(function (b) { ids[b.value] = true; });
+          const holder = document.getElementById('dx-lineup-members');
+          const emptied = (holder ? JSON.parse(holder.textContent) : []).filter(function (m) {
+            return m.pages.length && m.pages.every(function (id) { return ids[id]; });
+          }).map(function (m) { return m.name; });
+          msg = used.map(function (b) {
+            return b.dataset.pageName + ' is in ' + b.dataset.lineups;
+          }).join('\n') + '\n\nDelete the selected dashboards and remove them from those lineups?';
+          if (emptied.length) {
+            msg += '\n' + (emptied.length === 1 ? 'Lineup ' : 'Lineups ') + emptied.join(', ') +
+              (emptied.length === 1 ? ' has' : ' have') + ' no other dashboard and will be deleted too.';
+          }
+        }
+        delForm.elements.remove_from_lineups.value = used.length ? '1' : '';
+        if (!confirm(msg)) e.preventDefault();
+      });
+      delForm.addEventListener('submit', function () { inject(delForm); });
+    }
+    // Single delete of a lineup member: same pattern.
+    document.querySelectorAll('form[data-confirm-lineups]').forEach(function (f) {
+      f.addEventListener('submit', function (e) {
+        if (!confirm(f.dataset.confirmLineups)) { e.preventDefault(); return; }
+        f.elements.remove_from_lineups.value = '1';
+      });
+    });
     if (archiveForm) archiveForm.addEventListener('submit', function () { inject(archiveForm); });
     if (restoreForm) restoreForm.addEventListener('submit', function () { inject(restoreForm); });
     if (clearBtn) clearBtn.addEventListener('click', function () {

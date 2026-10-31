@@ -1294,11 +1294,27 @@ def create_page() -> Response:
 @bp.delete("/pages/<page_id>")
 def delete_page(page_id: str) -> Response:
     """Delete a canvas dashboard (e.g. a throwaway QA page). Only removes canvas
-    pages, same guardrail as the other page writes; 404 if it isn't one."""
+    pages, same guardrail as the other page writes; 404 if it isn't one. A page
+    a lineup uses is refused with 409 (``page_in_lineups``, naming them) until
+    the call repeats with ``remove_from_lineups=true``, which deletes it and
+    takes it out of those lineups."""
     if _pr._get_canvas(page_id) is None:
         return _err(404, f"no canvas dashboard {page_id!r}")
-    _pr._pages().delete(page_id)
-    return jsonify({"ok": True, "id": page_id})
+    from app import page_routes
+
+    names = page_routes.lineups_using(page_id)
+    if names and not page_routes.remove_consent():
+        refusal = page_routes.lineup_refusal(names, page_routes.would_delete_lineups([page_id]))
+        return _err(409, refusal.pop("error"), **refusal)
+    _deleted, cascade = page_routes.remove_page(page_id)
+    return jsonify(
+        {
+            "ok": True,
+            "id": page_id,
+            "removed_from_lineups": cascade.edited,
+            "deleted_lineups": cascade.removed,
+        }
+    )
 
 
 @bp.get("/pages/<page_id>/assets")

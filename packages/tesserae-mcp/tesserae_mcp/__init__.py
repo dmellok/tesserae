@@ -896,10 +896,15 @@ def build_server() -> Any:
         set_canvas)."""
         return _json("POST", "/pages", {"name": name, "w": w, "h": h})
 
-    def delete_canvas_page(page_id: str) -> Any:
+    def delete_canvas_page(page_id: str, remove_from_lineups: bool = False) -> Any:
         """Delete a canvas dashboard by id (e.g. a throwaway QA page). Returns
-        {ok: true} on success, or 404 if it isn't a canvas page."""
-        return _json("DELETE", f"/pages/{page_id}")
+        {ok: true} on success, or 404 if it isn't a canvas page. If a lineup uses
+        the page it is NOT deleted: you get HTTP 409 {error: "page_in_lineups",
+        lineups: [...names]}. Repeat with remove_from_lineups=true to delete it
+        and take it out of those lineups (a lineup left with no other dashboard
+        is deleted too)."""
+        suffix = "?remove_from_lineups=true" if remove_from_lineups else ""
+        return _json("DELETE", f"/pages/{page_id}{suffix}")
 
     def get_canvas(page_id: str) -> Any:
         """Get the full canvas document (size, appearance, and every element) for a
