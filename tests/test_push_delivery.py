@@ -245,6 +245,17 @@ def test_delivery_notice_says_quiet_hours(app: Flask, client: Any) -> None:
     assert "in quiet hours until 4:30 PM" in n["text"]
 
 
+def test_a_frame_that_only_polls_counts_its_poll_as_a_checkin(app: Flask, client: Any) -> None:
+    """TRMNL firmware records a status entry on every poll and no telemetry
+    sample; a frame like that has checked in, it just has no known cadence."""
+    app.config["DEVICE_STATUS"]["hall"] = {"received_at": time.time() - 60, "parsed": {}}
+    device = app.config["DEVICE_REGISTRY"].devices["hall"]
+    with app.test_request_context("/"):
+        n = pd.delivery_notice(device)
+    assert n["reason"] is None
+    assert "will pick this up the next time it checks in" in n["text"]
+
+
 def test_delivery_notices_keep_order_and_drop_unknown_ids(app: Flask, client: Any) -> None:
     _beat(app, "hallway", wake_in_s=10 * MIN)
     with app.test_request_context("/"):

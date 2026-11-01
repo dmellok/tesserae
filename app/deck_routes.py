@@ -2332,8 +2332,8 @@ def create() -> Response:
             return refusal(deck.device_ids, stranded)
         flash(flash_text(deck.device_ids, stranded), "error")
         return redirect(url_for("decks.index"))
-    _store().upsert(deck)
     apply_consent(deck.device_ids, deck.page_ids, consent)
+    _store().upsert(deck)
     _invalidate(deck)
     flash(f"Deck {deck.name!r} saved.", "ok")
     if wants_json:
@@ -2392,8 +2392,8 @@ def create_lineup() -> Response:
     stranded = guard_change(deck.device_ids, deck.page_ids, consent)
     if stranded:
         return refusal(deck.device_ids, stranded)
-    _store().upsert(deck)
     apply_consent(deck.device_ids, deck.page_ids, consent)
+    _store().upsert(deck)
     _invalidate(deck)
     # A dashboard picked here that isn't on any display yet binds to this
     # Lineup's display, so a freshly-created Lineup can actually render every
@@ -2487,8 +2487,8 @@ def update(deck_id: str) -> Response:
     if stranded:
         flash(flash_text(deck.device_ids, stranded), "error")
         return redirect(url_for("decks.index", edit=deck_id) + f"#deck-{deck_id}")
-    _store().upsert(deck)
     apply_consent(deck.device_ids, deck.page_ids, consent)
+    _store().upsert(deck)
     _invalidate(deck)
     flash(f"Deck {deck.name!r} updated.", "ok")
     return redirect(url_for("decks.index") + f"#deck-{deck_id}")
@@ -2551,8 +2551,8 @@ def edit_graph(deck_id: str) -> Response:
     if stranded:
         flash(flash_text(deck.device_ids, stranded), "error")
         return redirect(url_for("decks.index", edit=deck_id) + f"#deck-{deck_id}")
-    _store().upsert(deck)
     apply_consent(deck.device_ids, deck.page_ids, consent)
+    _store().upsert(deck)
     _invalidate(deck)
     flash(f"Deck {deck.name!r} graph updated.", "ok")
     return redirect(url_for("decks.index") + f"#deck-{deck_id}")
@@ -2920,8 +2920,8 @@ def editor_save() -> Response:
             if existing
             else (request.referrer or url_for("decks.editor"))
         )
-    _store().upsert(deck)
     apply_consent(deck.device_ids, ordered, consent)
+    _store().upsert(deck)
     # An unassigned dashboard added to the deck binds to the deck's display, so
     # the "only dashboards bound to this display" invariant holds next time.
     display = deck.device_ids[0] if deck.device_ids else None
@@ -3016,7 +3016,9 @@ def step(deck_id: str) -> Response:
         promoted = False
         if pusher is not None:
             promoter = getattr(pusher, "promote_deck_page", None)
-            promoted = callable(promoter) and promoter(device_id, target, extra={"deck_id": deck.id})
+            promoted = callable(promoter) and promoter(
+                device_id, target, extra={"deck_id": deck.id}
+            )
             if not promoted:
                 result = pusher.push(
                     target, device_ids={device_id}, respect_quiet_hours=False, source="deck"

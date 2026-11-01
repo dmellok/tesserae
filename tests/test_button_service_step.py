@@ -314,6 +314,33 @@ def test_step_leaves_the_panels_dedup_fingerprint_alone(tmp_path: Path) -> None:
     assert rig.svc.handle_button(device_id="kitchen", button="right", event_id=7).dedup is True
 
 
+class _PromotingPush(FakePush):
+    """A push manager whose promote writes a History row and reports its id."""
+
+    def promote_event_id(self, _device_id: str) -> int | None:
+        return 777 if self.promotes else None
+
+
+def test_retry_of_a_press_that_promoted_a_warmed_frame_is_deduped(tmp_path: Path) -> None:
+    rig = _rig(tmp_path)
+    rig.push = _PromotingPush(warmed={("kitchen", "b")})
+    rig.svc._push_getter = lambda: rig.push
+    rig.decks.upsert(_deck("morning", ["a", "b", "c"]))
+    rig.nav.set("kitchen", "morning", "a")
+
+    first = rig.svc.handle_button(device_id="kitchen", button="right", event_id=7)
+    assert first.pushed_page_id == "b"
+    assert rig.push.promotes == [("kitchen", "b")]
+    # The press keeps its own id as the dedup key, not the History row's.
+    assert rig.state.get("kitchen").last_button_event_id == 7
+    assert first.push_result is not None and first.push_result.event_id == 777
+
+    retry = rig.svc.handle_button(device_id="kitchen", button="right", event_id=7)
+    assert retry.dedup is True
+    assert rig.push.promotes == [("kitchen", "b")]
+    assert rig.nav.current_page("kitchen", "morning") == "b"
+
+
 def test_step_emits_no_input_event(tmp_path: Path) -> None:
     rig = _rig(tmp_path)
     rig.decks.upsert(_deck("morning", ["a", "b"]))

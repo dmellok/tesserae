@@ -8,51 +8,6 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
-- Lineups redesign, part 3 of 3: a push to a sleeping frame says so. Every
-  push surface (Send, Push now on the Dashboards list and device page, the
-  canvas editor's Send, lineup steps and Push, History resend, calibration
-  and test patterns, the setup wizard) adds a notice per waiting display,
-  such as "Hallway Frame is asleep: it will pick this up at its next check-in
-  (~3:48 PM)", or names quiet hours, an overdue check-in or a lost
-  connection. The webhook, REST, canvas and MCP push responses gain an
-  additive `delivery` list with the same words and `expected_at`, and a
-  Lineups step reads "Queued · picks up ~3:48 PM". Pickup times use one
-  formatter everywhere.
-- Putting a dashboard on a display it is not bound to now asks first. The
-  lineup editor, setup wizard and schedule form show a Bind to this display
-  prompt (move it, or keep its other display too); the save binds in the
-  same write. Without consent every write path refuses: forms flash why,
-  JSON and MCP answer 409 `pages_not_bound` with the dashboards and a
-  `bind_pages` fix, and the companion API returns 400. Lineups already in
-  that state show a flagged "Not on this display" step with a one-click
-  Bind button.
-
-### Changed
-
-- The device page's Lineups section lists the display's lineups (when, which
-  days, how many dashboards, Live or when it plays next), each linking to it
-  on the Lineups page, above any schedules. It used to list schedules only,
-  so a display run by lineups read "Nothing scheduled yet".
-
-- Lineups redesign, part 2 of 3: the Lineups page is rebuilt on the view model
-  from part 1. Each display gets a header that says what is on screen (the
-  picture itself), what is queued and when it lands, and when the frame next
-  wakes. Lineups show as Cards (a strip of each lineup's dashboards with Push
-  now on every step) or as a Timeline (one track per display across the day,
-  with repeated updates of one dashboard collapsed into one thumbnail and a
-  "x N updates" badge). Each lineup has a day bar with ticks for every
-  advance, instant tooltips, an "Update in N min" flag on the next one, start
-  labels under busy bars and a hatched strip where quiet hours cut into an
-  all-day block. Today | All switches between today's rows and every row; Fold
-  all, a settings gear by each display name, a span icon for the Full cycle
-  chip, drag and keyboard editing of windows and days, and a deleted
-  dashboard shown as a flagged step with Remove (also in the lineup editor).
-  Times follow the app locale's 12/24-hour style. Settings > Devices shows one
-  "Now" line per display (the live lineup and until when, or the next one)
-  instead of every lineup name.
-
-### Added
-
 - Lineups redesign, part 1 of 3: a view model for the Lineups page and the
   endpoints the new page edits through. `GET /decks/view.json` describes every
   display (what is on screen, what is queued and when a sleeping frame picks it
@@ -68,6 +23,16 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   whose dashboard was deleted are flagged (`missing`) and the lineup editor
   lists them so they can be removed. Additive: the current Lineups page is
   unchanged apart from using the same small thumbnails.
+- Lineups redesign, part 3 of 3: a push to a sleeping frame says so. Every
+  push surface (Send, Push now on the Dashboards list and device page, the
+  canvas editor's Send, lineup steps and Push, History resend, calibration
+  and test patterns, the setup wizard) adds a notice per waiting display,
+  such as "Hallway Frame is asleep: it will pick this up at its next check-in
+  (~3:48 PM)", or names quiet hours, an overdue check-in or a lost
+  connection. The webhook, REST, canvas and MCP push responses gain an
+  additive `delivery` list with the same words and `expected_at`, and a
+  Lineups step reads "Queued · picks up ~3:48 PM". Pickup times use one
+  formatter everywhere.
 - A device with its own menu can list the dashboards bound to it and show
   any of them. `frames.json` now lists, after "Current dashboard", one item per
   dashboard bound to the device that is not archived, with an ASCII title.
@@ -110,6 +75,40 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Changed
 
+- Lineups redesign, part 2 of 3: the Lineups page is rebuilt on the view model
+  from part 1. Each display gets a header that says what is on screen (the
+  picture itself), what is queued and when it lands, and when the frame next
+  wakes. Lineups show as Cards (a strip of each lineup's dashboards with Push
+  now on every step) or as a Timeline (one track per display across the day,
+  with repeated updates of one dashboard collapsed into one thumbnail and a
+  "x N updates" badge). Each lineup has a day bar with ticks for every
+  advance, instant tooltips, an "Update in N min" flag on the next one, start
+  labels under busy bars and a hatched strip where quiet hours cut into an
+  all-day block. Today | All switches between today's rows and every row; Fold
+  all, a settings gear by each display name, a span icon for the Full cycle
+  chip, drag and keyboard editing of windows and days, and a deleted
+  dashboard shown as a flagged step with Remove (also in the lineup editor).
+  Times follow the app locale's 12/24-hour style. Settings > Devices shows one
+  "Now" line per display (the live lineup and until when, or the next one)
+  instead of every lineup name. Each row's menu
+  holds Edit, Step back (by-hand lineups), Push now, Enable or Disable and
+  Delete; rows follow the order they next play in, and the Display order and
+  Z to A sorts are gone.
+- The device page's Lineups section lists the display's lineups (when, which
+  days, how many dashboards, Live or when it plays next), each linking to it
+  on the Lineups page, above any schedules. It used to list schedules only,
+  so a display run by lineups read "Nothing scheduled yet".
+- A lineup, schedule or rotation that names a dashboard bound only to another
+  display is now refused unless you agree to bind it. Before, the save went
+  through and every run failed with "dashboard targets none of the requested
+  device(s)". The lineup editor, setup wizard and schedule form show a Bind to
+  this display prompt (move it, or keep its other display too), and the save
+  binds in the same request, before the record is written. Without consent
+  every write path refuses: forms flash why, JSON and MCP answer 409
+  `pages_not_bound` with the dashboards and a `bind_pages` fix, and the
+  companion API returns 400 (it has no consent field yet). Lineups already in
+  that state show a flagged "Not on this display" step with a one-click Bind
+  button.
 - Display-accurate previews: thumbnails show what the display can actually
   show. A black-and-white screen previews in black and white instead of full
   color, a grey screen in greyscale, and a color screen is unchanged. A

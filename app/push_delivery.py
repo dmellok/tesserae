@@ -262,6 +262,14 @@ def delivery_notice(
             # (the end minute is inclusive); say the end the user set.
             quiet_until = ends.timestamp() - 60 if ends is not None else None
     heard = getattr(entry, "last_heartbeat_at", None)
+    if heard is None:
+        # A frame that only polls (TRMNL firmware on /api/display) records a
+        # status entry per poll and no telemetry sample, so that poll is the
+        # check-in we know of; without it every such frame would read as never
+        # having checked in.
+        status = config.get("DEVICE_STATUS")
+        cached = status.get(device.id) if isinstance(status, dict) else None
+        heard = cached.get("received_at") if isinstance(cached, dict) else None
     return notice_for(
         device_id=device.id,
         name=str(getattr(device, "display_name", None) or device.id),

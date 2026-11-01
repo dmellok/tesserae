@@ -1048,13 +1048,13 @@ class ButtonService:
             if callable(promoter) and promoter(
                 device_id, target_page, source=source, extra={"deck_id": deck.id}, **lock_kw
             ):
-                # The promote wrote the History row; link the press to it.
-                event_id_fn = getattr(pusher, "promote_event_id", None)
-                event_id = event_id_fn(device_id) if callable(event_id_fn) else None
-                if isinstance(event_id, int):
-                    push_result = PushResult(
-                        status="sent", page_id=target_page, event_id=event_id
-                    )
+                # The promote wrote the History row; link the press to it. The
+                # press's own ``event_id`` stays as it is: it is the dedup key
+                # for a firmware retry of this press.
+                row_id_fn = getattr(pusher, "promote_event_id", None)
+                row_id = row_id_fn(device_id) if callable(row_id_fn) else None
+                if isinstance(row_id, int):
+                    push_result = PushResult(status="sent", page_id=target_page, event_id=row_id)
             else:
                 # No warmed frame ready: render on the fly (Phase 4's refresh
                 # keeps decks warm so this is the cold-start / miss path).

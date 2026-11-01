@@ -124,10 +124,12 @@ def serve(kind: str, key: str, ext: str) -> Response:
                 cached.parent.mkdir(parents=True, exist_ok=True)
                 with Image.open(source) as im:
                     im.thumbnail((MAX_DIM, MAX_DIM), Image.Resampling.LANCZOS)
-                    with tempfile.NamedTemporaryFile(
-                        dir=cached.parent, suffix=".tmp", delete=False
-                    ) as tmp:
-                        try:
+                    tmp_path: Path | None = None
+                    try:
+                        with tempfile.NamedTemporaryFile(
+                            dir=cached.parent, suffix=".tmp", delete=False
+                        ) as tmp:
+                            tmp_path = Path(tmp.name)
                             im.convert("RGB").save(
                                 tmp,
                                 format=_FORMAT,
@@ -137,9 +139,11 @@ def serve(kind: str, key: str, ext: str) -> Response:
                                     else {"optimize": True}
                                 ),
                             )
-                            Path(tmp.name).replace(cached)
-                        finally:
-                            Path(tmp.name).unlink(missing_ok=True)
+                        # Closed before the rename: Windows refuses to move an open file.
+                        tmp_path.replace(cached)
+                    finally:
+                        if tmp_path is not None:
+                            tmp_path.unlink(missing_ok=True)
     response = send_file(
         cached,
         mimetype=f"image/{_EXT}",

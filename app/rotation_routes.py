@@ -401,8 +401,8 @@ def create() -> Response:
             return refusal(rotation.device_ids, stranded)
         flash(flash_text(rotation.device_ids, stranded), "error")
         return redirect(url_for("rotations.index"))
-    _store().upsert(rotation)
     apply_consent(rotation.device_ids, shown, consent)
+    _store().upsert(rotation)
     # A picked dashboard that isn't on any display yet binds to the
     # rotation's display, mirroring the deck editor's save behaviour, so a
     # bound rotation can always render every step.
@@ -449,8 +449,8 @@ def update(rotation_id: str) -> Response:
     if stranded:
         flash(flash_text(rotation.device_ids, stranded), "error")
         return redirect(url_for("rotations.index", edit=rotation_id) + f"#rotation-{rotation_id}")
-    _store().upsert(rotation)
     apply_consent(rotation.device_ids, shown, consent)
+    _store().upsert(rotation)
     flash(f"Rotation {rotation.name!r} updated.", "ok")
     # Scroll back to the just-saved rotation's card so the user lands
     # on the read view of what they just changed, instead of the top

@@ -2737,8 +2737,8 @@ def mcp_create_rotation() -> Response:
     )
     if stranded:
         return refusal(rotation.device_ids, stranded)
-    current_app.config["ROTATION_STORE"].upsert(rotation)
     apply_consent(rotation.device_ids, shown, consent)
+    current_app.config["ROTATION_STORE"].upsert(rotation)
     return jsonify({"ok": True, "id": rotation.id})
 
 
@@ -2784,8 +2784,8 @@ def mcp_create_schedule() -> Response:
     )
     if stranded:
         return refusal(schedule.device_ids, stranded)
-    current_app.config["SCHEDULE_STORE"].upsert(schedule)
     apply_consent(schedule.device_ids, shown, consent)
+    current_app.config["SCHEDULE_STORE"].upsert(schedule)
     return jsonify({"ok": True, "id": schedule.id})
 
 
@@ -2855,8 +2855,8 @@ def mcp_create_deck() -> Response:
                     ]
                 }
             )
-    current_app.config["DECK_STORE"].upsert(deck)
     apply_consent(deck.device_ids, deck.page_ids, consent)
+    current_app.config["DECK_STORE"].upsert(deck)
     return jsonify({"ok": True, "id": deck.id, "links_derived": any(p.links for p in deck.pages)})
 
 

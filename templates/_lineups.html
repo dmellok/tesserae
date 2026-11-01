@@ -176,6 +176,7 @@
 <details class="lu-more"><summary title="More" aria-label="More actions for {{ l.name }}">{{ ico('dots') }}</summary>
 <div class="lu-more-menu">
 {%- if a.edit_url %}<a href="{{ a.edit_url }}">Edit</a>{% endif -%}
+{%- if assigned and l.kind == 'manual' and a.play_url %}<form method="post" action="{{ a.play_url }}" class="lu-inline"><input type="hidden" name="dir" value="prev"><button type="submit">Step back</button></form>{% endif -%}
 {%- if assigned and l.kind == 'cycle' and a.fire_url %}<form method="post" action="{{ a.fire_url }}" class="lu-inline"><button type="submit">Push now</button></form>{% endif -%}
 {%- if a.toggle_url %}<form method="post" action="{{ a.toggle_url }}" class="lu-inline"><button type="submit">{{ 'Disable' if l.enabled else 'Enable' }}</button></form>{% endif -%}
 {%- if a.delete_url %}<form method="post" action="{{ a.delete_url }}" class="lu-inline" data-confirm="Delete {{ l.name }}?"><button type="submit" class="danger">Delete</button></form>{% endif -%}

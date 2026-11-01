@@ -1704,6 +1704,11 @@
     );
   };
   async function refresh() {
+    if (document.hidden) {
+      // Nothing to show; the visibilitychange listener refreshes on return.
+      refreshDirty = true;
+      return;
+    }
     if (refreshing || busy()) {
       refreshDirty = true;
       scheduleRefresh(250);

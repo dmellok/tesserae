@@ -552,8 +552,8 @@ def create() -> Response:
             return refusal(schedule.device_ids, stranded)
         flash(flash_text(schedule.device_ids, stranded), "error")
         return redirect(_next_with_error(nxt, "new") if nxt else url_for("schedules.index"))
-    _store().upsert(schedule)
     apply_consent(schedule.device_ids, shown, consent)
+    _store().upsert(schedule)
     flash(f"Schedule {schedule.name!r} saved.", "ok")
     # Land on the unified list with the new card highlighted (#167).
     url = nxt or (url_for("decks.index", hl=schedule.id) + f"#udeck-{schedule.id}")
@@ -598,8 +598,8 @@ def update(schedule_id: str) -> Response:
         if nxt:
             return redirect(_next_with_error(nxt, schedule_id))
         return redirect(url_for("schedules.index", edit=schedule_id))
-    _store().upsert(schedule)
     apply_consent(schedule.device_ids, shown, consent)
+    _store().upsert(schedule)
     flash(f"Schedule {schedule.name!r} updated.", "ok")
     return redirect(nxt or url_for("schedules.index"))
 

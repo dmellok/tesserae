@@ -55,6 +55,7 @@ jobs:
   lineups-browser:
     name: Lineups browser tests
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
