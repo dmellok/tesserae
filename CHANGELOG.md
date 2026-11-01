@@ -8,6 +8,11 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Changed
 
+- The device page's Lineups section lists the display's lineups (when, which
+  days, how many dashboards, Live or when it plays next), each linking to it
+  on the Lineups page, above any schedules. It used to list schedules only,
+  so a display run by lineups read "Nothing scheduled yet".
+
 - Lineups redesign, part 2 of 3: the Lineups page is rebuilt on the view model
   from part 1. Each display gets a header that says what is on screen (the
   picture itself), what is queued and when it lands, and when the frame next

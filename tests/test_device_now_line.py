@@ -112,3 +112,30 @@ def test_nothing_running_names_the_next(app: Flask, client: Any) -> None:
     line = _now_line(client)
     assert "is-idle" in line and "Nothing running" in line
     assert f"next Dinner today {later.strftime('%H:%M')}" in line
+
+
+def _device_page_lineups(client: Any) -> str:
+    body = str(client.get("/settings/devices/porch").get_data(as_text=True))
+    start = body.index('id="lineups"')
+    return body[start : body.index("</section>", start)]
+
+
+def test_device_page_lists_the_displays_lineups(app: Flask, client: Any) -> None:
+    now = _local_now()
+    _lineup(app, "morning", "Morning", now - timedelta(minutes=30), now + timedelta(hours=1))
+    later = now + timedelta(hours=2)
+    _lineup(app, "dinner", "Dinner", later, later + timedelta(hours=1))
+    section = _device_page_lineups(client)
+    assert "Nothing scheduled yet" not in section
+    assert 'href="/decks?hl=morning#display-porch">Morning</a>' in section
+    assert 'href="/decks?hl=dinner#display-porch">Dinner</a>' in section
+    # Live first, then the next to play.
+    assert section.index("Morning") < section.index("Dinner")
+    assert "Live" in section
+    assert "2 dashboards" in section
+
+
+def test_device_page_without_lineups_keeps_the_empty_state(client: Any) -> None:
+    section = _device_page_lineups(client)
+    assert "Nothing scheduled yet" in section
+    assert "data-device-lineups" not in section

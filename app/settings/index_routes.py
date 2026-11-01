@@ -1465,6 +1465,7 @@ def _build_device_section(store: Any, device: Device) -> dict[str, Any] | None:
     section["overview"] = _device_overview(device, section)
     section["lineup_names"] = _lineup_names_for(device.id, section["timetable_entries"])
     section["now_line"] = _now_line_for(device.id)
+    section["lineup_rows"] = _lineup_rows_for(device.id) if is_instance else []
     return section
 
 
@@ -1500,6 +1501,50 @@ def _queued_note(pending: dict[str, Any]) -> dict[str, Any]:
     return {"title": "Waiting for the frame", "text": text, "live": bool(pending.get("live"))}
 
 
+def _lineups_view() -> Any:
+    """The Lineups page's view-model, built once per request: the Devices
+    list asks for it once per display. ``None`` when it can't be built."""
+    from flask import g
+
+    from app.deck_routes import build_lineups_view
+
+    if "_lineups_view" not in g:
+        try:
+            g._lineups_view = build_lineups_view()
+        except Exception:
+            current_app.logger.debug("devices: no lineups view", exc_info=True)
+            g._lineups_view = None
+    return g._lineups_view
+
+
+def _lineup_rows_for(device_id: str) -> list[dict[str, Any]]:
+    """The lineups on this display, as the Lineups page lists them (live
+    first, then by when they play next), for the device page's Lineups
+    section. Each row links to the lineup on the Lineups page."""
+    view = _lineups_view()
+    display = next((d for d in view.displays if d.id == device_id), None) if view else None
+    rows: list[dict[str, Any]] = []
+    for lu in display.lineups if display is not None else []:
+        window = lu.window
+        rows.append(
+            {
+                "id": lu.id,
+                "name": lu.name,
+                "status": lu.status,
+                "status_label": lu.status_label,
+                "enabled": lu.enabled,
+                "when": window.label if window is not None else "All day",
+                "days": lu.days_text,
+                "mode": lu.mode_label,
+                "steps": lu.step_count,
+                "next": lu.next_run.text if lu.next_run is not None and lu.status != "live" else "",
+                "url": url_for("decks.index", hl=lu.id) + f"#display-{device_id}",
+                "edit_url": lu.actions.edit_url,
+            }
+        )
+    return rows
+
+
 def _now_line_for(device_id: str) -> dict[str, Any] | None:
     """The one "what's on now" line the Devices quick panel shows instead
     of every lineup name: the lineup live on this display and until when
@@ -1508,13 +1553,10 @@ def _now_line_for(device_id: str) -> dict[str, Any] | None:
     from the Lineups page's own view-model so the two pages agree; links to
     this display there. ``None`` when the view can't be built (the card
     falls back to the plain name list)."""
-    from app.deck_routes import build_lineups_view
     from app.lineups_view import clock
 
-    try:
-        view = build_lineups_view()
-    except Exception:
-        current_app.logger.debug("devices: no lineups view for %s", device_id, exc_info=True)
+    view = _lineups_view()
+    if view is None:
         return None
     display = next((d for d in view.displays if d.id == device_id), None)
     lineups = list(display.lineups) if display is not None else []
