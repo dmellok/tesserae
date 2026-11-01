@@ -42,7 +42,7 @@ class _FakePush:
         self.push_calls.append({"page_id": page_id, "device_ids": set(kwargs["device_ids"])})
         return SimpleNamespace(status=self.status, error=None, event_id=1)
 
-    def promote_deck_page(self, device_id: str, page_id: str) -> bool:
+    def promote_deck_page(self, device_id: str, page_id: str, **_kw: object) -> bool:
         self.promoted.append((device_id, page_id))
         return self.promote_ok
 

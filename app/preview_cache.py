@@ -40,6 +40,7 @@ class PreviewRenderQueue:
     def __init__(self) -> None:
         self._q: queue.Queue[_Task] = queue.Queue()
         self._pending: set[str] = set()
+        self._failed_until: dict[str, float] = {}
         self._lock = threading.Lock()
         self._thread: threading.Thread | None = None
 
@@ -70,9 +71,14 @@ class PreviewRenderQueue:
         context, so it cannot read the settings store itself. Omitting it
         leaves Chromium on the container clock, which is UTC under Docker,
         and any clock widget in the preview renders in the wrong zone."""
+        # Hover and Lineups callers share a flight, scoped to their data root.
+        key = str(cache_path)
         with self._lock:
-            if key in self._pending:
+            if key in self._pending or time.monotonic() < self._failed_until.get(key, 0):
                 return
+            self._failed_until = {
+                k: until for k, until in self._failed_until.items() if until > time.monotonic()
+            }
             self._pending.add(key)
             if self._thread is None or not self._thread.is_alive():
                 self._thread = threading.Thread(
@@ -96,6 +102,8 @@ class PreviewRenderQueue:
                 if force or not cache_path.exists():
                     self._render(base_url, page_id, width, height, cache_path, pool, tz, thumb)
             except Exception:
+                with self._lock:
+                    self._failed_until[key] = time.monotonic() + 60
                 logger.debug("preview: background render failed for %s", page_id, exc_info=True)
             finally:
                 with self._lock:

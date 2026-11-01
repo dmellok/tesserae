@@ -207,10 +207,12 @@ def test_a_hold_longer_than_the_dwell_still_slows_the_cycle(wiring) -> None:
     assert fired_at == ["00:00", "01:00", "02:00"]
 
 
-def test_promoted_advance_writes_a_history_row(tmp_path: Path) -> None:
-    """A cache-hit promote changes what the panel shows without a push, so the
-    scheduler writes the History (``type="push"``) row itself; otherwise the
-    flip a person actually saw never appears on /history (#266)."""
+def test_promoted_advance_leaves_the_history_row_to_the_promote(tmp_path: Path) -> None:
+    """A cache-hit promote changes what the panel shows without a push; the
+    promote writes the History (``type="push"``) row itself
+    (``PushManager.promote_deck_page``, #266), tagged with the lineup, so the
+    scheduler must not write a second one."""
+
     from app.state.event_log import EventLog
 
     deck_store = DeckStore(tmp_path / "decks.json")
@@ -232,13 +234,8 @@ def test_promoted_advance_writes_a_history_row(tmp_path: Path) -> None:
     scheduler._tick_once(datetime(2026, 6, 15, 0, 0, tzinfo=UTC))
 
     push.push.assert_not_called()
-    rows = log.list(type="push", source="deck", limit=5)
-    assert len(rows) == 1
-    row = rows[0]
-    assert row.status == "sent"
-    assert row.target == "a"
-    assert row.digest == "compdigest"
-    assert row.extra["promoted"] is True
-    assert row.extra["device_ids"] == ["panel"]
-    # The internal advance event is still recorded alongside.
+    push.promote_deck_page.assert_called_once()
+    assert push.promote_deck_page.call_args.kwargs["extra"] == {"deck_id": "d1"}
+    assert log.list(type="push", source="deck", limit=5) == []
+    # The internal advance event is still recorded.
     assert log.list(type="deck", limit=5)

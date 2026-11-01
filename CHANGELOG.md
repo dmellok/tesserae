@@ -8,6 +8,21 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- Lineups redesign, part 1 of 3: a view model for the Lineups page and the
+  endpoints the new page edits through. `GET /decks/view.json` describes every
+  display (what is on screen, what is queued and when a sleeping frame picks it
+  up, the real wake time, quiet hours, a day bar per lineup, each step with a
+  small thumbnail). `POST /decks/<id>/window`, `/days` and `/edits` change a
+  lineup's time window and weekdays in one locked write, refuse a change that
+  makes two lineups on one display overlap (409) and warn when a run falls in
+  quiet hours. `POST /decks/<id>/push-step` pushes one step now; with the
+  step's `composition_digest` it resends the saved picture the tile shows
+  instead of rendering again. Step thumbnails are small immutable WebP
+  snapshots keyed by the pushed composition, looked up in one query per page;
+  a dashboard never pushed is rendered once in the background. Lineup steps
+  whose dashboard was deleted are flagged (`missing`) and the lineup editor
+  lists them so they can be removed. Additive: the current Lineups page is
+  unchanged apart from using the same small thumbnails.
 - A device with its own menu can list the dashboards bound to it and show
   any of them. `frames.json` now lists, after "Current dashboard", one item per
   dashboard bound to the device that is not archived, with an ASCII title.
@@ -62,6 +77,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   unchanged. See `docs/thumbnail-color.md`.
 
 ### Fixed
+
+- A lineup step that lands a pre-rendered frame now shows up everywhere the
+  newest push is read. Home Assistant's Next and Previous, a physical button,
+  a tap, the companion API, the Lineups page's step and a home return could
+  swap the cached frame onto the display without writing a History row, so
+  the Lineups thumbnails, History and "from Home Assistant" labels kept the
+  frame from before. The promote now writes that row itself (with its
+  source), the timer advance no longer writes a second one, and a button
+  press's row links to it.
 
 - Settings > Devices and the device page no longer show a stale or mislabelled
   preview for a pull (REST) frame after a push. The page used to keep the old

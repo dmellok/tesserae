@@ -1611,7 +1611,13 @@ class HomeAssistantDiscovery:
                 promoter = getattr(pusher, "promote_deck_page", None)
                 promoted = bool(
                     callable(promoter)
-                    and promoter(device_id, target, lock_timeout_s=HA_PUSH_LOCK_TIMEOUT_S)
+                    and promoter(
+                        device_id,
+                        target,
+                        lock_timeout_s=HA_PUSH_LOCK_TIMEOUT_S,
+                        source="home_assistant",
+                        extra={"deck_id": deck.id},
+                    )
                 )
                 if not promoted:
                     result = pusher.push(

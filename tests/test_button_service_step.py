@@ -51,7 +51,7 @@ class FakePush:
         )
         return PushResult(status=self.status, page_id=page_id, event_id=100 + len(self.calls))
 
-    def promote_deck_page(self, device_id: str, page_id: str) -> bool:
+    def promote_deck_page(self, device_id: str, page_id: str, **_kw: object) -> bool:
         if (device_id, page_id) in self.warmed:
             self.promotes.append((device_id, page_id))
             return True

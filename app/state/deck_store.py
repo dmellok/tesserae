@@ -10,11 +10,13 @@ import logging
 import threading
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar
 
 from app.state.deck_model import Deck
 
 logger = logging.getLogger(__name__)
+
+_T = TypeVar("_T")
 
 
 class DeckStore:
@@ -90,6 +92,42 @@ class DeckStore:
                 raw.append(record)
             self._save_raw(raw)
         self._notify()
+
+    def transaction(self, plan: Callable[[dict[str, Deck]], tuple[list[Deck], _T]]) -> _T:
+        """Read, decide and write as one step under the store's lock.
+
+        ``plan`` gets every deck by id and returns ``(decks to write, result)``;
+        they are written in one save and ``result`` is returned. An exception
+        from ``plan`` writes nothing, and an empty write notifies nobody.
+
+        This serialises against this store's other transactions and its own
+        ``upsert`` / ``delete`` (they share the in-process lock); it does not
+        guard against another process writing the file, nor against a caller
+        that read decks earlier and upserts later. ``plan`` must not call back
+        into this store (the lock is not re-entrant)."""
+        with self._lock:
+            raw = self._load_raw()
+            decks: dict[str, Deck] = {}
+            for d in raw:
+                try:
+                    deck = Deck.model_validate(d)
+                except Exception:
+                    continue
+                decks[deck.id] = deck
+            to_write, result = plan(decks)
+            if to_write:
+                index = {str(d.get("id")): i for i, d in enumerate(raw)}
+                for deck in to_write:
+                    record = deck.model_dump(mode="json", exclude_none=True)
+                    if deck.id in index:
+                        raw[index[deck.id]] = record
+                    else:
+                        index[deck.id] = len(raw)
+                        raw.append(record)
+                self._save_raw(raw)
+        if to_write:
+            self._notify()
+        return result
 
     def delete(self, deck_id: str) -> bool:
         with self._lock:

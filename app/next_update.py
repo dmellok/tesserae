@@ -52,6 +52,10 @@ class Reach:
     gap_s: float | None = None
     live: bool = False
     step: Callable[[float], float | None] | None = None
+    # True when ``gap_s`` is a cadence the device keeps (the operator set its
+    # sleep interval, or the firmware states it), not a spacing seen between
+    # heartbeats of a device that may simply be awake on power.
+    cadence_stable: bool = False
 
 
 @dataclass(frozen=True)
@@ -288,6 +292,8 @@ def reach_for_device(device: Any, *, now: float | None = None) -> Reach:
             next_checkin_at=float(predicted),
             gap_s=float(gap) if isinstance(gap, (int, float)) and gap > 0 else None,
             step=_aligned_step(device, entry, stored),
+            cadence_stable=getattr(entry, "prediction_source", None)
+            in ("configured", "firmware", "server"),
         )
     if visionect.is_visionect_device(device):
         return Reach(MODE_SLEEPS)
@@ -382,6 +388,19 @@ def scheduled_push_at(device: Any, *, now: float | None = None) -> float | None:
     return events[0].scheduled_at.timestamp() if events else None
 
 
+def pause_hold_at(window: Any, push_at: float, tz: tzinfo | None) -> Hold | None:
+    """The pause-hours hold on a push at epoch ``push_at``: held to the end
+    of the quiet hours it lands in, or ``None`` when it lands outside them.
+    ``window`` is a ``quiet_hours.QuietHoursWindow``."""
+    from app.quiet_hours import is_in_window, quiet_ends_at
+
+    when = datetime.fromtimestamp(push_at, UTC)
+    if not is_in_window(window, when, tz):
+        return None
+    ends = quiet_ends_at(window, when, tz)
+    return Hold(ends.timestamp() if ends is not None else None, "quiet hours")
+
+
 def _quiet_window(device: Any) -> Any:
     from flask import current_app
 
@@ -418,12 +437,7 @@ class DeviceTiming:
         if hold is None and push is not None and self._window is not None:
             # A push that lands inside quiet hours that have not started yet
             # is held to their end, the same as one that lands during them.
-            from app.quiet_hours import is_in_window, quiet_ends_at
-
-            when = datetime.fromtimestamp(push, UTC)
-            if is_in_window(self._window, when, self.tz):
-                ends = quiet_ends_at(self._window, when, self.tz)
-                hold = Hold(ends.timestamp() if ends is not None else None, "quiet hours")
+            hold = pause_hold_at(self._window, push, self.tz)
         nu = compute_next_update(push, self.reach, now=self.now, hold=hold)
         out = describe(nu, self.reach, tz=self.tz, now=self.now)
         # ``when`` / ``detail`` / ``text`` stay 24-hour: Home Assistant's

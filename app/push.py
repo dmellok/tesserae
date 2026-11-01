@@ -47,7 +47,7 @@ import urllib.error
 import urllib.request
 from collections import OrderedDict
 from collections.abc import Callable, Iterator, Mapping
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 from typing import Any, Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -636,6 +636,8 @@ class PushManager:
         # (re-warmed on restart) but its digests are GC-protected via
         # ``_live_digests`` so the prune can't delete a warmed artifact.
         self._deck_renders: dict[str, dict[str, dict[str, Any]]] = {}
+        # The History row of each device's latest promote (``promote_event_id``).
+        self._promote_event_ids: dict[str, int] = {}
         # Offline-album frame cache (frame-cache collections, #177): the same
         # silent-warm mechanism as decks, keyed device_id -> frame_id -> render
         # info. An album frame is one gallery image rendered to the device's
@@ -1124,13 +1126,26 @@ class PushManager:
         return True
 
     def promote_deck_page(
-        self, device_id: str, page_id: str, *, lock_timeout_s: float | None = None
+        self,
+        device_id: str,
+        page_id: str,
+        *,
+        lock_timeout_s: float | None = None,
+        source: str = "deck",
+        extra: dict[str, Any] | None = None,
     ) -> bool:
         """Swap a pre-warmed deck frame into the device's live slot so the next
         ``/frame`` serves it with no render. Returns False on a cache miss, the
         caller should then fall back to an on-the-fly push. With
         ``lock_timeout_s``, also False when the lock isn't free in time (the
-        fallback push then reports the renderer busy)."""
+        fallback push then reports the renderer busy).
+
+        A promote changes what the panel shows without the push pipeline, so
+        it writes the ``type="push"`` row itself (``source``, plus ``extra``),
+        whoever asked for it: a lineup timer, a button, Home Assistant, the
+        companion API. History, the Lineups thumbnails and every other
+        reader of the latest push per dashboard then show the frame that is
+        actually on the panel. :meth:`promote_event_id` returns the row id."""
         with self._render_lock_within(lock_timeout_s) as held:
             if not held:
                 return False
@@ -1168,9 +1183,42 @@ class PushManager:
                     )
                 ],
             )
+        event_id = self._record_promote(device_id, page_id, info, source=source, extra=extra)
+        if event_id is not None:
+            result = replace(result, event_id=event_id, event_ids=(event_id,))
         # Relay and other delivery listeners must see cached navigations too.
         self._notify(result)
         return True
+
+    def _record_promote(
+        self,
+        device_id: str,
+        page_id: str,
+        info: dict[str, Any],
+        *,
+        source: str,
+        extra: dict[str, Any] | None,
+    ) -> int | None:
+        comp = info.get("composition_digest")
+        try:
+            event_id = self._event_log.record(
+                type="push",
+                source=source,
+                target=page_id,
+                status="sent",
+                digest=str(comp) if comp else None,
+                extra={**(extra or {}), "device_ids": [device_id], "promoted": True},
+            )
+        except Exception:
+            logger.exception("promote history row failed device=%s page=%s", device_id, page_id)
+            return None
+        # A plain dict write: ``_lock`` is the render lock, held for whole renders.
+        self._promote_event_ids[device_id] = event_id
+        return event_id
+
+    def promote_event_id(self, device_id: str) -> int | None:
+        """The History row id of the device's latest promote, if any."""
+        return self._promote_event_ids.get(device_id)
 
     def has_warm_deck_page(self, device_id: str, page_id: str) -> bool:
         return page_id in self._deck_renders.get(device_id, {})
@@ -2458,37 +2506,49 @@ class PushManager:
                     if isinstance(fit_candidate, str) and fit_candidate in _IMAGE_FIT_MODES
                     else None
                 )
-                # Republish is a user-initiated resend from the History
-                # page; treat it as user intent (bypass coalescing) so
-                # the user's re-send never gets silently superseded.
-                resending = set(selected_ids) or self._broadcast_recipients()
-                self._mark_rendering(resending, +1)
-                self._lock.acquire()
-                try:
-                    # ``force_publish=True``: resend is an explicit user
-                    # action from the History page; even when the same
-                    # composition is already the panel's current frame,
-                    # honour the click and re-publish (v0.71.x content-
-                    # checksum skip otherwise would collapse this into
-                    # ``no_change`` and swallow the user's intent).
-                    # Devices in one push row share a panel group, so the
-                    # first id resolves the group's dims (base-kind topic
-                    # prefixes miss the device lookup and fall back to the
-                    # virtual panel, same as the original unbound push).
-                    result = self._fan_out(
-                        comp_path.read_bytes(),
-                        self._panel_dims_for_send(selected_ids[0] if selected_ids else None),
-                        source="resend",
-                        target=record.target,
-                        started=time.monotonic(),
-                        device_filters=set(selected_ids) if selected_ids else None,
-                        image_fit=original_fit,
-                        force_publish=True,
-                        force_client_refetch=True,
-                    )
-                finally:
-                    self._lock.release()
-                    self._mark_rendering(resending, -1)
+                return self.republish_composition(
+                    comp_path.read_bytes(),
+                    page_id=record.target,
+                    device_ids=set(selected_ids) if selected_ids else None,
+                    image_fit=original_fit,
+                )
+        self._notify(result)
+        return result
+
+    def republish_composition(
+        self,
+        composition_png: bytes,
+        *,
+        page_id: str,
+        device_ids: set[str] | None,
+        image_fit: str | None = None,
+    ) -> PushResult:
+        """Send an upright saved composition through History's resend pipeline.
+
+        Callers validate provenance before supplying the PNG. Targets must
+        share panel dimensions, as in a History push row; Lineups invokes this
+        once per display. The normal renderer fits the saved pixels to the
+        target panel, then applies its physical rotation exactly once. No
+        widget is rendered again. Explicit sends bypass coalescing and quiet
+        hours, force publishing and a client refetch, and log the same digest.
+        """
+        resending = device_ids or self._broadcast_recipients()
+        self._mark_rendering(resending, +1)
+        try:
+            with self._lock:
+                result = self._fan_out(
+                    composition_png,
+                    self._panel_dims_for_send(sorted(device_ids)[0] if device_ids else None),
+                    source="resend",
+                    target=page_id,
+                    started=time.monotonic(),
+                    device_filters=device_ids,
+                    image_fit=image_fit,
+                    force_publish=True,
+                    force_client_refetch=True,
+                )
+        finally:
+            self._mark_rendering(resending, -1)
         self._notify(result)
         return result
 

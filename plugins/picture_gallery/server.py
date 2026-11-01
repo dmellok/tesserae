@@ -184,6 +184,13 @@ def _thumb_version(source: Path) -> str:
     return f"{int(st.st_mtime)}-{st.st_size}"
 
 
+def thumb_version(folder: str, filename: str) -> str:
+    """Public: the ``v`` query value for one image's thumbnail URL ("0" when
+    the file can't be resolved)."""
+    source = resolve_image_path(folder, filename)
+    return _thumb_version(source) if source is not None else "0"
+
+
 def _ensure_thumbnail(source: Path, dest: Path) -> Path | None:
     if dest.exists():
         return dest
