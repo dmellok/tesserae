@@ -1762,7 +1762,7 @@ class Scheduler:
         if callable(quiet_check) and quiet_check(device_id):
             return
         promoter = getattr(pusher, "promote_deck_page", None)
-        promoted = callable(promoter) and promoter(device_id, home)
+        promoted = callable(promoter) and promoter(device_id, home, extra={"deck_id": deck.id})
         if not promoted:
             result = pusher.push(
                 home,
@@ -1970,7 +1970,7 @@ class Scheduler:
         promoted = (
             callable(promoter)
             and not self._warm_frame_is_stale(pusher, deck, device_id, target, now)
-            and promoter(device_id, target)
+            and promoter(device_id, target, extra={"deck_id": deck.id})
         )
         if not promoted:
             result = pusher.push(
@@ -2019,27 +2019,7 @@ class Scheduler:
             "promoted" if promoted else "pushed",
         )
         if self._event_log is not None:
-            if promoted:
-                # A cache-hit promote changes what the panel shows without
-                # touching the push pipeline, so nothing else writes a
-                # History (``type="push"``) row for it. Record one here,
-                # otherwise History lists the background warms nobody sees
-                # while the flip the person actually watched is invisible.
-                render_for = getattr(pusher, "deck_render_for", None)
-                info = render_for(device_id, target) if callable(render_for) else None
-                comp = (info or {}).get("composition_digest")
-                self._event_log.record(
-                    type="push",
-                    source="deck",
-                    target=target,
-                    status="sent",
-                    digest=str(comp) if comp else None,
-                    extra={
-                        "device_ids": [device_id],
-                        "promoted": True,
-                        "deck_id": deck.id,
-                    },
-                )
+            # A promote writes its own History row (PushManager.promote_deck_page).
             self._event_log.record(
                 type="deck",
                 source="deck",

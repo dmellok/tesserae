@@ -320,10 +320,12 @@ def test_a_home_assistant_step_bounds_promote_and_push(tmp_path: Path) -> None:
     app.config["DEVICE_REGISTRY"] = type("R", (), {"get": staticmethod(lambda _id: device)})()
     app.config["BUTTON_SERVICE"] = rig.svc
     assert ha_hooks._step_device(app, "frame", 1) is None
-    assert rig.push.promote_kwargs == [{"lock_timeout_s": 60.0}]
+    assert len(rig.push.promote_kwargs) == 1
+    assert rig.push.promote_kwargs[0]["lock_timeout_s"] == 60.0
+    assert rig.push.promote_kwargs[0]["source"] == "home_assistant"
     assert rig.push.push_kwargs[-1]["lock_timeout_s"] == 60.0
     assert rig.push.push_kwargs[-1]["settle_max_s"] == 30.0
     # A physical press is unchanged: no deadlines.
     rig.svc.handle_button(device_id="frame", button="right", event_id=1)
-    assert rig.push.promote_kwargs[-1] == {}
+    assert "lock_timeout_s" not in rig.push.promote_kwargs[-1]
     assert "lock_timeout_s" not in rig.push.push_kwargs[-1]

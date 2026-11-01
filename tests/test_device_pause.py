@@ -62,7 +62,7 @@ class RecPush:
         ]
         return PushResult(status="sent", page_id=page_id, renderers=rows)
 
-    def promote_deck_page(self, _device_id: str, _page_id: str) -> bool:
+    def promote_deck_page(self, _device_id: str, _page_id: str, **_kw: object) -> bool:
         return False
 
     def device_in_quiet_hours(self, device_id: str) -> bool:
