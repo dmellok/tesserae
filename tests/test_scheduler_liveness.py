@@ -60,7 +60,7 @@ def test_fresh_warm_frame_is_promoted(wiring) -> None:
     store.upsert(_deck())
     push.deck_render_for.return_value = {"timestamp": T0.timestamp() - 10 * 60}
     scheduler._tick_once(T0)
-    push.promote_deck_page.assert_called_once_with("panel", "a")
+    push.promote_deck_page.assert_called_once_with("panel", "a", extra={"deck_id": "d1"})
     push.push.assert_not_called()
 
 
@@ -80,7 +80,7 @@ def test_page_without_warm_cadence_is_always_promotable(wiring) -> None:
     store.upsert(_deck(refresh_interval_minutes=0))
     push.deck_render_for.return_value = {"timestamp": T0.timestamp() - 3 * 3600}
     scheduler._tick_once(T0)
-    push.promote_deck_page.assert_called_once_with("panel", "a")
+    push.promote_deck_page.assert_called_once_with("panel", "a", extra={"deck_id": "d1"})
     push.push.assert_not_called()
 
 
@@ -89,7 +89,7 @@ def test_frame_without_timestamp_is_promoted(wiring) -> None:
     store.upsert(_deck())
     push.deck_render_for.return_value = {"composition_digest": "x"}
     scheduler._tick_once(T0)
-    push.promote_deck_page.assert_called_once_with("panel", "a")
+    push.promote_deck_page.assert_called_once_with("panel", "a", extra={"deck_id": "d1"})
 
 
 # -- skipped advances are visible -----------------------------------------

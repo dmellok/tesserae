@@ -47,7 +47,7 @@ import urllib.error
 import urllib.request
 from collections import OrderedDict
 from collections.abc import Callable, Iterator, Mapping
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 from typing import Any, Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -636,6 +636,8 @@ class PushManager:
         # (re-warmed on restart) but its digests are GC-protected via
         # ``_live_digests`` so the prune can't delete a warmed artifact.
         self._deck_renders: dict[str, dict[str, dict[str, Any]]] = {}
+        # The History row of each device's latest promote (``promote_event_id``).
+        self._promote_event_ids: dict[str, int] = {}
         # Offline-album frame cache (frame-cache collections, #177): the same
         # silent-warm mechanism as decks, keyed device_id -> frame_id -> render
         # info. An album frame is one gallery image rendered to the device's
@@ -1124,13 +1126,26 @@ class PushManager:
         return True
 
     def promote_deck_page(
-        self, device_id: str, page_id: str, *, lock_timeout_s: float | None = None
+        self,
+        device_id: str,
+        page_id: str,
+        *,
+        lock_timeout_s: float | None = None,
+        source: str = "deck",
+        extra: dict[str, Any] | None = None,
     ) -> bool:
         """Swap a pre-warmed deck frame into the device's live slot so the next
         ``/frame`` serves it with no render. Returns False on a cache miss, the
         caller should then fall back to an on-the-fly push. With
         ``lock_timeout_s``, also False when the lock isn't free in time (the
-        fallback push then reports the renderer busy)."""
+        fallback push then reports the renderer busy).
+
+        A promote changes what the panel shows without the push pipeline, so
+        it writes the ``type="push"`` row itself (``source``, plus ``extra``),
+        whoever asked for it: a lineup timer, a button, Home Assistant, the
+        companion API. History, the Lineups thumbnails and every other
+        reader of the latest push per dashboard then show the frame that is
+        actually on the panel. :meth:`promote_event_id` returns the row id."""
         with self._render_lock_within(lock_timeout_s) as held:
             if not held:
                 return False
@@ -1168,9 +1183,42 @@ class PushManager:
                     )
                 ],
             )
+        event_id = self._record_promote(device_id, page_id, info, source=source, extra=extra)
+        if event_id is not None:
+            result = replace(result, event_id=event_id, event_ids=(event_id,))
         # Relay and other delivery listeners must see cached navigations too.
         self._notify(result)
         return True
+
+    def _record_promote(
+        self,
+        device_id: str,
+        page_id: str,
+        info: dict[str, Any],
+        *,
+        source: str,
+        extra: dict[str, Any] | None,
+    ) -> int | None:
+        comp = info.get("composition_digest")
+        try:
+            event_id = self._event_log.record(
+                type="push",
+                source=source,
+                target=page_id,
+                status="sent",
+                digest=str(comp) if comp else None,
+                extra={**(extra or {}), "device_ids": [device_id], "promoted": True},
+            )
+        except Exception:
+            logger.exception("promote history row failed device=%s page=%s", device_id, page_id)
+            return None
+        # A plain dict write: ``_lock`` is the render lock, held for whole renders.
+        self._promote_event_ids[device_id] = event_id
+        return event_id
+
+    def promote_event_id(self, device_id: str) -> int | None:
+        """The History row id of the device's latest promote, if any."""
+        return self._promote_event_ids.get(device_id)
 
     def has_warm_deck_page(self, device_id: str, page_id: str) -> bool:
         return page_id in self._deck_renders.get(device_id, {})

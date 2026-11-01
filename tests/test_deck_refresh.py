@@ -112,7 +112,7 @@ class FakeNavPush(FakePush):
     promoted: list[tuple[str, str]] = field(default_factory=list)
     promote_ok: bool = True
 
-    def promote_deck_page(self, device_id: str, page_id: str) -> bool:
+    def promote_deck_page(self, device_id: str, page_id: str, **_kw: object) -> bool:
         if self.promote_ok:
             self.promoted.append((device_id, page_id))
         return self.promote_ok
