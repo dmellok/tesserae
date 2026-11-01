@@ -14,6 +14,8 @@ server draws is anchored to it.
 
 from __future__ import annotations
 
+import json
+import re
 from datetime import datetime
 from typing import TYPE_CHECKING
 from zoneinfo import ZoneInfo
@@ -78,6 +80,11 @@ def test_the_page_ships_the_zone_to_the_client(app: Flask) -> None:
     try:
         assert resp.status_code == 200
         body = resp.get_data(as_text=True)
-        assert "tzName" in body, "the rail tick no longer carries a timezone"
+        # The view-model rides along with the server's own clock and zone, so
+        # the now mark never comes from the browser's clock (#165).
+        m = re.search(r'<script type="application/json" data-lu-vm>(.*?)</script>', body, re.S)
+        assert m, "the page no longer carries its view-model"
+        now = json.loads(m.group(1))["now"]
+        assert {"tz", "minute", "weekday", "hhmm"} <= set(now)
     finally:
         resp.close()

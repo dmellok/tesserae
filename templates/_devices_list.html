@@ -131,9 +131,21 @@
         </div>
         <div class="dx-devquick-actions">
           {{ device_actions(section, 'is-sm') }}
+          {% set _now = section.now_line %}
+          {% if _now %}
+          {# What's on now, not every lineup name: the full list lives on Lineups. #}
+          <a class="dx-devnow is-{{ _now.state }}" href="{{ _now.url }}" title="Open this display on Lineups">
+            {% if _now.state != 'none' %}<span class="dx-devnow-dot" aria-hidden="true"></span>{% endif %}
+            <span class="dx-devnow-label">{{ 'Lineups' if _now.state == 'none' else 'Now' }}</span>
+            {% if _now.name %}<span class="dx-devnow-name">{{ _now.name }}</span>{% endif %}
+            {% if _now.meta %}<span class="dx-devnow-meta">{{ _now.meta }}</span>{% endif %}
+            <i class="ph ph-arrow-right" aria-hidden="true"></i>
+          </a>
+          {% else %}
           <span class="dx-devquick-lineups" title="Lineups and schedules targeting this display">
             {% if section.lineup_names %}{{ section.lineup_names|join(' · ') }}{% else %}No lineups yet{% endif %}
           </span>
+          {% endif %}
           <a class="dx-btn is-primary is-sm dx-devquick-open" href="{{ section.page_url }}">
             <span>Open settings</span><i class="ph ph-caret-right" aria-hidden="true"></i>
           </a>

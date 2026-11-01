@@ -10,9 +10,9 @@ unknown panels to `color` / 0 grey levels. Visionect Place & Play 32 is
 The helper also resolves the selected clone's dither setting, including fixed
 renderer overrides. Dither `none` does not change its level count.
 
-The request-cached Jinja `preview_color` resolver uses this helper. `data-gamut` and
-`data-grey-levels` sit on preview media or its immediate wrapper. Global
-`static/style/preview-color.css` filters grey media with
+The request-cached Jinja `preview_color` resolver and Lineups view model use
+this helper. `data-gamut` and `data-grey-levels` sit on preview media or its
+immediate wrapper. Global `static/style/preview-color.css` filters grey media with
 `grayscale(1)`, `mono-dither` media likewise (error diffusion and ordered
 dithering average to grey at thumbnail size, so a dithered 1-bit frame reads as
 a smooth grey photo) and `mono` media (dither `none`) through the shell's single
@@ -22,7 +22,8 @@ dither or calibrated-palette simulations. No images are regenerated.
 
 Unbound dashboards keep color. Multiple targets use their common mode and
 level count when they agree, otherwise color; unknown/removed targets also
-keep color.
+keep color. Lineups resolve each display separately, even for a shared lineup.
+The JSON additions preserve schema version 1.
 
 ## Thumbnail audit
 
@@ -30,10 +31,16 @@ keep color.
   latest-render thumbnail. `/preview/<id>.png` serves the **composition**, so
   this needs filtering even when delivery uses a quantised renderer. Legacy
   entries that have no composition digest fall back to the real artifact and
-  are explicitly excluded with `data-device-quantised`.
+  are explicitly excluded with `data-device-quantised`. For a pull device with
+  a newer image waiting, the big thumbnail is the frame's last fetched image
+  (`/renders/<composition>.png`) and a small "Queued" one (`/preview`) sits
+  under it; both carry the same color attributes.
 - Dashboards list: row image, opened preview and hover popover, including live
   iframe fallbacks (`pages_list.html`). Detached hover copies the row metadata.
-- Lineup editor filmstrip (`deck_editor.js`) follows its display chooser.
+- Lineups: display header, step tiles and hover enlargement (`_lineups.html`
+  and `lineups_render.js`), detached gallery popover, timeline step and carried
+  hold thumbnails. All use the owning display. Older lineup editor filmstrip
+  (`deck_editor.js`) follows its display chooser too.
 - History: composition thumbnails and every Open frame link; Events: push
   composition thumbnails. Shared lightbox copies the originating color mode.
   History uses the event's original target IDs, not today's page bindings.

@@ -5,9 +5,11 @@ and held by quiet hours / pauses."""
 from __future__ import annotations
 
 import json
+import re
 import time
-from datetime import UTC, datetime
+from datetime import UTC, datetime, tzinfo
 from pathlib import Path
+from typing import Any
 
 import pytest
 from flask import Flask
@@ -22,7 +24,7 @@ NOW = 1_900_000_000.0
 MIN = 60.0
 
 
-def _compute(push, reach, hold=None):
+def _compute(push: float | None, reach: nu.Reach, hold: nu.Hold | None = None) -> nu.NextUpdate:
     return nu.compute_next_update(push, reach, now=NOW, hold=hold)
 
 
@@ -93,11 +95,11 @@ def test_checkins_on_a_wake_alignment_grid_use_the_grid_not_a_fixed_gap() -> Non
     assert _compute(NOW + 25 * MIN, reach).at == NOW + 50 * MIN
 
 
-def _tz():
+def _tz() -> tzinfo:
     return UTC
 
 
-def _say(push, reach, hold=None):
+def _say(push: float | None, reach: nu.Reach, hold: nu.Hold | None = None) -> dict[str, Any]:
     r = _compute(push, reach, hold)
     return nu.describe(r, reach, tz=_tz(), now=NOW)
 
@@ -180,16 +182,18 @@ def app(tmp_path: Path) -> Flask:
         devices_dir=REPO_ROOT / "devices",
     )
     a.config["TESTING"] = True
+    # 24-hour labels, whatever the host's locale (the Lineups page follows it).
+    a.config["SETTINGS_STORE"].patch_section("app", {"locale": "en-GB"})
     for pid in ("kitchen", "hall"):
         a.config["PAGE_STORE"].save(Page(id=pid, name=pid.title()))
     return a
 
 
-def _sign_in(client) -> None:
+def _sign_in(client: Any) -> None:
     client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
 
 
-def _register(app: Flask, client, device_id: str) -> None:
+def _register(app: Flask, client: Any, device_id: str) -> None:
     code = app.config["PAIRING_STORE"].issue(note="test").code
     resp = client.post(
         "/api/v1/device/register",
@@ -223,10 +227,10 @@ def _seed_loop(app: Flask, device_id: str) -> None:
     )
 
 
-def _device_page(client, device_id: str) -> str:
+def _device_page(client: Any, device_id: str) -> str:
     resp = client.get(f"/settings/devices/{device_id}")
     assert resp.status_code == 200
-    return resp.get_data(as_text=True)
+    return str(resp.get_data(as_text=True))
 
 
 @pytest.mark.parametrize("design", ["classic", "paper"])
@@ -246,7 +250,7 @@ def test_device_page_says_when_a_sleeping_frame_gets_its_next_update(
 
 
 def test_device_page_says_connected_for_a_frame_with_a_live_connection(
-    app: Flask, monkeypatch
+    app: Flask, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     client = app.test_client()
     _sign_in(client)
@@ -269,12 +273,23 @@ def test_lineups_page_adds_the_next_update_to_the_next_advance(app: Flask) -> No
     _seed_loop(app, "panel")
     _beat(app, "panel", wake_in_s=3 * 3600)
     body = client.get("/decks").get_data(as_text=True)
-    assert "next advance" in body
-    assert "data-next-update>Next update ~" in body
-    assert "frame sleeps; next check-in ~" in body
+    # The display header's next line says when the queued step lands: at the
+    # next check-in, approximately, with the reason on hover.
+    line = re.search(r'<p class="lu-nextl" title="([^"]*)">(.*?)</p>', body)
+    assert line
+    assert "sleeps" in line.group(1) and "check-in" in line.group(1)
+    # Three hours can cross midnight. The weekday is part of that label.
+    assert re.search(r"<b>~(?:(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun) )?\d\d:\d\d</b>", line.group(2))
+    embedded = re.search(r'<script type="application/json" data-lu-vm>(.*?)</script>', body, re.S)
+    assert embedded
+    label = json.loads(embedded.group(1))["displays"][0]["next_line"]["at"]
+    assert f"<b>{label}</b>" in line.group(2)
+    assert re.search(r"<span>Wakes (?:at|\w{3}) ", body)
 
 
-def test_lineups_card_for_a_connected_frame_arrives_right_away(app: Flask, monkeypatch) -> None:
+def test_lineups_card_for_a_connected_frame_arrives_right_away(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
     client = app.test_client()
     _sign_in(client)
     _register(app, client, "panel")
@@ -289,7 +304,10 @@ def test_lineups_card_for_a_connected_frame_arrives_right_away(app: Flask, monke
         ),
     )
     body = client.get("/decks").get_data(as_text=True)
-    assert "frame connected, arrives right away" in body
+    line = re.search(r'<p class="lu-nextl" title="([^"]*)">(.*?)</p>', body)
+    assert line and "connected, so it lands right away" in line.group(1)
+    assert re.search(r"next at <b>\d\d:\d\d</b>", line.group(2))  # no ~: lands on time
+    assert "<span>Online</span>" in body
 
 
 def test_quiet_hours_hold_the_lineups_card_until_they_end(app: Flask) -> None:
@@ -368,13 +386,18 @@ def test_ha_state_for_a_sleeping_frame_has_a_checkin_and_a_check_in_reason(app: 
     _beat(app, "panel", wake_in_s=40 * 60)
     from app.ha_hooks import build_ha_hooks
 
-    state = build_ha_hooks(app).next_update_fn("panel")
+    hooks = build_ha_hooks(app)
+    assert hooks.next_update_fn is not None
+    state = hooks.next_update_fn("panel")
+    assert state is not None
     assert state["reason"] == "check-in" and state["mode"] == nu.MODE_SLEEPS
     assert state["checkin_at"] == pytest.approx(time.time() + 40 * 60, abs=5)
     assert state["at"] >= state["checkin_at"]  # arrives on a check-in
 
 
-def test_ha_state_for_a_connected_visionect_sign_has_no_wake(app: Flask, monkeypatch) -> None:
+def test_ha_state_for_a_connected_visionect_sign_has_no_wake(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
     client = app.test_client()
     _sign_in(client)
     _register(app, client, "panel")
@@ -385,7 +408,10 @@ def test_ha_state_for_a_connected_visionect_sign_has_no_wake(app: Flask, monkeyp
     )
     from app.ha_hooks import build_ha_hooks
 
-    state = build_ha_hooks(app).next_update_fn("panel")
+    hooks = build_ha_hooks(app)
+    assert hooks.next_update_fn is not None
+    state = hooks.next_update_fn("panel")
+    assert state is not None
     assert state["checkin_at"] is None
     assert state["reason"] == "connected"
     assert state["at"] is not None  # the scheduled push time, not a wake
@@ -411,11 +437,16 @@ def test_ha_state_is_held_by_pause_hours(app: Flask) -> None:
     _beat(app, "panel", wake_in_s=5 * 60)
     from app.ha_hooks import build_ha_hooks
 
-    state = build_ha_hooks(app).next_update_fn("panel")
+    hooks = build_ha_hooks(app)
+    assert hooks.next_update_fn is not None
+    state = hooks.next_update_fn("panel")
+    assert state is not None
     assert state["reason"] == "held by quiet hours" and state["held"] is True
 
 
 def test_ha_hook_is_none_for_an_unknown_display(app: Flask) -> None:
     from app.ha_hooks import build_ha_hooks
 
-    assert build_ha_hooks(app).next_update_fn("ghost") is None
+    hooks = build_ha_hooks(app)
+    assert hooks.next_update_fn is not None
+    assert hooks.next_update_fn("ghost") is None

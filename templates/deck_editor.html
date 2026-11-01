@@ -77,9 +77,9 @@
           <legend>Deck pages</legend>
           {% for p in page_meta %}
           {% set idx = member_ids.index(p.id) if p.id in member_ids else none %}
-          <div class="dxe-fb-row" data-page="{{ p.id }}">
+          <div class="dxe-fb-row{% if p.missing %} is-missing{% endif %}" data-page="{{ p.id }}">
             <label><input type="checkbox" name="member" value="{{ p.id }}"
-                     {% if p.id in member_ids %}checked{% endif %}> {{ p.name }}</label>
+                     {% if p.id in member_ids %}checked{% endif %}> {{ p.name }}{% if p.missing %} <small class="dxe-missing-id">{{ p.id }}</small>{% endif %}</label>
             <input type="number" name="order[{{ p.id }}]" min="1" max="99"
                    value="{{ (idx + 1) if idx is not none else loop.index }}" aria-label="Position">
             <label><input type="radio" name="home" value="{{ p.id }}"

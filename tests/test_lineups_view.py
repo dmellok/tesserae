@@ -748,6 +748,8 @@ def test_page_labels_follow_the_app_locale(
     morning = next(lu for lu in panel["lineups"] if lu["id"] == "morning")
     assert morning["window"]["label"] == label
     assert (morning["window"]["start"], morning["window"]["end"]) == ("06:00", "09:00")
+    page = client.get("/decks").get_data(as_text=True)
+    assert re.search(r'"time_cycle": ?"' + cycle, page)  # in the page's vm JSON
     resp = client.post("/decks/evening/window", json={"start": "17:00", "end": "24:00"})
     assert resp.status_code == 409
     assert resp.get_json()["error"] == f"Overlaps Night on Mon ({clash})."
@@ -2348,6 +2350,8 @@ def test_view_json_carries_the_header_frame(client: Any, app: Flask) -> None:
     assert f"/{comp}." in panel["frame"]["thumb_url"]
     assert panel["frame"]["label"] == "a frame sent by hand"
     assert "unknown" not in panel["show_title"].lower()
+    html = client.get("/decks?display=panel").get_data(as_text=True)
+    assert "a frame sent by hand" in html and "waiting for check-in" not in html
 
 
 def test_heard_display_with_unknown_cadence_is_not_offline() -> None:

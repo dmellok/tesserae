@@ -107,7 +107,9 @@
   function card(id, pos) {
     const p = pagesById[id] || { name: id, thumb: "", kind: "" };
     const c = document.createElement("div");
-    c.className = "dxe-pcard" + (selected === id ? " is-selected" : "");
+    c.className =
+      "dxe-pcard" + (selected === id ? " is-selected" : "") + (p.missing ? " is-missing" : "");
+    if (p.missing) c.title = "This dashboard was deleted; remove it from the lineup";
     c.draggable = true;
     c.dataset.page = id;
 
@@ -122,7 +124,10 @@
       thumb.style.setProperty("--thumb-r", (p.w / p.h).toFixed(4));
       if (p.h > p.w) thumb.classList.add("is-portrait");
     }
-    if (p.thumb) {
+    if (p.missing) {
+      thumb.classList.add("is-ph");
+      thumb.textContent = "!";
+    } else if (p.thumb) {
       const img = document.createElement("img");
       img.src = p.thumb;
       img.alt = "";
@@ -154,6 +159,21 @@
     name.className = "dxe-pcard-name";
     name.textContent = p.name;
     foot.appendChild(name);
+    if (p.missing) {
+      const rawId = document.createElement("small");
+      rawId.className = "dxe-missing-id";
+      rawId.textContent = id;
+      name.appendChild(rawId);
+      const rm = document.createElement("button");
+      rm.type = "button";
+      rm.className = "dxe-remove dxe-remove-missing";
+      rm.textContent = "Remove";
+      rm.addEventListener("click", (e) => {
+        e.stopPropagation();
+        removeMember(id);
+      });
+      foot.appendChild(rm);
+    }
     if (homeId() === id) {
       const star = document.createElement("span");
       star.className = "dxe-star";
@@ -326,7 +346,10 @@
     const inDeck = new Set(members());
     if (!dev) return [];
     return (data.pages || []).filter(
-      (p) => !inDeck.has(p.id) && ((p.devices || []).includes(dev) || (p.devices || []).length === 0)
+      (p) =>
+        !p.missing &&
+        !inDeck.has(p.id) &&
+        ((p.devices || []).includes(dev) || (p.devices || []).length === 0)
     );
   }
   function renderAvailable() {

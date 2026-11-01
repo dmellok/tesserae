@@ -54,7 +54,6 @@ def test_base_loads_the_list_helper(app: Flask) -> None:
         ("/settings/devices", "devices"),
         ("/history", "history"),
         ("/events", "events"),
-        ("/decks", "lineups"),
         ("/plugins/", "widgets"),
         ("/themes", "themes"),
         ("/settings/firmware", "firmware"),
@@ -117,3 +116,28 @@ def test_paper_sidebar_folds_to_a_rail(app: Flask) -> None:
     assert "/static/sidebar-rail.js" in html
     rail = (Path(app.static_folder or "static") / "sidebar-rail.js").read_text(encoding="utf-8")
     assert "tesserae-sidebar" in rail and "aria-expanded" in rail and "Expand sidebar" in rail
+
+
+def test_lineups_page_has_its_own_toolbar(app: Flask) -> None:
+    """The Lineups page filters its own view-model (static/lineups.js) rather
+    than the shared list helper: search, display/kind/state filters, order,
+    and a count."""
+    client = app.test_client()
+    _sign_in(client)
+    _seed(app, client)
+    from app.state.deck_model import Deck, DeckPage
+
+    app.config["DECK_STORE"].upsert(
+        Deck(id="d1", name="Mornings", pages=[DeckPage(page_id="home")])
+    )
+    html = client.get("/decks").get_data(as_text=True)
+    for hook in (
+        "data-lu-toolbar",
+        "data-lu-q",
+        'data-lu-filter="kind"',
+        'data-lu-filter="state"',
+        'data-lu-filter="sort"',
+        "data-lu-count",
+    ):
+        assert hook in html
+    assert "Mornings" in html

@@ -1464,6 +1464,8 @@ def _build_device_section(store: Any, device: Device) -> dict[str, Any] | None:
     section["push_now_endpoint"] = url_for("auth.devices_push_now", instance_id=device.id)
     section["overview"] = _device_overview(device, section)
     section["lineup_names"] = _lineup_names_for(device.id, section["timetable_entries"])
+    section["now_line"] = _now_line_for(device.id)
+    section["lineup_rows"] = _lineup_rows_for(device.id) if is_instance else []
     return section
 
 
@@ -1497,6 +1499,92 @@ def _queued_note(pending: dict[str, Any]) -> dict[str, Any]:
     else:
         text = f"{queued}. The frame picks it up when it next checks in."
     return {"title": "Waiting for the frame", "text": text, "live": bool(pending.get("live"))}
+
+
+def _lineups_view() -> Any:
+    """The Lineups page's view-model, built once per request: the Devices
+    list asks for it once per display. ``None`` when it can't be built."""
+    from flask import g
+
+    from app.deck_routes import build_lineups_view
+
+    if "_lineups_view" not in g:
+        try:
+            g._lineups_view = build_lineups_view()
+        except Exception:
+            current_app.logger.debug("devices: no lineups view", exc_info=True)
+            g._lineups_view = None
+    return g._lineups_view
+
+
+def _lineup_rows_for(device_id: str) -> list[dict[str, Any]]:
+    """The lineups on this display, as the Lineups page lists them (live
+    first, then by when they play next), for the device page's Lineups
+    section. Each row links to the lineup on the Lineups page."""
+    view = _lineups_view()
+    display = next((d for d in view.displays if d.id == device_id), None) if view else None
+    rows: list[dict[str, Any]] = []
+    for lu in display.lineups if display is not None else []:
+        window = lu.window
+        rows.append(
+            {
+                "id": lu.id,
+                "name": lu.name,
+                "status": lu.status,
+                "status_label": lu.status_label,
+                "enabled": lu.enabled,
+                "when": window.label if window is not None else "All day",
+                "days": lu.days_text,
+                "mode": lu.mode_label,
+                "steps": lu.step_count,
+                "next": lu.next_run.text if lu.next_run is not None and lu.status != "live" else "",
+                "url": url_for("decks.index", hl=lu.id) + f"#display-{device_id}",
+                "edit_url": lu.actions.edit_url,
+            }
+        )
+    return rows
+
+
+def _now_line_for(device_id: str) -> dict[str, Any] | None:
+    """The one "what's on now" line the Devices quick panel shows instead
+    of every lineup name: the lineup live on this display and until when
+    (``Morning · until 9 AM · then Breakfast``), else the next one to run
+    (``Nothing running · next Dinner today 5 PM``), else none at all. Read
+    from the Lineups page's own view-model so the two pages agree; links to
+    this display there. ``None`` when the view can't be built (the card
+    falls back to the plain name list)."""
+    from app.lineups_view import clock
+
+    view = _lineups_view()
+    if view is None:
+        return None
+    display = next((d for d in view.displays if d.id == device_id), None)
+    lineups = list(display.lineups) if display is not None else []
+    url = url_for("decks.index") + f"#display-{device_id}"
+    if not lineups:
+        return {"state": "none", "name": "", "meta": "None yet, add one", "url": url}
+    live = next((lu for lu in lineups if lu.status == "live"), None)
+    coming = sorted(
+        (lu for lu in lineups if lu is not live and lu.enabled and lu.next_run is not None),
+        key=lambda lu: lu.next_run.epoch if lu.next_run is not None else 0.0,
+    )
+    nxt = coming[0] if coming else None
+    if live is not None:
+        parts: list[str] = []
+        window = live.window
+        if window is not None and not window.is_point and window.end is not None:
+            parts.append(f"until {clock(window.end_min, end=True, cycle=view.time_cycle)}")
+            # The next lineup takes over where this one ends.
+            if nxt is not None and nxt.next_run is not None and nxt.next_run.hhmm == window.end:
+                parts.append(f"then {nxt.name}")
+        return {
+            "state": "running",
+            "name": live.name,
+            "meta": " · ".join(parts),
+            "url": url_for("decks.index", hl=live.id) + f"#display-{device_id}",
+        }
+    meta = f"next {nxt.name} {nxt.next_run.main}" if nxt and nxt.next_run else ""
+    return {"state": "idle", "name": "Nothing running", "meta": meta, "url": url}
 
 
 def _device_overview(device: Device, section: dict[str, Any]) -> dict[str, Any]:
