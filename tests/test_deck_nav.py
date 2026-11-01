@@ -37,7 +37,7 @@ class FakePush:
         # that reached the panel.
         return PushResult(status="sent", page_id=page_id)
 
-    def promote_deck_page(self, device_id: str, page_id: str) -> bool:
+    def promote_deck_page(self, device_id: str, page_id: str, **_kw: object) -> bool:
         if (device_id, page_id) in self.warmed:
             self.promotes.append((device_id, page_id))
             return True

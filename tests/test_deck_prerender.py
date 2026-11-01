@@ -331,3 +331,43 @@ def test_warm_render_failure_is_logged(wired, caplog) -> None:
     assert not manager.has_warm_deck_page("panel", "p_b")
     assert "deck warm produced no frame page=p_b device=panel" in caplog.text
     assert "chromium went away" in caplog.text
+
+
+def test_promote_writes_the_push_row_lineups_and_history_read(wired) -> None:
+    """A promote changes what the panel shows without a push, so it records
+    the ``type="push"`` row itself, whoever asked for it (here Home
+    Assistant). The latest push per dashboard, which the Lineups
+    thumbnails and History read, then names the frame on the panel."""
+    manager = wired
+    with patch("app.push.capture_composed", return_value=(_png((255, 0, 0)), [])):
+        manager.push("p_b", device_ids={"panel"})
+    with patch("app.push.capture_composed", return_value=(_png((0, 0, 255)), [])):
+        assert manager.warm_deck_page("p_b", "panel") is True
+    warm = manager.deck_render_for("panel", "p_b")
+    results = []
+    manager.add_listener(results.append)
+
+    with patch("app.push.capture_composed", side_effect=AssertionError("must not render")):
+        assert (
+            manager.promote_deck_page(
+                "panel", "p_b", source="home_assistant", extra={"deck_id": "d1"}
+            )
+            is True
+        )
+
+    latest = manager._event_log.list(type="push", target="p_b", limit=1)[0]
+    assert latest.digest == warm["composition_digest"]
+    assert latest.source == "home_assistant"
+    assert latest.status == "sent"
+    assert latest.extra["device_ids"] == ["panel"]
+    assert latest.extra["promoted"] is True
+    assert latest.extra["deck_id"] == "d1"
+    assert manager.promote_event_id("panel") == latest.id
+    assert results[-1].event_id == latest.id
+
+
+def test_promote_miss_writes_no_row(wired) -> None:
+    before = wired._event_log.count(type="push")
+    assert wired.promote_deck_page("panel", "never_warmed") is False
+    assert wired._event_log.count(type="push") == before
+    assert wired.promote_event_id("panel") is None

@@ -1989,7 +1989,11 @@ def test_lineup_actions_bound_their_renderer_waits(tmp_path: Path) -> None:
     assert pm.push.call_args.kwargs["lock_timeout_s"] == 60.0
     ha._on_lineup_cmd("tesserae/ha/lineup/morning/cmd/action", b"next")
     assert ha._wait_commands_idle()
-    assert pm.promote_deck_page.call_args.kwargs == {"lock_timeout_s": 60.0}
+    assert pm.promote_deck_page.call_args.kwargs == {
+        "lock_timeout_s": 60.0,
+        "source": "home_assistant",
+        "extra": {"deck_id": "morning"},
+    }
     ha._on_lineup_cmd("tesserae/ha/lineup/morning/cmd/enabled", b"OFF")
     assert ha._wait_commands_idle()
     assert _payload_for(client, "tesserae/ha/state/last_error") == (

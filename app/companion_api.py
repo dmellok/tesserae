@@ -1756,7 +1756,7 @@ def lineup_action(lineup_id: str) -> Any:
         for device_id in active:
             target_page = _target_page(device_id)
             promoter = getattr(manager, "promote_deck_page", None)
-            if callable(promoter) and promoter(device_id, target_page):
+            if callable(promoter) and promoter(device_id, target_page, source="companion"):
                 painted.append(device_id)
             else:
                 result = manager.push(

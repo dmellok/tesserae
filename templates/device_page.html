@@ -657,11 +657,36 @@
         <span class="dx-section-icon" aria-hidden="true"><i class="ph ph-calendar-blank"></i></span>
         <div class="dx-section-titleblock">
           <h3 class="dx-section-title">Lineups</h3>
-          <p class="dx-section-desc">What is scheduled on this display.</p>
+          <p class="dx-section-desc">The lineups and schedules on this display.</p>
         </div>
         <a class="dx-btn is-sm" href="{{ url_for('decks.index') }}"><i class="ph ph-arrow-square-out" aria-hidden="true"></i><span>Lineups page</span></a>
       </header>
       <div class="dx-section-body">
+        {% if section.lineup_rows %}
+        <ul class="timetable-list" data-device-lineups>
+          {% for lu in section.lineup_rows %}
+          <li class="timetable-row {% if not lu.enabled %}is-disabled{% endif %}">
+            <div class="timetable-when">
+              <strong>{{ lu.when }}</strong>
+              <span class="muted"> · {{ lu.days }}</span>
+            </div>
+            <div class="timetable-what">
+              <i class="ph ph-monitor-play" aria-hidden="true"></i>
+              <a href="{{ lu.url }}">{{ lu.name }}</a>
+              <span class="muted">{{ lu.mode }} · {{ lu.steps }} dashboard{{ '' if lu.steps == 1 else 's' }}</span>
+              {% if lu.status == 'live' %}<span class="tg tg--sm tg--ok">Live</span>
+              {% elif not lu.enabled %}<span class="tg tg--sm">Off</span>
+              {% elif lu.next %}<span class="muted">· {{ lu.next }}</span>{% endif %}
+            </div>
+            <div class="timetable-edit">
+              <a class="button ghost" href="{{ lu.edit_url }}">
+                <i class="ph ph-pencil-simple" aria-hidden="true"></i><span>Edit</span>
+              </a>
+            </div>
+          </li>
+          {% endfor %}
+        </ul>
+        {% endif %}
         {% if section.timetable_entries %}
         <ul class="timetable-list">
           {% for entry in section.timetable_entries %}
@@ -689,7 +714,8 @@
           {% endfor %}
         </ul>
         <p class="field-help">Schedules whose target dashboard is bound to this device. Edit them on the <a href="{{ url_for('decks.index') }}">Lineups</a> page.</p>
-        {% else %}
+        {% endif %}
+        {% if not section.lineup_rows and not section.timetable_entries %}
         <div class="dx-empty">
           <div class="dx-empty-icon"><i class="ph ph-calendar-blank" aria-hidden="true"></i></div>
           <p class="dx-empty-title">Nothing scheduled yet</p>

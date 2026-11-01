@@ -3016,7 +3016,7 @@ def step(deck_id: str) -> Response:
         promoted = False
         if pusher is not None:
             promoter = getattr(pusher, "promote_deck_page", None)
-            promoted = callable(promoter) and promoter(device_id, target)
+            promoted = callable(promoter) and promoter(device_id, target, extra={"deck_id": deck.id})
             if not promoted:
                 result = pusher.push(
                     target, device_ids={device_id}, respect_quiet_hours=False, source="deck"
