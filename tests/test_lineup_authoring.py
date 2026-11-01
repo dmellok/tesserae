@@ -179,17 +179,22 @@ def test_an_unassigned_dashboard_binds_to_the_display(app: Flask) -> None:
     _sign_in(client)
     _seed_page(app, "pantry")
     _seed_page(app, "weather", device_ids=["other"])
-    _create(
-        client,
-        intent="cycle",
-        name="Loop",
-        page_ids=["pantry", "weather"],
-        device_ids=["kitchen"],
-    )
+    fields = {"intent": "cycle", "name": "Loop", "device_ids": ["kitchen"]}
+    # A dashboard already on another display is never moved silently: the
+    # create is refused (nothing stored, nothing bound) until the caller
+    # consents with bind_pages.
+    refused = _create(client, page_ids=["pantry", "weather"], **fields)
+    assert refused.status_code == 409
+    assert refused.get_json()["code"] == "pages_not_bound"
     pages = app.config["PAGE_STORE"]
-    assert pages.get("pantry").device_ids == ["kitchen"]
-    # A dashboard already on another display is left alone.
+    assert pages.get("pantry").device_ids == []
     assert pages.get("weather").device_ids == ["other"]
+    assert app.config["DECK_STORE"].all() == []
+
+    ok = _create(client, page_ids=["pantry", "weather"], bind_pages=["weather"], **fields)
+    assert ok.status_code == 200
+    assert pages.get("pantry").device_ids == ["kitchen"]
+    assert pages.get("weather").device_ids == ["kitchen"]
 
 
 def test_single_dashboard_intents_take_a_display(app: Flask) -> None:

@@ -491,7 +491,7 @@
 
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
-    {% set FLASH_ICONS = {'ok': 'ph-check-circle', 'error': 'ph-x-circle', 'warn': 'ph-warning'} %}
+    {% set FLASH_ICONS = {'ok': 'ph-check-circle', 'error': 'ph-x-circle', 'warn': 'ph-warning', 'queued': 'ph-moon-stars'} %}
     <div class="flashes" role="status" aria-live="polite" data-flashes>
       {% for category, message in messages %}
       <div class="flash flash--{{ category }}" data-flash>
@@ -566,6 +566,7 @@
   {% endif %}
   <script src="{{ url_for('static', filename='restart-form.js') }}"></script>
   <script src="{{ url_for('static', filename='components.js') }}"></script>
+  <script src="{{ url_for('static', filename='bind_prompt.js') }}"></script>
   <script src="{{ url_for('static', filename='list-filter.js') }}"></script>
   {% if _paper %}<script src="{{ url_for('static', filename='morph.js') }}"></script>{% endif %}
   {% if _paper and not shell_locked %}<script src="{{ url_for('static', filename='sidebar-rail.js') }}"></script>{% endif %}

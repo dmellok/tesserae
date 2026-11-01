@@ -130,6 +130,9 @@ class DashboardInfo:
     items: tuple[ItemInfo, ...] = ()
     composition_digest: str | None = None
     missing: bool = False  # a lineup step still points at a deleted dashboard
+    #: displays it is bound to, and "Name (WxH)" for each, for the off-display flag
+    bound_ids: tuple[str, ...] = ()
+    bound_labels: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -159,6 +162,7 @@ class LineupUrls:
     push_step: str = ""
     window: str = ""
     days: str = ""
+    bind: str = ""
 
 
 @dataclass(frozen=True)
@@ -181,6 +185,8 @@ class LineupInput:
     urls: LineupUrls = field(default_factory=LineupUrls)
     priority: int = 0  # wins a tie with another lineup due at the same moment
     last_fired: float | None = None  # epoch of an interval lineup's last fire
+    #: the lineup names its display(s), so a step bound elsewhere cannot show
+    explicit_display: bool = False
 
 
 @dataclass(frozen=True)
@@ -599,6 +605,9 @@ class StepView(_Dict):
     push_title: str
     composition_digest: str | None = None
     missing: bool = False  # its dashboard was deleted; the scheduler cannot show it
+    #: its dashboard is bound only to other displays, so this one never shows it
+    off_display: bool = False
+    off_display_note: str = ""  # "Bound to Frame (480×800)"
 
 
 @dataclass
@@ -624,6 +633,7 @@ class ActionsView(_Dict):
     window_url: str
     days_url: str
     can_push_step: bool
+    bind_url: str = ""
 
 
 @dataclass
@@ -2385,13 +2395,20 @@ def _lineup_view(
             pill = PillView("next", f"Next {next_at}", f"Next advance {next_at}")
         items = list(dash.items) if dash else []
         count = max(dash.item_count if dash else 1, len(items), 1)
+        off_display = bool(
+            lineup.explicit_display
+            and dash
+            and not dash.missing
+            and dash.bound_ids
+            and d.id not in dash.bound_ids
+        )
         steps.append(
             StepView(
                 index=i,
                 position=f"{i + 1}/{n}" if n > 1 else "only",
                 dashboard_id=st.dashboard_id,
                 name=scr.name,
-                thumb_url=scr.thumb_url,
+                thumb_url="" if off_display else scr.thumb_url,
                 composition_digest=dash.composition_digest if dash else None,
                 width=scr.width,
                 height=scr.height,
@@ -2409,6 +2426,12 @@ def _lineup_view(
                 separator="arrow" if i < n - 1 else ("loop" if loops else ""),
                 push_title=MISSING_TITLE if scr.missing else f"Push {scr.name} to {d.name} now",
                 missing=scr.missing,
+                off_display=off_display,
+                off_display_note=(
+                    "Bound to " + ", ".join(dash.bound_labels or dash.bound_ids)
+                    if off_display and dash
+                    else ""
+                ),
             )
         )
     missing_count = sum(1 for sv in steps if sv.missing)
@@ -2476,6 +2499,7 @@ def _lineup_view(
             window_url=u.window,
             days_url=u.days,
             can_push_step=bool(lineup.steps),
+            bind_url=u.bind,
         ),
         sort_minutes=sort_minutes,
     )

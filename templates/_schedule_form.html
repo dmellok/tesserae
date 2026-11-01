@@ -47,7 +47,7 @@
    afterwards (the editor passes itself). ``in_dialog``: Cancel closes
    the host dialog instead of linking to the Lineups page. #}
 {% macro schedule_form(s, edit_mode, pages, devices=[], next_url=None, in_dialog=false) %}
-<form method="post" class="form schedule-form"
+<form method="post" class="form schedule-form" data-bind-guard="{{ 'edit' if edit_mode else 'new' }}" data-bind-check-url="{{ url_for('decks.bind_check') }}"
       action="{{ url_for('schedules.update', schedule_id=s.id) if edit_mode else url_for('schedules.create') }}">
   {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
   {# Row 1, what fires, which dashboard, how often. #}
@@ -197,4 +197,5 @@
   });
 </script>
 <script type="module" src="{{ url_for('static', filename='condition-picker.js') }}"></script>
+<script src="{{ url_for('static', filename='bind_guard.js') }}"></script>
 {% endmacro %}

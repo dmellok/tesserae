@@ -109,6 +109,17 @@ def _header_variant(display: dict[str, Any], kind: str) -> None:
         display["show_note"] = ", waiting for check-in"
 
 
+def _flag_off_display(vm: dict[str, Any]) -> None:
+    """Mark the first display's first step as bound to another display."""
+    d = vm["displays"][0]
+    lineup = d["lineups"][0]
+    lineup["actions"]["bind_url"] = f"/decks/{lineup['id']}/bind-pages"
+    step = lineup["steps"][0]
+    step["off_display"] = True
+    step["off_display_note"] = "Bound to Frame (480×800)"
+    step["thumb_url"] = ""
+
+
 @pytest.fixture
 def live(tmp_path: Path) -> Iterator[str]:
     from werkzeug.serving import make_server
@@ -127,6 +138,8 @@ def live(tmp_path: Path) -> Iterator[str]:
             for lu in d["lineups"]:
                 lu["actions"]["play_url"] = f"/decks/{lu['id']}/step"
                 lu["actions"]["fire_url"] = f"/decks/{lu['id']}/push"
+        if request.args.get("off"):
+            _flag_off_display(vm)
         return render_template("decks.html", vm=vm, automation_url="#auto")
 
     app.add_url_rule(PAGE, "lineups_sample", sample)
@@ -143,9 +156,11 @@ def live(tmp_path: Path) -> Iterator[str]:
 class _Api:
     """Answers the page's JSON calls and remembers what was sent."""
 
-    def __init__(self, cycle: str = "h23") -> None:
+    def __init__(self, cycle: str = "h23", off: bool = False) -> None:
         self.posts: list[tuple[str, Any]] = []
         self.vm = _sample_vm(cycle)
+        if off:
+            _flag_off_display(self.vm)
         self.push_message: str | None = None
 
     def install(self, page: Any) -> None:
@@ -154,11 +169,17 @@ class _Api:
             if req.method == "GET" and "/decks/view.json" in req.url:
                 route.fulfill(status=200, content_type="application/json", body=json.dumps(self.vm))
                 return
-            if req.method == "POST" and re.search(r"/decks/(edits|[^/]+/push-step)$", req.url):
+            if req.method == "POST" and re.search(
+                r"/decks/(edits|[^/]+/push-step|[^/]+/bind-pages)$", req.url
+            ):
                 self.posts.append((req.url, json.loads(req.post_data or "null")))
                 reply: dict[str, Any] = (
                     {"ok": True, "lands": "lands now"} if "push-step" in req.url else {"ok": True}
                 )
+                if req.url.endswith("/bind-pages"):
+                    self.vm["displays"][0]["lineups"][0]["steps"][0].update(
+                        off_display=False, off_display_note=""
+                    )
                 if "push-step" in req.url and self.push_message:
                     reply["message"] = self.push_message
                     reply["fresh"] = True
@@ -181,6 +202,7 @@ def _open(
     cycle: str = "h23",
     before_load: Any = None,
     hdr: str = "",
+    off: bool = False,
 ) -> tuple[Any, Any, _Api]:
     browser = _launch(p)
     ctx = browser.new_context(
@@ -190,11 +212,13 @@ def _open(
     errors: list[str] = []
     page.on("pageerror", lambda e: errors.append(str(e)))
     page._lu_errors = errors
-    api = _Api(cycle)
+    api = _Api(cycle, off)
     api.install(page)
     if before_load:
         before_load(page)
-    page.goto(base + PAGE + f"?cycle={cycle}&hdr={hdr}", wait_until="load")
+    page.goto(
+        base + PAGE + f"?cycle={cycle}&hdr={hdr}" + ("&off=1" if off else ""), wait_until="load"
+    )
     if js:
         page.wait_for_function(
             "() => document.querySelector('[data-lu]').classList.contains('is-enhanced')"
@@ -330,6 +354,47 @@ def test_header_without_a_dashboard_matches_both_renderers(live: str, hdr: str) 
         assert "checked in 18:10" in text and "waiting" not in text
     else:
         assert "waiting for check-in" in text
+
+
+def test_off_display_step_is_flagged_and_binds_in_one_click(live: str) -> None:
+    """A step whose dashboard is bound to another display: same markup from
+    the server and the client, a flagged neutral tile, no Push now, and a
+    Bind button that posts once and redraws the step as a normal one."""
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        browser, nojs, _ = _open(p, live, js=False, off=True)
+        server = nojs.eval_on_selector_all(".lu-ds", "els => els.map(e => e.outerHTML)")
+        browser.close()
+        browser, page, api = _open(p, live, off=True)
+        client = page.evaluate(
+            """() => {
+              const vm = JSON.parse(document.querySelector('[data-lu-vm]').textContent);
+              const ui = { view: 'cards', folded: (l) => l.folded, collapsed: () => false, pendingBar: () => '' };
+              return vm.displays.map((d) => TesseraeLineupsRender.display(vm, d, ui));
+            }"""
+        )
+        for s, c in zip(server, client, strict=True):
+            assert _shape(s) == _shape(c)
+        assert any("Not on this display" in s and 'class="lu-bind"' in s for s in server)
+
+        lid = api.vm["displays"][0]["lineups"][0]["id"]
+        tile = page.locator(f"#lu-row-{lid} .lu-step.is-offdisplay")
+        assert tile.count() == 1
+        assert tile.locator(".lu-thumb.offdisplay img").count() == 0
+        assert tile.locator(".lu-push-form").count() == 0
+        assert tile.locator(".lu-step-off").inner_text() == "Not on this display"
+        dname = api.vm["displays"][0]["name"]
+        button = tile.locator("button.lu-bind")
+        assert button.inner_text() == f"Bind to {dname}"
+        button.click()
+        page.wait_for_function(
+            "(id) => !document.querySelector(`#lu-row-${id} .lu-step.is-offdisplay`)", arg=lid
+        )
+        binds = [b for u, b in api.posts if u.endswith("/bind-pages")]
+        assert len(binds) == 1 and binds[0]["display_id"] == api.vm["displays"][0]["id"]
+        assert page._lu_errors == []
+        browser.close()
 
 
 def test_client_clock_matches_the_server_clock(live: str) -> None:

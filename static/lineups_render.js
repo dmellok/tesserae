@@ -327,7 +327,7 @@
       ? `<span class="lu-pill p-${esc(s.pill.kind)}" title="${esc(s.pill.title)}">${s.pill.kind === "now" ? ico("play") : ""}${esc(s.pill.label)}</span>`
       : "";
     const push =
-      d.id && l.actions.push_step_url && !s.missing
+      d.id && l.actions.push_step_url && !s.missing && !s.off_display
         ? `<form method="post" action="${esc(l.actions.push_step_url)}" class="lu-push-form"><input type="hidden" name="index" value="${s.index}"><input type="hidden" name="display_id" value="${esc(d.id)}"><input type="hidden" name="page_id" value="${esc(s.dashboard_id)}"><input type="hidden" name="composition_digest" value="${esc(s.composition_digest || "")}"><button type="submit" class="lu-push-ov" data-push="${esc(l.id)}:${s.index}" title="${esc(s.push_title)}" aria-label="${esc(s.push_title)}"><i>${ico("send")}</i><span>Push now</span></button></form>`
         : "";
     const count =
@@ -337,6 +337,13 @@
     const cond = s.conditional
       ? ` <span title="Shows only while its conditions pass">${ico("funnel")}</span>`
       : "";
+    const off = s.off_display
+      ? `<span class="lu-step-off" title="${esc(s.off_display_note)}">Not on this display</span>${
+          d.id && l.actions.bind_url
+            ? `<button type="button" class="lu-bind" data-bind="${esc(l.id)}:${s.index}" title="${esc(s.off_display_note)}. Bind it to ${esc(d.name)} too so it can show here.">Bind to ${esc(d.name)}</button>`
+            : ""
+        }`
+      : "";
     const sep =
       s.separator === "arrow"
         ? `<span class="lu-sep" aria-hidden="true">${ico("chev")}</span>`
@@ -344,9 +351,9 @@
           ? `<span class="lu-sep loop" title="Loops back to ${esc(l.steps[0].name)}">${ico("loop")}</span>`
           : "";
     return (
-      `<li class="lu-step${cls ? " " + cls : ""}${s.missing ? " is-missing" : ""}" data-step="${s.index}"${s.missing ? ' title="This dashboard was deleted; remove it from the lineup"' : ""}><figure><span class="lu-slot">${pill}</span>` +
-      `<span class="lu-tile${s.item_count > 1 ? " stacked" : ""}">${thumb(s.name, s.thumb_url, s.aspect, d.orientation || s.orientation, s.missing ? "missing" : "", null, false, d)}<span class="lu-scrim" aria-hidden="true"></span>${push}<span class="lu-pushed-msg" aria-hidden="true"></span>${count}</span>` +
-      `<figcaption><span class="lu-step-name">${esc(s.name)}</span><span class="lu-step-meta">${esc(s.position)}${cond}</span></figcaption></figure>${sep}</li>`
+      `<li class="lu-step${cls ? " " + cls : ""}${s.missing ? " is-missing" : ""}${s.off_display ? " is-offdisplay" : ""}" data-step="${s.index}"${s.missing ? ' title="This dashboard was deleted; remove it from the lineup"' : s.off_display ? ` title="${esc(s.off_display_note)}"` : ""}><figure><span class="lu-slot">${pill}</span>` +
+      `<span class="lu-tile${s.item_count > 1 ? " stacked" : ""}">${thumb(s.name, s.thumb_url, s.aspect, d.orientation || s.orientation, s.missing ? "missing" : s.off_display ? "offdisplay" : "", null, false, d)}<span class="lu-scrim" aria-hidden="true"></span>${push}<span class="lu-pushed-msg" aria-hidden="true"></span>${count}</span>` +
+      `<figcaption><span class="lu-step-name">${esc(s.name)}</span><span class="lu-step-meta">${esc(s.position)}${cond}</span>${off}</figcaption></figure>${sep}</li>`
     );
   }
 
