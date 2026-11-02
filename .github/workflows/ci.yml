@@ -54,7 +54,8 @@ jobs:
 
   lineups-browser:
     name: Lineups browser tests
-    runs-on: ubuntu-latest
+    # Pinned: Playwright ships no Chromium for ubuntu-latest (26.04) yet.
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
