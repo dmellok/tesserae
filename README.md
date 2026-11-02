@@ -288,9 +288,10 @@ Full renderer / device-kind compatibility matrix:
 ## Status
 
 Pre-1.0 and moving fast. Every release is documented in the
-[CHANGELOG](CHANGELOG.md). CI runs pytest (2,400+ tests, 80% coverage
-gate), ruff, and mypy (strict on the render/push pipeline modules) on
-every push.
+[CHANGELOG](CHANGELOG.md). CI runs pytest (7,700+ tests), the Lineups
+browser tests in Chromium, ruff, and mypy (strict on the render/push
+pipeline modules) on every push; coverage (86% at last count) is measured
+weekly, report only.
 
 Built with AI assistance (Claude Code). Architecture decisions, code
 review, hardware testing, and what ships vs. what doesn't are mine.

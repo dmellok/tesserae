@@ -5,7 +5,7 @@
 name: ci
 
 # Prose-only changes don't run the Python matrix. A markdown edit used to run
-# the whole suite four times (pytest, coverage, and both forward-compat legs)
+# the whole suite three times (pytest and both forward-compat legs)
 # for files no test imports. paths-ignore skips a run only when EVERY changed
 # file matches, so a commit touching docs AND code still runs in full.
 #
@@ -89,81 +89,28 @@ jobs:
       - name: pytest
         # -n auto fans the suite across the runner's vCPUs (pytest-xdist).
         # The suite is parallel-safe (tmp_path isolation, no shared ports).
-        # Coverage deliberately does NOT run here, see the `coverage` job.
+        # Coverage deliberately does NOT run here: it is a weekly report-only
+        # run (coverage.yml), since measuring it was the slowest job and the
+        # one that lost its runner, and nothing gated on the number.
         # --timeout / --durations: the suite runs in ~5 min locally but one
         # worker occasionally goes silent for 70-100 min on the runner. A
         # test that passes 15 min now fails with its stack, and the slowest
         # tests are listed either way, so a stall names itself.
         run: nice -n 10 pytest -n auto -q --timeout=900 --durations=15
 
-  coverage:
-    name: coverage
-    runs-on: ubuntu-latest
-    # Split out from `pytest` and pinned to 3.13 for one reason: speed.
-    # coverage.py's default C tracer costs ~2.5x on this suite, which is what
-    # made the blocking check a ~50 minute job. COVERAGE_CORE=sysmon puts it on
-    # sys.monitoring (3.12+), which is close to free: measured locally at 8:29
-    # (C tracer) vs 3:23-4:29 (sysmon), against a 3:24 no-coverage baseline.
-    # `pytest` above keeps 3.11, the shipped runtime, so correctness is still
-    # gated where it ships; only the coverage floor is measured on a newer
-    # interpreter, at 83.69% when this split landed. Both jobs run in parallel,
-    # so a green PR is gated by the slower of the two rather than by their sum.
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.13"
-          cache: pip
-      - name: Install dev deps
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e ".[dev]"
-      - name: pytest --cov
-        # The floor sits just under the current ~82% so a genuine regression
-        # fails the build while normal churn doesn't. Raise it as coverage
-        # climbs.
-        #
-        # From 2026-10-20 the runner was lost at 95-99% of this step with no
-        # test failing. The sampler below showed why: each worker grew past
-        # 7 GB until the 16 GB runner ran out. create_app registered bound
-        # stop methods with atexit, which pinned every app a test built
-        # (fixed in 0.471.3, tests/test_app_not_pinned.py). The sampler stays:
-        # it prints memory, disk, load and the largest processes once a minute
-        # into this log, which streams up to the moment a runner dies. pytest
-        # runs under nice so the runner agent keeps its CPU share.
-        env:
-          COVERAGE_CORE: sysmon
-        run: |
-          (while sleep 60; do
-            echo
-            echo "::group::resources $(date -u +%T)"
-            free -m | sed -n 2p; df -h / | tail -1; cat /proc/loadavg
-            ps -eo rss,pcpu,comm --sort=-rss | head -6
-            echo "::endgroup::"
-          done) &
-          sampler=$!
-          status=0
-          nice -n 10 pytest -n auto -q --timeout=900 --durations=15 --cov=app --cov-report=term-missing --cov-fail-under=80 || status=$?
-          kill "$sampler" 2>/dev/null || true
-          exit "$status"
-
   pytest-forward:
     name: pytest (forward-compat)
     runs-on: ubuntu-latest
-    # 3.12 runs informationally: requires-python is >=3.11 and the shipped
-    # runtime (Docker base, HA add-on) is 3.11. Failures surface as a warning
-    # instead of blocking main. Promote to a required matrix once consistently
-    # green.
-    #
-    # 3.13 is deliberately NOT here: the `coverage` job already runs the whole
-    # suite on 3.13, so a second leg was paying for a duplicate run that could
-    # not block anything anyway. 3.12 is the only interpreter nothing else
-    # covers.
+    # 3.12 and 3.13 run informationally: requires-python is >=3.11 and the
+    # shipped runtime (Docker base, HA add-on) is 3.11. Failures surface as a
+    # warning instead of blocking main. Promote to a required matrix once
+    # consistently green. (3.13 moved here from the coverage job when that
+    # left this workflow.)
     continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.12"]
+        python-version: ["3.12", "3.13"]
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6

@@ -1,0 +1,58 @@
+# Weekly coverage report. Nothing gates on it: the number is here to be looked
+# at now and then, and a sudden drop shows up as a failed scheduled run, not as
+# a blocked push. The blocking `ci` workflow runs the suite without coverage.
+#
+# Why it is not in `ci`: measuring coverage was a third full run of the suite
+# and the slowest job there (about 90 minutes against 55 for pytest), it was
+# the only job that ever lost its runner, and nothing consumed its report.
+name: coverage
+
+on:
+  schedule:
+    - cron: "17 3 * * 1" # Mondays, 03:17 UTC
+  workflow_dispatch:
+
+jobs:
+  coverage:
+    name: coverage (report only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: Install dev deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      - name: pytest --cov
+        # COVERAGE_CORE=sysmon (3.12+) is close to free in CPU where the C
+        # tracer costs about 2.2x, but its memory grows with every test a
+        # worker runs: one 419-test chunk peaks at 914 MB under sysmon against
+        # 231 MB with the C tracer (measured 2026-11-03). One pass of the
+        # whole suite put each of four workers near 4 GB and lost the 16 GB
+        # runner, so the suite runs as four fresh processes appending to one
+        # data file. The first chunk is "everything else", so a new directory
+        # or an oddly named file still runs. Collected 2026-11-03:
+        # 2427 / 1691 / 1320 / 2278.
+        env:
+          COVERAGE_CORE: sysmon
+        run: |
+          status=0
+          rm -f .coverage .coverage.*
+          run() { nice -n 10 pytest -n auto -q --timeout=900 --cov=app --cov-append "$@" || status=$?; }
+          run --cov-report= tests --ignore-glob='tests/test_[g-z]*.py'
+          run --cov-report= tests/test_[g-o]*.py
+          run --cov-report= tests/test_[p-r]*.py
+          run --cov-report=term-missing --cov-report=xml tests/test_[s-z]*.py
+          exit "$status"
+      - name: Keep the report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-xml
+          path: coverage.xml
+          if-no-files-found: ignore
+          retention-days: 90
