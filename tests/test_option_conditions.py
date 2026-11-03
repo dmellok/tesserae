@@ -15,7 +15,7 @@ import pytest
 from flask import Flask, render_template
 
 from app.main import REPO_ROOT, create_app
-from app.option_conditions import _matches, option_visible
+from app.option_conditions import _matches, canonical_value, option_visible
 
 OPTS = [
     {
@@ -309,3 +309,26 @@ def test_textarea_presets_render_an_examples_dropdown(app: Flask) -> None:
     assert "data-textarea-presets" not in plain
     schema = json.loads((REPO_ROOT / "schema" / "plugin.schema.json").read_text(encoding="utf-8"))
     jsonschema.validate(opts[0], schema["properties"]["cell_options"]["items"])
+
+
+def test_alias_reads_as_its_choice() -> None:
+    """A value an earlier manifest used for a choice (its ``aliases``) stands
+    for that choice in ``show_if`` too, so a renamed value keeps showing the
+    fields that hang off its successor."""
+    layout = {
+        "name": "layout",
+        "type": "select",
+        "default": "cluster",
+        "choices": [
+            {"value": "cluster", "label": "Cluster", "aliases": ["packed"]},
+            {"value": "grid", "label": "Grid"},
+        ],
+    }
+    packing = {"name": "packing", "type": "select", "show_if": {"layout": "cluster"}}
+    assert option_visible(packing, {"layout": "packed"}, [layout, packing])
+    assert not option_visible(packing, {"layout": "grid"}, [layout, packing])
+    assert canonical_value(layout, "packed") == "cluster"
+    assert canonical_value(layout, "grid") == "grid"
+    assert canonical_value(layout, "gone") == "gone"
+    assert canonical_value(layout, "") == ""
+    assert canonical_value({"name": "n", "type": "string"}, "packed") == "packed"

@@ -8,7 +8,10 @@ names. Every key must match for the field to show::
     "show_if": {"url": {"not": ""}}                      none of (here: set)
 
 Values compare as strings, so ``true`` matches a ticked switch and ``"8"``
-matches 8. A multiselect matches when any of its picks matches. A field
+matches 8. A multiselect matches when any of its picks matches. A ``select``
+choice may list ``aliases``, the values an earlier manifest used for it; a
+saved alias reads as that choice (``canonical_value``), here, in the
+editor's select and in the value the next save writes. A field
 whose controlling option is itself hidden is hidden too, so a chain like
 "cluster style only for the cluster layout, refresh only for the blend
 style" needs no repetition.
@@ -78,6 +81,33 @@ def _matches(actual: Any, expected: Any) -> bool:
     return _as_text(actual) in wanted
 
 
+def canonical_value(spec: Mapping[str, Any], value: Any) -> Any:
+    """``value`` as the option's current choice value.
+
+    A ``select`` choice may list ``aliases``: values an earlier manifest used
+    for it. A saved alias stands for the choice it names, so a widget can
+    rename a value without stranding every cell that still holds the old
+    one. An exact match outranks another choice's alias; anything else comes
+    back as it was."""
+    choices = spec.get("choices")
+    if spec.get("type") != "select" or not isinstance(choices, list):
+        return value
+    text = _as_text(value)
+    if text == "":
+        return value
+    found: Any = None
+    matched = False
+    for choice in choices:
+        if not isinstance(choice, Mapping) or "value" not in choice:
+            continue
+        if _as_text(choice["value"]) == text:
+            return value
+        aliases = choice.get("aliases")
+        if not matched and isinstance(aliases, list) and text in {_as_text(a) for a in aliases}:
+            found, matched = choice["value"], True
+    return found if matched else value
+
+
 def option_visible(
     spec: Mapping[str, Any],
     values: Mapping[str, Any] | None,
@@ -104,7 +134,7 @@ def option_visible(
         if not option_visible(controller, current, by_name.values(), _depth + 1):
             return False
         actual = current[name] if name in current else controller.get("default")
-        if not _matches(actual, expected):
+        if not _matches(canonical_value(controller, actual), expected):
             return False
     return True
 

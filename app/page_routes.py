@@ -52,6 +52,7 @@ from app.composer import _hydrate_page
 from app.layouts import LAYOUTS, LAYOUTS_BY_SLUG, detect_layout, to_panel_pixels
 from app.lineup_cascade import CascadeResult, emptied_by, remove_page_from_lineups
 from app.location_time import is_iana_zone
+from app.option_conditions import canonical_value
 from app.panel import (
     DESIGN_SIZES,
     device_panel,
@@ -242,7 +243,9 @@ def _coerce_cell_option(field: dict[str, Any], raw: str | None, all_form: Any) -
         for choice in field.get("choices", []):
             if str(choice.get("value")) == raw:
                 return choice["value"]
-        return raw
+        # a value an earlier manifest used for one of the choices (its
+        # ``aliases``) is written as that choice, so the cell heals on save
+        return canonical_value(field, raw)
     if ftype == "multiselect":
         # Persist path: ``all_form`` is a Werkzeug MultiDict (getlist gives
         # every checked box). Preview path: ``all_form`` is a plain dict

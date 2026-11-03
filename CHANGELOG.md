@@ -8,6 +8,11 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- A `select` cell option's choice can list `aliases`, the values an earlier
+  manifest used for it. A cell that still holds one shows the choice it
+  became rather than "Unavailable: <value>", `show_if` reads it the same way,
+  and the next save writes the current value, so a widget can rename a value
+  without stranding every cell set up before the rename.
 - Lineups redesign, part 1 of 3: a view model for the Lineups page and the
   endpoints the new page edits through. `GET /decks/view.json` describes every
   display (what is on screen, what is queued and when a sleeping frame picks it

@@ -102,6 +102,11 @@
                 "image_large": {
                   "type": "string",
                   "description": "A bigger copy of image, shown when the picker's picture is enlarged. Defaults to image."
+                },
+                "aliases": {
+                  "type": "array",
+                  "items": {},
+                  "description": "Values an earlier manifest used for this choice. A cell that still holds one shows this choice selected (not \"Unavailable\"), show_if reads it as this choice, and the next save writes value."
                 }
               }
             }

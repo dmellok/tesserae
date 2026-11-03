@@ -174,12 +174,19 @@ macro here instead.
     leaves the real choice unselected and adds an "Unavailable" duplicate of
     it below. ``none`` normalises to '' so it lines up with ``blank_label``. -#}
 {% set value_key = '' if value is none else value|string %}
-{% set selected = namespace(found=false) %}
+{#- A choice may list ``aliases``, the values an earlier manifest used for
+    it. A saved alias selects the choice it became, so a renamed value shows
+    its successor rather than an "Unavailable" duplicate, and the select
+    submits the current value on the next save. An exact match outranks
+    another choice's alias. -#}
+{% set selected = namespace(found=false, key=value_key) %}
 {% for opt in options %}
   {% if opt is mapping %}{% set option_value = opt.value %}
   {% else %}{% set option_value = opt[0] %}{% endif %}
-  {% if value_key == option_value|string %}{% set selected.found = true %}{% endif %}
+  {% if value_key == option_value|string %}{% set selected.found = true %}{% set selected.key = value_key %}
+  {% elif not selected.found and value_key != '' and opt is mapping and value_key in (opt.get('aliases') or [])|map('string')|list %}{% set selected.found = true %}{% set selected.key = option_value|string %}{% endif %}
 {% endfor %}
+{% set value_key = selected.key %}
 {% set has_value = value_key != '' %}
 {#- A choice may carry an ``image`` (a style's sample picture, say). When any
     does, the select is drawn as a picture picker: a row with the chosen

@@ -2775,3 +2775,51 @@ def test_confirm_page_has_no_emptied_line_when_every_lineup_keeps_a_dashboard(
     _add_lineup(app, "pair", "Pair", [a, b])
     html = client.post(f"/pages/{a}/delete").get_data(as_text=True)
     assert "will be deleted too" not in html and "data-delete-emptied" not in html
+
+
+def test_select_alias_selects_its_successor(app: Flask) -> None:
+    """A choice may list ``aliases``, the values an earlier manifest used for
+    it. A saved alias selects the choice (no "Unavailable" duplicate), so a
+    widget can rename a value without stranding every cell that holds the
+    old one; the select then submits the current value on the next save."""
+    html = _render_select(
+        app,
+        value="packed",
+        options=[
+            {"value": "cluster", "label": "Cluster", "aliases": ["packed", "scatter"]},
+            {"value": "grid", "label": "Grid", "aliases": ["band"]},
+        ],
+    )
+    assert "data-unmatched-option" not in html
+    assert '<option value="cluster" selected>Cluster</option>' in html
+    # an exact match outranks another choice's alias, whichever comes first
+    for options in (
+        [
+            {"value": "cluster", "label": "Cluster", "aliases": ["grid"]},
+            {"value": "grid", "label": "Grid"},
+        ],
+        [
+            {"value": "grid", "label": "Grid"},
+            {"value": "cluster", "label": "Cluster", "aliases": ["grid"]},
+        ],
+    ):
+        html = _render_select(app, value="grid", options=options)
+        assert '<option value="grid" selected>Grid</option>' in html
+        assert '<option value="cluster" selected' not in html
+
+
+def test_select_cell_option_coercion_writes_an_alias_as_its_choice() -> None:
+    from app.page_routes import _coerce_cell_option
+
+    field = {
+        "name": "layout",
+        "type": "select",
+        "default": "cluster",
+        "choices": [
+            {"value": "cluster", "label": "Cluster", "aliases": ["packed"]},
+            {"value": "grid", "label": "Grid"},
+        ],
+    }
+    assert _coerce_cell_option(field, "packed", {"opt_layout": "packed"}) == "cluster"
+    assert _coerce_cell_option(field, "grid", {"opt_layout": "grid"}) == "grid"
+    assert _coerce_cell_option(field, "gone", {"opt_layout": "gone"}) == "gone"

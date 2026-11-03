@@ -137,6 +137,14 @@ lowercase `[a-z0-9_]` is convention, not enforced. Name it `<family>_<role>`
   and `show_if` work as for a plain select. Keep the pictures small (a
   320x240 JPEG is plenty). Older servers ignore `image` and show the
   plain dropdown.
+* **Renamed values: `aliases` on a `select` choice.** When a later
+  manifest renames or merges a choice's value, list the old values under
+  the choice that replaces it: `{"value": "cluster", "label": "Cluster",
+  "aliases": ["packed", "scatter"]}`. A cell that still holds an old value
+  shows that choice selected rather than "Unavailable: packed", `show_if`
+  reads it the same way, and the next save writes the current value. Your
+  `fetch` still sees the old value until then, so map it there too. Older
+  servers ignore `aliases` and show the old value as unavailable.
 * **`secret` and `mask` on a cell option.** `secret: true` marks the
   value sensitive: it is stripped from the render context handed to the
   browser, and redacted on share to the catalog with an installer
