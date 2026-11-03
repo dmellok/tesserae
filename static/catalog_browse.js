@@ -1069,16 +1069,9 @@
     }
 
     var actions = el("div", { class: "cat-sheet-actions" });
-    var primary = el("button", {
-      type: "button",
-      class: actionClass(item) + " cat-btn--wide",
-      text: actionLabel(item),
-      disabled: state.pending[item.id] || (item.tooNew && (!item.installed || item.updateAvailable)) ? "disabled" : null,
-    });
-    primary.addEventListener("click", function () {
-      runAction(item, primary);
-    });
-    actions.appendChild(primary);
+    // Source (a link-weight button) first, the primary action last.
+    var src = sourceLink(item);
+    if (src) actions.appendChild(src);
     // An update-available entry's primary button updates, so uninstall
     // needs its own; when the primary IS Uninstall, one is enough.
     if (item.updateAvailable) {
@@ -1092,8 +1085,16 @@
       });
       actions.appendChild(remove);
     }
-    var src = sourceLink(item);
-    if (src) actions.appendChild(src);
+    var primary = el("button", {
+      type: "button",
+      class: actionClass(item) + " cat-btn--wide",
+      text: actionLabel(item),
+      disabled: state.pending[item.id] || (item.tooNew && (!item.installed || item.updateAvailable)) ? "disabled" : null,
+    });
+    primary.addEventListener("click", function () {
+      runAction(item, primary);
+    });
+    actions.appendChild(primary);
     sheetPanel.appendChild(actions);
     if (item.kind === "template") {
       sheetPanel.appendChild(

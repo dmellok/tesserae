@@ -19,8 +19,8 @@
   <form method="post" action="{{ url_for('pages.bulk_delete') }}" class="form form--inline">
     {% for r in rows %}<input type="hidden" name="page_ids" value="{{ r.id }}">{% endfor %}
     <input type="hidden" name="remove_from_lineups" value="1">
-    <button type="submit" class="dx-btn-primary-sm"><i class="ph ph-trash" aria-hidden="true"></i><span>Delete and remove from lineups</span></button>
     <a class="dx-btn-ghost-sm" href="{{ url_for('pages.index') }}">Cancel</a>
+    <button type="submit" class="dx-btn-primary-sm"><i class="ph ph-trash" aria-hidden="true"></i><span>Delete and remove from lineups</span></button>
   </form>
 </div>
 {% endblock %}

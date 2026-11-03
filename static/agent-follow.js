@@ -187,14 +187,14 @@
         "</div>" +
         '<div class="af-tape">' + lines + "</div>" +
         '<div class="af-acts">' +
+          (countdown > 0
+            ? '<button type="button" class="af-btn" data-stay>Stay here</button>'
+            : '<button type="button" class="af-btn" data-dismiss>Dismiss</button>') +
           (canOpen
             ? '<button type="button" class="af-btn accent" data-open>' +
                 (countdown > 0 ? "Opening in " + countdown + "…" : "Open editor") +
               "</button>"
             : "") +
-          (countdown > 0
-            ? '<button type="button" class="af-btn" data-stay>Stay here</button>'
-            : '<button type="button" class="af-btn" data-dismiss>Dismiss</button>') +
           '<label class="af-follow"><input type="checkbox" ' + (following() ? "checked" : "") +
             " data-follow> follow</label>" +
         "</div>" +

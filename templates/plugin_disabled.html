@@ -14,12 +14,12 @@
     <p class="dx-empty-help">Dashboards that use it show a placeholder and keep their settings. Enable it on the Widgets page to bring it back.</p>
     <form method="post" action="{{ url_for('plugins.enable_plugin') }}" class="form form--inline">
       <input type="hidden" name="plugin_id" value="{{ plugin.id }}">
-      <button type="submit" class="dx-btn-primary">
-        <i class="ph ph-power" aria-hidden="true"></i><span>Enable {{ plugin.name }}</span>
-      </button>
       <a class="dx-btn-ghost-sm" href="{{ url_for('plugins.plugins_index') }}">
         <i class="ph ph-puzzle-piece" aria-hidden="true"></i><span>Back to Widgets</span>
       </a>
+      <button type="submit" class="dx-btn-primary">
+        <i class="ph ph-power" aria-hidden="true"></i><span>Enable {{ plugin.name }}</span>
+      </button>
     </form>
   </div>
 {% endcall %}

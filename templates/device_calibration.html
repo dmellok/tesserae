@@ -94,6 +94,12 @@
         {% if section.custom_image_upload_endpoint %}
         <details class="dx-palette-import" style="margin-top: 12px;">
           <summary>{% if section.custom_image_uploaded %}Replace or remove custom image{% else %}Upload custom calibration image{% endif %}</summary>
+          {% if section.custom_image_uploaded and section.custom_image_delete_endpoint %}
+          <form method="post" action="{{ section.custom_image_delete_endpoint }}" class="form form--inline"
+                onsubmit="return confirm('Remove the uploaded calibration image?');" style="margin-bottom: 8px;">
+            <button type="submit" class="button ghost dx-danger">Delete uploaded image</button>
+          </form>
+          {% endif %}
           <form method="post" action="{{ section.custom_image_upload_endpoint }}" enctype="multipart/form-data" class="form">
             <div class="dx-palette-save-row">
               <input type="file" name="image" accept="image/png,image/jpeg,image/webp" required class="input">
@@ -101,12 +107,6 @@
             </div>
             <p class="field-help">PNG, JPEG, or WebP. Fit-to-panel with white padding on render (same as the Send-file flow).</p>
           </form>
-          {% if section.custom_image_uploaded and section.custom_image_delete_endpoint %}
-          <form method="post" action="{{ section.custom_image_delete_endpoint }}" class="form form--inline"
-                onsubmit="return confirm('Remove the uploaded calibration image?');" style="margin-top: 8px;">
-            <button type="submit" class="button ghost dx-danger">Delete uploaded image</button>
-          </form>
-          {% endif %}
         </details>
         {% endif %}
       </div>
