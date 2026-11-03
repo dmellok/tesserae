@@ -35,10 +35,10 @@
       {% if not has_key %}<span class="aw-warn"><i class="ph ph-warning" aria-hidden="true"></i> No fal.ai key yet: add one under <a href="{{ url_for('auth.genai_index') }}">Settings › Generative AI</a>, or to this widget's settings.</span>{% endif %}
     </div>
     <div class="aw-row">
+      <form method="post" action="{{ url_for('artwork.purge', plugin_id=plugin.id, name=c.name) }}" class="aw-inline aw-purge" onsubmit="return confirm('Delete every picture and every earlier version? Nothing comes back; the pages make them again as they are shown, within the budget.');"><button type="submit" class="ghost danger"><i class="ph ph-trash" aria-hidden="true"></i> Purge everything</button></form>
       <form method="post" action="{{ url_for('artwork.render_now', plugin_id=plugin.id, name=c.name) }}" class="aw-inline"><button type="submit" {% if not has_key %}disabled{% endif %} title="Paints what the panels showed lately and are missing"><i class="ph ph-play" aria-hidden="true"></i> Render now</button></form>
       {% if held %}<form method="post" action="{{ url_for('artwork.paint_held', plugin_id=plugin.id, name=c.name) }}" class="aw-inline"><button type="submit" {% if not has_key %}disabled{% endif %}><i class="ph ph-paint-brush" aria-hidden="true"></i> Paint the {{ held }} waiting</button></form>{% endif %}
       <span class="aw-meta">Render now paints what the panels' pages ask for and do not have{% if not wanted %}; no page has rendered to a panel yet{% endif %}.</span>
-      <form method="post" action="{{ url_for('artwork.purge', plugin_id=plugin.id, name=c.name) }}" class="aw-inline aw-purge" onsubmit="return confirm('Delete every picture and every earlier version? Nothing comes back; the pages make them again as they are shown, within the budget.');"><button type="submit" class="ghost danger"><i class="ph ph-trash" aria-hidden="true"></i> Purge everything</button></form>
     </div>
   </div>
   <div id="aw-queue" class="aw-ticker" hidden aria-live="polite" data-progress="{{ url_for('artwork.progress', plugin_id=plugin.id, name=c.name) }}" data-stop="{{ url_for('artwork.stop', plugin_id=plugin.id, name=c.name) }}" data-stop-all="{{ url_for('artwork.stop_all', plugin_id=plugin.id, name=c.name) }}">
@@ -122,7 +122,6 @@
 <style>
   .aw-today { display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; }
   .aw-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
-  .aw-purge { margin-left: auto; }
   .aw-inline { display: inline; margin: 0; }
   .aw-link { padding: 0 4px; font-size: inherit; text-decoration: underline; }
   .aw-warn { margin-left: 8px; }

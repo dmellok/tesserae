@@ -73,12 +73,12 @@
     </p>
   </div>
   <div class="dx-sponsor-actions">
-    <a class="button primary" href="{{ community_sponsor_url }}" target="_blank" rel="noreferrer noopener">
-      <i class="ph ph-heart" aria-hidden="true"></i> Sponsor Tesserae
-    </a>
     <form method="post" action="{{ url_for('stats.dismiss_sponsor') }}">
       {{ button('Dismiss', variant='ghost') }}
     </form>
+    <a class="button primary" href="{{ community_sponsor_url }}" target="_blank" rel="noreferrer noopener">
+      <i class="ph ph-heart" aria-hidden="true"></i> Sponsor Tesserae
+    </a>
   </div>
 </aside>
 {% endif %}

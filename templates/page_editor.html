@@ -250,9 +250,6 @@
   <span class="page-id-tag"><i class="ph ph-frame-corners" aria-hidden="true"></i> {{ panel.w }}×{{ panel.h }}</span>
   <span class="editor-spacer"></span>
   <div class="editor-actions">
-    <button type="button" class="primary" data-save-all>
-      <i class="ph ph-floppy-disk" aria-hidden="true"></i><span>Save</span>
-    </button>
     {# Push refuses unbound pushes: if devices exist but none are bound
        to this dashboard, the underlying send_page endpoint would render
        at the virtual-panel size and silently miss every device. Disable
@@ -288,6 +285,9 @@
         <i class="ph ph-trash" aria-hidden="true"></i>
       </button>
     </form>
+    <button type="button" class="primary" data-save-all>
+      <i class="ph ph-floppy-disk" aria-hidden="true"></i><span>Save</span>
+    </button>
   </div>
 </header>
 
@@ -664,11 +664,11 @@
       </p>
       {% endif %}
       <div class="schedules-card-actions">
+        <a class="ghost-link" href="{{ url_for('schedules.index') }}">All schedules</a>
         <button type="button" class="button" data-open-schedule-dialog="schedule-dialog-new">
           <i class="ph ph-plus" aria-hidden="true"></i>
           Add schedule
         </button>
-        <a class="ghost-link" href="{{ url_for('schedules.index') }}">All schedules</a>
       </div>
     </section>
   </div>

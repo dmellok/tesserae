@@ -319,12 +319,12 @@
             <p class="dx-band-desc">Look at the panel and pick the number you see top-left; the rotation is set to match and the card is re-sent to confirm.</p>
           </div>
           <div class="dx-band-actions calibrate-choices">
-            {% for n in [1, 2, 3, 4] %}
-            <button type="submit" form="{{ section.id }}-calibrate-apply" name="top_left" value="{{ n }}" class="dx-btn calibrate-num">{{ n }}</button>
-            {% endfor %}
             <button type="submit" form="{{ section.id }}-calibrate" class="dx-btn is-ghost">
               <i class="ph ph-arrow-clockwise" aria-hidden="true"></i><span>Re-send card</span>
             </button>
+            {% for n in [1, 2, 3, 4] %}
+            <button type="submit" form="{{ section.id }}-calibrate-apply" name="top_left" value="{{ n }}" class="dx-btn calibrate-num">{{ n }}</button>
+            {% endfor %}
           </div>
           {% else %}
           <div class="dx-band-text">
@@ -549,12 +549,12 @@
           </div>
           <div class="dx-band-actions">
             <form method="post" action="{{ url_for('auth.devices_colour_depth', instance_id=section.device_id) }}">
-              <input type="hidden" name="choice" value="grey">
-              <button type="submit" class="dx-btn is-primary"><span>Switch to grey</span></button>
-            </form>
-            <form method="post" action="{{ url_for('auth.devices_colour_depth', instance_id=section.device_id) }}">
               <input type="hidden" name="choice" value="mono">
               <button type="submit" class="dx-btn is-ghost"><span>Keep mono</span></button>
+            </form>
+            <form method="post" action="{{ url_for('auth.devices_colour_depth', instance_id=section.device_id) }}">
+              <input type="hidden" name="choice" value="grey">
+              <button type="submit" class="dx-btn is-primary"><span>Switch to grey</span></button>
             </form>
           </div>
         </div>
@@ -874,14 +874,14 @@
             <p class="dx-band-desc">Collect logs for the next 1, 5 or 20 wakes. A sleeping panel starts on its next check-in.</p>
           </div>
           <form method="post" action="{{ lg.collect_endpoint }}" class="dx-band-actions">
-            {% for n in [1, 5, 20] %}
-            <button type="submit" name="wakes" value="{{ n }}" class="dx-btn is-sm">{{ n }} wake{{ '' if n == 1 else 's' }}</button>
-            {% endfor %}
             {% if lg.remaining %}
             <button type="submit" name="wakes" value="0" class="dx-btn is-sm is-ghost">
               <i class="ph ph-stop" aria-hidden="true"></i><span>Stop</span>
             </button>
             {% endif %}
+            {% for n in [1, 5, 20] %}
+            <button type="submit" name="wakes" value="{{ n }}" class="dx-btn is-sm">{{ n }} wake{{ '' if n == 1 else 's' }}</button>
+            {% endfor %}
           </form>
         </div>
         <p class="field-help">
@@ -955,8 +955,8 @@
             <p class="field-help">Nothing else to wipe; the delete is already clean.</p>
             {% endif %}
             <div class="dx-delete-actions">
-              <button type="submit" class="button dx-danger"><i class="ph ph-trash" aria-hidden="true"></i><span>Delete device</span></button>
               <button type="button" class="button ghost" data-delete-cancel>Cancel</button>
+              <button type="submit" class="button dx-danger"><i class="ph ph-trash" aria-hidden="true"></i><span>Delete device</span></button>
             </div>
           </form>
         </details>

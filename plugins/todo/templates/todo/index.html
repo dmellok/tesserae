@@ -39,8 +39,8 @@
 <form method="post" action="{{ url_for('todo_admin.rename_list', list_id=selected.id) }}"
       class="td-rename-form" data-td-rename-form hidden>
   <input type="text" name="name" value="{{ selected.name }}" aria-label="List name" required>
-  <button type="submit" class="primary">Save</button>
   <button type="button" class="td-btn" data-td-rename-cancel>Cancel</button>
+  <button type="submit" class="primary">Save</button>
 </form>
 
 <form method="post" action="{{ url_for('todo_admin.add_item', list_id=selected.id) }}" class="td-additem">

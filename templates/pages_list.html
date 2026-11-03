@@ -509,14 +509,7 @@
 <div id="dx-bulk-bar" hidden>
   <span id="dx-bulk-count" class="dx-bulk-count">0 selected</span>
   <div class="dx-bulk-actions">
-    {% if archived_tab %}
-    <form method="post" action="{{ url_for('pages.bulk_unarchive') }}" id="dx-bulk-unarchive-form" class="form form--inline">
-      <button type="submit" class="dx-btn-primary-sm"><i class="ph ph-arrow-counter-clockwise" aria-hidden="true"></i><span>Restore selected</span></button>
-    </form>
-    {% else %}
-    <form method="post" action="{{ url_for('send.send_pages') }}" id="dx-bulk-push-form" class="form form--inline">
-      <button type="submit" class="dx-btn-primary-sm"><i class="ph ph-paper-plane-tilt" aria-hidden="true"></i><span>Push selected</span></button>
-    </form>
+    {% if not archived_tab %}
     <form method="post" action="{{ url_for('pages.bulk_archive') }}" id="dx-bulk-archive-form" class="form form--inline">
       <button type="submit" class="dx-btn-ghost-sm dx-btn-push" title="Archive the selected dashboards. Any still in a lineup is skipped."><i class="ph ph-archive" aria-hidden="true"></i><span>Archive selected</span></button>
     </form>
@@ -526,6 +519,15 @@
       <button type="submit" class="dx-btn-ghost-sm dx-btn-push"><i class="ph ph-trash" aria-hidden="true"></i><span>Delete selected</span></button>
     </form>
     <button type="button" id="dx-bulk-clear" class="dx-btn-ghost-sm">Clear selection</button>
+    {% if archived_tab %}
+    <form method="post" action="{{ url_for('pages.bulk_unarchive') }}" id="dx-bulk-unarchive-form" class="form form--inline">
+      <button type="submit" class="dx-btn-primary-sm"><i class="ph ph-arrow-counter-clockwise" aria-hidden="true"></i><span>Restore selected</span></button>
+    </form>
+    {% else %}
+    <form method="post" action="{{ url_for('send.send_pages') }}" id="dx-bulk-push-form" class="form form--inline">
+      <button type="submit" class="dx-btn-primary-sm"><i class="ph ph-paper-plane-tilt" aria-hidden="true"></i><span>Push selected</span></button>
+    </form>
+    {% endif %}
   </div>
 </div>
 

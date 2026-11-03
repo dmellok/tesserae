@@ -445,7 +445,6 @@
         </details>
 
         <div class="actions span-2">
-          <button type="submit" class="btn">Save changes</button>
           {% if view.dashboard_exists %}
           <a class="btn btn-quiet" href="{{ url_for('pages.edit', page_id=room.resolved_page_id()) }}">
             <i class="ph ph-arrow-square-out" aria-hidden="true"></i> Open dashboard
@@ -460,6 +459,7 @@
             Rebuilding regenerates from these settings and discards edits made to the dashboard
             by hand.
           </span>
+          <button type="submit" class="btn">Save changes</button>
         </div>
       </form>
 

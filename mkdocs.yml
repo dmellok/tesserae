@@ -138,6 +138,7 @@ nav:
       - Cross-widget design system: widget-design-system.md
       - "Looks: five page styles for code elements": mosaic.md
       - Design brief template: widget-design-brief.md
+      - Admin UI conventions: dev/ui-conventions.md
   - Client development:
       - Add hardware support: dev/adding-hardware.md
       - Client protocol spec: dev/client-protocol.md

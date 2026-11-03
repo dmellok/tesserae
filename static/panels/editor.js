@@ -3093,9 +3093,9 @@
     function draw() {
       b.innerHTML =
         '<span class="ag-move-t">The agent moved to <b></b></span>' +
+        '<button type="button" class="ag-move-b" data-stay>Stay here</button>' +
         '<button type="button" class="ag-move-b accent" data-go>' +
-        (left > 0 ? "Follow in " + left + "…" : "Open it") + "</button>" +
-        '<button type="button" class="ag-move-b" data-stay>Stay here</button>';
+        (left > 0 ? "Follow in " + left + "…" : "Open it") + "</button>";
       b.querySelector("b").textContent = name;
       b.querySelector("[data-go]").addEventListener("click", function () {
         window.location.href = canvasHref(pageId);
