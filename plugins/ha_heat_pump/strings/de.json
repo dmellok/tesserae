@@ -6,6 +6,7 @@
   "status_unavailable": "Status nicht verfügbar",
   "heating_temperature": "Heizung",
   "hot_water_temperature": "Warmwasser",
+  "water": "Wasser",
   "current_consumption": "Aktueller Verbrauch",
   "electricity_today": "Strom heute",
   "energy_details": "Stromverbrauch heute",

@@ -1,6 +1,6 @@
 {
   "tesserae_compat": "1.x",
-  "name": "HA Heat Pump",
+  "name": "Home Assistant, Heat Pump",
   "version": "0.1.0",
   "kind": "widget",
   "description": "Heat-pump compressor status, temperatures, and electricity consumption from Home Assistant.",

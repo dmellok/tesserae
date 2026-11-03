@@ -182,7 +182,7 @@ class HeatPumpSmokeTests(unittest.TestCase):
     def test_manifest_and_renderer_declare_requested_sizes_and_archetype(self) -> None:
         manifest = json.loads((PLUGIN_DIR / "plugin.json").read_text(encoding="utf-8"))
         client = (PLUGIN_DIR / "client.js").read_text(encoding="utf-8")
-        self.assertEqual(manifest["name"], "HA Heat Pump")
+        self.assertEqual(manifest["name"], "Home Assistant, Heat Pump")
         self.assertEqual(manifest["supports"]["sizes"], ["xs", "sm", "md", "lg"])
         options = {option["name"]: option["default"] for option in manifest["cell_options"]}
         self.assertEqual(options["flow_entity"], "sensor.e3_vitocal_17_vorlauftemperatur")
@@ -211,15 +211,51 @@ class HeatPumpSmokeTests(unittest.TestCase):
         self.assertIn('class="hp-reading-mode"', client)
         self.assertIn("aria-label=", client)
         self.assertIn(".hp-md .hp-yesterday { display: none; }", client)
+        self.assertIn(
+            ".hp-sm .hp-reading-top { align-items: flex-start; flex-direction: column; gap: 0; }",
+            client,
+        )
+        self.assertIn(".hp-sm .hp-readings { grid-auto-rows: max-content; }", client)
+        self.assertIn(".hp-sm .hp-reading { min-height: max-content; }", client)
+        self.assertIn('size === "xs" ? t("water", "Water")', client)
+        self.assertIn(".hp-xs .hp-readings { grid-template-columns: minmax(0, 1fr);", client)
+        self.assertIn(
+            ".hp-xs .hp-readings { grid-template-columns: minmax(0, 1fr); grid-auto-rows: max-content; gap: var(--space-2); }",
+            client,
+        )
+        self.assertIn(".hp-xs .hp-reading-top { align-items: center;", client)
+        self.assertIn(".hp-xs .hp-reading-caption { flex: 0 0 auto; flex-direction: row;", client)
+        self.assertIn(".hp-xs .hp-reading-value { flex: 1 1 auto; text-align: right; }", client)
+        self.assertIn(".hp-xs .hp-reading-value { overflow: visible; }", client)
+        self.assertIn(".hp-xs .hp-reading-value { font-size: var(--fs-body); }", client)
+        self.assertIn('<i class="ph-bold ph-thermometer-simple hp-reading-icon"', client)
+        self.assertIn('<i class="ph-bold ph-drop hp-reading-icon"', client)
+        self.assertIn('t("water", "Water")', client)
+        self.assertIn("ph-thermometer-simple hp-reading-icon", client)
+        self.assertIn("ph-drop hp-reading-icon", client)
+        self.assertIn(
+            ".hp-sm .hp-reading-top { align-items: flex-start; flex-direction: column; gap: 0; }",
+            client,
+        )
+        self.assertIn(".hp-sm .hp-hero { padding-bottom: var(--space-4); }", client)
         self.assertIn('modeIndicator(heatingMode.mode, t("heating_mode"', client)
         self.assertIn('modeIndicator(hotWaterMode.mode, t("hot_water_mode"', client)
         self.assertIn("status-grid hp-readings", client)
         self.assertIn(".hp-lg .hp-current-power { display: flex; }", client)
         self.assertIn(".hp-lg .hp-energy-details", client)
+        self.assertIn('role="meter" aria-label="${escapeHtml(label)}"', client)
+        self.assertIn(".hp-lg .hp-temperature-gauge { display: flex; }", client)
+        self.assertIn('size === "lg" ? temperatureGauge(heating', client)
+        self.assertIn('size === "lg" ? temperatureGauge(hotWater', client)
+        self.assertIn("const max = fahrenheit ? 176 : 80;", client)
         self.assertIn(
             ".hp-md .hp-reading-top { align-items: flex-start; flex-direction: column; }", client
         )
         self.assertIn('class="hp-reading-caption"', client)
+        self.assertIn(
+            ".hp-reading-caption { display: flex; min-width: 0; flex-direction: row; align-items: center;",
+            client,
+        )
         self.assertIn(".hp-md .hp-energy-details,", client)
         self.assertNotIn("client.css", client)
         self.assertNotIn("border:", client)

@@ -51,6 +51,25 @@ function modeIndicator(value, label, t) {
   return `<span class="hp-reading-mode" role="img" aria-label="${escapeHtml(accessibleLabel)}" title="${escapeHtml(accessibleLabel)}"><i aria-hidden="true" style="background:${color}"></i><span class="hp-reading-mode-label">${modeLabel(value, t)}</span></span>`;
 }
 
+function temperatureGauge(reading, label, accent) {
+  if (reading?.value === null || reading?.value === undefined) return "";
+  const value = Number(reading?.value);
+  if (!Number.isFinite(value)) return "";
+  const fahrenheit = reading?.unit === "°F";
+  const min = fahrenheit ? 32 : 0;
+  const max = fahrenheit ? 176 : 80;
+  const percentage = Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100));
+  const unit = fahrenheit ? "°F" : "°C";
+  return `
+    <div class="hp-temperature-gauge" role="meter" aria-label="${escapeHtml(label)}"
+         aria-valuemin="${min}" aria-valuemax="${max}" aria-valuenow="${escapeHtml(value)}">
+      <div class="hp-temperature-track" aria-hidden="true">
+        <span class="hp-temperature-fill" style="width:${percentage}%;background:var(${accent})"></span>
+      </div>
+      <div class="hp-temperature-scale" aria-hidden="true"><span>${min}${unit}</span><span>${max}${unit}</span></div>
+    </div>`;
+}
+
 export default function render(shadow, ctx) {
   const data = ctx?.data ?? {};
   const t = ctx?.t || ((key, fallback) => fallback ?? key);
@@ -155,12 +174,17 @@ export default function render(shadow, ctx) {
     .hp-reading--water { background: var(--accent-2-soft); }
     .hp-reading-top { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); min-width: 0; }
     .hp-reading-lockup { display: flex; min-width: 0; flex-direction: column; gap: var(--space-1); }
-    .hp-reading-caption { display: flex; min-width: 0; flex-direction: column; gap: var(--space-1); }
+    .hp-reading-caption { display: flex; min-width: 0; flex-direction: row; align-items: center; gap: var(--space-1); }
+    .hp-reading-icon { color: var(--text-muted); font-size: var(--fs-label); }
     .hp-reading-mode { display: none; width: 0.65em; height: 0.65em; flex: 0 0 auto; border-radius: 50%; background: var(--surface-sunken); }
     .hp-reading-mode i { display: block; width: 100%; height: 100%; border-radius: inherit; }
     .hp-reading-mode-label { display: none; }
     .hp-reading-label, .hp-energy-label { color: var(--text-muted); font-size: var(--fs-label); font-weight: var(--fw-bold); }
     .hp-reading-value { overflow: hidden; color: var(--text-primary); font-size: clamp(var(--fs-lead), 5cqw, var(--fs-display)); font-weight: var(--fw-black); line-height: var(--lh-tight); text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .hp-temperature-gauge { display: none; flex-direction: column; gap: var(--space-1); width: 100%; }
+    .hp-temperature-track { height: var(--space-2); overflow: hidden; border-radius: var(--pill-radius, var(--radius-1)); background: var(--surface-sunken); }
+    .hp-temperature-fill { display: block; height: 100%; border-radius: inherit; }
+    .hp-temperature-scale { display: flex; justify-content: space-between; color: var(--text-muted); font-size: var(--fs-caption); font-weight: var(--fw-bold); font-variant-numeric: tabular-nums; }
     .hp-current-power { display: none; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-radius: var(--radius-1); background: var(--accent-3-soft); }
     .hp-current-power .ph-bold { color: var(--accent-3); font-size: var(--icon-md); }
     .hp-power-lockup { display: flex; min-width: 0; flex-direction: column; gap: var(--space-1); }
@@ -179,8 +203,20 @@ export default function render(shadow, ctx) {
     .hp-xs .hp-hero { gap: var(--space-3); padding: var(--space-2) var(--space-3); }
     .hp-xs .hp-hero > .ph-bold { font-size: clamp(var(--icon-md), 15cqw, var(--icon-lg)); }
     .hp-xs .hp-state { font-size: var(--fs-lead); }
+    .hp-sm .hp-hero { padding-bottom: var(--space-4); }
     .hp-xs .hp-reading { padding: var(--space-2) var(--space-3); }
-    .hp-xs .hp-reading-value { font-size: var(--fs-lead); }
+    .hp-xs .hp-reading-value { font-size: var(--fs-body); }
+    .hp-xs .hp-body { overflow: visible; }
+    .hp-xs .hp-readings { grid-template-columns: minmax(0, 1fr); grid-auto-rows: max-content; gap: var(--space-2); }
+    .hp-xs .hp-reading { min-height: max-content; }
+    .hp-xs .hp-reading-top { align-items: center; justify-content: space-between; gap: var(--space-3); }
+    .hp-xs .hp-reading-caption { flex: 0 0 auto; flex-direction: row; align-items: center; }
+    .hp-xs .hp-reading-value { flex: 1 1 auto; text-align: right; }
+    .hp-xs .hp-reading-value { overflow: visible; }
+    .hp-sm .hp-readings { grid-auto-rows: max-content; }
+    .hp-sm .hp-reading { min-height: max-content; }
+    .hp-sm .hp-reading-top { align-items: flex-start; flex-direction: column; gap: 0; }
+    .hp-sm .hp-reading-value { text-align: left; }
     .hp-lg .hp-current-power { display: flex; }
     .hp-lg .hp-energy-details { display: grid; }
     .hp-lg .hp-daily-total { display: none; }
@@ -210,6 +246,7 @@ export default function render(shadow, ctx) {
     }
     .hp-lg .hp-reading-mode i { width: 0.65em; height: 0.65em; }
     .hp-lg .hp-reading-mode-label { display: inline; }
+    .hp-lg .hp-temperature-gauge { display: flex; }
     .hp-md .hp-energy-details,
     .hp-md .hp-current-power,
     .hp-md .hp-daily-total { display: none; }
@@ -243,20 +280,24 @@ export default function render(shadow, ctx) {
           <div class="hp-reading hp-reading--heating status-cell">
             <div class="hp-reading-top">
               <div class="hp-reading-caption">
+                <i class="ph-bold ph-thermometer-simple hp-reading-icon" aria-hidden="true"></i>
                 <span class="hp-reading-label">${escapeHtml(t("heating_temperature", "Heating"))}</span>
                 ${modeIndicator(heatingMode.mode, t("heating_mode", "Heating mode"), t)}
               </div>
               <strong class="hp-reading-value">${formatReading(heating, "°C")}</strong>
             </div>
+            ${size === "lg" ? temperatureGauge(heating, t("heating_temperature", "Heating"), "--accent-1") : ""}
           </div>
           <div class="hp-reading hp-reading--water status-cell">
             <div class="hp-reading-top">
               <div class="hp-reading-caption">
-                <span class="hp-reading-label">${escapeHtml(t("hot_water_temperature", "Hot water"))}</span>
+                <i class="ph-bold ph-drop hp-reading-icon" aria-hidden="true"></i>
+                <span class="hp-reading-label">${escapeHtml(size === "xs" ? t("water", "Water") : t("hot_water_temperature", "Hot water"))}</span>
                 ${modeIndicator(hotWaterMode.mode, t("hot_water_mode", "Hot-water mode"), t)}
               </div>
               <strong class="hp-reading-value">${formatReading(hotWater, "°C")}</strong>
             </div>
+            ${size === "lg" ? temperatureGauge(hotWater, t("hot_water_temperature", "Hot water"), "--accent-2") : ""}
           </div>
         </div>
         ${power.value != null ? `
