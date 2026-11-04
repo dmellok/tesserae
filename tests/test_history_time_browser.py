@@ -32,7 +32,15 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-@pytest.fixture(params=["en-US", "en-GB"])
+@pytest.fixture(
+    params=[
+        ("en-US", "classic"),
+        ("en-US", "paper"),
+        ("en-GB", "classic"),
+        ("en-GB", "paper"),
+    ],
+    ids=lambda p: "-".join(p),
+)
 def live_server(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[str]:
     from werkzeug.serving import make_server
 
@@ -45,7 +53,8 @@ def live_server(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[str]
     )
     app.config["TESTING"] = True
     store = app.config["SETTINGS_STORE"]
-    store.patch_section("app", {"onboarded": True, "locale": request.param})
+    locale, design = request.param
+    store.patch_section("app", {"onboarded": True, "locale": locale, "ui_design": design})
     store.patch_section("auth", {"disabled": True})
     app.config["PAGE_STORE"].save(Page(id="news", name="Newspaper", panel=Panel(w=800, h=480)))
     app.config["EVENT_LOG"].record(
@@ -66,15 +75,14 @@ def live_server(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[str]
         thread.join(timeout=10)
 
 
-@pytest.mark.parametrize("paper", [False, True])
-def test_the_time_ends_before_the_next_column(live_server: str, paper: bool) -> None:
+def test_the_time_ends_before_the_next_column(
+    live_server: str, request: pytest.FixtureRequest
+) -> None:
     from playwright.sync_api import sync_playwright
 
     with sync_playwright() as p:
         browser = p.chromium.launch(executable_path=_EXE) if _EXE else p.chromium.launch()
         ctx = browser.new_context(viewport={"width": 1280, "height": 900})
-        if paper:
-            ctx.add_init_script("localStorage.setItem('tesserae-ui', 'paper')")
         pg = ctx.new_page()
         pg.goto(f"{live_server}/history")
         pg.wait_for_selector(".dx-hist-row .dx-hist-time")
@@ -82,13 +90,23 @@ def test_the_time_ends_before_the_next_column(live_server: str, paper: bool) -> 
             """() => {
               const t = document.querySelector('.dx-hist-row .dx-hist-time');
               const next = t.nextElementSibling;
-              const tr = t.getBoundingClientRect();
-              // Text wider than its box would overflow into the next column.
+              // The rendered text itself, not its box: text wider than the
+              // box would spill past it into the next column.
+              const range = document.createRange();
+              range.selectNodeContents(t);
+              const textRight = range.getBoundingClientRect().right;
               return {overflow: t.scrollWidth - t.clientWidth,
-                      gap: next ? next.getBoundingClientRect().left - tr.right : 99,
-                      text: t.textContent};
+                      gap: next ? next.getBoundingClientRect().left - textRight : 99,
+                      text: t.textContent.trim(),
+                      design: document.documentElement.dataset.ui || 'classic'};
             }"""
         )
         browser.close()
+    locale, design = request.node.callspec.params["live_server"]
+    assert fits["design"] == design, fits
+    if locale == "en-US":
+        assert fits["text"].endswith(("AM", "PM")), fits
+    else:
+        assert not fits["text"].endswith(("AM", "PM")), fits
     assert fits["overflow"] <= 0, fits
     assert fits["gap"] >= 4, fits
