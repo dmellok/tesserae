@@ -192,27 +192,64 @@
        no battery popover, no update badge, no opt-in prompt. See
        auth.shell_locked; the context processor also withholds the data. #}
     {% if not shell_locked %}
+    {% if _paper %}
+    {# Paper phones: once the page's title scrolls under the top bar, the
+       bar becomes the page bar (static/phone-shell.js puts page-scrolled
+       on <body>): the title takes the brand name's place and the notices
+       that scrolled out of view ride along as chips. paper.css shows it
+       on phones only; desktop and the classic design never draw it. #}
+    <span class="topbar-page" data-page-bar>
+      <span class="topbar-page-title" data-page-bar-title></span>
+      <span class="topbar-page-chips">
+        {% if marketplace_restart_pending %}
+        <button type="submit" form="topbar-restart-form" class="topbar-chip topbar-chip--warn"
+                title="Restart Tesserae to load installed/uninstalled widgets">
+          <i class="ph-bold ph-arrow-clockwise" aria-hidden="true"></i><span>Restart</span>
+        </button>
+        {% endif %}
+        {% if update_status is defined and update_status.available %}
+        <a href="{{ url_for('auth.settings') }}" class="topbar-chip"
+           title="Tesserae update available{% if update_status.latest %} (v{{ update_status.latest }}){% endif %}">
+          <i class="ph-bold ph-arrow-circle-up" aria-hidden="true"></i><span>Update</span>
+        </a>
+        {% endif %}
+        {% if nav_discovered %}
+        <a href="{{ url_for('auth.settings_area', area='devices', discovered=1) }}" class="topbar-chip"
+           title="{{ nav_discovered|length }} new device{{ 's' if nav_discovered|length != 1 else '' }} heard, not registered yet">
+          <i class="ph-bold ph-broadcast" aria-hidden="true"></i><span>{{ nav_discovered|length }} new</span>
+        </a>
+        {% endif %}
+        {% if nav_batteries and nav_batteries[0].tone in ('low', 'critical') %}
+        {% set _chip_worst = nav_batteries[0] %}
+        <a href="{{ url_for('device_battery.index') }}" class="topbar-chip topbar-chip--{{ _chip_worst.tone }}"
+           title="{{ _chip_worst.name }} battery at {{ _chip_worst.pct }} percent">
+          <i class="ph-bold ph-battery-{{ 'warning' if _chip_worst.tone == 'critical' else 'low' }}" aria-hidden="true"></i><span>{{ _chip_worst.name }} {{ _chip_worst.pct }}%</span>
+        </a>
+        {% endif %}
+      </span>
+    </span>
+    {% endif %}
     {% block topnav %}
     <button type="button" class="nav-toggle" aria-label="Open menu" aria-controls="primary-nav" aria-expanded="false">
       <i class="ph ph-list" aria-hidden="true"></i>
     </button>
     <nav class="topnav" id="primary-nav">
       <a href="{{ url_for('send.index') }}"
-         class="{% if request.blueprint == 'send' %}is-active{% endif %}">
+         class="{% if request.blueprint == 'send' %}is-active{% endif %}" data-tab>
          <i class="ph ph-paper-plane-tilt" aria-hidden="true"></i><span>Send</span>
       </a>
       <a href="{{ url_for('pages.index') }}"
-         class="{% if request.blueprint == 'pages' %}is-active{% endif %}">
+         class="{% if request.blueprint == 'pages' %}is-active{% endif %}" data-tab>
          <i class="ph ph-squares-four" aria-hidden="true"></i><span>Dashboards</span>
       </a>
       {# #167 Phase 3: Schedules + Rotations fold into one surface (now
          titled Lineups); their old routes redirect there. #}
       <a href="{{ url_for('decks.index') }}"
-         class="{% if request.blueprint in ('decks', 'schedules', 'rotations') %}is-active{% endif %}">
+         class="{% if request.blueprint in ('decks', 'schedules', 'rotations') %}is-active{% endif %}" data-tab>
          <i class="ph ph-monitor-play" aria-hidden="true"></i><span>Lineups</span>
       </a>
       <a href="{{ url_for('history.index') }}"
-         class="{% if request.blueprint == 'history' %}is-active{% endif %}">
+         class="{% if request.blueprint == 'history' %}is-active{% endif %}" data-tab>
          <i class="ph ph-clock-counter-clockwise" aria-hidden="true"></i><span>History</span>
       </a>
       {# Stats sits beside History on purpose: same subject, one is the
@@ -462,7 +499,7 @@
        between batteries and the theme toggle so it's prominent
        without colliding with the per-page actions. #}
     <form method="post" action="{{ url_for('marketplace.restart') }}" class="inline topbar-restart-form"
-          data-restart-form data-restart-label="Restarting Tesserae">
+          id="topbar-restart-form" data-restart-form data-restart-label="Restarting Tesserae">
       <button type="submit" class="topbar-restart" title="Restart Tesserae to load installed/uninstalled widgets">
         <i class="ph-bold ph-arrow-clockwise" aria-hidden="true"></i>
         <span class="topbar-restart-text">
@@ -508,8 +545,86 @@
 
   <div class="nav-scrim" hidden></div>
   <main class="page {% block page_class %}{% endblock %}">
+    {% set _update_due = update_status is defined and update_status.available %}
+    {% if _paper and not shell_locked and (marketplace_restart_pending or _update_due or mcp_bridge_update or nav_discovered or online_features_unanswered) %}
+    {# Paper phones: the notices sit in a band at the top of the page, where
+       the sidebar foot would have put them out of reach. Each one is also a
+       chip in the page bar once this band has scrolled away. The restart
+       button submits the top bar's form by id, so the restart modal still
+       runs. paper.css shows the band on phones only. #}
+    <div class="shell-notices" data-shell-notices>
+      {% if marketplace_restart_pending %}
+      <div class="shell-notice shell-notice--warn" role="status">
+        <i class="ph-bold ph-arrow-clockwise" aria-hidden="true"></i>
+        <span class="shell-notice-text"><b>Restart required</b> <span>Loads your widget changes</span></span>
+        <button type="submit" form="topbar-restart-form" class="dx-btn">Restart</button>
+      </div>
+      {% endif %}
+      {% if _update_due %}
+      <a class="shell-notice" href="{{ url_for('auth.settings') }}">
+        <i class="ph-bold ph-arrow-circle-up" aria-hidden="true"></i>
+        <span class="shell-notice-text"><b>Update available</b>{% if update_status.latest %} <span>v{{ update_status.latest }}</span>{% endif %}</span>
+        <i class="ph ph-caret-right" aria-hidden="true"></i>
+      </a>
+      {% endif %}
+      {% if mcp_bridge_update %}
+      <a class="shell-notice" href="{{ url_for('auth.settings_area', area='system') }}#mcp">
+        <i class="ph-bold ph-plug" aria-hidden="true"></i>
+        <span class="shell-notice-text"><b>MCP bridge update</b> <span>v{{ mcp_bridge_update.expected }} ships with this Tesserae</span></span>
+        <i class="ph ph-caret-right" aria-hidden="true"></i>
+      </a>
+      {% endif %}
+      {% if nav_discovered %}
+      <a class="shell-notice" href="{{ url_for('auth.settings_area', area='devices', discovered=1) }}">
+        <i class="ph-bold ph-broadcast" aria-hidden="true"></i>
+        <span class="shell-notice-text"><b>{{ nav_discovered|length }} new device{{ 's' if nav_discovered|length != 1 else '' }}</b> <span>Heard, not registered yet</span></span>
+        <i class="ph ph-caret-right" aria-hidden="true"></i>
+      </a>
+      {% endif %}
+      {% if online_features_unanswered %}
+      <div class="shell-notice" role="group" aria-label="Anonymous install count">
+        <i class="ph-bold ph-heart" aria-hidden="true"></i>
+        <span class="shell-notice-text"><b>Count this install?</b> <span>An anonymous daily heartbeat, and update alerts</span></span>
+        <form method="post" action="{{ url_for('auth.settings_online_features_toggle') }}" class="inline">
+          <input type="hidden" name="online_features" value="1">
+          <input type="hidden" name="next" value="{{ request.full_path if request.query_string else request.path }}">
+          <button type="submit" class="dx-btn">Yes</button>
+        </form>
+        <form method="post" action="{{ url_for('auth.settings_online_features_toggle') }}" class="inline">
+          <input type="hidden" name="online_features" value="0">
+          <input type="hidden" name="next" value="{{ request.full_path if request.query_string else request.path }}">
+          <button type="submit" class="dx-btn" title="Keep this install offline. Changeable later in Settings › System.">No</button>
+        </form>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
     {% block main %}{% endblock %}
   </main>
+  {% if _paper and not shell_locked %}
+  {# Paper phones: the four places you go most in a tab bar along the
+     bottom; More lifts the nav (the old drawer) up as a sheet with the
+     rest. The selected tab is filled. paper.css shows it on phones only. #}
+  {% set _tab = 'send' if request.blueprint == 'send' else ('pages' if request.blueprint == 'pages' else ('decks' if request.blueprint in ('decks', 'schedules', 'rotations') else ('history' if request.blueprint == 'history' else 'more'))) %}
+  <nav class="tabbar" aria-label="Main" data-tabbar>
+    <a href="{{ url_for('send.index') }}"{% if _tab == 'send' %} class="is-active" aria-current="page"{% endif %}>
+      <i class="{{ 'ph-fill' if _tab == 'send' else 'ph' }} ph-paper-plane-tilt" aria-hidden="true"></i><span>Send</span>
+    </a>
+    <a href="{{ url_for('pages.index') }}"{% if _tab == 'pages' %} class="is-active" aria-current="page"{% endif %}>
+      <i class="{{ 'ph-fill' if _tab == 'pages' else 'ph' }} ph-squares-four" aria-hidden="true"></i><span>Dashboards</span>
+    </a>
+    <a href="{{ url_for('decks.index') }}"{% if _tab == 'decks' %} class="is-active" aria-current="page"{% endif %}>
+      <i class="{{ 'ph-fill' if _tab == 'decks' else 'ph' }} ph-monitor-play" aria-hidden="true"></i><span>Lineups</span>
+    </a>
+    <a href="{{ url_for('history.index') }}"{% if _tab == 'history' %} class="is-active" aria-current="page"{% endif %}>
+      <i class="{{ 'ph-fill' if _tab == 'history' else 'ph' }} ph-clock-counter-clockwise" aria-hidden="true"></i><span>History</span>
+    </a>
+    <button type="button"{% if _tab == 'more' %} class="is-active"{% endif %} data-more-toggle
+            aria-controls="primary-nav" aria-expanded="false" aria-haspopup="true">
+      <i class="{{ 'ph-fill' if _tab == 'more' else 'ph' }} ph-dots-three-outline" aria-hidden="true"></i><span>More</span>
+    </button>
+  </nav>
+  {% endif %}
   {# All footer links use ``rel="noreferrer noopener"``: ``noreferrer``
      strips the HTTP Referer header so we never leak the host's IP or
      hostname (loopback, LAN IP, ``tesserae.lan``) to the destination,
@@ -569,7 +684,8 @@
   <script src="{{ url_for('static', filename='bind_prompt.js') }}"></script>
   <script src="{{ url_for('static', filename='list-filter.js') }}"></script>
   {% if _paper %}<script src="{{ url_for('static', filename='morph.js') }}"></script>{% endif %}
-  {% if _paper and not shell_locked %}<script src="{{ url_for('static', filename='sidebar-rail.js') }}"></script>{% endif %}
+  {% if _paper and not shell_locked %}<script src="{{ url_for('static', filename='sidebar-rail.js') }}"></script>
+  <script src="{{ url_for('static', filename='phone-shell.js') }}" defer></script>{% endif %}
   <script src="{{ url_for('static', filename='info-pop.js') }}"></script>
   <script src="{{ url_for('static', filename='icon-picker.js') }}"></script>
   <script src="{{ url_for('static', filename='entity-overrides.js') }}"></script>
@@ -584,21 +700,32 @@
       if (tile) tile.classList.toggle('is-on', box.checked);
     });
     // Hamburger toggle for the right-side nav drawer.
+    // Paper phones open the same drawer as a sheet from the tab bar's
+    // More button; both toggles drive one state.
     (function () {
       const btn = document.querySelector('.nav-toggle');
+      const more = document.querySelector('[data-more-toggle]');
       const nav = document.getElementById('primary-nav');
       const scrim = document.querySelector('.nav-scrim');
       if (!btn || !nav || !scrim) return;
       function setOpen(open) {
         document.body.classList.toggle('nav-open', open);
         btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        if (more) more.setAttribute('aria-expanded', open ? 'true' : 'false');
         scrim.hidden = !open;
       }
-      btn.addEventListener('click', (e) => {
+      function toggle(e) {
         e.stopPropagation();
         setOpen(!document.body.classList.contains('nav-open'));
-      });
+      }
+      btn.addEventListener('click', toggle);
+      if (more) more.addEventListener('click', toggle);
       scrim.addEventListener('click', () => setOpen(false));
+      document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape' || !document.body.classList.contains('nav-open')) return;
+        setOpen(false);
+        (more && more.offsetParent ? more : btn).focus();
+      });
       nav.addEventListener('click', (e) => {
         // Close after navigating, but theme toggle / dropdown summaries
         // shouldn't dismiss the drawer.
@@ -612,7 +739,7 @@
       // cover because the topbar sits above the scrim in z-order.
       document.addEventListener('click', (e) => {
         if (!document.body.classList.contains('nav-open')) return;
-        if (nav.contains(e.target) || btn.contains(e.target)) return;
+        if (nav.contains(e.target) || btn.contains(e.target) || (more && more.contains(e.target))) return;
         setOpen(false);
       });
       window.addEventListener('resize', () => {

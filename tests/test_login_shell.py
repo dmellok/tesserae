@@ -50,6 +50,8 @@ def _assert_bare_shell(body: str) -> None:
     assert 'href="/send"' not in body
     assert 'href="/settings"' not in body
     assert "topbar-batteries" not in body, "battery popover rendered before sign-in"
+    assert "tabbar" not in body, "phone tab bar rendered before sign-in"
+    assert "topbar-page" not in body, "page bar chips rendered before sign-in"
     for b in FAKE_BATTERIES:
         assert b["name"] not in body, f"device name {b['name']!r} leaked before sign-in"
     assert "topbar-update" not in body
@@ -95,6 +97,9 @@ def test_signed_in_pages_keep_the_full_shell(app_with_gate: Flask) -> None:
     for b in FAKE_BATTERIES:
         assert b["name"] in body
     assert "Tesserae v" in body
+    # The worst charge is low, so the phone page bar carries it as a chip.
+    assert 'class="topbar-chip topbar-chip--low"' in body
+    assert "Kitchen Secret Panel 42%" in body
 
 
 def test_signed_in_admin_never_sees_the_login_page(app_with_gate: Flask) -> None:

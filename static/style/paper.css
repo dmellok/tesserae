@@ -415,6 +415,168 @@
   :root[data-ui="paper"] .topnav .topbar-batteries--drawer { display: none; }
 }
 
+/* ----- Shell: phones get a tab bar, a More sheet and a page bar ------- */
+/* The four places you go most sit in a tab bar along the bottom; More
+   lifts the old drawer up as a sheet holding the rest (Stats, Widgets,
+   Settings, the charge list, theme, the design switch). Once the page's
+   title scrolls under the top bar the bar becomes the page bar: the
+   title where the brand name was and the notices that scrolled away as
+   chips (static/phone-shell.js). The notices themselves sit in a band
+   at the top of the page rather than the drawer foot. The battery pill
+   leaves the top bar: the charge list lives in the sheet and a low one
+   is a chip. Desktop keeps the sidebar; the classic design is untouched. */
+@media (max-width: 900px) {
+  :root[data-ui="paper"] body.admin {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+    /* The device page's save bar measures from this (settings.css). */
+    --dx-save-bar-offset: calc(64px + env(safe-area-inset-bottom, 0px));
+  }
+  :root[data-ui="paper"] .nav-toggle,
+  :root[data-ui="paper"] .topbar > .topbar-batteries--topbar,
+  :root[data-ui="paper"] .topbar > .topbar-restart-form,
+  :root[data-ui="paper"] .topbar > .topbar-optin { display: none; }
+
+  /* Tab bar. */
+  :root[data-ui="paper"] .tabbar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 510;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    height: calc(64px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    box-sizing: border-box;
+    background: var(--t-surface);
+    border-top: 1px solid var(--t-border);
+  }
+  :root[data-ui="paper"] .tabbar > a,
+  :root[data-ui="paper"] .tabbar > button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    min-height: 44px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    color: var(--t-fg-soft);
+    font: inherit;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  :root[data-ui="paper"] .tabbar > a .ph,
+  :root[data-ui="paper"] .tabbar > a .ph-fill,
+  :root[data-ui="paper"] .tabbar > button .ph,
+  :root[data-ui="paper"] .tabbar > button .ph-fill { font-size: 22px; line-height: 1; }
+  :root[data-ui="paper"] .tabbar > .is-active,
+  :root[data-ui="paper"] .tabbar > [aria-expanded="true"] { color: var(--t-fg); font-weight: 600; }
+  :root[data-ui="paper"] .tabbar > a:focus-visible,
+  :root[data-ui="paper"] .tabbar > button:focus-visible { outline: 0; box-shadow: inset var(--t-ring); }
+
+  /* More: the drawer rises as a sheet, stopping above the tab bar. */
+  :root[data-ui="paper"] .topnav {
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: auto;
+    max-height: calc(100vh - 72px);
+    padding: 8px 8px calc(72px + env(safe-area-inset-bottom, 0px));
+    border: 0;
+    border-top: 1px solid var(--t-border-strong);
+    border-radius: 2px 2px 0 0;
+    box-shadow: none;
+    transform: translateY(100%);
+    transition: transform 240ms var(--p-ease);
+  }
+  :root[data-ui="paper"] body.nav-open .topnav { transform: translateY(0); }
+  /* The four tabbed places are not repeated in the sheet. */
+  :root[data-ui="paper"] .topnav > a[data-tab] { display: none; }
+  :root[data-ui="paper"] .topnav > a,
+  :root[data-ui="paper"] .topnav .nav-dropdown > summary { min-height: 48px; font-size: 15px; }
+  :root[data-ui="paper"] .topnav .topbar-batteries--drawer { display: block; }
+  :root[data-ui="paper"] .topnav .theme-toggle--drawer { min-height: 48px; margin-top: 4px; }
+
+  /* Page bar: the top bar once the title has scrolled under it. */
+  :root[data-ui="paper"] .topbar { gap: 10px; }
+  :root[data-ui="paper"] body.page-scrolled .brand-name { display: none; }
+  :root[data-ui="paper"] body.page-scrolled .topbar-page { display: flex; }
+  :root[data-ui="paper"] .topbar-page { flex: 1; align-items: center; gap: 8px; min-width: 0; }
+  :root[data-ui="paper"] .topbar-page-title {
+    flex: 1;
+    min-width: 0;
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  :root[data-ui="paper"] .topbar-page-chips { display: flex; gap: 6px; flex: none; }
+  :root[data-ui="paper"] .topbar-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 28px;
+    padding: 0 8px;
+    border: 1px solid var(--t-border);
+    border-radius: 2px;
+    background: var(--t-surface-sunk);
+    color: var(--t-fg);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  :root[data-ui="paper"] .topbar-chip .ph-bold { font-size: 14px; }
+  :root[data-ui="paper"] .topbar-chip--warn { background: var(--t-warn-bg); }
+  :root[data-ui="paper"] .topbar-chip--low { color: var(--t-warn); }
+  :root[data-ui="paper"] .topbar-chip--critical { color: var(--t-danger); }
+
+  /* Notices: a band at the top of the page. */
+  :root[data-ui="paper"] .shell-notices { display: flex; flex-direction: column; gap: 8px; margin: 0 0 16px; }
+  :root[data-ui="paper"] .shell-notice {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 48px;
+    padding: 8px 12px;
+    border: 1px solid var(--t-border);
+    border-radius: 2px;
+    background: var(--t-surface);
+    color: var(--t-fg);
+    font-size: 13px;
+    text-decoration: none;
+  }
+  :root[data-ui="paper"] .shell-notice--warn { background: var(--t-warn-bg); }
+  :root[data-ui="paper"] .shell-notice > .ph-bold { font-size: 18px; flex: none; }
+  :root[data-ui="paper"] .shell-notice > .ph { color: var(--t-fg-soft); flex: none; }
+  :root[data-ui="paper"] .shell-notice-text { flex: 1; min-width: 0; }
+  :root[data-ui="paper"] .shell-notice-text b { font-weight: 600; }
+  :root[data-ui="paper"] .shell-notice-text span { color: var(--t-fg-soft); }
+  :root[data-ui="paper"] .shell-notice .inline { margin: 0; }
+
+  /* Bars that stick to the bottom clear the tab bar. */
+  :root[data-ui="paper"] .dxe-actionbar,
+  :root[data-ui="paper"] .lu .lu-pending { bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
+  :root[data-ui="paper"] .dx-save-bar--page { bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
+}
+@media (max-width: 900px) and (prefers-reduced-motion: reduce) {
+  :root[data-ui="paper"] .topnav { transition: none; }
+}
+
 /* ----- Batteries: a floating pill in the top-right corner ------------ */
 /* The worst charge as an icon and a count (or the one percentage), on
    a round pill; the popover drops below it, right-aligned. */

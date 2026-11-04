@@ -431,6 +431,13 @@
   z-index: 499;
 }
 
+/* Paper's phone shell (paper.css): the tab bar, the page slot in the
+   top bar and the notices band are in the markup only under Paper and
+   show only on phones; nothing else ever draws them. */
+.tabbar,
+.topbar-page,
+.shell-notices { display: none; }
+
 @media (max-width: 900px) {
   .nav-toggle { display: inline-flex; }
   .topnav {

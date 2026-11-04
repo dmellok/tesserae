@@ -51,6 +51,30 @@ def test_paper_by_default_with_switch_offered(app: Flask) -> None:
     assert '<span class="brand-tag">Server</span>' in body
 
 
+def test_paper_phone_shell(app: Flask) -> None:
+    """Paper carries the phone shell: a tab bar with the four places you go
+    most plus More, the page slot in the top bar and the script that fills
+    it. The four tabbed links are marked in the nav so the sheet can drop
+    them. The classic design draws none of it."""
+    client = app.test_client()
+    _sign_in(client)
+    body = client.get("/history").get_data(as_text=True)
+    assert '<nav class="tabbar" aria-label="Main" data-tabbar>' in body
+    assert '<a href="/history" class="is-active" aria-current="page">' in body
+    assert "ph-fill ph-clock-counter-clockwise" in body
+    assert len(re.findall(r"<button[^>]*data-more-toggle", body)) == 1
+    assert 'aria-controls="primary-nav" aria-expanded="false" aria-haspopup="true"' in body
+    assert body.count(" data-tab>") == 4
+    assert 'class="topbar-page" data-page-bar' in body
+    assert "static/phone-shell.js" in body
+    app.config["SETTINGS_STORE"].update_section("app", {"ui_design": "classic"})
+    body = client.get("/history").get_data(as_text=True)
+    assert "tabbar" not in body
+    assert "data-page-bar" not in body
+    assert "phone-shell.js" not in body
+    assert "shell-notices" not in body
+
+
 @pytest.mark.parametrize("design", [None, "paper", "classic"])
 def test_preloads_active_ui_fonts_with_ingress_prefix(app: Flask, design: str | None) -> None:
     if design is not None:

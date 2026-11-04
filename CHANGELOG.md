@@ -8,6 +8,16 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- Paper's phone shell. The four places you go most (Send, Dashboards,
+  Lineups, History) sit in a tab bar along the bottom and More lifts the
+  rest up as a sheet, in place of the hamburger drawer. Once a page's title
+  scrolls under the top bar, the bar turns into the page bar: the title
+  where the brand name was, and the notices that scrolled away (restart
+  required, an update, new devices, a low battery) as chips. Those notices
+  sit in a band at the top of the page rather than the drawer. The battery
+  pill leaves the top bar; the charge list lives in the sheet. Desktop and
+  the classic design are unchanged.
+
 - A `select` cell option's choice can list `aliases`, the values an earlier
   manifest used for it. A cell that still holds one shows the choice it
   became rather than "Unavailable: <value>", `show_if` reads it the same way,
