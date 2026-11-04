@@ -13,7 +13,7 @@
    - ``testflight_url`` — public beta link, also encoded in the QR
 #}
 {% extends "_base.html" %}
-{% from "_components.html" import settings_tabs, text_input with context %}
+{% from "_components.html" import collapsible_toggle, settings_tabs, text_input with context %}
 {% block title %}Companion app, Tesserae{% endblock %}
 
 {% block main %}
@@ -28,15 +28,16 @@
 {{ settings_tabs('companion') }}
 
 {# ---- Get the app --------------------------------------------------------- #}
-<section class="dx-section-card" id="companion-install">
-  <header class="dx-section-head">
+<section data-collapsible class="dx-section-card" id="companion-install">
+  <header class="dx-section-head" data-collapsible-head>
     <span class="dx-section-icon" aria-hidden="true"><i class="ph ph-apple-logo"></i></span>
     <div class="dx-section-titleblock">
       <h3 class="dx-section-title">Get the app</h3>
       <p class="dx-section-desc">The app is in public beta on TestFlight. Scan the code with an iPhone, or open the link on the device you want to pair.</p>
     </div>
+  {{ collapsible_toggle('companion-install', 'Get the app') }}
   </header>
-  <div class="dx-section-body">
+  <div class="dx-section-body" id="companion-install-body" data-collapsible-body>
     <div class="companion-install">
       <a class="companion-qr" href="{{ testflight_url }}" rel="noopener noreferrer" target="_blank">
         <img src="{{ url_for('static', filename='brand/testflight-qr.svg') }}"
@@ -57,17 +58,18 @@
 </section>
 
 {# ---- Pairing ------------------------------------------------------------- #}
-<section class="dx-section-card" id="companion-app">
+<section data-collapsible class="dx-section-card" id="companion-app">
 
-  <header class="dx-section-head">
+  <header class="dx-section-head" data-collapsible-head>
     <span class="dx-section-icon" aria-hidden="true"><i class="ph ph-device-mobile"></i></span>
     <div class="dx-section-titleblock">
       <h3 class="dx-section-title">Pair a phone</h3>
       <p class="dx-section-desc">Each paired app gets its own token you can revoke here at any time.</p>
     </div>
+  {{ collapsible_toggle('companion-app', 'Pair a phone') }}
   </header>
 
-  <div class="dx-section-body">
+  <div class="dx-section-body" id="companion-app-body" data-collapsible-body>
 
     <div class="dx-hint-band">
       <i class="ph ph-info" aria-hidden="true"></i>

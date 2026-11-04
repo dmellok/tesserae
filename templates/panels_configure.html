@@ -21,7 +21,8 @@
 {% call section_card(icon='sliders-horizontal',
                      title='Settings' if inputs else 'No settings yet',
                      description='Saved straight onto the dashboard. Re-render or push it to see the change on a panel.'
-                                 if inputs else "This dashboard hasn't declared what it asks for.") %}
+                                 if inputs else "This dashboard hasn't declared what it asks for.",
+                     collapsible=False) %}
   <form method="post" action="{{ url_for('panels.configure', canvas_id=page.id) }}">
     {% include "panels_configure_fields.html" %}
     <div class="actions">

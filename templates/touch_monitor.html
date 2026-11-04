@@ -9,7 +9,8 @@
 {% block main %}
 <div class="page-wrap">
   {% call section_card(icon='hand-tap', title='Touch monitor',
-       description='Live view of taps, swipes and sliders landing on ' ~ device_name ~ '. Marks are colour-coded by outcome; toggle the regions overlay to see whether taps hit their targets.') %}
+       description='Live view of taps, swipes and sliders landing on ' ~ device_name ~ '. Marks are colour-coded by outcome; toggle the regions overlay to see whether taps hit their targets.',
+       collapsible=False) %}
 
     <div class="tm-toolbar">
       <span class="tm-live" data-tm-live>● live</span>

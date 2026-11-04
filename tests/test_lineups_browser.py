@@ -784,10 +784,17 @@ def test_no_page_level_sideways_scroll(live: str, width: int) -> None:
             if width <= 1024:
                 sc = page.locator("#lu-row-dinner .lu-strip-scroll")
                 assert sc.evaluate("e => e.scrollWidth > e.clientWidth")
-            # Content stays capped and left-aligned on a wide screen.
+            # Content stays capped and centred in the space beside the sidebar
+            # on a wide screen, like every other page.
             if width == 2736:
                 box = page.locator(".lu").bounding_box()
                 assert box["width"] <= 1480 + 1
+                gaps = page.evaluate(
+                    "() => { const r = document.querySelector('main.page').getBoundingClientRect();"
+                    " const pl = parseFloat(getComputedStyle(document.body).paddingLeft) || 0;"
+                    " return [r.left - pl, window.innerWidth - r.right]; }"
+                )
+                assert abs(gaps[0] - gaps[1]) <= 2, (scheme, gaps)
             browser.close()
 
 

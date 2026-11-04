@@ -9,19 +9,20 @@
    - ``panel_preset_choices`` — same shape used by the Add-device form
 #}
 
-{% from "_components.html" import number_input, select_field, text_input with context %}
+{% from "_components.html" import collapsible_toggle, number_input, select_field, text_input with context %}
 
 {% if kind_default_rows %}
-<section class="dx-section-card" id="kind-defaults">
-  <header class="dx-section-head">
+<section data-collapsible class="dx-section-card" id="kind-defaults">
+  <header class="dx-section-head" data-collapsible-head>
     <span class="dx-section-icon" aria-hidden="true"><i class="ph ph-puzzle-piece"></i></span>
     <div class="dx-section-titleblock">
       <h3 class="dx-section-title">Built-in device kinds</h3>
       <p class="dx-section-desc">Defaults applied when creating a new instance of each kind. Existing instances aren't affected. Kinds can't be renamed or deleted.</p>
     </div>
+  {{ collapsible_toggle('kind-defaults', 'Built-in device kinds') }}
   </header>
 
-  <div class="dx-section-body">
+  <div class="dx-section-body" id="kind-defaults-body" data-collapsible-body>
     <ul class="dx-kind-list">
       {% for row in kind_default_rows %}
       <li class="dx-kind-row" id="kind-{{ row.id }}" data-kind-row>

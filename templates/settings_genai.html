@@ -17,8 +17,9 @@
 <div class="settings-stack">
 
 {# ---- Account --------------------------------------------------------- #}
-<section class="card">
-  {{ card_head('Account', icon_name='key') }}
+<section id="genai-account" data-collapsible class="card">
+  {{ card_head('Account', icon_name='key', collapse='genai-account') }}
+  <div id="genai-account-body" data-collapsible-body>
   <p class="lede">Keys are kept on this server and sent only to the service they belong to. Widgets without a key of their own use them.</p>
   <form method="post" action="{{ url_for('auth.genai_save') }}" class="form" id="genai-form">
     <div class="field">
@@ -87,11 +88,13 @@
       <p class="help">Sent in this server's User-Agent when widgets fetch pictures from Wikimedia Commons, as Wikimedia asks of every application. Saved with the ceilings below.{% if commons_cache.files %} The Commons cache holds {{ commons_cache.files }} file{{ '' if commons_cache.files == 1 else 's' }}, {{ (commons_cache.bytes / 1048576) | round(1) }} MB.{% endif %}</p>
     </div>
   </form>
+  </div>{# /genai-account-body #}
 </section>
 
 {# ---- Spending -------------------------------------------------------- #}
-<section class="card">
-  {{ card_head('Spending', icon_name='coins') }}
+<section id="genai-spending" data-collapsible class="card">
+  {{ card_head('Spending', icon_name='coins', collapse='genai-spending') }}
+  <div id="genai-spending-body" data-collapsible-body>
   <p class="lede">Charged at the models' listed prices as each picture is asked for. Pictures are kept, so a subject in a style costs once.</p>
 
   <div class="dx-stat-tiles dx-genai-tiles">
@@ -136,11 +139,13 @@
     <form method="post" action="{{ url_for('auth.genai_reset') }}" class="ghost-link" onsubmit="return confirm('Count to-day\'s spend against the ceiling from now? The ledger keeps the lines.');"><button type="submit" class="btn btn-ghost">Reset to-day's count</button></form>
     <button type="submit" class="btn btn-primary" form="genai-form">Save</button>
   </div>
+  </div>{# /genai-spending-body #}
 </section>
 
 {# ---- Who is painting ------------------------------------------------- #}
-<section class="card">
-  {{ card_head('Who is painting', icon_name='paint-brush') }}
+<section id="genai-painters" data-collapsible class="card">
+  {{ card_head('Who is painting', icon_name='paint-brush', collapse='genai-painters') }}
+  <div id="genai-painters-body" data-collapsible-body>
   {% if who %}
   <p class="lede">Each widget's own page shows its pictures, what is painting, and the held ones.</p>
   <table class="dx-table dx-genai-table">
@@ -161,12 +166,14 @@
   {% else %}
   <p class="lede">No installed widget paints yet. Overhead, Specimen Sheet and Backyard Birds do; they are in the catalog under Widgets.</p>
   {% endif %}
+  </div>{# /genai-painters-body #}
 </section>
 
 {# ---- Where it went --------------------------------------------------- #}
 {% if went %}
-<section class="card">
-  {{ card_head('Where it went', icon_name='receipt') }}
+<section id="genai-history" data-collapsible class="card">
+  {{ card_head('Where it went', icon_name='receipt', collapse='genai-history') }}
+  <div id="genai-history-body" data-collapsible-body>
   <p class="lede">{{ summary.month_label }}, by widget and model, at the prices listed when each picture was asked for.</p>
   <table class="dx-table dx-genai-table">
     <thead><tr><th>Widget · model</th><th class="n">Pictures</th><th class="n">Each</th><th class="n">{{ summary.month_label }}</th></tr></thead>
@@ -182,6 +189,7 @@
       <tr class="dx-genai-total"><th>Total</th><td class="n">{{ '{:,}'.format(went | sum(attribute='pictures')) }}</td><td></td><td class="n">{{ dollars(summary.month) }}</td></tr>
     </tbody>
   </table>
+  </div>{# /genai-history-body #}
 </section>
 {% endif %}
 

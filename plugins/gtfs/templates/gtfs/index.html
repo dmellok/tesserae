@@ -45,7 +45,7 @@
     ({{ detail.stop_ids|join(', ') }}) · {{ detail.trips }} trips · timezone {{ detail.tz }}
   </p>
 
-  <h3>Routes calling here</h3>
+  <h3 class="dx-subhead">Routes calling here</h3>
   <p>
     {% for r in detail.routes %}
       <span class="pill" style="min-width:2.4em;justify-content:center;{% if r.color %}background:{{ r.color }};color:{{ r.text_color }}{% endif %}">{{ r.name }}</span>
@@ -54,7 +54,7 @@
     {% endfor %}
   </p>
 
-  <h3>Directions</h3>
+  <h3 class="dx-subhead">Directions</h3>
   <table class="table">
     <thead>
       <tr><th><code>direction</code> option</th><th>Goes to</th><th>Routes</th><th>Platforms</th></tr>
