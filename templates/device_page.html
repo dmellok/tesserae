@@ -312,7 +312,7 @@
                 interval, read here; every other kind picks it below. -#}
             {% set _sign_interval = (sign.rows|selectattr(0, 'in', ['Check-in interval', 'Next check-in'])|first) if sign else none %}
             {% if _sign_interval and not t_fields %}
-            {% call fld(section.id ~ '-sleep-ro', 'Sleep interval', help='This frame sleeps between check-ins on its own interval, set on the frame and read at each check-in.', w='md', label_for=False) %}
+            {% call fld(section.id ~ '-sleep-ro', 'Heart beat interval', help='This frame sleeps between check-ins on its own interval, set on the frame and read at each check-in.', w='md', label_for=False) %}
               <p class="dx-f-value" aria-labelledby="{{ section.id }}-sleep-ro-label">{{ _sign_interval[1] }} <span class="dx-help">· set on the frame</span></p>
             {% endcall %}
             {% endif %}
