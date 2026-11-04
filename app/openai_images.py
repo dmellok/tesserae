@@ -168,16 +168,18 @@ def generate(
     refs: Sequence[str] = (),
     aspect: str = "4:3",
     timeout: float = TIMEOUT_S,
+    quality: str = "medium",
 ) -> bytes:
     """One JPEG from GPT Image: an edit from ``refs`` when there are any,
-    else a picture from words alone. Raises :class:`OpenAIError`."""
+    else a picture from words alone, at ``quality`` (low, medium or high) and
+    the Images API size nearest ``aspect``. Raises :class:`OpenAIError`."""
     if not key:
         raise OpenAIError("no OpenAI key")
     fields = {
         "model": MODEL,
         "prompt": prompt,
         "size": size_for(aspect),
-        "quality": "medium",
+        "quality": quality if quality in ("low", "medium", "high") else "medium",
         "output_format": "jpeg",
         "n": "1",
     }
