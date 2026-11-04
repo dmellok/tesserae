@@ -74,6 +74,10 @@ _DEVICE_PAGE_SECTIONS: frozenset[str] = frozenset(
         "connection",
         "logs",
         "diagnostics",
+        "quiet-hours",
+        "button-map",
+        "battery-history",
+        "battery-offset",
     }
 )
 

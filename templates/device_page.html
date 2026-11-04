@@ -180,7 +180,7 @@
               </span>
             {% endcall %}
             {% call fld(section.id ~ '-panel-underscan', 'Underscan', help='Inset content by this many pixels on every edge so it clears a mat or bezel.', w='num') %}
-              <span class="dx-in-unit"><input class="dx-in" type="number" id="{{ section.id }}-panel-underscan" name="panel_underscan" value="{{ section.panel.get('underscan', 0) }}" min="0" step="1" form="{{ _form }}"><span aria-hidden="true">px</span></span>
+              <span class="dx-in-unit"><input class="dx-in" type="number" id="{{ section.id }}-panel-underscan" name="panel_underscan" value="{{ section.panel.get('underscan', 0) }}" min="0" max="{{ [section.panel.w, section.panel.h]|min // 4 }}" step="1" form="{{ _form }}"><span aria-hidden="true">px</span></span>
             {% endcall %}
             {#- Degrees are the turn from the panel's own framebuffer, so a
                 portrait-native panel reads 0° when it paints its buffer as-is

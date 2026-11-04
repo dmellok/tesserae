@@ -152,6 +152,18 @@ def test_old_section_anchors_still_resolve_inside_the_new_sections(app: Flask) -
     assert '<h3 class="dx-grp-title">Lineups</h3>' in body
 
 
+def test_a_save_lands_back_on_every_sub_group(app: Flask) -> None:
+    """Each sub-group a field can sit in is an anchor the save redirect
+    accepts, so saving after an edit there returns to it, not the top."""
+    from app.settings.devices_routes import _DEVICE_PAGE_SECTIONS
+
+    client, dev = _full_device(app)
+    body = client.get(f"/settings/devices/{dev}").get_data(as_text=True)
+    subs = set(re.findall(r'id="([^"]+)"[^>]*data-devsub', body))
+    assert subs, "no sub-groups found"
+    assert subs <= _DEVICE_PAGE_SECTIONS, subs - _DEVICE_PAGE_SECTIONS
+
+
 def test_each_section_is_a_collapsible_with_a_toggle_button(app: Flask) -> None:
     """The sections use the shared collapsible component."""
     client, dev = _full_device(app)
