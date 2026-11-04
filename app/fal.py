@@ -67,6 +67,9 @@ MODELS: dict[str, dict[str, Any]] = {
         "endpoint": "openai/gpt-image-2/edit",
         "label": "GPT Image 2",
         "cents": 5,
+        # High quality at about two megapixels (1200x1600), fal.ai's listed
+        # price, November 2026; a size can be asked for with ``size``.
+        "cents_high": 20,
         "kind": "edit",
         "refs": 4,
     },
@@ -99,6 +102,7 @@ MODELS: dict[str, dict[str, Any]] = {
         "endpoint": "openai:images/edits",
         "label": "GPT Image 2 (OpenAI)",
         "cents": 8,
+        "cents_high": 25,
         "kind": "edit",
         "refs": 16,
         "direct": "openai",
@@ -107,6 +111,7 @@ MODELS: dict[str, dict[str, Any]] = {
         "endpoint": "openai:images/generations",
         "label": "GPT Image 2 (OpenAI)",
         "cents": 6,
+        "cents_high": 23,
         "kind": "t2i",
         "refs": 0,
         "direct": "openai",
@@ -177,8 +182,20 @@ def model_of(model: str | None, default: str = DEFAULT_EDIT_MODEL) -> str:
     return model if model in MODELS else default
 
 
-def cents_of(model: str | None) -> int:
-    return int(MODELS.get(model_of(model), MODELS[DEFAULT_EDIT_MODEL])["cents"])
+QUALITIES = ("low", "medium", "high")
+
+
+def cents_of(model: str | None, quality: str = "medium") -> int:
+    """The listed price of one picture; a model that prices another quality
+    separately (``cents_high``) is charged that, any other at ``cents``."""
+    spec = MODELS.get(model_of(model), MODELS[DEFAULT_EDIT_MODEL])
+    return int(spec.get(f"cents_{quality}", spec["cents"]))
+
+
+def size16(size: tuple[int, int]) -> dict[str, int]:
+    """An exact size for an endpoint that wants both edges in multiples of 16."""
+    w, h = (max(16, round(int(v) / 16) * 16) for v in size)
+    return {"width": w, "height": h}
 
 
 def label_of(model: str | None) -> str:
@@ -218,7 +235,13 @@ def painting_key(settings: dict[str, Any] | None = None) -> str:
 
 
 def request_body(
-    model: str, prompt: str, refs: Sequence[str], aspect: str = "4:3"
+    model: str,
+    prompt: str,
+    refs: Sequence[str],
+    aspect: str = "4:3",
+    *,
+    quality: str = "medium",
+    size: tuple[int, int] | None = None,
 ) -> dict[str, Any]:
     """The request each endpoint expects. ``refs`` are URLs or data URIs."""
     urls = list(refs)
@@ -253,9 +276,11 @@ def request_body(
         return {
             "prompt": prompt,
             "image_urls": urls,
-            "image_size": "portrait_4_3" if portrait else "landscape_4_3",
+            "image_size": size16(size)
+            if size
+            else ("portrait_4_3" if portrait else "landscape_4_3"),
             "background": "opaque",
-            "quality": "medium",
+            "quality": quality if quality in QUALITIES else "medium",
             "output_format": "jpeg",
             "num_images": 1,
         }
@@ -385,16 +410,21 @@ class FalClient:
         refs: Sequence[str] = (),
         aspect: str = "4:3",
         retries: int = 1,
+        quality: str = "medium",
+        size: tuple[int, int] | None = None,
     ) -> bytes:
         """One picture from ``model``: a JPEG or PNG as bytes. Raises
-        :class:`FalError` with a sentence when there is none."""
+        :class:`FalError` with a sentence when there is none. ``quality``
+        and ``size`` (width, height) reach the models that take them (GPT
+        Image) and are ignored by the rest; the budget is charged the price
+        of the quality asked for."""
         model = model_of(model)
         spec = MODELS[model]
         if spec["kind"] != "t2i" and not refs:
             raise FalError("no reference picture to paint from")
         direct = self.direct_model(model)
         if direct is not None:
-            return self._generate_direct(direct, prompt, refs, aspect, retries)
+            return self._generate_direct(direct, prompt, refs, aspect, retries, quality)
         if not self.key:
             raise FalError(
                 "no fal.ai key"
@@ -405,15 +435,16 @@ class FalClient:
                 )
             )
         refs = list(refs)[: max(1, int(spec["refs"]))] if spec["refs"] else []
-        body = request_body(model, prompt, refs, aspect)
+        body = request_body(model, prompt, refs, aspect, quality=quality, size=size)
+        cents = cents_of(model, quality)
         url = f"{API_BASE}/{spec['endpoint']}"
         last = "no answer"
         for _attempt in range(retries + 1):
             if self.stopped:
                 raise FalError("stopped")
             if self._charge is not None:
-                self._charge(int(spec["cents"]), model)
-            self.spent_cents += int(spec["cents"])
+                self._charge(cents, model)
+            self.spent_cents += cents
             try:
                 answer = _http_json(url, body, self.key, self._timeout)
             except Exception as err:
@@ -460,7 +491,13 @@ class FalClient:
         return None
 
     def _generate_direct(
-        self, model: str, prompt: str, refs: Sequence[str], aspect: str, retries: int
+        self,
+        model: str,
+        prompt: str,
+        refs: Sequence[str],
+        aspect: str,
+        retries: int,
+        quality: str = "medium",
     ) -> bytes:
         from app import gemini_images, openai_images
 
@@ -468,13 +505,14 @@ class FalClient:
         provider = str(spec["direct"])
         key = self._direct_key(provider)
         refs = list(refs)[: int(spec["refs"])] if spec["refs"] else []
+        cents = cents_of(model, quality if provider == "openai" else "medium")
         last = "no answer"
         for _attempt in range(retries + 1):
             if self.stopped:
                 raise FalError("stopped")
             if self._charge is not None:
-                self._charge(int(spec["cents"]), model)
-            self.spent_cents += int(spec["cents"])
+                self._charge(cents, model)
+            self.spent_cents += cents
             try:
                 if provider == "gemini":
                     raw = gemini_images.generate(
@@ -485,7 +523,9 @@ class FalClient:
                         model=str(spec["endpoint"]).removeprefix("gemini:"),
                     )
                 else:
-                    raw = openai_images.generate(key, prompt, refs=refs, aspect=aspect)
+                    raw = openai_images.generate(
+                        key, prompt, refs=refs, aspect=aspect, quality=quality
+                    )
             except (openai_images.OpenAIError, gemini_images.GeminiError) as err:
                 last = str(err)
                 if err.auth:
