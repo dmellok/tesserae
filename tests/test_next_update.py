@@ -475,3 +475,26 @@ def test_the_checkin_gap_is_the_cadence_not_the_last_sleep_through_quiet_hours()
 
     reach = nu.Reach(nu.MODE_SLEEPS, next_checkin_at=1000.0, gap_s=1800.0)
     assert nu.compute_next_update(1500.0, reach, now=0.0).at == 2800.0
+
+
+def test_a_page_declared_wake_interval_sets_the_checkin_gap(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A device set to 15 minutes showing a page that declares an hour (#144)
+    is woken hourly, so its check-ins step by the hour, not the setting."""
+    from types import SimpleNamespace
+
+    from flask import Flask
+
+    import app.next_update as nu
+    from app import page_cadence
+
+    device = SimpleNamespace(id="desk", config_schema={})
+    monkeypatch.setattr(page_cadence, "page_sleep_interval_s", lambda _d: 3600)
+    with Flask(__name__).app_context():
+        assert nu._checkin_gap_s(device, None, {"sleep_interval_s": 900}) == 3600.0
+        # a sign's measured cadence is still what it actually does
+        assert nu._checkin_gap_s(device, None, {}, {"checkin_gap_s": 600.0}) == 600.0
+    monkeypatch.setattr(page_cadence, "page_sleep_interval_s", lambda _d: None)
+    with Flask(__name__).app_context():
+        assert nu._checkin_gap_s(device, None, {"sleep_interval_s": 900}) == 900.0

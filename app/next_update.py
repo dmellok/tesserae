@@ -19,12 +19,15 @@ helpers below read the app's stores to fill it in.
 
 from __future__ import annotations
 
+import logging
 import math
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, tzinfo
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 MODE_CONNECTED = "connected"
 MODE_SLEEPS = "sleeps"
@@ -307,7 +310,8 @@ def _checkin_gap_s(device: Any, entry: Any, stored: Any, sign_view: Any = None) 
     quiet hours is one long interval, and stepping by it puts the check-in
     after a 9:01 AM wake at 6:31 PM. So the cadence the device is set to (or a
     sign's measured one) comes first, and the last sleep only when neither is
-    known."""
+    known. A page on the glass that declares its own wake interval (#144)
+    replaces the device's, as it does when the device is told when to wake."""
 
     def positive(value: Any) -> float | None:
         if isinstance(value, bool) or not isinstance(value, (int, float)) or value <= 0:
@@ -316,6 +320,8 @@ def _checkin_gap_s(device: Any, entry: Any, stored: Any, sign_view: Any = None) 
 
     if isinstance(sign_view, dict) and (measured := positive(sign_view.get("checkin_gap_s"))):
         return measured
+    if (declared := positive(_page_cadence_s(device))) is not None:
+        return declared
     if isinstance(stored, dict) and (configured := positive(stored.get("sleep_interval_s"))):
         return configured
     schema = getattr(device, "config_schema", None)
@@ -323,6 +329,21 @@ def _checkin_gap_s(device: Any, entry: Any, stored: Any, sign_view: Any = None) 
     if isinstance(spec, dict) and (default := positive(spec.get("default"))):
         return default
     return positive(getattr(entry, "last_sleep_interval_s", None))
+
+
+def _page_cadence_s(device: Any) -> int | None:
+    """The wake interval the page on ``device``'s glass declares, or ``None``."""
+    from flask import has_app_context
+
+    if not has_app_context() or not getattr(device, "id", None):
+        return None
+    from app import page_cadence
+
+    try:
+        return page_cadence.page_sleep_interval_s(device)
+    except Exception:
+        logger.exception("next_update: page cadence failed for device=%s", device.id)
+        return None
 
 
 def _aligned_step(device: Any, entry: Any, stored: Any) -> Callable[[float], float | None] | None:
