@@ -113,6 +113,58 @@ def test_event_reason_reads_known_keys_in_priority_order() -> None:
     assert bc.event_reason({"diag": {"id": 1, "reset": "brownout"}}) == "brownout"
 
 
+def test_event_reason_reads_only_the_reasons_that_beat_sent() -> None:
+    # The merged status keeps a boot's reset_reason; a later row whose own beat
+    # sent no reason must not read it again.
+    stale = {"parsed": {"reset_reason": "poweron", "ip": "10.0.0.9"}, "reason_keys": []}
+    assert bc.event_reason(stale) is None
+    fresh = {"parsed": {"reset_reason": "poweron"}, "reason_keys": ["reset_reason"]}
+    assert bc.event_reason(fresh) == "poweron"
+    # a row from before reason_keys was written reads every key, as before
+    assert bc.event_reason({"parsed": {"reset_reason": "poweron"}}) == "poweron"
+
+
+def test_heartbeat_rows_name_only_their_own_reasons(tmp_path: Path) -> None:
+    import json
+
+    from app import device_service
+    from app.main import REPO_ROOT, create_app
+    from app.transport_wiring import record_status_heartbeat
+
+    app = create_app(
+        testing=False,
+        data_root=tmp_path,
+        plugins_dir=REPO_ROOT / "plugins",
+        renderers_dir=REPO_ROOT / "renderers",
+        devices_dir=REPO_ROOT / "devices",
+    )
+    device_service.create_instance(
+        devices=app.config["DEVICE_REGISTRY"],
+        renderers=app.config["RENDERER_REGISTRY"],
+        data_root=app.config["DEVICE_DATA_ROOT"],
+        instance_id="desk",
+        kind_id="esp32_client",
+        orientation="landscape",
+    )
+    device = app.config["DEVICE_REGISTRY"].get("desk")
+    log = app.config["EVENT_LOG"]
+
+    def beat(body: dict[str, object]) -> None:
+        record_status_heartbeat(
+            app=app,
+            device=device,
+            payload=json.dumps(body).encode(),
+            status_cache=app.config["DEVICE_STATUS"],
+            event_log=log,
+            event_target="rest://desk/status",
+        )
+
+    beat({"battery_pct": 80, "ip": "10.0.0.2", "reset_reason": "poweron"})
+    beat({"battery_pct": 80, "ip": "10.0.0.9"})  # a new IP is logged, no new reason
+    rows = log.device_status_events(["desk"], since=0)["desk"]
+    assert [bc.event_reason(r.extra) for r in rows] == ["poweron", None]
+
+
 @pytest.mark.parametrize(
     "extra",
     [

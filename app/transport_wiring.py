@@ -605,13 +605,19 @@ def record_status_heartbeat(
     # The live cache + HA sensors still see every heartbeat; this just
     # keeps steady heartbeats from churning the capped event log.
     if "error" in parsed or status_changed_meaningfully(prev, merged):
+        from app.battery_chart import REASON_KEYS
+
+        # ``merged`` keeps a reason from an earlier beat (a boot's reset_reason
+        # rides along until the next one), so name the reasons this beat sent.
+        extra: dict[str, Any] = {"parsed": merged}
+        extra["reason_keys"] = [k for k in REASON_KEYS if parsed.get(k) is not None]
         event_log.record(
             type="device",
             source=device.id,
             target=event_target,
             status="error" if "error" in parsed else "ok",
             error=parsed.get("error") if isinstance(parsed.get("error"), str) else None,
-            extra={"parsed": merged},
+            extra=extra,
         )
     ha: HomeAssistantDiscovery | None = app.config.get("HA_DISCOVERY")
     if ha is not None:

@@ -271,10 +271,15 @@ def event_reason(extra: dict[str, Any]) -> str | None:
     """The wake / connect reason an event-log row names, or ``None``.
 
     Looks at the parsed heartbeat first (:data:`REASON_KEYS`), then at an
-    abnormal-reset report (``diag.reset``: brownout, panic, watchdog)."""
+    abnormal-reset report (``diag.reset``: brownout, panic, watchdog). The
+    parsed dict is the merged status, which keeps a reason from an earlier
+    beat; a row that lists ``reason_keys`` (the reasons that beat itself sent)
+    is read for those keys only."""
     parsed = extra.get("parsed")
+    fresh = extra.get("reason_keys")
+    keys = REASON_KEYS if not isinstance(fresh, list) else [k for k in REASON_KEYS if k in fresh]
     if isinstance(parsed, dict):
-        for key in REASON_KEYS:
+        for key in keys:
             value = parsed.get(key)
             if isinstance(value, str) and value.strip():
                 return value.strip()[:MAX_REASON_CHARS]
@@ -657,12 +662,25 @@ def load_wake_events(
     return out
 
 
-def app_chart_options(config: Mapping[str, Any], device: Any) -> dict[str, Any]:
+def lineup_names(config: Mapping[str, Any]) -> dict[str, str]:
+    """Every deck and lineup id -> name, for naming a lineup update."""
+    names: dict[str, str] = {}
+    for key in ("DECK_STORE", "ROTATION_STORE"):
+        store = config.get(key)
+        if store is not None:
+            names.update({item.id: item.name for item in store.all()})
+    return names
+
+
+def app_chart_options(
+    config: Mapping[str, Any], device: Any, *, names: Mapping[str, str] | None = None
+) -> dict[str, Any]:
     """The per-device keyword arguments of :func:`build_battery_chart` that come
     from the running app: quiet hours and timezone (to call a gap asleep), the
     configured check-in interval (to size gaps) and lineup names (to name a
     lineup update). Call inside a request; the device page's embed uses it the
-    same way the Batteries page does."""
+    same way the Batteries page does. A page with many cards passes ``names``
+    (from :func:`lineup_names`) so the stores are read once."""
     from app.device_service import awake_poll_interval_s
     from app.quiet_hours import resolve_quiet_hours
     from app.tz_resolve import app_timezone
@@ -677,11 +695,8 @@ def app_chart_options(config: Mapping[str, Any], device: Any) -> dict[str, Any]:
         if isinstance(raw, int | float) and not isinstance(raw, bool) and raw > 0:
             hint = float(raw)
             break
-    names: dict[str, str] = {}
-    for key in ("DECK_STORE", "ROTATION_STORE"):
-        store = config.get(key)
-        if store is not None:
-            names.update({item.id: item.name for item in store.all()})
+    if names is None:
+        names = lineup_names(config)
     return {
         "quiet_window": resolve_quiet_hours(app_settings, device),
         "tz": app_timezone(),

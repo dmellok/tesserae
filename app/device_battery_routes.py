@@ -34,6 +34,7 @@ from app.battery_chart import (
     WakeEvents,
     app_chart_options,
     build_battery_chart,
+    lineup_names,
     load_wake_events,
     prediction_dict,
     render_card_parts,
@@ -146,6 +147,7 @@ def index() -> str:
         wake_events = load_wake_events(
             current_app.config.get("EVENT_LOG"), ordered, window_days=window_days
         )
+        names_by_lineup = lineup_names(current_app.config)
         for device_id in ordered:
             device = devices.get(device_id)
             mv_off, pct_off = get_offset(device.manifest) if device is not None else (0, 0)
@@ -160,7 +162,7 @@ def index() -> str:
                     mv_offset=mv_off,
                     pct_offset=pct_off,
                     events=wake_events.get(device_id, WakeEvents()),
-                    **app_chart_options(current_app.config, device),
+                    **app_chart_options(current_app.config, device, names=names_by_lineup),
                 )
             )
     return render_template(
