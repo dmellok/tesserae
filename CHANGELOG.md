@@ -165,6 +165,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 - History: 12-hour times no longer overlap the thumbnail.
 - A link now always sits left of a button, and the primary action is rightmost,
   across the admin pages, dialogs and banners.
+- Device batteries: a boot's reset reason no longer marks later status
+  changes as restarts.
+- Lineups and Home Assistant's next update follow a wake interval the page
+  on the display declares.
+- Device page: saving after an edit in quiet hours, the button map or battery
+  offsets lands back on that group; underscan keeps its old maximum.
+- Widgets: Loader errors can't be collapsed out of sight.
 
 - A lineup step that lands a pre-rendered frame now shows up everywhere the
   newest push is read. Home Assistant's Next and Previous, a physical button,
