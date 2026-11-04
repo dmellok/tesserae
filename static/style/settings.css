@@ -4278,18 +4278,18 @@ select.dx-input:hover {
 .dx-devsec .dx-section-head { margin-bottom: 8px; }
 .dx-devsec .dx-section-head .dx-btn { flex: none; }
 .dx-devsec .dx-section-body { display: block; }
-.dx-devsec .dx-section-body > .field,
+.dx-devsec :is(.dx-section-body, .dx-subgroup) > .field,
 .dx-devsec .dx-field-grid > .field {
   padding: 0;
   margin: 0;
   border-top: 0 !important;
 }
-.dx-devsec .dx-section-body > .field + .field,
-.dx-devsec .dx-section-body > .dx-field-grid + .dx-field-grid,
-.dx-devsec .dx-section-body > .field + .dx-field-grid,
-.dx-devsec .dx-section-body > .dx-field-grid + .field,
-.dx-devsec .dx-section-body > .field-help + .dx-field-grid,
-.dx-devsec .dx-section-body > .dx-hint + .dx-field-grid { margin-top: 14px; }
+.dx-devsec :is(.dx-section-body, .dx-subgroup) > .field + .field,
+.dx-devsec :is(.dx-section-body, .dx-subgroup) > .dx-field-grid + .dx-field-grid,
+.dx-devsec :is(.dx-section-body, .dx-subgroup) > .field + .dx-field-grid,
+.dx-devsec :is(.dx-section-body, .dx-subgroup) > .dx-field-grid + .field,
+.dx-devsec :is(.dx-section-body, .dx-subgroup) > .field-help + .dx-field-grid,
+.dx-devsec :is(.dx-section-body, .dx-subgroup) > .dx-hint + .dx-field-grid { margin-top: 14px; }
 .dx-devsec .dx-field-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -4297,6 +4297,28 @@ select.dx-input:hover {
   align-items: start;
 }
 .dx-devsec .dx-field-grid--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+/* Fields fill as many columns as fit (3-4 on a wide page, then 2, then 1)
+   so none sits alone at half width. */
+.dx-devsec .dx-field-grid--auto { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.dx-devsec .dx-field-grid--panel { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+/* Phones: the four numbers pair up (width/height, underscan/rotation) and
+   the action takes its own row. */
+@media (max-width: 600px) {
+  .dx-devsec .dx-field-grid--panel { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dx-devsec .dx-field-grid--panel .dx-field-action { grid-column: 1 / -1; }
+}
+/* A small action that belongs with the fields beside it: a label row (with
+   its info popover) and a button the same height as an input. */
+.dx-devsec .dx-field-action { display: flex; flex-direction: column; align-items: stretch; }
+.dx-devsec .dx-field-action-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--dx-ink-soft, #56564f);
+}
+:root[data-theme="dark"] .dx-devsec .dx-field-action-label { color: var(--t-fg-soft); }
+.dx-devsec .dx-field-action .dx-btn { justify-content: center; min-height: 39px; white-space: nowrap; }
 .dx-devsec .dx-section-body .field label { margin-bottom: 6px; }
 .dx-devsec .dx-section-body .field input:not([type="range"]):not([type="checkbox"]),
 .dx-devsec .dx-section-body .field select,
@@ -4307,7 +4329,7 @@ select.dx-input:hover {
   color: var(--dx-ink-soft);
   background: var(--t-surface-sunk);
 }
-.dx-devsec .dx-section-body > .field-help { margin: 10px 0 0; font-size: 12px; color: var(--dx-faint); }
+.dx-devsec :is(.dx-section-body, .dx-subgroup) > .field-help { margin: 10px 0 0; font-size: 12px; color: var(--dx-faint); }
 .dx-devsec .dx-divider { margin: 18px 0 14px; }
 .dx-devsec .device-subhead { margin: 0 0 4px; }
 .dx-devsec .dx-toggle-row { padding: 6px 0 14px; }
@@ -4340,6 +4362,58 @@ select.dx-input:hover {
 .dx-devsec .dx-smart-sync { margin-top: 16px; }
 .dx-devsec .dx-empty { padding: 26px 22px; }
 
+/* Collapsible sections. The whole header is a click target (settings.js,
+   initDevSections); the chevron button is the keyboard / screen-reader
+   control. The body is hidden with the attribute, `is-collapsed` styles the
+   header, and the choice is remembered per section id in localStorage. */
+.dx-devsec .dx-section-head[data-devsec-head] { cursor: pointer; }
+.dx-sec-toggle {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--dx-faint);
+  font-size: 16px;
+  cursor: pointer;
+  transition: background var(--t-trans-fast), color var(--t-trans-fast);
+}
+.dx-sec-toggle .ph { transition: transform 160ms ease; }
+.dx-section-head:hover .dx-sec-toggle,
+.dx-sec-toggle:hover { background: var(--t-surface-soft); color: var(--t-fg); }
+.dx-sec-toggle:focus-visible { outline: 2px solid var(--t-accent); outline-offset: 2px; }
+.dx-devsec.is-collapsed .dx-sec-toggle .ph { transform: rotate(-90deg); }
+.dx-devsec.is-collapsed .dx-section-head { margin-bottom: 0; padding-bottom: 0; border-bottom-color: transparent; }
+.dx-devsec .dx-section-body[hidden] { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .dx-sec-toggle .ph { transition: none; }
+}
+
+/* Sub-groups: the older, finer sections folded into one, each with a small
+   heading so nothing loses its place. They keep the old section ids. */
+.dx-subgroup { scroll-margin-top: calc(var(--t-topbar-h, 61px) + 16px); }
+.dx-subgroup + .dx-subgroup {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--dx-border-soft);
+}
+.dx-subgroup-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.dx-subgroup-titles { flex: 1 1 auto; min-width: 0; }
+.dx-devsec .dx-subgroup-title { margin: 0; }
+.dx-subgroup-desc { margin: 2px 0 0; font-size: 12px; color: var(--dx-faint); }
+.dx-subgroup-head .dx-btn { flex: none; }
+
 /* Logs: uploaded batches + inline viewer. */
 .dx-log-row { flex-wrap: wrap; }
 .dx-log-row.is-active { border-color: var(--t-accent); }
@@ -4364,6 +4438,20 @@ select.dx-input:hover {
 }
 .dx-overview-tiles .dx-bars { height: 14px; }
 
+/* A headline tile that jumps to the settings behind it: same look, a
+   hover ring and a slightly firmer label. */
+a.dx-qtile--link {
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  transition: box-shadow var(--t-trans-fast), background var(--t-trans-fast);
+}
+a.dx-qtile--link:hover,
+a.dx-qtile--link:focus-visible { box-shadow: inset 0 0 0 1px var(--t-accent); }
+a.dx-qtile--link:hover .dx-qtile-label,
+a.dx-qtile--link:focus-visible .dx-qtile-label { color: var(--t-accent); }
+a.dx-qtile--link:focus-visible { outline: 2px solid var(--t-accent); outline-offset: 2px; }
+
 /* Bands (orientation card, calibration link, touch). */
 .dx-band {
   margin-top: 14px;
@@ -4383,14 +4471,22 @@ select.dx-input:hover {
 .dx-band-desc { margin: 2px 0 0; font-size: 12px; color: var(--dx-faint); }
 .dx-band-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 
-/* Power: tile + two offsets. */
-.dx-power-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-  align-items: start;
+/* Power: one tile holding the reading and its display offsets. */
+.dx-qtile.dx-power-tile {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px 24px;
+  max-width: 560px;
 }
-.dx-power-grid .field { padding: 0; margin: 0; border-top: 0 !important; }
+.dx-power-reading { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; text-align: left; }
+.dx-power-offsets { display: flex; flex-direction: column; gap: 6px; }
+.dx-power-offset-fields { display: flex; gap: 8px; }
+.dx-power-offset { display: inline-flex; align-items: center; gap: 6px; margin: 0; }
+.dx-power-offset input[type="number"] { width: 84px; padding: 6px 8px; font-size: 13px; }
+.dx-power-unit { font-size: 12px; color: var(--dx-faint); font-family: var(--t-font-mono); }
 
 /* Connection: header tags (.tg) + wider dl. */
 .dx-conn-chips { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; flex: none; }
@@ -4475,7 +4571,7 @@ select.dx-input:hover {
   .dx-subnav::-webkit-scrollbar { display: none; }
   .dx-subnav-link { flex: none; padding: 7px 12px; border-radius: var(--t-radius-sm); border: 1px solid var(--t-border); font-size: 13px; }
   .dx-subnav-link.is-active { border-color: transparent; }
-  .dx-devsec .dx-field-grid,
+  .dx-devsec .dx-field-grid:where(:not(.dx-field-grid--auto)),
   .dx-devsec .dx-field-grid--3,
   .dx-power-grid { grid-template-columns: 1fr; }
 }

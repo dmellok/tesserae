@@ -6,12 +6,32 @@
 {# One headline tile: mono uppercase label, big value, mono sub-line.
    ``t`` is one of the dicts ``_device_overview`` builds (value / sub /
    muted / low). #}
-{%- macro stat_tile(label, t) -%}
-<div class="dx-qtile">
+{%- macro stat_tile(label, t, href='', hint='') -%}
+{%- set _tag = 'a' if href else 'div' -%}
+<{{ _tag }} class="dx-qtile{% if href %} dx-qtile--link{% endif %}"{% if href %} href="{{ href }}" title="{{ hint }}"{% endif %}>
   <span class="dx-qtile-label">{{ label }}</span>
   <span class="dx-qtile-value{% if t.muted %} is-muted{% endif %}{% if t.low %} is-warn{% endif %}" title="{{ t.value }}">{{ t.value }}</span>
   <span class="dx-qtile-sub">{{ t.sub or '' }}</span>
-</div>
+</{{ _tag }}>
+{%- endmacro -%}
+
+{# Head of a collapsible device-page section: icon, title, blurb and a
+   chevron button. The button is the keyboard and screen-reader control;
+   settings.js (initDevSections) also makes the rest of the header a click
+   target, remembers the choice per section id, and expands the section for
+   a jump or a #hash. The body it controls is ``<id>-body``. #}
+{%- macro devsec_head(id, icon, title, desc) -%}
+<header class="dx-section-head" data-devsec-head>
+  <span class="dx-section-icon" aria-hidden="true"><i class="ph ph-{{ icon }}"></i></span>
+  <div class="dx-section-titleblock">
+    <h3 class="dx-section-title">{{ title }}</h3>
+    <p class="dx-section-desc">{{ desc }}</p>
+  </div>
+  <button type="button" class="dx-sec-toggle" data-devsec-toggle aria-expanded="true" aria-controls="{{ id }}-body">
+    <i class="ph ph-caret-down" aria-hidden="true"></i>
+    <span class="sr-only">Collapse {{ title }}</span>
+  </button>
+</header>
 {%- endmacro -%}
 
 {%- macro mode_badge(section) -%}
@@ -25,13 +45,19 @@
 {# The four tiles every overview shows, in the order the mockups fix, then
    the Queued line when a pull frame has a newer image waiting. The wrapper
    is ``display: contents`` so the tiles stay grid items; the sync script
-   swaps it when the device's newest or fetched render changes. #}
-{%- macro overview_tiles(section) -%}
+   swaps it when the device's newest or fetched render changes.
+
+   ``base`` is None for plain tiles, or the URL the #anchors hang off ('' on
+   the device page itself, the page URL from the quick panel). Each tile then
+   links to the settings behind it: what is showing to Lineups, battery to
+   Power (when the device has one), firmware to Connection, next update to
+   Timing. #}
+{%- macro overview_tiles(section, base=None) -%}
 <div class="dx-live" data-render-sync="tiles:{{ section.get('device_id') }}">
-{{ stat_tile('Showing', section.overview.showing) }}
-{{ stat_tile('Battery', section.overview.battery) }}
-{{ stat_tile('Firmware', section.overview.firmware) }}
-{{ stat_tile('Next update', section.overview.next_wake) }}
+{{ stat_tile('Showing', section.overview.showing, (base ~ '#lineups') if base is not none else '', "Open this display's lineups") }}
+{{ stat_tile('Battery', section.overview.battery, (base ~ '#power') if base is not none and section.battery_offset_endpoint else '', 'Open power settings') }}
+{{ stat_tile('Firmware', section.overview.firmware, (base ~ '#connection') if base is not none else '', 'Open firmware and connection details') }}
+{{ stat_tile('Next update', section.overview.next_wake, (base ~ '#timing') if base is not none else '', 'Open wake timing') }}
 {%- if section.overview.queued %}
 <p class="dx-queued{% if section.overview.queued.live %} is-live{% endif %}" role="status" data-device-queued>
   <i class="ph ph-clock-countdown" aria-hidden="true"></i>

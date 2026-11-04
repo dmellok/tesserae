@@ -22,6 +22,7 @@ measured into ``--t-topbar-h`` and both offsets are derived from it.
 
 from __future__ import annotations
 
+import os
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -29,13 +30,17 @@ import pytest
 
 from app.main import REPO_ROOT
 
+# PLAYWRIGHT_CHROMIUM_EXECUTABLE points at another Chromium (a headless shell
+# from a different Playwright release) when the bundled one is missing.
+_EXE = os.environ.get("PLAYWRIGHT_CHROMIUM_EXECUTABLE") or None
+
 
 def _chromium_available() -> bool:
     try:
         from playwright.sync_api import sync_playwright
 
         with sync_playwright() as p:
-            return Path(p.chromium.executable_path).exists()
+            return Path(_EXE or p.chromium.executable_path).exists()
     except Exception:
         return False
 
@@ -47,14 +52,11 @@ pytestmark = pytest.mark.skipif(
 # The anchors device_page.html emits, in order.
 _ANCHORS = [
     ("overview", "Overview"),
-    ("identity", "Identity"),
     ("display", "Display"),
-    ("timing", "Timing"),
+    ("schedule", "Schedule"),
     ("controls", "Controls"),
-    ("rendering", "Rendering"),
     ("power", "Power"),
-    ("lineups", "Lineups"),
-    ("connection", "Connection"),
+    ("troubleshooting", "Troubleshooting"),
     ("remove", "Remove"),
 ]
 
@@ -139,7 +141,7 @@ def browser() -> Iterator[object]:
     from playwright.sync_api import sync_playwright
 
     with sync_playwright() as p:
-        b = p.chromium.launch()
+        b = p.chromium.launch(executable_path=_EXE) if _EXE else p.chromium.launch()
         yield b
         b.close()
 
@@ -178,7 +180,7 @@ def test_desktop_column_nav_never_scrolls_itself(browser, page_path: Path) -> No
     pg = _open(browser, page_path, width=1280)
     assert pg.evaluate(_NAV_OVERFLOWS) is False
 
-    pg.click('[data-subnav-link="connection"]')
+    pg.click('[data-subnav-link="troubleshooting"]')
     pg.wait_for_timeout(700)
 
     assert pg.evaluate(_NAV_SCROLL_LEFT) == 0

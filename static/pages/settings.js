@@ -53,7 +53,9 @@
       : null;
     function noteSection(target) {
       if (!sectionField || !target || !target.closest) return;
-      const sec = target.closest('[data-devsec]');
+      // The sub-group (#timing, #rendering, ...) when there is one, so the
+      // save lands on the part that was edited, not the top of its section.
+      const sec = target.closest('[data-devsub], [data-devsec]');
       if (sec && sec.id) sectionField.value = sec.id;
     }
     document.addEventListener('input', function (ev) {
@@ -272,6 +274,112 @@
     }
   }
 
+  // ---- Device page collapsible sections -----------------------------
+  // Each [data-devsec] has a header with a chevron button (aria-expanded /
+  // aria-controls the body). The whole header toggles too. The choice is
+  // remembered per section id in localStorage (shared by every device);
+  // sections start expanded. Jumping to a section, or to a sub-group inside
+  // one (#timing, #logs, ...), expands it first.
+  const DEVSEC_KEY = 'tesserae-devsec-collapsed:';
+  function devSecStored(id) {
+    try { return window.localStorage.getItem(DEVSEC_KEY + id) === '1'; } catch (e) { return false; }
+  }
+  function devSecStore(id, collapsed) {
+    try {
+      if (collapsed) window.localStorage.setItem(DEVSEC_KEY + id, '1');
+      else window.localStorage.removeItem(DEVSEC_KEY + id);
+    } catch (e) { /* private mode: the state just isn't remembered */ }
+  }
+  function setDevSecCollapsed(sec, collapsed, persist) {
+    const btn = sec.querySelector('[data-devsec-toggle]');
+    const body = btn && document.getElementById(btn.getAttribute('aria-controls'));
+    if (!btn || !body) return;
+    sec.classList.toggle('is-collapsed', collapsed);
+    body.hidden = collapsed;
+    btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    const label = btn.querySelector('.sr-only');
+    const title = sec.querySelector('.dx-section-title');
+    if (label && title) label.textContent = (collapsed ? 'Expand ' : 'Collapse ') + title.textContent.trim();
+    if (persist && sec.id) devSecStore(sec.id, collapsed);
+  }
+  // Expand the collapsed section that holds ``el`` (if any). True when it
+  // changed something, so the caller knows the layout moved under it.
+  function expandDevSecFor(el, persist) {
+    const sec = el && el.closest ? el.closest('[data-devsec].is-collapsed') : null;
+    if (!sec) return false;
+    setDevSecCollapsed(sec, false, persist);
+    return true;
+  }
+  function initDevSections(page) {
+    const secs = Array.from(page.querySelectorAll('[data-devsec]'))
+      .filter(function (sec) { return sec.querySelector('[data-devsec-toggle]'); });
+    if (!secs.length) return;
+    let anyCollapsed = false;
+    secs.forEach(function (sec) {
+      if (devSecStored(sec.id)) { setDevSecCollapsed(sec, true, false); anyCollapsed = true; }
+      const head = sec.querySelector('[data-devsec-head]');
+      if (!head) return;
+      head.addEventListener('click', function (ev) {
+        // Links and controls in the header keep their own job; only the
+        // chevron button (and bare header space) toggles.
+        const inner = ev.target.closest('a, button, input, select, textarea, label, summary');
+        if (inner && !inner.hasAttribute('data-devsec-toggle')) return;
+        // Dragging across the title to select it is not a click on the header.
+        const sel = window.getSelection && window.getSelection();
+        if (!inner && sel && !sel.isCollapsed && sel.toString().trim()) return;
+        setDevSecCollapsed(sec, !sec.classList.contains('is-collapsed'), true);
+      });
+    });
+
+    // A required field inside a collapsed section would block Save with a
+    // "not focusable" error nobody can see: open its section instead.
+    document.addEventListener('invalid', function (ev) { expandDevSecFor(ev.target, false); }, true);
+
+    // #hash links (old anchors, redirects after a save, the Overview tiles):
+    // the browser scrolled before the section was open, so open it and scroll.
+    function targetFromHash() {
+      const id = decodeURIComponent(window.location.hash.slice(1));
+      return id ? document.getElementById(id) : null;
+    }
+    const first = targetFromHash();
+    if (first && page.contains(first)) {
+      const opened = expandDevSecFor(first, true);
+      if (opened || anyCollapsed) {
+        first.scrollIntoView({ block: 'start' });
+        // Images, fonts and late scripts can still shift the layout (and the
+        // browser may restore its own scroll on load): land on the target
+        // again once the page settles, unless the person has scrolled.
+        let moved = false;
+        const stop = function () { moved = true; };
+        ['wheel', 'touchstart', 'keydown', 'mousedown'].forEach(function (t) {
+          window.addEventListener(t, stop, { once: true, passive: true });
+        });
+        const again = function () {
+          if (!moved) first.scrollIntoView({ block: 'start' });
+        };
+        if (document.readyState === 'complete') requestAnimationFrame(again);
+        else window.addEventListener('load', function () { requestAnimationFrame(again); }, { once: true });
+      }
+    }
+    window.addEventListener('hashchange', function () {
+      const el = targetFromHash();
+      if (el && page.contains(el) && expandDevSecFor(el, true)) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    });
+    // Following a link whose hash is already current fires no hashchange.
+    document.addEventListener('click', function (ev) {
+      if (ev.defaultPrevented) return;
+      const a = ev.target.closest && ev.target.closest('a[href^="#"]');
+      if (!a || a.getAttribute('href').length < 2) return;
+      const el = document.getElementById(decodeURIComponent(a.getAttribute('href').slice(1)));
+      if (!el || !page.contains(el) || !expandDevSecFor(el, true)) return;
+      ev.preventDefault();
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      history.replaceState(null, '', '#' + el.id);
+    });
+  }
+
   // ---- Device page sub-nav ------------------------------------------
   // Highlights the section nearest the top of the viewport and smooth-
   // scrolls on click. Pure convenience: the links are plain anchors.
@@ -313,6 +421,7 @@
         const target = document.getElementById(l.getAttribute('data-subnav-link'));
         if (!target) return;
         ev.preventDefault();
+        expandDevSecFor(target, true);
         target.scrollIntoView({ behavior: 'smooth', block: 'start' });
         history.replaceState(null, '', '#' + target.id);
         setActive(target.id);
@@ -680,6 +789,7 @@
     document.querySelectorAll('[data-devtable]').forEach(initDevicesTable);
     initAddDeviceToggle();
     initDiscoveredBanner();
+    document.querySelectorAll('[data-device-page]').forEach(initDevSections);
     document.querySelectorAll('[data-subnav]').forEach(initSubnav);
     document.querySelectorAll('[data-orient-swap]').forEach(initOrientSwap);
     document.querySelectorAll('[data-ha-device-picker]').forEach(initHaDevicePicker);

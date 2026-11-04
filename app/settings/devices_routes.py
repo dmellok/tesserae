@@ -56,16 +56,24 @@ from ._shared import (
 
 _DEVICE_PAGE_SECTIONS: frozenset[str] = frozenset(
     {
+        # The sections ...
         "overview",
-        "identity",
         "display",
-        "timing",
+        "schedule",
         "controls",
-        "rendering",
         "power",
+        "troubleshooting",
+        "remove",
+        # ... and the sub-groups inside them (the ids the older, finer
+        # sections had, so a save lands on the part that was being edited).
+        "identity",
+        "display-panel",
+        "rendering",
+        "timing",
         "lineups",
         "connection",
-        "remove",
+        "logs",
+        "diagnostics",
     }
 )
 
