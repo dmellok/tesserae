@@ -12,6 +12,14 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 - Sub-section titles are one heading style on every page, with a hairline above.
 - Paper's section title marker follows the theme's accent colour instead of a fixed red.
 - The Lineups page is centred like the other pages instead of sitting left.
+- A widget that paints with GPT Image can ask for the quality (low, medium
+  or high) and the exact size of the picture, so a poster can be painted
+  sharp at its panel's own resolution (1200x1600 for a 13.3" or OpenPaper L
+  panel) instead of 768x1024 at medium. fal.ai takes the size as asked,
+  rounded to multiples of 16; a picture sent straight to OpenAI gets the
+  quality at OpenAI's nearest size. The daily painting budget is charged the
+  high-quality price, about 20 US cents, when high is asked for. Widgets that
+  ask for neither are unchanged.
 - Paper's phone shell. The four places you go most (Send, Dashboards,
   Lineups, History) sit in a tab bar along the bottom and More lifts the
   rest up as a sheet, in place of the hamburger drawer. Once a page's title
