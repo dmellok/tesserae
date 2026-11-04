@@ -450,3 +450,28 @@ def test_ha_hook_is_none_for_an_unknown_display(app: Flask) -> None:
     hooks = build_ha_hooks(app)
     assert hooks.next_update_fn is not None
     assert hooks.next_update_fn("ghost") is None
+
+
+def test_the_checkin_gap_is_the_cadence_not_the_last_sleep_through_quiet_hours() -> None:
+    """A frame that sleeps 9.5 h through quiet hours still checks in every 30
+    minutes after it wakes: stepping by the long sleep put the check-in after
+    a 9:01 AM wake at 6:31 PM."""
+    from types import SimpleNamespace
+
+    import app.next_update as nu
+
+    overnight = SimpleNamespace(last_sleep_interval_s=34203)
+    plain = SimpleNamespace(config_schema={})
+    defaulted = SimpleNamespace(config_schema={"sleep_interval_s": {"default": 60}})
+    # What the operator set wins over the last sleep...
+    assert nu._checkin_gap_s(plain, overnight, {"sleep_interval_s": 1800}) == 1800.0
+    # ...then the kind's default...
+    assert nu._checkin_gap_s(defaulted, overnight, {}) == 60.0
+    # ...a sign's measured cadence comes first (it sets its own)...
+    assert nu._checkin_gap_s(plain, overnight, {}, {"checkin_gap_s": 900.0}) == 900.0
+    # ...and the last sleep only when nothing else is known.
+    assert nu._checkin_gap_s(plain, overnight, None) == 34203.0
+    assert nu._checkin_gap_s(plain, SimpleNamespace(), {"sleep_interval_s": True}) is None
+
+    reach = nu.Reach(nu.MODE_SLEEPS, next_checkin_at=1000.0, gap_s=1800.0)
+    assert nu.compute_next_update(1500.0, reach, now=0.0).at == 2800.0

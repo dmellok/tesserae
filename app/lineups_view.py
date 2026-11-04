@@ -1888,12 +1888,13 @@ def build_display(
         if runtime.next_at is not None:
             next_adv = clk.week_minute(runtime.next_at)
 
-    # An advance that comes due inside quiet hours (or a pause) is delivered
-    # when the hold ends, then at a sleeper's first check-in after that. That
-    # moment is the next advance the bar, the pills and the header count to.
-    nominal_adv = next_adv
+    # An advance that comes due inside quiet hours (or a pause) doesn't happen
+    # then. The scheduler's projection knows when this lineup really fires next
+    # (the first grid step after the hold, not the moment it ends); without a
+    # projection, the end of the hold stands in. The bar and the pill mark that
+    # step, and "Update in" counts to when it lands on the display.
     adv_lands: _Lands | None = None
-    if next_adv is not None:
+    if next_adv is not None and lb is not None:
         adv_epoch = (
             runtime.next_at
             if runtime is not None and runtime.next_at is not None
@@ -1901,8 +1902,23 @@ def build_display(
         )
         held_adv = _lands_at(d, clk, adv_epoch)
         if held_adv.held and held_adv.epoch is not None:
-            adv_lands = held_adv
-            next_adv = clk.week_minute(held_adv.epoch)
+            if d.upcoming is None:
+                adv_lands = held_adv
+                next_adv = clk.week_minute(held_adv.epoch)
+            else:
+                fires = next(
+                    (
+                        ev.at
+                        for ev in d.upcoming
+                        if ev.at > clk.epoch and ev.lineup_id == lb.lineup.id
+                    ),
+                    None,
+                )
+                if fires is None:
+                    next_adv = None
+                else:
+                    adv_lands = _lands_at(d, clk, fires)
+                    next_adv = clk.week_minute(fires)
 
     # A daily push that fired after the live window's latest step owns the
     # panel (a noon override inside an hourly rotation); windows alone miss
@@ -2002,24 +2018,6 @@ def build_display(
             item = (clk.epoch_of(t), b.lineup.steps[p.i].dashboard_id, b.lineup.id)
             upcoming = upcoming or item
             following = following or item
-
-    if adv_lands is not None and adv_lands.epoch is not None and lb is not None:
-        # The projection leaves out everything inside quiet hours, so its
-        # first event can be well after the held advance; this one is sooner.
-        sooner = upcoming is None or (
-            (up_at := _lands_at(d, clk, upcoming[0]).epoch) is None or adv_lands.epoch < up_at
-        )
-        if sooner and nominal_adv is not None:
-            n_steps = len(lb.lineup.steps)
-            step_i = next(
-                (p.i for p in lb.pts if p.t % WEEK_MIN == nominal_adv % WEEK_MIN),
-                0,
-            )
-            upcoming = (
-                clk.epoch_of(nominal_adv),
-                lb.lineup.steps[step_i % n_steps].dashboard_id if n_steps else None,
-                lb.lineup.id,
-            )
 
     def label_of(item: Item) -> str:
         if item[1] is not None:

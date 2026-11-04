@@ -1539,15 +1539,13 @@ def test_a_pause_that_ends_first_does_not_hold_later_runs() -> None:
     assert nu2 is not None and nu2.held and nu2.at_label == "18:45"
 
 
-def test_sleeping_display_next_advance_waits_for_quiet_hours_to_end() -> None:
-    """Asleep in quiet hours (23:12-09:00) at 00:20, a 30-minute interval's
-    nominal 00:30 advance only lands when the frame wakes after the window:
-    the flag, the NEXT pill, the next tick and the header all say so."""
-    from app.lineups_view import OnScreenInput, RuntimeStep, UpcomingInput
+def _asleep_in_quiet_hours(upcoming: Any) -> Any:
+    """A frame asleep in quiet hours (23:12-09:00) at 00:20, waking at 09:01
+    and every 30 minutes after, on a 30-minute interval due at 00:30."""
+    from app.lineups_view import OnScreenInput, RuntimeStep
     from app.next_update import MODE_SLEEPS, Reach
 
     now = SAMPLE_NOW.replace(day=29, hour=0, minute=20)
-    wake = now.replace(hour=9, minute=1).timestamp()
     every = LineupInput(
         "i",
         "Google Photos all day",
@@ -1558,34 +1556,54 @@ def test_sleeping_display_next_advance_waits_for_quiet_hours_to_end() -> None:
             0, since=now.replace(minute=0).timestamp(), next_at=now.replace(minute=30).timestamp()
         ),
     )
-    for upcoming in (
-        None,
-        (
-            UpcomingInput(
-                at=now.replace(hour=9, minute=20).timestamp(), lineup_id="i", dashboard_id="art"
-            ),
+    d, dashboards, _ = _one_display(
+        every,
+        pause=PauseInput(23 * 60 + 12, 9 * 60),
+        reach=Reach(
+            MODE_SLEEPS, next_checkin_at=now.replace(hour=9, minute=1).timestamp(), gap_s=1800.0
         ),
-    ):
-        d, dashboards, _ = _one_display(
-            every,
-            pause=PauseInput(23 * 60 + 12, 9 * 60),
-            reach=Reach(MODE_SLEEPS, next_checkin_at=wake, gap_s=1800.0),
-            published_known=True,
-            upcoming=upcoming,
-        )
-        d = replace(d, on_screen=OnScreenInput("weather", since=now.replace(minute=0).timestamp()))
-        out = build_view([d], dashboards, now=now, time_cycle="h12").displays[0]
-        nu = out.next_update
-        assert nu is not None and nu.at_epoch == wake and nu.held, upcoming
-        assert out.next_line.at.startswith("~9:01"), out.next_line
-        # The day bar's flag counts to the wake, not to 00:30.
-        ticks = [t for s in out.day.segments for t in s.ticks if t.next]
-        assert [(t.minute, t.in_sec, t.in_label) for t in ticks] == [
-            (9 * 60 + 1, int(wake - now.timestamp()), "Update in 8 h 41 min")
-        ], upcoming
-        # The step pill names the same moment.
-        pill = next(st.pill for st in _lineup(out, "i").steps if st.pill and st.pill.kind == "next")
-        assert pill.label.startswith("Next ") and "9:01" in pill.label, pill
+        published_known=True,
+        upcoming=upcoming,
+    )
+    d = replace(d, on_screen=OnScreenInput("weather", since=now.replace(minute=0).timestamp()))
+    return now, build_view([d], dashboards, now=now, time_cycle="h12").displays[0]
+
+
+def _next_ticks(out: Any) -> list[Any]:
+    return [t for s in out.day.segments for t in s.ticks if t.next]
+
+
+def test_a_sleeping_display_counts_to_the_scheduler_s_first_step_after_quiet_hours() -> None:
+    """The scheduler skips the 00:30 advance and everything else inside quiet
+    hours and next fires at 09:30. The 09:01 wake has nothing new, so the
+    picture lands at the 09:31 wake, and flag, tick, pill and header agree."""
+    from app.lineups_view import UpcomingInput
+
+    base = SAMPLE_NOW.replace(day=29, hour=9, minute=30).timestamp()
+    now, out = _asleep_in_quiet_hours((UpcomingInput(at=base, lineup_id="i", dashboard_id="art"),))
+    lands = now.replace(hour=9, minute=31).timestamp()
+    assert out.next_update is not None and out.next_update.at_epoch == lands
+    assert out.next_line.at.startswith("~9:31"), out.next_line
+    assert [(t.minute, t.in_sec, t.in_label) for t in _next_ticks(out)] == [
+        (9 * 60 + 30, int(lands - now.timestamp()), "Update in 9 h 11 min")
+    ]
+    pill = next(st.pill for st in _lineup(out, "i").steps if st.pill and st.pill.kind == "next")
+    assert "9:30" in pill.label, pill
+
+
+def test_a_sleeping_display_without_a_projection_waits_for_the_hold_to_end() -> None:
+    now, out = _asleep_in_quiet_hours(None)
+    wake = now.replace(hour=9, minute=1).timestamp()
+    assert out.next_update is not None and out.next_update.at_epoch == wake
+    assert out.next_line.at.startswith("~9:01"), out.next_line
+    assert [(t.minute, t.in_sec, t.in_label) for t in _next_ticks(out)] == [
+        (9 * 60 + 1, int(wake - now.timestamp()), "Update in 8 h 41 min")
+    ]
+
+
+def test_a_projection_with_nothing_due_flags_no_update_inside_quiet_hours() -> None:
+    _now, out = _asleep_in_quiet_hours(())
+    assert _next_ticks(out) == []
 
 
 def test_all_day_pause_label() -> None:
