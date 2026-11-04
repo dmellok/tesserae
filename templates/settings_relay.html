@@ -40,8 +40,9 @@
 {% endif %}
 
 {# ---- Link this install --------------------------------------------------- #}
-<section class="card">
-  {{ card_head('Relay link', blurb='This install ' + ('is linked.' if linked else 'is not linked yet.')) }}
+<section id="relay-link" data-collapsible class="card">
+  {{ card_head('Relay link', blurb='This install ' + ('is linked.' if linked else 'is not linked yet.'), collapse='relay-link') }}
+  <div id="relay-link-body" data-collapsible-body>
   {% if linked %}
     <p class="muted">Linked to <code>{{ base_url }}</code> as <code>{{ install_id }}</code>.</p>
   {% endif %}
@@ -62,12 +63,14 @@
       </button>
     </div>
   </form>
+  </div>{# /relay-link-body #}
 </section>
 
 {% if linked %}
 {# ---- Add a remote panel -------------------------------------------------- #}
-<section class="card">
-  {{ card_head('Add a remote panel', blurb='Creates a pairing code to enter on the panel.') }}
+<section id="relay-add" data-collapsible class="card">
+  {{ card_head('Add a remote panel', blurb='Creates a pairing code to enter on the panel.', collapse='relay-add') }}
+  <div id="relay-add-body" data-collapsible-body>
   {% if new_code %}
     <div class="callout callout-ok">
       <p>Pairing code for <strong>{{ new_code_device }}</strong>:</p>
@@ -130,11 +133,13 @@
       <button type="submit" class="btn">Create pairing code</button>
     </div>
   </form>
+  </div>{# /relay-add-body #}
 </section>
 
 {# ---- Remote panels ------------------------------------------------------- #}
-<section class="card" data-lf="relay">
-  {{ card_head('Remote panels', blurb='Devices delivered through the relay. Configure each one on the Devices tab, same as a local display; changes reach the panel on its next wake.') }}
+<section id="relay-panels" data-collapsible class="card" data-lf="relay">
+  {{ card_head('Remote panels', blurb='Devices delivered through the relay. Configure each one on the Devices tab, same as a local display; changes reach the panel on its next wake.', collapse='relay-panels') }}
+  <div id="relay-panels-body" data-collapsible-body>
   {% if relay_devices %}
   <div class="lf-tb relay-tb">
     <label class="dx-devtb-search">
@@ -179,6 +184,7 @@
   {% else %}
     {{ empty_state('cloud', 'No remote panels yet', 'Add one above to pair a panel at another location.') }}
   {% endif %}
+  </div>{# /relay-panels-body #}
 </section>
 {% endif %}
 {% endblock %}

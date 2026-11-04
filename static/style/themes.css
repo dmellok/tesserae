@@ -194,13 +194,6 @@
   flex-direction: column;
   gap: var(--t-space-2);
 }
-.themes-strip-head {
-  margin: 0;
-  font-size: var(--t-size-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--t-muted, #837F73);
-}
 .themes-strip-list {
   list-style: none;
   margin: 0;
@@ -471,11 +464,7 @@
    chrome so the surface / text / accent groups still read as separated
    without 9 cards. */
 .theme-builder-group-head {
-  margin: var(--t-space-3) 0 var(--t-space-1);
-  font-size: var(--t-size-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--t-muted, #837F73);
+  margin: var(--t-space-5) 0 var(--t-space-2);
 }
 .theme-builder-group-head:first-child {
   margin-top: 0;

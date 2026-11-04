@@ -18,10 +18,10 @@
  *  (--t-danger) for errors, neutral for scheduled blocks.
  * ============================================================ */
 
-/* ----- Page column: left-aligned, capped at 1480px of content --------- */
+/* ----- Page column: centred like every other page, capped at 1480px of content --- */
 main.page.lu-page {
   max-width: calc(1480px + 2 * var(--t-space-6));
-  margin-inline: 0;
+  margin-inline: auto;
 }
 
 .lu {

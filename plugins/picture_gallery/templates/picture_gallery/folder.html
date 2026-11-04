@@ -17,9 +17,10 @@
 </div>
 
 {% if not external %}
-<section class="card">
+<section id="gal-upload" data-collapsible class="card">
   {{ card_head('Upload', icon_name='upload-simple', level=2,
-               blurb='Allowed: %s. Max %dMB per file.'|format(allowed_exts|join(', '), max_upload_mb)) }}
+               blurb='Allowed: %s. Max %dMB per file.'|format(allowed_exts|join(', '), max_upload_mb), collapse='gal-upload') }}
+  <div id="gal-upload-body" data-collapsible-body>
   <form method="post" action="{{ url_for('picture_gallery_admin.upload', folder=folder_id) }}" class="form" enctype="multipart/form-data">
     <div class="field">
       <label for="upload-file">Pick one or more images</label>
@@ -27,11 +28,13 @@
     </div>
     <div class="actions">{{ button('Upload', icon='upload-simple') }}</div>
   </form>
+  </div>{# /gal-upload-body #}
 </section>
 {% endif %}
 
-<section class="card">
-  {{ card_head('Images', icon_name='images', level=2) }}
+<section id="gal-images" data-collapsible class="card">
+  {{ card_head('Images', icon_name='images', level=2, collapse='gal-images') }}
+  <div id="gal-images-body" data-collapsible-body>
   {% if images %}
   <div class="pg-grid">
     {% for img in images %}
@@ -61,12 +64,14 @@
     {% if external %}This external directory has no images Tesserae can read.{% else %}Upload some images above.{% endif %}
   </p>
   {% endif %}
+  </div>{# /gal-images-body #}
 </section>
 
 {% if images %}
-<section class="card">
+<section id="gal-album" data-collapsible class="card">
   {{ card_head('Offline photo album', icon_name='images-square', level=2,
-               blurb='Render this folder to a storage-capable panel so it caches the frames and plays them back locally, even when your server is unreachable. Needs firmware with a frame cache (SD card).') }}
+               blurb='Render this folder to a storage-capable panel so it caches the frames and plays them back locally, even when your server is unreachable. Needs firmware with a frame cache (SD card).', collapse='gal-album') }}
+  <div id="gal-album-body" data-collapsible-body>
   <form method="post" action="{{ url_for('picture_gallery_admin.use_as_album', folder=folder_id) }}" class="form">
     <div class="field">
       <label for="album-name">Album name</label>
@@ -129,17 +134,20 @@
     <p class="pg-hint">The panel clamps the interval to its own power limits, so very short intervals may run slower on battery displays.</p>
     <div class="actions">{{ button('Save album' if album else 'Create album', icon='images-square') }}</div>
   </form>
+  </div>{# /gal-album-body #}
 </section>
 {% endif %}
 
 {% if folder_id != '_root' %}
-<section class="card">
+<section id="gal-danger" data-collapsible class="card">
   {{ card_head('Danger zone', icon_name='trash', level=2,
-               blurb='External folders unlink only, the host files are never touched.' if external else 'Permanently removes the folder and all its images.') }}
+               blurb='External folders unlink only, the host files are never touched.' if external else 'Permanently removes the folder and all its images.', collapse='gal-danger') }}
+  <div id="gal-danger-body" data-collapsible-body>
   <form method="post" action="{{ url_for('picture_gallery_admin.delete_folder', folder=folder_id) }}"
         onsubmit="return confirm('Delete folder {{ folder_name }}{% if not external %} and all its images{% endif %}?');">
     {{ button('Delete folder' if not external else 'Unlink folder', icon='trash', variant='ghost danger') }}
   </form>
+  </div>{# /gal-danger-body #}
 </section>
 {% endif %}
 

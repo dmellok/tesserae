@@ -589,20 +589,25 @@ macro here instead.
 {%- endif -%}
 {%- endmacro -%}
 
-{%- macro card_head(title, icon_name=None, level=2, blurb=None, action=None) -%}
+{%- macro card_head(title, icon_name=None, level=2, blurb=None, action=None, collapse=None) -%}
 {#- Card header with an optional icon-box on the left, blurb popover
    next to the title, and a right-aligned action slot (typically a
    small button or link). The blurb used to render as a visible lede
    paragraph, now it's a click-to-pop ``?`` icon next to the title,
    per the UI-cleanup pass. Pages that want the descriptive paragraph
-   inline can still render a ``<p class="lede">…</p>`` themselves. -#}
-<header class="card-head">
+   inline can still render a ``<p class="lede">…</p>`` themselves.
+
+   ``collapse`` (a section id) makes the card collapsible: the chevron goes
+   last in the action slot. The card then needs ``id`` + ``data-collapsible``
+   and its content wrapped in ``<div id="ID-body" data-collapsible-body>``
+   (see ``collapsible_toggle``). -#}
+<header class="card-head"{% if collapse %} data-collapsible-head{% endif %}>
   <div class="card-head-row">
     <h{{ level }}>
       {% if icon_name %}<span class="icon-box"><i class="ph ph-{{ icon_name }}" aria-hidden="true"></i></span>{% endif %}
       <span>{{ title }}</span>{{ info_pop(blurb) }}
     </h{{ level }}>
-    {% if action %}<div class="card-head-action">{{ action }}</div>{% endif %}
+    {% if action or collapse %}<div class="card-head-action">{{ action or '' }}{% if collapse %}{{ collapsible_toggle(collapse, title) }}{% endif %}</div>{% endif %}
   </div>
 </header>
 {%- endmacro -%}
@@ -802,9 +807,27 @@ macro here instead.
    is-accent / is-held / is-info / is-neutral) to the chips.css tone. -#}
 {%- macro tg_tone(pill_class) -%}{{ {'is-ok': 'tg--ok', 'is-warn': 'tg--warn', 'is-danger': 'tg--bad', 'is-accent': 'tg--teal', 'is-held': 'tg--terracotta', 'is-info': 'tg--slate'}.get(pill_class or '', '') }}{%- endmacro -%}
 
-{%- macro section_card(icon, title, description=None, cta=None, meta=None, id=None, extra_class='') -%}
-<section class="dx-section-card {{ extra_class }}"{% if id %} id="{{ id }}"{% endif %}>
-  <header class="dx-section-head">
+{#- The chevron button of a collapsible section (static/collapsible.js).
+   Put it last in the section's header, after any link or button there, and
+   mark the section ``data-collapsible id="X"``, the header
+   ``data-collapsible-head`` and the body ``data-collapsible-body id="X-body"``.
+   ``section_card`` does all of that itself; use this macro for sections that
+   build their own markup. -#}
+{%- macro collapsible_toggle(id, title) -%}
+<button type="button" class="dx-collapse-toggle" data-collapsible-toggle aria-expanded="true" aria-controls="{{ id }}-body">
+  <i class="ph ph-caret-down" aria-hidden="true"></i>
+  <span class="sr-only">Collapse {{ title }}</span>
+</button>
+{%- endmacro -%}
+
+{#- ``collapsible`` (default on) gives the card a chevron in its header and
+   remembers the open/closed state per page and section (the section id is
+   ``id``, or a slug of the title). Pass ``collapsible=False`` for a page
+   with one section, or a card that must always show. -#}
+{%- macro section_card(icon, title, description=None, cta=None, meta=None, id=None, extra_class='', collapsible=True) -%}
+{%- set sid = id or ('sec-' ~ ((title|lower|list|select('in', 'abcdefghijklmnopqrstuvwxyz0123456789 ')|join).split()|join('-'))) -%}
+<section class="dx-section-card {{ extra_class }}"{% if collapsible %} data-collapsible{% endif %}{% if id or collapsible %} id="{{ sid }}"{% endif %}>
+  <header class="dx-section-head"{% if collapsible %} data-collapsible-head{% endif %}>
     {% if icon %}
     <span class="dx-section-icon" aria-hidden="true">
       <i class="ph ph-{{ icon }}"></i>
@@ -826,8 +849,9 @@ macro here instead.
       <span>{{ cta.label }}</span>
     </a>
     {% endif %}
+    {% if collapsible %}{{ collapsible_toggle(sid, title) }}{% endif %}
   </header>
-  <div class="dx-section-body">
+  <div class="dx-section-body"{% if collapsible %} id="{{ sid }}-body" data-collapsible-body{% endif %}>
     {{ caller() }}
   </div>
 </section>

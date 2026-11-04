@@ -8,9 +8,10 @@
   <p class="page-blurb">Folders of images for the picture_gallery widget to rotate through. Internal folders live in this appliance's data dir; external folders point at any directory on the host.</p>
 </div>
 
-<section class="card">
+<section id="gal-new" data-collapsible class="card">
   {{ card_head('New folder', icon_name='folder-plus', level=2,
-               blurb='Leave the external path blank for an internal folder (images uploaded here). Fill it in to link an existing host directory in read-only.') }}
+               blurb='Leave the external path blank for an internal folder (images uploaded here). Fill it in to link an existing host directory in read-only.', collapse='gal-new') }}
+  <div id="gal-new-body" data-collapsible-body>
   <form method="post" action="{{ url_for('picture_gallery_admin.create_folder') }}" class="form">
     <div class="field-grid">
       <div class="field">
@@ -26,10 +27,12 @@
     </div>
     <div class="actions">{{ button('Create folder', icon='plus') }}</div>
   </form>
+  </div>{# /gal-new-body #}
 </section>
 
-<section class="card">
-  {{ card_head('Your folders', icon_name='folders', level=2) }}
+<section id="gal-folders" data-collapsible class="card">
+  {{ card_head('Your folders', icon_name='folders', level=2, collapse='gal-folders') }}
+  <div id="gal-folders-body" data-collapsible-body>
   {% if folders %}
   <ul class="pg-folders">
     {% for f in folders %}
@@ -50,6 +53,7 @@
   {{ empty_state('images', 'No folders yet',
                  blurb='Create one above. Then add the Picture, Gallery widget to a dashboard cell and pick it from the cell editor.') }}
   {% endif %}
+  </div>{# /gal-folders-body #}
 </section>
 
 <style>

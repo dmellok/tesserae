@@ -52,7 +52,8 @@
 
 {% call section_card(icon='pulse', title='Event timeline',
                      description='Click any row to expand the raw event payload — useful for diagnosing scheduler decisions, condition holds, or render errors.',
-                     meta={'label': '', 'value': rows|length}) %}
+                     meta={'label': '', 'value': rows|length},
+                     collapsible=False) %}
   <div data-lf="events">
   <div class="dx-events-toolbar">
     <span class="dx-listening" data-live-indicator data-state="connecting">

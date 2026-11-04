@@ -2030,7 +2030,6 @@ input[type="range"].slider:focus::-moz-range-thumb {
   margin-top: 1.5rem;
 }
 .wizard-nav .actions { margin: 0; padding: 0; }
-.wizard-subhead { font-size: 1em; margin: 1.25rem 0 0.5rem; }
 .wizard-discovered li, .wizard-pages li {
   display: flex;
   align-items: center;

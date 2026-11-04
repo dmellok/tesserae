@@ -13,6 +13,10 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   where a reference picture would pull the composition towards itself. It
   takes the same quality and size as the edit model, and goes straight to
   OpenAI when only an OpenAI key is set.
+- Collapsible sections on the Server, System, About, Stats and other admin pages, remembered per page.
+- Sub-section titles are one heading style on every page, with a hairline above.
+- Paper's section title marker follows the theme's accent colour instead of a fixed red.
+- The Lineups page is centred like the other pages instead of sitting left.
 - A widget that paints with GPT Image can ask for the quality (low, medium
   or high) and the exact size of the picture, so a poster can be painted
   sharp at its panel's own resolution (1200x1600 for a 13.3" or OpenPaper L
